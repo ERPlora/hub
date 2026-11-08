@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8f1029494e82f0451edfad2229b5005841fecfa37a285f0e50ebe9b64ba94a49 -->
+<!-- generated from WORKBOOK.md sha256:fd2a2a0825446e5fb92d0dff24051704e1dc63f88ca5fcf2e978feed2a4f6459 -->
 
 ## What it is for and who it is for
 
@@ -224,7 +224,9 @@ Steps:
    progress: 0".
 In: what whoever creates it writes.
 Out: the station (announces: station created).
-If it fails: the rejection shows inside the panel. A name that another live station already has is rejected
+If it fails: the rejection shows inside the panel; the reason of a field, under it, and it goes away as soon
+as that field is corrected, even if another one says the same (hub#888). A name that another live station
+already has is rejected
 ("There is already a station with that name. Choose a different name."); the name of a deleted one is free
 again. Whoever cannot manage stations does not see the button.
 Involved: KITCHEN-F02, KITCHEN-F03, KITCHEN-F04, KITCHEN-F08, PRINTING-F04
@@ -242,7 +244,8 @@ Out: the changed station (announces: station changed). Switching it off makes th
 look for the station of their category and, if there is none, come out under "No station". What was
 already sent does not change station or destination; the name and colour the display paints are the live
 ones.
-If it fails: inside the form. A repeated name is rejected; saving a station that another device has just
+If it fails: inside the form, each reason under its field until that field is corrected, even if another
+one says the same (hub#888). A repeated name is rejected; saving a station that another device has just
 deleted says it no longer exists.
 Involved: KITCHEN-F01, KITCHEN-F04, KITCHEN-F10, PRINTING-F04
 
@@ -294,8 +297,8 @@ Steps:
    check's round, the check's label ("Table 4"), the type, the priority and the waiter.
 3. Each line that is not a service is a dish, in the order of the check, sent to its station
    (KITCHEN-F04); a menu, one dish for each dish chosen (KITCHEN-F06). Service lines are not cooked.
-4. The ticket appears on the display as "To prepare", rings (KITCHEN-F16) and comes out on paper
-   (KITCHEN-F08).
+4. The ticket appears on the display as "To prepare", rings (KITCHEN-F16), comes out on paper
+   (KITCHEN-F08) and the installed app shows its system notice, which opens Kitchen on a tap.
 In: from Sales, the check's sent lines (their round, their sending time, their product, their quantity,
 their note, their modifiers, their category and, if it is a menu, its dishes) and, when Kitchen does the
 sending, the priority, the channel and who sends.
@@ -495,10 +498,15 @@ Steps:
    becomes rush; if several arrive at once, once.
 2. It rings with the tone and volume of Settings; on opening the display it does not ring for what was
    already there. Recalling a ticket from "Ready" does not ring again: only new rounds and rushes ring.
+3. In the installed app, every new ticket shows a system notice with its label (or its number), its
+   dishes and whoever attends; tapping it opens **Kitchen → Display**. The browser does not show this
+   notice.
 In: the tickets of each update and the settings.
-Out: the sound; nothing is saved.
+Out: the sound and the system notice, once per ticket and device, even before the round is saved; saving
+it does not repeat it.
 If it fails: if the browser does not let it ring until the first tap, that chime is lost. With volume 0 it
-does not ring.
+does not ring. If Android does not allow notifications yet, the app asks for permission once; the ticket
+still arrives.
 Involved: KITCHEN-F05, KITCHEN-F10, KITCHEN-F12, KITCHEN-F14, KITCHEN-F26
 
 ### KITCHEN-F17 Print the pass when marking ready

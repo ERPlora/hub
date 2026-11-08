@@ -137,6 +137,10 @@ function priceLabel(app: AppRow): string {
   return t(`base.appsPage.right.${app.right}`);
 }
 
+/** What a row the business's country requires on says beside its state, for everyone (hub#997): the reason it is not
+ *  turned off, under it, only for whoever runs the business. */
+const mandatoryLabel = computed(() => t('base.appsPage.mandatory', { country: data.value?.country_name ?? '' }));
+
 /** Whoever reads a row's reason gets a column with room for it: a sentence, not a strip of a dozen short lines. */
 const statesSayWhy = computed(() => mayManage.value && apps.value.some((app) => app.refusal));
 
@@ -421,6 +425,12 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
               data-testid="apps-state"
               :tone="stateTone(row as AppRow)"
               :label="stateLabel(row as AppRow)"
+            />
+            <StatusPill
+              v-if="(row as AppRow).mandatory"
+              data-testid="apps-mandatory"
+              tone="info"
+              :label="mandatoryLabel"
             />
             <template v-if="(row as AppRow).state === 'blocked'">
               <a

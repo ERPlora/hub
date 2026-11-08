@@ -823,9 +823,13 @@ Pantalla: Vender, Hace falta una aprobación
 Pasos:
 1. Con Cocina activa, la cuenta tiene dos pestañas: «Cuenta», con todas sus líneas, y «Comanda actual»,
    con lo que falta por enviar; la pestaña dice cuántos artículos esperan («Comanda actual, 2 artículos por
-   enviar»). Sin nada pendiente, «Todo está enviado».
-2. En «Comanda actual», revisa cantidades y quién atiende y pulsa «Enviar comanda (N)». Para que salga
-   urgente, arma antes la llama de su lado: el botón pasa a «Enviar URGENTE (N)». Sale arriba de la pantalla
+   enviar»). Sin nada pendiente, «Todo está enviado». Mientras algo espera, las dos pestañas llevan «Enviar
+   comanda (N)» fija encima del total y de «Cobrar»: también «Cuenta», con la que se abre una cuenta (al pulsar
+   «Cobrar» en una mesa de Mesas, al cambiar de cuenta o al volver a abrir la app), en horizontal y en vertical
+   (hub#1017).
+2. Revisa cantidades y quién atiende («Comanda actual» deja solo lo pendiente) y pulsa «Enviar comanda (N)»
+   desde cualquiera de las dos pestañas. Para que salga urgente, arma antes la llama de su lado: el botón pasa
+   a «Enviar URGENTE (N)». Sale arriba de la pantalla
    «Comanda N enviada a cocina.», para poder pulsar «Cobrar» (SALE-F01) sin esperar a que se vaya; las líneas
    quedan marcadas con su ronda («Comanda N») y la hora de envío, y la llama se desarma. Un doble envío no
    manda nada dos veces.
@@ -1287,7 +1291,9 @@ Pasos:
 Entra: las categorías de IVA de Impuestos.
 Sale: la sección (nombre, categoría de IVA, posición). Lo ya vendido conserva el nombre y el IVA
 con que se cobró.
-Si falla: una categoría de IVA que no existe se rechaza junto a su campo. Una sección que otro ya
+Si falla: una categoría de IVA que no existe se rechaza junto a su campo. Cada campo rechazado pierde su
+motivo en cuanto se corrige —«IVA que cobra», al elegir otra categoría—, aunque otro diga lo mismo
+(hub#888). Una sección que otro ya
 borró: «Esa sección ya no está en este negocio. Recarga la lista y vuelve a intentarlo.».
 Por el asistente: su tarjeta de confirmación dice la sección por su nombre, nunca por un identificador; una que ya no está no sale en la tarjeta (BASE-F97).
 Implicados: TAX-F01, BASE-F97
@@ -1307,7 +1313,8 @@ Pasos:
 Entra: nada de otras apps.
 Sale: la nota rápida. Borrarla deja de ofrecerla; las notas ya escritas conservan su texto.
 Si falla: «No se ha podido guardar la nota rápida.»; una nota que ya no existe: «Esa nota rápida ya
-no está en este negocio. Recarga la lista y vuelve a intentarlo.».
+no está en este negocio. Recarga la lista y vuelve a intentarlo.». El rechazo de un campo sale bajo él y
+se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888).
 Implicados: ninguno
 
 ### SALE-F37 Añadir un medio de pago (Bizum, transferencia…)

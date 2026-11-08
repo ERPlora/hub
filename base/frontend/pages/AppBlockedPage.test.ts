@@ -27,6 +27,7 @@ function app(id: string, fields: Partial<AppRow> = {}): AppRow {
     requires: [],
     required_by: [],
     refusal: null,
+    mandatory: false,
     ...fields,
   };
 }
@@ -34,6 +35,7 @@ function app(id: string, fields: Partial<AppRow> = {}): AppRow {
 const STORE = 'https://erplora.com/store/modules?business=h1';
 const LIST: AppList = {
   apps: [app('stock', { name: 'Stock' })],
+  country_name: 'Spain',
   store_url: STORE,
   plan_url: 'https://erplora.com/store/plans?business=h1',
   max_apps: null,

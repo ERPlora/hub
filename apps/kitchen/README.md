@@ -22,7 +22,8 @@ sabe de mesas ni de clientes: pinta e imprime la etiqueta que le da la cuenta.
   vez por impresora y se puede reimprimir como copia.
 - **La pantalla** (F10–F17): tarjetas con semáforo verde, ámbar y rojo desde el envío, por estación o «Todas» (el
   pase); marcar listo por plato, por menú o por tarjeta, recuperar, entregar, marcar urgente (con aviso en papel),
-  «Resumen» de lo que queda por cocinar, sonido al entrar una comanda y pase en papel al quedar lista.
+  «Resumen» de lo que queda por cocinar, sonido y aviso del sistema al entrar una comanda (que abre Cocina al
+  tocarlo) y pase en papel al quedar lista.
 - **Desde el TPV de Ventas** (F18–F20): «Enviar comanda (N)» con la llama de urgencia, la hoja «Comandas de la
   cuenta» con el estado de cada ronda, viva, y «Marcar urgente» desde allí.
 - **La lista y el historial** (F21–F26): Comandas con búsqueda, filtros y páginas; lanzar, marcar lista, recuperar,
@@ -42,7 +43,7 @@ sabe de mesas ni de clientes: pinta e imprime la etiqueta que le da la cuenta.
 | Quién la usa | Ventas, en la pantalla «Vender»: `kitchen.ticket.send` al enviar (`useTill.ts`) y la hoja de la cuenta con `kitchen.ticket.by_order`, `kitchen.settings.get` y `kitchen.ticket.set_rush` (`KitchenTickets.vue`). Caja, al cerrar: `kitchen.ticket.board` (`CloseSessionForm.vue`). Ninguna app llama a Cocina desde su servidor; Menús y Suplementos no la llaman: sus datos llegan en las líneas de Ventas |
 | Usa de otras apps | Ventas: `sale.order.fire` (el envío) y sus modelos de cuenta y línea. Impresión: `printing.job.create` (documento `kitchen_order`). Inventario: `held` (retiene producto y categoría al enrutar) y, en las páginas, `inventory.product.list` e `inventory.category.list` |
 | Pantallas | `/kitchen/display`, `/kitchen/tickets`, `/kitchen/stations`, `/kitchen/history`, `/kitchen/settings`; la pestaña «Comanda actual» y la hoja «Comandas de la cuenta» del TPV las monta Ventas |
-| Operaciones | 9 consultas (`queries.py`) y 20 acciones (`services.py`), todas con `ai=`; 27 rutas en `/api/kitchen/…` (`kitchen.ticket.receive` y `kitchen.ticket.sync`, del sistema, no tienen ruta) |
+| Operaciones | 10 consultas (`queries.py`) y 20 acciones (`services.py`), todas con `ai=`; 28 rutas en `/api/kitchen/…` (`kitchen.ticket.receive` y `kitchen.ticket.sync`, del sistema, no tienen ruta) |
 | Eventos | 18, `kitchen.<entidad>.<hecho>` (`events.py`); `REACTIONS` a `sale.order.fired` (`kitchen.ticket.receive`) y a `sale.order.completed`, `sale.order.voided` y `sale.order.line_voided` (`kitchen.ticket.sync`), por el relay del outbox |
 | Tareas programadas | ninguna |
 | Migraciones | `0001_initial`, `0002_settings_row`, `0003_ticket_printed_at`, `0004_item_options_and_menu` |

@@ -14,7 +14,9 @@
 //
 // A press, topmost first:
 //   1. a presented Ionic overlay in the document (modal, alert, popover, action sheet, loading) — dismissed with role
-//      `backdrop` like Ionic's own hardware back; one that cannot be dismissed (`backdropDismiss: false`) HOLDS it;
+//      `backdrop` like Ionic's own hardware back; one that cannot be dismissed (`backdropDismiss: false`) HOLDS it, and
+//      so does a window holding what the person typed and has not saved, which asks first (`holdUnsavedChanges`,
+//      hub#1015: «Keep editing» or «Discard changes»; a second Back closes that question, i.e. keeps editing);
 //   2. an open `ion-menu` (the drawer); one still sliding in or out HOLDS the press (Ionic ignores a close mid-slide,
 //      and the screen must not move under it);
 //   3. the mounted app, through the `erplora:back` contract below;
@@ -74,11 +76,58 @@ async function shownMenu(doc: Document): Promise<{ menu: IonicMenu; open: boolea
   return undefined;
 }
 
+/**
+ * A window that holds what the person typed and has not saved (hub#1015; Cloudscape, Shopify's `leaveConfirmation`,
+ * Power Platform): while it holds something, Back on it asks first instead of closing it.
+ */
+export interface UnsavedChanges {
+  /** An element of the window (its fields), or nothing while it is closed: the overlay that contains it is the window. */
+  inside: () => Element | null | undefined;
+  /** Does it hold changes not saved yet? Read on each press. */
+  dirty: () => boolean;
+  /** «Discard changes?»: resolves `true` to throw them away and close the window, `false` to keep editing. */
+  confirmDiscard: () => Promise<boolean>;
+}
+
+const unsavedWindows = new Set<UnsavedChanges>();
+
+/** A window signs up as holding what the person types; it calls what this returns when it goes. */
+export function holdUnsavedChanges(window: UnsavedChanges): () => void {
+  unsavedWindows.add(window);
+  return () => {
+    unsavedWindows.delete(window);
+  };
+}
+
+/** The window shown by `overlay` that holds unsaved changes now, if any (what layer 1 asks before it closes one). */
+export function unsavedChangesIn(overlay: Element): UnsavedChanges | undefined {
+  for (const window of unsavedWindows) {
+    const fields = window.inside();
+    if (fields && overlay.contains(fields) && window.dirty()) return window;
+  }
+  return undefined;
+}
+
+/** Asks the window first; it closes, as Back would have, only once the person chose to discard. */
+function askThenClose(window: UnsavedChanges, overlay: IonicOverlay): void {
+  window
+    .confirmDiscard()
+    .then((discard) => {
+      if (discard) void overlay.dismiss(undefined, 'backdrop');
+    })
+    .catch((error: unknown) => console.error('base: could not ask whether to discard the changes', error));
+}
+
 /** Closes the topmost thing open on the screen, if any (layers 1–3). */
 export async function closeTopmostLayer(doc: Document = document, win: Window = window): Promise<BackOutcome> {
   const overlay = topmostPresentedOverlay(doc);
   if (overlay) {
     if (!overlay.backdropDismiss) return 'held';
+    const unsaved = unsavedChangesIn(overlay);
+    if (unsaved) {
+      askThenClose(unsaved, overlay);
+      return 'held';
+    }
     // Not awaited on purpose (as Ionic does): a `canDismiss` that asks for confirmation must not block the Back of the
     // alert it opens.
     void overlay.dismiss(undefined, 'backdrop');

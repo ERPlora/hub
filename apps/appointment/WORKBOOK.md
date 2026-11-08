@@ -29,7 +29,14 @@ Quién la usa:
   reserva online, a través de la API), siempre con las reglas de antelación del negocio.
 - El **asistente** (por voz o por texto, con la sesión de quien habla) hace todo lo anterior:
   «mañana a las 10 con Ana para corte a Lucía», «mueve la cita de Lucía al jueves», «cancela la de
-  las 12».
+  las 12». Antes de una acción pide confirmar con su tarjeta (BASE-F97), que nombra cada registro como
+  lo nombran las pantallas, nunca por su identificador: el profesional por su nombre («Profesional: Ana
+  López»), la cita por su clienta, día, hora y profesional («Cita: Lucía Pérez · lunes, 16 de noviembre
+  de 2026 · 10:00 · Ana López»), y cada una al borrar varias de golpe («Citas: …»), la cita periódica
+  como la titula la lista de periódicas («Cita periódica: Lucía Pérez · Cada semana · Lunes · 10:00») y
+  el bloqueo por su título, su día, su hora y su profesional («Bloqueo: Formación · lunes, 16 de
+  noviembre de 2026 · 14:00 · Ana López»). Lo que quien pregunta no puede ver, o lo que ya no existe, no
+  sale.
 
 ## Referencia adoptada
 
@@ -144,7 +151,7 @@ la más reciente primero, con servicios, profesional, estado y notas (la interna
 |---|---|
 | Cargando | «Cargando…» mientras llega el primer resultado; bajo Servicios y Profesional, «Cargando servicios…» / «Cargando profesionales…». |
 | Vacío | «Sin citas para este día.», «Todavía no hay citas periódicas.»; sin profesionales reservables, «Aún no hay profesionales reservables.»; en el alta, «Todavía no hay servicios reservables. Dalos de alta en Servicios.». |
-| Error | El aviso de la tabla o de la rejilla con «Reintentar». Un rechazo de un formulario sale dentro del formulario, cada motivo bajo su campo, sin perder lo tecleado; un conflicto (409) sale encima del botón y en un aviso. |
+| Error | El aviso de la tabla o de la rejilla con «Reintentar». Un rechazo de un formulario sale dentro del formulario, cada motivo bajo su campo, sin perder lo tecleado, y cada campo rechazado pierde su motivo en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888); los buscadores (**Servicios** y **Profesional**) todavía no: si dicen lo mismo que otro campo, siguen marcados hasta volver a guardar. Un conflicto (409) sale encima del botón y en un aviso. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…». |
 | App inactiva | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
@@ -878,6 +885,25 @@ agenda tuya que enseñar.».
 - **Cómo se nombra una cita en una tarjeta**: `AppointmentRefIn.id` lleva la marca `refers` a
   `appointment.appointment.get` y su `label` (clienta, día, hora y profesional, sin los que falten), y el título
   «Cita»; quien no puede leerla no ve el dato. Vale para la tarjeta del chat y para «Esperan tu respuesta».
+- **Cómo se nombra cada dato en una tarjeta** (hub#637): un dato que ningún modelo de Citas nombra lleva su `title`
+  en `schemas.py`, con su `es` en `locale/`: «Reservar aunque se solape» (`confirm_overlap`), «Fechas y horas»
+  (`starts`), «Lo pide la clienta» (`on_behalf_of_customer`), «Se aplica desde» (`from_date` al editar una serie),
+  «Reservar desde» y «Reservar hasta» (al reservar sus citas) y «Ficha duplicada» (`absorbed_id`), nunca el título que
+  pydantic inventa («Confirm Overlap»). `tests/test_integration_assistant.py` barre todas las escrituras, también las
+  reacciones, y `tests/test_i18n.py` comprueba que la tarjeta dice estos nombres, cada uno con español propio de Citas
+  y no el de otra app.
+- **Cómo se nombra el resto en una tarjeta** (BASE-F97, hub#635): cada id de una escritura de Citas lleva su marca
+  `refers` de `schemas.py`, leída como quien pregunta y con su permiso; el trinquete de
+  `base/tests/test_assistant_card_values.py` deja Citas a 0. El profesional (`staff_id` de reservar varias, editar,
+  bloquear y crear o editar una serie; `A_MEMBER`) por su nombre con `staff.member.detail` (`staff.view`); cada cita
+  de `bulk_delete` (`ids`, título «Citas») con `AN_APPOINTMENT`, y la tarjeta dice cuántas aunque no pueda nombrar
+  ninguna; la serie (`SeriesId` de pausar, reactivar, borrar, reservar y editar; título «Cita periódica»;
+  `A_SERIES`) con el `label` de `appointment.recurring.get` (`series_label`: clienta, repetición, día de la semana
+  si es semanal o quincenal, y hora, en el idioma de quien lee), que solo ve quien ve esa serie (`visible`); y el
+  bloqueo (`BlockedTimeRefIn.id`, título «Bloqueo», `A_BLOCK`) con `appointment.blocked_time.get`, una lectura
+  interna (`ai=INTERNAL`, ni herramienta ni ruta; su nombre, en el catálogo de Automatizaciones) con el permiso de
+  la lista (`view_schedule`), por su `label` (`block_label`: título, día, hora salvo de día entero, y profesional
+  si es suyo). Tests: `tests/test_assistant_card_records.py`.
 - **Solapes con bloqueo**: reservar, mover y editar bloquean antes la ficha del profesional
   (`resolve_member(lock=True)`, por id en orden fijo cuando son dos), así que dos reservas del mismo
   profesional a la vez se esperan y la segunda ve la primera (`tests/test_concurrency.py`). Con los
@@ -946,8 +972,6 @@ agenda tuya que enseñar.».
 
 Lo que se vio fallar y queda abierto al cerrar la app (2026-11-03), cada cosa con su issue (`migration-leftover`):
 
-- **hub#635** y **hub#637** — textos: la tarjeta de confirmación del asistente que no dice qué registro toca y la
-  que nombra en inglés algunos datos («Confirm Overlap»).
 - Las peticiones de componentes de [`UI-REQUESTS.md`](UI-REQUESTS.md) (`Scheduler`, `DateField`/`TimeField`, tres
   iconos y el bloqueo de la baja en Personal): ninguna rompe un flujo.
 

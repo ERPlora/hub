@@ -325,15 +325,45 @@ def list_field(card: dict, name: str) -> dict:
     return next(field for field in card["fields"] if field["name"] == name)
 
 
-def test_a_list_of_codes_nobody_names_reaches_its_card_unnamed_so_it_says_how_many():
-    """FIX-HUB-PRINTING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (ui#48's revisers): with the screen saying every list by its
-    items, a dangerous grant said «Permisos: sale.sale.create, invoice.invoice.issue» and a blueprint «Apps que se cargan:
-    sale, invoice». The server sends both as they are, never ``named``: the screen says how many they carry."""
-    grant = assistant.card(get("flow.flow.grant"), {"operations": ["sale.sale.create", "invoice.invoice.issue"]}, "es")
-    blueprint = assistant.card(get("base.blueprint.import"), {"apps": ["sale", "invoice"]}, "es")
-    for card, name in ((grant, "operations"), (blueprint, "apps")):
-        assert list_field(card, name)["kind"] == "list"
-        assert NAMED not in list_field(card, name), name
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("language", "expected"),
+    [("es", ["Crear una tarea", "Crear un cliente"]), ("en", ["Create a task", "Create a customer"])],
+)
+def test_the_permissions_of_a_grant_are_named_item_by_item(language, expected):
+    """hub#504: who confirms a grant reads what each permission lets the automation do, as the History names it."""
+    card = assistant.card(
+        get("flow.flow.grant"),
+        {"operations": ["task.task.create", "customer.customer.create"]},
+        language,
+        ctx=ctx({"*"}, language=language),
+    )
+    shown = list_field(card, "operations")
+    assert (shown["kind"], shown["value"], shown.get(NAMED)) == ("list", expected, True)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("language", "expected"), [("es", ["Ventas / TPV", "Facturación"]), ("en", ["Sales & POS", "Invoicing"])])
+def test_the_apps_of_a_blueprint_are_named_item_by_item(language, expected):
+    """hub#504: who confirms a template reads which apps it loads, by their name, never by their id."""
+    card = assistant.card(
+        get("base.blueprint.import"), {"apps": ["sale", "invoice"]}, language, ctx=ctx({"*"}, language=language)
+    )
+    shown = list_field(card, "apps")
+    assert (shown["kind"], shown["value"], shown.get(NAMED)) == ("list", expected, True)
+
+
+@pytest.mark.django_db
+def test_a_list_with_a_value_nobody_can_name_says_the_rest_and_counts_it():
+    """A stale permission or app is left out, never shown by its code: the screen says the rest and counts it among the more."""
+    grant = assistant.card(
+        get("flow.flow.grant"), {"operations": ["task.task.create", "ghost.thing.missing"]}, "es", ctx=ctx({"*"})
+    )
+    blueprint = assistant.card(get("base.blueprint.import"), {"apps": ["sale", "ghost"]}, "es", ctx=ctx({"*"}))
+    assert list_field(grant, "operations")["value"] == ["Crear una tarea", None]
+    assert list_field(blueprint, "apps")["value"] == ["Ventas / TPV", None]
+    assert list_field(grant, "operations")[NAMED] is True
+    assert list_field(blueprint, "apps")[NAMED] is True
 
 
 def text_lists() -> dict[str, list[str]]:
@@ -348,7 +378,7 @@ def text_lists() -> dict[str, list[str]]:
             if prop.get("type") != "array":
                 continue
             items = assistant._resolved(prop.get("items", {}), defs)
-            if items.get("type") == "string" and not {"enum", "format", REFERS} & items.keys():
+            if items.get("type") == "string" and not {"enum", "format", REFERS} & {*prop.keys(), *items.keys()}:
                 found.setdefault(op.name, []).append(name)
     return found
 
@@ -357,7 +387,7 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
     """Every one of them, codes or a person's own words: as sent, so never said item by item as if the server had named
     it. A list the server says in words is (positive control: a series of visits, said as moments)."""
     found = text_lists()
-    assert {"flow.flow.grant", "base.blueprint.import"} <= found.keys()
+    assert "flow.draft.propose" in found
     named = [
         f"{write}:{name}"
         for write, names in found.items()
@@ -376,7 +406,6 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
 #: them out. An attempt key (``attempt_key``) is no reference. Only ever lower: an app that marks its own lowers its
 #: number here, and none comes in.
 UNNAMED_REFERENCES = {
-    "appointment": 12,
     "invoice": 1,
     # The sale and the appointment a voucher or a session came from, the line of a sale that charged a voucher, the line
     # of an order that holds a session and the reference of a return: data of apps Services does not require, so it
@@ -508,6 +537,11 @@ TITLED_IN_SPANISH = {
     **{f"appointment.appointment.{action}:id": "Cita" for action in (
         "cancel", "charge", "complete", "confirm", "delete", "mark_no_show", "reschedule", "start", "update",
     )},
+    "appointment.appointment.bulk_delete:ids": "Citas",
+    "appointment.blocked_time.delete:id": "Bloqueo",
+    **{f"appointment.recurring.{action}:id": "Cita periódica" for action in (
+        "activate", "deactivate", "delete", "materialize", "update",
+    )},
     "attendance.record.close_for_terminated:id": "Persona",
     "base.api_key.revoke:id": "Clave de API",
     "base.device.remove:id": "Dispositivo",
@@ -527,6 +561,11 @@ TITLED_IN_SPANISH = {
     **{f"customer.group.{action}:id": "Grupo" for action in ("delete", "update")},
     **{f"customer.tag.{action}:id": "Etiqueta" for action in ("delete", "update")},
     **{f"demo.item.{action}:id": "Elemento" for action in ("add_line", "delete", "update")},
+    **{f"flow.flow.{action}:id": "Automatización" for action in (
+        "delete", "duplicate", "grant", "run", "set_enabled", "update",
+    )},
+    "flow.question.answer:id": "Pregunta",
+    "flow.run.retry:id": "Ejecución",
     **{f"inventory.category.{action}:id": "Categoría" for action in ("delete", "update")},
     **{f"inventory.product.{action}:id": "Producto" for action in (
         "delete", "print_label", "set_image", "set_sold_out", "update",
@@ -543,6 +582,14 @@ TITLED_IN_SPANISH = {
     **{f"pricing.price_item.{action}:id": "Precio" for action in ("remove", "update")},
     **{f"pricing.price_list.{action}:id": "Tarifa" for action in ("activate", "deactivate", "set_default", "update")},
     **{f"pricing.rule.{action}:id": "Regla de descuento" for action in ("activate", "deactivate", "update")},
+    "reservation.blocked_date.delete:id": "Fecha bloqueada",
+    **{f"reservation.reservation.{action}:id": "Reserva" for action in (
+        "cancel", "complete", "confirm", "delete", "no_show", "seat", "update",
+    )},
+    "reservation.time_slot.delete:id": "Franja",
+    **{f"reservation.waitlist.{action}:id": "Entrada de la lista de espera" for action in (
+        "convert", "delete", "update",
+    )},
     **{f"sale.department.{action}:id": "Sección" for action in ("delete", "update")},
     **{f"sale.quick_note.{action}:id": "Nota rápida" for action in ("delete", "update")},
     **{f"schedule.override.{action}:id": "Cambio temporal" for action in ("delete", "update")},
@@ -599,14 +646,17 @@ def test_every_datum_the_screen_knows_that_a_write_titles_is_called_by_its_title
     assert not {title for title in titles.values() if title.lower() in {"id", "ids"} or "_" in title}
 
 
-def test_every_dangerous_write_of_the_platform_titles_the_record_it_names():
-    """The record a dangerous write of the platform acts on is called as its screen calls it, in the person's language
-    («Dispositivo: Barra», «Evento caído: …»), never «Registro»: its schema titles it, and a catalog says that title in
-    Spanish. One that does not comes in here (FIX-HUB-BASE-ASSISTANT-DANGER-CARD-CALLS-THE-RECORD-BY-ITS-FIELD-NAME)."""
+def test_every_dangerous_write_of_the_platform_flow_and_reservation_titles_the_record_it_names():
+    """The record a dangerous write of the platform, Automations or Reservations acts on is called as its screen calls
+    it, in the person's language («Dispositivo: Barra», «Automatización: Bienvenida», «Reserva: Ana…»), never
+    «Registro»: its schema titles it, and a catalog says that title in Spanish. One that does not comes in here
+    (hub#428, hub#499 and hub#549)."""
     untitled = []
+    checked = []
     for op in writes():
-        if op.app_label != "base" or assistant.risk(op) != "high":
+        if op.app_label not in {"base", "flow", "reservation"} or assistant.risk(op) != "high":
             continue
+        checked.append(op.name)
         props = op.input.model_json_schema().get("properties", {})
         with translation.override("es"):
             untitled += [
@@ -614,6 +664,14 @@ def test_every_dangerous_write_of_the_platform_titles_the_record_it_names():
                 for name in ("id", "ids")
                 if name in props and assistant._own_title(name, props[name].get("title")) is None
             ]
+    assert {
+        "reservation.reservation.delete",
+        "reservation.reservation.no_show",
+        "reservation.reservation.cancel",
+        "reservation.time_slot.delete",
+        "reservation.blocked_date.delete",
+        "reservation.waitlist.delete",
+    } <= set(checked)
     assert untitled == []
 
 

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:36865c4c613bec03d0b8983db1f7b19fc174a49f13e9896dc7026e2ca4d13629 -->
+<!-- generated from WORKBOOK.md sha256:38465a819f1eeb548244def45d351ac4ec75862392ada8faaf60c0eeea68b513 -->
 
 ## What it is for and who it is for
 
@@ -204,7 +204,9 @@ default.
 Out: the option (announces: option created, changed or deleted). Deleting it takes it out of the
 catalogue: what was already ordered keeps its frozen copy, also on the kitchen ticket.
 If it fails: "Create" and "Save" are grey while the name is missing and while the business has not yet
-said its currency, because the supplement is read in it (without it, "150" yen would be saved as 15,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+said its currency, because the supplement is read in it (without it, "150" yen would be saved as 15,000); until
+then, leaving the supplement keeps it as typed, without inventing decimals for it or judging it: "¥150" or "-0,50 zł"
+are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, the button lights up (hub#938). An
 empty name or one repeated in the group, a supplement that is not an amount, a tax
 category that does not exist in Taxes or more default options than the maximum show next to their

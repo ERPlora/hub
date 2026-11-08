@@ -5,6 +5,7 @@
 // with the server's words on top, a failure without words as «The quick note could not be saved.».
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionValue, mountSale, settle } from '../../__tests__/mount-sale';
 import type { QuickNoteOut } from '../../operations';
 import QuickNoteFormModal from './QuickNoteFormModal.vue';
@@ -166,4 +167,14 @@ describe('QuickNoteFormModal: Spanish', () => {
     const e = await setup(NO_SALT, 'es');
     expect([e.title(), e.submit().textContent?.trim()]).toEqual(['Editar nota rápida', 'Guardar']);
   });
+});
+
+describe('QuickNoteFormModal: fields refused with the same words (hub#888)', () => {
+  itTellsTheCorrectedFieldApart(['text', 'sort_order'], async (locale, refusal) => {
+    const s = await setup(null, locale);
+    await s.type('text', 'no salt');
+    await s.type('order', '3');
+    s.answer(422, refusal);
+    return { field: (key) => s.field(key === 'sort_order' ? 'order' : key), send: () => click(s.submit()), settle };
+  }, 'sort_order');
 });

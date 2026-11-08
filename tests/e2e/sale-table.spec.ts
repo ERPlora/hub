@@ -10,7 +10,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, openApps, psql, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanSales, shots, stamp } from './sale-helpers';
+import { cleanSales, shots, stamp, zoneWithTable } from './sale-helpers';
 
 const RUN = stamp();
 const ZONE = `E2E Tbl ${RUN} Till`;
@@ -54,12 +54,7 @@ test.beforeAll(async ({ browser }) => {
   const page = await context.newPage();
   await login(page, A, '/sale/pos');
   coffee = await createProduct(context, { name: `E2E Table coffee ${RUN}`, sku: SKU, price: 150, tax_category_key: 'restaurant.drink' });
-  const zone = await api<{ id: string }>(context, A, 'POST', '/table/zones', { name: ZONE });
-  expect(zone.status, `zone ${JSON.stringify(zone.data)}`).toBe(201);
-  zoneId = zone.data.id;
-  const table = await api<{ id: string }>(context, A, 'POST', '/table/tables', { zone_id: zoneId, number: NUMBER, capacity: 4 });
-  expect(table.status, `table ${JSON.stringify(table.data)}`).toBe(201);
-  tableId = table.data.id;
+  ({ zoneId, tableId } = await zoneWithTable(context, ZONE, NUMBER));
   await context.close();
 });
 

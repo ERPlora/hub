@@ -239,6 +239,41 @@ def test_removing_a_slot_or_unblocking_a_date_names_it_as_its_list_does(language
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("language", "reservation", "slot", "blocked", "entry"),
+    [
+        ("es", "Reserva", "Franja", "Fecha bloqueada", "Entrada de la lista de espera"),
+        ("en", "Reservation", "Time slot", "Blocked date", "Waitlist entry"),
+    ],
+)
+def test_every_dangerous_write_titles_the_record_it_names(language, reservation, slot, blocked, entry):
+    """The dangerous card says what it acts on, never its generic «Registro»/«Record» (hub#549)."""
+    booked = make_reservation()
+    cases = [
+        ("reservation.reservation.delete", {"id": str(booked.id)}, reservation, f"Ana García · {WHEN[language]}"),
+        ("reservation.reservation.no_show", {"id": str(booked.id)}, reservation, f"Ana García · {WHEN[language]}"),
+        (
+            "reservation.reservation.cancel",
+            {"id": str(booked.id), "reason": "Llamó"},
+            reservation,
+            f"Ana García · {WHEN[language]}",
+        ),
+        ("reservation.time_slot.delete", {"id": str(make_slot().id)}, slot, DINNER[language]),
+    ]
+    for name, arguments, title, label in cases:
+        field = next(field for field in card_for(name, arguments, language)["fields"] if field["name"] == "id")
+        assert (field["label"], field["value"]) == (title, label), name
+
+    whole = make_blocked(dt.date(2026, 12, 25), reason="Navidad")
+    blocked_card = card_for("reservation.blocked_date.delete", {"id": str(whole.id)}, language)
+    assert said(blocked_card) == [(blocked, "25 dic 2026" if language == "es" else "Dec 25, 2026")]
+
+    waiting = make_entry()
+    entry_card = card_for("reservation.waitlist.delete", {"id": str(waiting.id)}, language)
+    assert said(entry_card) == [(entry, f"Luis Pérez · {WHEN[language]}")]
+
+
+@pytest.mark.django_db
 def test_a_record_the_person_may_not_read_is_left_out_never_by_its_id():
     """A host who books tables but may not read the customers' cards: the card names the table and leaves the customer
     out — as Customers would not show them that card."""

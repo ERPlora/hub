@@ -36,7 +36,8 @@ El Inicio es lo primero que ve cualquier persona del negocio al entrar. De un vi
 Quién lo usa:
 
 - El **propietario** y el **administrador** ven todo y son quienes pueden resolver los pasos de la
-  plataforma («Tus apps», «Tu equipo»), y en la campana ven los avisos entre apps que no se entregaron.
+  plataforma («Tus apps», «Activa …» de cada app obligatoria en su país, «Tu equipo»), y en la campana ven los
+  avisos entre apps que no se entregaron.
 - El **responsable** y el **empleado** ven sus apps, los pasos que les tocan, los paneles que pueden ver
   y la actividad. Un paso que solo puede resolver un administrador también lo ven, para saber por qué no se
   puede facturar, pero sin botón.
@@ -433,19 +434,26 @@ Pasos:
      también los hechos, en el orden que fijan las apps.
   3. Los de la plataforma son «Tus apps» (encender al menos una app de negocio) y «Tu equipo» (añadir a
      las personas que usarán el TPV); el resto los trae cada app encendida.
-  4. Un paso que solo vale para otro país, o que la persona no puede ver, no sale. Un negocio sin país (una
+  4. Además, por cada app obligatoria en el país del negocio que está desactivada, un paso «Importante» de la
+     plataforma: «Activa VeriFactu» con «Es obligatoria para los negocios de España.» (VeriFactu, en España) o
+     «Activa Impuestos» con el país del negocio (Impuestos, en todos). Solo lo ve quien administra el negocio, que
+     es quien activa apps; «Configurar» lleva a **Apps**, a «Añadir apps». En cuanto la activa, el paso se va solo
+     y llegan los de la propia app («Configura VeriFactu», «Tus impuestos»). Un negocio de otro país no ve el de
+     VeriFactu (hub#997).
+  5. Un paso que solo vale para otro país, o que la persona no puede ver, no sale. Un negocio sin país (una
      demo, el de ERPlora) cuenta como España, el mercado de ERPlora: ve los pasos de España y ninguno de otro país
      (hub#682). Un paso cuya comprobación falla tampoco sale: nunca se da por hecho ni por pendiente lo que no se
      pudo comprobar.
-  5. Mientras falta un paso «Necesario para facturar», la franja «Todavía no puedes facturar» sale encima
+  6. Mientras falta un paso «Necesario para facturar», la franja «Todavía no puedes facturar» sale encima
      de las demás pantallas; con el móvil tumbado, en una sola línea con un «Configurar» (hub#838).
-  6. Cuando otra persona completa un paso en otro dispositivo, la lista se pone al día sola.
-Entra: los pasos que declara cada app encendida, con su comprobación, su país, su permiso y su pantalla.
+  7. Cuando otra persona completa un paso en otro dispositivo, o activa una app, la lista se pone al día sola.
+Entra: los pasos que declara cada app encendida, con su comprobación, su país, su permiso y su pantalla; y los
+países donde cada app dice que es obligatoria.
 Sale: nada guardado.
 Si falla: «No se ha podido cargar lo que te falta por configurar» con «Reintentar». Un paso que es cosa
 nuestra (no hay ninguna app de negocio que encender) sale como «Todavía no disponible» con «Esto es cosa
 nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.».
-Implicados: INVENTORY-F28
+Implicados: INVENTORY-F28, BASE-F24, BASE-F25, VERIFACTU-F01, TAX-F17
 
 ### BASE-F02 Ver el negocio de un vistazo al entrar
 <!-- origen: old-hub:HUB_SHELL-F25 -->
@@ -515,9 +523,12 @@ Pasos:
      «Atrás». La hoja empieza por «Inicio», que vuelve al Inicio, y sigue con las apps; tocar una la abre.
      «Inicio» está ahí aunque la lista aún cargue, esté vacía o no se haya podido leer.
   6. En la aplicación de Android, el botón atrás del móvil cierra primero lo que haya abierto encima (una
-     ventana, una hoja o el menú); una ventana que no se puede cerrar así se queda. Sin nada abierto, en una
-     ficha o un alta hace lo mismo que «Atrás»; en la pantalla principal de una app vuelve al Inicio,
-     también si se llegó a ella por un enlace; y en el Inicio deja la aplicación en segundo plano.
+     ventana, una hoja o el menú); una ventana que no se puede cerrar así se queda, y una que guarda algo
+     escrito sin guardar y lo pide (hoy, el alta y la edición de producto de Inventario) pregunta antes
+     «¿Descartar los cambios?»: «Seguir editando», o atrás otra vez, la deja como estaba, y «Descartar
+     cambios» la cierra (hub#1015). Sin nada abierto, en una ficha o un alta hace lo mismo que «Atrás»; en
+     la pantalla principal de una app vuelve al Inicio, también si se llegó a ella por un enlace; y en el
+     Inicio deja la aplicación en segundo plano.
 Entra: las apps del menú de la persona (las mismas del botón «Mis apps» de la barra).
 Sale: cuántas veces se abre cada app en este navegador (solo para ordenar).
 Si falla: mientras carga, baldosas grises y «Cargando tus apps…» para el lector de pantalla. Sin apps:
@@ -530,7 +541,7 @@ trae la versión nueva; nunca se queda el toque sin hacer nada. Si el servidor n
 inestable), la persona se queda donde estaba y un aviso dice «No se ha podido abrir <app>. Comprueba la conexión e
 inténtalo de nuevo.» («esa página» si la pantalla no es de una app), con «Reintentar», que vuelve a probar y la abre
 en cuanto el servidor responde.
-Implicados: ninguno
+Implicados: INVENTORY-F01, INVENTORY-F02
 
 ### BASE-F06 Ver los paneles de las apps en Inicio
 <!-- origen: old-hub:HUB_SHELL-F33 -->
@@ -715,7 +726,9 @@ Pasos:
   1. Pulsa «Apps» en el menú lateral. Se abre en la pestaña «Mis apps»; «Añadir apps» y «De pago» tienen
      también su dirección, que se puede enlazar.
   2. Mientras llega la lista: «Cargando tus apps…». Después, una fila (o una tarjeta, a elegir) por cada app que
-     el negocio tiene en marcha, con su icono y su nombre, su «Categoría» y su «Estado» («Activa»).
+     el negocio tiene en marcha, con su icono y su nombre, su «Categoría» y su «Estado» («Activa»). Una app que el
+     país del negocio exige lleva además, junto a su estado, «Obligatoria en España» (o el país del negocio): Impuestos
+     en todos, VeriFactu en España (hub#997).
   3. Busca en «Buscar en tus apps…» (nombre, descripción o categoría), filtra por categoría con el embudo,
      ordena o elige columnas.
   4. Cuando el negocio contrata una app en erplora.com o deja de tenerla, la lista se pone al día sola, sin
@@ -750,7 +763,8 @@ Pasos:
   1. En Apps, pulsa «Añadir apps» (todas las apps de ERPlora) o «De pago» (solo las que se contratan aparte).
   2. Mientras llega: «Cargando el catálogo…». Después, una fila por app con «App», «Categoría», «Descripción»,
      «Precio», «Viene con» y «Estado» («Instalada» o «Necesita suscripción»), con los nombres y las
-     descripciones en el idioma de quien mira.
+     descripciones en el idioma de quien mira. Una app que el país del negocio exige lleva «Obligatoria en España» (o
+     el país del negocio) junto a su estado, también desactivada: así se ve cuál falta por activar (hub#997).
   3. Busca en «Buscar apps para añadir…» (en «De pago», «Buscar apps de pago…») por nombre, descripción o
      categoría, y filtra por categoría o por estado.
 Entra: las apps que trae el hub y lo que el negocio tiene contratado en erplora.com.
@@ -893,7 +907,8 @@ Pasos:
   1. En «Mis apps», quien administra pulsa «Desactivar» en la fila de una app.
   2. Le pregunta siempre, con el nombre de la app: «¿Desactivar Reservas?» — «Sale del menú de todos en este
      negocio. No se borra nada: al volver a activarla, tiene sus datos.». Si con ella se van otras que llegaron solo
-     por ella, las nombra: «Mesas se desactiva con ella: solo la necesitaba Reservas.».
+     por ella, las nombra: «Mesas se desactiva con ella: solo la necesitaba Reservas.». Nunca se va con ella una app
+     que el país del negocio exige: al desactivar Ventas, Impuestos se queda activa y no se nombra (hub#997).
   3. Confirma con «Desactivar»: «Reservas está desactivada. También se ha desactivado: Mesas.». Las dos salen de
      «Mis apps» y, sin recargar, del menú de todos los dispositivos del negocio; sus pantallas dicen que la app no
      está disponible (BASE-F26) y el contador de arriba resta una.
@@ -943,16 +958,21 @@ Pasos:
   2. Tampoco lo ofrecen las apps que esa necesita, que no se pueden desactivar antes, y cada una dice por cuál:
      «Facturación no se puede desactivar: hace falta para VeriFactu. VeriFactu no se puede desactivar una vez
      activada: la ley obliga a que tus facturas sigan llegando a la AEAT.».
-  3. Quien administra pulsa «Desactivar» en una app que otra en marcha necesita y que sí se puede desactivar (por
+  3. Una app activa que el país del negocio exige («Obligatoria en España», BASE-F14) tampoco lo ofrece, y dice por
+     qué: «Impuestos es obligatoria para los negocios de España: no se puede desactivar.». Lo dice ella misma aunque
+     otra app la necesite, porque desactivar esa otra no cambiaría nada; una app con motivo propio (VeriFactu) dice
+     el suyo. Mientras se está activando, o si no se pudo activar, todavía se puede dejar (hub#997).
+  4. Quien administra pulsa «Desactivar» en una app que otra en marcha necesita y que sí se puede desactivar (por
      ejemplo, «Mesas» mientras «Reservas» está activada). El hub no cambia nada: encima de la tabla sale «No se ha
      cambiado nada» con lo que hay que hacer antes, «Desactiva antes Reservas.» (sin preguntar).
-  4. El aviso se queda hasta que se cierra o se activa o desactiva otra app; la app sigue «Activa».
-Entra: las apps en marcha que la necesitan, o el motivo de la app que se niega.
+  5. El aviso se queda hasta que se cierra o se activa o desactiva otra app; la app sigue «Activa».
+Entra: las apps en marcha que la necesitan, el motivo de la app que se niega, o el país del negocio y las apps que
+exige.
 Sale: nada.
 Si falla: si aun así se pide por el asistente o por la API, el hub contesta el mismo motivo y no cambia nada. Sin
 motivo propio de la app, el mismo aviso dice que no se ha podido cambiar, con el nombre de la app y lo que ha
 contestado el hub.
-Implicados: VERIFACTU-F32
+Implicados: VERIFACTU-F32, BASE-F01
 
 ### BASE-F26 Entender por qué una app no se abre
 <!-- origen: old-hub:HUB_SHELL-F41 -->
@@ -1065,7 +1085,9 @@ Pasos:
      plan no incluye, dice «Esta app está desactivada en tu negocio: no se cargará nada suyo.» y una que este
      negocio no tiene, «Este negocio no tiene esta app: no se cargará nada suyo.». Los clientes de
      una plantilla se quedan fuera: «Datos personales: solo se cargan desde una copia de seguridad.». Lo que
-     el Hub nunca carga (personas, PIN, datos fiscales) sale en «Nunca se carga aquí».
+     el Hub nunca carga (personas, PIN, datos fiscales) sale en «Nunca se carga aquí». Ninguna plantilla del
+     catálogo trae VeriFactu, tampoco en España: no sale en la revisión y la carga no la activa, porque ata el negocio
+     a la AEAT y la activa el dueño desde Apps (VERIFACTU-F01).
   3. Desmarca las apps que no quiera y pulsa «Importar» («Importando…»), o «Elegir otro» para volver.
   4. Al terminar sale el informe (BASE-F32). Lo que ya había en el negocio se queda como estaba: no se
      duplica ni se sobrescribe. Si una app de la plantilla aún se está preparando (BASE-F22), lo suyo entra solo en
@@ -1081,7 +1103,7 @@ puede cargarse en tu negocio: ninguna de sus apps se puede activar aquí.». Una
 tope de apps del plan, una app que el plan no incluye) se queda desactivada, no carga nada y el informe dice
 por qué; el resto se carga. Un fichero no se guarda: si una de sus apps aún se está preparando, su fila dice «Se está
 preparando para este negocio. Vuelve a subir el archivo dentro de un minuto para traer sus datos.».
-Implicados: BASE-F22, INVENTORY-F12
+Implicados: BASE-F22, INVENTORY-F12, VERIFACTU-F01
 
 ### BASE-F32 Leer el informe de la importación
 <!-- origen: old-hub:HUB_SHELL-F178 -->
@@ -1260,7 +1282,8 @@ Pasos:
      que resolvió la plantilla y los paneles se refrescan. Igual tras cargar una plantilla o un fichero desde
      «Datos y copias».
 Entra: las plantillas y si el negocio todavía está vacío.
-Sale: lo que trae la plantilla, como en BASE-F31 (`base.blueprint.imported`).
+Sale: lo que trae la plantilla, como en BASE-F31 (`base.blueprint.imported`): VeriFactu se queda desactivada
+(VERIFACTU-F01).
 Si falla: si no entró todo, «No todo ha entrado» con «Estas no han entrado: {apps}.» (o «Hay algo más que
 no ha entrado.») y «Ver el informe»; si una app no se ha podido preparar, «Una app aún no se ha podido preparar» con
 «Se sigue intentando sola y sus datos se cargarán cuando lo consiga: {apps}. En el informe puedes reintentarlo
@@ -1269,7 +1292,7 @@ cambiado nada en tu negocio: {reason}» e «Intentar otra vez»; si se cortó a 
 terminado» con «Puede que parte ya esté dentro. Compruébalo en Ajustes › Datos antes de volver a
 intentarlo.» y «Ver el informe», sin reintento. Si las plantillas no se pueden leer, «No se han podido
 cargar las plantillas para empezar.» con «Reintentar» y «Ahora no».
-Implicados: BASE-F01, INVENTORY-F12
+Implicados: BASE-F01, INVENTORY-F12, VERIFACTU-F01
 
 ### BASE-F39 Abrir Sistema y moverse por sus pestañas
 <!-- origen: old-hub:HUB_SHELL-F135 -->
@@ -2544,7 +2567,10 @@ Pasos:
      vistazo si sobra o falta (el cierre de caja dice «Diferencia: +137,90 €» si sobra, «-4,90 €» si falta y sin signo si cuadra); un sí o un no, como «Sí» o «No»;
      una lista que su app (el servidor) nombra, por sus elementos uno tras otro («Impresoras: Caja, Cocina»; con más
      de cuatro, los tres primeros y cuántos más: «Caja, Cocina, Barra y 2 más»; si un elemento lleva coma, como una
-     fecha, separados por punto y coma: «2 nov 2026, 10:00; 9 nov 2026, 10:00»); una lista de líneas que solo llevan
+     fecha, separados por punto y coma: «2 nov 2026, 10:00; 9 nov 2026, 10:00»); los permisos que se conceden a una
+     automatización, por la acción de cada uno como la nombra su Historial («Permisos: Crear una tarea, Crear un
+     cliente»), y las apps que carga una plantilla, por su nombre («Apps que se cargan: Ventas / TPV, Facturación»);
+     una lista de líneas que solo llevan
      su registro, como los servicios de una cita, igual, por el nombre de cada uno («Servicios: Corte de pelo, Tinte»;
      uno que no se puede nombrar cuenta entre los «más»), también cuando el asistente manda un servicio por su nombre
      porque no sabe cuál es («Servicios: Tinte»; si manda el servicio y además un nombre, dice el servicio que se
@@ -2996,6 +3022,31 @@ Implicados: HUBS-F17, WEBSITE-F10
   (`/app/download/<windows|linux|android>/`) van en `hub-home.app_downloads` (`base/spa.py`) para cualquier sesión, y
   `lib/app-downloads.ts` las ofrece solo en un navegador. Tests: `test_home.py`, `test_queries_home.py`, `test_spa.py`,
   `SystemAppCards.test.ts` y `app-downloads.test.ts`.
+- Apps obligatorias por país (hub#997, PLAN-HUB ronda 2026-11-07, BASE-F01): una app declara en su `LiveAppConfig`
+  `mandatory = {"countries": "all" | ["ES", …], "platform_turns_on": bool}`: dónde tiene que estar encendida y si la
+  plataforma puede encenderla sola al alta (Impuestos: `"all"`, sí; VeriFactu: `["ES"]`, nunca, porque ata al negocio
+  con la AEAT). `base.E016` (`base/home.py`) comprueba al arrancar la forma: `"all"` o códigos ISO 3166-1 alfa-2 en
+  mayúsculas sin repetir (nunca una lista vacía, que leería «en ninguno» o «en todos») y `platform_turns_on`
+  booleano. `base` la lee con `getattr` sin nombrar ninguna app: `home.mandatory_steps` da un paso `base.mandatory.<app>`
+  (nivel `functional`, orden 15, ruta `/apps#all`, el icono con que el shell pinta la app: el de su primera entrada de
+  menú, `home.shell_icon`, nunca el de la tienda, que `HubIcon` rechazaría) por cada una obligatoria en el país del negocio
+  (`country_or_market`: sin país, España) que no está encendida, solo a quien tiene `base.administer_hub`, dentro de
+  `base.setup.status`, que ya se re-ejecuta al encender o apagar una app (`APP_EVENTS`). Mientras se crean sus tablas
+  (`creating`) el paso sigue: todavía no está encendida. `platform_turns_on` lo leerá el alta (hub#997, parte 3). Tests:
+  `test_home.py` y `test_queries_home.py` (con apps de paja), `apps/verifactu/tests/test_mandatory_in_spain.py` (dos
+  hubs reales) y `apps/tax/tests/test_apps.py`.
+  Una vez encendida no se apaga en ese país (hub#997, parte 2; BASE-F14, F16, F23 y F25): `activation.mandatory_on`
+  da las obligatorias del país que están `on` (no `creating` ni `failed`, que aún no atan y se pueden dejar), que
+  `activation.disabling` nunca apaga en cascada (ni lo que necesitan: siguen queriéndolo) y a las que
+  `activation.refusals` da el motivo de `base` (`MANDATORY_OFF`, con el nombre de la app y el del país en el idioma
+  de quien pregunta) cuando la app no da uno propio (VeriFactu da el suyo, VERIFACTU-F32). `base.app.disable` y
+  `base.app.list` leen el país de la fila del negocio (`Hub.country`); `queries.app_off_refusal` pone el motivo
+  propio de la app por delante del de las que la necesitan, porque desactivarlas no la apagaría. `base.app.list` trae
+  `mandatory` por app y `country_name` (CLDR, `business.country_name`), y Apps pinta «Obligatoria en {país}» con un
+  `StatusPill` de `@erplora/ui` junto al estado; `lib/apps.ts` `goesOffWith` deja fuera la obligatoria encendida,
+  como el servidor. Tests: `test_activation.py` (las reglas), `test_app_activation.py` (409, cascada y dos hubs
+  reales), `test_queries_apps.py`, `apps/verifactu/tests/test_app_disable.py`, `lib/apps.test.ts`,
+  `pages/AppsPage.test.ts` y la e2e `tests/e2e/base-app-activation.spec.ts`.
 - Un panel `chart` cuyas etiquetas son días (`YYYY-MM-DD`: día civil de negocio, sin zona) los nombra con
   `Intl` en UTC, nunca con `new Date(<día>)` en la zona del navegador (`isoDay` y `formatDay` de
   `base/frontend/lib/home.ts`): una semana, por su día de la semana corto (`vie`); una serie más larga, por su
@@ -3619,6 +3670,11 @@ Implicados: HUBS-F17, WEBSITE-F10
   `tests/e2e/base-assistant.spec.ts` contra un SaaS de verdad con su pasarela y el proveedor falso
   `tests/e2e/assistant-provider.ts` (un servidor HTTP en 127.0.0.1 que habla la API de OpenAI; receta en
   `tests/e2e/README.md`, «El asistente»): ningún test llega a un proveedor real.
+- **Resumen propio de una escritura** (hub#693): `ai["summary"]` es un callable
+  `(ctx, arguments, fields) -> list[dict]`; `base.assistant.card` lo ejecuta solo con `ctx`, como esa persona y bajo
+  `translation.override(language)`, con `fields` ya en ese idioma, y pone exactamente los campos que devuelve. Sin
+  `ctx` o sin callable, deja el detalle normal. `website.site.save` es el primer uso; su contrato está en
+  `base/tests/test_assistant.py`.
 
 - Personas y permisos (APP-BASE-5): las personas son `Membership` (control) más la foto de erplora.com
   (`hub.state["members"]`, `plan.max_users`); invitar, cambiar el rol y quitar son de erplora.com (HUBS-F24…F29):
@@ -3763,8 +3819,7 @@ con su issue, y llegan con ella. Después llegaron BASE-F21 y BASE-F22 (hub#601)
 - **Las notas de cada versión (BASE-F41)**, hub#576.
 - **Los roles que trae una app (BASE-F82)**, hub#579, con la contradicción entre PLAN-HUB §3 (`RoleActivation`) y
   los cuatro roles de PLAN §22 sin resolver.
-- **La cola de PgBouncer de cada negocio en CloudWatch**, hub#572, y **la tarjeta del asistente que enseña los ids de
-  las apps de una plantilla** (`base.blueprint.import`), hub#504 (también de Automatizaciones).
+- **La cola de PgBouncer de cada negocio en CloudWatch**, hub#572.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md) (los iconos de documento de
   Archivos, los del cuadro del asistente y `useI18n` en el shell).
 

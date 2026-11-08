@@ -47,7 +47,7 @@ def test_it_requires_invoicing_alone():
     assert verifactu().requires == ["invoice"]
 
 
-def test_verifactu_is_a_free_module_of_the_sales_group_in_both_verticals():
+def test_verifactu_is_a_free_module_of_the_sales_group_in_no_template():
     config = verifactu()
     assert config.kind == "app"
     assert config in module_configs()
@@ -57,7 +57,8 @@ def test_verifactu_is_a_free_module_of_the_sales_group_in_both_verticals():
     assert config.icon == "ion:shield-checkmark-outline"
     assert 0 < len(str(config.summary)) <= 120
     assert str(config.description)
-    assert config.verticals == ["hair_salon", "restaurant"]
+    # Its owner turns it on, never a template (PLAN-HUB round 2026-11-07, hub#998): it lists no vertical.
+    assert config.verticals == []
     assert config.listed is True
 
 

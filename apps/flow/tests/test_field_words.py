@@ -94,6 +94,7 @@ def test_every_field_an_action_asks_for_or_leaves_has_its_words():
         "kitchen__station__get",
         "kitchen__item__get",
         "tax__rule__get",
+        "appointment__blocked_time__get",
     ],
 )
 def test_a_read_that_names_a_record_on_the_assistants_card_has_a_name_of_its_own(action, language):

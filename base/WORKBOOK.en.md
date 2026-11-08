@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b6bdeaca53d766f54db5a917fd328f1a625061dac5b304173b922d1111354e3f -->
+<!-- generated from WORKBOOK.md sha256:05676f9f39ccc381bbcc7d74c78390abf24f711c05bfa764c8d4165f0952c5fd -->
 
 ## What it is for and who it is for
 
@@ -23,8 +23,8 @@ The Home is the first thing anyone in the business sees on coming in. At a glanc
 Who uses it:
 
 - The **owner** and the **administrator** see everything and are the ones who can complete the
-  platform's steps ("Your apps", "Your team"), and in the bell they see the notices between apps that were
-  not delivered.
+  platform's steps ("Your apps", "Turn on …" for each app mandatory in their country, "Your team"), and in the bell
+  they see the notices between apps that were not delivered.
 - The **manager** and the **employee** see their apps, the steps that are theirs, the panels they may
   see and the activity. A step that only an administrator can complete is shown to them too, so they know
   why invoicing is not possible, but without a button.
@@ -426,20 +426,26 @@ Steps:
      too, in the order the apps set.
   3. The platform's are "Your apps" (turn on at least one business app) and "Your team" (add the people
      who will use the till); the rest come from each app that is on.
-  4. A step that only applies to another country, or that the person may not see, does not show. A business
+  4. Besides, for each app mandatory in the business's country that is off, an "Important" step of the
+     platform: "Turn on VeriFactu" with "It is mandatory for businesses in Spain." (VeriFactu, in Spain) or
+     "Turn on Taxes" with the business's country (Taxes, in every one). Only whoever runs the business sees it,
+     since they are the one who turns apps on; "Set up" leads to **Apps**, to "Add apps". As soon as they turn it
+     on, the step goes by itself and the app's own steps come ("Set up VeriFactu", "Your taxes"). A business of
+     another country does not see VeriFactu's (hub#997).
+  5. A step that only applies to another country, or that the person may not see, does not show. A business
      without a country (a demo, ERPlora's own) counts as Spain, ERPlora's market: it sees Spain's steps and none
      of another country (hub#682). A step whose check fails does not show either: what could not be checked is
      never taken as done nor as pending.
-  5. While a "Needed to invoice" step is missing, the "You cannot issue invoices yet" strip shows over the
+  6. While a "Needed to invoice" step is missing, the "You cannot issue invoices yet" strip shows over the
      other screens; with the phone on its side, in one line with a single "Set up" (hub#838).
-  6. When someone else completes a step on another device, the list updates by itself.
+  7. When someone else completes a step on another device, or turns an app on, the list updates by itself.
 In: the steps each app that is on declares, with their check, their country, their permission and their
-screen.
+screen; and the countries where each app says it is mandatory.
 Out: nothing saved.
 If it fails: "Could not load what is left to set up" with "Retry". A step that is on us (there is no
 business app to turn on) shows as "Not available yet" with "This one is on us: there is nothing on your
 side to do yet. We are on it.".
-Involved: INVENTORY-F28
+Involved: INVENTORY-F28, BASE-F24, BASE-F25, VERIFACTU-F01, TAX-F17
 
 ### BASE-F02 See the business at a glance on coming in
 Status: discarded — the hub's health row (the printer and WhatsApp, with a link to System) needs each app to say how its own part is doing, and that touches Printing and the WhatsApp Inbox; today the bell already warns when nobody is printing (hub#573)
@@ -504,9 +510,12 @@ Steps:
      with "Home", which goes back to the Home, and goes on with the apps; tapping one opens it. "Home" is
      there even while the list loads, when it is empty or when it could not be read.
   6. In the Android app, the phone's back button first closes whatever is open on top (a window, a sheet
-     or the menu); a window that cannot be closed that way stays. With nothing open, on a record or a new
-     one it does the same as "Back"; on the main screen of an app it goes back to the Home, also when that
-     screen was reached through a link; and on the Home it sends the app to the background.
+     or the menu); a window that cannot be closed that way stays, and one that holds something typed and
+     not saved and asks for it (today, creating and editing a product in Inventory) asks first "Discard
+     changes?": "Keep editing", or back again, leaves it as it was, and "Discard changes" closes it
+     (hub#1015). With nothing open, on a record or a new one it does the same as "Back"; on the main screen
+     of an app it goes back to the Home, also when that screen was reached through a link; and on the Home
+     it sends the app to the background.
 In: the apps of the person's menu (the same as the bar's "My apps" button).
 Out: how many times each app is opened in this browser (only to order them).
 If it fails: while loading, grey tiles and "Loading your apps…" for the screen reader. Without apps:
@@ -518,7 +527,7 @@ any button), in a fresh load of the page, which already brings the new version; 
 the server does not answer (offline or on a flaky network), the person stays where they were and a notice says
 "Could not open <app>. Check the connection and try again." ("that page" when the screen is not an app's), with
 "Retry", which tries again and opens it as soon as the server answers.
-Involved: none
+Involved: INVENTORY-F01, INVENTORY-F02
 
 ### BASE-F06 See the apps' panels on the Home
 Status: done
@@ -695,7 +704,9 @@ Steps:
   1. They tap "Apps" in the side menu. It opens on the "My apps" tab; "Add apps" and "Paid" have their own
      address too, which can be linked.
   2. While the list arrives: "Loading your apps…". Then one row (or one card, as chosen) for each app the
-     business has running, with its icon and its name, its "Category" and its "Status" ("Active").
+     business has running, with its icon and its name, its "Category" and its "Status" ("Active"). An app the
+     business's country requires also shows, next to its status, "Mandatory in Spain" (or the business's country):
+     Taxes in every country, VeriFactu in Spain (hub#997).
   3. They search in "Search your apps…" (name, description or category), filter by category with the funnel,
      sort or choose columns.
   4. When the business subscribes to an app on erplora.com or stops having it, the list updates by itself,
@@ -729,7 +740,9 @@ Steps:
   1. In Apps, they tap "Add apps" (every ERPlora app) or "Paid" (only the ones subscribed to separately).
   2. While it arrives: "Loading the catalogue…". Then one row per app with "App", "Category", "Description",
      "Price", "Comes with" and "Status" ("Installed" or "Needs a subscription"), with the names and the
-     descriptions in the language of whoever looks.
+     descriptions in the language of whoever looks. An app the business's country requires shows "Mandatory in
+     Spain" (or the business's country) next to its status, off too: that way it shows which one is still to be
+     turned on (hub#997).
   3. They search in "Search apps to add…" (in "Paid", "Search paid apps…") by name, description or
      category, and filter by category or by status.
 In: the apps the hub brings and what the business has subscribed to on erplora.com.
@@ -864,7 +877,8 @@ Steps:
   1. In "My apps", whoever runs the business presses "Turn off" on an app's row.
   2. It always asks, with the app's name: "Turn off Reservations?" — "It leaves the menu for everyone in this
      business. Nothing is deleted: turned on again, it has its data.". If others that came only for it go with
-     it, it names them: "Tables turns off with it: only Reservations needed it.".
+     it, it names them: "Tables turns off with it: only Reservations needed it.". An app the business's country
+     requires never goes with it: on turning Sales off, Taxes stays on and is not named (hub#997).
   3. They confirm with "Turn off": "Reservations is off. Also turned off: Tables.". Both leave "My apps" and,
      without reloading, the menu of every device of the business; their screens say the app is not available
      (BASE-F26) and the counter at the top takes one away.
@@ -914,16 +928,22 @@ Steps:
   2. Neither do the apps that one needs, which cannot be turned off first, and each says which one it is for:
      "Invoicing can't be turned off: VeriFactu needs it. VeriFactu can't be turned off once it's on: the law requires
      your invoices to keep reaching the AEAT.".
-  3. Whoever runs the business presses "Turn off" on an app another running one needs and that can be turned off (for
+  3. An app on that the business's country requires ("Mandatory in Spain", BASE-F14) does not offer it either, and
+     says why: "Taxes is mandatory for businesses in Spain: it can't be turned off.". It says so itself even when
+     another app needs it, because turning that other one off would change nothing; an app with a reason of its own
+     (VeriFactu) says its own. While it is being turned on, or if it could not be, it can still be given up
+     (hub#997).
+  4. Whoever runs the business presses "Turn off" on an app another running one needs and that can be turned off (for
      instance, "Tables" while "Reservations" is on). The hub changes nothing: above the table "Nothing was changed"
      shows with what has to be done first, "Turn off Reservations first." (without asking).
-  4. The notice stays until it is closed or another app is turned on or off; the app stays "Active".
-In: the running apps that need it, or the reason of the app that refuses.
+  5. The notice stays until it is closed or another app is turned on or off; the app stays "Active".
+In: the running apps that need it, the reason of the app that refuses, or the business's country and the apps it
+requires.
 Out: nothing.
 If it fails: if it is asked for anyway through the assistant or the API, the hub answers the same reason and changes
 nothing. Without a reason of the app's own, the same notice says it could not be changed, with the app's name and
 what the hub answered.
-Involved: VERIFACTU-F32
+Involved: VERIFACTU-F32, BASE-F01
 
 ### BASE-F26 Understand why an app does not open
 Status: done
@@ -1028,7 +1048,9 @@ Steps:
      "This app is off in your business: nothing of it will load." and one this business does not have, "This
      business does not have this app: nothing of it will load.". A template's
      customers stay out: "Personal data: it loads only from a backup.". What the Hub never loads (people,
-     PINs, fiscal data) shows in "Never loaded here".
+     PINs, fiscal data) shows in "Never loaded here". No template of the catalogue brings VeriFactu, in Spain
+     either: it is not in the review and the load does not turn it on, because it binds the business to the AEAT
+     and the owner turns it on from Apps (VERIFACTU-F01).
   3. Untick the apps not wanted and tap "Import" ("Importing…"), or "Choose another" to go back.
   4. When it ends, the report shows (BASE-F32). What the business already had stays as it was: nothing is
      duplicated nor overwritten. If an app of the template is still being set up (BASE-F22), its part comes in by
@@ -1044,7 +1066,7 @@ load in your business: none of its apps can be turned on here.". An app that cou
 plan's limit of apps, an app the plan does not include) stays off, loads nothing and the report says why;
 the rest loads. A file is not kept: if one of its apps is still being set up, its row says "It is being set up for
 this business. Upload the file again in a minute to bring its data.".
-Involved: BASE-F22, INVENTORY-F12
+Involved: BASE-F22, INVENTORY-F12, VERIFACTU-F01
 
 ### BASE-F32 Read the import report
 Status: done
@@ -1208,7 +1230,7 @@ Steps:
      the template solved and the panels refresh. The same after loading a template or a file from "Data and
      backups".
 In: the templates and whether the business is still empty.
-Out: what the template brings, as in BASE-F31 (`base.blueprint.imported`).
+Out: what the template brings, as in BASE-F31 (`base.blueprint.imported`): VeriFactu stays off (VERIFACTU-F01).
 If it fails: if not everything went in, "Not everything went in" with "These did not go in: {apps}." (or
 "Something else did not go in.") and "See the report"; if an app could not be set up, "An app could not be set up
 yet" with "It keeps trying by itself and its data will load when it works: {apps}. In the report you can try again
@@ -1217,7 +1239,7 @@ be opened" with "Nothing has changed in your business: {reason}" and "Try again"
 "The setup did not finish" with "Part of it may be in already. Check it in Settings › Data before trying
 again." and "See the report", with no retry. If the templates cannot be read, "The templates to start with
 could not be loaded." with "Retry" and "Not now".
-Involved: BASE-F01, INVENTORY-F12
+Involved: BASE-F01, INVENTORY-F12, VERIFACTU-F01
 
 ### BASE-F39 Open System and move between its tabs
 Status: done
@@ -2426,7 +2448,9 @@ Steps:
      no sign when it balances); a yes or a no, as "Yes" or "No"; a list that its app (the server) names, by its items
      one after another ("Printers: Till, Kitchen"; past four, the first three and how many more: "Till, Kitchen, Bar and
      2 more"; when an item carries a comma, such as a date, separated by semicolons: "Nov 2, 2026, 10:00 AM; Nov 9,
-     2026, 10:00 AM"); a list of lines that carry only their record, such as the services of an appointment, the same
+     2026, 10:00 AM"); the permissions granted to an automation, by each action as its History names it ("Permissions:
+     Create a task, Create a customer"), and the apps a template loads, by their name ("Apps to load: Sales & POS,
+     Invoicing"); a list of lines that carry only their record, such as the services of an appointment, the same
      way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"), also
      when the assistant sends a service by its name because it does not know which one it is ("Services: Colour"; when
      it sends the service and a name as well, it says the service that is booked); a list of lines that carry their

@@ -123,12 +123,14 @@ def test_the_reason_is_in_the_language_of_whoever_turns_it_off():
     assert refusal(admin(language="es")).message == NEVER_OFF_ES
 
 
-NAMES = {"invoice": "Invoicing", "tax": "Taxes", "sale": "Sales & POS", "customer": "Customers"}
-NAMES_ES = {"invoice": "Facturación", "tax": "Impuestos", "sale": "Ventas / TPV", "customer": "Clientes"}
+#: What VeriFactu needs that only it keeps on. Taxes, which it needs too, never goes off anyway: it is mandatory in every
+#: country and says so itself (hub#997, ``test_taxes_says_it_is_mandatory_before_that_verifactu_needs_it``).
+NAMES = {"invoice": "Invoicing", "sale": "Sales & POS", "customer": "Customers"}
+NAMES_ES = {"invoice": "Facturación", "sale": "Ventas / TPV", "customer": "Clientes"}
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("app", ["invoice", "tax", "sale", "customer"])
+@pytest.mark.parametrize("app", list(NAMES))
 def test_what_verifactu_needs_stays_on_with_it_and_says_why(app):
     """hub#619: never «Turn off VeriFactu first», which nobody can do: the real reason, VeriFactu's."""
     business_in("ES")
@@ -143,7 +145,7 @@ def test_what_verifactu_needs_stays_on_with_it_and_says_why(app):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("app", ["invoice", "tax", "sale", "customer"])
+@pytest.mark.parametrize("app", list(NAMES))
 def test_that_reason_is_in_the_language_of_whoever_turns_it_off(app):
     business_in("ES")
 
@@ -153,7 +155,7 @@ def test_that_reason_is_in_the_language_of_whoever_turns_it_off(app):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("app", ["invoice", "tax", "sale", "customer"])
+@pytest.mark.parametrize("app", list(NAMES))
 def test_outside_spain_turning_verifactu_off_first_is_what_there_is_to_do(app):
     business_in("PL")
 
@@ -163,6 +165,22 @@ def test_outside_spain_turning_verifactu_off_first_is_what_there_is_to_do(app):
     assert (refused.status, error["code"]) == (409, "base.app_required")
     assert "verifactu" in error["required_by"]
     assert "VeriFactu" in refused.message
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("country", "named"), [("ES", "Spain"), ("", "Spain"), ("PL", "Poland")])
+def test_taxes_says_it_is_mandatory_before_that_verifactu_needs_it(country, named):
+    """hub#997: Taxes, mandatory in every country, gives base's reason, its own, in Spain with VeriFactu on too:
+    turning VeriFactu off would still leave it on. Apps says the same beforehand."""
+    business_in(country)
+    reason = f"Taxes is mandatory for businesses in {named}: it can't be turned off."
+
+    refused = refusal(app="tax")
+
+    error = refused.envelope()["error"]
+    assert (refused.status, error["code"], error["app"], refused.message) == (409, "base.app_vetoed", "tax", reason)
+    assert is_on(app="tax")
+    assert rows_of_the_list()["tax"]["refusal"] == reason
 
 
 # ── What Apps says beforehand (hub#618): it never offers what is always refused ─────────────────────────────────────

@@ -15,11 +15,6 @@
       "appInactive": "This app is not active in this business",
       "retry": "Retry"
     },
-    "money": {
-      "notAmount": "This is not an amount. Type a figure, for example 12.50.",
-      "negative": "This amount cannot be negative.",
-      "ambiguous": "This amount can be read in two ways: «{typed}» could be {grouped} or {decimal}. Write the decimals so there is no doubt."
-    },
     "state": { "active": "Active", "inactive": "Inactive" },
     "status": { "active": "Active", "inactive": "Inactive" },
     "taxBasis": { "business": "Business default", "included": "Tax included", "excluded": "Tax excluded" },

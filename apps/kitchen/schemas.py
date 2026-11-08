@@ -382,6 +382,26 @@ class TicketsOut(Schema):
     )
 
 
+class NoticesIn(In):
+    since: dt.datetime | None = Field(
+        None, description="Only tickets received from this instant on; empty = the last 24 hours."
+    )
+    limit: int = Field(20, ge=1, le=50, description="How many notices, the newest first (1 to 50).")
+
+
+class NoticeOut(Schema):
+    id: UUID = Field(description="The ticket's id, the same before and after the relay saves it.")
+    at: dt.datetime = Field(description="When the ticket was received.")
+    number: str = Field(description="The ticket's number, YYYYMMDD-NNNN.")
+    label: str = Field(description="Where the ticket goes; empty when it has no label.")
+    dish_names: str = Field(description="The dishes, separated by commas.")
+    waiter: str = Field(description="Who attends the check; empty when nobody is named.")
+
+
+class NoticesOut(Schema):
+    rows: list[NoticeOut] = Field(description="The new tickets, the newest first.")
+
+
 class TicketSendIn(In):
     order_id: UUID = Field(
         description="The open check whose pending lines go to the kitchen.", json_schema_extra=A_CHECK

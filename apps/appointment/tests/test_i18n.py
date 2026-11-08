@@ -1,5 +1,6 @@
 """Every visible text of the appointment app has its Spanish translation, compiled and current."""
 
+import gettext
 import json
 from pathlib import Path
 
@@ -26,6 +27,7 @@ from base.tests.po import (
     missing_from_catalogue,
     model_texts,
     module_texts,
+    operation_titles,
     untranslated,
 )
 
@@ -34,7 +36,8 @@ MODELS = (Settings, Counter, Recurring, RecurringService, Appointment, Appointme
 
 
 def visible_texts() -> set[str]:
-    """The English source of every lazy text the app shows (menu, store, admin, choices, messages)."""
+    """The English source of every lazy text the app shows (menu, store, admin, choices, messages) and the titles of
+    its schemas, which name a datum on the assistant's card (hub#635)."""
     config = apps.get_app_config("appointment")
     lazies = [
         *config_texts(config),
@@ -52,7 +55,13 @@ def visible_texts() -> set[str]:
     ):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {catalogue_key(text) for text in lazies}
+        return {catalogue_key(text) for text in lazies} | operation_titles("appointment")
+
+
+def own_catalogue() -> gettext.GNUTranslations:
+    """Citas's own compiled Spanish catalogue, read alone: not merged with the other apps' ones."""
+    with (LOCALE / "django.mo").open("rb") as compiled:
+        return gettext.GNUTranslations(compiled)
 
 
 def test_every_entry_has_a_spanish_translation():
@@ -67,6 +76,37 @@ def test_every_visible_text_is_in_the_catalog():
 
 def test_the_compiled_catalog_is_current():
     assert compiled_differences(LOCALE) == {}
+
+
+def test_the_card_says_each_title_with_citas_own_spanish():
+    """The assistant's card names a datum by the title its schema gives it, said through every app's catalogue: one an
+    app installed before Citas also writes, with other Spanish, would win and leave Citas's entry dead (hub#637)."""
+    own = own_catalogue()
+    titles = operation_titles("appointment")
+    assert {"Book even if it overlaps", "Duplicate customer"} <= titles  # positive control: Citas's titles are read
+    # Each title has Spanish of its own: with its entry gone, both sides below would say the English and agree.
+    assert sorted(title for title in titles if own.gettext(title) == title) == []
+    with translation.override("es"):
+        assert {title: translation.gettext(title) for title in titles} == {title: own.gettext(title) for title in titles}
+
+
+def test_the_card_says_each_title_with_the_spanish_of_the_workbook():
+    """The names the WORKBOOK gives the data of the assistant's card (an appointment is «Cita»; the data no model of
+    Citas names, hub#637), with its own words: the one who asks is «la clienta», as its screens and messages say."""
+    with translation.override("es"):
+        assert {title: translation.gettext(title) for title in operation_titles("appointment")} == {
+            "Appointment": "Cita",
+            "Appointments": "Citas",
+            "Repeating appointment": "Cita periódica",
+            "Blocked period": "Bloqueo",
+            "Book even if it overlaps": "Reservar aunque se solape",
+            "Dates and times": "Fechas y horas",
+            "Asked by the customer": "Lo pide la clienta",
+            "Applies from": "Se aplica desde",
+            "Book from": "Reservar desde",
+            "Book up to": "Reservar hasta",
+            "Duplicate customer": "Ficha duplicada",
+        }
 
 
 def test_spanish_texts_of_the_workbook():

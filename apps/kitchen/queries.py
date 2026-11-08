@@ -57,6 +57,8 @@ from apps.kitchen.schemas import (
     LogListIn,
     LogPage,
     NoIn,
+    NoticesIn,
+    NoticesOut,
     RoutingListIn,
     RoutingPage,
     SettingsOut,
@@ -1104,6 +1106,47 @@ def list_tickets(ctx: OperationContext, params: TicketListIn) -> dict:
         "total": total,
         "limit": params.limit,
         "offset": params.offset,
+    }
+
+
+#: How far back the device notices go when nobody says (the shell tells each row once per device).
+NOTICES_WINDOW = dt.timedelta(hours=24)
+
+
+@operation(
+    "kitchen.ticket.notices",
+    kind="query",
+    permission="kitchen.view_ticket",
+    input=NoticesIn,
+    output=NoticesOut,
+    expose_api=True,
+    ai={
+        "description": "The new kitchen tickets, the newest first, with their destination, dishes and waiter; "
+        "a round fired by Sales is included before the relay saves it, with the same id it keeps afterwards."
+    },
+)
+def notices(ctx: OperationContext, params: NoticesIn) -> dict:
+    since = params.since or timezone.now() - NOTICES_WINDOW
+    settings = current_settings()
+    saved = Ticket.objects.filter(is_deleted=False, received_at__gte=since).prefetch_related("items")
+    views = [
+        view
+        for view in [*saved_views(saved), *unsaved_views(settings)]
+        if view.received_at >= since
+    ]
+    views.sort(key=lambda view: (view.received_at, view.id), reverse=True)
+    return {
+        "rows": [
+            {
+                "id": view.id,
+                "at": view.received_at,
+                "number": view.number,
+                "label": view.label,
+                "dish_names": ", ".join(item.name for item in view.live_items),
+                "waiter": view.waiter,
+            }
+            for view in views[: params.limit]
+        ]
     }
 
 

@@ -238,7 +238,8 @@ Pasos:
    curso: 0».
 Entra: lo que escribe quien la crea.
 Sale: la estación (avisa: estación creada).
-Si falla: el rechazo sale dentro del panel. Un nombre que ya tiene otra estación viva se rechaza
+Si falla: el rechazo sale dentro del panel; el motivo de un campo, debajo de él, y se quita en cuanto se
+corrige ese campo, aunque otro diga lo mismo (hub#888). Un nombre que ya tiene otra estación viva se rechaza
 («Ya hay una estación con ese nombre. Elige otro nombre.»); el de una eliminada vuelve a estar libre.
 Quien no puede gestionar estaciones no ve el botón.
 Implicados: KITCHEN-F02, KITCHEN-F03, KITCHEN-F04, KITCHEN-F08, PRINTING-F04
@@ -256,7 +257,8 @@ Entra: la estación y lo que cambia.
 Sale: la estación cambiada (avisa: estación cambiada). Desactivarla hace que los platos que se envíen
 después busquen la estación de su categoría y, si no hay, salgan «Sin estación». Lo ya enviado no cambia
 de estación ni de destino; el nombre y el color que pinta la pantalla sí son los vivos.
-Si falla: dentro del formulario. Un nombre repetido se rechaza; guardar una estación que otro
+Si falla: dentro del formulario, cada motivo bajo su campo hasta que se corrige ese campo, aunque otro
+diga lo mismo (hub#888). Un nombre repetido se rechaza; guardar una estación que otro
 dispositivo acaba de eliminar dice que ya no existe.
 Implicados: KITCHEN-F01, KITCHEN-F04, KITCHEN-F10, PRINTING-F04
 
@@ -312,8 +314,8 @@ Pasos:
 3. Cada línea que no es un servicio es un plato, en el orden de la cuenta, mandado a su estación
    (KITCHEN-F04); un menú, un plato por cada plato elegido (KITCHEN-F06). Las líneas de servicio no se
    cocinan.
-4. La comanda aparece en la pantalla «Por preparar», suena (KITCHEN-F16) y sale en papel
-   (KITCHEN-F08).
+4. La comanda aparece en la pantalla «Por preparar», suena (KITCHEN-F16), sale en papel
+   (KITCHEN-F08) y la app instalada muestra su aviso del sistema, que abre Cocina al tocarlo.
 Entra: de Ventas, las líneas enviadas de la cuenta (su ronda, su hora de envío, su producto, su
 cantidad, su nota, sus suplementos, su categoría y, si es un menú, sus platos) y, cuando el envío lo hace Cocina, la prioridad, el canal y quién
 envía.
@@ -523,10 +525,14 @@ Pasos:
    una que tenía pasa a urgente; si llegan varias a la vez, una vez.
 2. Suena con el tono y el volumen de Ajustes; al abrir la pantalla no suena por lo que ya estaba.
    Recuperar una comanda de «Listas» no vuelve a sonar: solo suenan las rondas nuevas y las urgencias.
+3. En la app instalada, cada comanda nueva muestra un aviso del sistema con su etiqueta (o su número),
+   sus platos y quien atiende; al tocarlo se abre **Cocina → Pantalla**. El navegador no muestra este
+   aviso.
 Entra: las comandas de cada actualización y los ajustes.
-Sale: el sonido; nada se guarda.
+Sale: el sonido y el aviso del sistema, una vez por comanda y dispositivo, también si la ronda aún no se
+ha guardado; guardarla no lo repite.
 Si falla: si el navegador no deja sonar hasta el primer toque, ese aviso se pierde. Con volumen 0 no
-suena.
+suena. Si Android aún no permite notificar, la app pide el permiso una vez; la comanda sigue llegando.
 Implicados: KITCHEN-F05, KITCHEN-F10, KITCHEN-F12, KITCHEN-F14, KITCHEN-F26
 
 ### KITCHEN-F17 Imprimir el pase al marcar lista
@@ -825,6 +831,7 @@ Implicados: CASH_REGISTER-F08, CASH_REGISTER-F09, KITCHEN-F10, KITCHEN-F13
 | Las comandas, con búsqueda, filtros y páginas | ver comandas | F21 | `kitchen.ticket.list` |
 | Una comanda por id, número o etiqueta («la mesa 4») | ver comandas | F21 | `kitchen.ticket.get` |
 | Las comandas de una cuenta de Ventas | ver comandas | F19 | `kitchen.ticket.by_order` |
+| Las comandas nuevas de las últimas 24 horas para el aviso del dispositivo, también las aún no guardadas | ver comandas | F05, F16 | `kitchen.ticket.notices` |
 | Las estaciones, con lo que tienen en curso | ver comandas | F01–F03 | `kitchen.station.list` |
 | Una estación por su id o su nombre: lo que lee la tarjeta del asistente para nombrarla (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver comandas | F02, F03, F04 | `kitchen.station.get` |
 | Un plato de una comanda por su id, guardada o recién enviada: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver comandas | F11, F12 | `kitchen.item.get` |
@@ -939,10 +946,16 @@ que no tiene ningún papel: solo el sistema (`*`).
 - Anatomía completa: `apps.py`, `models.py`, `migrations/` (`0001_initial`; `0002_settings_row` crea la
   fila de ajustes con la hora desde la que Cocina recibe, con reverso; `0003_ticket_printed_at`;
   `0004_item_options_and_menu`, los suplementos y el menú de cada plato), `schemas.py`, `queries.py`,
-  `services.py`, `events.py`, `live.py`, `api.py` (27 rutas: todas las operaciones salvo `receive` y
+  `services.py`, `events.py`, `live.py`, `api.py` (28 rutas: todas las operaciones salvo `receive` y
   `sync`, que son del sistema, y las dos lecturas internas de la tarjeta del asistente), `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por
   fichero, más `test_integration_sale.py`, `test_integration_inventory.py`, `test_integration_combo.py`,
   `test_integration_modifier.py` y `test_concurrency.py` con las apps reales.
+- **Avisos del dispositivo** (KITCHEN-F05/F16): `apps.py` declara un `DeviceNotice` sobre
+  `kitchen.ticket.notices`; incluye las rondas de Ventas aún no guardadas y las ya guardadas con el mismo
+  id, las de las últimas 24 horas, lo más nuevo primero. `base.notice.list` rellena título y cuerpo en el
+  idioma de la persona y la shell avisa una vez por dispositivo con `erplora_notify`; el toque abre
+  `/kitchen/display`. Se actualiza con `sale.order.fired`, `kitchen.ticket.received` y
+  `kitchen.ticket.created`, sin esperar al relay.
 - **`requires = ["sale", "inventory"]`**. El enrutado apunta a `inventory.Product` y
   `inventory.Category` con clave ajena. Las cuentas y las líneas de Ventas, por UUID opaco
   (`Ticket.order_id`, `TicketItem.sale_line_id`): sin clave ajena, como Mesas.

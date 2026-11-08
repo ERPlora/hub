@@ -57,8 +57,8 @@ describe('kitchen routes.ts', () => {
   it('has a page for every tab, and every menu entry of apps.py is one of them', () => {
     expect(routes.map((r) => r.path)).toEqual(KITCHEN_TABS.map((tab) => tab.to));
     const appsPy = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
-    const paths = [...appsPy.matchAll(/"(\/kitchen\/[a-z-]+)"/g)].map((m) => m[1]);
-    expect(paths.every((path) => routes.some((r) => r.path === path))).toBe(true);
+    const paths = new Set([...appsPy.matchAll(/"(\/kitchen\/[a-z-]+)"/g)].map((m) => m[1]));
+    expect([...paths].every((path) => routes.some((r) => r.path === path))).toBe(true);
     expect(paths).toHaveLength(4);
   });
 });

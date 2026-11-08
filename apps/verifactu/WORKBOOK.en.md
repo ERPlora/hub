@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9de4abc037aa355811067c47ad725c4acd573a75baf533bae750e78e36b52dab -->
+<!-- generated from WORKBOOK.md sha256:19e525498afa85556210316996c96274495b131dd041a1c81c6e5ad4ae6fae7f -->
 
 ## What it is for and who it is for
 
@@ -72,6 +72,11 @@ Here the reference is not a competitor: it is the AEAT's rules.
   VeriFactu is told "An administrator has to set this up.". Only a business in Spain is asked; one without a
   country (a demo) counts as Spain, and one from another country never sees it, neither in testing nor in production
   (hub#682).
+- **It is mandatory in Spain.** While it is off in a business in Spain (or without a country, such as a demo),
+  "Finish setting up your business" asks whoever runs it to "Turn on VeriFactu" ("Important"), with "Set up"
+  leading to **Apps**; as soon as they turn it on, that step goes and "Set up VeriFactu" comes. It never turns on by
+  itself: it binds the business to the AEAT until the end of the calendar year, so the owner turns it on (BASE-F01,
+  hub#997).
 - **The software producer's data** (ERPlora) go fixed in every record (its responsible declaration declares them),
   also "Serves several taxpayers", always "S" (contradiction 7, closed).
 
@@ -249,7 +254,7 @@ Screen notices: the result of each action in a strip on top (green if it went we
 | VERIFACTU-F35 | Ask the AEAT whether it already has a queue record | done — in the record's detail, in the Hub's admin and through the API |
 
 ### VERIFACTU-F01 Activate VeriFactu
-Status: done — turning the app on in the Hub is activating it (activation per hub arrives with phase 2); outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), one already on records and sends nothing (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) and the Home does not ask it to "Set up VeriFactu" (hub#682)
+Status: done — turning the app on in the Hub is activating it (activation per hub arrives with phase 2); outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), one already on records and sends nothing (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) and the Home does not ask it to "Set up VeriFactu" (hub#682); no template turns it on, in Spain either: the owner turns it on (hub#998)
 Actor: administrator
 Screen: Hub: Apps
 Steps:
@@ -258,18 +263,24 @@ Steps:
    environment.
 3. Only in a business in Spain. In one from another country (that of its erplora.com account), Apps does not offer
    it: it shows "Not available" with "VeriFactu is only for businesses in Spain." and no "Turn on", and the hub answers
-   the same if asked through the assistant or the API. A hair salon or restaurant template does not promise to turn it
-   on, loads everything else and ends complete, with no "Retry", saying why VeriFactu stays out.
+   the same if asked through the assistant or the API. A data file that brings it (the one another business exported)
+   does not promise to turn it on, loads everything else and ends complete, with no "Retry", saying why VeriFactu
+   stays out.
 4. If it was already on in a business from another country, it does nothing and can be turned off: invoices go out without a record or QR, **VeriFactu → Settings** and **VeriFactu → Configuration**
    say on top "VeriFactu is only for businesses in Spain." without offering anything that leads to the AEAT, and
    whatever asks to record or send something answers the same.
    "Finish setting up your business", on the Home, does not ask it to "Set up VeriFactu" nor does the strip "You
    cannot invoice yet" show because of it; a business without a country (a demo) counts as Spain and does see it
    (hub#682).
+5. No template turns it on, in Spain either: neither the Home's "Start with a business like yours" nor "Use template"
+   in **Settings → Data and backups** names it in "Review what it brings" or turns it on. They load everything else of
+   the sector, Invoicing included, and VeriFactu stays "Off" in Apps, with "Turn on", and "Finish setting up your
+   business" asks to "Turn on VeriFactu" until the owner turns it on themselves: it binds them to the AEAT until the end
+   of the calendar year and no longer goes off (VERIFACTU-F32).
 In: nothing but the order.
 Out: the app active; no switch of its own.
 If it fails: the Hub's apps page says so.
-Involved: INVOICE-F01, BASE-F18
+Involved: INVOICE-F01, BASE-F18, BASE-F31, BASE-F38
 
 ### VERIFACTU-F02 Upload the business's own certificate
 Status: done — in the Hub; encrypted in the hub's DB with `FISCAL_CERTIFICATE_KEY`

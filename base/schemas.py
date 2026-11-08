@@ -318,7 +318,10 @@ class SetupStatusIn(Schema):
 
 
 class SetupItemOut(Schema):
-    key: str = Field(description="«<app>.<step>»: «base.apps», «base.team» or a module's own step.")
+    key: str = Field(
+        description="«<app>.<step>»: «base.apps», «base.mandatory.<app>» (turn on an app mandatory in the business's "
+        "country), «base.team» or a module's own step."
+    )
     app: str = Field(description="The app that declares the step («base» for the platform's).")
     state: Literal["done", "pending", "unavailable"] = Field(
         description="«unavailable»: ours, not the person's task (nothing could be turned on)."
@@ -460,12 +463,19 @@ class AppOut(Schema):
     requires: list[str]
     required_by: list[str]
     #: Why turning it on (off) or off (on) is refused, in the reader's language: an app's own ``can_enable`` or
-    #: ``can_disable``, and the apps it depends on (hub#618, hub#694); ``None``: nothing refuses it.
+    #: ``can_disable``, base's for one the business's country requires on, and the apps it depends on (hub#618,
+    #: hub#694, hub#997); ``None``: nothing refuses it.
     refusal: str | None
+    #: The business's country requires it on, as the app declares it (``mandatory``, hub#997): «Mandatory in …», on or
+    #: off; once on there, it never goes off.
+    mandatory: bool
 
 
 class AppListOut(Schema):
     apps: list[AppOut]
+    #: The business's country by its name in the reader's language (a business without one is in Spain): what
+    #: «Mandatory in …» says.
+    country_name: str
     #: erplora.com's Store of this business's modules, where a paid one is bought (never inside the Hub).
     store_url: str
     #: erplora.com's plans of this business, where a higher limit is bought.
@@ -762,7 +772,7 @@ class BlueprintSummaryOut(Schema):
 
 
 class BlueprintImportIn(BlueprintSourceIn):
-    apps: list[str] | None = Field(
+    apps: list[Annotated[str, Field(json_schema_extra=names("base.app.get", by="app"))]] | None = Field(
         None,
         max_length=200,
         title=gettext_noop("Apps to load"),

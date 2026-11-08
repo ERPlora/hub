@@ -82,6 +82,10 @@ Aquí la referencia no es un competidor: es la norma de la AEAT.
   todo el equipo, y a quien no configura VeriFactu le dice «Esto lo tiene que configurar un administrador.». Solo
   se lo pide a un negocio de España; uno sin país (una demo) cuenta como España, y uno de otro país no lo ve nunca,
   ni en pruebas ni en producción (hub#682).
+- **Es obligatoria en España.** Mientras está desactivada en un negocio de España (o sin país, como una demo),
+  «Termina de configurar tu negocio» pide a quien lo administra «Activa VeriFactu» («Importante»), con «Configurar»
+  que lleva a **Apps**; en cuanto la activa, ese paso se va y llega «Configura VeriFactu». Nunca se activa sola:
+  ata al negocio con la AEAT hasta el fin del año natural, así que la activa el dueño (BASE-F01, hub#997).
 - **Los datos del productor del software** (ERPlora) van fijos en cada registro (los declara su declaración
   responsable), también «Da servicio a varios obligados», siempre «S» (contradicción 7, cerrada).
 
@@ -265,7 +269,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 
 ### VERIFACTU-F01 Activar VeriFactu
 <!-- origen: old-hub:HUB-F300 old:verifactu/workflow/configuracion.md#verifactu-f01 -->
-Estado: hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2); fuera de España, Apps no la ofrece y el hub la niega (`can_enable`, hub#694), una ya encendida no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) y el Inicio no le pide «Configura VeriFactu» (hub#682)
+Estado: hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2); fuera de España, Apps no la ofrece y el hub la niega (`can_enable`, hub#694), una ya encendida no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) y el Inicio no le pide «Configura VeriFactu» (hub#682); ninguna plantilla la enciende, tampoco en España: la activa el dueño (hub#998)
 Actor: administrador
 Pantalla: Hub: Apps
 Pasos:
@@ -274,16 +278,21 @@ Pasos:
    pruebas.
 3. Solo en un negocio de España. En uno de otro país (el de su cuenta de erplora.com), Apps no la ofrece: sale
    «No disponible» con «VeriFactu solo es para negocios de España.» y sin «Activar», y el hub contesta lo mismo si se
-   pide por el asistente o por la API. Una plantilla de peluquería o de restaurante no promete encenderla, carga todo
-   lo demás y queda completa, sin «Reintentar», diciendo por qué VeriFactu se queda fuera.
+   pide por el asistente o por la API. Un fichero de datos que la trae (el que exportó otro negocio) no promete
+   encenderla, carga todo lo demás y queda completo, sin «Reintentar», diciendo por qué VeriFactu se queda fuera.
 4. Si ya estaba encendida en un negocio de otro país, no hace nada y se puede desactivar: las facturas salen sin registro ni QR, **VeriFactu → Ajustes** y **VeriFactu → Configuración** dicen
    arriba «VeriFactu solo es para negocios de España.» sin ofrecer nada que lleve a la AEAT, y lo que pida registrar o enviar algo contesta lo mismo.
    «Termina de configurar tu negocio», en el Inicio, no le pide «Configura VeriFactu» ni la franja «Todavía no puedes
    facturar» sale por ella; un negocio sin país (una demo) cuenta como España y sí lo ve (hub#682).
+5. Ninguna plantilla la enciende, tampoco en España: ni «Empieza con un negocio como el tuyo» del Inicio ni «Usar
+   plantilla» de **Ajustes → Datos y copias** la nombran en «Revisa lo que trae» ni la activan. Cargan todo lo demás del
+   sector, Facturación incluida, y VeriFactu sigue «Desactivada» en Apps, con «Activar», y «Termina de configurar tu
+   negocio» pide «Activa VeriFactu» hasta que el dueño la enciende él: le ata a la AEAT hasta el fin del año natural y
+   ya no se apaga (VERIFACTU-F32).
 Entra: nada más que la orden.
 Sale: la app activa; sin interruptor propio.
 Si falla: lo dice la página de apps del Hub.
-Implicados: INVOICE-F01, BASE-F18
+Implicados: INVOICE-F01, BASE-F18, BASE-F31, BASE-F38
 
 ### VERIFACTU-F02 Subir el certificado propio del negocio
 <!-- origen: fi:hub/runtime#certificado-fiscal-del-negocio-core-adr-0079-0081 fi:hub/server-cloud#settings-capabilities-certificado-fiscal-settings-rs old-hub:HUB-F302 old:verifactu/workflow/configuracion.md#verifactu-f02 qa:modules/verifactu/configure-identity-and-certificate -->
@@ -1529,9 +1538,9 @@ Las cerradas quedan tachadas con su motivo; las abiertas dicen dónde siguen.
     guarda otra fuente del mismo dato (FIX-HUB-VERIFACTU-OWN-SHORTCUT-FOR-PLATFORM-HUB-COUNTRY). Lo sellado antes en
     un negocio de fuera no se borra (los registros fiscales nunca se borran): se queda sin enviar, con su motivo. **Apps**
     no la ofrece encendible fuera de España: `can_enable(self, ctx) -> str | None` en `LiveAppConfig`, como
-    `can_disable`, que respetan `base.app.enable`, `base.app.retry` y `base.app.list` (hub#694). Una plantilla de
-    vertical pasa por `base.app.enable`: VeriFactu se queda fuera, con su motivo, y lo demás carga. Una ya encendida
-    se queda como está y no hace nada.
+    `can_disable`, que respetan `base.app.enable`, `base.app.retry` y `base.app.list` (hub#694). Un fichero que la
+    trae pasa por `base.app.enable`: VeriFactu se queda fuera, con su motivo, y lo demás carga (ninguna plantilla del
+    catálogo la trae, decisión 17). Una ya encendida se queda como está y no hace nada.
 16. **Una vez encendida, VeriFactu no se apaga en España** (FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON, 2026-11-01; ajuste
     de Ioan del 22/10 en el plan de la fase 2, «Tablas por módulo (S3)»): `disable_refusal` contesta siempre
     `NEVER_OFF`, salvo fuera de España (decisión 15) o si nunca llegó a `on` (`creating` o `failed` de S3: no ha
@@ -1545,6 +1554,13 @@ Las cerradas quedan tachadas con su motivo; las abiertas dicen dónde siguen.
     la negativa por registros pendientes (hub#267; el aviso con cuántos de hub#2595 queda sin objeto). Solo
     `base.app.disable` apaga una app: bajar de plan no apaga nada (BASE-F24), la foto del SaaS no apaga apps, una
     demo caducada se borra entera y la baja de un negocio conserva su base de datos.
+17. **Ninguna plantilla la enciende, tampoco en España** (PLAN-HUB, ronda 2026-11-07; hub#998): una app que ata al
+    negocio con la AEAT hasta fin de año y no se apaga (decisión 16) la activa el dueño, de forma explícita, como en
+    Square, Odoo, Holded o Sage 50. La app no lista ningún sector en `verticals` (`apps.py`), así que
+    `base.catalog.template_apps` no la mete en las plantillas de restaurante ni de peluquería: ni «Revisa lo que trae»
+    la anuncia ni la carga la activa. Consecuencia en erplora.com: `verticals` es también lo que la tienda pública
+    usa para «Pensada para» y para las apps de cada sector (`public/industries.py` del SaaS), así que VeriFactu deja
+    de salir en las páginas de restaurante y de peluquería, como Pagos, que tampoco viene en ninguna plantilla.
 
 ### Cambios frente al producto actual
 

@@ -4782,8 +4782,9 @@ def _unchanged(hub: Hub | None, label: str, row: activation.Activation) -> dict:
     ai={
         "description": "Turns off one of this business's apps (by its name as the person says it, or its id): it "
         "leaves everyone's menu and its screens stop opening; the apps that came along only with it go off too. Nothing "
-        "is deleted: turned on again, it has its data. Refused while another app on needs it, when the app itself says "
-        "why not yet or when the name fits several apps (ask which one). already=true: it was off already.",
+        "is deleted: turned on again, it has its data; an app the business's country requires stays on. Refused while "
+        "another app on needs it, when the business's country requires the app on, when the app itself says why not "
+        "yet or when the name fits several apps (ask which one). already=true: it was off already.",
         "risk": "high",
         "check": "base.app.get",
         "asks": {
@@ -4801,24 +4802,30 @@ def _unchanged(hub: Hub | None, label: str, row: activation.Activation) -> dict:
     },
 )
 def app_disable(ctx: OperationContext, data: AppChangeIn) -> dict:
-    """BASE-F23/F25: the app off, and what came along only with it. 409 ``base.app_required`` while an app on needs
-    it (naming the ones to turn off first); 409 ``base.app_vetoed`` when it, one that would go off with it or one of
-    those that need it refuses (``can_disable``, FIX-BASE-APP-TURN-OFF-VETO, hub#619: nobody can turn off first one that
-    refuses). Its tables are never dropped."""
+    """BASE-F23/F25: the app off, and what came along only with it but what the business's country requires on, which
+    stays on (hub#997). 409 ``base.app_required`` while an app on needs it (naming the ones to turn off first); 409
+    ``base.app_vetoed`` when it, one that would go off with it or one of those that need it refuses (``can_disable``, or
+    base's reason for one the country requires on: FIX-BASE-APP-TURN-OFF-VETO, hub#619, hub#997; nobody can turn off
+    first one that refuses). Its tables are never dropped."""
     with activation.changing(ctx.scope.key):
         return _disable(ctx, data)
 
 
 def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
-    app = _business_module(ctx, data.app, _business_hub(ctx)).label
+    hub = _business_hub(ctx)
+    app = _business_module(ctx, data.app, hub).label
     graph = activation.module_graph()
     if not activation.states_of(ctx.scope)[app].wanted:
         return _app_answer(app, activation.OFF_ROW, [], already=True)
     current = _locked_states(ctx, graph)
     if not current[app].wanted:
         return _app_answer(app, activation.OFF_ROW, [], already=True)
-    said = activation.refusals(activation.keeping_on(app, current, graph), ctx=ctx)
-    refused = queries.app_off_refusal(ctx, app, current, graph, said)
+    # What the business's country requires on never goes off, by itself nor along with this one (hub#997).
+    country = hub.country if hub else ""
+    kept = activation.mandatory_on(current, country)
+    keeping = activation.keeping_on(app, current, graph, kept)
+    said = activation.refusals(keeping, ctx=ctx, kept=kept, country=country)
+    refused = queries.app_off_refusal(ctx, app, current, graph, said, kept)
     if refused is not None:
         raise AppVetoed(refused[1], app=refused[0])
     needed = activation.required_by(app, current, graph)
@@ -4828,7 +4835,7 @@ def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
         with translation.override(ctx.language):
             message = gettext("Turn off %(apps)s first.") % {"apps": _names_said(ctx, first)}
         raise AppRequired(message, required_by=needed)
-    changes = activation.disabling(app, current, graph)
+    changes = activation.disabling(app, current, graph, kept)
     _write_states(ctx.scope.key, changes)
     along = [label for label in changes if label != app]
     record_event(ctx, events.APP_DISABLED, {"app": app, "along": along})

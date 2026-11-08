@@ -98,14 +98,23 @@ def test_navigation_is_the_old_modules_single_entry_with_a_registered_icon():
     ]
 
 
+#: The reads that are no assistant tool: what names a blocked period on the assistant's card (hub#635); the model reads
+#: the blocks by their list.
+INTERNAL_READS = {"appointment.blocked_time.get"}
+
+
 def test_every_operation_is_a_tool_of_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: the operation's
     # permission is its only door. A command says its risk; a read has none.
-    from live.operations import registry
+    from live.operations import INTERNAL, registry
 
     ops = {name: op for name, op in registry.items() if name.startswith("appointment.")}
     assert ops, "the appointment app declares no operation"
+    assert {name for name, op in ops.items() if op.ai is INTERNAL} == INTERNAL_READS
     for name, op in ops.items():
+        if name in INTERNAL_READS:
+            assert (op.kind, op.expose_api) == ("query", False), name
+            continue
         assert op.ai and op.ai.get("description"), name
         if op.kind == "command":
             assert op.ai.get("risk") in {"normal", "high"}, name

@@ -508,7 +508,9 @@ Steps = Annotated[
 
 
 class FlowRefIn(In):
-    id: UUID | None = Field(None, description=D_FLOW_ID, json_schema_extra=AN_AUTOMATION)
+    id: UUID | None = Field(
+        None, title=gettext_noop("Automation"), description=D_FLOW_ID, json_schema_extra=AN_AUTOMATION
+    )
     flow: Reference | None = Field(None, validate_default=True, description=D_FLOW)
 
     @field_validator("flow")
@@ -565,8 +567,23 @@ class EnabledIn(FlowRefIn):
     enabled: bool = Field(description="true: turn it on; false: pause it.")
 
 
+class OperationRefIn(In):
+    operation: str = Field(max_length=96, description="The operation to name, by its registered name.")
+
+
+class OperationNameOut(Schema):
+    operation: str
+    label: str
+
+
 class GrantIn(FlowRefIn):
-    operations: list[Annotated[str, StringConstraints(max_length=96)]] = Field(
+    operations: list[
+        Annotated[
+            str,
+            StringConstraints(max_length=96),
+            Field(json_schema_extra=names("flow.operation.get", by="operation", name=("label",))),
+        ]
+    ] = Field(
         max_length=100,
         title=gettext_noop("Permissions"),
         description="The whole list of actions and reads it may run, by name; what is not here is withdrawn.",
@@ -606,7 +623,11 @@ class StatusIn(In):
 
 
 class RunRefIn(In):
-    id: UUID = Field(description="The run's id (its reference in the history).", json_schema_extra=A_RUN)
+    id: UUID = Field(
+        title=gettext_noop("Automation run"),
+        description="The run's id (its reference in the history).",
+        json_schema_extra=A_RUN,
+    )
 
 
 class RecordCallIn(In):
@@ -756,7 +777,11 @@ class QuestionListIn(In):
 
 
 class QuestionRefIn(In):
-    id: UUID = Field(description="The question's id, from `flow.question.list`.", json_schema_extra=A_QUESTION)
+    id: UUID = Field(
+        title=gettext_noop("Question"),
+        description="The question's id, from `flow.question.list`.",
+        json_schema_extra=A_QUESTION,
+    )
 
 
 class AnswerIn(QuestionRefIn):

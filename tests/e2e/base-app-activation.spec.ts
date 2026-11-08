@@ -15,7 +15,7 @@
 // offers no «Desactivar» and says its own reason on its row, as the server does when asked directly (BASE-F25,
 // VERIFACTU-F32, hub#618). That ticket is issued through Invoicing's API and deleted after the run with its record
 // (`cleanInvoices`), the numbering given back.
-// flow: BASE-F18 BASE-F19 BASE-F23 BASE-F24 BASE-F25 BASE-F26
+// flow: BASE-F14 BASE-F16 BASE-F18 BASE-F19 BASE-F23 BASE-F24 BASE-F25 BASE-F26
 import { execFileSync } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 
@@ -25,6 +25,7 @@ import {
   A,
   api,
   appRow,
+  capture,
   horizontalOverflow,
   HUB_DIR,
   hostPage,
@@ -458,6 +459,65 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       expect(await menuApps(page)).toEqual(expect.arrayContaining(['VeriFactu', 'Facturación']));
       await snap(page, 'vetoed', width);
       await page.screenshot({ path: shot(`FIX-HUB-BASE-APP-ACTIVATION-BASE-F25-veto-${width}`) });
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+// hub#997 (part 2): an app the business's country requires — `a` has none, so it is in Spain: Taxes everywhere,
+// VeriFactu in Spain — says «Obligatoria en España» next to its state, on or off (BASE-F14, BASE-F16). Taxes on offers
+// no «Desactivar» and says base's reason, as the server does when asked directly (BASE-F25), and turning off Sales,
+// which it came along with, leaves it on and never names it (BASE-F23). `a` stands here for a business that turned on
+// Sales alone: Taxes and Customers came along with it, everything else is off (VeriFactu too).
+for (const [label, viewport] of Object.entries(VIEWPORTS)) {
+  const width = Number(label);
+
+  test(`BASE-F14 BASE-F23 BASE-F25 — an app mandatory in Spain says so, never goes off and stays on when Sales goes, at ${width}`, async ({ browser }) => {
+    await pushPhoto(GRATIS);
+    psql(
+      [
+        "update base_appactivation set state = 'off', chosen = false where host = 'a'",
+        "update base_appactivation set state = 'on', chosen = (app = 'sale') where host = 'a' and app in ('sale', 'tax', 'customer')",
+      ].join('; '),
+    );
+    const { context, page } = await signedInSpanish(browser, viewport, '/apps');
+    try {
+      const mandatory = 'Impuestos es obligatoria para los negocios de España: no se puede desactivar.';
+      await search(page, 'Impuestos');
+      await expect(appRow(page, 'tax').locator('[data-testid="apps-mandatory"]')).toHaveText('Obligatoria en España');
+      await expect(appRow(page, 'tax').locator('[data-testid="apps-state"]')).toHaveText('Activa');
+      await expect(appRow(page, 'tax').locator('[data-testid="apps-refusal"]')).toHaveText(mandatory);
+      await expect(testid(page, 'apps-row-tax-toggle')).toHaveCount(0);
+      await snap(page, 'mandatory', width);
+      await capture(page, `FIX-HUB-997-MANDATORY-MINE-${width}`);
+      // The server says the same if asked anyway, and nothing is written.
+      const direct = await api<{ error: { code: string; message: string; app: string } }>(context, A, 'POST', '/apps/disable', { app: 'tax' });
+      expect(direct.status).toBe(409);
+      expect(direct.data.error).toMatchObject({ code: 'base.app_vetoed', message: mandatory, app: 'tax' });
+      expect(stored('tax'), 'nothing written').toBe('on:false');
+
+      // BASE-F23 — «Desactivar» Sales names Customers, which came along only with it, never Taxes, which stays on.
+      await search(page, 'Ventas');
+      await expect(appRow(page, 'sale').locator('[data-testid="apps-mandatory"]')).toHaveCount(0);
+      await testid(page, 'apps-row-sale-toggle').click();
+      const askOff = page.locator('.ep-confirm-dialog').last();
+      await expect(askOff).toContainText('Clientes se desactiva con ella: solo la necesitaba Ventas / TPV.');
+      await expect(askOff).not.toContainText('Impuestos');
+      await askOff.getByRole('button', { name: 'Desactivar' }).click();
+      await expect(toast(page, 'Ventas / TPV está desactivada. También se ha desactivado: Clientes.')).toBeVisible();
+      expect([stored('sale'), stored('customer'), stored('tax')]).toEqual(['off:false', 'off:false', 'on:false']);
+      await search(page, 'Impuestos');
+      await expect(appRow(page, 'tax').locator('[data-testid="apps-state"]')).toHaveText('Activa');
+
+      // BASE-F16 — in «Añadir apps», VeriFactu, off, is labelled too, and can be turned on.
+      await page.goto(`${A}/apps#all`);
+      await search(page, 'VeriFactu');
+      await expect(appRow(page, 'verifactu').locator('[data-testid="apps-mandatory"]')).toHaveText('Obligatoria en España');
+      await expect(appRow(page, 'verifactu').locator('[data-testid="apps-state"]')).toHaveText('Desactivada');
+      await expect(testid(page, 'apps-row-verifactu-toggle')).toContainText('Activar');
+      await snap(page, 'mandatory-off', width);
+      await capture(page, `FIX-HUB-997-MANDATORY-ALL-${width}`);
     } finally {
       await context.close();
     }

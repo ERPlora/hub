@@ -131,6 +131,7 @@ async function save(): Promise<void> {
         label-placement="floating"
         fill="outline"
         mode="md"
+        name="clock_in_at"
         :error-text="local.clock_in_at || fieldErrors.clock_in_at"
         :class="invalid(local.clock_in_at || fieldErrors.clock_in_at)"
         @ion-input="clockIn = text($event.detail.value)"
@@ -144,6 +145,7 @@ async function save(): Promise<void> {
         label-placement="floating"
         fill="outline"
         mode="md"
+        name="clock_out_at"
         :error-text="local.clock_out_at || fieldErrors.clock_out_at"
         :class="invalid(local.clock_out_at || fieldErrors.clock_out_at)"
         @ion-input="clockOut = text($event.detail.value)"
@@ -159,6 +161,7 @@ async function save(): Promise<void> {
         auto-grow
         counter
         :maxlength="500"
+        name="reason"
         :error-text="local.reason || fieldErrors.reason"
         :class="invalid(local.reason || fieldErrors.reason)"
         @ion-input="reason = text($event.detail.value)"

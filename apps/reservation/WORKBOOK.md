@@ -648,8 +648,10 @@ como lo nombran las pantallas de Reservas, nunca por su código: una reserva, po
 hora («Ana García · 15 oct 2026 · 21:00»; sin nombre, por su teléfono; con los datos del cliente borrados,
 por el día y la hora); una entrada de la lista de espera, igual; una franja, por su día de la semana y sus
 horas («Jueves · 20:00–23:30»); una fecha bloqueada, por su día y, si no es entera, sus horas; el cliente,
-por el nombre de su ficha, y la mesa, por su número. Un registro que quien confirma no puede ver (por
-ejemplo, la ficha de un cliente sin permiso para ver clientes) no sale en la tarjeta.
+por el nombre de su ficha, y la mesa, por su número. En una acción peligrosa, la etiqueta dice qué es:
+«Reserva», «Franja», «Fecha bloqueada» o «Entrada de la lista de espera», nunca «Registro». Un registro
+que quien confirma no puede ver (por ejemplo, la ficha de un cliente sin permiso para ver clientes) no
+sale en la tarjeta.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -857,7 +859,10 @@ la que solo se le autorizó reservar.
   `.time_slot.get`, `.blocked_date.get`), que da su `label` en el idioma de quien la pide (`queries.py`,
   `*_label`: día mediano y hora corta de CLDR, como dice la tarjeta una fecha); el cliente
   (`customer_id`, `on_behalf_of`), `customer.customer.detail` por su `name`; la mesa, `table.table.get`
-  por su `number`. El trinquete de `base/tests/test_assistant_card_values.py` no deja entrar uno sin marca.
+  por su `number`. El id de una reserva, franja, fecha bloqueada o entrada lleva además su `title`, con su
+  español en `locale/`: la tarjeta peligrosa lo nombra por lo que es, nunca «Registro». El trinquete de
+  `base/tests/test_assistant_card_values.py` no deja entrar uno sin marca ni una escritura peligrosa de la
+  plataforma o Reservas sin título.
 - **Administrador de Django con CRUD completo** (ronda 12, PLAN §17): ajustes, franjas, bloqueos,
   reservas y lista de espera; ids y fechas en solo lectura. Lo que guarda no pasa por las operaciones
   ni deja aviso.
@@ -935,8 +940,6 @@ la que solo se le autorizó reservar.
 
 ### Lo que queda fuera
 
-- **hub#549** — La tarjeta de confirmación del asistente llama «Registro» a la reserva, la franja o la
-  entrada que va a borrar.
 - **hub#550** — La tarjeta de confirmación del asistente dice la mesa solo por su número, sin su zona.
 - **Asignación automática de mesa y juntar mesas para un grupo grande**: una reserva tiene una mesa
   (la retención de Mesas es una por reserva); juntar mesas espera a que Mesas tenga mesas unidas
