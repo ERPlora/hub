@@ -33,6 +33,8 @@ describe('HomeMyApps', () => {
     const first = m.wrapper.get('[data-testid="home-my-app"]');
     expect(first.attributes('title')).toBe('App demo');
     expect(first.attributes('href')).toBe('/demo/home');
+    expect(m.wrapper.get('.my-apps').classes()).toContain('ep-surface');
+    expect(first.get('.my-app-icon').classes()).toContain('ep-icon-tile');
     // A bare name of the menu is Ionicons (`iconName`).
     expect(m.wrapper.findAllComponents(HubIcon).map((icon) => icon.props('name'))).toEqual([
       'ion:flask-outline',
