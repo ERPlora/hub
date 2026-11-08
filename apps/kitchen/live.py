@@ -39,6 +39,10 @@ live("kitchen.ticket.all_day", on=BOARD)
 live("kitchen.ticket.list", on=BOARD)
 live("kitchen.ticket.get", on=BOARD)
 live("kitchen.ticket.by_order", on=[*BOARD, *SALE_CHECK_MOVES])
+live(
+    "kitchen.ticket.notices",
+    on=["kitchen.ticket.received", "kitchen.ticket.created", "sale.order.fired"],
+)
 live("kitchen.station.list", on=BOARD)
 live("kitchen.routing.list", on=[*STATION_EVENTS, ROUTING_CHANGED, *CATALOGUE])
 live("kitchen.settings.get", on=[SETTINGS_UPDATED])

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-21 03:19+0200\n"
+"POT-Creation-Date: 2026-11-08 03:27+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,11 +18,16 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
 "1 : 2;\n"
 
-#: apps.py:13 models.py:41
+#: apps.py:10
+#, python-brace-format
+msgid "Waiter: {waiter}"
+msgstr "Camarero: {waiter}"
+
+#: apps.py:17 models.py:41
 msgid "Kitchen"
 msgstr "Cocina"
 
-#: apps.py:20
+#: apps.py:24
 msgid ""
 "The kitchen display: every round the till sends, dish by dish, per station "
 "and to the pass."
@@ -30,7 +35,7 @@ msgstr ""
 "La pantalla de cocina: cada ronda que envía el TPV, plato a plato, por "
 "estación y hasta el pase."
 
-#: apps.py:23
+#: apps.py:27
 msgid ""
 "Kitchen turns every round the waiter sends from the till into a ticket on a "
 "kitchen display that reads from a metre away. Each dish goes to its station "
@@ -48,22 +53,32 @@ msgstr ""
 "queda por cocinar, oye un aviso cuando entra una comanda, un reloj verde, "
 "ámbar y rojo en cada tarjeta, y el historial de lo que pasó en la cocina."
 
-#: apps.py:65
+#: apps.py:69
 msgid "Display"
 msgstr "Pantalla"
 
-#: apps.py:66
+#: apps.py:70
 msgid "Tickets"
 msgstr "Comandas"
 
-#: apps.py:67
+#: apps.py:71
 msgid "Stations"
 msgstr "Estaciones"
 
-#: apps.py:68
+#: apps.py:72
 msgctxt "kitchen menu"
 msgid "History"
 msgstr "Historial"
+
+#: apps.py:79
+#, python-brace-format
+msgid "New kitchen ticket · {label}"
+msgstr "Nueva comanda · {label}"
+
+#: apps.py:79
+#, python-brace-format
+msgid "New kitchen ticket · {number}"
+msgstr "Nueva comanda · {number}"
 
 #: models.py:35
 msgid "Screen and paper"
@@ -500,51 +515,72 @@ msgstr "entrada del historial"
 msgid "history"
 msgstr "historial"
 
-#: queries.py:69
+#: queries.py:79
 msgid "That kitchen ticket does not exist in this business."
 msgstr "Esa comanda no existe en este negocio."
 
-#: queries.py:71
+#: queries.py:81
 #, python-format
 msgid ""
 "“%(said)s” matches several tickets: %(names)s. Say which one by its number."
 msgstr ""
 "«%(said)s» coincide con varias comandas: %(names)s. Di cuál por su número."
 
-#: queries.py:73
+#: queries.py:83
 msgid "That station does not exist in this business."
 msgstr "Esa estación no existe en este negocio."
 
-#: queries.py:82
+#: queries.py:84
 msgid "That dish is on no kitchen ticket of this business."
 msgstr "Ese plato no está en ninguna comanda de este negocio."
 
-#: queries.py:74
+#: queries.py:85
 #, python-format
 msgid "“%(said)s” matches several stations: %(names)s. Say which one."
 msgstr "«%(said)s» coincide con varias estaciones: %(names)s. Di cuál."
 
-#: schemas.py:28
+#: schemas.py:31
 msgid "Say which ticket: its id, its number or its label."
 msgstr "Di qué comanda: su id, su número o su etiqueta."
 
-#: schemas.py:29
+#: schemas.py:32
 msgid "Say which station: its id or its name."
 msgstr "Di qué estación: su id o su nombre."
 
-#: schemas.py:30
+#: schemas.py:33
 msgid "Say one product or one category, not both."
 msgstr "Di un producto o una categoría, no los dos."
 
-#: schemas.py:31
+#: schemas.py:34
 msgid "Say which dish: a product of the catalogue or its name."
 msgstr "Di qué plato: un producto del catálogo o su nombre."
 
-#: schemas.py:32
+#: schemas.py:35
 msgid "Add at least one dish."
 msgstr "Añade al menos un plato."
 
-#: services.py:105
+# How the assistant's card names the data of kitchen's writes (titles of the schemas).
+#: schemas.py:38
+msgid "Ticket type"
+msgstr "Tipo de comanda"
+
+#: schemas.py:39
+msgid "Dishes"
+msgstr "Platos"
+
+#: schemas.py:40
+msgid "Station colour"
+msgstr "Color de la estación"
+
+#: schemas.py:486
+msgid "From check"
+msgstr "Cuenta de origen"
+
+#: schemas.py:491
+msgid "Into check"
+msgstr "Cuenta de destino"
+
+#: services.py:107
 msgid ""
 "That kitchen ticket is no longer in the state this action requires. Refresh "
 "and try again."
@@ -552,15 +588,15 @@ msgstr ""
 "Esa comanda ya no está en el estado que requiere esta acción. Actualiza e "
 "inténtalo de nuevo."
 
-#: services.py:107
+#: services.py:109
 msgid "That ticket is no longer being cooked."
 msgstr "Esa comanda ya no se cocina."
 
-#: services.py:108
+#: services.py:110
 msgid "That ticket is VIP: a rush does not change its priority."
 msgstr "Esa comanda es VIP: marcarla urgente no cambia su prioridad."
 
-#: services.py:110
+#: services.py:112
 msgid ""
 "That ticket cannot be deleted: it comes from a check or it is already being "
 "cooked. Cancel it instead."
@@ -568,33 +604,33 @@ msgstr ""
 "Esa comanda no se puede borrar: viene de una cuenta o ya se está cocinando. "
 "Cancélala."
 
-#: services.py:112
+#: services.py:114
 msgid "That dish is not on this ticket."
 msgstr "Ese plato no está en esta comanda."
 
-#: services.py:114
+#: services.py:116
 msgid "Nothing of this ticket goes to paper: its stations are screen only."
 msgstr ""
 "Nada de esta comanda sale en papel: sus estaciones son solo de pantalla."
 
-#: services.py:116
+#: services.py:118
 msgid "Nothing on this check is cooked: services do not go to the kitchen."
 msgstr "Nada de esta cuenta se cocina: los servicios no van a cocina."
 
-#: services.py:117
+#: services.py:119
 msgid "Printing is not active in this business."
 msgstr "Impresión no está activa en este negocio."
 
-#: services.py:118
+#: services.py:120
 #, python-format
 msgid "The ticket could not be printed: %(reason)s"
 msgstr "No se pudo imprimir la comanda: %(reason)s"
 
-#: services.py:120
+#: services.py:122
 msgid "There is already a station with that name. Choose a different name."
 msgstr "Ya hay una estación con ese nombre. Elige otro nombre."
 
-#: services.py:123
+#: services.py:125
 msgid ""
 "This station cannot be deleted: products or categories are routed to it, or "
 "it has dishes to cook. Move them to another station first."
@@ -602,62 +638,46 @@ msgstr ""
 "Esta estación no se puede eliminar: tiene productos o categorías enrutados, "
 "o platos por hacer. Pásalos antes a otra estación."
 
-#: services.py:127
+#: services.py:129
 msgid "That station is switched off: switch it on or choose another one."
 msgstr "Esa estación está desactivada: actívala o elige otra."
 
-#: services.py:129
+#: services.py:131
 msgid "That product does not exist in the catalogue."
 msgstr "Ese producto no existe en el catálogo."
 
-#: services.py:130
+#: services.py:132
 #, python-format
 msgid "“%(said)s” matches several products: %(names)s. Say which one."
 msgstr "«%(said)s» coincide con varios productos: %(names)s. Di cuál."
 
-#: services.py:131
+#: services.py:133
 msgid "That category does not exist in the catalogue."
 msgstr "Esa categoría no existe en el catálogo."
 
-#: services.py:133
+#: services.py:135
 #, python-format
 msgid "“%(said)s” matches several categories: %(names)s. Say which one."
 msgstr "«%(said)s» coincide con varias categorías: %(names)s. Di cuál."
 
-#: services.py:135
+#: services.py:137
 msgid "Nothing is routed from that product or category."
 msgstr "Ese producto o esa categoría no van a ninguna estación."
 
-#: services.py:136
+#: services.py:138
 msgid "The amber warning has to come before the red one."
 msgstr "El aviso ámbar tiene que llegar antes que el rojo."
 
-#: services.py:137
+#: services.py:139
 msgid "!! URGENT !!"
 msgstr "!! URGENTE !!"
 
-#: services.py:138
+#: services.py:140
 #, python-format
 msgid "VOIDED DISH · %(label)s"
 msgstr "PLATO ANULADO · %(label)s"
 
-#: services.py:139
+#: services.py:141
 #, python-format
 msgid "CANCELLED · %(label)s"
 msgstr "ANULADA · %(label)s"
-
-# How the assistant's card names the data of kitchen's writes (titles of the schemas).
-msgid "Ticket type"
-msgstr "Tipo de comanda"
-
-msgid "Dishes"
-msgstr "Platos"
-
-msgid "From check"
-msgstr "Cuenta de origen"
-
-msgid "Into check"
-msgstr "Cuenta de destino"
-
-msgid "Station colour"
-msgstr "Color de la estación"

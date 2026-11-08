@@ -3,7 +3,11 @@ pass, and the kitchen's history (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import Category, DeviceNotice, LiveAppConfig, Nav
+
+#: A round is told as soon as Sales fires it; saving it or creating one by hand refreshes the same row.
+NOTICE_EVENTS = ["kitchen.ticket.received", "kitchen.ticket.created", "sale.order.fired"]
+NOTICE_BODY = ["{dish_names}", _("Waiter: {waiter}")]
 
 
 class KitchenConfig(LiveAppConfig):
@@ -66,4 +70,16 @@ class KitchenConfig(LiveAppConfig):
         Nav("tickets", _("Tickets"), "ion:list-outline", "/kitchen/tickets"),
         Nav("stations", _("Stations"), "ion:layers-outline", "/kitchen/stations"),
         Nav("history", pgettext_lazy("kitchen menu", "History"), "ion:time-outline", "/kitchen/history"),
+    ]
+    # KITCHEN-F05/F16: every new ticket tells the installed device; a tap opens the kitchen display.
+    notices = [
+        DeviceNotice(
+            key="received",
+            operation="kitchen.ticket.notices",
+            title=[_("New kitchen ticket · {label}"), _("New kitchen ticket · {number}")],
+            body=NOTICE_BODY,
+            route="/kitchen/display",
+            permission="kitchen.view_ticket",
+            refresh_on=NOTICE_EVENTS,
+        )
     ]

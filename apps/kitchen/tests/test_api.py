@@ -21,6 +21,7 @@ ROUTES = {
     ("GET", "/kitchen/tickets", "kitchen.ticket.list"),
     ("GET", "/kitchen/tickets/detail", "kitchen.ticket.get"),
     ("GET", "/kitchen/tickets/by_order", "kitchen.ticket.by_order"),
+    ("GET", "/kitchen/tickets/notices", "kitchen.ticket.notices"),
     ("POST", "/kitchen/tickets", "kitchen.ticket.create"),
     ("POST", "/kitchen/tickets/send", "kitchen.ticket.send"),
     ("POST", "/kitchen/tickets/start", "kitchen.ticket.start"),

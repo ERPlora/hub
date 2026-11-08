@@ -1685,6 +1685,7 @@
       "discount_type": "Tipo de descuento",
       "display_description": "Descripción visible",
       "display_name": "Nombre visible",
+      "dish_names": "Platos",
       "document": "Documento",
       "document_type": "Tipo de documento",
       "documents_pending": "Documentos pendientes",

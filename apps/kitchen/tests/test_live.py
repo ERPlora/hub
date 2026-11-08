@@ -54,6 +54,11 @@ def test_each_live_query_and_its_events():
         "kitchen.ticket.list": BOARD,
         "kitchen.ticket.get": BOARD,
         "kitchen.ticket.by_order": [*BOARD, *CHECK_MOVES],
+        "kitchen.ticket.notices": [
+            events.TICKET_RECEIVED,
+            events.TICKET_CREATED,
+            events.SALE_ORDER_FIRED,
+        ],
         "kitchen.station.list": BOARD,
         "kitchen.routing.list": [
             *events.STATION_EVENTS,
