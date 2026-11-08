@@ -161,6 +161,15 @@ export interface TicketsOut {
   tickets: TicketOut[];
 }
 
+export interface NoticeOut {
+  id: string;
+  at: string;
+  number: string;
+  label: string;
+  dish_names: string;
+  waiter: string;
+}
+
 export interface TicketSendIn {
   order_id: string;
   label?: string;
@@ -314,6 +323,10 @@ declare module '@erplora/ui/sdk' {
     'kitchen.ticket.list': { input: TicketListIn; output: Page<TicketRowOut> };
     'kitchen.ticket.get': { input: TicketRefIn; output: TicketOut };
     'kitchen.ticket.by_order': { input: ByOrderIn; output: TicketsOut };
+    'kitchen.ticket.notices': {
+      input: { since?: string | null; limit?: number };
+      output: { rows: NoticeOut[] };
+    };
     'kitchen.ticket.create': { input: TicketCreateIn; output: TicketOut };
     'kitchen.ticket.send': { input: TicketSendIn; output: TicketOut };
     'kitchen.ticket.start': { input: TicketRefIn; output: TicketOut };
