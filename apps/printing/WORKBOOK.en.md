@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fe748e07b5753f07884c7c5a135a09c77b362ca6ad0df9a5401971a21835f681 -->
+<!-- generated from WORKBOOK.md sha256:e58a0dc143637c956adda62b76039106915428c5a21f3eb322ee753084cdc282 -->
 
 ## What it is for and who it is for
 
@@ -167,6 +167,12 @@ role whose printer it refuses (PRINTING-F06).
 | Reconnecting | What is drawn stays; a strip warns "Reconnecting…" until the connection comes back. |
 | App inactive | "Printing is not active in this business." |
 | No permission | What they cannot do does not appear (in Devices, neither "Print from this device", nor "Edit", nor "Retire"); the settings show locked with "You do not have permission to change these settings.". |
+
+## Unsaved changes on Android
+
+In "Print from this device", "Edit device", "New printer" and "Edit printer", the phone's Back button asks "Discard
+changes?" when something typed or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes
+the window without saving. With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
 

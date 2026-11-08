@@ -9,6 +9,8 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { IonCheckbox, IonInput, IonNote } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { refusal } from '../lib/refusal';
 import type { DeviceOut, PrinterOut } from '../operations';
@@ -71,6 +73,9 @@ async function confirm(): Promise<void> {
   void toastSuccess(t(props.device ? 'printing.devices.modal.saved' : 'printing.devices.modal.created'));
   open.value = false;
 }
+
+// A Set has no JSON of its own: the ticked printers are compared as a sorted list.
+useUnsavedFormOnOpen('printing-device', () => ({ name: name.value, printers: [...chosen.value].sort() }), open);
 </script>
 
 <template>

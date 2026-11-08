@@ -66,3 +66,15 @@ describe('ProjectFormModal', () => {
     expect(s.field('code').placeholder).toBe('Código (q3-audit)');
   });
 });
+
+describe('ProjectFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('task-project-form'),
+      change: () => ionValue(s.field('name'), 'Audit', 'ionInput'),
+      restore: () => ionValue(s.field('name'), '', 'ionInput'),
+    });
+  });
+});
