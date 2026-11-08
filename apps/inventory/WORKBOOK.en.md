@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:bd36f4b5cef97e21c9614432b3c00078d72714a333a4a480a0e75387ab8e25a5 -->
+<!-- generated from WORKBOOK.md sha256:319a9e44052a5f86222b07c2573304c823cacef0dff8a931666625a4c0c735f6 -->
 
 ## What it is for and who it is for
 
@@ -277,6 +277,11 @@ Steps:
 5. If there are categories, search in "Categories" for the ones that group the product on the till
    and pick them one by one: each one shows below the field, with its button to remove it.
 6. Tap "Save" ("Saving…"). The panel closes and the product shows in the table with Status "Yes".
+7. In the Android app, the phone's back button with something typed or chosen and not saved (the photo
+   too) does not close the panel: it asks "Discard changes?" ("What you typed in this window has not been
+   saved."). "Keep editing", or back again, leaves the panel with what was typed; "Discard changes"
+   closes it without saving anything. With the panel as it opened, back closes it without asking
+   (hub#1015).
 In: the tax categories and their type, from Taxes; the units of measure and the product categories,
 from Inventory.
 Out: the product, active and linked to the ticked categories, in a single step: either it is saved
@@ -294,7 +299,7 @@ respect the step allowed for this unit". A SKU another live product already has:
 exists in the catalog"; a repeated EAN-13: "Another product of the catalog already has that EAN-13". A
 tax category that is no longer in Taxes is refused, also if it arrives through the assistant or the
 API. Every refusal shows inside the panel and nothing is saved.
-Involved: SALE-F01, TAX-F01, TAX-F19
+Involved: SALE-F01, TAX-F01, TAX-F19, BASE-F05
 
 ### INVENTORY-F02 Edit a product
 Status: done
@@ -306,7 +311,9 @@ Steps:
 2. Change what is needed. The SKU is locked ("The SKU is the product's identity: it is not edited").
    The stock is not edited here: it is received (INVENTORY-F13) or counted (INVENTORY-F14). The "Type"
    and the "Initial stock" do not show.
-3. Tap "Save changes". "Cancel editing" or closing the panel leaves it as it was.
+3. Tap "Save changes". "Cancel editing" or closing the panel leaves it as it was. In the Android app,
+   the back button with a change not saved asks first, as when creating (INVENTORY-F01, step 7); with no
+   change, it closes the panel.
 4. The row shows the new data.
 In: the product as it is saved; the tax categories, from Taxes; the units and the product
 categories.
@@ -317,7 +324,7 @@ If it fails: the same refusals as creating (INVENTORY-F01), inside the panel, an
 The tax category cannot be emptied: the field has no empty option. The unit of a product with stock
 is not changed: "The unit of a product with stock cannot be changed. Count its stock to zero and change
 it afterwards.".
-Involved: SALE-F01, TAX-F01, TAX-F19
+Involved: SALE-F01, TAX-F01, TAX-F19, BASE-F05
 
 ### INVENTORY-F03 Turn a product on and off
 Status: done
