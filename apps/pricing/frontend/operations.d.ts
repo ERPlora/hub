@@ -141,12 +141,13 @@ export interface PriceItemOut {
   base_price: number | null;
   min_quantity: string;
   price: number;
+  /** The currency of its list, the one `price` is in (ISO 4217). */
+  currency: string;
   updated_at: string;
 }
 
-/** One price with the currency of its list, the one its price is in (ISO 4217). */
+/** One price with the label that names it outside its list. */
 export interface PriceItemDetailOut extends PriceItemOut {
-  currency: string;
   /** How it is named outside its list, in the reader's language: «Shampoo · VIP prices · from 10». */
   label: string;
 }
@@ -215,6 +216,8 @@ export interface RuleOut {
   rule_type: RuleType;
   percent: string | null;
   amount: number | null;
+  /** The currency `amount` is in (ISO 4217): the business's; a rule belongs to no list. */
+  currency: string;
   buy_quantity: number | null;
   get_quantity: number | null;
   tiers: Tier[];

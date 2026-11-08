@@ -30,6 +30,7 @@ from apps.cart_checkout.schemas import (
     OrderPage,
     OrderRefIn,
 )
+from apps.pricing.schemas import PriceItemOut, RuleOut
 
 from base.tests.ordering import assert_reads_backwards, listed_with
 
@@ -393,18 +394,18 @@ def test_nobody_without_the_view_permission(orders):
         run("cart_checkout.cart.list", permissions={"cart_checkout.manage_cart"})
 
 
-# ── The pages filter with the declared filters only ───────────────────────────────────────────
+# ── The typed operations declare the schema fields ─────────────────────────────────────────────
 
 OPERATIONS_TS = Path(__file__).resolve().parents[1] / "frontend" / "operations.d.ts"
 
 
-def ts_fields(interface: str) -> set[str]:
+def ts_fields(interface: str, operations_ts: Path = OPERATIONS_TS) -> set[str]:
     """The fields of ``interface`` in the pages' typed operations (``frontend/operations.d.ts``)."""
-    source = OPERATIONS_TS.read_text()
+    source = operations_ts.read_text()
     found = re.search(rf"export interface {interface}(?: extends (\w+))? \{{(.*?)\n\}}", source, re.S)
     assert found, f"{interface} is not in operations.d.ts"
     fields = set(re.findall(r"^\s+(\w+)\??:", found.group(2), re.M))
-    return fields | (ts_fields(found.group(1)) if found.group(1) else set())
+    return fields | (ts_fields(found.group(1), operations_ts) if found.group(1) else set())
 
 
 @pytest.mark.parametrize(
@@ -415,6 +416,19 @@ def test_the_pages_filter_with_the_declared_filters_only(interface, schema):
     # The old module's filters lived in its manifest; a filter the query does not declare did nothing.
     # The pages build their query as these TypeScript types (vue-tsc checks it); the types are the schema.
     assert ts_fields(interface) == set(schema.model_fields)
+
+
+@pytest.mark.parametrize(
+    ("app", "interface", "schema"),
+    [
+        ("cart_checkout", "ItemOut", ItemOut),
+        ("pricing", "RuleOut", RuleOut),
+        ("pricing", "PriceItemOut", PriceItemOut),
+    ],
+)
+def test_the_typed_outputs_declare_their_schema_fields(app, interface, schema):
+    operations_ts = Path(__file__).resolve().parents[2] / app / "frontend" / "operations.d.ts"
+    assert ts_fields(interface, operations_ts) == set(schema.model_fields)
 
 
 def _tied_carts():
