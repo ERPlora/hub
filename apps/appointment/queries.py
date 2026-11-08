@@ -19,11 +19,13 @@ from dataclasses import replace
 from uuid import UUID
 
 from django.db.models import Count, Exists, OuterRef, Q, QuerySet
-from django.utils import timezone
+from django.utils import timezone, translation
+from django.utils.dates import WEEKDAYS
+from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
-from live.operations import operation
+from live.operations import INTERNAL, operation
 
 from apps.appointment import engine
 from apps.appointment.models import (
@@ -40,7 +42,9 @@ from apps.appointment.schemas import (
     AppointmentPage,
     AppointmentRefIn,
     BlockedTimeListIn,
+    BlockedTimeNamedOut,
     BlockedTimePage,
+    BlockedTimeRefIn,
     CheckIn,
     CheckOut,
     CountForServiceIn,
@@ -97,6 +101,7 @@ STAFF_CHUNK = 731
 
 APPOINTMENT_NOT_FOUND = _("That appointment does not exist in this business.")
 RECURRING_NOT_FOUND = _("That repeating appointment does not exist in this business.")
+BLOCK_NOT_FOUND = _("That blocked period does not exist in this business.")
 SERVICE_NOT_BOOKABLE = _("“%(name)s” cannot be booked: it is archived or not bookable.")
 STAFF_NOT_BOOKABLE = _("%(name)s cannot take appointments: inactive or not bookable.")
 STAFF_NOT_ELIGIBLE = _("%(name)s does not perform “%(service)s”.")
@@ -1062,6 +1067,33 @@ def list_blocked_times(ctx: OperationContext, params: BlockedTimeListIn) -> dict
     return _page(rows.order_by("start", "id"), params.limit, params.offset, blocked_out)
 
 
+def block_label(ctx: OperationContext, block: dict) -> str:
+    """How a person names a blocked period (``blocked_out``): its title, as the Agenda paints it, its day, its hour (none
+    for a whole day) and its professional (none for the whole business's)."""
+    said = start_labels(ctx, block["start"])
+    hour = "" if block["all_day"] else said["start_time_label"]
+    parts = (block["title"], said["start_date_label"], hour, block["staff_name"])
+    return " · ".join(part for part in parts if part)
+
+
+@operation(
+    "appointment.blocked_time.get",
+    kind="query",
+    permission="appointment.view_schedule",
+    input=BlockedTimeRefIn,
+    output=BlockedTimeNamedOut,
+    ai=INTERNAL,
+)
+def get_blocked_time(ctx: OperationContext, data: BlockedTimeRefIn) -> dict:
+    """One blocked period with its name: what names one on the assistant's card (``schemas.A_BLOCK``); the model and the
+    Agenda read the blocks by their list."""
+    block = BlockedTime.objects.select_related("staff").filter(pk=data.id).first()
+    if block is None:
+        raise NotFound(str(BLOCK_NOT_FOUND), code="appointment.blocked_time_not_found")
+    said = blocked_out(block)
+    return {**said, "label": block_label(ctx, said)}
+
+
 # ── Series ───────────────────────────────────────────────────────────────────────────────────
 
 
@@ -1173,6 +1205,15 @@ def list_series(ctx: OperationContext, params: RecurringListIn) -> dict:
     )
 
 
+def series_label(series: Recurring) -> str:
+    """How a person names ``series`` in the active language, as each card of the series list is titled: its customer
+    (nothing once her data were erased), its repetition, its weekday (only a weekly or biweekly one keeps one) and its
+    hour."""
+    weekday = "" if series.day_of_week is None else WEEKDAYS[series.day_of_week]
+    parts = (series.customer_name, series.get_frequency_display(), capfirst(weekday), f"{series.time:%H:%M}")
+    return " · ".join(str(part) for part in parts if part)
+
+
 def series_reach(series: Recurring, from_date: dt.date) -> tuple[int, int]:
     """``(upcoming, charged)``: the live appointments of the series from ``from_date`` on, and how many are charged."""
     start, _ = day_bounds(from_date, from_date)
@@ -1203,11 +1244,14 @@ def get_series(ctx: OperationContext, data: RecurringGetIn) -> dict:
     remaining = [day for day in dates if day >= today()]
     next_date = remaining[0] if remaining else upcoming_date
     upcoming, charged = series_reach(series, data.from_date or today())
+    with translation.override(ctx.language):
+        label = series_label(series)
     return {
         **series_out(series),
         "next_date": next_date,
         "upcoming": upcoming,
         "charged": charged,
+        "label": label,
     }
 
 
