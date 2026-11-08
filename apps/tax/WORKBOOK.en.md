@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:aa7f5a72300a5b9021c2cd26f9ff00cdc2e00be9e5040576a6dbc406bba71fa4 -->
+<!-- generated from WORKBOOK.md sha256:8a01aa27392c09f76d0ff3e8365b16d126408bc1c5ee01e08564189f50ce3246 -->
 
 ## What it is for and who it is for
 
@@ -49,11 +49,13 @@ country.
 
 - When Taxes is turned on, the business gets **11 categories**, **18 aliases** and **the rates of Spain**
   from the factory (TAX-F16). With that a Spanish business can sell without touching anything.
-- Turning on Inventory, Services, Sales, Invoicing, Menus and combos or Modifiers turns on Taxes with them,
-  and Taxes cannot be turned off while any of them is on.
-- **It is mandatory in every country**: without it nothing is charged. While it is off, "Finish setting up your
-  business" on the Home asks whoever runs the business to "Turn on Taxes" ("Important"), with "Set up" leading to
-  **Apps**; as soon as they turn it on, that step goes and "Your taxes" comes (BASE-F01, hub#997).
+- Turning on Inventory, Services, Sales, Invoicing, Menus and combos or Modifiers turns on Taxes with them.
+  Once on, Taxes is not turned off: neither by itself ("Taxes is mandatory for businesses in Spain: it can't be
+  turned off.") nor when the app it came with is turned off (BASE-F25, hub#997).
+- **It is mandatory in every country**: without it nothing is charged, and **Apps** marks it "Mandatory in Spain"
+  (or in the business's country). While it is off, "Finish setting up your business" on the Home asks whoever runs
+  the business to "Turn on Taxes" ("Important"), with "Set up" leading to **Apps**; as soon as they turn it on,
+  that step goes and "Your taxes" comes (BASE-F01, hub#997).
 - **The business's country and tax region**: the country is the one chosen when the business was signed up
   on erplora.com, and it is not changed here (a business without a country, such as a demo, is in Spain); the
   tax region —the whole country, or the Canary Islands, Ceuta or Melilla in Spain— is chosen in **Taxes →

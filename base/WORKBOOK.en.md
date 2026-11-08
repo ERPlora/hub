@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:40202ce1edba85d0b88fe67d0196058ea6eecd63ae6b6d3519ee9c103970af7f -->
+<!-- generated from WORKBOOK.md sha256:842f1cab8d4ed03ac1a9d5c7379c7eb083436469ae6ea18f500bfe2c9ef2e917 -->
 
 ## What it is for and who it is for
 
@@ -445,7 +445,7 @@ Out: nothing saved.
 If it fails: "Could not load what is left to set up" with "Retry". A step that is on us (there is no
 business app to turn on) shows as "Not available yet" with "This one is on us: there is nothing on your
 side to do yet. We are on it.".
-Involved: INVENTORY-F28, BASE-F24, VERIFACTU-F01, TAX-F17
+Involved: INVENTORY-F28, BASE-F24, BASE-F25, VERIFACTU-F01, TAX-F17
 
 ### BASE-F02 See the business at a glance on coming in
 Status: discarded — the hub's health row (the printer and WhatsApp, with a link to System) needs each app to say how its own part is doing, and that touches Printing and the WhatsApp Inbox; today the bell already warns when nobody is printing (hub#573)
@@ -701,7 +701,9 @@ Steps:
   1. They tap "Apps" in the side menu. It opens on the "My apps" tab; "Add apps" and "Paid" have their own
      address too, which can be linked.
   2. While the list arrives: "Loading your apps…". Then one row (or one card, as chosen) for each app the
-     business has running, with its icon and its name, its "Category" and its "Status" ("Active").
+     business has running, with its icon and its name, its "Category" and its "Status" ("Active"). An app the
+     business's country requires also shows, next to its status, "Mandatory in Spain" (or the business's country):
+     Taxes in every country, VeriFactu in Spain (hub#997).
   3. They search in "Search your apps…" (name, description or category), filter by category with the funnel,
      sort or choose columns.
   4. When the business subscribes to an app on erplora.com or stops having it, the list updates by itself,
@@ -735,7 +737,9 @@ Steps:
   1. In Apps, they tap "Add apps" (every ERPlora app) or "Paid" (only the ones subscribed to separately).
   2. While it arrives: "Loading the catalogue…". Then one row per app with "App", "Category", "Description",
      "Price", "Comes with" and "Status" ("Installed" or "Needs a subscription"), with the names and the
-     descriptions in the language of whoever looks.
+     descriptions in the language of whoever looks. An app the business's country requires shows "Mandatory in
+     Spain" (or the business's country) next to its status, off too: that way it shows which one is still to be
+     turned on (hub#997).
   3. They search in "Search apps to add…" (in "Paid", "Search paid apps…") by name, description or
      category, and filter by category or by status.
 In: the apps the hub brings and what the business has subscribed to on erplora.com.
@@ -870,7 +874,8 @@ Steps:
   1. In "My apps", whoever runs the business presses "Turn off" on an app's row.
   2. It always asks, with the app's name: "Turn off Reservations?" — "It leaves the menu for everyone in this
      business. Nothing is deleted: turned on again, it has its data.". If others that came only for it go with
-     it, it names them: "Tables turns off with it: only Reservations needed it.".
+     it, it names them: "Tables turns off with it: only Reservations needed it.". An app the business's country
+     requires never goes with it: on turning Sales off, Taxes stays on and is not named (hub#997).
   3. They confirm with "Turn off": "Reservations is off. Also turned off: Tables.". Both leave "My apps" and,
      without reloading, the menu of every device of the business; their screens say the app is not available
      (BASE-F26) and the counter at the top takes one away.
@@ -920,16 +925,22 @@ Steps:
   2. Neither do the apps that one needs, which cannot be turned off first, and each says which one it is for:
      "Invoicing can't be turned off: VeriFactu needs it. VeriFactu can't be turned off once it's on: the law requires
      your invoices to keep reaching the AEAT.".
-  3. Whoever runs the business presses "Turn off" on an app another running one needs and that can be turned off (for
+  3. An app on that the business's country requires ("Mandatory in Spain", BASE-F14) does not offer it either, and
+     says why: "Taxes is mandatory for businesses in Spain: it can't be turned off.". It says so itself even when
+     another app needs it, because turning that other one off would change nothing; an app with a reason of its own
+     (VeriFactu) says its own. While it is being turned on, or if it could not be, it can still be given up
+     (hub#997).
+  4. Whoever runs the business presses "Turn off" on an app another running one needs and that can be turned off (for
      instance, "Tables" while "Reservations" is on). The hub changes nothing: above the table "Nothing was changed"
      shows with what has to be done first, "Turn off Reservations first." (without asking).
-  4. The notice stays until it is closed or another app is turned on or off; the app stays "Active".
-In: the running apps that need it, or the reason of the app that refuses.
+  5. The notice stays until it is closed or another app is turned on or off; the app stays "Active".
+In: the running apps that need it, the reason of the app that refuses, or the business's country and the apps it
+requires.
 Out: nothing.
 If it fails: if it is asked for anyway through the assistant or the API, the hub answers the same reason and changes
 nothing. Without a reason of the app's own, the same notice says it could not be changed, with the app's name and
 what the hub answered.
-Involved: VERIFACTU-F32
+Involved: VERIFACTU-F32, BASE-F01
 
 ### BASE-F26 Understand why an app does not open
 Status: done

@@ -59,10 +59,12 @@ No decide el precio, no emite facturas ni habla con la AEAT, y no guarda el paí
 - Al activar Impuestos, el negocio recibe de fábrica **11 categorías**, **18 alias** y **los tipos de
   España** (TAX-F16). Con eso un negocio español puede vender sin tocar nada.
 - Activar Inventario, Servicios, Ventas, Facturación, Menús y combos o Suplementos activa Impuestos con
-  ellas, e Impuestos no se puede desactivar mientras alguna de ellas esté activa.
-- **Es obligatoria en todos los países**: sin ella no se cobra nada. Mientras está desactivada, «Termina de
-  configurar tu negocio» del Inicio pide a quien administra el negocio «Activa Impuestos» («Importante»), con
-  «Configurar» que lleva a **Apps**; en cuanto la activa, ese paso se va y llega «Tus impuestos» (BASE-F01, hub#997).
+  ellas. Una vez activa, Impuestos no se desactiva: ni sola («Impuestos es obligatoria para los negocios de
+  España: no se puede desactivar.») ni al desactivar la app con la que llegó (BASE-F25, hub#997).
+- **Es obligatoria en todos los países**: sin ella no se cobra nada, y **Apps** la marca «Obligatoria en España» (o
+  en el país del negocio). Mientras está desactivada, «Termina de configurar tu negocio» del Inicio pide a quien
+  administra el negocio «Activa Impuestos» («Importante»), con «Configurar» que lleva a **Apps**; en cuanto la
+  activa, ese paso se va y llega «Tus impuestos» (BASE-F01, hub#997).
 - **País y territorio fiscal del negocio**: el país es el que se eligió al dar de alta el negocio en
   erplora.com, y no se cambia aquí (un negocio sin país, como una demo, está en España); el territorio
   fiscal —todo el país, o Canarias, Ceuta o Melilla en España— se elige en **Impuestos → Ajustes**
