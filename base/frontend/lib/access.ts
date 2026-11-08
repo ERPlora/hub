@@ -230,7 +230,7 @@ export interface WayInDeps {
   logout: () => void;
   toast: (message: string) => void;
   /** The shell's `applyUserThemePreferences`; `null`: the business's. */
-  paint: (mode: 'system' | 'light' | 'dark' | null, palette: string | null) => void;
+  paint: (mode: 'system' | 'light' | 'dark' | null, palette: string | null, scale: number) => void;
   /** The shell's `resetUserThemePreferences`. */
   reset: () => void;
   /** The name of the person of the session. */
@@ -242,6 +242,7 @@ export interface WayInDeps {
 interface Appearance {
   theme_mode: '' | 'system' | 'light' | 'dark';
   palette: string;
+  ui_scale: number;
 }
 
 /** What the session's way in asks of the mounted shell: the idle lock of a till that always asks (BASE-G59), the
@@ -252,8 +253,8 @@ export function startWayIn(doc: Document, deps: WayInDeps): () => void {
   const stop = access.idle_minutes ? createIdleLock(access.idle_minutes, deps.logout, deps.target) : () => undefined;
   const appearance = readJsonBlock<{ preferences?: Appearance }>('hub-home', doc)?.preferences;
   const switched = takeSwitchAnnouncement(deps.storage);
-  if (appearance && (appearance.theme_mode || appearance.palette)) {
-    deps.paint(appearance.theme_mode || null, appearance.palette || null);
+  if (appearance && (appearance.theme_mode || appearance.palette || appearance.ui_scale !== 100)) {
+    deps.paint(appearance.theme_mode || null, appearance.palette || null, appearance.ui_scale);
   } else if (switched !== null) {
     deps.reset();
   }
