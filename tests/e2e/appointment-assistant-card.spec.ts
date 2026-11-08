@@ -19,10 +19,11 @@ import { post } from './service-helpers';
 const TAG = 'E2E Tarjeta cita';
 const DAY = aMonday();
 
-/** What the card calls each record, and how a weekly series repeats, by the language of the card. */
+/** What the card calls each record, how a weekly series repeats and how many records one appointment is (ui#117: the
+ *  singular, never «1 registros»), by the language of the card. */
 const WORDS = {
-  es: { appointments: 'Citas', series: 'Cita periódica', block: 'Bloqueo', professional: 'Profesional', weekly: 'Cada semana · Lunes' },
-  en: { appointments: 'Appointments', series: 'Repeating appointment', block: 'Blocked period', professional: 'Professional', weekly: 'Every week · Monday' },
+  es: { appointments: 'Citas', series: 'Cita periódica', block: 'Bloqueo', professional: 'Profesional', weekly: 'Cada semana · Lunes', oneRecord: 'Afecta a 1 registro.' },
+  en: { appointments: 'Appointments', series: 'Repeating appointment', block: 'Blocked period', professional: 'Professional', weekly: 'Every week · Monday', oneRecord: 'It acts on 1 record.' },
 };
 /** The words the card would call them by if nothing titled them, in each language. */
 const UNTITLED = { es: ['Registro', 'Ids', 'Staff Id'], en: ['Record', 'Ids', 'Staff Id'] };
@@ -117,6 +118,7 @@ for (const language of ['es', 'en'] as const) {
     for (const vp of VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await expect(card(page)).toContainText(diary.customer.name);
+      await expect(card(page)).toContainText(words.oneRecord);
       await expect(card(page)).not.toContainText(AN_ID);
       for (const untitled of UNTITLED[language]) await expect(card(page)).not.toContainText(`${untitled}:`);
       await capture(page, `hub-635-bulk-delete-${language}-${vp.label}`);
