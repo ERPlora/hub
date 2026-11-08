@@ -130,3 +130,16 @@ describe('CategoryFormModal', () => {
     expect(s.el('inventory-category-form-cancel')?.textContent?.trim()).toBe('Cancelar edición');
   });
 });
+
+describe('CategoryFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
+  it('editing: as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup({ category: category() });
+    const name = (s.el('inventory-category-name') as Control).value as string;
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.el('inventory-category-form'),
+      change: () => s.type('inventory-category-name', 'Desserts'),
+      restore: () => s.type('inventory-category-name', name),
+    });
+  });
+});

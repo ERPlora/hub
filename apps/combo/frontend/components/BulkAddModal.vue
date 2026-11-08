@@ -14,6 +14,8 @@ import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonCheckbox, IonItem, IonList, IonNote, IonSearchbar } from '@ionic/vue';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useLocale, useT } from '../composables/useT';
 import { formatMoney, useBusinessMoney } from '../lib/format';
 import { isPortion, searchCategories } from '../lib/pickers';
@@ -131,6 +133,9 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+// What is searched or narrowed only filters the list: what would be added is what is ticked.
+useUnsavedFormOnOpen('combo-bulk', picked, open);
 </script>
 
 <template>

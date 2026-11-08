@@ -138,3 +138,17 @@ describe('OpenSessionModal: a business whose money cannot be read (hub#938)', ()
     await expectWindowSaysMoneyUnreadable(m, 'cash-register-open-submit', m.sent);
   });
 });
+
+describe('OpenSessionModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
+  it('as opened closes, also once the only drawer is chosen alone; a change asks; restored closes again', async () => {
+    const s = await setup();
+    await s.result(REGISTERS, page([{ id: 'r1', name: 'Bar', is_active: true }]));
+    expect(prop(s.inDoc('cash-register-open-register'), 'value')).toBe('r1');
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('cash-register-open'),
+      change: () => ionValue(s.inDoc('cash-register-open-balance'), '150,50', 'ionInput'),
+      restore: () => ionValue(s.inDoc('cash-register-open-balance'), '', 'ionInput'),
+    });
+  });
+});

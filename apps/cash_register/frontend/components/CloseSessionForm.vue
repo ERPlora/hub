@@ -17,6 +17,7 @@ import { IonButton, IonInput, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
+import { useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
 import { useLocale, useT } from '../composables/useT';
 import { formatMoney, formatSignedMoney, moneyFieldText, moneyRefusal, readAmount, useBusinessMoney } from '../lib/money';
 import { refusal } from '../lib/refusal';
@@ -44,11 +45,16 @@ const acknowledged = shallowRef(false);
 
 // The last closing count seeds the field while the person has not typed anything, written in the business's money
 // once it has answered (before it, 1500 yen would be written «15.00»; hub#921).
+/** The last closing count, written in the business's money; `null` until both have answered. */
+const seed = computed(() => {
+  const last = counts.data.value?.rows?.find((count) => count.type === 'closing');
+  const money = business.value;
+  return last && money ? moneyFieldText(last.total, locale.value, money.decimals) : null;
+});
 watch(
-  [() => counts.data.value?.rows, business],
-  ([rows, money]) => {
-    const last = rows?.find((count) => count.type === 'closing');
-    if (last && money && !touched.value) counted.value = moneyFieldText(last.total, locale.value, money.decimals);
+  seed,
+  (text) => {
+    if (text !== null && !touched.value) counted.value = text;
   },
   { immediate: true },
 );
@@ -124,6 +130,9 @@ async function confirm(): Promise<void> {
 }
 
 defineExpose({ confirm });
+
+// The body only exists while the window is open: as it opened is the cash the last count left and no notes.
+useUnsavedForm('cash-register-close-notes', () => ({ counted: counted.value, notes: notes.value }), () => ({ counted: seed.value ?? '', notes: '' }));
 </script>
 
 <template>

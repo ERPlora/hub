@@ -13,6 +13,7 @@ import { IonInput, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useLocale, useT } from '../composables/useT';
 import { useBusinessMoney } from '../lib/format';
 import { searchTaxCategories } from '../lib/pickers';
@@ -137,6 +138,16 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+// An untouched supplement follows the business's money when it answers after the window opened: that is no change.
+useUnsavedFormOnOpen(
+  'modifier-option-form',
+  () => {
+    const stored = props.option ? moneyFieldText(props.option.price_delta, locale.value, money.value) : '';
+    return { ...form.value, price: form.value.price === stored ? null : form.value.price };
+  },
+  open,
+);
 </script>
 
 <template>

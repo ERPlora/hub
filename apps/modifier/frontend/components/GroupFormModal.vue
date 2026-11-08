@@ -9,6 +9,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import type { GroupIn, GroupOut, GroupPatchIn } from '../operations';
 
@@ -104,6 +106,8 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+useUnsavedFormOnOpen('modifier-group-form', form, open);
 </script>
 
 <template>

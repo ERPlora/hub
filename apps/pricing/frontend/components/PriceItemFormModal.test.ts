@@ -121,3 +121,16 @@ describe('PriceItemFormModal: fields refused with the same words (hub#888)', () 
     return { field: s.field, send: () => click(s.save()), settle };
   }, 'price');
 });
+
+describe('PriceItemFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
+  it('editing: as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup({ item: priceItem() });
+    const price = s.field('price').value as string;
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('pricing-item-form'),
+      change: () => ionValue(s.field('price'), '9,99', 'ionInput'),
+      restore: () => ionValue(s.field('price'), price, 'ionInput'),
+    });
+  });
+});

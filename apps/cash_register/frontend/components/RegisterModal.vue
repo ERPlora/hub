@@ -7,6 +7,8 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { IonInput } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { refusal } from '../lib/refusal';
 
@@ -50,6 +52,8 @@ async function confirm(): Promise<void> {
   void toastSuccess(t(props.register ? 'cash_register.registers.modal.renamed' : 'cash_register.registers.modal.created'));
   open.value = false;
 }
+
+useUnsavedFormOnOpen('cash-register-register', name, open);
 </script>
 
 <template>
