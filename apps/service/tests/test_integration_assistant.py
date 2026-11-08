@@ -144,7 +144,7 @@ NAMED = {
     "service.category.update": {"id": "category", "parent_id": "parent"},
     "service.grant.adjust": {"id": "grant"},
     "service.grant.create": {"package_id": "package", "customer_id": "customer"},
-    "service.grant.redeem": {"id": "grant", "service_id": "service"},
+    "service.grant.redeem": {"id": "grant", "service_id": "service", "member_id": "member"},
     "service.grant.void": {"id": "grant"},
     "service.package.delete": {"id": "package"},
     "service.package.update": {"id": "package"},
@@ -484,6 +484,6 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
                 if marked is None or not mine.has(registry[marked["read"]].permission):
                     unread.append((role, name, datum))
     # Positive control: the owner and the admin run them all, the manager and the employee what their roles give them
-    # (the settle's ``customer_id`` is replaced by its ``ids`` here).
-    assert checked == 87
+    # (the settle's ``customer_id`` is replaced by its ``ids`` here; the four roles that spend a session say who did it).
+    assert checked == 91
     assert unread == []

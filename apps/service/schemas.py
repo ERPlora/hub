@@ -1107,6 +1107,12 @@ class RedeemIn(GrantRefIn):
         None, description="The service performed, by id; the voucher must cover it.", json_schema_extra=A_SERVICE
     )
     service: Said | None = Field(None, description="The service performed, by name.")
+    member_id: UUID | None = Field(
+        None,
+        description="The professional (Staff) who did it, by id: its value counts in their production.",
+        json_schema_extra=A_MEMBER,
+    )
+    member: Said | None = Field(None, description="The professional (Staff) who did it, by name.")
     appointment_id: UUID | None = Field(
         None, description="The appointment it is spent on (Appointments), if any."
     )
@@ -1133,6 +1139,8 @@ class RedemptionOut(Schema):
     grant_id: UUID
     service_id: UUID | None
     service_name: str | None
+    member_id: UUID | None = Field(description="The professional who did it; null = nobody said.")
+    member_name: str | None
     redeemed_at: datetime
     remaining: int | None = Field(
         description="Sessions left after this one; null = unlimited."

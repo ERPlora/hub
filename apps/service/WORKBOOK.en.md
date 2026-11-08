@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:11cf88a51a4bbacd74f1f02605ffe060254ee36b3f7f81deada14bb9f4f9bd4c -->
+<!-- generated from WORKBOOK.md sha256:d74557c6099516dab9657881f2d711dbacbf63b0655858c403da91cda17e33b6 -->
 
 ## What it is for and who it is for
 
@@ -583,16 +583,25 @@ Screen: assistant
 Steps:
 1. If you want, ask the assistant first whether a session of that voucher could be spent and why not.
 2. Ask the assistant to spend a session of a voucher the customer bought, and if you want say which
-   service was done and link it to the appointment or the sale.
-In: the purchase of the voucher; the service, the appointment and the sale, as a reference.
+   service was done, which professional did it ("Ana did it") and link it to the appointment or the sale.
+3. The assistant's confirmation card names the voucher, the service and the professional; confirm it.
+In: the purchase of the voucher; the service and the professional of Staff's team who did it; the
+appointment and the sale, as a reference.
 Out: a **Delivered** session at once (`service.grant.redeemed`), which counts against the "Uses" and takes
-its share of the price (SERVICE-F24). It does not say who did it, so it counts in nobody's production
-(hub#770). It issues no tax document.
+its share of the price (SERVICE-F24). If it says who did it, the session keeps it and what it is worth counts in
+that professional's production in Sales, on the business day it is spent, and with it in their commission
+(SALE-F28, STAFF-F21), just like the one spent at the checkout. A session of an unlimited voucher has nothing to
+divide by: it is worth what that professional charges for the service (their own price or the service's), like
+the checkout's line; without the service said, it adds nothing. Without saying who did it, it counts in nobody's
+production. Without Sales in the business, the session is spent all the same and keeps who did it, but there is
+no production to count it in. It issues no tax document.
 If it fails: "This voucher was voided: it can no longer be used.", "This voucher has no sessions left.",
 "This voucher has expired.", "This voucher does not cover that service. A voucher of haircuts pays for
-haircuts, not for the shampoo." or "That voucher sale does not exist in this business.". Two tills that
+haircuts, not for the shampoo." or "That voucher sale does not exist in this business.". A professional who is
+not on the team (or has already left), "That staff member does not exist in this business."; a name that fits
+several, "There are several staff members called "…": …. Say which one.". Nothing is spent. Two tills that
 spend the last session at the same time go in line and the second one gets the real reason.
-Involved: SERVICE-F19, SERVICE-F20
+Involved: SERVICE-F19, SERVICE-F20, SERVICE-F24, SALE-F28, STAFF-F21
 
 ### SERVICE-F22 Pay a line with a voucher
 Status: done (with Sales, SALE-F27)
@@ -958,7 +967,7 @@ be followed live.
 | Grants a voucher to a customer and tells Sales which line paid for it | grant vouchers | F14 | `service.grant.create` |
 | Voids an unused sold voucher | void vouchers | F17 | `service.grant.void` |
 | Gives or takes sessions, or extends the expiry | adjust vouchers | F18 | `service.grant.adjust` |
-| Spends a session | spend sessions | F21 | `service.grant.redeem` |
+| Spends a session and, if who did it is said, tells Sales to count what it is worth in their production | spend sessions | F21 | `service.grant.redeem` |
 | Holds a session of a voucher for a line of the check (Sales calls it) | spend sessions | F22 | `service.session.hold` |
 | Releases a held session (Sales calls it) | spend sessions | F23 | `service.session.release` |
 | Marks as spent the held sessions of a charged sale (Sales calls it) | spend sessions | F24 | `service.session.settle` |
@@ -1021,11 +1030,17 @@ with the session of whoever sells, as it does with Inventory.
   - when voiding the sale, `service.session.return` with all its sessions (`reference` = the sale) and,
     when refunding it, with those of the lines that go back (`reference` = the refund).
   To paint the slot, the checkout reads `service.grant.tender_options` (`customer_id`, `service_id`).
-- **The line that sold a voucher (F14, F17)**: the one thing Services asks of Sales, also by name and with the
-  session of whoever grants. `service.grant.create`, with an amount and a sale, calls `sale.sale.voucher_sold`
+- **The line that sold a voucher (F14, F17)**: one of the two things Services asks of Sales, also by name and with
+  the session of whoever grants. `service.grant.create`, with an amount and a sale, calls `sale.sale.voucher_sold`
   (`sale_id`, `line_id`, `amount`) and keeps in `sale_line_id` the line it answers; `service.grant.void` calls
   `sale.sale.voucher_unsold` (`line_id`, `amount`). Without Sales in the business there is no figure to keep it
   out of: it is not called, the voucher keeps no line and its sessions do not count.
+- **The session spent outside the checkout with its professional (F21)**: the other one. `service.grant.redeem` with
+  `member_id` or `member` calls `sale.voucher_session.record` (`session_id`, `staff_id`, `value`) with the session of
+  whoever spends it (its Sales permission, "Build the check", is held by all four roles) and in the same transaction.
+  `value` is the session's or, on an unlimited voucher, that professional's price for the service. Sales keeps it
+  apart, because there is no line, and adds it to the production (SALE-F28): a session of the checkout never comes
+  this way, so none counts twice. Without Sales in the business it is not called.
   Services keeps the sale and the check's line as opaque identifiers (`sale_id`,
   `order_line_id`): Sales is not a requirement of Services nor Services of Sales.
 
