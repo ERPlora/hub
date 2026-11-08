@@ -9,7 +9,7 @@
 // the demo there and this run never finds it.
 import { execFileSync } from 'node:child_process';
 
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { api, collectProblems, createViaPage, HUB_DIR, listReady, rowNames, SAAS, shot, shown, turnOn, uniqueName } from './helpers';
 import { STACK } from './stack';
@@ -25,6 +25,18 @@ interface Me {
 /** The door's state (`data-testid="demo-state-<state>"`, public/demo.py of the SaaS). */
 async function doorSays(page: Page, state: string): Promise<void> {
   await expect(page.getByTestId(`demo-state-${state}`)).toBeVisible();
+}
+
+/** The door's «Back to my demo»: a link, as the public web draws its buttons (`{% button %}`, saas#246), found by its
+ *  role and name, not by the element that draws it (an `ion-button` until then: hub#1040). */
+function backToMyDemo(page: Page): Locator {
+  return page.getByRole('link', { name: 'Back to my demo', exact: true });
+}
+
+/** Where «Back to my demo» goes: the jump into the demo `slug` on this stack's Hub (its `/auth/login`, the SaaS's
+ *  `hub_start_url`), never another demo's. */
+function jumpInto(slug: string): RegExp {
+  return new RegExp(`^http://${slug}\\.localhost:${STACK.hubPort}/auth/login\\?`);
 }
 
 /** How long a demo may take to be ready, door to shell: since S3 its sign-up is the clone of its template (every app off,
@@ -85,7 +97,7 @@ test('a demo from the SaaS door: empty hub as «Demo», something made, ended no
   // Back on the door, the session holds the live demo.
   await page.goto(DOOR);
   await doorSays(page, 'ready');
-  await expect(page.locator('ion-button', { hasText: 'Back to my demo' })).toHaveAttribute('href', new RegExp(`//${slug}\\.`));
+  await expect(backToMyDemo(page)).toHaveAttribute('href', jumpInto(slug));
 
   expect(expireNow(slug)).toBe(`${slug}: purged`);
 
@@ -102,7 +114,9 @@ test('a demo from the SaaS door: empty hub as «Demo», something made, ended no
   await back.click();
   await page.waitForURL(`${DOOR}?state=expired`);
   await doorSays(page, 'expired');
-  await expect(page.locator('ion-button', { hasText: 'Back to my demo' })).toHaveCount(0);
+  await expect(page.getByTestId('demo-start')).toBeVisible();
+  // Nothing on it offers the ended demo back, whatever draws the offer: a link, or a button that is not one.
+  await expect(page.getByText('Back to my demo', { exact: true })).toHaveCount(0);
   await page.screenshot({ path: shot('demo-03-door-expired') });
   await page.goto(DOOR);
   await doorSays(page, 'idle');
