@@ -555,6 +555,16 @@ class Redemption(UUIDModel):
         related_name="+",
         verbose_name=_("service"),
     )
+    # The professional of Staff who did it, when it was said (SERVICE-F21): a session spent outside the till counts in
+    # her production (SALE-F28). One of the till is said on its line, in Sales.
+    member = models.ForeignKey(
+        "staff.Member",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("professional"),
+    )
     # Opaque ids of the Appointments and Sales apps (not requirements).
     appointment_id = models.UUIDField(_("appointment"), null=True, blank=True)
     sale_id = models.UUIDField(_("sale"), null=True, blank=True)

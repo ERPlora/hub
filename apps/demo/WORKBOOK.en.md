@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:913d961424a0709605ecd70a0c3b3f2797d9ab738c939df90e49d6452f4b16ef -->
+<!-- generated from WORKBOOK.md sha256:df05bfd8a7974914df380229c9d8f2b6147ba96377ac440047969ca114d7957c -->
 
 ## What it is for and who it is for
 
@@ -34,11 +34,9 @@ Odoo's "record that no longer exists".
 - You need to sign in with an account that has a role in that business. Demo has no sign-in of its
   own: without a session, it takes you to the ERPlora sign-in, which comes back to the business with
   your role.
-- In phase 1 the business is the **first part of the address** (business `a` and business `b`). In
-  phase 2 each business will have its own data.
-- ⚠️ In phase 1 both businesses **share the items**. What is already kept apart is the **live
-  notice**: saving in `a` only refreshes the screens open in `a`. Those in `b` see the change when they
-  reload or with the next notice of `b`.
+- The business is the **first part of the address** (business `a` and business `b`), and each business
+  has its own data: the items of `a` do not show in `b`, and saving in `a` only refreshes the screens
+  open in `a`.
 
 ## Screens
 
@@ -194,7 +192,7 @@ Involved: none
 
 ## Services: what goes in and what comes out
 
-Everything can be requested through the screens, the assistant (phase 2) and the API, with the same
+Everything can be requested through the screens, the assistant and the API, with the same
 rules and the same permissions. Before changing or deleting an item or adding a line to it, the assistant asks for
 confirmation with its card (BASE-F97), which names the item as the screens name it, never by its id: by its name
 ("Item: Mesa 4"), and the status by its word ("Open", "Done"). What the person asking cannot see is left out.

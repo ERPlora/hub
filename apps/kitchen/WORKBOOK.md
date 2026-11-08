@@ -1070,9 +1070,6 @@ que no tiene ningún papel: solo el sistema (`*`).
 
 ### Contradicciones (sin resolver; se señalan)
 
-- **Fase 1 sin tenencia**: todas las cuentas comparten tablas, así que la pantalla de cocina de un hub
-  lee también las rondas de otro (`b.localhost` ve las de `a.localhost`). Lo resuelve la BD por hub de la
-  fase 2.
 - **Ronda de una cuenta fusionada**: Ventas conserva su `round_no`, así que la cuenta que queda puede
   tener dos «Comanda 1»; el producto actual las renumeraba detrás de las suyas.
 

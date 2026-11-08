@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ef084a8ebb3efac505d95728b0f367211c874f748406ecdc5751b860864957ac -->
+<!-- generated from WORKBOOK.md sha256:ce41752ed7af37abee9f4ae2ecd3927006e516e673ba8d1614fb09ece9398862 -->
 
 ## What it is for and who it is for
 
@@ -894,7 +894,7 @@ the month's cap…), the bubble says "Not delivered" and its reason; if erplora.
 connected, the Hub says so in its own words ("WhatsApp is not connected: connect the number in Settings to send."),
 never as Meta's reason. If erplora.com does not answer, does not confirm or asks to go slower, the bubble says "Not
 sent" with **Retry**, which hands it over again with the same key: it never goes out twice. It always goes out
-through the number of the business that sent it, even if someone else retries it from the shared inbox of phase 1.
+through the business's number, whoever retries it.
 Involved: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F33 Send a template
