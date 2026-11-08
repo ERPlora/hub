@@ -512,9 +512,10 @@ Cómo las expone la plataforma (fase 2, bloque 7 «puerta pública `/p/`»):
 - **Dónde vive la página pública**: el encargo y este documento la ponen en `/p/<slug>/book` del host del hub;
   `CLAUDE.md` («Frontend y admin») dice «Web/carta pública por hub (pendiente): plantillas en un dominio
   aparte». Lo decide el bloque de la web pública; el contrato de operaciones vale para los dos.
-- **Tablas compartidas en la fase 1**: sin tenencia todavía, la fila única de `Settings` (y `Booking`) la
-  comparten todos los ámbitos de la plataforma; es el estado de la fase 1, no del módulo: en la fase 2 cada
-  hub la tiene en su BD.
+- **Una fila de `Settings` por BD**: cada negocio tiene su propia BD (desde el corte S5, hub#602), así que la
+  fila única de `Settings` (y las `Booking`) es la de ese negocio. Solo el respaldo de los tests escritos antes de
+  la tenencia (`base/tenancy/tests/legacy.py`, hasta hub#611) guarda `a` y `b` en la misma BD y les hace
+  compartirla.
 
 Las dos siguen escritas, sin elegir, en la ronda 2026-10-21 (CLOSE-ONLINE_BOOKING) de `PLAN-HUB.md`.
 

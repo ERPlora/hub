@@ -810,9 +810,9 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 - Los avisos llegan a las apps que reaccionan por el relay del outbox del worker (`base.relay`): lo
   prueban de punta a punta `apps/task/tests/test_relay.py` (TASK-F15, hub#124), `apps/service/tests/test_relay.py`
   y `apps/appointment/tests/test_relay.py`.
-- Tenencia: en la fase 1, y en el modo compartido de la tenencia S1 (hub#175), un hub sin BD propia —hoy
-  todos— guarda sus datos en la BD compartida, así que `a` y `b` comparten fichas, horarios y ausencias;
-  lo que sí se separa son los avisos en vivo. Con una BD por hub cada uno tendrá su equipo.
+- Tenencia: cada negocio tiene su propia BD (desde el corte S5, hub#602; el modo compartido de la tenencia S1,
+  hub#175, ya no existe), así que cada uno tiene su equipo: fichas, horarios y ausencias. Solo los tests escritos
+  antes de la tenencia guardan `a` y `b` en la misma BD de test (`base/tenancy/tests/legacy.py`, hasta hub#611).
 - La resta de intervalos de la disponibilidad está hecha a mano: la única librería de intervalos de
   tamaño razonable (`portion`) es un proyecto de una sola persona, y las que cumplen los criterios
   (`sympy`, `pandas`) son desproporcionadas para eso.
