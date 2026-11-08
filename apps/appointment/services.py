@@ -49,6 +49,7 @@ from apps.appointment.models import (
 from apps.appointment.queries import (
     ADD_OWN,
     APPOINTMENT_NOT_FOUND,
+    BLOCK_NOT_FOUND,
     BUSY,
     CHANGE_ALL,
     CHANGE_OWN,
@@ -1205,10 +1206,7 @@ def create_blocked_time(ctx: OperationContext, data: BlockedTimeCreateIn) -> dic
 def delete_blocked_time(ctx: OperationContext, data: BlockedTimeRefIn) -> dict:
     block = BlockedTime.objects.select_for_update().filter(pk=data.id).first()
     if block is None:
-        raise NotFound(
-            str(_("That blocked period does not exist in this business.")),
-            code="appointment.blocked_time_not_found",
-        )
+        raise NotFound(str(BLOCK_NOT_FOUND), code="appointment.blocked_time_not_found")
     block.delete()
     record_event(ctx, events.BLOCKED_TIME_DELETED, {"id": str(data.id)})
     return {"id": data.id}

@@ -35,12 +35,20 @@ MAX_BULK_DELETE = 100
 #: The longest range the agenda reads at once (two months: a week view and its neighbours).
 MAX_RANGE_DAYS = 62
 
-#: How the assistant's card names an appointment and what booking one takes, by what their reads answer and never by
-#: an id (base/assistant.py).
+#: How the assistant's card names an appointment, a repeating appointment, a blocked period and what booking one takes,
+#: by what their reads answer and never by an id (base/assistant.py).
 AN_APPOINTMENT = names("appointment.appointment.get", name=("label",))
+A_SERIES = names("appointment.recurring.get", name=("label",))
+A_BLOCK = names("appointment.blocked_time.get", name=("label",))
 A_CUSTOMER = names("customer.customer.detail")
 A_SERVICE = names("service.service.get")
 A_MEMBER = names("staff.member.detail", name=("full_name",))
+#: What the card calls them, as their lists call one (or many): «Cita», «Citas», «Cita periódica»; a blocked period,
+#: which no list shows, as this app's catalog calls one («Bloqueo»).
+T_APPOINTMENT = gettext_noop("Appointment")
+T_APPOINTMENTS = gettext_noop("Appointments")
+T_SERIES = gettext_noop("Repeating appointment")
+T_BLOCK = gettext_noop("Blocked period")
 
 SAY_WHICH_CUSTOMER = _("Say which customer: her id, or her name, phone or email.")
 SAY_WHICH_STAFF = _("Say which professional: their id, or their name.")
@@ -195,7 +203,7 @@ class StaffOf(In):
 
 class AppointmentRefIn(In):
     id: UUID | None = Field(
-        None, title=gettext_noop("Appointment"), description="The appointment's id.", json_schema_extra=AN_APPOINTMENT
+        None, title=T_APPOINTMENT, description="The appointment's id.", json_schema_extra=AN_APPOINTMENT
     )
     number: _text(24, 1) | None = Field(
         None,
@@ -268,7 +276,7 @@ class AppointmentCreateIn(CustomerOf):
 
 class BulkCreateIn(CustomerOf):
     services: Services = Field(description=D_SERVICES)
-    staff_id: UUID | None = Field(None, description="The professional's id.")
+    staff_id: UUID | None = Field(None, description="The professional's id.", json_schema_extra=A_MEMBER)
     staff: Said | None = Field(
         None, validate_default=True, description="The professional's name."
     )
@@ -368,7 +376,7 @@ class UpdateIn(AppointmentRefIn):
     duration_minutes: Minutes | None = Field(
         None, description="The new length in minutes."
     )
-    staff_id: UUID | None = Field(None, description="The new professional's id.")
+    staff_id: UUID | None = Field(None, description="The new professional's id.", json_schema_extra=A_MEMBER)
     staff: Said | None = Field(None, description="The new professional's name.")
     services: OptionalServices = Field(None, description="The new services.")
     confirm_overlap: bool = Field(False, title=BOOK_EVEN_IF_IT_OVERLAPS, description=D_CONFIRM_OVERLAP)
@@ -387,9 +395,10 @@ class CancelIn(AppointmentRefIn, ForCustomer):
 
 
 class BulkDeleteIn(In):
-    ids: list[UUID] = Field(
+    ids: list[Annotated[UUID, Field(json_schema_extra=AN_APPOINTMENT)]] = Field(
         min_length=1,
         max_length=MAX_BULK_DELETE,
+        title=T_APPOINTMENTS,
         description="The appointments to delete.",
     )
 
@@ -741,7 +750,7 @@ class BlockedTimeCreateIn(In):
         False, description="True: whole days, from the start's day to the end's day."
     )
     staff_id: UUID | None = Field(
-        None, description="Only this professional; empty = the whole business."
+        None, description="Only this professional; empty = the whole business.", json_schema_extra=A_MEMBER
     )
     staff: Said | None = Field(None, description="Only this professional, by name.")
     reason: Reason = Field("", description="Why (optional).")
@@ -762,7 +771,7 @@ class BlockedTimeCreateIn(In):
 
 
 class BlockedTimeRefIn(In):
-    id: UUID = Field(description="The blocked period's id.")
+    id: UUID = Field(title=T_BLOCK, description="The blocked period's id.", json_schema_extra=A_BLOCK)
 
 
 class BlockedTimeListIn(DateRange):
@@ -783,6 +792,12 @@ class BlockedTimeOut(Schema):
     staff_id: UUID | None
     staff_name: str
     reason: str
+
+
+class BlockedTimeNamedOut(BlockedTimeOut):
+    label: str = Field(
+        description="How a person names it: its title, its day, its hour (none for a whole day) and its professional."
+    )
 
 
 class BlockedTimePage(Page[BlockedTimeOut]):
@@ -820,7 +835,7 @@ class RecurringRule(In):
 
 class RecurringCreateIn(RecurringRule, CustomerOf):
     services: Services = Field(description=D_SERVICES)
-    staff_id: UUID | None = Field(None, description="The professional's id.")
+    staff_id: UUID | None = Field(None, description="The professional's id.", json_schema_extra=A_MEMBER)
     staff: Said | None = Field(
         None, validate_default=True, description="The professional's name."
     )
@@ -839,8 +854,14 @@ class RecurringCreateIn(RecurringRule, CustomerOf):
         return value
 
 
+#: A repeating appointment's id, named on the assistant's card as the series list titles one.
+SeriesId = Annotated[
+    UUID, Field(title=T_SERIES, description="The repeating appointment's id.", json_schema_extra=A_SERIES)
+]
+
+
 class RecurringRefIn(In):
-    id: UUID = Field(description="The repeating appointment's id.")
+    id: SeriesId
 
 
 class RecurringGetIn(RecurringRefIn):
@@ -851,7 +872,7 @@ class RecurringGetIn(RecurringRefIn):
 
 
 class RecurringUpdateIn(In):
-    id: UUID = Field(description="The repeating appointment's id.")
+    id: SeriesId
     from_date: dt.date = Field(
         title=gettext_noop("Applies from"),
         description="The occurrence from which the change applies (this and all following).",
@@ -863,7 +884,7 @@ class RecurringUpdateIn(In):
     time: dt.time | None = Field(None, description="The new time.")
     duration_minutes: Minutes | None = Field(None, description="The new length.")
     staff_id: UUID | None = Field(
-        None, description="The professional who takes it over."
+        None, description="The professional who takes it over.", json_schema_extra=A_MEMBER
     )
     staff: Said | None = Field(
         None, description="The professional who takes it over, by name."
@@ -882,7 +903,7 @@ class RecurringUpdateIn(In):
 
 
 class MaterializeIn(In):
-    id: UUID = Field(description="The repeating appointment's id.")
+    id: SeriesId
     from_date: dt.date | None = Field(
         None,
         title=gettext_noop("Book from"),
@@ -942,6 +963,9 @@ class RecurringDetailOut(RecurringOut):
     )
     charged: int = Field(
         description="Of those, how many are charged: an edit leaves them alone."
+    )
+    label: str = Field(
+        description="How a person names it, as the series list titles one: its customer and how it repeats."
     )
 
 

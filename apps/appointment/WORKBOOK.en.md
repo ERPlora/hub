@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:21e16bd9a7a00dc6bd284ebf7a500e4ccf2ae5d812532ed3fe26885fa008ee5b -->
+<!-- generated from WORKBOOK.md sha256:2295f6542de5792d4e906e101f848162e564721dd27d0a32e62c97b7654c03a9 -->
 
 ## What it is for and who it is for
 
@@ -19,7 +19,14 @@ Who uses it:
   through online booking, via the API), always with the business's notice rules.
 - The **assistant** (by voice or by text, with the session of whoever is speaking) does all of the above:
   "tomorrow at 10 with Ana, a haircut for Lucía", "move Lucía's appointment to Thursday", "cancel the one
-  at 12".
+  at 12". Before an action it asks to confirm with its card (BASE-F97), which names each record as the
+  screens name it, never by its identifier: the professional by their name ("Professional: Ana López"),
+  the appointment by its customer, day, time and professional ("Appointment: Lucía Pérez · Monday,
+  Nov. 16, 2026 · 10:00 · Ana López"), and each one when several are deleted at once ("Appointments:
+  …"), the repeating appointment as the list of repeating appointments titles it ("Repeating
+  appointment: Lucía Pérez · Every week · Monday · 10:00") and the blocked period by its title, its day,
+  its time and its professional ("Blocked period: Training · Monday, Nov. 16, 2026 · 14:00 · Ana
+  López"). What the person asking may not see, or what no longer exists, is left out.
 
 ## Reference adopted
 

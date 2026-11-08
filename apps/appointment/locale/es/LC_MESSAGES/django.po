@@ -630,3 +630,9 @@ msgstr "Reservar hasta"
 
 msgid "Duplicate customer"
 msgstr "Ficha duplicada"
+
+msgid "Repeating appointment"
+msgstr "Cita periódica"
+
+msgid "Blocked period"
+msgstr "Bloqueo"

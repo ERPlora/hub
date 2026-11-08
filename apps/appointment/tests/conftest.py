@@ -363,9 +363,8 @@ def make_block(
     )
 
 
-@pytest.fixture
-def salon(db):
-    """The usual cast: a customer, a cut and a colour (taxed), and Ana, who performs both."""
+def make_salon():
+    """The usual cast: a customer, a cut and a colour (taxed), Ana and Bea; in the hub in use."""
     tax = make_tax()
     cut = make_service("Haircut", price=2000, duration=30, tax=tax)
     colour = make_service("Colour", price=4500, duration=60, tax=tax)
@@ -384,3 +383,9 @@ def salon(db):
             "lucia": lucia,
         },
     )
+
+
+@pytest.fixture
+def salon(db):
+    """The usual cast (``make_salon``)."""
+    return make_salon()

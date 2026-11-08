@@ -376,7 +376,6 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
 #: them out. An attempt key (``attempt_key``) is no reference. Only ever lower: an app that marks its own lowers its
 #: number here, and none comes in.
 UNNAMED_REFERENCES = {
-    "appointment": 12,
     "invoice": 1,
     # The sale and the appointment a voucher or a session came from, the line of a sale that charged a voucher, the line
     # of an order that holds a session and the reference of a return: data of apps Services does not require, so it
@@ -507,6 +506,11 @@ KNOWN = json.loads(
 TITLED_IN_SPANISH = {
     **{f"appointment.appointment.{action}:id": "Cita" for action in (
         "cancel", "charge", "complete", "confirm", "delete", "mark_no_show", "reschedule", "start", "update",
+    )},
+    "appointment.appointment.bulk_delete:ids": "Citas",
+    "appointment.blocked_time.delete:id": "Bloqueo",
+    **{f"appointment.recurring.{action}:id": "Cita periódica" for action in (
+        "activate", "deactivate", "delete", "materialize", "update",
     )},
     "attendance.record.close_for_terminated:id": "Persona",
     "base.api_key.revoke:id": "Clave de API",
