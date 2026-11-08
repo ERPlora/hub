@@ -247,7 +247,10 @@ class ReservationListIn(PageIn):
 
 class ReservationRefIn(In):
     id: UUID | None = Field(
-        None, description="The reservation's id.", json_schema_extra=A_RESERVATION
+        None,
+        title=gettext_noop("Reservation"),
+        description="The reservation's id.",
+        json_schema_extra=A_RESERVATION,
     )
     guest: Said | None = Field(
         None,
@@ -562,7 +565,10 @@ class TimeSlotIn(In):
 
 class TimeSlotRefIn(In):
     id: UUID | None = Field(
-        None, description="The slot's id.", json_schema_extra=A_SLOT
+        None,
+        title=gettext_noop("Time slot"),
+        description="The slot's id.",
+        json_schema_extra=A_SLOT,
     )
     day_of_week: Weekday | None = Field(
         None, description="Its weekday, when the id is not known."
@@ -649,7 +655,10 @@ class BlockedDateIn(In):
 
 class BlockedDateRefIn(In):
     id: UUID | None = Field(
-        None, description="The blocked date's id.", json_schema_extra=A_BLOCK
+        None,
+        title=gettext_noop("Blocked date"),
+        description="The blocked date's id.",
+        json_schema_extra=A_BLOCK,
     )
     date: dt.date | None = Field(
         None, description="Its day, YYYY-MM-DD, when the id is not known."
@@ -729,7 +738,10 @@ class WaitlistIn(In):
 
 class WaitlistRefIn(In):
     id: UUID | None = Field(
-        None, description="The entry's id.", json_schema_extra=AN_ENTRY
+        None,
+        title=gettext_noop("Waitlist entry"),
+        description="The entry's id.",
+        json_schema_extra=AN_ENTRY,
     )
     guest: Said | None = Field(
         None,
