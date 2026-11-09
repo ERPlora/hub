@@ -94,7 +94,7 @@ class Command(BaseCommand):
             raise CommandError(
                 f"{source_path}: its merge is not clean; resolve it with the translation."
             )
-        if merged.returncode > 1 or merged.returncode < 0:
+        if merged.returncode == 255 or merged.returncode < 0:
             raise CommandError(f"{path}: git merge-file failed: {merged.stderr}")
 
         match = _header(merged.stdout, path)
