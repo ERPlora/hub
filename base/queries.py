@@ -1895,6 +1895,7 @@ def profile_get(ctx: OperationContext, data: ProfileIn) -> dict[str, Any]:
         "language": profile.language if profile else "",
         "theme_mode": profile.theme_mode if profile else "",
         "palette": profile.palette if profile else "",
+        "ui_scale": profile.ui_scale if profile else 100,
         "role": role,
         "has_pin": has_pin(user),
         "pin_length": access_settings().pin_length,
@@ -1912,11 +1913,13 @@ def avatar_url(ctx: OperationContext, name: str) -> str:
     return media_url(hub_id(ctx.scope), name)
 
 
-def appearance_of(user) -> dict[str, str]:
-    """The mode and palette a person chose in «My profile» (BASE-G125), for the shell to paint on any device they enter;
-    empty, the business's."""
-    chosen = Profile.objects.filter(username=user.get_username()).values("theme_mode", "palette").first()
-    return {"theme_mode": chosen["theme_mode"], "palette": chosen["palette"]} if chosen else {"theme_mode": "", "palette": ""}
+def appearance_of(user) -> dict[str, str | int]:
+    """The appearance a person chose in «My profile» (BASE-G125), for the shell to paint on any device they enter;
+    empty mode and palette, the business's."""
+    chosen = Profile.objects.filter(username=user.get_username()).values("theme_mode", "palette", "ui_scale").first()
+    if chosen:
+        return {"theme_mode": chosen["theme_mode"], "palette": chosen["palette"], "ui_scale": chosen["ui_scale"]}
+    return {"theme_mode": "", "palette": "", "ui_scale": 100}
 
 
 def shell_access(request: HttpRequest, slug: str) -> dict[str, Any]:
