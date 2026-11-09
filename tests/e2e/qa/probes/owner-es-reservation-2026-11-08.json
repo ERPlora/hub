@@ -271,6 +271,26 @@
       "phrase": "marca a Ana QA como contactada en la lista de espera y anota «prefiere terraza QA»",
       "expect": "card",
       "decide": "cancel"
+    },
+    {
+      "id": "owner.es.reservation.reservation.no_show",
+      "app": "reservation",
+      "tool": "reservation.reservation.no_show",
+      "role": "owner",
+      "language": "es",
+      "phrase": "marca que Ana QA no se presentó a su reserva de mañana y libera la mesa",
+      "expect": "card",
+      "decide": "cancel"
+    },
+    {
+      "id": "owner.es.reservation.reservation.release_unconfirmed",
+      "app": "reservation",
+      "tool": "reservation.release_unconfirmed",
+      "role": "owner",
+      "language": "es",
+      "phrase": "libera ahora las reservas pendientes que ya superaron el tiempo de cortesía sin confirmar",
+      "expect": "card",
+      "decide": "cancel"
     }
   ]
 }
