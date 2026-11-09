@@ -53,7 +53,7 @@ def tick(monkeypatch):
 
 def test_citas_declares_fill_the_gap_and_automations_offers_it():
     assert [recipe["id"] for recipe in declared.RECIPES] == ["customer_cancelled"]
-    recipe = recipes.find(REF)
+    recipe = recipes.find(A, REF)
     assert recipes.grants(recipe) == ["task.task.create"]
     assert recipes.words(recipe, "es") == {
         "name": "Cubrir el hueco cuando un cliente cancela",

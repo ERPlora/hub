@@ -11,7 +11,7 @@ from apps.flow import document, queries, recipes
 from apps.flow.tests.test_recipes import without
 from apps.whatsapp_inbox import recipes as inbox_recipes
 from apps.whatsapp_inbox.recipes import RECIPES
-from apps.whatsapp_inbox.tests.conftest import ctx_for, run
+from apps.whatsapp_inbox.tests.conftest import A, ctx_for, run
 
 pytestmark = pytest.mark.django_db
 
@@ -20,24 +20,28 @@ RESERVATION_REF = "whatsapp_inbox/reservation_confirmed"
 
 
 def offered() -> dict[str, recipes.Recipe]:
-    return {recipe.ref: recipe for recipe in recipes.shelf()[0]}
+    return {recipe.ref: recipe for recipe in recipes.shelf(A)[0]}
+
+
+def assert_grants_are_offerable(recipe: recipes.Recipe, built: dict) -> None:
+    operations = [step["operation"] for step in built["steps"] if step["kind"] in ("command", "query")]
+    assert operations[-1] == "whatsapp_inbox.message.notify"
+    assert "whatsapp_inbox.message.send" not in operations
+    assert recipes.grants(recipe) == document.required_grants(built["steps"])
+    catalog = queries.catalog_operations(A)
+    assert all(name in catalog for name in recipes.grants(recipe))
 
 
 def test_the_confirmed_appointment_notice_is_offered_whole():
     assert REF in offered()
-    assert not [item for item in recipes.shelf()[1] if item.ref.startswith("whatsapp_inbox/")]
+    assert not [item for item in recipes.shelf(A)[1] if item.ref.startswith("whatsapp_inbox/")]
 
 
 def test_it_starts_when_an_appointment_is_confirmed_and_writes_only_through_the_narrow_send():
     recipe = offered()[REF]
     built = recipes.build(recipe, "en")
     assert built["trigger"] == {"kind": "event", "event": "appointment.appointment.confirmed"}
-    operations = [step["operation"] for step in built["steps"] if step["kind"] in ("command", "query")]
-    assert operations[-1] == "whatsapp_inbox.message.notify"
-    assert "whatsapp_inbox.message.send" not in operations
-    assert recipes.grants(recipe) == document.required_grants(built["steps"])
-    catalog = queries.catalog_operations()
-    assert all(name in catalog for name in recipes.grants(recipe))
+    assert_grants_are_offerable(recipe, built)
 
 
 def test_it_stops_without_a_phone_or_a_conversation_before_it_sends():
@@ -68,7 +72,7 @@ def test_the_confirmed_reservation_notice_is_offered_whole():
 
 def test_without_reservations_the_reservation_notice_is_set_aside_naming_the_app(monkeypatch):
     without(monkeypatch, "reservation")
-    offered_now, set_aside = recipes.shelf()
+    offered_now, set_aside = recipes.shelf(A)
     assert RESERVATION_REF not in {recipe.ref for recipe in offered_now}
     assert REF in {recipe.ref for recipe in offered_now}  # the appointment's notice does not need Reservations
     assert [(item.code, item.apps) for item in set_aside if item.ref == RESERVATION_REF] == [
@@ -90,11 +94,7 @@ def test_it_starts_only_when_a_reservation_turns_confirmed_and_writes_only_throu
         assert document.holds(built["trigger"]["filter"], payload) is starts, status
     operations = [step["operation"] for step in built["steps"] if step["kind"] in ("command", "query")]
     assert operations[0] == "reservation.reservation.get"
-    assert operations[-1] == "whatsapp_inbox.message.notify"
-    assert "whatsapp_inbox.message.send" not in operations
-    assert recipes.grants(recipe) == document.required_grants(built["steps"])
-    catalog = queries.catalog_operations()
-    assert all(name in catalog for name in recipes.grants(recipe))
+    assert_grants_are_offerable(recipe, built)
 
 
 def test_the_reservation_notice_stops_without_a_phone_or_a_conversation_before_it_sends():
@@ -221,8 +221,8 @@ def test_an_answer_asks_the_assistant_ask_me_first_with_only_what_it_needs(ref):
     assert step["mode"] == "ask"
     assert step["tools"] == TOOLS[ref]
     assert recipes.grants(offered()[ref]) == document.required_grants(recipes.build(offered()[ref], "en")["steps"])
-    assert all(name in queries.ask_first_catalog() for name in recipes.grants(offered()[ref]))
-    catalog = queries.catalog_operations()
+    assert all(name in queries.ask_first_catalog(A) for name in recipes.grants(offered()[ref]))
+    catalog = queries.catalog_operations(A)
     assert {name for name in recipes.grants(offered()[ref]) if name not in catalog} == ASKED_FIRST[ref]
 
 
@@ -234,7 +234,7 @@ def test_an_answer_that_did_it_on_its_own_would_not_be_offered(monkeypatch, ref)
     [step] = [step for step in answer["steps"] if step["kind"] == "assistant"]
     step["mode"] = "auto"
     monkeypatch.setattr(inbox_recipes, "RECIPES", declared)
-    offered_now, set_aside = recipes.shelf()
+    offered_now, set_aside = recipes.shelf(A)
     assert ref not in {recipe.ref for recipe in offered_now}
     assert [(item.code, item.apps) for item in set_aside if item.ref == ref] == [("flow.recipe_invalid", ())]
 
@@ -480,7 +480,7 @@ def test_both_answers_make_her_card_with_the_same_two_steps():
 )
 def test_without_its_app_an_answer_is_set_aside_naming_it(monkeypatch, ref, app):
     without(monkeypatch, app)
-    offered_now, set_aside = recipes.shelf()
+    offered_now, set_aside = recipes.shelf(A)
     assert ref not in {recipe.ref for recipe in offered_now}
     assert [(item.code, item.apps) for item in set_aside if item.ref == ref] == [("flow.recipe_needs_apps", (app,))]
 
