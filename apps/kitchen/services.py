@@ -858,6 +858,7 @@ def _pass(
 @operation(
     "kitchen.ticket.start",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="kitchen.change_ticket",
     input=TicketRefIn,
     output=TicketOut,
@@ -883,6 +884,7 @@ def start_ticket(ctx: OperationContext, data: TicketRefIn) -> dict:
 @operation(
     "kitchen.ticket.ready",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="kitchen.change_ticket",
     input=TicketRefIn,
     output=TicketOut,
@@ -909,6 +911,7 @@ def ready_ticket(ctx: OperationContext, data: TicketRefIn) -> dict:
 @operation(
     "kitchen.ticket.serve",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="kitchen.complete_ticket",
     input=TicketRefIn,
     output=TicketOut,
@@ -934,6 +937,7 @@ def serve_ticket(ctx: OperationContext, data: TicketRefIn) -> dict:
 @operation(
     "kitchen.ticket.recall",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="kitchen.change_ticket",
     input=TicketRefIn,
     output=TicketOut,
@@ -960,6 +964,7 @@ def recall_ticket(ctx: OperationContext, data: TicketRefIn) -> dict:
 @operation(
     "kitchen.ticket.cancel",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="kitchen.cancel_ticket",
     input=TicketCancelIn,
     output=TicketOut,
@@ -1004,6 +1009,7 @@ def cancel_ticket(ctx: OperationContext, data: TicketCancelIn) -> dict:
 @operation(
     "kitchen.ticket.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="kitchen.delete_ticket",
     input=TicketRefIn,
     output=DeletedOut,
@@ -1037,6 +1043,7 @@ def delete_ticket(ctx: OperationContext, data: TicketRefIn) -> dict:
 @operation(
     "kitchen.ticket.set_rush",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="kitchen.change_ticket",
     input=TicketRushIn,
     output=TicketOut,
@@ -1080,6 +1087,7 @@ def set_rush(ctx: OperationContext, data: TicketRushIn) -> dict:
 @operation(
     "kitchen.ticket.reprint",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="kitchen.change_ticket",
     input=TicketRefIn,
     output=TicketOut,
@@ -1138,6 +1146,7 @@ def _targets(ticket: Ticket, data: ItemBumpIn, statuses) -> list[TicketItem]:
 @operation(
     "kitchen.item.bump",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="kitchen.change_ticket",
     input=ItemBumpIn,
     output=TicketOut,
@@ -1198,6 +1207,7 @@ def bump_items(ctx: OperationContext, data: ItemBumpIn) -> dict:
 @operation(
     "kitchen.item.recall",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="kitchen.change_ticket",
     input=ItemRecallIn,
     output=TicketOut,
@@ -1279,6 +1289,7 @@ def _save_station(station: Station, **save) -> None:
 @operation(
     "kitchen.station.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="kitchen.manage_station",
     input=StationIn,
     output=StationOut,
@@ -1300,6 +1311,7 @@ def create_station(ctx: OperationContext, data: StationIn) -> dict:
 @operation(
     "kitchen.station.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="kitchen.manage_station",
     input=StationPatchIn,
     output=StationOut,
@@ -1329,6 +1341,7 @@ def update_station(ctx: OperationContext, data: StationPatchIn) -> dict:
 @operation(
     "kitchen.station.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="kitchen.manage_station",
     input=StationRefIn,
     output=DeletedOut,
@@ -1410,6 +1423,7 @@ def _route_event(ctx: OperationContext, station: Station, product, category) -> 
 @operation(
     "kitchen.routing.set",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="kitchen.manage_station",
     input=RoutingSetIn,
     output=RouteOut,
@@ -1450,6 +1464,7 @@ def set_route(ctx: OperationContext, data: RoutingSetIn) -> dict:
 @operation(
     "kitchen.routing.clear",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="kitchen.manage_station",
     input=RoutingClearIn,
     output=RouteOut,
@@ -1480,6 +1495,7 @@ def clear_route(ctx: OperationContext, data: RoutingClearIn) -> dict:
 @operation(
     "kitchen.settings.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="kitchen.change_settings",
     input=SettingsPatchIn,
     output=SettingsOut,

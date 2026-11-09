@@ -157,6 +157,7 @@ def _cart_event(ctx: OperationContext, name: str, cart: Cart) -> None:
 @operation(
     "cart_checkout.cart.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cart_checkout.manage_cart",
     input=CartIn,
     output=CartOut,
@@ -198,6 +199,7 @@ def create_cart(ctx: OperationContext, data: CartIn) -> dict:
 @operation(
     "cart_checkout.cart.mark_abandoned",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cart_checkout.manage_cart",
     input=AbandonIn,
     output=CartOut,
@@ -222,6 +224,7 @@ def mark_abandoned(ctx: OperationContext, data: AbandonIn) -> dict:
 @operation(
     "cart_checkout.cart.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cart_checkout.manage_cart",
     input=CartRefIn,
     output=CartOut,
@@ -244,6 +247,7 @@ def delete_cart(ctx: OperationContext, data: CartRefIn) -> dict:
 @operation(
     "cart_checkout.cart.clear",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cart_checkout.manage_cart",
     input=CartRefIn,
     output=CartOut,
@@ -267,6 +271,7 @@ def clear_cart(ctx: OperationContext, data: CartRefIn) -> dict:
 @operation(
     "cart_checkout.cart.cleanup_expired",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cart_checkout.manage_cart",
     input=CleanupIn,
     output=CleanupOut,
@@ -308,6 +313,7 @@ def _line_and_cart(item_id) -> tuple[CartItem, Cart]:
 @operation(
     "cart_checkout.item.add",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cart_checkout.manage_cart",
     input=ItemAddIn,
     output=ItemChangeOut,
@@ -357,6 +363,7 @@ def add_item(ctx: OperationContext, data: ItemAddIn) -> dict:
 @operation(
     "cart_checkout.item.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cart_checkout.manage_cart",
     input=ItemUpdateIn,
     output=ItemChangeOut,
@@ -393,6 +400,7 @@ def update_item(ctx: OperationContext, data: ItemUpdateIn) -> dict:
 @operation(
     "cart_checkout.item.remove",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cart_checkout.manage_cart",
     input=ItemRefIn,
     output=ItemChangeOut,
@@ -511,6 +519,7 @@ def _refuse(refusal, order: Order) -> Conflict:
 @operation(
     "cart_checkout.order.mark_paid",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cart_checkout.checkout",
     input=OrderRefIn,
     output=OrderOut,
@@ -532,6 +541,7 @@ def mark_paid(ctx: OperationContext, data: OrderRefIn) -> dict:
 @operation(
     "cart_checkout.order.fail",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cart_checkout.checkout",
     input=FailIn,
     output=OrderOut,
@@ -559,6 +569,7 @@ def fail_order(ctx: OperationContext, data: FailIn) -> dict:
 @operation(
     "cart_checkout.order.complete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cart_checkout.checkout",
     input=OrderRefIn,
     output=OrderOut,
@@ -588,6 +599,7 @@ def complete_order(ctx: OperationContext, data: OrderRefIn) -> dict:
 @operation(
     "cart_checkout.customer.erase",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cart_checkout.manage_cart",
     input=CustomerEraseIn,
     output=CustomerEraseOut,

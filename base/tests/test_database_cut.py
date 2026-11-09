@@ -111,7 +111,7 @@ class Refused:
 
     def __call__(self, execute, query, params, many, context):
         statement = str(query).lstrip().upper()
-        if statement.startswith(("INSERT", "UPDATE", "DELETE")) or "FOR UPDATE" in statement:
+        if statement.startswith(("INSERT", "UPDATE", "DELETE")) or "FOR UPDATE" in statement or "FOR KEY SHARE" in statement:
             _read_only(self.database, False)
         try:
             return execute(query, params, many, context)
@@ -175,6 +175,21 @@ def _host(hub) -> str:
 
 def _create(client, hub, path: str, data: dict):
     return client.post(path, json.dumps(data), content_type="application/json", HTTP_HOST=_host(hub))
+
+
+_after_view_armed = False
+
+
+def _after_the_view(get_response):
+    def middleware(request):
+        response = get_response(request)
+        global _after_view_armed
+        _after_view_armed = True
+        with connections["default"].cursor() as cursor:
+            cursor.execute("SELECT 1")
+        return response
+
+    return middleware
 
 
 def _items(hub) -> list[str]:
@@ -332,6 +347,262 @@ def test_a_save_refused_as_read_only_goes_in_once(boss, hub_a):
     assert refused.statements
     assert _items(hub_a) == ["Once"]
     assert _created_events(hub_a) == 1
+
+
+def test_a_customer_save_refused_as_read_only_goes_in_once(boss, hub_a):
+    """A customer is only written to its business's database: the refused try leaves nothing behind."""
+    from apps.customer.models import Customer
+
+    _old_writer(hub_a)
+    refused = Refused(hub_a.db_name)
+
+    with _in(hub_a, hubs.HUB_A_ALIAS, refused):
+        response = _create(boss, hub_a, "/api/customer/customers", {"name": "Once"})
+
+    assert response.status_code == 201, response.content
+    assert refused.statements
+    with context.use_hub(hub_a):
+        assert list(Customer.objects.values_list("name", flat=True)) == ["Once"]
+        assert OutboxEvent.objects.filter(name="customer.customer.created").count() == 1
+
+
+APP_SAVES = [
+    ("appointment", "/api/appointment/settings", {"cancellation_notice_hours": 48}, "appointment.settings.updated"),
+    ("attendance", "/api/attendance/settings", {"auto_close_after_hours": 12}, "attendance.settings.updated"),
+    ("cart_checkout", "/api/cart_checkout/carts", {"session_token": "once"}, "cart_checkout.cart.created"),
+    ("cash_register", "/api/cash_register/registers", {"name": "Once"}, "cash_register.register.created"),
+    (
+        "combo",
+        "/api/combo/combos",
+        {"name": "Once", "supply_kind": "goods", "tax_category_key": "product.generic"},
+        "combo.combo.created",
+    ),
+    ("customer", "/api/customer/groups", {"name": "Once"}, "customer.group.created"),
+    ("flow", "/api/flow/secrets", {"name": "ONCE_KEY", "value": "test-value"}, "flow.secret.saved"),
+    ("inventory", "/api/inventory/categories", {"name": "Once"}, "inventory.category.created"),
+    (
+        "invoice",
+        "/api/invoice/series",
+        {"code": "ONCE", "name": "Once", "invoice_type": "F1", "year": 2026},
+        "invoice.series.created",
+    ),
+    ("kitchen", "/api/kitchen/stations", {"name": "Once", "destination": "display"}, "kitchen.station.created"),
+    ("modifier", "/api/modifier/groups", {"name": "Once"}, "modifier.group.created"),
+    ("online_booking", "/api/online_booking/settings", {"page_title": "Once"}, "online_booking.settings.updated"),
+    ("payment", "/api/payment/methods", {"name": "Once"}, "payment.method.created"),
+    ("pricing", "/api/pricing/price_lists", {"code": "ONCE", "name": "Once"}, "pricing.price_list.created"),
+    (
+        "printing",
+        "/api/printing/printers",
+        {"name": "Once", "kind": "system", "usage": "receipt"},
+        "printing.printer.created",
+    ),
+    (
+        "reservation",
+        "/api/reservation/time_slots",
+        {"day_of_week": 0, "start_time": "09:00", "end_time": "10:00"},
+        "reservation.time_slot.created",
+    ),
+    ("sale", "/api/sale/payment_methods", {"name": "Once", "type": "other"}, "sale.payment_method.created"),
+    ("schedule", "/api/schedule/settings", {"week_starts_on": 7}, "schedule.settings.updated"),
+    ("service", "/api/service/categories", {"name": "Once"}, "service.category.created"),
+    ("staff", "/api/staff/roles", {"name": "Once"}, "staff.role.created"),
+    ("table", "/api/table/zones", {"name": "Once"}, "table.zone.created"),
+    ("task", "/api/task/projects", {"code": "once", "name": "Once"}, "task.project.created"),
+    ("tax", "/api/tax/categories", {"key": "product.once", "name": "Once"}, "tax.category.created"),
+    (
+        "website",
+        "/api/website/site",
+        {"template": "classic", "content": {"hero": {"title": "Once"}}},
+        "website.site.updated",
+    ),
+    ("whatsapp_inbox", "/api/whatsapp_inbox/notes", {"text": "Once"}, "whatsapp_inbox.note.added"),
+    (
+        "base",
+        "/api/me/preferences",
+        {"language": "en", "theme_mode": "dark", "palette": "ocean", "ui_scale": 100},
+        "base.profile.updated",
+    ),
+]
+
+
+@pytest.mark.parametrize(("app", "path", "payload", "event"), APP_SAVES, ids=[case[0] for case in APP_SAVES])
+def test_a_local_save_of_each_app_refused_as_read_only_goes_in_once(boss, hub_a, settings, app, path, payload, event):
+    """One real route of every changed app: its refused write is rolled back and then lands once, with its event."""
+    from cryptography.fernet import Fernet
+
+    settings.FLOW_SECRETS_KEY = Fernet.generate_key().decode()
+    cut = settings.LIVE["database_cut"]
+    settings.LIVE = {**settings.LIVE, "database_cut": {**cut, "wait_seconds": 5}}
+    if app == "whatsapp_inbox":
+        from apps.whatsapp_inbox.models import Conversation
+
+        with context.use_hub(hub_a):
+            conversation = Conversation.objects.create(phone="+34600111222", contact_name="Ana")
+        payload = {"id": str(conversation.id), **payload}
+    if app == "combo":
+        from apps.tax.models import TaxCategory
+
+        with context.use_hub(hub_a):
+            TaxCategory.objects.get_or_create(key="product.generic", defaults={"name": "Generic"})
+    _old_writer(hub_a)
+    refused = Refused(hub_a.db_name)
+
+    with _in(hub_a, hubs.HUB_A_ALIAS, refused):
+        response = _create(boss, hub_a, path, payload)
+
+    assert response.status_code in {200, 201}, (response.content, refused.statements)
+    assert refused.statements
+    with context.use_hub(hub_a):
+        assert OutboxEvent.objects.filter(name=event).count() == 1
+
+
+def test_a_committed_save_whose_answer_is_lost_says_it_was_saved(boss, hub_a, settings):
+    """The command committed; the database read after the view is what the cut stopped."""
+    global _after_view_armed
+    _after_view_armed = False
+    settings.MIDDLEWARE = [*settings.MIDDLEWARE, "base.tests.test_database_cut._after_the_view"]
+    cut = CutOn("")
+
+    def after_the_command(execute, query, params, many, context):
+        if not _after_view_armed:
+            return execute(query, params, many, context)
+        return cut(execute, query, params, many, context)
+
+    with connections["default"].execute_wrapper(after_the_command):
+        response = _create(boss, hub_a, ITEMS, {"name": "Saved"})
+    _after_view_armed = False
+
+    _assert_come_back(response, "database_answer_lost")
+    assert response.json()["error"]["message"] == DatabaseCut(repeatable=False, applied=True).message
+    assert cut.done == 1
+    assert _items(hub_a) == ["Saved"]
+    assert _created_events(hub_a) == 1
+
+
+def test_two_saves_refused_at_once_leave_one_group_and_one_event(boss, hub_a):
+    """Two requests racing after the old writer refused both still obey the unique constraint and the outbox."""
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    from apps.customer.models import CustomerGroup
+
+    other = _member(hub_a, username="other")
+    _old_writer(hub_a)
+    lock = threading.Lock()
+    refused = []
+
+    class BothRefused:
+        def __call__(self, execute, query, params, many, context):
+            try:
+                return execute(query, params, many, context)
+            except DatabaseError:
+                statement = str(query).lstrip().upper()
+                if statement.startswith(("INSERT", "UPDATE", "DELETE")) or "FOR UPDATE" in statement or "FOR KEY SHARE" in statement:
+                    with lock:
+                        refused.append(statement)
+                        if len(refused) == 2:
+                            _read_only(hub_a.db_name, False)
+                raise
+
+    def save(client):
+        with _in(hub_a, hubs.HUB_A_ALIAS, BothRefused()):
+            return _create(client, hub_a, "/api/customer/groups", {"name": "Once"})
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        responses = [future.result() for future in [pool.submit(save, boss), pool.submit(save, other)]]
+
+    assert sorted(response.status_code for response in responses) == [201, 409]
+    assert len(refused) >= 2
+    with context.use_hub(hub_a):
+        assert CustomerGroup.objects.filter(name="Once").count() == 1
+        assert OutboxEvent.objects.filter(name="customer.group.created").count() == 1
+
+
+def test_every_routed_command_declares_whether_a_cut_may_repeat_it():
+    """A new route must be reviewed: local-only commands repeat; the exclusions say why they must not."""
+    import ast
+    from pathlib import Path
+
+    from live.operations import registry
+
+    root = Path(__file__).resolve().parents[2]
+    routed = set()
+    for path in [*root.glob("apps/*/api.py"), *root.glob("base/api.py")]:
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.Call) and ast.unparse(node.func) == "bind" and len(node.args) >= 2:
+                routed.add(ast.literal_eval(node.args[1]))
+    exclusions = {
+        "appointment.appointment.create",
+        "appointment.appointment.bulk_create",
+        "appointment.appointment.charge",
+        "appointment.recurring.create",
+        "appointment.recurring.materialize",
+        "base.app.enable",
+        "base.approval.approve",
+        "base.blueprint.import",
+        "base.device.prune",
+        "base.device.remove",
+        "base.failed_event.retry",
+        "base.failed_event.retry_all",
+        "base.hub.reset",
+        "base.person.badge_set",
+        "base.pin.set",
+        "base.profile.avatar_set",
+        "base.saas_pass.create",
+        "base.support.report",
+        "cart_checkout.checkout.initiate",
+        "cash_register.session.open",
+        "combo.option.upload_image",
+        "flow.flow.run",
+        "flow.question.answer",
+        "flow.run.retry",
+        "inventory.product.upload_image",
+        "invoice.invoice.create",
+        "invoice.invoice.create_from_sale",
+        "invoice.invoice.mark_paid",
+        "invoice.invoice.print",
+        "invoice.invoice.rectify",
+        "invoice.invoice.rectify_from_refund",
+        "invoice.invoice.rectify_from_void",
+        "invoice.invoice.substitute",
+        "kitchen.ticket.create",
+        "kitchen.ticket.send",
+        "online_booking.public.book",
+        "payment.payment.create",
+        "sale.order.fire",
+        "sale.sale.complete",
+        "sale.sale.complete_over_limit",
+        "sale.sale.issue_documents",
+        "sale.sale.print",
+        "sale.sale.refund",
+        "sale.sale.void",
+        "service.service.upload_image",
+        "table.table.bulk_create",
+        "table.table.create",
+        "task.task.create",
+        "website.image.upload",
+        "whatsapp_inbox.channel.connect",
+        "whatsapp_inbox.channel.disconnect",
+        "whatsapp_inbox.channel.prepare",
+        "whatsapp_inbox.conversation.erase",
+        "whatsapp_inbox.message.notify",
+        "whatsapp_inbox.message.retry",
+        "whatsapp_inbox.message.send",
+        "whatsapp_inbox.template.create",
+        "whatsapp_inbox.template.delete",
+        "whatsapp_inbox.template.retry",
+        "whatsapp_inbox.template.update",
+        "whatsapp_inbox.template_sample.upload",
+    }
+    wrong = []
+    for operation in registry.values():
+        if operation.kind != "command" or operation.name not in routed:
+            continue
+        excluded = operation.name in exclusions or operation.name.startswith(("verifactu.", "base.assistant.", "base.file."))
+        if operation.repeatable == excluded:
+            wrong.append(operation.name)
+    assert wrong == []
 
 
 def test_a_save_that_numbers_is_never_repeated_blindly(boss, hub_a):
