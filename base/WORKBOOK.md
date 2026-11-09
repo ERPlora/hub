@@ -198,7 +198,8 @@ aquí.», «¿Quién se pone?» con las caras, el teclado y «Cancelar».
 
 ### Mi perfil
 Desde «Perfil» del menú de usuario. Arriba, la persona (cara, nombre y rol); debajo, «Datos de la cuenta» (con la
-foto), «Preferencias» (idioma y apariencia) y «PIN».
+foto), «Preferencias» (idioma y apariencia: paleta, tema y tamaño de interfaz del 80 al 120%, por defecto 100%) y
+«PIN».
 
 ### Ajustes · General
 Lo que se abre con «Ajustes» en el menú lateral: la primera pestaña de abajo, «General», con «Este dispositivo»,
@@ -1848,13 +1849,14 @@ Pasos:
   3. «Elegir imagen» sube una foto JPG, PNG o WebP de hasta 2 MB («Foto actualizada»); «Quitar» la borra («Foto
      quitada»).
   4. En «Preferencias», «Idioma» («Usar el idioma del negocio», «Español», «English») y «Apariencia» («Paleta de
-     tema» y «Tema»: «Sistema (auto)», «Claro», «Oscuro») se guardan al elegir y se aplican al momento; «Usar la
-     apariencia del negocio» deshace lo propio.
+     tema», «Tema»: «Sistema (auto)», «Claro», «Oscuro», y «Tamaño de la interfaz»: 80, 90, 100, 110 o 120%, por
+     defecto 100%) se guardan al elegir y se aplican al momento en cualquier dispositivo; «Usar la apariencia del
+     negocio» deshace lo propio y devuelve el tamaño a 100%.
 Entra: el perfil de quien tiene la sesión.
 Sale: su nombre en este negocio (el que sale en el menú lateral, en las caras y en «Dispositivos»), su foto, su idioma
-y su apariencia, que le siguen en cualquier dispositivo en el que entre, con su PIN o con su cuenta. Con «Usar el
-idioma del negocio», entra con PIN en el del negocio y con su cuenta en el de su cuenta de erplora.com (BASE-F51). El
-correo es solo de contacto: no cambia la cuenta de erplora.com.
+y su apariencia, incluido el tamaño de interfaz, que le siguen en cualquier dispositivo en el que entre, con su PIN,
+su placa o su cuenta. Con «Usar el idioma del negocio», entra con PIN en el del negocio y con su cuenta en el de su
+cuenta de erplora.com (BASE-F51). El correo es solo de contacto: no cambia la cuenta de erplora.com.
 Si falla: si el perfil no se pudo leer, «No se pudo cargar el perfil» — «Tus datos siguen igual. Comprueba la
 conexión y vuelve a intentarlo.» con «Reintentar». Al guardar: «No se pudo guardar el perfil»; foto rechazada:
 «No se pudo guardar la foto. Usa JPG, PNG o WebP de hasta 2 MB.»; preferencias: «No se pudieron guardar tus
