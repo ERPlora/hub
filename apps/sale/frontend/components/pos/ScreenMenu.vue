@@ -94,6 +94,12 @@ function choose(): void {
 .pos-more__trigger:hover {
   --color: var(--ion-text-color);
 }
+@media (pointer: coarse) {
+  .pos-more__trigger {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
 .pos-more__menu {
   min-width: 13rem;
   padding: 0.3rem;
