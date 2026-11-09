@@ -468,7 +468,9 @@ Pasos:
   3. Debajo, en este orden: «Empieza con un negocio como el tuyo» (solo mientras el negocio está vacío y
      para quien lo administra, BASE-F38), «Mis apps», «Termina de configurar tu negocio» y el tablero de
      paneles.
-  4. Abajo, dos pestañas: «Resumen» (lo anterior) y «Actividad».
+  4. Al cambiar el idioma de la interfaz, los nombres de «Mis apps» y los textos del checklist cambian en el
+     sitio, sin recargar ni reabrir la aplicación.
+  5. Abajo, dos pestañas: «Resumen» (lo anterior) y «Actividad».
 Entra: el nombre del negocio y la fecha del dispositivo.
 Sale: nada guardado.
 Si falla: una zona que no carga no tumba las demás; cada una dice lo suyo. En el móvil las zonas se

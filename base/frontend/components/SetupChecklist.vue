@@ -1,15 +1,15 @@
 <script setup lang="ts">
 // «Finish setting up your business» (BASE-G22, BASE-G130, BASE-G164; hub#372, ADR-0063): ONE live read of
 // `base.setup.status` — the platform's steps and the modules', already ordered and filtered by country,
-// vertical and permission on the server — painted as it comes. «Set up» only where the step's screen exists
-// and the person can do it; a ⛔ only an administrator can do says who can. Folded: ⛔ first, then 🔴, at
+// vertical and permission on the server — painted as it comes, and read again when the shell changes language.
+// «Set up» only where the step's screen exists and the person can do it; a ⛔ only an administrator can do says who can. Folded: ⛔ first, then 🔴, at
 // most 5 rows (2 on a phone); «Your apps» is the «My apps» card's, so the fold does not repeat it. While something is
 // left, «Ask the assistant» opens its panel on the setup (BASE-G121).
 import { InlineFeedback, StatusPill, type StatusPillTone } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonProgressBar, IonSkeletonText } from '@ionic/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import { useRouter } from 'vue-router';
 
@@ -23,12 +23,13 @@ import '../home.css';
 /** What the «My apps» card above already offers. */
 const ALREADY_ON_SCREEN = ['base.apps'];
 
-const { t } = useBaseI18n();
+const { t, locale } = useBaseI18n();
 const router = useRouter();
 const phone = usePhone();
 const expanded = ref(false);
 const assistant = useAssistant();
 const { data, status, refresh } = useLive('base.setup.status', {});
+watch(locale, () => refresh());
 
 const view = computed(() =>
   checklistView(data.value, {

@@ -137,12 +137,19 @@ describe('ProfilePage — who I am', () => {
 
 describe('ProfilePage — preferences', () => {
   it('a language is saved for the person and applied at once', async () => {
-    const { wrapper, calls } = await profile();
-    const select = wrapper.get('[data-testid="profile-language"]');
-    select.element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: 'es' } }));
-    await flush();
-    expect(calls('/api/me/preferences')).toEqual([{ language: 'es', theme_mode: '', palette: '', ui_scale: 100 }]);
-    expect(wrapper.vm.$i18n.locale).toBe('es');
+    const changed = vi.fn();
+    const stop = onSessionChanged(changed);
+    try {
+      const { wrapper, calls } = await profile();
+      const select = wrapper.get('[data-testid="profile-language"]');
+      select.element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: 'es' } }));
+      await flush();
+      expect(calls('/api/me/preferences')).toEqual([{ language: 'es', theme_mode: '', palette: '', ui_scale: 100 }]);
+      expect(wrapper.vm.$i18n.locale).toBe('es');
+      expect(changed).toHaveBeenCalledOnce();
+    } finally {
+      stop();
+    }
   });
 
   it('a mode and a palette are saved and painted', async () => {

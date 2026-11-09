@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:970e40ca5d15b1bc1f30cd03ed769f4ebd7f33b895a0c4a1989277272718a49c -->
+<!-- generated from WORKBOOK.md sha256:dac99d70eb14555cc0648bb3881ecaeb73f1030cce6b3b10192f29ee2242c610 -->
 
 ## What it is for and who it is for
 
@@ -459,7 +459,9 @@ Steps:
   3. Below, in this order: "Start with a business like yours" (only while the business is empty and for
      who administers it, BASE-F38), "My apps", "Finish setting up your business" and the board of
      panels.
-  4. At the bottom, two tabs: "Summary" (the above) and "Activity".
+  4. When the interface language changes, the names in "My apps" and the checklist's texts change in place,
+     without reloading or reopening the application.
+  5. At the bottom, two tabs: "Summary" (the above) and "Activity".
 In: the business's name and the device's date.
 Out: nothing saved.
 If it fails: a zone that does not load does not bring the others down; each one says its own. On a phone
