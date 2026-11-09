@@ -217,7 +217,7 @@ class Profile(UUIDModel):
 
     The name and the contact email are this business's (receipts, Personal), not the erplora.com account's, which
     the SaaS keeps; the contact email never gives nor takes any access. ``language``, ``theme_mode`` and ``palette``
-    empty = the business's.
+    empty = the business's. ``ui_scale`` is the percentage painted across the whole interface.
     """
 
     class Language(models.TextChoices):
@@ -243,6 +243,13 @@ class Profile(UUIDModel):
         OCEAN = "ocean", pgettext_lazy("palette", "Ocean")
         VIOLET = "violet", pgettext_lazy("palette", "Violet")
 
+    class UiScale(models.IntegerChoices):
+        PERCENT_80 = 80, "80%"
+        PERCENT_90 = 90, "90%"
+        PERCENT_100 = 100, "100%"
+        PERCENT_110 = 110, "110%"
+        PERCENT_120 = 120, "120%"
+
     username = models.CharField(_("person"), max_length=150, unique=True)
     first_name = models.CharField(_("first name"), max_length=150, blank=True)
     last_name = models.CharField(_("last name"), max_length=150, blank=True)
@@ -251,6 +258,9 @@ class Profile(UUIDModel):
     language = models.CharField(_("language"), max_length=8, choices=Language.choices, blank=True)
     theme_mode = models.CharField(_("appearance"), max_length=8, choices=ThemeMode.choices, blank=True)
     palette = models.CharField(_("palette"), max_length=16, choices=Palette.choices, blank=True)
+    ui_scale = models.PositiveSmallIntegerField(
+        _("interface scale"), choices=UiScale.choices, default=100, db_default=100
+    )
     updated_at = models.DateTimeField(pgettext_lazy("profile", "updated at"), auto_now=True)
 
     class Meta:

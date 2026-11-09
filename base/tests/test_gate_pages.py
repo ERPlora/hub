@@ -3,11 +3,14 @@ one stylesheet of ``base``, served as a static file with the logo: they are rend
 nonce, and the strict CSP lets in only what comes from 'self' (no ``<style>`` nor ``style=``)."""
 
 import re
+from pathlib import Path
 
 import pytest
+from django.apps import apps
 from django.contrib.staticfiles import finders
 from django.core.management import call_command
-from django.template.loader import render_to_string
+from django.template.loader import get_template, render_to_string
+from django.template.loader_tags import ExtendsNode
 
 from base.models import Hub
 
@@ -24,7 +27,12 @@ PAGES = {
     "gone-demo": ("base/hub_gone.html", {"is_demo": True, "back_url": f"{SAAS}/demo/ended"}),
     "suspended": ("base/hub_suspended.html", {"back_url": f"{SAAS}/launch"}),
     "login-retry": ("base/login_retry.html", {"retry_url": "/auth/login?next=%2F"}),
+    "too-many-attempts": ("base/too_many_attempts.html", {"minutes": 15}),
+    "jump": ("base/jump.html", {"target": "/auth/login?next=", "csp_nonce": "n0nce"}),
+    "database-cut": ("base/database_cut.html", {"message": "ERPlora will be back in a moment."}),
 }
+#: The one layout every gate page wears: its head, its stylesheet and ERPlora's mark are written once.
+LAYOUT = "base/gate.html"
 
 
 def csp_directives(response) -> dict[str, list[str]]:
@@ -39,6 +47,24 @@ def test_every_gate_page_links_the_gate_stylesheet_and_shows_the_logo_with_no_in
     assert html.count(f'<link rel="stylesheet" href="{settings.STATIC_URL}{STYLESHEET}">') == 1
     assert f'src="{settings.STATIC_URL}{LOGO}"' in html
     assert not re.search(r"<style\b|\sstyle\s*=", html, re.IGNORECASE)
+
+
+@pytest.mark.parametrize("page", PAGES)
+def test_every_gate_page_wears_the_one_gate_layout(page):
+    """A gate page says only what is its own: a new one that copies the head and the mark again is the duplicate this
+    stops (dup-guard, hub#831)."""
+    template = get_template(PAGES[page][0]).template
+    first = template.nodelist[0]
+    assert isinstance(first, ExtendsNode), f"{template.origin.template_name} does not extend {LAYOUT}"
+    assert first.parent_name.var == LAYOUT
+
+
+def test_every_gate_page_is_listed_here():
+    """Each template that wears the gate's look is checked above: none is left out."""
+    folder = Path(apps.get_app_config("base").path) / "templates" / "base"
+    wearing = {path.name for path in folder.glob("*.html") if "ep-gate__" in path.read_text() or "{% extends" in path.read_text()}
+    listed = {Path(template).name for template, _context in PAGES.values()}
+    assert wearing - {Path(LAYOUT).name, "_gate_brand.html"} == listed
 
 
 @pytest.mark.parametrize("path", [STYLESHEET, LOGO])

@@ -61,7 +61,8 @@ its database context: ``use_hub(request.hub)`` on a hub's host; on the platform 
 (``/admin/hub/<slug>/``) or, with none, control (a page of a hub's model there goes back to the index, asking to
 choose a business); nothing for ``/internal`` and the open paths, whose code opens its own. A hub's database that says
 it is another hub (``base.tenancy.identity``) answers 503 (``base.hub_unavailable``), serves nothing and raises an
-alarm; one that cannot be reached now answers the same 503 with ``Retry-After`` and a warning; a business without its
+alarm; one that cannot be reached now answers the same 503 with ``Retry-After`` and a warning, after waiting for it when
+it is a cut of the database (``live.database_cut``, BASE-F111: marked, so the request runs again); a business without its
 own database yet (phase 1's, before its cut: S5) answers 503 ``base.hub_maintenance``, as one being moved. A hub
 whose every place in this process is taken (its plan's transactions at once, ``base.tenancy.limits``) answers 503
 ``base.hub_busy`` with ``Retry-After``, whether that happens while checking its database, in
@@ -93,6 +94,7 @@ from django.utils.deprecation import MiddlewareMixin
 from django.utils.translation import gettext
 from django.views.defaults import page_not_found
 from live.api_errors import DEFAULT_API_PREFIX
+from live.database_cut import cut_of, marked
 from live.errors import NotFound
 
 from base import custom_domains, meter, public_home, registry
@@ -226,7 +228,7 @@ def _not_found(request: HttpRequest) -> HttpResponse:
 def _refuse(request: HttpRequest, hub: Hub, refusal: registry.Refusal) -> HttpResponse:
     """The registry's refusal: its envelope, or its page for a browser (gone, being prepared, under maintenance,
     suspended)."""
-    if _wants_envelope(request):
+    if wants_envelope(request):
         response = _envelope(refusal.status, refusal.code, refusal.message)
     elif refusal.code == registry.HUB_GONE:
         back = saas_url(DEMO_ENDED_PATH if hub.is_demo else LAUNCH_PATH)
@@ -249,7 +251,7 @@ def _is_api(request: HttpRequest) -> bool:
     return request.path_info.startswith(api_prefix)
 
 
-def _wants_envelope(request: HttpRequest) -> bool:
+def wants_envelope(request: HttpRequest) -> bool:
     """The API, and any call that does not ask for a page, gets the JSON envelope; a browser gets the page."""
     return _is_api(request) or "text/html" not in request.headers.get("Accept", "")
 
@@ -410,7 +412,7 @@ class HubDatabaseMiddleware:
     def _not_created(request: HttpRequest, refused: tenancy_context.AppNotCreated) -> HttpResponse:
         """404 ``app_inactive``: the envelope; the admin's page, its index with what it says; another page, the index
         itself included (going back to it would be a loop), its message."""
-        if _wants_envelope(request):
+        if wants_envelope(request):
             return _envelope(refused.status, refused.code, refused.message)
         if getattr(request, "platform_host", False) and request.path_info != _route("admin:index"):
             from django.contrib import messages
@@ -424,7 +426,7 @@ class HubDatabaseMiddleware:
         """503 ``base.hub_busy``: the envelope, or the message for a page; come back in a moment (``Retry-After``). It has
         reached a client, so it counts (``HubBusy.reached_client``)."""
         busy.reached_client()
-        if _wants_envelope(request):
+        if wants_envelope(request):
             response = _envelope(busy.status, busy.code, busy.message)
         else:
             response = HttpResponse(busy.message, status=busy.status, content_type="text/plain; charset=utf-8")
@@ -433,8 +435,8 @@ class HubDatabaseMiddleware:
 
     @staticmethod
     def _unavailable(request: HttpRequest, error: Exception) -> HttpResponse:
-        """503: a database that is not its hub's (an alarm), one that cannot be reached now (it passes), or a business
-        without its own yet (its cut is to come)."""
+        """503: a database that is not its hub's (an alarm), one that cannot be reached now (it passes; a cut of the database
+        is waited for first), or a business without its own yet (its cut is to come)."""
         hub = getattr(request, "hub", None)
         if isinstance(error, tenancy_context.HubWithoutDatabase):
             logger.warning("base.hub_without_database: %s; nothing is served until its cut.", error)
@@ -453,15 +455,20 @@ class HubDatabaseMiddleware:
         refusal = registry.unavailable()
         response = _envelope(refusal.status, refusal.code, refusal.message)
         response["Retry-After"] = str(PREPARING_RETRY_AFTER_SECONDS)
-        return response
+        # A cut of the database (live.database_cut, BASE-F111) is the same 503, marked: nothing ran yet, so the request
+        # waits for it and runs again while its limit lasts.
+        cut = cut_of(error, request)
+        return response if cut is None else marked(response, cut)
 
 
 def _count_the_request(request: HttpRequest) -> None:
     """One more request of the business whose host it came to (``base.meter``, BASE-F40): the platform's host, ``/internal``
     and the open paths have no ``request.hub``, and ``HealthCheckMiddleware`` and WhiteNoise answered before; a demo is not
-    measured."""
+    measured. Once per request: a cut of the database runs the same request again (``live.database_cut``, BASE-F111), and
+    its tries are not more requests of the business."""
     hub = getattr(request, "hub", None)
-    if hub is not None and not hub.is_demo:
+    if hub is not None and not hub.is_demo and not getattr(request, "_counted_by_meter", False):
+        request._counted_by_meter = True
         meter.count_request(hub.pk)
 
 

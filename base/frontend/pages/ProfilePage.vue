@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // «My profile» (`/profile`, BASE-G125, G126; the old hub's ProfilePage): the person heading it (photo, name, role in
 // this business), «Account details» (name, surname, contact email: never the email they sign in with), the photo,
-// «Preferences» (language, mode and palette: saved for them, so they follow them to any device, and applied at once)
-// and «PIN» (their own: the current one when they have one, the new one twice). The profile comes live
+// «Preferences» (language, mode, palette and interface scale: saved for them, so they follow them to any device, and
+// applied at once) and «PIN» (their own: the current one when they have one, the new one twice). The profile comes live
 // (`base.profile.get`): a change saved elsewhere repaints what the person has not touched. A profile that cannot be
 // read offers nothing to save, only «Retry» (hub#2541).
 import { ImageUpload, type ImageUploadValue, InlineFeedback, UserAvatar } from '@erplora/ui/components';
@@ -14,8 +14,9 @@ import {
   THEME_PALETTES,
   type ThemeMode,
   type ThemePalette,
+  type ThemeScale,
 } from '@erplora/ui/shell';
-import { IonButton, IonInput, IonLabel, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonSpinner } from '@ionic/vue';
+import { IonButton, IonInput, IonLabel, IonRange, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonSpinner } from '@ionic/vue';
 import { computed, getCurrentInstance, ref, watch } from 'vue';
 
 import { sessionChanged } from '../lib/access';
@@ -114,13 +115,18 @@ async function onPhoto(value: ImageUploadValue | null): Promise<void> {
 }
 
 // ── Preferences ──
-const prefs = ref<Preferences>({ language: '', theme_mode: '', palette: '' });
+const prefs = ref<Preferences>({ language: '', theme_mode: '', palette: '', ui_scale: 100 });
 const prefsError = ref('');
 watch(
   profile,
   (value) => {
     if (value && !prefsCommand.pending.value) {
-      prefs.value = { language: value.language, theme_mode: value.theme_mode, palette: value.palette };
+      prefs.value = {
+        language: value.language,
+        theme_mode: value.theme_mode,
+        palette: value.palette,
+        ui_scale: value.ui_scale ?? 100,
+      };
     }
   },
   { immediate: true },
@@ -131,11 +137,16 @@ const MODES: Exclude<ProfileThemeMode, ''>[] = ['system', 'light', 'dark'];
 const PALETTES = THEME_PALETTES as readonly ThemePalette[];
 
 function paint(value: Preferences): void {
-  if (!value.theme_mode && !value.palette) {
+  if (!value.theme_mode && !value.palette && value.ui_scale === 100) {
     resetUserThemePreferences();
     return;
   }
-  applyUserThemePreferences((value.theme_mode || null) as ThemeMode | null, (value.palette || null) as ThemePalette | null);
+  applyUserThemePreferences(
+    (value.theme_mode || null) as ThemeMode | null,
+    (value.palette || null) as ThemePalette | null,
+    undefined,
+    value.ui_scale,
+  );
 }
 
 async function savePrefs(change: Partial<Preferences>): Promise<void> {
@@ -145,7 +156,7 @@ async function savePrefs(change: Partial<Preferences>): Promise<void> {
   try {
     const answer = await prefsCommand.run(wanted);
     if (answer.language === 'es' || answer.language === 'en') i18n.$i18n.locale = answer.language;
-    if ('theme_mode' in change || 'palette' in change) paint(wanted);
+    if ('theme_mode' in change || 'palette' in change || 'ui_scale' in change) paint(wanted);
   } catch (reason) {
     prefsError.value = reason instanceof ApiError && reason.message ? reason.message : t('base.profile.prefs.failed');
   }
@@ -416,12 +427,36 @@ const text = (value: unknown): string => (value === null || value === undefined 
               <ion-label>{{ t(`base.profile.prefs.modes.${mode}`) }}</ion-label>
             </ion-segment-button>
           </ion-segment>
+          <h4 class="profile__eyebrow">
+            {{ t('base.profile.prefs.scale') }}
+          </h4>
+          <p class="profile__note">
+            {{ t('base.profile.prefs.scaleHelp') }}
+          </p>
+          <ion-range
+            data-testid="profile-scale"
+            :aria-label="t('base.profile.prefs.scale')"
+            :min="80"
+            :max="120"
+            :step="10"
+            :ticks="true"
+            :snaps="true"
+            :pin="true"
+            :value="prefs.ui_scale"
+            @ion-change="savePrefs({ ui_scale: Number($event.detail.value) as ThemeScale })"
+          />
+          <p
+            class="profile__note"
+            data-testid="profile-scale-value"
+          >
+            {{ prefs.ui_scale }}%
+          </p>
           <ion-button
             fill="clear"
             size="small"
             data-testid="profile-appearance-business"
-            :disabled="!prefs.theme_mode && !prefs.palette"
-            @click="savePrefs({ theme_mode: '', palette: '' })"
+            :disabled="!prefs.theme_mode && !prefs.palette && prefs.ui_scale === 100"
+            @click="savePrefs({ theme_mode: '', palette: '', ui_scale: 100 })"
           >
             {{ t('base.profile.prefs.business') }}
           </ion-button>

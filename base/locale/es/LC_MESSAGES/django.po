@@ -444,6 +444,10 @@ msgstr "Estamos preparando tu negocio"
 msgid "This business is under maintenance"
 msgstr "Este negocio está en mantenimiento"
 
+#: templates/base/database_cut.html
+msgid "We will be back soon"
+msgstr "Volvemos enseguida"
+
 msgid "It takes a few minutes. This page refreshes by itself."
 msgstr "Tarda unos minutos. Esta página se actualiza sola."
 
@@ -1297,6 +1301,10 @@ msgstr "apariencia"
 #: models.py:239
 msgid "palette"
 msgstr "paleta"
+
+#: models.py:262
+msgid "interface scale"
+msgstr "Tamaño de la interfaz"
 
 #: models.py:243
 msgid "profile"

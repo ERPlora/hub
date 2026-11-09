@@ -53,6 +53,7 @@ def test_without_a_profile_it_is_the_account_s_name_and_the_business_s_preferenc
     answer = get(client)
     assert (answer["first_name"], answer["last_name"], answer["contact_email"]) == ("Ana", "", "")
     assert (answer["language"], answer["theme_mode"], answer["palette"], answer["avatar_url"]) == ("", "", "", "")
+    assert answer["ui_scale"] == 100
     assert (answer["role"], answer["has_pin"], answer["pin_length"]) == ("hub_manager", False, 4)
 
 
@@ -87,17 +88,37 @@ def test_the_contact_email_must_be_an_email_and_gives_no_access(client, ana):
 
 
 def test_the_language_and_the_appearance_are_kept_and_the_language_applies_at_once(client, ana):
-    response = post(client, "/me/preferences", {"language": "en", "theme_mode": "dark", "palette": "forest"})
+    response = post(client, "/me/preferences", {"language": "en", "theme_mode": "dark", "palette": "forest", "ui_scale": 100})
     assert response.status_code == 200
     assert response.cookies[settings.LANGUAGE_COOKIE_NAME].value == "en"
     profile = Profile.objects.get(username="saas:1")
     assert (profile.language, profile.theme_mode, profile.palette) == ("en", "dark", "forest")
-    back = post(client, "/me/preferences", {"language": "", "theme_mode": "", "palette": ""})
+    back = post(client, "/me/preferences", {"language": "", "theme_mode": "", "palette": "", "ui_scale": 100})
     business = Hub.objects.get(slug="a").language or settings.LANGUAGE_CODE
     assert back.cookies[settings.LANGUAGE_COOKIE_NAME].value == business
 
 
-@pytest.mark.parametrize("body", [{"language": "fr", "theme_mode": "", "palette": ""}, {"language": "", "theme_mode": "neon", "palette": ""}, {"language": "", "theme_mode": "", "palette": "pink"}])
+@pytest.mark.parametrize("scale", [80, 90, 100, 110, 120])
+def test_every_interface_scale_is_saved_returned_and_read_back(client, ana, scale):
+    response = post(client, "/me/preferences", {"language": "", "theme_mode": "", "palette": "", "ui_scale": scale})
+    assert response.status_code == 200
+    assert response.json()["ui_scale"] == scale
+    assert Profile.objects.get(username="saas:1").ui_scale == scale
+    assert get(client)["ui_scale"] == scale
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"language": "fr", "theme_mode": "", "palette": "", "ui_scale": 100},
+        {"language": "", "theme_mode": "neon", "palette": "", "ui_scale": 100},
+        {"language": "", "theme_mode": "", "palette": "pink", "ui_scale": 100},
+        *[
+            {"language": "", "theme_mode": "", "palette": "", "ui_scale": scale}
+            for scale in [75, 85, 95, 105, 115, 125, 130]
+        ],
+    ],
+)
 def test_a_preference_it_does_not_offer_is_refused(client, ana, body):
     assert post(client, "/me/preferences", body).status_code == 422
 

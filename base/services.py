@@ -3190,10 +3190,11 @@ def preferences_set(ctx: OperationContext, data: PreferencesIn) -> dict:
     user = queries.signed_in(ctx)
     profile = _profile(user)
     profile.language, profile.theme_mode, profile.palette = data.language, data.theme_mode, data.palette
+    profile.ui_scale = data.ui_scale
     profile.save()
     record_event(ctx, events.PROFILE_UPDATED, {})
     language = queries.language_of(user, ctx.scope.key) or settings.LANGUAGE_CODE
-    return {"language": language, "theme_mode": profile.theme_mode, "palette": profile.palette}
+    return {"language": language, "theme_mode": profile.theme_mode, "palette": profile.palette, "ui_scale": profile.ui_scale}
 
 
 #: The largest photo, in bytes (before base64); the old Hub's.
