@@ -10,7 +10,7 @@
 // (`…-es-1440`). What the run creates is deleted after it and `a`'s registration put back, also when a test fails.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, hostPage, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
+import { A, api, capture, hostPage, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
 import { openTillCart } from './sale-helpers';
 import { cleanUp as cleanServices, named, noHorizontalScroll, pick, post, settled } from './service-helpers';
 
@@ -149,7 +149,7 @@ test(`${KEY}: service-business-currency a business in Japan saves «1500» as 15
       await expect(checkout).toBeVisible();
       await expect(checkout.locator('[data-testid=sale-checkout-total]')).toContainText('¥1,500');
       await settled(page);
-      await page.screenshot({ path: shot(`${KEY}-jp-checkout-${size.name}`) });
+      await capture(page, `${KEY}-jp-checkout-${size.name}`);
       await checkout.locator('[data-testid=sale-checkout-close]').click();
       await expect(checkout).toBeHidden();
     }
