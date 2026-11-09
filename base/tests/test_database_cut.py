@@ -207,12 +207,9 @@ def test_controls_pool_hands_out_no_connection_the_server_cut_while_it_was_idle(
     assert boss.get(ITEMS, HTTP_HOST=_host(hub_a)).status_code == 200
     connections["default"].close()
     name = connections["default"].settings_dict["NAME"]
-    with _admin() as admin:
-        pids = admin.execute(
-            "SELECT pid FROM pg_stat_activity WHERE datname = %s AND pid <> pg_backend_pid()", (name,)
-        ).fetchall()
+    pids = [session[0] for session in hubs.client_sessions_on(name)]
     assert pids, "the pool keeps its connection: there has to be one to cut"
-    for (pid,) in pids:
+    for pid in pids:
         _terminate(pid)
     caplog.clear()
 
