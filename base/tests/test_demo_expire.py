@@ -1,7 +1,9 @@
 """``manage.py demo_expire <slug>``: end a demo now and purge it at once (plan 2026-10-17, §1.7).
 
 Support's tool and the e2e's clock: through its operations (``base.demo.expire``, then one pass of the reaper), in
-every environment (not only ``DEBUG``), and it says how the demo was left.
+every environment (not only ``DEBUG``), and it says how the demo was left. While the platform is frozen for a database
+upgrade (``control.freeze.set``; hub#930) it ends the demo all the same and leaves its database where it is: a ``DROP
+DATABASE`` meanwhile would never reach the upgrade's copy; the reaper drops it once the freeze is lifted.
 """
 
 import hashlib
@@ -18,7 +20,9 @@ from live.context import system_context
 from base.models import DemoCode, Hub, Membership
 from base.registry import REGISTRY_SCOPE
 from base.schemas import DemoCodeIn, DemoCreateIn
-from base.services import demo_code_create, demo_create, open_demo_session, redeem_demo_code
+from base.services import demo_code_create, demo_create, open_demo_session, reap_demos, redeem_demo_code
+from control.schemas import FreezeIn
+from control.services import freeze_set
 
 pytestmark = pytest.mark.django_db
 
@@ -68,3 +72,19 @@ def test_a_slug_that_names_no_demo_is_an_error_and_changes_nothing(slug):
     with pytest.raises(CommandError, match="no demo"):
         expire(slug)
     assert Hub.objects.get(slug="a").status == "ready"
+
+
+def test_frozen_it_ends_the_demo_and_leaves_its_database_for_after_the_freeze():
+    platform = system_context(REGISTRY_SCOPE)
+    slug = entered_demo()
+    freeze_set(platform, FreezeIn(frozen=True, reason="Aurora upgrade"))
+
+    output = expire(slug)
+
+    assert Hub.objects.get(slug=slug).status == "expired"
+    assert output.strip() == f"{slug}: expired (frozen: its database is dropped once the freeze is lifted)"
+
+    freeze_set(platform, FreezeIn(frozen=False))
+    reap_demos()
+
+    assert Hub.objects.get(slug=slug).status == "purged"
