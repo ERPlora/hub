@@ -123,6 +123,14 @@ SAMPLE = [
     ("es", "sale.order.set_label", "ponle de nombre «Ana — terraza» a la cuenta"),
     ("es", "sale.sale.get", "¿qué llevaba el último ticket?"),
     ("en", "sale.order.get", "what's on table 4's check?"),
+    ("es", "base.file.read", "lee el tamaño y el tipo de Documentos QA/nota-qa.txt"),
+    ("es", "base.blueprint.import", "importa la plantilla de restaurante"),
+    ("es", "base.app.enable", "vuelve a dejar Reservas disponible"),
+    ("es", "base.device.mode_set", "convierte este ordenador en una caja compartida"),
+    ("es", "base.device.prune", "retira los equipos sin uso durante 30 días"),
+    ("es", "base.device.remove", "cierra el acceso del primer dispositivo"),
+    ("es", "base.device.rename", "nombra este ordenador «Ordenador de oficina QA»"),
+    ("es", "base.person.badge_remove", "desactiva la placa de la empleada"),
 ]
 
 
