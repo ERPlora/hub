@@ -1302,6 +1302,10 @@ msgstr "apariencia"
 msgid "palette"
 msgstr "paleta"
 
+#: models.py:262
+msgid "interface scale"
+msgstr "Tamaño de la interfaz"
+
 #: models.py:243
 msgid "profile"
 msgstr "perfil"

@@ -661,6 +661,7 @@ export interface AccessSettings {
 
 export type ProfileLanguage = '' | 'es' | 'en';
 export type ProfileThemeMode = '' | 'system' | 'light' | 'dark';
+export type ProfileUiScale = 80 | 90 | 100 | 110 | 120;
 
 /** `base.ProfileOut`: «My profile». Empty language, mode or palette: the business's. */
 export interface Profile {
@@ -671,6 +672,7 @@ export interface Profile {
   language: ProfileLanguage;
   theme_mode: ProfileThemeMode;
   palette: string;
+  ui_scale: ProfileUiScale;
   role: string;
   has_pin: boolean;
   pin_length: number;
@@ -681,6 +683,7 @@ export interface Preferences {
   language: ProfileLanguage;
   theme_mode: ProfileThemeMode;
   palette: string;
+  ui_scale: ProfileUiScale;
 }
 
 // ── People and permissions (APP-BASE-5) ──
