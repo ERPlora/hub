@@ -21,7 +21,8 @@ The worker's metrics (``base.metrics``, hub#488; PLAN-AWS §8, PLAN-DB §6 and �
 
 The freeze switch (hub#930; PLAN-DB round 2026-11-04e, «Congelar») is read here twice: ``control.freeze.get`` says how
 it stands to the staff in the Hub admin, with how many hubs the worker is still working on; :func:`active_freeze`, a
-plain read too, is what the worker asks once a tick and ``manage.py migrate_hubs`` before it starts.
+plain read too, is what the worker asks once a tick, ``manage.py migrate_hubs`` before it starts and ``base.hub.get``
+adds to the SaaS's signed status poll.
 """
 
 import datetime as dt

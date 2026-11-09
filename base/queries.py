@@ -94,9 +94,9 @@ from base.schemas import (
     FileOut,
     FileReadIn,
     HubGetIn,
+    HubGetOut,
     HubUserGetIn,
     HubUserOut,
-    HubOut,
     HubsBySlugIn,
     HubsBySlugOut,
     NoticeListIn,
@@ -199,15 +199,22 @@ def _user(actor: Any, person: HubUser | None = None) -> dict[str, str] | None:
 
 
 # Not an assistant tool: the platform's door (/internal, the SaaS), no person.
-@operation("base.hub.get", kind="query", permission=None, input=HubGetIn, output=HubOut, ai=INTERNAL)
+@operation("base.hub.get", kind="query", permission=None, input=HubGetIn, output=HubGetOut, ai=INTERNAL)
 def hub_get(ctx: OperationContext, data: HubGetIn) -> dict[str, Any]:
-    """The registry's row of ``data.id`` (``GET /internal/hubs/{id}``), for the platform only: the SaaS asks it about
-    a sign-up whose ``ready`` it never heard, and marks it ready when ``status`` is ``ready``."""
+    """The registry's row of ``data.id`` and control's active freeze, for the SaaS's signed status poll.
+
+    Maintenance is global provisioning state, not part of the SaaS photo: reading it never changes ``state_version``;
+    a repeated poll is idempotent and one after a missed notification or a lift recovers the current truth.
+    """
+    from control.queries import active_freeze
+
     internal_only(ctx)
     hub = Hub.objects.filter(pk=data.id).first()
     if hub is None:
         raise NotFound(gettext("No hub has this id."))
-    return hub_answer(hub)
+    freeze = active_freeze()
+    maintenance = None if freeze is None else {"frozen": freeze.frozen, "reason": freeze.reason, "since": freeze.since}
+    return {**hub_answer(hub), "maintenance": maintenance}
 
 
 # Not an assistant tool: the platform's door (/internal, the SaaS), no person.
