@@ -5,7 +5,7 @@ One operation = one transaction, with its events in the outbox. A write on an au
 What a document names (an event, an action, a read) is checked against the active apps
 (``queries.catalog_problems``) and refused by field; nothing fails in silence.
 
-**The engine.** A run starts in ``flow.run.react`` (an event of another app), ``flow.schedule.fire_due``
+**The engine.** A run starts in ``flow.run.react`` (an event of another active app), ``flow.schedule.fire_due``
 (a schedule or a date), ``flow.flow.run`` (by hand) and goes on in ``flow.run.resume_due`` (after a
 wait). Its steps run in order, in the same transaction, each one an operation of another app nested in
 a savepoint: a step that fails leaves nothing of its own and stops the run with its reason; the steps
@@ -49,6 +49,7 @@ from apps.flow.queries import (
     RESUME_DAYS,
     SYSTEM,
     action_label,
+    active_apps,
     ask_first_catalog,
     asked_first,
     catalog_operations,
@@ -1875,6 +1876,8 @@ def react(ctx: OperationContext, data: ReactIn) -> dict:
         .order_by("created_at", "id")
         .values_list("pk", flat=True)
     )
+    if waiting_ids and data.event.split(".", 1)[0] not in active_apps(ctx.scope):
+        return {"started": 0, "skipped": len(waiting_ids)}
     for flow_id in waiting_ids:
         flow = (
             Flow.objects.select_for_update()

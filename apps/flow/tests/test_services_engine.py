@@ -296,10 +296,20 @@ def test_an_action_that_says_no_stops_the_run_with_its_own_words():
     assert "project" in run_.log[0]["error"]["fields"]
 
 
-def test_an_action_whose_app_is_gone_is_unavailable(django_capture_on_commit_callbacks):
+def test_an_event_of_an_app_that_is_off_starts_nothing():
     make_flow(trigger_event="task.task.created")
     run("base.app.disable", {"app": "task"})
-    deliver("task.task.created")
+
+    result = deliver("task.task.created")
+
+    assert (result.started, result.skipped) == (0, 1)
+    assert FlowRun.objects.count() == 0
+
+
+def test_an_action_whose_app_is_gone_is_unavailable(django_capture_on_commit_callbacks):
+    make_flow()
+    run("base.app.disable", {"app": "task"})
+    deliver()
     stopped = FlowRun.objects.get()
     assert (stopped.status, stopped.error_code) == (
         FlowRun.Status.FAILED,
