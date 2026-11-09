@@ -257,7 +257,8 @@ describe('CourseCard: in the business’s currency', () => {
     s.answer(200, option({}));
     await ionValue(s.el('combo-course-g1-delta'), '250', 'ionInput');
     await click(s.el('combo-course-g1-save'));
-    expect(s.posts().at(-1)?.body).toEqual({ id: 'o1', price_delta: 250 });
+    expect(s.posts()).toHaveLength(1);
+    expect(s.posts()[0]).toEqual({ method: 'POST', path: '/api/combo/options/update', query: {}, body: { id: 'o1', price_delta: 250 } });
   });
 
   it('until the business answers, a dash and «Supplement»; an edit opened then follows the currency when it arrives', async () => {

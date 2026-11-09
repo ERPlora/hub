@@ -138,6 +138,7 @@ describe('CustomerListPage: the screen', () => {
 
   it('paints Name, Email, Phone, Stage and Spent (money), each sortable on the server', async () => {
     const s = await setup();
+    await s.result(s.call, 'base.business.get', business());
     await s.show(PAGE);
     const columns = s.prop<{ key: string; label: string; sortable?: boolean }[]>('columns');
     expect(columns.map((c) => [c.key, c.label, c.sortable])).toEqual([
@@ -151,8 +152,8 @@ describe('CustomerListPage: the screen', () => {
     expect(s.wrapper.findAll('[data-testid="customer-list-stage"]').map((c) => c.text())).toEqual(['Active', 'VIP']);
     expect(s.wrapper.findAll('[data-testid="customer-list-phone"]').map((c) => c.text())).toEqual(['+34 600 111 222', '+34 600 111 222']);
     expect(s.wrapper.findAll('[data-testid="customer-list-spent"]').map((c) => c.text())).toEqual([
-      '45.50',
-      '45.50',
+      '€45.50',
+      '€45.50',
     ]);
   });
 

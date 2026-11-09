@@ -35,7 +35,7 @@ describe('ruleValueLabel', () => {
   it('an amount per unit is in the business’s currency: in Poland, zlotys; a dash until it answers', () => {
     const fixed = rule({ rule_type: 'fixed', percent: null, amount: 50 });
     expect(ruleValueLabel(fixed, translator('es'), 'es', { currency: 'PLN', decimals: 2 })).toBe('0,50\u00a0zł por unidad');
-    expect(ruleValueLabel(fixed, translator('en'), 'en')).toBe('— por unidad');
+    expect(ruleValueLabel(fixed, translator('en'), 'en')).toBe('— per unit');
   });
 });
 

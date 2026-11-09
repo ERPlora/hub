@@ -48,6 +48,7 @@ describe('CustomerStats', () => {
 
   it('paints the four figures in the product order, revenue as money', async () => {
     const s = await setup();
+    await s.result(s.call, 'base.business.get', business());
     await s.result(s.call, 'customer.customer.stats', STATS);
     const group = s.wrapper.get('[data-testid="customer-stats"]');
     expect([group.attributes('role'), group.attributes('aria-label'), group.attributes('aria-busy')]).toEqual([
@@ -62,7 +63,7 @@ describe('CustomerStats', () => {
       'Revenue',
     ]);
     expect(['total', 'active', 'vip'].map((k) => s.kpi(k).find('.customer-kpi__value').text())).toEqual(['12', '9', '2']);
-    expect(s.kpi('revenue').find('.customer-kpi__value').text()).toBe('1,234.56');
+    expect(s.kpi('revenue').find('.customer-kpi__value').text()).toBe('€1,234.56');
     expect(['total', 'active', 'vip', 'revenue'].map((k) => s.kpi(k).attributes('data-value'))).toEqual([
       '12',
       '9',
@@ -87,6 +88,7 @@ describe('CustomerStats', () => {
 
   it('speaks Spanish', async () => {
     const s = await setup('es');
+    await s.result(s.call, 'base.business.get', business());
     await s.result(s.call, 'customer.customer.stats', STATS);
     expect(['total', 'active', 'vip', 'revenue'].map((k) => s.kpi(k).find('.customer-kpi__label').text())).toEqual([
       'Clientes',
@@ -94,7 +96,7 @@ describe('CustomerStats', () => {
       'VIP',
       'Ingresos',
     ]);
-    expect(s.kpi('revenue').find('.customer-kpi__value').text()).toBe('1.234,56');
+    expect(s.kpi('revenue').find('.customer-kpi__value').text()).toBe('1.234,56\u00a0€');
   });
 
   // Measured in the browser by tests/e2e/base-money-grouping.spec.ts: two on a phone, and a figure on one line.

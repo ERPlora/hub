@@ -52,6 +52,7 @@ describe('CustomerFacts: «Spent» in the business\'s currency (customer-busines
 describe('CustomerFacts', () => {
   it('shows the card\'s data in the product order, and what was hidden before', async () => {
     const s = await setup();
+    await s.result(await s.live(), 'base.business.get', business());
     expect(s.facts()).toEqual([
       ['Email', 'ana@x.es'],
       ['Phone', '+34 600 111 222'],
@@ -62,7 +63,7 @@ describe('CustomerFacts', () => {
       ['Source', 'Walk-in'],
       ['Preferred channel', 'Email'],
       ['Purchases', '3'],
-      ['Spent', '45.50'],
+      ['Spent', '€45.50'],
       ['Last purchase', formatDateTime('2026-10-01T10:00:00Z', 'en')],
       ['Active', 'Yes'],
       ['Birthday', 'Feb 3, 1990'],
