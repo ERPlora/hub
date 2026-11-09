@@ -1,5 +1,6 @@
 // flow: BASE-G52 BASE-G53 BASE-G54 BASE-G55 BASE-G56 BASE-G57 BASE-G58 BASE-G59 BASE-G60 BASE-G61 BASE-G62 BASE-G63
-// BASE-G64 BASE-G65 BASE-G66 BASE-G72 BASE-G81 BASE-G125 BASE-G126 BASE-G151 (base/WORKBOOK.md, «Acceso»; APP-BASE-3)
+// BASE-G64 BASE-G65 BASE-G66 BASE-G72 BASE-G81 BASE-G125 BASE-G126 BASE-G151 BASE-F64 (base/WORKBOOK.md, «Acceso»;
+// APP-BASE-3)
 // The way in of a business on the Free plan (one device at a time), two people and two browsers: the owner enters with
 // their erplora.com account on a first device (A), names themselves (the side menu takes the name at once) and chooses
 // a PIN in «My profile», names the device in Settings and sees it in use in System › «Usage and plan»; the employee enters with theirs on a till (B), which asks them to create their PIN and ends A's
@@ -12,7 +13,7 @@ import { createHmac } from 'node:crypto';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { api, collectProblems, type Credentials, login, MAIL_DIR, psql, SAAS, shot, shown, turnOn, untilStill } from './helpers';
+import { api, capture, collectProblems, type Credentials, horizontalOverflow, login, MAIL_DIR, psql, SAAS, shot, shown, turnOn, untilStill } from './helpers';
 import { readMailCode } from './mail';
 import { cleanSales } from './sale-helpers';
 import { STACK } from './stack';
@@ -214,6 +215,58 @@ test('BASE-G52 BASE-G125 BASE-G126: the owner enters with the account, names the
     expect(await cutLabels(shown(page).getByTestId('profile-mode'))).toEqual([]);
     await toTop(page);
   });
+});
+
+test('BASE-G125 BASE-F64: the personal interface scale is saved, painted and kept at every viewport', async () => {
+  const page = owner.page;
+  await page.goto(`${origin}/profile`);
+  const profile = shown(page);
+  const range = profile.getByTestId('profile-scale');
+  const value = profile.getByTestId('profile-scale-value');
+  await expect(range).toBeVisible();
+
+  async function expectScale(scale: number): Promise<void> {
+    await expect(range).toHaveJSProperty('value', scale);
+    await expect(value).toHaveText(`${scale}%`);
+    await expect.poll(() => page.evaluate(() => document.documentElement.style.zoom)).toBe(`${scale}%`);
+  }
+
+  async function chooseScale(scale: number): Promise<void> {
+    const saving = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/api/me/preferences') &&
+        response.request().method() === 'POST' &&
+        response.request().postDataJSON().ui_scale === scale,
+    );
+    await range.evaluate((control, next) => {
+      (control as HTMLElement & { value: number }).value = next;
+      control.dispatchEvent(new CustomEvent('ionChange', { bubbles: true, detail: { value: next } }));
+    }, scale);
+    const answer = await saving;
+    expect(answer.status()).toBe(200);
+    expect(((await answer.json()) as { ui_scale: number }).ui_scale).toBe(scale);
+    await expectScale(scale);
+  }
+
+  await expectScale(100);
+  for (const scale of [80, 90, 100, 110, 120] as const) {
+    await chooseScale(scale);
+    for (const size of SIZES) {
+      await page.setViewportSize({ width: size.width, height: size.height });
+      await untilStill(page);
+      expect(await horizontalOverflow(page), `${scale}% at ${size.name}`).toBeLessThanOrEqual(1);
+      if (scale === 120 && size.width === 834) {
+        await range.scrollIntoViewIfNeeded();
+        await capture(page, 'APP-BASE-3-BASE-F64-scale-120-834', { fullPage: true });
+      }
+    }
+  }
+
+  await page.reload();
+  await expectScale(120);
+  await chooseScale(100);
+  await page.reload();
+  await expectScale(100);
 });
 
 /** How the head of «My profile» lays its name out: in how many lines, whether it fits its box, and whether what does not

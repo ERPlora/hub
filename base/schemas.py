@@ -1268,6 +1268,7 @@ class ProfileOut(Schema):
     language: Literal["", "es", "en"] = Field(description="Empty: the business's.")
     theme_mode: Literal["", "system", "light", "dark"] = Field(description="Empty: the business's.")
     palette: str = Field(description="Empty: the business's.")
+    ui_scale: int
     role: str
     has_pin: bool
     pin_length: int
@@ -1283,12 +1284,14 @@ class PreferencesIn(Schema):
     language: Literal["", "es", "en"]
     theme_mode: Literal["", "system", "light", "dark"]
     palette: Literal["", "erplora", "terracotta", "corporate", "minimal", "forest", "ocean", "violet"]
+    ui_scale: Literal[80, 90, 100, 110, 120]
 
 
 class PreferencesOut(Schema):
     language: str = Field(description="The language now in use: the person's, else the business's.")
     theme_mode: str
     palette: str
+    ui_scale: int
 
 
 class AvatarIn(Schema):
