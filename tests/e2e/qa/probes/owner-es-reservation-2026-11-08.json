@@ -285,7 +285,7 @@
     {
       "id": "owner.es.reservation.reservation.release_unconfirmed",
       "app": "reservation",
-      "tool": "reservation.release_unconfirmed",
+      "tool": "reservation.reservation.release_unconfirmed",
       "role": "owner",
       "language": "es",
       "phrase": "libera ahora las reservas pendientes que ya superaron el tiempo de cortesía sin confirmar",
