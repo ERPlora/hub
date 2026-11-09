@@ -21,6 +21,12 @@ on control (the registry's scope) and records its event in control's outbox in t
 
 Each locks the cluster's row first, as the placement does, so a hub placed at the same time is either counted or
 placed after.
+
+``control.freeze.set`` freezes the platform for a database upgrade with Blue/Green, or lifts its freeze (hub#930;
+PLAN-DB round 2026-11-04e, «Congelar»): while frozen the worker makes, drops and moves no database and makes no app's
+tables, and ``migrate_hubs`` refuses to start, while the relay, the tasks and the sends to the AEAT go on. It is
+idempotent: frozen again, the freeze in course is kept as it was (who, since when, why); lifted again, nothing changes.
+Only a real change records its event. Its one row is locked first, so two admins at once change it once.
 """
 
 import datetime as dt
@@ -39,13 +45,15 @@ from live.outbox import record_event
 from base.registry import internal_only
 from base.tenancy.credentials import APP, CredentialsUnavailable, credentials_for
 from control import events, queries
-from control.models import Cluster, Hub, HubDue, LeftoverDatabase, MovedCopy
+from control.models import Cluster, Freeze, Hub, HubDue, LeftoverDatabase, MovedCopy
 from control.schemas import (
     ClusterDeletedOut,
     ClusterIdIn,
     ClusterIn,
     ClusterOut,
     ClusterUpdateIn,
+    FreezeIn,
+    FreezeOut,
     HubIdIn,
     HubMoveIn,
     HubMoveOut,
@@ -297,6 +305,39 @@ def hub_move_cancel(ctx: OperationContext, data: HubIdIn) -> dict:
     hub.save(update_fields=["move_undo_asked_at", "last_error", "updated_at"])
     record_event(ctx, events.HUB_MOVE_CANCEL_REQUESTED, {"id": str(hub.pk), "slug": hub.slug})
     return {"id": hub.pk, "slug": hub.slug, "cluster": hub.cluster_id, "moving_to": hub.moving_to_id}
+
+
+def _who(ctx: OperationContext) -> str:
+    """Who changes the switch, as the Hub admin shows it: the staff member's name (or username), or the platform."""
+    actor = ctx.actor
+    if hasattr(actor, "get_username"):
+        return (actor.get_full_name() or actor.get_username())[:150]
+    return str(actor)[:150]
+
+
+# Not an assistant tool: the platform's admins, in the Hub admin (Admin › Freeze).
+@operation("control.freeze.set", kind="command", permission=None, input=FreezeIn, output=FreezeOut, ai=INTERNAL)
+def freeze_set(ctx: OperationContext, data: FreezeIn) -> dict:
+    """Freeze the platform for a database upgrade (``data.frozen``, with why) or lift its freeze; asked while already
+    so, it is left as it is."""
+    platform_admin_only(ctx)
+    row = Freeze.objects.select_for_update().first()
+    if row is None:
+        # Control's migration makes it; only a database whose rows were emptied by hand lacks it. One row at most: a
+        # second made at the same time is refused by its constraint, and this call fails rather than write twice.
+        row = Freeze.objects.create()
+    if row.frozen == data.frozen:
+        return queries.freeze_answer(row)
+    now = timezone.now()
+    if data.frozen:
+        row.frozen, row.reason, row.since, row.by = True, data.reason, now, _who(ctx)
+        record_event(ctx, events.FREEZE_STARTED, {"reason": row.reason})
+    else:
+        started = row.since
+        row.frozen, row.reason, row.since, row.by = False, "", now, _who(ctx)
+        record_event(ctx, events.FREEZE_LIFTED, {"frozen_since": started.isoformat() if started else ""})
+    row.save(update_fields=["frozen", "reason", "since", "by"])
+    return queries.freeze_answer(row)
 
 
 # ── The worker's side of a move (``base.tenancy.move``): no operations, the platform's own steps on control ─────────
