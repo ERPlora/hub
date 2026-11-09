@@ -1,0 +1,11 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261108.employee.es.customer.activity.list","app":"customer","tool":"customer.activity.list","role":"employee","language":"es","phrase":"¿qué notas y visitas tiene apuntadas Ana QA últimamente?","expect":"read","lookups":["customer.customer.list"]},
+    {"id":"qa20261108.employee.es.customer.consent.grant","app":"customer","tool":"customer.consent.grant","role":"employee","language":"es","phrase":"Ana QA me ha dicho ahora en barra que acepta ofertas por email; regístralo con el texto «Acepto recibir ofertas por email», versión QA-1","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.employee.es.customer.consent.withdraw","app":"customer","tool":"customer.consent.withdraw","role":"employee","language":"es","phrase":"apunta que Ana QA ya no quiere recibir promociones por WhatsApp porque me lo acaba de pedir","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.employee.es.customer.activity.add","app":"customer","tool":"customer.activity.add","role":"employee","language":"es","phrase":"escribe en el historial de Ana QA una visita llamada «Evento QA» con nota «Reservó dos sitios»","expect":"refused"},
+    {"id":"qa20261108.employee.es.customer.customer.erase","app":"customer","tool":"customer.customer.erase","role":"employee","language":"es","phrase":"borra definitivamente todos los datos personales de Rocío QA por una solicitud de privacidad","expect":"refused"},
+    {"id":"qa20261108.employee.es.customer.group.delete","app":"customer","tool":"customer.group.delete","role":"employee","language":"es","phrase":"elimina el grupo Empresas QA y deja fuera a todos sus clientes","expect":"refused"}
+  ]
+}

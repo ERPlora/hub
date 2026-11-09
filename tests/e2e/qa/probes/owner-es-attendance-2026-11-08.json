@@ -1,0 +1,22 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"owner.es.attendance.correction.list","app":"attendance","tool":"attendance.correction.list","role":"owner","language":"es","phrase":"muéstrame el historial de correcciones de Fichaje QA, con horas anteriores y nuevas, motivo y autor","expect":"read"},
+    {"id":"owner.es.attendance.person.detail","app":"attendance","tool":"attendance.person.detail","role":"owner","language":"es","phrase":"abre la ficha de personal de Fichaje QA en el control horario y dime si sigue activa","expect":"read","lookups":["attendance.person.list"]},
+    {"id":"owner.es.attendance.person.list","app":"attendance","tool":"attendance.person.list","role":"owner","language":"es","phrase":"¿qué personas puedo consultar en el historial de fichajes?","expect":"read"},
+    {"id":"owner.es.attendance.presence.count","app":"attendance","tool":"attendance.presence.count","role":"owner","language":"es","phrase":"¿cuántas personas hay fichadas ahora mismo?","expect":"read"},
+    {"id":"owner.es.attendance.presence.list","app":"attendance","tool":"attendance.presence.list","role":"owner","language":"es","phrase":"dime quién está trabajando ahora, desde cuándo y si alguien está en descanso","expect":"read"},
+    {"id":"owner.es.attendance.record.current","app":"attendance","tool":"attendance.record.current","role":"owner","language":"es","phrase":"¿cómo va mi día de trabajo hoy y cuánto llevo fichado y en pausas?","expect":"read"},
+    {"id":"owner.es.attendance.record.detail","app":"attendance","tool":"attendance.record.detail","role":"owner","language":"es","phrase":"abre el último fichaje de Fichaje QA con sus pausas, origen del registro y quién lo hizo","expect":"read","lookups":["attendance.record.list"]},
+    {"id":"owner.es.attendance.record.export","app":"attendance","tool":"attendance.record.export","role":"owner","language":"es","phrase":"exporta a CSV todos los días de trabajo de Fichaje QA para la gestoría","expect":"read"},
+    {"id":"owner.es.attendance.record.list","app":"attendance","tool":"attendance.record.list","role":"owner","language":"es","phrase":"lista los últimos fichajes de Fichaje QA con entrada, salida, pausas y tiempo trabajado","expect":"read"},
+    {"id":"owner.es.attendance.settings.get","app":"attendance","tool":"attendance.settings.get","role":"owner","language":"es","phrase":"¿qué ubicación y radio exige el control horario y cuándo marca un día olvidado para revisión?","expect":"read"},
+    {"id":"owner.es.attendance.record.clock_in","app":"attendance","tool":"attendance.record.clock_in","role":"owner","language":"es","phrase":"ficha la entrada de Fichaje QA ahora","expect":"card","decide":"confirm"},
+    {"id":"owner.es.attendance.break.start","app":"attendance","tool":"attendance.break.start","role":"owner","language":"es","phrase":"empieza el descanso de Fichaje QA ahora","expect":"card","decide":"confirm"},
+    {"id":"owner.es.attendance.break.end","app":"attendance","tool":"attendance.break.end","role":"owner","language":"es","phrase":"Fichaje QA ya vuelve del descanso, reanuda su jornada","expect":"card","decide":"confirm"},
+    {"id":"owner.es.attendance.record.clock_out","app":"attendance","tool":"attendance.record.clock_out","role":"owner","language":"es","phrase":"ficha la salida de Fichaje QA ahora","expect":"card","decide":"confirm"},
+    {"id":"owner.es.attendance.record.correct","app":"attendance","tool":"attendance.record.correct","role":"owner","language":"es","phrase":"corrige el último fichaje de Fichaje QA dejando la salida a las 06:10, con el motivo «hora de salida equivocada QA»","expect":"card","decide":"confirm"},
+    {"id":"owner.es.attendance.record.review_stale","app":"attendance","tool":"attendance.record.review_stale","role":"owner","language":"es","phrase":"revisa ahora los días que llevan demasiadas horas abiertos y márcalos para revisión sin inventar salidas","expect":"card","decide":"cancel"},
+    {"id":"owner.es.attendance.settings.update","app":"attendance","tool":"attendance.settings.update","role":"owner","language":"es","phrase":"exige ubicación al fichar desde un móvil personal, con un radio de 250 metros alrededor del local","expect":"card","decide":"cancel"}
+  ]
+}
