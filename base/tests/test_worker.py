@@ -192,6 +192,27 @@ def reaper(monkeypatch) -> FakeReaper:
     return fake
 
 
+class FakeFreeze:
+    """Stands in for ``worker._frozen``, the freeze switch read once a tick (hub#930): one answer per read, in order,
+    the last one kept; counts the reads."""
+
+    def __init__(self) -> None:
+        self.answers: list[bool] = [False]
+        self.reads = 0
+
+    def __call__(self) -> bool:
+        self.reads += 1
+        return self.answers.pop(0) if len(self.answers) > 1 else self.answers[0]
+
+
+@pytest.fixture(autouse=True)
+def freeze_switch(monkeypatch) -> FakeFreeze:
+    """The platform not frozen unless a test says so (``control.freeze.set``; its real read: ``test_the_switch_*``)."""
+    fake = FakeFreeze()
+    monkeypatch.setattr(worker, "_frozen", fake)
+    return fake
+
+
 @pytest.fixture(autouse=True)
 def nobody_without_a_database(monkeypatch) -> list:
     """Stands in for the registry's businesses still on control's database (``services.hubs_on_control``), read once at
@@ -617,6 +638,17 @@ def test_a_relay_pass_that_fails_is_logged_and_the_next_tick_tries_again(caplog,
 # ── The hubs due: their databases made, the demos that ended dropped (round 2026-10-30, S2a) ───────────────────────
 
 
+def every_pass(monkeypatch, order: list[str], due: FakeDue, outbox: FakeRelay) -> None:
+    """The passes of the tick note their names in ``order``, in the order they run (the slow ones inline: ``Inline``);
+    the moves and the reaper keep their own fakes (``moves_pass``, ``reaper``)."""
+    monkeypatch.setattr(provision, "run_due", lambda now: order.append("due") or due(now))
+    monkeypatch.setattr(relay, "run", lambda now, of_hubs=True: order.append("relay") or outbox(now, of_hubs=of_hubs))
+    monkeypatch.setattr(worker, "_hubs", lambda now: order.append("hubs"))
+    monkeypatch.setattr(worker, "_activations", lambda now: order.append("activations"))
+    monkeypatch.setattr(worker, "_data", lambda now, stop=None: order.append("data"))
+    monkeypatch.setattr(worker, "_usage", lambda now: order.append("usage"))
+
+
 def test_takes_control_s_outbox_then_relays_the_hubs_own_then_makes_the_hubs_due_on_every_tick(
     monkeypatch, calls, tasks, due, outbox
 ):
@@ -624,12 +656,7 @@ def test_takes_control_s_outbox_then_relays_the_hubs_own_then_makes_the_hubs_due
     VeriFactu back; then the hubs with their own database, each relayed in it; the hubs due last, on control. A hub
     made ready in a tick has its outbox relayed from the next one."""
     order: list[str] = []
-    monkeypatch.setattr(provision, "run_due", lambda now: order.append("due") or due(now))
-    monkeypatch.setattr(relay, "run", lambda now, of_hubs=True: order.append("relay") or outbox(now, of_hubs=of_hubs))
-    monkeypatch.setattr(worker, "_hubs", lambda now: order.append("hubs"))
-    monkeypatch.setattr(worker, "_activations", lambda now: order.append("activations"))
-    monkeypatch.setattr(worker, "_data", lambda now, stop=None: order.append("data"))
-    monkeypatch.setattr(worker, "_usage", lambda now: order.append("usage"))
+    every_pass(monkeypatch, order, due, outbox)
     stop = threading.Event()
     wait, _ = stop_after(stop, 3)
 
@@ -861,3 +888,113 @@ def test_a_moves_pass_that_fails_is_logged_and_the_next_tick_tries_again(monkeyp
 
     [record] = [r for r in caplog.records if r.name == "base.worker"]
     assert "move" in record.getMessage() and record.exc_info[1] is failure
+
+
+# ── The freeze switch (hub#930; PLAN-DB round 2026-11-04e, «Congelar») ───────────────────────────────────────────────
+
+
+def ticks(count: int, **options) -> int:
+    """Run the loop for ``count`` ticks, at 10:00, 10:01…; its exit code."""
+    stop = threading.Event()
+    wait, _ = stop_after(stop, count)
+    return worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(*range(count)), **options)
+
+
+def test_frozen_it_makes_drops_moves_and_sets_up_nothing_while_the_relay_the_tasks_and_the_use_go_on(
+    monkeypatch, calls, tasks, due, outbox, moves_pass, reaper, freeze_switch
+):
+    """While a database upgrade runs nothing may change a schema: no sign-up or demo made, no demo dropped, no app's
+    tables made, no move, no data work (a business past its days is dropped); the relay, every hub's tasks (VeriFactu's
+    queue among them) and the nightly measure go on."""
+    freeze_switch.answers = [True]
+    order: list[str] = []
+    every_pass(monkeypatch, order, due, outbox)
+
+    assert ticks(2) == 0
+
+    assert order == ["relay", "hubs", "usage"] * 2
+    assert (due.passes, moves_pass, reaper.passes) == ([], [], [])
+
+
+def test_the_switch_is_read_once_a_tick(calls, freeze_switch):
+    ticks(3)
+
+    assert freeze_switch.reads == 3
+
+
+def test_a_stop_before_the_first_tick_reads_no_switch(calls, freeze_switch):
+    worker.run(stopped())
+
+    assert freeze_switch.reads == 0
+
+
+def test_once_lifted_the_next_tick_makes_what_waited_and_reaps_at_once(
+    monkeypatch, calls, tasks, due, outbox, moves_pass, reaper, freeze_switch
+):
+    freeze_switch.answers = [True, True, False]
+    order: list[str] = []
+    every_pass(monkeypatch, order, due, outbox)
+
+    ticks(3)
+
+    assert order[-6:] == ["relay", "hubs", "activations", "data", "usage", "due"]
+    # The reaper, held while frozen, runs on the first tick after: the demos that ended do not wait another minute.
+    assert (due.passes, moves_pass, reaper.passes) == ([ten(2)], [ten(2)], [ten(2)])
+
+
+def test_frozen_the_e2es_worker_does_nothing(monkeypatch, calls, tasks, due, outbox, reaper, freeze_switch):
+    freeze_switch.answers = [True]
+    order: list[str] = []
+    every_pass(monkeypatch, order, due, outbox)
+
+    ticks(2, databases_only=True)
+
+    assert (order, reaper.passes) == ([], [])
+
+
+def test_it_says_once_when_it_freezes_and_once_when_it_is_lifted(caplog, calls, freeze_switch):
+    freeze_switch.answers = [False, True, True, False, False]
+
+    with caplog.at_level(logging.INFO, logger="base.worker"):
+        ticks(5)
+
+    said = [r.getMessage() for r in caplog.records if r.name == "base.worker" and "freeze" in r.getMessage()]
+    assert len(said) == 2
+    assert "frozen" in said[0] and "control.freeze.set" in said[0]
+    assert "lifted" in said[1]
+
+
+@pytest.mark.django_db
+def test_the_switch_read_says_whether_control_is_frozen(monkeypatch):
+    from control import services as control_services
+    from control.schemas import FreezeIn
+    from live.context import system_context
+
+    from base.registry import REGISTRY_SCOPE
+
+    monkeypatch.undo()
+    platform = system_context(REGISTRY_SCOPE)
+
+    assert worker._frozen() is False
+    control_services.freeze_set(platform, FreezeIn(frozen=True, reason="upgrade"))
+    assert worker._frozen() is True
+    control_services.freeze_set(platform, FreezeIn(frozen=False))
+    assert worker._frozen() is False
+
+
+def test_the_switch_that_cannot_be_read_freezes_the_tick_and_says_why(monkeypatch, caplog):
+    from control import queries as control_queries
+
+    monkeypatch.undo()
+    failure = DatabaseError("server closed the connection unexpectedly")
+
+    def broken():
+        raise failure
+
+    monkeypatch.setattr(control_queries, "active_freeze", broken)
+
+    with caplog.at_level(logging.ERROR, logger="base.worker"):
+        assert worker._frozen() is True
+
+    [record] = [r for r in caplog.records if r.name == "base.worker"]
+    assert "freeze" in record.getMessage() and record.exc_info[1] is failure

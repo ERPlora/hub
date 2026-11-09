@@ -24,6 +24,7 @@ from base.tests.test_worker import (  # noqa: F401 (the fakes of every pass of t
     WRITTEN,
     data_pass,
     due,
+    freeze_switch,
     hubs_pass,
     inline_passes,
     outbox,

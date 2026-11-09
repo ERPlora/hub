@@ -15,6 +15,7 @@ from decouple import Csv, config
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.csp import CSP
 from live.csp import base_policy, debug_policy
+from psycopg_pool import ConnectionPool
 
 from base.storage import hub_files_storage
 from base.tenancy.names import MAX_CONTROL
@@ -132,6 +133,9 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     # First: answers /healthz before the Host is validated.
     "base.health.HealthCheckMiddleware",
+    # Then: a cut of the database waits and repeats the whole request, when it may (live.database_cut, BASE-F111; Django
+    # turns an exception into a response at every layer, so only the outermost sees it all).
+    "live.database_cut.DatabaseCutMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
@@ -223,6 +227,8 @@ DATABASES = {
                 "max_size": 8,
                 "max_idle": 60,
                 "timeout": db_connect_timeout,
+                # A connection the server cut while it sat in the pool (a restart, a switchover) is never handed out.
+                "check": ConnectionPool.check_connection,
             },
             "connect_timeout": db_connect_timeout,
             **{
@@ -504,6 +510,14 @@ LIVE = {
     # Where live.operations.atomic() opens (a services.py's savepoint): the active use_hub's alias, inside an operation
     # its transaction's; without a context HubContextMissing, never control's by omission (phase 2, W9).
     "current_database": "base.tenancy.context.current_alias",
+    # A cut of the database (a restart, AWS's maintenance, the Blue/Green switchover; PLAN-DB, round 2026-11-04e, point 5;
+    # BASE-F111): a read, and what was not applied, waits and tries again up to this long in the whole request, far below
+    # the 120 s of the load balancer. What tries again on its own gets its 503 at once: the SaaS's /internal, and
+    # /readyz, which has to say the database is gone before its probes give up.
+    "database_cut": {
+        "wait_seconds": config("DB_CUT_WAIT_SECONDS", default=20, cast=int),
+        "no_wait_prefixes": ("/internal/", "/readyz"),
+    },
     # Hub slugs (live.slugs): 3–63 characters in production; local development also opens the
     # one-letter demo hubs a and b (a.localhost:8000, b.localhost:8000).
     "hub_slug_min_length": 1 if DEBUG else 3,

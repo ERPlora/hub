@@ -18,6 +18,10 @@ reached, or a secret that does not resolve, is ``control.cluster_unreachable`` (
 The worker's metrics (``base.metrics``, hub#488; PLAN-AWS §8, PLAN-DB §6 and §8) read the registry's health here too:
 :func:`registry_health` is a plain read, not an operation (no hub and no user: the worker's own measure, like
 ``base.services.hubs_to_serve``), on control's database (the caller opens ``use_control``).
+
+The freeze switch (hub#930; PLAN-DB round 2026-11-04e, «Congelar») is read here twice: ``control.freeze.get`` says how
+it stands to the staff in the Hub admin, with how many hubs the worker is still working on; :func:`active_freeze`, a
+plain read too, is what the worker asks once a tick and ``manage.py migrate_hubs`` before it starts.
 """
 
 import datetime as dt
@@ -26,20 +30,21 @@ from dataclasses import dataclass
 
 import psycopg
 from django.core.cache import cache
-from django.db import DEFAULT_DB_ALIAS, DatabaseError, connection, connections
+from django.db import DEFAULT_DB_ALIAS, DatabaseError, ProgrammingError, connection, connections
 from django.db.models import Count, Min, Q
 from django.db.models.functions import Coalesce
+from django.utils import timezone
 from django.utils.translation import gettext
 from live.context import OperationContext
 from live.errors import NotFound, OperationError
-from live.operations import INTERNAL, operation
+from live.operations import INTERNAL, atomic, operation
 
 from base.registry import PREPARING_STATUSES, internal_only
 from base.tenancy.connections import NON_LIBPQ_OPTIONS
 from base.tenancy.credentials import APP, CredentialsUnavailable, credentials_for
 from base.tenancy.ops import MAINTENANCE_DATABASE
-from control.models import Cluster, Hub
-from control.schemas import ClusterSizesIn, ClusterSizesOut
+from control.models import Cluster, Freeze, Hub, HubDue
+from control.schemas import ClusterSizesIn, ClusterSizesOut, FreezeGetIn, FreezeOut
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +53,8 @@ SIZE_TTL_SECONDS = 600
 SIZE_KEY_PREFIX = "control.database_size"
 #: The catalogue's answer: no database is opened, and one that is not on the server is not in it.
 SIZES_SQL = "SELECT datname, pg_database_size(datname) FROM pg_database WHERE datname = ANY(%s)"
+#: Postgres' «relation does not exist»: control's database before the migration that makes the freeze's table.
+UNDEFINED_TABLE = "42P01"
 
 
 def platform_staff_only(ctx: OperationContext) -> None:
@@ -189,3 +196,37 @@ def registry_health(now: dt.datetime) -> RegistryHealth:
         ),
     )
     return RegistryHealth(**row)
+
+
+# ── The freeze switch (hub#930) ──
+
+
+def active_freeze() -> Freeze | None:
+    """The freeze in course, or ``None`` when the platform is not frozen: never frozen, lifted, or a control database
+    that has no table for it yet (``migrate_hubs`` reads it before it migrates control, and the first deploy with the
+    switch makes it). The read runs in a savepoint of its own, so a missing table leaves the transaction around it
+    usable; any other failure is raised."""
+    try:
+        with atomic():
+            return Freeze.objects.filter(frozen=True).first()
+    except ProgrammingError as failed:
+        if getattr(failed.__cause__, "sqlstate", None) == UNDEFINED_TABLE:
+            return None
+        raise
+
+
+def freeze_answer(row: Freeze | None) -> dict:
+    """The switch as its operations answer it (``FreezeOut``), with the hubs the worker is working on now."""
+    working = HubDue.objects.filter(lease_until__gt=timezone.now()).count()
+    if row is None:
+        return {"frozen": False, "reason": "", "since": None, "by": "", "working": working}
+    return {"frozen": row.frozen, "reason": row.reason, "since": row.since, "by": row.by, "working": working}
+
+
+# Not an assistant tool: the platform's staff, in the Hub admin.
+@operation("control.freeze.get", kind="query", permission=None, input=FreezeGetIn, output=FreezeOut, ai=INTERNAL)
+def freeze_get(ctx: OperationContext, data: FreezeGetIn) -> dict:
+    """How the freeze switch stands: frozen or not, why, since when and by whom, and how many hubs the worker is still
+    working on (the staff waits for 0 before an upgrade starts)."""
+    platform_staff_only(ctx)
+    return freeze_answer(Freeze.objects.first())
