@@ -248,9 +248,10 @@ def _after_commit(ctx: OperationContext, job, *args) -> None:
 
 
 def _after_commit_as(host: str, ctx: OperationContext, job, *args) -> None:
-    """``_after_commit`` for the business in ``host`` (the row's own), whatever business ``ctx`` runs as, and where that
-    business's operations run: phase 1's shared database when it is another business of phase 1 (the shared inbox's
-    «Retry», erasing again, the sweep), at once; never another hub's database (``base.outbound``, ``scope=``). A row
+    """``_after_commit`` for the business in ``host`` (the row's own), whatever business ``ctx`` runs as; never in
+    another hub's database (``base.outbound``, ``scope=``). Since S5 a hub's database holds its own rows only, so
+    ``host`` is ``ctx``'s business; another one is left from the tables phase 1 shared, and only the suite's fallback,
+    which keeps ``a`` and ``b`` in one database (``base/tenancy/tests/legacy.py``), still makes it (hub#1053). A row
     made before its business was recorded (empty ``host``) goes as ``ctx``'s, as it did."""
     scope = Scope(ctx.scope.kind, host) if host else ctx.scope
     outbound.after_commit(job, scope, *args, scope=scope)
@@ -1320,8 +1321,10 @@ def record_delivery(ctx: OperationContext, data: RecordDeliveryIn) -> dict:
     },
 )
 def resume_deliveries(ctx: OperationContext, data: ResumeIn) -> dict:
-    """Hand erplora.com again what was left: every business's, each for its own (phase 1's worker runs on one fixed
-    scope). A message or an erasure made before its business was recorded (0007) goes as ``ctx``'s, as it did."""
+    """Hand erplora.com again what was left in this hub's database, each row for the business that made it. The worker
+    runs this in each hub's own database and on its scope (``base.worker``), so every row is that hub's; the business
+    kept on each row is from the tables phase 1 shared (hub#1053). A message or an erasure made before its business was
+    recorded (0007) goes as ``ctx``'s, as it did."""
     cutoff = clock.now() - STUCK_AFTER
     messages = list(
         Message.objects.select_for_update(skip_locked=True)
@@ -1335,7 +1338,7 @@ def resume_deliveries(ctx: OperationContext, data: ResumeIn) -> dict:
         .order_by("erased_at", "id")
         .values_list("id", "erase_host")[:RESUME_BATCH]
     )
-    # Every business's, each handed over as its own (phase 1's worker runs on one fixed scope).
+    # Each handed over as the business that made it (``host``): in a hub's own database, that hub.
     templates = list(
         templates_of_every_business().select_for_update(skip_locked=True)
         .filter(submit_state__in=_TEMPLATE_ON_ITS_WAY, submit_at__lt=cutoff, deleted_at__isnull=True)
@@ -1586,7 +1589,7 @@ def link_customer(ctx: OperationContext, data: LinkCustomerIn) -> dict:
 def _erase(ctx: OperationContext, conversation: Conversation) -> None:
     """Empty every personal datum of ``conversation`` once, and ask erplora.com to forget its number
     after the COMMIT until it confirms; again changes nothing here and asks erplora.com again, for the business
-    that erased it (``erase_host``), whoever asks from the shared inbox."""
+    that erased it (``erase_host``), whoever asks."""
     if conversation.erased_at is None:
         conversation.messages.update(
             body="",

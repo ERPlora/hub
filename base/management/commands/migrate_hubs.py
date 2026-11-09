@@ -9,6 +9,11 @@
 
 Any failure is logged with its traceback and exits non-zero, which the infra's ``task_failed`` rule reports.
 
+While the platform is frozen for a database upgrade (``control.freeze.set``; hub#930, PLAN-DB round 2026-11-04e,
+«Congelar»: logical replication copies no DDL) a run refuses to start, before it touches anything, with who froze it,
+since when and why, and exits non-zero: a deploy meanwhile stops at its migration. Lifted, the next run goes on as
+always. ``--check`` still runs: it applies nothing.
+
 ``--check`` applies nothing, as ``migrate --check``: it lists what a run would apply (one ``<app>.<migration>`` per
 line, under the database it belongs to; the hubs behind as ``<slug> (<database>)``) and exits 1 if anything; the
 e2e's ``global-setup.ts`` runs it. It opens the templates, never a hub's database.
@@ -20,6 +25,8 @@ import sys
 from django.core.management.base import BaseCommand, CommandError
 
 from base.tenancy import migrator
+from base.tenancy.context import use_control
+from control.queries import active_freeze
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +49,7 @@ class Command(BaseCommand):
         if check:
             self.check_pending()
             return
+        self.refuse_if_frozen()
         try:
             applied = migrator.migrate_control(stdout=self.stdout, verbosity=verbosity)
         except Exception as error:
@@ -50,6 +58,23 @@ class Command(BaseCommand):
         self.stdout.write(f"migrate_hubs: control database migrated, {applied} migration(s) applied.")
         self.migrate_templates()
         self.migrate_hubs()
+
+    def refuse_if_frozen(self) -> None:
+        """Stop before anything when the platform is frozen (``control.freeze.set``): a database upgrade is running."""
+        try:
+            with use_control():
+                freeze = active_freeze()
+        except Exception as error:
+            logger.exception("migrate_hubs: the freeze switch could not be read.")
+            raise CommandError(f"migrate_hubs: the freeze switch could not be read: {error}; nothing was migrated.") from error
+        if freeze is None:
+            return
+        since = freeze.since.isoformat() if freeze.since else "-"
+        raise CommandError(
+            f"migrate_hubs: the platform is frozen since {since} by {freeze.by or '-'} ({freeze.reason or 'no reason'}): "
+            "no database is migrated while a database upgrade runs. Lift it with control.freeze.set (the Hub admin, "
+            "Admin › Freeze) and run it again."
+        )
 
     def migrate_templates(self) -> None:
         try:

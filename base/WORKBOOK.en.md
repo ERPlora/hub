@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c048b68470905618843e980bcbe5cb81be8adbb9564c66bf131cd09c183b7035 -->
+<!-- generated from WORKBOOK.md sha256:9aaac68e388f0017f3bf3596a37eb4d9115a8dced16f17d2a28f82233f49fb1d -->
 
 ## What it is for and who it is for
 
@@ -180,7 +180,8 @@ here.", "Who is taking over?" with the faces, the keypad and "Cancel".
 
 ### My profile
 From "Profile" in the user menu. At the top, the person (face, name and role); below, "Account details" (with the
-photo), "Preferences" (language and appearance) and "PIN".
+photo), "Preferences" (language and appearance: palette, theme and interface size from 80 to 120%, default 100%) and
+"PIN".
 
 ### Settings · General
 What "Settings" in the side menu opens: the first tab at the bottom, "General", with "This device", "PIN pad",
@@ -866,7 +867,8 @@ Steps:
      business without reloading and its screen says "{app} is ready" — "It can be used now.", with "Open {app}".
 In: how the activation is going.
 Out: the app running in this business (`base.app.enabled`).
-If it fails: BASE-F21.
+If it fails: BASE-F21. While ERPlora's staff keeps the platform frozen for a database upgrade (a few minutes,
+hub#930), the app stays "Turning on…" and finishes by itself as soon as the freeze is lifted.
 Involved: BASE-F31, BASE-F32
 
 ### BASE-F23 Turn an app off
@@ -1757,7 +1759,9 @@ Steps:
 In: the business's state erplora.com passes on.
 Out: nothing saved.
 If it fails: an address that belongs to no business does not exist; a business that was closed says "This hub
-is no longer available.".
+is no longer available.". While ERPlora's staff keeps the platform frozen for a database upgrade (a few minutes,
+hub#930), the business waits to be prepared: the page stays on "Your business is being prepared" and comes in by
+itself as soon as the freeze is lifted and it is done.
 Involved: none
 
 ### BASE-F64 Change my details, photo, language and appearance
@@ -1772,11 +1776,12 @@ Steps:
   3. "Choose image" uploads a JPG, PNG or WebP photo of up to 2 MB ("Photo updated"); "Remove" deletes it
      ("Photo removed").
   4. In "Preferences", "Language" ("Use the business’s language", "Español", "English") and "Appearance" ("Theme
-     palette" and "Theme": "System (auto)", "Light", "Dark") are saved on choosing and applied at once; "Use the
-     business’s appearance" undoes their own.
+     palette", "Theme": "System (auto)", "Light", "Dark", and "Interface size": 80, 90, 100, 110 or 120%, default
+     100%) are saved on choosing and applied at once on any device; "Use the business’s appearance" undoes their own
+     and returns the size to 100%.
 In: the profile of whoever has the session.
 Out: their name in this business (the one in the side menu, on the faces and in "Devices"), their photo, their language and their
-appearance, which follow them on any device they enter, with their PIN or with their account. With "Use the
+appearance, including the interface size, which follow them on any device they enter, with their PIN, badge or account. With "Use the
 business’s language", they enter with a PIN in the business's and with their account in their erplora.com
 account's (BASE-F51). The email is only for contact: it does not change the erplora.com account.
 If it fails: if the profile could not be read, "Could not load the profile" — "Your details stay the same. Check
@@ -2217,9 +2222,7 @@ Steps:
 In: the name, the pace and what it may do.
 Out: the key, of which the business keeps only what lets it be recognised. Event `base.api_key.created`.
 If it fails: "The API key could not be created.", "Choose at least one app and what the key may do on it.", "That
-app does not publish what the key would do on it." or "It could not be copied to the clipboard.". A business that
-still shares its database with others (those signed up before every business was born with its own) has no "New API
-key" (BASE-F89).
+app does not publish what the key would do on it." or "It could not be copied to the clipboard.".
 Involved: BASE-F89, BASE-F90
 
 ### BASE-F87 Rotate an API key
@@ -2263,9 +2266,7 @@ Steps:
 In: the business's keys.
 Out: nothing saved. It updates by itself when one is created, rotated or revoked.
 If it fails: "Your API keys could not be loaded." with "Retry"; with none, "No API keys yet. Create one so that
-another system can read or write your business's data.". A business that still shares its database with others
-cannot have keys, because a key of its own could open another's data: instead, "Not available yet" and "API keys are
-not available yet in this business." show, until it moves to its own.
+another system can read or write your business's data.".
 Involved: BASE-F86, BASE-F87, BASE-F88
 
 ### BASE-F90 Read the API documentation
@@ -2812,3 +2813,38 @@ redirect (WEBSITE-F10).
 If it fails: a domain nobody connected opens nothing. If the business removes it, is cancelled or suspended, or has no
 published page, the domain says there is nothing there. A business being prepared or moved asks to come back in a moment.
 Involved: HUBS-F17, WEBSITE-F10
+
+### BASE-F111 Wait for the database when it is cut for a moment
+<!-- origin: new (PLAN-DB, round 2026-11-04e, point 5: a restart, an AWS maintenance or the change of version cut the database for a few seconds; twin of erplora.com's ACCOUNTS-F50) gh:hub#831 -->
+Status: done (reads, what never started and Demo's changes; that the changes of the other apps repeat too is hub#1051)
+Actor: anyone of the business in the Hub, on the web or in the app, and any program connected through the API
+Screen: any of the Hub, Page «We will be back soon»
+Steps:
+  1. The person opens a screen or saves something while the database is cut for a few seconds: a restart, an AWS
+     maintenance or the change of version.
+  2. What they were reading waits and is asked for again by itself, up to 20 seconds in all. If the database comes back
+     sooner, the screen arrives as always: the person only notices it took longer.
+  3. What they were saving waits the same when it is known that nothing was applied: it never started (opening the
+     business's database or checking who the person is), or it is a change that only touches the database and had not
+     been confirmed yet. Today Demo's changes are, the reference app's. It is saved only once and in its business, and
+     the notice to the other screens goes out after it is confirmed.
+  4. While it waits it holds none of the transactions at once the business's plan gives: the rest of the business's
+     people go on working.
+  5. If the time runs out, whoever opens the business's address in the browser sees «We will be back soon» with
+     «ERPlora will be back in a moment: try again in a few seconds.», on a page that refreshes by itself. Inside the app,
+     what could not be loaded or saved says so in its place, as any other error.
+In: nothing: the person does nothing different.
+Out: the same answer as always, a few seconds late; or, past the time, a 503 answer with `Retry-After` and never a server
+error. A program receives the code `database_unavailable`, or `base.hub_unavailable` if what does not answer is the
+business's database while it is opened.
+If it fails: what may have been applied is never repeated blindly, and each outcome says its own. A change of the other
+apps cut halfway or while it was being confirmed may have done something outside the database (numbering a task or a
+ticket, a charge, the submission to the AEAT, a WhatsApp): the person reads «The connection was lost while this was being
+saved. Check whether it was saved before trying again.» and a program, the code `database_outcome_unknown`. If the save
+had already been confirmed and the cut only took its answer, they read «It was saved, but the connection was lost before
+the answer arrived. Reload the page in a few seconds to see it.» (`database_answer_lost`). What is no cut (a query that
+takes too long, a fault of the program) stays the error it always was. erplora.com's calls to `/internal` and `/readyz`
+get their 503 at once, without waiting: erplora.com tries again on its own, and `/readyz` has to say the database is gone
+before its probes give up.
+Involved: ACCOUNTS-F50 (its twin on erplora.com), Demo (its changes repeat), the Hub's other waiting pages (a business
+being prepared or moving to another server: the same look); hub#831, hub#1051 and hub#1052

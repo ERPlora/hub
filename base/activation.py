@@ -18,8 +18,9 @@ The rules, without the database: ``base.services`` (``base.app.enable``, ``base.
   chosen (today 17 of 27). The migration ``base.0017`` writes it down for every hub of before, so none loses an app,
   and the developer's local hubs ``a`` and ``b`` are seeded with it. The platform always has it, rows or not: a scope
   that is no business's, ERPlora's own hub (``PLATFORM_HUB_SLUG``, Invoicing and VeriFactu always active) and the
-  worker's scope (``WORKER_SCOPE_SLUG``), where phase 1 runs every app's scheduled tasks over the tables every hub
-  shares (:func:`is_platform`).
+  worker's fixed scope (``WORKER_SCOPE_SLUG``), where phase 1 ran every app's scheduled tasks over the tables every hub
+  shared (:func:`is_platform`). Since S5 the worker runs each hub's on its own scope (``base.scheduler``): only the
+  suite's tests written before the tenancy still run on the fixed one (hub#1053).
 - **The plan's limit**: the SaaS's photo carries ``plan.max_apps`` (0, or no key: no limit), how many modules the
   business may *choose*; the ones brought along do not count. A photo with a lower limit than the chosen ones (a plan
   lowered) turns nothing off: it only refuses turning on one more (PLAN §32, point 3).
@@ -297,8 +298,9 @@ def veto(
 
 
 def is_platform(scope: Scope) -> bool:
-    """A scope that is no business choosing its apps: no business's at all, ERPlora's own hub or the worker's (phase
-    1 runs every app's scheduled tasks there, over the tables every hub shares). Every module is on in it."""
+    """A scope that is no business choosing its apps: no business's at all, ERPlora's own hub or the worker's fixed
+    one (phase 1 ran every app's scheduled tasks there, over the tables every hub shared; since S5 only the suite's
+    tests written before the tenancy do, hub#1053). Every module is on in it."""
     return scope.kind != HUB_SCOPE_KIND or scope.key in {settings.PLATFORM_HUB_SLUG, settings.WORKER_SCOPE_SLUG}
 
 
@@ -326,7 +328,8 @@ def off_apps(scope: Scope) -> frozenset[str]:
 
 def creating_apps(scope: Scope) -> frozenset[str]:
     """The modules whose tables ``scope``'s business is getting (``creating``), kept with :func:`off_apps`: the session
-    tells them «activating». None in the platform, nor in a hub that shares phase 1's database."""
+    tells them «activating». None in the platform, nor in a hub without a database of its own, where nothing is made
+    later (since S5 only the suite's fallback keeps one, hub#611)."""
     if is_platform(scope):
         return frozenset()
     return _kept(scope)[1]

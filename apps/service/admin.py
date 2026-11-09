@@ -214,6 +214,7 @@ class RedemptionInline(admin.TabularInline):
     extra = 0
     fields = (
         "service",
+        "member",
         "status",
         "order_line_id",
         "hold_until",

@@ -109,6 +109,10 @@ check "writes the PLAN-DB settings" '
   has_line "max_client_conn=300" && has_line "server_idle_timeout=10" &&
   has_line "autodb_idle_timeout=300" && has_line "query_wait_timeout=10" &&
   has_line "server_tls_sslmode=verify-full" && has_line "max_prepared_statements=0"'
+check "writer DNS expires within AWS's five-second budget and login retries soon" \
+  'has_line "dns_max_ttl=5" && has_line "server_login_retry=2"'
+check "a writer name that failed to resolve is asked again within the same five seconds" \
+  'has_line "dns_nxdomain_ttl=5"'
 check "an idle hub database costs no server connection: no minimum, no reserve" \
   'has_line "min_pool_size=0" && has_line "reserve_pool_size=0"'
 check "every setting is written once" \

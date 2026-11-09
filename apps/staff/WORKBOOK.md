@@ -810,9 +810,9 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 - Los avisos llegan a las apps que reaccionan por el relay del outbox del worker (`base.relay`): lo
   prueban de punta a punta `apps/task/tests/test_relay.py` (TASK-F15, hub#124), `apps/service/tests/test_relay.py`
   y `apps/appointment/tests/test_relay.py`.
-- Tenencia: en la fase 1, y en el modo compartido de la tenencia S1 (hub#175), un hub sin BD propia —hoy
-  todos— guarda sus datos en la BD compartida, así que `a` y `b` comparten fichas, horarios y ausencias;
-  lo que sí se separa son los avisos en vivo. Con una BD por hub cada uno tendrá su equipo.
+- Tenencia: cada negocio tiene su propia BD (desde el corte S5, hub#602; el modo compartido de la tenencia S1,
+  hub#175, ya no existe), así que cada uno tiene su equipo: fichas, horarios y ausencias. Solo los tests escritos
+  antes de la tenencia guardan `a` y `b` en la misma BD de test (`base/tenancy/tests/legacy.py`, hasta hub#611).
 - La resta de intervalos de la disponibilidad está hecha a mano: la única librería de intervalos de
   tamaño razonable (`portion`) es un proyecto de una sola persona, y las que cumplen los criterios
   (`sympy`, `pandas`) son desproporcionadas para eso.
@@ -828,9 +828,6 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   `staff_staffsettings` hasta el paso contract (expand/contract, PLAN-DB), con su migración reversible,
   una vez desplegado hub#177; va a `## 6` de `MIGRATION.md`. Al borrarlas, `apps/flow/tests/test_i18n.py`
   (recorre las columnas de cada modelo) dirá qué entradas del catálogo de Automatizaciones sobran.
-- **Lo que Comisiones aún no cuenta** (STAFF-F21), las dos de otras apps y en la cola: una venta cobrada
-  con «Atiende yo» no se atribuye a nadie (`FIX-SALE-SERVED-BY-ME-NOT-ATTRIBUTED`) y la sesión de un
-  bono vale 0 € para quien la hace (`FIX-SERVICE-VOUCHER-SESSION-STAFF-VALUE`).
 - **Comisiones en el menú**: es una pestaña de Personal para quien ve la compensación, no una entrada de
   menú, porque una entrada no puede depender de un permiso (`live.meta.Nav`, «Cómo son las páginas»).
   El producto actual no tenía la pantalla.

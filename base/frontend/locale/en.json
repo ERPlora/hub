@@ -710,7 +710,9 @@
         "languageHelp": "Saved for you. If you choose none, the business’s language is used.",
         "businessLanguage": "Use the business’s language",
         "appearance": "Appearance",
-        "appearanceHelp": "Choose the mode and the palette you prefer.",
+        "appearanceHelp": "Choose the mode, palette and interface size you prefer.",
+        "scale": "Interface size",
+        "scaleHelp": "Scale the whole interface from 80% to 120%. Your choice is saved and applies on every device.",
         "palette": "Theme palette",
         "palettes": {
           "erplora": "ERPlora",

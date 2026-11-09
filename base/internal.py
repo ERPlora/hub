@@ -96,6 +96,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from live.context import OperationContext, Scope, system_context
+from live.database_cut import marked
 from live.errors import OperationError
 from live.operations import get as get_operation
 from pydantic import ValidationError
@@ -449,7 +450,8 @@ def _operation_call(name: str, payload: dict, ctx: OperationContext):
     try:
         return op(ctx, data), None
     except OperationError as failed:
-        return None, JsonResponse(failed.envelope(), status=failed.status)
+        # A cut of the database carries its Retry-After (live.database_cut): the SaaS tries again on its own.
+        return None, marked(JsonResponse(failed.envelope(), status=failed.status), failed)
 
 
 @internal_view

@@ -610,16 +610,25 @@ Pantalla: asistente
 Pasos:
 1. Si quieres, pregunta antes al asistente si se podría gastar una sesión de ese bono y por qué no.
 2. Pide al asistente que gaste una sesión de un bono comprado por la clienta, y si quieres que diga
-   qué servicio se hizo y la enlace a la cita o a la venta.
-Entra: la compra del bono; el servicio, la cita y la venta, como referencia.
+   qué servicio se hizo, qué profesional lo hizo («la hizo Ana») y la enlace a la cita o a la venta.
+3. La tarjeta de confirmación del asistente nombra el bono, el servicio y la profesional; confírmala.
+Entra: la compra del bono; el servicio y la profesional del equipo de Personal que lo hizo; la cita y la
+venta, como referencia.
 Sale: una sesión **Entregada** al momento (`service.grant.redeemed`), que cuenta contra los «Usos» y se
-lleva su parte del precio (SERVICE-F24). No dice quién la hizo, así que no cuenta en la producción de nadie
-(hub#770). No emite documento fiscal.
+lleva su parte del precio (SERVICE-F24). Si dice quién la hizo, la sesión lo guarda y lo que vale cuenta en
+la producción de esa profesional en Ventas, el día del negocio en que se gasta, y con ella en su comisión
+(SALE-F28, STAFF-F21), igual que la que se gasta al cobrar. Una sesión de un bono sin límite no tiene entre
+qué dividir: vale lo que esa profesional cobra por el servicio (su precio propio o el del servicio), como la
+línea del cobro; sin decir el servicio, no suma. Sin decir quién la hizo, no cuenta en la producción de nadie.
+Sin Ventas en el negocio, la sesión se gasta igual y guarda quién la hizo, pero no hay producción en la que
+contarla. No emite documento fiscal.
 Si falla: «Este bono está anulado: ya no se puede usar.», «Este bono ya no tiene sesiones
 disponibles.», «Este bono ha caducado.», «Este bono no cubre ese servicio. Un bono de cortes paga
-cortes, no el champú.» o «Esa venta de bono no existe en este negocio.». Dos cajas que gastan la
-última sesión a la vez van en fila y la segunda recibe el motivo real.
-Implicados: SERVICE-F19, SERVICE-F20
+cortes, no el champú.» o «Esa venta de bono no existe en este negocio.». Una profesional que no está en el
+equipo (o ya se dio de baja), «Ese miembro del personal no existe en este negocio.»; un nombre que vale para
+varias, «Hay varios miembros del personal que se llaman «…»: …. Di cuál.». Nada se gasta. Dos cajas que
+gastan la última sesión a la vez van en fila y la segunda recibe el motivo real.
+Implicados: SERVICE-F19, SERVICE-F20, SERVICE-F24, SALE-F28, STAFF-F21
 
 ### SERVICE-F22 Pagar una línea con un bono
 <!-- origen: qa:verticals/beauty/05-sale-upsell-and-payment wf:peluqueria-dia#rec_peluqueria-f10 wf:peluqueria-dia#rec_peluqueria-f11 old:services/workflow/cobro-y-devolucion.md#services-f22 -->
@@ -994,7 +1003,7 @@ sesión, se pueden seguir en vivo.
 | Concede un bono a una clienta y le dice a Ventas qué línea lo pagó | conceder bonos | F14 | `service.grant.create` |
 | Anula un bono vendido sin usar | anular bonos | F17 | `service.grant.void` |
 | Regala o quita sesiones, o alarga la caducidad | ajustar bonos | F18 | `service.grant.adjust` |
-| Gasta una sesión | gastar sesiones | F21 | `service.grant.redeem` |
+| Gasta una sesión y, si se dice quién la hizo, le dice a Ventas que cuente lo que vale en su producción | gastar sesiones | F21 | `service.grant.redeem` |
 | Reserva una sesión de un bono para una línea de la cuenta (la llama Ventas) | gastar sesiones | F22 | `service.session.hold` |
 | Suelta una sesión reservada (la llama Ventas) | gastar sesiones | F23 | `service.session.release` |
 | Da por gastadas las sesiones reservadas de una venta cobrada (la llama Ventas) | gastar sesiones | F24 | `service.session.settle` |
@@ -1057,11 +1066,17 @@ con la sesión de quien vende, como hace con Inventario.
   - al anular la venta, `service.session.return` con todas sus sesiones (`reference` = la venta) y,
     al devolverla, con las de las líneas que vuelven (`reference` = la devolución).
   Para pintar el hueco, el cobro lee `service.grant.tender_options` (`customer_id`, `service_id`).
-- **La línea que vendió un bono (F14, F17)**: es lo único que Servicios le pide a Ventas, también por nombre y con
-  la sesión de quien concede. `service.grant.create`, con importe y venta, llama a `sale.sale.voucher_sold`
+- **La línea que vendió un bono (F14, F17)**: es una de las dos cosas que Servicios le pide a Ventas, también por
+  nombre y con la sesión de quien concede. `service.grant.create`, con importe y venta, llama a `sale.sale.voucher_sold`
   (`sale_id`, `line_id`, `amount`) y guarda en `sale_line_id` la línea que le devuelve; `service.grant.void` llama a
   `sale.sale.voucher_unsold` (`line_id`, `amount`). Sin Ventas en el negocio no hay cifra de la que apartarla:
   no se llama, el bono no guarda línea y sus sesiones no cuentan.
+- **La sesión gastada fuera del cobro con su profesional (F21)**: la otra. `service.grant.redeem` con `member_id` o
+  `member` llama a `sale.voucher_session.record` (`session_id`, `staff_id`, `value`) con la sesión de quien la gasta
+  (su permiso de Ventas, «Montar la cuenta», lo tienen los cuatro papeles) y en la misma transacción. `value` es el de
+  la sesión o, en un bono sin límite, el precio de esa profesional para el servicio. Ventas lo guarda aparte, porque
+  no hay línea, y lo suma en la producción (SALE-F28): una sesión del cobro nunca pasa por aquí, así que ninguna cuenta
+  dos veces. Sin Ventas en el negocio no se llama.
   Servicios guarda la venta y la línea de la cuenta como identificadores opacos (`sale_id`,
   `order_line_id`): Ventas no es requisito de Servicios ni Servicios de Ventas.
 
@@ -1107,7 +1122,8 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   `test_concurrency.py` (hilos).
 - **`requires = ["tax", "staff", "customer"]`**: `Service.tax_category` y
   `ServiceSettings.default_tax_category` son claves ajenas a `tax.TaxCategory`;
-  `Assignment.member`, a `staff.Member`; `Grant.customer`, a `customer.Customer`. Los nombres se
+  `Assignment.member` y `Redemption.member` (la profesional que hizo una sesión gastada fuera del cobro, F21;
+  `PROTECT`: una ficha no se borra, se da de baja), a `staff.Member`; `Grant.customer`, a `customer.Customer`. Los nombres se
   resuelven con `apps.staff.queries.resolve_member` y `apps.customer.queries.find_customer`. La venta
   y la cita de una sesión o de una compra son identificadores opacos (`sale_id`, `appointment_id`),
   sin clave ajena: Ventas y Citas no son requisito (como `sale` guarda `staff_id`).
@@ -1196,10 +1212,11 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   persona detrás, sin permiso o con un id de otro negocio, el registro queda fuera, nunca su id (hub#676).
 - El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (ronda 12, PLAN §17);
   una escritura cruda del admin no pasa por las reglas ni deja aviso, salvo la del árbol de categorías.
-- Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`, como en
-  `demo`; lo que sí se separa son los avisos en vivo. Todas las apps están encendidas en todos los
-  negocios (`base.relay.active_apps`): los rechazos por «Servicios no activa» de F24, F26 y F27 solo los
-  ven los tests hasta que un negocio pueda apagarla (fase 2).
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD (desde el corte S5,
+  hub#602): los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
+  en la misma BD de test (`base/tenancy/tests/legacy.py`, hasta hub#611). Cada negocio enciende y apaga sus
+  apps (BASE-F23, BASE-F24; `base.relay.active_apps`): los rechazos por «Servicios no activa» de F24, F26 y F27
+  los ve un negocio que apaga Servicios y sigue cobrando en Ventas, que no la tiene en sus `requires`.
 - Quién lee el catálogo, contado por sus llamadas (`rg '"service\.' apps`): Citas
   (`service.service.list_for_sale`, `service.assignment.eligible` y los modelos, que requiere), Ventas
   (las de «Contrato con Ventas», sin requerirla), Reservas online (`service.service.list` y `.update` en sus
@@ -1242,7 +1259,8 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   la sección de su IVA) y se concede con la concesión (asistente o API, F14) diciendo la venta.
 - **Enlazar a su venta un bono concedido sin decirla** (F14, hub#786): el bono sigue sin contar para quien hace
   sus sesiones. Le pasa también a los vendidos antes de esa cifra.
-- **La sesión gastada fuera del cobro en la producción de quien la hizo** (F21, hub#770).
+- **Gastar una sesión fuera del cobro desde Bonos vendidos, eligiendo la profesional, y ver en Movimientos quién
+  la hizo** (F21, F19, hub#1058): hoy es del asistente y de la API.
 - **Importar servicios desde un fichero**: como en el producto actual, el alta de golpe es del
   asistente y la API.
 - **Decir en la tarjeta del asistente de qué venta, cita, línea de la cuenta o devolución se trata**: son datos de
@@ -1294,3 +1312,5 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
     precio y la sesión volvía al bono sin avisar): lo que enseña el cobro es lo que se cobra.
 16. **Devolver una sesión** pide su propio permiso, que tienen responsable, propietario y
     administrador (antes la devolvía quien hacía la devolución).
+17. **Una sesión gastada fuera del cobro dice quién la hizo** (hub#770; antes no lo recibía y no contaba en la
+    producción ni en la comisión de nadie): su valor cuenta para esa profesional en Ventas, como la del cobro.
