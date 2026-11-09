@@ -31,6 +31,7 @@ const RUN_ORDERS =
 
 /** `a`'s registration as the run found it (put back after). */
 let original: Registration;
+let japanTaxRuleId = '';
 /** A service and a voucher of the run, priced through the API in minor units (22,50 and 90,00 in euros). */
 let color = { id: '', name: '' };
 let voucher = { id: '', name: '' };
@@ -82,6 +83,7 @@ test.beforeAll(async ({ browser }) => {
   original = registrationOf('a');
   cleanAll();
   const owner = await hostPage(browser, A, { next: '/service/services' });
+  japanTaxRuleId = (await post<{ id: string }>(owner.context, '/tax/rules', { country_code: 'JP', tax_category_key: 'service.generic', rate_pct: 10 })).id;
   const colorName = named('Color');
   color = { id: (await post<{ id: string }>(owner.context, '/service/services', { name: colorName, price: 2250, tax_category_key: 'service.generic' })).id, name: colorName };
   const voucherName = named('Bono');
@@ -93,6 +95,7 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(async () => {
   if (original) await registerBusinessIn(original, original.country);
   cleanAll();
+  if (japanTaxRuleId) psql(`delete from tax_taxrule where id = '${japanTaxRuleId}'`);
 });
 
 test(`${KEY}: service-business-currency a business in Japan saves «1500» as 1500 yen and the till charges ¥1,500 in 390, 834 and 1440`, async ({
@@ -140,6 +143,16 @@ test(`${KEY}: service-business-currency a business in Japan saves «1500» as 15
     await settled(page);
     await noHorizontalScroll(page, `till ${size.name}`);
     await page.screenshot({ path: shot(`${KEY}-jp-pos-${size.name}`) });
+    if (size.name === '390') {
+      await shown(page).locator('[data-testid=pos-charge]').click();
+      const checkout = page.locator('[data-testid=sale-checkout-modal]');
+      await expect(checkout).toBeVisible();
+      await expect(checkout.locator('[data-testid=sale-checkout-total]')).toContainText('¥1,500');
+      await settled(page);
+      await page.screenshot({ path: shot(`${KEY}-jp-checkout-${size.name}`) });
+      await checkout.locator('[data-testid=sale-checkout-close]').click();
+      await expect(checkout).toBeHidden();
+    }
   }
 });
 

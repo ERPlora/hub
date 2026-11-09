@@ -154,6 +154,18 @@ describe('PosPage: selling', () => {
     expect(s.wrapper.findComponent(CartLines).props('lines')).toEqual(CHECK.lines);
   });
 
+  it('a valuation refusal says why instead of an endless dash, and the next valuation clears it', async () => {
+    const s = await setup();
+    await s.addProduct();
+    s.net.lastStream().push(errorFrame(s.subId('sale.checkout.preview'), 'sale.no_tax_rule'));
+    await s.reopen();
+    expect(s.find('pos-total').text()).toBe('—');
+    expect(s.find('pos-preview-error').text()).toContain('msg sale.no_tax_rule');
+    await s.result('sale.checkout.preview', preview({ total: 150 }));
+    expect(s.find('pos-preview-error').exists()).toBe(false);
+    expect(plain(s.find('pos-total').text())).toBe('€1.50');
+  });
+
   it('a reload comes back to the check the device had', async () => {
     localStorage.setItem(CURRENT_CHECK_KEY, 'o5');
     const s = await setup();
