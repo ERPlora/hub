@@ -475,3 +475,43 @@ msgstr "base de datos que dejó un traslado deshecho"
 
 msgid "databases left by undone moves"
 msgstr "bases de datos que dejaron traslados deshechos"
+
+#: models.py (the freeze switch, hub#930)
+msgctxt "freeze"
+msgid "frozen"
+msgstr "congelado"
+
+msgctxt "freeze"
+msgid "not frozen"
+msgstr "sin congelar"
+
+msgctxt "freeze"
+msgid "reason"
+msgstr "motivo"
+
+msgctxt "freeze"
+msgid "since"
+msgstr "desde"
+
+msgctxt "freeze"
+msgid "by"
+msgstr "por"
+
+msgctxt "freeze"
+msgid "freeze"
+msgstr "congelación"
+
+#: admin.py
+msgctxt "freeze"
+msgid "state"
+msgstr "estado"
+
+#: admin.py
+msgid "Frozen: the worker is still working on %(count)d hub; wait until it is 0 before the upgrade."
+msgid_plural "Frozen: the worker is still working on %(count)d hubs; wait until it is 0 before the upgrade."
+msgstr[0] "Congelado: el worker aún trabaja en %(count)d hub; espera a que sea 0 antes de la subida."
+msgstr[1] "Congelado: el worker aún trabaja en %(count)d hubs; espera a que sea 0 antes de la subida."
+msgstr[2] "Congelado: el worker aún trabaja en %(count)d hubs; espera a que sea 0 antes de la subida."
+
+msgid "Frozen: the worker is working on no hub: the database may be upgraded."
+msgstr "Congelado: el worker no trabaja en ningún hub: ya se puede subir la base de datos."

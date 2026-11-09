@@ -24,6 +24,7 @@ ITEM_DONE = _("This item is closed: open it to add lines.")
 @operation(
     "demo.item.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="demo.manage",
     input=ItemIn,
     output=ItemDetailOut,
@@ -42,6 +43,7 @@ def create_item(ctx: OperationContext, data: ItemIn) -> Item | None:
 @operation(
     "demo.item.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="demo.manage",
     input=ItemPatchIn,
     output=ItemDetailOut,
@@ -67,6 +69,7 @@ def update_item(ctx: OperationContext, data: ItemPatchIn) -> Item | None:
 @operation(
     "demo.item.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="demo.manage",
     input=ByIdIn,
     output=DeletedOut,
@@ -84,6 +87,7 @@ def delete_item(ctx: OperationContext, data: ByIdIn) -> dict:
 @operation(
     "demo.item.add_line",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="demo.manage",
     input=LineIn,
     output=ItemDetailOut,

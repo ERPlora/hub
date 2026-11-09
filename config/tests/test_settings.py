@@ -18,6 +18,7 @@ from django.core.mail import mailers
 from django.test import RequestFactory, override_settings
 from live.csp import base_policy, debug_policy
 from live.slugs import is_reserved_hub_slug
+from psycopg_pool import ConnectionPool
 
 SETTINGS_FILE = Path(__file__).resolve().parents[1] / "settings.py"
 BASE_DIR = SETTINGS_FILE.parents[1]
@@ -73,6 +74,7 @@ ENV_KEYS = (
     "METRICS_ENABLED",
     "METER_ENABLED",
     "PGBOUNCER_MAX_DB_CONNECTIONS",
+    "DB_CUT_WAIT_SECONDS",
 )
 # Local development opts in with DEBUG=True (the .env of a checkout); nothing else turns it on.
 DEVELOPMENT_ENV = {"DEBUG": "True"}
@@ -139,7 +141,9 @@ def test_defaults_are_the_local_compose_database_with_a_pool(load_settings):
         "127.0.0.1",
         5432,
     )
-    assert db["OPTIONS"]["pool"] == {"min_size": 1, "max_size": 8, "max_idle": 60, "timeout": 5}
+    # A connection the server cut while it sat in the pool is never handed out (BASE-F111).
+    pool = {"min_size": 1, "max_size": 8, "max_idle": 60, "timeout": 5, "check": ConnectionPool.check_connection}
+    assert db["OPTIONS"]["pool"] == pool
     # Its own test database, so it never drops the one the packages/live suite is using.
     assert db["TEST"]["NAME"] == "test_hub_next"
 
@@ -381,7 +385,7 @@ def test_the_running_pool_closes_idle_connections_after_60_seconds():
 def test_database_tls_and_application_name_only_when_set(load_settings):
     options = load_settings(**DEVELOPMENT_ENV)["DATABASES"]["default"]["OPTIONS"]
     assert options == {
-        "pool": {"min_size": 1, "max_size": 8, "max_idle": 60, "timeout": 5},
+        "pool": {"min_size": 1, "max_size": 8, "max_idle": 60, "timeout": 5, "check": ConnectionPool.check_connection},
         "connect_timeout": 5,
     }
     loaded = load_settings(
@@ -391,7 +395,7 @@ def test_database_tls_and_application_name_only_when_set(load_settings):
         DB_APPLICATION_NAME="worker",
     )
     assert loaded["DATABASES"]["default"]["OPTIONS"] == {
-        "pool": {"min_size": 1, "max_size": 8, "max_idle": 60, "timeout": 5},
+        "pool": {"min_size": 1, "max_size": 8, "max_idle": 60, "timeout": 5, "check": ConnectionPool.check_connection},
         "connect_timeout": 5,
         "sslmode": "verify-full",
         "sslrootcert": "/etc/ssl/certs/rds-global-bundle.pem",
@@ -409,6 +413,23 @@ def test_a_dead_database_fails_within_db_connect_timeout_seconds(load_settings):
         "default"
     ]["OPTIONS"]
     assert (options["connect_timeout"], options["pool"]["timeout"]) == (2, 2)
+
+
+def test_a_cut_of_the_database_is_waited_for_far_below_the_load_balancer(load_settings):
+    # BASE-F111: a request waits for a cut up to its limit, and its last try may still wait DB_CONNECT_TIMEOUT for a
+    # pooled connection and as long to connect: all of it far below the 120 s of the ALB's idle_timeout.
+    loaded = load_settings(**DEVELOPMENT_ENV)
+    cut = loaded["LIVE"]["database_cut"]
+    connect_timeout = loaded["DATABASES"]["default"]["OPTIONS"]["connect_timeout"]
+    assert cut["wait_seconds"] == 20
+    assert cut["wait_seconds"] + 2 * connect_timeout < 60
+    assert load_settings(**DEVELOPMENT_ENV, DB_CUT_WAIT_SECONDS="8")["LIVE"]["database_cut"]["wait_seconds"] == 8
+
+
+def test_what_tries_again_on_its_own_gets_its_503_at_once(load_settings):
+    # The SaaS's signed calls try again themselves, and /readyz has to say the database is gone before its probes give up.
+    prefixes = load_settings(**DEVELOPMENT_ENV)["LIVE"]["database_cut"]["no_wait_prefixes"]
+    assert sorted(prefixes) == ["/internal/", "/readyz"]
 
 
 def test_production_cookies_are_secure_and_hsts_is_on_for_the_hub_host_only(
@@ -731,7 +752,10 @@ def test_one_letter_hubs_only_in_local_development(load_settings):
 def test_middleware_order():
     middleware = settings.MIDDLEWARE
     assert middleware[0] == "base.health.HealthCheckMiddleware"
-    assert middleware[1:3] == [
+    # A cut of the database is waited for outside every other layer (BASE-F111): Django turns an exception into a
+    # response at each one, so only the outermost sees the whole request. /healthz reads no database.
+    assert middleware[1] == "live.database_cut.DatabaseCutMiddleware"
+    assert middleware[2:4] == [
         "django.middleware.security.SecurityMiddleware",
         "whitenoise.middleware.WhiteNoiseMiddleware",
     ]

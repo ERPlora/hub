@@ -1,7 +1,8 @@
 """What control's operations take and give: the database clusters of the Hub admin (round 2026-10-30b of PLAN-DB,
-decision 1; tranche S7). Their bounds are the model's (``control.models.Cluster``), so any caller, not only the
-admin's form, is held to them."""
+decision 1; tranche S7) and its freeze switch (hub#930). Their bounds are the model's (``control.models.Cluster``,
+``control.models.Freeze``), so any caller, not only the admin's form, is held to them."""
 
+import datetime as dt
 from uuid import UUID
 
 from ninja import Schema
@@ -92,3 +93,32 @@ class HubIdIn(Schema):
     """Which hub (``control.hub.move_cancel``)."""
 
     id: UUID
+
+
+class FreezeIn(Schema):
+    """Freeze the platform (``frozen``) or lift its freeze, for a database upgrade (hub#930); ``reason``: why, for
+    whoever looks meanwhile. Asked while already so, nothing changes."""
+
+    frozen: bool
+    reason: str = Field(default="", max_length=500)
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def _stripped(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+
+class FreezeGetIn(Schema):
+    """Nothing to say: there is one switch."""
+
+
+class FreezeOut(Schema):
+    """How the switch stands: frozen or not, why, since when and by whom it last changed (``None`` and empty: never),
+    and how many hubs the worker is working on now (their ``hub_due`` lease held: what it started before a freeze and
+    has not finished; 0 before the upgrade starts)."""
+
+    frozen: bool
+    reason: str
+    since: dt.datetime | None
+    by: str
+    working: int

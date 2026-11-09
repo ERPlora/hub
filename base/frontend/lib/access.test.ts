@@ -273,7 +273,7 @@ describe('startWayIn — what the shell does with the session’s way in, once m
   }
 
   const ACCOUNT = { credential: 'account', switch_user: false, idle_minutes: null };
-  const NONE = { theme_mode: '', palette: '' };
+  const NONE = { theme_mode: '', palette: '', ui_scale: 100 };
 
   it('a till that always asks signs out after its idle minutes (BASE-G59)', () => {
     const d = deps();
@@ -293,8 +293,15 @@ describe('startWayIn — what the shell does with the session’s way in, once m
 
   it('paints the person’s own appearance (BASE-G125)', () => {
     const d = deps();
-    startWayIn(page({ access: ACCOUNT, preferences: { theme_mode: 'dark', palette: 'forest' } }), d)();
-    expect(d.paint).toHaveBeenCalledWith('dark', 'forest');
+    startWayIn(page({ access: ACCOUNT, preferences: { theme_mode: 'dark', palette: 'forest', ui_scale: 120 } }), d)();
+    expect(d.paint).toHaveBeenCalledWith('dark', 'forest', 120);
+    expect(d.reset).not.toHaveBeenCalled();
+  });
+
+  it('paints a personal interface scale even without a mode or palette override', () => {
+    const d = deps();
+    startWayIn(page({ access: ACCOUNT, preferences: { ...NONE, ui_scale: 120 } }), d)();
+    expect(d.paint).toHaveBeenCalledWith(null, null, 120);
     expect(d.reset).not.toHaveBeenCalled();
   });
 

@@ -304,6 +304,26 @@ describe('SettingsPage (ATTENDANCE-F04)', () => {
     expect([s.sent(), s.find('attendance-settings-saved').exists()]).toEqual([[], true]);
   });
 
+  // hub#894: a save fails with no connection, the hours are typed back to what is saved and «Save» again. What is on
+  // screen is what is saved, so it says only that: the failed save's red notice goes with it, until the next refusal.
+  it('a failed save, the field typed back and «Save» again: only «Settings saved.», the red notice goes', async () => {
+    const s = await setup();
+    s.net.onApi(() => Promise.reject(new TypeError('Failed to fetch')));
+    await ionValue(s.field('auto_close_after_hours'), '13', 'ionInput');
+    await click(s.field('save'));
+    await settle();
+    expect(s.find('attendance-settings-save-error').exists()).toBe(true);
+    await ionValue(s.field('auto_close_after_hours'), '12', 'ionInput');
+    expect(s.find('attendance-settings-save-error').exists()).toBe(true);
+    await click(s.field('save'));
+    await settle();
+    expect([s.sent().length, s.find('attendance-settings-saved').exists(), s.find('attendance-settings-save-error').exists()]).toEqual([1, true, false]);
+    await ionValue(s.field('auto_close_after_hours'), '13', 'ionInput');
+    await click(s.field('save'));
+    await settle();
+    expect([s.sent().length, s.find('attendance-settings-saved').exists(), s.find('attendance-settings-save-error').exists()]).toEqual([2, false, true]);
+  });
+
   it('«Save» shows its save icon, and a spinner instead while saving', async () => {
     const s = await setup();
     let answer!: (response: Response) => void;

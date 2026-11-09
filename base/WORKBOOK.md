@@ -198,7 +198,8 @@ aquí.», «¿Quién se pone?» con las caras, el teclado y «Cancelar».
 
 ### Mi perfil
 Desde «Perfil» del menú de usuario. Arriba, la persona (cara, nombre y rol); debajo, «Datos de la cuenta» (con la
-foto), «Preferencias» (idioma y apariencia) y «PIN».
+foto), «Preferencias» (idioma y apariencia: paleta, tema y tamaño de interfaz del 80 al 120%, por defecto 100%) y
+«PIN».
 
 ### Ajustes · General
 Lo que se abre con «Ajustes» en el menú lateral: la primera pestaña de abajo, «General», con «Este dispositivo»,
@@ -895,7 +896,8 @@ Pasos:
      {app}».
 Entra: cómo va la activación.
 Sale: la app en marcha en este negocio (`base.app.enabled`).
-Si falla: BASE-F21.
+Si falla: BASE-F21. Mientras el personal de ERPlora tiene congelada la plataforma por una subida de la base de datos
+(unos minutos, hub#930), la app sigue «Activándose…» y termina sola en cuanto se descongela.
 Implicados: BASE-F31, BASE-F32
 
 ### BASE-F23 Desactivar una app
@@ -1829,7 +1831,9 @@ Pasos:
 Entra: el estado del negocio que le pasa erplora.com.
 Sale: nada guardado.
 Si falla: una dirección que no es de ningún negocio no existe; un negocio dado de baja dice «Este hub ya no está
-disponible.».
+disponible.». Mientras el personal de ERPlora tiene congelada la plataforma por una subida de la base de datos
+(unos minutos, hub#930), el negocio espera a prepararse: la página sigue en «Estamos preparando tu negocio» y entra
+sola en cuanto se descongela y termina.
 Implicados: ninguno
 
 ### BASE-F64 Cambiar mis datos, foto, idioma y apariencia
@@ -1845,13 +1849,14 @@ Pasos:
   3. «Elegir imagen» sube una foto JPG, PNG o WebP de hasta 2 MB («Foto actualizada»); «Quitar» la borra («Foto
      quitada»).
   4. En «Preferencias», «Idioma» («Usar el idioma del negocio», «Español», «English») y «Apariencia» («Paleta de
-     tema» y «Tema»: «Sistema (auto)», «Claro», «Oscuro») se guardan al elegir y se aplican al momento; «Usar la
-     apariencia del negocio» deshace lo propio.
+     tema», «Tema»: «Sistema (auto)», «Claro», «Oscuro», y «Tamaño de la interfaz»: 80, 90, 100, 110 o 120%, por
+     defecto 100%) se guardan al elegir y se aplican al momento en cualquier dispositivo; «Usar la apariencia del
+     negocio» deshace lo propio y devuelve el tamaño a 100%.
 Entra: el perfil de quien tiene la sesión.
 Sale: su nombre en este negocio (el que sale en el menú lateral, en las caras y en «Dispositivos»), su foto, su idioma
-y su apariencia, que le siguen en cualquier dispositivo en el que entre, con su PIN o con su cuenta. Con «Usar el
-idioma del negocio», entra con PIN en el del negocio y con su cuenta en el de su cuenta de erplora.com (BASE-F51). El
-correo es solo de contacto: no cambia la cuenta de erplora.com.
+y su apariencia, incluido el tamaño de interfaz, que le siguen en cualquier dispositivo en el que entre, con su PIN,
+su placa o su cuenta. Con «Usar el idioma del negocio», entra con PIN en el del negocio y con su cuenta en el de su
+cuenta de erplora.com (BASE-F51). El correo es solo de contacto: no cambia la cuenta de erplora.com.
 Si falla: si el perfil no se pudo leer, «No se pudo cargar el perfil» — «Tus datos siguen igual. Comprueba la
 conexión y vuelve a intentarlo.» con «Reintentar». Al guardar: «No se pudo guardar el perfil»; foto rechazada:
 «No se pudo guardar la foto. Usa JPG, PNG o WebP de hasta 2 MB.»; preferencias: «No se pudieron guardar tus
@@ -2934,6 +2939,42 @@ Si falla: un dominio que nadie ha conectado no abre nada. Si el negocio lo quita
 tiene una página publicada, el dominio dice que no hay nada ahí. Un negocio que se está preparando o mudando pide volver
 en un momento.
 Implicados: HUBS-F17, WEBSITE-F10
+
+### BASE-F111 Esperar a la base de datos cuando se corta un momento
+<!-- origen: nuevo (PLAN-DB, ronda 2026-11-04e, punto 5: un reinicio, un mantenimiento de AWS o el cambio de versión cortan la base unos segundos; gemelo de ACCOUNTS-F50 de erplora.com) gh:hub#831 -->
+Estado: hecho (las lecturas, lo que no llegó a empezar y los cambios de Demo; que se repitan también los cambios de las
+demás apps es hub#1051)
+Actor: cualquier persona del negocio en el Hub, en la web o en la app, y cualquier programa conectado por la API
+Pantalla: cualquiera del Hub, Página «Volvemos enseguida»
+Pasos:
+  1. La persona abre una pantalla o guarda algo mientras la base de datos se corta unos segundos: un reinicio, un
+     mantenimiento de AWS o el cambio de versión.
+  2. Lo que estaba leyendo espera y se vuelve a pedir solo, hasta 20 segundos en total. Si la base vuelve antes, la
+     pantalla llega como siempre: la persona solo nota que ha tardado.
+  3. Lo que estaba guardando espera igual cuando consta que no se aplicó nada: no llegó a empezar (abrir la base del
+     negocio o comprobar quién es la persona), o es un cambio que solo toca la base de datos y todavía no se había
+     confirmado. Hoy lo son los cambios de Demo, la app de referencia. Se guarda una sola vez y en su negocio, y el aviso
+     a las demás pantallas sale después de confirmarse.
+  4. Mientras espera no ocupa ninguna de las transacciones a la vez que da el plan del negocio: las demás personas del
+     negocio siguen trabajando.
+  5. Si se acaba el tiempo, quien abre la dirección del negocio en el navegador ve «Volvemos enseguida» con «ERPlora
+     vuelve en un momento: inténtalo de nuevo en unos segundos.», en una página que se recarga sola. Dentro de la app,
+     lo que no se pudo cargar o guardar lo dice en su sitio, como cualquier otro error.
+Entra: nada: la persona no hace nada distinto.
+Sale: la misma respuesta de siempre, con unos segundos de retraso; o, pasado el tiempo, una respuesta 503 con
+`Retry-After` y nunca un error del servidor. Un programa recibe el código `database_unavailable`, o
+`base.hub_unavailable` si lo que no responde es la base del negocio al abrirla.
+Si falla: lo que pudo aplicarse no se repite nunca a ciegas, y cada resultado dice el suyo. Un cambio de las demás apps
+cortado a medias o mientras se confirmaba pudo haber hecho algo fuera de la base (numerar una tarea o un ticket, un
+cobro, el envío a la AEAT, un WhatsApp): la persona lee «Se ha perdido la conexión mientras se guardaba. Comprueba si se
+ha guardado antes de volver a intentarlo.» y un programa, el código `database_outcome_unknown`. Si el guardado ya se
+había confirmado y el corte se llevó solo la respuesta, lee «Se ha guardado, pero la conexión se ha perdido antes de
+llegar la respuesta. Recarga la página en unos segundos para verlo.» (`database_answer_lost`). Lo que no es un corte (una
+consulta que tarda demasiado, un fallo del programa) sigue siendo el error de siempre. Las llamadas de erplora.com a
+`/internal` y `/readyz` reciben su 503 al momento, sin esperar: erplora.com reintenta por su cuenta, y `/readyz` tiene
+que decir que la base no está antes de que sus sondas se cansen.
+Implicados: ACCOUNTS-F50 (su gemelo de erplora.com), Demo (sus cambios se repiten), las demás páginas de espera del Hub
+(un negocio que se prepara o se muda de servidor: el mismo aspecto); hub#831, hub#1051 y hub#1052
 
 ## Para quien lo mantiene
 

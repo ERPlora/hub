@@ -1,4 +1,4 @@
-"""Settings of the test run (``pytest.ini``): ``config.settings`` with Vite's default port.
+"""Settings of the test run (``pytest.ini``): ``config.settings`` with Vite's default port and a short wait for a cut.
 
 A second checkout carries ``VITE_DEV_PORT`` in its shell or its ``.env`` (tests/e2e/README.md «Varias
 ejecuciones a la vez»), and pytest-django loads the settings before any conftest runs, so the port is
@@ -14,6 +14,10 @@ cluster of AWS refuses (``base/cache.py``): a call on keys of different hash slo
 import os
 
 os.environ["VITE_DEV_PORT"] = "5173"
+# A cut of the database (live.database_cut, BASE-F111) is waited for 1 s in the suite, not production's 20: a test that
+# makes the database unreachable gets its 503 without a 20 s sleep. The default itself is tested by re-running
+# config/settings.py (config/tests/test_settings.py), and each test of the cut sets its own limit.
+os.environ.setdefault("DB_CUT_WAIT_SECONDS", "1")
 
 from config.settings import *  # noqa: E402, F403
 
