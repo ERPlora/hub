@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:41e9b2ac41ac47cb9d7ac009ab09597fbf22ffc31d2a73d41d2aab448fd19519 -->
+<!-- generated from WORKBOOK.md sha256:8fe1f7c8cb4361cf8442780d290e64dd50a40e380fac70bbc848f34a3ebffe60 -->
 
 ## What it is for and who it is for
 
@@ -867,7 +867,8 @@ Steps:
      business without reloading and its screen says "{app} is ready" — "It can be used now.", with "Open {app}".
 In: how the activation is going.
 Out: the app running in this business (`base.app.enabled`).
-If it fails: BASE-F21.
+If it fails: BASE-F21. While ERPlora's staff keeps the platform frozen for a database upgrade (a few minutes,
+hub#930), the app stays "Turning on…" and finishes by itself as soon as the freeze is lifted.
 Involved: BASE-F31, BASE-F32
 
 ### BASE-F23 Turn an app off
@@ -1757,7 +1758,9 @@ Steps:
 In: the business's state erplora.com passes on.
 Out: nothing saved.
 If it fails: an address that belongs to no business does not exist; a business that was closed says "This hub
-is no longer available.".
+is no longer available.". While ERPlora's staff keeps the platform frozen for a database upgrade (a few minutes,
+hub#930), the business waits to be prepared: the page stays on "Your business is being prepared" and comes in by
+itself as soon as the freeze is lifted and it is done.
 Involved: none
 
 ### BASE-F64 Change my details, photo, language and appearance

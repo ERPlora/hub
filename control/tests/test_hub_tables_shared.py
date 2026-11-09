@@ -32,6 +32,8 @@ from control.models import Hub
 
 MIGRATION = "0007_hub_tables_renamed_shared"
 BEFORE = "0006_hub_activity"
+#: The tables control's migrations after ``MIGRATION`` make, which the deploy makes too (0010: the freeze switch, hub#930).
+LATER_TABLES = {"control_freeze"}
 SUFFIX = "_shared_20261101"
 LEGACY_ROUTER = "base.tenancy.tests.legacy.LegacyTablesRouter"
 #: Control's own tables, Django's and the outbox's: none of them is ever renamed.
@@ -455,7 +457,7 @@ def test_the_deploy_renames_them_a_second_run_changes_nothing_and_stepping_back_
 
     assert deployed.returncode == 0, deployed.stderr[-3000:]
     renamed = hubs.table_names(name)
-    assert renamed == (found - hub_tables()) | {shared(table) for table in hub_tables()}
+    assert renamed == (found - hub_tables()) | {shared(table) for table in hub_tables()} | LATER_TABLES
     with hubs._maintenance(name) as conn:
         assert conn.execute(f'SELECT count(*) FROM "{shared("base_hub_identity")}"').fetchone()[0] == 1
     stepped = _manage(name, "config.settings", "control", MIGRATION)
