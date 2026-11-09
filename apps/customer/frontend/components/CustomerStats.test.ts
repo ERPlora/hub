@@ -31,10 +31,10 @@ describe('CustomerStats: «Revenue» in the business\'s currency (customer-busin
     expect(revenue(jp)).toBe('¥123,456');
   });
 
-  it('a figure without a symbol until the business answers', async () => {
+  it('a dash until the business answers', async () => {
     const s = await setup();
     await s.result(s.call, 'customer.customer.stats', STATS);
-    expect(revenue(s)).toBe('1,234.56');
+    expect(revenue(s)).toBe('—');
   });
 });
 

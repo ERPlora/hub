@@ -424,7 +424,8 @@ pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ve
   (pycountry). `Payment.currency` no tiene valor por defecto (migración 0004, sin datos). La salida de
   `payment.payment.list`/`get` lleva `currency_decimals` (los decimales que cuenta el servidor, CLDR/babel:
   2 en el forinto, que Intl deja en 0), con los que la pantalla pinta cada pago en su moneda; lo tecleado
-  se lee con los de `useBusinessMoney()` y, mientras no contesta, una cifra sin símbolo y nunca un euro.
+  se lee con los de `useBusinessMoney()` y, mientras no contesta, un importe es «—», nunca un euro ni decimales
+  supuestos.
 - **IBAN**: opcional; si se da, se valida y se guarda compacto y en mayúsculas (`python-stdnum`).
 - **Cuentas tapadas**: una lista y su flujo vivo nunca llevan un IBAN ni una cuenta enteros
   (`queries.mask_account`: el país y los últimos cuatro de un IBAN, en grupos de cuatro; de otro texto,

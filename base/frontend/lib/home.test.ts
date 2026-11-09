@@ -185,7 +185,7 @@ const PLN = { currency: 'PLN', decimals: 2 };
 
 // BASE-G98: an amount of the Home is in the business's currency (its country's, as Settings › Business says), with
 // its decimals and the symbol a till of that country prints — a Polish business reads «zł», a Spanish one «€» —,
-// never a fixed euro; until the business is known, the amount without a symbol, never another currency's.
+// never a fixed euro; until the business is known, a dash, never another currency's.
 describe('formatValue: the business currency (BASE-G98)', () => {
   it("writes an amount (the server's minor unit of the currency) in the business's currency, by its local symbol", () => {
     expect(formatValue(1250, 'currency', 'es', EUR)).toBe('12,50\u00a0€');
@@ -202,16 +202,16 @@ describe('formatValue: the business currency (BASE-G98)', () => {
     expect(formatValue(123456, 'currency', 'en', EUR)).toBe('€1,234.56');
   });
 
-  it('without the business yet, the amount alone, never in a currency it is not', () => {
-    expect(formatValue(1250, 'currency', 'es')).toBe('12,50');
-    expect(formatValue(1250, 'currency', 'en')).toBe('12.50');
+  it('without the business yet, a dash, never in a currency it is not', () => {
+    expect(formatValue(1250, 'currency', 'es')).toBe('—');
+    expect(formatValue(1250, 'currency', 'en')).toBe('—');
   });
 
   it('an amount of four figures groups its thousands, as Sales writes it (base-money-thousands-grouping)', () => {
     // The Spanish CLDR only groups from five figures: the Home said «1234,56 €» where Sales says «1.234,56 €».
     expect(formatValue(123456, 'currency', 'es', EUR)).toBe('1.234,56\u00a0€');
     expect(formatValue('123456', 'currency', 'es', EUR)).toBe('1.234,56\u00a0€');
-    expect(formatValue(123456, 'currency', 'es')).toBe('1.234,56');
+    expect(formatValue(123456, 'currency', 'es')).toBe('—');
     expect(formatValue(123400, 'currency', 'es', { currency: 'JPY', decimals: 0 })).toBe('123.400\u00a0¥');
     const list = widget('s.top', { kind: 'bar-list', map: { label: 'name', value: 'total' }, options: { valueFormat: 'currency' } });
     const view = widgetView(list, { rows: [{ name: 'Café', total: 123456 }] }, 'es', { money: EUR });

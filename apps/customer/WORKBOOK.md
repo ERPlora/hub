@@ -1237,8 +1237,8 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
 - **Un dato de salud solo se guarda con el permiso expreso en vigor**, y retirarlo lo borra.
 - **El dinero va en céntimos** (la unidad más pequeña de la moneda); la pantalla pinta los importes y
   escribe los filtros en la moneda del negocio, la de su país en Ajustes → Negocio (euros en España, złoty
-  en Polonia), con sus decimales; mientras el negocio no contesta, una cifra sin símbolo, nunca euros. Cada
-  compra, en la moneda en que se cobró.
+  en Polonia), con sus decimales; mientras el negocio no contesta, un importe es «—», nunca euros ni decimales
+  supuestos. Cada compra, en la moneda en que se cobró.
 - **Buscar por teléfono nunca devuelve a todos.**
 - **Clientes no depende de ninguna app**: se enciende sola.
 

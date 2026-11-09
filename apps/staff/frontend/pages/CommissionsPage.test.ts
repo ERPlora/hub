@@ -237,11 +237,11 @@ describe('CommissionsPage: the business\'s currency (staff-business-currency)', 
     expect(s.cells(0).slice(2)).toEqual(['¥2,721', '15 %', '¥408']);
   });
 
-  it('until the business answers, figures without a symbol, never euros', async () => {
+  it('until the business answers, amounts are dashes, never euros', async () => {
     const s = await setup();
     await s.show(REPORT);
-    expect(s.cells(0).slice(2)).toEqual(['27.21', '15 %', '4.08']);
-    expect(s.find('staff-commissions-total-sold').text()).toMatch(/^Production\s*37\.33$/);
+    expect(s.cells(0).slice(2)).toEqual(['—', '15 %', '—']);
+    expect(s.find('staff-commissions-total-sold').text()).toMatch(/^Production\s*—$/);
   });
 });
 

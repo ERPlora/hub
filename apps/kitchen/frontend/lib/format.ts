@@ -2,7 +2,7 @@
 // History's moments in the business's zone. Pure functions: the pages pass the language, the zone and the money.
 // The money is the business's (`useBusinessMoney`, the platform's: its country's currency and the decimals the server
 // counts it in), written with the platform's `formatMoney`: its thousands grouped from four digits on, as every screen
-// writes them; until it is known an amount is a figure without a symbol, never the euro by default. Its decimals come
+// writes them; until it is known an amount is a dash, never the euro by default nor guessed decimals. Its decimals come
 // from the server, never from the browser's Intl (which gives none to the forint). A quantity is written with the
 // platform's `formatQuantity` («2.000» → «2», «1500.000» → «1.500»), as the till that sent it writes it.
 import type { Money } from '../../../../base/frontend/lib/home';

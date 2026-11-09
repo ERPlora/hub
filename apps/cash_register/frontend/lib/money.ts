@@ -59,11 +59,11 @@ export function formatFace(face: string, locale: string, money?: Money): string 
   return formatter(locale, `face-${money?.currency ?? ''}-${decimals}`, moneyOptions(money, decimals)).format(value);
 }
 
-/** A difference with its sign: «+5,10 €» over, «-4,90 €» short, zero without sign. */
+/** A difference with its sign: «+5,10 €» over, «-4,90 €» short, zero without sign; only a dash without money. */
 export function formatSignedMoney(cents: number | null | undefined, locale: string, money?: Money): string {
   if (missing(cents)) return '—';
   const written = formatMoney(cents, locale, money);
-  return (cents as number) > 0 ? `+${written}` : written;
+  return (cents as number) > 0 && written !== '—' ? `+${written}` : written;
 }
 
 /** Minor units as a money field holds them: ungrouped, with the reader's decimal sign («1250,50»). */

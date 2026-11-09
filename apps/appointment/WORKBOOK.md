@@ -107,7 +107,7 @@ profesional**, además, **Día · Semana**.
   y el **Total** salen con la duración y el precio propios del profesional elegido para cada servicio
   (Servicios, «Profesionales que lo hacen»), o los del catálogo si no tiene; es lo que la cita reserva. Los
   importes van en la moneda del negocio, la de su país, con sus decimales (BASE-F50: «65,00 zł» en un negocio de
-  Polonia; sin símbolo mientras el negocio no contesta, nunca en euros por defecto) y salen agrupados desde cuatro
+  Polonia; «—» mientras el negocio no contesta, nunca en euros ni con decimales supuestos) y salen agrupados desde cuatro
   cifras («1.234,56 €»; en inglés, «€1,234.56»).
   Avisos: «Esta cita empieza en el pasado. Se guardará a esa hora.» y el profesional que no hace un servicio.
 - **Editar** → **Editar la cita**: Día, Hora, Min., Servicios, Profesional, las notas y **Guardar

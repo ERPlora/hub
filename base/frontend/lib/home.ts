@@ -146,13 +146,13 @@ function numberFormat(locale: string, format: string): Intl.NumberFormat {
 }
 
 /** A value of a panel as text: money in the minor unit of its currency (the server's: 1250 is 12.50 €, ¥1,250 has no
- *  cents) in the business's currency (`money`; without it, the amount alone, in cents), a percentage as 0–100, else
+ *  cents) in the business's currency (`money`; without it, a dash), a percentage as 0–100, else
  *  the number. */
 export function formatValue(value: unknown, format: unknown, locale: string, money?: Money): string {
   const number = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN;
   if (Number.isNaN(number)) return String(value);
   // Money as every screen writes it (`formatMoney`: the symbol a till of that country prints, «zł», «€»; until the
-  // business is known, the amount alone).
+  // business is known, a dash).
   if (format === 'currency') return formatMoney(number, locale, money);
   if (format === 'percent') return numberFormat(locale, 'percent').format(number / 100);
   return numberFormat(locale, format === 'compact' ? 'compact' : 'number').format(number);

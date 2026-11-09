@@ -3,12 +3,13 @@
 // (`listMoney`: two decimals, the only ones the server takes for a list), the catalog's prices and a rule's
 // amount in the business's (`useBusinessMoney`, the platform's: its country's currency with the decimals the
 // server counts it in, never the browser's Intl, which gives none to the forint). Until the business answers an
-// amount is a figure without a symbol, never the euro by default. A day is a calendar day (`YYYY-MM-DD`), painted
+// amount is a dash, never the euro by default nor guessed decimals. A day is a calendar day (`YYYY-MM-DD`), painted
 // as it is whatever the device's time zone. A quantity is written with the platform's `formatQuantity` («10.000» →
 // «10», «1500.000» → «1.500»), as every screen writes it; its field shows it ungrouped, as typed.
 import { decimalMark } from '@erplora/ui/components';
 
 import type { Money } from '../../../../base/frontend/lib/home';
+import { formatMoney as writeMoney } from '../../../../base/frontend/lib/money';
 
 export type { Money };
 export { useBusinessMoney } from '../../../../base/frontend/lib/money';
@@ -41,15 +42,10 @@ function numberFormat(locale: string, key: string, options: Intl.NumberFormatOpt
   return found;
 }
 
-/** Minor units in `money`, in `locale` («12,50 zł», «€12.50», «¥2,450»; «12,50» while it is unknown), with the
+/** Minor units in `money`, in `locale` («12,50 zł», «€12.50», «¥2,450»; «—» while it is unknown), with the
  *  thousands grouped from four digits on in every language (Spanish CLDR waits for five: hub#1090). */
 export function formatMoney(cents: number, locale: string, money?: Money): string {
-  const decimals = moneyDecimals(money);
-  const digits = { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: 'always' as const };
-  const options: Intl.NumberFormatOptions = money
-    ? { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol', ...digits }
-    : digits;
-  return numberFormat(locale, `money:${money?.currency ?? ''}:${decimals}`, options).format(cents / 10 ** decimals);
+  return writeMoney(cents, locale, money);
 }
 
 /** A percent as the server sends it («12.50»), with up to two decimals, in `locale` («12,5 %»). */

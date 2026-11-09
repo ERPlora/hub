@@ -460,10 +460,10 @@ describe('CustomerListPage: the business\'s currency (customer-business-currency
     expect(spent(en)).toEqual(['€1,234.56']);
   });
 
-  it('until the business answers, «Spent» is a figure without a symbol, never euros', async () => {
+  it('until the business answers, «Spent» is a dash, never euros', async () => {
     const s = await setup();
     await s.show(PAGE);
-    expect(spent(s)).toEqual(['45.50', '45.50']);
+    expect(spent(s)).toEqual(['—', '—']);
   });
 
   it('«Spent» is typed in the business\'s currency: złoty with its symbol, yen without decimals', async () => {

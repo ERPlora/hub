@@ -6,7 +6,7 @@
 // deleted in Inventory); per row the handle, up and down (the whole order saved at once), «Sold out» /
 // «Available», edit (keeps its place) and remove (after its confirmation). Below, the product picker,
 // «Supplement (PLN)» (it may be negative), «Add choice» and «Add several». A refusal is said in the course. Every
-// amount is in the business's currency, its country's, with its decimals; a bare figure (and just «Supplement»)
+// amount is in the business's currency, its country's, with its decimals; a dash (and just «Supplement»)
 // until the business answers, never a euro. «Add choice» / «Save» wait in grey until then: the supplement is read in
 // that currency (hub#946); the builder's page says it, with «Retry», if the business's money cannot be read.
 import { Combo, type ComboOption, ConfirmDialog, InlineFeedback, StatusPill } from '@erplora/ui/components';

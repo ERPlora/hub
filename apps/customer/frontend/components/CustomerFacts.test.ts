@@ -31,10 +31,10 @@ describe('CustomerFacts: «Spent» in the business\'s currency (customer-busines
     expect(spent(jp)).toBe('¥4,550');
   });
 
-  it('a figure without a symbol until the business answers', async () => {
+  it('a dash until the business answers', async () => {
     const s = await setup();
     await s.live();
-    expect(spent(s)).toBe('45.50');
+    expect(spent(s)).toBe('—');
   });
 
   it('an amount of four figures groups its thousands, in both languages (hub#512)', async () => {
