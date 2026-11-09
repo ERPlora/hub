@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:93489104f448b747da4d96f15e1fd414b9277dd204a720c6dceff73f8f9bb504 -->
+<!-- generated from WORKBOOK.md sha256:28a247a86be79a7f3f7c4d8b28dee526ba26e706e7ca67d957a2a6cfee9122b4 -->
 
 ## What it is for and who it is for
 
@@ -180,7 +180,8 @@ here.", "Who is taking over?" with the faces, the keypad and "Cancel".
 
 ### My profile
 From "Profile" in the user menu. At the top, the person (face, name and role); below, "Account details" (with the
-photo), "Preferences" (language and appearance) and "PIN".
+photo), "Preferences" (language and appearance: palette, theme and interface size from 80 to 120%, default 100%) and
+"PIN".
 
 ### Settings · General
 What "Settings" in the side menu opens: the first tab at the bottom, "General", with "This device", "PIN pad",
@@ -1771,11 +1772,12 @@ Steps:
   3. "Choose image" uploads a JPG, PNG or WebP photo of up to 2 MB ("Photo updated"); "Remove" deletes it
      ("Photo removed").
   4. In "Preferences", "Language" ("Use the business’s language", "Español", "English") and "Appearance" ("Theme
-     palette" and "Theme": "System (auto)", "Light", "Dark") are saved on choosing and applied at once; "Use the
-     business’s appearance" undoes their own.
+     palette", "Theme": "System (auto)", "Light", "Dark", and "Interface size": 80, 90, 100, 110 or 120%, default
+     100%) are saved on choosing and applied at once on any device; "Use the business’s appearance" undoes their own
+     and returns the size to 100%.
 In: the profile of whoever has the session.
 Out: their name in this business (the one in the side menu, on the faces and in "Devices"), their photo, their language and their
-appearance, which follow them on any device they enter, with their PIN or with their account. With "Use the
+appearance, including the interface size, which follow them on any device they enter, with their PIN, badge or account. With "Use the
 business’s language", they enter with a PIN in the business's and with their account in their erplora.com
 account's (BASE-F51). The email is only for contact: it does not change the erplora.com account.
 If it fails: if the profile could not be read, "Could not load the profile" — "Your details stay the same. Check
