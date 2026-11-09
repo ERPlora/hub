@@ -431,17 +431,20 @@ def create_department(ctx: OperationContext, data: DepartmentIn) -> dict:
     input=DepartmentUpdateIn,
     output=DepartmentOut,
     ai=AI(
-        description="Change the name, the tax category or the position of a department of the open price (named by its id "
-        "or its name). What was already sold keeps the name and the VAT it was charged with.",
+        description="Change the name, the tax category or the position of a department of the open price. Pass its "
+        "current name in department, or its id when already known; never ask the person for an internal id. What was "
+        "already sold keeps the name and the VAT it was charged with.",
         risk="normal",
         asks={
             "en": (
                 "move the drinks section to the standard VAT rate",
                 "rename the Misc section to Others",
+                "Rename and reorder QA Sweets",
             ),
             "es": (
                 "pon la sección de bebidas al IVA general",
                 "renombra el departamento «Varios» a «Otros»",
+                "Renombra y ordena Chuches QA",
             ),
         },
     ),
@@ -529,16 +532,19 @@ def create_quick_note(ctx: OperationContext, data: QuickNoteIn) -> dict:
     input=QuickNoteUpdateIn,
     output=QuickNoteOut,
     ai=AI(
-        description="Change the text or the position of a quick note of the till (named by its id or its text).",
+        description="Change the text or the position of a quick note of the till. Pass its current text in quick_note, "
+        "or its id when already known; never ask the person for an internal id.",
         risk="normal",
         asks={
             "en": (
                 "change the 'no salt' note to 'low salt'",
                 "move 'no ice' to the top of the notes",
+                "Rename the No cilantro QA note",
             ),
             "es": (
                 "cambia la nota «sin sal» por «poca sal»",
                 "sube «sin hielo» a la primera de las notas",
+                "Renombra la nota Sin cilantro QA",
             ),
         },
     ),
@@ -755,18 +761,21 @@ def open_order(ctx: OperationContext, data: OrderOpenIn) -> dict:
     output=OrderOut,
     ai=AI(
         description="Add a product of the catalog (by id, SKU or name) to an open check, with its quantity in the product's "
-        "unit. The price is the catalog's and stays frozen on the line.",
+        "unit. Find a check the person names with sale.order.list(search=...); never ask them for order_id. The price is "
+        "the catalog's and stays frozen on the line.",
         risk="normal",
         asks={
             "en": (
                 "add two coffees to table 4",
                 "put another beer on that tab",
                 "ring up a croissant",
+                "Add a coffee to QA Check",
             ),
             "es": (
                 "añade dos cafés a la mesa 4",
                 "ponle otra caña a la terraza",
                 "mete un cruasán en la cuenta",
+                "Añade un café a Cuenta QA",
             ),
         },
     ),
@@ -788,16 +797,19 @@ def add_line(ctx: OperationContext, data: OrderAddLineIn) -> dict:
     output=OrderOut,
     ai=AI(
         description="Add an open-price line to an open check: the amount typed, charged at a department's VAT (or a tax "
-        "category's when there are no departments). Needs the open-price permission.",
+        "category's when there are no departments). Find a check the person names with sale.order.list(search=...); "
+        "never ask them for order_id. Needs the open-price permission.",
         risk="normal",
         asks={
             "en": (
                 "add 3.50 at an open price under bakery",
                 "key in 12 euros by hand in the drinks section",
+                "Key in 4.75 euros under QA Sweets",
             ),
             "es": (
                 "marca 3,50 € a precio libre en bollería",
                 "mete 12 € a mano en la sección de varios",
+                "Apunta 4,75 € en Chuches QA",
             ),
         },
     ),
@@ -820,18 +832,21 @@ def add_open_line(ctx: OperationContext, data: OrderAddOpenLineIn) -> dict:
     output=OrderOut,
     expose_api=True,
     ai=AI(
-        description="Add a service of Services (by id or name) to an open check. A fixed-price service takes its price; one "
-        "without a fixed price (from, hourly, variable, free) needs the amount charged, within its minimum and maximum. "
-        "Its tax category is the service's.",
+        description="Add a service of Services (by id or name) to an open check. Find a check the person names with "
+        "sale.order.list(search=...); never ask them for order_id. A fixed-price service takes its price; one without a "
+        "fixed price (from, hourly, variable, free) needs the amount charged, within its minimum and maximum. Its tax "
+        "category is the service's.",
         risk="normal",
         asks={
             "en": (
                 "add a haircut to Ana's ticket",
                 "put the 45 euro colour on her check",
+                "Add QA Haircut to the check",
             ),
             "es": (
                 "añade un corte de pelo a la cuenta de Ana",
                 "cárgale también el lavado a su cuenta",
+                "Añade Corte QA a la cuenta",
             ),
         },
     ),
@@ -855,17 +870,20 @@ def add_service_line(ctx: OperationContext, data: OrderAddServiceLineIn) -> dict
     expose_api=True,
     ai=AI(
         description="Add a menu of Menus (by id or name) to an open check with the dishes picked in each course "
-        "(«menu of the day with lentils, hake and flan»). Menus checks the courses and prices it: its closed price plus "
-        "the supplements, frozen on the line; the kitchen receives its dishes.",
+        "(«menu of the day with lentils, hake and flan»). Find a check the person names with "
+        "sale.order.list(search=...); never ask them for order_id. Menus checks the courses and prices it: its closed "
+        "price plus the supplements, frozen on the line; the kitchen receives its dishes.",
         risk="normal",
         asks={
             "en": (
                 "add a menu of the day with lentils, hake and flan",
                 "add two lunch menus to table 3",
+                "Add the QA Menu with its dishes",
             ),
             "es": (
                 "pon un menú del día con lentejas, merluza y flan",
                 "añade dos menús a la mesa 3",
+                "Añade el Menú QA con sus platos",
             ),
         },
     ),
@@ -927,18 +945,21 @@ def _release_vouchers(ctx: OperationContext, lines) -> None:
     expose_api=True,
     ai=AI(
         description="Pay a line of a service of an open check with one session of a customer's voucher (Services): the "
-        "session is held for the line and the line is charged at 0. One unit per line (split it first). Read the "
-        "customer's vouchers for that service with service.grant.tender_options. The sale must then be charged to the "
-        "voucher's owner.",
+        "session is held for the line and the line is charged at 0. Resolve the check with sale.order.list(search=...) "
+        "and its line with sale.order.get, then read the customer's vouchers for that service with "
+        "service.grant.tender_options; never ask the person for order_id, line_id or grant_id. One unit per line "
+        "(split it first). The sale must then be charged to the voucher's owner.",
         risk="normal",
         asks={
             "en": (
                 "use a session of Ana's voucher for the haircut",
                 "the massage goes on her pack of sessions",
+                "Pay for QA Haircut with Ana's voucher",
             ),
             "es": (
                 "usa una sesión del bono de Ana para el corte",
                 "el masaje se lo descuentas del bono",
+                "Paga Corte QA con el bono de Ana",
             ),
         },
     ),
@@ -996,16 +1017,19 @@ def apply_voucher(ctx: OperationContext, data: OrderApplyVoucherIn) -> dict:
     expose_api=True,
     ai=AI(
         description="Undo the voucher of a line of an open check: its session goes back to the voucher and the line is "
-        "charged at its price again. Only before the sale is charged.",
+        "charged at its price again. Resolve the check with sale.order.list(search=...) and its line with "
+        "sale.order.get; never ask the person for order_id or line_id. Only before the sale is charged.",
         risk="normal",
         asks={
             "en": (
                 "don't use the voucher for the haircut after all",
                 "take the voucher off that line",
+                "Take the voucher off the line",
             ),
             "es": (
                 "al final no uses el bono en el corte",
                 "quita el bono de esa línea",
+                "Quita el bono de la línea",
             ),
         },
     ),
@@ -1031,18 +1055,21 @@ def remove_voucher(ctx: OperationContext, data: OrderLineRefIn) -> dict:
     output=OrderOut,
     ai=AI(
         description="Change a pending line of an open check: its quantity, whether it is a comp (charged at 0, with a "
-        "reason) and its note. Priced from the line's frozen price.",
+        "reason) and its note. Resolve the check with sale.order.list(search=...) and its line with sale.order.get; "
+        "never ask the person for order_id or line_id. Priced from the line's frozen price.",
         risk="normal",
         asks={
             "en": (
                 "make it three coffees instead of two",
                 "the dessert is on the house, it took too long",
                 "note on the burger: no onion",
+                "Correct the quantity and note of the coffees",
             ),
             "es": (
                 "que sean tres cafés en vez de dos",
                 "el postre va invitado, que ha tardado mucho",
                 "pon en la hamburguesa que sea sin cebolla",
+                "Corrige cantidad y nota de los cafés",
             ),
         },
     ),
@@ -1078,16 +1105,19 @@ def update_line(ctx: OperationContext, data: OrderUpdateLineIn) -> dict:
     output=OrderOut,
     ai=AI(
         description="Say who did a pending line of an open check (a member of Staff), or empty for the check's professional. "
-        "Money does not change.",
+        "Resolve the check with sale.order.list(search=...), its line with sale.order.get and the person with "
+        "staff.member.list(search=...); never ask for order_id, line_id or staff_id. Money does not change.",
         risk="normal",
         asks={
             "en": (
                 "the colour was done by Laura",
                 "put Marta on the haircut line",
+                "Assign the line to QA Sales Waiter",
             ),
             "es": (
                 "el tinte lo hizo Laura",
                 "pon a Marta en la línea del corte",
+                "Asigna la línea a Camarera Ventas QA",
             ),
         },
     ),
@@ -1204,16 +1234,19 @@ def remove_line(ctx: OperationContext, data: OrderLineRefIn) -> dict:
     output=OrderOut,
     ai=AI(
         description="Void a line of an open check that was ALREADY sent to the kitchen, with a mandatory reason: it leaves "
-        "the check, keeps the reason, who and when, and the kitchen is told.",
+        "the check, keeps the reason, who and when, and the kitchen is told. Resolve the check with "
+        "sale.order.list(search=...) and its line with sale.order.get; never ask the person for order_id or line_id.",
         risk="high",
         asks={
             "en": (
                 "void the burger that already went to the kitchen",
                 "cancel the fries we sent, they don't want them",
+                "Void a line sent to the kitchen",
             ),
             "es": (
                 "anula la hamburguesa que ya salió a cocina",
                 "cancela las bravas de la comanda, que no las quieren",
+                "Anula una línea enviada a cocina",
             ),
         },
     ),
@@ -1357,16 +1390,19 @@ def fire(ctx: OperationContext, data: OrderFireIn) -> dict:
     output=OrderSplitOut,
     ai=AI(
         description="Split an open check in two: the lines named move whole (amount, VAT and kitchen round) to a new check; "
-        "with no lines the new check is blank. Both add up to the original to the cent.",
+        "with no lines the new check is blank. Resolve the check with sale.order.list(search=...) and the lines to move "
+        "with sale.order.get; never ask the person for order_id or line_ids. Both add up to the original to the cent.",
         risk="normal",
         asks={
             "en": (
                 "split table 4's bill in two",
                 "move the drinks to another check, they pay separately",
+                "Move the croissant from QA Check to another check",
             ),
             "es": (
                 "divide la cuenta de la mesa 4",
                 "pasa las bebidas a otra cuenta, que pagan aparte",
+                "Pasa el cruasán de Cuenta QA a otra cuenta",
             ),
         },
     ),
@@ -1744,16 +1780,19 @@ def set_line_discount_over_limit(
     output=OrderOut,
     ai=AI(
         description="Set the title of an open check (e.g. «Table 4», «Ana — terrace»): how it is recognised among the open "
-        "checks when it is parked.",
+        "checks when it is parked. Find a check the person names with sale.order.list(search=...); never ask them for "
+        "order_id.",
         risk="normal",
         asks={
             "en": (
                 "call this check 'Ana, terrace'",
                 "name the tab Table 4",
+                "Change the name of the check",
             ),
             "es": (
                 "ponle de nombre «Ana — terraza» a la cuenta",
                 "llama a esta cuenta «Mesa 4»",
+                "Cambia el nombre de la cuenta",
             ),
         },
     ),
@@ -1773,16 +1812,20 @@ def set_label(ctx: OperationContext, data: OrderSetLabelIn) -> dict:
     input=OrderSetAppointmentIn,
     output=OrderOut,
     ai=AI(
-        description="Link an open check to the appointment it charges (or unlink it): charging it then tells the diary.",
+        description="Link an open check to the appointment it charges (or unlink it): charging it then tells the diary. "
+        "Find the check with sale.order.list(search=...) and the appointment by customer, service or date with "
+        "appointment.appointment.list; never ask the person for order_id or appointment_id.",
         risk="normal",
         asks={
             "en": (
                 "this ticket is for Ana's 5 o'clock appointment",
                 "link the check to Marta's appointment",
+                "Link tomorrow's appointment",
             ),
             "es": (
                 "esta cuenta es de la cita de Ana de las 5",
                 "asocia la cuenta a la cita de Marta",
+                "Vincula la cita de mañana",
             ),
         },
     ),
@@ -2703,16 +2746,20 @@ def complete(ctx: OperationContext, data: CompleteIn) -> dict:
     output=SaleOut,
     ai=AI(
         description="The manager's door to the very same charge as sale.sale.complete, for a discount bigger than the "
-        "business's cap. Never use it to dodge the cap when the discount fits under it.",
+        "business's cap. For a named open check, resolve it with sale.order.list(search=...) and charge it directly; "
+        "do not stop at sale.order.set_discount_over_limit or ask the person for order_id. Never use it to dodge the "
+        "cap when the discount fits under it.",
         risk="high",
         asks={
             "en": (
                 "charge it with 50% off, I'm authorising the discount",
                 "ring it up with a discount above the cap",
+                "Charge it with an authorised 60% discount",
             ),
             "es": (
                 "cóbralo con un 50 % de descuento, lo autorizo yo",
                 "cobra con el descuento aunque pase del máximo",
+                "Cobra con 60 % autorizado",
             ),
         },
     ),
@@ -2815,17 +2862,20 @@ def void_sale(ctx: OperationContext, data: VoidIn) -> dict:
     ai=AI(
         description="Issue now the fiscal documents of a sale (by its id or number) that wait because Invoicing could "
         "not issue them in the charge, the void or a refund (no issuer yet, no permission…): its ticket or invoice, "
-        "the rectifying invoice of its void and those of its refunds. A refusal says why and changes nothing; with "
-        "nothing waiting, nothing happens.",
+        "the rectifying invoice of its void and those of its refunds. If no number was given, find the sale with "
+        "sale.sale.list; do not charge it again and never ask for its internal id. A refusal says why and changes "
+        "nothing; with nothing waiting, nothing happens.",
         risk="high",
         asks={
             "en": (
                 "issue the invoice that got stuck for sale 12",
                 "issue the fiscal document that is still pending for that ticket",
+                "Issue the pending documents",
             ),
             "es": (
                 "emite ya la factura pendiente de la venta 12",
                 "saca el tique fiscal que se quedó colgado",
+                "Emite los documentos pendientes",
             ),
         },
     ),
@@ -2983,20 +3033,23 @@ def _refund_replay(data: RefundIn) -> dict | None:
     ai=AI(
         description="Refund a charged sale (by its id or number), whole or in part, with a mandatory reason: how much goes "
         "back on each of its tenders (never more than each charged minus what it already returned; another method if the "
-        "original is gone) and, if the customer returns them, which lines and how many units. A line paid with a voucher "
-        "gives its session back, also with no money at all. Read sale.refund.options "
-        "first. Send an idempotency_key on a retry.",
+        "original is gone) and, if the customer returns them, which lines and how many units. If no number was given, "
+        "find the sale with sale.sale.list. Read sale.refund.options first for its tender and line ids; never ask the "
+        "person for internal ids. A line paid with a voucher gives its session back, also with no money at all. Send an "
+        "idempotency_key on a retry.",
         risk="high",
         asks={
             "en": (
                 "refund the last sale",
                 "give back 5 euros of ticket 7, the coffee was cold",
                 "she brought one shirt back, refund it",
+                "Refund 2 euros of the sale",
             ),
             "es": (
                 "devuélvele el dinero de la última venta",
                 "devuelve 5 € del ticket 7, que el café estaba frío",
                 "ha devuelto un producto, hazle el reembolso",
+                "Devuelve 2 € de la venta",
             ),
         },
     ),

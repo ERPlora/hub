@@ -2401,16 +2401,20 @@ def tender_options(sale: Sale) -> list[dict]:
     output=RefundOptionsOut,
     expose_api=True,
     ai=AI(
-        description="What a sale can still give back: for each tender, what it charged, what it already returned, what is "
-        "left and whether it can go back through its own method; for each line, the units already returned and left.",
+        description="Refund options: what a sale can still give back, for each tender and each line. For each tender, "
+        "what it charged, what it already returned, what is left and whether it can go back through its own method; "
+        "for each line, the units already returned and left. Use this read before sale.sale.refund. If no sale number "
+        "was given, find the sale with sale.sale.list; never ask the person for its internal id.",
         asks={
             "en": (
                 "how much can I still give back on that sale?",
                 "what's left to refund on ticket 12?",
+                "Check what can be refunded",
             ),
             "es": (
                 "¿cuánto se puede devolver todavía de esa venta?",
                 "¿qué queda por devolver del ticket 12?",
+                "Consulta qué se puede devolver",
             ),
         },
     ),
@@ -2470,15 +2474,19 @@ def refund_row(refund: Refund) -> dict:
     output=RefundListOut,
     expose_api=True,
     ai=AI(
-        description="List the refunds of a sale, newest first, with their amount, reason and who made them.",
+        description="List the refunds of a sale, newest first, with their amount, reason and who made them. If no sale "
+        "number was given, find the sale with sale.sale.list rather than looking through open checks; never ask the "
+        "person for its internal id.",
         asks={
             "en": (
                 "what refunds did that sale have?",
                 "who gave money back on ticket 7?",
+                "Check the sale's refunds",
             ),
             "es": (
                 "¿qué devoluciones tiene esa venta?",
                 "¿quién hizo la devolución del ticket 7?",
+                "Consulta reembolsos de la venta",
             ),
         },
     ),
