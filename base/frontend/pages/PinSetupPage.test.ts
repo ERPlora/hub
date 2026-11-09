@@ -19,6 +19,7 @@ const PROFILE: Profile = {
   language: '',
   theme_mode: '',
   palette: '',
+  ui_scale: 100,
   role: 'Employee',
   has_pin: false,
   pin_length: 4,

@@ -138,7 +138,7 @@ def test_the_shell_embeds_this_hub_s_name_and_where_its_plan_is_changed_on_the_s
         "manage_url": "",
         # APP-BASE-3: the session's way in (base/tests/test_access_spa.py).
         "access": {"credential": "account", "switch_user": False, "idle_minutes": None},
-        "preferences": {"theme_mode": "", "palette": ""},
+        "preferences": {"theme_mode": "", "palette": "", "ui_scale": 100},
         # Round 2026-11-04a: no server voice for the assistant unless ASSISTANT_SERVER_VOICE (base/tests/test_assistant_speak.py).
         "server_voice": False,
         # hub#683: where erplora.com serves the ERPlora app of each system it publishes (PUBLIC-F24: no macOS), to anyone.

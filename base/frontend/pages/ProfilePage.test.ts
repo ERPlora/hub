@@ -19,6 +19,7 @@ const PROFILE: Profile = {
   language: '',
   theme_mode: '',
   palette: '',
+  ui_scale: 100,
   role: 'hub_owner',
   has_pin: true,
   pin_length: 4,
@@ -140,7 +141,7 @@ describe('ProfilePage — preferences', () => {
     const select = wrapper.get('[data-testid="profile-language"]');
     select.element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: 'es' } }));
     await flush();
-    expect(calls('/api/me/preferences')).toEqual([{ language: 'es', theme_mode: '', palette: '' }]);
+    expect(calls('/api/me/preferences')).toEqual([{ language: 'es', theme_mode: '', palette: '', ui_scale: 100 }]);
     expect(wrapper.vm.$i18n.locale).toBe('es');
   });
 
@@ -151,18 +152,34 @@ describe('ProfilePage — preferences', () => {
     await wrapper.get('[data-testid="profile-palette-forest"]').trigger('click');
     await flush();
     expect(calls('/api/me/preferences')).toEqual([
-      { language: '', theme_mode: 'dark', palette: '' },
-      { language: '', theme_mode: 'dark', palette: 'forest' },
+      { language: '', theme_mode: 'dark', palette: '', ui_scale: 100 },
+      { language: '', theme_mode: 'dark', palette: 'forest', ui_scale: 100 },
     ]);
-    expect(shell.applyUserThemePreferences).toHaveBeenLastCalledWith('dark', 'forest');
+    expect(shell.applyUserThemePreferences).toHaveBeenLastCalledWith('dark', 'forest', undefined, 100);
+  });
+
+  it('an interface scale is saved and painted with the current appearance', async () => {
+    const { wrapper, calls } = await profile();
+    const range = wrapper.get('[data-testid="profile-scale"]');
+    expect(wrapper.get('[data-testid="profile-scale-value"]').text()).toBe('100%');
+    range.element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: 110 } }));
+    await flush();
+    expect(calls('/api/me/preferences')).toEqual([{ language: '', theme_mode: '', palette: '', ui_scale: 110 }]);
+    expect(shell.applyUserThemePreferences).toHaveBeenCalledWith(null, null, undefined, 110);
+    expect(wrapper.get('[data-testid="profile-scale-value"]').text()).toBe('110%');
   });
 
   it('«Use the business’s appearance» undoes the person’s own', async () => {
-    const { wrapper, calls } = await profile({ ...PROFILE, theme_mode: 'dark', palette: 'forest' });
+    const { wrapper, calls } = await profile({ ...PROFILE, theme_mode: 'dark', palette: 'forest', ui_scale: 120 });
     await wrapper.get('[data-testid="profile-appearance-business"]').trigger('click');
     await flush();
-    expect(calls('/api/me/preferences')).toEqual([{ language: '', theme_mode: '', palette: '' }]);
+    expect(calls('/api/me/preferences')).toEqual([{ language: '', theme_mode: '', palette: '', ui_scale: 100 }]);
     expect(shell.resetUserThemePreferences).toHaveBeenCalled();
+  });
+
+  it('a scale override alone keeps «Use the business’s appearance» available', async () => {
+    const { wrapper } = await profile({ ...PROFILE, ui_scale: 120 });
+    expect(wrapper.get('[data-testid="profile-appearance-business"]').attributes('disabled')).toBeUndefined();
   });
 });
 
