@@ -99,11 +99,11 @@ def test_a_personal_device_never_locks_nor_switches(client, people):
 
 
 def test_the_person_s_own_appearance_comes_with_the_html_on_any_device(client, people):
-    # BASE-G125: the mode and palette chosen in «My profile» follow the person to every device they enter; empty, the
-    # business's (and the browser's own toggle).
+    # BASE-G125: the mode, palette and interface scale chosen in «My profile» follow the person to every device they
+    # enter; empty, the business's (and the browser's own toggle).
     ana, bea = people
-    Profile.objects.create(username=ana.username, theme_mode="dark", palette="forest")
+    Profile.objects.create(username=ana.username, theme_mode="dark", palette="forest", ui_scale=120)
     client.force_login(ana)
-    assert hub_home(client)["preferences"] == {"theme_mode": "dark", "palette": "forest"}
+    assert hub_home(client)["preferences"] == {"theme_mode": "dark", "palette": "forest", "ui_scale": 120}
     client.force_login(bea)
-    assert hub_home(client)["preferences"] == {"theme_mode": "", "palette": ""}
+    assert hub_home(client)["preferences"] == {"theme_mode": "", "palette": "", "ui_scale": 100}
