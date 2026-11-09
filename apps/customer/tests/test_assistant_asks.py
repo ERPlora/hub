@@ -11,9 +11,13 @@ import pytest
 from live.context import OperationContext, Scope
 from live.operations import AI, Operation, registry
 
+from apps.customer.models import Customer
+from apps.customer.schemas import MergeIn
 from base import assistant
 from base.models import Membership
 from base.permissions import permissions_for
+
+from .conftest import ctx_for
 
 A = Scope("host", "a")
 #: Writes on cards and settings that only the owner and the admin hold, none of them a manager approves: an employee's
@@ -82,3 +86,63 @@ def test_a_customers_orders_bring_the_tool_of_customers_with_room_to_spare(catal
     assert name in tools  # positive control: the role holds the tool, so its place is known
     offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
     assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:WITH_ROOM])
+
+
+MERGE_ASKS = [
+    ("en", "merge the card for 611 222 444 into the one for 611 222 333"),
+    ("es", "junta la ficha del 611 222 444 dentro de la del 611 222 333"),
+]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("language", "phrase"), MERGE_ASKS)
+def test_a_merge_by_two_phones_offers_the_existing_operation(catalog_of, language, phrase):
+    tools = catalog_of(Membership.Role.OWNER, language)
+    name = "customer.customer.merge"
+    assert name in tools  # positive control: the owner holds it, so the model can receive it
+    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
+    assert name in offered[:10], (offered.index(name) + 1 if name in offered else None, offered[:10])
+
+
+def test_the_merge_instruction_completes_the_action_with_human_references():
+    description = assistant.description(registry["customer.customer.merge"])
+    for expected in (
+        "Use this tool once both cards are known",
+        "do not stop at reading or explaining",
+        "`customer` is the card that stays",
+        "`absorbed` is the duplicate",
+        "customer.customer.by_phone",
+        "customer.customer.list",
+        "never ask the person for an internal id",
+    ):
+        assert expected in description
+
+
+def test_the_merge_schema_distinguishes_the_survivor_from_the_duplicate():
+    properties = MergeIn.model_json_schema()["properties"]
+    for name in ("id", "customer"):
+        assert "card that stays" in properties[name]["description"]
+    for name in ("absorbed_id", "absorbed"):
+        assert "duplicate" in properties[name]["description"]
+
+
+@pytest.mark.django_db
+def test_the_reported_merge_keeps_its_confirmation_and_absorbs_the_right_card():
+    survivor = Customer.objects.create(name="Ana QA", phone="+34611222333")
+    duplicate = Customer.objects.create(name="Ana QA copia", phone="+34611222444")
+    op = registry["customer.customer.merge"]
+    arguments = {"customer": "611 222 333", "absorbed": "611 222 444"}
+    ctx = ctx_for("hub_owner", language="es")
+
+    card = assistant.card(op, arguments, "es", ctx)
+    assert op.ai_spec().risk == "high"
+    assert [(field["name"], field["value"]) for field in card["fields"]] == [
+        ("customer", "Ana QA"),
+        ("absorbed", "Ana QA copia"),
+    ]
+
+    op(ctx, op.input.model_validate(arguments))
+    survivor.refresh_from_db()
+    duplicate.refresh_from_db()
+    assert duplicate.merged_into_id == survivor.id
+    assert survivor.name == "Ana QA"
