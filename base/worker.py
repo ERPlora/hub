@@ -65,6 +65,15 @@ Each pass opens its database context (phase 2, S1; plan 2026-10-22): each hub wi
 registry and the demos live (the provisioning enters each hub's own database itself). Since S5 there is no shared
 database: a business without its own is never entered.
 
+Each tick first reads the freeze switch of control, once (``control.queries.active_freeze``; hub#930, PLAN-DB round
+2026-11-04e, «Congelar»: a database upgrade with Blue/Green copies no DDL). While the staff keeps the platform frozen
+(``control.freeze.set``, the Hub admin) the tick starts nothing that makes, drops or moves a database or makes a table:
+the apps' tables, the data work (a reset, a business that left and its drop after its days), the moves, the reaper and
+the hubs due wait, each in its own queue, and are done from the first tick after the freeze is lifted. The relay, every
+hub's tasks (VeriFactu's queue among them), the nightly measure and the metrics go on. What a pass started before the
+freeze ends (its lease held: ``control.freeze.get`` counts them). A switch that cannot be read counts as frozen for that
+tick: every pass it holds back reads control first anyway. The change is said once each way.
+
 Its CloudWatch metrics (``base.metrics``, hub#488), only where ``METRICS_ENABLED`` is on, are one more slow pass in a
 thread of its own (``Background("metrics")``), started on the first tick and then once a minute of its clock, also with
 ``databases_only``: the registry's (a sign-up still being prepared, the hubs that failed, a demo left to drop) and the
@@ -92,6 +101,7 @@ from base.tenancy import dumps, migrator, move, offboarding, provision
 from base.tenancy.connections import close_hub_aliases, close_this_threads_connections
 from base.schemas import AppActivationSettleIn, HubResetApplyIn
 from base.tenancy.context import use_control, use_hub
+from control import queries as control_queries
 from control.models import Hub, HubDump
 
 logger = logging.getLogger(__name__)
@@ -190,21 +200,31 @@ def run(
     data_pass, usage_pass, metrics_pass = Background("data"), Background("usage"), Background("metrics")
     # A hub's move to another cluster (base.tenancy.move): its copy takes a while too, in a thread of its own.
     move_pass = Background("move")
+    was_frozen = False
     while not stop.is_set():
         now = clock()
+        # Once a tick: what changes a database waits while the platform is frozen (hub#930).
+        frozen = _frozen()
+        if frozen != was_frozen:
+            _say_freeze(frozen)
+            was_frozen = frozen
         if not databases_only:
             _relay(now)
             _hubs(now)
-        _activations(now)
+        if not frozen:
+            _activations(now)
         if not databases_only:
-            data_pass.start(partial(_data, now, stop))
+            if not frozen:
+                data_pass.start(partial(_data, now, stop))
             usage_pass.start(partial(_usage, now))
-            move_pass.start(partial(_moves, now, stop))
+            if not frozen:
+                move_pass.start(partial(_moves, now, stop))
         emitter.start_due(now, metrics_pass)
-        if next_reap is None or now >= next_reap:
-            _reap(now)
-            next_reap = now + dt.timedelta(seconds=REAPER_INTERVAL_SECONDS)
-        _due(now)
+        if not frozen:
+            if next_reap is None or now >= next_reap:
+                _reap(now)
+                next_reap = now + dt.timedelta(seconds=REAPER_INTERVAL_SECONDS)
+            _due(now)
         wait(tick_seconds)
     # On the way out: a copy hears the stop (pg_dump killed, its lease given back), a metrics pass ends before its next
     # hub; they all get a while, together.
@@ -258,6 +278,30 @@ class Background:
             )
             return False
         return True
+
+
+def _frozen() -> bool:
+    """Whether the platform is frozen (``control.freeze.set``; hub#930), read once for this tick on control; ``True``
+    too when the switch cannot be read, said in the log: no pass that changes a database starts blind."""
+    try:
+        with use_control():
+            return control_queries.active_freeze() is not None
+    except Exception:
+        logger.exception(
+            "worker: the freeze switch could not be read; this tick makes, drops and moves no database."
+        )
+        return True
+
+
+def _say_freeze(frozen: bool) -> None:
+    """Say, once, that the platform was frozen or that its freeze was lifted."""
+    if frozen:
+        logger.warning(
+            "worker: frozen (control.freeze.set): no database is made, dropped or moved and no app's tables are made "
+            "until the freeze is lifted; the relay, the tasks and VeriFactu go on."
+        )
+    else:
+        logger.info("worker: the freeze was lifted; what waited is done from this tick.")
 
 
 def _reap(now: dt.datetime) -> None:

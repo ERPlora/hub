@@ -356,7 +356,7 @@ def test_the_templates_of_this_module_leave_no_migrator_alias_behind(small):
     assert [alias for alias in connections.settings if alias.endswith(names.DDL_SUFFIX)] == []
 
 
-def test_a_failure_exits_non_zero_with_the_reason(monkeypatch):
+def test_a_failure_exits_non_zero_with_the_reason(monkeypatch, db):
     def broken_migrate_control(**kwargs):
         raise DatabaseError("could not connect to server")
 
@@ -477,3 +477,72 @@ def test_check_that_cannot_read_the_database_exits_non_zero_with_the_reason(monk
         migrate_hubs_check()
 
     assert raised.value.returncode != 0
+
+
+# ── The freeze (hub#930; PLAN-DB round 2026-11-04e, «Congelar») ──────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def switch(db):
+    """Freeze and lift the platform (``control.freeze.set``) on this module's ``db``, which commits: taken back after
+    the test, the switch not frozen and the events it recorded gone, so no later test finds the platform frozen."""
+    from types import SimpleNamespace
+
+    from control.models import Freeze
+    from control.schemas import FreezeIn
+    from control.services import freeze_set
+    from live.context import system_context
+    from live.models import OutboxEvent
+
+    from base.registry import REGISTRY_SCOPE
+
+    platform = system_context(REGISTRY_SCOPE)
+    started = timezone.now()
+
+    def freeze(reason: str = "Aurora upgrade with Blue/Green") -> None:
+        freeze_set(platform, FreezeIn(frozen=True, reason=reason))
+
+    def lift() -> None:
+        freeze_set(platform, FreezeIn(frozen=False))
+
+    yield SimpleNamespace(freeze=freeze, lift=lift)
+    Freeze.objects.update(frozen=False, reason="", since=None, by="")
+    OutboxEvent.objects.filter(name__startswith="control.freeze.", created_at__gte=started).delete()
+
+
+def test_frozen_it_refuses_to_start_says_why_and_migrates_nothing(switch, monkeypatch):
+    """A deploy during a database upgrade stops at its migration: nothing reaches control, a template or a hub."""
+    switch.freeze()
+    touched: list[str] = []
+    monkeypatch.setattr(migrator, "migrate_control", lambda **kwargs: touched.append("control") or 0)
+    monkeypatch.setattr(migrator, "clusters_to_migrate", lambda: touched.append("templates") or [])
+    monkeypatch.setattr(migrator, "migrate_hubs_behind", lambda **kwargs: touched.append("hubs"))
+
+    with pytest.raises(CommandError, match="frozen") as raised:
+        migrate_hubs()
+
+    assert raised.value.returncode != 0
+    assert "Aurora upgrade with Blue/Green" in str(raised.value) and "control.freeze.set" in str(raised.value)
+    assert touched == []
+
+
+def test_once_lifted_it_runs_again(small, switch):
+    switch.freeze()
+    switch.lift()
+
+    out = migrate_hubs()
+
+    assert "migrate_hubs: control database migrated, 0 migration(s) applied." in out
+
+
+def test_check_still_says_what_a_run_would_apply_while_frozen(small, switch, make_hub):
+    """It applies nothing: the e2e's global setup and the staff may look while frozen."""
+    make_hub(missing_database(), schema_apps=at_the_leaf())
+    switch.freeze()
+
+    status, out = migrate_hubs_check()
+
+    assert status == 0
+    assert out.splitlines() == [
+        "migrate_hubs: the control database, 2 template(s) and 1 hub(s) are up to date.",
+    ]
