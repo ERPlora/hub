@@ -3,7 +3,7 @@
 // come from the shared Playwright configuration; a passing run captures nothing.
 import { expect, type Locator, test } from '@playwright/test';
 
-import { A, login, OWNER, shown } from './helpers';
+import { A, horizontalOverflow, login, OWNER, shown } from './helpers';
 
 const VIEWPORTS = [
   { width: 390, height: 844 },
@@ -42,26 +42,31 @@ for (const viewport of VIEWPORTS) {
     const toggle = setup.locator('[data-testid="setup-toggle"]:visible');
     if (await toggle.count()) await toggle.click();
     await expect44(setup.locator('ion-button[size="small"]:visible'), 'setup');
+    expect(await horizontalOverflow(page), `home at ${viewport.width}px`).toBeLessThanOrEqual(1);
 
     await page.goto(`${A}/profile`);
     await expect(shown(page).locator('[data-testid="profile-summary"]')).toBeVisible();
     await expect44(shown(page).locator('[data-testid="profile-photo-choose"]:visible'), 'profile photo choose');
     const removePhoto = shown(page).locator('[data-testid="profile-photo-remove"]:visible');
     if (await removePhoto.count()) await expect44(removePhoto, 'profile photo remove');
+    expect(await horizontalOverflow(page), `profile at ${viewport.width}px`).toBeLessThanOrEqual(1);
 
     await page.goto(`${A}/files`);
     const files = shown(page).locator('[data-testid="files-manager"]');
     await expect(files.locator('[data-testid="files-view-list"]')).toBeVisible();
     await expect44(files.locator('ion-button[size="small"]:visible'), 'files');
+    expect(await horizontalOverflow(page), `files at ${viewport.width}px`).toBeLessThanOrEqual(1);
 
     await page.goto(`${A}/settings#general`);
     const device = shown(page).locator('[data-testid="device-row"]').first();
     await expect(device).toBeVisible();
     await expect44(device.locator('ion-button[size="small"]:visible'), 'devices');
+    expect(await horizontalOverflow(page), `settings at ${viewport.width}px`).toBeLessThanOrEqual(1);
 
     await page.goto(`${A}/inventory/products`);
     await expect44(shown(page).locator('[data-testid="inventory-products-csv-import-button"]:visible'), 'CSV import');
     await expect44(shown(page).locator('[data-testid="inventory-products-csv-export"]:visible'), 'CSV export');
+    expect(await horizontalOverflow(page), `products at ${viewport.width}px`).toBeLessThanOrEqual(1);
 
     await page.goto(`${A}/sale/pos`);
     const till = shown(page).locator('[data-testid="pos-till"]');
@@ -74,5 +79,6 @@ for (const viewport of VIEWPORTS) {
     await expect44(cart.locator('[data-testid="pos-table-trigger"]:visible'), 'POS table trigger');
     await expect44(cart.locator('[data-testid="pos-open-checks"]:visible'), 'POS open checks');
     await expect44(cart.locator('[data-testid="pos-check-title-edit"]:visible'), 'POS check title edit');
+    expect(await horizontalOverflow(page), `POS at ${viewport.width}px`).toBeLessThanOrEqual(1);
   });
 }
