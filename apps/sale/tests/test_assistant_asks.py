@@ -6,6 +6,8 @@ the catalogue of a business with every app on and ranked as a turn ranks, is ``b
 (sale is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over its asks.
 """
 
+import re
+
 import pytest
 from live.assistant import asks_of
 from live.operations import registry
@@ -101,7 +103,7 @@ def test_no_qa_probe_is_an_ask():
         if op.app_label == "sale" and assistant.is_tool(op):
             for phrases in asks_of(op).values():
                 for phrase in phrases:
-                    assert "QA" not in phrase.split(), (op.name, phrase)
+                    assert not re.search(r"\bQA\b", phrase), (op.name, phrase)
 
 
 RESOLUTION_READS = {
