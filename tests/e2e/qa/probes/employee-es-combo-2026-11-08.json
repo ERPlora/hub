@@ -1,0 +1,11 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261108.employee.es.combo.combo.for_sale","app":"combo","tool":"combo.combo.for_sale","role":"employee","language":"es","phrase":"¿qué menús puedo ofrecer ahora a los clientes y qué elecciones tienen?","expect":"read"},
+    {"id":"qa20261108.employee.es.combo.combo.list","app":"combo","tool":"combo.combo.list","role":"employee","language":"es","phrase":"¿qué menús hay dados de alta y cuánto cuesta cada uno?","expect":"read"},
+    {"id":"qa20261108.employee.es.combo.combo.suggest_image","app":"combo","tool":"combo.combo.suggest_image","role":"employee","language":"es","phrase":"busca una imagen adecuada para el Menú QA en la biblioteca","expect":"read","lookups":["combo.combo.list"]},
+    {"id":"qa20261108.employee.es.combo.option.bulk_create","app":"combo","tool":"combo.option.bulk_create","role":"employee","language":"es","phrase":"añade lentejas y flan como opciones de Platos QA en el Menú QA","expect":"refused"},
+    {"id":"qa20261108.employee.es.combo.option.reorder","app":"combo","tool":"combo.option.reorder","role":"employee","language":"es","phrase":"pon el flan el primero de las opciones de Platos QA en el Menú QA","expect":"refused"},
+    {"id":"qa20261108.employee.es.combo.option.update","app":"combo","tool":"combo.option.update","role":"employee","language":"es","phrase":"marca el Café del Menú QA como agotado y ponle un suplemento de 1 €","expect":"refused"}
+  ]
+}

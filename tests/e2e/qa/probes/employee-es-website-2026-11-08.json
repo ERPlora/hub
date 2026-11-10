@@ -1,0 +1,8 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261108.employee.es.website.site.get","app":"website","tool":"website.site.get","role":"employee","language":"es","phrase":"enséñame el borrador completo de la web y los cambios que faltan por publicar","expect":"refused"},
+    {"id":"qa20261108.employee.es.website.site.save","app":"website","tool":"website.site.save","role":"employee","language":"es","phrase":"cambia el título de la web a «Restaurante QA» y deja el resto del borrador igual","expect":"refused"},
+    {"id":"qa20261108.employee.es.website.site.unpublish","app":"website","tool":"website.site.unpublish","role":"employee","language":"es","phrase":"desconecta ahora la web pública del restaurante","expect":"refused"}
+  ]
+}

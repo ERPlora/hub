@@ -1,0 +1,11 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261108.employee.es.printing.device.list","app":"printing","tool":"printing.device.list","role":"employee","language":"es","phrase":"¿qué equipos hay registrados para imprimir los tickets del negocio?","expect":"read"},
+    {"id":"qa20261108.employee.es.printing.printer.list","app":"printing","tool":"printing.printer.list","role":"employee","language":"es","phrase":"¿qué impresoras puedo usar para cocina y para recibos?","expect":"read"},
+    {"id":"qa20261108.employee.es.printing.job.complete","app":"printing","tool":"printing.job.complete","role":"employee","language":"es","phrase":"confirma que Tablet QA imprimió bien QA-JOB-1 en su primer intento","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.employee.es.printing.device.register","app":"printing","tool":"printing.device.register","role":"employee","language":"es","phrase":"registra esta tablet como Tablet empleado QA y enlázala con Caja QA","expect":"refused"},
+    {"id":"qa20261108.employee.es.printing.device.retire","app":"printing","tool":"printing.device.retire","role":"employee","language":"es","phrase":"retira Tablet QA del sistema de impresión, que ya no funciona","expect":"refused"},
+    {"id":"qa20261108.employee.es.printing.printer.create","app":"printing","tool":"printing.printer.create","role":"employee","language":"es","phrase":"añade una impresora de red llamada Cocina QA en la IP 192.168.1.250, puerto 9100","expect":"refused"}
+  ]
+}

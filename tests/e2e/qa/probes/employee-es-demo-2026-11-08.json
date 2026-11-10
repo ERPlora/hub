@@ -1,0 +1,11 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261108.employee.es.demo.item.detail","app":"demo","tool":"demo.item.detail","role":"employee","language":"es","phrase":"¿qué pone en la nota y en las líneas de Ejemplo QA?","expect":"read","lookups":["demo.item.list"]},
+    {"id":"qa20261108.employee.es.demo.item.open_count","app":"demo","tool":"demo.item.open_count","role":"employee","language":"es","phrase":"¿cuántos ejemplos siguen abiertos ahora?","expect":"read"},
+    {"id":"qa20261108.employee.es.demo.item.add_line","app":"demo","tool":"demo.item.add_line","role":"employee","language":"es","phrase":"agrega a Ejemplo QA la línea «apunte de empleado» con cantidad 1 y referencia QA-EMP-1","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.employee.es.demo.item.delete","app":"demo","tool":"demo.item.delete","role":"employee","language":"es","phrase":"borra Ejemplo QA y todas las líneas que tenga","expect":"refused"},
+    {"id":"qa20261108.employee.es.demo.item.stats","app":"demo","tool":"demo.item.stats","role":"employee","language":"es","phrase":"dame las cifras completas de todos los ejemplos y sus líneas","expect":"refused"},
+    {"id":"qa20261108.employee.es.demo.item.update","app":"demo","tool":"demo.item.update","role":"employee","language":"es","phrase":"marca Ejemplo QA como terminado y cambia su nota a «hecho por empleado»","expect":"refused"}
+  ]
+}
