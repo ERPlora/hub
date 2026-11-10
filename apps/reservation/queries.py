@@ -589,6 +589,18 @@ RESERVATION_SORTS = {
     output=ReservationPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what bookings do we have tonight?",
+                "show me the reservations for the weekend",
+                "any pending bookings for Saturday?",
+            ),
+            "es": (
+                "¿qué reservas tenemos esta noche?",
+                "enséñame las reservas del fin de semana",
+                "¿hay reservas sin confirmar para el sábado?",
+            ),
+        },
         "description": "Lists reservations: of some days (date_from, date_to) or, with `search` (a guest's name, phone "
         "or email), of the whole book; filters by status, table, customer, party size and time; in calendar order by "
         "default; pages of up to 100."
@@ -635,6 +647,17 @@ def list_reservations(ctx: OperationContext, params: ReservationListIn) -> dict:
     output=ReservationDetailOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what time is Luis's booking on Saturday?",
+                "show me the details of Marta's reservation",
+            ),
+            "es": (
+                "¿a qué hora es la reserva de Luis del sábado?",
+                "dime los datos de la reserva de Marta",
+                "¿cuántos vienen en la reserva de los Pérez?",
+            ),
+        },
         "description": "Reads one reservation with all its detail: by id, or by its guest's name or phone and its day "
         "(«Ana's reservation tomorrow»); without a day, her coming ones."
     },
@@ -652,6 +675,18 @@ def get_reservation(ctx: OperationContext, params: ReservationRefIn) -> dict:
     output=DayOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how many covers are booked today?",
+                "how does Saturday night look for bookings?",
+                "is there still room to book on Sunday?",
+            ),
+            "es": (
+                "¿cuántos cubiertos tenemos reservados hoy?",
+                "¿cómo vamos de reservas el sábado por la noche?",
+                "¿queda hueco para reservar el domingo?",
+            ),
+        },
         "description": "How a service day looks (today if no date): its covers and reservations, whether it is blocked, "
         "the business's opening hours, and each slot with its reservations, guests, maximum and what is left (full or "
         "not, inside the opening hours or not). Counts exactly what booking checks."
@@ -704,6 +739,16 @@ def day_availability(ctx: OperationContext, params: DayIn) -> dict:
     output=FreeTablesOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "where can I seat a party of four on Friday at 9 pm?",
+                "what is still free for a booking of six tomorrow at 21:00?",
+            ),
+            "es": (
+                "¿qué mesa le doy a una reserva de cuatro el viernes a las 21:00?",
+                "¿tengo la mesa 5 libre para reservar mañana a las 21:00?",
+            ),
+        },
         "description": "The tables in service for a day, time and party: whether each one is free then (no live "
         "reservation overlaps the stay) and whether the party fits its seats; free and fitting first. Use it to pick "
         "the table of a reservation («is table 5 free tomorrow at 21?»)."
@@ -763,6 +808,16 @@ SLOT_SORTS = {
     output=TimeSlotPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what booking slots do we have?",
+                "at what times do we take reservations on weekends?",
+            ),
+            "es": (
+                "lista las franjas horarias de la semana",
+                "¿en qué horarios aceptamos reservas los fines de semana?",
+            ),
+        },
         "description": "Lists the slots the book takes reservations in (weekday 0 = Monday … 6 = Sunday, from, to, "
         "maximum reservations and guests), by weekday and start."
     },
@@ -782,6 +837,16 @@ def list_slots(ctx: OperationContext, params: TimeSlotListIn) -> dict:
     output=TimeSlotDetailOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how many bookings fit in the Saturday 8 pm slot?",
+                "show me the Sunday lunch slot",
+            ),
+            "es": (
+                "¿cuántas reservas caben en la franja del sábado a las 20:00?",
+                "enséñame la franja del domingo a mediodía",
+            ),
+        },
         "description": "Reads one slot the book takes reservations in: by id, or by its weekday (0 = Monday … 6 = "
         "Sunday) and its start."
     },
@@ -806,6 +871,16 @@ BLOCKED_SORTS = {
     output=BlockedDatePage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which days are closed to bookings?",
+                "show me the blocked dates",
+            ),
+            "es": (
+                "¿qué días tengo cerrados a las reservas?",
+                "enséñame las fechas bloqueadas",
+            ),
+        },
         "description": "Lists the days (or hours) the book takes no reservations, with their reason, by date."
     },
 )
@@ -830,8 +905,20 @@ def list_blocked(ctx: OperationContext, params: BlockedDateListIn) -> dict:
     output=BlockedDateDetailOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "why is Christmas Day blocked?",
+                "show me the Christmas closure block",
+            ),
+            "es": (
+                "¿por qué está bloqueado el día de Navidad?",
+                "enséñame el bloqueo del cierre por vacaciones",
+                "¿qué horas cubre el bloqueo del sábado?",
+            ),
+        },
         "description": "Reads one blocked date (a day, or some hours of it, the book takes no reservations) with its "
-        "reason: by id, or by its date when it is blocked once."
+        "reason: by id, or by its date when it is blocked once. A block named by its reason («the Christmas closure») is "
+        "found in reservation.blocked_date.list."
     },
 )
 def get_blocked(ctx: OperationContext, params: BlockedDateRefIn) -> dict:
@@ -858,6 +945,16 @@ WAITLIST_SORTS = {
     output=WaitlistPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "who is on the waitlist tonight?",
+                "show me Saturday's waitlist",
+            ),
+            "es": (
+                "¿quién está en lista de espera esta noche?",
+                "enséñame la lista de espera del sábado",
+            ),
+        },
         "description": "Lists the waitlist in the order people were written down (day, preferred time, arrival): who, "
         "for how many, contacted or not, and converted into a reservation or still waiting."
     },
@@ -891,6 +988,16 @@ def list_waitlist(ctx: OperationContext, params: WaitlistListIn) -> dict:
     output=WaitlistDetailOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "is Luis still on the waitlist?",
+                "show me Marta's waitlist entry",
+            ),
+            "es": (
+                "¿sigue Luis en la lista de espera?",
+                "¿hemos contactado ya con Marta de la lista de espera?",
+            ),
+        },
         "description": "Reads one waitlist entry: by id, or by its guest's name or phone (and its day, when they wait "
         "for several); among several, the ones still waiting."
     },
@@ -908,6 +1015,16 @@ def get_entry(ctx: OperationContext, params: WaitlistRefIn) -> dict:
     output=SettingsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how far ahead can guests book?",
+                "are reservations confirmed automatically?",
+            ),
+            "es": (
+                "¿qué antelación piden los ajustes de reservas?",
+                "¿las reservas se confirman solas?",
+            ),
+        },
         "description": "Reads the book's rules: guests per reservation, notice and days ahead, default duration, "
         "automatic confirmation, phone or email required, when an unconfirmed reservation is released, and the "
         "business's time zone."
