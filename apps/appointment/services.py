@@ -1424,7 +1424,6 @@ def materialize(ctx: OperationContext, data: MaterializeIn) -> dict:
 @operation(
     "appointment.recurring.update",
     kind="command",
-    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=RecurringUpdateIn,
     output=RecurringUpdatedOut,

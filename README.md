@@ -80,7 +80,9 @@ corte y qué se repite, en el README de `packages/live`):
   de todas las apps. Nunca uno que cobra, numera, genera un QR, envía a la AEAT, manda un correo o un WhatsApp, llama a
   un tercero o escribe fuera de su transacción (caché, sesiones, control o el almacén de ficheros). La lista de
   exclusiones y una ruta real por app están en `base/tests/test_database_cut.py`, que además obliga a revisar cada
-  comando nuevo expuesto por una ruta.
+  comando nuevo expuesto por una ruta; otra prueba del mismo fichero recorre el código de cada comando repetible, y lo
+  que llama, y falla si antes del COMMIT numera (también los tickets de Cocina al guardar las rondas pendientes),
+  guarda un fichero con nombre nuevo, cuenta un intento en la caché o llama a otro sistema.
 - **Pasado el tope, o si no se puede repetir:** 503 con `Retry-After`, nunca un 500 (`base.database_cut.server_error`, el
   `handler500`): el sobre para la API, y para el navegador `base/database_cut.html`, que se recarga sola. Al abrir la
   base del negocio, el 503 es el de siempre, `base.hub_unavailable`, pero después de esperar.

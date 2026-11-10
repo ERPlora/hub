@@ -11,9 +11,15 @@ reads «come back in a moment» with 503 and ``Retry-After``, never a 500; and t
 once.
 """
 
+import ast
 import asyncio
+import functools
+import importlib
+import inspect
 import json
+import textwrap
 import time
+import types
 from types import SimpleNamespace
 
 import live.database_cut as live_database_cut
@@ -538,6 +544,7 @@ def test_every_routed_command_declares_whether_a_cut_may_repeat_it():
         "appointment.appointment.charge",
         "appointment.recurring.create",
         "appointment.recurring.materialize",
+        "appointment.recurring.update",
         "base.app.enable",
         "base.approval.approve",
         "base.blueprint.import",
@@ -566,8 +573,23 @@ def test_every_routed_command_declares_whether_a_cut_may_repeat_it():
         "invoice.invoice.rectify_from_refund",
         "invoice.invoice.rectify_from_void",
         "invoice.invoice.substitute",
+        "kitchen.item.bump",
+        "kitchen.item.recall",
+        "kitchen.routing.clear",
+        "kitchen.routing.set",
+        "kitchen.settings.update",
+        "kitchen.station.delete",
+        "kitchen.station.update",
+        "kitchen.ticket.cancel",
         "kitchen.ticket.create",
+        "kitchen.ticket.delete",
+        "kitchen.ticket.ready",
+        "kitchen.ticket.recall",
+        "kitchen.ticket.reprint",
         "kitchen.ticket.send",
+        "kitchen.ticket.serve",
+        "kitchen.ticket.set_rush",
+        "kitchen.ticket.start",
         "online_booking.public.book",
         "payment.payment.create",
         "sale.order.fire",
@@ -601,11 +623,201 @@ def test_every_routed_command_declares_whether_a_cut_may_repeat_it():
     for operation in registry.values():
         if operation.kind != "command" or operation.name not in routed:
             continue
-        excluded = operation.name in exclusions or operation.name.startswith(("verifactu.", "base.assistant.", "base.file."))
+        excluded = operation.name in exclusions or operation.name.startswith(
+            ("verifactu.", "base.assistant.", "base.file.")
+        )
         if operation.repeatable == excluded:
             wrong.append(operation.name)
     assert wrong == []
 
+
+
+#: What a try does that the ROLLBACK of its database does not undo, or a number it takes on the way (PLAN-DB, round
+#: 2026-11-04e, point 5): a command that may repeat never reaches one of them before its COMMIT (BASE-F111).
+NOT_UNDONE_BY_A_ROLLBACK = {
+    "apps.appointment.services._next_number": "numbers an appointment",
+    "apps.cart_checkout.services._number": "numbers an order",
+    "apps.cash_register.services._number": "numbers a till session",
+    "apps.invoice.services._take_number": "numbers an invoice",
+    "apps.kitchen.services.take_number": "numbers a kitchen ticket",
+    "apps.payment.services._number": "numbers a payment",
+    "apps.sale.services._number": "numbers a sale",
+    "apps.table.services._next_number": "numbers a table",
+    "apps.task.services._next_number": "numbers a task",
+    "base.images.keep_photo": "keeps a file under a new name",
+    "base.throttle.AttemptLimit.failed": "counts a try in the cache",
+}
+#: Modules whose use is a call to another system: what was sent stays sent.
+OTHER_SYSTEMS = ("httpx", "requests", "urllib.request", "smtplib", "django.core.mail")
+
+
+def _chain(node) -> list[str] | None:
+    parts = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    return [node.id, *reversed(parts)] if isinstance(node, ast.Name) else None
+
+
+def _ours(obj) -> bool:
+    module = getattr(obj, "__module__", None) or ""
+    return module.startswith(("apps.", "base.")) and ".tests" not in module
+
+
+def _dotted(obj) -> str | None:
+    if isinstance(obj, types.ModuleType):
+        return obj.__name__
+    module, name = getattr(obj, "__module__", None), getattr(obj, "__qualname__", None)
+    return f"{module}.{name}" if isinstance(module, str) and isinstance(name, str) else None
+
+
+def _names_of(fn, tree) -> dict:
+    """What a name in ``fn`` means: its module's globals, its closure and its own imports (an import inside a function
+    is where a call to another system likes to hide)."""
+    names = dict(fn.__globals__)
+    for name, cell in zip(fn.__code__.co_freevars, fn.__closure__ or ()):
+        try:
+            names[name] = cell.cell_contents
+        except ValueError:
+            continue
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module and not node.level:
+            module = importlib.import_module(node.module)
+            for alias in node.names:
+                found = getattr(module, alias.name, None)
+                names[alias.asname or alias.name] = found or importlib.import_module(f"{node.module}.{alias.name}")
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                importlib.import_module(alias.name)
+                names[alias.asname or alias.name.partition(".")[0]] = importlib.import_module(
+                    alias.name if alias.asname else alias.name.partition(".")[0]
+                )
+    return names
+
+
+def _meant(names: dict, node):
+    """The object a name or a dotted name of a function's code stands for, or ``None``."""
+    parts = _chain(node)
+    if not parts or parts[0] not in names:
+        return None
+    obj = names[parts[0]]
+    for part in parts[1:]:
+        try:
+            obj = getattr(obj, part)
+        except Exception:
+            return None
+    return obj
+
+
+@functools.cache
+def _steps(fn) -> tuple[frozenset[str], tuple, frozenset[str]]:
+    """What ``fn`` touches (by dotted name), the functions of the Hub it goes on to (and the methods its models
+    override) and the operations it names. What it leaves for after the COMMIT of its operation
+    (``live.operations.on_commit(...)``) is not a step; Django's own ``transaction.on_commit`` on ``default`` would run at
+    once in a business's command, so it is."""
+    from live.operations import on_commit, registry
+
+    try:
+        tree = ast.parse(textwrap.dedent(inspect.getsource(fn)))
+    except (OSError, TypeError):
+        return frozenset(), (), frozenset()
+    names = _names_of(fn, tree)
+    later = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and _meant(names, node.func) is on_commit:
+            for argument in [*node.args, *(keyword.value for keyword in node.keywords)]:
+                later.update(id(inner) for inner in ast.walk(argument))
+    touched, onward, named = set(), [], set()
+    for node in ast.walk(tree):
+        if id(node) in later:
+            continue
+        if isinstance(node, ast.Constant) and node.value in registry:
+            named.add(node.value)
+        obj = _meant(names, node) if isinstance(node, (ast.Name, ast.Attribute)) else None
+        if obj is None:
+            continue
+        if isinstance(obj, str):
+            if obj in registry:
+                named.add(obj)
+            continue
+        if isinstance(obj, types.MethodType):
+            obj = obj.__func__
+        dotted = _dotted(obj)
+        if dotted is not None:
+            touched.add(dotted)
+        if isinstance(obj, types.FunctionType) and _ours(obj):
+            onward.append(obj)
+        elif isinstance(obj, type) and _ours(obj):
+            overrides = (vars(obj).get(key) for key in ("save", "delete", "clean"))
+            onward.extend(method for method in overrides if isinstance(method, types.FunctionType))
+    return frozenset(touched), tuple(onward), frozenset(named)
+
+
+def _reached(operation) -> dict[str, tuple[str, ...]]:
+    """Everything ``operation`` reaches before its COMMIT, by dotted name, with the way there."""
+    from live.operations import registry
+
+    ways: dict[str, tuple[str, ...]] = {}
+    pending = [(operation.fn, (operation.name,))]
+    seen, named_seen = set(), {operation.name}
+    while pending:
+        fn, way = pending.pop()
+        fn = inspect.unwrap(fn)
+        if fn in seen:
+            continue
+        seen.add(fn)
+        touched, onward, named = _steps(fn)
+        for dotted in touched:
+            ways.setdefault(dotted, way)
+        pending.extend((step, (*way, step.__qualname__)) for step in onward)
+        for name in named - named_seen:
+            named_seen.add(name)
+            pending.append((registry[name].fn, (*way, name)))
+    return ways
+
+
+def _resolve(dotted: str):
+    """The function ``dotted`` names: a name that is no longer there would leave its check silent."""
+    parts = dotted.split(".")
+    for cut in range(len(parts) - 1, 0, -1):
+        try:
+            target = importlib.import_module(".".join(parts[:cut]))
+        except ImportError:
+            continue
+        for part in parts[cut:]:
+            target = getattr(target, part)
+        return target
+    raise LookupError(dotted)
+
+
+def _never_twice(operation) -> list[str]:
+    """What of ``operation`` a repeat would do twice, or a number it would take blindly."""
+    found = []
+    for dotted, way in sorted(_reached(operation).items()):
+        why = NOT_UNDONE_BY_A_ROLLBACK.get(dotted)
+        if why is None and any(dotted == module or dotted.startswith(f"{module}.") for module in OTHER_SYSTEMS):
+            why = "calls another system"
+        if why is not None:
+            found.append(f"{operation.name} {why}: {' > '.join(way)} > {dotted}")
+    return found
+
+
+def test_a_command_that_may_repeat_reaches_nothing_its_rollback_leaves_behind():
+    """The exclusions above are written by hand (hub#1051 marked a photo upload and the kitchen's numbering): this walks
+    every repeatable command's code, and what it calls, to what a ROLLBACK does not undo."""
+    from live.operations import registry
+
+    for dotted in NOT_UNDONE_BY_A_ROLLBACK:
+        assert callable(_resolve(dotted)), dotted
+    # The walk sees what it must: commands that do take a number, keep a photo or call another system.
+    assert any("take_number" in line for line in _never_twice(registry["kitchen.ticket.create"]))
+    assert any("_take_number" in line for line in _never_twice(registry["invoice.invoice.create"]))
+    assert any("keep_photo" in line for line in _never_twice(registry["combo.combo.upload_image"]))
+    assert any("another system" in line for line in _never_twice(registry["whatsapp_inbox.message.send"]))
+
+    found = [line for operation in registry.values() if operation.repeatable for line in _never_twice(operation)]
+
+    assert found == []
 
 def test_a_save_that_numbers_is_never_repeated_blindly(boss, hub_a):
     """A task is numbered (TSK-…): its command does not say it may run again, so a cut after it began asks to check."""
