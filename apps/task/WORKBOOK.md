@@ -514,7 +514,14 @@ cliente o a un compañero).
 - El «hoy» es `business_today` (`base.business.business_zone`, hub#779); las páginas calculan «vencida» y «vence hoy»
   en esa misma zona (`useBusinessZone`), para que la pantalla y el filtro «Vencidas» no se contradigan.
 - Asistente: toda operación declara `ai={"description"…}` (`risk` solo en las acciones; `high` al
-  borrar una tarea o un proyecto) y todo campo de entrada lleva `description`.
+  borrar una tarea o un proyecto) y todo campo de entrada lleva `description`. Cada herramienta dice
+  además sus `asks`, las frases en `en` y `es` con que una persona la pide (`live.E020`: Tareas está en
+  `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1098), y los `SYNONYMS` del Hub (`base/assistant.py`) leen «tarea»
+  como `task`, «proyecto» como `project` y «comenta en…» o «un comentario» como `comment` (por sus frases,
+  no por la palabra: «comentario» comparte raíz con los «comensales» de Mesas). Así comentar, cambiar el
+  estado, completar o cambiar un proyecto desde el chat (TASK-F05, F06, F10 y F13) llegan a su operación: las
+  frases reales de la QA del asistente (`tests/e2e/qa/probes/owner-es-task-2026-11-08.json`) quedan entre las
+  20 primeras herramientas del turno (`tests/test_assistant_asks.py`).
 - La tarjeta de confirmación del asistente (BASE-F97, hub#677) nombra el registro que una escritura señala por su id
   con las marcas `refers` de `schemas.py`, leídas como quien pregunta con las lecturas por id que ya existen: la
   tarea por su `title` con `task.task.detail` (`A_TASK`: el `id` de `TaskRefIn`, `parent_id` y el `task_id` de un

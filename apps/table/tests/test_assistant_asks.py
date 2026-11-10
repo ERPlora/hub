@@ -113,21 +113,10 @@ def test_the_reported_tables_request_offers_its_existing_operation(role, languag
     assert name in offered(role, language, name, phrase)
 
 
-def needs_live_48(*case):
-    return pytest.param(*case, marks=pytest.mark.xfail(strict=True, reason=(
-        "ERPlora/live#48: «sienta», «traslada» and «comensales» ask for no action and name no guests"
-    )))
-
-
-#: The reported requests that come among the first ten, as layer 1 asks of an ask. Not the Spanish split: «abre una
-#: segunda cuenta» asks to open a check, which ``sale.order.open`` does by its very verb, so it is only offered.
-WITHIN_TEN = [
-    needs_live_48(*case) if case[1] == "es" and case[2] in {
-        "table.session.open", "table.session.set_guests", "table.session.transfer"
-    } else case
-    for case in QA_PROBES
-    if case[1:3] != ("es", "table.session.split")
-]
+#: The reported requests that come among the first ten, as layer 1 asks of an ask: «sienta» opens, «traslada»
+#: transfers and «comensales» are the guests (ERPlora/live#48). Not the Spanish split: «abre una segunda cuenta» asks to
+#: open a check, which ``sale.order.open`` does by its very verb, so it is only offered.
+WITHIN_TEN = [case for case in QA_PROBES if case[1:3] != ("es", "table.session.split")]
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)

@@ -110,9 +110,11 @@ APP_WORDS = shared.app_words
 #: panel); a ticket or a receipt is a sale's, as the till's screens say («Tickets hoy», «Ticket medio», the «Tique» it
 #: prints), never the kitchen's, which is named by its app («la cocina»); a «placa» is a person's badge; the «unidades»
 #: are Inventory's units of measure (``inventory.unit``), and a «albarán», the «mercancía» or what «entran» (never
-#: «entrada»: its stem is that of «entre») is the goods ``inventory.stock.receive`` records. To «desactivar» names the
-#: deactivation itself (``staff.member.deactivate``, ``*.deactivate``), not only a switch off, and what one «pide» or
-#: «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``).
+#: «entrada»: its stem is that of «entre») is the goods ``inventory.stock.receive`` records; a «tarea» and a «proyecto»
+#: are Tasks' task and project (``task.task``, ``task.project``), and what one «comenta» its comment (``task.comment``),
+#: named by its phrases and never by the word: «comentario» shares its stem with «comensales», a table's guests. To
+#: «desactivar» names the deactivation itself (``staff.member.deactivate``, ``*.deactivate``), not only a switch off,
+#: and what one «pide» or «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``).
 SYNONYMS = (
     ("cuenta", "check", "tab", "order"),
     ("ticket", "tique", "recibo", "receipt", "sale"),
@@ -123,6 +125,13 @@ SYNONYMS = (
         "albaran", "mercancia", "entran", "recibir", "recibe", "recibido", "receive", "received", "goods",
         "delivery note",
     ),
+    ("tarea", "tareas", "task", "tasks"),
+    ("proyecto", "proyectos", "project", "projects"),
+    (
+        "comment", "comments", "comenta en", "comenta que", "un comentario", "el comentario", "los comentarios",
+        "sus comentarios", "que comentarios", "de comentarios",
+    ),
+    # staff
     ("desactiva", "desactivar", "deactivate"),
     ("pido", "solicito", "solicitud", "request"),
 )
