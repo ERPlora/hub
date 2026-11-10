@@ -8,12 +8,7 @@ import { nextTick } from 'vue';
 import { createMemoryHistory, createRouter, type NavigationFailure, type RouteRecordRaw } from 'vue-router';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const sdk = vi.hoisted(() => ({
-  client: {
-    api: { call: (() => undefined) as (...args: unknown[]) => unknown },
-    stream: { reconnect: (() => undefined) as () => void },
-  },
-}));
+const sdk = vi.hoisted(() => ({ client: { api: { call: (() => undefined) as (...args: unknown[]) => unknown } } }));
 
 vi.mock('@erplora/ui/shell', () => ({
   createShell: vi.fn(),
@@ -89,7 +84,6 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   sdk.client.api.call = vi.fn();
-  sdk.client.stream.reconnect = vi.fn();
   renderShellHtml();
 });
 

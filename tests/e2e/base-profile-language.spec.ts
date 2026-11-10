@@ -1,6 +1,6 @@
 // BASE-F64, BASE-F02: choosing a language applies it to the whole open shell. «My apps» and the setup checklist
 // take their server-rendered names again in that language, in both directions, without reloading the document.
-import { expect, type Page, test } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, hostPage, shown } from './helpers';
 
@@ -42,6 +42,15 @@ async function restoreLanguage(page: Page, language: Language): Promise<void> {
   await chooseLanguage(page, LABELS[language]);
 }
 
+/** «My profile» of the owner of `a`, opened by its address, with English chosen; `initial` is what it had saved. */
+async function profileInEnglish(browser: Browser): Promise<{ context: BrowserContext; page: Page; initial: Language }> {
+  const { context, page } = await hostPage(browser, A, { viewport: { width: 1440, height: 900 }, next: '/profile' });
+  await expect(shown(page).getByTestId('profile-language')).toBeVisible();
+  const initial = await savedLanguage(page);
+  if (initial !== 'en') await chooseLanguage(page, 'English');
+  return { context, page, initial };
+}
+
 function appTile(page: Page, name: string) {
   return shown(page).getByTestId('home-my-app').filter({ hasText: new RegExp(`^\\s*${name}\\s*$`) });
 }
@@ -53,11 +62,8 @@ function verifactuStep(page: Page) {
 test('BASE-F64: Mis apps and the setup checklist change language with the open shell, in both directions', async ({
   browser,
 }) => {
-  const { context, page } = await hostPage(browser, A, { viewport: { width: 1440, height: 900 }, next: '/profile' });
-  await expect(shown(page).getByTestId('profile-language')).toBeVisible();
-  const initial = await savedLanguage(page);
+  const { context, page, initial } = await profileInEnglish(browser);
   try {
-    if (initial !== 'en') await chooseLanguage(page, 'English');
     await backHome(page);
     // Setup only: establish an English baseline before measuring the no-reload transition.
     await page.reload();
@@ -98,11 +104,8 @@ test('BASE-F64: Mis apps and the setup checklist change language with the open s
 test('BASE-F64: choosing a language on «My profile» opened by its address reopens the live stream at once', async ({
   browser,
 }) => {
-  const { context, page } = await hostPage(browser, A, { viewport: { width: 1440, height: 900 }, next: '/profile' });
-  await expect(shown(page).getByTestId('profile-language')).toBeVisible();
-  const initial = await savedLanguage(page);
+  const { context, page, initial } = await profileInEnglish(browser);
   try {
-    if (initial !== 'en') await chooseLanguage(page, 'English');
     await page.reload();
     await expect(shown(page).getByTestId('profile-language')).toBeVisible();
     await expect(shown(page).getByTestId('home-my-apps')).toHaveCount(0);
