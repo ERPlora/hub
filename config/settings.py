@@ -563,6 +563,7 @@ LIVE_ASSISTANT_ASKS_REQUIRED = (
     "reservation",
     "sale",
     "table",
+    "task",
     "website",
 )
 
