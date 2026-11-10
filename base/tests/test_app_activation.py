@@ -152,17 +152,15 @@ def test_a_hub_of_before_keeps_every_app_on_and_its_roots_chosen():
 
 
 @pytest.mark.django_db
-def test_erploras_own_hub_and_the_workers_scope_have_every_app_on(settings):
-    """Phase 1 runs every app's scheduled tasks on the worker's scope (``WORKER_SCOPE_SLUG``) over the tables every
-    hub shares, and ERPlora's own hub (``PLATFORM_HUB_SLUG``) issues ERPlora's invoices with Invoicing and VeriFactu:
-    neither is a business that chooses its apps, so neither is born with them off (round 2026-10-27)."""
+def test_erploras_own_hub_has_every_app_on_and_the_worker_scope_is_not_the_platform(settings):
+    """ERPlora's own hub issues its invoices with Invoicing and VeriFactu; the worker's legacy scope is not it."""
     settings.PLATFORM_HUB_SLUG, settings.WORKER_SCOPE_SLUG = "erplora", "worker-scope"
     graph = activation.module_graph()
-    for slug in ("erplora", "worker-scope"):
-        scope = Scope("host", slug)
-        assert activation.off_apps(scope) == frozenset()
-        assert activation.states_of(scope) == activation.every_on(graph)
-        assert {"invoice", "verifactu", "whatsapp_inbox"} <= relay.active_apps(scope)
+    scope = Scope("host", "erplora")
+    assert activation.off_apps(scope) == frozenset()
+    assert activation.states_of(scope) == activation.every_on(graph)
+    assert {"invoice", "verifactu", "whatsapp_inbox"} <= relay.active_apps(scope)
+    assert activation.off_apps(Scope("host", "worker-scope")) == frozenset(graph)
     assert activation.off_apps(Scope("host", "c")) == frozenset(graph)
 
 

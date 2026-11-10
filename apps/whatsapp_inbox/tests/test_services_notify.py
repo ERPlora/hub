@@ -20,7 +20,8 @@ from live.operations import get
 
 from apps.whatsapp_inbox.models import Conversation, Message
 from apps.whatsapp_inbox.services import NO_PLAN_MESSAGES
-from apps.whatsapp_inbox.tests.conftest import B, NOW, A, connect, ctx_for, receive, run, template
+from apps.whatsapp_inbox.tests.conftest import B, NOW, A, connect, ctx_for, receive, run, system, template
+from base.tenancy.tests import hubs
 
 pytestmark = pytest.mark.django_db
 
@@ -80,7 +81,7 @@ def test_within_the_24_hours_the_notice_goes_as_text_to_the_exact_number_through
     assert (sent["hub"], sent["to"], sent["type"], sent["text"]) == ("a", ANA, "text", TEXT)
     message = Message.objects.get(pk=out.id)
     assert (message.kind, message.body, message.status, message.wa_message_id) == ("text", TEXT, "sent", "wamid.OUT")
-    assert message.sent_by is None and message.host == "a"
+    assert message.sent_by is None
     assert [event.payload["id"] for event in OutboxEvent.objects.filter(name="whatsapp_inbox.message.sent")] == [str(out.id)]
 
 
@@ -165,12 +166,26 @@ def test_a_number_not_connected_sends_nothing():
     assert refused.value.code == "whatsapp_inbox.channel_not_connected"
 
 
-def test_another_business_goes_by_its_own_number():
-    ready()  # a's number is connected; b never connected one
-    with pytest.raises(Conflict) as refused:
-        notify({"phone": ANA, "text": TEXT}, automation(B))
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.usefixtures("no_test_fallback")
+def test_another_business_goes_by_its_own_number(hub_a, hub_b):
+    from base.tenancy.context import use_hub
+    from base.tenancy.tests import hubs
+    from live.context import Scope
+
+    with use_hub(hub_a):
+        system(
+            "whatsapp_inbox.channel.sync",
+            {"version": 1, "status": "connected", "phone_number": "+34910000000", "monthly_limit": 150,
+             "templates": [template("recordatorio"), template("promo", category="MARKETING", variables=0, body="¡Oferta!")]},
+            Scope("host", hub_a.slug),
+        )
+        receive("wamid.IN", sent_at=(NOW - dt.timedelta(minutes=10)).isoformat(), scope=Scope("host", hub_a.slug))
+    with use_hub(hub_b), pytest.raises(Conflict) as refused:
+        notify({"phone": ANA, "text": TEXT}, automation(Scope("host", hub_b.slug)))
     assert refused.value.code == "whatsapp_inbox.channel_not_connected"
-    assert not Message.objects.filter(direction="outbound").exists()
+    with use_hub(hub_b):
+        assert not Message.objects.filter(direction="outbound").exists()
 
 
 @respx.mock

@@ -212,11 +212,11 @@ def test_a_job_for_another_hub_never_reaches_its_database(hub_a, hub_b, pool, mo
     tenant_a, tenant_b = Scope("host", hub_a.slug), Scope("host", hub_b.slug)
 
     def ask(ctx, data):
-        outbound.after_commit(job, tenant_b, scope=tenant_b)
+        outbound.after_commit(job, tenant_b)
         return {"count": 1}
 
     def ask_the_platform(ctx, data):
-        outbound.after_commit(job, PLATFORM, scope=PLATFORM)
+        outbound.after_commit(job, PLATFORM)
         return {"count": 1}
 
     with context.use_hub(hub_a):

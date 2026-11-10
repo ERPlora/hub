@@ -114,7 +114,7 @@ def test_confirming_tells_the_customer_once_in_her_conversation_through_erplora(
     run_row = FlowRun.objects.get()
     assert (run_row.event_name, run_row.status) == ("appointment.appointment.confirmed", "succeeded")
     [message] = outbound()
-    assert (message.conversation.phone, message.kind, message.status, message.host) == (ANA, "text", "sent", "a")
+    assert (message.conversation.phone, message.kind, message.status) == (ANA, "text", "sent")
     assert message.body.startswith("Confirmed! We are expecting you on Monday, ")
     assert message.body.endswith(" at 10:00 for your Haircut with Ana López.")
     assert [json.loads(call.request.content)["to"] for call in door.calls] == [ANA]
@@ -162,7 +162,7 @@ def test_another_business_tells_its_customer_through_its_own_number(tick, door):
     confirm(appointment, scope=B)
     tick()
     [message] = outbound()
-    assert message.host == "b"
+    assert message.origin == "hub"
     assert json.loads(door.calls.last.request.content)["hub"] == "b"
     sent = OutboxEvent.objects.get(name="whatsapp_inbox.message.sent")
     assert (sent.scope_kind, sent.scope_key) == (B.kind, B.key)
@@ -229,7 +229,7 @@ def test_confirming_a_reservation_tells_the_guest_once_in_her_conversation(resta
     [run_row] = table_runs()
     assert run_row.status == "succeeded"
     [message] = outbound()
-    assert (message.conversation.phone, message.kind, message.status, message.host) == (ANA, "text", "sent", "a")
+    assert (message.conversation.phone, message.kind, message.status) == (ANA, "text", "sent")
     assert message.body == "Confirmed! We are expecting you on Friday, Oct. 16, 2026 at 21:00, table for 4."
     assert [json.loads(call.request.content)["to"] for call in door.calls] == [ANA]
 
@@ -386,7 +386,7 @@ def test_another_restaurant_tells_its_guest_through_its_own_number(restaurant_cl
     act("reservation.reservation.confirm", reservation.id, scope=B)
     tick()
     [message] = outbound()
-    assert message.host == "b"
+    assert message.origin == "hub"
     assert json.loads(door.calls.last.request.content)["hub"] == "b"
     sent = OutboxEvent.objects.get(name="whatsapp_inbox.message.sent")
     assert (sent.scope_kind, sent.scope_key) == (B.kind, B.key)

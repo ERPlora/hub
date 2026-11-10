@@ -114,13 +114,6 @@ function download(): void {
         <p class="api-docs__intro">
           {{ t('base.apiDocs.intro') }}
         </p>
-        <InlineFeedback
-          v-if="!data.keys_available"
-          tone="warning"
-          data-testid="api-docs-keys-soon"
-        >
-          {{ t('base.apiDocs.keysSoon') }}
-        </InlineFeedback>
         <div class="api-docs__actions">
           <IonButton
             fill="outline"

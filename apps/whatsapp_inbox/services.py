@@ -78,7 +78,6 @@ from apps.whatsapp_inbox.queries import (
     team,
     template_out,
     templates_of,
-    templates_of_every_business,
 )
 from apps.whatsapp_inbox.schemas import (
     AssignIn,
@@ -245,16 +244,6 @@ def _after_commit(ctx: OperationContext, job, *args) -> None:
     request, the worker's relay or its tick that committed never waits for erplora.com. A job lost on the way (the
     process stopped) is found again by ``delivery.resume``: each one claims its row first."""
     outbound.after_commit(job, ctx.scope, *args)
-
-
-def _after_commit_as(host: str, ctx: OperationContext, job, *args) -> None:
-    """``_after_commit`` for the business in ``host`` (the row's own), whatever business ``ctx`` runs as; never in
-    another hub's database (``base.outbound``, ``scope=``). Since S5 a hub's database holds its own rows only, so
-    ``host`` is ``ctx``'s business; another one is left from the tables phase 1 shared, and only the suite's fallback,
-    which keeps ``a`` and ``b`` in one database (``base/tenancy/tests/legacy.py``), still makes it (hub#1053). A row
-    made before its business was recorded (empty ``host``) goes as ``ctx``'s, as it did."""
-    scope = Scope(ctx.scope.kind, host) if host else ctx.scope
-    outbound.after_commit(job, scope, *args, scope=scope)
 
 
 def _conversation_for(phone: str, contact_name: str = "") -> Conversation:
@@ -609,12 +598,12 @@ def sync_channel(ctx: OperationContext, data: ChannelSyncIn) -> dict:
 def _locked_channel(ctx: OperationContext) -> Channel:
     """The row of the business of ``ctx``, locked; born the first time erplora.com speaks of it (two at once: one
     creates it, the other finds it)."""
-    rows = Channel.objects.select_for_update().filter(host=ctx.scope.key)
+    rows = Channel.objects.select_for_update()
     row = rows.first()
     if row is None:
         try:
             with atomic():
-                row = Channel.objects.create(host=ctx.scope.key)
+                row = Channel.objects.create()
         except IntegrityError:
             row = rows.get()
     return row
@@ -635,7 +624,7 @@ def _sync_templates(ctx: OperationContext, items, now) -> None:
             deleted = templates_of(ctx.scope).filter(name=item.name, language=item.language, deleted_at__isnull=False)
             if deleted.filter(Q(delete_state=Template.DeleteState.PENDING) | Q(meta_id=item.meta_id)).exists():
                 continue
-            row = Template(host=ctx.scope.key, name=item.name, language=item.language)
+            row = Template(name=item.name, language=item.language)
         elif row.status == Template.Status.DRAFT and row.submit_state:
             kept.append(row.pk)
             continue
@@ -998,7 +987,7 @@ def _file_to_send(ctx: OperationContext, template: Template, chosen: UUID | None
         return None
     wanted = chosen or template.header_sample_id
     sample = (
-        TemplateSample.objects.filter(pk=wanted, host=ctx.scope.key, header_format=template.header_format).first()
+        TemplateSample.objects.filter(pk=wanted, header_format=template.header_format).first()
         if wanted
         else None
     )
@@ -1039,7 +1028,6 @@ def _queue_message(
                 client_message_id=key,
                 sent_by=acting_hub_user(ctx),
                 sent_at=now,
-                host=ctx.scope.key,
             )
     except IntegrityError:
         # The same key at the same time: the other one kept it and hands it over.
@@ -1085,7 +1073,7 @@ def retry_message(ctx: OperationContext, data: MessageRefIn) -> dict:
         raise Conflict(str(NOT_RETRYABLE), code="whatsapp_inbox.not_retryable")
     message.error_code = message.error_message = ""
     message.save(update_fields=["error_code", "error_message"])
-    _after_commit_as(message.host, ctx, deliver, message.id)
+    _after_commit(ctx, deliver, message.id)
     return message_out(message)
 
 
@@ -1236,7 +1224,7 @@ def claim_delivery(ctx: OperationContext, data: MessageRefIn) -> dict:
     )
     if template is not None and message.header_sample_id is not None:
         # Read after the claim's COMMIT, with no connection held (``deliver``): only a file of its own business.
-        sample = TemplateSample.objects.filter(pk=message.header_sample_id, host=message.host).first()
+        sample = TemplateSample.objects.filter(pk=message.header_sample_id).first()
         if sample is not None:
             template.update(header_format=sample.header_format, sample_key=sample.key, sample_name=sample.name)
         else:
@@ -1321,44 +1309,40 @@ def record_delivery(ctx: OperationContext, data: RecordDeliveryIn) -> dict:
     },
 )
 def resume_deliveries(ctx: OperationContext, data: ResumeIn) -> dict:
-    """Hand erplora.com again what was left in this hub's database, each row for the business that made it. The worker
-    runs this in each hub's own database and on its scope (``base.worker``), so every row is that hub's; the business
-    kept on each row is from the tables phase 1 shared (hub#1053). A message or an erasure made before its business was
-    recorded (0007) goes as ``ctx``'s, as it did."""
+    """Hand erplora.com again what was left in this hub's database, as this business."""
     cutoff = clock.now() - STUCK_AFTER
     messages = list(
         Message.objects.select_for_update(skip_locked=True)
         .filter(origin=Message.Origin.HUB, status__in=_ON_ITS_WAY, status_at__lt=cutoff)
         .order_by("status_at", "id")
-        .values_list("id", "host")[:RESUME_BATCH]
+        .values_list("id", flat=True)[:RESUME_BATCH]
     )
     erasures = list(
         Conversation.objects.select_for_update(skip_locked=True)
         .filter(erase_status=Conversation.EraseStatus.PENDING, erased_at__lt=cutoff)
         .order_by("erased_at", "id")
-        .values_list("id", "erase_host")[:RESUME_BATCH]
+        .values_list("id", flat=True)[:RESUME_BATCH]
     )
-    # Each handed over as the business that made it (``host``): in a hub's own database, that hub.
     templates = list(
-        templates_of_every_business().select_for_update(skip_locked=True)
+        Template.objects.select_for_update(skip_locked=True)
         .filter(submit_state__in=_TEMPLATE_ON_ITS_WAY, submit_at__lt=cutoff, deleted_at__isnull=True)
         .order_by("submit_at", "id")
-        .values_list("id", "host")[:RESUME_BATCH]
+        .values_list("id", flat=True)[:RESUME_BATCH]
     )
     deletions = list(
-        templates_of_every_business().select_for_update(skip_locked=True)
+        Template.objects.select_for_update(skip_locked=True)
         .filter(delete_state=Template.DeleteState.PENDING, deleted_at__lt=cutoff)
         .order_by("deleted_at", "id")
-        .values_list("id", "host")[:RESUME_BATCH]
+        .values_list("id", flat=True)[:RESUME_BATCH]
     )
-    for message_id, host in messages:
-        _after_commit_as(host, ctx, deliver, message_id)
-    for conversation_id, host in erasures:
-        _after_commit_as(host, ctx, forget, conversation_id)
-    for template_id, host in templates:
-        _after_commit_as(host, ctx, submit_template, template_id)
-    for template_id, host in deletions:
-        _after_commit_as(host, ctx, remove_template, template_id)
+    for message_id in messages:
+        _after_commit(ctx, deliver, message_id)
+    for conversation_id in erasures:
+        _after_commit(ctx, forget, conversation_id)
+    for template_id in templates:
+        _after_commit(ctx, submit_template, template_id)
+    for template_id in deletions:
+        _after_commit(ctx, remove_template, template_id)
     return {
         "messages": len(messages),
         "erasures": len(erasures),
@@ -1588,8 +1572,7 @@ def link_customer(ctx: OperationContext, data: LinkCustomerIn) -> dict:
 
 def _erase(ctx: OperationContext, conversation: Conversation) -> None:
     """Empty every personal datum of ``conversation`` once, and ask erplora.com to forget its number
-    after the COMMIT until it confirms; again changes nothing here and asks erplora.com again, for the business
-    that erased it (``erase_host``), whoever asks."""
+    after the COMMIT until it confirms; again changes nothing here and asks erplora.com again."""
     if conversation.erased_at is None:
         conversation.messages.update(
             body="",
@@ -1606,7 +1589,6 @@ def _erase(ctx: OperationContext, conversation: Conversation) -> None:
         conversation.notes.all().delete()
         conversation.erase_phone = conversation.phone
         conversation.erase_status = Conversation.EraseStatus.PENDING
-        conversation.erase_host = ctx.scope.key
         conversation.phone = ""
         conversation.contact_name = ""
         conversation.last_message_preview = ""
@@ -1618,7 +1600,7 @@ def _erase(ctx: OperationContext, conversation: Conversation) -> None:
         conversation.save()
         record_event(ctx, events.ERASED, {"id": str(conversation.id)})
     if conversation.erase_status == Conversation.EraseStatus.PENDING:
-        _after_commit_as(conversation.erase_host, ctx, forget, conversation.id)
+        _after_commit(ctx, forget, conversation.id)
 
 
 def forget(scope: Scope, conversation_id: UUID) -> None:
@@ -1810,7 +1792,7 @@ def _header_file(ctx: OperationContext, data: TemplateWriteIn) -> None:
     if data.header_format not in samples.FILE_HEADERS:
         return
     kept = data.header_sample is not None and TemplateSample.objects.filter(
-        pk=data.header_sample, host=ctx.scope.key, header_format=data.header_format
+        pk=data.header_sample, header_format=data.header_format
     ).exists()
     if not kept:
         message = str(HEADER_FILE_MISSING)
@@ -1881,7 +1863,6 @@ def upload_sample(ctx: OperationContext, data: TemplateSampleUploadIn) -> dict:
     except STORE_ERRORS as exc:
         raise OperationError(str(SAMPLE_NOT_KEPT), code="whatsapp_inbox.sample_not_kept", status=503) from exc
     row = TemplateSample.objects.create(
-        host=ctx.scope.key,
         header_format=data.header_format,
         key=key,
         sha256=sha,
@@ -1916,7 +1897,7 @@ def create_template(ctx: OperationContext, data: TemplateCreateIn) -> dict:
     exists = Conflict(str(TEMPLATE_EXISTS % {"name": data.name}), code="whatsapp_inbox.template_exists")
     if live_templates(ctx.scope).filter(name=data.name, language=data.language).exists():
         raise exists
-    row = Template(host=ctx.scope.key, name=data.name, language=data.language, status=Template.Status.DRAFT)
+    row = Template(name=data.name, language=data.language, status=Template.Status.DRAFT)
     _apply(row, _content(data))
     try:
         with atomic():
@@ -2150,7 +2131,7 @@ def claim_submit(ctx: OperationContext, data: TemplateRefIn) -> dict:
     template = {"name": row.name, "language": row.language, **content, "meta_id": row.meta_id}
     if header_format in samples.FILE_HEADERS:
         # Read after the claim's COMMIT, with no connection held (``submit_template``): the key, not the bytes.
-        sample = TemplateSample.objects.filter(pk=sample_id, host=row.host).first() if sample_id else None
+        sample = TemplateSample.objects.filter(pk=sample_id).first() if sample_id else None
         template.update(header_format=header_format)
         if sample is not None:
             template.update(sample_key=sample.key, sample_name=sample.name)

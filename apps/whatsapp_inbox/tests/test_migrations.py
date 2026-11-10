@@ -120,6 +120,65 @@ def test_messages_and_erasures_go_forward_with_no_business_and_back_without_the_
 
 HEADER_FILES = [(APP, "0008_template_header_files")]
 BEFORE_HEADER_FILES = [(APP, "0007_deliveries_per_business")]
+HOST_DEFAULTS = [(APP, "0011_host_defaults")]
+NO_HOSTS = [(APP, "0012_no_business_hosts")]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_business_hosts_get_a_default_and_leave_only_the_state():
+    try:
+        migrate(HOST_DEFAULTS)
+        with connection.cursor() as cursor:
+            for table, column in (
+                ("whatsapp_inbox_channel", "host"),
+                ("whatsapp_inbox_conversation", "erase_host"),
+                ("whatsapp_inbox_message", "host"),
+                ("whatsapp_inbox_template", "host"),
+                ("whatsapp_inbox_templatesample", "host"),
+            ):
+                cursor.execute(
+                    "SELECT column_default FROM information_schema.columns "
+                    "WHERE table_name = %s AND column_name = %s",
+                    [table, column],
+                )
+                assert cursor.fetchone()[0] is not None
+
+        new = migrate(NO_HOSTS)
+        for model, field in (
+            ("Channel", "host"),
+            ("Conversation", "erase_host"),
+            ("Message", "host"),
+            ("Template", "host"),
+            ("TemplateSample", "host"),
+        ):
+            assert field not in {item.name for item in new.get_model(APP, model)._meta.get_fields()}
+
+        with connection.cursor() as cursor:
+            for table, column in (
+                ("whatsapp_inbox_channel", "host"),
+                ("whatsapp_inbox_conversation", "erase_host"),
+                ("whatsapp_inbox_message", "host"),
+                ("whatsapp_inbox_template", "host"),
+                ("whatsapp_inbox_templatesample", "host"),
+            ):
+                cursor.execute(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = %s AND column_name = %s",
+                    [table, column],
+                )
+                assert cursor.fetchone() is not None
+
+        Channel = new.get_model(APP, "Channel")
+        TemplateSample = new.get_model(APP, "TemplateSample")
+        Channel.objects.create()
+        TemplateSample.objects.create(
+            header_format="IMAGE", key="sample.jpg", sha256="a" * 64,
+            content_type="image/jpeg", size=10, name="sample.jpg",
+        )
+        old = migrate(HOST_DEFAULTS)
+        assert "host" in {item.name for item in old.get_model(APP, "Channel")._meta.get_fields()}
+    finally:
+        migrate(latest())
 
 
 @pytest.mark.django_db(transaction=True)

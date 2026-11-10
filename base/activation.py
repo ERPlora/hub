@@ -301,7 +301,7 @@ def is_platform(scope: Scope) -> bool:
     """A scope that is no business choosing its apps: no business's at all, ERPlora's own hub or the worker's fixed
     one (phase 1 ran every app's scheduled tasks there, over the tables every hub shared; since S5 only the suite's
     tests written before the tenancy do, hub#1053). Every module is on in it."""
-    return scope.kind != HUB_SCOPE_KIND or scope.key in {settings.PLATFORM_HUB_SLUG, settings.WORKER_SCOPE_SLUG}
+    return scope.kind != HUB_SCOPE_KIND or scope.key == settings.PLATFORM_HUB_SLUG
 
 
 def states_of(scope: Scope) -> dict[str, Activation]:

@@ -168,14 +168,10 @@ def _the_pool() -> Pool:
         return _pool
 
 
-def after_commit(fn: Callable[..., Any], *args: Hashable, scope: Scope | None = None) -> None:
+def after_commit(fn: Callable[..., Any], *args: Hashable) -> None:
     """Run ``fn(*args)`` after the COMMIT of the running operation, in a thread of the pool and in this operation's
-    database context; nothing after a rollback. ``args`` say which job it is (ids: hashable, logged on a failure).
-
-    ``scope``: the business the job works for, when it may not be this operation's. Since S5 it changes nothing: the
-    job runs in this operation's context, where another hub's operation is refused, and never in another hub's database
-    (``base.tenancy.context.current_for``); it is left from the tables phase 1 shared (hub#1053)."""
-    job = Job(fn, args, context.current() if scope is None else context.current_for(scope))
+    database context; nothing after a rollback. ``args`` say which job it is (ids: hashable, logged on a failure)."""
+    job = Job(fn, args, context.current())
     hash(job.key)
     on_commit(partial(_submit, job), robust=True)
 

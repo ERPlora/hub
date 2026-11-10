@@ -1377,13 +1377,10 @@ FAILED_EVENT_ERROR_LENGTH = 300
     ),
 )
 def system_status(ctx: OperationContext, data: SystemStatusIn) -> dict:
-    """The release (``base.system``: the commit, short) and its date, never made up, and where the business's data
-    lives (``Hub.db_name`` empty: phase 1's shared database)."""
-    hub = Hub.objects.filter(slug=ctx.scope.key).first()
+    """The release (``base.system``: the commit, short) and its date, never made up."""
     return {
         "version": system.version(settings.APP_VERSION),
         "released_at": system.released_at(settings.APP_RELEASED_AT),
-        "shared_database": not (hub is not None and hub.db_name),
     }
 
 

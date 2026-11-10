@@ -72,17 +72,15 @@ def test_the_status_says_the_release_and_where_the_data_lives(settings):
     assert run("base.system.status", ADMIN) == {
         "version": "4da2a10",
         "released_at": "2026-10-23T18:50:00Z",
-        # Phase 1: every business on the one shared database (``db_name`` empty).
-        "shared_database": True,
     }
 
 
-def test_a_hub_with_its_own_database_says_so(settings):
+def test_a_hub_with_its_own_database_has_no_shared_database_state(settings):
     settings.APP_VERSION, settings.APP_RELEASED_AT = "", ""
     Hub.objects.filter(slug="b").update(db_name="hub_0190f3a4b5c67d8e9fa0b1c2d3e4f5a6")
 
-    assert run("base.system.status", ADMIN, scope=B)["shared_database"] is False
-    assert run("base.system.status", ADMIN)["shared_database"] is True
+    assert "shared_database" not in run("base.system.status", ADMIN, scope=B)
+    assert "shared_database" not in run("base.system.status", ADMIN)
 
 
 def test_without_a_release_it_runs_the_development_build_and_never_makes_up_a_date(settings):
@@ -95,7 +93,7 @@ def test_without_a_release_it_runs_the_development_build_and_never_makes_up_a_da
 
 def test_the_status_carries_no_error_text(settings):
     """hub#2566: the old history sent the verbatim error of a rollback to any session; nothing like it travels now."""
-    assert set(run("base.system.status", ADMIN)) == {"version", "released_at", "shared_database"}
+    assert set(run("base.system.status", ADMIN)) == {"version", "released_at"}
 
 
 # ── base.event.list: the log of events between apps (BASE-G90) ──────────────────────────────────────────────

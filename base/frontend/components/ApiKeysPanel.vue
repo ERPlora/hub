@@ -40,7 +40,6 @@ const revoke = useCommand('base.api_key.revoke');
 
 const rows = computed<ApiKeyRow[]>(() => data.value?.keys ?? []);
 const apps = computed(() => data.value?.apps ?? []);
-const available = computed(() => data.value?.available ?? false);
 const failed = computed(() => status.value === 'error' && data.value === undefined);
 const when = (value: string | null) => (value ? formatDateTime(value, locale.value) : t('base.apiKeys.never'));
 const appName = (id: string) => apps.value.find((app) => app.id === id)?.name ?? id;
@@ -216,57 +215,47 @@ async function confirmRevoke(): Promise<void> {
 
 <template>
   <section class="api-keys">
-    <InlineFeedback
-      v-if="data && !available"
-      tone="info"
-      data-testid="api-keys-unavailable"
-      :heading="t('base.apiKeys.unavailableHeading')"
-    >
-      {{ t('base.apiKeys.unavailable') }}
-    </InlineFeedback>
-    <template v-else>
-      <header class="api-keys-head">
-        <p class="api-keys-intro">
-          {{ t('base.apiKeys.intro') }}
-        </p>
-        <ion-button
-          v-if="data"
-          data-testid="api-keys-new"
-          @click="startCreating()"
-        >
-          {{ t('base.apiKeys.new') }}
-        </ion-button>
-      </header>
-      <DataTable
-        testid="api-keys"
-        :columns="columns"
-        :rows="rows"
-        :actions="actions"
-        :page-size="20"
-        :page-size-options="[]"
-        :views="['table', 'cards']"
-        :card-title="(row: ApiKeyRow) => row.name"
-        card-title-column="name"
-        :search-keys="['name', 'prefix']"
-        :search-placeholder="t('base.apiKeys.search')"
-        :empty-message="t('base.apiKeys.empty')"
-        :loading="data === undefined && !failed"
-        :error="failed ? t('base.apiKeys.loadError') : undefined"
-        @action="onAction"
-        @retry="refresh()"
+    <header class="api-keys-head">
+      <p class="api-keys-intro">
+        {{ t('base.apiKeys.intro') }}
+      </p>
+      <ion-button
+        v-if="data"
+        data-testid="api-keys-new"
+        @click="startCreating()"
       >
-        <template #scopes="{ row }">
-          <span data-testid="api-keys-scopes">{{ scopesText(row as ApiKeyRow) }}</span>
-        </template>
-        <template #state="{ row }">
-          <StatusPill
-            size="sm"
-            :tone="(row as ApiKeyRow).revoked_at ? 'neutral' : 'success'"
-            :label="t((row as ApiKeyRow).revoked_at ? 'base.apiKeys.states.revoked' : 'base.apiKeys.states.active')"
-          />
-        </template>
-      </DataTable>
-    </template>
+        {{ t('base.apiKeys.new') }}
+      </ion-button>
+    </header>
+    <DataTable
+      testid="api-keys"
+      :columns="columns"
+      :rows="rows"
+      :actions="actions"
+      :page-size="20"
+      :page-size-options="[]"
+      :views="['table', 'cards']"
+      :card-title="(row: ApiKeyRow) => row.name"
+      card-title-column="name"
+      :search-keys="['name', 'prefix']"
+      :search-placeholder="t('base.apiKeys.search')"
+      :empty-message="t('base.apiKeys.empty')"
+      :loading="data === undefined && !failed"
+      :error="failed ? t('base.apiKeys.loadError') : undefined"
+      @action="onAction"
+      @retry="refresh()"
+    >
+      <template #scopes="{ row }">
+        <span data-testid="api-keys-scopes">{{ scopesText(row as ApiKeyRow) }}</span>
+      </template>
+      <template #state="{ row }">
+        <StatusPill
+          size="sm"
+          :tone="(row as ApiKeyRow).revoked_at ? 'neutral' : 'success'"
+          :label="t((row as ApiKeyRow).revoked_at ? 'base.apiKeys.states.revoked' : 'base.apiKeys.states.active')"
+        />
+      </template>
+    </DataTable>
 
     <FormModal
       v-model:open="creating"

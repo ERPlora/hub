@@ -112,23 +112,17 @@ def test_a_client_message_id_is_used_once():
     message(conv, "wamid.4")
 
 
-def test_one_channel_row_per_business():
-    # Each business (phase 1: its host) keeps its own number; the one row shared by all is gone.
-    Channel.objects.create(host="a")
-    Channel.objects.create(host="b")
-    assert violates(
-        "whatsapp_inbox_channel_one_per_host", lambda: Channel.objects.create(host="a")
-    )
+def test_one_channel_row_per_database():
+    Channel.objects.create()
+    assert violates("whatsapp_inbox_channel_one_per_host", Channel.objects.create)
 
 
-def test_one_template_per_business_name_and_language():
-    Template.objects.create(host="a", name="recordatorio", language="es")
-    Template.objects.create(host="a", name="recordatorio", language="en")
-    # Another business holds its own of the same name (phase 1 shares the table).
-    Template.objects.create(host="b", name="recordatorio", language="es")
+def test_one_template_per_name_and_language():
+    Template.objects.create(name="recordatorio", language="es")
+    Template.objects.create(name="recordatorio", language="en")
     assert violates(
         "whatsapp_inbox_template_live_host_name_language_unique",
-        lambda: Template.objects.create(host="a", name="recordatorio", language="es"),
+        lambda: Template.objects.create(name="recordatorio", language="es"),
     )
 
 

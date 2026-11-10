@@ -18,6 +18,7 @@ from apps.whatsapp_inbox.tests.conftest import B, ctx_for
 from apps.whatsapp_inbox.tests.test_template_header_file import PDF, upload
 from apps.whatsapp_inbox.tests.test_template_header_file import hub_files  # noqa: F401 - fixture
 from base import assistant
+from base.tenancy.tests import hubs
 from base.tests.test_assistant import named_by_the_screen, technical_names
 
 APP = Path(apps.get_app_config("whatsapp_inbox").path)
@@ -165,11 +166,16 @@ def test_the_card_of_a_template_to_review_names_its_headers_file_and_never_its_s
 
 
 @pytest.mark.django_db
-def test_a_file_of_another_business_is_never_named_nor_shown_by_its_id():
-    """Phase 1 shares the tables: ``b``'s file, named in a write of ``a``, is left out of the card."""
-    theirs = upload(PDF, "DOCUMENT", "de-b.pdf", ctx=ctx_for(scope=B))
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.usefixtures("no_test_fallback")
+def test_a_file_of_another_business_is_never_named_nor_shown_by_its_id(hub_a, hub_b):
+    from base.tenancy.context import use_hub
+    from live.context import Scope
 
-    card = assistant.card(get("whatsapp_inbox.message.send"), sending(theirs.id, KEYS[0]), "es", ctx=ctx_for("hub_employee"))
+    with use_hub(hub_b):
+        theirs = upload(PDF, "DOCUMENT", "de-b.pdf", ctx=ctx_for(scope=Scope("host", hub_b.slug)))
+    with use_hub(hub_a):
+        card = assistant.card(get("whatsapp_inbox.message.send"), sending(theirs.id, KEYS[0]), "es", ctx=ctx_for("hub_employee", scope=Scope("host", hub_a.slug)))
 
     assert values(card)["template"] == {"name": "carta_del_dia", "language": "es"}
     assert not AN_ID.search(json.dumps(card, ensure_ascii=False))

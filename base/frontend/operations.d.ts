@@ -527,8 +527,6 @@ export interface SystemStatus {
   version: string;
   /** When it was published (ISO 8601), or null: never made up. */
   released_at: string | null;
-  /** Phase 1: the database every business shares. */
-  shared_database: boolean;
 }
 
 /** `base.EventLogEntryOut`: an event between apps as System › Logs shows it. */

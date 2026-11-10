@@ -130,12 +130,11 @@ describe('ApiKeysPanel', () => {
     }
   });
 
-  it('a business that cannot have keys yet is told so, with nothing to create', async () => {
+  it('the phase-1 unavailable notice is gone; the keys panel and its action stay', async () => {
     const m = await open({ locale: 'es' });
     await m.result(m.call, 'base.api_key.list', { available: false, keys: [], apps: APPS });
-    expect(m.wrapper.get('[data-testid="api-keys-unavailable"]').text()).toContain('Las API keys todavía no están disponibles en este negocio.');
-    expect(m.wrapper.find('[data-testid="api-keys-new"]').exists()).toBe(false);
-    expect(m.wrapper.find('[data-testid="api-keys-row"]').exists()).toBe(false);
+    expect(m.wrapper.find('[data-testid="api-keys-unavailable"]').exists()).toBe(false);
+    expect(m.wrapper.find('[data-testid="api-keys-new"]').exists()).toBe(true);
   });
 
   it('a list that cannot be read says so with «Retry», never «no keys»', async () => {
