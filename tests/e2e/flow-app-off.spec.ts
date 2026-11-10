@@ -12,13 +12,14 @@ const TAG = 'E2E FlowOff';
 const OFF_EVENT = 'Its app, Tasks, is off in this business: turn it on in Apps, or choose another event.';
 const OFF_ACTION = 'Its app, Tasks, is off in this business: turn it on in Apps, or choose another action.';
 
-const cleanUp = (): void =>
+function cleanUp(): void {
   psql(
     [
       `delete from flow_flowrun where flow_id in (select id from flow_flow where name like '${TAG}%')`,
       `delete from flow_flow where name like '${TAG}%'`,
     ].join('; '),
   );
+}
 
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
