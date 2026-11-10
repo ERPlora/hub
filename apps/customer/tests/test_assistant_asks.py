@@ -130,6 +130,8 @@ def test_the_merge_instruction_completes_the_action_with_human_references():
         "customer.customer.by_phone",
         "customer.customer.list",
         "never ask the person for an internal id",
+        # The ids those reads return go in the id fields: an id in `customer` or `absorbed` is no name, phone or email.
+        "their ids in `id` and `absorbed_id`",
     ):
         assert expected in description
 

@@ -673,10 +673,11 @@ def delete_customer(ctx: OperationContext, data: CustomerRefIn) -> dict:
     ai=AI(
         "Use this tool once both cards are known; do not stop at reading or explaining the merge. `customer` is the "
         "card that stays and `absorbed` is the duplicate merged into it: for «merge A into B», B is `customer` and A "
-        "is `absorbed`. Pass an exact name, phone or email in either field, or the ids returned by "
-        "customer.customer.by_phone or customer.customer.list; never ask the person for an internal id. The survivor "
-        "keeps its data and fills only its empty fields, notes are appended and figures summed; activity, custom "
-        "values, groups, tags, purchases, orders and consent move to it, and the duplicate is retired. Cannot be undone.",
+        "is `absorbed`. Pass an exact name, phone or email in either field or, once customer.customer.by_phone or "
+        "customer.customer.list found the cards, their ids in `id` and `absorbed_id`; never ask the person for an "
+        "internal id. The survivor keeps its data and fills only its empty fields, notes are appended and figures "
+        "summed; activity, custom values, groups, tags, purchases, orders and consent move to it, and the duplicate is "
+        "retired. Cannot be undone.",
         risk="high",
         asks={
             "en": (
