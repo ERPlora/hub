@@ -37,6 +37,7 @@ from django.utils import translation
 from django.utils.functional import Promise
 from django.utils.module_loading import module_has_submodule
 from django.utils.translation import gettext_lazy as _
+from live.context import Scope
 from live.errors import Conflict, NotFound
 from live.meta import LiveAppConfig, module_configs
 
@@ -92,10 +93,14 @@ class SetAside:
         return f"{self.app.label}/{self.declaration.get('id', '')}"
 
 
-def declarations() -> list[tuple[LiveAppConfig, dict]]:
-    """Every recipe the active apps declare in their ``recipes.py``, in the order of the apps and of each list."""
+def declarations(scope: Scope | None = None) -> list[tuple[LiveAppConfig, dict]]:
+    """Every recipe the apps declare in their ``recipes.py``, in the order of the apps and of each list: those on in
+    ``scope``'s business (what the gallery offers), or, without one, every installed app's, on or off — what an app
+    fixes on the automations built from its recipe holds while it is off (hub#447, FLOW-F36): a run already under way
+    may be resumed with the tools of another app that is still on."""
+    apps = queries.active_apps(scope) if scope is not None else queries.installed_apps()
     found: list[tuple[LiveAppConfig, dict]] = []
-    for label, config in sorted(queries.active_apps().items()):
+    for label, config in sorted(apps.items()):
         if not module_has_submodule(config.module, "recipes"):
             continue
         for declared in getattr(import_module(f"{config.name}.recipes"), "RECIPES", []):
@@ -161,7 +166,7 @@ def _apps_named(parsed: CreateIn) -> set[str]:
     return {name.split(".", 1)[0] for name in named} & apps
 
 
-def _problem(config: LiveAppConfig, declared: Any) -> tuple[str, str, tuple[str, ...]] | None:
+def _problem(scope: Scope, config: LiveAppConfig, declared: Any) -> tuple[str, str, tuple[str, ...]] | None:
     """``(code, message, apps it lacks)`` of why this business cannot offer ``declared``; ``None`` when it can."""
     if not isinstance(declared, dict) or not RECIPE_ID.fullmatch(str(declared.get("id", ""))):
         return INVALID, str(NOT_A_RECIPE) % {"problem": "id"}, ()
@@ -175,10 +180,10 @@ def _problem(config: LiveAppConfig, declared: Any) -> tuple[str, str, tuple[str,
         first = error.errors()[0]
         where = ".".join(str(part) for part in first["loc"])
         return INVALID, str(NOT_A_RECIPE) % {"problem": f"{where}: {first['msg']}"}, ()
-    lacking = tuple(sorted(_apps_named(parsed) - set(queries.active_apps())))
+    lacking = tuple(sorted(_apps_named(parsed) - set(queries.active_apps(scope))))
     if lacking:
         return NEEDS_APPS, str(NEEDS_APPS_MESSAGE) % {"apps": ", ".join(lacking)}, lacking
-    problems, _code = queries.catalog_problems(parsed.trigger, parsed.steps)
+    problems, _code = queries.catalog_problems(scope, parsed.trigger, parsed.steps)
     if problems:
         return INVALID, next(iter(problems.values())), ()
     needed = document.required_grants(built["steps"])
@@ -192,13 +197,13 @@ def _problem(config: LiveAppConfig, declared: Any) -> tuple[str, str, tuple[str,
     return None
 
 
-def shelf() -> tuple[list[Recipe], list[SetAside]]:
+def shelf(scope: Scope) -> tuple[list[Recipe], list[SetAside]]:
     """What the active apps bring: the recipes this business can offer and the ones it sets aside."""
     offered: list[Recipe] = []
     set_aside: list[SetAside] = []
     seen: set[str] = set()
-    for config, declared in declarations():
-        problem = _problem(config, declared)
+    for config, declared in declarations(scope):
+        problem = _problem(scope, config, declared)
         ref = f"{config.label}/{declared.get('id', '') if isinstance(declared, dict) else ''}"
         if problem is None and ref in seen:
             problem = (INVALID, str(REPEATED), ())
@@ -212,10 +217,10 @@ def shelf() -> tuple[list[Recipe], list[SetAside]]:
     return offered, set_aside
 
 
-def find(ref: str) -> Recipe:
+def find(scope: Scope, ref: str) -> Recipe:
     """The recipe ``<app>/<id>`` this business offers. ``NotFound`` when no active app brings it; a
     ``Conflict`` with its own code when it is set aside."""
-    offered, set_aside = shelf()
+    offered, set_aside = shelf(scope)
     for recipe in offered:
         if recipe.ref == ref:
             return recipe
@@ -248,8 +253,8 @@ def missing_clauses(recipe: Recipe, flow: Flow) -> dict[str, dict[str, Any]]:
 
 
 def _declaring(ref: str) -> tuple[LiveAppConfig, dict] | None:
-    """The active app that brings ``ref`` and what it declares for it today, as it is (set aside or not: a fix it
-    makes must reach the automations built from it all the same); ``None`` when no active app does."""
+    """The installed app that brings ``ref`` and what it declares for it today, as it is (set aside or not, on or off:
+    a fix it makes must reach the automations built from it all the same); ``None`` when no installed app does."""
     for config, declared in declarations():
         if isinstance(declared, dict) and f"{config.label}/{declared.get('id', '')}" == ref:
             return config, declared
@@ -273,7 +278,7 @@ def fixed_filter(flow: Flow) -> dict[str, Any]:
 def fixed_by_app(flow: Flow) -> dict[str, Any] | None:
     """What its app fixes today on ``flow`` and is not taken off from it (FLOW-F36): the data its recipe's «Only
     when…» has a condition on (while it starts on that ``event``) and, by step id and tool, the data its «Ask the
-    assistant» steps fix; ``None`` when no active app's recipe built it or it fixes nothing. A copy has no recipe: what
+    assistant» steps fix; ``None`` when no installed app's recipe built it or it fixes nothing. A copy has no recipe: what
     its app fixed is the owner's there."""
     found = _declaring(flow.recipe) if flow.recipe else None
     if found is None:

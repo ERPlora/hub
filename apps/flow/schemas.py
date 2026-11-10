@@ -937,9 +937,16 @@ class CatalogActionOut(Schema):
     ask_first: bool = False
 
 
+class CatalogAppOut(Schema):
+    app: str
+    app_name: str
+
+
 class CatalogOut(Schema):
     events: list[CatalogEventOut]
     actions: list[CatalogActionOut]
+    #: The installed apps that are off in the business: what a saved automation may still name (hub#1054).
+    off_apps: list[CatalogAppOut]
 
 
 class SampleOut(Schema):

@@ -4,6 +4,8 @@
 
 ```bash
 git submodule update --init          # packages/live y packages/ui (ERPlora/live, ERPlora/ui)
+git config merge.workbook-translation.driver \
+  'uv run --no-sync python manage.py merge_workbook_translation %O %A %B %P || git merge-file -L ours -L base -L theirs %A %O %B'  # una vez por clon: lo comparten sus worktrees
 printf 'DEBUG=True\n' > .env         # sin DEBUG, el hub arranca como producción
 uv sync && pnpm install
 uv run python manage.py migrate && uv run python manage.py seed_local_hubs   # deja `a` y `b` en el registro

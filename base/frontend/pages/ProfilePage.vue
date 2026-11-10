@@ -156,6 +156,7 @@ async function savePrefs(change: Partial<Preferences>): Promise<void> {
   try {
     const answer = await prefsCommand.run(wanted);
     if (answer.language === 'es' || answer.language === 'en') i18n.$i18n.locale = answer.language;
+    if ('language' in change) sessionChanged();
     if ('theme_mode' in change || 'palette' in change || 'ui_scale' in change) paint(wanted);
   } catch (reason) {
     prefsError.value = reason instanceof ApiError && reason.message ? reason.message : t('base.profile.prefs.failed');

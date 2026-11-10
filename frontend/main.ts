@@ -19,7 +19,7 @@ import {
 } from '@erplora/ui/shell';
 import { assistantMessages, configureAssistant, forgetAssistant } from '@erplora/ui/components';
 import { createLiveClient, type LiveClient, provideLiveClient, readSpaConfig } from '@erplora/ui/sdk';
-import { defineAsyncComponent, ref } from 'vue';
+import { defineAsyncComponent, ref, watch } from 'vue';
 import { isNavigationFailure, type RouteRecordRaw } from 'vue-router';
 
 import { onSessionChanged, readAccess, startWayIn } from '../base/frontend/lib/access';
@@ -255,6 +255,15 @@ export async function boot(
     label: () => session.session.value?.user?.label,
   });
   onSessionChanged(() => void reload());
+  // The server writes the texts of every live read in the stream's language (BASE-F64, hub#1038): a session back in
+  // another language reopens the tab's one stream, so the checklist, the panels and the bell answer in it at once,
+  // whichever screens are mounted.
+  watch(
+    () => session.session.value?.language,
+    (language, previous) => {
+      if (language && previous && language !== previous) client.stream.reconnect();
+    },
+  );
 }
 
 type Translate = (key: string, values?: Record<string, unknown>) => string;

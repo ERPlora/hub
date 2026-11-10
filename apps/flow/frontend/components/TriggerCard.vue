@@ -41,6 +41,14 @@ const events = computed<ComboOption[]>(() =>
     .map(({ id, label, hint }) => ({ id, label, hint })),
 );
 
+/** The app, off in this business, of the event a saved trigger names: it is missing from the list for that (hub#1054). */
+const offApp = computed(() => {
+  const value = trigger.value;
+  if (value.kind !== 'event' || !value.event || props.catalog?.events.some((event) => event.name === value.event)) return undefined;
+  const app = value.event.split('.', 1)[0];
+  return props.catalog?.off_apps?.find((off) => off.app === app);
+});
+
 const chosenEvent = computed<ComboOption | null>(() => {
   const value = trigger.value;
   if (value.kind !== 'event' || !value.event) return null;
@@ -150,7 +158,7 @@ const generalError = computed(() => props.errors['trigger.at'] ?? props.errors['
             :options="events"
             :label="$t('flow.trigger.chooseEvent')"
             :placeholder="$t('flow.trigger.searchEvent')"
-            :error-text="errors['trigger.event']"
+            :error-text="errors['trigger.event'] ?? (offApp ? $t('flow.trigger.appOff', { app: offApp.app_name }) : undefined)"
             :clearable="false"
             @update:model-value="setEvent"
           />

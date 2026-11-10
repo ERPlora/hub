@@ -14,7 +14,7 @@ from live.errors import InvalidPayload
 from apps.sale.models import Order
 from apps.table.models import TableSession
 
-from .conftest import add_line, make_session, make_table, open_check, run
+from .conftest import A, add_line, make_session, make_table, open_check, run
 
 pytestmark = pytest.mark.django_db
 
@@ -58,7 +58,7 @@ def test_no_automation_is_offered_or_granted_what_is_done_at_the_table(operation
     from apps.flow.models import Flow
     from apps.flow.queries import catalog_operations
 
-    assert operation not in catalog_operations()
+    assert operation not in catalog_operations(A)
     with pytest.raises(InvalidPayload) as refused:
         run("flow.flow.create", {"steps": [step(operation, AT_THE_TABLE[operation])]})
     assert refused.value.code == "flow.high_risk"

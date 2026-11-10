@@ -172,6 +172,23 @@ def make_flow(name: str = "Welcome", **fields):
     return Flow.objects.create(name=name, **fields)
 
 
+def due_daily_flow(monkeypatch):
+    """A flow every day at 09:00 whose 09:00 has not fired, with the clock at 12:00 of 2026-10-15 in Madrid."""
+    from zoneinfo import ZoneInfo
+
+    from apps.flow.models import Flow
+
+    madrid = ZoneInfo("Europe/Madrid")
+    now = dt.datetime(2026, 10, 15, 12, 0, tzinfo=madrid)
+    monkeypatch.setattr(timezone, "now", lambda: now)
+    return make_flow(
+        trigger_kind=Flow.Trigger.SCHEDULE,
+        trigger_event="",
+        schedule={"every": "day", "time": "09:00"},
+        next_fire_at=dt.datetime(2026, 10, 15, 9, 0, tzinfo=madrid),
+    )
+
+
 def make_run(flow, **fields):
     """A run of ``flow`` straight in the table, finished well unless told otherwise."""
     from apps.flow.models import FlowRun

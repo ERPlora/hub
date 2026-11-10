@@ -468,7 +468,9 @@ Pasos:
   3. Debajo, en este orden: «Empieza con un negocio como el tuyo» (solo mientras el negocio está vacío y
      para quien lo administra, BASE-F38), «Mis apps», «Termina de configurar tu negocio» y el tablero de
      paneles.
-  4. Abajo, dos pestañas: «Resumen» (lo anterior) y «Actividad».
+  4. Al cambiar el idioma de la interfaz, los nombres de «Mis apps» y los textos del checklist cambian en el
+     sitio, sin recargar ni reabrir la aplicación.
+  5. Abajo, dos pestañas: «Resumen» (lo anterior) y «Actividad».
 Entra: el nombre del negocio y la fecha del dispositivo.
 Sale: nada guardado.
 Si falla: una zona que no carga no tumba las demás; cada una dice lo suyo. En el móvil las zonas se
@@ -1852,7 +1854,9 @@ Pasos:
   4. En «Preferencias», «Idioma» («Usar el idioma del negocio», «Español», «English») y «Apariencia» («Paleta de
      tema», «Tema»: «Sistema (auto)», «Claro», «Oscuro», y «Tamaño de la interfaz»: 80, 90, 100, 110 o 120%, por
      defecto 100%) se guardan al elegir y se aplican al momento en cualquier dispositivo; «Usar la apariencia del
-     negocio» deshace lo propio y devuelve el tamaño a 100%.
+     negocio» deshace lo propio y devuelve el tamaño a 100%. El idioma pasa a toda la aplicación abierta, también a
+     los textos que manda el servidor (el menú lateral, «Mis apps», el checklist, los paneles de Inicio y la campana),
+     sin recargar ni volver a Inicio.
 Entra: el perfil de quien tiene la sesión.
 Sale: su nombre en este negocio (el que sale en el menú lateral, en las caras y en «Dispositivos»), su foto, su idioma
 y su apariencia, incluido el tamaño de interfaz, que le siguen en cualquier dispositivo en el que entre, con su PIN,
