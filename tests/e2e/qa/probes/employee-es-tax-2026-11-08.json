@@ -1,0 +1,11 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261108.employee.es.tax.category.list","app":"tax","tool":"tax.category.list","role":"employee","language":"es","phrase":"¿qué categorías de IVA puedo elegir al revisar un producto?","expect":"read"},
+    {"id":"qa20261108.employee.es.tax.rule.list","app":"tax","tool":"tax.rule.list","role":"employee","language":"es","phrase":"enséñame los porcentajes fiscales vigentes hoy en España","expect":"read"},
+    {"id":"qa20261108.employee.es.tax.rule.status","app":"tax","tool":"tax.rule.status","role":"employee","language":"es","phrase":"¿están configurados los impuestos necesarios para poder vender ahora?","expect":"read"},
+    {"id":"qa20261108.employee.es.tax.alias.create","app":"tax","tool":"tax.alias.create","role":"employee","language":"es","phrase":"enseña al importador que «iva empleado qa» equivale a product.qa","expect":"refused"},
+    {"id":"qa20261108.employee.es.tax.category.create","app":"tax","tool":"tax.category.create","role":"employee","language":"es","phrase":"crea una categoría fiscal nueva llamada product.empleado.qa","expect":"refused"},
+    {"id":"qa20261108.employee.es.tax.rule.end","app":"tax","tool":"tax.rule.end","role":"employee","language":"es","phrase":"termina la regla española de product.qa el próximo 31 de diciembre","expect":"refused"}
+  ]
+}
