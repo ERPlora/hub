@@ -21,7 +21,6 @@ from apps.customer.models import Customer
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template
 from apps.whatsapp_inbox.tests.conftest import (
     A,
-    B,
     NOW,
     card,
     connect,
@@ -31,6 +30,7 @@ from apps.whatsapp_inbox.tests.conftest import (
     system,
     template,
 )
+from base.tenancy.tests import hubs
 
 pytestmark = pytest.mark.django_db
 
@@ -414,42 +414,64 @@ def channel_of(scope):
     return run("whatsapp_inbox.channel.get", {}, ctx_for(scope=scope))
 
 
-def test_each_business_keeps_its_own_number_and_its_own_version():
-    # The row was one for every business: B's newer photo said «not connected» for A too.
-    assert connect(version=50).applied is True
-    b = {"version": 120, "status": "not_connected", "phone_number": "", "display_name": ""}
-    assert system("whatsapp_inbox.channel.sync", b, B).applied is True
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.usefixtures("no_test_fallback")
+def test_each_business_keeps_its_own_number_and_its_own_version(hub_a, hub_b):
+    from base.tenancy.context import use_hub
+    from live.context import Scope
 
-    a_now, b_now = channel_of(A), channel_of(B)
-    assert (a_now.status, a_now.phone_number, a_now.monthly_limit) == ("connected", "+34910000000", 150)
-    assert (b_now.status, b_now.phone_number, b_now.monthly_limit) == ("not_connected", "", 0)
-    # Each version is its own business's: A's 60 is newer than A's 50, whatever B's is.
-    assert connect(version=60, status="reconnect_needed").applied is True
-    assert system("whatsapp_inbox.channel.sync", {**b, "version": 110}, B).applied is False
-    assert (channel_of(A).status, channel_of(B).status) == ("reconnect_needed", "not_connected")
-    assert set(Channel.objects.values_list("host", "version")) == {("a", 60), ("b", 120)}
+    with use_hub(hub_a):
+        assert system("whatsapp_inbox.channel.sync", {"version": 50, "status": "connected", "phone_number": "+34910000000", "monthly_limit": 150}, Scope("host", hub_a.slug)).applied is True
+        assert system("whatsapp_inbox.channel.sync", {"version": 60, "status": "reconnect_needed", "phone_number": "+34910000000", "monthly_limit": 150}, Scope("host", hub_a.slug)).applied is True
+    with use_hub(hub_b):
+        b = {"version": 120, "status": "not_connected", "phone_number": "", "display_name": ""}
+        assert system("whatsapp_inbox.channel.sync", b, Scope("host", hub_b.slug)).applied is True
+        assert system("whatsapp_inbox.channel.sync", {**b, "version": 110}, Scope("host", hub_b.slug)).applied is False
+        assert Channel.objects.get().version == 120
+
+    with use_hub(hub_a):
+        a_now = channel_of(Scope("host", hub_a.slug))
+        assert (a_now.status, a_now.phone_number, a_now.monthly_limit) == ("reconnect_needed", "+34910000000", 150)
+    with use_hub(hub_b):
+        b_now = channel_of(Scope("host", hub_b.slug))
+        assert (b_now.status, b_now.phone_number, b_now.monthly_limit) == ("not_connected", "", 0)
 
 
-def test_only_the_business_with_its_number_connected_may_send_and_its_month_is_its_own():
-    connect(version=1, monthly_limit=150, monthly_usage=150, usage_month="2026-10")
-    receive("wamid.1", "34600111222")
-    ref = {"id": str(conv().id)}
-    a = run("whatsapp_inbox.conversation.detail", ref, ctx_for(scope=A))
-    b = run("whatsapp_inbox.conversation.detail", ref, ctx_for(scope=B))
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.usefixtures("no_test_fallback")
+def test_only_the_business_with_its_number_connected_may_send_and_its_month_is_its_own(hub_a, hub_b):
+    from base.tenancy.context import use_hub
+    from live.context import Scope
+
+    with use_hub(hub_a):
+        system(
+            "whatsapp_inbox.channel.sync",
+            {"version": 1, "status": "connected", "phone_number": "+34910000000", "monthly_limit": 150, "monthly_usage": 150, "usage_month": "2026-10"},
+            Scope("host", hub_a.slug),
+        )
+        conversation = receive("wamid.1", "34600111222", scope=Scope("host", hub_a.slug))
+        ref = {"id": str(conversation.conversation_id)}
+        a = run("whatsapp_inbox.conversation.detail", ref, ctx_for(scope=Scope("host", hub_a.slug)))
+        a_month = run("whatsapp_inbox.conversation.summary", {}, ctx_for(scope=Scope("host", hub_a.slug)))
+    with use_hub(hub_b):
+        other = receive("wamid.2", "34600222111", scope=Scope("host", hub_b.slug))
+        b = run(
+            "whatsapp_inbox.conversation.detail",
+            {"id": str(other.conversation_id)},
+            ctx_for(scope=Scope("host", hub_b.slug)),
+        )
+        b_month = run("whatsapp_inbox.conversation.summary", {}, ctx_for(scope=Scope("host", hub_b.slug)))
     assert (a.send_blocked, b.send_blocked) == ("cap_reached", "not_connected")
-    a_month = run("whatsapp_inbox.conversation.summary", {}, ctx_for(scope=A))
-    b_month = run("whatsapp_inbox.conversation.summary", {}, ctx_for(scope=B))
     assert (a_month.cap_reached, b_month.cap_reached) == (True, False)
 
 
-def test_each_business_s_photo_keeps_its_own_number(client, settings):
-    # Two businesses with the inbox on: A's photo v50 says connected, B's v120 not connected.
-    from base.models import Hub
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.usefixtures("no_test_fallback")
+def test_each_business_s_photo_keeps_its_own_number(client, settings, hub_a, hub_b):
     from base.tests.test_internal import SECRET, signed
 
     settings.INTERNAL_SHARED_SECRET, settings.INTERNAL_SHARED_SECRET_PREVIOUS = SECRET, ""
-    # The registry has the local hubs ``a`` and ``b`` (the root conftest, as ``seed_local_hubs``).
-    a_id, b_id = (str(Hub.objects.get(slug=slug).id) for slug in ("a", "b"))
+    a_id, b_id = str(hub_a.id), str(hub_b.id)
     block = {"status": "connected", "phone_number": "+34910000000", "display_name": "Ana", "version": 1}
 
     def photo(hub_id, slug, version, **whatsapp):
@@ -459,8 +481,13 @@ def test_each_business_s_photo_keeps_its_own_number(client, settings):
     assert photo(a_id, "a", 50).json() == {"applied": True, "version": 50}
     assert photo(b_id, "b", 120, status="not_connected", phone_number="", display_name="").json()["applied"] is True
 
-    assert (channel_of(A).status, channel_of(A).phone_number) == ("connected", "+34910000000")
-    assert (channel_of(B).status, channel_of(B).phone_number) == ("not_connected", "")
+    from base.tenancy.context import use_hub
+    from live.context import Scope
+
+    with use_hub(hub_a):
+        assert (channel_of(Scope("host", hub_a.slug)).status, channel_of(Scope("host", hub_a.slug)).phone_number) == ("connected", "+34910000000")
+    with use_hub(hub_b):
+        assert (channel_of(Scope("host", hub_b.slug)).status, channel_of(Scope("host", hub_b.slug)).phone_number) == ("not_connected", "")
 
 
 def test_templates_are_replaced_by_the_list_and_the_missing_ones_stay_deleted():

@@ -1186,19 +1186,16 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   plan no incluye ninguno, nunca sin límite, y antes de la primera foto, `synced_at` vacío, no se supone
   tope: `Channel.cap_reached`) y la
   `version` de la última foto de erplora.com **de ese negocio** (una igual o más vieja se ignora). Cada negocio
-  tiene su BD (desde el corte S5, hub#602) y su fila en ella. La fila lleva además el negocio en `host` (la primera
-  etiqueta de su host, como `base.Membership`; única, desde la migración `0005`, reversible), de cuando las tablas
-  eran compartidas: cada operación lee y escribe solo la del `Scope` de su contexto, y bajo el respaldo de los tests
-  (`base/tenancy/tests/legacy.py`), que guarda `a` y `b` en la misma BD, la foto de `b` nunca pisa el número de `a`.
-  Retirar `host` es hub#1053. Solo la escribe lo que dice erplora.com: su foto y su respuesta al conectar o
-  desconectar desde Ajustes.
+  tiene su BD (desde el corte S5, hub#602) y una sola fila en ella: dos primeras fotos a la vez crean una y la otra
+  la encuentra. Solo la escribe lo que dice erplora.com: su foto y su respuesta al conectar o desconectar desde
+  Ajustes.
 - `Conversation`: número E.164 (`phone`, único entre las no borradas), nombre de WhatsApp y su forma
   para buscar (`contact_search`: sin mayúsculas, tildes, emojis ni espacios de más), ficha
   (`customer`, FK a `customer.Customer`; una ficha eliminada cuenta como ninguna), asignada
   (`assigned_to`, FK al usuario), estado, sin leer, último mensaje (hora, extracto, tipo, dirección),
   último mensaje del cliente (`last_inbound_at`: la ventana de 24 h), `erased_at`, y el borrado en
   erplora.com (`erase_status`: vacío, `pending`, `done`; `erase_phone`: el número que erplora.com tiene
-  que olvidar, solo hasta que lo confirma; `erase_host`: el negocio que lo borró, desde la migración `0007`) y la
+  que olvidar, solo hasta que lo confirma) y la
   marca «Necesita atención» (`needs_attention`, migración `0009`): la pone `conversation.flag` y la quitan una
   respuesta de una persona (`message.send` o el eco del móvil) y `conversation.set_status`, nunca `message.notify`.
 - `Message`: dirección (`inbound`, `outbound`), origen (`customer`, `phone_app`, `hub`), procedencia
@@ -1207,16 +1204,14 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   `delivered` → `read`, o `failed`) con el código del último intento o de Meta (`error_code`) y, solo en un
   rechazo que el Hub no nombra, el motivo tal como llegó (`error_message`; ver «Un motivo se dice…»),
   `wa_message_id` (único; vacío mientras no ha salido), `client_message_id` (la clave del envío, única,
-  obligatoria), el negocio que lo envió desde el Hub (`host`, de cuando las tablas eran compartidas, desde la
-  migración `0007`; vacío en lo que llega; hub#1053), plantilla usada y sus variables, quién lo envió, hora en que
+  obligatoria), plantilla usada y sus variables, quién lo envió, hora en que
   se dijo, objeto de Meta (`payload`), `reply_to` (el `wa_message_id` al que contesta o reacciona) y `reply_id`
   (la opción tocada: el identificador que el negocio puso en el botón, F38). Una reacción es un mensaje de tipo
   `reaction` cuyo `reply_to` es el mensaje al que responde: no suma en «Sin leer» ni pasa a último
   mensaje.
 - `Note`: texto, autor y hora.
-- `Template` (de cada negocio): el negocio en `host` (como `Channel`, hub#1053; desde la migración `0006`,
-  reversible: las copias de antes quedan sin negocio, solo en el admin, y la foto de cada negocio trae de Meta
-  las suyas), nombre + idioma (únicos por negocio entre las no borradas), categoría, estado en Meta (`DRAFT` mientras
+- `Template` (de cada negocio, en su BD): nombre + idioma (únicos entre las no borradas), categoría, estado en Meta
+  (`DRAFT` mientras
   Meta nunca la tuvo, `APPROVED`, `PENDING`, `REJECTED`, `PAUSED`, `DISABLED`, `DELETED`), cabecera
   (`header_format`: vacío, `TEXT`, `IMAGE`, `VIDEO`, `DOCUMENT` o `LOCATION`; `header`; `header_sample`, el
   archivo elegido aquí, que se queda vacío si la lista de Meta trae otro tipo de cabecera), cuerpo,
@@ -1234,7 +1229,7 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   tiene); el paso «Enviar un mensaje» de una automatización (FLOW-F31, F32) ofrece las `fillable`, no solo las
   `sendable`, y la de cabecera con archivo sale con el elegido en el paso o con el suyo (`message.notify` toma
   `template.header_sample` como `message.send`; sin ninguno, 422 en `header_sample`).
-- `TemplateSample` (de cada negocio, `host`): el archivo de una cabecera (`header_format` `IMAGE`, `VIDEO` o
+- `TemplateSample` (de cada negocio, en su BD): el archivo de una cabecera (`header_format` `IMAGE`, `VIDEO` o
   `DOCUMENT`, por sus primeros bytes, nunca por el nombre), su clave en el almacén del hub
   (`hub-<hex>/whatsapp_inbox/samples/<16 hex del sha256>.<ext>`: el mismo archivo dos veces es un objeto),
   `sha256`, tipo, tamaño y nombre. `/p/media/` lo sirve solo a una sesión del hub (`members_media` de `apps.py`; un
@@ -1279,16 +1274,12 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   `apps.py`) retoma con `SKIP LOCKED`, de 50 en 50, los mensajes `queued`/`sending`, las plantillas
   `queued`/`sending` y los borrados `pending` (de números y de plantillas) con más de 2 minutos. El
   worker la corre en cada negocio que sirve, en su BD y con su ámbito (`base.worker._serve_hub`): retoma lo de ese
-  negocio, y cada mensaje, plantilla o borrado se entrega a erplora.com como el de su negocio
-  (`Message.host`, `Template.host`, `Conversation.erase_host`), con su contenido; un mensaje o un borrado de
-  número anterior a la migración `0007`, sin negocio guardado, sale con el ámbito de esa pasada, el de ese
-  negocio. «Reintentar» (`message.retry`) y volver a borrar un
-  número ya borrado (`conversation.erase` por su id) entregan igual, con el negocio de la fila; sin negocio
-  guardado (anterior a `0007`), con el de quien lo pide. La entrega dice a `base.outbound` de qué negocio es el
-  trabajo (`scope=`, en `_after_commit_as`) y su hilo trabaja en el contexto de BD activo
-  (`base.tenancy.context.current_for`): una BD de hub solo guarda lo suyo, y una operación de otro negocio allí se
-  rechaza (`HubContextMismatch`), así que ningún trabajo llega a la BD de otro hub. El barrido pasa por el mismo
-  camino, dentro del `use_hub` de cada negocio (`tests/test_resume_per_business.py`).
+  negocio y lo entrega a erplora.com como ese negocio, con su contenido. «Reintentar» (`message.retry`) y volver a
+  borrar un número ya borrado (`conversation.erase` por su id) entregan igual, como el negocio de quien lo pide. El
+  hilo de la entrega trabaja en el contexto de BD de la operación que la pidió (`base.outbound`): una BD de hub solo
+  guarda lo suyo, y una operación de otro negocio allí se rechaza (`HubContextMismatch`), así que ningún trabajo llega
+  a la BD de otro hub. El barrido pasa por el mismo camino, dentro del `use_hub` de cada negocio
+  (`tests/test_resume_per_business.py`).
 - **Un mensaje nunca es «enviado» sin el id de Meta.** Respuestas de erplora.com: 200 con
   `wa_message_id` → `sent`; 409 → `failed` con su motivo (`whatsapp.cap_reached` se guarda como
   `whatsapp_inbox.cap_reached`; `whatsapp.reconnect_needed`, el 190 de Meta, como
@@ -1738,12 +1729,13 @@ el **Aprobar** se comprueba la cita de verdad) y en la e2e `tests/e2e/appointmen
   (RESERVATION-F17, probado en sus tests). F24 sigue a Reservas, que es quien escribe la reserva; la respuesta de
   citas también la crea (F21, CUSTOMER-F26).
 - ~~Modo compartido de la tenencia (PLAN-DB, S1)~~ — **resuelta** por el corte S5 (hub#602): cada negocio tiene su
-  BD y no comparte nada. Mientras lo hubo, las conversaciones de `a` y `b` compartían tablas y por eso `Channel` y
-  `Template` llevan su negocio en `host` (la foto de `b` pisaba el número de `a` y su lista de Meta dejaba
-  «Borradas en WhatsApp Manager» las plantillas de `a`), y el mensaje que sale del Hub y el número que se pide
-  olvidar guardan el suyo (el worker los retomaba con el suyo y «Reintentar» o volver a borrar desde otro negocio
-  los entregaban con el de quien lo pedía). Retirar esas columnas es hub#1053, que antes comprueba que ninguna BD
-  guarda filas de otro negocio (las que pudo copiar el modo `copy-all` del corte).
+  BD y no comparte nada. Mientras lo hubo, cada fila llevaba su negocio en `host` (`erase_host` en un número por
+  olvidar). hub#1053 lo saca de los modelos (migraciones `0011` y `0012`): las columnas, sus datos y las dos guardas
+  únicas que las nombran (`whatsapp_inbox_channel_one_per_host` y
+  `whatsapp_inbox_template_live_host_name_language_unique`) se quedan en la BD para el código de antes, que sigue
+  corriendo mientras el despliegue migra; el código nuevo las deja vacías, así que siguen guardando una fila de canal
+  y una plantilla viva por nombre e idioma. Rehacer esas guardas sin `host` y borrar las columnas es de un
+  despliegue posterior (hub#1132).
 
 Resueltas en los planes, y fuera de esta lista:
 

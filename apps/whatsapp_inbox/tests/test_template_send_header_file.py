@@ -17,14 +17,17 @@ import json
 import httpx
 import pytest
 import respx
+from live.context import Scope
 from live.errors import InvalidPayload
 
 from apps.whatsapp_inbox.models import Message, Template, TemplateSample
-from apps.whatsapp_inbox.tests.conftest import NOW, B, connect, ctx_for, receive, run, template
+from apps.whatsapp_inbox.tests.conftest import NOW, connect, ctx_for, receive, run, system, template
 from apps.whatsapp_inbox.tests.test_services import SEND, conv, send, stored
 from apps.whatsapp_inbox.tests.test_services import delivered  # noqa: F401 - fixture
 from apps.whatsapp_inbox.tests.test_template_header_file import JPEG, MP4, OTHER_JPEG, approved_with_photo, upload
 from apps.whatsapp_inbox.tests.test_template_header_file import hub_files  # noqa: F401 - fixture
+from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("hub_files")]
 
@@ -52,10 +55,19 @@ def with_photo(delivered) -> Template:
     return row
 
 
-def from_manager():
+def from_manager(scope=None):
     """A photo template made in WhatsApp Manager (no file of its own here), and a conversation."""
-    connect(templates=[template(MANAGER_PHOTO, header_format="IMAGE", body="¡Hola {{1}}!", variables=1)])
-    return a_conversation()
+    if scope is None:
+        connect(templates=[template(MANAGER_PHOTO, header_format="IMAGE", body="¡Hola {{1}}!", variables=1)])
+        return a_conversation()
+    system(
+        "whatsapp_inbox.channel.sync",
+        {"version": 1, "status": "connected", "phone_number": "+34910000000", "monthly_limit": 150,
+         "templates": [template(MANAGER_PHOTO, header_format="IMAGE", body="¡Hola {{1}}!", variables=1)]},
+        scope,
+    )
+    receive("wamid.IN", sent_at=(NOW - dt.timedelta(days=3)).isoformat(), scope=scope)
+    return conv()
 
 
 def sending(row: Template, **fields) -> dict:
@@ -147,16 +159,20 @@ def test_without_its_file_it_does_not_leave():
     assert not Message.objects.filter(direction=Message.Direction.OUTBOUND).exists()
 
 
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.usefixtures("no_test_fallback")
 @pytest.mark.parametrize("sample", ["another_kind", "another_business"])
-def test_the_file_is_of_its_kind_and_of_its_business(sample):
-    c = from_manager()
-    chosen = {
-        "another_kind": lambda: upload(MP4, "VIDEO", name="visita.mp4"),
-        "another_business": lambda: upload(ctx=ctx_for(scope=B)),
-    }[sample]()
+def test_the_file_is_of_its_kind_and_of_its_business(hub_a, hub_b, sample):
+    with use_hub(hub_a):
+        c = from_manager(Scope("host", hub_a.slug))
+        if sample == "another_kind":
+            chosen = upload(MP4, "VIDEO", name="visita.mp4", ctx=ctx_for(scope=Scope("host", hub_a.slug)))
+        else:
+            with use_hub(hub_b):
+                chosen = upload(ctx=ctx_for(scope=Scope("host", hub_b.slug)))
 
-    with pytest.raises(InvalidPayload) as refused:
-        send({"id": str(c.id), "template": {"name": MANAGER_PHOTO, "variables": ["Ana"], "header_sample": str(chosen.id)}})
+        with pytest.raises(InvalidPayload) as refused:
+            send({"id": str(c.id), "template": {"name": MANAGER_PHOTO, "variables": ["Ana"], "header_sample": str(chosen.id)}}, ctx_for(scope=Scope("host", hub_a.slug)))
 
     assert "file" in refused.value.fields["header_sample"]
 
@@ -215,24 +231,6 @@ def test_meta_not_taking_the_file_is_said_as_metas_never_erploras(delivered):
     assert (message.status, message.error_code) == (Message.Status.SENDING, "whatsapp_inbox.meta_unreachable")
     [listed] = [m for m in run("whatsapp_inbox.message.list", {"id": str(conv().id)}).rows if m.id == out.id]
     assert "Meta" in listed.error_message and "erplora" not in listed.error_message.lower()
-
-
-@respx.mock
-def test_a_message_never_carries_another_business_file(delivered):
-    """Phase 1 shares the tables: a message of ``a`` naming ``b``'s file (never written by the operations) is not
-    handed over with it."""
-    row = with_photo(delivered)
-    route = respx.post(SEND).mock(side_effect=httpx.ConnectError("down"))
-    out = delivered(lambda: send({"id": str(conv().id), "template": sending(row)}))
-    foreign = upload(OTHER_JPEG, name="de-b.jpg", ctx=ctx_for(scope=B))
-    Message.objects.filter(pk=out.id).update(header_sample_id=foreign.id)
-    calls = route.call_count
-
-    route.mock(side_effect=None, return_value=httpx.Response(200, json={"wa_message_id": "wamid.OUT"}))
-    delivered(lambda: run("whatsapp_inbox.message.retry", {"id": str(out.id)}))
-
-    assert route.call_count == calls
-    assert stored(out).error_code == "whatsapp_inbox.header_sample_missing"
 
 
 # ── An automation (notify) ──────────────────────────────────────────────────────────────────────

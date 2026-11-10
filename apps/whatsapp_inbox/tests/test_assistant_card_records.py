@@ -257,7 +257,7 @@ def test_a_record_of_another_business_is_left_out(hub_a, hub_b):
     with use_hub(hub_a):
         conversation = Conversation.objects.get(pk=receive(scope=in_a.scope).conversation_id)
         note = Note.objects.create(conversation=conversation, text="Prefers mornings")
-        kept = Template.objects.create(host=hub_a.slug, name="recordatorio", language="es", body="Hola")
+        kept = Template.objects.create(name="recordatorio", language="es", body="Hola")
         writes = [
             ("whatsapp_inbox.conversation.set_status", conversation, {"status": "open"}),
             ("whatsapp_inbox.note.delete", note, {}),
@@ -301,14 +301,11 @@ def test_the_reads_say_not_found_for_what_is_not_there(name):
 
 
 @pytest.mark.django_db
-def test_a_template_of_another_business_or_gone_for_good_is_not_found():
-    """Phase 1 shares the table: only the business's own, and not one Meta deleted too."""
-    theirs = Template.objects.create(host="b", name="recordatorio", language="es", body="Hola")
+def test_a_template_gone_for_good_is_not_found():
     gone = a_template("aviso")
     Template.objects.filter(pk=gone.pk).update(deleted_at=NOW)
-    for row in (theirs, gone):
-        with pytest.raises(NotFound):
-            read("whatsapp_inbox.template.get", {"id": str(row.id)})
+    with pytest.raises(NotFound):
+        read("whatsapp_inbox.template.get", {"id": str(gone.id)})
 
 
 @pytest.mark.parametrize("name", READS)

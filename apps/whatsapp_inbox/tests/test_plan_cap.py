@@ -17,9 +17,10 @@ from live.errors import Conflict
 
 from apps.whatsapp_inbox import clock
 from apps.whatsapp_inbox.models import Channel, Conversation, Message
-from apps.whatsapp_inbox.tests.conftest import A, B, NOW, connect, ctx_for, receive, run, system
+from apps.whatsapp_inbox.tests.conftest import NOW, connect, ctx_for, receive, run, system
 from base.models import Hub
 from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
 
 pytestmark = pytest.mark.django_db
 
@@ -130,15 +131,25 @@ def test_what_customers_write_still_arrives():
     assert (row.unread_count, row.last_message_preview) == (2, "¿Tenéis hora el viernes?")
 
 
-def test_each_business_has_its_own_plan():
-    connect(**NONE)
-    system(
-        "whatsapp_inbox.channel.sync",
-        {"version": 1, "status": "connected", "phone_number": "+34910000001", "monthly_limit": 150},
-        B,
-    )
-    a = run("whatsapp_inbox.channel.get", {}, ctx_for(scope=A))
-    b = run("whatsapp_inbox.channel.get", {}, ctx_for(scope=B))
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.usefixtures("no_test_fallback")
+def test_each_business_has_its_own_plan(hub_a, hub_b):
+    from live.context import Scope
+
+    with use_hub(hub_a):
+        system(
+            "whatsapp_inbox.channel.sync",
+            {"version": 1, "status": "connected", "phone_number": "+34910000000", **NONE},
+            Scope("host", hub_a.slug),
+        )
+        a = run("whatsapp_inbox.channel.get", {}, ctx_for(scope=Scope("host", hub_a.slug)))
+    with use_hub(hub_b):
+        system(
+            "whatsapp_inbox.channel.sync",
+            {"version": 1, "status": "connected", "phone_number": "+34910000001", "monthly_limit": 150},
+            Scope("host", hub_b.slug),
+        )
+        b = run("whatsapp_inbox.channel.get", {}, ctx_for(scope=Scope("host", hub_b.slug)))
     assert (a.cap_reached, b.cap_reached) == (True, False)
 
 

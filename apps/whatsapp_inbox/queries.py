@@ -265,9 +265,8 @@ def find_conversation(
 
 
 def channel(scope: Scope) -> Channel | None:
-    """The number of the business of ``scope`` (its row's ``host``, hub#1053), or ``None`` before erplora.com spoke of
-    it."""
-    return Channel.objects.filter(host=scope.key).first()
+    """The number of the business of ``scope``, or ``None`` before erplora.com spoke of it."""
+    return Channel.objects.first()
 
 
 def send_blocked(row: Channel | None) -> str | None:
@@ -712,14 +711,7 @@ def get_note(ctx: OperationContext, data: NoteRefIn) -> dict:
 
 
 def templates_of(scope: Scope) -> QuerySet:
-    """The templates of the business of ``scope`` (their ``host``, hub#1053), and only those."""
-    return Template.objects.filter(host=scope.key)
-
-
-def templates_of_every_business() -> QuerySet:
-    """Every template of this hub's database, only for the worker's ``delivery.resume``, which hands each over as its
-    business (``host``). Since S5 the worker runs it in each hub's own database, which holds that hub's alone; the
-    per-row business is from the table phase 1 shared (hub#1053)."""
+    """The templates of the business of ``scope``."""
     return Template.objects.all()
 
 
@@ -804,9 +796,8 @@ def sample_out(sample: TemplateSample | None) -> dict | None:
 
 
 def _its_own(row: Template) -> TemplateSample | None:
-    """The template's header file, only if it is its business's (``host``, from the tables phase 1 shared; hub#1053)."""
-    sample = row.header_sample
-    return sample if sample is not None and sample.host == row.host else None
+    """The template's header file."""
+    return row.header_sample
 
 
 def _draft_out(row: Template) -> dict | None:
@@ -814,7 +805,7 @@ def _draft_out(row: Template) -> dict | None:
     if not draft:
         return None
     sample = draft.get("header_sample")
-    kept = TemplateSample.objects.filter(pk=sample, host=row.host).first() if sample else None
+    kept = TemplateSample.objects.filter(pk=sample).first() if sample else None
     return {
         **draft,
         "header_format": draft.get("header_format", "TEXT" if draft.get("header") else ""),
@@ -911,9 +902,8 @@ def get_template(ctx: OperationContext, data: TemplateRefIn) -> dict:
     },
 )
 def template_sample_detail(ctx: OperationContext, data: TemplateSampleRefIn) -> dict:
-    """F29, F33: a header's file as its upload answered it, only of the business that asks (its ``host``, as
-    ``Template``'s; hub#1053)."""
-    sample = TemplateSample.objects.filter(pk=data.id, host=ctx.scope.key).first()
+    """F29, F33: a header's file as its upload answered it."""
+    sample = TemplateSample.objects.filter(pk=data.id).first()
     if sample is None:
         raise NotFound(str(SAMPLE_NOT_FOUND), code="whatsapp_inbox.sample_not_found")
     return sample_out(sample)
@@ -932,7 +922,7 @@ def template_sample_detail(ctx: OperationContext, data: TemplateSampleRefIn) -> 
     },
 )
 def channel_get(ctx: OperationContext, data: ChannelGetIn) -> dict:
-    row = channel(ctx.scope) or Channel(host=ctx.scope.key)
+    row = channel(ctx.scope) or Channel()
     month = clock.allowance_month()
     return {
         "status": row.status,
