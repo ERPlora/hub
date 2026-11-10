@@ -302,7 +302,7 @@ async function exportFile(): Promise<void> {
   exporting.value = true;
   try {
     const file = await client.api.call('inventory.product.export', { ...listFilters(), ...table.params.value });
-    saveTextFile(file.filename, file.content, file.content_type);
+    await saveTextFile(file.filename, file.content, file.content_type, t);
   } catch (failure) {
     pageError.value = failure instanceof Error ? failure.message : t('inventory.products.exportError');
   } finally {

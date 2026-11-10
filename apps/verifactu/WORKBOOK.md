@@ -372,7 +372,9 @@ Pasos:
 2. «Descargar el modelo» baja el modelo oficial (Anexo I del Convenio 17, el del SaaS) con los datos del negocio ya
    puestos: la razón social, el NIF y la dirección del emisor de Facturación (el municipio y la vía pública, con el
    número tal como figura en la dirección); sin emisor, baja en blanco. Se completa lo que falte y se firma fuera de
-   la pantalla: a mano (y se escanea a PDF, con el sello si es una sociedad) o con AutoFirma.
+   la pantalla: a mano (y se escanea a PDF, con el sello si es una sociedad) o con AutoFirma. Debajo del botón sale
+   «Modelo descargado. Fírmalo y súbelo aquí abajo.»; dentro de la app de ERPlora el modelo se guarda en Descargas y
+   sale también «Guardado en {ruta}» (BASE-F112).
 3. Una sociedad escribe su representante legal (nombre y NIF/NIE); un autónomo firma él mismo.
 4. Se elige el documento de identidad (DNI o NIE) y se adjuntan los PDF: el modelo firmado, la copia del
    documento, con NIE una muestra de la firma y, con sociedad, el justificante de representación.
@@ -396,8 +398,9 @@ emisor, 409 `verifactu.issuer_missing`; sin la foto de la cuenta (el Hub aún no
 que el SaaS no conoce, 409 `verifactu.hub_unregistered` («ERPlora todavía no ha vinculado este negocio.»); sin el
 SaaS, 503 `verifactu.saas_unreachable` («ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.»).
 Al descargar el modelo, un dato del emisor que el modelo no puede escribir (una letra fuera de las suyas o un texto
-demasiado largo) baja en blanco para escribirlo a mano, con el resto ya puesto: nunca deja sin modelo.
-Implicados: VERIFACTU-F08
+demasiado largo) baja en blanco para escribirlo a mano, con el resto ya puesto: nunca deja sin modelo. Dentro de la app,
+si no lo puede guardar, lo dice con su motivo (BASE-F112) y no sale «Modelo descargado».
+Implicados: VERIFACTU-F08, BASE-F112 (dentro de la app)
 
 ### VERIFACTU-F06 Volver a enviar el otorgamiento
 <!-- origen: old-saas:SAAS_DASHBOARD-F157 old:verifactu/workflow/configuracion.md#verifactu-f06 -->

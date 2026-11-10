@@ -3,14 +3,29 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
+import { browserDownloads, insideTheAppSaving, outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
 import { mountWebsite, settle } from '../__tests__/mount-website';
 import ShareDialog from './ShareDialog.vue';
 
-const toasts = vi.hoisted(() => ({ success: vi.fn() }));
+const toasts = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
   toastSuccess: toasts.success,
+  toastError: toasts.error,
 }));
+
+/** The hub's answer to the QR's address, as `website.qr.get` serves it: the image, as an attachment with its name. */
+function servesTheQr(): ReturnType<typeof vi.fn> {
+  const fetch = vi.fn(async (url: string) => {
+    const format = new globalThis.URL(url, 'https://pepe.erplora.com').searchParams.get('format');
+    const type = format === 'png' ? 'image/png' : 'image/svg+xml';
+    return new Response(format === 'png' ? new Uint8Array([0x89, 0x50]) : '<svg/>', {
+      headers: { 'Content-Type': type, 'Content-Disposition': `attachment; filename="website-qr-pepe.${format}"` },
+    });
+  });
+  vi.stubGlobal('fetch', fetch);
+  return fetch;
+}
 
 /** Ionic's modal presents itself only in a real browser: the stub renders its content while open. */
 const IonModalStub = defineComponent({
@@ -24,13 +39,16 @@ const IonModalStub = defineComponent({
 
 const URL = 'https://pepe.erplora.com/';
 
-async function dialog(props: Record<string, unknown> = {}) {
-  return mountWebsite(ShareDialog, { props: { open: true, url: URL, isLive: true, ...props }, stubs: { IonModal: IonModalStub } });
+async function dialog(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
+  return mountWebsite(ShareDialog, { props: { open: true, url: URL, isLive: true, ...props }, locale, stubs: { IonModal: IonModalStub } });
 }
 
 afterEach(() => {
+  outOfTheApp();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
   toasts.success.mockReset();
+  toasts.error.mockReset();
 });
 
 describe('ShareDialog', () => {
@@ -40,12 +58,47 @@ describe('ShareDialog', () => {
     const qr = wrapper.get('[data-testid="website-share-qr"]');
     expect(qr.attributes('src')).toBe('/api/website/qr?format=svg');
     expect(qr.attributes('alt')).toBe('QR code of your website');
-    // ion-button takes href and download as properties (it renders the <a> in its shadow root).
-    const link = (testid: string) => wrapper.get(`[data-testid="${testid}"]`).element as HTMLElement & { href?: string; download?: string };
-    expect([link('website-share-png').href, link('website-share-png').download]).toEqual(['/api/website/qr?format=png', 'website-qr.png']);
-    expect([link('website-share-svg').href, link('website-share-svg').download]).toEqual(['/api/website/qr?format=svg', 'website-qr.svg']);
+    expect(wrapper.get('[data-testid="website-share-png"]').text()).toBe('Download PNG');
+    expect(wrapper.get('[data-testid="website-share-svg"]').text()).toBe('Download SVG');
     expect(wrapper.get('[data-testid="website-share-signed-in"]').text()).toContain('private window');
     expect(wrapper.find('[data-testid="website-share-not-live"]').exists()).toBe(false);
+  });
+
+  it('each download brings the QR with the session and hands it to the browser under its name', async () => {
+    const fetch = servesTheQr();
+    const saved = browserDownloads();
+    const { wrapper } = await dialog();
+    await wrapper.get('[data-testid="website-share-png"]').trigger('click');
+    await settle();
+    await wrapper.get('[data-testid="website-share-svg"]').trigger('click');
+    await settle();
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual(['/api/website/qr?format=png', '/api/website/qr?format=svg']);
+    expect(saved.map((file) => [file.name, file.blob.type])).toEqual([
+      ['website-qr-pepe.png', 'image/png'],
+      ['website-qr-pepe.svg', 'image/svg+xml'],
+    ]);
+    expect(toasts.error).not.toHaveBeenCalled();
+  });
+
+  it('inside the installed app the QR goes to the app’s Downloads, which says where (hub#1041)', async () => {
+    servesTheQr();
+    const invoke = insideTheAppSaving({ path: 'Download/website-qr-pepe.png' });
+    const saved = browserDownloads();
+    const { wrapper } = await dialog();
+    await wrapper.get('[data-testid="website-share-png"]').trigger('click');
+    await settle();
+    expect(invoke).toHaveBeenCalledWith('save_download', { name: 'website-qr-pepe.png', dataBase64: btoa('\x89\x50') });
+    expect(saved).toEqual([]);
+    expect(toasts.success).toHaveBeenCalledWith('Saved to Download/website-qr-pepe.png');
+  });
+
+  it('a QR that does not come is said, never a press that does nothing', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))));
+    const { wrapper } = await dialog({}, 'es');
+    await wrapper.get('[data-testid="website-share-svg"]').trigger('click');
+    await settle();
+    expect(toasts.error).toHaveBeenCalledWith('No se ha podido descargar el archivo.');
   });
 
   it('warns that the address opens the sign-in while the site is not online', async () => {

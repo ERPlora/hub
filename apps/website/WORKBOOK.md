@@ -336,7 +336,7 @@ Sale: la dirección pública del negocio, la suya en erplora.com tal y como la v
 dispositivo la dirección abre la app (para ver la página: el móvil o una ventana privada) y, si la página no está en
 línea, de que aún lleva al acceso del equipo.
 Si falla: si no se puede copiar, «No se pudo copiar el enlace: selecciónalo y cópialo a mano.».
-Implicados: WEBSITE-F07, WEBSITE-F10
+Implicados: WEBSITE-F07, WEBSITE-F10, BASE-F112 (dentro de la app)
 
 ### WEBSITE-F10 Visitar la página pública
 <!-- origen: nuevo (la web del negocio en su propia dirección, con «Entrar» para el equipo; PLAN §29, decisión de Ioan del 21/10) -->

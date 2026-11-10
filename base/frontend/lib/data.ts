@@ -142,16 +142,6 @@ export function base64ToBlob(content: string, type: string): Blob {
   return new Blob([bytes], { type });
 }
 
-/** Hands the browser a file: a Blob saved through a temporary link, never added to the page. */
-export function saveFile(filename: string, blob: Blob): void {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 /** Hands the browser the file at `url`, a link of the server's signed for a while (a copy of the business's data): it
  *  is served as an attachment, so the browser saves it and the page stays. */
 export function downloadFrom(url: string): void {

@@ -27,13 +27,13 @@ import {
   exportFileName,
   exportInput,
   freshExportChoice,
-  saveFile,
   selectAll,
   toggleApp,
   toggleData,
   toggleDataset,
   travels,
 } from '../../lib/data';
+import { saveFile } from '../../lib/download';
 import { type HubHome, readJsonBlock } from '../../lib/home';
 import { useBaseI18n } from '../../lib/i18n';
 import type { AppDatasets, BlueprintPurpose } from '../../operations';
@@ -86,8 +86,10 @@ async function run(): Promise<void> {
   failure.value = '';
   try {
     const file = await client.api.call('base.blueprint.export', input.value);
-    saveFile(file.filename, base64ToBlob(file.content_base64, file.content_type));
-    done.value = t('base.data.export.done', { file: file.filename });
+    // Inside the installed app the app saves it and a toast says where, or why it could not (hub#1041).
+    if (await saveFile(file.filename, base64ToBlob(file.content_base64, file.content_type), t)) {
+      done.value = t('base.data.export.done', { file: file.filename });
+    }
   } catch (error) {
     failure.value = t('base.data.export.error', { reason: (error as ApiError).message ?? String(error) });
   } finally {

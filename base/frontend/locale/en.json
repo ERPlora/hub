@@ -1489,6 +1489,15 @@
       "notSaved": "The photo could not be saved. Try again.",
       "retry": "Retry"
     },
+    "download": {
+      "savedTo": "Saved to {path}",
+      "refusal": {
+        "unreachable": "This app cannot save files on a phone or tablet. Open your business in a browser to download it.",
+        "unlinked": "The file could not be saved: this app is linked to another business.",
+        "outdated": "This version of the ERPlora app cannot save files. Update it to download.",
+        "failed": "The file could not be downloaded."
+      }
+    },
     "print": {
       "refusal": {
         "refused": "the document is empty or too large to print",
