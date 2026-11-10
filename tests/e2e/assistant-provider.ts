@@ -1,7 +1,11 @@
 // The AI provider of the assistant's e2e (APP-BASE-9): a real HTTP server on 127.0.0.1 that speaks OpenAI's API
 // (`/v1/models`, streamed `/v1/chat/completions`, `/v1/embeddings`, `/v1/audio/transcriptions`). erplora.com's gateway
 // of the run's SaaS talks to it (`assistant_seed.py gateway http://127.0.0.1:<port>/v1`, README «El asistente»): no test
-// reaches a real provider nor writes a real key. What it answers depends on the question, by a marker the spec writes:
+// reaches a real provider nor writes a real key. It answers in the language the Hub asks for, as a real model does: the
+// Hub's system message says «Answer in English» or «Answer in Spanish» (base/assistant.py `instructions`, the person's
+// language or, for an automation, the one it was saved in); each text is exported in both (`DONE.en`, `DONE.es`), English
+// its source and the language of a turn that says none (hub#1025). What it answers depends on the question, by a marker
+// the spec writes:
 // - `E2E-FORMAT`: an answer with a heading, bold, a list, a table and a screen of the hub;
 // - `E2E-CREATE <name>`: asks for the write `demo.item.create` with that name, then says it is done;
 // - `E2E-DELETE <id>`: asks for the dangerous write `demo.item.delete` of that item, then says it is done;
@@ -27,23 +31,63 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 
 export const DICTATION = 'E2E-CREATE Mesa dictada';
-export const GREETING = 'Hola, soy el asistente de prueba.';
-export const FORMAT_ANSWER = [
-  '## Ventas de hoy',
-  '',
-  'Has vendido **120 €** en *3 tickets*. Revisa los datos en [Ajustes](/settings#business).',
-  '',
-  '- Café: 12',
-  '- Tostadas: 5',
-  '',
-  '| Producto | Unidades | Importe |',
-  '|---|---|---|',
-  '| Café con leche | 12 | 18,00 € |',
-  '| Tostada con tomate y aceite de oliva virgen extra | 5 | 12,50 € |',
-].join('\n');
-export const CLAIM_ANSWER = 'Listo: he creado la mesa 9 y la he guardado.';
+
+/** The languages it answers in (the Hub's), English the source. */
+export const LANGUAGES = ['en', 'es'] as const;
+export type Language = (typeof LANGUAGES)[number];
+/** A text as it says it in each language. */
+export type Said = Readonly<Record<Language, string>>;
+
+/** Each language by the name the Hub's system message gives it (Django's `get_language_info(language)["name"]`). */
+const NAMED: Readonly<Record<string, Language>> = { English: 'en', Spanish: 'es' };
+
+export const GREETING: Said = { en: 'Hi, I am the test assistant.', es: 'Hola, soy el asistente de prueba.' };
+export const FORMAT_ANSWER: Said = {
+  en: [
+    '## Today’s sales',
+    '',
+    'You have sold **€120** in *3 tickets*. Check the data in [Settings](/settings#business).',
+    '',
+    '- Coffee: 12',
+    '- Toast: 5',
+    '',
+    '| Product | Units | Amount |',
+    '|---|---|---|',
+    '| White coffee | 12 | €18.00 |',
+    '| Toast with tomato and extra virgin olive oil | 5 | €12.50 |',
+  ].join('\n'),
+  es: [
+    '## Ventas de hoy',
+    '',
+    'Has vendido **120 €** en *3 tickets*. Revisa los datos en [Ajustes](/settings#business).',
+    '',
+    '- Café: 12',
+    '- Tostadas: 5',
+    '',
+    '| Producto | Unidades | Importe |',
+    '|---|---|---|',
+    '| Café con leche | 12 | 18,00 € |',
+    '| Tostada con tomate y aceite de oliva virgen extra | 5 | 12,50 € |',
+  ].join('\n'),
+};
+export const CLAIM_ANSWER: Said = { en: 'Done: I created table 9 and saved it.', es: 'Listo: he creado la mesa 9 y la he guardado.' };
+/** What it says once a write's result comes back: it ran, or it did not (cancelled, refused or failed). */
+export const DONE: Said = { en: 'Done.', es: 'Hecho.' };
+export const NOT_DONE: Said = { en: 'I have not done it.', es: 'No lo he hecho.' };
+/** What it says before why a rectification's preview was refused (the Hub's message, after it). */
+export const CANNOT_RECTIFY: Said = { en: 'It cannot be rectified:', es: 'No se puede rectificar:' };
+/** The reason `E2E-RECTIFY` gives the rectification when its question says none. */
+export const NO_REASON: Said = { en: 'error in the invoice', es: 'error en la factura' };
+/** `E2E-SLOW`'s answer, which comes piece by piece. */
+export const SLOW_ANSWER: Said = {
+  en: 'This answer is long and comes slowly, piece by piece. '.repeat(20),
+  es: 'Esta respuesta es larga y llega despacio, trozo a trozo. '.repeat(20),
+};
 /** What `E2E-STEPS` says before its read and before its write: one round each. */
-export const STEPS_SAID = ['Miro primero qué mesas tienes.', 'Ninguna se llama así: te pido crearla.'];
+export const STEPS_SAID: Readonly<Record<Language, readonly [string, string]>> = {
+  en: ['First I look at which tables you have.', 'None is called that: I ask you to create it.'],
+  es: ['Miro primero qué mesas tienes.', 'Ninguna se llama así: te pido crearla.'],
+};
 
 export interface Seen {
   path: string;
@@ -68,25 +112,52 @@ export interface CloseCashSummary {
   };
 }
 
+/** The words of the close's summary (`closeCashSummary`), in each language. */
+const CLOSE_WORDS = {
+  en: {
+    title: (number: string) => `You are about to close session **${number}**:`,
+    counted: 'Counted',
+    blind: 'Blind count: the close compares it when you confirm.',
+    expected: 'Expected',
+    difference: 'Difference',
+    openChecks: 'Open checks',
+    unserved: 'Orders not served',
+    prints: 'Prints not out',
+    incomplete: 'Not everything pending could be checked.',
+  },
+  es: {
+    title: (number: string) => `Vas a cerrar la sesión **${number}**:`,
+    counted: 'Contado',
+    blind: 'Arqueo ciego: el cierre lo comparará al confirmar.',
+    expected: 'Esperado',
+    difference: 'Diferencia',
+    openChecks: 'Cuentas abiertas',
+    unserved: 'Comandas sin servir',
+    prints: 'Impresiones sin salir',
+    incomplete: 'No se ha podido comprobar todo lo pendiente.',
+  },
+} as const;
+
 const euros = (cents: number, signed = false) => `${signed && cents > 0 ? '+' : ''}${(cents / 100).toFixed(2)} €`;
 const named = (count: number, labels: string[]) => (labels.length ? `${count} (${labels.join(' · ')})` : String(count));
 
-/** What the model says of the close's summary before its card: only what the summary carries (never an expected
- *  that a blind count left out), and what is still pending at the close. */
-export function closeCashSummary(summary: CloseCashSummary): string {
-  const lines = [`Vas a cerrar la sesión **${summary.number}**:`, ''];
-  if (summary.closing_balance !== null) lines.push(`- Contado: ${euros(summary.closing_balance)}`);
+/** What the model says of the close's summary before its card, in `language`: only what the summary carries (never an
+ *  expected that a blind count left out), and what is still pending at the close. */
+export function closeCashSummary(summary: CloseCashSummary, language: Language): string {
+  const words = CLOSE_WORDS[language];
+  const lines = [words.title(summary.number), ''];
+  if (summary.closing_balance !== null) lines.push(`- ${words.counted}: ${euros(summary.closing_balance)}`);
   if (summary.expected_hidden || summary.expected_balance === null) {
-    lines.push('- Arqueo ciego: el cierre lo comparará al confirmar.');
+    lines.push(`- ${words.blind}`);
   } else {
-    lines.push(`- Esperado: ${euros(summary.expected_balance)}`);
-    if (summary.difference !== null) lines.push(`- Diferencia: ${euros(summary.difference, true)}`);
+    lines.push(`- ${words.expected}: ${euros(summary.expected_balance)}`);
+    if (summary.difference !== null) lines.push(`- ${words.difference}: ${euros(summary.difference, true)}`);
   }
   const review = summary.pending;
-  if (review.open_checks) lines.push(`- Cuentas abiertas: ${named(review.open_checks, review.open_check_labels)}`);
-  if (review.unserved) lines.push(`- Comandas sin servir: ${named(review.unserved, review.unserved_labels)}`);
-  if (review.prints) lines.push(`- Impresiones sin salir: ${review.prints}`);
-  if (review.incomplete) lines.push('- No se ha podido comprobar todo lo pendiente.');
+  if (review.open_checks) lines.push(`- ${words.openChecks}: ${named(review.open_checks, review.open_check_labels)}`);
+  if (review.unserved) lines.push(`- ${words.unserved}: ${named(review.unserved, review.unserved_labels)}`);
+  if (review.prints) lines.push(`- ${words.prints}: ${review.prints}`);
+  if (review.incomplete) lines.push(`- ${words.incomplete}`);
   return lines.join('\n');
 }
 
@@ -107,22 +178,63 @@ export interface RectificationPreview {
 
 const day = (iso: string) => iso.split('-').reverse().join('/');
 
-/** What the model says of the rectification's preview before its card: the invoice it rectifies, the rectifying invoice
- *  that would be born (its number as the series' next one, never as reserved) and what was left of the original. */
-export function rectifyPreview(preview: RectificationPreview): string {
+/** The words of the rectification's preview (`rectifyPreview`), in each language. */
+const RECTIFY_WORDS = {
+  en: {
+    title: (number: string, issued: string, whom: string) => `You are about to rectify invoice **${number}** of ${issued}${whom} with this rectifying invoice:`,
+    type: 'Type',
+    reason: 'Reason',
+    number: (next: string, series: string) => `${next} (the next one of series ${series}; it is assigned when issued)`,
+    numberLabel: 'Number',
+    date: 'Date',
+    left: (remaining: string, total: string) => `Rectifies what is left: ${remaining} of ${total}`,
+    base: 'Base',
+    tax: 'Taxes',
+    total: 'Total',
+  },
+  es: {
+    title: (number: string, issued: string, whom: string) => `Vas a rectificar la factura **${number}** del ${issued}${whom} con esta rectificativa:`,
+    type: 'Tipo',
+    reason: 'Motivo',
+    number: (next: string, series: string) => `${next} (el siguiente de la serie ${series}; se asigna al emitirla)`,
+    numberLabel: 'Número',
+    date: 'Fecha',
+    left: (remaining: string, total: string) => `Rectifica lo que queda: ${remaining} de ${total}`,
+    base: 'Base',
+    tax: 'Impuestos',
+    total: 'Total',
+  },
+} as const;
+
+/** What the model says of the rectification's preview before its card, in `language`: the invoice it rectifies, the
+ *  rectifying invoice that would be born (its number as the series' next one, never as reserved) and what was left of
+ *  the original. */
+export function rectifyPreview(preview: RectificationPreview, language: Language): string {
+  const words = RECTIFY_WORDS[language];
   const original = preview.original;
   const whom = original.customer_name ? ` (${original.customer_name})` : '';
-  const lines = [`Vas a rectificar la factura **${original.number}** del ${day(original.issue_date)}${whom} con esta rectificativa:`, ''];
-  lines.push(`- Tipo: ${preview.invoice_type}`, `- Motivo: ${preview.reason}`);
-  lines.push(`- Número: ${preview.next_number} (el siguiente de la serie ${preview.series_code}; se asigna al emitirla)`);
-  lines.push(`- Fecha: ${day(preview.issue_date)}`);
-  if (!preview.whole) lines.push(`- Rectifica lo que queda: ${euros(original.remaining)} de ${euros(original.total_amount)}`);
+  const lines = [words.title(original.number, day(original.issue_date), whom), ''];
+  lines.push(`- ${words.type}: ${preview.invoice_type}`, `- ${words.reason}: ${preview.reason}`);
+  lines.push(`- ${words.numberLabel}: ${words.number(preview.next_number, preview.series_code)}`);
+  lines.push(`- ${words.date}: ${day(preview.issue_date)}`);
+  if (!preview.whole) lines.push(`- ${words.left(euros(original.remaining), euros(original.total_amount))}`);
   for (const line of preview.lines) lines.push(`- ${line.description} × ${Number(line.quantity)}: ${euros(line.total_amount)}`);
-  lines.push(`- Base: ${euros(preview.base_amount)}`, `- Impuestos: ${euros(preview.tax_amount)}`, `- Total: ${euros(preview.total_amount)}`);
+  lines.push(`- ${words.base}: ${euros(preview.base_amount)}`, `- ${words.tax}: ${euros(preview.tax_amount)}`, `- ${words.total}: ${euros(preview.total_amount)}`);
   return lines.join('\n');
 }
 
 type Message = { role: string; content?: unknown; tool_calls?: { function?: { name?: string } }[] };
+
+/** The language the conversation's system message asks the answer in («Answer in Spanish, …»); without one, or with
+ *  one it does not speak, English (the source). */
+export function languageOf(messages: Message[]): Language {
+  for (const message of messages) {
+    if (message.role !== 'system') continue;
+    const asked = /\bAnswer in (\w+)/.exec(textOf(message.content))?.[1];
+    if (asked && asked in NAMED) return NAMED[asked];
+  }
+  return 'en';
+}
 
 function textOf(content: unknown): string {
   if (typeof content === 'string') return content;
@@ -153,6 +265,8 @@ const usage = { object: 'chat.completion.chunk', choices: [], usage: { prompt_to
 /** The answer to a conversation, as the frames of a stream (or a status for a failure). */
 export function answerTo(messages: Message[]): { status: number; frames: unknown[]; delayMs: number } {
   const last = messages.at(-1);
+  const language = languageOf(messages);
+  const outcome = (result: unknown) => (refused(textOf(result)) ? NOT_DONE : DONE)[language];
   const question = textOf([...messages].reverse().find((message) => message.role === 'user')?.content);
   const text = (value: string, delayMs = 0) => ({
     status: 200,
@@ -181,8 +295,8 @@ export function answerTo(messages: Message[]): { status: number; frames: unknown
   if (steps) {
     // The results of this request only: the conversation may have run a chain before.
     const results = messages.slice(messages.findLastIndex((message) => message.role === 'user') + 1).filter((message) => message.role === 'tool').length;
-    if (results === 0) return call('demo__item__list', {}, STEPS_SAID[0]);
-    if (results === 1) return call('demo__item__create', { name: steps[1].trim() }, STEPS_SAID[1]);
+    if (results === 0) return call('demo__item__list', {}, STEPS_SAID[language][0]);
+    if (results === 1) return call('demo__item__create', { name: steps[1].trim() }, STEPS_SAID[language][1]);
   }
   const closeCash = /E2E-CLOSE-CASH (\d+)/.exec(question);
   if (closeCash) {
@@ -194,28 +308,26 @@ export function answerTo(messages: Message[]): { status: number; frames: unknown
     if (results.length === 1) {
       const summary = JSON.parse(textOf(results[0].content)) as CloseCashSummary & { error?: unknown };
       if (!summary.error) {
-        return call('cash_register__session__close', { session: summary.number, closing_balance: counted }, closeCashSummary(summary));
+        return call('cash_register__session__close', { session: summary.number, closing_balance: counted }, closeCashSummary(summary, language));
       }
     }
   }
   const rectify = /E2E-RECTIFY (\S+)(?:.*?porque (.+))?$/m.exec(question);
   if (rectify) {
-    const reason = rectify[2]?.trim() || 'error en la factura';
+    const reason = rectify[2]?.trim() || NO_REASON[language];
     // The results of this request only: a conversation may have rectified (or cancelled) before.
     const asked = messages.findLastIndex((message) => message.role === 'user');
     const results = messages.slice(asked + 1).filter((message) => message.role === 'tool');
     if (results.length === 0) return call('invoice__invoice__rectification_preview', { number: rectify[1], reason });
     if (results.length === 1) {
       const preview = JSON.parse(textOf(results[0].content)) as RectificationPreview & { error?: { message?: string } };
-      if (preview.error) return text(`No se puede rectificar: ${preview.error.message ?? ''}`);
-      return call('invoice__invoice__rectify', { number: preview.original.number, reason }, rectifyPreview(preview));
+      if (preview.error) return text(`${CANNOT_RECTIFY[language]} ${preview.error.message ?? ''}`);
+      return call('invoice__invoice__rectify', { number: preview.original.number, reason }, rectifyPreview(preview, language));
     }
     // The rectification's own result names the original, now «cancelled»: only an error is a refusal.
-    return text(refused(textOf(results.at(-1)!.content)) ? 'No lo he hecho.' : 'Hecho.');
+    return text(outcome(results.at(-1)!.content));
   }
-  if (last?.role === 'tool') {
-    return text(refused(textOf(last.content)) ? 'No lo he hecho.' : 'Hecho.');
-  }
+  if (last?.role === 'tool') return text(outcome(last.content));
   const offer = /E2E-OFFER (.+)$/m.exec(question);
   if (offer) return text(offer[1].split(' | ').join('\n'));
   const create = /E2E-CREATE (.+)$/m.exec(question);
@@ -224,11 +336,11 @@ export function answerTo(messages: Message[]): { status: number; frames: unknown
   if (remove) return call('demo__item__delete', { id: remove[1] });
   const named = /E2E-ASK (\S+) (\{.*\})$/m.exec(question);
   if (named) return call(named[1], JSON.parse(named[2]) as Record<string, unknown>);
-  if (question.includes('E2E-FORMAT')) return text(FORMAT_ANSWER);
-  if (question.includes('E2E-CLAIM')) return text(CLAIM_ANSWER);
+  if (question.includes('E2E-FORMAT')) return text(FORMAT_ANSWER[language]);
+  if (question.includes('E2E-CLAIM')) return text(CLAIM_ANSWER[language]);
   if (question.includes('E2E-DOWN')) return { status: 500, frames: [], delayMs: 0 };
-  if (question.includes('E2E-SLOW')) return text('Esta respuesta es larga y llega despacio, trozo a trozo. '.repeat(20), 250);
-  return text(GREETING);
+  if (question.includes('E2E-SLOW')) return text(SLOW_ANSWER[language], 250);
+  return text(GREETING[language]);
 }
 
 function read(request: IncomingMessage): Promise<Record<string, unknown> | null> {

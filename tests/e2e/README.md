@@ -232,7 +232,11 @@ Prueba el asistente del Hub (BASE-F92…F106) con sus dependencias de verdad: el
 la pila (`/internal/assistant/*` y `/internal/speech/transcribe`) y, detrás, el proveedor falso
 `tests/e2e/assistant-provider.ts`, un servidor HTTP en 127.0.0.1 que habla la API de OpenAI y que la propia spec
 arranca en `E2E_AI_PROVIDER_PORT` (por defecto, el puerto del Hub + 2). Ningún test llega a un proveedor real ni
-escribe una clave real. Pide tres cosas al SaaS de la pila:
+escribe una clave real. Responde en el idioma que pide el mensaje de sistema del Hub («Answer in English» o «Answer in
+Spanish»: el de la persona o, en una automatización, el de quien la guardó), como un modelo de verdad; sin él, en inglés.
+Cada texto suyo se exporta en los dos idiomas (`DONE.en` y `DONE.es`, `NOT_DONE`, `GREETING`…), así que una spec con
+la interfaz en inglés espera `NOT_DONE.en` tras «Cancelar» y una en español, `NOT_DONE.es` (hub#1025). Pide tres cosas
+al SaaS de la pila:
 
 - **La BD del SaaS sembrada con ese proveedor**, desde su worktree y antes de la primera ejecución:
   `env DB_NAME=saas_e2e_<Hub+1> uv run python tests/e2e/panel/assistant_seed.py gateway http://127.0.0.1:<Hub+2>/v1`

@@ -386,9 +386,9 @@ for (const language of LANGUAGES) {
       await box.fill(language === 'es' ? 'Hola' : 'Hello');
       // «Send», as on a phone, where Enter breaks the line.
       await panel.locator('[data-testid="assistant-send"]').click();
-      await expect(panel.locator('[data-testid="assistant-bubble-assistant"]').last()).toContainText(GREETING, { timeout: SAAS_STEP });
+      await expect(panel.locator('[data-testid="assistant-bubble-assistant"]').last()).toContainText(GREETING[language], { timeout: SAAS_STEP });
       await expect(panel.locator('[data-testid="assistant-send"]')).toBeVisible({ timeout: SAAS_STEP });
-      data.add(GREETING);
+      data.add(GREETING[language]);
       data.add(language === 'es' ? 'Hola' : 'Hello');
       await check('assistant');
       await panel.locator('[data-testid="assistant-close"]').click();

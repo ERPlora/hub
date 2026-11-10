@@ -705,6 +705,7 @@ def _move(
 @operation(
     "appointment.appointment.reschedule",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=RescheduleIn,
     output=AppointmentOut,
@@ -738,6 +739,7 @@ def reschedule(ctx: OperationContext, data: RescheduleIn) -> dict:
 @operation(
     "appointment.appointment.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=UpdateIn,
     output=AppointmentOut,
@@ -826,6 +828,7 @@ def _transition(
 @operation(
     "appointment.appointment.confirm",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=AppointmentRefIn,
     output=AppointmentOut,
@@ -850,6 +853,7 @@ def confirm(ctx: OperationContext, data: AppointmentRefIn) -> dict:
 @operation(
     "appointment.appointment.start",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=AppointmentRefIn,
     output=AppointmentOut,
@@ -874,6 +878,7 @@ def start(ctx: OperationContext, data: AppointmentRefIn) -> dict:
 @operation(
     "appointment.appointment.complete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=AppointmentRefIn,
     output=AppointmentOut,
@@ -898,6 +903,7 @@ def complete(ctx: OperationContext, data: AppointmentRefIn) -> dict:
 @operation(
     "appointment.appointment.mark_no_show",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=AppointmentRefIn,
     output=AppointmentOut,
@@ -932,6 +938,7 @@ def mark_no_show(ctx: OperationContext, data: AppointmentRefIn) -> dict:
 @operation(
     "appointment.appointment.cancel",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=CancelIn,
     output=AppointmentOut,
@@ -997,6 +1004,7 @@ def _delete(ctx: OperationContext, appointment: Appointment) -> None:
 @operation(
     "appointment.appointment.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=DELETE,
     input=AppointmentRefIn,
     output=DeletedOut,
@@ -1016,6 +1024,7 @@ def delete_appointment(ctx: OperationContext, data: AppointmentRefIn) -> dict:
 @operation(
     "appointment.appointment.bulk_delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=DELETE,
     input=BulkDeleteIn,
     output=BulkDeletedOut,
@@ -1147,6 +1156,7 @@ def _charge_out(appointment: Appointment, order) -> dict:
 @operation(
     "appointment.blocked_time.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE_SCHEDULE,
     input=BlockedTimeCreateIn,
     output=BlockedTimeOut,
@@ -1194,6 +1204,7 @@ def create_blocked_time(ctx: OperationContext, data: BlockedTimeCreateIn) -> dic
 @operation(
     "appointment.blocked_time.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE_SCHEDULE,
     input=BlockedTimeRefIn,
     output=DeletedOut,
@@ -1609,6 +1620,7 @@ def _set_active(ctx: OperationContext, series_id: UUID, active: bool) -> dict:
 @operation(
     "appointment.recurring.deactivate",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=RecurringRefIn,
     output=RecurringOut,
@@ -1625,6 +1637,7 @@ def deactivate_series(ctx: OperationContext, data: RecurringRefIn) -> dict:
 @operation(
     "appointment.recurring.activate",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=RecurringRefIn,
     output=RecurringOut,
@@ -1641,6 +1654,7 @@ def activate_series(ctx: OperationContext, data: RecurringRefIn) -> dict:
 @operation(
     "appointment.recurring.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=RecurringRefIn,
     output=RecurringDeletedOut,
@@ -1667,6 +1681,7 @@ def delete_series(ctx: OperationContext, data: RecurringRefIn) -> dict:
 @operation(
     "appointment.settings.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE_SETTINGS,
     input=SettingsIn,
     output=SettingsOut,

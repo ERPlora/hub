@@ -2943,8 +2943,7 @@ Implicados: HUBS-F17, WEBSITE-F10
 
 ### BASE-F111 Esperar a la base de datos cuando se corta un momento
 <!-- origen: nuevo (PLAN-DB, ronda 2026-11-04e, punto 5: un reinicio, un mantenimiento de AWS o el cambio de versión cortan la base unos segundos; gemelo de ACCOUNTS-F50 de erplora.com) gh:hub#831 -->
-Estado: hecho (las lecturas, lo que no llegó a empezar y los cambios de Demo; que se repitan también los cambios de las
-demás apps es hub#1051)
+Estado: hecho
 Actor: cualquier persona del negocio en el Hub, en la web o en la app, y cualquier programa conectado por la API
 Pantalla: cualquiera del Hub, Página «Volvemos enseguida»
 Pasos:
@@ -2954,8 +2953,8 @@ Pasos:
      pantalla llega como siempre: la persona solo nota que ha tardado.
   3. Lo que estaba guardando espera igual cuando consta que no se aplicó nada: no llegó a empezar (abrir la base del
      negocio o comprobar quién es la persona), o es un cambio que solo toca la base de datos y todavía no se había
-     confirmado. Hoy lo son los cambios de Demo, la app de referencia. Se guarda una sola vez y en su negocio, y el aviso
-     a las demás pantallas sale después de confirmarse.
+     confirmado. Esto vale para Demo y para los comandos locales de las demás apps. Se guarda una sola vez y en su
+     negocio, y el aviso a las demás pantallas sale después de confirmarse.
   4. Mientras espera no ocupa ninguna de las transacciones a la vez que da el plan del negocio: las demás personas del
      negocio siguen trabajando.
   5. Si se acaba el tiempo, quien abre la dirección del negocio en el navegador ve «Volvemos enseguida» con «ERPlora
@@ -2965,17 +2964,18 @@ Entra: nada: la persona no hace nada distinto.
 Sale: la misma respuesta de siempre, con unos segundos de retraso; o, pasado el tiempo, una respuesta 503 con
 `Retry-After` y nunca un error del servidor. Un programa recibe el código `database_unavailable`, o
 `base.hub_unavailable` si lo que no responde es la base del negocio al abrirla.
-Si falla: lo que pudo aplicarse no se repite nunca a ciegas, y cada resultado dice el suyo. Un cambio de las demás apps
-cortado a medias o mientras se confirmaba pudo haber hecho algo fuera de la base (numerar una tarea o un ticket, un
-cobro, el envío a la AEAT, un WhatsApp): la persona lee «Se ha perdido la conexión mientras se guardaba. Comprueba si se
-ha guardado antes de volver a intentarlo.» y un programa, el código `database_outcome_unknown`. Si el guardado ya se
-había confirmado y el corte se llevó solo la respuesta, lee «Se ha guardado, pero la conexión se ha perdido antes de
-llegar la respuesta. Recarga la página en unos segundos para verlo.» (`database_answer_lost`). Lo que no es un corte (una
-consulta que tarda demasiado, un fallo del programa) sigue siendo el error de siempre. Las llamadas de erplora.com a
-`/internal` y `/readyz` reciben su 503 al momento, sin esperar: erplora.com reintenta por su cuenta, y `/readyz` tiene
-que decir que la base no está antes de que sus sondas se cansen.
-Implicados: ACCOUNTS-F50 (su gemelo de erplora.com), Demo (sus cambios se repiten), las demás páginas de espera del Hub
-(un negocio que se prepara o se muda de servidor: el mismo aspecto); hub#831, hub#1051 y hub#1052
+Si falla: lo que pudo aplicarse no se repite nunca a ciegas, y cada resultado dice el suyo. Un comando excluido porque
+numera, cobra, genera un QR, envía a la AEAT, manda un correo o un WhatsApp, llama a un tercero o escribe fuera de su
+transacción (en caché, sesiones, control o el almacén de ficheros), cortado a medias o mientras se confirmaba: la
+persona lee «Se ha perdido la conexión mientras se guardaba. Comprueba si se ha guardado antes de volver a intentarlo.»
+y un programa, el código `database_outcome_unknown`. Si el guardado ya se había confirmado y el corte se llevó solo la
+respuesta, lee «Se ha guardado, pero la conexión se ha perdido antes de llegar la respuesta. Recarga la página en unos
+segundos para verlo.» (`database_answer_lost`). Lo que no es un corte (una consulta que tarda demasiado, un fallo del
+programa) sigue siendo el error de siempre. Las llamadas de erplora.com a `/internal` y `/readyz` reciben su 503 al
+momento, sin esperar: erplora.com reintenta por su cuenta, y `/readyz` tiene que decir que la base no está antes de que
+sus sondas se cansen.
+Implicados: ACCOUNTS-F50 (su gemelo de erplora.com), todas las apps con cambios locales que se repiten, las demás páginas
+de espera del Hub (un negocio que se prepara o se muda de servidor: el mismo aspecto); hub#831, hub#1051 y hub#1052
 
 ## Para quien lo mantiene
 
