@@ -41,6 +41,10 @@ REPORTED = [
     ("task.task.set_status", "pon Revisar almacén QA en curso porque ya he empezado"),
 ]
 
+#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a request of the QA may bring its tool: half of them, so
+#: twenty tools of the apps that say their asks later may climb past it before the model loses it (measured on this
+#: branch: the 12th at worst, the task's completion).
+WITH_ROOM = 20
 #: Every probe of layer 2 of Tasks, the owner's real phrases of the QA: the four above and the ones the model got right.
 PROBES = json.loads(
     (Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes" / "owner-es-task-2026-11-08.json").read_text(
@@ -116,7 +120,7 @@ def test_the_reported_task_request_offers_its_existing_operation(catalog_of, nam
     assert name in tools  # positive control: the owner holds the tool, so its place is known
     assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
     offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
-    assert name in offered, (len(offered), offered[:10])
+    assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:10])
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -130,4 +134,4 @@ def test_every_probe_of_tasks_offers_its_tool_without_being_one_of_its_asks(cata
     assert name in tools  # positive control: the owner holds the tool, so its place is known
     assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
     offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
-    assert name in offered, (offered.index(name) + 1 if name in offered else None, len(offered), offered[:10])
+    assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:10])
