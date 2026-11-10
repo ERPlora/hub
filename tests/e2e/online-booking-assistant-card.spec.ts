@@ -4,13 +4,15 @@
 // booking?» dialog does —, and a service and a professional of the page's booking by their names, read as the person,
 // in their language, never by an id. End to end with the stack's SaaS gateway and the e2e's provider
 // (assistant-provider.ts, `E2E-ASK <tool> <JSON>`): the SaaS must be seeded with it (README of this folder, «El
-// asistente»). Cancelled, nothing changes. What this file creates is named «E2E Tarjeta reserva …» and goes away
-// before and after; the apps it turns on are turned off again.
+// asistente»). Cancelled, nothing changes, and the assistant says it did not do it in the person's language, never in
+// the other one (hub#1025). What this file creates is named «E2E Tarjeta reserva …» and goes away before and after;
+// the apps it turns on are turned off again.
 // flow: ONLINE_BOOKING-F01 ONLINE_BOOKING-F02 ONLINE_BOOKING-F05 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
 import { cancel, cardSpec, datumOf, fieldsOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
-import { card, openPanel } from './assistant-real';
+import { NOT_DONE } from './assistant-provider';
+import { answers, card, openPanel } from './assistant-real';
 import { aMonday, openForACut, salonCleanUp } from './appointment-helpers';
 import { A, api, capture, psql } from './helpers';
 import { post } from './service-helpers';
@@ -75,6 +77,7 @@ async function diarySays(context: BrowserContext, id: string): Promise<{ label: 
 
 for (const language of ['es', 'en'] as const) {
   const words = WORDS[language];
+  const other = language === 'es' ? 'en' : 'es';
 
   test(`online-booking-assistant-card — in ${language}, a write of Online booking says which booking, services and professional, never by an id`, async ({ browser }) => {
     const [context, page] = await ownerIn(browser, language);
@@ -98,12 +101,21 @@ for (const language of ['es', 'en'] as const) {
     }
     await page.setViewportSize({ width: 1440, height: 900 });
     await cancel(page);
+    // Cancelled: the assistant says it did not do it, in the language of the card.
+    await expect(answers(page).last()).toContainText(NOT_DONE[language]);
+    await expect(answers(page).last()).not.toContainText(NOT_DONE[other]);
+    for (const vp of VIEWPORTS) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await capture(page, `hub-1025-cancelled-${language}-${vp.label}`);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
 
     // «Confirma la reserva APT-…»: a write that is not dangerous is said in one line, the booking by its name.
     const confirmed = await datumOf(page, 'online_booking__booking__confirm', { id: booking.id });
     expect([confirmed.label, confirmed.value]).toEqual([words.booking, label]);
     await expect(card(page)).toContainText(label);
     await cancel(page);
+    await expect(answers(page).last()).toContainText(NOT_DONE[language]);
 
     // A booking of the page: each service and the professional by their names, under the words of the booking page.
     const booked = await fieldsOf(page, 'online_booking__public__book', {
@@ -126,6 +138,7 @@ for (const language of ['es', 'en'] as const) {
     }
     await page.setViewportSize({ width: 1440, height: 900 });
     await cancel(page);
+    await expect(answers(page).last()).toContainText(NOT_DONE[language]);
 
     // Cancelled, nothing changed: the booking as it was, and nobody booked for Marta.
     expect((await diarySays(context, booking.id)).status).toBe(status);
