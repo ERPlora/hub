@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:065a49767b065d0154817821ca560787a6e11698a1717af0e71bea62711ae065 -->
+<!-- generated from WORKBOOK.md sha256:f17453b011ccfcd3e5b14f60e43fb6f1d03ed5b6123dc551352cf802a2aa0876 -->
 
 ## What it is for and who it is for
 
@@ -2819,7 +2819,7 @@ Involved: HUBS-F17, WEBSITE-F10
 
 ### BASE-F111 Wait for the database when it is cut for a moment
 <!-- origin: new (PLAN-DB, round 2026-11-04e, point 5: a restart, an AWS maintenance or the change of version cut the database for a few seconds; twin of erplora.com's ACCOUNTS-F50) gh:hub#831 -->
-Status: done (reads, what never started and Demo's changes; that the changes of the other apps repeat too is hub#1051)
+Status: done
 Actor: anyone of the business in the Hub, on the web or in the app, and any program connected through the API
 Screen: any of the Hub, Page «We will be back soon»
 Steps:
@@ -2829,8 +2829,8 @@ Steps:
      sooner, the screen arrives as always: the person only notices it took longer.
   3. What they were saving waits the same when it is known that nothing was applied: it never started (opening the
      business's database or checking who the person is), or it is a change that only touches the database and had not
-     been confirmed yet. Today Demo's changes are, the reference app's. It is saved only once and in its business, and
-     the notice to the other screens goes out after it is confirmed.
+     been confirmed yet. This covers Demo and the other apps' local commands. It is saved only once and in its business,
+     and the notice to the other screens goes out after it is confirmed.
   4. While it waits it holds none of the transactions at once the business's plan gives: the rest of the business's
      people go on working.
   5. If the time runs out, whoever opens the business's address in the browser sees «We will be back soon» with
@@ -2840,14 +2840,14 @@ In: nothing: the person does nothing different.
 Out: the same answer as always, a few seconds late; or, past the time, a 503 answer with `Retry-After` and never a server
 error. A program receives the code `database_unavailable`, or `base.hub_unavailable` if what does not answer is the
 business's database while it is opened.
-If it fails: what may have been applied is never repeated blindly, and each outcome says its own. A change of the other
-apps cut halfway or while it was being confirmed may have done something outside the database (numbering a task or a
-ticket, a charge, the submission to the AEAT, a WhatsApp): the person reads «The connection was lost while this was being
-saved. Check whether it was saved before trying again.» and a program, the code `database_outcome_unknown`. If the save
-had already been confirmed and the cut only took its answer, they read «It was saved, but the connection was lost before
-the answer arrived. Reload the page in a few seconds to see it.» (`database_answer_lost`). What is no cut (a query that
-takes too long, a fault of the program) stays the error it always was. erplora.com's calls to `/internal` and `/readyz`
-get their 503 at once, without waiting: erplora.com tries again on its own, and `/readyz` has to say the database is gone
-before its probes give up.
-Involved: ACCOUNTS-F50 (its twin on erplora.com), Demo (its changes repeat), the Hub's other waiting pages (a business
-being prepared or moving to another server: the same look); hub#831, hub#1051 and hub#1052
+If it fails: what may have been applied is never repeated blindly, and each outcome says its own. An excluded command,
+because it numbers, charges, generates a QR, submits to the AEAT, sends an email or a WhatsApp, calls a third party or
+writes outside its transaction (cache, sessions, control or the file store), cut halfway or while being confirmed: the
+person reads «The connection was lost while this was being saved. Check whether it was saved before trying again.» and a
+program, the code `database_outcome_unknown`. If the save had already been confirmed and the cut only took its answer,
+they read «It was saved, but the connection was lost before the answer arrived. Reload the page in a few seconds to see
+it.» (`database_answer_lost`). What is no cut (a query that takes too long, a fault of the program) stays the error it
+always was. erplora.com's calls to `/internal` and `/readyz` get their 503 at once, without waiting: erplora.com tries
+again on its own, and `/readyz` has to say the database is gone before its probes give up.
+Involved: ACCOUNTS-F50 (its twin on erplora.com), every app whose local changes repeat, the Hub's other waiting pages (a
+business being prepared or moving to another server: the same look); hub#831, hub#1051 and hub#1052

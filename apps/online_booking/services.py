@@ -134,6 +134,7 @@ def _diary(ctx: OperationContext, name: str, appointment: Appointment, **extra):
 @operation(
     "online_booking.booking.confirm",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CONFIRM,
     input=BookingRefIn,
     output=BookingOut,
@@ -153,6 +154,7 @@ def confirm_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
 @operation(
     "online_booking.booking.complete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE,
     input=BookingRefIn,
     output=BookingOut,
@@ -172,6 +174,7 @@ def complete_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
 @operation(
     "online_booking.booking.no_show",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE,
     input=BookingRefIn,
     output=BookingOut,
@@ -191,6 +194,7 @@ def no_show_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
 @operation(
     "online_booking.booking.cancel",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE,
     input=CancelIn,
     output=BookingOut,
@@ -210,6 +214,7 @@ def cancel_booking(ctx: OperationContext, data: CancelIn) -> dict:
 @operation(
     "online_booking.booking.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=DELETE,
     input=BookingRefIn,
     output=DeletedOut,
@@ -233,6 +238,7 @@ def delete_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
 @operation(
     "online_booking.settings.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE,
     input=SettingsIn,
     output=SettingsOut,
@@ -431,6 +437,7 @@ def public_book(ctx: OperationContext, data: PublicBookIn) -> dict:
 @operation(
     "online_booking.public.cancel",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=PUBLIC,
     input=PublicCancelIn,
     output=PublicBookingOut,

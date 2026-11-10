@@ -115,6 +115,7 @@ def _save_method(method: PaymentMethod, **kwargs) -> None:
 @operation(
     "payment.method.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="payment.add_payment",
     input=MethodIn,
     output=MethodOut,
@@ -146,6 +147,7 @@ def create_method(ctx: OperationContext, data: MethodIn) -> dict:
 @operation(
     "payment.method.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="payment.add_payment",
     input=MethodPatchIn,
     output=MethodOut,
@@ -204,6 +206,7 @@ def _set_active(ctx: OperationContext, data: MethodRefIn, active: bool) -> dict:
 @operation(
     "payment.method.deactivate",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="payment.add_payment",
     input=MethodRefIn,
     output=MethodOut,
@@ -221,6 +224,7 @@ def deactivate_method(ctx: OperationContext, data: MethodRefIn) -> dict:
 @operation(
     "payment.method.activate",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="payment.add_payment",
     input=MethodRefIn,
     output=MethodOut,
@@ -428,6 +432,7 @@ def _step(
 @operation(
     "payment.payment.approve",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="payment.approve_payment",
     input=PaymentRefIn,
     output=PaymentOut,
@@ -452,6 +457,7 @@ def approve_payment(ctx: OperationContext, data: PaymentRefIn) -> dict:
 @operation(
     "payment.payment.mark_sent",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="payment.add_payment",
     input=PaymentRefIn,
     output=PaymentOut,
@@ -476,6 +482,7 @@ def mark_sent(ctx: OperationContext, data: PaymentRefIn) -> dict:
 @operation(
     "payment.payment.mark_completed",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="payment.add_payment",
     input=PaymentRefIn,
     output=PaymentOut,
@@ -500,6 +507,7 @@ def mark_completed(ctx: OperationContext, data: PaymentRefIn) -> dict:
 @operation(
     "payment.payment.cancel",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="payment.approve_payment",
     input=CancelIn,
     output=PaymentOut,
