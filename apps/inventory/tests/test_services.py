@@ -193,7 +193,7 @@ def test_declarations(name, permission, input, output, risk):
     op = get(name)
     # Every action is reachable by API (WORKBOOK, change 12) and by the assistant, with its risk.
     assert (op.kind, op.permission, op.input, op.output, op.expose_api) == ("command", permission, input, output, True)
-    assert set(op.ai) == {"description", "risk"} and op.ai["description"]
+    assert set(op.ai) == {"description", "risk", "asks"} and op.ai["description"]
     assert op.ai["risk"] == risk
 
 
