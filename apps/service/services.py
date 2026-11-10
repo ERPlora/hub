@@ -347,6 +347,7 @@ def _announce_created(ctx: OperationContext, service: Service) -> None:
 @operation(
     "service.service.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.add_service",
     input=ServiceIn,
     output=ServiceOut,
@@ -369,6 +370,7 @@ def create_service(ctx: OperationContext, data: ServiceIn) -> dict:
 @operation(
     "service.service.bulk_create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.change_service",
     input=ServiceBulkIn,
     output=ServicesOut,
@@ -407,6 +409,7 @@ def bulk_create_services(ctx: OperationContext, data: ServiceBulkIn) -> dict:
 @operation(
     "service.service.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.change_service",
     input=ServicePatchIn,
     output=ServiceOut,
@@ -457,6 +460,7 @@ def update_service(ctx: OperationContext, data: ServicePatchIn) -> dict:
 @operation(
     "service.service.archive",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.delete_service",
     input=ServiceRefIn,
     output=ServiceOut,
@@ -479,6 +483,7 @@ def archive_service(ctx: OperationContext, data: ServiceRefIn) -> dict:
 @operation(
     "service.service.restore",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.change_service",
     input=ServiceRefIn,
     output=ServiceOut,
@@ -506,6 +511,7 @@ PHOTOS = "service/services/"
 @operation(
     "service.service.set_image",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.change_service",
     input=ServiceImageIn,
     output=ServiceOut,
@@ -611,6 +617,7 @@ def lock_tree() -> dict:
 @operation(
     "service.category.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.add_category",
     input=CategoryIn,
     output=CategoryOut,
@@ -646,6 +653,7 @@ def create_category(ctx: OperationContext, data: CategoryIn) -> dict:
 @operation(
     "service.category.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.change_category",
     input=CategoryPatchIn,
     output=CategoryOut,
@@ -696,6 +704,7 @@ def update_category(ctx: OperationContext, data: CategoryPatchIn) -> dict:
 @operation(
     "service.category.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.delete_category",
     input=CategoryRefIn,
     output=DeletedOut,
@@ -728,6 +737,7 @@ def delete_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
 @operation(
     "service.settings.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.manage_settings",
     input=SettingsIn,
     output=SettingsOut,
@@ -790,6 +800,7 @@ def _assignment_payload(assignment: Assignment) -> dict:
 @operation(
     "service.assignment.assign",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.change_service",
     input=AssignIn,
     output=AssignmentOut,
@@ -847,6 +858,7 @@ def _locked_assignment(assignment_id) -> Assignment:
 @operation(
     "service.assignment.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.change_service",
     input=AssignmentPatchIn,
     output=AssignmentOut,
@@ -884,6 +896,7 @@ def update_assignment(ctx: OperationContext, data: AssignmentPatchIn) -> dict:
 @operation(
     "service.assignment.remove",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.change_service",
     input=AssignmentRefIn,
     output=DeletedOut,
@@ -968,6 +981,7 @@ def _line_services(data: PackageIn) -> list[Service]:
 @operation(
     "service.package.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.add_package",
     input=PackageIn,
     output=PackageOut,
@@ -1014,6 +1028,7 @@ def create_package(ctx: OperationContext, data: PackageIn) -> dict:
 @operation(
     "service.package.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.change_package",
     input=PackagePatchIn,
     output=PackageOut,
@@ -1055,6 +1070,7 @@ def update_package(ctx: OperationContext, data: PackagePatchIn) -> dict:
 @operation(
     "service.package.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.delete_package",
     input=PackageRefIn,
     output=DeletedOut,
@@ -1097,6 +1113,7 @@ def _tell_sales(ctx: OperationContext, name: str, data: dict) -> Any:
 @operation(
     "service.grant.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.grant_package",
     input=GrantIn,
     output=GrantOut,
@@ -1145,6 +1162,7 @@ def create_grant(ctx: OperationContext, data: GrantIn) -> dict:
 @operation(
     "service.grant.void",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.void_grant",
     input=VoidIn,
     output=GrantOut,
@@ -1180,6 +1198,7 @@ def void_grant(ctx: OperationContext, data: VoidIn) -> dict:
 @operation(
     "service.grant.adjust",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.adjust_grant",
     input=AdjustIn,
     output=GrantOut,
@@ -1224,6 +1243,7 @@ def adjust_grant(ctx: OperationContext, data: AdjustIn) -> dict:
 @operation(
     "service.grant.redeem",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.redeem_package",
     input=RedeemIn,
     output=RedemptionOut,

@@ -1,0 +1,23 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261108.owner.es.tax.alias.list","app":"tax","tool":"tax.alias.list","role":"owner","language":"es","phrase":"¿qué nombres de un CSV sabe interpretar el importador como categorías de impuestos?","expect":"read"},
+    {"id":"qa20261108.owner.es.tax.alias.resolve","app":"tax","tool":"tax.alias.resolve","role":"owner","language":"es","phrase":"si una celda dice «comida», ¿a qué categoría fiscal la asignarías?","expect":"read"},
+    {"id":"qa20261108.owner.es.tax.category.get","app":"tax","tool":"tax.category.get","role":"owner","language":"es","phrase":"comprueba si existe la categoría product.qa y dime su nombre en español","expect":"read"},
+    {"id":"qa20261108.owner.es.tax.category.list","app":"tax","tool":"tax.category.list","role":"owner","language":"es","phrase":"lista las categorías fiscales activas y el porcentaje que aplica hoy a cada una en mi región","expect":"read"},
+    {"id":"qa20261108.owner.es.tax.rate.calculate","app":"tax","tool":"tax.rate.calculate","role":"owner","language":"es","phrase":"usa la calculadora fiscal para comprobar base, impuesto y total de 12,10 € sin IVA incluido en la categoría de comida en España","expect":"read"},
+    {"id":"qa20261108.owner.es.tax.rule.countries","app":"tax","tool":"tax.rule.countries","role":"owner","language":"es","phrase":"¿en qué países tengo reglas de impuestos activas o desactivadas?","expect":"read"},
+    {"id":"qa20261108.owner.es.tax.rule.list","app":"tax","tool":"tax.rule.list","role":"owner","language":"es","phrase":"enséñame las reglas fiscales vigentes en España, con porcentajes, fechas y calificación de la operación","expect":"read"},
+    {"id":"qa20261108.owner.es.tax.rule.parent_candidates","app":"tax","tool":"tax.rule.parent_candidates","role":"owner","language":"es","phrase":"¿de qué regla principal de product.qa en España puede colgar un recargo de equivalencia?","expect":"read"},
+    {"id":"qa20261108.owner.es.tax.rule.status","app":"tax","tool":"tax.rule.status","role":"owner","language":"es","phrase":"¿tengo suficientes reglas activas para que el TPV pueda calcular impuestos hoy en España?","expect":"read"},
+    {"id":"qa20261108.owner.es.tax.settings.get","app":"tax","tool":"tax.settings.get","role":"owner","language":"es","phrase":"¿en qué país y región fiscal está operando el negocio: IVA, IGIC o IPSI?","expect":"read"},
+    {"id":"qa20261108.owner.es.tax.category.create","app":"tax","tool":"tax.category.create","role":"owner","language":"es","phrase":"crea la categoría fiscal product.qa llamada Productos QA, con descripción «solo para pruebas QA»","expect":"card","decide":"confirm"},
+    {"id":"qa20261108.owner.es.tax.rule.create","app":"tax","tool":"tax.rule.create","role":"owner","language":"es","phrase":"para product.qa en España crea una regla sujeta al 21 % desde el 01/01/2026, sin fecha de fin","expect":"card","decide":"confirm"},
+    {"id":"qa20261108.owner.es.tax.rule.bulk_create","app":"tax","tool":"tax.rule.bulk_create","role":"owner","language":"es","phrase":"importa en un solo lote dos reglas para product.qa: Italia sujeta al 22 % y Alemania sujeta al 19 %, ambas desde el 01/01/2026 y sin componentes","expect":"card","decide":"confirm"},
+    {"id":"qa20261108.owner.es.tax.alias.create","app":"tax","tool":"tax.alias.create","role":"owner","language":"es","phrase":"aprende que el texto «iva qa» en un CSV significa la categoría product.qa","expect":"card","decide":"confirm"},
+    {"id":"qa20261108.owner.es.tax.rule.deactivate","app":"tax","tool":"tax.rule.deactivate","role":"owner","language":"es","phrase":"desactiva temporalmente la regla española de product.qa sin perder su porcentaje ni sus fechas","expect":"card","decide":"confirm"},
+    {"id":"qa20261108.owner.es.tax.rule.activate","app":"tax","tool":"tax.rule.activate","role":"owner","language":"es","phrase":"vuelve a activar la regla española de product.qa que acabo de desactivar","expect":"card","decide":"confirm"},
+    {"id":"qa20261108.owner.es.tax.rule.end","app":"tax","tool":"tax.rule.end","role":"owner","language":"es","phrase":"haz que la regla española de product.qa deje de aplicarse después del 31/12/2026 inclusive","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.owner.es.tax.settings.update","app":"tax","tool":"tax.settings.update","role":"owner","language":"es","phrase":"mantén el negocio en la fiscalidad general española, sin región especial de Canarias, Ceuta ni Melilla","expect":"card","decide":"cancel"}
+  ]
+}

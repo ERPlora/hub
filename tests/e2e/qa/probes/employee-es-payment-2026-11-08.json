@@ -1,0 +1,11 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261108.employee.es.payment.method.get","app":"payment","tool":"payment.method.get","role":"employee","language":"es","phrase":"¿qué referencia tiene Banco QA y está disponible para pagos?","expect":"read","lookups":["payment.method.list"]},
+    {"id":"qa20261108.employee.es.payment.method.list","app":"payment","tool":"payment.method.list","role":"employee","language":"es","phrase":"¿desde qué cuentas puede salir un pago a un proveedor?","expect":"read"},
+    {"id":"qa20261108.employee.es.payment.payment.list","app":"payment","tool":"payment.payment.list","role":"employee","language":"es","phrase":"enséñame los pagos a proveedores que todavía no están completados","expect":"read"},
+    {"id":"qa20261108.employee.es.payment.method.activate","app":"payment","tool":"payment.method.activate","role":"employee","language":"es","phrase":"vuelve a activar Banco QA para que pueda usarse en un pago nuevo","expect":"refused"},
+    {"id":"qa20261108.employee.es.payment.method.create","app":"payment","tool":"payment.method.create","role":"employee","language":"es","phrase":"crea una cuenta llamada Banco empleado QA con referencia ES91 2100 0418 4502 0005 1332","expect":"refused"},
+    {"id":"qa20261108.employee.es.payment.payment.create","app":"payment","tool":"payment.payment.create","role":"employee","language":"es","phrase":"registra un pago de 10 € a Proveedor QA desde Banco QA con fecha de hoy","expect":"refused"}
+  ]
+}

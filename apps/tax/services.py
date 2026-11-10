@@ -79,6 +79,7 @@ RULE_ALREADY_INACTIVE = _("That rule is already deactivated.")
 @operation(
     "tax.category.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="tax.manage",
     input=CategoryIn,
     output=CategoryOut,
@@ -121,6 +122,7 @@ def _category(reference: str, field: str = "tax_category_key") -> TaxCategory:
 @operation(
     "tax.alias.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="tax.manage",
     input=AliasIn,
     output=AliasOut,
@@ -263,6 +265,7 @@ def _coherent_parent(data: RuleIn, category: TaxCategory) -> TaxRule:
 @operation(
     "tax.rule.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="tax.manage",
     input=RuleIn,
     output=RuleOut,
@@ -293,6 +296,7 @@ def create_rule(ctx: OperationContext, data: RuleIn) -> dict:
 @operation(
     "tax.rule.bulk_create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="tax.manage",
     input=RuleBulkIn,
     output=RuleBulkOut,
@@ -387,6 +391,7 @@ def _latest_deactivated(rules: list[TaxRule]) -> TaxRule | None:
 @operation(
     "tax.rule.end",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="tax.manage",
     input=RuleEndIn,
     output=RuleOut,
@@ -442,6 +447,7 @@ def _switch(ctx: OperationContext, rule: TaxRule, active: bool) -> dict:
 @operation(
     "tax.rule.deactivate",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="tax.manage",
     input=RuleRefIn,
     output=RuleOut,
@@ -459,6 +465,7 @@ def deactivate_rule(ctx: OperationContext, data: RuleRefIn) -> dict:
 @operation(
     "tax.rule.activate",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="tax.manage",
     input=RuleRefIn,
     output=RuleOut,
@@ -497,6 +504,7 @@ def _actor(ctx: OperationContext) -> str:
 @operation(
     "tax.settings.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="tax.manage",
     input=TaxSettingsIn,
     output=TaxSettingsOut,

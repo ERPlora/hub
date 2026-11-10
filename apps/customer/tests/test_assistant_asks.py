@@ -9,11 +9,16 @@ each.
 
 import pytest
 from live.context import OperationContext, Scope
+from live.errors import Conflict
 from live.operations import AI, Operation, registry
 
+from apps.customer.models import Customer
+from apps.customer.schemas import MergeIn
 from base import assistant
 from base.models import Membership
 from base.permissions import permissions_for
+
+from .conftest import ctx_for
 
 A = Scope("host", "a")
 #: Writes on cards and settings that only the owner and the admin hold, none of them a manager approves: an employee's
@@ -82,3 +87,101 @@ def test_a_customers_orders_bring_the_tool_of_customers_with_room_to_spare(catal
     assert name in tools  # positive control: the role holds the tool, so its place is known
     offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
     assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:WITH_ROOM])
+
+
+#: A merge asked by the two phones, in words that are none of its ``asks``: the Spanish one is the phrase of the
+#: real-model QA that ended without a card (hub#1084, ``qa20261108.owner.es.customer.customer.merge``), 20th of the
+#: tools offered before the merge's ``asks`` said «A into B»; the English one, its twin, was 9th.
+MERGE_BY_TWO_PHONES = [
+    (
+        "es",
+        (
+            "junta la ficha con móvil 611 222 444 dentro de la ficha con móvil 611 222 333, que es la buena, y "
+            "traslada todo su historial"
+        ),
+    ),
+    (
+        "en",
+        (
+            "fold the customer with phone 611 222 444 into the one with 611 222 333, that one is the right card, and "
+            "move all her history"
+        ),
+    ),
+]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("language", "phrase"), MERGE_BY_TWO_PHONES)
+def test_a_merge_by_two_phones_offers_the_existing_operation_with_room_to_spare(catalog_of, language, phrase):
+    tools = catalog_of(Membership.Role.OWNER, language)
+    name = "customer.customer.merge"
+    assert name in tools  # positive control: the owner holds it, so the model can receive it
+    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
+    assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:WITH_ROOM])
+
+
+def test_the_merge_instruction_completes_the_action_with_human_references():
+    description = assistant.description(registry["customer.customer.merge"])
+    for expected in (
+        "Use this tool once both cards are known",
+        "do not stop at reading or explaining",
+        "`customer` is the card that stays",
+        "`absorbed` is the duplicate",
+        "customer.customer.by_phone",
+        "customer.customer.list",
+        "never ask the person for an internal id",
+        # The ids those reads return go in the id fields: an id in `customer` or `absorbed` is no name, phone or email.
+        "their ids in `id` and `absorbed_id`",
+    ):
+        assert expected in description
+
+
+def test_the_merge_schema_distinguishes_the_survivor_from_the_duplicate():
+    properties = MergeIn.model_json_schema()["properties"]
+    for name in ("id", "customer"):
+        assert "card that stays" in properties[name]["description"]
+    for name in ("absorbed_id", "absorbed"):
+        assert "duplicate" in properties[name]["description"]
+
+
+@pytest.mark.django_db
+def test_the_reported_merge_keeps_its_confirmation_and_absorbs_the_right_card():
+    survivor = Customer.objects.create(name="Ana QA", phone="+34611222333")
+    duplicate = Customer.objects.create(name="Ana QA copia", phone="+34611222444")
+    op = registry["customer.customer.merge"]
+    arguments = {"customer": "611 222 333", "absorbed": "611 222 444"}
+    ctx = ctx_for("hub_owner", language="es")
+
+    card = assistant.card(op, arguments, "es", ctx)
+    assert op.ai_spec().risk == "high"
+    assert [(field["name"], field["value"]) for field in card["fields"]] == [
+        ("customer", "Ana QA"),
+        ("absorbed", "Ana QA copia"),
+    ]
+
+    op(ctx, op.input.model_validate(arguments))
+    survivor.refresh_from_db()
+    duplicate.refresh_from_db()
+    assert duplicate.merged_into_id == survivor.id
+    assert survivor.name == "Ana QA"
+
+
+@pytest.mark.django_db
+def test_a_merge_whose_survivor_fits_two_cards_leaves_it_out_of_the_card_and_merges_nothing():
+    """The written reference is no name: with two «Ana» the card cannot say which one stays, so it leaves that datum
+    out (as an id it cannot name), and the merge refuses: it never merges into the first card that fits."""
+    Customer.objects.create(name="Ana", phone="+34611222555")
+    Customer.objects.create(name="Ana", phone="+34611222666")
+    duplicate = Customer.objects.create(name="Ana QA copia", phone="+34611222444")
+    op = registry["customer.customer.merge"]
+    arguments = {"customer": "Ana", "absorbed": "611 222 444"}
+    ctx = ctx_for("hub_owner", language="es")
+
+    card = assistant.card(op, arguments, "es", ctx)
+    assert [(field["name"], field["value"]) for field in card["fields"]] == [("absorbed", "Ana QA copia")]
+
+    with pytest.raises(Conflict) as excinfo:
+        op(ctx, op.input.model_validate(arguments))
+    assert excinfo.value.code == "customer.customer_ambiguous"
+    duplicate.refresh_from_db()
+    assert duplicate.merged_into_id is None

@@ -349,6 +349,7 @@ def lock_customers(ids) -> list[UUID]:
 @operation(
     "customer.customer.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=CustomerIn,
     output=CustomerDetailOut,
@@ -382,6 +383,7 @@ def create_customer(ctx: OperationContext, data: CustomerIn) -> dict:
 @operation(
     "customer.customer.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=CustomerPatchIn,
     output=CustomerDetailOut,
@@ -500,6 +502,7 @@ def _already_imported(values: dict) -> bool:
 @operation(
     "customer.customer.import",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=ImportIn,
     output=ImportOut,
@@ -584,6 +587,7 @@ def _set_members(
 @operation(
     "customer.customer.set_groups",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=SetGroupsIn,
     output=CustomerDetailOut,
@@ -612,6 +616,7 @@ def set_groups(ctx: OperationContext, data: SetGroupsIn) -> dict:
 @operation(
     "customer.customer.set_tags",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=SetTagsIn,
     output=CustomerDetailOut,
@@ -640,6 +645,7 @@ def set_tags(ctx: OperationContext, data: SetTagsIn) -> dict:
 @operation(
     "customer.customer.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.delete",
     input=CustomerRefIn,
     output=DeletedOut,
@@ -667,17 +673,30 @@ def delete_customer(ctx: OperationContext, data: CustomerRefIn) -> dict:
 @operation(
     "customer.customer.merge",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.merge",
     input=MergeIn,
     output=CustomerDetailOut,
     ai=AI(
-        "Merges a duplicate card (absorbed) into the one that stays: the survivor keeps its data and fills only its "
-        "empty fields, notes are appended and figures summed; activity, custom values, groups, tags, purchases, "
-        "orders and consent move to it, and the duplicate is retired. Cannot be undone.",
+        "Use this tool once both cards are known; do not stop at reading or explaining the merge. `customer` is the "
+        "card that stays and `absorbed` is the duplicate merged into it: for «merge A into B», B is `customer` and A "
+        "is `absorbed`. Pass an exact name, phone or email in either field or, once customer.customer.by_phone or "
+        "customer.customer.list found the cards, their ids in `id` and `absorbed_id`; never ask the person for an "
+        "internal id. The survivor keeps its data and fills only its empty fields, notes are appended and figures "
+        "summed; activity, custom values, groups, tags, purchases, orders and consent move to it, and the duplicate is "
+        "retired. Cannot be undone.",
         risk="high",
         asks={
-            "en": ("merge the two Marta cards", "Ana's in there twice, combine them"),
-            "es": ("Ana López está repetida, júntala con la otra", "tengo a Marta duplicada, únelas"),
+            "en": (
+                "merge the two Marta cards",
+                "Ana's in there twice, combine them",
+                "merge the card for 611 222 444 into the one for 611 222 333",
+            ),
+            "es": (
+                "Ana López está repetida, júntala con la otra",
+                "tengo a Marta duplicada, únelas",
+                "junta la ficha del 611 222 444 dentro de la del 611 222 333",
+            ),
         },
     ),
 )
@@ -789,6 +808,7 @@ def _merge_health(survivor: Customer, absorbed: Customer) -> None:
 @operation(
     "customer.customer.erase",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.erase",
     input=EraseIn,
     output=ErasedOut,
@@ -859,6 +879,7 @@ def _erase_card(ctx: OperationContext, customer: Customer, reason: str) -> None:
 @operation(
     "customer.note.add",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=NoteIn,
     output=ActivityRow,
@@ -899,6 +920,7 @@ def add_note(ctx: OperationContext, data: NoteIn) -> Activity:
 @operation(
     "customer.activity.add",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.record_activity",
     input=ActivityIn,
     output=ActivityRow,
@@ -1008,6 +1030,7 @@ def _record_consent(ctx: OperationContext, data, state: str) -> Consent:
 @operation(
     "customer.consent.grant",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=ConsentGrantIn,
     output=ConsentRow,
@@ -1033,6 +1056,7 @@ def grant_consent(ctx: OperationContext, data: ConsentGrantIn) -> Consent:
 @operation(
     "customer.consent.withdraw",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=ConsentWithdrawIn,
     output=ConsentRow,
@@ -1112,6 +1136,7 @@ def _health_fact(
 @operation(
     "customer.health.grant",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=HealthGrantIn,
     output=HealthOut,
@@ -1127,6 +1152,7 @@ def grant_health(ctx: OperationContext, data: HealthGrantIn) -> dict:
 @operation(
     "customer.health.withdraw",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=HealthWithdrawIn,
     output=HealthOut,
@@ -1144,6 +1170,7 @@ def withdraw_health(ctx: OperationContext, data: HealthWithdrawIn) -> dict:
 @operation(
     "customer.health.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=HealthIn,
     output=HealthOut,
@@ -1200,6 +1227,7 @@ def update_health(ctx: OperationContext, data: HealthIn) -> dict:
 @operation(
     "customer.order.link",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=OrderLinkIn,
     output=OrderCustomerOut,
@@ -1498,6 +1526,7 @@ def _with_count(instance):
 @operation(
     "customer.group.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.configure",
     input=GroupIn,
     output=GroupRow,
@@ -1519,6 +1548,7 @@ def create_group(ctx: OperationContext, data: GroupIn) -> dict:
 @operation(
     "customer.group.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.configure",
     input=GroupPatchIn,
     output=GroupRow,
@@ -1542,6 +1572,7 @@ def update_group(ctx: OperationContext, data: GroupPatchIn) -> dict:
 @operation(
     "customer.group.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.delete",
     input=GroupRefIn,
     output=DeletedOut,
@@ -1565,6 +1596,7 @@ def delete_group(ctx: OperationContext, data: GroupRefIn) -> dict:
 @operation(
     "customer.tag.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.configure",
     input=TagIn,
     output=TagRow,
@@ -1586,6 +1618,7 @@ def create_tag(ctx: OperationContext, data: TagIn) -> dict:
 @operation(
     "customer.tag.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.configure",
     input=TagPatchIn,
     output=TagRow,
@@ -1608,6 +1641,7 @@ def update_tag(ctx: OperationContext, data: TagPatchIn) -> dict:
 @operation(
     "customer.tag.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.delete",
     input=TagRefIn,
     output=DeletedOut,
@@ -1631,6 +1665,7 @@ def delete_tag(ctx: OperationContext, data: TagRefIn) -> dict:
 @operation(
     "customer.field.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.configure",
     input=FieldIn,
     output=FieldRow,
@@ -1656,6 +1691,7 @@ def create_field(ctx: OperationContext, data: FieldIn) -> CustomField:
 @operation(
     "customer.field.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.configure",
     input=FieldPatchIn,
     output=FieldRow,
@@ -1702,6 +1738,7 @@ def update_field(ctx: OperationContext, data: FieldPatchIn) -> CustomField:
 @operation(
     "customer.field.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.configure",
     input=FieldRefIn,
     output=DeletedOut,
