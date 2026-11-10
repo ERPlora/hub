@@ -4,6 +4,7 @@
 import datetime as dt
 import uuid
 from decimal import Decimal
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -12,8 +13,10 @@ from live.errors import Conflict, NotFound
 from live.operations import get
 
 from apps.pricing import queries
+from apps.pricing.schemas import PriceItemDetailOut, PriceItemOut, RuleOut
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
+from base.tests.typed_operations import ts_fields
 
 from .conftest import (
     TODAY,
@@ -825,3 +828,18 @@ def test_a_rule_a_category_or_a_group_of_another_business_is_not_found_there(hub
                 by_id(name, data, in_a)
     with use_hub(hub_b):  # positive control: they are there, in their own business
         assert [by_id(name, data, in_b).id for name, data in reads] == [rule.id, hair.id, vip.id]
+
+
+# ── The typed outputs declare the schema fields ────────────────────────────────────────────────
+
+OPERATIONS_TS = Path(__file__).resolve().parents[1] / "frontend" / "operations.d.ts"
+
+
+@pytest.mark.parametrize(
+    ("interface", "schema"),
+    [("PriceItemOut", PriceItemOut), ("PriceItemDetailOut", PriceItemDetailOut), ("RuleOut", RuleOut)],
+)
+def test_the_typed_outputs_declare_their_schema_fields(interface, schema):
+    # The pages read what the server answers through these TypeScript types (vue-tsc checks them): a field the
+    # schema answers and the type does not declare is invisible to them, as the currency was (hub#942).
+    assert ts_fields(interface, OPERATIONS_TS) == set(schema.model_fields)

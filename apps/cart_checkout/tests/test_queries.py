@@ -7,7 +7,6 @@ cart past its expiry reads as expired, and a deleted cart is never listed.
 """
 
 import datetime as dt
-import re
 from decimal import Decimal
 from pathlib import Path
 
@@ -30,9 +29,9 @@ from apps.cart_checkout.schemas import (
     OrderPage,
     OrderRefIn,
 )
-from apps.pricing.schemas import PriceItemOut, RuleOut
 
 from base.tests.ordering import assert_reads_backwards, listed_with
+from base.tests.typed_operations import ts_fields
 
 from .conftest import NOW, ctx_for, make_cart, make_item, make_order
 
@@ -399,15 +398,6 @@ def test_nobody_without_the_view_permission(orders):
 OPERATIONS_TS = Path(__file__).resolve().parents[1] / "frontend" / "operations.d.ts"
 
 
-def ts_fields(interface: str, operations_ts: Path = OPERATIONS_TS) -> set[str]:
-    """The fields of ``interface`` in the pages' typed operations (``frontend/operations.d.ts``)."""
-    source = operations_ts.read_text()
-    found = re.search(rf"export interface {interface}(?: extends (\w+))? \{{(.*?)\n\}}", source, re.S)
-    assert found, f"{interface} is not in operations.d.ts"
-    fields = set(re.findall(r"^\s+(\w+)\??:", found.group(2), re.M))
-    return fields | (ts_fields(found.group(1), operations_ts) if found.group(1) else set())
-
-
 @pytest.mark.parametrize(
     ("interface", "schema"),
     [("CartListIn", CartListIn), ("ItemListIn", ItemListIn), ("OrderListIn", OrderListIn)],
@@ -415,20 +405,13 @@ def ts_fields(interface: str, operations_ts: Path = OPERATIONS_TS) -> set[str]:
 def test_the_pages_filter_with_the_declared_filters_only(interface, schema):
     # The old module's filters lived in its manifest; a filter the query does not declare did nothing.
     # The pages build their query as these TypeScript types (vue-tsc checks it); the types are the schema.
-    assert ts_fields(interface) == set(schema.model_fields)
+    assert ts_fields(interface, OPERATIONS_TS) == set(schema.model_fields)
 
 
-@pytest.mark.parametrize(
-    ("app", "interface", "schema"),
-    [
-        ("cart_checkout", "ItemOut", ItemOut),
-        ("pricing", "RuleOut", RuleOut),
-        ("pricing", "PriceItemOut", PriceItemOut),
-    ],
-)
-def test_the_typed_outputs_declare_their_schema_fields(app, interface, schema):
-    operations_ts = Path(__file__).resolve().parents[2] / app / "frontend" / "operations.d.ts"
-    assert ts_fields(interface, operations_ts) == set(schema.model_fields)
+def test_the_typed_outputs_declare_their_schema_fields():
+    # The pages read what the server answers through these TypeScript types: a field the schema answers and the
+    # type does not declare is invisible to them, as a line's currency was (hub#942).
+    assert ts_fields("ItemOut", OPERATIONS_TS) == set(ItemOut.model_fields)
 
 
 def _tied_carts():
