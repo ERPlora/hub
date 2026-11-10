@@ -208,6 +208,18 @@ def _refuse_taken_name() -> Conflict:
     output=PrinterOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "add a new printer called Kitchen 2 on 192.168.1.50",
+                "add a receipt printer",
+                "connect a bluetooth printer for labels",
+            ),
+            "es": (
+                "añade una impresora nueva llamada Cocina 2 con la IP 192.168.1.50",
+                "da de alta una impresora de tickets para la caja",
+                "conecta una impresora bluetooth para etiquetas",
+            ),
+        },
         "description": "Add a printer of the business: its name (Till, Kitchen), its connection (network with its IP and "
         "port 9100, bluetooth with its MAC, usb with the name of the computer's print queue, or system for the "
         "computer's A4 printer), its paper (80 or 58 mm) and what it prints (receipt, kitchen, bar or label). Two "
@@ -246,6 +258,20 @@ def create_printer(ctx: OperationContext, data: PrinterIn) -> dict:
     output=PrinterOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "change the IP, the paper and the name of the Caja 2 printer",
+                "rename the Till printer to Front desk",
+                "switch the kitchen printer to 58 mm paper",
+                "deactivate the old bar printer",
+            ),
+            "es": (
+                "cambia la IP, el papel y el nombre de la impresora Caja 2",
+                "renombra la impresora de la caja como Recepción",
+                "pon la impresora de cocina con papel de 58 mm",
+                "desactiva la impresora de la barra",
+            ),
+        },
         "description": "Change a printer, named by its name or id: its name, connection, address, port, paper or "
         "function, or deactivate it (it takes no new jobs) and activate it again. A printer is never deleted. A "
         "printer that changes function stops being the chosen one of its old function.",
@@ -340,6 +366,19 @@ def _chosen_printer(field: str, ref: str | None, usage: str) -> Printer | None:
     output=SettingsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "print the receipt by itself when I charge",
+                "send the kitchen orders to Kitchen 2",
+                "print two copies of every receipt",
+            ),
+            "es": (
+                "que el ticket se imprima solo al cobrar",
+                "manda los pedidos de cocina a la impresora Cocina 2",
+                "imprime dos copias de cada ticket",
+                "que se abra el cajón al cobrar",
+            ),
+        },
         "description": "Change how the business prints, field by field: print the receipt by itself at checkout, open the "
         "drawer with it, receipt copies (1 to 3), and the printer of each function by its name («the kitchen orders go "
         "to Kitchen 2»; null = the first active one of that function). What is not sent is kept.",
@@ -452,6 +491,18 @@ def _new_job(ctx: OperationContext, **values) -> PrintJob:
     output=JobCreateOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "print this receipt on the Till printer",
+                "print the label of this product",
+                "send this document to the kitchen printer",
+            ),
+            "es": (
+                "imprime este ticket en la impresora de la caja",
+                "imprime la etiqueta de este producto",
+                "manda este documento a la impresora de cocina",
+            ),
+        },
         "description": "Print a document: put it in the print queue, where the device next to its printer prints it. "
         "The document is structured (a receipt: business_name, receipt_id, items [{name, quantity, total}], totals, "
         "payment; a barcode label: product_name, barcode, price) and goes to the printer of its function, or to a "
@@ -524,6 +575,18 @@ def create_job(ctx: OperationContext, data: JobCreateIn) -> dict:
     output=JobOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "print a test page on the Caja 2 printer",
+                "test the kitchen printer",
+                "send a test ticket to the Till printer",
+            ),
+            "es": (
+                "saca una página de prueba en la impresora Caja 2",
+                "prueba la impresora de cocina",
+                "manda un ticket de prueba a la impresora de la caja",
+            ),
+        },
         "description": "Print a test page on a printer, named by its name or id («test the kitchen printer»): the device "
         "next to it prints the sheet with the printer's address and the time, or an A4 page on the system printer.",
         "risk": "normal",
@@ -652,6 +715,16 @@ def _copy_of(job: PrintJob) -> dict | None:
     output=JobClaimOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "take the next print job for this device",
+                "this device is ready to print the oldest job",
+            ),
+            "es": (
+                "este equipo recoge el siguiente trabajo de impresión",
+                "este equipo está listo para imprimir el trabajo más antiguo",
+            ),
+        },
         "description": "For the device that prints (base's /ws/print): take the oldest queued job of the printers this "
         "device reaches, or one with no printer of their function. It is marked sent for 90 s; without an answer it "
         "goes back to the queue. Not for a person.",
@@ -716,6 +789,16 @@ def claim_job(ctx: OperationContext, data: JobClaimIn) -> dict:
     output=JobAckOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "this device confirms the job came out on paper",
+                "the print job is done on this device",
+            ),
+            "es": (
+                "este equipo confirma que el trabajo salió en papel",
+                "el trabajo de impresión ya está hecho en este equipo",
+            ),
+        },
         "description": "For the device that prints: confirm a job came out on paper, saying which device and which "
         "hand-out. Confirming twice is one confirmation; a late confirmation of the device that took it is taken even "
         "if the job went back to the queue (the paper did come out). Another device: refused. Not for a person.",
@@ -750,6 +833,16 @@ def complete_job(ctx: OperationContext, data: JobCompleteIn) -> dict:
     output=JobAckOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "this device reports the print job did not come out",
+                "the printer ran out of paper on this job",
+            ),
+            "es": (
+                "este equipo avisa de que el trabajo no salió impreso",
+                "la impresora se quedó sin papel en este trabajo",
+            ),
+        },
         "description": "For the device that prints: say a job did not come out, with the device's error, the device "
         "and the hand-out it answers. It goes back to the queue, and fails after its fifth hand-out. Another device or "
         "another hand-out: refused. Not for a person.",
@@ -796,6 +889,16 @@ def _reached_printers(ids: list) -> list[Printer]:
     output=DeviceOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "enroll this station as the one that prints",
+                "this counter's station will take the print jobs",
+            ),
+            "es": (
+                "deja este equipo encargado de la impresión de los tickets",
+                "este equipo se encargará de los trabajos de impresión",
+            ),
+        },
         "description": "Set up the device the person is using to print, with its name and the printers it reaches: from "
         "then on it prints their jobs with anybody's session. Only from the device itself (it says which device it is); "
         "setting up a retired device again brings it back.",
@@ -850,6 +953,16 @@ def see_device(ctx: OperationContext, data: DeviceSeenIn) -> dict:
     output=DeviceOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "change the name and the printers of the Bar 2 station",
+                "make this station reach the kitchen printer too",
+            ),
+            "es": (
+                "renombra el equipo de impresión Barra 2",
+                "haz que este equipo también llegue a la impresora de cocina",
+            ),
+        },
         "description": "Rename a device that prints, or change the printers it reaches, by its registration id "
         "(printing.device.list). From any device.",
         "risk": "high",
@@ -875,6 +988,16 @@ def update_device(ctx: OperationContext, data: DeviceUpdateIn) -> dict:
     output=DeviceOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "retire the Bar 2 station for good",
+                "that station was lost, take it out of service",
+            ),
+            "es": (
+                "retira el equipo Barra 2, ya no está",
+                "da de baja el equipo perdido de la barra",
+            ),
+        },
         "description": "Retire a device that prints (a till replaced or lost), by its registration id: it takes, confirms "
         "and fails no job any more, and printing from it does not set it up again. Its jobs in hand go back to the "
         "queue when their time to answer runs out.",
@@ -901,6 +1024,18 @@ def retire_device(ctx: OperationContext, data: DeviceRefIn) -> dict:
     output=JobOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "retry the failed print of ticket T-000123",
+                "print that failed ticket again",
+                "reprint the stuck job",
+            ),
+            "es": (
+                "reintenta la impresión fallida del ticket T-000123",
+                "vuelve a mandar a imprimir ese ticket que falló",
+                "reenvía la impresión atascada a la cola",
+            ),
+        },
         "description": "Send a queued or failed print job (or a sent one with no answer) back to the queue, named by its id or "
         "the number of its document («retry ticket T-000123»): its attempts start again, and if its printer is no "
         "longer active it goes to the printer of its function now.",
@@ -931,6 +1066,18 @@ def retry_job(ctx: OperationContext, data: JobRefIn) -> dict:
     output=JobOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "cancel the print job of ticket T-000123",
+                "do not print that queued document",
+                "drop the stuck print from the queue",
+            ),
+            "es": (
+                "cancela la impresión del ticket T-000123",
+                "no imprimas ese documento que está en cola",
+                "saca de la cola la impresión atascada",
+            ),
+        },
         "description": "Cancel a print job that is queued, failed or sent with no answer, named by its id or the "
         "number of its document, with an optional reason. It is not printed and stays in the queue with who, when "
         "and why. A job a printer is printing or has printed is not cancelled.",

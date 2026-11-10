@@ -108,6 +108,18 @@ def settings_row(settings: Settings) -> dict:
     output=SettingsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "is the receipt printed automatically at checkout?",
+                "which printer prints the kitchen orders?",
+                "how is printing set up?",
+            ),
+            "es": (
+                "¿está activada la impresión automática del ticket?",
+                "¿qué impresora tengo elegida para la cocina?",
+                "¿cómo tengo configurada la impresión?",
+            ),
+        },
         "description": "Get the printing settings: whether the receipt prints and the drawer opens by itself at checkout, "
         "the receipt copies and the printer chosen for each function (receipts, kitchen, bar, labels). The receipt's "
         "header and footer are not here: they are Sales' settings."
@@ -221,6 +233,18 @@ _PRINTER_SORT = {"name": Lower("name"), "usage": "usage", "kind": "kind", "creat
     output=Page[PrinterOut],
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what printers do I have?",
+                "show me the printers of the business",
+                "which printers are inactive?",
+            ),
+            "es": (
+                "¿qué impresoras tengo?",
+                "enséñame las impresoras del negocio",
+                "¿qué impresoras hay de cocina?",
+            ),
+        },
         "description": "List the business's printers by name, with their connection, address, paper, function "
         "(receipt, kitchen, bar, label), whether they are active and their state (ready, waiting, failing, inactive). "
         "Search by name or address; filter by function, connection or active."
@@ -250,7 +274,20 @@ def list_printers(ctx: OperationContext, params: PrinterListIn) -> dict:
     input=PrinterRefIn,
     output=PrinterOut,
     expose_api=True,
-    ai={"description": "Get one printer by its id or its name («the kitchen one» → Kitchen), with its state."},
+    ai={
+        "description": "Get one printer by its id or its name («the kitchen one» → Kitchen), with its state.",
+        "asks": {
+            "en": (
+                "tell me about the kitchen printer",
+                "what IP does the Till printer have?",
+            ),
+            "es": (
+                "háblame de la impresora de cocina",
+                "¿qué IP tiene la impresora de la caja?",
+                "¿de qué papel es la impresora Caja 2?",
+            ),
+        },
+    },
 )
 def get_printer(ctx: OperationContext, params: PrinterRefIn) -> dict:
     return printer_row(find_printer(params.printer_id, params.printer, rows=_with_queue(Printer.objects.all())))
@@ -264,6 +301,18 @@ def get_printer(ctx: OperationContext, params: PrinterRefIn) -> dict:
     output=PrinterStatusOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "is the kitchen printer working?",
+                "why is the Till printer not printing?",
+                "when did the bar printer last print?",
+            ),
+            "es": (
+                "¿funciona la impresora de cocina?",
+                "¿por qué no imprime la impresora de la caja?",
+                "¿cuándo imprimió por última vez la de la barra?",
+            ),
+        },
         "description": "How a printer is doing, by its name or id: its state, how many of its jobs wait and since when, "
         "how many a device has and how many failed, when it last printed, its last error and whether it is the printer "
         "of its function. «Is the kitchen printer working?»"
@@ -361,6 +410,18 @@ def find_job(job_id: uuid.UUID | None, reference: str | None, *, lock: bool = Fa
     output=Page[JobOut],
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what is in the print queue?",
+                "which print jobs failed today?",
+                "show me the pending prints",
+            ),
+            "es": (
+                "¿qué hay en la cola de impresión?",
+                "¿qué impresiones han fallado hoy?",
+                "enséñame las impresiones pendientes",
+            ),
+        },
         "description": "List the print queue, newest first: each job's document and number, function, printer, state "
         "(pending, sent, done, failed, cancelled), attempts, last error and who retried or cancelled it. Filter by "
         "state, function or printer; search by the document's number («T-000123»)."
@@ -400,6 +461,17 @@ def job_label(job: PrintJob, language: str) -> str:
     output=JobDetailOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what happened to the print job of ticket T-000123?",
+                "did ticket T-000123 print?",
+            ),
+            "es": (
+                "¿qué pasó con la impresión del ticket T-000123?",
+                "¿se imprimió el ticket T-000123?",
+                "dime el estado de la impresión de la factura F-000045",
+            ),
+        },
         "description": "Get one print job by its id or by its document's number («T-000123»: its newest job), titled as "
         "the queue titles it, with its state, printer, attempts, last error and who retried or cancelled it."
     },
@@ -467,6 +539,18 @@ def stalled(usages: list[str]) -> dict[str, int]:
     output=JobSummaryOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how is printing going?",
+                "is any print job stuck?",
+                "is the print queue healthy?",
+            ),
+            "es": (
+                "¿cómo va la cola de impresión?",
+                "¿hay alguna impresión atascada?",
+                "¿se están imprimiendo los pedidos de cocina?",
+            ),
+        },
         "description": "How printing is going, by function (receipts, kitchen, bar, labels): its active printers, the "
         "one chosen in the settings, how many jobs wait and since when, how many a device has, how many failed, and "
         "how many have waited a minute with no device on to print them."
@@ -571,6 +655,16 @@ def device_row(device: PrintDevice, this_key: str | None) -> dict:
     output=Page[DeviceOut],
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which stations are registered, and when were they last seen?",
+                "list the stations and when each was last seen",
+            ),
+            "es": (
+                "¿desde qué equipos se imprime en el negocio?",
+                "¿qué equipos están dados de alta y cuándo se vieron por última vez?",
+            ),
+        },
         "description": "List the devices set up to print, by name: the printers each one reaches and prints for, who set "
         "it up and when it was last seen (connected to print, or asked for a job). Only these devices print; their own "
         "ids are never shown."
@@ -592,6 +686,16 @@ def list_devices(ctx: OperationContext, params: DeviceListIn) -> dict:
     output=DeviceOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "tell me about the Bar 2 station: what does it reach and when was it last seen?",
+                "when did the Bar 2 station last report in?",
+            ),
+            "es": (
+                "háblame del equipo Barra 2: a qué llega y cuándo se vio por última vez",
+                "¿para qué está dado de alta el equipo Barra 2?",
+            ),
+        },
         "description": "Get one device set up to print by its registration id (printing.device.list): its name, the "
         "printers it reaches and prints for, who set it up and when it was last seen. A retired one is not there."
     },
@@ -628,6 +732,16 @@ def get_device(ctx: OperationContext, params: DeviceGetIn) -> dict:
     output=CoverageOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "does every function have a station set up, or are jobs waiting for nobody?",
+                "is anybody covering the kitchen orders?",
+            ),
+            "es": (
+                "¿tiene cada función un equipo dado de alta o hay trabajos esperando a nadie?",
+                "¿hay alguien cubriendo los pedidos de cocina?",
+            ),
+        },
         "description": "Whether a function (receipt, kitchen, bar, label) has a device set up to print it, on or not, and "
         "how many of its jobs have waited a minute or more with no device on to print them (none set up for them, or "
         "the one set up gave no news in the last 90 s). «Is anybody printing the kitchen orders?»"
