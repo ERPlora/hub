@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { pluralsInParentheses } from '../../../../base/frontend/__tests__/catalogue-plurals';
 import en from './en.json';
 import es from './es.json';
 
@@ -61,8 +62,8 @@ describe('inventory catalogues (en source + es)', () => {
     }
   });
 
-  it('hub#1124: never spell a plural with «(s)»; one and many are vue-i18n forms («one | many»)', () => {
-    for (const [key, message] of [...EN, ...ES]) expect(message, key).not.toMatch(/\p{L}\((?:s|es|as|os|ies)\)/u);
+  it('hub#1124: say a count in the singular or the plural, never «(s)»', () => {
+    expect(pluralsInParentheses(EN, ES)).toEqual([]);
   });
 
   it('hold no key that nothing uses (each one is written out whole somewhere in the sources)', () => {

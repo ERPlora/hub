@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { pluralsInParentheses } from '../../../../base/frontend/__tests__/catalogue-plurals';
 import en from './en.json';
 import es from './es.json';
 
@@ -54,8 +55,8 @@ describe('combo catalogues (en source + es)', () => {
     for (const [key, message] of ES) expect(message, key).not.toMatch(/\bcursos?\b/i);
   });
 
-  it('hub#1124: never spell a plural with «(s)»; one and many are vue-i18n forms («one | many»)', () => {
-    for (const [key, message] of [...EN, ...ES]) expect(message, key).not.toMatch(/\p{L}\((?:s|es|as|os|ies)\)/u);
+  it('hub#1124: say a count in the singular or the plural, never «(s)»', () => {
+    expect(pluralsInParentheses(EN, ES)).toEqual([]);
   });
 
   it('have no empty message', () => {
