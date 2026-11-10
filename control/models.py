@@ -467,8 +467,8 @@ class Freeze(UUIDModel):
     ``since`` and ``by`` say when and by whom it was last frozen or lifted; ``reason``, why it is frozen.
 
     One row at most (``control_freeze_one_row``), which control's migration makes; none is the same as never frozen.
-    Written only by ``control.freeze.set`` (``control.services``), read by ``control.freeze.get`` and, once a tick, by
-    the worker (``control.queries.active_freeze``)."""
+    Written only by ``control.freeze.set`` (``control.services``), read by ``control.freeze.get``, the SaaS's signed
+    status poll (``base.hub.get``) and, once a tick, by the worker (``control.queries.active_freeze``)."""
 
     frozen = models.BooleanField(pgettext_lazy("freeze", "frozen"), default=False)
     reason = models.CharField(pgettext_lazy("freeze", "reason"), max_length=500, blank=True, default="")
