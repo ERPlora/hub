@@ -7,7 +7,7 @@ type TauriWindow = { __TAURI__?: { core: { invoke: (command: string, args?: unkn
 
 /** Puts the page inside the installed app; `save_download` answers `answer` (a refusal when it is a string). */
 export function insideTheAppSaving(answer: { path: string } | string | Record<string, never>) {
-  const invoke = vi.fn(async (command: string, _args?: unknown): Promise<unknown> => {
+  const invoke = vi.fn<(command: string, args?: unknown) => Promise<unknown>>(async (command) => {
     if (command !== 'save_download') return undefined;
     if (typeof answer === 'string') throw answer;
     return answer;
