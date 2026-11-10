@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d75a6a75aa0a9741098afbd3d2f1b64a3a4af0e0c976015c9e71a80b4dba848d -->
+<!-- generated from WORKBOOK.md sha256:3f840d64df6c80325aaa2fb788df843fb41ea68c04362463dae23a16053b52a5 -->
 
 ## What it is for and who it is for
 
@@ -360,7 +360,8 @@ Steps:
    details already in: Invoicing's issuer's legal name, tax ID and address (the municipality and the street, with
    the number as it appears in the address); with no issuer, it comes blank. Whatever is missing is filled in and it
    is signed away from the screen: by hand (and scanned to PDF, with the stamp if it is a company) or with
-   AutoFirma.
+   AutoFirma. Under the button, "Model downloaded. Sign it and upload it below." appears; inside the ERPlora app the
+   form is saved in Downloads and "Saved to {path}" appears too (BASE-F112).
 3. A company writes its legal representative (name and NIF/NIE); a sole trader signs themselves.
 4. The identity document (DNI or NIE) is chosen and the PDFs attached: the signed form, the copy of the document,
    with a NIE a signature sample and, with a company, the proof of representation.
@@ -386,8 +387,9 @@ business the SaaS does not know, 409 `verifactu.hub_unregistered` ("ERPlora has 
 without the SaaS, 503 `verifactu.saas_unreachable` ("ERPlora could not handle this right now. Try again in a few
 minutes.").
 When downloading the form, an issuer detail the form cannot write (a letter outside its own or a text that is too
-long) comes blank to write it by hand, with the rest already in: it never leaves you without a form.
-Involved: VERIFACTU-F08
+long) comes blank to write it by hand, with the rest already in: it never leaves you without a form. Inside the app,
+if it cannot save it, it says so with its reason (BASE-F112) and "Model downloaded" does not appear.
+Involved: VERIFACTU-F08, BASE-F112 (inside the app)
 
 ### VERIFACTU-F06 Send the authorisation again
 Status: done — in the Hub, like VERIFACTU-F05

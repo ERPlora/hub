@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0e5ce66f509bff1bc5fc09be66420e74920e8b31a1578fd3949e33119665f78b -->
+<!-- generated from WORKBOOK.md sha256:468d2d76db2d8220d25bef5c07e65c888e5bfa89f469440831145ae040942b21 -->
 
 ## What it is for and who it is for
 
@@ -321,7 +321,7 @@ Out: the business's public address, its own on erplora.com as the browser sees i
 device the address opens the app (to see the page: the phone or a private window) and, if the page is not online,
 that it still leads to the team's sign-in.
 If it fails: if it cannot be copied, «The link could not be copied: select it and copy it by hand.».
-Involved: WEBSITE-F07, WEBSITE-F10
+Involved: WEBSITE-F07, WEBSITE-F10, BASE-F112 (inside the app)
 
 ### WEBSITE-F10 Visit the public page
 <!-- origin: new (the business's website at its own address, with «Log in» for the team; PLAN §29, Ioan's decision of 21/10) -->

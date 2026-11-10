@@ -223,7 +223,7 @@ describe('CategoriesPage: import and export', () => {
     await flush();
     const [call] = s.calls('/api/inventory/categories/export');
     expect(s.query(call)).toEqual({ search: 'dri', sort: 'name' });
-    expect(mocks.save).toHaveBeenCalledWith('inventario-categorias.csv', '﻿Nombre;Slug;Productos\n', 'text/csv');
+    expect(mocks.save).toHaveBeenCalledWith('inventario-categorias.csv', '﻿Nombre;Slug;Productos\n', 'text/csv', expect.any(Function));
   });
 
   it('speaks Spanish', async () => {

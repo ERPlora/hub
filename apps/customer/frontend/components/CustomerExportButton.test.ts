@@ -1,19 +1,27 @@
 // «Export CSV» of the customer list's toolbar (CUSTOMER-F09): downloads `customers.csv` with EVERY
 // card matching the search and filters, not just the page shown; the server builds the file and
 // checks the permission.
-import { toastError } from '@erplora/ui/shell';
+import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { browserDownloads, insideTheAppSaving, outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
 import { flush, json, mountCustomer, refusal, sent } from '../__tests__/mount-customer';
 import CustomerExportButton from './CustomerExportButton.vue';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
   toastError: vi.fn(() => Promise.resolve()),
+  toastSuccess: vi.fn(() => Promise.resolve()),
 }));
 
-beforeEach(() => vi.mocked(toastError).mockClear());
-afterEach(() => vi.restoreAllMocks());
+beforeEach(() => {
+  vi.mocked(toastError).mockClear();
+  vi.mocked(toastSuccess).mockClear();
+});
+afterEach(() => {
+  outOfTheApp();
+  vi.restoreAllMocks();
+});
 
 describe('CustomerExportButton', () => {
   it('asks the server for the file with the search and filters and downloads it', async () => {
@@ -38,6 +46,19 @@ describe('CustomerExportButton', () => {
     const blob = created.mock.calls[0][0] as Blob;
     expect(await blob.text()).toBe('﻿name\nAna\n');
     expect(revoked).toHaveBeenCalledWith('blob:x');
+  });
+
+  it('inside the installed app the file goes to the app’s Downloads, which says where (hub#1041)', async () => {
+    const invoke = insideTheAppSaving({ path: 'Download/customers.csv' });
+    const saved = browserDownloads();
+    const m = await mountCustomer(CustomerExportButton, { props: { filters: {} } });
+    m.net.onApi(() => json({ filename: 'customers.csv', content_type: 'text/csv', rows: 1, csv: 'name\nAna\n' }));
+    await m.wrapper.get('[data-testid="customer-export"]').trigger('click');
+    await flush();
+    await flush();
+    expect(invoke).toHaveBeenCalledWith('save_download', { name: 'customers.csv', dataBase64: btoa('\xef\xbb\xbfname\nAna\n') });
+    expect(saved).toEqual([]);
+    expect(toastSuccess).toHaveBeenCalledWith('Saved to Download/customers.csv');
   });
 
   it('a refusal (no permission to export) is told in a toast', async () => {
