@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:dac99d70eb14555cc0648bb3881ecaeb73f1030cce6b3b10192f29ee2242c610 -->
+<!-- generated from WORKBOOK.md sha256:065a49767b065d0154817821ca560787a6e11698a1717af0e71bea62711ae065 -->
 
 ## What it is for and who it is for
 
@@ -1779,7 +1779,9 @@ Steps:
   4. In "Preferences", "Language" ("Use the business’s language", "Español", "English") and "Appearance" ("Theme
      palette", "Theme": "System (auto)", "Light", "Dark", and "Interface size": 80, 90, 100, 110 or 120%, default
      100%) are saved on choosing and applied at once on any device; "Use the business’s appearance" undoes their own
-     and returns the size to 100%.
+     and returns the size to 100%. The language reaches the whole open application, also the texts the server sends
+     (the side menu, "My apps", the checklist, the Home's panels and the bell), without reloading or going back to
+     Home.
 In: the profile of whoever has the session.
 Out: their name in this business (the one in the side menu, on the faces and in "Devices"), their photo, their language and their
 appearance, including the interface size, which follow them on any device they enter, with their PIN, badge or account. With "Use the

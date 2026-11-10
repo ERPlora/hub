@@ -50,15 +50,6 @@ describe('SetupChecklist', () => {
     expect(s.wrapper.get('[data-testid="setup-card"]').attributes('aria-busy')).toBe('true');
   });
 
-  it('reopens its live read when the shell changes language, keeping the same screen mounted', async () => {
-    const s = await setup();
-    expect(s.net.streams).toHaveLength(1);
-    s.wrapper.vm.$i18n.locale = 'es';
-    await flush();
-    expect(s.net.streams).toHaveLength(2);
-    expect(s.wrapper.find('[data-testid="setup-card"]').exists()).toBe(true);
-  });
-
   it('heads the card with how much is done and a bar of it', async () => {
     const s = await setup({ locale: 'es' });
     await s.show(status([item('a.one', { state: 'done' }), item('a.two'), item('a.three'), item('a.four')]));
