@@ -220,3 +220,22 @@ describe('FailedEvents', () => {
     expect(m.wrapper.find('[data-testid="failed-events-retry-all"]').text()).toBe('Reenviar todos');
   });
 });
+
+describe('FailedEvents: Android Back with unsaved changes (hub#1046, BASE-F05)', () => {
+  it('the discard dialog as opened closes; a typed reason asks; emptied again it closes', async () => {
+    const m = await open();
+    await m.result(m.call, OP, { items: [failed('d1')], total: 1 });
+    await m.wrapper.find('[data-testid="failed-event-discard"]').trigger('click');
+    await flush();
+    const typed = async (value: string) => {
+      inDoc('failed-event-discard-reason').dispatchEvent(new CustomEvent('ionInput', { detail: { value } }));
+      await flush();
+    };
+    const { expectUnsavedFormOnAndroidBack } = await import('../__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => inDoc('failed-event-discard-dialog'),
+      change: () => typed('Invoiced by hand.'),
+      restore: () => typed(''),
+    });
+  });
+});

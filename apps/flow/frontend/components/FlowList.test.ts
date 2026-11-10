@@ -49,8 +49,8 @@ const flow = (id: string, over: Partial<FlowOut> = {}): FlowOut =>
     ...over,
   }) as FlowOut;
 
-async function setup(rows: FlowOut[] = [flow('f1'), flow('f2', { enabled: false, name: 'Weekly', trigger: { kind: 'schedule', every: 'day', time: '09:00' }, last_run: { id: 'r1', status: 'failed', started_at: '2026-10-15T09:00:00+02:00' } })], answers: Record<string, [number, unknown]> = {}) {
-  const m = await mountFlow(FlowList, { props: { catalog: CATALOG, allTotal: rows.length }, answers });
+async function setup(rows: FlowOut[] = [flow('f1'), flow('f2', { enabled: false, name: 'Weekly', trigger: { kind: 'schedule', every: 'day', time: '09:00' }, last_run: { id: 'r1', status: 'failed', started_at: '2026-10-15T09:00:00+02:00' } })], answers: Record<string, [number, unknown]> = {}, locale: 'en' | 'es' = 'en') {
+  const m = await mountFlow(FlowList, { props: { catalog: CATALOG, allTotal: rows.length }, answers, locale });
   await m.live();
   await m.result(OP, page(rows, rows.length));
   const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
@@ -132,6 +132,19 @@ describe('FlowList', () => {
       { id: 'f2', enabled: false },
     ]);
     expect((s.table().props() as Record<string, unknown>).selected).toEqual([]);
+  });
+
+  it.each([
+    { locale: 'en' as const, ids: ['f1'], enable: 'Turn it on', pause: 'Pause it' },
+    { locale: 'en' as const, ids: ['f1', 'f2'], enable: 'Turn them on', pause: 'Pause them' },
+    { locale: 'es' as const, ids: ['f1'], enable: 'Encenderla', pause: 'Ponerla en pausa' },
+    { locale: 'es' as const, ids: ['f1', 'f2'], enable: 'Encenderlas', pause: 'Ponerlas en pausa' },
+  ])('bulk actions: $enable / $pause ($locale, FLOW-F03)', async ({ locale, ids, enable, pause }) => {
+    const s = await setup(undefined, {}, locale);
+    s.table().vm.$emit('update:selected', ids);
+    await flush();
+    expect(s.find('flow-list-bulk-enable').text()).toBe(enable);
+    expect(s.find('flow-list-bulk-pause').text()).toBe(pause);
   });
 
   it('a copy says it is paused and has no permissions; deleting asks first', async () => {

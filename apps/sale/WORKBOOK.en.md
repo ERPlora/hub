@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:33f637f712074aa4bef58863ac42bde80ac6fff1a29b2f297bd6cca25f3839d8 -->
+<!-- generated from WORKBOOK.md sha256:9879914d0065cd7f95ca67ca3f4424a9b4ea2b9ec92e6e16635793e1f1951ec3 -->
 
 ## What it is for and who it is for
 
@@ -312,7 +312,10 @@ category, rate, country, region and Taxes rule it was charged with.
 If it fails: while the business has not yet said its currency, **Sell** paints no figure: the total, the lines,
 the tiles, the search, the open checks and the floating button say "—", and the foot "Charge · —", as while the
 total is on its way, because without it the number of decimals is unknown (in yen, "Charge · 15.00" for ¥1,500;
-hub#936); as soon as it says it, the figure shows with its sign. The **Charge** sheet stays on "Working out
+hub#936); as soon as it says it, the figure shows with its sign. If the server cannot value the check
+(for example, because no applicable VAT rule exists), the foot says why instead of leaving only "—";
+when it can value it, the notice clears and the total returns, and parking the check does not leave it
+on the empty till. The **Charge** sheet stays on "Working out
 the total…", with no keypad and "Charge" grey, because the total is painted and the amount tendered read in
 it (without it, "1500" yen tendered would be charged as 150,000); if the currency cannot be read, the notice
 with "Retry" shows in its place, as with any other read of the charge. With no amount tendered the button does

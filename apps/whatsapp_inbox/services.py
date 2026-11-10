@@ -1373,6 +1373,7 @@ def resume_deliveries(ctx: OperationContext, data: ResumeIn) -> dict:
 @operation(
     "whatsapp_inbox.conversation.mark_read",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="whatsapp_inbox.view",
     input=ConversationRefIn,
     output=ConversationOut,
@@ -1439,6 +1440,7 @@ def _assignee(ctx: OperationContext, data: AssignIn) -> HubUser | None:
 @operation(
     "whatsapp_inbox.conversation.assign",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="whatsapp_inbox.reply",
     input=AssignIn,
     output=ConversationOut,
@@ -1487,6 +1489,7 @@ def assign(ctx: OperationContext, data: AssignIn) -> dict:
 @operation(
     "whatsapp_inbox.conversation.set_status",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="whatsapp_inbox.reply",
     input=SetStatusIn,
     output=ConversationOut,
@@ -1514,6 +1517,7 @@ def set_status(ctx: OperationContext, data: SetStatusIn) -> dict:
 @operation(
     "whatsapp_inbox.conversation.flag",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="whatsapp_inbox.reply",
     input=ConversationRefIn,
     output=FlaggedOut,
@@ -1539,6 +1543,7 @@ def flag(ctx: OperationContext, data: ConversationRefIn) -> dict:
 @operation(
     "whatsapp_inbox.conversation.link_customer",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="whatsapp_inbox.reply",
     input=LinkCustomerIn,
     output=ConversationOut,
@@ -1718,6 +1723,7 @@ def erase(ctx: OperationContext, data: ConversationRefIn) -> dict:
 @operation(
     "whatsapp_inbox.note.add",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="whatsapp_inbox.reply",
     input=NoteAddIn,
     output=NoteOut,
@@ -1748,6 +1754,7 @@ def add_note(ctx: OperationContext, data: NoteAddIn) -> dict:
 @operation(
     "whatsapp_inbox.note.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="whatsapp_inbox.reply",
     input=NoteRefIn,
     output=NoteDeletedOut,

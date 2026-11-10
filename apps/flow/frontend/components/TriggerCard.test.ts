@@ -11,6 +11,7 @@ import ConditionRows from './ConditionRows.vue';
 import TriggerCard from './TriggerCard.vue';
 
 const CATALOG = {
+  off_apps: [],
   events: [
     { name: 'sale.sale.completed', app: 'sale', app_name: 'Sales' },
     { name: 'customer.group.deleted', app: 'customer', app_name: 'Customers' },
@@ -49,6 +50,7 @@ describe('TriggerCard', () => {
 
   it('looking for «carrito» finds Cart & Checkout’s events in its own words, with no online shop it does not have', async () => {
     const carts = {
+      off_apps: [],
       events: [
         { name: 'cart_checkout.cart.abandoned', app: 'cart_checkout', app_name: 'Carrito y pago' },
         { name: 'cart_checkout.checkout.initiated', app: 'cart_checkout', app_name: 'Carrito y pago' },
@@ -119,6 +121,21 @@ describe('TriggerCard', () => {
       props: { modelValue: { kind: 'event', event: 'customer.group.deleted', filter }, open: true, catalog: CATALOG, choices: [], steps: [], errors: {}, fixedByApp },
     });
     expect(other.find('flow-trigger-filter-remove-0').exists()).toBe(true);
+  });
+
+  it('an event of an app that is off says so in place, in its language, until the app is on again (hub#1054)', async () => {
+    const modelValue: Trigger = { kind: 'event', event: 'task.task.created' };
+    const off = { events: [], actions: [], off_apps: [{ app: 'task', app_name: 'Tasks' }] } as unknown as CatalogOut;
+    const s = await mountFlow(TriggerCard, { props: { modelValue, open: true, catalog: off, choices: [], steps: [], errors: {} } });
+    expect(s.wrapper.findComponent(Combo).props('errorText')).toBe('Its app, Tasks, is off in this business: turn it on in Apps, or choose another event.');
+    const es = await mountFlow(TriggerCard, {
+      locale: 'es',
+      props: { modelValue, open: true, catalog: { ...off, off_apps: [{ app: 'task', app_name: 'Tareas' }] }, choices: [], steps: [], errors: {} },
+    });
+    expect(es.wrapper.findComponent(Combo).props('errorText')).toBe('Su app, Tareas, está apagada en este negocio: enciéndela en Apps o elige otro aviso.');
+    const on = { ...off, events: [{ name: 'task.task.created', app: 'task', app_name: 'Tasks' }], off_apps: [] } as unknown as CatalogOut;
+    await s.wrapper.setProps({ catalog: on });
+    expect(s.wrapper.findComponent(Combo).props('errorText')).toBeFalsy();
   });
 
   it('shows the server’s refusals next to their field', async () => {

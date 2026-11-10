@@ -15,7 +15,7 @@ import { promisify } from 'node:util';
 
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { type Provider, startProvider } from './assistant-provider';
+import { NOT_DONE, type Provider, startProvider } from './assistant-provider';
 import { A, api, capture, HUB_DIR, psql, REPO_DIR, shown } from './helpers';
 import { confirmDialog, parkedEvent, RELAY, signedIn } from './flow-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
@@ -305,7 +305,7 @@ for (const viewport of VIEWPORTS) {
         psql(
           `select body from whatsapp_inbox_message where conversation_id = '${message.conversation_id}' and direction = 'outbound' order by created_at desc, id desc limit 1`,
         ),
-      ).toBe('No lo he hecho.');
+      ).toBe(NOT_DONE.en);
     } finally {
       await context.close();
     }

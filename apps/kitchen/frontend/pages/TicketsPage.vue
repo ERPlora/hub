@@ -19,6 +19,8 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonInput } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import TicketDetailModal from '../components/TicketDetailModal.vue';
 import TicketFormModal from '../components/TicketFormModal.vue';
@@ -148,6 +150,8 @@ const detailOpen = ref(false);
 const formOpen = ref(false);
 const cancelOpen = ref(false);
 const reason = ref('');
+// A typed reason is unsaved: Android's Back asks before dropping it (hub#1046, BASE-F05).
+useUnsavedFormOnOpen('kitchen-tickets-cancel', reason, cancelOpen);
 
 async function step(run: () => Promise<unknown>): Promise<void> {
   actionError.value = null;

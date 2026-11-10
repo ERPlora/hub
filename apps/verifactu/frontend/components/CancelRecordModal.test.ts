@@ -59,3 +59,16 @@ describe('CancelRecordModal', () => {
     expect(s.find('verifactu-cancel').text()).toContain('This record cannot be cancelled.');
   });
 });
+
+
+describe('CancelRecordModal: Android Back with unsaved changes (hub#1046, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('verifactu-cancel'),
+      change: () => ionValue(s.find('verifactu-cancel-reason').element, 'Duplicated ticket', 'ionInput'),
+      restore: () => ionValue(s.find('verifactu-cancel-reason').element, '', 'ionInput'),
+    });
+  });
+});
