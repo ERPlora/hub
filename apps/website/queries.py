@@ -162,6 +162,18 @@ def shown_reviews(slug: str, content: dict, snapshot: dict | None) -> dict | Non
     output=SiteOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me the website",
+                "is my web page online?",
+                "which version of the website is published?",
+            ),
+            "es": (
+                "¿mi página web ya está en internet?",
+                "dime qué pone ahora en la web del negocio",
+                "¿la web tiene algo pendiente de publicar?",
+            ),
+        },
         "description": "The business's website: its template, colours and the content of each section as it is being "
         "edited, which version is published, whether it is online and whether the draft has unpublished changes."
     },
@@ -235,7 +247,19 @@ def get_qr(ctx: OperationContext, data: QrIn) -> dict:
     input=CategoriesIn,
     output=CategoriesOut,
     expose_api=True,
-    ai={"description": "The categories of Inventory's products or Services' services the website's catalog can show."},
+    ai={
+        "asks": {
+            "en": (
+                "which categories can the website's catalog show?",
+                "what categories can I choose for the catalog on my web page?",
+            ),
+            "es": (
+                "¿qué categorías se pueden enseñar en la página web?",
+                "¿qué categorías de servicios puede mostrar el catálogo de la web?",
+            ),
+        },
+        "description": "The categories of Inventory's products or Services' services the website's catalog can show.",
+    },
 )
 def list_categories(ctx: OperationContext, data: CategoriesIn) -> dict:
     if not _source_on(ctx.scope, data.source):

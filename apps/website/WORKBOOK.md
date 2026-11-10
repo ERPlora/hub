@@ -609,11 +609,17 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   soporte): no se añade ni se borra nada desde allí, y esa escritura no deja aviso.
 - Asistente: las cinco operaciones que usa (`website.site.get`, `website.site.save`, `website.site.publish`,
   `website.site.unpublish` y `website.catalog.categories`) declaran `ai={"description"…}`, con `risk` `normal` en las
-  acciones; las seis que no son herramienta, a propósito, no lo llevan: la vista previa (HTML para el marco del
-  editor), el QR (una imagen en base64), la subida (un fichero en base64 de hasta 5 MB) y las tres lecturas públicas de
-  los visitantes, sin sesión. Esas seis esperan al marcador `INTERNAL` y al check `live.E017` de la ronda 2026-10-22b
-  (PLAN §30), que aún no existen en `packages/live`. Lo comprueba `tests/test_apps.py`, que también exige descripción
-  en cada campo de `SaveIn`.
+  acciones, y sus `asks`: lo que una persona escribe para pedir cada una, en `en` y `es` (hub#1093; `website` está en
+  `LIVE_ASSISTANT_ASKS_REQUIRED` y `base/tests/test_assistant_asks.py` exige que cada frase traiga su herramienta
+  entre las diez primeras, por rol). Sin ellos, guardar y desconectar quedaban fuera de las 40 herramientas que se
+  ofrecen en un turno y el asistente decía que no podía. `tests/test_assistant_asks.py` mide con las frases reales de
+  la QA de la capa 2 (`tests/e2e/qa/probes/owner-es-website-2026-11-08.json`), nunca con los propios `asks`, y que el
+  encargado solo recibe `website.site.get` y el empleado nada. «Borrador» no lleva sinónimo en `base.assistant.SYNONYMS`:
+  su raíz es la del verbo «borrar» y convertiría cada «borra …» en una mención del borrador. Las ocho que no son
+  herramienta, a propósito, declaran `ai=INTERNAL` (`live.E017` exige a toda operación su `ai=`): la vista previa
+  (HTML para el marco del editor), el QR (una imagen en base64), la subida (un fichero en base64 de hasta 5 MB), las
+  tres lecturas públicas de los visitantes, sin sesión, y las dos con las que la tarjeta nombra una imagen o una
+  categoría. Lo comprueba `tests/test_apps.py`, que también exige descripción en cada campo de `SaveIn`.
 - La tarjeta de confirmación del asistente (BASE-F97, hub#679 y hub#693): `base.assistant._card_details` traduce el
   detalle con las marcas `refers` de `schemas.py`, leídas como quien pregunta (cada imagen por `website.image.get` y
   cada categoría por `website.category.get`, las dos `INTERNAL`, sin ruta ni consulta viva) y las listas cerradas de
@@ -686,11 +692,6 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
 
 ## Lo que queda fuera
 
-- **`ai=` en las seis operaciones que no son herramienta del asistente** (`website.site.preview`, `website.qr.get`,
-  `website.image.upload`, `website.public.site`, `website.public.catalog` y `website.public.reviews`): PLAN §30 pide
-  `ai=` en toda operación, y estas seis esperan al marcador `INTERNAL` y al check `live.E017`, que aún no existen en
-  `packages/live` (ver «Asistente» en «Para quien lo mantiene»). El QR no hace falta como herramienta:
-  `website.site.get` ya da la dirección pública.
 - **Dos arreglos fuera de la app** (`TODO.md`, vistos en APP-WEBSITE):
   - `FIX-HUB-SPA-STATIC-PROBES-SET-CSRF-COOKIE` (`base/spa.py`), hecho: en el host de un hub, `/favicon.ico`,
     `/robots.txt` o cualquier ruta que nombra un fichero y no tiene URL propia recibe un 404 sin la SPA ni cookie
