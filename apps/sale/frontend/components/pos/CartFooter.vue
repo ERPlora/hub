@@ -3,8 +3,10 @@
 // takes off, as the server's preview says), «Total» — the preview's, a dash while it is on its way —,
 // the ticket-discount button (only where discounts are allowed), the printer («Print bill») and
 // «Charge · <total>»; while the business has not said its money, every amount is a dash, as while the total is on its
-// way (hub#936). An empty check can do none of it. When something is missing (a required
-// customer), Charge looks blocked and says why, but still takes the tap: the page answers it.
+// way (hub#936). A valuation refusal is said in the server's words, never left as an unexplained dash.
+// An empty check can do none of it. When something is missing (a required customer), Charge looks
+// blocked and says why, but still takes the tap: the page answers it.
+import { InlineFeedback } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
@@ -16,6 +18,8 @@ const props = defineProps<{
   hasLines: boolean;
   /** The preview's total; `undefined` while it is on its way. */
   total: number | undefined;
+  /** Why the server could not value the check; `null` when its preview is valid or pending. */
+  previewError?: string | null;
   /** The check's ticket discount: percentage and fixed amount. */
   discountPercent: string;
   discountAmount: number;
@@ -41,6 +45,13 @@ const discountLabel = computed(() => {
 
 <template>
   <div class="pos-foot">
+    <InlineFeedback
+      v-if="previewError"
+      tone="danger"
+      data-testid="pos-preview-error"
+    >
+      {{ previewError }}
+    </InlineFeedback>
     <div
       v-if="hasDiscount"
       class="pos-foot__discount"
