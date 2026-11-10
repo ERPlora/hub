@@ -6,6 +6,7 @@ import { h } from 'vue';
 
 import { click, mountSale } from '../../__tests__/mount-sale';
 import CartToolbar from './CartToolbar.vue';
+import source from './CartToolbar.vue?raw';
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   return mountSale(
@@ -59,5 +60,11 @@ describe('CartToolbar', () => {
     expect(close.attributes('aria-label')).toBe('Close');
     await click(close.element);
     expect(m.wrapper.findComponent(CartToolbar).emitted('close')).toHaveLength(1);
+  });
+
+  it('gives open checks a 44px touch target on coarse-pointer devices', () => {
+    expect(source).toMatch(
+      /@media \(pointer: coarse\)\s*\{\s*\.pos-toolbar__checks\s*\{[^}]*min-width: 44px;[^}]*min-height: 44px;/s,
+    );
   });
 });
