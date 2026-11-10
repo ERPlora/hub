@@ -57,6 +57,7 @@ CUSTOM_FIELD = gettext_noop("Custom field")
 # asks, never by its id. An open order is Sales's, which Customers does not require: ``customer.order.get`` asks Sales
 # for its name, and without Sales the card leaves it out.
 A_CUSTOMER = names("customer.customer.detail")
+A_CUSTOMER_REFERENCE = names("customer.customer.detail", by="customer")
 A_GROUP = names("customer.group.detail")
 A_TAG = names("customer.tag.detail")
 A_FIELD = names("customer.field.detail")
@@ -457,17 +458,30 @@ class SetTagsIn(CustomerRefIn):
 class MergeIn(CustomerRefIn):
     """``id``/``customer`` is the card that stays; ``absorbed_id``/``absorbed`` the duplicate."""
 
+    id: UUID | None = Field(
+        None,
+        title=CUSTOMER,
+        description="The id of the card that stays.",
+        json_schema_extra=A_CUSTOMER,
+    )
+    customer: Reference | None = Field(
+        None,
+        validate_default=True,
+        description="The card that stays: its exact name, phone or email, when its id is not known.",
+        json_schema_extra=A_CUSTOMER_REFERENCE,
+    )
     absorbed_id: UUID | None = Field(
         None,
         title=DUPLICATE_CUSTOMER,
-        description="The duplicate's id: it is merged into the other card.",
+        description="The duplicate's id: it is merged into the card that stays.",
         json_schema_extra=A_CUSTOMER,
     )
     absorbed: Reference | None = Field(
         None,
         validate_default=True,
         title=DUPLICATE_CUSTOMER,
-        description="The duplicate's exact name, phone or email.",
+        description="The duplicate's exact name, phone or email, when its id is not known.",
+        json_schema_extra=A_CUSTOMER_REFERENCE,
     )
 
     _absorbed_named = field_validator("absorbed")(_named_unless("absorbed_id", ABSORBED_REF_MISSING))

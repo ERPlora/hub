@@ -3,8 +3,8 @@
 - **The catalog** (``catalog_events``, ``catalog_operations``): what the active apps declare, never a
   name made up here. Events are each app's ``events.ALL``; actions and reads are its registered
   operations whose permission the app declares (a person can be granted it: platform-only reactions
-  are left out). ``active_apps`` is the phase-1 seam: every installed module but this one, as
-  ``base.session.me``; phase 2 reads the SaaS's picture there.
+  are left out). ``active_apps`` asks ``base.relay.active_apps`` for the business's active apps, the same
+  activation and entitlement check the relay and the operation gate use.
 - **Values** (``map_params``): a step's params for what the run knows (``document.resolve``), leaving out
   what came out empty, so an optional field keeps its default. What a person reads (``PERSON_PARAMS``, a question's
   texts) says each datum in words (``words_for``); what goes to a machine, as the code keeps it.
@@ -40,6 +40,7 @@ from live.operations import INTERNAL, Operation, operation, registry
 
 from apps.flow import document, recipes, vault
 from base import assistant as hub_assistant
+from base import relay
 from base.business import babel_locale, currency_decimals, money_text
 from base.home import ISO_HOUR, moment
 from base.operations import business_currency
@@ -102,6 +103,13 @@ ASSISTANT_WANTS = _("The assistant wants to change something in «%(app)s»")
 AMBIGUOUS_FLOW = _("Several automations fit «%(text)s»: %(names)s. Say which one.")
 UNKNOWN_EVENT = _("That does not happen in this business: «%(name)s».")
 UNKNOWN_ACTION = _("That action does not exist in this business: «%(name)s».")
+#: Off is not «does not exist» (hub#1054): what is missing is of an app the business turned off, and it comes back on.
+OFF_EVENT = _(
+    "«%(name)s» is from %(app)s, which is off in this business: turn it on in Apps, or choose another event."
+)
+OFF_ACTION = _(
+    "«%(name)s» is from %(app)s, which is off in this business: turn it on in Apps, or choose another action."
+)
 NOT_AN_ACTION = _("«%(name)s» only reads: use «Look something up».")
 NOT_A_READ = _("«%(name)s» changes data: use «Do something».")
 HIGH_RISK = _("«%(name)s» needs a person in front: an automation cannot do it.")
@@ -129,17 +137,36 @@ AMBIGUOUS_SHOWN = 5
 # --- The catalog ------------------------------------------------------------------------------------
 
 
-def active_apps() -> dict[str, LiveAppConfig]:
-    """The modules active in this business, but this one (phase 1: every installed module)."""
-    return {
-        config.label: config for config in module_configs() if config.label != "flow"
-    }
+def installed_apps() -> dict[str, LiveAppConfig]:
+    """Every installed module but this one, on or off: whose recipes still fix what was built from them."""
+    return {config.label: config for config in module_configs() if config.label != "flow"}
 
 
-def catalog_events() -> dict[str, LiveAppConfig]:
+def off_apps(scope: Scope) -> dict[str, LiveAppConfig]:
+    """The installed modules that are not on in ``scope``'s business (turned off, or without the right to them): what
+    an automation built before still names, and the editor says why it is missing."""
+    active = active_apps(scope)
+    return {label: config for label, config in installed_apps().items() if label not in active}
+
+
+def _app_name(label: str) -> str:
+    return str(installed_apps()[label].verbose_name)
+
+
+def active_apps(scope: Scope) -> dict[str, LiveAppConfig]:
+    """The modules active in ``scope``'s business, but this one, as the platform's relay resolves them."""
+    active = relay.active_apps(scope)
+    return {label: config for label, config in installed_apps().items() if label in active}
+
+
+def catalog_events(scope: Scope) -> dict[str, LiveAppConfig]:
     """``{event name: its app}``: the ``events.ALL`` of every active app."""
+    return _events_of(active_apps(scope))
+
+
+def _events_of(apps: dict[str, LiveAppConfig]) -> dict[str, LiveAppConfig]:
     found: dict[str, LiveAppConfig] = {}
-    for label, config in active_apps().items():
+    for label, config in apps.items():
         module_name = f"{config.name}.events"
         if find_spec(module_name) is None:
             continue
@@ -149,10 +176,13 @@ def catalog_events() -> dict[str, LiveAppConfig]:
     return found
 
 
-def grantable_operations() -> dict[str, Operation]:
+def grantable_operations(scope: Scope) -> dict[str, Operation]:
     """``{operation name: operation}`` of the active apps whose permission the app declares: what a
     person can be granted (the platform-only reactions are left out)."""
-    apps = active_apps()
+    return _grantable_of(active_apps(scope))
+
+
+def _grantable_of(apps: dict[str, LiveAppConfig]) -> dict[str, Operation]:
     granted: dict[str, Operation] = {}
     for name, op in registry.items():
         config = apps.get(op.app_label)
@@ -187,14 +217,18 @@ def yes_permission(op: Operation) -> str | None:
     return declared or op.permission
 
 
-def catalog_operations() -> dict[str, Operation]:
+def catalog_operations(scope: Scope) -> dict[str, Operation]:
     """What an automation may be granted and run: the grantable operations that do not need a person."""
-    return {name: op for name, op in grantable_operations().items() if not needs_a_person(op)}
+    return {name: op for name, op in grantable_operations(scope).items() if not needs_a_person(op)}
 
 
-def ask_first_catalog() -> dict[str, Operation]:
+def ask_first_catalog(scope: Scope) -> dict[str, Operation]:
     """What an «Ask the assistant» step that asks first may be granted and offered: the catalog and ``ASK_FIRST``."""
-    return {name: op for name, op in grantable_operations().items() if not needs_a_person(op) or asks_first(op)}
+    return {
+        name: op
+        for name, op in grantable_operations(scope).items()
+        if not needs_a_person(op) or asks_first(op)
+    }
 
 
 def asked_first(steps: list[dict]) -> set[str]:
@@ -207,10 +241,10 @@ def asked_first(steps: list[dict]) -> set[str]:
     }
 
 
-def read_permissions(op: Operation) -> frozenset[str]:
+def read_permissions(scope: Scope, op: Operation) -> frozenset[str]:
     """The reads of ``op``'s app (its declared ``<app>.view…`` permissions): what a step may also need to
     answer with what it did, never to change anything else."""
-    config = active_apps().get(op.app_label)
+    config = active_apps(scope).get(op.app_label)
     declared = config.permissions if config is not None else []
     return frozenset(permission for permission in declared if permission.split(".", 1)[-1].startswith("view"))
 
@@ -322,9 +356,9 @@ def read_catalog(ctx: OperationContext, data: CatalogIn) -> dict:
     with translation.override(ctx.language):
         events = [
             {"name": name, "app": config.label, "app_name": str(config.verbose_name)}
-            for name, config in catalog_events().items()
+            for name, config in catalog_events(ctx.scope).items()
         ]
-        apps = active_apps()
+        apps = active_apps(ctx.scope)
         actions = [
             {
                 "name": name,
@@ -337,15 +371,19 @@ def read_catalog(ctx: OperationContext, data: CatalogIn) -> dict:
                 "assistant": hub_assistant.is_tool(op),
                 "ask_first": asks_first(op),
             }
-            for name, op in ask_first_catalog().items()
+            for name, op in ask_first_catalog(ctx.scope).items()
         ]
+        off = [{"app": label, "app_name": str(config.verbose_name)} for label, config in off_apps(ctx.scope).items()]
     return {
         "events": sorted(events, key=lambda event: (event["app"], event["name"])),
         "actions": sorted(actions, key=lambda action: (action["app"], action["name"])),
+        "off_apps": sorted(off, key=lambda app: app["app"]),
     }
 
 
-def operation_problem(name: str, kind: str | None = None, *, asking: bool = False) -> tuple[str, str] | None:
+def operation_problem(
+    scope: Scope, name: str, kind: str | None = None, *, asking: bool = False
+) -> tuple[str, str] | None:
     """``(code, message)`` of why an automation may not run the operation ``name`` (as a step of
     ``kind``, when given; for a step that asks first, ``asking``), or ``None`` when it may. A call's origin
     (``http:https://host``) is checked as an address."""
@@ -354,8 +392,11 @@ def operation_problem(name: str, kind: str | None = None, *, asking: bool = Fals
         if document.origin(address) != address:
             return "invalid_payload", str(BAD_HTTP_GRANT) % {"name": name}
         return None
-    op = grantable_operations().get(name)
+    op = grantable_operations(scope).get(name)
     if op is None:
+        off = _grantable_of(installed_apps()).get(name)
+        if off is not None:
+            return "invalid_payload", str(OFF_ACTION) % {"name": name, "app": _app_name(off.app_label)}
         return "invalid_payload", str(UNKNOWN_ACTION) % {"name": name}
     if needs_a_person(op) and not (asking and asks_first(op)):
         message = ASK_FIRST_ONLY if kind is None and asks_first(op) else HIGH_RISK
@@ -420,11 +461,11 @@ def _tried_pinned(ctx: OperationContext, step: Any, values: dict, unknown_steps:
     return rows
 
 
-def pinned_problem(tools: list[str], pinned: dict[str, dict[str, Any]]) -> str | None:
+def pinned_problem(scope: Scope, tools: list[str], pinned: dict[str, dict[str, Any]]) -> str | None:
     """Why the fixed data of an «Ask the assistant» step cannot be saved (the first reason), or ``None``: each is of a
     tool the step may use, names a datum that tool asks for and has a value."""
     for name, fixed in pinned.items():
-        op = grantable_operations().get(name)
+        op = grantable_operations(scope).get(name)
         if name not in tools or op is None:
             return str(PINNED_NOT_A_TOOL) % {"name": name}
         inputs = {field["name"] for field in action_fields(op)}
@@ -436,14 +477,19 @@ def pinned_problem(tools: list[str], pinned: dict[str, dict[str, Any]]) -> str |
     return None
 
 
-def catalog_problems(trigger: Any, steps: list[Any]) -> tuple[dict[str, str], str]:
+def catalog_problems(scope: Scope, trigger: Any, steps: list[Any]) -> tuple[dict[str, str], str]:
     """What a document names that this business does not have, by field (``trigger.event``,
     ``steps.<n>.operation``), and the code of the refusal: ``flow.high_risk`` when a step needs a
     person in front, ``invalid_payload`` otherwise."""
     problems: dict[str, str] = {}
     code = "invalid_payload"
-    if trigger is not None and trigger.kind == "event" and trigger.event not in catalog_events():
-        problems["trigger.event"] = str(UNKNOWN_EVENT) % {"name": trigger.event}
+    if trigger is not None and trigger.kind == "event" and trigger.event not in catalog_events(scope):
+        off = _events_of(installed_apps()).get(trigger.event)
+        problems["trigger.event"] = (
+            str(OFF_EVENT) % {"name": trigger.event, "app": str(off.verbose_name)}
+            if off is not None
+            else str(UNKNOWN_EVENT) % {"name": trigger.event}
+        )
     kept = None
     for index, step in enumerate(steps):
         if step.kind == "http":
@@ -460,20 +506,20 @@ def catalog_problems(trigger: Any, steps: list[Any]) -> tuple[dict[str, str], st
             continue
         if step.kind == "assistant":
             for name in step.tools:
-                problem = operation_problem(name, asking=step.mode == "ask")
-                if problem is None and not hub_assistant.is_tool(grantable_operations()[name]):
+                problem = operation_problem(scope, name, asking=step.mode == "ask")
+                if problem is None and not hub_assistant.is_tool(grantable_operations(scope)[name]):
                     problem = ("invalid_payload", str(NOT_FOR_THE_ASSISTANT) % {"name": name})
                 if problem is not None:
                     problem_code, problems[f"steps.{index}.tools"] = problem
                     code = HIGH_RISK_CODE if problem_code == HIGH_RISK_CODE else code
                     break
-            problem = pinned_problem(step.tools, step.pinned or {})
+            problem = pinned_problem(scope, step.tools, step.pinned or {})
             if problem is not None:
                 problems[f"steps.{index}.pinned"] = problem
             continue
         if step.kind not in ("command", "query"):
             continue
-        problem = operation_problem(step.operation, step.kind)
+        problem = operation_problem(scope, step.operation, step.kind)
         if problem is not None:
             problem_code, problems[f"steps.{index}.operation"] = problem
             if problem_code == HIGH_RISK_CODE:
@@ -687,7 +733,7 @@ def recipe_flow(ref: str, *, lock: bool = False) -> Flow | None:
     },
 )
 def list_recipes(ctx: OperationContext, data: RecipeListIn) -> dict:
-    offered, set_aside = recipes.shelf()
+    offered, set_aside = recipes.shelf(ctx.scope)
     mine = {flow.recipe: flow for flow in live_flows().exclude(recipe="")}
     rows = []
     with translation.override(ctx.language):
@@ -1393,7 +1439,7 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:
         else []
     )
     stopped = bool(trigger_failed)
-    operations = catalog_operations()
+    operations = catalog_operations(ctx.scope)
     # What a person would read is said as the person trying it reads it (who saves it, in their language).
     say = words_for([step.model_dump() for step in tried.steps], ctx.language, ctx.scope, values)
     unknown_steps: set[str] = set()
@@ -1460,7 +1506,7 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:
             step.params, values, unknown_steps, say=say, person=PERSON_PARAMS.get(step.operation, ())
         )
         out |= {"params": mapped, "empty": empty, "unknown": unknown}
-        grantable = grantable_operations().get(step.operation)
+        grantable = grantable_operations(ctx.scope).get(step.operation)
         if grantable is not None and needs_a_person(grantable):
             steps.append(out | {"outcome": "high_risk"})
         elif op is None or op.kind != step.kind:
@@ -1506,7 +1552,7 @@ def proposal_held(run: FlowRun) -> dict | None:
     return (run.outputs.get(TURN) or {}).get("proposal") if step.get("kind") == "assistant" else None
 
 
-def proposal_of(question: Question) -> tuple[Operation, dict] | None:
+def proposal_of(scope: Scope, question: Question) -> tuple[Operation, dict] | None:
     """The change the assistant wants that ``question`` waits on — its action and what a yes would send, with what its
     step fixes today put in (FLOW-F36: also a change proposed before its app fixed it) —, or ``None``: an «Ask someone
     first» question, or a change whose action is gone, has none (``proposal_held``)."""
@@ -1545,7 +1591,7 @@ def question_row(ctx: OperationContext, question: Question) -> dict[str, Any]:
         "action": "",
         "fields": [],
     }
-    proposal = proposal_of(question)
+    proposal = proposal_of(ctx.scope, question)
     if proposal is None:
         return row
     op, arguments = proposal

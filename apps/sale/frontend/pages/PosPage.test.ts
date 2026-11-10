@@ -141,6 +141,15 @@ describe('PosPage: the screen', () => {
   });
 });
 
+/** A check with a line whose valuation the server refused (no tax rule applies to it). */
+async function refusedCheck() {
+  const s = await setup();
+  await s.addProduct();
+  s.net.lastStream().push(errorFrame(s.subId('sale.checkout.preview'), 'sale.no_tax_rule'));
+  await s.reopen();
+  return s;
+}
+
 describe('PosPage: selling', () => {
   it('a tap opens the check, which is then followed live and valued by the server', async () => {
     const s = await setup();
@@ -152,6 +161,27 @@ describe('PosPage: selling', () => {
     await s.result('sale.checkout.preview', preview({ total: 150 }));
     expect(plain(s.find('pos-total').text())).toBe('€1.50');
     expect(s.wrapper.findComponent(CartLines).props('lines')).toEqual(CHECK.lines);
+  });
+
+  it('a valuation refusal says why instead of an endless dash, and the next valuation clears it', async () => {
+    const s = await refusedCheck();
+    expect(s.find('pos-total').text()).toBe('—');
+    expect(s.find('pos-preview-error').text()).toContain('msg sale.no_tax_rule');
+    await s.result('sale.checkout.preview', preview({ total: 150 }));
+    expect(s.find('pos-preview-error').exists()).toBe(false);
+    expect(plain(s.find('pos-total').text())).toBe('€1.50');
+  });
+
+  it('a refused check that is parked leaves no reason behind on the empty till', async () => {
+    const s = await refusedCheck();
+    expect(s.find('pos-preview-error').exists()).toBe(true);
+    await click(s.find('pos-park').element);
+    s.reply(CHECK);
+    s.wrapper.findComponent(ParkSheet).vm.$emit('park', 'Ana');
+    await settle();
+    expect(localStorage.getItem(CURRENT_CHECK_KEY)).toBeNull();
+    expect(s.find('pos-total').exists()).toBe(true);
+    expect(s.find('pos-preview-error').exists()).toBe(false);
   });
 
   it('a reload comes back to the check the device had', async () => {

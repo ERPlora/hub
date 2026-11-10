@@ -15,6 +15,7 @@ import { computed, ref } from 'vue';
 
 import { useBaseI18n } from '../lib/i18n';
 import { failureKey } from '../lib/system';
+import { useUnsavedFormOnOpen } from '../lib/unsaved-changes';
 import type { FailedEvent } from '../operations';
 
 /** The most the list shows: the old hub's; «Resend all» reaches the ones beyond it too. */
@@ -37,6 +38,8 @@ const resending = ref<string | null>(null);
 const discarding = ref<FailedEvent | null>(null);
 const discardOpen = ref(false);
 const reason = ref('');
+// A typed reason is unsaved: Android's Back asks before dropping it (hub#1046, BASE-F05).
+useUnsavedFormOnOpen('failed-event-discard-dialog', reason, discardOpen);
 
 const when = (iso: string) =>
   new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso));

@@ -3,9 +3,10 @@
 // Until `@erplora/ui/components/format` has money and number formatters (UI-REQUESTS.md), this is the one
 // place the app turns them into text (`Intl`) and amounts into cents. Money is in the invoice's own currency (the
 // business's when it was issued), with the decimals the server counts it in (`currency_decimals`; the browser's
-// Intl gives the forint none): without one, a figure without a symbol, never the euro by default. A quantity is
+// Intl gives the forint none): without one, an amount is a dash, never the euro by default nor guessed decimals. A quantity is
 // written with the platform's `formatQuantity` («2.000» → «2», «1500.000» → «1.500»), as every screen writes it.
 import type { Money } from '../../../../base/frontend/lib/home';
+import { formatMoney as writeMoney } from '../../../../base/frontend/lib/money';
 
 export type { Money };
 export { useBusinessMoney } from '../../../../base/frontend/lib/money';
@@ -59,8 +60,12 @@ function moneyFormat(locale: string, money: Money | undefined, min: number, max:
  *  show is «—». */
 export function formatMoney(cents: number | null | undefined, locale: string, money?: Money): string {
   if (missing(cents)) return '—';
-  const decimals = money?.decimals ?? NO_MONEY_DECIMALS;
-  return moneyFormat(locale, money, decimals, decimals).format((cents as number) / 10 ** decimals);
+  try {
+    return writeMoney(cents as number, locale, money);
+  } catch (error) {
+    if (!(error instanceof RangeError) || locale === FALLBACK_LOCALE) throw error;
+    return writeMoney(cents as number, FALLBACK_LOCALE, money);
+  }
 }
 
 /** A unit price in cents with two decimals («82.64» → «€0.8264»): the decimals of `money`, up to two more when

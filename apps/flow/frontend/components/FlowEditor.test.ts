@@ -31,6 +31,7 @@ afterEach(() => {
 });
 
 const CATALOG: CatalogOut = {
+  off_apps: [],
   events: [{ name: 'sale.sale.completed', app: 'sale', app_name: 'Sales' }],
   actions: [
     {

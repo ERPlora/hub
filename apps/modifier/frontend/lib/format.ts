@@ -1,8 +1,8 @@
 // How the modifier screens paint a supplement and a group's rule (pages never format by hand). An amount is written
 // with the platform's `formatMoney` (`@erplora/ui/components`), in whole minor units of the business's currency
 // (`useBusinessMoney`, the platform's: its country's currency with the decimals the server counts it in, never the
-// browser's Intl, which gives none to the forint). Until the business answers an amount is a figure without a symbol,
-// never the euro by default. A supplement may be negative (a discount) and carries its sign; 0 is free.
+// browser's Intl, which gives none to the forint). Until the business answers an amount is a dash,
+// never the euro by default nor guessed decimals. A supplement may be negative (a discount) and carries its sign; 0 is free.
 import { formatMoney } from '@erplora/ui/components';
 
 import type { Money } from '../../../../base/frontend/lib/home';
@@ -10,11 +10,11 @@ import type { Money } from '../../../../base/frontend/lib/home';
 export type { Money };
 export { useBusinessMoney } from '../../../../base/frontend/lib/money';
 
-/** A supplement in `money` with its sign («+1,00 zł», «-0,50 zł»; «+1,00» while it is unknown); `free` for 0. */
+/** A supplement in `money` with its sign («+1,00 zł», «-0,50 zł»; «—» while it is unknown); `free` for 0. */
 export function formatDelta(cents: number, locale: string, free: string, money?: Money): string {
   if (cents === 0) return free;
   const amount = formatMoney(cents, locale, money);
-  return cents > 0 ? `+${amount}` : amount;
+  return cents > 0 && amount !== '—' ? `+${amount}` : amount;
 }
 
 /** What `choiceRule` reads of a group. */

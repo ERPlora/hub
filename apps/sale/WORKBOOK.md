@@ -326,8 +326,11 @@ el tipo, el país, la región y la regla de Impuestos con que se cobró.
 Si falla: mientras el negocio no haya dicho todavía su moneda, **Vender** no pinta ninguna cifra: el total, las
 líneas, las baldosas, la búsqueda, las cuentas abiertas y el botón flotante dicen «—», y el pie «Cobrar · —», como
 mientras llega el total, porque sin ella no se sabe cuántos decimales tiene (en yenes, «Cobrar · 15,00» para
-1.500 ¥; hub#936); en cuanto la dice, sale la cifra con su signo. La hoja **Cobro** sigue en «Calculando el
-total…», sin teclado y con «Cobrar» en gris, porque el total se pinta y lo entregado se lee en ella (sin ella,
+1.500 ¥; hub#936); en cuanto la dice, sale la cifra con su signo. Si el servidor no puede valorar la
+cuenta (por ejemplo, porque falta una regla de IVA aplicable), el pie muestra su motivo en vez de dejar
+solo «—»; al poder valorarla, el aviso desaparece y vuelve el total, y al aparcar la cuenta no se
+queda en el TPV vacío. La hoja **Cobro** sigue en
+«Calculando el total…», sin teclado y con «Cobrar» en gris, porque el total se pinta y lo entregado se lee en ella (sin ella,
 «1500» yenes entregados se cobraría como 150 000); si la moneda no se puede leer, sale el aviso con «Reintentar»
 en su lugar, como con cualquier otra lectura del cobro. Sin importe entregado el botón no cobra y se lee encima del
 teclado «Marca en el teclado el importe entregado»; corto, «Lo entregado no cubre el total» (también en el botón, y lo dice al tocarlo). Un artículo sin IVA sale marcado «Falta el IVA»

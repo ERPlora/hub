@@ -4,12 +4,13 @@
 // (`currency_decimals`: 2 in PLN and in HUF, 0 in JPY), never the browser's Intl (which gives the forint none): a
 // cart or an order in its own currency (a record is never rewritten), what a person types in the business's
 // (`useBusinessMoney`, the platform's: its country's; flow cart-checkout-business-currency). Until the business
-// answers an amount is a figure without a symbol, never the euro by default. A quantity is a decimal string from
+// answers an amount is a dash, never the euro by default nor guessed decimals. A quantity is a decimal string from
 // the server (`"2.500"`), written with the platform's `formatQuantity`: without decorative zeros and grouped from four
 // digits on («1.500»), as the till and the stock write it (hub#974).
 import type { StatusPillTone } from '@erplora/ui/components';
 
 import type { Money } from '../../../../base/frontend/lib/home';
+import { formatMoney as writeMoney } from '../../../../base/frontend/lib/money';
 import type { CartStatus, OrderStatus } from '../operations';
 
 export type { Money };
@@ -36,9 +37,9 @@ function moneyFormat(locale: string, of: Money | undefined, symbol = true): Intl
   return found;
 }
 
-/** Whole minor units in `of`, in `locale` («42,50 zł», «€31.50», «¥1,999»; «31,50» while it is unknown). */
+/** Whole minor units in `of`, in `locale` («42,50 zł», «€31.50», «¥1,999»; «—» while it is unknown). */
 export function formatMoney(minor: number, locale: string, of?: Money): string {
-  return moneyFormat(locale, of).format(minor / 10 ** (of?.decimals ?? UNKNOWN_DECIMALS));
+  return writeMoney(minor, locale, of);
 }
 
 /** The money of a cart or an order: its own currency, with the decimals the server counts it in. */

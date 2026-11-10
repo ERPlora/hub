@@ -440,6 +440,7 @@ def _loaded(ctx: OperationContext, reservation: Reservation) -> dict:
 @operation(
     "reservation.reservation.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="reservation.add_reservation",
     input=ReservationIn,
     output=ReservationOut,
@@ -528,6 +529,7 @@ CONTACT_FIELDS = ("guest_name", "guest_phone", "guest_email")
 @operation(
     "reservation.reservation.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="reservation.change_reservation",
     input=ReservationPatchIn,
     output=ReservationOut,
@@ -680,6 +682,7 @@ def judged_as(reservation: Reservation, data: ReservationPatchIn) -> str:
 @operation(
     "reservation.reservation.confirm",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="reservation.change_reservation",
     input=ReservationRefIn,
     output=ReservationOut,
@@ -703,6 +706,7 @@ def confirm_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
 @operation(
     "reservation.reservation.seat",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="reservation.change_reservation",
     input=ReservationRefIn,
     output=ReservationOut,
@@ -772,6 +776,7 @@ def seat_at_table(ctx: OperationContext, reservation: Reservation):
 @operation(
     "reservation.reservation.complete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="reservation.change_reservation",
     input=ReservationRefIn,
     output=ReservationOut,
@@ -792,6 +797,7 @@ def complete_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
 @operation(
     "reservation.reservation.cancel",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="reservation.change_reservation",
     input=CancelIn,
     output=ReservationOut,
@@ -815,6 +821,7 @@ def cancel_reservation(ctx: OperationContext, data: CancelIn) -> dict:
 @operation(
     "reservation.reservation.no_show",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="reservation.change_reservation",
     input=ReservationRefIn,
     output=ReservationOut,
@@ -837,6 +844,7 @@ def no_show_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
 @operation(
     "reservation.reservation.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="reservation.delete_reservation",
     input=ReservationRefIn,
     output=DeletedOut,
@@ -862,6 +870,7 @@ def delete_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
 @operation(
     "reservation.reservation.release_unconfirmed",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="reservation.change_reservation",
     input=NoIn,
     output=ReleasedOut,
@@ -905,6 +914,7 @@ def release_unconfirmed(ctx: OperationContext, data: NoIn) -> dict:
 @operation(
     "reservation.time_slot.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="reservation.change_timeslot",
     input=TimeSlotIn,
     output=TimeSlotOut,
@@ -945,6 +955,7 @@ def create_slot(ctx: OperationContext, data: TimeSlotIn) -> dict:
 @operation(
     "reservation.time_slot.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="reservation.change_timeslot",
     input=TimeSlotRefIn,
     output=DeletedOut,
@@ -970,6 +981,7 @@ def delete_slot(ctx: OperationContext, data: TimeSlotRefIn) -> dict:
 @operation(
     "reservation.blocked_date.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="reservation.change_blockeddate",
     input=BlockedDateIn,
     output=BlockedDateOut,
@@ -1009,6 +1021,7 @@ def create_blocked(ctx: OperationContext, data: BlockedDateIn) -> dict:
 @operation(
     "reservation.blocked_date.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="reservation.change_blockeddate",
     input=BlockedDateRefIn,
     output=DeletedOut,
@@ -1038,6 +1051,7 @@ def delete_blocked(ctx: OperationContext, data: BlockedDateRefIn) -> dict:
 @operation(
     "reservation.waitlist.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="reservation.change_waitlistentry",
     input=WaitlistIn,
     output=WaitlistOut,
@@ -1074,6 +1088,7 @@ def create_entry(ctx: OperationContext, data: WaitlistIn) -> dict:
 @operation(
     "reservation.waitlist.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="reservation.change_waitlistentry",
     input=WaitlistPatchIn,
     output=WaitlistOut,
@@ -1099,6 +1114,7 @@ def update_entry(ctx: OperationContext, data: WaitlistPatchIn) -> dict:
 @operation(
     "reservation.waitlist.convert",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="reservation.change_waitlistentry",
     input=WaitlistConvertIn,
     output=ConvertedOut,
@@ -1158,6 +1174,7 @@ def convert_entry(ctx: OperationContext, data: WaitlistConvertIn) -> dict:
 @operation(
     "reservation.waitlist.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="reservation.change_waitlistentry",
     input=WaitlistRefIn,
     output=DeletedOut,
@@ -1182,6 +1199,7 @@ def delete_entry(ctx: OperationContext, data: WaitlistRefIn) -> dict:
 @operation(
     "reservation.settings.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="reservation.manage_settings",
     input=SettingsIn,
     output=SettingsOut,

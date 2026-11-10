@@ -4,7 +4,7 @@
 // product with its supplement and why it is not offered, and per row the handle, up, down, «Sold out» /
 // «Available», edit and remove (after its confirmation); below, the product picker, «Supplement», «Add
 // choice» and «Add several». A refusal is said inside the course. Every amount is the business's currency: the
-// supplement on the row, the field («Supplement (PLN)») and the price in the picker; a bare figure until it answers.
+// supplement on the row, the field («Supplement (PLN)») and the price in the picker; a dash until it answers.
 import { Combo, ConfirmDialog, StatusPill } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -257,12 +257,13 @@ describe('CourseCard: in the business’s currency', () => {
     s.answer(200, option({}));
     await ionValue(s.el('combo-course-g1-delta'), '250', 'ionInput');
     await click(s.el('combo-course-g1-save'));
-    expect(s.posts()).toEqual([{ method: 'POST', path: '/api/combo/options/update', query: {}, body: { id: 'o1', price_delta: 250 } }]);
+    expect(s.posts()).toHaveLength(1);
+    expect(s.posts()[0]).toEqual({ method: 'POST', path: '/api/combo/options/update', query: {}, body: { id: 'o1', price_delta: 250 } });
   });
 
-  it('until the business answers, a bare figure and «Supplement»; an edit opened then follows the currency when it arrives', async () => {
+  it('until the business answers, a dash and «Supplement»; an edit opened then follows the currency when it arrives', async () => {
     const s = await setup(COURSE, { business: null });
-    expect(s.label('o1')).toBe('Hake +2.00');
+    expect(s.label('o1')).toBe('Hake —');
     expect(s.el('combo-course-g1-delta').label).toBe('Supplement');
     await click(s.el('combo-choice-o1-edit'));
     expect(s.el('combo-course-g1-delta').value).toBe('2.00');

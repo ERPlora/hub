@@ -52,6 +52,15 @@ const addable = computed<ComboOption[]>(() =>
     .map(({ id: name, label: text, hint }) => ({ id: name, label: text, hint })),
 );
 
+/** The chosen ones whose app is off in this business, with that app: missing from the catalog for that (hub#1054). */
+const offTools = computed(() =>
+  props.step.tools.flatMap((name) => {
+    if (props.catalog?.actions.some((action) => action.name === name)) return [];
+    const app = props.catalog?.off_apps?.find((off) => off.app === name.split('.', 1)[0]);
+    return app ? [{ name, app: app.app_name }] : [];
+  }),
+);
+
 /** The chosen ones that wait for the yes of someone who may do them, said under the mode while it asks first. */
 const waitsForWho = computed<string>(() =>
   props.step.mode === 'ask' ? props.step.tools.filter(askFirst).map((name) => `«${label(name)}»`).join(', ') : '',
@@ -204,6 +213,11 @@ function setRounds(text: string | null | undefined): void {
         class="flow-assistant__bad"
         :data-testid="`flow-assistant-tools-error-${id}`"
       >{{ error('tools') }}</span>
+      <span
+        v-else-if="offTools.length"
+        class="flow-assistant__bad"
+        :data-testid="`flow-assistant-tools-off-${id}`"
+      >{{ offTools.map((tool) => $t('flow.assistant.toolOff', { action: label(tool.name), app: tool.app })).join(' ') }}</span>
       <span class="flow-card__hint">{{ $t('flow.assistant.toolsHint') }}</span>
     </div>
     <div

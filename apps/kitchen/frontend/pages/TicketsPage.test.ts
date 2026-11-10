@@ -81,11 +81,11 @@ describe('TicketsPage', () => {
     expect(s.wrapper.text()).not.toContain('€');
   });
 
-  it('until the business answers, the Total is a figure without a symbol, never in euros', async () => {
+  it('until the business answers, the Total is a dash, never in euros', async () => {
     const s = await setup();
     await s.result('kitchen.settings.get', SETTINGS);
     await s.result(OP, page([READY]));
-    expect(s.wrapper.text()).toContain('24.50');
+    expect(s.wrapper.text()).toContain('—');
     expect(s.wrapper.text()).not.toContain('€');
   });
 
@@ -211,5 +211,19 @@ describe('TicketsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+});
+
+describe('TicketsPage: Android Back with unsaved changes (hub#1046, BASE-F05)', () => {
+  it('the cancel dialog as opened closes; a typed reason asks; emptied again it closes', async () => {
+    const s = await setup();
+    await s.show([PENDING]);
+    await s.action('cancel', PENDING);
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('kitchen-tickets-cancel'),
+      change: () => ionValue(s.inDoc('kitchen-tickets-cancel-reason'), 'Guest left', 'ionInput'),
+      restore: () => ionValue(s.inDoc('kitchen-tickets-cancel-reason'), '', 'ionInput'),
+    });
   });
 });

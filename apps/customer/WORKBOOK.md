@@ -1116,6 +1116,14 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   detrás, sin permiso, con un id de otro negocio o de algo que ya no está, el registro queda fuera, nunca su id:
   `tests/test_assistant_card_records.py`, y el trinquete `UNNAMED_REFERENCES` de
   `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca.
+- La fusión (F13) es la única escritura cuyas referencias escritas también llevan marca: `customer` y `absorbed` de
+  `MergeIn`, con `A_CUSTOMER_REFERENCE` (`customer.customer.detail` por `customer`). Así, «junta la ficha del
+  611 222 444 dentro de la del 611 222 333» sale en la tarjeta como «Cliente: Ana QA» y «Ficha duplicada: Ana QA
+  copia», no como los dos teléfonos: se ve quién se queda antes de algo que no se deshace. Si una referencia no encaja
+  con una sola ficha viva, ese dato queda fuera de la tarjeta, como un id sin nombre, y la fusión responde con el mismo
+  aviso que la ficha (`customer.customer_ambiguous` o `customer.customer_unavailable`) sin tocar nada. Su `AI` dice que
+  `customer` es la que se queda («A dentro de B»: B es `customer`, A es `absorbed`) y que no se para en leerlas:
+  `tests/test_assistant_asks.py` (hub#1084).
 - Búsqueda: cada ficha guarda `search_text` (nombre, email, teléfono, NIF y empresa en minúsculas y
   sin acentos), recalculado en `Customer.save()`; así no hace falta la extensión `unaccent`.
 - Estados de una ficha: viva (`deleted_at` vacío), eliminada (`deleted_at`), unida (`merged_into`) y
@@ -1237,8 +1245,8 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
 - **Un dato de salud solo se guarda con el permiso expreso en vigor**, y retirarlo lo borra.
 - **El dinero va en céntimos** (la unidad más pequeña de la moneda); la pantalla pinta los importes y
   escribe los filtros en la moneda del negocio, la de su país en Ajustes → Negocio (euros en España, złoty
-  en Polonia), con sus decimales; mientras el negocio no contesta, una cifra sin símbolo, nunca euros. Cada
-  compra, en la moneda en que se cobró.
+  en Polonia), con sus decimales; mientras el negocio no contesta, un importe es «—», nunca euros ni decimales
+  supuestos. Cada compra, en la moneda en que se cobró.
 - **Buscar por teléfono nunca devuelve a todos.**
 - **Clientes no depende de ninguna app**: se enciende sola.
 

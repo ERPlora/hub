@@ -27,6 +27,10 @@ from django.apps import apps
 
 from apps.flow import queries
 
+from .conftest import A
+
+pytestmark = pytest.mark.django_db
+
 LOCALE = Path(apps.get_app_config("flow").path) / "frontend" / "locale"
 
 
@@ -52,7 +56,7 @@ def without_words(names: dict[str, set[str]]) -> dict[str, list[str]]:
 def catalog_names() -> dict[str, set[str]]:
     """Everything the editor offers, the cancellations only «Ask me first» may use included (``ask_first_catalog``)."""
     names: dict[str, set[str]] = defaultdict(set)
-    for name, op in queries.ask_first_catalog().items():
+    for name, op in queries.ask_first_catalog(A).items():
         for field in queries.action_fields(op):
             names[field["name"]].add(f"{name} asks for it")
         for output in queries.action_outputs(op):
@@ -61,7 +65,7 @@ def catalog_names() -> dict[str, set[str]]:
 
 
 def test_the_catalog_reaches_every_module_with_actions():
-    covered = {op.app_label for op in queries.catalog_operations().values()}
+    covered = {op.app_label for op in queries.catalog_operations(A).values()}
     assert {"appointment", "reservation", "sale", "task", "inventory"} <= covered
     names = catalog_names()
     assert "appointment.appointment.get leaves it" in names["start_date_label"]
@@ -100,7 +104,7 @@ def test_every_field_an_action_asks_for_or_leaves_has_its_words():
 def test_a_read_that_names_a_record_on_the_assistants_card_has_a_name_of_its_own(action, language):
     """The catalog offers every operation with a declared permission, these reads too: without a name of their own the
     editor composes one from their id («Get · Sales & POS (Record)»)."""
-    assert queries.catalog_operations()[action.replace("__", ".")]
+    assert queries.catalog_operations(A)[action.replace("__", ".")]
     actions = json.loads((LOCALE / f"{language}.json").read_text(encoding="utf-8"))["flow"]["actions"]
     assert actions.get(action, "").strip()
 
@@ -447,7 +451,7 @@ def event_names() -> tuple[dict[str, set[str]], list[str]]:
     """``({key: where it is sent}, unread payloads)`` of the events of every installed module."""
     names: dict[str, set[str]] = defaultdict(set)
     unread: list[str] = []
-    for label, config in sorted(queries.active_apps().items()):
+    for label, config in sorted(queries.active_apps(A).items()):
         services = Path(config.path) / "services.py"
         if not services.exists():
             continue

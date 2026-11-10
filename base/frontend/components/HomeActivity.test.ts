@@ -80,14 +80,15 @@ describe('HomeActivity', () => {
   });
 
   // BASE-G98: the amount of each sale is in the business's currency, never a fixed euro.
-  it("writes each sale's amount in the business's currency: zł in a Polish business", async () => {
+  it("writes each sale's amount in the business's currency: zł in a Polish business, a dash until it answers (hub#947)", async () => {
     const m = await mountBase(HomeActivity, { session: WITH_SALES, locale: 'es' });
     const call = await m.live();
     await m.result(call, 'sale.sale.list', { rows: [sale('1')], total: 1, limit: 100, offset: 0 });
-    expect(m.wrapper.get('[data-testid="home-activity-row"]').text()).toContain('12,50');
+    const amount = () => m.wrapper.get('[data-testid="home-activity-row"]').findAll('[role="cell"]')[4].text();
+    expect(amount()).toBe('—');
     expect(m.wrapper.get('[data-testid="home-activity-row"]').text()).not.toContain('€');
     await m.result(call, 'base.business.get', business(POLISH));
-    expect(m.wrapper.get('[data-testid="home-activity-row"]').text()).toContain('12,50\u00a0zł');
+    expect(amount()).toBe('12,50\u00a0zł');
     expect(m.wrapper.get('[data-testid="home-activity-row"]').text()).not.toContain('€');
   });
 

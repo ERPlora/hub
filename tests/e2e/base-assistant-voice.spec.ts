@@ -91,7 +91,7 @@ async function answered(page: Page): Promise<void> {
   await openPanel(page);
   await box(page).fill('Hola');
   await box(page).press('Enter');
-  await expect(lastAnswer(page).locator('[data-testid="assistant-bubble-assistant"]')).toHaveText(GREETING);
+  await expect(lastAnswer(page).locator('[data-testid="assistant-bubble-assistant"]')).toHaveText(GREETING.es);
   await expect(listen(page)).toBeVisible();
 }
 
@@ -107,7 +107,7 @@ test('BASE-F93 — with no server voice (the default) there is no choice of voic
 
   await expect(voice(page)).toHaveCount(0);
   await listen(page).click();
-  await expect.poll(() => deviceSaid(page)).toEqual([{ text: GREETING, lang: 'es-ES' }]);
+  await expect.poll(() => deviceSaid(page)).toEqual([{ text: GREETING.es, lang: 'es-ES' }]);
   await expect(listen(page)).toHaveText('Leer en voz alta');
   await expect(panel(page).locator('[data-testid="assistant-listen-failed"]')).toHaveCount(0);
   for (const vp of VIEWPORTS) {
@@ -135,11 +135,11 @@ test('BASE-F93 — with the server’s voice on there is nothing to choose: the 
   expect(response.status()).toBe(503);
   expect((await response.json()).error.code).toMatch(/^base\.assistant_speech_(unavailable|failed)$/);
   expect(JSON.parse(response.request().postData() ?? '{}')).toEqual({
-    text: GREETING,
+    text: GREETING.es,
     language: 'es',
     voice: '',
   });
-  await expect.poll(() => deviceSaid(page)).toEqual([{ text: GREETING, lang: 'es-ES' }]);
+  await expect.poll(() => deviceSaid(page)).toEqual([{ text: GREETING.es, lang: 'es-ES' }]);
   await expect(listen(page)).toHaveText('Leer en voz alta');
   await expect(panel(page).locator('[data-testid="assistant-listen-failed"]')).toHaveCount(0);
   for (const vp of VIEWPORTS) {

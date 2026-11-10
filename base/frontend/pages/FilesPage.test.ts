@@ -600,3 +600,29 @@ describe('FilesPage · delete (BASE-G86)', () => {
     );
   });
 });
+
+
+describe('FilesPage: Android Back with unsaved changes (hub#1046, BASE-F05)', () => {
+  it('New folder: as opened closes; a change asks; restored as opened closes again', async () => {
+    const m = await open();
+    await m.wrapper.find('[data-testid="files-new-folder"]').trigger('click');
+    await flush();
+    const { expectUnsavedFormOnAndroidBack } = await import('../__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => byTestid('files-new-folder-dialog'),
+      change: () => input('files-new-folder-name', '2027'),
+      restore: () => input('files-new-folder-name', ''),
+    });
+  });
+
+  it('Rename: as opened closes; a change asks; restored as opened closes again', async () => {
+    const m = await open();
+    await menu(m, 'marzo.pdf', 'rename');
+    const { expectUnsavedFormOnAndroidBack } = await import('../__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => byTestid('files-rename-dialog'),
+      change: () => input('files-rename-name', 'abril.pdf'),
+      restore: () => input('files-rename-name', 'marzo.pdf'),
+    });
+  });
+});

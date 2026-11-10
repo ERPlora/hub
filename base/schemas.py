@@ -109,6 +109,20 @@ class HubOut(Schema):
     state_version: int
 
 
+class HubMaintenanceOut(Schema):
+    """A database upgrade pauses provisioning platform-wide; ``None`` on ``HubGetOut`` once it is lifted."""
+
+    frozen: bool
+    reason: str
+    since: dt.datetime | None
+
+
+class HubGetOut(HubOut):
+    """The signed status poll: the registry row plus the real maintenance state, never a guessed timeout."""
+
+    maintenance: HubMaintenanceOut | None
+
+
 class HubRegisterOut(HubOut):
     #: Whether this call created the row (``202``) or updated it (``200``); not sent to the SaaS.
     created: bool

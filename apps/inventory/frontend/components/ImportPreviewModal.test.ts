@@ -117,3 +117,22 @@ describe('ImportPreviewModal', () => {
     expect(s.el('inventory-import-summary')?.textContent).toContain('5 fila(s) listas · 12 con problemas');
   });
 });
+
+
+describe('ImportPreviewModal: Android Back with unsaved changes (hub#1046, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.el('inventory-import-preview'),
+      change: async () => {
+        await s.wrapper.setProps({ mapping: ['name', 'sku', 'description'] });
+        await flush();
+      },
+      restore: async () => {
+        await s.wrapper.setProps({ mapping: ['name', 'sku', ''] });
+        await flush();
+      },
+    });
+  });
+});

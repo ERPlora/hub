@@ -4,6 +4,8 @@
 
 ```bash
 git submodule update --init          # packages/live y packages/ui (ERPlora/live, ERPlora/ui)
+git config merge.workbook-translation.driver \
+  'uv run --no-sync python manage.py merge_workbook_translation %O %A %B %P || git merge-file -L ours -L base -L theirs %A %O %B'  # una vez por clon: lo comparten sus worktrees
 printf 'DEBUG=True\n' > .env         # sin DEBUG, el hub arranca como producción
 uv sync && pnpm install
 uv run python manage.py migrate && uv run python manage.py seed_local_hubs   # deja `a` y `b` en el registro
@@ -76,8 +78,13 @@ corte y qué se repite, en el README de `packages/live`):
 - **Espera** hasta `DB_CUT_WAIT_SECONDS` (20 s por defecto, muy por debajo de los 120 s del balanceador) y repite sola una
   lectura, lo que no llegó a empezar (abrir la base del negocio, leer quién pregunta) y un comando `repeatable=True` cortado
   antes de su COMMIT. La espera es fuera de la transacción: no retiene la plaza del plan del negocio (`base.tenancy.limits`).
-- **`repeatable=True`** solo lo lleva un comando que no toca nada más que su base; hoy, los de Demo, la app de referencia
-  (las demás apps, en hub#1051). Nunca uno que cobra, numera, genera un QR, envía a la AEAT o llama a un tercero.
+- **`repeatable=True`** solo lo lleva un comando que no toca nada más que su base: Demo y los comandos locales revisados
+  de todas las apps. Nunca uno que cobra, numera, genera un QR, envía a la AEAT, manda un correo o un WhatsApp, llama a
+  un tercero o escribe fuera de su transacción (caché, sesiones, control o el almacén de ficheros). La lista de
+  exclusiones y una ruta real por app están en `base/tests/test_database_cut.py`, que además obliga a revisar cada
+  comando nuevo expuesto por una ruta; otra prueba del mismo fichero recorre el código de cada comando repetible, y lo
+  que llama, y falla si antes del COMMIT numera (también los tickets de Cocina al guardar las rondas pendientes),
+  guarda un fichero con nombre nuevo, cuenta un intento en la caché o llama a otro sistema.
 - **Pasado el tope, o si no se puede repetir:** 503 con `Retry-After`, nunca un 500 (`base.database_cut.server_error`, el
   `handler500`): el sobre para la API, y para el navegador `base/database_cut.html`, que se recarga sola. Al abrir la
   base del negocio, el 503 es el de siempre, `base.hub_unavailable`, pero después de esperar.

@@ -1,6 +1,6 @@
 // How the service screens paint money, rates and dates, with the page language's own format (Intl): minor
 // units in the business's currency (flow service-business-currency: its country's, with the decimals the
-// server counts it in, never the browser's Intl; a figure without a symbol until it answers, never the euro by
+// server counts it in, never the browser's Intl; a dash until it answers, never the euro by
 // default), a discount in basis points as the language writes a percentage, and a day.
 import { describe, expect, it } from 'vitest';
 
@@ -28,7 +28,7 @@ describe('formatMoney', () => {
     expect(formatMoney(123456789, 'es', EUR)).toMatch(/^1\.234\.567,89\s€$/);
     expect(formatMoney(123456, 'en', EUR)).toBe('€1,234.56');
     expect(formatMoney(1500, 'es', JPY)).toMatch(/^1\.500\s¥$/);
-    expect(formatMoney(123456, 'es')).toBe('1.234,56');
+    expect(formatMoney(123456, 'es')).toBe('—');
     expect(formatMoney(99999, 'es', EUR)).toMatch(/^999,99\s€$/);
   });
 
@@ -42,9 +42,9 @@ describe('formatMoney', () => {
     expect(plain(formatMoney(1350, 'es', HUF))).toBe('13,50 Ft');
   });
 
-  it('is a figure without a symbol until the business answers: never a euro by default', () => {
-    expect(formatMoney(2250, 'es')).toBe('22,50');
-    expect(formatMoney(2250, 'en')).toBe('22.50');
+  it('is a dash until the business answers: never a euro by default', () => {
+    expect(formatMoney(2250, 'es')).toBe('—');
+    expect(formatMoney(2250, 'en')).toBe('—');
   });
 });
 

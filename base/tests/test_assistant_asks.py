@@ -11,9 +11,13 @@ app (``AsksBacklog``), never failed. How many asks of each listed app reach thei
 (``own_asks=False``: how a person's new phrase would) is reported too (``AsksReach``), never failed.
 """
 
+import json
+import re
+import unicodedata
 import warnings
 from collections import Counter
 from collections.abc import Iterable
+from pathlib import Path
 
 import pytest
 from django.conf import settings
@@ -115,6 +119,104 @@ def test_live_asks_nothing_more_of_the_listed_apps():
     assert check_assistant_asks() == []
 
 
+#: The probes of layer 2 (``tests/e2e/qa/assistant-probes.spec.ts``), every app and role: phrases nobody wrote as asks.
+PROBES = Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes"
+
+
+def comparable(text: str) -> str:
+    """``text`` as layer 2 compares a probe with the asks (``tests/e2e/assistant-probes.ts`` ``normalized``): lower
+    case, without accents, punctuation or extra spaces."""
+    bare = "".join(c for c in unicodedata.normalize("NFD", text) if not unicodedata.combining(c)).lower()
+    return " ".join(re.sub(r"[^\w]+|_", " ", bare).split())
+
+
+def probe_phrases() -> dict[str, str]:
+    return {
+        comparable(probe["phrase"]): probe["id"]
+        for path in sorted(PROBES.glob("*.json"))
+        for probe in json.loads(path.read_text(encoding="utf-8"))["probes"]
+    }
+
+
+def test_no_ask_copies_a_qa_probe_or_names_a_qa_record():
+    """The probes measure that the selection generalises (docs plan 2026-10-31 §1.5): a probe written into its tool's
+    asks ranks its own words and layer 2 skips it as a copy, and a record of the QA's data («Documentos QA/nota-qa.txt»,
+    «Ordenador de oficina QA») is no phrase a business says: its «QA» scores for every probe that names one."""
+    phrases = probe_phrases()
+    assert len(phrases) > 100  # positive control: the probes of layer 2 are read
+    assert comparable("¿Cuánto vendí hoy?") == "cuanto vendi hoy"
+    copied, qa = [], []
+    for op in registry.values():
+        if not assistant.is_tool(op):
+            continue
+        for phrases_of in shared.asks_of(op).values():
+            for ask in phrases_of:
+                if comparable(ask) in phrases:
+                    copied.append((op.name, ask, phrases[comparable(ask)]))
+                if re.search(r"\bQA\b", ask):
+                    qa.append((op.name, ask))
+    assert copied == []
+    assert qa == []
+
+
+#: The requests of hub#1083's QA (``qa20261108.owner.es.base.*``), as the owner said them: each is offered its existing
+#: operation (among the ``MAX_TOOLS`` a turn offers, so the model can choose it), without being one of its asks.
+REPORTED = [
+    ("base.file.read", "busca el documento Documentos QA/nota-qa.txt y dime su tamaño y tipo"),
+    (
+        "base.blueprint.import",
+        "carga la plantilla de restaurante conservando lo que ya exista, sin traer personas ni información fiscal",
+    ),
+    ("base.app.enable", "quiero volver a tener Reservas disponible en el menú con todo lo que tenía"),
+    ("base.device.mode_set", "convierte este ordenador en una caja compartida que pida PIN a cada empleado"),
+    (
+        "base.device.prune",
+        "retira de una vez todos los equipos que nadie haya utilizado durante los últimos treinta días, menos este",
+    ),
+    (
+        "base.device.remove",
+        "he perdido el primer dispositivo de la lista; cierra su acceso y obliga a entrar de nuevo con una cuenta",
+    ),
+    pytest.param(
+        "base.device.rename",
+        "pon al dispositivo que estoy usando ahora el nombre «Ordenador de oficina QA»",
+        # «pon al … el nombre» reads as any change (``set``/``update``), not as ``rename``: 43rd of 40 (ERPlora/live#47).
+        marks=pytest.mark.xfail(strict=True, reason="ERPlora/live#47: a split «pon … el nombre» is no rename"),
+    ),
+    (
+        "base.person.badge_remove",
+        "la empleada de la demo ha perdido su tarjeta; desactiva esa placa sin quitarle el PIN ni la cuenta",
+    ),
+]
+
+
+def test_the_hub_reads_a_placa_as_a_badge_and_an_employee_as_a_person():
+    """``base.assistant.SYNONYMS``: «la placa» is the badge of ``base.person.badge_*`` and «la empleada» a
+    ``base.person``, so a request in the words of the till's screens reaches those tools without their own asks."""
+    concepts = shared.asked(["quita la placa de la empleada"], assistant.SYNONYMS).concepts
+    assert any(shared.stem("badge") in concept for concept in concepts)
+    assert any(shared.stem("person") in concept for concept in concepts)
+    assert not any(shared.stem("badge") in concept for concept in shared.asked(["quita la placa de la empleada"]).concepts)
+
+
+def test_the_reported_requests_are_the_probes_of_layer_2():
+    phrases = probe_phrases()
+    reported = [case.values if hasattr(case, "values") else case for case in REPORTED]
+    assert [phrases.get(comparable(phrase)) for _, phrase in reported] == [
+        f"qa20261108.owner.es.{name}" for name, _ in reported
+    ]
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("name", "phrase"), REPORTED)
+def test_the_reported_platform_request_offers_its_existing_operation(context_of, name, phrase):
+    tools = assistant.catalog(context_of(Membership.Role.OWNER, "es"))
+    assert name in tools
+    assert phrase not in shared.asks_of(tools[name])["es"]
+    offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
+    assert name in offered
+
+
 #: A phrase of some tools, each with the tool it asks for: reads and writes, both languages, and words only the Hub's
 #: ``SYNONYMS`` read as it does («cuenta» is a table's check, «ticket» a sale).
 SAMPLE = [
@@ -123,6 +225,14 @@ SAMPLE = [
     ("es", "sale.order.set_label", "ponle de nombre «Ana — terraza» a la cuenta"),
     ("es", "sale.sale.get", "¿qué llevaba el último ticket?"),
     ("en", "sale.order.get", "what's on table 4's check?"),
+    ("es", "base.file.read", "¿de qué tipo es el documento del presupuesto y cuánto ocupa?"),
+    ("es", "base.blueprint.import", "importa la plantilla de restaurante"),
+    ("es", "base.app.enable", "recupera la app de fichajes que quité del menú"),
+    ("es", "base.device.mode_set", "usa este portátil como caja de todo el equipo, con PIN"),
+    ("es", "base.device.prune", "da de baja los equipos que no se han usado en el último mes"),
+    ("es", "base.device.remove", "corta el acceso del móvil que se ha perdido"),
+    ("es", "base.device.rename", "cambia el nombre de este dispositivo a «Caja 2»"),
+    ("es", "base.person.badge_remove", "anula la tarjeta de Pedro, que se le ha perdido"),
 ]
 
 
