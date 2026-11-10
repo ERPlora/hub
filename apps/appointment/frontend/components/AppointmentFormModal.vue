@@ -358,6 +358,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             v-model="services"
             :facts="facts"
             testid="appointment-form"
+            name="services"
             :error-text="fieldErrors.services"
             :disabled="charged"
           />
@@ -369,6 +370,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         </div>
         <Combo
           testid="appointment-form-staff"
+          name="staff"
           :model-value="staff"
           :search="searchStaff"
           :label="t('appointment.form.staff')"

@@ -290,17 +290,30 @@ describe('RuleFormModal: the business answers after the form opened', () => {
   });
 });
 
-// A percent rule for everything (the form as it opens). What it applies to and the customer group are Combos
-// (@erplora/ui), which do not hand a name to their field yet: left out here.
+// A percent rule for everything (the form as it opens), and one for a single category, product or service. What it
+// applies to and the customer group are Combos, named by the key of the id they send.
 describe('RuleFormModal: fields refused with the same words (hub#888)', () => {
-  const KEYS = ['code', 'name', 'rule_type', 'percent', 'applies_to', 'min_quantity', 'priority', 'valid_from', 'valid_until'];
+  const FIELD_OF: Record<string, string> = { category_id: 'target', product_id: 'target', service_id: 'target', customer_group_id: 'group' };
+  const KEYS = ['code', 'name', 'rule_type', 'percent', 'applies_to', 'customer_group_id', 'min_quantity', 'priority', 'valid_from', 'valid_until'];
   itTellsTheCorrectedFieldApart(KEYS, async (locale, refusal) => {
     const s = await setupAnswered({}, locale);
     await named(s);
     await ionValue(s.field('percent'), '10', 'ionInput');
     s.answer(422, refusal);
-    return { field: s.field, send: () => click(s.save()), settle };
+    return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.save()), settle };
   }, 'percent');
+
+  describe.each(['category', 'product', 'service'])('a rule for one %s', (scope) => {
+    itTellsTheCorrectedFieldApart([`${scope}_id`, 'customer_group_id', 'percent'], async (locale, refusal) => {
+      const s = await setupAnswered({}, locale);
+      await named(s);
+      await ionValue(s.field('percent'), '10', 'ionInput');
+      await ionValue(s.field('applies_to'), scope);
+      await s.pick('target', { id: 't1', label: 'Shampoo' });
+      s.answer(422, refusal);
+      return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.save()), settle };
+    }, `${scope}_id`);
+  });
 });
 
 // hub#938 (PRICING-F11): if the business's money cannot be read, the rule says so with «Retry» instead of waiting in grey

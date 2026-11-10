@@ -117,6 +117,7 @@ async function save(): Promise<void> {
         <Combo
           v-if="forAnyone"
           testid="staff-time-off-form-member_id"
+          name="member_id"
           :model-value="memberChoice"
           :label="$t('staff.timeOff.form.member')"
           :search="findMembers"

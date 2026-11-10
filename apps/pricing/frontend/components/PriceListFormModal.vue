@@ -231,6 +231,7 @@ useUnsavedFormOnOpen(
         </div>
         <Combo
           testid="pricing-list-form-group"
+          name="customer_group_id"
           :model-value="form.group"
           :search="search"
           :label="t('pricing.lists.form.group')"

@@ -110,16 +110,20 @@ describe('PriceItemFormModal', () => {
   });
 });
 
-// The product or service is a Combo (@erplora/ui), which does not hand a name to its field yet: left out here.
+// The product or service is a Combo, named by the key of the id it sends: `product_id` or `service_id`.
 describe('PriceItemFormModal: fields refused with the same words (hub#888)', () => {
-  itTellsTheCorrectedFieldApart(['min_quantity', 'price'], async (locale, refusal) => {
-    const s = await setup({}, locale);
-    s.article().vm.$emit('update:modelValue', { id: 'p1', label: 'Shampoo' });
-    await settle();
-    await ionValue(s.field('price'), '12', 'ionInput');
-    s.answer(422, refusal);
-    return { field: s.field, send: () => click(s.save()), settle };
-  }, 'price');
+  const FIELD_OF: Record<string, string> = { product_id: 'article', service_id: 'article' };
+  describe.each(['product', 'service'])('a price of a %s', (kind) => {
+    itTellsTheCorrectedFieldApart([`${kind}_id`, 'min_quantity', 'price'], async (locale, refusal) => {
+      const s = await setup({}, locale);
+      if (kind === 'service') await ionValue(s.field('kind'), 'service');
+      s.article().vm.$emit('update:modelValue', { id: 'a1', label: 'Shampoo' });
+      await settle();
+      await ionValue(s.field('price'), '12', 'ionInput');
+      s.answer(422, refusal);
+      return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.save()), settle };
+    }, 'price');
+  });
 });
 
 describe('PriceItemFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {

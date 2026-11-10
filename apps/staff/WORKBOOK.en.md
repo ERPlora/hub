@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6c0aa9e5bdc463396a60f119dbf5a3b64ecb0edf3de1cb6aff6dc2bdec7706fa -->
+<!-- generated from WORKBOOK.md sha256:0fccb57cf955ab9cc3becca7742d5b2f2c19379c752f4c3105007ca26abd7419 -->
 
 ## What it is for and who it is for
 
@@ -140,7 +140,7 @@ above the Time Off one and the "Members" column of Roles (STAFF-F20 and STAFF-F2
 |---|---|
 | Loading | "Loading…" while the first result arrives; each figure shows "…". |
 | Empty | "No staff members.", "No roles defined.", "No time-off requests." or "This member has no schedules yet."; with a search or a filter, "No results". "Today’s time off" with nobody: "Nobody is away today."; on the **Home**, a panel with nothing to show says "No data". Commissions with nobody who can earn one: "No one on the team can earn a commission yet."; without Sales in the business, "Commissions come from the sales" and "Turn on Sales to see what each professional earned.", without a list. |
-| Error | The table's notice with "Retry"; in Settings, "The settings could not be loaded" with "Retry" and no form. The figures say "The figures could not be loaded" and "Today’s time off", "Who is away today could not be loaded", and the table keeps working; on the **Home**, the panel that cannot be read says "Unavailable" and the others go on. A refusal of a form shows inside the form, without losing what was typed, and each refused field says its reason under it and loses it as soon as that field is corrected, even if another one says the same (hub#888); **Role**, **Hub user** and the **Member** of a time off, which are search pickers, not yet: if they say the same as another field, they stay marked until the next save. The refusal of a row action shows above the table. |
+| Error | The table's notice with "Retry"; in Settings, "The settings could not be loaded" with "Retry" and no form. The figures say "The figures could not be loaded" and "Today’s time off", "Who is away today could not be loaded", and the table keeps working; on the **Home**, the panel that cannot be read says "Unavailable" and the others go on. A refusal of a form shows inside the form, without losing what was typed, and each refused field says its reason under it and loses it as soon as that field is corrected, even if another one says the same (hub#888), the search pickers too (**Role**, **Hub user** and the **Member** of a time off), as soon as another one is chosen. The refusal of a row action shows above the table. |
 | Reconnecting | What is painted stays; a strip warns "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not show; if it arrives through another door, "You do not have permission". |

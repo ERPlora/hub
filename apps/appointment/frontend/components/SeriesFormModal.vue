@@ -222,10 +222,12 @@ const text = (value: unknown): string => (value === null || value === undefined 
           v-model="services"
           :facts="facts"
           testid="series-form"
+          name="services"
           :error-text="fieldErrors.services"
         />
         <Combo
           testid="series-form-staff"
+          name="staff"
           :model-value="staff"
           :search="searchStaff"
           :label="t('appointment.form.staff')"

@@ -469,6 +469,7 @@ useUnsavedFormOnOpen(
           v-if="TARGETS[form.scope]"
           :key="form.scope"
           testid="pricing-rule-form-target"
+          :name="TARGETS[form.scope]"
           :model-value="form.target"
           :search="searchTarget"
           :label="t(`pricing.rules.form.${form.scope}`)"
@@ -478,6 +479,7 @@ useUnsavedFormOnOpen(
         />
         <Combo
           testid="pricing-rule-form-group"
+          name="customer_group_id"
           :model-value="form.group"
           :search="searchGroup"
           :label="t('pricing.rules.form.group')"
