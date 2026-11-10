@@ -298,8 +298,8 @@ describe('MembersPage: the business\'s currency (staff-business-currency)', () =
     expect((await rate(JAPANESE, 'en', 1500)).cell).toBe('¥1,500');
   });
 
-  it('until the business answers, Rate/h is a figure without a symbol, never euros', async () => {
-    expect((await rate(null)).cell).toBe('12.50');
+  it('until the business answers, Rate/h is a dash, never euros', async () => {
+    expect((await rate(null)).cell).toBe('—');
   });
 });
 

@@ -100,11 +100,11 @@ describe('ListDetailPage', () => {
     expect(s.find('pricing-detail-default').exists()).toBe(false);
   });
 
-  it('until the business answers, the catalog price is a bare figure and the list cannot be made general', async () => {
+  it('until the business answers, the catalog price is a dash and the list cannot be made general', async () => {
     const s = await setup({}, null);
     await s.result(LIST, priceList({ customer_group_id: null, customer_group_name: null }));
     await s.result(ITEMS, page([BULK]));
-    expect(s.cells(0).slice(4, 6)).toEqual(['€10.00', '15.00']);
+    expect(s.cells(0).slice(4, 6)).toEqual(['€10.00', '—']);
     expect(s.find('pricing-detail-default').exists()).toBe(false);
   });
 

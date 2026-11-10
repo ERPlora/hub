@@ -294,10 +294,12 @@ describe('ServicesPage', () => {
       expect(s.cells(0)[4]).toBe('¥1,500');
     });
 
-    it('paints a figure without a symbol until the business answers', async () => {
+    it('paints a dash until the business answers, then the amount in yen', async () => {
       const s = await setup({ business: null });
       await s.show(page(ROWS));
-      expect(s.cells(0)[4]).toBe('22.50');
+      expect(s.cells(0)[4]).toBe('—');
+      await s.result('base.business.get', business(JAPANESE));
+      expect(s.cells(0)[4]).toBe('¥2,250');
     });
 
     it('reads the price filter in the business currency’s minor units: «1500» is 1500 yen', async () => {

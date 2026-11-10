@@ -19,9 +19,9 @@ describe('formatMoney', () => {
     expect(nbsp(formatMoney(1250, 'en', { currency: 'PLN', decimals: 2 }))).toBe('zł 12.50');
   });
 
-  it('while the money is unknown, a figure without a symbol: never the euro by default', () => {
-    expect(nbsp(formatMoney(25000, 'es'))).toBe('250,00');
-    expect(formatMoney(123456, 'en')).toBe('1,234.56');
+  it('while the money is unknown, an amount is a dash: never the euro by default', () => {
+    expect(nbsp(formatMoney(25000, 'es'))).toBe('—');
+    expect(formatMoney(123456, 'en')).toBe('—');
     expect('CURRENCY' in format).toBe(false);
   });
 
@@ -31,7 +31,7 @@ describe('formatMoney', () => {
     expect(nbsp(formatMoney(123456, 'es', EUR))).toBe('1.234,56 €');
     expect(nbsp(formatMoney(1234567, 'es', EUR))).toBe('12.345,67 €');
     expect(formatMoney(123456, 'en', EUR)).toBe('€1,234.56');
-    expect(nbsp(formatMoney(123456, 'es'))).toBe('1.234,56');
+    expect(nbsp(formatMoney(123456, 'es'))).toBe('—');
   });
 
   it('uses the decimals the server counts the currency in, never the browser’s', () => {

@@ -66,7 +66,7 @@ pnpm e2e tests/e2e/modifier-groups.spec.ts tests/e2e/modifier-till.spec.ts tests
 - `modifier-business-currency.spec.ts`: la hoja del grupo y «Nueva opción» en la moneda del negocio (F04; el
   negocio `a` en Polonia, en złoty, en 390, 834 y 1440, y de vuelta en España, en euros). Los importes se pintan y
   se leen con `base.business.get` (`useBusinessMoney`), con los decimales que cuenta el servidor; mientras el
-  negocio no contesta, una cifra sin símbolo, nunca un euro.
+  negocio no contesta, un importe es «—», nunca un euro ni decimales supuestos.
 
 ## Qué queda fuera
 

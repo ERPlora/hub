@@ -633,7 +633,7 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   de esa pregunta (FIX-HUB-PRICING-OWN-COPY-OF-BUSINESS-CURRENCY). Una tarifa
   sin divisa se guarda en la del negocio; el `default="EUR"` de la columna se queda (una columna no sabe el
   negocio) y nada guardado se reescribe. La pantalla la lee con `useBusinessMoney` de `base` (los decimales
-  del servidor, nunca los de `Intl`; mientras no contesta, una cifra sin símbolo y sin «Hacer general»)
+  del servidor, nunca los de `Intl`; mientras no contesta, un importe es «—» y no se puede «Hacer general»)
   (FIX-HUB-PRICING-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY).
 - El «hoy» es el del reloj del negocio (`base.business.business_zone`, hub#771), también el día de un `when`;
   `pricing.price.resolve` toma `when` y los tests nunca leen el reloj real.

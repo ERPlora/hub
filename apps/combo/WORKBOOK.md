@@ -720,8 +720,8 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 - Los importes se leen con `lib/money.ts` (coma o punto, el «1.250» ambiguo se pregunta, el suplemento
   admite signo) y se pintan con `lib/format.ts`, en la moneda del negocio (`useBusinessMoney` de `base`,
   `base.business.get`): sus decimales, los del servidor, nunca los del navegador; su código o su símbolo es
-  ruido al leer, el de otra moneda no. Mientras el negocio no contesta, una cifra sin símbolo (nunca un
-  euro), el campo dice solo «Precio cerrado» o «Suplemento» y salir de él no lo reformatea. Si contesta (o
+  ruido al leer, el de otra moneda no. Mientras el negocio no contesta, un importe es «—» (nunca un
+  euro ni decimales supuestos), el campo dice solo «Precio cerrado» o «Suplemento» y salir de él no lo reformatea. Si contesta (o
   cambia) con el formulario del menú o la edición de una elección abiertos, el importe que nadie ha tocado
   se reescribe desde lo guardado con los decimales de su moneda; lo tecleado se queda y se lee en ella al
   guardar (si no se puede, lo dice el campo).

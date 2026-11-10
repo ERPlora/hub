@@ -42,9 +42,9 @@ describe('formatMoney', () => {
     expect(nbsp(formatMoney(1999, 'en', KWD))).toBe('KWD 1.999');
   });
 
-  it('while the business has not answered, the figure goes without a symbol, never in euros', () => {
-    expect(formatMoney(3150, 'es')).toBe('31,50');
-    expect(formatMoney(123456, 'en')).toBe('1,234.56');
+  it('while the business has not answered, the amount is a dash, never in euros', () => {
+    expect(formatMoney(3150, 'es')).toBe('—');
+    expect(formatMoney(123456, 'en')).toBe('—');
   });
 
   it('groups the thousands of a four-digit amount too, so a column of totals lines up (hub#1090)', () => {
@@ -53,7 +53,7 @@ describe('formatMoney', () => {
     expect(nbsp(formatMoney(123456, 'es', EUR))).toBe('1.234,56 €');
     expect(nbsp(formatMoney(1234560, 'es', PLN))).toBe('12.345,60 zł');
     expect(formatMoney(123456, 'en', EUR)).toBe('€1,234.56');
-    expect(formatMoney(123456, 'es')).toBe('1.234,56');
+    expect(formatMoney(123456, 'es')).toBe('—');
   });
 });
 
