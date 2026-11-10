@@ -14,6 +14,7 @@ const action = (name: string, kind: 'command' | 'query', assistant: boolean, ask
   name, kind, app: 'task', app_name: 'Tasks', description: '', fields: [], outputs: [], assistant, ask_first,
 });
 const CATALOG: CatalogOut = {
+  off_apps: [],
   events: [],
   actions: [
     action('task.task.list', 'query', true),
@@ -102,6 +103,7 @@ describe('AssistantStepPanel', () => {
 describe('AssistantStepPanel fixed data', () => {
   const field = (name: string, required = false) => ({ name, type: 'string', required, description: '', choices: [] });
   const BOOKING: CatalogOut = {
+    off_apps: [],
     events: [],
     actions: [
       { ...action('reservation.reservation.cancel', 'command', true, true), app: 'reservation', app_name: 'Reservations', fields: [field('id'), field('reason'), field('on_behalf_of')] },

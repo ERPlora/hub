@@ -178,7 +178,7 @@ def test_a_recipe_whose_assistant_asks_first_to_cancel_is_offered_and_turned_on(
         "grants": {CANCEL: "Cancels the table after your yes."},
     }
     reservation = queries.active_apps(A)["reservation"]
-    monkeypatch.setattr(recipes, "declarations", lambda _scope: [(reservation, declared)])
+    monkeypatch.setattr(recipes, "declarations", lambda _scope=None: [(reservation, declared)])
     offered, set_aside = recipes.shelf(A)
     assert ([recipe.ref for recipe in offered], set_aside) == (["reservation/cancel_by_message"], [])
     done = run("flow.recipe.enable", {"recipe": "reservation/cancel_by_message"})

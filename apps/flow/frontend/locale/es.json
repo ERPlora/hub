@@ -320,7 +320,8 @@
         "month": "Todos los meses el día {day} a las {time}",
         "at": "Una vez, el {date}",
         "noDate": "Una vez, en la fecha que elijas"
-      }
+      },
+      "appOff": "Su app, {app}, está apagada en este negocio: enciéndela en Apps o elige otro aviso."
     },
     "steps": {
       "none": "Todavía no hay pasos. Añade lo primero que debe hacer esta automatización.",
@@ -409,7 +410,8 @@
         "onErrorHint": "El fallo queda escrito en este paso y los siguientes pueden mirar si falló.",
         "summaryRunIf": "Solo si: {clauses}",
         "summaryOnError": "Si falla, sigue"
-      }
+      },
+      "appOff": "Su app, {app}, está apagada en este negocio: enciéndela en Apps o elige otra acción."
     },
     "picker": {
       "title": "¿Qué dato?",

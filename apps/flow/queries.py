@@ -103,6 +103,13 @@ ASSISTANT_WANTS = _("The assistant wants to change something in «%(app)s»")
 AMBIGUOUS_FLOW = _("Several automations fit «%(text)s»: %(names)s. Say which one.")
 UNKNOWN_EVENT = _("That does not happen in this business: «%(name)s».")
 UNKNOWN_ACTION = _("That action does not exist in this business: «%(name)s».")
+#: Off is not «does not exist» (hub#1054): what is missing is of an app the business turned off, and it comes back on.
+OFF_EVENT = _(
+    "«%(name)s» is from %(app)s, which is off in this business: turn it on in Apps, or choose another event."
+)
+OFF_ACTION = _(
+    "«%(name)s» is from %(app)s, which is off in this business: turn it on in Apps, or choose another action."
+)
 NOT_AN_ACTION = _("«%(name)s» only reads: use «Look something up».")
 NOT_A_READ = _("«%(name)s» changes data: use «Do something».")
 HIGH_RISK = _("«%(name)s» needs a person in front: an automation cannot do it.")
@@ -130,20 +137,36 @@ AMBIGUOUS_SHOWN = 5
 # --- The catalog ------------------------------------------------------------------------------------
 
 
+def installed_apps() -> dict[str, LiveAppConfig]:
+    """Every installed module but this one, on or off: whose recipes still fix what was built from them."""
+    return {config.label: config for config in module_configs() if config.label != "flow"}
+
+
+def off_apps(scope: Scope) -> dict[str, LiveAppConfig]:
+    """The installed modules that are not on in ``scope``'s business (turned off, or without the right to them): what
+    an automation built before still names, and the editor says why it is missing."""
+    active = active_apps(scope)
+    return {label: config for label, config in installed_apps().items() if label not in active}
+
+
+def _app_name(label: str) -> str:
+    return str(installed_apps()[label].verbose_name)
+
+
 def active_apps(scope: Scope) -> dict[str, LiveAppConfig]:
     """The modules active in ``scope``'s business, but this one, as the platform's relay resolves them."""
     active = relay.active_apps(scope)
-    return {
-        config.label: config
-        for config in module_configs()
-        if config.label != "flow" and config.label in active
-    }
+    return {label: config for label, config in installed_apps().items() if label in active}
 
 
 def catalog_events(scope: Scope) -> dict[str, LiveAppConfig]:
     """``{event name: its app}``: the ``events.ALL`` of every active app."""
+    return _events_of(active_apps(scope))
+
+
+def _events_of(apps: dict[str, LiveAppConfig]) -> dict[str, LiveAppConfig]:
     found: dict[str, LiveAppConfig] = {}
-    for label, config in active_apps(scope).items():
+    for label, config in apps.items():
         module_name = f"{config.name}.events"
         if find_spec(module_name) is None:
             continue
@@ -156,7 +179,10 @@ def catalog_events(scope: Scope) -> dict[str, LiveAppConfig]:
 def grantable_operations(scope: Scope) -> dict[str, Operation]:
     """``{operation name: operation}`` of the active apps whose permission the app declares: what a
     person can be granted (the platform-only reactions are left out)."""
-    apps = active_apps(scope)
+    return _grantable_of(active_apps(scope))
+
+
+def _grantable_of(apps: dict[str, LiveAppConfig]) -> dict[str, Operation]:
     granted: dict[str, Operation] = {}
     for name, op in registry.items():
         config = apps.get(op.app_label)
@@ -347,9 +373,11 @@ def read_catalog(ctx: OperationContext, data: CatalogIn) -> dict:
             }
             for name, op in ask_first_catalog(ctx.scope).items()
         ]
+        off = [{"app": label, "app_name": str(config.verbose_name)} for label, config in off_apps(ctx.scope).items()]
     return {
         "events": sorted(events, key=lambda event: (event["app"], event["name"])),
         "actions": sorted(actions, key=lambda action: (action["app"], action["name"])),
+        "off_apps": sorted(off, key=lambda app: app["app"]),
     }
 
 
@@ -366,6 +394,9 @@ def operation_problem(
         return None
     op = grantable_operations(scope).get(name)
     if op is None:
+        off = _grantable_of(installed_apps()).get(name)
+        if off is not None:
+            return "invalid_payload", str(OFF_ACTION) % {"name": name, "app": _app_name(off.app_label)}
         return "invalid_payload", str(UNKNOWN_ACTION) % {"name": name}
     if needs_a_person(op) and not (asking and asks_first(op)):
         message = ASK_FIRST_ONLY if kind is None and asks_first(op) else HIGH_RISK
@@ -453,7 +484,12 @@ def catalog_problems(scope: Scope, trigger: Any, steps: list[Any]) -> tuple[dict
     problems: dict[str, str] = {}
     code = "invalid_payload"
     if trigger is not None and trigger.kind == "event" and trigger.event not in catalog_events(scope):
-        problems["trigger.event"] = str(UNKNOWN_EVENT) % {"name": trigger.event}
+        off = _events_of(installed_apps()).get(trigger.event)
+        problems["trigger.event"] = (
+            str(OFF_EVENT) % {"name": trigger.event, "app": str(off.verbose_name)}
+            if off is not None
+            else str(UNKNOWN_EVENT) % {"name": trigger.event}
+        )
     kept = None
     for index, step in enumerate(steps):
         if step.kind == "http":
@@ -532,13 +568,13 @@ def resolve_flow(
     return flow
 
 
-def trigger_of(scope: Scope, flow: Flow) -> dict[str, Any]:
+def trigger_of(flow: Flow) -> dict[str, Any]:
     """The trigger of ``flow`` as the document writes it."""
     if flow.trigger_kind == Flow.Trigger.EVENT:
         return {
             "kind": "event",
             "event": flow.trigger_event,
-            "filter": recipes.fixed_filter(scope, flow),
+            "filter": recipes.fixed_filter(flow),
         }
     if flow.trigger_kind == Flow.Trigger.SCHEDULE:
         schedule = flow.schedule
@@ -563,7 +599,7 @@ def with_last_run(flows: QuerySet[Flow]) -> QuerySet[Flow]:
     )
 
 
-def flow_row(scope: Scope, flow: Flow) -> dict[str, Any]:
+def flow_row(flow: Flow) -> dict[str, Any]:
     """What ``FlowOut`` shows of an automation (annotated with ``with_last_run`` or not). Not annotated, it
     reads its last run again: only for a row the caller has just written or holds locked; a plain read
     takes it annotated from ``resolve_flow(rows=…)``."""
@@ -574,8 +610,8 @@ def flow_row(scope: Scope, flow: Flow) -> dict[str, Any]:
         "id": flow.id,
         "name": flow.name,
         "enabled": flow.enabled,
-        "trigger": trigger_of(scope, flow),
-        "steps": recipes.fixed_data(scope, flow, flow.steps),
+        "trigger": trigger_of(flow),
+        "steps": recipes.fixed_data(flow, flow.steps),
         "grants": flow.grants,
         "required_grants": required,
         "missing_grants": [name for name in required if name not in flow.grants],
@@ -594,7 +630,7 @@ def flow_row(scope: Scope, flow: Flow) -> dict[str, Any]:
             if flow.last_run_id
             else None
         ),
-        "fixed_by_app": recipes.fixed_by_app(scope, flow),
+        "fixed_by_app": recipes.fixed_by_app(flow),
     }
 
 
@@ -628,7 +664,7 @@ def list_flows(ctx: OperationContext, data: FlowListIn) -> dict:
         data.offset : data.offset + data.limit
     ]
     return {
-        "rows": [flow_row(ctx.scope, flow) for flow in page],
+        "rows": [flow_row(flow) for flow in page],
         "total": total,
         "limit": data.limit,
         "offset": data.offset,
@@ -647,7 +683,7 @@ def list_flows(ctx: OperationContext, data: FlowListIn) -> dict:
     },
 )
 def flow_detail(ctx: OperationContext, data: FlowRefIn) -> dict:
-    return flow_row(ctx.scope, resolve_flow(data.id, data.flow, rows=with_last_run(live_flows())))
+    return flow_row(resolve_flow(data.id, data.flow, rows=with_last_run(live_flows())))
 
 
 @operation(
@@ -1529,7 +1565,7 @@ def proposal_of(scope: Scope, question: Question) -> tuple[Operation, dict] | No
         arguments = json.loads(proposal.get("arguments") or "{}")
     except ValueError:
         arguments = {}
-    step = recipes.fixed_data(scope, question.flow, run.definition["steps"])[run.step_index]
+    step = recipes.fixed_data(question.flow, run.definition["steps"])[run.step_index]
     fixed, empty = pinned_values(run, step, op.name)
     sent = {name: value for name, value in (arguments if isinstance(arguments, dict) else {}).items() if name not in empty}
     return op, {**sent, **fixed}

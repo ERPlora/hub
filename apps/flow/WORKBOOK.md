@@ -405,7 +405,9 @@ Si falla: un aviso que no existe en el negocio, un horario sin hora o una fecha 
 servidor al guardar, junto al campo. La fecha solo se mira si cambia: una automatización «Una vez» que ya
 se disparó se puede renombrar o pausar. Si la app de un aviso ya guardado se apaga después, la
 automatización se conserva como estaba; mientras esté apagada no empieza con avisos nuevos de esa app. Al
-volver a encenderla, sus avisos vuelven a poder arrancarla.
+volver a encenderla, sus avisos vuelven a poder arrancarla. Mientras tanto, el editor lo dice junto al aviso
+(«Su app, Tareas, está apagada en este negocio: enciéndela en Apps o elige otro aviso.») y guardar desde él lo
+rechaza con ese mismo motivo, nunca con «no existe».
 Implicados: FLOW-F21, FLOW-F22, FLOW-F15
 
 ### FLOW-F11 Añadir, ordenar y rellenar los pasos
@@ -467,7 +469,9 @@ llegan, enseña los datos de los pasos anteriores sin cerrarla; nunca «Todavía
 paso delante. Si no se pueden leer, lo dice dentro, en rojo, con **Reintentar**. Si una ejecución llega a
 una acción o consulta cuya app se apagó después de guardar la automatización, se para y Historial dice que
 esa acción ya no está disponible; la automatización y lo que hicieron los pasos anteriores se conservan.
-Tras volver a encender la app, **Reanudar desde el paso que falló** la continúa desde ahí (FLOW-F24).
+Mientras esté apagada, el editor lo dice junto al paso («Su app, Tareas, está apagada en este negocio:
+enciéndela en Apps o elige otra acción.») y guardar desde él lo rechaza con ese mismo motivo. Tras volver a
+encender la app, **Reanudar desde el paso que falló** la continúa desde ahí (FLOW-F24).
 Implicados: FLOW-F12, FLOW-F13, FLOW-F16, FLOW-F24
 
 ### FLOW-F12 Conceder y retirar los permisos
@@ -1384,7 +1388,13 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   que `base.relay.active_apps(ctx.scope)` resuelve con los derechos del SaaS y `base.activation.off_apps`, la
   misma lectura que usa el relay y la guarda de operaciones; `queries.active_apps` solo descarta `flow` y
   devuelve sus configuraciones. Una acción de una app apagada después de guardarla deja la ejecución en
-  `flow.action_unavailable`, sin borrar la automatización; se reanuda tras encenderla (hub#1054).
+  `flow.action_unavailable`, sin borrar la automatización; se reanuda tras encenderla (hub#1054). El catálogo
+  dice también las apps apagadas (`off_apps`), para que el editor explique un paso o un aviso que falta, y al
+  guardar el motivo es `OFF_ACTION`/`OFF_EVENT`, no «no existe». Lo que una receta fija (`fixed_filter`,
+  `fixed_by_app`, `fixed_data`) se lee de todas las apps instaladas, encendidas o no (`recipes.declarations()`
+  sin negocio): una ejecución en curso que se reanuda con herramientas de otra app encendida nunca pierde lo que
+  su app fijó (hub#447). El motor programado corre en el negocio de cada hub: el worker pasa
+  `Scope("host", <slug>)` a `scheduler.run_due` (`base.worker._serve_hub`).
 - **La excepción «Que me lo pregunte»** (revisión 2026-10-30, FIX-HUB-FLOW-ASK-ME-FIRST-CANNOT-GRANT-A-CANCELLATION):
   `queries.ASK_FIRST` (`reservation.reservation.cancel` y, desde hub#634, `appointment.appointment.cancel`; nunca lo
   que se hace en persona, `asks_first`)
@@ -1793,8 +1803,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   `delete` son `risk: "high"` (el asistente confirma antes).
 - **`@operation` no aplicaba la app activa** en la fase 1: el catálogo de esta app filtra por las apps
   instaladas y el motor comprueba que la operación sigue en él al ejecutar. Resuelta en la plataforma: rechaza
-  la operación de una app apagada en el negocio («app_inactive», `base.entitlement.operation_database`). El
-  catálogo sigue filtrando por las instaladas, no por las encendidas en el negocio (hub#1054).
+  la operación de una app apagada en el negocio («app_inactive», `base.entitlement.operation_database`), y desde
+  hub#1054 el catálogo ofrece solo las encendidas en el negocio.
 
 ## Qué queda fuera
 

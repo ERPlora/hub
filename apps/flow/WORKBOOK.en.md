@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a67320edd3cbe40b58a6e47e586584c156fe4f83d784cff0577e9b34be88d33f -->
+<!-- generated from WORKBOOK.md sha256:52279a27eead66e33b5468a6232c03c4953db354d8d1fdeb28632e5177bc4d43 -->
 
 ## What it is for and who it is for
 
@@ -379,7 +379,9 @@ If it fails: a notice that does not exist in the business, a schedule without a 
 refused by the server on saving, next to the field. The date is only looked at if it changes: a "Once"
 automation that already fired can be renamed or paused. If the app of an already saved notice is turned off
 afterwards, the automation is kept as it was; while it is off, no new notices from that app start it. Once
-the app is on again, its notices can start it again.
+the app is on again, its notices can start it again. Meanwhile, the editor says so next to the notice ("Its app,
+Tasks, is off in this business: turn it on in Apps, or choose another event.") and saving from it is refused with
+that same reason, never with "does not exist".
 Involved: FLOW-F21, FLOW-F22, FLOW-F15
 
 ### FLOW-F11 Add, order and fill in the steps
@@ -439,8 +441,9 @@ opens before the actions of the apps arrive (right after entering the editor), i
 they arrive, shows the data of the previous steps without closing it; never "There is no data to insert here yet"
 with a step before it. If they cannot be read, it says so inside, in red, with **Retry**. If a run reaches
 an action or query whose app was turned off after the automation was saved, it stops and History says that
-the action is no longer available; the automation and what the previous steps did are kept. After turning
-the app on again, **Resume from the step that failed** carries it on from there (FLOW-F24).
+the action is no longer available; the automation and what the previous steps did are kept. While it is off,
+the editor says so next to the step ("Its app, Tasks, is off in this business: turn it on in Apps, or choose
+another action.") and saving from it is refused with that same reason. After turning the app on again, **Resume from the step that failed** carries it on from there (FLOW-F24).
 Involved: FLOW-F12, FLOW-F13, FLOW-F16, FLOW-F24
 
 ### FLOW-F12 Grant and withdraw the permissions

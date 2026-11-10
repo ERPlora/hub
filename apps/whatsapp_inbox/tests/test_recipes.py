@@ -8,6 +8,7 @@ import pytest
 from django.utils import translation
 
 from apps.flow import document, queries, recipes
+from apps.flow.models import Flow
 from apps.flow.tests.test_recipes import without
 from apps.whatsapp_inbox import recipes as inbox_recipes
 from apps.whatsapp_inbox.recipes import RECIPES
@@ -492,3 +493,20 @@ def test_each_permission_says_why_in_both_languages(ref):
     assert all(reason and reason != recipes.reasons(recipe, "en")[name]
                for name, reason in recipes.reasons(recipe, "es").items())
     assert recipes.words(recipe, "es")["name"] != recipes.words(recipe, "en")["name"]
+
+
+def test_what_the_booking_answer_fixes_holds_while_whatsapp_is_off(django_capture_on_commit_callbacks):
+    """An app's safety fix is not an offer (hub#447, FLOW-F36/F37): with WhatsApp off, an answer built before it fixed
+    whose card the assistant acts for still gets those data, so a run already under way that is resumed (Appointments
+    is still on) never acts for another customer. Only the gallery and the catalog depend on the app being on."""
+    flow_id = str(run("flow.recipe.enable", {"recipe": BOOKING_REF}, ctx_for("hub_owner")).flow.id)
+    flow = Flow.objects.get(pk=flow_id)
+    fixed = next(step for step in flow.steps if step["kind"] == "assistant")["pinned"]
+    flow.steps = [{key: value for key, value in step.items() if key != "pinned"} for step in flow.steps]
+    flow.save(update_fields=["steps"])
+    with django_capture_on_commit_callbacks(execute=True):
+        run("base.app.disable", {"app": "whatsapp_inbox"})
+    assert "whatsapp_inbox" not in queries.active_apps(A)
+
+    shown = run("flow.flow.detail", {"id": flow_id}).model_dump(mode="json")
+    assert next(step for step in shown["steps"] if step["kind"] == "assistant").get("pinned") == fixed

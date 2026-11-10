@@ -63,7 +63,7 @@ def declared(monkeypatch):
     def plant(*found: tuple[str, dict]) -> None:
         apps = queries.active_apps(A)
         monkeypatch.setattr(
-            recipes, "declarations", lambda _scope: [(apps[label], recipe) for label, recipe in found]
+            recipes, "declarations", lambda _scope=None: [(apps[label], recipe) for label, recipe in found]
         )
 
     return plant

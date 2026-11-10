@@ -18,7 +18,7 @@ from apps.flow import events
 from apps.flow.models import Flow, FlowRun
 from apps.task.models import Task
 
-from .conftest import A, TASK_STEP, make_flow, make_run, run
+from .conftest import A, TASK_STEP, due_daily_flow, make_flow, make_run, run
 
 pytestmark = pytest.mark.django_db
 
@@ -326,6 +326,22 @@ def test_an_action_whose_app_is_gone_is_unavailable(django_capture_on_commit_cal
         "",
     )
     assert Task.objects.count() == 1
+
+
+def test_a_scheduled_run_on_the_worker_s_pass_stops_at_an_action_whose_app_is_off(monkeypatch, django_capture_on_commit_callbacks):
+    """The worker runs a hub's due schedules on that hub's own scope (``base.worker._serve_hub``): there, Tasks is off,
+    so the step stops as unavailable and nothing is created; on the platform's scope nothing would be off."""
+    from live.context import system_context
+
+    flow = due_daily_flow(monkeypatch)
+    with django_capture_on_commit_callbacks(execute=True):
+        run("base.app.disable", {"app": "task"})
+
+    assert run("flow.schedule.fire_due", {}, system_context(A)).count == 1
+
+    stopped = FlowRun.objects.get(flow=flow)
+    assert (stopped.status, stopped.error_code) == (FlowRun.Status.FAILED, "flow.action_unavailable")
+    assert Task.objects.count() == 0
 
 
 def test_an_unexpected_failure_of_a_step_is_kept_and_visible(monkeypatch, caplog):

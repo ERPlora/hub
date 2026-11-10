@@ -93,10 +93,14 @@ class SetAside:
         return f"{self.app.label}/{self.declaration.get('id', '')}"
 
 
-def declarations(scope: Scope) -> list[tuple[LiveAppConfig, dict]]:
-    """Every recipe the active apps declare in their ``recipes.py``, in the order of the apps and of each list."""
+def declarations(scope: Scope | None = None) -> list[tuple[LiveAppConfig, dict]]:
+    """Every recipe the apps declare in their ``recipes.py``, in the order of the apps and of each list: those on in
+    ``scope``'s business (what the gallery offers), or, without one, every installed app's, on or off — what an app
+    fixes on the automations built from its recipe holds while it is off (hub#447, FLOW-F36): a run already under way
+    may be resumed with the tools of another app that is still on."""
+    apps = queries.active_apps(scope) if scope is not None else queries.installed_apps()
     found: list[tuple[LiveAppConfig, dict]] = []
-    for label, config in sorted(queries.active_apps(scope).items()):
+    for label, config in sorted(apps.items()):
         if not module_has_submodule(config.module, "recipes"):
             continue
         for declared in getattr(import_module(f"{config.name}.recipes"), "RECIPES", []):
@@ -248,35 +252,35 @@ def missing_clauses(recipe: Recipe, flow: Flow) -> dict[str, dict[str, Any]]:
     return _missing(recipe.declaration, flow)
 
 
-def _declaring(scope: Scope, ref: str) -> tuple[LiveAppConfig, dict] | None:
-    """The active app that brings ``ref`` and what it declares for it today, as it is (set aside or not: a fix it
-    makes must reach the automations built from it all the same); ``None`` when no active app does."""
-    for config, declared in declarations(scope):
+def _declaring(ref: str) -> tuple[LiveAppConfig, dict] | None:
+    """The installed app that brings ``ref`` and what it declares for it today, as it is (set aside or not, on or off:
+    a fix it makes must reach the automations built from it all the same); ``None`` when no installed app does."""
+    for config, declared in declarations():
         if isinstance(declared, dict) and f"{config.label}/{declared.get('id', '')}" == ref:
             return config, declared
     return None
 
 
-def _declared(scope: Scope, ref: str) -> dict | None:
-    found = _declaring(scope, ref)
+def _declared(ref: str) -> dict | None:
+    found = _declaring(ref)
     return found[1] if found else None
 
 
-def fixed_filter(scope: Scope, flow: Flow) -> dict[str, Any]:
+def fixed_filter(flow: Flow) -> dict[str, Any]:
     """``flow``'s «Only when…» with the clauses its recipe has today and it lacks, whenever it was built: it never
     starts in a case its app excludes, and without waiting for anybody (FLOW-F36). A clause the owner put on the same
     datum is theirs; one that starts on another event gets none."""
-    declared = _declared(scope, flow.recipe) if flow.recipe else None
+    declared = _declared(flow.recipe) if flow.recipe else None
     missing = _missing(declared, flow) if declared else {}
     return {**flow.trigger_filter, **missing} if missing else flow.trigger_filter
 
 
-def fixed_by_app(scope: Scope, flow: Flow) -> dict[str, Any] | None:
+def fixed_by_app(flow: Flow) -> dict[str, Any] | None:
     """What its app fixes today on ``flow`` and is not taken off from it (FLOW-F36): the data its recipe's «Only
     when…» has a condition on (while it starts on that ``event``) and, by step id and tool, the data its «Ask the
-    assistant» steps fix; ``None`` when no active app's recipe built it or it fixes nothing. A copy has no recipe: what
+    assistant» steps fix; ``None`` when no installed app's recipe built it or it fixes nothing. A copy has no recipe: what
     its app fixed is the owner's there."""
-    found = _declaring(scope, flow.recipe) if flow.recipe else None
+    found = _declaring(flow.recipe) if flow.recipe else None
     if found is None:
         return None
     config, declared = found
@@ -298,12 +302,12 @@ def fixed_by_app(scope: Scope, flow: Flow) -> dict[str, Any] | None:
     }
 
 
-def fixed_data(scope: Scope, flow: Flow, steps: list[dict]) -> list[dict]:
+def fixed_data(flow: Flow, steps: list[dict]) -> list[dict]:
     """``steps`` of ``flow`` with the data its recipe fixes today on its «Ask the assistant» steps (``pinned``,
     FLOW-F37) that they leave to the assistant, whenever it was built: an app's safety fix never waits for the owner
     (FLOW-F36). By step id, only for the tools the step still offers and only the data nobody fixed there: what the
     owner fixed stays, and the rest of each step and every other step are as they are."""
-    declared = _declared(scope, flow.recipe) if flow.recipe else None
+    declared = _declared(flow.recipe) if flow.recipe else None
     wanted = {
         step.get("id"): step["pinned"]
         for step in (declared or {}).get("steps") or []

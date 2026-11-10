@@ -157,6 +157,17 @@ def test_an_app_that_is_not_active_is_not_in_the_catalog():
     assert not any(action.app == "task" for action in catalog.actions)
 
 
+def test_the_catalog_names_the_apps_that_are_off_so_the_editor_can_say_why_a_step_is_missing(
+    django_capture_on_commit_callbacks,
+):
+    assert "task" not in [app.app for app in run("flow.catalog.read").off_apps]
+    with django_capture_on_commit_callbacks(execute=True):
+        run("base.app.disable", {"app": "task"})
+    off = run("flow.catalog.read").off_apps
+    assert {"app": "task", "app_name": "Tasks"} in [app.model_dump() for app in off]
+    assert "flow" not in [app.app for app in off]
+
+
 def test_the_catalog_needs_view():
     with pytest.raises(PermissionDenied):
         run("flow.catalog.read", ctx=ctx_for("hub_manager"))

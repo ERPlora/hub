@@ -206,7 +206,7 @@ def _taken_off(ctx: OperationContext, flow: Flow, trigger: Any, steps: list[Any]
     """Refuses, by field, a change that leaves out what its app fixes on ``flow`` (FLOW-F36): a condition of its «Only
     when…» while it starts on the recipe's event, or a datum of an «Ask the assistant» step (or leaves it empty) while
     that step may use its tool. Saved, it would come back on reading it without a word."""
-    fixed = recipes.fixed_by_app(ctx.scope, flow)
+    fixed = recipes.fixed_by_app(flow)
     if fixed is None:
         return
     problems: dict[str, str] = {}
@@ -317,7 +317,7 @@ def create_flow(ctx: OperationContext, data: CreateIn) -> dict:
         record_event(
             ctx, events.DRAFT_USED, {"id": str(draft.id), "flow_id": str(flow.id)}
         )
-    return flow_row(ctx.scope, flow)
+    return flow_row(flow)
 
 
 @operation(
@@ -378,7 +378,7 @@ def update_flow(ctx: OperationContext, data: UpdateIn) -> dict:
         record_event(
             ctx, events.FLOW_UPDATED, {"id": str(flow.id), "version": flow.version}
         )
-    return flow_row(ctx.scope, flow)
+    return flow_row(flow)
 
 
 @operation(
@@ -397,7 +397,7 @@ def update_flow(ctx: OperationContext, data: UpdateIn) -> dict:
 def set_enabled(ctx: OperationContext, data: EnabledIn) -> dict:
     flow = resolve_flow(data.id, data.flow, lock=True)
     _switch(ctx, flow, data.enabled)
-    return flow_row(ctx.scope, flow)
+    return flow_row(flow)
 
 
 def _switch(ctx: OperationContext, flow: Flow, enabled: bool) -> None:
@@ -438,10 +438,10 @@ def duplicate_flow(ctx: OperationContext, data: FlowRefIn) -> dict:
         enabled=False,
         trigger_kind=original.trigger_kind,
         trigger_event=original.trigger_event,
-        trigger_filter=recipes.fixed_filter(ctx.scope, original),
+        trigger_filter=recipes.fixed_filter(original),
         schedule=original.schedule,
         run_at=original.run_at,
-        steps=recipes.fixed_data(ctx.scope, original, original.steps),
+        steps=recipes.fixed_data(original, original.steps),
         language=ctx.language,
         created_by=_actor(ctx),
         updated_by=_actor(ctx),
@@ -449,7 +449,7 @@ def duplicate_flow(ctx: OperationContext, data: FlowRefIn) -> dict:
     refresh_search_text(copy)
     copy.save()
     record_event(ctx, events.FLOW_CREATED, {"id": str(copy.id)})
-    return flow_row(ctx.scope, copy)
+    return flow_row(copy)
 
 
 @operation(
@@ -532,7 +532,7 @@ def grant(ctx: OperationContext, data: GrantIn) -> dict:
     flow.updated_by = _actor(ctx)
     flow.save(update_fields=["grants", "updated_by", "updated_at"])
     record_event(ctx, events.FLOW_GRANTED, {"id": str(flow.id)})
-    return flow_row(ctx.scope, flow)
+    return flow_row(flow)
 
 
 # --- The ready-made automations the apps bring (FLOW-F33 to F36) -------------------------------------
@@ -603,7 +603,7 @@ def enable_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
         else:
             for name in (events.FLOW_CREATED, events.FLOW_GRANTED, events.FLOW_ENABLED):
                 record_event(ctx, name, {"id": str(flow.id)})
-            return {"created": True, "flow": flow_row(ctx.scope, flow)}
+            return {"created": True, "flow": flow_row(flow)}
     if not flow.grants:
         # Left with no permission at all, it could do nothing: «on» means working, so it gets the recipe's.
         flow.grants = wanted
@@ -611,7 +611,7 @@ def enable_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
         flow.save(update_fields=["grants", "updated_by", "updated_at"])
         record_event(ctx, events.FLOW_GRANTED, {"id": str(flow.id)})
     _switch(ctx, flow, True)
-    return {"created": False, "flow": flow_row(ctx.scope, flow)}
+    return {"created": False, "flow": flow_row(flow)}
 
 
 @operation(
@@ -629,7 +629,7 @@ def enable_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
 def disable_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
     flow = _recipe_flow(data.recipe)
     _switch(ctx, flow, False)
-    return flow_row(ctx.scope, flow)
+    return flow_row(flow)
 
 
 @operation(
@@ -657,7 +657,7 @@ def restore_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
     record_event(ctx, events.FLOW_UPDATED, {"id": str(flow.id), "version": flow.version})
     if granted:
         record_event(ctx, events.FLOW_GRANTED, {"id": str(flow.id)})
-    return flow_row(ctx.scope, flow)
+    return flow_row(flow)
 
 
 @operation(
@@ -677,7 +677,7 @@ def repair_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
     recipe = recipes.find(ctx.scope, data.recipe)
     flow = _recipe_flow(recipe.ref)
     missing = recipes.missing_clauses(recipe, flow)
-    steps = recipes.fixed_data(ctx.scope, flow, flow.steps)
+    steps = recipes.fixed_data(flow, flow.steps)
     if missing or steps != flow.steps:
         flow.trigger_filter = {**flow.trigger_filter, **missing}
         flow.steps = steps
@@ -685,7 +685,7 @@ def repair_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
         flow.updated_by = _actor(ctx)
         flow.save(update_fields=["trigger_filter", "steps", "version", "updated_by", "updated_at"])
         record_event(ctx, events.FLOW_UPDATED, {"id": str(flow.id), "version": flow.version})
-    return flow_row(ctx.scope, flow)
+    return flow_row(flow)
 
 
 # --- Secrets (FLOW-F26) ------------------------------------------------------------------------------
@@ -1230,7 +1230,7 @@ def _instructions(ctx: OperationContext, flow: Flow, step: dict) -> str:
 def _step_of(ctx: OperationContext, run: FlowRun, flow: Flow) -> dict:
     """The step ``run`` is on, as its automation was when it started, with the data its app fixes today (FLOW-F36):
     also a run started before its app fixed them."""
-    return recipes.fixed_data(ctx.scope, flow, run.definition["steps"])[run.step_index]
+    return recipes.fixed_data(flow, run.definition["steps"])[run.step_index]
 
 
 def _assistant_run(ctx: OperationContext, run_id: uuid.UUID) -> tuple[FlowRun | None, dict]:
@@ -1888,7 +1888,7 @@ def react(ctx: OperationContext, data: ReactIn) -> dict:
             skipped += 1
             continue
         # What its recipe excludes today counts too, whenever it was built (FLOW-F36).
-        wanted = recipes.fixed_filter(ctx.scope, flow)
+        wanted = recipes.fixed_filter(flow)
         if not document.readable(wanted):
             # Never «does not hold» in silence (hub#1766): the owner reads why in its history.
             run = _start(
