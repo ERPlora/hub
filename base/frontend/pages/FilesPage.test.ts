@@ -419,7 +419,7 @@ describe('FilesPage · open and download (BASE-G84)', () => {
     await flush();
     expect(fetchFile).toHaveBeenCalledWith('/api/files/raw?path=marzo.pdf', 'application/pdf');
     expect(mocks.saveFile).toHaveBeenCalledWith('marzo.pdf', blob, expect.any(Function));
-    const t = mocks.saveFile.mock.calls[0][2] as (key: string, values: object) => string;
+    const t = (mocks.saveFile.mock.calls[0] as unknown[])[2] as (key: string, values: object) => string;
     expect(t('base.download.savedTo', { path: 'Download/x' })).toBe('Saved to Download/x');
   });
 
