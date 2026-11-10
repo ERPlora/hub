@@ -2820,7 +2820,8 @@
       "addPin": "Fix a datum",
       "choosePin": "Choose a datum",
       "removePin": "Unfix «{datum}»",
-      "pinnedHint": "The assistant never sees them nor can change them: they are filled in when it is asked, and a tool whose fixed datum is empty is not used."
+      "pinnedHint": "The assistant never sees them nor can change them: they are filled in when it is asked, and a tool whose fixed datum is empty is not used.",
+      "toolOff": "«{action}» is from {app}, which is off in this business: turn it on in Apps, or remove it."
     }
   }
 }

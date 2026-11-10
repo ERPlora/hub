@@ -2820,7 +2820,8 @@
       "addPin": "Fijar un dato",
       "choosePin": "Elige un dato",
       "removePin": "Quitar «{datum}»",
-      "pinnedHint": "El asistente no los ve ni puede cambiarlos: se rellenan al pedírselo, y una herramienta con un dato fijo vacío no se usa."
+      "pinnedHint": "El asistente no los ve ni puede cambiarlos: se rellenan al pedírselo, y una herramienta con un dato fijo vacío no se usa.",
+      "toolOff": "«{action}» es de {app}, que está apagada en este negocio: enciéndela en Apps o quítala."
     }
   }
 }
