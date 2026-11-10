@@ -6,9 +6,9 @@ Every tool of an app listed in ``LIVE_ASSISTANT_ASKS_REQUIRED`` says what a pers
 ``ALWAYS`` first, the same ``APP_WORDS``, the Hub's own ``SYNONYMS`` and ``HOWTO``), brings its tool among the first ten
 offered, against the real catalogue of each role of the Hub (``base.assistant.catalog`` of a member of business ``a``,
 which has every module on: the largest catalogue a role can have). What a role may not run is not in its catalogue at
-all. An app joins the list in the same pull request that completes its asks, and stays in it while they are complete;
-the ones still missing are reported per app (``AsksBacklog``), never failed. How many asks of each listed app reach
-their tool without their own words (``own_asks=False``: how a person's new phrase would) is reported too
+all. An app joins the list in the same pull request that completes its asks, and stays in it while any of its tools
+says one; the ones still missing are reported per app (``AsksBacklog``), never failed. How many asks of each listed
+app reach their tool without their own words (``own_asks=False``: how a person's new phrase would) is reported too
 (``AsksReach``), never failed.
 """
 
@@ -118,13 +118,18 @@ def completed() -> set[str]:
     return {op.app_label for op in tools} - short
 
 
+def started() -> set[str]:
+    """The apps with a tool that says any ask: asks are written in the pull request that lists their app, so an app
+    taken off the list while its other tools still say theirs is seen."""
+    return {op.app_label for op in registry.values() if assistant.is_tool(op) and any(shared.asks_of(op).values())}
+
+
 def test_the_listed_apps_are_the_ones_that_completed_their_asks():
-    """An app whose tools all say their asks is listed, and stays listed while they do: one left out of
-    ``LIVE_ASSISTANT_ASKS_REQUIRED`` (forgotten, or taken off it) escapes the sweep; one listed without them fails
-    it (hub#1144)."""
-    done = completed()
-    assert sorted(done - set(LISTED)) == []
-    assert sorted(set(LISTED) - done) == []
+    """An app whose tools say asks is listed, and stays listed: one left out of ``LIVE_ASSISTANT_ASKS_REQUIRED``
+    (forgotten, or taken off it to quiet the sweep when a new tool came without its asks) escapes the sweep; one listed
+    without them all fails it (hub#1144)."""
+    assert sorted(started() - set(LISTED)) == []
+    assert sorted(set(LISTED) - completed()) == []
 
 
 def test_live_asks_nothing_more_of_the_listed_apps():
