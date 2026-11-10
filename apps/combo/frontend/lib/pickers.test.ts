@@ -1,6 +1,6 @@
 // The searches behind the combo pickers (Combo of @erplora/ui): they ask the server for what the person
 // types (20 at a time) and turn each row into an option. A choice is an active product of Inventory, by
-// id, named with its SKU and its price (in the business's currency; a bare figure until it answers); a menu's VAT
+// id, named with its SKU and its price (in the business's currency; a dash until it answers); a menu's VAT
 // category is a Taxes key, named by its name and rate.
 import type { LiveClient } from '@erplora/ui/sdk';
 import { describe, expect, it, vi } from 'vitest';
@@ -33,11 +33,11 @@ describe('searchProducts', () => {
     expect(options.map((o) => ({ ...o, hint: plain(o.hint ?? '') }))).toEqual([{ id: 'p1', label: 'Hake', hint: 'HAK · 14,00 zł' }]);
   });
 
-  it('names the price in the business currency with its decimals, and as a bare figure until it answers', async () => {
+  it('names the price in the business currency with its decimals, and as a dash until it answers', async () => {
     const portion = { unit: 'ud', pricing_unit: 'ud', price_quantity: '1.000' };
     const { client: c } = client([{ id: 'p1', name: 'Hake', sku: 'HAK', price: 1400, ...portion }]);
     expect((await searchProducts(c, 'en', JPY)('')).map((o) => o.hint)).toEqual(['HAK · ¥1,400']);
-    expect((await searchProducts(c, 'es')('')).map((o) => o.hint)).toEqual(['HAK · 14,00']);
+    expect((await searchProducts(c, 'es')('')).map((o) => o.hint)).toEqual(['HAK · —']);
   });
 
   it('opening the list asks without a search', async () => {

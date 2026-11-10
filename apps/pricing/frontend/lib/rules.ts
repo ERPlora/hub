@@ -7,7 +7,7 @@ import { formatMoney, formatPercent, formatQuantity, type Money } from './format
 
 type Translate = (key: string, named?: Record<string, unknown>) => string;
 
-/** A rule's value; an amount per unit in the business's `money` (a bare figure until it answers). */
+/** A rule's value; an amount per unit in the business's `money` (a dash until it answers). */
 export function ruleValueLabel(rule: RuleOut, t: Translate, locale: string, money?: Money): string {
   switch (rule.rule_type) {
     case 'percent':

@@ -3,8 +3,8 @@
 // service-business-currency; `useBusinessMoney`, the platform's: its country's currency with the decimals the
 // server counts it in, never the browser's Intl, which gives the forint none): 1500 is ¥1,500 in Japan and
 // 15,00 € in Spain, as Sales charges it, written with the platform's `formatMoney`: its thousands grouped from four
-// digits on, as every screen writes them. Until the business answers an amount is a figure without a symbol, never
-// the euro by default. A percentage discount travels in basis points (1050 = 10,50 %): the form writes and reads
+// digits on, as every screen writes them. Until the business answers an amount is a dash, never
+// the euro by default nor guessed decimals. A percentage discount travels in basis points (1050 = 10,50 %): the form writes and reads
 // it as a percentage with at most two decimals.
 import type { Money } from '../../../../base/frontend/lib/home';
 

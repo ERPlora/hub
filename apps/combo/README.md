@@ -66,8 +66,8 @@ pnpm e2e tests/e2e/combo-menus.spec.ts tests/e2e/combo-till.spec.ts tests/e2e/co
 - `combo-business-currency.spec.ts`: la lista de menús, el constructor (precio cerrado y suplementos) y los
   campos de importe en la moneda del negocio (el negocio `a` en Polonia, en złoty, en 390, 834 y 1440, y de
   vuelta en España, en euros). Los importes se pintan y se leen con `base.business.get` (`useBusinessMoney`),
-  con los decimales que cuenta el servidor; mientras el negocio no contesta, una cifra sin símbolo, nunca un
-  euro.
+  con los decimales que cuenta el servidor; mientras el negocio no contesta, un importe es «—», nunca un
+  euro ni decimales supuestos.
 
 ## Qué queda fuera
 

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6c0aa9e5bdc463396a60f119dbf5a3b64ecb0edf3de1cb6aff6dc2bdec7706fa -->
+<!-- generated from WORKBOOK.md sha256:d654645209b1be37cdbc28f216374bc565f24bc92b03a63ee9259aebfb9d88cf -->
 
 ## What it is for and who it is for
 
@@ -81,8 +81,8 @@ Active, Inactive, On leave), **Bookable**, **Buffer between appointments (min)**
 (%)**. Row actions for the owner and the administrator: **Deactivate** and **Terminate**, both with a
 confirmation. The rate (in the column, in the form and in "My record") is in the business's currency, its
 country's in Settings → Business (euros in Spain, złoty in Poland), with its decimals (the yen has none) and
-its symbol at the end of the field; while the business has not answered, a figure without a symbol, never
-euros.
+its symbol at the end of the field; while the business has not answered, an amount is "—", never euros or guessed
+decimals.
 
 ### Roles
 Table with the search "Search role…" and columns **Role, Description, Members** (how many **Active**
