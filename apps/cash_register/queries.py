@@ -983,12 +983,12 @@ def current_session(ctx: OperationContext, params: EmptyIn) -> dict:
         "asks": {
             "en": (
                 "show me the report of session S-261014-0001",
-                "how did yesterday's till shift go?",
+                "how did Monday's till shift go?",
                 "what difference did last night's session give and with what float did it start?",
             ),
             "es": (
                 "enséñame el informe de la sesión S-261014-0001",
-                "¿cómo fue el turno de caja de ayer?",
+                "¿cómo fue el turno de caja del lunes?",
                 "¿qué diferencia dio la sesión de anoche y con cuánto fondo empezó?",
             ),
         },
