@@ -23,8 +23,8 @@ A = Scope("host", "a")
 
 #: The requests of hub#1105's QA (``owner.es.reservation.*`` of ``tests/e2e/qa/probes/owner-es-reservation-*.json``),
 #: as the owner said them: each is offered its existing operation (among the ``MAX_TOOLS`` a turn offers, so the model
-#: can choose it), without being one of its asks. The last two the QA left out by their short names (the issue's
-#: comment): they are the owner's tools too, so they are measured with the rest.
+#: can choose it), without being one of its asks. ``no_show`` and ``release_unconfirmed`` the QA left out by their short
+#: names (the issue's comment): they are the owner's tools too, so they are measured with the rest.
 REPORTED = [
     ("reservation.blocked_date.get", "abre el bloqueo Cierre QA y dime qué día y horario impide reservar y por qué"),
     ("reservation.blocked_date.delete", "quita el bloqueo Cierre QA para volver a aceptar reservas ese día"),
@@ -39,6 +39,19 @@ REPORTED = [
     (
         "reservation.reservation.release_unconfirmed",
         "libera ahora las reservas pendientes que ya superaron el tiempo de cortesía sin confirmar",
+    ),
+    # Not in the issue's table, but out of the 40 before Reservations said its asks: the first by its own asks alone.
+    (
+        "reservation.waitlist.get",
+        "abre la entrada de Ana QA en la lista de espera y dime si está contactada o convertida",
+    ),
+    (
+        "reservation.time_slot.get",
+        "detalla la franja de reservas del viernes a las 20:00 y cuántas mesas y comensales admite",
+    ),
+    (
+        "reservation.reservation.seat",
+        "sienta a Ana QA en la mesa de su reserva de mañana y abre la cuenta con dos comensales",
     ),
 ]
 
@@ -86,7 +99,7 @@ def test_the_reported_reservation_request_offers_its_existing_operation(catalog_
 #: (``base.assistant.instructions``: «call its tool: the person sees a card and confirms it before it runs»), so a tool
 #: that says to ask first is asked about in the chat and never shows its card (hub#1105: cancelling, deleting,
 #: unblocking and taking off the waitlist were offered 4th to 10th and the model answered without the card).
-ASK_FIRST = re.compile(r"\bask (?:first|before)\b", re.IGNORECASE)
+ASK_FIRST = re.compile(r"\bask\b[^.]*\b(?:first|before)\b", re.IGNORECASE)
 
 
 def reservation_tools() -> dict[str, Operation]:
@@ -95,6 +108,8 @@ def reservation_tools() -> dict[str, Operation]:
 
 def test_no_tool_of_reservation_tells_the_model_to_ask_in_the_chat_before_its_card():
     assert ASK_FIRST.search("its table is freed. Ask first.")  # positive control: the pattern catches the old text
+    assert ASK_FIRST.search("the ones it had stay. Always ask the person before.")  # and its other wordings
+    assert not ASK_FIRST.search("Use it to answer what they ask. Free it or move the reservation first.")
     told = {name for name, op in reservation_tools().items() if ASK_FIRST.search(shared.description(op))}
     assert told == set()
 
