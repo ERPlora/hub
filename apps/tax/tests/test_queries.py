@@ -103,8 +103,8 @@ def test_declarations(name, input, output, expose_api):
         output,
         expose_api,
     )
-    # The assistant sees every read; a read carries no risk.
-    assert isinstance(op.ai, dict) and op.ai["description"].strip() and set(op.ai) == {"description"}
+    # The assistant sees every read, with what a person says to ask for it (hub#1094); a read carries no risk.
+    assert isinstance(op.ai, dict) and op.ai["description"].strip() and set(op.ai) == {"asks", "description"}
 
 
 def test_an_employee_reads_and_a_role_without_tax_does_not(no_seed):
