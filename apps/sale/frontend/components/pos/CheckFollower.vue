@@ -10,7 +10,12 @@ import type { OrderOut, PreviewOut } from '../../operations';
 import PreviewFollower from './PreviewFollower.vue';
 
 const props = defineProps<{ orderId: string; valued: boolean }>();
-const emit = defineEmits<{ order: [order: OrderOut]; preview: [preview: PreviewOut | undefined]; gone: [] }>();
+const emit = defineEmits<{
+  order: [order: OrderOut];
+  preview: [preview: PreviewOut | undefined];
+  previewError: [message: string | null];
+  gone: [];
+}>();
 
 const { data, error } = useLive('sale.order.get', () => ({ order_id: props.orderId }));
 
@@ -25,5 +30,6 @@ watch(error, (failed) => {
     v-if="valued"
     :order-id="orderId"
     @preview="emit('preview', $event)"
+    @preview-error="emit('previewError', $event)"
   />
 </template>

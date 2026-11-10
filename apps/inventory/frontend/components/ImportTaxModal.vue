@@ -7,6 +7,8 @@ import { FormModal } from '@erplora/ui/components';
 import { IonInput, IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import type { TaxChoice, UnresolvedText } from '../composables/useProductImport';
 import TaxCategorySelect from './TaxCategorySelect.vue';
 
@@ -19,6 +21,7 @@ const props = withDefaults(
   { pending: false },
 );
 const open = defineModel<boolean>('open', { default: false });
+useUnsavedFormOnOpen('inventory-import-tax', () => props.unresolved, open);
 const emit = defineEmits<{ setChoice: [text: string, patch: Partial<TaxChoice>]; confirm: []; cancel: [] }>();
 
 /** «Pick» without a category or «Create» without a key: nothing to apply yet. */

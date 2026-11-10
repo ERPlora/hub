@@ -60,3 +60,16 @@ describe('StepDialog', () => {
     expect(s.wrapper.emitted('done')).toBeUndefined();
   });
 });
+
+
+describe('StepDialog: Android Back with unsaved changes (hub#1046, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup('cancel');
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('reservation-step-cancel'),
+      change: () => ionValue(s.inDoc('reservation-step-cancel-reason'), 'Ill', 'ionInput'),
+      restore: () => ionValue(s.inDoc('reservation-step-cancel-reason'), '', 'ionInput'),
+    });
+  });
+});

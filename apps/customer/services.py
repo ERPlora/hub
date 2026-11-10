@@ -678,13 +678,25 @@ def delete_customer(ctx: OperationContext, data: CustomerRefIn) -> dict:
     input=MergeIn,
     output=CustomerDetailOut,
     ai=AI(
-        "Merges a duplicate card (absorbed) into the one that stays: the survivor keeps its data and fills only its "
-        "empty fields, notes are appended and figures summed; activity, custom values, groups, tags, purchases, "
-        "orders and consent move to it, and the duplicate is retired. Cannot be undone.",
+        "Use this tool once both cards are known; do not stop at reading or explaining the merge. `customer` is the "
+        "card that stays and `absorbed` is the duplicate merged into it: for «merge A into B», B is `customer` and A "
+        "is `absorbed`. Pass an exact name, phone or email in either field or, once customer.customer.by_phone or "
+        "customer.customer.list found the cards, their ids in `id` and `absorbed_id`; never ask the person for an "
+        "internal id. The survivor keeps its data and fills only its empty fields, notes are appended and figures "
+        "summed; activity, custom values, groups, tags, purchases, orders and consent move to it, and the duplicate is "
+        "retired. Cannot be undone.",
         risk="high",
         asks={
-            "en": ("merge the two Marta cards", "Ana's in there twice, combine them"),
-            "es": ("Ana López está repetida, júntala con la otra", "tengo a Marta duplicada, únelas"),
+            "en": (
+                "merge the two Marta cards",
+                "Ana's in there twice, combine them",
+                "merge the card for 611 222 444 into the one for 611 222 333",
+            ),
+            "es": (
+                "Ana López está repetida, júntala con la otra",
+                "tengo a Marta duplicada, únelas",
+                "junta la ficha del 611 222 444 dentro de la del 611 222 333",
+            ),
         },
     ),
 )

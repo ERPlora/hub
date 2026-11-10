@@ -8,6 +8,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useLocale, useT } from '../composables/useT';
 import { formatMoney, useBusinessMoney } from '../lib/format';
 import type { GrantOut } from '../operations';
@@ -20,6 +22,7 @@ const locale = useLocale();
 const money = useBusinessMoney();
 const voiding = useCommand('service.grant.void');
 const reason = ref('');
+useUnsavedFormOnOpen('service-grant-void', reason, open);
 
 watch(open, (isOpen) => {
   if (!isOpen) return;

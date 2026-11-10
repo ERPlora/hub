@@ -527,9 +527,9 @@ Pasos:
      «Inicio» está ahí aunque la lista aún cargue, esté vacía o no se haya podido leer.
   6. En la aplicación de Android, el botón atrás del móvil cierra primero lo que haya abierto encima (una
      ventana, una hoja o el menú); una ventana que no se puede cerrar así se queda, y una que guarda algo
-     escrito sin guardar y lo pide (en el alta y la edición de producto de Inventario y en las ventanas de alta y edición de Ventas, Mesas, Cocina, Clientes, Reservas, Citas, Personal, Servicios, Control horario, Carrito y pago, Caja, Menús, Suplementos, Pagos, Tarifas, Facturación, Impresión, Horarios, Tareas, Impuestos y la Bandeja de WhatsApp, en las de categoría y stock de Inventario y en «Nueva API key») pregunta antes
+     escrito sin guardar y lo pide (en el alta y la edición de producto de Inventario y en las ventanas de alta y edición de Ventas, Mesas, Cocina, Clientes, Reservas, Citas, Personal, Servicios, Control horario, Carrito y pago, Caja, Menús, Suplementos, Pagos, Tarifas, Facturación, Impresión, Horarios, Tareas, Impuestos y la Bandeja de WhatsApp, en las de categoría y stock de Inventario y en «Nueva API key», en las anulaciones con motivo de Reservas online, Pagos, Impresión, Reservas, Servicios, VeriFactu y Cocina (cancelar una comanda), en el motivo de «Descartar» un evento caído de Sistema, en «Nueva carpeta» y «Renombrar» de Archivos, en los pasos de importar productos, en las fichas de Tarea y Proyecto y en el alta rápida de cliente del TPV) pregunta antes
      «¿Descartar los cambios?»: «Seguir editando», o atrás otra vez, la deja como estaba, y «Descartar
-     cambios» la cierra (hub#1015, hub#1020, hub#1031). Sin nada abierto, en una ficha o un alta hace lo mismo que «Atrás»; en
+     cambios» la cierra (hub#1015, hub#1020, hub#1031, hub#1046). Sin nada abierto, en una ficha o un alta hace lo mismo que «Atrás»; en
      la pantalla principal de una app vuelve al Inicio, también si se llegó a ella por un enlace; y en el
      Inicio deja la aplicación en segundo plano.
 Entra: las apps del menú de la persona (las mismas del botón «Mis apps» de la barra).
@@ -544,7 +544,7 @@ trae la versión nueva; nunca se queda el toque sin hacer nada. Si el servidor n
 inestable), la persona se queda donde estaba y un aviso dice «No se ha podido abrir <app>. Comprueba la conexión e
 inténtalo de nuevo.» («esa página» si la pantalla no es de una app), con «Reintentar», que vuelve a probar y la abre
 en cuanto el servidor responde.
-Implicados: INVENTORY-F01, INVENTORY-F02, SALE-F35, TABLE-F01, KITCHEN-F01, CUSTOMER-F01, RESERVATION-F06, APPOINTMENT-F01, STAFF-F01, SERVICE-F01, ATTENDANCE-F08, CART_CHECKOUT-F01, CASH_REGISTER-F02, COMBO-F02, INVENTORY-F06, MODIFIER-F02, PAYMENT-F01, PRICING-F02, INVOICE-F03, PRINTING-F03, SCHEDULE-F04, TASK-F01, TAX-F02, WHATSAPP_INBOX-F29, BASE-F86
+Implicados: INVENTORY-F01, INVENTORY-F02, SALE-F35, TABLE-F01, KITCHEN-F01, CUSTOMER-F01, RESERVATION-F06, APPOINTMENT-F01, STAFF-F01, SERVICE-F01, ATTENDANCE-F08, CART_CHECKOUT-F01, CASH_REGISTER-F02, COMBO-F02, INVENTORY-F06, MODIFIER-F02, PAYMENT-F01, PRICING-F02, INVOICE-F03, PRINTING-F03, SCHEDULE-F04, TASK-F01, TAX-F02, WHATSAPP_INBOX-F29, BASE-F86, ONLINE_BOOKING-F05, PAYMENT-F05, PRINTING-F14, RESERVATION-F09, SERVICE-F17, VERIFACTU-F30, BASE-F73, BASE-F75, INVENTORY-F09, TASK-F09, TASK-F10, TASK-F13, CUSTOMER-F18, KITCHEN-F22, BASE-F46
 
 ### BASE-F06 Ver los paneles de las apps en Inicio
 <!-- origen: old-hub:HUB_SHELL-F33 -->
