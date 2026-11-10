@@ -1204,7 +1204,7 @@ Sale: un .blueprint.zip con las apps marcadas y, de las que llevan datos, sus fi
 ni datos fiscales. En el negocio no se guarda nada.
 Si falla: «La exportación falló: {reason}»; sin nombre, «Escribe un nombre para el archivo.» y no se puede
 exportar. Quien no administra el negocio lee «Solo un administrador puede exportar el negocio.».
-Implicados: ninguno
+Implicados: BASE-F112 (dentro de la app)
 
 ### BASE-F36 Elegir qué apps, datos y tablas viajan en la exportación
 <!-- origen: old-hub:HUB_SHELL-F174 -->
@@ -2089,7 +2089,7 @@ dispositivo.»; una hoja o un documento de más de 10 MB (o que al abrirlo ocupa
 «Demasiado grande para la vista previa» con «La vista previa abre archivos de hasta 10 MB. Descárgalo para abrirlo
 con una aplicación de tu dispositivo.». «Descargar» sigue siempre arriba. Si no se pudo descargar, «No se pudo
 descargar «{name}»: {reason}».
-Implicados: ninguno
+Implicados: BASE-F112 (dentro de la app)
 
 ### BASE-F75 Mover y renombrar un archivo o una carpeta
 <!-- origen: old-hub:HUB_SHELL-F133 -->
@@ -2308,7 +2308,7 @@ Sale: nada; es solo lectura (el archivo exportado no cambia nada). Se pone al d�
 Si falla: «No se pudo cargar el registro de aprobaciones.» con «Reintentar»; sin ninguna, «Todavía nadie ha tenido
 que autorizar nada en este negocio.» (y el archivo exportado trae solo la cabecera). Si no se puede exportar, un aviso
 lo dice con su motivo y no se descarga nada.
-Implicados: BASE-F84
+Implicados: BASE-F84, BASE-F112 (dentro de la app)
 
 ### BASE-F86 Crear una llave de API y copiar su token
 <!-- origen: old-hub:HUB_SHELL-F94 -->
@@ -2397,7 +2397,7 @@ Ajustes › General»; si no llega, «No se pudo cargar la documentación.» con
 «Ninguna app de este negocio publica todavía su API.». Si el negocio aún no puede tener llaves: «Las API keys
 todavía no están disponibles para este negocio: puedes leer la documentación, pero aún ningún sistema puede
 llamarla.».
-Implicados: BASE-F91, BASE-F86
+Implicados: BASE-F91, BASE-F86, BASE-F112 (dentro de la app)
 
 ### BASE-F91 Mostrar u ocultar la documentación de la API
 <!-- origen: old-hub:HUB_SHELL-F161 -->
@@ -2980,6 +2980,32 @@ momento, sin esperar: erplora.com reintenta por su cuenta, y `/readyz` tiene que
 sus sondas se cansen.
 Implicados: ACCOUNTS-F50 (su gemelo de erplora.com), todas las apps con cambios locales que se repiten, las demás páginas
 de espera del Hub (un negocio que se prepara o se muda de servidor: el mismo aspecto); hub#831, hub#1051 y hub#1052
+
+### BASE-F112 Guardar un archivo descargado dentro de la app
+<!-- origen: old-hub:HUB_SHELL-F126 old-hub:HUB_SHELL-F132 old-hub:HUB_SHELL-F173 (la parte del Hub de HUB_APP-F30 de ERPlora/app) gh:hub#1041 -->
+Estado: hecho
+Actor: cualquier persona del negocio que descarga un archivo en el Hub
+Pantalla: las que descargan un archivo que la pantalla ya tiene: VeriFactu › Configuración (el modelo del
+otorgamiento), Ajustes · Datos y copias › Exportar, Archivos, Empleados › Aprobaciones, la documentación de la API,
+Fichajes, Inventario (Productos y Categorías), Clientes y «Compartir y QR» de la web
+Pasos:
+  1. La persona pulsa descargar: el modelo del otorgamiento, una exportación, un archivo, un CSV, el fichero OpenAPI o
+     el QR.
+  2. En un navegador, el archivo baja con su nombre a las descargas del navegador, que ya lo dicen.
+  3. Dentro de la app de ERPlora (ordenador o Android 10 o posterior), el Hub le da el archivo a la app, que lo guarda
+     en la carpeta Descargas, y sale «Guardado en {ruta}» (en Android, «Guardado en Download/<nombre>»): dentro de la
+     app no hay barra de descargas ni otro aviso.
+Entra: el archivo que la pantalla ya tiene, con su nombre.
+Sale: el archivo en Descargas y, dentro de la app, el aviso con su ruta. En el Hub no se guarda nada.
+Si falla: dentro de la app el botón nunca se queda sin respuesta. Sin una carpeta de descargas que la persona pueda
+abrir (Android 9 o anterior, iOS): «Esta app no puede guardar archivos en un móvil o una tablet. Abre tu negocio en un
+navegador para descargarlo.»; con la app enlazada a otro negocio: «No se ha podido guardar el archivo: esta app está
+vinculada a otro negocio.»; una versión de la app sin esta función: «Esta versión de la app de ERPlora no puede guardar
+archivos. Actualízala para descargar.»; cualquier otro fallo (un nombre que la app rechaza, sin espacio):
+«No se ha podido descargar el archivo.». En esos casos la pantalla no dice que se descargó. Las copias que guarda
+ERPlora (Datos y copias › Copias) bajan por un enlace firmado y no pasan por aquí.
+Implicados: HUB_APP-F30 (ERPlora/app), BASE-F35, BASE-F74, BASE-F85, BASE-F90, VERIFACTU-F05, ATTENDANCE-F10,
+INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
 
 ## Para quien lo mantiene
 

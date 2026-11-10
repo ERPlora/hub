@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:48a974dd2b67f7f73ba25d9b783747c01afb0b1e716c2dbaadcdefe08d418afe -->
+<!-- generated from WORKBOOK.md sha256:4ffbd1e41efc061d1127cdeb2953c9afb1b17270bf09a05efb8ea9c6cbfdfdff -->
 
 ## What it is for and who it is for
 
@@ -383,7 +383,7 @@ phone, for example) comes out with an apostrophe in front so the spreadsheet doe
 formula; the import removes it.
 If it fails: without permission to export, the server refuses it even if called through the API. With no
 cards, a file with only the headers comes out.
-Involved: none
+Involved: BASE-F112 (inside the app)
 
 ### CUSTOMER-F10 Recognise a person by their phone number
 Status: done

@@ -354,7 +354,7 @@ Sale: el fichero descargado en el dispositivo; nada se guarda en el Hub.
 Si falla: un mes sin jornadas descarga solo la cabecera y avisa «No hay jornadas con este filtro: el
 fichero solo lleva la cabecera.»; si la descarga falla, «No se ha podido exportar el CSV. Inténtalo de
 nuevo.».
-Implicados: ATTENDANCE-F06, ATTENDANCE-F07
+Implicados: ATTENDANCE-F06, ATTENDANCE-F07, BASE-F112 (dentro de la app)
 
 ### ATTENDANCE-F11 Ver quién está fichado ahora
 <!-- origen: old:attendance/WORKFLOW.md#attendance-f11 -->

@@ -26,7 +26,8 @@ import { useRoute, useRouter } from 'vue-router';
 
 import FilePreview from '../components/FilePreview.vue';
 import FileTree from '../components/FileTree.vue';
-import { bytesToBase64, saveFile } from '../lib/data';
+import { bytesToBase64 } from '../lib/data';
+import { saveFile } from '../lib/download';
 import {
   afterDelete,
   afterMove,
@@ -255,7 +256,7 @@ function openEntry(entry: Entry): void {
 async function download(item: FileItem): Promise<void> {
   try {
     const { blob, name } = await fetchFile(rawUrl(item.path), item.content_type);
-    saveFile(name || item.name, blob);
+    await saveFile(name || item.name, blob, t);
   } catch (failure) {
     void toastError(t('base.files.downloadFailed', { name: item.name, reason: reasonOf(failure, item.name) }));
   }

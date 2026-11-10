@@ -1,12 +1,10 @@
-// Hands the browser a file the server wrote (the CSV export, WORKBOOK INVENTORY-F11): a Blob saved
-// through a temporary link, never added to the page, its object URL released afterwards.
+// Hands the person a file the server wrote (the CSV export, WORKBOOK INVENTORY-F11), saved by the Hub's `saveFile`
+// — a temporary link in a browser, the app's Downloads inside the installed app, which says where (hub#1041).
+import { saveFile } from '../../../../base/frontend/lib/download';
 
-export function saveTextFile(filename: string, content: string, contentType: string): void {
-  const blob = new Blob([content], { type: `${contentType};charset=utf-8` });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.setAttribute('href', url);
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
+type Translate = (key: string, values?: Record<string, unknown>) => string;
+
+/** Resolves `true` when the file was handed over, `false` when the installed app could not save it (already said). */
+export function saveTextFile(filename: string, content: string, contentType: string, t: Translate): Promise<boolean> {
+  return saveFile(filename, new Blob([content], { type: `${contentType};charset=utf-8` }), t);
 }

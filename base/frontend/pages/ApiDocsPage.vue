@@ -14,7 +14,7 @@ import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import { apiDocFileName, apiDocSections } from '../lib/api-docs';
-import { saveFile } from '../lib/data';
+import { saveFile } from '../lib/download';
 import { useBaseI18n } from '../lib/i18n';
 
 const { t } = useBaseI18n();
@@ -53,10 +53,10 @@ const failed = computed(() => failure.value !== null && data.value === undefined
 const hidden = computed(() => failure.value === 'hidden');
 const sections = computed(() => (data.value ? apiDocSections(data.value.document, data.value.apps) : []));
 
-function download(): void {
+async function download(): Promise<void> {
   if (!data.value) return;
   const blob = new Blob([JSON.stringify(data.value.document, null, 2)], { type: 'application/json' });
-  saveFile(apiDocFileName(window.location.hostname.split('.')[0] ?? ''), blob);
+  await saveFile(apiDocFileName(window.location.hostname.split('.')[0] ?? ''), blob, t);
 }
 </script>
 

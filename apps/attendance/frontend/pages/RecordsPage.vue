@@ -176,7 +176,7 @@ async function exportCsv(): Promise<void> {
   try {
     const search = table.query.value.search;
     const file = await client.api.call('attendance.record.export', { ...query.value, sort: table.query.value.sort, ...(search ? { search } : {}) });
-    saveCsv(file.filename, file.csv);
+    await saveCsv(file.filename, file.csv, t);
     if (file.rows === 0) exportNotice.value = { tone: 'info', text: t('attendance.records.exportEmpty') };
   } catch {
     exportNotice.value = { tone: 'danger', text: t('attendance.records.exportFailed') };
