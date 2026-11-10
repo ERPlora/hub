@@ -61,6 +61,10 @@ describe('inventory catalogues (en source + es)', () => {
     }
   });
 
+  it('hub#1124: never spell a plural with «(s)»; one and many are vue-i18n forms («one | many»)', () => {
+    for (const [key, message] of [...EN, ...ES]) expect(message, key).not.toMatch(/\p{L}\((?:s|es|as|os|ies)\)/u);
+  });
+
   it('hold no key that nothing uses (each one is written out whole somewhere in the sources)', () => {
     const sources = sourceFiles(FRONTEND).map((file) => readFileSync(file, 'utf8')).join('\n');
     const unused = [...EN.keys()].filter((key) => !sources.includes(`'${key}'`) && !sources.includes(`'${key}`));

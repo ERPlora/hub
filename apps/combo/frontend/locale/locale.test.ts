@@ -54,6 +54,10 @@ describe('combo catalogues (en source + es)', () => {
     for (const [key, message] of ES) expect(message, key).not.toMatch(/\bcursos?\b/i);
   });
 
+  it('hub#1124: never spell a plural with «(s)»; one and many are vue-i18n forms («one | many»)', () => {
+    for (const [key, message] of [...EN, ...ES]) expect(message, key).not.toMatch(/\p{L}\((?:s|es|as|os|ies)\)/u);
+  });
+
   it('have no empty message', () => {
     for (const [key, message] of [...EN, ...ES]) expect(message.trim(), key).not.toBe('');
   });
@@ -112,7 +116,7 @@ describe('combo catalogues (en source + es)', () => {
       ['combo.choices.empty', 'No choices yet: nobody can resolve this course.', 'Aún no hay elecciones: nadie puede resolver este plato.'],
       ['combo.choices.add', 'Add choice', 'Añadir elección'],
       ['combo.bulk.open', 'Add several', 'Añadir varios'],
-      ['combo.bulk.addCount', 'Add {n} selected', 'Añadir {n} seleccionados'],
+      ['combo.bulk.addCount', 'Add {n} selected | Add {n} selected', 'Añadir {n} seleccionado | Añadir {n} seleccionados'],
       ['combo.money.notAmount', 'This is not an amount. Type a figure, for example 12.50.', 'Esto no es un importe. Escribe una cifra, por ejemplo 12,50.'],
       ['combo.live.reconnecting', 'Reconnecting…', 'Reconectando…'],
       ['combo.live.appInactive', 'This app is not active in this business', 'Esta app no está activa en este negocio'],
