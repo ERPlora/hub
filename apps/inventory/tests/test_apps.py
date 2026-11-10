@@ -17,7 +17,7 @@ from live.meta import (
     module_configs,
     permissions_for_role,
 )
-from live.operations import INTERNAL, registry
+from live.operations import AI, INTERNAL, registry
 
 from apps.inventory import events as E
 from base import home
@@ -116,6 +116,8 @@ def test_every_operation_is_a_tool_of_the_assistant():
             continue
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
+        if isinstance(op.ai_spec(), AI):  # a tool says what a person types to ask for it (live.E020)
+            expected |= {"asks"}
         assert set(op.ai) == expected, op.name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, op.name

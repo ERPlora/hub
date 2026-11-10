@@ -267,7 +267,19 @@ def _first_match(queryset, lookups) -> list:
         "description": "List the catalog's products with their current stock; needs_tax_setup marks the ones "
         "without a tax category, which cannot be sold, and is_sold_out the ones marked sold out. Filter by "
         "category to get one category's articles, by is_active=true to get what the till offers (add "
-        "include_sold_out=true for every active product, sold out or not)."
+        "include_sold_out=true for every active product, sold out or not).",
+        "asks": {
+            "en": (
+                "what products do I have?",
+                "show me the catalog with their stock",
+                "list all my products",
+            ),
+            "es": (
+                "¿qué productos tengo?",
+                "enséñame el catálogo con su stock",
+                "lista todos mis productos",
+            ),
+        },
     },
 )
 def list_products(ctx: OperationContext, params: ProductListIn) -> dict:
@@ -283,7 +295,17 @@ def list_products(ctx: OperationContext, params: ProductListIn) -> dict:
     output=ProductOut,
     expose_api=True,
     ai={
-        "description": "Get the full detail of one product, named by its id, its SKU or its name."
+        "description": "Get the full detail of one product, named by its id, its SKU or its name.",
+        "asks": {
+            "en": (
+                "tell me everything about the coffee product",
+                "show the detail of the croissant",
+            ),
+            "es": (
+                "dime todo del producto café",
+                "enséñame la ficha del cruasán",
+            ),
+        },
     },
 )
 def get_product(ctx: OperationContext, data: ProductRefIn) -> dict:
@@ -302,7 +324,17 @@ def get_product(ctx: OperationContext, data: ProductRefIn) -> dict:
     ai={
         "description": "Propose images of ERPlora's shared image library for a product's photo («ponle foto al café "
         "con leche»), the product named by its id, SKU or name: the best matches for its name first, each with its title and its reference (catalog:<folder>/<name>). It "
-        "never sets one: show them, and set the one the person picks with inventory.product.set_image."
+        "never sets one: show them, and set the one the person picks with inventory.product.set_image.",
+        "asks": {
+            "en": (
+                "which library images could fit the latte?",
+                "suggest an image for the croissant",
+            ),
+            "es": (
+                "¿qué imagen le iría al café con leche?",
+                "propón una imagen para el cruasán",
+            ),
+        },
     },
 )
 def suggest_image(ctx: OperationContext, data: ProductImageSuggestIn) -> dict:
@@ -327,7 +359,17 @@ def suggest_image(ctx: OperationContext, data: ProductImageSuggestIn) -> dict:
     expose_api=True,
     ai={
         "description": "Sale catalog: the products on sale (active, not sold out) with what prices a sale line "
-        "(price, cost, tax category, units) and whether a sale lowers their stock; never their stock."
+        "(price, cost, tax category, units) and whether a sale lowers their stock; never their stock.",
+        "asks": {
+            "en": (
+                "what can I sell right now?",
+                "list the products on sale with their prices",
+            ),
+            "es": (
+                "¿qué puedo vender ahora mismo?",
+                "lista los productos a la venta con sus precios",
+            ),
+        },
     },
 )
 def list_for_sale(ctx: OperationContext, params: ForSaleListIn) -> dict:
@@ -351,7 +393,19 @@ def list_for_sale(ctx: OperationContext, params: ForSaleListIn) -> dict:
     output=LowStockPage,
     expose_api=True,
     ai={
-        "description": "List the active articles with stock control at or under their low-stock threshold, the one with less first."
+        "description": "List the active articles with stock control at or under their low-stock threshold, the one with less first.",
+        "asks": {
+            "en": (
+                "what is running low?",
+                "which products are almost out of stock?",
+                "which products are below their minimum stock?",
+            ),
+            "es": (
+                "¿qué me queda poco?",
+                "¿qué productos están a punto de agotarse?",
+                "¿qué productos están por debajo del stock mínimo?",
+            ),
+        },
     },
 )
 def list_low_stock(ctx: OperationContext, params: LowStockListIn) -> dict:
@@ -442,7 +496,17 @@ def filter_products(products, params: ProductFiltersIn):
     output=ProductCategoryPage,
     expose_api=True,
     ai={
-        "description": "Map each active product to its categories; the till filters its grid by category with it."
+        "description": "Map each active product to its categories; the till filters its grid by category with it.",
+        "asks": {
+            "en": (
+                "which category is each till item in?",
+                "what family does each article belong to?",
+            ),
+            "es": (
+                "¿en qué familia está cada artículo del TPV?",
+                "¿a qué categoría pertenece cada producto?",
+            ),
+        },
     },
 )
 def list_product_categories(
@@ -476,7 +540,17 @@ def list_product_categories(
     output=CategoryPage,
     expose_api=True,
     ai={
-        "description": "List the product categories, with how many active products each one has (sold out included)."
+        "description": "List the product categories, with how many active products each one has (sold out included).",
+        "asks": {
+            "en": (
+                "what categories do I have?",
+                "list the families of the till with how many items each",
+            ),
+            "es": (
+                "¿qué categorías tengo?",
+                "lista las familias del TPV con cuántos artículos tiene cada una",
+            ),
+        },
     },
 )
 def list_categories(ctx: OperationContext, params: CategoryListIn) -> dict:
@@ -533,7 +607,19 @@ def _filter_categories(categories, params: CategoryFiltersIn):
     expose_api=True,
     ai={
         "description": "The stock ledger, never edited: receptions, sales, voids, counts and write-offs, with "
-        "the quantity, the balance left, the reason, the reference (sale or delivery note) and who made it."
+        "the quantity, the balance left, the reason, the reference (sale or delivery note) and who made it.",
+        "asks": {
+            "en": (
+                "show me the history of stock coming in and going out",
+                "what stock movements were there this week?",
+                "who changed the stock of the coffee?",
+            ),
+            "es": (
+                "¿qué entradas, salidas y ajustes de stock ha habido esta semana?",
+                "enséñame el historial de movimientos del café",
+                "¿quién tocó el stock del té?",
+            ),
+        },
     },
 )
 def list_movements(ctx: OperationContext, params: MovementListIn) -> dict:
@@ -571,7 +657,19 @@ def list_movements(ctx: OperationContext, params: MovementListIn) -> dict:
     expose_api=True,
     ai={
         "description": "The inventory's figures: articles with stock control, in stock, out of stock, low on "
-        "stock, without cost, the stock's value at cost and the number of active products."
+        "stock, without cost, the stock's value at cost and the number of active products.",
+        "asks": {
+            "en": (
+                "how is my inventory doing?",
+                "how much is my stock worth?",
+                "give me the inventory figures: how many products are out of stock",
+            ),
+            "es": (
+                "¿cómo va mi inventario?",
+                "¿cuánto vale mi stock?",
+                "¿cuántos productos se han quedado sin existencias?",
+            ),
+        },
     },
 )
 def get_summary(ctx: OperationContext, data: SummaryIn) -> dict:
@@ -615,7 +713,17 @@ def get_summary(ctx: OperationContext, data: SummaryIn) -> dict:
     output=UnitPage,
     expose_api=True,
     ai={
-        "description": "List the units of measure (code, kind, exact conversion factor and the step every quantity must fit)."
+        "description": "List the units of measure (code, kind, exact conversion factor and the step every quantity must fit).",
+        "asks": {
+            "en": (
+                "what units of measure are set up in this business?",
+                "which units can I sell in, kilos, litres?",
+            ),
+            "es": (
+                "¿qué unidades de medida tengo configuradas en este negocio?",
+                "¿qué unidades de medida hay, kilos, litros, piezas?",
+            ),
+        },
     },
 )
 def list_units(ctx: OperationContext, params: UnitListIn) -> dict:
@@ -654,7 +762,19 @@ def list_units(ctx: OperationContext, params: UnitListIn) -> dict:
     output=ConfigOut,
     expose_api=True,
     ai={
-        "description": "Get the inventory settings: selling without stock, the default low-stock threshold and stock tracking."
+        "description": "Get the inventory settings: selling without stock, the default low-stock threshold and stock tracking.",
+        "asks": {
+            "en": (
+                "how is my inventory set up?",
+                "can I sell without stock right now?",
+                "what is the low stock threshold?",
+            ),
+            "es": (
+                "¿cómo tengo configurado el inventario?",
+                "¿ahora puedo vender sin stock?",
+                "¿cuál es el aviso de stock bajo?",
+            ),
+        },
     },
 )
 def get_config(ctx: OperationContext, data: ConfigGetIn) -> dict:
@@ -680,7 +800,17 @@ def config_row(settings: Settings) -> dict:
     output=ExportOut,
     expose_api=True,
     ai={
-        "description": "Export to CSV every product that matches the search and the filters, with the headers the import reads."
+        "description": "Export to CSV every product that matches the search and the filters, with the headers the import reads.",
+        "asks": {
+            "en": (
+                "export my products to a spreadsheet",
+                "give me the catalog as a CSV",
+            ),
+            "es": (
+                "exporta mis productos a una hoja de cálculo",
+                "pásame el catálogo en CSV",
+            ),
+        },
     },
 )
 def export_products(ctx: OperationContext, params: ProductFiltersIn) -> dict:
@@ -713,7 +843,17 @@ def export_products(ctx: OperationContext, params: ProductFiltersIn) -> dict:
     output=ExportOut,
     expose_api=True,
     ai={
-        "description": "Export the product categories to CSV: name, slug and number of active products."
+        "description": "Export the product categories to CSV: name, slug and number of active products.",
+        "asks": {
+            "en": (
+                "export my categories to a spreadsheet",
+                "give me the categories as a CSV",
+            ),
+            "es": (
+                "exporta mis categorías a una hoja de cálculo",
+                "pásame las categorías en CSV",
+            ),
+        },
     },
 )
 def export_categories(ctx: OperationContext, params: CategoryFiltersIn) -> dict:
