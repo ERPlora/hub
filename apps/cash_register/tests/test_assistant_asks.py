@@ -96,9 +96,9 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 
 def test_the_hub_reads_an_arqueo_as_a_count_and_the_moneda_as_the_currency():
     """``base.assistant.SYNONYMS``: an «arqueo», a «recuento» or a «conteo» is a count of the drawer
-    (``cash_register.count``) and the «moneda» or the «divisa» of the business its currency (``cash_register.currency``),
-    so the person's words reach those tools without their own asks; without the Hub's groups, none does (positive
-    control)."""
+    (``cash_register.count``) and the «moneda» or the «divisa» of the business its currency
+    (``cash_register.currency``), so the person's words reach those tools without their own asks; without the Hub's
+    groups, none does (positive control)."""
     count, currency = shared.stem("count"), shared.stem("currency")
     for phrase, wanted in (
         ("haz el arqueo del cajón", count),
