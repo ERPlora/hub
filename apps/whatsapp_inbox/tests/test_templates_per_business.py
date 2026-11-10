@@ -11,7 +11,7 @@ from live.context import Scope
 from live.errors import NotFound
 
 from apps.whatsapp_inbox.models import Template
-from apps.whatsapp_inbox.tests.conftest import NOW, ctx_for, receive, run, system, template
+from apps.whatsapp_inbox.tests.conftest import NOW, ctx_for, receive, resume_each, run, system, template
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 
@@ -138,10 +138,8 @@ def test_each_worker_pass_resumes_only_its_own_templates(hub_a, hub_b, django_ca
     deleted = respx.post(DELETE).mock(return_value=httpx.Response(200, json={"deleted": True}))
     monkeypatch.setattr(fixed_clock, "now", lambda: NOW + dt.timedelta(minutes=3))
 
-    for hub in (hub_a, hub_b):
-        with use_hub(hub) as active, django_capture_on_commit_callbacks(execute=True, using=active.alias):
-            resumed = system("whatsapp_inbox.delivery.resume", {}, Scope("host", hub.slug))
-        assert (resumed.templates, resumed.template_deletions) == (1, 1)
+    passes = resume_each((hub_a, hub_b), django_capture_on_commit_callbacks)
+    assert [(resumed.templates, resumed.template_deletions) for resumed in passes] == [(1, 1), (1, 1)]
 
     sent = sorted((body["hub"], body["name"], body["body"]) for body in (json.loads(c.request.content) for c in registered.calls))
     assert sent == [

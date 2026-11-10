@@ -103,6 +103,15 @@ def outbound() -> list[Message]:
     return list(rows.order_by("created_at", "id"))
 
 
+def sent_as(scope, door) -> None:
+    """The one message left from the Hub through ``scope``'s own number, and its «sent» event is ``scope``'s."""
+    [message] = outbound()
+    assert message.origin == "hub"
+    assert json.loads(door.calls.last.request.content)["hub"] == scope.key
+    sent = OutboxEvent.objects.get(name="whatsapp_inbox.message.sent")
+    assert (sent.scope_kind, sent.scope_key) == (scope.kind, scope.key)
+
+
 def test_confirming_tells_the_customer_once_in_her_conversation_through_erplora(tick, door):
     appointment = salon()
     confirm(appointment)
@@ -161,11 +170,7 @@ def test_another_business_tells_its_customer_through_its_own_number(tick, door):
     )
     confirm(appointment, scope=B)
     tick()
-    [message] = outbound()
-    assert message.origin == "hub"
-    assert json.loads(door.calls.last.request.content)["hub"] == "b"
-    sent = OutboxEvent.objects.get(name="whatsapp_inbox.message.sent")
-    assert (sent.scope_kind, sent.scope_key) == (B.kind, B.key)
+    sent_as(B, door)
 
 
 # ── WHATSAPP_INBOX-F26 / RESERVATION-F19: the restaurant confirms the table ─────────────────────────────
@@ -385,8 +390,4 @@ def test_another_restaurant_tells_its_guest_through_its_own_number(restaurant_cl
     )
     act("reservation.reservation.confirm", reservation.id, scope=B)
     tick()
-    [message] = outbound()
-    assert message.origin == "hub"
-    assert json.loads(door.calls.last.request.content)["hub"] == "b"
-    sent = OutboxEvent.objects.get(name="whatsapp_inbox.message.sent")
-    assert (sent.scope_kind, sent.scope_key) == (B.kind, B.key)
+    sent_as(B, door)

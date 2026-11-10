@@ -15,6 +15,7 @@ from psycopg.conninfo import make_conninfo
 
 from base.models import Membership
 from base.services import ensure_hub_user
+from base.tenancy.context import use_hub
 
 A = Scope("host", "a")
 B = Scope("host", "b")
@@ -47,6 +48,17 @@ def run(name: str, payload: dict | None = None, ctx: OperationContext | None = N
 def system(name: str, payload: dict | None = None, scope: Scope = A):
     """Run ``name`` as the platform (the doors erplora.com calls, the reactions)."""
     return run(name, payload, system_context(scope))
+
+
+def resume_each(hubs, on_commit) -> list:
+    """The worker's resume pass of each of ``hubs`` in its own database, as its business (``base.worker``), with what
+    it leaves for after the COMMIT (the calls to erplora.com) run; ``on_commit`` is pytest-django's
+    ``django_capture_on_commit_callbacks``. One result per hub, in order."""
+    results = []
+    for hub in hubs:
+        with use_hub(hub) as active, on_commit(execute=True, using=active.alias):
+            results.append(system("whatsapp_inbox.delivery.resume", {}, Scope("host", hub.slug)))
+    return results
 
 
 def inbound(wa_id: str = "wamid.1", phone: str = "34600111222", **fields) -> dict:

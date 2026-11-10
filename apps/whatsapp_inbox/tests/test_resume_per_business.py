@@ -10,7 +10,7 @@ import respx
 from live.context import Scope
 
 from apps.whatsapp_inbox.models import Conversation, Message
-from apps.whatsapp_inbox.tests.conftest import NOW, ctx_for, receive, run, system
+from apps.whatsapp_inbox.tests.conftest import NOW, ctx_for, receive, resume_each, run, system
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 
@@ -68,10 +68,8 @@ def test_each_worker_pass_hands_only_its_own_stuck_message_and_erasure(hub_a, hu
     forgotten = respx.post(ERASE).mock(return_value=httpx.Response(200, json={"erased": True}))
     monkeypatch.setattr(fixed_clock, "now", lambda: NOW + dt.timedelta(minutes=3))
 
-    for hub in (hub_a, hub_b):
-        with use_hub(hub) as active, django_capture_on_commit_callbacks(execute=True, using=active.alias):
-            resumed = system("whatsapp_inbox.delivery.resume", {}, Scope("host", hub.slug))
-        assert (resumed.messages, resumed.erasures) == (1, 1)
+    passes = resume_each((hub_a, hub_b), django_capture_on_commit_callbacks)
+    assert [(resumed.messages, resumed.erasures) for resumed in passes] == [(1, 1), (1, 1)]
 
     replies = sorted((body["hub"], body["to"], body["text"]) for body in (json.loads(c.request.content) for c in sent.calls))
     assert replies == [("tenant-a", "+34600111222", "Hola desde tenant-a"), ("tenant-b", "+34600222111", "Hola desde tenant-b")]
