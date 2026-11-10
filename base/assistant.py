@@ -110,11 +110,9 @@ APP_WORDS = shared.app_words
 #: panel); a ticket or a receipt is a sale's, as the till's screens say («Tickets hoy», «Ticket medio», the «Tique» it
 #: prints), never the kitchen's, which is named by its app («la cocina»); a «placa» is a person's badge; the «unidades»
 #: are Inventory's units of measure (``inventory.unit``), and a «albarán», the «mercancía» or what «entran» (never
-#: «entrada»: its stem is that of «entre») is the goods ``inventory.stock.receive`` records. An «automatización» or a
-#: «flujo» is an automation (``flow.flow``), its «ejecución» (or what «ejecuta») a run of it (``flow.run``,
-#: ``flow.flow.run``), its «pasos» its steps, a «pregunta» the question an automation waits on (``flow.question``), a
-#: «borrador» a draft (the assistant's, ``flow.draft``; the website's draft says «draft» too) and a «receta» a
-#: ready-made automation (``flow.recipe``). «Borrar» stems apart from «borrador» («borr»), all but «borrad».
+#: «entrada»: its stem is that of «entre») is the goods ``inventory.stock.receive`` records; a «tarea» and a «proyecto»
+#: are Tasks' task and project (``task.task``, ``task.project``), and what one «comenta» its comment (``task.comment``),
+#: named by its phrases and never by the word: «comentario» shares its stem with «comensales», a table's guests.
 SYNONYMS = (
     ("cuenta", "check", "tab", "order"),
     ("ticket", "tique", "recibo", "receipt", "sale"),
@@ -125,6 +123,15 @@ SYNONYMS = (
         "albaran", "mercancia", "entran", "recibir", "recibe", "recibido", "receive", "received", "goods",
         "delivery note",
     ),
+    ("tarea", "tareas", "task", "tasks"),
+    ("proyecto", "proyectos", "project", "projects"),
+    (
+        "comment", "comments", "comenta en", "comenta que", "un comentario", "el comentario", "los comentarios",
+        "sus comentarios", "que comentarios", "de comentarios",
+    ),
+    # flow: an «automatización» or a «flujo» is an automation (``flow.flow``), its «ejecución» a run of it
+    # (``flow.run``), its «pasos» its steps, a «pregunta» the question an automation waits on (``flow.question``), a
+    # «borrador» a draft (the assistant's, ``flow.draft``) and a «receta» a ready-made automation (``flow.recipe``).
     ("automatizacion", "automatizaciones", "automatiza", "automation", "automations", "flujo", "flow"),
     ("ejecucion", "ejecuciones", "run", "runs"),
     ("pregunta", "preguntas", "question", "questions"),
