@@ -30,11 +30,14 @@ from live.errors import Conflict
 EMPTY_SALE = _("There is nothing to charge: the check has no lines.")
 DISCOUNT_OUT_OF_RANGE = _("That discount is bigger than what it comes off.")
 NO_TAX_RULE = _(
-    "«%(name)s» cannot be charged: no tax rule applies to its tax category («%(category)s») here."
+    "«%(name)s» cannot be charged: no tax rule applies to its tax category «%(category)s» here. "
+    "Create its rule in Taxes › Rules."
 )
 
 #: ``close(category_key, amount, tax_included)`` → a ``CalculationOut`` of tax.
 Closer = Callable[[str, int, bool], dict]
+#: ``category_name(category_key)`` → the category's name as Taxes shows it, in the active language.
+Namer = Callable[[str], str]
 
 DEFAULT_TAX_KIND = "vat"
 GENERAL_REGIME = "01"
@@ -167,7 +170,10 @@ def value(
     close: Closer,
     ticket_percent: Decimal = Decimal(0),
     ticket_amount: int = 0,
+    category_name: Namer | None = None,
 ) -> Valuation:
+    """``category_name`` names the category of a line refused for want of a rule (the till's in production,
+    ``queries.tax_category_name``); without one, as the arithmetic's own tests value, its key."""
     if not lines:
         raise Conflict(str(EMPTY_SALE), code="sale.empty_sale")
     amounts = [
@@ -225,7 +231,7 @@ def value(
     for index, line in enumerate(lines):
         category = line.tax_category_key
         if category not in rules:
-            rules[category] = _resolve(close, line, tax_included)
+            rules[category] = _resolve(close, line, tax_included, category_name)
         groups.setdefault(fiscal_key(rules[category]), []).append(index)
 
     breakdown: list[dict] = []
@@ -307,15 +313,16 @@ def value(
     )
 
 
-def _resolve(close: Closer, line: LineIn, tax_included: bool) -> dict:
-    """The rule of ``line``'s category (a closing of 0 cents); without one, 409 naming the line."""
+def _resolve(close: Closer, line: LineIn, tax_included: bool, category_name: Namer | None) -> dict:
+    """The rule of ``line``'s category (a closing of 0 cents); without one, 409 naming the line and its
+    category as Taxes shows it, and where its rule is made (hub#1123)."""
     try:
         return close(line.tax_category_key, 0, tax_included)
     except Conflict as refusal:
         if refusal.code != "tax.no_rate":
             raise
-        name = line.name or line.tax_category_key
-        message = str(NO_TAX_RULE) % {"name": name, "category": line.tax_category_key}
+        category = category_name(line.tax_category_key) if category_name else line.tax_category_key
+        message = str(NO_TAX_RULE) % {"name": line.name or category, "category": category}
         raise Conflict(message, code="sale.no_tax_rule") from None
 
 

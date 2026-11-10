@@ -1574,7 +1574,16 @@ def valuate(
         close=pricing.tax_closer(on),
         ticket_percent=discount_percent,
         ticket_amount=discount_amount,
+        category_name=tax_category_name,
     )
+
+
+def tax_category_name(key: str) -> str:
+    """The name Taxes shows for the tax category ``key``, in the active language (a factory category's
+    translated, one of the business's as typed); the key itself once no category has it (deleted in the Hub
+    admin after the line was added). Read only when a line is refused for want of a rule."""
+    category = TaxCategory.objects.filter(key=key).first()
+    return category.display_name if category else key
 
 
 def breakdown_rows(breakdown: list[dict]) -> list[dict]:
