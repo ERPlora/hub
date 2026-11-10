@@ -722,7 +722,7 @@ def _copy_of(job: PrintJob) -> dict | None:
             ),
             "es": (
                 "este equipo recoge el siguiente trabajo de impresión",
-                "este equipo está listo para imprimir el trabajo más antiguo",
+                "que este puesto coja el trabajo de impresión más antiguo",
             ),
         },
         "description": "For the device that prints (base's /ws/print): take the oldest queued job of the printers this "
