@@ -1,4 +1,9 @@
-"""Git merge driver for WORKBOOK.en.md: merge its body and refresh its source hash."""
+"""Git merge driver for WORKBOOK.en.md: merge its body and refresh its source hash.
+
+It writes the file only when the merge is clean. Anything else (a conflict in either text, a hash no committed
+WORKBOOK.md has, a branch whose ``manage.py`` has no such command) fails, and the README's driver then runs git's own
+three-way merge with its markers: never only one side's copy (hub#1082).
+"""
 
 import subprocess
 import tempfile
@@ -9,6 +14,11 @@ from django.core.management.base import BaseCommand, CommandError
 from base import catalog
 
 _PLACEHOLDER = "0" * 64
+#: What ``git config merge.workbook-translation.driver`` runs (README): this command, or git's own merge when it fails.
+DRIVER = (
+    "uv run --no-sync python manage.py merge_workbook_translation %O %A %B %P"
+    " || git merge-file -L ours -L base -L theirs %A %O %B"
+)
 
 
 def _header(text: str, path: str):
@@ -19,7 +29,7 @@ def _header(text: str, path: str):
 
 
 def _git_text(*args: str) -> str:
-    result = subprocess.run(["git", *args], text=True, capture_output=True)
+    result = subprocess.run(["git", *args], text=True, capture_output=True, check=False)
     if result.returncode:
         raise CommandError(f"git {' '.join(args)} failed: {result.stderr}")
     return result.stdout
@@ -30,7 +40,7 @@ def _source_version(translation: str, translation_path: str, source_path: str) -
     commits = _git_text("rev-list", "--all", "--", source_path).splitlines()
     for commit in commits:
         result = subprocess.run(
-            ["git", "show", f"{commit}:{source_path}"], text=True, capture_output=True
+            ["git", "show", f"{commit}:{source_path}"], text=True, capture_output=True, check=False
         )
         if result.returncode:
             continue
@@ -60,11 +70,14 @@ def _merge_file(directory: Path, name: str, texts: dict[str, str]):
         ],
         text=True,
         capture_output=True,
+        check=False,
     )
 
 
 class Command(BaseCommand):
     help = "Merge WORKBOOK.en.md without conflicting on its generated source hash."
+    # A merge waits for it once per conflicting file: no system checks to run.
+    requires_system_checks = ()
 
     def add_arguments(self, parser):
         for name in ("base", "current", "other", "path"):
@@ -94,12 +107,10 @@ class Command(BaseCommand):
             raise CommandError(
                 f"{source_path}: its merge is not clean; resolve it with the translation."
             )
-        if merged.returncode == 255 or merged.returncode < 0:
-            raise CommandError(f"{path}: git merge-file failed: {merged.stderr}")
+        if merged.returncode:
+            raise CommandError(f"{path}: its translated body does not merge clean: {merged.stderr}")
 
         match = _header(merged.stdout, path)
         digest = catalog.source_hash(catalog.user_part(merged_source.stdout))
         result = f"{merged.stdout[: match.start(1)]}{digest}{merged.stdout[match.end(1) :]}"
         Path(current).write_text(result, encoding="utf-8")
-        if merged.returncode:
-            raise CommandError(f"{path}: resolve the conflicting translation body.")
