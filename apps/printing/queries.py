@@ -661,7 +661,7 @@ def device_row(device: PrintDevice, this_key: str | None) -> dict:
                 "list the stations and when each was last seen",
             ),
             "es": (
-                "¿qué equipos hay dados de alta para imprimir los tickets del negocio?",
+                "¿desde qué equipos se imprime en el negocio?",
                 "¿qué equipos están dados de alta y cuándo se vieron por última vez?",
             ),
         },

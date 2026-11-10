@@ -540,8 +540,8 @@ Estado: hecho
 Actor: administrador, responsable, empleado
 Pantalla: Asistente
 Pasos:
-1. Pide al asistente «Imprime una prueba en la de cocina», «saca una página de prueba en Caja QA»,
-   «cambia la IP, el papel y el nombre de la impresora Caja QA», «reintenta los trabajos fallidos de
+1. Pide al asistente «Imprime una prueba en la de cocina», «saca una página de prueba en la de la caja»,
+   «cambia la IP, el papel y el nombre de la impresora de la caja», «reintenta los trabajos fallidos de
    etiquetas» o «¿cómo está la impresora de la caja?».
 2. El asistente hace lo mismo que las pantallas, nombrando la impresora por su nombre y el trabajo por
    su número, y contesta con lo que ha hecho. Antes de cambiar algo, su tarjeta de confirmación dice la
