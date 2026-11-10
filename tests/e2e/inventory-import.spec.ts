@@ -51,6 +51,9 @@ test('INVENTORY-F09: a CSV is checked first, its unknown tax text is asked for, 
   await expect(preview.locator('[data-testid=inventory-import-reason]')).toHaveCount(1);
   await expect(preview.locator('[data-testid=inventory-import-reason]')).toContainText(/(Line|Línea) 4/);
   await expect(preview.locator('[data-testid=inventory-import-skipped]')).toBeVisible();
+  // hub#1124: the one row already there is said in the singular, the two to import in the plural.
+  await expect(preview.locator('[data-testid=inventory-import-skipped]')).toHaveText(/^\s*1 (row already in the catalog will be skipped|fila que ya está en el catálogo se omitirá)\.\s*$/);
+  await expect(preview.locator('[data-testid=inventory-import-preview-submit]')).toHaveText(/^\s*(Import 2 products|Importar 2 productos)\s*$/);
   await page.screenshot({ path: shot('inventory-import-preview-1280') });
   await shootFlow(page, 'INVENTORY-F09');
   await preview.locator('[data-testid=inventory-import-preview-submit]').click();
