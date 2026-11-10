@@ -32,7 +32,7 @@ const row = (id: string, over: Partial<AssignmentOut> = {}): AssignmentOut => ({
 });
 const ROWS = [row('a1', { is_primary: true }), row('a2', { member_name: 'Bea Ruiz', custom_duration: 40, custom_price: 2500, duration: 40, price: 2500 })];
 
-type Control = HTMLElement & { value?: unknown; checked?: boolean; disabled?: boolean; label?: string };
+type Control = HTMLElement & { value?: unknown; checked?: boolean; disabled?: boolean; label?: string; errorText?: string };
 
 async function setup(options: { canChange?: boolean; locale?: 'en' | 'es'; business?: Business | null } = {}) {
   const m = await mountService(ServiceProfessionals, {
@@ -78,6 +78,21 @@ describe('ServiceProfessionals: in the business currency (service-business-curre
     await s.result('base.business.get', business(JAPANESE));
     expect(s.el('service-professionals-price-a2').value).toBe('2500');
     expect(s.el('service-professionals-save-a2').disabled).toBe(true);
+  });
+
+  // SERVICE-F31, F32, hub#924: an own price is judged in the business's money: a euro one is no złoty amount in Poland.
+  it.each([
+    { field: 'service-professionals-price', save: 'service-professionals-assign', rows: [] },
+    { field: 'service-professionals-price-a2', save: 'service-professionals-save-a2', rows: [row('a2', { custom_price: 2500, price: 2500 })] },
+  ] as const)('in Poland «13,50 €» in $field says it is not an amount once left, and nothing is sent', async ({ field, save, rows }) => {
+    const s = await setup({ business: business(POLISH) });
+    await s.show(page([...rows]));
+    if (rows.length === 0) s.member().vm.$emit('update:modelValue', { id: 'm9', label: 'Carla' });
+    await ionValue(s.el(field), '13,50 €', 'ionInput');
+    s.el(field).dispatchEvent(new CustomEvent('ionBlur'));
+    await flush();
+    await click(s.el(save));
+    expect([s.el(field).errorText, s.sent()]).toEqual(['This is not an amount. Type a figure, for example 12.50.', []]);
   });
 });
 

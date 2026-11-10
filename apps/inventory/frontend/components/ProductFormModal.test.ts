@@ -323,6 +323,15 @@ describe('ProductFormModal: editing', () => {
       expect(s.el('inventory-product-cost')?.label).toBe('Cost (PLN)');
     });
 
+    // hub#924: the cost is judged in the business's money, like the price: a euro one is no złoty amount in Poland.
+    it('in Poland a cost «13,50 €» says it is not an amount, and nothing is saved', async () => {
+      const s = await setup({}, { business: business(POLISH) });
+      await s.fillRequired();
+      await s.type('inventory-product-cost', '13,50 €');
+      await s.submit();
+      expect([s.el('inventory-product-cost')?.errorText, s.calls('/api/inventory/products')]).toEqual(['This is not an amount. Type a figure, for example 12.50.', []]);
+    });
+
     it('while the business is not read, «Cost» without a currency, never the euro', async () => {
       const s = await setup({}, { business: null });
       expect(s.el('inventory-product-cost')?.label).toBe('Cost');

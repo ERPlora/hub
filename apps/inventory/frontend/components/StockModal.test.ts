@@ -14,7 +14,7 @@ import {
   expectWindowSaysMoneyUnreadable,
 } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations';
-import { business, errorFrame, flush, mountInventory, ok, product, refusal, subId, UNITS } from '../__tests__/mount-inventory';
+import { business, errorFrame, flush, mountInventory, ok, POLISH, product, refusal, subId, UNITS } from '../__tests__/mount-inventory';
 import StockModal from './StockModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -133,6 +133,16 @@ describe('StockModal: goods receipt', () => {
     s.net.onApi(() => ok({ rows: [product({ stock: '8.000' })] }));
     await s.submit();
     expect(s.sent('/api/inventory/stock/receive')).toEqual({ items: [{ product_id: 'p1', qty: '3', unit_cost: cents }] });
+  });
+
+  // INVENTORY-F13, hub#924: the unit cost is judged in the business's money: a euro one is no złoty amount in Poland.
+  it('in Poland a unit cost «13,50 €» says it is not an amount once left, and nothing is recorded', async () => {
+    const s = await setup('receive', {}, 'en', business(POLISH));
+    await s.type('inventory-stock-qty', '3');
+    await s.type('inventory-stock-cost', '13,50 €');
+    await s.leave('inventory-stock-cost');
+    await s.submit();
+    expect([s.el('inventory-stock-cost')?.errorText, s.calls('/api/inventory/stock/receive')]).toEqual(['This is not an amount. Type a figure, for example 12.50.', []]);
   });
 
   it("a quantity off the unit's step says so under the quantity and stays", async () => {

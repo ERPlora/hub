@@ -159,6 +159,15 @@ describe('PackageFormModal: New package', () => {
 
 // flow service-business-currency: a voucher's closed price and its amount off are the business's currency.
 describe('PackageFormModal: in the business currency (service-business-currency)', () => {
+  // SERVICE-F12, F13, hub#924: an amount off and a closed price are judged in the business's money: a euro one is no
+  // złoty amount in Poland.
+  it.each(['discount_amount', 'fixed_price'])('in Poland «13,50 €» in the %s says it is not an amount, and nothing is sent', async (name) => {
+    const s = await setup(pkg({ discount_type: 'fixed', discount_percent_bp: 0, discount_amount: 500 }), 'en', { business: business(POLISH) });
+    await ionValue(s.field(name), '13,50 €', 'ionInput');
+    await click(s.save());
+    expect([s.field(name).errorText, s.sent()]).toEqual(['This is not an amount. Type a figure, for example 12.50.', []]);
+  });
+
   it('a business in Japan saves «9000» as a closed price of 9000 yen and «500» off as 500 yen', async () => {
     const s = await setup(null, 'en', { business: business(JAPANESE) });
     expect(s.field('fixed_price').label).toBe('Closed price (JPY)');
