@@ -253,6 +253,18 @@ def settings_row(settings: Settings) -> dict:
     output=SettingsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "is the blind count on in the till?",
+                "what time does the till close by itself?",
+                "show me the till settings",
+            ),
+            "es": (
+                "¿cómo están los ajustes del arqueo ciego?",
+                "¿a qué hora se cierra sola la caja?",
+                "enséñame los ajustes de caja",
+            ),
+        },
         "description": "Read how the drawer works: cash register on, opening float required, count required to close, "
         "negative balance allowed, blind count, and the daily auto-close with its hour (the factory values until saved)."
     },
@@ -298,6 +310,16 @@ def find_register(
     output=RegisterPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which drawers do we have?",
+                "list the active drawers",
+            ),
+            "es": (
+                "¿qué cajones tenemos?",
+                "lista los cajones activos",
+            ),
+        },
         "description": "List the drawers by name: search by name, only active or inactive ones."
     },
 )
@@ -324,7 +346,19 @@ def list_registers(ctx: OperationContext, params: RegisterListIn) -> dict:
     input=RegisterGetIn,
     output=RegisterOut,
     expose_api=True,
-    ai={"description": "One drawer by its id: its name and whether it is active."},
+    ai={
+        "asks": {
+            "en": (
+                "is the Terrace drawer active?",
+                "show me the details of the bar drawer",
+            ),
+            "es": (
+                "¿está activo el cajón Terraza?",
+                "dame los datos del cajón de la barra",
+            ),
+        },
+        "description": "One drawer by its id: its name and whether it is active.",
+    },
 )
 def get_register(ctx: OperationContext, params: RegisterGetIn) -> dict:
     return register_row(find_register(params.register_id, None))
@@ -843,6 +877,16 @@ _SESSION_SORT = {"number": ("business_day", "sequence")}
     output=SessionPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me this week's cash sessions",
+                "which till closes came out short?",
+            ),
+            "es": (
+                "enséñame las sesiones de caja de esta semana",
+                "¿qué cierres de caja tuvieron diferencia?",
+            ),
+        },
         "description": "List the cash sessions, newest first: search by number; filter by status (open, closed), drawer, "
         "business days and amounts in cents (opening float, expected, counted, difference; negative = short). The open "
         "session carries its live expected cash unless a blind count hides it from the reader. Closed sessions sorted "
@@ -892,6 +936,18 @@ def list_sessions(ctx: OperationContext, params: SessionListIn) -> dict:
     output=CurrentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "is the till open right now?",
+                "how much cash should be in the drawer now?",
+                "which cash shift is open?",
+            ),
+            "es": (
+                "¿está abierta la caja?",
+                "¿cuánto efectivo debería haber ahora en el cajón?",
+                "¿qué turno de caja está abierto?",
+            ),
+        },
         "description": "Is the drawer open? The open session (with its live expected cash, unless a blind count hides it), "
         "whether the cash register is on (Sales should then charge cash only with a session open), whether the open "
         "session is past its daily cut-off (it then takes nothing more), and how many sale lines fell in no shift and "
@@ -924,6 +980,18 @@ def current_session(ctx: OperationContext, params: EmptyIn) -> dict:
     output=SessionOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me the report of session S-261014-0001",
+                "how did yesterday's till shift go?",
+                "what difference did last night's session give and with what float did it start?",
+            ),
+            "es": (
+                "enséñame el informe de la sesión S-261014-0001",
+                "¿cómo fue el turno de caja de ayer?",
+                "¿qué diferencia dio la sesión de anoche y con cuánto fondo empezó?",
+            ),
+        },
         "description": "One cash session by its id or number (S-261014-0001) with its report: who opened and closed it, its "
         "drawer, opening float, sales by payment method, refunds and voids, cash in and out, comps at cost, expected, "
         "counted, difference and notes, in cents. A blind count hides the expected of an open session from the reader."
@@ -986,6 +1054,16 @@ def shift_review(ctx: OperationContext) -> dict:
     output=ClosingSummaryOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what difference would 200 € counted give at the close?",
+                "before closing, is anything still pending?",
+            ),
+            "es": (
+                "¿qué diferencia saldría con 200 € contados en el cajón?",
+                "antes de cerrar, ¿hay algo pendiente?",
+            ),
+        },
         "description": "The summary of closing the drawer, before closing it: what closing a cash session (the open one "
         "unless its number is said) would give with the cash counted in cents: its number, the counted cash and, "
         "unless a blind count hides them from the reader, the expected cash and the difference (negative = short); and "
@@ -1047,6 +1125,16 @@ def line_row(line: Line) -> dict:
     output=MovementPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which cash went in or out of the till today?",
+                "show me the movements of the cash session",
+            ),
+            "es": (
+                "¿qué salidas de dinero ha habido hoy en la caja?",
+                "enséñame los movimientos de la sesión de caja",
+            ),
+        },
         "description": "The lines of a cash session (by its id or number), newest first: cash in and out written by hand, "
         "and the sales, voids and refunds of Sales with their payment method (a blind count shows whoever may not see "
         "the expected only the lines written by hand of an open session); or, with unassigned=true, the sale lines that "
@@ -1111,6 +1199,16 @@ def count_row(count: Count) -> dict:
     output=CountPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me the counts of session S-261014-0001",
+                "list this morning's drawer counts",
+            ),
+            "es": (
+                "enséñame los arqueos de la sesión S-261014-0001",
+                "lista los arqueos del cajón de esta mañana",
+            ),
+        },
         "description": "The counts of a cash session (by its id or number), newest first: opening or closing, the total "
         "counted in cents and its notes and coins."
     },
@@ -1137,6 +1235,16 @@ def list_counts(ctx: OperationContext, params: CountListIn) -> dict:
     output=CurrencyOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what currency and decimals does the business use?",
+                "list the notes and coins to count the drawer",
+            ),
+            "es": (
+                "dime la divisa y los decimales del negocio",
+                "lista los billetes y monedas para contar el cajón",
+            ),
+        },
         "description": "The business's currency, its decimals and its notes and coins (face values in major units, largest "
         "first), which a count by notes and coins takes."
     },
