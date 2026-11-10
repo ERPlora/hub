@@ -126,6 +126,12 @@ De 20 en 20, con «Cargar más».
 | App inactiva (`app_inactive`) | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
 
+## Cambios sin guardar en Android
+
+En las ventanas de alta y edición de esta app, el botón atrás del móvil pregunta «¿Descartar los cambios?»
+cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar cambios»
+cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05); el suplemento que se reescribe solo en la moneda del negocio no cuenta como cambio.
+
 ## Flujos
 
 | ID | Flujo | Estado |
@@ -488,13 +494,14 @@ cajero del producto actual es un empleado.
   enganches vacíos, dobles o repetidos.
 - **Señalado, sin resolver aquí**:
   - `apps/modifier/tests/test_events.py` (`test_the_reaction_runs_as_the_system_scope_given`) da por bueno que la
-    reacción de un ámbito B borre los enganches que creó A: es el estado de la fase 1, con las tablas
-    compartidas y sin tenencia. En la fase 2, cada hub en su base de datos, la reacción solo verá los
-    suyos y el test tendrá que decirlo.
-  - Las claves ajenas `CASCADE` de `ModifierLink` hacia `inventory.Product` y `inventory.Category`
-    chocarán en la fase 2 con «tablas al activar» (PLAN §15): las tablas de Suplementos solo existen en
-    un hub que las encendió, e Inventario es su `requires`, así que se crean después; pero un borrado
-    físico de un producto desde el admin cruzaría a una tabla de otra app. Señalado para PLAN-DB.
+    reacción de un ámbito B borre los enganches que creó A: solo pasa bajo el respaldo de los tests, que guarda
+    `a` y `b` en la misma BD de test (`base/tenancy/tests/legacy.py`). En producción cada negocio tiene su BD
+    (desde el corte S5, hub#602) y la reacción solo ve los suyos; el test tendrá que decirlo cuando se retire el
+    respaldo (hub#611).
+  - ~~Las claves ajenas `CASCADE` de `ModifierLink` hacia `inventory.Product` y `inventory.Category`
+    frente a «tablas al activar» (PLAN §15)~~ — **resuelta** por hub#778: las tablas de Suplementos solo
+    existen en un hub que las encendió, y el borrado físico de un producto desde el admin pasa por alto la
+    relación con una tabla que ese hub no tiene (`base/tenancy/deletion.py`).
 
 - **Páginas** (`frontend/`): `pages/GroupsPage.vue` (la tabla, `useLiveList` en ventanas de hasta 100),
   `components/GroupSheet.vue` (la hoja: `modifier.group.get` vivo y dos `useSheetList` de 20 en 20),

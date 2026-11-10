@@ -140,6 +140,12 @@ cambios: así el negocio se queda con los de fábrica.
 | App inactiva | «Caja no está activa en este negocio.» en lugar de la lista. |
 | Sin permiso | No aparece lo que no puede hacer («Abrir sesión», «Movimiento», «Arqueo», «Cerrar», «Guardar»); si llega por otra puerta, «No tienes permiso». |
 
+## Cambios sin guardar en Android
+
+En las ventanas de esta app (cajón, apertura, movimiento, arqueo y cierre de sesión), el botón atrás del móvil pregunta «¿Descartar los cambios?»
+cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar cambios»
+cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05); el cajón que se elige solo y el efectivo que el cierre propone del último arqueo no cuentan como cambio.
+
 ## Flujos
 
 | ID | Flujo | Vertical | Estado |
@@ -753,7 +759,8 @@ cajero del producto actual es un empleado.
   `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#653). Un
   billete o moneda (`formatFace`) se escribe con la misma regla y sin decimales si es entero («5.000 Ft»).
 - **Monedas**: la del negocio es la de su país, que da `base.business.get` desde el registro de este hub (APP-BASE-6),
-  y en el hub propio de ERPlora (sin registro en la fase 1, `create_platform_hub`, con todas las apps activas), la del
+  y en el hub propio de ERPlora (sin negocio en erplora.com: `create_platform_hub` le da su fila del registro y su BD,
+  con todas las apps activas), la del
   país de su emisor (`PLATFORM_ISSUER_COUNTRY`). En el servidor, `business_currency` de Ventas (`apps.sale.queries`,
   la misma con la que nace cada venta; leída como la plataforma: una API key solo tiene el permiso de su operación);
   en pantalla, `useBusinessMoney()` de `base`. Los decimales, de `babel` (los del servidor, nunca los de Intl: Intl le

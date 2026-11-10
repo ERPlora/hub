@@ -52,3 +52,28 @@ describe('CloseSessionModal: before the business answers its money (hub#921)', (
     await expectWaitsForTheYen(m, 'cash-register-close-submit', 'cash-register-close-counted');
   });
 });
+
+describe('CloseSessionModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
+  it('as opened closes, also once the last closing count fills the cash; a change asks; restored closes again', async () => {
+    const m = await mountCash(CloseSessionModal, { props: { open: true, session: SESSION } });
+    await m.live();
+    const page = (rows: unknown[]) => ({ rows, total: rows.length, limit: 20, offset: 0 });
+    await m.result('cash_register.session.get', { id: 's1', number: 'S-261014-0001', status: 'open', summary: { expected_cash: 1500 } });
+    await m.result('cash_register.count.list', page([{ id: 'c1', type: 'closing', total: 1500 }]));
+    await m.result('sale.order.list', page([]));
+    await m.result('kitchen.ticket.board', { cooking: [], ready: [], cooking_count: 0, ready_count: 0, stations: [], truncated: false });
+    await m.result('printing.job.summary', { usages: [], pending: 0, sent: 0, failed: 0 });
+    const counted = () => m.inDoc('cash-register-close-counted');
+    const seeded = (counted() as unknown as { value?: unknown }).value;
+    expect(seeded).toBeTruthy();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => m.inDoc('cash-register-close'),
+      change: () => ionValue(counted(), '14,00', 'ionInput'),
+      restore: () => ionValue(counted(), seeded, 'ionInput'),
+    });
+    await ionValue(m.inDoc('cash-register-close-notes'), 'Short by one', 'ionInput');
+    const { unsavedChangesIn } = await import('../../../../base/frontend/lib/system-back');
+    expect(unsavedChangesIn(m.inDoc('cash-register-close')!)).toBeDefined();
+  });
+});

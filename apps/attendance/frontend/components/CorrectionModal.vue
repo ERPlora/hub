@@ -12,6 +12,7 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useBusinessClock } from '../../../../base/frontend/lib/zone';
 import { useLocale, useT } from '../composables/useT';
 import { formatDay, toLocalInput } from '../lib/time';
@@ -102,6 +103,17 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+// What would be sent, so the business's clock answering after it opened is not a change of the person's.
+useUnsavedFormOnOpen(
+  'attendance-correct',
+  () => ({
+    clockIn: instant(clockIn.value, props.record?.clock_in_at ?? null),
+    clockOut: instant(clockOut.value, props.record?.clock_out_at ?? null),
+    reason: reason.value,
+  }),
+  open,
+);
 </script>
 
 <template>

@@ -139,3 +139,26 @@ describe('MethodFormModal: fields refused with the same words (hub#888)', () => 
     return { field: (key) => s.field(TESTID[key]), send: () => click(s.save()), settle };
   });
 });
+
+describe('MethodFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
+  it('editing: as opened closes, also once the whole account is read; a change asks; restored closes again', async () => {
+    const s = await setup(LISTED);
+    expect(s.field('account').value).toBe(WHOLE.bank_account_ref);
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('payment-method-form'),
+      change: () => ionValue(s.field('account'), 'ES91 2100 0418 4502 0005 9999', 'ionInput'),
+      restore: () => ionValue(s.field('account'), WHOLE.bank_account_ref, 'ionInput'),
+    });
+  });
+
+  it('creating: as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('payment-method-form'),
+      change: () => ionValue(s.field('name'), 'Card', 'ionInput'),
+      restore: () => ionValue(s.field('name'), '', 'ionInput'),
+    });
+  });
+});

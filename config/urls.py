@@ -41,6 +41,10 @@ from config.api import api
 # through the SaaS.
 NON_SPA_PREFIXES = (*BASE_NON_SPA_PREFIXES, "ws", "p", "auth")
 
+# A cut of the database is no fault of the server (BASE-F111): 503 with Retry-After, which live.database_cut's middleware
+# waits for and repeats while it may; anything else, Django's own 500.
+handler500 = "base.database_cut.server_error"
+
 # ERPlora's name on every page of the staff's admin, never «Django administration» (as the SaaS's admin does).
 admin.site.site_header = "ERPlora Hub"
 admin.site.site_title = "ERPlora Hub Admin"

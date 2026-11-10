@@ -168,8 +168,8 @@ def effective_environment(ctx: OperationContext, config: Config) -> str:
     deployment's (``prod``: production; ``pre``: testing), whatever its switch says, but production only once ERPlora
     opens it on the server (``production_open``, working-rules §15: its own invoices skip no lock); once live there, it
     stays in production while the server is closed, its records waiting (``production_closed``), so its real invoices
-    never move to the test chain. A demo, always testing (HUB-F315): phase 1 shares the tables, so the configuration
-    it reads may be a business's that went live. Any other business, its configuration's."""
+    never move to the test chain. A demo, always testing (HUB-F315), whatever its configuration says: it never goes
+    live (``go_live_forbidden``). Any other business, its configuration's."""
     if platform.is_demo_hub(ctx.scope):
         return Environment.TESTING
     if platform.is_platform_hub(ctx.scope):
@@ -261,9 +261,10 @@ def _server_problem(environment: str) -> str:
 def presenter(scope: Scope, config: Config, issuer_nif: str) -> str | None:
     """Who ERPlora's gateway is told presents ``issuer_nif``'s records (its ``hub``): ``scope``'s business by its slug
     (saas#29). ERPlora's own hub presents ERPlora's own records only (``PLATFORM_HUB_SLUG``); a business's record its
-    pass sees (the worker's fixed scope while the tables are shared, phase 1) goes as that business, by the id
-    erplora.com gave it (``Config.hub_id``, which the SaaS takes as well as a slug), never as ERPlora: the gateway
-    would refuse it (409 ``nif_mismatch``, hub#454). ``None`` without that id: nothing can be presented yet."""
+    pass sees goes as that business, by the id erplora.com gave it (``Config.hub_id``, which the SaaS takes as well as
+    a slug), never as ERPlora: the gateway would refuse it (409 ``nif_mismatch``, hub#454). ``None`` without that id:
+    nothing can be presented yet. Since S5 the platform hub's database holds ERPlora's records alone and each business
+    runs its pass in its own (``base.worker``): only the suite's fixed worker scope still sees another's (hub#1053)."""
     if not platform.is_platform_hub(scope) or issuer_nif == settings.PLATFORM_ISSUER_TAX_ID:
         return scope.key
     return str(config.hub_id) if config.hub_id is not None else None

@@ -143,6 +143,16 @@ describe('SettingsPage: the number and the month', () => {
     expect(spent.find('whatsapp-inbox-settings-near-cap').exists()).toBe(false);
   });
 
+  it.each([
+    ['es', 149, 'Te queda 1 de 150 mensajes de tu plan este mes.'],
+    ['es', 120, 'Te quedan 30 de 150 mensajes de tu plan este mes.'],
+    ['en', 149, 'You have 1 of 150 messages of your plan left this month.'],
+    ['en', 120, 'You have 30 of 150 messages of your plan left this month.'],
+  ] as const)('in %s, near the cap with %i sent: the singular for one message left, the plural from two (hub#1044)', async (locale, used, said) => {
+    const near = await setup({ locale }, { ...CONNECTED, monthly_usage: used });
+    expect(near.find('whatsapp-inbox-settings-near-cap').text()).toBe(said);
+  });
+
   it('a plan without WhatsApp messages says so, never «No limit» (WHATSAPP_INBOX-F13, ADR-0474: 0 = none)', async () => {
     const none = await setup({}, { ...CONNECTED, monthly_limit: 0, monthly_usage: 0, cap_reached: true });
     expect(none.wrapper.findComponent(UsageMeter).exists()).toBe(false);

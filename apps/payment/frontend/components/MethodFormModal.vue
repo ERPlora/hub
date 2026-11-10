@@ -10,6 +10,8 @@ import { ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import type { MethodOut, MethodPatchIn, MethodType } from '../operations';
 
@@ -106,6 +108,10 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+/** As it opened: the method as the list shows it (account blank) until its whole account has been read. */
+const original = computed(() => fromMethod(props.method && (whole.value ?? { ...props.method, bank_account_ref: '' })));
+useUnsavedForm('payment-method-form', () => (open.value ? form.value : original.value), original);
 </script>
 
 <template>

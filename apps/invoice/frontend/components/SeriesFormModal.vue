@@ -14,6 +14,8 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { IonInput, IonItem, IonSelect, IonSelectOption, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { TYPE_CODES } from '../lib/invoice';
 import { refusal } from '../lib/refusal';
@@ -134,6 +136,8 @@ async function save(): Promise<void> {
   void toastSuccess(t(editing.value ? 'invoice.series.form.saved' : 'invoice.series.form.created', { code: saved.code }));
   open.value = false;
 }
+
+useUnsavedFormOnOpen('invoice-series-form', form, open);
 </script>
 
 <template>

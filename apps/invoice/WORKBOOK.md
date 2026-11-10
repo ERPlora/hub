@@ -184,6 +184,14 @@ ninguna factura.»; si lo mandó la cuenta de ERPlora, «Datos recibidos de tu c
 | App inactiva (`app_inactive`) | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
 
+## Cambios sin guardar en Android
+
+En «Nueva factura manual», «Rectificar», «Nueva serie de numeración», «Editar serie» y «Factura completa del
+ticket», el botón atrás del móvil pregunta «¿Descartar los cambios?» cuando hay algo escrito o elegido sin guardar:
+«Seguir editando» conserva lo tecleado y «Descartar cambios» cierra la ventana sin guardarlo. Con la ventana como
+se abrió, atrás la cierra sin preguntar; la serie que la ventana elige sola al abrirse y el tipo que llega del
+territorio no cuentan como cambio, ni una rectificativa ya emitida: atrás cierra su resultado (BASE-F05).
+
 ## Flujos
 
 | ID | Flujo | Estado |
@@ -1010,19 +1018,18 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   - **PDF**: `pdf.py` (WeasyPrint ≥ 66) imprime el A4 fuera de la transacción; solo lee `data:` (nada de
     red). La imagen lleva Pango, HarfBuzz y DejaVu, y la caché de Fontconfig en `/tmp`.
 - **Alta del hub de plataforma**: `manage.py create_platform_hub` (ensayo; con `--execute` escribe),
-  idempotente como el `ensure_platform_hub` del SaaS antiguo. En la fase 1 no hay registro de hubs ni
-  BD por hub: le pone el emisor de ERPlora desde `PLATFORM_ISSUER_LEGAL_NAME`, `PLATFORM_ISSUER_TAX_ID`,
+  idempotente como el `ensure_platform_hub` del SaaS antiguo. Desde S5 el hub de plataforma es una fila del
+  registro (`is_platform`) con su propia BD, como cualquier negocio: si falta, la hace como un alta
+  (`base.services.platform_hub_register` y `base.tenancy.provision`); después, dentro de esa BD, le pone el emisor
+  de ERPlora desde `PLATFORM_ISSUER_LEGAL_NAME`, `PLATFORM_ISSUER_TAX_ID`,
   `PLATFORM_ISSUER_ADDRESS`, `PLATFORM_ISSUER_POSTAL_CODE`, `PLATFORM_ISSUER_CITY`,
   `PLATFORM_ISSUER_PROVINCE` y `PLATFORM_ISSUER_COUNTRY` (por defecto, los datos de ERPLORA CLOUD SL del
   `seed_company_036` antiguo) y fija VeriFactu al entorno del despliegue
   (`verifactu.config.follow_deployment`). Nunca escribe encima de otro emisor (otra cadena). En AWS se
-  lanza una vez por entorno como tarea ECS puntual con la definición del servicio `hub` y el comando
-  `python manage.py create_platform_hub --execute` (primero sin `--execute` para ver lo que hará). Con
-  el alta con BD propia (tajada S2 de la tenencia, que PLAN §35 adelantó a la fase 1) tiene que añadir la
-  fila del registro (`is_platform`) y su BD, como cualquier alta (hub#502). ⚠️ **Mientras los negocios
-  compartan la BD**: el emisor que pone sería el de todos los hosts, así que no se lanza en un despliegue
-  donde factura un negocio real hasta que el hub de plataforma tenga la suya (PLAN-HUB §4, ronda
-  2026-10-15c).
+  lanza una vez por entorno como tarea ECS puntual de la familia `worker`, que tiene las credenciales del
+  migrador para hacer la BD, con el comando `python manage.py create_platform_hub --execute` (primero sin
+  `--execute` para ver lo que hará). Su emisor es solo el de su BD: ningún otro negocio lo ve. Que ERPlora
+  emita de verdad sus facturas desde él sigue en hub#502 (INVOICE-F23).
 
 - Anatomía completa: `apps.py`, `models.py` (`InvoiceSeries`, `Issuer`, `Invoice`, `InvoiceLine`),
   `migrations/`, `schemas.py`, `fiscal.py` (aritmética pura: cierre por clave fiscal, prorrateo,

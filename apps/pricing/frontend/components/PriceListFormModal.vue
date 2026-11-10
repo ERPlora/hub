@@ -12,6 +12,8 @@ import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { useBusinessMoney } from '../lib/format';
 import { searchGroups } from '../lib/pickers';
@@ -143,6 +145,13 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+// A new list's currency, proposed from the business's when it answers after the window opened, is no change.
+useUnsavedFormOnOpen(
+  'pricing-list-form',
+  () => ({ ...form.value, currency: !props.priceList && form.value.currency === (businessCurrency.value ?? '') ? null : form.value.currency }),
+  open,
+);
 </script>
 
 <template>

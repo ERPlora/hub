@@ -13,6 +13,7 @@ import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useLocale, useT } from '../composables/useT';
 import { moneyDecimals, formatMoney, moneyFieldText, moneyRefusal, readAmount, useBusinessMoney } from '../lib/money';
 import { refusal } from '../lib/refusal';
@@ -79,6 +80,17 @@ async function confirm(): Promise<void> {
   open.value = false;
   emit('opened');
 }
+
+// The only drawer, chosen alone when the drawers answer, is how the window opens, not a choice of the person's.
+useUnsavedFormOnOpen(
+  'cash-register-open',
+  () => ({
+    register: drawers.value.length === 1 && registerId.value === drawers.value[0].id ? '' : registerId.value,
+    balance: balance.value,
+    notes: notes.value,
+  }),
+  open,
+);
 </script>
 
 <template>

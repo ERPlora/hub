@@ -15,6 +15,7 @@ import { IonInput, IonItem, IonLabel, IonList, IonNote } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useT } from '../composables/useT';
 import type { Unit } from '../composables/useUnits';
 import { errorFields } from '../lib/errors';
@@ -114,6 +115,8 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+useUnsavedFormOnOpen('inventory-stock-form', () => ({ qty: qty.value, cost: cost.value, reason: reason.value }), open);
 </script>
 
 <template>

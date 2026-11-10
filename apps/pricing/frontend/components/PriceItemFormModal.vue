@@ -9,6 +9,8 @@ import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useLocale, useT } from '../composables/useT';
 import { listMoney, quantityFieldText, readDecimal, useBusinessMoney } from '../lib/format';
 import { searchProducts, searchServices } from '../lib/pickers';
@@ -101,6 +103,8 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+useUnsavedFormOnOpen('pricing-item-form', form, open);
 </script>
 
 <template>

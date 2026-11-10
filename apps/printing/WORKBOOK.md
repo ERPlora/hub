@@ -180,6 +180,13 @@ debajo de la función cuya impresora rechaza (PRINTING-F06).
 | App inactiva | «Impresión no está activa en este negocio.» |
 | Sin permiso | No aparece lo que no puede hacer (en Dispositivos, ni «Imprimir desde este dispositivo», ni «Editar», ni «Retirar»); los ajustes salen bloqueados con «No tienes permiso para cambiar estos ajustes.». |
 
+## Cambios sin guardar en Android
+
+En «Imprimir desde este dispositivo», «Editar dispositivo», «Nueva impresora» y «Editar impresora», el botón atrás
+del móvil pregunta «¿Descartar los cambios?» cuando hay algo escrito o elegido sin guardar: «Seguir editando»
+conserva lo tecleado y «Descartar cambios» cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la
+cierra sin preguntar (BASE-F05).
+
 ## Flujos
 
 | ID | Flujo | Vertical | Estado |

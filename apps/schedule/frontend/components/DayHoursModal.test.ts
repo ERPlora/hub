@@ -137,3 +137,15 @@ describe('DayHoursModal (SCHEDULE-F02)', () => {
     expect([s.control('weekday').label, s.submit().textContent?.trim()]).toEqual(['Día', 'Guardar día']);
   });
 });
+
+describe('DayHoursModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('the day as loaded closes; a change asks; restored as loaded closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('schedule-day-form'),
+      change: () => toggle(s.control('closed'), true),
+      restore: () => toggle(s.control('closed'), false),
+    });
+  });
+});

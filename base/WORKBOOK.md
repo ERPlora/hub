@@ -198,7 +198,8 @@ aquí.», «¿Quién se pone?» con las caras, el teclado y «Cancelar».
 
 ### Mi perfil
 Desde «Perfil» del menú de usuario. Arriba, la persona (cara, nombre y rol); debajo, «Datos de la cuenta» (con la
-foto), «Preferencias» (idioma y apariencia) y «PIN».
+foto), «Preferencias» (idioma y apariencia: paleta, tema y tamaño de interfaz del 80 al 120%, por defecto 100%) y
+«PIN».
 
 ### Ajustes · General
 Lo que se abre con «Ajustes» en el menú lateral: la primera pestaña de abajo, «General», con «Este dispositivo»,
@@ -524,9 +525,9 @@ Pasos:
      «Inicio» está ahí aunque la lista aún cargue, esté vacía o no se haya podido leer.
   6. En la aplicación de Android, el botón atrás del móvil cierra primero lo que haya abierto encima (una
      ventana, una hoja o el menú); una ventana que no se puede cerrar así se queda, y una que guarda algo
-     escrito sin guardar y lo pide (en el alta y la edición de producto de Inventario y en las ventanas de alta y edición de Ventas, Mesas, Cocina, Clientes, Reservas, Citas, Personal y Servicios) pregunta antes
+     escrito sin guardar y lo pide (en el alta y la edición de producto de Inventario y en las ventanas de alta y edición de Ventas, Mesas, Cocina, Clientes, Reservas, Citas, Personal, Servicios, Control horario, Carrito y pago, Caja, Menús, Suplementos, Pagos, Tarifas, Facturación, Impresión, Horarios, Tareas, Impuestos y la Bandeja de WhatsApp, en las de categoría y stock de Inventario y en «Nueva API key») pregunta antes
      «¿Descartar los cambios?»: «Seguir editando», o atrás otra vez, la deja como estaba, y «Descartar
-     cambios» la cierra (hub#1015, hub#1020). Sin nada abierto, en una ficha o un alta hace lo mismo que «Atrás»; en
+     cambios» la cierra (hub#1015, hub#1020, hub#1031). Sin nada abierto, en una ficha o un alta hace lo mismo que «Atrás»; en
      la pantalla principal de una app vuelve al Inicio, también si se llegó a ella por un enlace; y en el
      Inicio deja la aplicación en segundo plano.
 Entra: las apps del menú de la persona (las mismas del botón «Mis apps» de la barra).
@@ -541,7 +542,7 @@ trae la versión nueva; nunca se queda el toque sin hacer nada. Si el servidor n
 inestable), la persona se queda donde estaba y un aviso dice «No se ha podido abrir <app>. Comprueba la conexión e
 inténtalo de nuevo.» («esa página» si la pantalla no es de una app), con «Reintentar», que vuelve a probar y la abre
 en cuanto el servidor responde.
-Implicados: INVENTORY-F01, INVENTORY-F02, SALE-F35, TABLE-F01, KITCHEN-F01, CUSTOMER-F01, RESERVATION-F06, APPOINTMENT-F01, STAFF-F01, SERVICE-F01
+Implicados: INVENTORY-F01, INVENTORY-F02, SALE-F35, TABLE-F01, KITCHEN-F01, CUSTOMER-F01, RESERVATION-F06, APPOINTMENT-F01, STAFF-F01, SERVICE-F01, ATTENDANCE-F08, CART_CHECKOUT-F01, CASH_REGISTER-F02, COMBO-F02, INVENTORY-F06, MODIFIER-F02, PAYMENT-F01, PRICING-F02, INVOICE-F03, PRINTING-F03, SCHEDULE-F04, TASK-F01, TAX-F02, WHATSAPP_INBOX-F29, BASE-F86
 
 ### BASE-F06 Ver los paneles de las apps en Inicio
 <!-- origen: old-hub:HUB_SHELL-F33 -->
@@ -895,7 +896,8 @@ Pasos:
      {app}».
 Entra: cómo va la activación.
 Sale: la app en marcha en este negocio (`base.app.enabled`).
-Si falla: BASE-F21.
+Si falla: BASE-F21. Mientras el personal de ERPlora tiene congelada la plataforma por una subida de la base de datos
+(unos minutos, hub#930), la app sigue «Activándose…» y termina sola en cuanto se descongela.
 Implicados: BASE-F31, BASE-F32
 
 ### BASE-F23 Desactivar una app
@@ -1829,7 +1831,9 @@ Pasos:
 Entra: el estado del negocio que le pasa erplora.com.
 Sale: nada guardado.
 Si falla: una dirección que no es de ningún negocio no existe; un negocio dado de baja dice «Este hub ya no está
-disponible.».
+disponible.». Mientras el personal de ERPlora tiene congelada la plataforma por una subida de la base de datos
+(unos minutos, hub#930), el negocio espera a prepararse: la página sigue en «Estamos preparando tu negocio» y entra
+sola en cuanto se descongela y termina.
 Implicados: ninguno
 
 ### BASE-F64 Cambiar mis datos, foto, idioma y apariencia
@@ -1845,13 +1849,14 @@ Pasos:
   3. «Elegir imagen» sube una foto JPG, PNG o WebP de hasta 2 MB («Foto actualizada»); «Quitar» la borra («Foto
      quitada»).
   4. En «Preferencias», «Idioma» («Usar el idioma del negocio», «Español», «English») y «Apariencia» («Paleta de
-     tema» y «Tema»: «Sistema (auto)», «Claro», «Oscuro») se guardan al elegir y se aplican al momento; «Usar la
-     apariencia del negocio» deshace lo propio.
+     tema», «Tema»: «Sistema (auto)», «Claro», «Oscuro», y «Tamaño de la interfaz»: 80, 90, 100, 110 o 120%, por
+     defecto 100%) se guardan al elegir y se aplican al momento en cualquier dispositivo; «Usar la apariencia del
+     negocio» deshace lo propio y devuelve el tamaño a 100%.
 Entra: el perfil de quien tiene la sesión.
 Sale: su nombre en este negocio (el que sale en el menú lateral, en las caras y en «Dispositivos»), su foto, su idioma
-y su apariencia, que le siguen en cualquier dispositivo en el que entre, con su PIN o con su cuenta. Con «Usar el
-idioma del negocio», entra con PIN en el del negocio y con su cuenta en el de su cuenta de erplora.com (BASE-F51). El
-correo es solo de contacto: no cambia la cuenta de erplora.com.
+y su apariencia, incluido el tamaño de interfaz, que le siguen en cualquier dispositivo en el que entre, con su PIN,
+su placa o su cuenta. Con «Usar el idioma del negocio», entra con PIN en el del negocio y con su cuenta en el de su
+cuenta de erplora.com (BASE-F51). El correo es solo de contacto: no cambia la cuenta de erplora.com.
 Si falla: si el perfil no se pudo leer, «No se pudo cargar el perfil» — «Tus datos siguen igual. Comprueba la
 conexión y vuelve a intentarlo.» con «Reintentar». Al guardar: «No se pudo guardar el perfil»; foto rechazada:
 «No se pudo guardar la foto. Usa JPG, PNG o WebP de hasta 2 MB.»; preferencias: «No se pudieron guardar tus
@@ -2317,9 +2322,7 @@ Pasos:
 Entra: el nombre, el ritmo y lo que puede hacer.
 Sale: la llave, de la que el negocio solo guarda lo que permite reconocerla. Evento `base.api_key.created`.
 Si falla: «No se pudo crear la API key.», «Elige al menos una app y qué puede hacer la key en ella.», «Esa app no
-publica lo que la key haría en ella.» o «No se pudo copiar al portapapeles.». Un negocio que todavía comparte su base
-de datos con otros (los dados de alta antes de que cada negocio naciera con la suya) no tiene «Nueva API key»
-(BASE-F89).
+publica lo que la key haría en ella.» o «No se pudo copiar al portapapeles.».
 Implicados: BASE-F89, BASE-F90
 
 ### BASE-F87 Rotar una llave de API
@@ -2366,9 +2369,7 @@ Pasos:
 Entra: las llaves del negocio.
 Sale: nada guardado. Se pone al día sola al crear, rotar o revocar una.
 Si falla: «No se pudieron cargar tus API keys.» con «Reintentar»; sin ninguna, «Aún no hay API keys. Crea una para
-que un sistema externo pueda leer o escribir datos de tu negocio.». Un negocio que todavía comparte su base de datos
-con otros no puede tener llaves, porque una llave suya podría abrir los datos de otro: en su lugar sale «Todavía no
-disponible» y «Las API keys todavía no están disponibles en este negocio.», hasta que pase a la suya.
+que un sistema externo pueda leer o escribir datos de tu negocio.».
 Implicados: BASE-F86, BASE-F87, BASE-F88
 
 ### BASE-F90 Consultar la documentación de la API
@@ -2939,6 +2940,42 @@ tiene una página publicada, el dominio dice que no hay nada ahí. Un negocio qu
 en un momento.
 Implicados: HUBS-F17, WEBSITE-F10
 
+### BASE-F111 Esperar a la base de datos cuando se corta un momento
+<!-- origen: nuevo (PLAN-DB, ronda 2026-11-04e, punto 5: un reinicio, un mantenimiento de AWS o el cambio de versión cortan la base unos segundos; gemelo de ACCOUNTS-F50 de erplora.com) gh:hub#831 -->
+Estado: hecho (las lecturas, lo que no llegó a empezar y los cambios de Demo; que se repitan también los cambios de las
+demás apps es hub#1051)
+Actor: cualquier persona del negocio en el Hub, en la web o en la app, y cualquier programa conectado por la API
+Pantalla: cualquiera del Hub, Página «Volvemos enseguida»
+Pasos:
+  1. La persona abre una pantalla o guarda algo mientras la base de datos se corta unos segundos: un reinicio, un
+     mantenimiento de AWS o el cambio de versión.
+  2. Lo que estaba leyendo espera y se vuelve a pedir solo, hasta 20 segundos en total. Si la base vuelve antes, la
+     pantalla llega como siempre: la persona solo nota que ha tardado.
+  3. Lo que estaba guardando espera igual cuando consta que no se aplicó nada: no llegó a empezar (abrir la base del
+     negocio o comprobar quién es la persona), o es un cambio que solo toca la base de datos y todavía no se había
+     confirmado. Hoy lo son los cambios de Demo, la app de referencia. Se guarda una sola vez y en su negocio, y el aviso
+     a las demás pantallas sale después de confirmarse.
+  4. Mientras espera no ocupa ninguna de las transacciones a la vez que da el plan del negocio: las demás personas del
+     negocio siguen trabajando.
+  5. Si se acaba el tiempo, quien abre la dirección del negocio en el navegador ve «Volvemos enseguida» con «ERPlora
+     vuelve en un momento: inténtalo de nuevo en unos segundos.», en una página que se recarga sola. Dentro de la app,
+     lo que no se pudo cargar o guardar lo dice en su sitio, como cualquier otro error.
+Entra: nada: la persona no hace nada distinto.
+Sale: la misma respuesta de siempre, con unos segundos de retraso; o, pasado el tiempo, una respuesta 503 con
+`Retry-After` y nunca un error del servidor. Un programa recibe el código `database_unavailable`, o
+`base.hub_unavailable` si lo que no responde es la base del negocio al abrirla.
+Si falla: lo que pudo aplicarse no se repite nunca a ciegas, y cada resultado dice el suyo. Un cambio de las demás apps
+cortado a medias o mientras se confirmaba pudo haber hecho algo fuera de la base (numerar una tarea o un ticket, un
+cobro, el envío a la AEAT, un WhatsApp): la persona lee «Se ha perdido la conexión mientras se guardaba. Comprueba si se
+ha guardado antes de volver a intentarlo.» y un programa, el código `database_outcome_unknown`. Si el guardado ya se
+había confirmado y el corte se llevó solo la respuesta, lee «Se ha guardado, pero la conexión se ha perdido antes de
+llegar la respuesta. Recarga la página en unos segundos para verlo.» (`database_answer_lost`). Lo que no es un corte (una
+consulta que tarda demasiado, un fallo del programa) sigue siendo el error de siempre. Las llamadas de erplora.com a
+`/internal` y `/readyz` reciben su 503 al momento, sin esperar: erplora.com reintenta por su cuenta, y `/readyz` tiene
+que decir que la base no está antes de que sus sondas se cansen.
+Implicados: ACCOUNTS-F50 (su gemelo de erplora.com), Demo (sus cambios se repiten), las demás páginas de espera del Hub
+(un negocio que se prepara o se muda de servidor: el mismo aspecto); hub#831, hub#1051 y hub#1052
+
 ## Para quien lo mantiene
 
 - **Dominio propio de un negocio** (BASE-F110, HUBS-F17, PLAN-SAAS §37 punto 2; `base/custom_domains.py`,
@@ -3158,8 +3195,10 @@ Implicados: HUBS-F17, WEBSITE-F10
   encender por sus datos. `base.import.list` se re-ejecuta también con `APP_EVENTS`, y `ImportPanel` y
   `BlueprintCardPending` siguen esa lista. Tests: `base/tests/test_blueprint_waits_for_apps.py`, con dos BD reales y el
   worker de verdad; e2e `tests/e2e/base-template-waits-for-apps.spec.ts`.
-- Fase 1: los negocios comparten base de datos, así que `base.hub.reset` sin `dry_run` responde 409
-  `base.reset_shared_database` (`available: false` en el plan) y «vacío» mira las filas de todos.
+- Un negocio sin BD propia (`hub.db_name` vacío) recibe de `base.hub.reset` sin `dry_run` un 409
+  `base.reset_shared_database` (`available: false` en el plan). Desde el corte S5 (hub#602) ninguno de
+  producción está así: solo lo alcanza el respaldo de los tests escritos antes de la tenencia
+  (`base/tenancy/tests/legacy.py`), y la rama se va con él (hub#611).
 - Frontend: `base/frontend/pages/SettingsPage.vue` (`/settings`, pestaña en el hash `#data`; `/import` y `/export`
   del viejo llevan aquí), `components/data/*` y `lib/data.ts`; la tarjeta `components/BlueprintCard.vue` («Ahora
   no» en `localStorage["hub-blueprint-card-dismissed"]`). Tests: `base/tests/test_blueprint.py`,
@@ -3686,7 +3725,8 @@ Implicados: HUBS-F17, WEBSITE-F10
   operación `expose_api`; la llave recibe el permiso de esa operación y nada más, con su ritmo por minuto y el freno
   por dirección (`KEY_ADDRESS_LIMIT`). Solo con `hub.db_name` (BD propia), que desde el corte (S5) tienen todos: sin
   ella, `base.api_key.*` responde 409 `base.api_keys_unavailable` y un `Bearer` no entra (test A≠B en
-  `base/tests/test_api_keys.py`).
+  `base/tests/test_api_keys.py`); esa rama, y el «Todavía no disponible» de sus pantallas, solo la alcanza el
+  respaldo de los tests (hub#1053).
 - Aprobación con PIN de un responsable: una app nombra sus órdenes aprobables en su `LiveAppConfig`
   (`approvals = {"sale.sale.void": _("Void a sale")}`; una consulta nunca, ni una orden `database=False`, que no abre
   transacción en la que gastar el pase: `base.E004` lo dice al arrancar). `base/approvals.py` pone su puerta

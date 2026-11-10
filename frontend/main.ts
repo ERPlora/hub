@@ -250,7 +250,7 @@ export async function boot(
     translate: (key, values) => (app.config.globalProperties as unknown as { $t: Translate }).$t(key, values),
     logout: () => signOut(doc),
     toast: (message) => void toastSuccess(message),
-    paint: (mode, palette) => applyUserThemePreferences(mode, palette as ThemePalette | null),
+    paint: (mode, palette, scale) => applyUserThemePreferences(mode, palette as ThemePalette | null, undefined, scale),
     reset: resetUserThemePreferences,
     label: () => session.session.value?.user?.label,
   });

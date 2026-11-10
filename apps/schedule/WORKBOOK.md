@@ -150,6 +150,13 @@ poder cambiarlo y sin **Guardar**.
 | App inactiva | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
 
+## Cambios sin guardar en Android
+
+En «Editar horario» de un día, «Nuevo día especial», «Nuevo cambio temporal» y su corrección («Editar · …»), el
+botón atrás del móvil pregunta «¿Descartar los cambios?» cuando hay algo escrito o elegido sin guardar: «Seguir
+editando» conserva lo tecleado y «Descartar cambios» cierra la ventana sin guardarlo. Con la ventana como se abrió,
+atrás la cierra sin preguntar (BASE-F05).
+
 ## Flujos
 
 | ID | Flujo | Estado |
@@ -575,8 +582,9 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
 - El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (ronda 12, PLAN §17), con
   los tramos como líneas de su día; ids y fechas de auditoría, de solo lectura. Una escritura cruda del
   admin no deja aviso.
-- Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`, como en
-  `demo`; lo que sí se separa son los avisos en vivo.
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD (desde el corte S5,
+  hub#602): los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
+  en la misma BD de test (`base/tenancy/tests/legacy.py`, hasta hub#611).
 - La semana por defecto la planta la migración `0002_default_week` (con su vuelta atrás, que solo quita
   la semana si sigue sin confirmar).
 - **El paso del Inicio** (PLAN-HUB ronda 2026-10-21; FIX-SCHEDULE-SETUP-HOOKS): `ScheduleConfig.setup` declara el

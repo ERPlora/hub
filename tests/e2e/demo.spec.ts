@@ -6,11 +6,13 @@
 //
 // It needs the SaaS with the demo door and its HUB_INTERNAL_URL on this stack's Hub (README of this folder,
 // «La demo»): the SaaS calls the Hub's /internal/demos itself, so a SaaS pointed at another Hub's port creates
-// the demo there and this run never finds it.
+// the demo there and this run never finds it. And its limit of new demos per address raised, as the README's recipe
+// starts it (`DEMO_SPAWN_RATELIMIT`, demo-door.ts): every run starts two from 127.0.0.1, and it lets 3 an hour.
 import { execFileSync } from 'node:child_process';
 
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
+import { doorOutcome, noDemoBecause } from './demo-door';
 import { api, collectProblems, createViaPage, HUB_DIR, listReady, rowNames, SAAS, shot, shown, turnOn, uniqueName } from './helpers';
 import { STACK } from './stack';
 
@@ -27,6 +29,18 @@ async function doorSays(page: Page, state: string): Promise<void> {
   await expect(page.getByTestId(`demo-state-${state}`)).toBeVisible();
 }
 
+/** The door's «Back to my demo»: a link, as the public web draws its buttons (`{% button %}`, saas#246), found by its
+ *  role and name, not by the element that draws it (an `ion-button` until then: hub#1040). */
+function backToMyDemo(page: Page): Locator {
+  return page.getByRole('link', { name: 'Back to my demo', exact: true });
+}
+
+/** Where «Back to my demo» goes: the jump into the demo `slug` on this stack's Hub (its `/auth/login`, the SaaS's
+ *  `hub_start_url`), never another demo's. */
+function jumpInto(slug: string): RegExp {
+  return new RegExp(`^http://${slug}\\.localhost:${STACK.hubPort}/auth/login\\?`);
+}
+
 /** How long a demo may take to be ready, door to shell: since S3 its sign-up is the clone of its template (every app off,
  *  an app's tables made when it is turned on), measured at 1.4–4.1 s from its request to `ready` with the worker's 5 s
  *  tick (2026-10-31; 13–32 s while every app's tables were made at sign-up). PLAN-DB §6 aims at 5 s: 15 s is the tick
@@ -34,10 +48,13 @@ async function doorSays(page: Page, state: string): Promise<void> {
 const DEMO_READY_MS = 15_000;
 
 /** «Try the demo» on the door, then the jump through the demo's /auth/login and callback: its slug, once its shell
- *  is up. */
+ *  is up. A door that answers with an outcome instead (`?state=throttled`…) fails the run at once saying which, not
+ *  as a demo that never got ready (hub#1048). */
 async function startDemo(page: Page): Promise<string> {
   await page.getByTestId('demo-start').click();
-  await page.waitForURL(DEMO_HOST, { timeout: DEMO_READY_MS });
+  await page.waitForURL((url) => DEMO_HOST.test(url.href) || doorOutcome(url.href, DOOR) !== null, { timeout: DEMO_READY_MS });
+  const refused = doorOutcome(page.url(), DOOR);
+  if (refused) throw new Error(noDemoBecause(refused));
   await shown(page).locator('[data-testid=topbar-apps]').waitFor({ state: 'attached', timeout: DEMO_READY_MS });
   const slug = DEMO_HOST.exec(page.url())?.[1];
   if (!slug) throw new Error(`not on a demo host: ${page.url()}`);
@@ -85,7 +102,7 @@ test('a demo from the SaaS door: empty hub as «Demo», something made, ended no
   // Back on the door, the session holds the live demo.
   await page.goto(DOOR);
   await doorSays(page, 'ready');
-  await expect(page.locator('ion-button', { hasText: 'Back to my demo' })).toHaveAttribute('href', new RegExp(`//${slug}\\.`));
+  await expect(backToMyDemo(page)).toHaveAttribute('href', jumpInto(slug));
 
   expect(expireNow(slug)).toBe(`${slug}: purged`);
 
@@ -102,7 +119,9 @@ test('a demo from the SaaS door: empty hub as «Demo», something made, ended no
   await back.click();
   await page.waitForURL(`${DOOR}?state=expired`);
   await doorSays(page, 'expired');
-  await expect(page.locator('ion-button', { hasText: 'Back to my demo' })).toHaveCount(0);
+  await expect(page.getByTestId('demo-start')).toBeVisible();
+  // Nothing on it offers the ended demo back, whatever draws the offer: a link, or a button that is not one.
+  await expect(page.getByText('Back to my demo', { exact: true })).toHaveCount(0);
   await page.screenshot({ path: shot('demo-03-door-expired') });
   await page.goto(DOOR);
   await doorSays(page, 'idle');

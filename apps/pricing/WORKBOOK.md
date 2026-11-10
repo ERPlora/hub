@@ -179,6 +179,12 @@ por Artículo, Desde y Precio; filtro por Tipo, con el embudo; 50 por página.
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
 | Tarifa que no existe | El detalle dice «Esta tarifa no existe» con **Volver**. |
 
+## Cambios sin guardar en Android
+
+En las ventanas de alta y edición de esta app, el botón atrás del móvil pregunta «¿Descartar los cambios?»
+cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar cambios»
+cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05); la moneda que se propone sola y el importe que se reescribe en la del negocio no cuentan como cambio.
+
 ## Flujos
 
 | ID | Flujo | Estado |
@@ -596,7 +602,7 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   UUID opaco con copia del nombre (precedente PLAN §20.5, el de Ventas).
 - **El grupo es un UUID, no una clave ajena**: Clientes borra los grupos de verdad
   (`customer.group.delete`), y con una clave ajena su borrado leería las tablas de Tarifas, que en un
-  hub sin Tarifas no existen (fase 2). Las variantes de base de datos de Django 6.1 (`DB_SET_NULL`) no
+  hub sin Tarifas no existen. Las variantes de base de datos de Django 6.1 (`DB_SET_NULL`) no
   sirven: `fields.E323` exige la misma variante en toda la cadena y los modelos de Inventario usan las
   de Python. Productos y categorías solo se borran de verdad desde el admin (Inventario los borra
   lógicamente): sus claves ajenas son `CASCADE`.
@@ -650,8 +656,9 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
 - Cantidades de las reglas: `Article.measure` (la cantidad en `pricing_unit`, con las fracciones exactas
   de `UNIT_SPECS`); el importe de la línea usa además `price_quantity` (`Article.ratio`). Los tramos de
   una tarifa siguen en la unidad propia del producto, que la tabla pinta junto a la cantidad («500 g»).
-- Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`, como en
-  `demo`; lo que sí se separa son los avisos en vivo.
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD (desde el corte S5,
+  hub#602): los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
+  en la misma BD de test (`base/tenancy/tests/legacy.py`, hasta hub#611).
 - **Orden de las tablas** (`base.ordering.list_order`, nota vigente del producto actual del 2026-09-28, hub#2355, como Ventas,
   Caja, Inventario y Tareas): la columna elegida y después el desempate, todo en la dirección de la lista y
   con los vacíos al final en las dos; `desc` es `asc` leído al revés, empates incluidos. Tarifas y reglas
@@ -660,28 +667,22 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
 
 ## Contradicciones señaladas (no se resuelven aquí)
 
-- **Fase 1 comparte las tablas entre hubs** (estado del repo, como `demo`): lo que se separa por ámbito
-  son los avisos en vivo; la frontera de una BD por hub llega en la fase 2. Este WORKBOOK describe el
-  comportamiento de un hub.
-- **`@operation` hoy no lanza `AppInactive`**: con Servicios instalada pero apagada, `service.service.get`
-  responde igual; `pricing.services_unavailable` solo salta si Servicios no está instalada
-  (`UnknownOperation`). El «Servicios no está activa en este negocio» de PRICING-F07 depende de que la
-  plataforma compruebe la app activa (fase 2).
+- ~~**`@operation` no lanzaba `AppInactive`**~~ — **resuelta** en la plataforma: con Servicios apagada en el
+  negocio, `service.service.get` lanza `AppInactive` (`base.entitlement.operation_database`) y `call_service`
+  responde, igual que sin Servicios instalada (`UnknownOperation`), 409 `pricing.services_unavailable`: el
+  «Servicios no está activa en este negocio» de PRICING-F07.
 - **Ventas no llama a Tarifas** (pricing#9 sigue abierto): ninguna app llama a `pricing.price.resolve`
   (`git grep` en `origin/main`); el `pricing` de Ventas es su propia valoración (`apps/sale/pricing.py`). El
   TPV cobra el precio de la ficha. PRICING-F13 es `hecho` como consulta (su test y `pricing-lists.spec.ts`);
   engancharla es de Ventas, con «Contrato con Ventas» como encargo.
-- **API keys**: el Hub aún no las tiene (`config/api.py`: «API keys (`erpk_live`) come in phase 2»).
-  `expose_api` marca lo que alcanzarán (`EXPOSED` en `tests/test_apps.py`).
-- **«Asistente» en los flujos** (actor de casi todos y el ejemplo de voz): es la operación con `ai=` y su
-  ruta de la API; el asistente del Hub aún no existe (la misma lectura de los cierres de Demo, Servicios,
-  Menús y Tareas).
-- **Fase 2 y las claves ajenas hacia Inventario** (`PriceItem.product`, `DiscountRule.product` y
-  `DiscountRule.category` en `CASCADE`): con «tablas al activar», el borrado físico de un producto o de una
-  categoría (el admin del Hub) en un hub donde Tarifas nunca se creó consultaría tablas que no existen. El
-  grupo ya es un UUID por eso mismo; lo anotó el «Para PLAN-DB» de
-  `docs/plans/2026-10-14-migracion-modulos.md` (Suplementos, Menús, Cocina y Tarifas) y PLAN-DB aún no lo
-  recoge.
+- ~~**API keys**: el Hub aún no las tenía~~ — **resuelta**: las llaves son de `base` (BASE-F86, `base/api_keys.py`) y
+  `expose_api` marca lo que alcanzan de Tarifas (`EXPOSED` en `tests/test_apps.py`).
+- ~~**«Asistente» en los flujos**~~ — **resuelta**: el actor de casi todos y el ejemplo de voz es el asistente del
+  Hub, que llama a la operación por su `ai=`, como las pantallas y la API.
+- ~~**Las claves ajenas hacia Inventario frente a «tablas al activar»**~~ (`PriceItem.product`,
+  `DiscountRule.product` y `DiscountRule.category` en `CASCADE`) — **resuelta** por hub#778: el borrado físico de
+  un producto o de una categoría (el admin del Hub) en un hub donde Tarifas nunca se creó pasa por alto la
+  relación con sus tablas, que no existen (`base/tenancy/deletion.py`). El grupo ya era un UUID por eso mismo.
 
 ## Cómo son las páginas (para quien lo mantiene)
 

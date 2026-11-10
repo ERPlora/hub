@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:516ec5f1afaf979effc32acf23f745e373ddb3343edc4624b5a633538dc3e531 -->
+<!-- generated from WORKBOOK.md sha256:4ecdc0c7a463a8841e5a2b2194092eb255f8bb42bd3badec169050c1d95c50f8 -->
 
 ## What it is for and who it is for
 
@@ -92,6 +92,12 @@ everyone else sees it read-only with "Only a manager or an administrator can cha
 On all three pages: "Reconnecting…" while the live connection recovers (what is painted stays), "This
 app is not active in this business" if it is turned off and "You do not have permission" if the role
 does not reach.
+
+## Unsaved changes on Android
+
+In the "Correct working day" window, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05); a time rewritten by itself in the business's time zone is no change.
 
 ## Flows
 
@@ -215,7 +221,9 @@ your device settings to read the workplace position, or type the coordinates.");
 manager sees the settings read-only. As in the form windows, the notice goes as soon as something is changed
 and a field's reason as soon as that field is corrected (the coordinates, as the pair they are: correcting one
 takes both reasons away); both come back if the next try is refused too. A refusal that names no field stays
-until the next try (hub#854).
+until the next try (hub#854). Tapping "Save" with nothing to send is a try too: it says "Settings saved." and
+takes away the red notice and the fields' reasons of the last refusal, which do not come back until the next
+refusal (hub#894).
 Involved: ATTENDANCE-F03, ATTENDANCE-F05
 
 ### ATTENDANCE-F05 Flag for review a working day nobody closed

@@ -143,6 +143,12 @@ la crea dentro del proyecto.
 | App inactiva | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
 
+## Cambios sin guardar en Android
+
+En «Nueva tarea», «Editando tarea» y «Nuevo proyecto», el botón atrás del móvil pregunta «¿Descartar los cambios?»
+cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar cambios» cierra
+la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05).
+
 ## Flujos
 
 | ID | Flujo | Estado |
@@ -525,8 +531,9 @@ cliente o a un compañero).
   **Creada el** y **Actualizada el** llevan el contexto `task` (`pgettext_lazy`), porque sin él saldrían el
   «creado por» de Inventario y el masculino del proyecto; el proyecto y el comentario siguen en masculino
   (`tests/test_admin.py`, `tests/test_i18n.py`).
-- Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`, como en
-  `demo`; lo que sí se separa son los avisos en vivo.
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD (desde el corte S5,
+  hub#602): los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
+  en la misma BD de test (`base/tenancy/tests/legacy.py`, hasta hub#611).
 
 ## Cómo son las páginas (para quien lo mantiene)
 

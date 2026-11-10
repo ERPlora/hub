@@ -227,6 +227,12 @@ fueran los del negocio.
 | App inactiva | «Esta app no está activa en este negocio» en lugar de las cifras y de la tabla. |
 | Sin permiso | No aparece lo que no puede hacer (ni **+**, ni importar o exportar, ni las acciones de stock, ni el interruptor: «Sí»/«No»); Ajustes no sale y su dirección dice «Esta página no existe»; si pierde el permiso con Ajustes abierto, los campos se bloquean con «No tienes permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas.». |
 
+## Cambios sin guardar en Android
+
+En las ventanas de categoría y de movimientos de stock (recibir, recuento y merma), el botón atrás del móvil pregunta «¿Descartar los cambios?»
+cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar cambios»
+cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05); el alta y la edición de producto preguntan igual (INVENTORY-F01, INVENTORY-F02).
+
 ## Flujos
 
 | ID | Flujo | Estado |
@@ -1322,7 +1328,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   decimales; exportar, importar y la etiqueta (F25) la preguntan a `base.operations.business_currency` como toda
   app que cobra (BASE-F50), sin copia propia: la de su país que contesta `base.business.get`, leída como la
   plataforma (una API key solo lleva el permiso de la operación), y en el hub propio de ERPlora, sin negocio en
-  erplora.com (fase 1, sin fila de registro: `create_platform_hub`), la del país de su emisor
+  erplora.com (su fila del registro y su BD las hace `create_platform_hub`), la del país de su emisor
   (`PLATFORM_ISSUER_COUNTRY`), como Ventas y Tarifas (`tests/test_business_currency.py`);
   la importación acepta su código y su símbolo alrededor de la cifra («PLN12.50», «12,50 zł»), no los de otra.
 - **Agotado (INVENTORY-F29, 2026-10-21)**: `Product.is_sold_out` con `db_default=False` (la 0003 solo

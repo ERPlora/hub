@@ -18,6 +18,7 @@ import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useT } from '../composables/useT';
 import { localDay, useBusinessMoney } from '../lib/format';
 import { parseMoney } from '../lib/money';
@@ -114,6 +115,8 @@ function goToMethods(): void {
   open.value = false;
   void router.push('/payment/methods');
 }
+
+useUnsavedFormOnOpen('payment-form', form, open);
 </script>
 
 <template>
