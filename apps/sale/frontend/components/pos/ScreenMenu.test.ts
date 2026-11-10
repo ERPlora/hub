@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SHELL_BACK_EVENT } from '../../../../../base/frontend/lib/system-back';
 import { click, mountSale } from '../../__tests__/mount-sale';
 import ScreenMenu from './ScreenMenu.vue';
+import source from './ScreenMenu.vue?raw';
 
 const PopoverStub = defineComponent({
   name: 'IonPopover',
@@ -113,5 +114,11 @@ describe('ScreenMenu', () => {
     await click(m.find('pos-screen-menu').element);
     m.wrapper.unmount();
     expect(pressBack()).toBe(false);
+  });
+
+  it('gives its trigger a 44px touch target on coarse-pointer devices', () => {
+    expect(source).toMatch(
+      /@media \(pointer: coarse\)\s*\{\s*\.pos-more__trigger\s*\{[^}]*min-width: 44px;[^}]*min-height: 44px;/s,
+    );
   });
 });

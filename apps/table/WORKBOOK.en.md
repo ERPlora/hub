@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fcb835d25e4be398df9612676e233b2da17b0a890114efc2b41fc63219163ffa -->
+<!-- generated from WORKBOOK.md sha256:e5a8e199cb5b542183ee9301377c396bb2c84bb4df6e67d149f4165c4b14d942 -->
 
 ## What it is for and who it is for
 
@@ -387,8 +387,8 @@ Involved: TABLE-F10, TABLE-F25, TABLE-F29, SALE-F19
 
 ### TABLE-F10 Seat a party at a free or reserved table
 Status: done
-Actor: employee, manager
-Screen: Floor plan (Service)
+Actor: employee, manager, assistant
+Screen: Floor plan (Service); assistant
 Steps:
 1. In **Floor plan → Service**, tap an Available or Reserved table. "Guests at table N" is asked, with
    the capacity (or the booking's guests) already set.
@@ -398,6 +398,7 @@ Steps:
 3. If you want, before seating "Assign customer" puts the card on the check (TABLE-F32).
 4. The table turns Occupied and its open check is born in Sales with the title "Table N" (**Open
    checks** of the till sees it). Whoever seats is the server of the check.
+5. With the assistant: "seat 3 at table 4" (with its zone if the number repeats).
 In: the table and the guests; on a Reserved one, the booking's guests.
 Out: the table check opened with its guests, the time and the server (announces:
 `table.session.opened`); its check in Sales (announces: `sale.order.opened`); the bookings held at that
@@ -468,12 +469,13 @@ Involved: TABLE-F24, SALE-F19
 
 ### TABLE-F14 Correct the guests of an occupied table
 Status: done
-Actor: employee, manager
-Screen: Floor plan (Service)
+Actor: employee, manager, assistant
+Screen: Floor plan (Service); assistant
 Steps:
 1. In the window of the occupied table tap "Guests".
 2. The question comes with the current guests; change them with a shortcut or with "−" / "+" and "Save".
 3. The table shows the new guests. On a split table the chosen check is corrected.
+4. With the assistant: "one more joined table 4, make it five"; on a split table, say which of its checks.
 In: the open check of the table.
 Out: the check's guests (announces: `table.session.updated`).
 If it fails: a check already closed, transferred, merged or parked is not corrected (the message of
@@ -482,8 +484,8 @@ Involved: TABLE-F10, TABLE-F17
 
 ### TABLE-F15 Move the check to another table (transfer)
 Status: done
-Actor: employee, manager
-Screen: Floor plan (Service)
+Actor: employee, manager, assistant
+Screen: Floor plan (Service); assistant
 Steps:
 1. In the window of the occupied table tap "Transfer".
 2. The plan says "Transfer N to…" and "Pick a free table": only the Available and Reserved ones can be
@@ -492,6 +494,7 @@ Steps:
 4. The check is the same one, now at the destination table, with its guests, its server, its notes, its
    arrival time and its new title in Sales ("Table M"); the origin one stays free if it has no other
    check left, and the destination one, Occupied (if it was Reserved, it spends the booking).
+5. With the assistant: "move table 4 to 6".
 In: the origin check and the destination table.
 Out: the origin check "Transferred" and a new table check at the destination with the same Sales check
 (announces: `table.session.transferred`).
@@ -523,8 +526,8 @@ Involved: TABLE-F17, SALE-F24
 
 ### TABLE-F17 Split the check of a table
 Status: done
-Actor: employee, manager
-Screen: Floor plan (Service)
+Actor: employee, manager, assistant
+Screen: Floor plan (Service); assistant
 Steps:
 1. In the window of the occupied table tap "Split check".
 2. Mark the lines that go to the new check (those of its check in Sales, each with its amount in the
@@ -532,6 +535,8 @@ Steps:
 3. Tables opens a second check at the same table (1 guest) and Sales moves the marked lines to it, in
    the same operation. Charging one closes only that one: the table stays Occupied with the other. It
    can be split even if the table is blocked or deactivated: nobody new is seated.
+4. With the assistant: "split table 4's check, they're paying separately" (naming no lines, the new one
+   is born empty).
 In: the open check of the table and the lines that move.
 Out: two open table checks at the same table, the new one hanging from the original (announces:
 `table.session.split` and `sale.order.opened`).
@@ -620,10 +625,12 @@ Involved: TABLE-F18, TABLE-F19, TABLE-F23
 ### TABLE-F23 Delete a closed check from the history
 Status: done
 Actor: administrator, assistant
-Screen: Sessions
+Screen: Sessions; assistant
 Steps:
 1. In **Sessions → Closed** (or **All**), "Delete" on a finished check and confirm it.
 2. It disappears from **Sessions**; it stays stored as deleted and its trail through the tables is kept.
+3. With the assistant: "delete table 4's closed check from the history"; it finds the check itself and
+   asks for confirmation.
 In: the table check.
 Out: the deleted check (announces: `table.session.deleted`).
 If it fails: an open or parked check is not deleted: "That check is still open: close it before

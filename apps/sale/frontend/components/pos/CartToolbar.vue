@@ -100,6 +100,12 @@ const emit = defineEmits<{ park: []; toggleChecks: []; close: [] }>();
   --padding-end: 0.3rem;
   --color: var(--ion-text-color, #1c1b18);
 }
+@media (pointer: coarse) {
+  .pos-toolbar__checks {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
 /* The room between the bar's icons, measured: «Assign customer» in two lines needs 10.5rem beside the table button's
    2.6rem, which a phone of 360 px has even with the count on «Open checks»; in less, a phone of 320 px, it would sit
    on «Open checks» (hub#630). */
