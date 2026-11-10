@@ -17,7 +17,7 @@ from live.operations import AI, Operation, registry
 from base import assistant
 from base.models import Membership
 from base.permissions import permissions_for
-from base.tests.test_assistant_asks import PROBES, comparable, probe_phrases
+from base.tests.test_assistant_asks import PROBES, TOP, comparable, probe_phrases
 
 A = Scope("host", "a")
 
@@ -89,6 +89,22 @@ def test_the_hub_reads_desactivar_as_a_deactivation_and_pido_as_a_request():
         concepts = shared.asked([phrase], assistant.SYNONYMS).concepts
         assert any(wanted in concept for concept in concepts), phrase
         assert not any(wanted in concept for concept in shared.asked([phrase]).concepts), phrase
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.EMPLOYEE])
+def test_what_one_asks_for_oneself_brings_the_request_among_the_first_ten(catalog_of, role):
+    """What the «pido» group of ``base.assistant.SYNONYMS`` is for, in a turn: a request for oneself nobody wrote as
+    an ask nor as a probe brings ``staff.time_off.request`` among the first ten (``TOP``), before the weeks of the rota
+    and the approvals; without the group, «pido vacaciones…» leaves it the 36th of the owner's 40 and the 16th of an
+    employee's."""
+    name, phrase = "staff.time_off.request", "pido vacaciones la primera semana de julio"
+    tools = catalog_of(role, "es")
+    assert name in tools  # positive control: the role holds it, so its place is known
+    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
+    assert comparable(phrase) not in probe_phrases()
+    offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
+    assert name in offered[:TOP], (len(offered), offered[:TOP])
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
