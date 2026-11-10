@@ -1279,6 +1279,7 @@ def _save_station(station: Station, **save) -> None:
 @operation(
     "kitchen.station.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="kitchen.manage_station",
     input=StationIn,
     output=StationOut,

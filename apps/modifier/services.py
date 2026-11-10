@@ -94,6 +94,7 @@ _CHECKS = {
 @operation(
     "modifier.group.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="modifier.manage",
     input=GroupIn,
     output=GroupOut,
@@ -116,6 +117,7 @@ def create_group(ctx: OperationContext, data: GroupIn) -> dict:
 @operation(
     "modifier.group.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="modifier.manage",
     input=GroupPatchIn,
     output=GroupOut,
@@ -160,6 +162,7 @@ def update_group(ctx: OperationContext, data: GroupPatchIn) -> dict:
 @operation(
     "modifier.group.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="modifier.manage",
     input=GroupRefIn,
     output=DeletedOut,
@@ -183,6 +186,7 @@ def delete_group(ctx: OperationContext, data: GroupRefIn) -> dict:
 @operation(
     "modifier.option.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="modifier.manage",
     input=OptionIn,
     output=OptionOut,
@@ -220,6 +224,7 @@ def create_option(ctx: OperationContext, data: OptionIn) -> dict:
 @operation(
     "modifier.option.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="modifier.manage",
     input=OptionPatchIn,
     output=OptionOut,
@@ -265,6 +270,7 @@ def update_option(ctx: OperationContext, data: OptionPatchIn) -> dict:
 @operation(
     "modifier.option.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="modifier.manage",
     input=OptionRefIn,
     output=DeletedOut,
@@ -288,6 +294,7 @@ def delete_option(ctx: OperationContext, data: OptionRefIn) -> dict:
 @operation(
     "modifier.link.attach",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="modifier.manage",
     input=LinkIn,
     output=LinkOut,
@@ -320,6 +327,7 @@ def attach_link(ctx: OperationContext, data: LinkIn) -> dict:
 @operation(
     "modifier.link.detach",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="modifier.manage",
     input=LinkRefIn,
     output=DeletedOut,

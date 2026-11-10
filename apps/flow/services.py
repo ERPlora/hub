@@ -285,6 +285,7 @@ def _decide_draft(
 @operation(
     "flow.flow.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE,
     input=CreateIn,
     output=FlowOut,
@@ -323,6 +324,7 @@ def create_flow(ctx: OperationContext, data: CreateIn) -> dict:
 @operation(
     "flow.flow.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE,
     input=UpdateIn,
     output=FlowOut,
@@ -384,6 +386,7 @@ def update_flow(ctx: OperationContext, data: UpdateIn) -> dict:
 @operation(
     "flow.flow.set_enabled",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE,
     input=EnabledIn,
     output=FlowOut,
@@ -414,6 +417,7 @@ def _switch(ctx: OperationContext, flow: Flow, enabled: bool) -> None:
 @operation(
     "flow.flow.duplicate",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE,
     input=FlowRefIn,
     output=FlowOut,
@@ -455,6 +459,7 @@ def duplicate_flow(ctx: OperationContext, data: FlowRefIn) -> dict:
 @operation(
     "flow.flow.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE,
     input=FlowRefIn,
     output=DeletedOut,
@@ -495,6 +500,7 @@ def delete_flow(ctx: OperationContext, data: FlowRefIn) -> dict:
 @operation(
     "flow.flow.grant",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE,
     input=GrantIn,
     output=FlowOut,
@@ -576,6 +582,7 @@ def _apply_recipe(ctx: OperationContext, flow: Flow, recipe: recipes.Recipe, now
 @operation(
     "flow.recipe.enable",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE,
     input=RecipeRefIn,
     output=RecipeEnabledOut,
@@ -617,6 +624,7 @@ def enable_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
 @operation(
     "flow.recipe.disable",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE,
     input=RecipeRefIn,
     output=FlowOut,
@@ -635,6 +643,7 @@ def disable_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
 @operation(
     "flow.recipe.restore",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE,
     input=RecipeRefIn,
     output=FlowOut,
@@ -663,6 +672,7 @@ def restore_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
 @operation(
     "flow.recipe.repair",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE,
     input=RecipeRefIn,
     output=FlowOut,
@@ -694,6 +704,7 @@ def repair_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
 @operation(
     "flow.secret.set",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE,
     input=SecretSetIn,
     output=SecretOut,
@@ -723,6 +734,7 @@ def set_secret(ctx: OperationContext, data: SecretSetIn) -> dict:
 @operation(
     "flow.secret.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE,
     input=SecretRefIn,
     output=DeletedOut,
@@ -749,6 +761,7 @@ def delete_secret(ctx: OperationContext, data: SecretRefIn) -> dict:
 @operation(
     "flow.draft.propose",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE,
     input=DraftProposeIn,
     output=DraftOut,
@@ -776,6 +789,7 @@ def propose_draft(ctx: OperationContext, data: DraftProposeIn) -> dict:
 @operation(
     "flow.draft.dismiss",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE,
     input=DraftRefIn,
     output=DraftOut,

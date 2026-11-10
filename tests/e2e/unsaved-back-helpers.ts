@@ -1,7 +1,7 @@
 // BASE-F05: one create window of an app, as the person reaches it. The installed app's Back is simulated at the edge;
 // every screen, form and confirmation is real. Nothing is saved: the dirty form asks, keeps what was typed on a second
 // Back, closes only on «Discard changes», opens blank again and closes cleanly when untouched, in three sizes.
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 import { A, capture, login, shown } from './helpers';
 import { insideTheApp, pressBack } from './system-back-helpers';
@@ -11,8 +11,8 @@ export interface UnsavedFormCase {
   flow: string;
   /** The screen that opens the window. */
   route: string;
-  /** The button that opens it. */
-  add: string;
+  /** The button that opens it (its `data-testid`), or what opens it on the screen when it is not a button (a row). */
+  add: string | ((page: Page) => Locator);
   /** The window's `data-testid`. */
   form: string;
   /** A text field of it, which opens blank. */
@@ -34,7 +34,7 @@ export async function expectBackAsksOnDirtyForm(page: Page, item: UnsavedFormCas
   await login(page, A);
   await insideTheApp(page);
   await page.goto(item.route);
-  const add = shown(page).locator(`[data-testid=${item.add}]`);
+  const add = typeof item.add === 'string' ? shown(page).locator(`[data-testid=${item.add}]`) : item.add(page);
   await expect(add).toBeVisible();
   const form = page.locator(`ion-modal[data-testid=${item.form}]`);
   const field = form.locator(`[data-testid=${item.field}] input`);

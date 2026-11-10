@@ -330,6 +330,7 @@ def _zone_out(zone: Zone) -> dict:
 @operation(
     "table.zone.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="table.add_zone",
     input=ZoneIn,
     output=ZoneOut,
@@ -360,6 +361,7 @@ def create_zone(ctx: OperationContext, data: ZoneIn) -> dict:
 @operation(
     "table.zone.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="table.change_zone",
     input=ZonePatchIn,
     output=ZoneOut,
@@ -387,6 +389,7 @@ def update_zone(ctx: OperationContext, data: ZonePatchIn) -> dict:
 @operation(
     "table.zone.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="table.delete_zone",
     input=ZoneRefIn,
     output=DeletedOut,
@@ -556,6 +559,7 @@ def bulk_create_tables(ctx: OperationContext, data: TableBulkIn) -> dict:
 @operation(
     "table.table.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="table.change_table",
     input=TablePatchIn,
     output=TableOut,
@@ -590,6 +594,7 @@ def update_table(ctx: OperationContext, data: TablePatchIn) -> dict:
 @operation(
     "table.table.move",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="table.change_table",
     input=TableMoveIn,
     output=TableOut,
@@ -615,6 +620,7 @@ def move_table(ctx: OperationContext, data: TableMoveIn) -> dict:
 @operation(
     "table.table.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="table.delete_table",
     input=TableRefIn,
     output=DeletedOut,
@@ -682,6 +688,7 @@ def _put_customer(ctx: OperationContext, order_id: UUID, customer_id: UUID | Non
 @operation(
     "table.session.open",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="table.add_session",
     input=SessionOpenIn,
     output=SessionOut,
@@ -735,6 +742,7 @@ def open_session(ctx: OperationContext, data: SessionOpenIn) -> dict:
 @operation(
     "table.session.close",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="table.change_session",
     input=SessionCloseIn,
     output=SessionOut,
@@ -780,6 +788,7 @@ def close_session(ctx: OperationContext, data: SessionCloseIn) -> dict:
 @operation(
     "table.session.transfer",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="table.transfer_session",
     input=SessionTransferIn,
     output=SessionOut,
@@ -845,6 +854,7 @@ def _merge_target(data: SessionMergeIn, source: TableSession) -> TableSession:
 @operation(
     "table.session.merge",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="table.transfer_session",
     input=SessionMergeIn,
     output=SessionOut,
@@ -907,6 +917,7 @@ def merge_session(ctx: OperationContext, data: SessionMergeIn) -> dict:
 @operation(
     "table.session.split",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="table.change_session",
     input=SessionSplitIn,
     output=SplitOut,
@@ -964,6 +975,7 @@ def split_session(ctx: OperationContext, data: SessionSplitIn) -> dict:
 @operation(
     "table.session.set_guests",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="table.change_session",
     input=SessionGuestsIn,
     output=SessionOut,
@@ -985,6 +997,7 @@ def set_guests(ctx: OperationContext, data: SessionGuestsIn) -> dict:
 @operation(
     "table.session.park",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="table.change_session",
     input=SessionRefIn,
     output=SessionOut,
@@ -1012,6 +1025,7 @@ def park_session(ctx: OperationContext, data: SessionRefIn) -> dict:
 @operation(
     "table.session.restore",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="table.change_session",
     input=SessionRestoreIn,
     output=SessionOut,
@@ -1045,6 +1059,7 @@ def restore_session(ctx: OperationContext, data: SessionRestoreIn) -> dict:
 @operation(
     "table.session.link_order",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="table.add_session",
     input=SessionLinkOrderIn,
     output=SessionOut,
@@ -1074,6 +1089,7 @@ def link_order(ctx: OperationContext, data: SessionLinkOrderIn) -> dict:
 @operation(
     "table.session.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="table.delete_session",
     input=ByIdIn,
     output=DeletedOut,
@@ -1150,6 +1166,7 @@ def _hold_event(ctx: OperationContext, name: str, hold: Hold) -> None:
 @operation(
     "table.hold.place",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="table.change_session",
     input=HoldPlaceIn,
     output=HoldOut,
@@ -1187,6 +1204,7 @@ def place_hold(ctx: OperationContext, data: HoldPlaceIn) -> dict:
 @operation(
     "table.hold.release",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="table.change_session",
     input=HoldReleaseIn,
     output=HoldOut,
@@ -1394,6 +1412,7 @@ def _settings_row_locked() -> TableSettings:
 @operation(
     "table.settings.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="table.manage_settings",
     input=SettingsIn,
     output=SettingsOut,

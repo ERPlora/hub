@@ -29,6 +29,8 @@ const props = defineProps<{
   label: string;
   /** The preview's total; `undefined` while it is on its way. */
   total: number | undefined;
+  /** Why the server could not value the check; `null` when its preview is valid or pending. */
+  previewError?: string | null;
   ticketDiscount: number;
   marks: readonly string[];
   staffNames: Readonly<Record<string, string>>;
@@ -239,6 +241,7 @@ function park(): void {
     <CartFooter
       :has-lines="hasLines"
       :total="total"
+      :preview-error="previewError"
       :discount-percent="order?.discount_percent ?? '0'"
       :discount-amount="order?.discount_amount ?? 0"
       :ticket-discount="ticketDiscount"

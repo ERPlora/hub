@@ -525,9 +525,9 @@ Pasos:
      «Inicio» está ahí aunque la lista aún cargue, esté vacía o no se haya podido leer.
   6. En la aplicación de Android, el botón atrás del móvil cierra primero lo que haya abierto encima (una
      ventana, una hoja o el menú); una ventana que no se puede cerrar así se queda, y una que guarda algo
-     escrito sin guardar y lo pide (en el alta y la edición de producto de Inventario y en las ventanas de alta y edición de Ventas, Mesas, Cocina, Clientes, Reservas, Citas, Personal, Servicios, Control horario, Carrito y pago, Caja, Menús, Suplementos, Pagos, Tarifas, Facturación, Impresión, Horarios, Tareas, Impuestos y la Bandeja de WhatsApp, en las de categoría y stock de Inventario y en «Nueva API key») pregunta antes
+     escrito sin guardar y lo pide (en el alta y la edición de producto de Inventario y en las ventanas de alta y edición de Ventas, Mesas, Cocina, Clientes, Reservas, Citas, Personal, Servicios, Control horario, Carrito y pago, Caja, Menús, Suplementos, Pagos, Tarifas, Facturación, Impresión, Horarios, Tareas, Impuestos y la Bandeja de WhatsApp, en las de categoría y stock de Inventario y en «Nueva API key», en las anulaciones con motivo de Reservas online, Pagos, Impresión, Reservas, Servicios, VeriFactu y Cocina (cancelar una comanda), en el motivo de «Descartar» un evento caído de Sistema, en «Nueva carpeta» y «Renombrar» de Archivos, en los pasos de importar productos, en las fichas de Tarea y Proyecto y en el alta rápida de cliente del TPV) pregunta antes
      «¿Descartar los cambios?»: «Seguir editando», o atrás otra vez, la deja como estaba, y «Descartar
-     cambios» la cierra (hub#1015, hub#1020, hub#1031). Sin nada abierto, en una ficha o un alta hace lo mismo que «Atrás»; en
+     cambios» la cierra (hub#1015, hub#1020, hub#1031, hub#1046). Sin nada abierto, en una ficha o un alta hace lo mismo que «Atrás»; en
      la pantalla principal de una app vuelve al Inicio, también si se llegó a ella por un enlace; y en el
      Inicio deja la aplicación en segundo plano.
 Entra: las apps del menú de la persona (las mismas del botón «Mis apps» de la barra).
@@ -542,7 +542,7 @@ trae la versión nueva; nunca se queda el toque sin hacer nada. Si el servidor n
 inestable), la persona se queda donde estaba y un aviso dice «No se ha podido abrir <app>. Comprueba la conexión e
 inténtalo de nuevo.» («esa página» si la pantalla no es de una app), con «Reintentar», que vuelve a probar y la abre
 en cuanto el servidor responde.
-Implicados: INVENTORY-F01, INVENTORY-F02, SALE-F35, TABLE-F01, KITCHEN-F01, CUSTOMER-F01, RESERVATION-F06, APPOINTMENT-F01, STAFF-F01, SERVICE-F01, ATTENDANCE-F08, CART_CHECKOUT-F01, CASH_REGISTER-F02, COMBO-F02, INVENTORY-F06, MODIFIER-F02, PAYMENT-F01, PRICING-F02, INVOICE-F03, PRINTING-F03, SCHEDULE-F04, TASK-F01, TAX-F02, WHATSAPP_INBOX-F29, BASE-F86
+Implicados: INVENTORY-F01, INVENTORY-F02, SALE-F35, TABLE-F01, KITCHEN-F01, CUSTOMER-F01, RESERVATION-F06, APPOINTMENT-F01, STAFF-F01, SERVICE-F01, ATTENDANCE-F08, CART_CHECKOUT-F01, CASH_REGISTER-F02, COMBO-F02, INVENTORY-F06, MODIFIER-F02, PAYMENT-F01, PRICING-F02, INVOICE-F03, PRINTING-F03, SCHEDULE-F04, TASK-F01, TAX-F02, WHATSAPP_INBOX-F29, BASE-F86, ONLINE_BOOKING-F05, PAYMENT-F05, PRINTING-F14, RESERVATION-F09, SERVICE-F17, VERIFACTU-F30, BASE-F73, BASE-F75, INVENTORY-F09, TASK-F09, TASK-F10, TASK-F13, CUSTOMER-F18, KITCHEN-F22, BASE-F46
 
 ### BASE-F06 Ver los paneles de las apps en Inicio
 <!-- origen: old-hub:HUB_SHELL-F33 -->
@@ -2942,8 +2942,7 @@ Implicados: HUBS-F17, WEBSITE-F10
 
 ### BASE-F111 Esperar a la base de datos cuando se corta un momento
 <!-- origen: nuevo (PLAN-DB, ronda 2026-11-04e, punto 5: un reinicio, un mantenimiento de AWS o el cambio de versión cortan la base unos segundos; gemelo de ACCOUNTS-F50 de erplora.com) gh:hub#831 -->
-Estado: hecho (las lecturas, lo que no llegó a empezar y los cambios de Demo; que se repitan también los cambios de las
-demás apps es hub#1051)
+Estado: hecho
 Actor: cualquier persona del negocio en el Hub, en la web o en la app, y cualquier programa conectado por la API
 Pantalla: cualquiera del Hub, Página «Volvemos enseguida»
 Pasos:
@@ -2953,8 +2952,8 @@ Pasos:
      pantalla llega como siempre: la persona solo nota que ha tardado.
   3. Lo que estaba guardando espera igual cuando consta que no se aplicó nada: no llegó a empezar (abrir la base del
      negocio o comprobar quién es la persona), o es un cambio que solo toca la base de datos y todavía no se había
-     confirmado. Hoy lo son los cambios de Demo, la app de referencia. Se guarda una sola vez y en su negocio, y el aviso
-     a las demás pantallas sale después de confirmarse.
+     confirmado. Esto vale para Demo y para los comandos locales de las demás apps. Se guarda una sola vez y en su
+     negocio, y el aviso a las demás pantallas sale después de confirmarse.
   4. Mientras espera no ocupa ninguna de las transacciones a la vez que da el plan del negocio: las demás personas del
      negocio siguen trabajando.
   5. Si se acaba el tiempo, quien abre la dirección del negocio en el navegador ve «Volvemos enseguida» con «ERPlora
@@ -2964,17 +2963,18 @@ Entra: nada: la persona no hace nada distinto.
 Sale: la misma respuesta de siempre, con unos segundos de retraso; o, pasado el tiempo, una respuesta 503 con
 `Retry-After` y nunca un error del servidor. Un programa recibe el código `database_unavailable`, o
 `base.hub_unavailable` si lo que no responde es la base del negocio al abrirla.
-Si falla: lo que pudo aplicarse no se repite nunca a ciegas, y cada resultado dice el suyo. Un cambio de las demás apps
-cortado a medias o mientras se confirmaba pudo haber hecho algo fuera de la base (numerar una tarea o un ticket, un
-cobro, el envío a la AEAT, un WhatsApp): la persona lee «Se ha perdido la conexión mientras se guardaba. Comprueba si se
-ha guardado antes de volver a intentarlo.» y un programa, el código `database_outcome_unknown`. Si el guardado ya se
-había confirmado y el corte se llevó solo la respuesta, lee «Se ha guardado, pero la conexión se ha perdido antes de
-llegar la respuesta. Recarga la página en unos segundos para verlo.» (`database_answer_lost`). Lo que no es un corte (una
-consulta que tarda demasiado, un fallo del programa) sigue siendo el error de siempre. Las llamadas de erplora.com a
-`/internal` y `/readyz` reciben su 503 al momento, sin esperar: erplora.com reintenta por su cuenta, y `/readyz` tiene
-que decir que la base no está antes de que sus sondas se cansen.
-Implicados: ACCOUNTS-F50 (su gemelo de erplora.com), Demo (sus cambios se repiten), las demás páginas de espera del Hub
-(un negocio que se prepara o se muda de servidor: el mismo aspecto); hub#831, hub#1051 y hub#1052
+Si falla: lo que pudo aplicarse no se repite nunca a ciegas, y cada resultado dice el suyo. Un comando excluido porque
+numera, cobra, genera un QR, envía a la AEAT, manda un correo o un WhatsApp, llama a un tercero o escribe fuera de su
+transacción (en caché, sesiones, control o el almacén de ficheros), cortado a medias o mientras se confirmaba: la
+persona lee «Se ha perdido la conexión mientras se guardaba. Comprueba si se ha guardado antes de volver a intentarlo.»
+y un programa, el código `database_outcome_unknown`. Si el guardado ya se había confirmado y el corte se llevó solo la
+respuesta, lee «Se ha guardado, pero la conexión se ha perdido antes de llegar la respuesta. Recarga la página en unos
+segundos para verlo.» (`database_answer_lost`). Lo que no es un corte (una consulta que tarda demasiado, un fallo del
+programa) sigue siendo el error de siempre. Las llamadas de erplora.com a `/internal` y `/readyz` reciben su 503 al
+momento, sin esperar: erplora.com reintenta por su cuenta, y `/readyz` tiene que decir que la base no está antes de que
+sus sondas se cansen.
+Implicados: ACCOUNTS-F50 (su gemelo de erplora.com), todas las apps con cambios locales que se repiten, las demás páginas
+de espera del Hub (un negocio que se prepara o se muda de servidor: el mismo aspecto); hub#831, hub#1051 y hub#1052
 
 ## Para quien lo mantiene
 
