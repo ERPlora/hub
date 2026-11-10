@@ -8,6 +8,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useLocale, useT } from '../composables/useT';
 import { formatDay, formatTime } from '../lib/clock';
 import type { ReservationOut } from '../operations';
@@ -25,6 +27,7 @@ const noShow = useCommand('reservation.reservation.no_show');
 const remove = useCommand('reservation.reservation.delete');
 const command = computed(() => ({ cancel, no_show: noShow, delete: remove })[props.kind]);
 const reason = ref('');
+useUnsavedFormOnOpen('reservation-step-cancel', reason, open);
 
 const KEYS: Record<StepKind, string> = { cancel: 'cancel', no_show: 'noShow', delete: 'delete' };
 const key = computed(() => KEYS[props.kind]);

@@ -63,6 +63,8 @@ import { HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonButtons, IonContent, IonHeader, IonInput, IonModal, IonTitle, IonToolbar } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { refusalFields } from '../lib/apiErrors';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 import CustomerPicker from './CustomerPicker.vue';
@@ -116,6 +118,11 @@ function remove(): void {
 const quickOpen = ref(false);
 const quickName = ref('');
 const quickPhone = ref('');
+useUnsavedFormOnOpen(
+  'customer-search-modal',
+  () => ({ name: quickName.value, phone: quickPhone.value }),
+  () => open.value && quickOpen.value,
+);
 const create = useCommand('customer.customer.create');
 const quickErrors = computed(() => refusalFields(create.error.value));
 const quickFailure = computed(() => (create.error.value && !Object.keys(quickErrors.value).length ? create.error.value.message : ''));

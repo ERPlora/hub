@@ -161,3 +161,28 @@ describe('ProjectSheet', () => {
     expect(s.text('task-project-sheet-toggle')).toBe('Desactivar');
   });
 });
+
+
+describe('ProjectSheet: Android Back with unsaved changes (hub#1046, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('task-project-sheet'),
+      change: () => ionValue(s.el('task-project-sheet-name'), 'Grand opening', 'ionInput'),
+      restore: () => ionValue(s.el('task-project-sheet-name'), 'Opening', 'ionInput'),
+    });
+  });
+
+  it('closing after discarding clears the edited fields and the half-written new task', async () => {
+    const s = await setup();
+    await ionValue(s.el('task-project-sheet-name'), 'Grand opening', 'ionInput');
+    await ionValue(s.el('task-project-sheet-new-task'), 'Hang the sign', 'ionInput');
+    await s.wrapper.setProps({ open: false });
+    await settle();
+    await s.wrapper.setProps({ open: true });
+    await settle();
+    expect(s.el('task-project-sheet-name').value).toBe('Opening');
+    expect(s.el('task-project-sheet-new-task').value).toBe('');
+  });
+});

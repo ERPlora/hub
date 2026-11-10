@@ -52,3 +52,16 @@ describe('CancelJobModal', () => {
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
   });
 });
+
+
+describe('CancelJobModal: Android Back with unsaved changes (hub#1046, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('printing-cancel-job'),
+      change: () => ionValue(s.inDoc('printing-cancel-job-reason'), 'customer left', 'ionInput'),
+      restore: () => ionValue(s.inDoc('printing-cancel-job-reason'), '', 'ionInput'),
+    });
+  });
+});
