@@ -477,9 +477,8 @@ describe('MemberFormModal: who may open it', () => {
 });
 
 describe('MemberFormModal: fields refused with the same words (hub#888)', () => {
-  // A new record's fields, each refused under its own key. Role and Hub user are Combos, which hub#888 leaves for
-  // @erplora/ui: a Combo does not hand its name to the field FormModal reads.
-  const KEYS = ['first_name', 'last_name', 'email', 'phone', 'employee_number', 'booking_buffer', 'hire_date', 'color', 'specialties', 'bio', 'hourly_rate', 'commission_rate', 'notes'];
+  // A new record's fields, each refused under its own key; Role and Hub user are Combos, named by the key of their id.
+  const KEYS = ['first_name', 'last_name', 'email', 'phone', 'employee_number', 'role_id', 'user_id', 'booking_buffer', 'hire_date', 'color', 'specialties', 'bio', 'hourly_rate', 'commission_rate', 'notes'];
   itTellsTheCorrectedFieldApart(KEYS, async (locale, refusal) => {
     const s = await setup(null, { locale, routes: { '/api/staff/members': [422, refusal] } });
     const send = async () => {

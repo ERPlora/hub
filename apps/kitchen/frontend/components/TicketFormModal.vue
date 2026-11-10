@@ -184,6 +184,7 @@ async function save(): Promise<void> {
           <Combo
             :model-value="entry.product"
             :testid="`kitchen-ticket-form-dish-${index}-product`"
+            :name="dishField(entry, 'product_id')"
             :search="findProducts"
             :label="t('kitchen.form.product')"
             :error-text="refused(fieldErrors, dishField(entry, 'product_id')).errorText"

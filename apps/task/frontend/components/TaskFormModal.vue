@@ -195,6 +195,7 @@ useUnsavedForm('task-form', () => (open.value ? form.value : original.value), or
         <Combo
           v-if="!task"
           testid="task-form-assignee"
+          name="assigned_to_id"
           :model-value="form.assignee"
           :search="findMembers"
           :label="$t('task.form.assignee')"
@@ -204,6 +205,7 @@ useUnsavedForm('task-form', () => (open.value ? form.value : original.value), or
         />
         <Combo
           testid="task-form-project"
+          name="project_id"
           :model-value="form.project"
           :search="findProjects"
           :label="$t('task.form.project')"

@@ -200,11 +200,11 @@ describe('PriceListFormModal', () => {
   });
 });
 
-// The customer group is a Combo (@erplora/ui), which does not hand a name to its field yet: left out here.
 describe('PriceListFormModal: fields refused with the same words (hub#888)', () => {
   /** Each field of the window by the key the server refuses it under. */
   const TESTID: Record<string, string> = {
     code: 'code',
+    customer_group_id: 'group',
     name: 'name',
     currency: 'currency',
     tax_included: 'tax',

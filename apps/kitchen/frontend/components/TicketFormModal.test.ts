@@ -5,6 +5,7 @@ import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { ticket } from '../__tests__/kitchen';
 import { click, ionValue, mountKitchen, settle } from '../__tests__/mount-kitchen';
 import TicketFormModal from './TicketFormModal.vue';
@@ -221,6 +222,21 @@ describe('TicketFormModal', () => {
     expect(f.field('submit').textContent?.trim()).toBe('Crear comanda');
     expect(f.field('add-dish').textContent?.trim()).toBe('Añadir plato');
   });
+});
+
+describe('TicketFormModal: fields refused with the same words (hub#888)', () => {
+  // Two dishes with their product (a Combo, named by its place in what was sent) and a label, each refused under its
+  // own key.
+  const FIELD_OF: Record<string, string> = { 'items.0.product_id': 'dish-0-product', 'items.1.product_id': 'dish-1-product', 'items.1.quantity': 'dish-1-quantity' };
+  itTellsTheCorrectedFieldApart(['label', 'items.0.product_id', 'items.1.product_id', 'items.1.quantity'], async (locale, refusal) => {
+    const f = await form({}, { '/api/kitchen/tickets': [422, refusal] }, locale);
+    f.combo(0)!.vm.$emit('update:modelValue', { id: 'p1', label: 'Burger' });
+    await settle();
+    await click(f.field('add-dish'));
+    f.combo(1)!.vm.$emit('update:modelValue', { id: 'p2', label: 'Salad' });
+    await settle();
+    return { field: (key) => f.field(FIELD_OF[key] ?? key), send: () => click(f.field('submit')), settle };
+  }, 'items.1.product_id');
 });
 
 describe('TicketFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {

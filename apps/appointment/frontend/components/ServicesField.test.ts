@@ -8,15 +8,23 @@ import type { ServiceFacts } from '../lib/pickers';
 import { business, click, mountAppointment, page, POLISH, settle } from '../__tests__/mount-appointment';
 import ServicesField from './ServicesField.vue';
 
-async function setup(modelValue = [{ id: 'cut', label: 'Haircut' }]) {
+async function setup(modelValue = [{ id: 'cut', label: 'Haircut' }], props: Record<string, unknown> = {}) {
   const facts = new Map<string, ServiceFacts>();
-  const m = await mountAppointment(ServicesField, { props: { modelValue, facts, testid: 'appointment-form' } });
+  const m = await mountAppointment(ServicesField, { props: { modelValue, facts, testid: 'appointment-form', ...props } });
   m.answerBy({ '/api/service/services/for_sale': [200, page([{ id: 'colour', name: 'Colour', price: 4500, duration_minutes: 60, is_bookable: true }])] });
   const combo = () => m.wrapper.findComponent(Combo);
   return { ...m, facts, combo };
 }
 
 describe('ServicesField', () => {
+  it('hands its name to the search, so the window tells that a service added corrects a refusal of the services (hub#888)', async () => {
+    const s = await setup([], { name: 'services', errorText: 'Check this field.' });
+    await settle();
+    const field = s.wrapper.get('ion-input[data-testid="appointment-form-service-add"]').element as HTMLElement & { name?: string };
+    expect(field.name).toBe('services');
+    expect(s.combo().props('errorText')).toBe('Check this field.');
+  });
+
   it('shows the services chosen and adds one from the catalog, keeping its facts', async () => {
     const s = await setup();
     expect(s.find('appointment-form-service-cut').html()).toContain('Haircut');

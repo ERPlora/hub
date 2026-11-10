@@ -6,7 +6,7 @@
 // booked and skipped). «Edit repeating appointment»: the change applies from a date on («From») — the
 // panel says how many booked appointments it reaches and how many charged ones it leaves alone — and
 // «Save from this occurrence on» sends only what changed.
-import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
+import { type ComboOption, FormModal } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -15,10 +15,11 @@ import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-chan
 
 import CustomerSearch, { type CustomerSnapshot } from '../../../customer/frontend/components/CustomerSearch.vue';
 import { useT } from '../composables/useT';
-import { eligibleStaff, ownTerms, type ServiceFacts } from '../lib/pickers';
+import { ownTerms, type ServiceFacts } from '../lib/pickers';
 import type { Frequency, MaterializeOut, RecurringCreateIn, RecurringOut, RecurringUpdatedOut, RecurringUpdateIn } from '../operations';
 import SeriesScopeHint from './SeriesScopeHint.vue';
 import ServicesField from './ServicesField.vue';
+import StaffField from './StaffField.vue';
 
 const FREQUENCIES: readonly Frequency[] = ['daily', 'weekly', 'biweekly', 'monthly'];
 const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
@@ -67,7 +68,6 @@ const error = computed(() => (props.series ? update.error.value : create.error.v
 const editing = computed(() => props.series !== null);
 const weekly = computed(() => frequency.value === 'weekly' || frequency.value === 'biweekly');
 const serviceIds = computed(() => services.value.map((option) => option.id));
-const searchStaff = (query: string) => eligibleStaff(client, serviceIds.value, query);
 
 const ready = computed(
   () =>
@@ -222,19 +222,16 @@ const text = (value: unknown): string => (value === null || value === undefined 
           v-model="services"
           :facts="facts"
           testid="series-form"
+          name="services"
           :error-text="fieldErrors.services"
         />
-        <Combo
-          testid="series-form-staff"
-          :model-value="staff"
-          :search="searchStaff"
-          :label="t('appointment.form.staff')"
-          :placeholder="t('appointment.form.pickStaff')"
-          :empty-label="t('appointment.form.staffNone')"
+        <StaffField
+          v-model="staff"
+          :service-ids="serviceIds"
+          testid="series-form"
+          name="staff"
           :error-text="fieldErrors.staff"
-          :clearable="!ownStaff"
-          :disabled="!!ownStaff"
-          @update:model-value="staff = $event"
+          :own="!!ownStaff"
         />
         <ion-input
           v-if="series"
