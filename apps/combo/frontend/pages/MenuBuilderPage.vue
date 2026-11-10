@@ -29,7 +29,7 @@ const session = useSession();
 const canManage = computed(() => session.can('combo.manage'));
 const t = useT();
 const locale = useLocale();
-/** The business's currency (its country's), a bare figure until it answers: never a euro by default. */
+/** The business's currency (its country's), a dash until it answers: never a euro by default. */
 const money = useBusinessMoney();
 
 const { data: menu, status, error } = useLive('combo.combo.get', () => ({ id: props.id }));

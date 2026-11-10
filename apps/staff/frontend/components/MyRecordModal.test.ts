@@ -105,7 +105,7 @@ describe('MyRecordModal: the business\'s currency (staff-business-currency)', ()
     expect(rate(await setup('en', JAPANESE, { ...MINE, hourly_rate: 1500 }))).toBe('¥1,500');
   });
 
-  it('until the business answers, a figure without a symbol, never euros', async () => {
-    expect(rate(await setup('en', null))).toBe('12.50');
+  it('until the business answers, a dash, never euros', async () => {
+    expect(rate(await setup('en', null))).toBe('—');
   });
 });

@@ -47,7 +47,7 @@ const canCancel = computed(() => session.can('kitchen.cancel_ticket'));
 
 const { data: settings } = useLive('kitchen.settings.get', {});
 const timezone = computed(() => settings.value?.timezone ?? 'Europe/Madrid');
-// The Total in the business's currency (its country's, with the server's decimals); a bare figure until it answers.
+// The Total in the business's currency (its country's, with the server's decimals); a dash until it answers.
 const money = useBusinessMoney();
 
 const table = useServerTable({ sort: '-received_at' });

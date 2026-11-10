@@ -6,7 +6,7 @@
 // SKU, From (with the product's unit), Price (in the list's currency) and Catalog price, «Search product
 // or service…», a Type filter, 50 a page by item. «+» adds a price; a row is edited or removed (asking
 // first). A list that does not exist says so, with Back. Its prices are in its own currency; the catalog's,
-// in the business's (its country's; a bare figure until it answers), and only a list in the business's
+// in the business's (its country's; a dash until it answers), and only a list in the business's
 // currency can be made general.
 import {
   ConfirmDialog,

@@ -4,7 +4,7 @@
 // the menu does on the receipt and, when the till does not offer it yet, why. Then «Courses», one card
 // each in their order (the handle and the arrows save the whole order at once; «Withdraw» asks first),
 // and «Add a course», which edits the course whose «Edit details» was pressed. The closed price and the
-// supplements are in the business's currency (its country's); a bare figure until it answers, never a euro.
+// supplements are in the business's currency (its country's); a dash until it answers, never a euro.
 import { ConfirmDialog, InlineFeedback } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
@@ -106,10 +106,10 @@ describe('MenuBuilderPage', () => {
     expect(s.wrapper.text()).not.toContain('€');
   });
 
-  it('until the business answers the closed price is a figure without a symbol, never a euro', async () => {
+  it('until the business answers the closed price is a dash, never a euro', async () => {
     const s = await setup({ business: null });
     await s.show(MENU);
-    expect(s.inDoc('combo-builder-price')?.textContent).toBe('13.50');
+    expect(s.inDoc('combo-builder-price')?.textContent).toBe('—');
     await s.result('base.business.get', business(POLISH));
     expect(s.inDoc('combo-builder-price')?.textContent?.replace(/[\u00a0\u202f]/g, ' ')).toBe('zł 13.50');
   });

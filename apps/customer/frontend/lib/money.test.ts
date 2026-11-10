@@ -1,8 +1,8 @@
 // Money on the customer screens (WORKBOOK «Reglas que no se rompen»: money travels in minor units; the
 // screen paints and the «Spent» filter is typed in the business's currency, flow customer-business-currency).
 // One parser, so no page scales by hand (an amount is written with the platform's `formatMoney`). The decimals are
-// the server's (`currency_decimals`), never the browser's Intl; while the business has not answered, a figure without
-// a symbol, never the euro by default.
+// the server's (`currency_decimals`), never the browser's Intl; while the business has not answered, an amount is a
+// dash, never the euro by default.
 import { describe, expect, it } from 'vitest';
 
 import { centsFromAmount, type Money, readAmount, recordMoney } from './money';

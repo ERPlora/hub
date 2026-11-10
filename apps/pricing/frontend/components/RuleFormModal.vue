@@ -6,7 +6,7 @@
 // Priority (100). A row's Edit opens «Editing rule — {name}» and «Save» sends only what changed: a new
 // type with its value, a new scope with its target (the server empties the old ones). Refusals stay in
 // the dialog, under their field. The amount, and the catalog prices beside the products and services, are in
-// the business's currency (its country's; a bare figure until it answers, and then an untouched amount takes its
+// the business's currency (its country's; a dash until it answers, and then an untouched amount takes its
 // decimals). «Create» and «Save» wait in grey until the business has answered its money (the amount is read in it;
 // hub#921); if that read fails, the dialog says so with «Retry» (hub#938).
 import { Combo, type ComboOption, FormModal, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';

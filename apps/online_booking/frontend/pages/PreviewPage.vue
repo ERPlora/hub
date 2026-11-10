@@ -4,7 +4,7 @@
 // templates) will call in-process — services, a professional or «No preference», a day and a free time, name
 // and mobile, book; then the booking seen and cancelled with the personal link. One-shot calls of the API
 // client (what is public is not followed live). A price is in the business's money (BASE-F50: «20,00 zł» in Poland,
-// the figure alone until it answers), as the diary paints it. Never part of a production build.
+// a dash until it answers), as the diary paints it. Never part of a production build.
 import { InlineFeedback, useRefusal } from '@erplora/ui/components';
 import { ApiError, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage } from '@erplora/ui/shell';

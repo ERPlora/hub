@@ -24,10 +24,10 @@ afterEach(() => {
 });
 
 describe('formatMoney', () => {
-  it('writes minor units with their thousands grouped from four digits on, with or without the currency', () => {
+  it('writes minor units with their thousands grouped, or a dash while the currency is unknown', () => {
     expect(formatMoney(123456, 'es', { currency: 'EUR', decimals: 2 })).toMatch(/^1\.234,56\s€$/);
     expect(formatMoney(1500, 'es', { currency: 'JPY', decimals: 0 })).toMatch(/^1\.500\s¥$/);
-    expect(formatMoney(123456, 'es')).toBe('1.234,56');
+    expect(formatMoney(123456, 'es')).toBe('—');
   });
 
   it('only takes a number: an amount that may be missing does not compile', () => {

@@ -1041,7 +1041,7 @@ que no tiene ningún papel: solo el sistema (`*`).
   `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#655).
 - **Moneda**: el Total de Comandas va en la moneda del negocio (`useBusinessMoney` de `base`, la de
   `base.business.get`) con los decimales del servidor, nunca los de `Intl` (el forint) ni un euro por defecto:
-  mientras el negocio no contesta, una cifra sin símbolo. El `total` del servidor ya va en unidades menores de la
+  mientras el negocio no contesta, un importe es «—», nunca con decimales supuestos. El `total` del servidor ya va en unidades menores de la
   moneda de la venta (FIX-HUB-KITCHEN-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY, como Caja en hub#273).
 - Toda lista pagina (`limit` ≤ 100) con desempate por `id`; el tablero tiene un tope de 200 comandas en
   marcha (`truncated`).

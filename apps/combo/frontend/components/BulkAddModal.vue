@@ -39,7 +39,7 @@ interface Article {
 const locale = useLocale();
 const t = useT();
 const client = useLiveClient();
-/** The business's currency (its country's), a bare figure until it answers: never a euro by default. */
+/** The business's currency (its country's), a dash until it answers: never a euro by default. */
 const money = useBusinessMoney();
 const add = useCommand('combo.option.bulk_create');
 const articles = ref<Article[]>([]);

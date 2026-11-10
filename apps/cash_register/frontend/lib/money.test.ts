@@ -1,7 +1,7 @@
 // Money of the drawer screens: the server keeps whole cents; a person reads money in the page's language and
 // types it as she reads it («150,50», «1.250,50»). One gate reads every money field: empty, an amount,
 // or why it is not one (garbage, negative, or «1.250», which reads two ways). Money is in the business's currency
-// (flow business-currency): the one the screen passes, and until it is known a figure without a symbol, never the euro.
+// (flow business-currency): the one the screen passes, and until it is known only a dash, never the euro.
 import { describe, expect, it } from 'vitest';
 
 import { formatFace, formatMoney, formatSignedMoney, moneyFieldText, moneyRefusal, plain, readAmount, readMoney } from './money';
@@ -28,7 +28,7 @@ describe('formatMoney', () => {
     expect(plain(formatMoney(123456789, 'es', EUR))).toBe('1.234.567,89 €');
     expect(plain(formatMoney(123456, 'en', EUR))).toBe('€1,234.56');
     expect(plain(formatMoney(-123456, 'es', EUR))).toBe('-1.234,56 €');
-    expect(plain(formatMoney(123456, 'es'))).toBe('1.234,56');
+    expect(plain(formatMoney(123456, 'es'))).toBe('—');
     expect(plain(formatMoney(99999, 'es', EUR))).toBe('999,99 €');
     expect(plain(formatSignedMoney(123456, 'es', EUR))).toBe('+1.234,56 €');
   });
@@ -143,10 +143,11 @@ describe('money of the business (flow business-currency)', () => {
     expect(plain(formatMoney(123450, 'hu', HUF))).toBe('1 234,50 Ft');
   });
 
-  it('until the business’s currency is known a figure has no symbol, never the euro', () => {
-    expect(plain(formatMoney(15050, 'es'))).toBe('150,50');
-    expect(plain(formatMoney(15050, 'en'))).toBe('150.50');
-    expect(plain(formatSignedMoney(510, 'es'))).toBe('+5,10');
+  it('until the business’s currency is known money and its sign are only a dash, never the euro', () => {
+    expect(plain(formatMoney(15050, 'es'))).toBe('—');
+    expect(plain(formatMoney(15050, 'en'))).toBe('—');
+    expect(plain(formatSignedMoney(510, 'es'))).toBe('—');
+    expect(plain(formatSignedMoney(-490, 'en'))).toBe('—');
     expect(plain(formatFace('500', 'es'))).toBe('500');
     expect(plain(formatFace('0.50', 'en'))).toBe('0.50');
   });
