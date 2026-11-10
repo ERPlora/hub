@@ -406,7 +406,7 @@ ninguno en yenes), `last_purchase_at`, `created_at`,
 un apóstrofo delante para que la hoja de cálculo no lo lea como una fórmula; la importación lo quita.
 Si falla: sin permiso de exportar, el servidor lo rechaza aunque se llame por la API. Sin fichas,
 sale un fichero solo con las cabeceras.
-Implicados: ninguno
+Implicados: BASE-F112 (dentro de la app)
 
 ### CUSTOMER-F10 Reconocer a una persona por su número de teléfono
 <!-- origen: wf:whatsapp-cita#rec_wa_cita-f03 old:customers/workflow/identidad-y-privacidad.md#customers-f10 wf:whatsapp-mesa#rec_wa_mesa-f03 -->

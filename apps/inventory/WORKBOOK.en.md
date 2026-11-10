@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f052b6763967616da6f18a0000454235aa7e248b0fde29886ce953d0eb9b8800 -->
+<!-- generated from WORKBOOK.md sha256:672cfb9b3b77a1e33898c95275cb48ed5927882cc4e09c9359577655c76862f5 -->
 
 ## What it is for and who it is for
 
@@ -515,7 +515,7 @@ If it fails: with no products, the file carries only the header. Without permiss
 button does not show and the app does not hand it over through any other door. A text a spreadsheet
 would run as a formula (it starts with =, +, -, @…) comes out with an apostrophe in front, which the
 import removes.
-Involved: none
+Involved: BASE-F112 (inside the app)
 
 ### INVENTORY-F12 Load the menu of a sector template
 Status: done
