@@ -1,0 +1,11 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261108.employee.es.kitchen.station.list","app":"kitchen","tool":"kitchen.station.list","role":"employee","language":"es","phrase":"¿qué puestos hay ahora mismo en cocina y cuánto trabajo tiene cada uno?","expect":"read"},
+    {"id":"qa20261108.employee.es.kitchen.ticket.reprint","app":"kitchen","tool":"kitchen.ticket.reprint","role":"employee","language":"es","phrase":"vuelve a imprimir la comanda «Comida personal QA», que el papel se ha manchado","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.employee.es.kitchen.ticket.serve","app":"kitchen","tool":"kitchen.ticket.serve","role":"employee","language":"es","phrase":"ya he entregado «Comida personal QA»; márcala como servida","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.employee.es.kitchen.routing.clear","app":"kitchen","tool":"kitchen.routing.clear","role":"employee","language":"es","phrase":"quita la asignación del Café a Plancha QA para que no vaya a ningún puesto","expect":"refused"},
+    {"id":"qa20261108.employee.es.kitchen.settings.update","app":"kitchen","tool":"kitchen.settings.update","role":"employee","language":"es","phrase":"apaga el sonido de cocina y pon el aviso rojo a los 5 minutos","expect":"refused"},
+    {"id":"qa20261108.employee.es.kitchen.station.delete","app":"kitchen","tool":"kitchen.station.delete","role":"employee","language":"es","phrase":"borra el puesto Plancha QA de cocina, que sobra","expect":"refused"}
+  ]
+}
