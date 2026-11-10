@@ -47,6 +47,7 @@ import {
   tooLarge,
 } from '../lib/files';
 import { useBaseI18n } from '../lib/i18n';
+import { useUnsavedFormOnOpen } from '../lib/unsaved-changes';
 import type { FileItem } from '../operations';
 
 /** A file or a folder of the open folder, as the actions take it. */
@@ -264,6 +265,8 @@ async function download(item: FileItem): Promise<void> {
 const renaming = ref<Entry | null>(null);
 const renameOpen = ref(false);
 const renameName = ref('');
+useUnsavedFormOnOpen('files-new-folder-dialog', folderName, folderOpen);
+useUnsavedFormOnOpen('files-rename-dialog', renameName, renameOpen);
 const renameError = computed(() =>
   rename.error.value ? { message: reasonOf(rename.error.value, renameName.value) } : null,
 );

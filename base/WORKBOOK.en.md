@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2bd7620360a4a8bc4fd73e23da65bbbee6ec1d239a1bb6965254b989d6694fda -->
+<!-- generated from WORKBOOK.md sha256:6a451abc028439f33ec4117951f90b7e987fb54cfab92d12a468436530c0e487 -->
 
 ## What it is for and who it is for
 
@@ -512,9 +512,9 @@ Steps:
      there even while the list loads, when it is empty or when it could not be read.
   6. In the Android app, the phone's back button first closes whatever is open on top (a window, a sheet
      or the menu); a window that cannot be closed that way stays, and one that holds something typed and
-     not saved and asks for it (when creating and editing a product in Inventory and in the create and edit windows of Sales, Tables, Kitchen, Customers, Reservations, Appointments, Staff, Services, Time clock, Cart & Checkout, Cash register, Menus and combos, Modifiers, Payments, Price Lists, Invoicing, Printing, Schedule, Tasks, Taxes and the WhatsApp Inbox, in Inventory's category and stock windows and in "New API key") asks first "Discard
+     not saved and asks for it (when creating and editing a product in Inventory and in the create and edit windows of Sales, Tables, Kitchen, Customers, Reservations, Appointments, Staff, Services, Time clock, Cart & Checkout, Cash register, Menus and combos, Modifiers, Payments, Price Lists, Invoicing, Printing, Schedule, Tasks, Taxes and the WhatsApp Inbox, in Inventory's category and stock windows and in "New API key", in the cancellation-reason windows of Online bookings, Payments, Printing, Reservations, Services, VeriFactu and Kitchen (cancelling a ticket), in the reason for "Discard" on a failed event in System, in "New folder" and "Rename" in Files, in the product-import steps, in the Task and Project sheets and in quick customer creation at the till) asks first "Discard
      changes?": "Keep editing", or back again, leaves it as it was, and "Discard changes" closes it
-     (hub#1015, hub#1020, hub#1031). With nothing open, on a record or a new one it does the same as "Back"; on the main screen
+     (hub#1015, hub#1020, hub#1031, hub#1046). With nothing open, on a record or a new one it does the same as "Back"; on the main screen
      of an app it goes back to the Home, also when that screen was reached through a link; and on the Home
      it sends the app to the background.
 In: the apps of the person's menu (the same as the bar's "My apps" button).
@@ -528,7 +528,7 @@ any button), in a fresh load of the page, which already brings the new version; 
 the server does not answer (offline or on a flaky network), the person stays where they were and a notice says
 "Could not open <app>. Check the connection and try again." ("that page" when the screen is not an app's), with
 "Retry", which tries again and opens it as soon as the server answers.
-Involved: INVENTORY-F01, INVENTORY-F02, SALE-F35, TABLE-F01, KITCHEN-F01, CUSTOMER-F01, RESERVATION-F06, APPOINTMENT-F01, STAFF-F01, SERVICE-F01, ATTENDANCE-F08, CART_CHECKOUT-F01, CASH_REGISTER-F02, COMBO-F02, INVENTORY-F06, MODIFIER-F02, PAYMENT-F01, PRICING-F02, INVOICE-F03, PRINTING-F03, SCHEDULE-F04, TASK-F01, TAX-F02, WHATSAPP_INBOX-F29, BASE-F86
+Involved: INVENTORY-F01, INVENTORY-F02, SALE-F35, TABLE-F01, KITCHEN-F01, CUSTOMER-F01, RESERVATION-F06, APPOINTMENT-F01, STAFF-F01, SERVICE-F01, ATTENDANCE-F08, CART_CHECKOUT-F01, CASH_REGISTER-F02, COMBO-F02, INVENTORY-F06, MODIFIER-F02, PAYMENT-F01, PRICING-F02, INVOICE-F03, PRINTING-F03, SCHEDULE-F04, TASK-F01, TAX-F02, WHATSAPP_INBOX-F29, BASE-F86, ONLINE_BOOKING-F05, PAYMENT-F05, PRINTING-F14, RESERVATION-F09, SERVICE-F17, VERIFACTU-F30, BASE-F73, BASE-F75, INVENTORY-F09, TASK-F09, TASK-F10, TASK-F13, CUSTOMER-F18, KITCHEN-F22, BASE-F46
 
 ### BASE-F06 See the apps' panels on the Home
 Status: done

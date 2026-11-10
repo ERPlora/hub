@@ -8,6 +8,8 @@ import { FormModal, InlineFeedback } from '@erplora/ui/components';
 import { IonSelect, IonSelectOption, IonSpinner } from '@ionic/vue';
 import { computed } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import type { Rehearsal } from '../composables/useProductImport';
 import type { CsvTable } from '../lib/csv';
@@ -30,6 +32,7 @@ const props = withDefaults(
   { pending: false },
 );
 const open = defineModel<boolean>('open', { default: false });
+useUnsavedFormOnOpen('inventory-import-preview', () => props.mapping, open);
 const emit = defineEmits<{ setMapping: [index: number, field: ProductImportField | '']; confirm: []; cancel: [] }>();
 
 const { t } = useT();

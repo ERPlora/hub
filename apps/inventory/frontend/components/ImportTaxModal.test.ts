@@ -101,3 +101,23 @@ describe('ImportTaxModal', () => {
     expect(s.el('inventory-import-tax-text')?.textContent?.trim()).toBe('Filas sin categoría fiscal');
   });
 });
+
+
+describe('ImportTaxModal: Android Back with unsaved changes (hub#1046, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const unresolved = [{ text: 'Vino', choice: choice('create', 'Vino') }];
+    const s = await setup(unresolved);
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.el('inventory-import-tax'),
+      change: async () => {
+        await s.wrapper.setProps({ unresolved: [{ text: 'Vino', choice: { ...choice('create', 'Vino'), newKey: 'drinks.wine' } }] });
+        await flush();
+      },
+      restore: async () => {
+        await s.wrapper.setProps({ unresolved });
+        await flush();
+      },
+    });
+  });
+});

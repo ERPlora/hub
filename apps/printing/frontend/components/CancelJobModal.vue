@@ -8,6 +8,8 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { IonTextarea } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useLocale, useT } from '../composables/useT';
 import { jobTitle } from '../lib/format';
 import { refusal } from '../lib/refusal';
@@ -21,6 +23,7 @@ const t = useT();
 const locale = useLocale();
 const cancel = useCommand('printing.job.cancel');
 const reason = shallowRef('');
+useUnsavedFormOnOpen('printing-cancel-job', reason, open);
 
 watch(
   open,
