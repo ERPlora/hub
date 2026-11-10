@@ -12,6 +12,8 @@ import { useSession } from '@erplora/ui/shell';
 import { IonButton, IonButtons, IonContent, IonHeader, IonInput, IonModal, IonTitle, IonToolbar } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { STATUS_TONE } from '../lib/format';
 import type { ProjectPatchIn } from '../operations';
@@ -42,6 +44,11 @@ const editColor = ref('');
 /** The name and colour the inputs started from: what Save compares with. */
 const base = ref({ name: '', color: '' });
 const newTask = ref('');
+useUnsavedForm(
+  'task-project-sheet',
+  () => ({ name: editName.value, color: editColor.value, newTask: newTask.value }),
+  () => ({ ...base.value, newTask: '' }),
+);
 const sheetError = ref<ApiError | null>(null);
 const deleteOpen = ref(false);
 
@@ -67,6 +74,12 @@ watch(
     base.value = { name, color };
   },
 );
+watch(open, (isOpen) => {
+  if (isOpen) return;
+  editName.value = base.value.name;
+  editColor.value = base.value.color;
+  newTask.value = '';
+});
 
 async function send(changes: Omit<ProjectPatchIn, 'id' | 'project'>): Promise<void> {
   if (!project.value || busy.value) return;

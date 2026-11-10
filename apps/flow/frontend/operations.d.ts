@@ -393,9 +393,16 @@ export interface CatalogActionOut {
   ask_first?: boolean;
 }
 
+export interface CatalogAppOut {
+  app: string;
+  app_name: string;
+}
+
 export interface CatalogOut {
   events: CatalogEventOut[];
   actions: CatalogActionOut[];
+  /** The installed apps that are off in the business: what a saved automation may still name (hub#1054). */
+  off_apps: CatalogAppOut[];
 }
 
 export interface SampleIn {

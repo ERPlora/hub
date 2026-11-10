@@ -227,6 +227,7 @@ def _reordered(rows, wanted: list[UUID]) -> None:
 @operation(
     "combo.combo.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=ComboIn,
     output=ComboDetailOut,
@@ -254,6 +255,7 @@ def create_combo(ctx: OperationContext, data: ComboIn) -> dict:
 @operation(
     "combo.combo.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=ComboPatchIn,
     output=ComboDetailOut,
@@ -300,6 +302,7 @@ def update_combo(ctx: OperationContext, data: ComboPatchIn) -> dict:
 @operation(
     "combo.combo.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=ComboRefIn,
     output=DeletedOut,
@@ -331,6 +334,7 @@ PHOTOS = "combo/combos/"
 @operation(
     "combo.combo.set_image",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=ComboImageIn,
     output=ComboDetailOut,
@@ -400,6 +404,7 @@ def _name_free(combo_id: UUID, name: str, exclude: UUID | None = None) -> None:
 @operation(
     "combo.group.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=GroupIn,
     output=GroupOut,
@@ -433,6 +438,7 @@ def create_group(ctx: OperationContext, data: GroupIn) -> dict:
 @operation(
     "combo.group.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=GroupPatchIn,
     output=GroupOut,
@@ -475,6 +481,7 @@ def update_group(ctx: OperationContext, data: GroupPatchIn) -> dict:
 @operation(
     "combo.group.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=GroupRefIn,
     output=DeletedOut,
@@ -495,6 +502,7 @@ def delete_group(ctx: OperationContext, data: GroupRefIn) -> dict:
 @operation(
     "combo.group.reorder",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=GroupReorderIn,
     output=ComboDetailOut,
@@ -529,6 +537,7 @@ def _product_free(
 @operation(
     "combo.option.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=OptionIn,
     output=OptionOut,
@@ -563,6 +572,7 @@ def create_option(ctx: OperationContext, data: OptionIn) -> dict:
 @operation(
     "combo.option.bulk_create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=OptionBulkIn,
     output=GroupOut,
@@ -600,6 +610,7 @@ def bulk_create_options(ctx: OperationContext, data: OptionBulkIn) -> dict:
 @operation(
     "combo.option.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=OptionPatchIn,
     output=OptionOut,
@@ -650,6 +661,7 @@ def update_option(ctx: OperationContext, data: OptionPatchIn) -> dict:
 @operation(
     "combo.option.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=OptionRefIn,
     output=DeletedOut,
@@ -675,6 +687,7 @@ def delete_option(ctx: OperationContext, data: OptionRefIn) -> dict:
 @operation(
     "combo.option.reorder",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=OptionReorderIn,
     output=GroupOut,

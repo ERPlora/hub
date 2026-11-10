@@ -259,7 +259,7 @@ const tableError = computed(() => (status.value === 'error' && listError.value ?
             data-testid="flow-list-bulk-enable"
             @click="bulk(true)"
           >
-            {{ $t('flow.list.bulkEnable') }}
+            {{ $t('flow.list.bulkEnable', selected.length) }}
           </IonButton>
           <IonButton
             size="small"
@@ -268,7 +268,7 @@ const tableError = computed(() => (status.value === 'error' && listError.value ?
             data-testid="flow-list-bulk-pause"
             @click="bulk(false)"
           >
-            {{ $t('flow.list.bulkPause') }}
+            {{ $t('flow.list.bulkPause', selected.length) }}
           </IonButton>
         </div>
       </template>

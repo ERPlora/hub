@@ -310,3 +310,19 @@ describe('CustomerSearch: markup', () => {
     for (const tag of source.match(/<ion-(input|select|textarea)\b[^>]*>/gs) ?? []) if (/fill=/.test(tag)) expect(tag).toMatch(/mode="md"/);
   });
 });
+
+
+describe('CustomerSearch: Android Back with unsaved changes (hub#1046, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup(null, undefined, true);
+    await s.results([]);
+    await s.type('customer-picker-search', 'Marta');
+    await s.click('customer-search-quick-add');
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.el('customer-search-modal'),
+      change: () => s.type('customer-search-quick-name', 'Marta López'),
+      restore: () => s.type('customer-search-quick-name', 'Marta'),
+    });
+  });
+});

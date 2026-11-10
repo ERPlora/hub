@@ -80,7 +80,7 @@ def test_every_app_a_factory_recipe_names_has_its_name_in_the_catalog():
     rows = [*catalog.events, *catalog.actions]
     named = {row.app for row in rows}
     wanted = set()
-    for _config, recipe in recipes.declarations():
+    for _config, recipe in recipes.declarations(A):
         steps = recipe.get("steps") or []
         names = [(recipe.get("trigger") or {}).get("event", ""), *(step.get("operation", "") for step in steps)]
         names += [tool for step in steps for tool in step.get("tools") or []]
@@ -134,7 +134,7 @@ def test_the_catalog_offers_what_a_step_leaves_inside_an_object_never_inside_a_l
     assert "invoice.lines" in invoice
     assert not [path for path in invoice if path.startswith(("invoice.lines.", "invoice.tax_breakdown."))]
     # The same paths the engine resolves, for every action and read: nothing walked twice.
-    operations = queries.ask_first_catalog()
+    operations = queries.ask_first_catalog(A)
     for name, action in actions.items():
         assert action.outputs[: len(queries.step_data(operations[name]))] == list(queries.step_data(operations[name])), name
 
@@ -142,7 +142,7 @@ def test_the_catalog_offers_what_a_step_leaves_inside_an_object_never_inside_a_l
 def test_what_a_step_leaves_is_read_from_one_build_of_its_schema(monkeypatch):
     """The catalog walks some 500 operations on every read: what a step leaves, inside its objects too, comes from a
     single build of its output's schema (a second one per operation cost the editor half a second more)."""
-    op = queries.ask_first_catalog()["cart_checkout.item.add"]
+    op = queries.ask_first_catalog(A)["cart_checkout.item.add"]
     built = []
     schema = op.output.model_json_schema
     monkeypatch.setattr(op.output, "model_json_schema", lambda *args, **kwargs: built.append(1) or schema(*args, **kwargs))
@@ -150,16 +150,22 @@ def test_what_a_step_leaves_is_read_from_one_build_of_its_schema(monkeypatch):
     assert len(built) == 1
 
 
-def test_an_app_that_is_not_active_is_not_in_the_catalog(monkeypatch):
-    active = {
-        label: config
-        for label, config in queries.active_apps().items()
-        if label != "task"
-    }
-    monkeypatch.setattr(queries, "active_apps", lambda: active)
+def test_an_app_that_is_not_active_is_not_in_the_catalog():
+    run("base.app.disable", {"app": "task"})
     catalog = run("flow.catalog.read")
     assert not any(event.app == "task" for event in catalog.events)
     assert not any(action.app == "task" for action in catalog.actions)
+
+
+def test_the_catalog_names_the_apps_that_are_off_so_the_editor_can_say_why_a_step_is_missing(
+    django_capture_on_commit_callbacks,
+):
+    assert "task" not in [app.app for app in run("flow.catalog.read").off_apps]
+    with django_capture_on_commit_callbacks(execute=True):
+        run("base.app.disable", {"app": "task"})
+    off = run("flow.catalog.read").off_apps
+    assert {"app": "task", "app_name": "Tasks"} in [app.model_dump() for app in off]
+    assert "flow" not in [app.app for app in off]
 
 
 def test_the_catalog_needs_view():
@@ -492,10 +498,10 @@ def test_try_says_what_the_action_would_refuse_and_what_it_is_not_allowed():
 def test_try_says_an_action_of_an_app_that_is_not_here_is_unavailable(monkeypatch):
     active = {
         label: config
-        for label, config in queries.active_apps().items()
+        for label, config in queries.active_apps(A).items()
         if label != "task"
     }
-    monkeypatch.setattr(queries, "active_apps", lambda: active)
+    monkeypatch.setattr(queries, "active_apps", lambda _scope: active)
     outbox("sale.sale.completed", {"total": 20000})
     document = {"trigger": {"kind": "manual"}, "steps": [TASK_STEP]}
     assert try_(document).steps[0].outcome == "unavailable"
@@ -623,8 +629,8 @@ def test_a_recipe_turned_on_says_which_automation_it_is_and_how_it_is():
 
 
 def test_a_recipe_this_business_cannot_offer_is_listed_apart_with_its_reason(monkeypatch):
-    active = {label: config for label, config in queries.active_apps().items() if label != "task"}
-    monkeypatch.setattr(queries, "active_apps", lambda: active)
+    active = {label: config for label, config in queries.active_apps(A).items() if label != "task"}
+    monkeypatch.setattr(queries, "active_apps", lambda _scope: active)
     listed = run("flow.recipe.list")
     assert GAP not in {recipe.ref for recipe in listed.recipes}
     aside = next(item for item in listed.set_aside if item.ref == GAP)

@@ -133,6 +133,7 @@ TRANSITIONS = {
 @operation(
     "staff.member.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="staff.add_member",
     input=MemberIn,
     output=MemberDetailOut,
@@ -161,6 +162,7 @@ def create_member(ctx: OperationContext, data: MemberIn) -> Member | None:
 @operation(
     "staff.member.bulk_create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="staff.add_member",
     input=BulkCreateIn,
     output=BulkCreatedOut,
@@ -215,6 +217,7 @@ def _bulk_row(row: Any) -> tuple[str | None, dict]:
 @operation(
     "staff.member.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="staff.change_member",
     input=MemberPatchIn,
     output=MemberDetailOut,
@@ -257,6 +260,7 @@ def update_member(ctx: OperationContext, data: MemberPatchIn) -> Member | None:
 @operation(
     "staff.member.deactivate",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="staff.delete_member",
     input=MemberRefIn,
     output=MemberDetailOut,
@@ -281,6 +285,7 @@ def deactivate_member(ctx: OperationContext, data: MemberRefIn) -> Member | None
 @operation(
     "staff.member.terminate",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="staff.delete_member",
     input=TerminateIn,
     output=TerminatedOut,
@@ -398,6 +403,7 @@ def lock_members(ids) -> list[UUID]:
 @operation(
     "staff.role.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="staff.manage_settings",
     input=RoleIn,
     output=RoleOut,
@@ -417,6 +423,7 @@ def create_role(ctx: OperationContext, data: RoleIn) -> Role | None:
 @operation(
     "staff.role.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="staff.manage_settings",
     input=RolePatchIn,
     output=RoleOut,
@@ -458,6 +465,7 @@ def _save_role(role: Role, **options: Any) -> None:
 @operation(
     "staff.schedule.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="staff.manage_settings",
     input=ScheduleIn,
     output=ScheduleOut,
@@ -491,6 +499,7 @@ def create_schedule(ctx: OperationContext, data: ScheduleIn) -> Schedule | None:
 @operation(
     "staff.schedule.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="staff.manage_settings",
     input=ScheduleUpdateIn,
     output=ScheduleOut,
@@ -536,6 +545,7 @@ def update_schedule(ctx: OperationContext, data: ScheduleUpdateIn) -> Schedule |
 @operation(
     "staff.schedule.set_active",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="staff.manage_settings",
     input=SetActiveIn,
     output=ScheduleOut,
@@ -562,6 +572,7 @@ def set_schedule_active(ctx: OperationContext, data: SetActiveIn) -> Schedule | 
 @operation(
     "staff.schedule.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="staff.manage_settings",
     input=ScheduleRefIn,
     output=DeletedOut,
@@ -623,6 +634,7 @@ def _write_week(schedule: Schedule, days: list) -> None:
 @operation(
     "staff.time_off.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="staff.manage_time_off",
     input=TimeOffIn,
     output=TimeOffDetailOut,
@@ -641,6 +653,7 @@ def create_time_off(ctx: OperationContext, data: TimeOffIn) -> TimeOff | None:
 @operation(
     "staff.time_off.request",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="staff.request_time_off",
     input=TimeOffRequestIn,
     output=TimeOffDetailOut,
@@ -693,6 +706,7 @@ def _register_time_off(
 @operation(
     "staff.time_off.approve",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="staff.manage_time_off",
     input=TimeOffRefIn,
     output=TimeOffDetailOut,
@@ -727,6 +741,7 @@ def approve_time_off(ctx: OperationContext, data: TimeOffRefIn) -> TimeOff | Non
 @operation(
     "staff.time_off.reject",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="staff.manage_time_off",
     input=TimeOffRefIn,
     output=TimeOffDetailOut,
@@ -740,6 +755,7 @@ def reject_time_off(ctx: OperationContext, data: TimeOffRefIn) -> TimeOff | None
 @operation(
     "staff.time_off.cancel",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="staff.request_time_off",
     input=TimeOffRefIn,
     output=TimeOffDetailOut,
@@ -811,6 +827,7 @@ def _finish_move(
 @operation(
     "staff.settings.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="staff.manage_settings",
     input=SettingsIn,
     output=SettingsOut,
