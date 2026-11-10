@@ -55,6 +55,8 @@ for (const viewport of VIEWPORTS) {
     await page.goto(`${A}/files`);
     const files = shown(page).locator('[data-testid="files-manager"]');
     await expect(files.locator('[data-testid="files-view-list"]')).toBeVisible();
+    // «New folder» and «Upload» come with the listing's permissions: measured once they are there (hub#1075).
+    await expect(files.locator('[data-testid="files-upload"]')).toBeVisible();
     await expect44(files.locator('ion-button[size="small"]:visible'), 'files');
     expect(await horizontalOverflow(page), `files at ${viewport.width}px`).toBeLessThanOrEqual(1);
 
