@@ -110,7 +110,11 @@ APP_WORDS = shared.app_words
 #: panel); a ticket or a receipt is a sale's, as the till's screens say («Tickets hoy», «Ticket medio», the «Tique» it
 #: prints), never the kitchen's, which is named by its app («la cocina»); a «placa» is a person's badge; the «unidades»
 #: are Inventory's units of measure (``inventory.unit``), and a «albarán», the «mercancía» or what «entran» (never
-#: «entrada»: its stem is that of «entre») is the goods ``inventory.stock.receive`` records.
+#: «entrada»: its stem is that of «entre») is the goods ``inventory.stock.receive`` records. An «automatización» or a
+#: «flujo» is an automation (``flow.flow``), its «ejecución» (or what «ejecuta») a run of it (``flow.run``,
+#: ``flow.flow.run``), its «pasos» its steps, a «pregunta» the question an automation waits on (``flow.question``), a
+#: «borrador» a draft (the assistant's, ``flow.draft``; the website's draft says «draft» too) and a «receta» a
+#: ready-made automation (``flow.recipe``). «Borrar» stems apart from «borrador» («borr»), all but «borrad».
 SYNONYMS = (
     ("cuenta", "check", "tab", "order"),
     ("ticket", "tique", "recibo", "receipt", "sale"),
@@ -121,6 +125,12 @@ SYNONYMS = (
         "albaran", "mercancia", "entran", "recibir", "recibe", "recibido", "receive", "received", "goods",
         "delivery note",
     ),
+    ("automatizacion", "automatizaciones", "automatiza", "automation", "automations", "flujo", "flow"),
+    ("ejecucion", "ejecuciones", "run", "runs"),
+    ("pregunta", "preguntas", "question", "questions"),
+    ("paso", "pasos", "step", "steps"),
+    ("borrador", "borradores", "draft", "drafts"),
+    ("receta", "recetas", "recipe", "recipes"),
 )
 #: The help a how-to question asks for (``live.assistant.HOWTO_POINTS``): it ranks by being one, not only by ``ALWAYS``.
 HOWTO = (DOCS_SEARCH,)
