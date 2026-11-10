@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3ca2007efbba0b3c9022057a1f8a6a3e897ddd44c39aed987615ab1380d539bf -->
+<!-- generated from WORKBOOK.md sha256:9c3ba2579e0563126f3154fa449fc28a603e18f08dc6f04eb72f45b0bed92955 -->
 
 ## What it is for and who it is for
 
@@ -640,7 +640,8 @@ If it fails: inside the panel, and what was typed stays. A ticket without dishes
 one dish."). What the server refuses of a field is marked under that field, with its reason: a quantity of 0
 marks the quantity of that dish ("Ensure this value is greater than 0."), even with empty rows above it, and
 the window brings the field into view if the person was further down. The mark goes when that field changes
-or the dish is removed. As it hangs from no check, charging does not close it.
+or the dish is removed, and only that field's even if another one says the same (a dish's product too, when
+another one is chosen; hub#888). As it hangs from no check, charging does not close it.
 Involved: KITCHEN-F04, KITCHEN-F10, KITCHEN-F21, KITCHEN-F24, KITCHEN-F27, INVENTORY-F27
 
 ### KITCHEN-F24 Delete a ticket

@@ -28,7 +28,7 @@ import { inflateSync } from 'node:zlib';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, HUB_DIR, login, psql, shot, shown, topbarApps } from './helpers';
+import { A, capture, HUB_DIR, login, psql, saveSessionForTheSweep, shot, shown, topbarApps } from './helpers';
 import { cleanInvoices, ensureIssuer, FLOW_VIEWPORTS, type IssuerOut, snapshotSeries } from './invoice-helpers';
 import { STACK } from './stack';
 
@@ -247,6 +247,7 @@ test.beforeAll(async ({ browser }) => {
   backUpConfig();
   const { context } = await spanishPage(browser, '/verifactu/config');
   issuer = await ensureIssuer(context);
+  await saveSessionForTheSweep(context);
   await context.close();
 });
 
@@ -368,6 +369,51 @@ test('VERIFACTU-F05: «Descargar el modelo» downloads the model with the busine
   for (const value of [issuer.legal_name, issuer.tax_id, issuer.city, issuer.address]) {
     expect(written, `the model carries «${value}»`).toContain(value);
   }
+  await context.close();
+});
+
+test('VERIFACTU-F05 inside the ERPlora app: «Descargar el modelo» is saved by the app in Descargas, which says where (hub#1041)', async ({ browser }) => {
+  await pushPhoto('none');
+  const { context, page } = await spanishPage(browser, '/verifactu/config');
+  // From the next load on, the page runs inside the installed app: its bridge answers `save_download` as ERPlora/app
+  // does on Android (HUB_APP-F30), with the place it published the file, and keeps what it was given.
+  await context.addInitScript(() => {
+    const given: { name: string; head: string; size: number }[] = [];
+    Object.assign(window, {
+      savedByTheApp: given,
+      __TAURI__: {
+        core: {
+          invoke: async (command: string, args?: { name: string; dataBase64: string }) => {
+            if (command !== 'save_download' || !args) return null;
+            const bytes = atob(args.dataBase64);
+            given.push({ name: args.name, head: bytes.slice(0, 4), size: bytes.length });
+            return { path: `Download/${args.name}` };
+          },
+        },
+      },
+    });
+  });
+  await page.reload();
+  const grant = shown(page).locator('[data-testid=verifactu-config-erplora]');
+  await expect(grant.locator('[data-testid=verifactu-grant-form]')).toBeVisible();
+  let browserDownload = false;
+  page.on('download', () => {
+    browserDownload = true;
+  });
+
+  await grant.locator('[data-testid=verifactu-grant-download]').click();
+
+  const name = 'anexo-i-otorgamiento-representacion-erplora.pdf';
+  await expect(page.locator('ion-toast')).toContainText(`Guardado en Download/${name}`);
+  await capture(page, 'APP-VERIFACTU-F05-app-saved-to');
+  await expect(grant.locator('[data-testid=verifactu-grant-downloaded]')).toBeVisible();
+  const given = await page.evaluate(() => (window as unknown as { savedByTheApp: { name: string; head: string; size: number }[] }).savedByTheApp);
+  expect(given.map(({ name: saved, head }) => [saved, head])).toEqual([[name, '%PDF']]);
+  expect(given[0].size).toBeGreaterThan(1000);
+  expect(browserDownload, 'inside the app nothing goes to a browser download').toBe(false);
+  await flowShots(page, 'F05-app', async (sized) => {
+    await expect(sized.locator('[data-testid=verifactu-grant-downloaded]')).toBeVisible();
+  });
   await context.close();
 });
 

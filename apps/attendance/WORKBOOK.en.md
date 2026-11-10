@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4ecdc0c7a463a8841e5a2b2194092eb255f8bb42bd3badec169050c1d95c50f8 -->
+<!-- generated from WORKBOOK.md sha256:0b985f4906080544d480ce23be5f4841b5ce59698ccc5c4274ff306dfa07d38c -->
 
 ## What it is for and who it is for
 
@@ -334,7 +334,7 @@ Out: the file downloaded on the device; nothing is saved in the Hub.
 If it fails: a month without working days downloads only the header and warns "There are no working days
 for this filter: the file only has the header."; if the download fails, "The CSV could not be exported.
 Try again.".
-Involved: ATTENDANCE-F06, ATTENDANCE-F07
+Involved: ATTENDANCE-F06, ATTENDANCE-F07, BASE-F112 (inside the app)
 
 ### ATTENDANCE-F11 See who is clocked in now
 Status: done (server, screen and Home panel)

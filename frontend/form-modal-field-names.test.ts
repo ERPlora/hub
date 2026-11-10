@@ -18,20 +18,14 @@ import { parse } from 'vue/compiler-sfc';
 /** The root of the hub: the paths below are relative to it. */
 const HUB_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** What is left of the fields without their name, by file: it only goes down. COMBO: a `name` on `<Combo>` would pass
- *  this guard and fix nothing: Combo (@erplora/ui) does not declare the prop and its root is a div, and FormModal reads
- *  the `name` property of the field, not the attribute. Those fields stay counted here until Combo hands its name to
- *  its ion-input. */
+/** What is left of the fields without their name, by file: it only goes down. A component around a field (Combo of
+ *  @erplora/ui, ServicesField) has to hand its `name` to its ion-input, as Combo does: FormModal reads the `name`
+ *  property of the field, not an attribute on a wrapper's div, so a name this guard sees there fixes nothing until
+ *  the component declares it; the window's own test (`itTellsTheCorrectedFieldApart`) is what proves it. */
 const STILL_UNNAMED: Record<string, number> = {
-  'apps/appointment/frontend/components/AppointmentFormModal.vue': 2, // Services (ServicesField, around a Combo) and Professional: Combos
-  'apps/appointment/frontend/components/SeriesFormModal.vue': 2, // Services (ServicesField, around a Combo) and Professional: Combos
   'apps/combo/frontend/components/MenuFormModal.vue': 5,
-  'apps/kitchen/frontend/components/TicketFormModal.vue': 1, // A dish's Product: a Combo
   'apps/modifier/frontend/components/GroupFormModal.vue': 5,
   'apps/modifier/frontend/components/OptionFormModal.vue': 5,
-  'apps/pricing/frontend/components/PriceItemFormModal.vue': 1, // Product or service: a Combo
-  'apps/pricing/frontend/components/PriceListFormModal.vue': 1, // Customer group: a Combo
-  'apps/pricing/frontend/components/RuleFormModal.vue': 2, // What it applies to and Customer group: Combos
   'apps/reservation/frontend/components/BlockedDateFormModal.vue': 3,
   'apps/reservation/frontend/components/ReservationFormModal.vue': 10,
   'apps/reservation/frontend/components/SlotFormModal.vue': 4,
@@ -41,11 +35,8 @@ const STILL_UNNAMED: Record<string, number> = {
   'apps/service/frontend/components/GrantVoidModal.vue': 1,
   'apps/service/frontend/components/PackageFormModal.vue': 8,
   'apps/service/frontend/components/ServiceFormModal.vue': 6,
-  'apps/staff/frontend/components/MemberFormModal.vue': 2, // Role and Hub user: Combos (see COMBO above)
-  'apps/staff/frontend/components/TimeOffFormModal.vue': 1, // Team member: a Combo
   'apps/table/frontend/components/TableFormModal.vue': 3,
   'apps/table/frontend/components/ZoneFormModal.vue': 3,
-  'apps/task/frontend/components/TaskFormModal.vue': 2, // Assigned to and Project: Combos
   'apps/tax/frontend/components/AliasCreateModal.vue': 3,
   'apps/tax/frontend/components/CategoryCreateModal.vue': 3,
   'apps/tax/frontend/components/RuleCreateModal.vue': 12,

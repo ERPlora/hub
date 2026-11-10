@@ -78,9 +78,6 @@ RECORD_NOT_FOUND = _("Record not found.")
 INVOICE_NOT_FOUND = _("Invoice not found.")
 #: The waits that are a past attempt's failure, kept on the record (the rest are computed when read).
 ATTEMPT_FAILURES = ("unreachable", "refused", "unknown", "aeat_fault", "xml_invalid")
-#: The wait of a business's record that ERPlora's own hub cannot present yet: it does not know the business's id
-#: (``presenter``, hub#454). Kept on the record by the pass that found it, told until the business is linked.
-UNREGISTERED = "hub_unregistered"
 #: Days before its expiry from which the own certificate is announced (VERIFACTU-F34).
 EXPIRY_WARNING_DAYS = 30
 RECORD_EVENTS_SHOWN = 20
@@ -258,16 +255,12 @@ def _server_problem(environment: str) -> str:
     return ""
 
 
-def presenter(scope: Scope, config: Config, issuer_nif: str) -> str | None:
-    """Who ERPlora's gateway is told presents ``issuer_nif``'s records (its ``hub``): ``scope``'s business by its slug
-    (saas#29). ERPlora's own hub presents ERPlora's own records only (``PLATFORM_HUB_SLUG``); a business's record its
-    pass sees goes as that business, by the id erplora.com gave it (``Config.hub_id``, which the SaaS takes as well as
-    a slug), never as ERPlora: the gateway would refuse it (409 ``nif_mismatch``, hub#454). ``None`` without that id:
-    nothing can be presented yet. Since S5 the platform hub's database holds ERPlora's records alone and each business
-    runs its pass in its own (``base.worker``): only the suite's fixed worker scope still sees another's (hub#1130)."""
-    if not platform.is_platform_hub(scope) or issuer_nif == settings.PLATFORM_ISSUER_TAX_ID:
-        return scope.key
-    return str(config.hub_id) if config.hub_id is not None else None
+def presenter(scope: Scope) -> str:
+    """Who ERPlora's gateway is told presents the records of ``scope`` (its ``hub``): ``scope``'s business by its
+    slug (saas#29), whatever tax ID a record bears. Every business runs its pass in its own database, and since the S5
+    cut (hub#602) ERPlora's own hub's (``PLATFORM_HUB_SLUG``) holds ERPlora's records alone, so it presents ERPlora's
+    own and nobody else's (hub#1130)."""
+    return scope.key
 
 
 def route_problem(config: Config, environment: str, scope: Scope | None) -> str:
@@ -357,7 +350,7 @@ def waiting_of(record: Record, config: Config, scope: Scope | None) -> list[dict
     ).first()
     if control and control.next_send_at and control.next_send_at > timezone.now():
         reasons.append(wait("aeat_wait", at=_local_time(control.next_send_at)))
-    if record.wait_reason in ATTEMPT_FAILURES or (record.wait_reason == UNREGISTERED and config.hub_id is None):
+    if record.wait_reason in ATTEMPT_FAILURES:
         reasons.append(wait(record.wait_reason, record.wait_detail))
     return reasons
 

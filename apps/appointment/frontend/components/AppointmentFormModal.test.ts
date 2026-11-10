@@ -359,6 +359,13 @@ describe('AppointmentFormModal: Edit appointment', () => {
     ]);
   });
 
+  it('a charged appointment keeps its services and professional: both pickers are locked', async () => {
+    const s = await setup({ appointment: { ...BOOKED, sale_id: 'sale1' } });
+    expect([s.servicePicker().props('disabled'), s.staffPicker().props('disabled')]).toEqual([true, true]);
+    const open = await setup({ appointment: BOOKED });
+    expect([open.servicePicker().props('disabled'), open.staffPicker().props('disabled')]).toEqual([false, false]);
+  });
+
   it('a series occurrence asks the scope; «This and all following» edits the series from its date', async () => {
     const s = await setup({ appointment: { ...BOOKED, recurring_id: 'r1', occurrence_date: '2026-10-19' } });
     await ionValue(s.field('time'), '12:00', 'ionInput');
@@ -479,11 +486,10 @@ describe('AppointmentFormModal: a new customer without leaving the agenda (CUSTO
 });
 
 describe('AppointmentFormModal: fields refused with the same words (hub#888)', () => {
-  // A new appointment's fields, each refused under its own key; the time says the refusal of `start`. Services and
-  // Professional are Combos (Services through ServicesField), which hub#888 leaves for @erplora/ui: a Combo does not
-  // hand its name to the field FormModal reads.
-  const FIELD_OF: Record<string, string> = { start: 'time' };
-  itTellsTheCorrectedFieldApart(['start', 'minutes', 'notes', 'internal_notes'], async (locale, refusal) => {
+  // A new appointment's fields, each refused under its own key; the time says the refusal of `start`, and the search
+  // that adds a service (ServicesField's Combo) the refusal of `services`.
+  const FIELD_OF: Record<string, string> = { start: 'time', services: 'service-add' };
+  itTellsTheCorrectedFieldApart(['services', 'staff', 'start', 'minutes', 'notes', 'internal_notes'], async (locale, refusal) => {
     const s = await setup({}, locale);
     await fillNew(s);
     s.answer(422, refusal);

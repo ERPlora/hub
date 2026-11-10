@@ -18,10 +18,13 @@ const props = withDefaults(
   defineProps<{
     facts: Map<string, ServiceFacts>;
     testid: string;
+    /** The form's key for the services (`services`), handed to the search's field: FormModal tells by it that a
+     *  service added corrects a refusal of the services, though another field was refused with the same words. */
+    name?: string;
     errorText?: string;
     disabled?: boolean;
   }>(),
-  { errorText: undefined, disabled: false },
+  { name: undefined, errorText: undefined, disabled: false },
 );
 const services = defineModel<ComboOption[]>({ required: true });
 
@@ -79,6 +82,7 @@ function remove(id: string): void {
     </div>
     <Combo
       :testid="`${testid}-service-add`"
+      :name="name"
       :model-value="adding"
       :search="search"
       :label="services.length ? t('appointment.form.addService') : t('appointment.form.service')"

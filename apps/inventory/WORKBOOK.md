@@ -545,7 +545,7 @@ ni avisa nada.
 Si falla: sin productos, el fichero lleva solo la cabecera. Sin permiso de exportar, el botón no
 sale y la app no lo entrega por ninguna otra puerta. Un texto que una hoja de cálculo ejecutaría como
 fórmula (empieza por =, +, -, @…) sale con un apóstrofo delante, que la importación quita.
-Implicados: ninguno
+Implicados: BASE-F112 (dentro de la app)
 
 ### INVENTORY-F12 Cargar la carta de una plantilla del sector
 <!-- origen: old-hub:HUB_SHELL-F26 old-hub:HUB-F235 old:inventory/workflow/importar-y-exportar.md#inventory-f12 wf:alta#rec_alta-f08 -->

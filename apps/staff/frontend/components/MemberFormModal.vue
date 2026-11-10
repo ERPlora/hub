@@ -307,6 +307,7 @@ async function save(): Promise<void> {
         />
         <Combo
           testid="staff-member-form-role_id"
+          name="role_id"
           data-field
           :model-value="roleChoice"
           :label="$t('staff.members.form.role')"
@@ -318,6 +319,7 @@ async function save(): Promise<void> {
         />
         <Combo
           testid="staff-member-form-user_id"
+          name="user_id"
           data-field
           :model-value="userChoice"
           :label="$t('staff.members.form.hubUser')"

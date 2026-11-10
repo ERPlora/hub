@@ -137,6 +137,7 @@ useUnsavedFormOnOpen('pricing-item-form', form, open);
           <Combo
             :key="form.kind"
             testid="pricing-item-form-article"
+            :name="`${form.kind}_id`"
             :model-value="form.article"
             :search="search"
             :label="form.kind === 'product' ? t('pricing.items.form.product') : t('pricing.items.form.service')"

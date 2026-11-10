@@ -675,7 +675,8 @@ Si falla: dentro del panel, y lo escrito se queda. Una comanda sin platos se rec
 plato.»). Lo que el servidor rechaza de un campo se marca bajo ese campo, con su motivo: una cantidad 0
 marca la cantidad de ese plato («Debe ser mayor que 0.»), aunque haya filas vacías encima, y la ventana
 trae el campo a la vista si la persona estaba más abajo. La marca se va al cambiar ese campo o al quitar
-el plato. Como no cuelga de ninguna cuenta, cobrar no la cierra.
+el plato, y solo la de ese campo aunque otro diga lo mismo (también la del producto de un plato, al elegir otro;
+hub#888). Como no cuelga de ninguna cuenta, cobrar no la cierra.
 Implicados: KITCHEN-F04, KITCHEN-F10, KITCHEN-F21, KITCHEN-F24, KITCHEN-F27, INVENTORY-F27
 
 ### KITCHEN-F24 Borrar una comanda

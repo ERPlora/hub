@@ -14,8 +14,10 @@ import { HubIcon, toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, reactive, shallowRef, watch } from 'vue';
 
+import { base64ToBlob } from '../../../../base/frontend/lib/data';
+import { saveFile } from '../../../../base/frontend/lib/download';
 import { useLocale, useT } from '../composables/useT';
-import { fileToBase64, saveBase64File } from '../lib/files';
+import { fileToBase64 } from '../lib/files';
 import { refusal } from '../lib/refusal';
 import type { ConfigOut, RepresentationDocument, RepresentationOut, RepresentationSubmitIn } from '../operations';
 
@@ -142,8 +144,8 @@ async function downloadModel(): Promise<void> {
   downloading.value = true;
   try {
     const model = await client.api.call('verifactu.representation.model', {});
-    saveBase64File(model.filename, model.content_type, model.content_base64);
-    downloaded.value = true;
+    // Inside the installed app the app saves it and a toast says where, or why it could not (hub#1041).
+    downloaded.value = await saveFile(model.filename, base64ToBlob(model.content_base64, model.content_type), t);
   } catch (error) {
     problem.value = errorText(error);
   } finally {

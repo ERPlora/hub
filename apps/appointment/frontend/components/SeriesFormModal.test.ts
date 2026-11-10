@@ -123,6 +123,12 @@ describe('SeriesFormModal: New repeating appointment', () => {
     expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
   });
 
+  it('an employee’s series is for herself only: the professional is her own record, fixed', async () => {
+    const s = await setup({ ownStaff: { id: 's1', name: 'Ana López' } });
+    expect(s.combo('series-form-staff').props('modelValue')).toEqual({ id: 's1', label: 'Ana López' });
+    expect([s.combo('series-form-staff').props('disabled'), s.combo('series-form-staff').props('clearable')]).toEqual([true, false]);
+  });
+
   it('has no day of the week for a daily or monthly series', async () => {
     const s = await setup();
     await ionValue(s.field('frequency'), 'monthly');
@@ -173,16 +179,17 @@ describe('SeriesFormModal: Edit repeating appointment', () => {
 });
 
 describe('SeriesFormModal: fields refused with the same words (hub#888)', () => {
-  // Each field refused under its own key. Services and Professional are Combos (Services through ServicesField),
-  // which hub#888 leaves for @erplora/ui: a Combo does not hand its name to the field FormModal reads.
+  // Each field refused under its own key; the search that adds a service (ServicesField's Combo) says the refusal of
+  // `services`.
+  const FIELD_OF: Record<string, string> = { duration_minutes: 'minutes', services: 'service-add' };
   describe('a new series', () => {
-    itTellsTheCorrectedFieldApart(['start_date', 'time', 'duration_minutes', 'end_date', 'max_occurrences'], async (locale, refusal) => {
+    itTellsTheCorrectedFieldApart(['services', 'staff', 'start_date', 'time', 'duration_minutes', 'end_date', 'max_occurrences'], async (locale, refusal) => {
       const s = await setup({}, locale);
       await s.pickWhoAndWhat();
       await ionValue(s.field('start_date'), '2026-10-19', 'ionInput');
       await ionValue(s.field('time'), '11:00', 'ionInput');
       s.answer(422, refusal);
-      return { field: (key) => s.field(key === 'duration_minutes' ? 'minutes' : key), send: () => click(s.submit()), settle };
+      return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.submit()), settle };
     }, 'end_date');
   });
 

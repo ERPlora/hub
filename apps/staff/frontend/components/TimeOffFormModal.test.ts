@@ -7,6 +7,7 @@
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, EMPLOYEE, ionChecked, ionValue, mountStaff, type MountOptions, page, settle } from '../__tests__/mount-staff';
 import TimeOffFormModal from './TimeOffFormModal.vue';
 
@@ -184,6 +185,16 @@ describe('TimeOffFormModal: ask for one’s own (STAFF-F24)', () => {
     expect(s.inDoc('staff-time-off-form')?.getAttribute('aria-label')).toBe('Pedir ausencia');
     expect([s.field('start_date').label, s.field('is_full_day').textContent?.trim(), s.field('reason').label]).toEqual(['Desde', 'Día completo', 'Motivo']);
   });
+});
+
+describe('TimeOffFormModal: fields refused with the same words (hub#888)', () => {
+  // A manager's new absence: its fields, each refused under its own key; Member is a Combo, named by the key of its id.
+  itTellsTheCorrectedFieldApart(['member_id', 'leave_type', 'start_date', 'end_date', 'reason'], async (locale, refusal) => {
+    const s = await setup('create', { locale, answers: { '/api/staff/members': [200, MEMBERS], '/api/staff/time_off': [422, refusal] } });
+    await s.chooseMember('m1');
+    await s.dates('2026-12-21', '2026-12-24');
+    return { field: s.field, send: () => click(s.save()), settle };
+  }, 'member_id');
 });
 
 describe('TimeOffFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {

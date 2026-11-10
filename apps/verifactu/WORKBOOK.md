@@ -372,7 +372,9 @@ Pasos:
 2. «Descargar el modelo» baja el modelo oficial (Anexo I del Convenio 17, el del SaaS) con los datos del negocio ya
    puestos: la razón social, el NIF y la dirección del emisor de Facturación (el municipio y la vía pública, con el
    número tal como figura en la dirección); sin emisor, baja en blanco. Se completa lo que falte y se firma fuera de
-   la pantalla: a mano (y se escanea a PDF, con el sello si es una sociedad) o con AutoFirma.
+   la pantalla: a mano (y se escanea a PDF, con el sello si es una sociedad) o con AutoFirma. Debajo del botón sale
+   «Modelo descargado. Fírmalo y súbelo aquí abajo.»; dentro de la app de ERPlora el modelo se guarda en Descargas y
+   sale también «Guardado en {ruta}» (BASE-F112).
 3. Una sociedad escribe su representante legal (nombre y NIF/NIE); un autónomo firma él mismo.
 4. Se elige el documento de identidad (DNI o NIE) y se adjuntan los PDF: el modelo firmado, la copia del
    documento, con NIE una muestra de la firma y, con sociedad, el justificante de representación.
@@ -396,8 +398,9 @@ emisor, 409 `verifactu.issuer_missing`; sin la foto de la cuenta (el Hub aún no
 que el SaaS no conoce, 409 `verifactu.hub_unregistered` («ERPlora todavía no ha vinculado este negocio.»); sin el
 SaaS, 503 `verifactu.saas_unreachable` («ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.»).
 Al descargar el modelo, un dato del emisor que el modelo no puede escribir (una letra fuera de las suyas o un texto
-demasiado largo) baja en blanco para escribirlo a mano, con el resto ya puesto: nunca deja sin modelo.
-Implicados: VERIFACTU-F08
+demasiado largo) baja en blanco para escribirlo a mano, con el resto ya puesto: nunca deja sin modelo. Dentro de la app,
+si no lo puede guardar, lo dice con su motivo (BASE-F112) y no sale «Modelo descargado».
+Implicados: VERIFACTU-F08, BASE-F112 (dentro de la app)
 
 ### VERIFACTU-F06 Volver a enviar el otorgamiento
 <!-- origen: old-saas:SAAS_DASHBOARD-F157 old:verifactu/workflow/configuracion.md#verifactu-f06 -->
@@ -621,10 +624,8 @@ Si falla: sin pasarela configurada, sin datos del productor o sin vía lista, no
 dice por qué espera (VERIFACTU-F17). Nunca se da por aceptado un registro sin la respuesta de la AEAT. Un negocio
 de fuera de España no envía nada nunca: lo que quedó sellado antes se guarda tal cual, sin salir, y dice por qué.
 El registro de un negocio se presenta siempre como ese negocio, nunca como el hub de ERPlora (hub#454): el worker
-pasa por cada negocio en su BD y con su ámbito. Si la pasada del hub de ERPlora ve un registro con otro NIF que el de
-ERPlora, lo presenta con el id que erplora.com le dio al negocio; sin ese id (aún no ha llegado la foto de su
-cuenta) no se manda nada y el registro espera con «ERPlora todavía no ha vinculado este negocio con su cuenta en
-este servidor» (`hub_unregistered`; «Enviar ahora» → 409 `verifactu.hub_unregistered`), hasta que la foto lo trae.
+pasa por cada negocio en su BD y con su ámbito, y cada pasada presenta lo que guarda su BD como su negocio, sea cual
+sea el NIF del registro. La BD del hub de ERPlora solo guarda los registros de ERPlora (hub#602, hub#1130).
 Implicados: VERIFACTU-F20, FLOW-F04 (la tarjeta de la galería de Automatizaciones que crea una tarea urgente cuando
 la AEAT rechaza un registro)
 
@@ -654,13 +655,12 @@ Pasos:
 2. Se abre «Registro {número}» con la factura, la cadena, el QR, la respuesta de la AEAT y el XML.
 3. Si no está en la AEAT, «Aún no está en la AEAT» dice por qué («la pasarela de envío de ERPlora no está
    configurada en este servidor», «tu certificado propio no está cargado o ha caducado», «la AEAT pidió esperar
-   hasta las {hora}», «no se ha podido contactar con la pasarela o con la AEAT ({detalle})», «ERPlora todavía no ha
-   vinculado este negocio con su cuenta en este servidor») y un solo cuándo: si todo lo que espera se resuelve solo
-   (la AEAT pidió esperar, sin contacto, sin respuesta, un fallo de la AEAT), «Sale solo en la próxima pasada, en
-   orden y declarado como envío tardío si ya falló antes. No tienes que hacer nada.»; si espera a que se resuelva
-   algo (un rechazo de la pasarela, que no se reenvía solo; la autorización; la vía; el servidor; el negocio sin
-   vincular), «Sale solo, en orden y declarado como envío tardío, en cuanto se resuelva.» (hub#454). Debajo, el
-   «Próximo intento».
+   hasta las {hora}», «no se ha podido contactar con la pasarela o con la AEAT ({detalle})») y un solo cuándo: si
+   todo lo que espera se resuelve solo (la AEAT pidió esperar, sin contacto, sin respuesta, un fallo de la AEAT),
+   «Sale solo en la próxima pasada, en orden y declarado como envío tardío si ya falló antes. No tienes que hacer
+   nada.»; si espera a que se resuelva algo (un rechazo de la pasarela, que no se reenvía solo; la autorización; la
+   vía; el servidor), «Sale solo, en orden y declarado como envío tardío, en cuanto se resuelva.» (hub#454). Debajo,
+   el «Próximo intento».
 4. En un negocio de fuera de España dice solo «este negocio no está en España: VeriFactu solo es para negocios de
    España, así que no se envía nada a la AEAT», sin próximo intento ni botones para enviar, subsanar o anular:
    nunca sale.
@@ -1263,11 +1263,11 @@ app: gh:verifactu#139). Tests: `test_apps.py` (declaración, textos `en` + `es`,
     certificado propio (VERIFACTU-F02) viaja descifrado en cada llamada y la pasarela no lo guarda; para
     presentarlo, su clave PEM pasa unos milisegundos por disco, en dos ficheros `0600` de un directorio
     temporal privado del SaaS que se borra en cuanto TLS los ha leído. `hub` nombra al negocio
-    (`queries.presenter`, el mismo para el envío, la consulta y la prueba de conexión): el slug de su host
-    (`ctx.scope.key`); el hub de ERPlora (`PLATFORM_HUB_SLUG`) solo para los registros de ERPlora (emisor
-    `PLATFORM_ISSUER_TAX_ID`), y el registro de un negocio que ve su pasada, con el UUID que erplora.com le dio
-    (`Config.hub_id`, de la foto); sin él, nada sale (`hub_unregistered`, hub#454). La pasarela acepta los dos
-    (saas#25: UUID o un slug válido de `live.slugs`).
+    (`queries.presenter`, el mismo para el envío, la consulta y la prueba de conexión): siempre el slug de su host
+    (`ctx.scope.key`), sea cual sea el NIF del registro. El hub de ERPlora (`PLATFORM_HUB_SLUG`) solo guarda y
+    presenta los registros de ERPlora (emisor `PLATFORM_ISSUER_TAX_ID`) desde el corte S5 (hub#602); hasta hub#1130
+    su pasada presentaba el registro de otro negocio con el UUID que erplora.com le dio (`Config.hub_id`, hub#454),
+    algo que la pasarela sigue aceptando (saas#25: UUID o un slug válido de `live.slugs`).
   - Lo que no es `200`: `404 {"error": {"code": "hub_unknown"}}` (el `hub` del cuerpo no es ningún hub del SaaS;
     saas#29; cualquier otro 404 es una puerta que aún no está y se reintenta); `409 {"error": {"code",
     "message"}}` con `nif_mismatch` (el sobre nombra a otro contribuyente; se decide antes de tocar la AEAT),
@@ -1384,8 +1384,8 @@ app: gh:verifactu#139). Tests: `test_apps.py` (declaración, textos `en` + `es`,
   juntan en una sola pasada. Si la pasada falla, se registra en el log, se deshace lo suyo y vuelve al minuto
   siguiente. La pasada de un negocio ve solo sus registros y los presenta con su slug. También se sirve a un negocio
   que se fue y conserva su BD (`base.services.hubs_to_serve`), porque lo que le queda por enviar tiene que llegar a
-  la AEAT. Un registro con otro NIF en la pasada del hub de ERPlora (`PLATFORM_HUB_SLUG`) se presenta como ese
-  negocio, nunca como `erplora` (`queries.presenter`, hub#454).
+  la AEAT. La pasada del hub de ERPlora (`PLATFORM_HUB_SLUG`) solo ve los registros de ERPlora y los presenta como
+  `erplora` (`queries.presenter`, hub#1130).
 
 ### Administrador de Django
 
@@ -1658,8 +1658,15 @@ Al cerrar la app (CLOSE-VERIFACTU, 2026-10-27), lo que sigue en la cola fuera de
   pruebas en vez de esperar con `representation_not_approved`.
 - ~~**El NIF de ERPlora tecleado por un negocio en la BD compartida**~~ — **cerrada** por el corte S5 (hub#602): la
   pasada de cada negocio corre en su BD y en su ámbito (`base.worker`), así que presenta con su slug
-  (`queries.presenter`) y nunca como `erplora` (saas#2524). La rama de `presenter` para el registro de otro negocio en
-  el hub de plataforma solo la alcanza el respaldo de los tests (hub#1130).
+  (`queries.presenter`) y nunca como `erplora` (saas#2524). La rama de `presenter` que presentaba el registro de otro
+  negocio en el hub de plataforma con `Config.hub_id` se quitó en hub#1130: presenta siempre con el slug de su ámbito.
+- **Contracción de `hub_unregistered` como espera** (hub#1130): ningún registro espera ya a que ERPlora vincule el
+  negocio (solo lo producía la rama quitada de `presenter`), así que «Aún no está en la AEAT» no lo dice. El texto de
+  su motivo en `WAIT_REASONS` («ERPlora todavía no ha vinculado este negocio con su cuenta en este servidor») se
+  queda para leer el `Record.wait_reason` que guardó una pasada de antes del corte S5: lo enseñan la cola
+  (`last_error`) y el filtro del admin hasta que una pasada posterior lo envía o le pone otro motivo. Se retira
+  cuando ninguna BD de negocio guarde un registro con `wait_reason = "hub_unregistered"`. El código
+  `verifactu.hub_unregistered` del otorgamiento (sin `Config.hub_id` o con el 404 del SaaS, VERIFACTU-F08) sigue vivo.
 - **Contracción de `live_paid`** (`## 6` del registro de migración): la columna `Config.live_paid` (migración
   `0003_live_paid`) sigue sin lectura ni escritura y `ConfigSyncIn` acepta e ignora el campo hasta que ningún SaaS
   desplegado lo mande (expand/contract, hub#205 y saas#108).

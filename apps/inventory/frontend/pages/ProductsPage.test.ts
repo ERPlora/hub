@@ -463,7 +463,7 @@ describe('ProductsPage: import and export', () => {
     s.wrapper.findComponent(CsvButtons).vm.$emit('export');
     await flush();
     expect(s.query(s.calls('/api/inventory/products/export')[0])).toEqual({ sku: 'CAF', price_min: '200', sort: 'name' });
-    expect(mocks.save).toHaveBeenCalledWith('inventario-productos.csv', '﻿Nombre;SKU\n', 'text/csv');
+    expect(mocks.save).toHaveBeenCalledWith('inventario-productos.csv', '﻿Nombre;SKU\n', 'text/csv', expect.any(Function));
   });
 
   it('importing a file opens «Check the import» with its columns', async () => {
