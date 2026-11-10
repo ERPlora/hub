@@ -205,8 +205,8 @@ def test_no_other_business_follows_the_deployment(db, platform_slug):
 @pytest.mark.parametrize("scope", [PLATFORM, A], ids=["platform", "business"])
 def test_the_gateway_is_told_the_hub_by_its_slug(db, platform_slug, settings, scope):
     # The SaaS knows ERPlora's own hub by ``PLATFORM_HUB_SLUG`` and any other by its host's slug (saas#29). ERPlora's
-    # own hub presents ERPlora's own records: its issuer is ERPlora (hub#454: a business's tax ID on that scope is
-    # not ERPlora's record, see the tests below).
+    # own hub presents ERPlora's own records: its issuer is ERPlora (whatever tax ID a record bears, it goes as the
+    # hub of its scope, see the tests below, hub#1130).
     settings.ERPLORA_ENVIRONMENT = "pre"
     settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
     settings.INTERNAL_SHARED_SECRET = "test-internal-secret"
@@ -274,21 +274,20 @@ def test_a_business_typing_erploras_tax_id_still_needs_its_approved_authorisatio
     assert not Record.objects.exists()
 
 
-# ── hub#454: the platform's pass presents each record as the business it belongs to ─────────────────────────────
+# ── hub#1130: a record goes as the hub whose database holds it, whatever tax ID it bears ─────────────────────────
 #
-# In phase 1 the worker runs the queue on its fixed scope (``WORKER_SCOPE_SLUG``, ERPlora's own hub by default) and,
-# while the tables are shared, that pass sees the businesses' records too. Presenting them as ``erplora`` made the
-# SaaS's gateway refuse them (409 ``nif_mismatch``: the platform's hub files ERPlora's own records only), so no ticket
-# reached the AEAT. A business's record is presented as its business (the id erplora.com gave it, ``Config.hub_id``,
-# which the SaaS takes as well as a slug); without it, nothing is presented and the record says why.
+# Since the S5 cut (hub#602) every business runs its pass in its own database and ERPlora's own hub's holds ERPlora's
+# records alone, so the send, the AEAT query and the connection test always name the hub of their scope by its slug
+# (saas#29). erplora.com's id of the business (``Config.hub_id``) never names who presents, and nothing waits for it.
 
 BUSINESS_ID = "0192f0a3-8c4e-7d21-9b6a-3f5e2d1c0b7a"
 URL = "http://saas.internal:8001"
+LINKS = pytest.mark.parametrize("link", [True, False], ids=["linked", "not_linked"])
 
 
 @pytest.fixture
 def platform_pass(db, platform_slug, settings):
-    """The worker's pass on ERPlora's own hub in ``pre`` (the AEAT's test environment), with a business's issuer."""
+    """A pass on ERPlora's own hub in ``pre`` (the AEAT's test environment) whose issuer is not ERPlora."""
     settings.ERPLORA_ENVIRONMENT = "pre"
     settings.VERIFACTU_GATEWAY_URL = URL
     settings.INTERNAL_SHARED_SECRET = "test-internal-secret"
@@ -319,57 +318,29 @@ def busy() -> httpx.Response:
     return httpx.Response(503, json={"error": {"code": "gateway_busy", "message": "Busy."}})
 
 
-def test_the_platforms_pass_presents_a_business_record_as_its_business(platform_pass):
-    linked()
-    sealed(platform_pass)
+@LINKS
+def test_the_platforms_pass_presents_a_record_with_another_tax_id_as_the_platform_hub(platform_pass, link):
+    if link:
+        linked()
+    record = sealed(platform_pass)
     with respx.mock:
         door = respx.post(f"{URL}/internal/verifactu/submit").mock(return_value=busy())
         run("verifactu.contingency.process", None, platform_pass)
 
     assert door.call_count == 1
     sent = json.loads(door.calls.last.request.content)
-    assert (sent["hub"], sent["nif"]) == (BUSINESS_ID, ISSUER["tax_id"])
-
-
-def test_without_the_business_link_nothing_is_presented_and_the_record_says_why(platform_pass):
-    record = sealed(platform_pass)
-    with respx.mock(assert_all_called=False) as mock:
-        door = mock.post(f"{URL}/internal/verifactu/submit").mock(return_value=busy())
-        out = run("verifactu.contingency.process", None, platform_pass)
-
-    assert door.call_count == 0
-    assert out.reason == "hub_unregistered"
+    assert (sent["hub"], sent["nif"]) == (PLATFORM.key, ISSUER["tax_id"])
     record.refresh_from_db()
-    assert (record.status, record.attempts, record.wait_reason) == ("pending", 0, "hub_unregistered")
-    waiting = run("verifactu.record.get", {"record_id": str(record.id)}, platform_pass).waiting
-    assert [reason.code for reason in waiting] == ["hub_unregistered"]
+    assert record.wait_reason != "hub_unregistered"
 
 
-def test_once_erplora_links_the_business_its_record_stops_waiting_and_goes_out_as_late(platform_pass):
+def test_sending_it_by_hand_on_the_platform_hub_presents_it_as_the_platform_hub(platform_pass):
     record = sealed(platform_pass)
-    run("verifactu.contingency.process", None, platform_pass)
-
-    linked()
-
-    waiting = run("verifactu.record.get", {"record_id": str(record.id)}, platform_pass).waiting
-    assert "hub_unregistered" not in {reason.code for reason in waiting}
     with respx.mock:
         door = respx.post(f"{URL}/internal/verifactu/submit").mock(return_value=busy())
-        run("verifactu.contingency.process", None, platform_pass)
-    sent = json.loads(door.calls.last.request.content)
-    assert sent["hub"] == BUSINESS_ID
-    # It did not leave when it was sealed: it goes declared as late (Incidencia), as every record that waited.
-    assert "<sum1:Incidencia>S</sum1:Incidencia>" in sent["envelope"]
+        run("verifactu.record.transmit", {"record_id": str(record.id)}, platform_pass)
 
-
-def test_sending_it_by_hand_without_the_link_is_refused_with_the_reason(platform_pass):
-    record = sealed(platform_pass)
-
-    refused = code_of(
-        lambda: run("verifactu.record.transmit", {"record_id": str(record.id)}, platform_pass)
-    )
-
-    assert refused == "verifactu.hub_unregistered"
+    assert json.loads(door.calls.last.request.content)["hub"] == PLATFORM.key
 
 
 def test_erploras_own_records_are_still_presented_as_erploras_hub(platform_pass, settings):
@@ -383,47 +354,26 @@ def test_erploras_own_records_are_still_presented_as_erploras_hub(platform_pass,
     assert json.loads(door.calls.last.request.content)["hub"] == PLATFORM.key
 
 
-def test_the_connection_test_on_the_platform_presents_the_business(platform_pass):
-    linked()
+@LINKS
+def test_the_connection_test_on_the_platform_hub_presents_the_platform_hub(platform_pass, link):
+    if link:
+        linked()
     with respx.mock:
         probe = respx.post(f"{URL}/internal/verifactu/probe").mock(
             return_value=httpx.Response(200, json={"ready": True, "message": "Ready."})
         )
-        run("verifactu.diagnostic.run", None, platform_pass)
-
-    assert json.loads(probe.calls.last.request.content)["hub"] == BUSINESS_ID
-
-
-def test_the_connection_test_without_the_link_asks_nothing_and_says_why(platform_pass):
-    with respx.mock(assert_all_called=False) as mock:
-        probe = mock.post(f"{URL}/internal/verifactu/probe").mock(
-            return_value=httpx.Response(200, json={"ready": True, "message": "Ready."})
-        )
         result = run("verifactu.diagnostic.run", None, platform_pass)
 
-    assert probe.call_count == 0
-    assert result.can_send is False
-    assert "hub_unregistered" in {reason.code for reason in result.reasons}
+    assert json.loads(probe.calls.last.request.content)["hub"] == PLATFORM.key
+    assert "hub_unregistered" not in {reason.code for reason in result.reasons}
 
 
-def test_the_aeat_query_on_the_platform_presents_the_business(platform_pass):
-    linked()
+@LINKS
+def test_the_aeat_query_on_the_platform_hub_presents_the_platform_hub(platform_pass, link):
+    if link:
+        linked()
     with respx.mock:
         door = respx.post(f"{URL}/internal/verifactu/query").mock(return_value=busy())
-        code_of(
-            lambda: run(
-                "verifactu.aeat.query",
-                {"issuer_nif": ISSUER["tax_id"], "year": 2026, "month": 10},
-                platform_pass,
-            )
-        )
-
-    assert json.loads(door.calls.last.request.content)["hub"] == BUSINESS_ID
-
-
-def test_the_aeat_query_without_the_link_asks_nothing_and_says_why(platform_pass):
-    with respx.mock(assert_all_called=False) as mock:
-        door = mock.post(f"{URL}/internal/verifactu/query").mock(return_value=busy())
         refused = code_of(
             lambda: run(
                 "verifactu.aeat.query",
@@ -432,5 +382,23 @@ def test_the_aeat_query_without_the_link_asks_nothing_and_says_why(platform_pass
             )
         )
 
-    assert door.call_count == 0
-    assert refused == "verifactu.hub_unregistered"
+    assert json.loads(door.calls.last.request.content)["hub"] == PLATFORM.key
+    assert refused != "verifactu.hub_unregistered"
+
+
+def test_a_wait_for_the_link_left_before_the_cut_is_no_longer_told_but_still_reads_in_the_queue(db):
+    # A pass before S5 could leave ``hub_unregistered`` on a business's record (its id from erplora.com had not come
+    # yet). Nothing waits for that link any more, so the record does not say it waits for it; the queue still reads
+    # the stored wait in words, never as a bare code, until the next pass replaces it.
+    ctx = ctx_for()
+    run("invoice.issuer.update", ISSUER, ctx)
+    record = sealed(ctx)
+    Record.objects.filter(pk=record.pk).update(wait_reason="hub_unregistered")
+
+    waiting = run("verifactu.record.get", {"record_id": str(record.id)}, ctx).waiting
+    rows = run("verifactu.contingency.list", None, ctx).rows
+
+    assert "hub_unregistered" not in {reason.code for reason in waiting}
+    assert [row.last_error for row in rows] == [
+        "ERPlora has not linked this business to its account on this server yet"
+    ]

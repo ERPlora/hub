@@ -136,8 +136,8 @@ describe('RecordDetailPage', () => {
   });
 
   // hub#454, VERIFACTU-F17: one «when». A wait that something has to resolve (a refusal of the gateway that is not
-  // sent again by itself, the authorisation, a business ERPlora has not linked) never says «nothing to do».
-  it.each(['refused', 'representation_not_approved', 'hub_unregistered', 'gateway_unavailable'])(
+  // sent again by itself, the authorisation, the server) never says «nothing to do».
+  it.each(['refused', 'representation_not_approved', 'gateway_unavailable'])(
     'with a %s wait it goes out once resolved, never «nothing to do»',
     async (code) => {
       const s = await setup({

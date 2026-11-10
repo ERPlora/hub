@@ -58,7 +58,6 @@ from apps.verifactu.models import (
 )
 from apps.verifactu.queries import (
     OUTSIDE_SPAIN,
-    UNREGISTERED,
     aeat_row,
     blockers,
     can_cancel,
@@ -890,9 +889,6 @@ def _send_chain(
             certificate = own_certificate_material(config)
         except certificates.CertificateUnreadable:
             problem = "own_certificate_unreadable"
-    hub = None if problem else presenter(ctx.scope, config, issuer_nif)
-    if not problem and hub is None:
-        problem = UNREGISTERED
     if problem:
         if strict:
             raise Conflict(
@@ -986,7 +982,7 @@ def _send_chain(
     incident = "<sum1:Incidencia>S</sum1:Incidencia>" in whole
     _outlast_the_gateway()
     reply = gateway.submit(
-        hub=hub,
+        hub=presenter(ctx.scope),
         nif=issuer_nif,
         environment=environment,
         route=config.route,
@@ -1478,15 +1474,9 @@ def _query_page(
             str(AEAT_UNREACHABLE) % {"detail": str(error)},
             code="verifactu.aeat_unreachable",
         ) from None
-    hub = presenter(ctx.scope, config, nif)
-    if hub is None:
-        raise Conflict(
-            str(CANNOT_SEND) % {"why": wait_reason_text(UNREGISTERED)},
-            code=f"verifactu.{UNREGISTERED}",
-        )
     _outlast_the_gateway()
     reply = gateway.query(
-        hub=hub,
+        hub=presenter(ctx.scope),
         nif=nif,
         environment=environment,
         route=config.route,
@@ -1701,13 +1691,10 @@ def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
     nif = issuer_identity()[0]
     codes = blockers(config, config.environment, ctx.scope)
     gateway_ready, gateway_detail, refusal = None, "", ""
-    hub = presenter(ctx.scope, config, nif)
-    if hub is None:
-        codes.append(UNREGISTERED)
-    elif gateway.configured() and "own_certificate_unreadable" not in codes:
+    if gateway.configured() and "own_certificate_unreadable" not in codes:
         _outlast_the_gateway()
         reply = gateway.probe(
-            hub=hub,
+            hub=presenter(ctx.scope),
             nif=nif,
             environment=config.environment,
             route=config.route,
