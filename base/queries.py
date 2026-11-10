@@ -2600,8 +2600,16 @@ def file_list(ctx: OperationContext, data: FileListIn) -> dict:
             "bytes are read at the same address by whoever may see the files."
         ),
         asks={
-            "en": ("find the file Invoices/march.pdf", "how big is the contract PDF?"),
-            "es": ("búscame el archivo Facturas/marzo.pdf", "¿cuánto pesa ese archivo?"),
+            "en": (
+                "find the file Invoices/march.pdf",
+                "how big is the contract PDF?",
+                "what kind of document is the quote, and how much space does it take?",
+            ),
+            "es": (
+                "búscame el archivo Facturas/marzo.pdf",
+                "¿cuánto pesa ese archivo?",
+                "¿de qué tipo es el documento del presupuesto y cuánto ocupa?",
+            ),
         },
     ),
 )
