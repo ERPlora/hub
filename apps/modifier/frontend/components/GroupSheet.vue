@@ -49,7 +49,7 @@ const rule = computed(() => choiceRule(group.value, t));
 const short = computed(
   () => !group.value.allow_repeat && options.total.value > 0 && options.total.value < group.value.min_choices,
 );
-/** The business's currency (its country's), a bare figure until it answers: never a euro by default. */
+/** The business's currency (its country's), a dash until it answers: never a euro by default. */
 const money = useBusinessMoney();
 const delta = (cents: number) => formatDelta(cents, locale.value, t('modifier.free'), money.value);
 const target = (link: LinkOut) =>

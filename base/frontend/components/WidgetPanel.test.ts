@@ -199,7 +199,7 @@ describe('WidgetPanel', () => {
   });
 
   // BASE-G98: a panel's amounts are in the business's currency (`base.business.get`, the same subscription for every
-  // panel of the tab), never a fixed euro; until the business is known, the amount without a symbol.
+  // panel of the tab), never a fixed euro; until the business is known, a dash.
   describe("the business's currency", () => {
     const money = { map: { value: 'total' }, options: { format: 'currency' } } as const;
 
@@ -208,7 +208,7 @@ describe('WidgetPanel', () => {
       const call = await m.live();
       expect(m.client.stream.subscriptions('base.business.get').map((sub) => sub.params)).toEqual([{}]);
       await m.result(call, 'demo.item.stats', { total: 1250 });
-      expect(value(m.wrapper).text()).toBe('12,50');
+      expect(value(m.wrapper).text()).toBe('—');
       await m.result(call, 'base.business.get', business(POLISH));
       expect(value(m.wrapper).text()).toBe('12,50\u00a0zł');
       await m.result(call, 'base.business.get', business(), 2);

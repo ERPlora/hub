@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8e43ba46599843dd8e26231c691f10e3639c58194bde1b0ae29c14adb2d08693 -->
+<!-- generated from WORKBOOK.md sha256:4ebaa585129e22e4d4cd9941184211714004c1aab5b549cce1acad7b03ecdaef -->
 
 ## What it is for and who it is for
 
@@ -1512,7 +1512,8 @@ Steps:
      without a country (a demo) is in euros.
   3. On the Home, the amounts of the panels (such as "Sales, last 7 days") and of "Activity" are in that currency,
      with its symbol and its decimals, as a till of that country prints them: "zł" in a business in Poland, "€" in
-     one in Spain. While the business has not answered, the amount shows without a symbol, never in another currency.
+     one in Spain. While the business has not answered, the amount shows as "—", never in another currency or with
+     guessed decimals.
   4. The apps that show prices or amounts are in that same currency, Appointments too (each service's price when
      booking and the appointment's "Total") and the preview of Online booking (hub#577).
 In: the business's country.

@@ -530,7 +530,7 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
   (migración 0003, solo de estado). Cada fila de carrito y de pedido lleva `currency_decimals`
   (`base.business.currency_decimals`, CLDR: 2 en HUF, que `Intl` da sin decimales) y la pantalla la pinta con
   `formatMoney(…, recordMoney(row))`. El filtro de Total se lee con `useBusinessMoney()` de
-  `base/frontend/lib/money` (sin símbolo y con dos decimales mientras no contesta); un `watch` de su moneda
+  `base/frontend/lib/money` («—» mientras no contesta); un `watch` de su moneda
   y sus decimales vuelve a leer un Total ya tecleado desde la primera página, y el ejemplo del aviso sale de
   `amountExample` con los decimales de esa moneda.
 - La columna del número de pedido tiene ancho mínimo (`minmax(10.5rem, 1fr)`) y el motivo de un pedido

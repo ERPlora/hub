@@ -1,7 +1,7 @@
 // How the staff screens paint and read money, rates, calendar dates and wall-clock times (pages never
 // format by hand). Money is whole minor units of the business's currency (its country's, with the decimals
-// the server counts it in: `useBusinessMoney`); until the business answers an amount is a figure without a
-// symbol, never in euros by default. A calendar date (`YYYY-MM-DD`) is a day, not an instant, so it is
+// the server counts it in: `useBusinessMoney`); until the business answers an amount is a dash,
+// never in euros by default. A calendar date (`YYYY-MM-DD`) is a day, not an instant, so it is
 // painted in UTC and never moves a day; a time is the wall clock of the business (`HH:MM:SS` on the wire,
 // `HH:MM` in a time field).
 import { describe, expect, it } from 'vitest';
@@ -48,13 +48,13 @@ describe('formatMoney', () => {
     expect(plain(formatMoney(123456, 'es', EURO))).toBe('1.234,56 €');
     expect(plain(formatMoney(123456789, 'es', EURO))).toBe('1.234.567,89 €');
     expect(formatMoney(123456, 'en', EURO)).toBe('€1,234.56');
-    expect(formatMoney(123456, 'es')).toBe('1.234,56');
+    expect(formatMoney(123456, 'es')).toBe('—');
     expect(plain(formatMoney(99999, 'es', EURO))).toBe('999,99 €');
   });
 
-  it('until the business answers, a figure without a symbol, never euros', () => {
-    expect(formatMoney(1250, 'es')).toBe('12,50');
-    expect(formatMoney(1250, 'en')).toBe('12.50');
+  it('until the business answers, an amount is a dash, never euros', () => {
+    expect(formatMoney(1250, 'es')).toBe('—');
+    expect(formatMoney(1250, 'en')).toBe('—');
   });
 });
 

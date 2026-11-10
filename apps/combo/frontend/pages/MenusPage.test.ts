@@ -86,10 +86,10 @@ describe('MenusPage', () => {
     expect(yen.cells(0)[2]).toBe('¥1,350');
   });
 
-  it('until the business answers a closed price is a figure without a symbol, never a euro', async () => {
+  it('until the business answers a closed price is a dash, never a euro', async () => {
     const s = await setup({ business: null });
     await s.show(page(ROWS));
-    expect(s.cells(0)[2]).toBe('13.50');
+    expect(s.cells(0)[2]).toBe('—');
     expect(s.wrapper.text()).not.toContain('€');
     await s.result('base.business.get', business(POLISH));
     expect(s.cells(0)[2].replace(/[\u00a0\u202f]/g, ' ')).toBe('zł 13.50');

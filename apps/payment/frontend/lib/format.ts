@@ -2,12 +2,13 @@
 // page language's own format (Intl). An amount is whole minor units of a money: a payment's own currency, with the
 // decimals the server counts it in (`currency_decimals`: 2 in EUR and in the forint, 0 in JPY, 3 in KWD), never the
 // browser's Intl decimals (which give the forint none); what a person types is in the business's money
-// (`useBusinessMoney`: its country's currency). While it is unknown, a figure without a symbol, never the euro by
+// (`useBusinessMoney`: its country's currency). While it is unknown, an amount is a dash, never the euro by
 // default. A payment date is a calendar day (`YYYY-MM-DD`), painted in UTC so the browser's time zone never moves it
 // a day.
 import type { StatusPillTone } from '@erplora/ui/components';
 
 import type { Money } from '../../../../base/frontend/lib/home';
+import { formatMoney as writeMoney } from '../../../../base/frontend/lib/money';
 import type { PaymentOut, PaymentStatus } from '../operations';
 
 export type { Money };
@@ -16,33 +17,14 @@ export { useBusinessMoney } from '../../../../base/frontend/lib/money';
 /** The decimals of an amount while its money is unknown. */
 const NO_MONEY_DECIMALS = 2;
 
-const money = new Map<string, Intl.NumberFormat>();
 const days = new Map<string, Intl.DateTimeFormat>();
 
 /** The decimals of `value` (2 in EUR and HUF, 0 in JPY): its minor unit; two while unknown. */
 export const moneyDecimals = (value?: Money): number => value?.decimals ?? NO_MONEY_DECIMALS;
 
-function moneyFormat(locale: string, value: Money | undefined): Intl.NumberFormat {
-  const decimals = moneyDecimals(value);
-  const key = `${locale}|${value?.currency ?? ''}|${decimals}`;
-  let found = money.get(key);
-  if (!found) {
-    // Grouped always: Spanish CLDR waits for five digits (minimumGroupingDigits 2) and would paint
-    // «1234,56 €» here beside «1.234,56 €» in the other screens (hub#1090). The symbol a till of that country
-    // prints («zł», «Ft»); until the money is known, the figure alone.
-    const digits = { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: 'always' as const };
-    found = new Intl.NumberFormat(
-      locale,
-      value ? { style: 'currency', currency: value.currency, currencyDisplay: 'narrowSymbol', ...digits } : digits,
-    );
-    money.set(key, found);
-  }
-  return found;
-}
-
-/** Whole minor units of `value` in `locale` («12,50 €», «€12.50», «zł 12.50», «¥1,999»; «12,50» while unknown). */
+/** Whole minor units of `value` in `locale` («12,50 €», «€12.50», «zł 12.50», «¥1,999»; «—» while unknown). */
 export function formatMoney(minor: number, locale: string, value?: Money): string {
-  return moneyFormat(locale, value).format(minor / 10 ** moneyDecimals(value));
+  return writeMoney(minor, locale, value);
 }
 
 /** The money of a payment: the currency it was recorded in, with the decimals the server says for it. */

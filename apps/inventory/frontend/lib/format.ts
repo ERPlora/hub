@@ -2,7 +2,7 @@
 // always with the page language's own number format (Intl). Money is whole minor units of the business's money
 // (`useBusinessMoney`: its country's currency and the decimals the server counts it in, never the browser's: Intl
 // gives the forint none), written with the platform's `formatMoney`: its thousands grouped from four digits on, as
-// every screen writes them; while it is unknown, a figure without a symbol, never the euro by default. Quantities are
+// every screen writes them; while it is unknown, an amount is a dash, never the euro by default nor guessed decimals. Quantities are
 // exact decimals from the API («2.500», at most three decimals), written with the platform's `formatQuantity`: without
 // trailing zeros and grouped from four digits on («12.500»), as the till and the invoice write them (hub#974).
 import { formatQuantity } from '@erplora/ui/components';

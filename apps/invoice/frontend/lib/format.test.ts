@@ -163,9 +163,9 @@ describe('money of the invoice’s currency (flow business-currency)', () => {
     expect(plain(formatMoney(123450, 'en', moneyOf({ currency: 'HUF', currency_decimals: 2 })))).toBe('Ft 1,234.50');
   });
 
-  it('without a currency a figure has no symbol, never the euro', () => {
-    expect(plain(formatMoney(12100, 'es'))).toBe('121,00');
-    expect(plain(formatMoney(123456, 'en'))).toBe('1,234.56');
+  it('without a currency an amount is a dash, never the euro', () => {
+    expect(plain(formatMoney(12100, 'es'))).toBe('—');
+    expect(plain(formatMoney(123456, 'en'))).toBe('—');
     expect(plain(formatUnitPrice('82.64', 'en'))).toBe('0.8264');
   });
 });

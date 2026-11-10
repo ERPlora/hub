@@ -44,10 +44,10 @@ describe('SplitLines', () => {
     expect(text('l2')).toBe('1 × Steak · 18,00 zł');
   });
 
-  it('until the business answers a line goes without a symbol, never in euros; then in its currency and decimals', async () => {
+  it('until the business answers a line is a dash, never in euros; then in its currency and decimals', async () => {
     const s = await setup();
     await s.result(OP, ORDER);
-    expect(s.el('split-line-l1').text()).toBe('2 × Coffee · 3.00');
+    expect(s.el('split-line-l1').text()).toBe('2 × Coffee · —');
     await s.result('base.business.get', business(JAPANESE));
     expect(s.el('split-line-l1').text()).toBe('2 × Coffee · ¥300');
   });

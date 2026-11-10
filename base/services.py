@@ -1967,7 +1967,7 @@ def blueprint_inspect(ctx: OperationContext, data: BlueprintSourceIn) -> dict:
             "its tables and the rest of its apps' data, app by app; what is already there is left as it was. An app "
             "still being set up («waiting») brings its data by itself when it is ready: nothing to do but say so. "
             "Returns the report of what went in, with why an app could not be turned on. Never brings people, PINs or "
-            "fiscal data."
+            "fiscal data. Use this, not blueprint.list or blueprint.inspect, when asked to load, import or apply one."
         ),
         risk="high",
         asks={
@@ -1975,8 +1975,13 @@ def blueprint_inspect(ctx: OperationContext, data: BlueprintSourceIn) -> dict:
                 "load the restaurant template",
                 "set me up like a hair salon",
                 "fill the business with the café starter menu",
+                "import the restaurant template",
             ),
-            "es": ("carga la plantilla de restaurante", "quiero empezar con la plantilla de bar"),
+            "es": (
+                "carga la plantilla de restaurante",
+                "quiero empezar con la plantilla de bar",
+                "importa la plantilla de restaurante",
+            ),
         },
     ),
 )
@@ -2962,11 +2967,20 @@ def _actor_label(ctx: OperationContext) -> str:
     ai=AI(
         description=(
             "Makes the device the person is using shared (a till several people use: PIN, a shift) or personal (one "
-            "person's: no PIN, 30 days). Only on the device itself."
+            "person's: no PIN, 30 days). Only on the device itself. Use this, not access.settings_update, to make "
+            "the device in hand shared or personal; access.settings_update changes the business-wide PIN rules."
         ),
         asks={
-            "en": ("make this tablet a shared till", "this laptop is only mine, set it to personal"),
-            "es": ("pon esta tablet como caja compartida", "este portátil es solo mío, que no pida PIN"),
+            "en": (
+                "make this tablet a shared till",
+                "this laptop is only mine, set it to personal",
+                "use this laptop as the whole team's till, with a PIN",
+            ),
+            "es": (
+                "pon esta tablet como caja compartida",
+                "este portátil es solo mío, que no pida PIN",
+                "usa este portátil como caja de todo el equipo, con PIN",
+            ),
         },
     ),
 )
@@ -3002,8 +3016,16 @@ def _device(device_id) -> TrustedDevice:
     ai=AI(
         description="Names a device of the hub after its place («Bar», «Kitchen», «Office laptop»).",
         asks={
-            "en": ("call this tablet Bar", "rename the old iPad to Kitchen"),
-            "es": ("llama a esta tablet «Barra»", "renombra el iPad viejo como «Terraza»"),
+            "en": (
+                "call this tablet Bar",
+                "rename the old iPad to Kitchen",
+                "rename this device to Front desk",
+            ),
+            "es": (
+                "llama a esta tablet «Barra»",
+                "renombra el iPad viejo como «Terraza»",
+                "cambia el nombre de este dispositivo a «Caja 2»",
+            ),
         },
     ),
 )
@@ -3032,12 +3054,21 @@ def device_rename(ctx: OperationContext, data: DeviceRenameIn) -> dict:
     ai=AI(
         description=(
             "Removes a lost device from the hub: its session ends at once and the PIN stops working on it until "
-            "someone signs in with an account on it again. Removing the one in hand signs the person out."
+            "someone signs in with an account on it again. Removing the one in hand signs the person out. After "
+            "device.list identifies the device, use this to close its access; listing alone changes nothing."
         ),
         risk="high",
         asks={
-            "en": ("we lost the terrace tablet, remove it", "kick the stolen phone out of the business"),
-            "es": ("hemos perdido la tablet de la terraza, quítala", "echa del negocio el móvil que nos robaron"),
+            "en": (
+                "we lost the terrace tablet, remove it",
+                "kick the stolen phone out of the business",
+                "cut off access for the phone we lost",
+            ),
+            "es": (
+                "hemos perdido la tablet de la terraza, quítala",
+                "echa del negocio el móvil que nos robaron",
+                "corta el acceso del móvil que se ha perdido",
+            ),
         },
     ),
 )
@@ -3062,10 +3093,15 @@ def device_remove(ctx: OperationContext, data: DeviceByIdIn) -> dict:
         description="Removes at once the devices of the hub nobody used in 30 days, never the one in hand.",
         risk="high",
         asks={
-            "en": ("clean out the devices nobody has used in 30 days", "remove the old devices we don't use"),
+            "en": (
+                "clean out the devices nobody has used in 30 days",
+                "remove the old devices we don't use",
+                "drop the computers nobody has opened in the last month",
+            ),
             "es": (
                 "limpia los dispositivos que nadie usa desde hace 30 días",
                 "quita los aparatos viejos que ya no se usan",
+                "da de baja los equipos que no se han usado en el último mes",
             ),
         },
     ),
@@ -3397,10 +3433,21 @@ def person_badge_set(ctx: OperationContext, data: BadgeSetIn) -> dict:
     input=PersonIn,
     output=PersonDetailOut,
     ai=AI(
-        description="Takes a person's badge away (a lost card): it stops opening the till; their PIN and account stay.",
+        description=(
+            "Takes a person's badge away (a lost card): it stops opening the till; their PIN and account stay. For a "
+            "person named in the chat, find their person id with person.list and then use this; do not ask for an id."
+        ),
         asks={
-            "en": ("Luis lost his card, take his badge away", "remove Marta's badge"),
-            "es": ("Luis ha perdido la tarjeta, quítale la placa", "quita la placa de Marta"),
+            "en": (
+                "Luis lost his card, take his badge away",
+                "remove Marta's badge",
+                "cancel Pedro's card, he lost it",
+            ),
+            "es": (
+                "Luis ha perdido la tarjeta, quítale la placa",
+                "quita la placa de Marta",
+                "anula la tarjeta de Pedro, que se le ha perdido",
+            ),
         },
     ),
 )
@@ -4712,12 +4759,23 @@ def _app_answer(label: str, row: activation.Activation, along: list[dict[str, st
         "apps it needs, which come along: it shows in the menu and can be used, with the data it had. Refused when the "
         "plan's limit of apps is reached (turn one off, or upgrade the plan on erplora.com), a paid app is not "
         "subscribed, the app itself says why not or the name fits several apps (ask which one). state=creating: it is "
-        "being set up and is on in a moment. already=true: it was on (or being set up) already, nothing changed.",
+        "being set up and is on in a moment. already=true: it was on (or being set up) already, nothing changed. Use "
+        "this when an app should be available again, not another app's settings operation.",
         "risk": "normal",
         "check": "base.app.get",
         "asks": {
-            "en": ("turn on the customers app", "activate the bookings app", "can you turn on the kitchen module?"),
-            "es": ("activa la app de clientes", "ponme la app de cocina", "activa el módulo de citas"),
+            "en": (
+                "turn on the customers app",
+                "activate the bookings app",
+                "can you turn on the kitchen module?",
+                "bring back the time clock app I took off the menu",
+            ),
+            "es": (
+                "activa la app de clientes",
+                "ponme la app de cocina",
+                "activa el módulo de citas",
+                "recupera la app de fichajes que quité del menú",
+            ),
         },
     },
 )
