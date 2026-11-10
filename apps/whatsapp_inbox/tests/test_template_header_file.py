@@ -20,12 +20,12 @@ import pytest
 import respx
 from django.apps import apps
 from django.core.files.storage import storages
-from live.context import OperationContext
+from live.context import OperationContext, Scope
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
 from live.models import OutboxEvent
 
 from apps.whatsapp_inbox.models import Template, TemplateSample
-from apps.whatsapp_inbox.tests.conftest import B, connect, ctx_for, run, template
+from apps.whatsapp_inbox.tests.conftest import B, connect, ctx_for, run, system, template
 from apps.whatsapp_inbox.tests.test_services_templates import (  # noqa: F401 - shared helpers and fixtures
     delivered,
     key,
@@ -34,6 +34,8 @@ from apps.whatsapp_inbox.tests.test_services_templates import (  # noqa: F401 - 
 )
 from base import files
 from base.models import Hub
+from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
 
 pytestmark = pytest.mark.django_db
 
@@ -77,12 +79,19 @@ def door_8(route) -> dict:
     return json.loads(route.calls.last.request.content)
 
 
-def approved_with_photo(delivered) -> Template:
+def approved_with_photo(delivered, scope=None) -> Template:
     """A template made here with a photo header, which Meta took and approved."""
-    connect()
+    if scope is None:
+        connect()
+    else:
+        system(
+            "whatsapp_inbox.channel.sync",
+            {"version": 1, "status": "connected", "phone_number": "+34910000000", "monthly_limit": 150},
+            scope,
+        )
     registering()
-    sample = upload()
-    out = delivered(lambda: create(with_file(sample.id)))
+    sample = upload(ctx=ctx_for(scope=scope) if scope else None)
+    out = delivered(lambda: create(with_file(sample.id), ctx_for(scope=scope) if scope else None))
     row = Template.objects.get(pk=out.id)
     Template.objects.filter(pk=row.pk).update(status=Template.Status.APPROVED)
     row.refresh_from_db()
@@ -388,21 +397,32 @@ def test_a_text_header_goes_as_it_always_went(delivered):
 
 @pytest.mark.parametrize("sample", ["none", "another_kind", "another_business"])
 @respx.mock
-def test_a_file_header_needs_its_file_of_its_kind_and_of_its_business(sample):
-    connect()
-    route = registering()
-    ids = {
-        "none": None,
-        "another_kind": upload(MP4, "VIDEO", name="visita.mp4").id,
-        "another_business": upload(ctx=ctx_for(scope=B)).id,
-    }
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.usefixtures("no_test_fallback")
+def test_a_file_header_needs_its_file_of_its_kind_and_of_its_business(hub_a, hub_b, sample):
+    with use_hub(hub_a):
+        system(
+            "whatsapp_inbox.channel.sync",
+            {"version": 1, "status": "connected", "phone_number": "+34910000000", "monthly_limit": 150},
+            Scope("host", hub_a.slug),
+        )
+        route = registering()
+    with use_hub(hub_a):
+        ids = {"none": None, "another_kind": upload(MP4, "VIDEO", name="visita.mp4", ctx=ctx_for(scope=Scope("host", hub_a.slug))).id}
+    if sample == "another_business":
+        with use_hub(hub_b):
+            ids[sample] = upload(ctx=ctx_for(scope=Scope("host", hub_b.slug))).id
+    else:
+        ids[sample] = ids["another_kind"]
 
-    payload = written(header="", header_format="IMAGE", header_sample=str(ids[sample]) if ids[sample] else None)
-    with pytest.raises(InvalidPayload) as refused:
-        create(payload)
+    with use_hub(hub_a):
+        payload = written(header="", header_format="IMAGE", header_sample=str(ids[sample]) if ids[sample] else None)
+        with pytest.raises(InvalidPayload) as refused:
+            create(payload, ctx_for(scope=Scope("host", hub_a.slug)))
 
     assert "file" in refused.value.fields["header_sample"]
-    assert not Template.objects.exists()
+    with use_hub(hub_a):
+        assert not Template.objects.exists()
     assert route.call_count == 0
 
 
@@ -582,38 +602,6 @@ def test_metas_list_with_the_same_photo_header_keeps_the_file(delivered):
 # ── Never another business's file ───────────────────────────────────────────────────────────────
 
 
-@respx.mock
-def test_a_file_of_another_business_named_by_a_template_is_never_shown_nor_sent(delivered):
-    """Phase 1 shares the tables: a template of ``a`` whose row or edit names ``b``'s file (which the operations never
-    write: they check it) shows no file, and its hand-over carries none, said as a file to choose again."""
-    connect()
-    route = registering()
-    out = delivered(lambda: create(with_file(upload().id)))
-    foreign = upload(OTHER_JPEG, name="de-b.jpg", ctx=ctx_for(scope=B))
-    row = Template.objects.get(pk=out.id)
-    edit = {
-        "category": row.category,
-        "header_format": "IMAGE",
-        "header": "",
-        "header_sample": str(foreign.id),
-        "body": row.body,
-        "body_examples": row.body_examples,
-        "footer": row.footer,
-        "buttons": row.buttons,
-    }
-    Template.objects.filter(pk=row.pk).update(header_sample_id=foreign.id, draft=edit, submit_state="failed")
-    calls = route.call_count
-
-    [listed] = run("whatsapp_inbox.template.list", {}).rows
-    assert (listed.header_sample, listed.draft.header_sample) == (None, None)
-
-    delivered(lambda: run("whatsapp_inbox.template.retry", {"id": str(row.id)}))
-
-    assert route.call_count == calls, "b's file never leaves for erplora.com"
-    row.refresh_from_db()
-    assert (row.submit_state, row.submit_error_code) == ("failed", "whatsapp_inbox.header_sample_missing")
-
-
 # ── The file, read by its id (the assistant's card names it so: FIX-HUB-WHATSAPP-INBOX-ATTEMPT-KEYS-UNMARKED) ──────
 
 
@@ -631,15 +619,18 @@ def test_a_header_file_is_read_by_its_id_as_it_was_kept():
     assert (read.name, read.header_format) == ("carta.pdf", "DOCUMENT")
 
 
-def test_a_header_file_of_another_business_is_not_there():
-    """Phase 1 shares the tables: ``b``'s file, asked for by its id from ``a``, does not exist."""
-    theirs = upload(OTHER_JPEG, name="de-b.jpg", ctx=ctx_for(scope=B))
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.usefixtures("no_test_fallback")
+def test_a_header_file_of_another_business_is_not_there(hub_a, hub_b):
+    with use_hub(hub_b):
+        theirs = upload(OTHER_JPEG, name="de-b.jpg", ctx=ctx_for(scope=Scope("host", hub_b.slug)))
 
-    with pytest.raises(NotFound) as gone:
-        detail(theirs.id)
+    with use_hub(hub_a), pytest.raises(NotFound) as gone:
+        detail(theirs.id, ctx_for(scope=Scope("host", hub_a.slug)))
 
     assert gone.value.code == "whatsapp_inbox.sample_not_found"
-    assert detail(theirs.id, ctx_for(scope=B)).name == "de-b.jpg"
+    with use_hub(hub_b):
+        assert detail(theirs.id, ctx_for(scope=Scope("host", hub_b.slug))).name == "de-b.jpg"
 
 
 def test_only_who_may_answer_reads_a_header_file():

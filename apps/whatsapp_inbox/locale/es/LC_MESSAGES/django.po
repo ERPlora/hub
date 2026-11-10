@@ -55,12 +55,6 @@ msgctxt "whatsapp channel"
 msgid "Needs reconnecting"
 msgstr "Hay que reconectar"
 
-msgid "host"
-msgstr "host"
-
-msgid "First label of the host of the business, e.g. “a” for a.localhost."
-msgstr "Primera etiqueta del host del negocio, p. ej. «a» para a.localhost."
-
 msgid "status"
 msgstr "estado"
 
@@ -157,9 +151,6 @@ msgstr "borrado en erplora.com"
 
 msgid "number to erase at erplora.com"
 msgstr "número que borrar en erplora.com"
-
-msgid "business that erased it"
-msgstr "negocio que lo borró"
 
 msgid "created at"
 msgstr "creado el"

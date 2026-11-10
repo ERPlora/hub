@@ -69,7 +69,7 @@ def test_the_pages_render(client, superuser):
     conversation = Conversation.objects.get()
     message = Message.objects.get()
     note = Note.objects.create(conversation=conversation, text="Llamar", created_at=NOW)
-    template = Template.objects.create(host="a", name="recordatorio", language="es")
+    template = Template.objects.create(name="recordatorio", language="es")
     channel = Channel.objects.create()
     client.force_login(superuser)
     host = {"HTTP_HOST": "hubs.localhost"}
@@ -85,21 +85,19 @@ def test_the_pages_render(client, superuser):
         assert client.get(path, **host).status_code == 200, path
 
 
-def test_the_channels_say_whose_business_they_are():
-    # One row per business (phase 1: its host): the staff tells them apart by it.
+def test_the_channel_admin_shows_the_number_and_keeps_only_its_timestamp_read_only():
     channels = admin.site._registry[Channel]
-    assert channels.list_display[0] == "host"
-    assert "host" in channels.search_fields
-    assert "host" in channels.readonly_fields
+    assert channels.list_display[0] == "phone_number"
+    assert "host" not in channels.search_fields
+    assert channels.readonly_fields == ("updated_at",)
 
 
-def test_the_templates_say_whose_business_they_are():
-    # Each business's templates are its own (phase 1: its host); the staff tells them apart by it.
+def test_the_template_admin_has_no_legacy_business_column():
     templates = admin.site._registry[Template]
-    assert templates.list_display[0] == "host"
-    assert "host" in templates.list_filter
-    assert "host" in templates.search_fields
-    assert "host" in templates.readonly_fields
+    assert templates.list_display[0] == "name"
+    assert "host" not in templates.list_filter
+    assert "host" not in templates.search_fields
+    assert "host" not in templates.readonly_fields
 
 
 @pytest.mark.django_db
@@ -109,7 +107,7 @@ def test_the_admin_in_spanish_says_the_inboxs_own_words(client, superuser):
     the inbox's words, not the «origen» and «eliminado el» of Clientes nor the «recibido el» of Facturación, loaded
     before it with the same English (hub#570)."""
     receive("wamid.1")
-    template = Template.objects.create(host="a", name="recordatorio", language="es", synced_at=NOW, deleted_at=NOW)
+    template = Template.objects.create(name="recordatorio", language="es", synced_at=NOW, deleted_at=NOW)
     channel = Channel.objects.create(synced_at=NOW)
     client.force_login(superuser)
 

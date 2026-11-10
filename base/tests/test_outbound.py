@@ -212,11 +212,11 @@ def test_a_job_for_another_hub_never_reaches_its_database(hub_a, hub_b, pool, mo
     tenant_a, tenant_b = Scope("host", hub_a.slug), Scope("host", hub_b.slug)
 
     def ask(ctx, data):
-        outbound.after_commit(job, tenant_b, scope=tenant_b)
+        outbound.after_commit(job, tenant_b)
         return {"count": 1}
 
     def ask_the_platform(ctx, data):
-        outbound.after_commit(job, PLATFORM, scope=PLATFORM)
+        outbound.after_commit(job, PLATFORM)
         return {"count": 1}
 
     with context.use_hub(hub_a):
@@ -234,7 +234,7 @@ def test_whom_a_job_is_for_is_kept_from_when_it_is_asked():
     """The context a job runs in is chosen when it is asked and never changes after: nobody hands it another hub's."""
     a = SimpleNamespace(slug="a", db_name="")
     with context.use_hub(a):
-        job = outbound.Job(print, (), context.current_for(B))
+        job = outbound.Job(print, (), context.current())
     with pytest.raises(FrozenInstanceError):
         job.database = context.CONTROL_DATABASE  # type: ignore[misc]
     assert job.database.hub is a

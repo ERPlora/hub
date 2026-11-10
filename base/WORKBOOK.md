@@ -3355,9 +3355,9 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   lo que su app recupera sola (reclamo con plazo y barrido, como `flow.run.claim_call`). En los tests corre en línea
   (`conftest.py`); la marca `outbound_threads` da los hilos de verdad. Tests: `base/tests/test_outbound.py` y
   `apps/flow/tests/test_relay.py`.
-- Un trabajo corre en el contexto de quien lo pide, fijado al pedirlo (`Job` inmutable), también con `after_commit(fn,
-  *args, scope=…)` (`base.tenancy.context.current_for`): desde el corte (S5) cada BD solo guarda sus filas, la operación
-  de otro hub se rechaza (`HubContextMismatch`) y ningún trabajo entra jamás en la BD de otro hub.
+- Un trabajo corre en el contexto de quien lo pide, fijado al pedirlo (`Job` inmutable): desde el corte (S5) cada BD
+  solo guarda sus filas, la operación de otro hub se rechaza (`HubContextMismatch`) y ningún trabajo entra jamás en la
+  BD de otro hub (hub#1053 quitó el `scope=` de `after_commit`, que ya no cambiaba nada).
 - Informe de errores de la pantalla: `base/frontend/lib/error-report.ts` (`error`, `unhandledrejection` y
   `app.config.errorHandler`; `navigator.sendBeacon`, el mismo error una vez cada 30 s, 50 recordados), instalado en
   `frontend/main.ts`. No envía los avisos del navegador de `BROWSER_NOTICES` («ResizeObserver loop completed with
@@ -3757,7 +3757,7 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   por dirección (`KEY_ADDRESS_LIMIT`). Solo con `hub.db_name` (BD propia), que desde el corte (S5) tienen todos: sin
   ella, `base.api_key.*` responde 409 `base.api_keys_unavailable` y un `Bearer` no entra (test A≠B en
   `base/tests/test_api_keys.py`); esa rama, y el «Todavía no disponible» de sus pantallas, solo la alcanza el
-  respaldo de los tests (hub#1053).
+  respaldo de los tests, y se retira con él (hub#611).
 - Aprobación con PIN de un responsable: una app nombra sus órdenes aprobables en su `LiveAppConfig`
   (`approvals = {"sale.sale.void": _("Void a sale")}`; una consulta nunca, ni una orden `database=False`, que no abre
   transacción en la que gastar el pase: `base.E004` lo dice al arrancar). `base/approvals.py` pone su puerta
