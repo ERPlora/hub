@@ -260,7 +260,7 @@ def settings_row(settings: Settings) -> dict:
                 "show me the till settings",
             ),
             "es": (
-                "¿cómo están los ajustes del arqueo ciego?",
+                "¿tenemos puesto el arqueo ciego en los ajustes?",
                 "¿a qué hora se cierra sola la caja?",
                 "enséñame los ajustes de caja",
             ),
@@ -944,7 +944,7 @@ def list_sessions(ctx: OperationContext, params: SessionListIn) -> dict:
             ),
             "es": (
                 "¿está abierta la caja?",
-                "¿cuánto efectivo debería haber ahora en el cajón?",
+                "¿cuánto dinero tendría que haber ahora en el cajón?",
                 "¿qué turno de caja está abierto?",
             ),
         },
@@ -1131,7 +1131,7 @@ def line_row(line: Line) -> dict:
                 "show me the movements of the cash session",
             ),
             "es": (
-                "¿qué salidas de dinero ha habido hoy en la caja?",
+                "¿cuánto dinero ha salido hoy de la caja?",
                 "enséñame los movimientos de la sesión de caja",
             ),
         },
@@ -1242,7 +1242,7 @@ def list_counts(ctx: OperationContext, params: CountListIn) -> dict:
             ),
             "es": (
                 "dime la divisa y los decimales del negocio",
-                "lista los billetes y monedas para contar el cajón",
+                "lista los valores de billetes y monedas del negocio",
             ),
         },
         "description": "The business's currency, its decimals and its notes and coins (face values in major units, largest "
