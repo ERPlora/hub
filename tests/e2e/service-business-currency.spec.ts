@@ -3,8 +3,10 @@
 // Services writes, saves and paints its amounts in the business's currency: its country's, as erplora.com registered
 // it (`PUT /internal/hubs/{id}`, signed the way the SaaS sends it), in that currency's minor units — the unit Sales
 // charges —, never in hundredths of a fixed euro. Hub `a` moves to Japan: «New service» names the field «Price (JPY)»,
-// «1500» is saved as 1500 yen (read back through the API) and the till charges it at ¥1,500, never ¥150,000, in 390, 834
-// and 1440. In Poland the run's service and voucher read in złoty in the list (captures
+// «1500» is saved as 1500 yen (read back through the API). With only Spain's factory rules there is no rule for the
+// service in Japan: the till's foot says why it cannot value the check, never an unexplained «—» (hub#1069), in 390, 834
+// and 1440; once a Japanese rule exists the notice clears by itself and the till charges it at ¥1,500, never ¥150,000,
+// in 390, 834 and 1440. In Poland the run's service and voucher read in złoty in the list (captures
 // `FIX-HUB-SERVICE-PRICE-STORED-IN-HUNDREDTHS-WHATEVER-THE-CURRENCY-<width>`), the form names «Price (PLN)» and its two
 // readings of «1.250» are in złoty, and «Packages» shows the voucher's closed price in złoty. Back in Spain, euros
 // (`…-es-1440`). What the run creates is deleted after it and `a`'s registration put back, also when a test fails.
@@ -31,7 +33,8 @@ const RUN_ORDERS =
 
 /** `a`'s registration as the run found it (put back after). */
 let original: Registration;
-let japanTaxRuleId = '';
+/** The Japanese rule the run creates for its service (any left by a killed run goes before it starts). */
+const JAPAN_RULES = "delete from tax_taxrule where country_code = 'JP'";
 /** A service and a voucher of the run, priced through the API in minor units (22,50 and 90,00 in euros). */
 let color = { id: '', name: '' };
 let voucher = { id: '', name: '' };
@@ -82,8 +85,8 @@ async function voucherRow(page: Page): Promise<Locator> {
 test.beforeAll(async ({ browser }) => {
   original = registrationOf('a');
   cleanAll();
+  psql(JAPAN_RULES);
   const owner = await hostPage(browser, A, { next: '/service/services' });
-  japanTaxRuleId = (await post<{ id: string }>(owner.context, '/tax/rules', { country_code: 'JP', tax_category_key: 'service.generic', rate_pct: 10 })).id;
   const colorName = named('Color');
   color = { id: (await post<{ id: string }>(owner.context, '/service/services', { name: colorName, price: 2250, tax_category_key: 'service.generic' })).id, name: colorName };
   const voucherName = named('Bono');
@@ -95,7 +98,7 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(async () => {
   if (original) await registerBusinessIn(original, original.country);
   cleanAll();
-  if (japanTaxRuleId) psql(`delete from tax_taxrule where id = '${japanTaxRuleId}'`);
+  psql(JAPAN_RULES);
 });
 
 test(`${KEY}: service-business-currency a business in Japan saves «1500» as 1500 yen and the till charges ¥1,500 in 390, 834 and 1440`, async ({
@@ -134,6 +137,20 @@ test(`${KEY}: service-business-currency a business in Japan saves «1500» as 15
   await expect(tile).toContainText('¥1,500');
   await tile.click();
   await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: YEN_SERVICE }).first()).toBeVisible();
+  // No rule for the service in Japan yet: the foot says why, in the server's words, and the total waits.
+  for (const size of SIZES) {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await openTillCart(page);
+    const refusal = shown(page).locator('[data-testid=pos-preview-error]');
+    await expect(refusal, `refusal at ${size.name}`).toContainText('no tax rule applies');
+    await expect(refusal, `refusal at ${size.name}`).toBeInViewport();
+    await expect(shown(page).locator('[data-testid=pos-total]'), `refusal at ${size.name}`).toHaveText('—');
+    await settled(page);
+    await noHorizontalScroll(page, `refusal ${size.name}`);
+    await capture(page, `${KEY}-jp-refusal-${size.name}`);
+  }
+  await post(context, '/tax/rules', { country_code: 'JP', tax_category_key: 'service.generic', rate_pct: 10 });
+  await expect(shown(page).locator('[data-testid=pos-preview-error]')).toBeHidden();
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
     await openTillCart(page);

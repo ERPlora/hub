@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:43fb2765b337739e769d5f2175e090651e4678fdaf1ea5f39611c99d8748bbde -->
+<!-- generated from WORKBOOK.md sha256:9879914d0065cd7f95ca67ca3f4424a9b4ea2b9ec92e6e16635793e1f1951ec3 -->
 
 ## What it is for and who it is for
 
@@ -314,7 +314,8 @@ the tiles, the search, the open checks and the floating button say "—", and th
 total is on its way, because without it the number of decimals is unknown (in yen, "Charge · 15.00" for ¥1,500;
 hub#936); as soon as it says it, the figure shows with its sign. If the server cannot value the check
 (for example, because no applicable VAT rule exists), the foot says why instead of leaving only "—";
-when it can value it, the notice clears and the total returns. The **Charge** sheet stays on "Working out
+when it can value it, the notice clears and the total returns, and parking the check does not leave it
+on the empty till. The **Charge** sheet stays on "Working out
 the total…", with no keypad and "Charge" grey, because the total is painted and the amount tendered read in
 it (without it, "1500" yen tendered would be charged as 150,000); if the currency cannot be read, the notice
 with "Retry" shows in its place, as with any other read of the charge. With no amount tendered the button does

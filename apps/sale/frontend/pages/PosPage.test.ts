@@ -166,6 +166,21 @@ describe('PosPage: selling', () => {
     expect(plain(s.find('pos-total').text())).toBe('€1.50');
   });
 
+  it('a refused check that is parked leaves no reason behind on the empty till', async () => {
+    const s = await setup();
+    await s.addProduct();
+    s.net.lastStream().push(errorFrame(s.subId('sale.checkout.preview'), 'sale.no_tax_rule'));
+    await s.reopen();
+    expect(s.find('pos-preview-error').exists()).toBe(true);
+    await click(s.find('pos-park').element);
+    s.reply(CHECK);
+    s.wrapper.findComponent(ParkSheet).vm.$emit('park', 'Ana');
+    await settle();
+    expect(localStorage.getItem(CURRENT_CHECK_KEY)).toBeNull();
+    expect(s.find('pos-total').exists()).toBe(true);
+    expect(s.find('pos-preview-error').exists()).toBe(false);
+  });
+
   it('a reload comes back to the check the device had', async () => {
     localStorage.setItem(CURRENT_CHECK_KEY, 'o5');
     const s = await setup();
