@@ -540,7 +540,8 @@ Estado: hecho
 Actor: administrador, responsable, empleado
 Pantalla: Asistente
 Pasos:
-1. Pide al asistente «Imprime una prueba en la de cocina», «reintenta los trabajos fallidos de
+1. Pide al asistente «Imprime una prueba en la de cocina», «saca una página de prueba en Caja QA»,
+   «cambia la IP, el papel y el nombre de la impresora Caja QA», «reintenta los trabajos fallidos de
    etiquetas» o «¿cómo está la impresora de la caja?».
 2. El asistente hace lo mismo que las pantallas, nombrando la impresora por su nombre y el trabajo por
    su número, y contesta con lo que ha hecho. Antes de cambiar algo, su tarjeta de confirmación dice la
@@ -966,7 +967,8 @@ la enseña. Tests: `tests/test_apps.py`, `tests/test_integration_home.py` y
   barras lo dibuja la impresora (`GS k`).
 - **Administrador de Django con CRUD completo** (ronda 12, PLAN §17), solo en `hubs.erplora.com`; ids y
   fechas de solo lectura. Lo que guarda no pasa por las operaciones ni deja aviso.
-- **Asistente**: cada operación declara `ai` y cada campo de `schemas.py` su `description`; la
+- **Asistente**: cada operación declara `ai` con sus `asks` (frases en `en` y `es`, `live.E020`: Impresión está en
+  `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1086) y cada campo de `schemas.py` su `description`; la
   impresora se nombra por su nombre y el trabajo por su número de documento. La tarjeta de
   confirmación nombra cada dato por el `title` de su esquema (`gettext_noop`, con su `es` en el catálogo:
   «Trabajo» para `job_id`, «Dispositivo», «Intento», «Error de impresión», «Referencia») o, si no lo tiene,
