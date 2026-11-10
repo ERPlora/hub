@@ -122,7 +122,8 @@ def test_the_assistant_gets_every_operation_but_the_screen_only_ones():
             continue
         assert isinstance(op.ai, dict), name
         assert len(str(op.ai.get("description", "")).strip()) > 20, name
-        expected = {"description", "risk"} if op.kind == "command" else {"description"}
+        # What a person types to ask for it (``asks``, hub#1093): website is listed in LIVE_ASSISTANT_ASKS_REQUIRED.
+        expected = {"description", "asks", "risk"} if op.kind == "command" else {"description", "asks"}
         if name == "website.site.save":
             expected.add("summary")
         assert set(op.ai) == expected, name
