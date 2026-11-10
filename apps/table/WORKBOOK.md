@@ -402,8 +402,8 @@ Implicados: TABLE-F10, TABLE-F25, TABLE-F29, SALE-F19
 ### TABLE-F10 Sentar a un grupo en una mesa libre o reservada
 <!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen qa:verticals/restaurant/11-races-and-concurrency wf:whatsapp-mesa#rec_wa_mesa-f10 wf:restaurante-dia#rec_restaurante-f05 qa:modules/reservations/waitlist-and-walk-in qa:modules/tables/seat-and-open-table fi:modules/tables#command-handler-wasm-tables-sessions-open-open_session fi:modules/tables#slot-provides_slots-sales-pos-order_context-erp-tables-pos-zones old:tables/workflow/servicio.md#tables-f10 -->
 Estado: hecho
-Actor: empleado, responsable
-Pantalla: Plano de sala (Servicio)
+Actor: empleado, responsable, asistente
+Pantalla: Plano de sala (Servicio); asistente
 Pasos:
 1. En **Plano de sala → Servicio**, toca una mesa Disponible o Reservada. Se pregunta «Comensales en
    la mesa N», con el aforo (o los comensales de la reserva) ya puesto.
@@ -413,6 +413,7 @@ Pasos:
 3. Si quieres, antes de sentar «Asignar cliente» le pone la ficha a la cuenta (TABLE-F32).
 4. La mesa pasa a Ocupada y en Ventas nace su cuenta abierta con el título «Mesa N» (la ve **Cuentas
    abiertas** del TPV). Quien sienta es el camarero de la cuenta.
+5. Con el asistente: «sienta a tres en la mesa 4» (con su zona si el número se repite).
 Entra: la mesa y los comensales; en una Reservada, los comensales de la reserva.
 Sale: la cuenta de mesa abierta con sus comensales, la hora y el camarero (avisa:
 `table.session.opened`); su cuenta en Ventas (avisa: `sale.order.opened`); las reservas retenidas en
@@ -486,12 +487,13 @@ Implicados: TABLE-F24, SALE-F19
 ### TABLE-F14 Corregir los comensales de una mesa ocupada
 <!-- origen: qa:modules/tables/seat-and-open-table old:tables/workflow/servicio.md#tables-f14 qa:modules/tables/move-and-merge-tables -->
 Estado: hecho
-Actor: empleado, responsable
-Pantalla: Plano de sala (Servicio)
+Actor: empleado, responsable, asistente
+Pantalla: Plano de sala (Servicio); asistente
 Pasos:
 1. En la ventana de la mesa ocupada pulsa «Comensales».
 2. Sale la pregunta con los comensales actuales; cámbialos con un atajo o con «−» / «+» y «Guardar».
 3. La mesa enseña los comensales nuevos. En una mesa dividida se corrige la cuenta elegida.
+4. Con el asistente: «en la mesa 4 ahora son cinco»; en una mesa dividida, di cuál de sus cuentas.
 Entra: la cuenta abierta de la mesa.
 Sale: los comensales de la cuenta (avisa: `table.session.updated`).
 Si falla: una cuenta ya cerrada, trasladada, fusionada o aparcada no se corrige (mensaje de
@@ -501,8 +503,8 @@ Implicados: TABLE-F10, TABLE-F17
 ### TABLE-F15 Pasar la cuenta a otra mesa (transferir)
 <!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen qa:verticals/restaurant/11-races-and-concurrency wf:restaurante-dia#rec_restaurante-f10 qa:modules/tables/move-and-merge-tables fi:modules/tables#command-handler-wasm-tables-sessions-transfer-transfer_session old:tables/workflow/servicio.md#tables-f15 -->
 Estado: hecho
-Actor: empleado, responsable
-Pantalla: Plano de sala (Servicio)
+Actor: empleado, responsable, asistente
+Pantalla: Plano de sala (Servicio); asistente
 Pasos:
 1. En la ventana de la mesa ocupada pulsa «Transferir».
 2. El plano dice «Transferir N a…» y «Elige una mesa libre»: solo se pueden tocar las Disponibles y
@@ -511,6 +513,7 @@ Pasos:
 4. La cuenta es la misma, ahora en la mesa de destino, con sus comensales, su camarero, sus notas, su
    hora de llegada y su título nuevo en Ventas («Mesa M»); la de origen queda libre si no le queda otra
    cuenta, y la de destino, Ocupada (si estaba Reservada, gasta la reserva).
+5. Con el asistente: «pasa la mesa 4 a la 6».
 Entra: la cuenta de origen y la mesa de destino.
 Sale: la cuenta de origen «Trasladada» y una cuenta de mesa nueva en el destino con la misma cuenta
 de Ventas (avisa: `table.session.transferred`).
@@ -544,8 +547,8 @@ Implicados: TABLE-F17, SALE-F24
 ### TABLE-F17 Dividir la cuenta de una mesa
 <!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen wf:restaurante-dia#rec_restaurante-f10 qa:modules/sales/split-bill old:tables/workflow/servicio.md#tables-f17 -->
 Estado: hecho
-Actor: empleado, responsable
-Pantalla: Plano de sala (Servicio)
+Actor: empleado, responsable, asistente
+Pantalla: Plano de sala (Servicio); asistente
 Pasos:
 1. En la ventana de la mesa ocupada pulsa «Dividir cuenta».
 2. Marca las líneas que se van a la cuenta nueva (las de su cuenta en Ventas, cada una con su importe
@@ -553,6 +556,8 @@ Pasos:
 3. Mesas abre una segunda cuenta en la misma mesa (1 comensal) y Ventas le pasa las líneas marcadas,
    en la misma operación. Cobrar una cierra solo esa: la mesa sigue Ocupada con la otra. Se puede
    dividir aunque la mesa esté bloqueada o desactivada: no se sienta a nadie nuevo.
+4. Con el asistente: «divide la cuenta de la mesa 4, pagan por separado» (sin decir líneas, la nueva
+   nace vacía).
 Entra: la cuenta abierta de la mesa y las líneas que se mueven.
 Sale: dos cuentas de mesa abiertas en la misma mesa, la nueva colgando de la original (avisa:
 `table.session.split` y `sale.order.opened`).
@@ -646,10 +651,12 @@ Implicados: TABLE-F18, TABLE-F19, TABLE-F23
 <!-- origen: fi:modules/tables#command-handler-wasm-tables-sessions-delete-delete_session old:tables/workflow/cierre-e-historial.md#tables-f23 -->
 Estado: hecho
 Actor: administrador, asistente
-Pantalla: Sesiones
+Pantalla: Sesiones; asistente
 Pasos:
 1. En **Sesiones → Cerradas** (o **Todas**), «Borrar» en una cuenta terminada y confírmalo.
 2. Desaparece de **Sesiones**; queda guardada como borrada y su recorrido por las mesas se conserva.
+3. Con el asistente: «borra del historial la cuenta cerrada de la mesa 4»; busca él la cuenta y pide
+   confirmación.
 Entra: la cuenta de mesa.
 Sale: la cuenta borrada (avisa: `table.session.deleted`).
 Si falla: una cuenta abierta o aparcada no se borra: «Esa cuenta sigue abierta: ciérrala antes de

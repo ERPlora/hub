@@ -559,6 +559,7 @@ LIVE_ASSISTANT_ASKS_REQUIRED = (
     "base",
     "customer",
     "sale",
+    "table",
 )
 
 # Email: the console locally; in production the SES API signed by the task role (no static keys,
