@@ -42,6 +42,7 @@ for (const viewport of VIEWPORTS) {
     const toggle = setup.locator('[data-testid="setup-toggle"]:visible');
     if (await toggle.count()) await toggle.click();
     await expect44(setup.locator('ion-button[size="small"]:visible'), 'setup');
+    await expect44(shown(page).locator('[data-testid="widgets-customize"]:visible'), 'customize panel');
     expect(await horizontalOverflow(page), `home at ${viewport.width}px`).toBeLessThanOrEqual(1);
 
     await page.goto(`${A}/profile`);
