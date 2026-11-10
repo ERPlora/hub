@@ -3811,7 +3811,7 @@ def _file_bytes(content_base64: str) -> bytes:
         asks={
             "en": ("upload the contract I attached", "keep this photo in our files", "save this PDF in our files"),
             "es": (
-                "archiva esta foto en los documentos",
+                "archiva este documento en los archivos",
                 "guarda este PDF en los archivos",
                 "sube el archivo que te he adjuntado",
             ),

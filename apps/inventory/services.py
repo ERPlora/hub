@@ -154,6 +154,18 @@ _PRODUCT_CONSTRAINTS = {
         "description": "Create a product of the catalog with its tax category, its categories and, if given, "
         "its initial stock.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "add a new product: Iced Coffee, 3.50",
+                "create the product Croissant at 2 euros",
+                "add a lemon tart to my catalog at 4 euros",
+            ),
+            "es": (
+                "crea un producto nuevo: Café helado a 3,50",
+                "da de alta el cruasán, vale 2 euros",
+                "añade una tarta de limón al catálogo a 4 euros",
+            ),
+        },
     },
 )
 def create_product(ctx: OperationContext, data: ProductIn) -> dict:
@@ -217,6 +229,16 @@ def create_product(ctx: OperationContext, data: ProductIn) -> dict:
         "description": "Create many products at once (a CSV import): each row created, skipped because its SKU "
         "already exists, or failed with its reason; dry_run only checks.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "import my product catalog from a CSV file",
+                "load all the items of this CSV into the catalog",
+            ),
+            "es": (
+                "importa mi catálogo de productos desde un archivo CSV",
+                "carga todos los artículos de este CSV en el catálogo",
+            ),
+        },
     },
 )
 def bulk_create_products(ctx: OperationContext, data: ProductImportIn) -> dict:
@@ -289,6 +311,18 @@ def bulk_create_products(ctx: OperationContext, data: ProductImportIn) -> dict:
         "description": "Change a product, named by its id, SKU or name: its data, active or not, its stock "
         "control and its categories. The SKU, the type and the stock are not changed here.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "change the price of the coffee to 1.80",
+                "rename the Tea product and make it inactive",
+                "the croissant now costs 2.20",
+            ),
+            "es": (
+                "cámbiale el precio al café a 1,80",
+                "renombra el producto Té y desactívalo",
+                "el cruasán ahora cuesta 2,20",
+            ),
+        },
     },
 )
 def update_product(ctx: OperationContext, data: ProductPatchIn) -> dict:
@@ -343,6 +377,16 @@ def update_product(ctx: OperationContext, data: ProductPatchIn) -> dict:
         "description": "Delete a product of the catalog, named by its id, SKU or name (logically: its movements "
         "stay and its SKU and EAN-13 are freed).",
         "risk": "high",
+        "asks": {
+            "en": (
+                "delete the product Old Tea",
+                "remove the croissant from the catalog",
+            ),
+            "es": (
+                "borra el producto Té viejo",
+                "quita el cruasán del catálogo",
+            ),
+        },
     },
 )
 def delete_product(ctx: OperationContext, data: ProductRefIn) -> dict:
@@ -370,6 +414,18 @@ def delete_product(ctx: OperationContext, data: ProductRefIn) -> dict:
         "description": "Mark a product sold out («86»: the till stops offering it, it stays active) or put it "
         "back on sale, named by its id, SKU or name.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "mark the Tea as sold out for today",
+                "we ran out of croissants, stop offering them",
+                "put the coffee back on sale",
+            ),
+            "es": (
+                "marca el Té QA como agotado",
+                "se nos han acabado los cruasanes, que no se vendan",
+                "vuelve a poner a la venta el café",
+            ),
+        },
     },
 )
 def set_sold_out(ctx: OperationContext, data: ProductSoldOutIn) -> dict:
@@ -402,6 +458,18 @@ PHOTOS = "inventory/products/"
         "leche»), named by its id, SKU or name: an image of ERPlora's shared library by its reference (catalog:<folder>/<name>, from "
         "inventory.product.suggest_image or base.catalog_image.search), or empty to show none (its initials).",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "put an image on the latte",
+                "set the image of the croissant",
+                "remove the image of the tea",
+            ),
+            "es": (
+                "ponle una imagen al café con leche",
+                "pon una imagen al cruasán",
+                "quita la imagen del producto té",
+            ),
+        },
     },
 )
 def set_image(ctx: OperationContext, data: ProductImageIn) -> dict:
@@ -459,6 +527,16 @@ def _change_image(ctx: OperationContext, product: Product, image: str) -> None:
         "description": "Print the barcode label of a product (its name, its SKU as the code and its price) on the "
         "printer of the «Label» function, named by its id, SKU or name; each call prints one label.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "print a label for the coffee",
+                "I need the barcode label of the croissant",
+            ),
+            "es": (
+                "imprime una etiqueta del café",
+                "necesito la etiqueta con el código de barras del cruasán",
+            ),
+        },
     },
 )
 def print_label(ctx: OperationContext, data: ProductRefIn) -> dict:
@@ -500,7 +578,21 @@ def print_label(ctx: OperationContext, data: ProductRefIn) -> dict:
     input=ProductCategoryIn,
     output=ProductCategoryLinkOut,
     expose_api=True,
-    ai={"description": "Put a product in a category so that the till groups it there.", "risk": "normal"},
+    ai={
+        "description": "Put a product in a category so that the till groups it there.", "risk": "normal",
+        "asks": {
+            "en": (
+                "put the Coffee in the Cafetería QA category",
+                "classify the croissant as bakery",
+                "move the tea to the drinks family",
+            ),
+            "es": (
+                "clasifica el Café en la categoría Cafetería QA",
+                "mete el cruasán en la familia Bollería",
+                "clasifica el té en la categoría Bebidas",
+            ),
+        },
+    },
 )
 def add_product_category(ctx: OperationContext, data: ProductCategoryIn) -> dict:
     product = find_product(data.product_id, data.product, lock=True)
@@ -519,7 +611,19 @@ def add_product_category(ctx: OperationContext, data: ProductCategoryIn) -> dict
     input=ProductCategoryIn,
     output=ProductCategoryLinkOut,
     expose_api=True,
-    ai={"description": "Take a product out of a category.", "risk": "normal"},
+    ai={
+        "description": "Take a product out of a category.", "risk": "normal",
+        "asks": {
+            "en": (
+                "take the coffee out of the drinks category",
+                "unclassify the croissant from bakery",
+            ),
+            "es": (
+                "saca el café de la categoría bebidas",
+                "quita el cruasán de la familia Bollería",
+            ),
+        },
+    },
 )
 def remove_product_category(ctx: OperationContext, data: ProductCategoryIn) -> dict:
     product = find_product(data.product_id, data.product, lock=True)
@@ -541,7 +645,19 @@ def remove_product_category(ctx: OperationContext, data: ProductCategoryIn) -> d
     input=CategoryIn,
     output=CategoryOut,
     expose_api=True,
-    ai={"description": "Create a product category; its slug is made from the name when not given.", "risk": "normal"},
+    ai={
+        "description": "Create a product category; its slug is made from the name when not given.", "risk": "normal",
+        "asks": {
+            "en": (
+                "create a category called Desserts",
+                "add a new family for the till: Wines",
+            ),
+            "es": (
+                "crea una categoría que se llame Postres",
+                "añade una familia nueva para el TPV: Vinos",
+            ),
+        },
+    },
 )
 def create_category(ctx: OperationContext, data: CategoryIn) -> dict:
     tax_category = _tax_category(data.tax_category_key) if data.tax_category_key else None
@@ -568,6 +684,16 @@ def create_category(ctx: OperationContext, data: CategoryIn) -> dict:
         "description": "Create many categories at once (a CSV import); one whose name already exists is skipped, "
         "so repeating the file duplicates nothing.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "import product categories from a CSV file",
+                "load these categories from a CSV",
+            ),
+            "es": (
+                "importa las categorías de producto desde un archivo CSV",
+                "carga estas categorías desde un CSV",
+            ),
+        },
     },
 )
 def bulk_create_categories(ctx: OperationContext, data: CategoryImportIn) -> dict:
@@ -622,6 +748,16 @@ def bulk_create_categories(ctx: OperationContext, data: CategoryImportIn) -> dic
         "description": "Change a category, named by its id or name; what is not sent (icon, colour, order, "
         "description) is kept.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "rename the Drinks category to Beverages",
+                "change the colour of the Desserts family",
+            ),
+            "es": (
+                "renombra la categoría Bebidas a Refrescos",
+                "cámbiale el color a la familia Postres",
+            ),
+        },
     },
 )
 def update_category(ctx: OperationContext, data: CategoryPatchIn) -> dict:
@@ -654,6 +790,16 @@ def update_category(ctx: OperationContext, data: CategoryPatchIn) -> dict:
     ai={
         "description": "Delete a category, named by its id or name: its products stay, only unlinked from it.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "delete the Desserts category",
+                "remove the family Wines from the till",
+            ),
+            "es": (
+                "borra la categoría Postres",
+                "quita la familia Vinos del TPV",
+            ),
+        },
     },
 )
 def delete_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
@@ -684,6 +830,18 @@ def delete_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
         "description": "Record goods received: raises the stock of one or more products (by id, SKU or name), "
         "with the unit cost and the delivery note's number.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "I just received 20 coffees, delivery note A-123",
+                "a delivery arrived: add 10 boxes of tea to the stock",
+                "record the goods that came in today",
+            ),
+            "es": (
+                "ha llegado un pedido: recibe 20 cafés con el albarán A-123",
+                "entra mercancía: 10 cajas de té al stock",
+                "registra la entrada de mercancía del proveedor de hoy",
+            ),
+        },
     },
 )
 def receive_stock(ctx: OperationContext, data: ReceiveIn) -> dict:
@@ -729,6 +887,18 @@ def receive_stock(ctx: OperationContext, data: ReceiveIn) -> dict:
         "description": "Apply a stock count: the product's balance becomes the ABSOLUTE value counted, with a "
         "mandatory reason; the ledger records the difference.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "I counted 12 croissants, fix the stock",
+                "do a stock count: the coffee is really 45",
+                "inventory count of the tea: 8 left",
+            ),
+            "es": (
+                "he contado 12 cruasanes, corrige el stock",
+                "haz un recuento: del café hay 45 de verdad",
+                "recuento del té: quedan 8",
+            ),
+        },
     },
 )
 def count_stock(ctx: OperationContext, data: CountIn) -> dict:
@@ -757,6 +927,18 @@ def count_stock(ctx: OperationContext, data: CountIn) -> dict:
         "description": "Write off stock without a sale (waste, breakage, own consumption) with its reason; a "
         "service or an article without stock control is refused (there is no stock to lower).",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "write off 2 coffees, they broke",
+                "discard 3 croissants, they went stale",
+                "take out of stock what we used ourselves",
+            ),
+            "es": (
+                "da de baja 2 cafés que se han roto",
+                "tira 3 cruasanes que se han puesto malos",
+                "quita del stock lo que hemos consumido nosotros",
+            ),
+        },
     },
 )
 def write_off_stock(ctx: OperationContext, data: WriteOffIn) -> dict:
@@ -791,6 +973,18 @@ def write_off_stock(ctx: OperationContext, data: WriteOffIn) -> dict:
         "description": "Change the inventory settings: allow selling without stock, the default low-stock "
         "threshold and whether stock is tracked (an article's own decision wins).",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "let me sell products even with no stock",
+                "change the default low stock threshold to 5",
+                "stop tracking stock",
+            ),
+            "es": (
+                "deja vender productos aunque no haya stock",
+                "pon el aviso de stock bajo en 5 por defecto",
+                "no quiero controlar el stock",
+            ),
+        },
     },
 )
 def update_config(ctx: OperationContext, data: ConfigPatchIn) -> dict:
