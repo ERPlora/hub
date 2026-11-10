@@ -1928,6 +1928,7 @@ def _who(ctx: OperationContext) -> str:
 @operation(
     "base.blueprint.inspect",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=ADMINISTER_HUB,
     input=BlueprintSourceIn,
     output=BlueprintSummaryOut,
@@ -2033,6 +2034,7 @@ def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
 @operation(
     "base.import.undo",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=ADMINISTER_HUB,
     input=ImportUndoIn,
     output=ImportUndoOut,
@@ -2711,6 +2713,7 @@ def failed_event_retry_all(ctx: OperationContext, data: FailedEventRetryAllIn) -
 @operation(
     "base.failed_event.discard",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=ADMINISTER_HUB,
     input=FailedEventDiscardIn,
     output=FailedEventOutId,
@@ -2952,6 +2955,7 @@ def _actor_label(ctx: OperationContext) -> str:
 @operation(
     "base.device.mode_set",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=ADMINISTER_HUB,
     input=DeviceModeIn,
     output=DeviceCurrentOut,
@@ -2991,6 +2995,7 @@ def _device(device_id) -> TrustedDevice:
 @operation(
     "base.device.rename",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=ADMINISTER_HUB,
     input=DeviceRenameIn,
     output=DeviceByIdIn,
@@ -3084,6 +3089,7 @@ def _remove_devices(ids: list) -> None:
 @operation(
     "base.access.settings_update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=ADMINISTER_HUB,
     input=AccessSettingsUpdateIn,
     output=AccessSettingsOut,
@@ -3140,6 +3146,7 @@ def _profile(user) -> Profile:
 @operation(
     "base.profile.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=VIEW_HOME,
     input=ProfileUpdateIn,
     output=ProfileOut,
@@ -3173,6 +3180,7 @@ def profile_update(ctx: OperationContext, data: ProfileUpdateIn) -> dict:
 @operation(
     "base.profile.preferences_set",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=VIEW_HOME,
     input=PreferencesIn,
     output=PreferencesOut,
@@ -3252,6 +3260,7 @@ def _is_image(raw: bytes, pillow_format: str) -> bool:
 @operation(
     "base.profile.avatar_remove",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=VIEW_HOME,
     input=AvatarRemoveIn,
     output=AvatarOut,
@@ -3300,6 +3309,7 @@ def _person_answer(ctx: OperationContext, person_id: str) -> dict:
 @operation(
     "base.person.pin_remove",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=ADMINISTER_HUB,
     input=PersonIn,
     output=PersonDetailOut,
@@ -3382,6 +3392,7 @@ def person_badge_set(ctx: OperationContext, data: BadgeSetIn) -> dict:
 @operation(
     "base.person.badge_remove",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=ADMINISTER_HUB,
     input=PersonIn,
     output=PersonDetailOut,
@@ -3443,6 +3454,7 @@ def _new_token_for(key: ApiKey) -> str:
 @operation(
     "base.api_key.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=ADMINISTER_HUB,
     input=ApiKeyCreateIn,
     output=ApiKeyTokenOut,
@@ -3484,6 +3496,7 @@ def _live_key(key_id: UUID) -> ApiKey:
 @operation(
     "base.api_key.rotate",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=ADMINISTER_HUB,
     input=ApiKeyIdIn,
     output=ApiKeyTokenOut,
@@ -3507,6 +3520,7 @@ def api_key_rotate(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
 @operation(
     "base.api_key.revoke",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=ADMINISTER_HUB,
     input=ApiKeyIdIn,
     output=ApiKeyRevokeOut,
@@ -3731,6 +3745,7 @@ from base.schemas import ApiDocSettingsIn, ApiDocSettingsOut, ApiDocSettingsUpda
 @operation(
     "base.api_doc.settings_update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=ADMINISTER_HUB,
     input=ApiDocSettingsUpdateIn,
     output=ApiDocSettingsOut,
@@ -4776,6 +4791,7 @@ def _unchanged(hub: Hub | None, label: str, row: activation.Activation) -> dict:
 @operation(
     "base.app.disable",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=ADMINISTER_HUB,
     input=AppChangeIn,
     output=AppChangeOut,
@@ -4847,6 +4863,7 @@ def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
 @operation(
     "base.app.retry",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=ADMINISTER_HUB,
     input=AppChangeIn,
     output=AppChangeOut,

@@ -195,6 +195,7 @@ def _default_changed(ctx: OperationContext, price_list: PriceList, previous: Pri
 @operation(
     "pricing.price_list.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="pricing.manage",
     input=PriceListIn,
     output=PriceListOut,
@@ -240,6 +241,7 @@ def create_price_list(ctx: OperationContext, data: PriceListIn) -> dict:
 @operation(
     "pricing.price_list.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="pricing.manage",
     input=PriceListPatchIn,
     output=PriceListOut,
@@ -288,6 +290,7 @@ def update_price_list(ctx: OperationContext, data: PriceListPatchIn) -> dict:
 @operation(
     "pricing.price_list.set_default",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="pricing.manage",
     input=PriceListDefaultIn,
     output=PriceListOut,
@@ -342,6 +345,7 @@ def _switch_list(ctx: OperationContext, data: PriceListRefIn, active: bool) -> d
 @operation(
     "pricing.price_list.deactivate",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="pricing.manage",
     input=PriceListRefIn,
     output=PriceListOut,
@@ -358,6 +362,7 @@ def deactivate_price_list(ctx: OperationContext, data: PriceListRefIn) -> dict:
 @operation(
     "pricing.price_list.activate",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="pricing.manage",
     input=PriceListRefIn,
     output=PriceListOut,
@@ -395,6 +400,7 @@ def _save_item(item: PriceItem) -> None:
 @operation(
     "pricing.price_item.add",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="pricing.manage",
     input=PriceItemIn,
     output=PriceItemOut,
@@ -466,6 +472,7 @@ def _named_item(ctx: OperationContext, data: PriceItemRefIn) -> PriceItem:
 @operation(
     "pricing.price_item.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="pricing.manage",
     input=PriceItemPatchIn,
     output=PriceItemOut,
@@ -499,6 +506,7 @@ def update_price_item(ctx: OperationContext, data: PriceItemPatchIn) -> dict:
 @operation(
     "pricing.price_item.remove",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="pricing.manage",
     input=PriceItemRefIn,
     output=DeletedOut,
@@ -578,6 +586,7 @@ def _save_rule(rule: DiscountRule) -> None:
 @operation(
     "pricing.rule.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="pricing.manage",
     input=RuleIn,
     output=RuleOut,
@@ -635,6 +644,7 @@ _COMPARED = (
 @operation(
     "pricing.rule.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="pricing.manage",
     input=RulePatchIn,
     output=RuleOut,
@@ -700,6 +710,7 @@ def _switch_rule(ctx: OperationContext, data: RuleRefIn, active: bool) -> dict:
 @operation(
     "pricing.rule.deactivate",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="pricing.manage",
     input=RuleRefIn,
     output=RuleOut,
@@ -716,6 +727,7 @@ def deactivate_rule(ctx: OperationContext, data: RuleRefIn) -> dict:
 @operation(
     "pricing.rule.activate",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="pricing.manage",
     input=RuleRefIn,
     output=RuleOut,
