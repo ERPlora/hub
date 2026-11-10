@@ -232,6 +232,8 @@ fueran los del negocio.
 En las ventanas de categoría y de movimientos de stock (recibir, recuento y merma), el botón atrás del móvil pregunta «¿Descartar los cambios?»
 cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar cambios»
 cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05); el alta y la edición de producto preguntan igual (INVENTORY-F01, INVENTORY-F02).
+En el alta y la edición de producto preguntan lo mismo, también en el navegador, «Cancelar» («Cancelar edición»), la «×» del panel,
+Escape y tocar fuera del panel (hub#1023).
 
 ## Flujos
 
@@ -299,11 +301,12 @@ Pasos:
    una: cada una sale debajo del campo, con su botón para quitarla.
 6. Pulsa «Guardar» («Guardando…»). El panel se cierra y el producto sale en la tabla con Estado
    «Sí».
-7. En la aplicación de Android, el botón atrás del móvil con algo escrito o elegido sin guardar (la foto
-   también) no cierra el panel: pregunta «¿Descartar los cambios?» («Lo que has escrito en esta ventana no
-   se ha guardado.»). «Seguir editando», o atrás otra vez, deja el panel con lo escrito; «Descartar
-   cambios» lo cierra sin guardar nada. Con el panel como se abrió, atrás lo cierra sin preguntar
-   (hub#1015).
+7. Con algo escrito o elegido sin guardar (la foto también), ni «Cancelar», ni la «×» del panel, ni Escape, ni
+   tocar fuera del panel, ni en la aplicación de Android el botón atrás del móvil, lo cierran: preguntan
+   «¿Descartar los cambios?» («Lo que has escrito en esta ventana no se ha guardado.»). «Seguir editando»,
+   o atrás otra vez, deja el panel con lo escrito; «Descartar cambios» lo cierra sin guardar nada y sin
+   volver a preguntar. Con el panel como se abrió, cualquiera de ellos lo cierra sin preguntar (hub#1015,
+   hub#1023).
 Entra: las categorías fiscales y su tipo, de Impuestos; las unidades de medida y las categorías de
 producto, de Inventario.
 Sale: el producto, activo y enlazado a las categorías marcadas, en un solo paso: o se guarda
@@ -334,9 +337,9 @@ Pasos:
 2. Cambia lo que haga falta. El SKU está bloqueado («El SKU es la identidad del producto: no se
    edita»). El stock no se edita aquí: se recibe (INVENTORY-F13) o se cuenta (INVENTORY-F14). El
    «Tipo» y el «Stock inicial» no salen.
-3. Pulsa «Guardar cambios». «Cancelar edición» o cerrar el panel lo deja como estaba. En la aplicación de
-   Android, el botón atrás con un cambio sin guardar pregunta antes, como en el alta (INVENTORY-F01, paso 7);
-   sin cambios, cierra el panel.
+3. Pulsa «Guardar cambios». Con un cambio sin guardar, «Cancelar edición», la «×», Escape, tocar fuera del panel
+   y, en la aplicación de Android, el botón atrás preguntan antes, como en el alta (INVENTORY-F01, paso 7), y
+   «Descartar cambios» lo deja como estaba; sin cambios, cierran el panel.
 4. La fila enseña los datos nuevos.
 Entra: el producto tal como está guardado; las categorías fiscales, de Impuestos; las unidades y
 las categorías de producto.
@@ -1008,7 +1011,8 @@ Pasos:
 3. Toca una imagen: la ventana se cierra y el formulario la enseña en «Foto», con «Cambiar» y «Quitar
    foto».
 4. Pulsa «Guardar» o «Guardar cambios»: la foto queda en el artículo. «Cancelar edición» o cerrar el
-   panel la descarta.
+   panel pregunta antes «¿Descartar los cambios?» y, con «Descartar cambios», la descarta (INVENTORY-F01,
+   paso 7).
 5. Por el asistente: «ponle foto al café con leche». El asistente busca por el nombre del artículo,
    enseña hasta cinco imágenes candidatas por su título y pregunta cuál; nunca pone una por su cuenta.
    Al elegir una, pide la tarjeta de confirmación de un clic y la pone.
