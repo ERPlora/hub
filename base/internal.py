@@ -25,7 +25,8 @@ registry's scope (``base.registry.REGISTRY_SCOPE``):
   PLAN-DB) before it tells the SaaS ``ready``; 202 too for an update while it is being made, 200 for one of a ready
   hub;
 - ``GET /internal/hubs/{id}`` → ``base.hub.get``: the row, whose ``status`` ``ready`` the SaaS waits for (``requested``,
-  ``creating``, ``migrating``, ``seeding`` or ``failed`` before); never where its database is;
+  ``creating``, ``migrating``, ``seeding`` or ``failed`` before), plus ``maintenance`` with control's active freeze
+  (``null`` when lifted); never where its database is nor part of the photo's monotonic ``state_version``;
 - ``DELETE /internal/hubs/{id}`` → ``base.hub.cancel`` (202; a business with its own database is copied by the
   worker, ``offboarding``); ``POST /internal/hubs/{id}/restore`` → ``base.hub.restore`` (200; 409 ``hub_purged`` when
   it can never come back);
