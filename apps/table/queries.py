@@ -601,7 +601,18 @@ def session_out(session: TableSession) -> dict:
     output=ZonePage,
     expose_api=True,
     ai={
-        "description": "List the zones of the room (dining room, terrace, bar…) with their tables and how many are free."
+        "description": "List the zones of the room (dining room, terrace, bar…) with their tables and how many are "
+        "free.",
+        "asks": {
+            "en": (
+                "what areas does the restaurant have?",
+                "list the zones of the floor and their free tables",
+            ),
+            "es": (
+                "¿qué zonas tiene el local?",
+                "dime las zonas del restaurante y cuántas mesas libres quedan en cada una",
+            ),
+        },
     },
 )
 def list_zones(ctx: OperationContext, params: ZoneListIn) -> dict:
@@ -624,7 +635,17 @@ def list_zones(ctx: OperationContext, params: ZoneListIn) -> dict:
     output=ZoneOut,
     expose_api=True,
     ai={
-        "description": "Get one zone of the room by its id or its name, with its tables and the free ones."
+        "description": "Get one zone of the room by its id or its name, with its tables and the free ones.",
+        "asks": {
+            "en": (
+                "how many tables are free in the terrace zone?",
+                "show me the bar zone",
+            ),
+            "es": (
+                "¿cuántas mesas libres quedan en la zona de la terraza?",
+                "enséñame la zona del salón",
+            ),
+        },
     },
 )
 def get_zone(ctx: OperationContext, params: ZoneRefIn) -> dict:
@@ -644,7 +665,19 @@ def get_zone(ctx: OperationContext, params: ZoneRefIn) -> dict:
     ai={
         "description": "List the tables of the room in natural order (2 before 10), each with its status right now "
         "(available, occupied, reserved, blocked), its guests and since when, who serves it, its customer and its next "
-        "reservation of today. Filter by zone, status or number."
+        "reservation of today. Filter by zone, status or number.",
+        "asks": {
+            "en": (
+                "which tables are free right now?",
+                "what tables are occupied?",
+                "show me all the tables and how they are",
+            ),
+            "es": (
+                "¿qué mesas están libres ahora?",
+                "¿qué mesas tengo ocupadas?",
+                "enséñame cómo están todas las mesas",
+            ),
+        },
     },
 )
 def list_tables(ctx: OperationContext, params: TableListIn) -> dict:
@@ -695,7 +728,19 @@ def list_tables(ctx: OperationContext, params: TableListIn) -> dict:
     expose_api=True,
     ai={
         "description": "Get one table by its id or its number («table 4», with its zone if the number repeats): its "
-        "status right now, its open checks (two after a split), guests, waiter, customer and next reservation."
+        "status right now, its open checks (two after a split), guests, waiter, customer and next reservation.",
+        "asks": {
+            "en": (
+                "how's table 4 doing?",
+                "is table 7 on the terrace free?",
+                "who's serving table 2?",
+            ),
+            "es": (
+                "¿cómo está la mesa 4?",
+                "¿está libre la 7 de la terraza?",
+                "¿quién atiende la mesa 2?",
+            ),
+        },
     },
 )
 def get_table(ctx: OperationContext, params: TableRefIn) -> dict:
@@ -716,7 +761,19 @@ def get_table(ctx: OperationContext, params: TableRefIn) -> dict:
     expose_api=True,
     ai={
         "description": "List the checks of the room (open, closed, transferred, merged, parked), newest first, with "
-        "their table, zone, waiter, guests, times and what their check of Sales charged."
+        "their table, zone, waiter, guests, times and what their check of Sales charged.",
+        "asks": {
+            "en": (
+                "which table checks are still open?",
+                "show me today's closed table checks",
+                "show me the history of table checks",
+            ),
+            "es": (
+                "¿qué cuentas de mesa siguen abiertas?",
+                "enséñame las cuentas de mesa cerradas hoy",
+                "enséñame el historial de cuentas de mesa",
+            ),
+        },
     },
 )
 def list_sessions(ctx: OperationContext, params: SessionListIn) -> dict:
@@ -757,7 +814,17 @@ def list_sessions(ctx: OperationContext, params: SessionListIn) -> dict:
     expose_api=True,
     ai={
         "description": "Get one table check by its id, or the open check of a table by its number («table 4»), with "
-        "its check of Sales, guests, waiter, customer and what it charged."
+        "its check of Sales, guests, waiter, customer and what it charged.",
+        "asks": {
+            "en": (
+                "how many guests are on table 4's check?",
+                "since when has table 5's check been open?",
+            ),
+            "es": (
+                "¿cuántos comensales tiene la cuenta de la mesa 4?",
+                "¿desde cuándo está abierta la cuenta de la mesa 5?",
+            ),
+        },
     },
 )
 def get_session(ctx: OperationContext, params: SessionRefIn) -> dict:
@@ -774,7 +841,17 @@ def get_session(ctx: OperationContext, params: SessionRefIn) -> dict:
     output=SessionsOut,
     expose_api=True,
     ai={
-        "description": "Find the table of a check of Sales: the table checks that hold it, newest first."
+        "description": "Find the table of a check of Sales: the table checks that hold it, newest first.",
+        "asks": {
+            "en": (
+                "which table is this check at?",
+                "what table is Ana's check sitting at?",
+            ),
+            "es": (
+                "¿en qué mesa está esta cuenta?",
+                "¿a qué mesa pertenece la cuenta de Ana?",
+            ),
+        },
     },
 )
 def sessions_by_order(ctx: OperationContext, params: ByOrderIn) -> dict:
@@ -795,7 +872,17 @@ def sessions_by_order(ctx: OperationContext, params: ByOrderIn) -> dict:
     expose_api=True,
     ai={
         "description": "Get one line of the check of Sales of a table check by its id: its name and quantity, as "
-        "«Split check» lists it."
+        "«Split check» lists it.",
+        "asks": {
+            "en": (
+                "what is that line on the table's check?",
+                "show me that line of table 4's check",
+            ),
+            "es": (
+                "¿qué es esa línea de la cuenta de la mesa?",
+                "¿cuántas unidades lleva esa línea de la mesa?",
+            ),
+        },
     },
 )
 def get_line(ctx: OperationContext, params: LineRefIn) -> dict:
@@ -813,7 +900,17 @@ def get_line(ctx: OperationContext, params: LineRefIn) -> dict:
     input=WaiterListIn,
     output=WaiterPage,
     ai={
-        "description": "List the people who have opened checks of the room (the waiter filter), by name."
+        "description": "List the people who have opened checks of the room (the waiter filter), by name.",
+        "asks": {
+            "en": (
+                "which waiters have opened table checks?",
+                "who has been serving tables?",
+            ),
+            "es": (
+                "¿qué camareros han abierto cuentas de mesa?",
+                "dime los camareros que han llevado mesas",
+            ),
+        },
     },
 )
 def list_waiters(ctx: OperationContext, params: WaiterListIn) -> dict:
@@ -846,7 +943,17 @@ def list_waiters(ctx: OperationContext, params: WaiterListIn) -> dict:
     input=NoIn,
     output=FloorStatusOut,
     ai={
-        "description": "Whether the floor plan is set up: how many tables are in use and how many zones there are."
+        "description": "Whether the floor plan is set up: how many tables are in use and how many zones there are.",
+        "asks": {
+            "en": (
+                "is my floor plan set up?",
+                "how many tables do I have in use?",
+            ),
+            "es": (
+                "¿tengo montado el plano de la sala?",
+                "¿cuántas mesas tengo en uso?",
+            ),
+        },
     },
 )
 def floor_status(ctx: OperationContext, params: NoIn) -> dict:
@@ -874,7 +981,19 @@ def settings_row(settings: TableSettings) -> dict:
     output=SettingsOut,
     ai={
         "description": "Read the room settings: whether seating asks for the guests and when an open check turns "
-        "amber and red."
+        "amber and red.",
+        "asks": {
+            "en": (
+                "when does a table turn red?",
+                "how long until a table shows amber?",
+                "does seating ask how many guests?",
+            ),
+            "es": (
+                "¿a partir de cuántos minutos se pone en rojo una mesa?",
+                "¿cuándo se pone una mesa en ámbar?",
+                "¿al sentar se preguntan los comensales?",
+            ),
+        },
     },
 )
 def get_settings(ctx: OperationContext, params: NoIn) -> dict:
@@ -893,7 +1012,17 @@ def get_settings(ctx: OperationContext, params: NoIn) -> dict:
     expose_api=True,
     ai={
         "description": "Get the hold a reservation of Reservations keeps on its table, while it holds it: the table, "
-        "its window and the name it paints on the table."
+        "its window and the name it paints on the table.",
+        "asks": {
+            "en": (
+                "which table is Ana's booking holding?",
+                "what table did we keep for the Garcia reservation?",
+            ),
+            "es": (
+                "¿qué mesa tiene guardada la reserva de Ana?",
+                "¿qué mesa retiene la reserva de los García?",
+            ),
+        },
     },
 )
 def hold_by_reservation(ctx: OperationContext, params: HoldByReservationIn) -> dict:
