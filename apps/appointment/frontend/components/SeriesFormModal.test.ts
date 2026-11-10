@@ -123,6 +123,12 @@ describe('SeriesFormModal: New repeating appointment', () => {
     expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
   });
 
+  it('an employee’s series is for herself only: the professional is her own record, fixed', async () => {
+    const s = await setup({ ownStaff: { id: 's1', name: 'Ana López' } });
+    expect(s.combo('series-form-staff').props('modelValue')).toEqual({ id: 's1', label: 'Ana López' });
+    expect([s.combo('series-form-staff').props('disabled'), s.combo('series-form-staff').props('clearable')]).toEqual([true, false]);
+  });
+
   it('has no day of the week for a daily or monthly series', async () => {
     const s = await setup();
     await ionValue(s.field('frequency'), 'monthly');
