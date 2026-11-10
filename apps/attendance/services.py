@@ -254,6 +254,7 @@ def _end_break(ctx: OperationContext, record: Record, at: dt.datetime) -> bool:
 @operation(
     "attendance.record.clock_in",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="attendance.clock",
     input=ClockInIn,
     output=RecordOut,
@@ -314,6 +315,7 @@ def clock_in(ctx: OperationContext, data: ClockInIn) -> dict:
 @operation(
     "attendance.record.clock_out",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="attendance.clock",
     input=ClockOutIn,
     output=RecordOut,
@@ -352,6 +354,7 @@ def clock_out(ctx: OperationContext, data: ClockOutIn) -> dict:
 @operation(
     "attendance.break.start",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="attendance.clock",
     input=BreakIn,
     output=RecordOut,
@@ -389,6 +392,7 @@ def start_break(ctx: OperationContext, data: BreakIn) -> dict:
 @operation(
     "attendance.break.end",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="attendance.clock",
     input=BreakIn,
     output=RecordOut,
@@ -463,6 +467,7 @@ def _correct(
 @operation(
     "attendance.record.correct",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="attendance.correct",
     input=CorrectIn,
     output=RecordOut,
@@ -524,6 +529,7 @@ REQUIRED_SETTINGS = ("require_location", "geofence_radius_m", "auto_close_after_
 @operation(
     "attendance.settings.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="attendance.manage_settings",
     input=SettingsIn,
     output=SettingsOut,

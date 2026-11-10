@@ -1,0 +1,18 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261108.owner.es.payment.method.get","app":"payment","tool":"payment.method.get","role":"owner","language":"es","phrase":"enséñame la referencia completa de la cuenta Banco QA y si admite nuevos pagos","expect":"read","lookups":["payment.method.list"]},
+    {"id":"qa20261108.owner.es.payment.method.list","app":"payment","tool":"payment.method.list","role":"owner","language":"es","phrase":"¿desde qué cuentas, tarjetas o cajones puedo registrar pagos a proveedores?","expect":"read"},
+    {"id":"qa20261108.owner.es.payment.payment.get","app":"payment","tool":"payment.payment.get","role":"owner","language":"es","phrase":"pásame todos los datos del pago a Proveedor QA: método, concepto, IBAN, factura y quién lo modificó","expect":"read","lookups":["payment.payment.list"]},
+    {"id":"qa20261108.owner.es.payment.payment.list","app":"payment","tool":"payment.payment.list","role":"owner","language":"es","phrase":"lista los pagos pendientes y enviados a proveedores, sin mezclarlos con los cobros del TPV","expect":"read"},
+    {"id":"qa20261108.owner.es.payment.method.create","app":"payment","tool":"payment.method.create","role":"owner","language":"es","phrase":"registra una cuenta bancaria llamada Banco QA para pagos salientes, con referencia ES91 2100 0418 4502 0005 1332","expect":"card","decide":"confirm"},
+    {"id":"qa20261108.owner.es.payment.payment.create","app":"payment","tool":"payment.payment.create","role":"owner","language":"es","phrase":"deja en borrador un pago de 42,75 € desde Banco QA a Proveedor QA, hoy, por la factura F-QA-01 y concepto «material QA»; no muevas dinero","expect":"card","decide":"confirm"},
+    {"id":"qa20261108.owner.es.payment.payment.approve","app":"payment","tool":"payment.payment.approve","role":"owner","language":"es","phrase":"autoriza el borrador de 42,75 € a Proveedor QA para que ya pueda tramitarse","expect":"card","decide":"confirm"},
+    {"id":"qa20261108.owner.es.payment.payment.mark_sent","app":"payment","tool":"payment.payment.mark_sent","role":"owner","language":"es","phrase":"he ordenado en el banco el pago a Proveedor QA; marca ese pago como enviado, sin hacer ninguna transferencia desde aquí","expect":"card","decide":"confirm"},
+    {"id":"qa20261108.owner.es.payment.payment.mark_completed","app":"payment","tool":"payment.payment.mark_completed","role":"owner","language":"es","phrase":"Proveedor QA confirma que ya recibió el dinero; deja su pago como completado","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.owner.es.payment.payment.cancel","app":"payment","tool":"payment.payment.cancel","role":"owner","language":"es","phrase":"cancela el pago a Proveedor QA porque la factura estaba duplicada y guarda ese motivo","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.owner.es.payment.method.deactivate","app":"payment","tool":"payment.method.deactivate","role":"owner","language":"es","phrase":"impide que Banco QA se use en pagos nuevos, sin borrar los movimientos que ya tiene","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.owner.es.payment.method.activate","app":"payment","tool":"payment.method.activate","role":"owner","language":"es","phrase":"vuelve a habilitar Banco QA para registrar pagos salientes","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.owner.es.payment.method.update","app":"payment","tool":"payment.method.update","role":"owner","language":"es","phrase":"renombra Banco QA como «Banco principal QA» y actualiza su referencia a ES91 2100 0418 4502 0005 1332","expect":"card","decide":"cancel"}
+  ]
+}

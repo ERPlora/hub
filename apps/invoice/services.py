@@ -255,6 +255,7 @@ def _save_issuer(ctx: OperationContext, data: IssuerIn, **extra) -> Issuer:
 @operation(
     "invoice.issuer.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="invoice.manage_issuer",
     input=IssuerIn,
     output=IssuerOut,
@@ -1306,6 +1307,7 @@ def _demote_defaults(year: int, keep: UUID | None = None) -> None:
 @operation(
     "invoice.series.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="invoice.manage_series",
     input=SeriesCreateIn,
     output=SeriesOut,
@@ -1356,6 +1358,7 @@ def create_series(ctx: OperationContext, data: SeriesCreateIn) -> dict:
 @operation(
     "invoice.series.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="invoice.manage_series",
     input=SeriesUpdateIn,
     output=SeriesOut,

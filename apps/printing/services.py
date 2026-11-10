@@ -202,6 +202,7 @@ def _refuse_taken_name() -> Conflict:
 @operation(
     "printing.printer.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.manage_settings",
     input=PrinterIn,
     output=PrinterOut,
@@ -239,6 +240,7 @@ def create_printer(ctx: OperationContext, data: PrinterIn) -> dict:
 @operation(
     "printing.printer.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.manage_settings",
     input=PrinterUpdateIn,
     output=PrinterOut,
@@ -332,6 +334,7 @@ def _chosen_printer(field: str, ref: str | None, usage: str) -> Printer | None:
 @operation(
     "printing.settings.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.manage_settings",
     input=SettingsPatchIn,
     output=SettingsOut,
@@ -443,6 +446,7 @@ def _new_job(ctx: OperationContext, **values) -> PrintJob:
 @operation(
     "printing.job.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.print",
     input=JobCreateIn,
     output=JobCreateOut,
@@ -514,6 +518,7 @@ def create_job(ctx: OperationContext, data: JobCreateIn) -> dict:
 @operation(
     "printing.printer.test",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.print",
     input=PrinterRefIn,
     output=JobOut,
@@ -641,6 +646,7 @@ def _copy_of(job: PrintJob) -> dict | None:
 @operation(
     "printing.job.claim",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.print",
     input=JobClaimIn,
     output=JobClaimOut,
@@ -704,6 +710,7 @@ def claim_job(ctx: OperationContext, data: JobClaimIn) -> dict:
 @operation(
     "printing.job.complete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.print",
     input=JobCompleteIn,
     output=JobAckOut,
@@ -737,6 +744,7 @@ def complete_job(ctx: OperationContext, data: JobCompleteIn) -> dict:
 @operation(
     "printing.job.fail",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.print",
     input=JobFailIn,
     output=JobAckOut,
@@ -782,6 +790,7 @@ def _reached_printers(ids: list) -> list[Printer]:
 @operation(
     "printing.device.register",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE_SETTINGS,
     input=DeviceRegisterIn,
     output=DeviceOut,
@@ -835,6 +844,7 @@ def see_device(ctx: OperationContext, data: DeviceSeenIn) -> dict:
 @operation(
     "printing.device.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE_SETTINGS,
     input=DeviceUpdateIn,
     output=DeviceOut,
@@ -859,6 +869,7 @@ def update_device(ctx: OperationContext, data: DeviceUpdateIn) -> dict:
 @operation(
     "printing.device.retire",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE_SETTINGS,
     input=DeviceRefIn,
     output=DeviceOut,
@@ -884,6 +895,7 @@ def retire_device(ctx: OperationContext, data: DeviceRefIn) -> dict:
 @operation(
     "printing.job.retry",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.manage_jobs",
     input=JobRefIn,
     output=JobOut,
@@ -913,6 +925,7 @@ def retry_job(ctx: OperationContext, data: JobRefIn) -> dict:
 @operation(
     "printing.job.cancel",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.manage_jobs",
     input=JobCancelIn,
     output=JobOut,
