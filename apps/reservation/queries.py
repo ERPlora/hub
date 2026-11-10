@@ -843,7 +843,7 @@ def list_slots(ctx: OperationContext, params: TimeSlotListIn) -> dict:
                 "show me the Sunday lunch slot",
             ),
             "es": (
-                "¿cuántas reservas caben en la franja del sábado a las 20:00?",
+                "¿cuántas reservas caben en la franja del domingo a las 13:30?",
                 "enséñame la franja del domingo a mediodía",
             ),
         },

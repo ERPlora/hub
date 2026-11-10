@@ -964,7 +964,7 @@ def delete_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
             ),
             "es": (
                 "suelta las reservas que nadie ha confirmado",
-                "quita ya las reservas pendientes que pasaron de hora sin confirmar",
+                "suelta las reservas de hoy que siguen pendientes y ya pasó su hora",
             ),
         },
         "description": "Releases the pending reservations nobody confirmed whose time passed more than the book's "
@@ -1017,7 +1017,7 @@ def release_unconfirmed(ctx: OperationContext, data: NoIn) -> dict:
                 "take reservations on Sunday evenings from 8 to 11",
             ),
             "es": (
-                "añade una franja de reservas los sábados de 13:00 a 16:00",
+                "nueva franja de reservas: sábados de 13:00 a 16:00",
                 "acepta reservas los domingos por la noche de 20:00 a 23:00",
             ),
         },
@@ -1069,7 +1069,7 @@ def create_slot(ctx: OperationContext, data: TimeSlotIn) -> dict:
             ),
             "es": (
                 "quita la franja de los lunes a mediodía",
-                "borra la franja de reservas del domingo de las 20:00",
+                "ya no damos cenas los domingos: borra esa franja de reservas",
             ),
         },
         "description": "Removes a slot (by id, or by its weekday and start): no more reservations are taken in it; the "
@@ -1104,7 +1104,7 @@ def delete_slot(ctx: OperationContext, data: TimeSlotRefIn) -> dict:
                 "close reservations next Monday evening for a private event",
             ),
             "es": (
-                "bloquea el 24 de diciembre para que nadie reserve",
+                "bloquea el día de Año Nuevo para que nadie reserve",
                 "bloquea el lunes por la noche para un evento privado",
             ),
         },
@@ -1155,7 +1155,7 @@ def create_blocked(ctx: OperationContext, data: BlockedDateIn) -> dict:
             ),
             "es": (
                 "desbloquea el 24 de diciembre",
-                "quita el bloqueo del cierre por vacaciones",
+                "ya no cerramos por vacaciones, quita ese bloqueo",
                 "borra el bloqueo del día de Navidad",
             ),
         },
