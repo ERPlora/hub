@@ -169,6 +169,19 @@ def _save_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) ->
     output=SiteOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "change the main title of the website",
+                "put opening hours Monday to Friday 9 to 8 on the website",
+                "hide the gallery section of the web page",
+            ),
+            "es": (
+                "cambia el título de la portada de la web",
+                "pon en la página web el horario de lunes a viernes de 9 a 20",
+                "oculta la sección de la galería en la página web",
+                "edita el borrador de la página web sin perder nada",
+            ),
+        },
         "description": "Saves the website's whole draft, which replaces the one kept: read it first with "
         "website.site.get, change only what was asked and send everything back (a section left out goes back to "
         "empty). It holds the template (classic, modern, minimal or bold), the theme (a palette by its id, optionally "
@@ -209,6 +222,18 @@ def save_site(ctx: OperationContext, data: SaveIn) -> dict:
     output=PublicationOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "publish the website",
+                "put the web page online",
+                "make my latest changes to the website live",
+            ),
+            "es": (
+                "publica la página web",
+                "haz pública la web del negocio",
+                "sube a la web los últimos cambios del borrador",
+            ),
+        },
         "description": "Publishes the website's draft: from now on, whoever opens the business's address sees it, with "
         "the catalog as it is now.",
         "risk": "normal",
@@ -245,6 +270,18 @@ def publish_site(ctx: OperationContext, data: NoIn) -> dict:
     output=PublicationOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "take the website offline",
+                "unpublish the web page for now",
+                "hide the website from visitors without losing anything",
+            ),
+            "es": (
+                "pon la página web fuera de línea",
+                "desconecta la web un tiempo sin perder el contenido",
+                "retira la web publicada pero guarda el borrador",
+            ),
+        },
         "description": "Takes the website offline: the business's address goes back to the team's sign-in page until "
         "it is published again. Nothing is lost.",
         "risk": "normal",
