@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5feedd0ec006b7fb8e9b3a8a713b92bea88d32bb0618d1081923175280002707 -->
+<!-- generated from WORKBOOK.md sha256:80ab42cb337d0c6fb59f8e98634fd3c0aea7feb2535299b3ece1e2f0600299d7 -->
 
 ## What it is for and who it is for
 
@@ -97,8 +97,8 @@ professional**, also **Day · Week**.
   notes. Min. and the **Total** come with the professional's own duration and price for each service
   (Services, "Professionals who perform it"), or the catalogue's if they have none; it is what the
   appointment books. Amounts are in the business's currency, its country's, with its decimals (BASE-F50:
-  "65,00 zł" in a business in Poland; without a symbol while the business has not answered, never in euros by
-  default) and are grouped from four digits ("1.234,56 €"; in English, "€1,234.56").
+  "65,00 zł" in a business in Poland; "—" while the business has not answered, never in euros or with guessed
+  decimals) and are grouped from four digits ("1.234,56 €"; in English, "€1,234.56").
   Notices: "This appointment starts in the past. It will be saved at that time." and the professional who
   does not perform a service.
 - **Edit** → **Edit appointment**: Day, Time, Min., Services, Professional, the notes and **Save

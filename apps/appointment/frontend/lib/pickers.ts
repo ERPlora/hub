@@ -3,7 +3,7 @@
 // own operations (Services, Staff), never their models.
 //   - A service: the bookable ones of the catalog (`service.service.list_for_sale`), 20 at a time, with its
 //     minutes and price as a hint, the price in the business's money («30 min · 20,00 €» in Spain, «30 min ·
-//     20,00 zł» in Poland; the figure alone until it answers); its length and price are kept in `facts` for
+//     20,00 zł» in Poland; a dash until it answers); its length and price are kept in `facts` for
 //     the panel's minutes.
 //   - A professional: the active, bookable team (`staff.member.list`), narrowed, for every service
 //     chosen, to whoever is assigned to it (`service.assignment.eligible`); a service nobody is assigned

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d74557c6099516dab9657881f2d711dbacbf63b0655858c403da91cda17e33b6 -->
+<!-- generated from WORKBOOK.md sha256:c02e31200ce5fe03a4af33c1b4a6fdc295420d1508357a4dfe42825efbe83178 -->
 
 ## What it is for and who it is for
 
@@ -64,7 +64,7 @@ Amounts (the price of a service and that of each professional, the closed price 
 voucher, what was paid for a voucher) are in **the business's currency**, its country's, the one **Settings →
 Business** shows (euros in Spain, złoty in Poland, yen in Japan), with its decimals (the yen has none), written
 with a comma or a point: "1500" is a price of 1500 yen in Japan and of €1,500.00 in Spain, and Sales charges it
-the same. While the business has not answered, an amount shows as a figure without a symbol, never in euros. The
+the same. While the business has not answered, an amount shows as "—", never in euros or with guessed decimals. The
 examples in this document are from a business in Spain, in euros.
 
 ## Screens

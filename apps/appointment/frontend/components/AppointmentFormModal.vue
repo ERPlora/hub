@@ -5,7 +5,7 @@
 // read through Services and Staff), the Day and the Time (with the «Free times»), the Min. (the services'
 // sum unless typed) and the notes. The Min. and the Total are the professional's own for each service
 // (Services · «Who does it»), the catalog's where she has none — what the server books; the Total is in the
-// business's money (BASE-F50: «65,00 zł» in Poland, the figure alone until it answers). «Add appointment» books it. «Edit appointment» comes filled in, sends
+// business's money (BASE-F50: «65,00 zł» in Poland, a dash until it answers). «Add appointment» books it. «Edit appointment» comes filled in, sends
 // only what changed (`appointment.appointment.update`) and shows the history below; a series occurrence
 // first asks «This appointment only» / «This and all following» (the latter edits the series from its
 // date). An overlap asks first (409 `appointment.overlap_needs_confirmation`: «Book anyway» sends it again

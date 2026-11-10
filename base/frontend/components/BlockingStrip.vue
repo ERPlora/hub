@@ -154,11 +154,18 @@ const firstToConfigure = computed(() => items.value.find(canConfigure));
   color: var(--ion-color-medium-shade, #555);
 }
 
-/* As low as a phone on its side (hub#838): one line of 48 px, the 40 of «Set up» (the touch minimum) and 4 above and
-   under it. It may wrap on a window too narrow for both, never cut. */
+/* As low as a phone on its side (hub#838): one line of 48 px at most, «Set up» and 4 above and under it. It may wrap on
+   a window too narrow for both, never cut. By touch «Set up» is a 44 px target (ui#131, hub#1074) and the line is just
+   that: at 568x320 the till keeps 150 px, room for a tile with a name in two lines (147 px). */
 .blocking-strip--low {
   align-items: center;
   padding-block: 4px;
+}
+
+@media (pointer: coarse) {
+  .blocking-strip--low {
+    padding-block: 0;
+  }
 }
 
 .blocking-strip--low .blocking-strip-body {

@@ -211,11 +211,11 @@ describe('AppointmentFormModal: New appointment', () => {
     }
   });
 
-  it('the total is in the business’s currency: złoty in a business in Poland, a figure alone until it answers (hub#577)', async () => {
+  it('the total is in the business’s currency: złoty in a business in Poland, a dash until it answers (hub#577, hub#947)', async () => {
     const s = await setup({}, 'es');
     await s.addService('cut', 'Haircut');
     await s.addService('colour', 'Colour');
-    expect(s.inDoc('appointment-form-total')?.textContent).toMatch(/: 65,00$/);
+    expect(s.inDoc('appointment-form-total')?.textContent).toMatch(/: —$/);
     await s.businessIn(POLISH);
     expect(s.inDoc('appointment-form-total')?.textContent).toMatch(/: 65,00\u00a0zł$/);
     expect(s.inDoc('appointment-form-total')?.textContent).not.toContain('€');

@@ -94,7 +94,7 @@ Email, Teléfono, Nº de empleado, Rol** («Sin rol»), **Usuario del Hub** («S
 **Desactivar** y **Dar de baja**, las dos con confirmación. La tarifa (en la columna, en el formulario y en
 «Mi ficha») va en la moneda del negocio, la de su país en Ajustes → Negocio (euros en España, złoty en
 Polonia), con sus decimales (el yen no tiene) y su símbolo al final del campo; mientras el negocio no
-contesta, una cifra sin símbolo, nunca euros.
+contesta, un importe es «—», nunca euros ni decimales supuestos.
 
 ### Roles
 Tabla con buscador «Buscar rol…» y columnas **Rol, Descripción, Miembros** (cuántas personas

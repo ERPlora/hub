@@ -1,6 +1,6 @@
 // The group's sheet (WORKBOOK «Hoja del grupo»; MODIFIER-F04, F05): «Group — {name}» with its rule, followed
 // live; «Options» with each one's supplement in the business's currency («+1,00 zł» in Poland, «+1,00 €» in
-// Spain; a bare figure until the business answers, never a euro by default; «Free»), its own tax category and «By default»,
+// Spain; a dash until the business answers, never a euro by default; «Free»), its own tax category and «By default»,
 // and «Applies to» with each product («Product · Burger (BUR-01)») or category. Whoever may manage adds,
 // edits and deletes options and applies or stops applying the group; an employee only reads. 20 at a time
 // with «Load more»; loading, empty and error states per section; a warning when the group asks for more
@@ -138,9 +138,9 @@ describe('GroupSheet', () => {
     expect(['o1', 'o2', 'o3'].map((id) => s.text(`modifier-sheet-options-row-${id}`)).join(' ')).not.toContain('€');
   });
 
-  it('until the business answers a supplement is a bare figure, never a euro by default', async () => {
+  it('until the business answers a supplement is only a dash, never a euro by default', async () => {
     const s = await filled({ owner: null });
-    expect(s.text('modifier-sheet-options-row-o2')).toMatch(/Cheese\s*\+1\.00\s*Kitchen/);
+    expect(s.text('modifier-sheet-options-row-o2')).toMatch(/Cheese\s*—\s*Kitchen/);
     expect(s.text('modifier-sheet-options-row-o2')).not.toContain('€');
   });
 

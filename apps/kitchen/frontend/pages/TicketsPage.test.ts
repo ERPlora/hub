@@ -81,11 +81,11 @@ describe('TicketsPage', () => {
     expect(s.wrapper.text()).not.toContain('€');
   });
 
-  it('until the business answers, the Total is a figure without a symbol, never in euros', async () => {
+  it('until the business answers, the Total is a dash, never in euros', async () => {
     const s = await setup();
     await s.result('kitchen.settings.get', SETTINGS);
     await s.result(OP, page([READY]));
-    expect(s.wrapper.text()).toContain('24.50');
+    expect(s.wrapper.text()).toContain('—');
     expect(s.wrapper.text()).not.toContain('€');
   });
 

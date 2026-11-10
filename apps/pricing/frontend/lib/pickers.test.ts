@@ -27,12 +27,12 @@ describe('pickers', () => {
     expect(call).toHaveBeenCalledWith('service.service.list', { limit: 20 });
   });
 
-  it('the catalog price is in the business’s currency: in Poland, zlotys; a bare figure until it answers', async () => {
+  it('the catalog price is in the business’s currency: in Poland, zlotys; a dash until it answers', async () => {
     const products = client({ rows: [{ id: 'p1', name: 'Shampoo', sku: 'SH-1', price: 1500 }], total: 1 });
     expect(await searchProducts(products.client, 'es', PLN)('')).toEqual([{ id: 'p1', label: 'Shampoo', hint: 'SH-1 · 15,00\u00a0zł' }]);
     const services = client({ rows: [{ id: 's1', name: 'Haircut', price: 1800 }], total: 1 });
     expect(await searchServices(services.client, 'en', PLN)('')).toEqual([{ id: 's1', label: 'Haircut', hint: 'zł\u00a018.00' }]);
-    expect(await searchServices(services.client, 'en')('')).toEqual([{ id: 's1', label: 'Haircut', hint: '18.00' }]);
+    expect(await searchServices(services.client, 'en')('')).toEqual([{ id: 's1', label: 'Haircut', hint: '—' }]);
   });
 
   it('searches the active customer groups and the categories', async () => {
