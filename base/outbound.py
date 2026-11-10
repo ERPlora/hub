@@ -6,10 +6,8 @@ runs what a transaction leaves for after its COMMIT right there, in that loop: a
 until it answered, and a call the tick sent again held the scheduled tasks. ``after_commit(fn, *args)`` is the one way
 an app makes such I/O: after the COMMIT of the running operation (never after a rollback), ``fn(*args)`` goes to a
 few threads of the process's own, in the database context of the operation that asked (its ``use_hub``, or
-``use_control``), and the loop goes on at once. A job said to be for another business than the operation's (``scope``)
-stays in that context too and never reaches another hub's database (``context.current_for``;
-FIX-HUB-BASE-OUTBOUND-JOB-OF-ANOTHER-BUSINESS-HUB-CONTEXT-MISMATCH): since S5 a hub's database holds its own rows only,
-so ``scope`` is left from the tables phase 1 shared (the inbox's «Retry»; hub#1053).
+``use_control``), and the loop goes on at once: a hub's database holds its own rows only, so a job never reaches
+another hub's (FIX-HUB-BASE-OUTBOUND-JOB-OF-ANOTHER-BUSINESS-HUB-CONTEXT-MISMATCH, hub#1053).
 
 - **Recovered by its app**: a job may be lost (its queue is full, the worker stops, the process dies), so ``fn`` is
   only work its app finds again by itself: a claim with a lease, and a sweep that sends again what nobody claimed or
@@ -41,7 +39,6 @@ from functools import partial
 from typing import Any
 
 from django.db import close_old_connections
-from live.context import Scope
 from live.operations import current_operation, on_commit
 
 from base.tenancy import context

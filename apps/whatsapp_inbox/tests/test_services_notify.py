@@ -20,7 +20,7 @@ from live.operations import get
 
 from apps.whatsapp_inbox.models import Conversation, Message
 from apps.whatsapp_inbox.services import NO_PLAN_MESSAGES
-from apps.whatsapp_inbox.tests.conftest import B, NOW, A, connect, ctx_for, receive, run, system, template
+from apps.whatsapp_inbox.tests.conftest import NOW, A, connect, ctx_for, receive, run, system, template
 from base.tenancy.tests import hubs
 
 pytestmark = pytest.mark.django_db
@@ -170,7 +170,6 @@ def test_a_number_not_connected_sends_nothing():
 @pytest.mark.usefixtures("no_test_fallback")
 def test_another_business_goes_by_its_own_number(hub_a, hub_b):
     from base.tenancy.context import use_hub
-    from base.tenancy.tests import hubs
     from live.context import Scope
 
     with use_hub(hub_a):

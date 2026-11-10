@@ -4,6 +4,7 @@ import uuid
 
 import pytest
 from live.context import Scope
+from live.errors import NotFound
 
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Template, TemplateSample
 from apps.whatsapp_inbox.tests.conftest import ctx_for, run, system, template
@@ -61,7 +62,7 @@ def test_rows_can_be_written_without_a_host_and_read_back_with_their_header_file
                 size=10,
                 name="sample.jpg",
             )
-            row = Template.objects.create(
+            Template.objects.create(
                 name="recordatorio",
                 language="es",
                 body="Hola",
@@ -78,7 +79,7 @@ def test_rows_can_be_written_without_a_host_and_read_back_with_their_header_file
             assert detail.name == "sample.jpg"
 
 
-def test_business_columns_leave_the_models_but_their_data_is_not_queried_between_hubs(hub_a, hub_b):
+def test_the_business_columns_leave_the_models_and_each_database_holds_its_own_template_names(hub_a, hub_b):
     for model, field in (
         (Channel, "host"),
         (Conversation, "erase_host"),
@@ -88,7 +89,24 @@ def test_business_columns_leave_the_models_but_their_data_is_not_queried_between
     ):
         assert field not in {item.name for item in model._meta.get_fields()}
 
-    with use_hub(hub_a):
-        Template.objects.create(name="shared-name", language="es", submit_key=uuid.uuid7())
+    for hub in (hub_a, hub_b):
+        with use_hub(hub):
+            Template.objects.create(name="shared-name", language="es", submit_key=uuid.uuid7())
+    for hub in (hub_a, hub_b):
+        with use_hub(hub):
+            assert Template.objects.filter(name="shared-name", language="es").count() == 1
+
+
+def test_a_header_file_of_another_business_is_never_found(hub_a, hub_b):
     with use_hub(hub_b):
-        Template.objects.create(name="shared-name", language="es", submit_key=uuid.uuid7())
+        theirs = TemplateSample.objects.create(
+            header_format=TemplateSample.Kind.IMAGE,
+            key=f"hub-{hub_b.id.hex}/sample.jpg",
+            sha256="b" * 64,
+            content_type="image/jpeg",
+            size=10,
+            name="theirs.jpg",
+        )
+    with use_hub(hub_a), pytest.raises(NotFound) as gone:
+        run("whatsapp_inbox.template_sample.detail", {"id": str(theirs.id)}, ctx_for(scope=scope(hub_a)))
+    assert gone.value.code == "whatsapp_inbox.sample_not_found"

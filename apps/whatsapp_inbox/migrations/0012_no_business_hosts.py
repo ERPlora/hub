@@ -3,7 +3,12 @@ from django.db.models import Q
 
 
 class Migration(migrations.Migration):
-    """Remove business separation from the state only; the columns and their data stay."""
+    """Each business keeps its rows in its own database (hub#1053): the business each row carried from the tables
+    phase 1 shared leaves the models only. Its columns, their data and the two unique guards that name them stay in
+    the database for the code of before, which still runs while the deploy migrates (``base/tests/
+    test_migration_safety.py``): ``0011`` gave them an empty default, so the code no longer writes them, and the
+    guards still keep one channel row and one live template per name and language. A later deploy drops them
+    (hub#1132)."""
 
     dependencies = [("whatsapp_inbox", "0011_host_defaults")]
 

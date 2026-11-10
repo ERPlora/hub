@@ -74,10 +74,9 @@ describe('ApiDocsPage', () => {
     expect(m.wrapper.find('[data-testid="api-docs-keys-soon"]').exists()).toBe(false);
   });
 
-  it('never adds a phase-1 unavailable notice to the documentation', async () => {
+  it('says when this business cannot make keys yet', async () => {
     const m = await open(Response.json({ ...ANSWER, keys_available: false }));
-    expect(m.wrapper.find('[data-testid="api-docs-keys-soon"]').exists()).toBe(false);
-    expect(m.wrapper.find('[data-testid="api-docs-section"]').exists()).toBe(true);
+    expect(m.wrapper.get('[data-testid="api-docs-keys-soon"]').text()).toContain('API keys are not available yet for this business');
   });
 
   it('«Download the OpenAPI file» saves the document', async () => {

@@ -1077,6 +1077,8 @@ class SystemStatusOut(Schema):
     version: str
     #: When that release was published (``APP_RELEASED_AT``); ``None`` when it is not known, never made up.
     released_at: dt.datetime | None
+    #: Phase 1: every business on the one shared database; ``False`` once the hub has its own.
+    shared_database: bool
 
 
 class EventListIn(Schema):

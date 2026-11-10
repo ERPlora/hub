@@ -17,10 +17,9 @@ The rules, without the database: ``base.services`` (``base.app.enable``, ``base.
 - **Every module on** (:func:`every_on`): what a hub had without rows before that round, every module on and its roots
   chosen (today 17 of 27). The migration ``base.0017`` writes it down for every hub of before, so none loses an app,
   and the developer's local hubs ``a`` and ``b`` are seeded with it. The platform always has it, rows or not: a scope
-  that is no business's, ERPlora's own hub (``PLATFORM_HUB_SLUG``, Invoicing and VeriFactu always active) and the
-  worker's fixed scope (``WORKER_SCOPE_SLUG``), where phase 1 ran every app's scheduled tasks over the tables every hub
-  shared (:func:`is_platform`). Since S5 the worker runs each hub's on its own scope (``base.scheduler``): only the
-  suite's tests written before the tenancy still run on the fixed one (hub#1053).
+  that is no business's and ERPlora's own hub (``PLATFORM_HUB_SLUG``, Invoicing and VeriFactu always active;
+  :func:`is_platform`). The worker runs each hub's scheduled tasks on that hub's own scope (``base.scheduler``), so a
+  business's apps are its own there too (hub#1053).
 - **The plan's limit**: the SaaS's photo carries ``plan.max_apps`` (0, or no key: no limit), how many modules the
   business may *choose*; the ones brought along do not count. A photo with a lower limit than the chosen ones (a plan
   lowered) turns nothing off: it only refuses turning on one more (PLAN §32, point 3).
@@ -298,9 +297,8 @@ def veto(
 
 
 def is_platform(scope: Scope) -> bool:
-    """A scope that is no business choosing its apps: no business's at all, ERPlora's own hub or the worker's fixed
-    one (phase 1 ran every app's scheduled tasks there, over the tables every hub shared; since S5 only the suite's
-    tests written before the tenancy do, hub#1053). Every module is on in it."""
+    """A scope that is no business choosing its apps: no business's at all, or ERPlora's own hub. Every module is on
+    in it."""
     return scope.kind != HUB_SCOPE_KIND or scope.key == settings.PLATFORM_HUB_SLUG
 
 

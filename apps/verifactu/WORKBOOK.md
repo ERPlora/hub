@@ -1659,7 +1659,7 @@ Al cerrar la app (CLOSE-VERIFACTU, 2026-10-27), lo que sigue en la cola fuera de
 - ~~**El NIF de ERPlora tecleado por un negocio en la BD compartida**~~ — **cerrada** por el corte S5 (hub#602): la
   pasada de cada negocio corre en su BD y en su ámbito (`base.worker`), así que presenta con su slug
   (`queries.presenter`) y nunca como `erplora` (saas#2524). La rama de `presenter` para el registro de otro negocio en
-  el hub de plataforma solo la alcanza el respaldo de los tests (hub#1053).
+  el hub de plataforma solo la alcanza el respaldo de los tests (hub#1130).
 - **Contracción de `live_paid`** (`## 6` del registro de migración): la columna `Config.live_paid` (migración
   `0003_live_paid`) sigue sin lectura ni escritura y `ConfigSyncIn` acepta e ignora el campo hasta que ningún SaaS
   desplegado lo mande (expand/contract, hub#205 y saas#108).

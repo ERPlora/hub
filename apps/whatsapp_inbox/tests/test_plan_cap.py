@@ -17,7 +17,7 @@ from live.errors import Conflict
 
 from apps.whatsapp_inbox import clock
 from apps.whatsapp_inbox.models import Channel, Conversation, Message
-from apps.whatsapp_inbox.tests.conftest import A, B, NOW, connect, ctx_for, receive, run, system
+from apps.whatsapp_inbox.tests.conftest import NOW, connect, ctx_for, receive, run, system
 from base.models import Hub
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs

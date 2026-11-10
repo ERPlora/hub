@@ -234,7 +234,7 @@ def test_whom_a_job_is_for_is_kept_from_when_it_is_asked():
     """The context a job runs in is chosen when it is asked and never changes after: nobody hands it another hub's."""
     a = SimpleNamespace(slug="a", db_name="")
     with context.use_hub(a):
-        job = outbound.Job(print, (), context.current_for(B))
+        job = outbound.Job(print, (), context.current())
     with pytest.raises(FrozenInstanceError):
         job.database = context.CONTROL_DATABASE  # type: ignore[misc]
     assert job.database.hub is a

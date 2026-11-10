@@ -144,13 +144,6 @@ def current() -> DatabaseContext:
     return active
 
 
-def current_for(scope) -> DatabaseContext:
-    """The context where work for ``scope``'s business runs when the active context asks for it (``base.outbound``):
-    the active one. A hub holds only its own rows, and another hub's operation there is refused
-    (``HubContextMismatch``): no work ever reaches another hub's database."""
-    return current()
-
-
 def current_alias() -> str:
     """The alias of the active context (``default`` for control)."""
     return current().alias

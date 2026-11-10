@@ -21,7 +21,6 @@ from apps.customer.models import Customer
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template
 from apps.whatsapp_inbox.tests.conftest import (
     A,
-    B,
     NOW,
     card,
     connect,
@@ -419,7 +418,6 @@ def channel_of(scope):
 @pytest.mark.usefixtures("no_test_fallback")
 def test_each_business_keeps_its_own_number_and_its_own_version(hub_a, hub_b):
     from base.tenancy.context import use_hub
-    from base.tenancy.tests import hubs
     from live.context import Scope
 
     with use_hub(hub_a):
@@ -443,7 +441,6 @@ def test_each_business_keeps_its_own_number_and_its_own_version(hub_a, hub_b):
 @pytest.mark.usefixtures("no_test_fallback")
 def test_only_the_business_with_its_number_connected_may_send_and_its_month_is_its_own(hub_a, hub_b):
     from base.tenancy.context import use_hub
-    from base.tenancy.tests import hubs
     from live.context import Scope
 
     with use_hub(hub_a):

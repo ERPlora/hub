@@ -14,7 +14,7 @@ import pytest
 from django.apps import apps
 from live.operations import get, registry
 
-from apps.whatsapp_inbox.tests.conftest import B, ctx_for
+from apps.whatsapp_inbox.tests.conftest import ctx_for
 from apps.whatsapp_inbox.tests.test_template_header_file import PDF, upload
 from apps.whatsapp_inbox.tests.test_template_header_file import hub_files  # noqa: F401 - fixture
 from base import assistant

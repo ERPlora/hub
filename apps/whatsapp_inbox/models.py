@@ -36,7 +36,8 @@ class Channel(UUIDModel):
     """The business's WhatsApp number as erplora.com reports it: one row per business, written only by what the SaaS
     says (its photo, and its answer when the Hub connects or disconnects the number).
 
-    Each business keeps one row in its own database.
+    Each business keeps one row in its own database: the database holds it to one by the unique business column phase 1
+    left (``migrations/0005``), empty in every row the code writes since ``0011`` and ``0012``.
     """
 
     class Status(models.TextChoices):
@@ -509,7 +510,8 @@ class Template(UUIDModel):
         verbose_name_plural = _("templates")
         ordering = ["name", "language", "id"]
         constraints = [
-            # One live template per business, name and language: one deleted here frees them.
+            # One live template per name and language: one deleted here frees them. In the database it still holds
+            # the business column phase 1 left (``migrations/0012``), where every row the code writes has it empty.
             models.UniqueConstraint(
                 fields=["name", "language"],
                 condition=Q(deleted_at__isnull=True),

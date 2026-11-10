@@ -16,7 +16,7 @@ from live.errors import OperationError, PermissionDenied
 from live.models import OutboxEvent
 
 from apps.whatsapp_inbox.models import Channel
-from apps.whatsapp_inbox.tests.conftest import A, B, connect, ctx_for, run, system
+from apps.whatsapp_inbox.tests.conftest import connect, ctx_for, run, system
 from base.tenancy.tests import hubs
 
 pytestmark = pytest.mark.django_db
@@ -213,7 +213,6 @@ def test_a_server_without_erplora_s_address_says_so(settings):
 @pytest.mark.usefixtures("no_test_fallback")
 def test_the_number_meta_s_window_chose_is_the_business_s_at_once(hub_a, hub_b):
     from base.tenancy.context import use_hub
-    from base.tenancy.tests import hubs
     from live.context import Scope
 
     route = respx.post(CONNECT).mock(return_value=httpx.Response(200, json=CONNECTED))
