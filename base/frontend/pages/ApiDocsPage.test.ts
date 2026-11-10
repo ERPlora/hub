@@ -9,10 +9,10 @@ import { AppPage } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
-import { saveFile } from '../lib/data';
+import { saveFile } from '../lib/download';
 import ApiDocsPage from './ApiDocsPage.vue';
 
-vi.mock('../lib/data', async (importOriginal) => ({ ...(await importOriginal<typeof import('../lib/data')>()), saveFile: vi.fn() }));
+vi.mock('../lib/download', () => ({ saveFile: vi.fn(async () => true) }));
 
 const DOCUMENT = {
   openapi: '3.1.0',
@@ -82,8 +82,9 @@ describe('ApiDocsPage', () => {
   it('«Download the OpenAPI file» saves the document', async () => {
     const m = await open(Response.json(ANSWER));
     await m.wrapper.get('[data-testid="api-docs-download"]').trigger('click');
-    const [name, blob] = vi.mocked(saveFile).mock.calls[0];
+    const [name, blob, t] = vi.mocked(saveFile).mock.calls[0];
     expect(name).toMatch(/^erplora-.*openapi\.json$/);
+    expect(t('base.download.savedTo', { path: 'Download/x' })).toBe('Saved to Download/x');
     expect(JSON.parse(await (blob as Blob).text())).toEqual(DOCUMENT);
   });
 

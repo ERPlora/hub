@@ -18,6 +18,8 @@ import {
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
 import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
 import { ComposableHost } from './composable-host';
+import baseEn from '../../../../base/frontend/locale/en.json';
+import baseEs from '../../../../base/frontend/locale/es.json';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 
@@ -90,7 +92,7 @@ export async function mountVerifactu(component: Component, options: MountOptions
   const wrapper = mount(component, {
     props: options.props,
     global: {
-      plugins: [router, createShellI18n({ locale: options.locale ?? 'en', messages: { en, es } })],
+      plugins: [router, createShellI18n({ locale: options.locale ?? 'en', messages: { en: { ...baseEn, ...en }, es: { ...baseEs, ...es } } })],
       provide: { ...app._context.provides, [LIVE_CLIENT_KEY as symbol]: harness.client },
       stubs: options.stubs,
     },

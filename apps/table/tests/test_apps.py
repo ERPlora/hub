@@ -146,16 +146,23 @@ def test_what_is_done_at_the_table_is_in_person_and_of_normal_risk():
 
 def test_every_operation_is_a_tool_of_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: the operation's
-    # permission is its only door. A command says its risk; a read has none.
+    # permission is its only door. A command says its risk; a read has none. A tool says what a
+    # person types to ask for it (table is in LIVE_ASSISTANT_ASKS_REQUIRED, hub#1081); the
+    # platform's own writes (permission ``table.system``) are no tool and say none.
     from live.operations import registry
+
+    from base.assistant import is_tool
 
     operations = [op for name, op in registry.items() if name.startswith("table.")]
     assert len(operations) == 38
+    assert sum(is_tool(op) for op in operations) == 33  # positive control: the platform's 5 are left out
     for op in operations:
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
         if op.name in IN_PERSON:
             expected = expected | {"in_person"}
+        if is_tool(op):
+            expected = expected | {"asks"}
         assert set(op.ai) == expected, op.name
         assert op.ai.get("in_person", False) is (op.name in IN_PERSON), op.name
         if op.kind == "command":

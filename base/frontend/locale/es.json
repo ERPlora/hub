@@ -1489,6 +1489,15 @@
       "notSaved": "No se pudo guardar la foto. Inténtalo de nuevo.",
       "retry": "Reintentar"
     },
+    "download": {
+      "savedTo": "Guardado en {path}",
+      "refusal": {
+        "unreachable": "Esta app no puede guardar archivos en un móvil o una tablet. Abre tu negocio en un navegador para descargarlo.",
+        "unlinked": "No se ha podido guardar el archivo: esta app está vinculada a otro negocio.",
+        "outdated": "Esta versión de la app de ERPlora no puede guardar archivos. Actualízala para descargar.",
+        "failed": "No se ha podido descargar el archivo."
+      }
+    },
     "print": {
       "refusal": {
         "refused": "el documento está vacío o es demasiado grande para imprimirlo",

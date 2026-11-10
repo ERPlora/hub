@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e58a0dc143637c956adda62b76039106915428c5a21f3eb322ee753084cdc282 -->
+<!-- generated from WORKBOOK.md sha256:cdbb36c226e620e965b9b8b0dd67d7a4ffa129edcb16d2c7292f6c3a86088f4b -->
 
 ## What it is for and who it is for
 
@@ -512,7 +512,8 @@ Status: done
 Actor: administrator, manager, employee
 Screen: Assistant
 Steps:
-1. Ask the assistant "Print a test on the kitchen one", "retry the failed label
+1. Ask the assistant "Print a test on the kitchen one", "print a test page on the till one",
+   "change the IP, the paper and the name of the till printer", "retry the failed label
    jobs" or "how is the till's printer doing?".
 2. The assistant does the same as the screens, naming the printer by its name and the job by
    its number, and answers with what it has done. Before changing something, its confirmation card says the

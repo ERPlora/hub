@@ -222,7 +222,7 @@ describe('RecordsPage for a manager (ATTENDANCE-F07)', () => {
         body: undefined,
       },
     ]);
-    expect(download.saveCsv).toHaveBeenCalledWith('attendance-2026-10.csv', 'date,user\r\n');
+    expect(download.saveCsv).toHaveBeenCalledWith('attendance-2026-10.csv', 'date,user\r\n', expect.any(Function));
   });
 
   it('an empty export still downloads the header and says so; a failure says so', async () => {

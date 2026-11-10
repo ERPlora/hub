@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4ebaa585129e22e4d4cd9941184211714004c1aab5b549cce1acad7b03ecdaef -->
+<!-- generated from WORKBOOK.md sha256:8852b0101eaf8405d93c9a1ab716adb92824c89bba7c081d042ac96555bc0a4f -->
 
 ## What it is for and who it is for
 
@@ -1160,7 +1160,7 @@ Out: a .blueprint.zip with the apps ticked and, of those that take their data, t
 PINs nor fiscal data. Nothing is kept in the business.
 If it fails: "The export failed: {reason}"; without a name, "Write a name for the file." and it cannot be
 exported. Who does not administer the business reads "Only an administrator can export the business.".
-Involved: none
+Involved: BASE-F112 (inside the app)
 
 ### BASE-F36 Choose which apps, data and tables travel in the export
 Status: done
@@ -1998,7 +1998,7 @@ could not be read" with "It may be damaged or saved in another format. Download 
 device."; a sheet or a document over 10 MB (or one that would take too much once opened) is not even fetched: "Too
 large to preview" with "The preview opens files of up to 10 MB. Download it to open it with an app on your device.".
 "Download" is always at the top. If it could not be downloaded, "Could not download “{name}”: {reason}".
-Involved: none
+Involved: BASE-F112 (inside the app)
 
 ### BASE-F75 Move and rename a file or a folder
 Status: done
@@ -2208,7 +2208,7 @@ Out: nothing; it is read only (the exported file changes nothing). It updates by
 If it fails: "Could not load the record of approvals." with "Retry"; with none, "Nobody has had to approve
 anything in this business yet." (and the exported file brings its header alone). If it cannot export, a notice says
 so with its reason and nothing is downloaded.
-Involved: BASE-F84
+Involved: BASE-F84, BASE-F112 (inside the app)
 
 ### BASE-F86 Create an API key and copy its token
 Status: done
@@ -2292,7 +2292,7 @@ If it fails: hidden, "The API documentation is hidden in this business." and, fo
 nothing published, "None of this business’s apps publishes its API yet.". If the business cannot have keys yet:
 "API keys are not available yet for this business: you can read the documentation, but no system can call it
 yet.".
-Involved: BASE-F91, BASE-F86
+Involved: BASE-F91, BASE-F86, BASE-F112 (inside the app)
 
 ### BASE-F91 Show or hide the API documentation
 Status: done
@@ -2852,3 +2852,28 @@ always was. erplora.com's calls to `/internal` and `/readyz` get their 503 at on
 again on its own, and `/readyz` has to say the database is gone before its probes give up.
 Involved: ACCOUNTS-F50 (its twin on erplora.com), every app whose local changes repeat, the Hub's other waiting pages (a
 business being prepared or moving to another server: the same look); hub#831, hub#1051 and hub#1052
+
+### BASE-F112 Save a downloaded file inside the app
+<!-- origin: old-hub:HUB_SHELL-F126 old-hub:HUB_SHELL-F132 old-hub:HUB_SHELL-F173 (the Hub's side of ERPlora/app's HUB_APP-F30) gh:hub#1041 -->
+Status: done
+Actor: anyone of the business who downloads a file in the Hub
+Screen: those that download a file the screen already holds: VeriFactu › Configuration (the authorisation's form),
+Settings · Data and copies › Export, Files, Employees › Approvals, the API documentation, Attendance, Inventory
+(Products and Categories), Customers and the website's "Share and QR"
+Steps:
+  1. The person presses download: the authorisation's form, an export, a file, a CSV, the OpenAPI file or the QR.
+  2. In a browser, the file goes with its name to the browser's downloads, which already say so.
+  3. Inside the ERPlora app (computer, or Android 10 or later), the Hub hands the file to the app, which saves it in the
+     Downloads folder, and "Saved to {path}" appears (on Android, "Saved to Download/<name>"): inside the app there is
+     no downloads bar nor any other notice.
+In: the file the screen already holds, with its name.
+Out: the file in Downloads and, inside the app, the notice with its path. Nothing is kept in the Hub.
+If it fails: inside the app the button is never left without an answer. With no downloads folder the person can open
+(Android 9 or earlier, iOS): "This app cannot save files on a phone or tablet. Open your business in a browser to
+download it."; with the app linked to another business: "The file could not be saved: this app is linked to another
+business."; a version of the app without this feature: "This version of the ERPlora app cannot save files. Update it
+to download."; any other failure (a name the app refuses, no space left): "The file could not be downloaded.". In
+those cases the screen does not say it was downloaded. The copies ERPlora keeps (Data and copies › Copies) come down
+through a signed link and do not go through here.
+Involved: HUB_APP-F30 (ERPlora/app), BASE-F35, BASE-F74, BASE-F85, BASE-F90, VERIFACTU-F05, ATTENDANCE-F10,
+INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041

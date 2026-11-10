@@ -338,6 +338,16 @@ def _zone_out(zone: Zone) -> dict:
     ai={
         "description": "Create a zone of the room (dining room, terrace, bar…); it goes last unless told its order.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "add a terrace zone",
+                "create a new area called Upstairs",
+            ),
+            "es": (
+                "crea la zona Terraza",
+                "añade una zona nueva para el salón de arriba",
+            ),
+        },
     },
 )
 def create_zone(ctx: OperationContext, data: ZoneIn) -> dict:
@@ -370,6 +380,18 @@ def create_zone(ctx: OperationContext, data: ZoneIn) -> dict:
         "description": "Rename a zone or change its description, colour, order or whether it is in service (an "
         "inactive zone leaves the service view). Only what is sent changes.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "rename the terrace zone to Patio",
+                "make the bar zone blue",
+                "take the terrace out of service, it's raining",
+            ),
+            "es": (
+                "cambia el nombre de la zona Terraza a Patio",
+                "pon la zona de la barra en azul",
+                "modifica la zona de la terraza, hoy no la usamos",
+            ),
+        },
     },
 )
 def update_zone(ctx: OperationContext, data: ZonePatchIn) -> dict:
@@ -397,6 +419,16 @@ def update_zone(ctx: OperationContext, data: ZonePatchIn) -> dict:
     ai={
         "description": "Delete an empty zone (a zone with tables is refused: move or delete them first).",
         "risk": "high",
+        "asks": {
+            "en": (
+                "delete the patio zone, it's empty",
+                "remove the upstairs area",
+            ),
+            "es": (
+                "borra la zona Patio, ya no tiene mesas",
+                "elimina la zona de arriba",
+            ),
+        },
     },
 )
 def delete_zone(ctx: OperationContext, data: ZoneRefIn) -> dict:
@@ -482,6 +514,16 @@ def _save_unique(row) -> None:
         "description": "Add a table to a zone (by the zone's id or name). Without a number it takes the first free "
         "one of the zone; without a position, the first free spot of the plan. Square, for 4, unless told.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "add table 15 to the terrace",
+                "put a new round table for two in the dining room",
+            ),
+            "es": (
+                "añade la mesa 15 en la terraza",
+                "pon una mesa redonda nueva para dos en el comedor",
+            ),
+        },
     },
 )
 def create_table(ctx: OperationContext, data: TableIn) -> dict:
@@ -521,6 +563,16 @@ def create_table(ctx: OperationContext, data: TableIn) -> dict:
         "description": "Create many tables of a zone at once (1 to 100), numbered with a prefix from a first number "
         "(T1…T12), with their seats and shape, in the first free spots of the plan. If a number is taken, none is made.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "create 10 tables on the terrace, T1 to T10",
+                "add twelve tables for four at once",
+            ),
+            "es": (
+                "crea 12 mesas en la terraza, de la T1 a la T12",
+                "monta de golpe diez mesas de cuatro en el salón",
+            ),
+        },
     },
 )
 def bulk_create_tables(ctx: OperationContext, data: TableBulkIn) -> dict:
@@ -568,6 +620,18 @@ def bulk_create_tables(ctx: OperationContext, data: TableBulkIn) -> dict:
         "description": "Change a table (by its id or number): its number, name, seats, shape, zone, whether it is out "
         "of service (blocked) or in use. Only what is sent changes.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "table 6 now seats six",
+                "block table 3, a leg is broken",
+                "rename table 9 to Window",
+            ),
+            "es": (
+                "la mesa 6 ahora es para seis",
+                "bloquea la mesa 3, que tiene una pata rota",
+                "pasa la mesa 9 a la zona de la terraza",
+            ),
+        },
     },
 )
 def update_table(ctx: OperationContext, data: TablePatchIn) -> dict:
@@ -602,6 +666,16 @@ def update_table(ctx: OperationContext, data: TablePatchIn) -> dict:
     ai={
         "description": "Place a table on its zone's plan (pixels from the top-left corner), and resize its box.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "move table 4 to the left on the floor plan",
+                "make table 2 bigger on the plan",
+            ),
+            "es": (
+                "coloca la mesa 4 más a la izquierda en el plano",
+                "haz más grande la mesa 2 en el plano",
+            ),
+        },
     },
 )
 def move_table(ctx: OperationContext, data: TableMoveIn) -> dict:
@@ -629,6 +703,16 @@ def move_table(ctx: OperationContext, data: TableMoveIn) -> dict:
         "description": "Delete a table (by its id or number): it leaves the plan and the lists, its history of checks "
         "stays. A table with an open check is refused.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "delete table 12, we got rid of it",
+                "remove table 8 from the room",
+            ),
+            "es": (
+                "borra la mesa 12, ya no la tenemos",
+                "elimina la mesa 8 del salón",
+            ),
+        },
     },
 )
 def delete_table(ctx: OperationContext, data: TableRefIn) -> dict:
@@ -695,11 +779,24 @@ def _put_customer(ctx: OperationContext, order_id: UUID, customer_id: UUID | Non
     expose_api=True,
     ai={
         "description": "Seat a party at a free or reserved table («seat 3 at table 4»): its check opens in Sales titled "
-        "with the table. Without guests, the reservation's or the table's seats. Optionally bring an open check of "
-        "Sales to the table, and put a customer (by name or phone) on the check.",
+        "with the table. Use this, not sale.order.open, whenever people sit at a table: that one opens a check no "
+        "table holds. Without guests, the reservation's or the table's seats. Optionally bring an open check of Sales "
+        "to the table (its order_id, from sale.order.list), and put a customer (by name or phone) on the check.",
         "risk": "normal",
         # Done by the waiter with the party in front, never by an automation (TABLE-F10).
         "in_person": True,
+        "asks": {
+            "en": (
+                "seat 3 at table 4",
+                "a party of two just sat down at table 7",
+                "put Ana's check on table 4",
+            ),
+            "es": (
+                "sienta a tres en la mesa 4",
+                "han llegado dos para la mesa 7",
+                "abre la mesa 5 para cuatro",
+            ),
+        },
     },
 )
 def open_session(ctx: OperationContext, data: SessionOpenIn) -> dict:
@@ -752,6 +849,18 @@ def open_session(ctx: OperationContext, data: SessionOpenIn) -> dict:
         "something ordered still open in Sales is refused (charge it, move it or delete it first); an empty one is "
         "voided in Sales. Ask first.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "close table 4, they've left",
+                "free table 2, they didn't order anything",
+                "table 9 is done, close it",
+            ),
+            "es": (
+                "cierra la mesa 4, ya se han ido",
+                "libera la mesa 2, que no pidieron nada",
+                "la 9 ya ha terminado, ciérrala",
+            ),
+        },
     },
 )
 def close_session(ctx: OperationContext, data: SessionCloseIn) -> dict:
@@ -795,8 +904,22 @@ def close_session(ctx: OperationContext, data: SessionCloseIn) -> dict:
     expose_api=True,
     ai={
         "description": "Move a table's check to a free or reserved table («move table 4 to 6»): same check of Sales "
-        "(retitled), guests, waiter and notes; the old table frees if nothing else sits there. Ask first.",
+        "(retitled), guests, waiter and notes; the old table frees if nothing else sits there. Use this, not "
+        "sale.order.set_label: retitling a check moves nobody. Both tables go by their number (and zone); at a table "
+        "with two checks, the check's id comes from table.table.get. Ask first.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "move table 4 to 6",
+                "they want to sit outside, take their check to table 12",
+                "transfer table 3's check to table 10",
+            ),
+            "es": (
+                "pasa la mesa 4 a la 6",
+                "los de la 3 se mudan a la mesa 10",
+                "se quieren ir fuera, llévate su cuenta a la mesa 12",
+            ),
+        },
     },
 )
 def transfer_session(ctx: OperationContext, data: SessionTransferIn) -> dict:
@@ -861,8 +984,21 @@ def _merge_target(data: SessionMergeIn, source: TableSession) -> TableSession:
     expose_api=True,
     ai={
         "description": "Join a table's check into the open check of another table (or the other check of a split "
-        "table): its lines move to that check in Sales, and its table frees if nothing else sits there. Ask first.",
+        "table): its lines move to that check in Sales, and its table frees if nothing else sits there. Tables go by "
+        "their number (and zone); the two checks of a split table, by the ids table.table.get lists. Ask first.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "join tables 4 and 5 into one check",
+                "merge table 2's check into table 3's",
+                "tables 7 and 8 are paying together, combine them",
+            ),
+            "es": (
+                "junta la mesa 4 con la mesa 5, que pagan juntos",
+                "une las mesas 2 y 3 en una sola",
+                "fusiona la cuenta de la mesa 7 con la de la 8",
+            ),
+        },
     },
 )
 def merge_session(ctx: OperationContext, data: SessionMergeIn) -> dict:
@@ -924,10 +1060,26 @@ def merge_session(ctx: OperationContext, data: SessionMergeIn) -> dict:
     expose_api=True,
     ai={
         "description": "Split a table's check in two so each part pays separately: a second check opens at the same "
-        "table and the lines named move to it in Sales (none = a blank check).",
+        "table and the lines named move to it in Sales (none = a blank check). Use this, not sale.order.split nor "
+        "sale.order.open, for a check seated at a table (a second check for someone who pays apart too): only this "
+        "one keeps both checks at the table. The table goes by its number (and "
+        "zone); at a table with two checks already, the check's id comes from table.table.get, and the lines to move "
+        "from sale.order.get.",
         "risk": "normal",
         # Done at the table with the party, never by an automation (TABLE-F17).
         "in_person": True,
+        "asks": {
+            "en": (
+                "split table 4's check, they're paying separately",
+                "open a separate check at table 2 for one of them",
+                "table 6 wants two checks, one of them pays on their own",
+            ),
+            "es": (
+                "divide la cuenta de la mesa 4, pagan por separado",
+                "sepárame la cuenta de la 2, uno paga aparte",
+                "abre otra cuenta en la mesa 6 para uno que paga lo suyo",
+            ),
+        },
     },
 )
 def split_session(ctx: OperationContext, data: SessionSplitIn) -> dict:
@@ -981,8 +1133,21 @@ def split_session(ctx: OperationContext, data: SessionSplitIn) -> dict:
     output=SessionOut,
     expose_api=True,
     ai={
-        "description": "Correct how many guests sit at a table's open check (e.g. one more joined).",
+        "description": "Correct how many guests sit at a table's open check (e.g. one more joined). The table goes by "
+        "its number (and zone); at a table with two checks, the check's id comes from table.table.get.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "one more joined table 4, make it five",
+                "table 3 is actually six people",
+                "change the guests at table 6 to two",
+            ),
+            "es": (
+                "en la mesa 4 ahora son cinco",
+                "se ha sumado uno más a la mesa 3",
+                "corrige los comensales de la mesa 6 a dos",
+            ),
+        },
     },
 )
 def set_guests(ctx: OperationContext, data: SessionGuestsIn) -> dict:
@@ -1006,6 +1171,18 @@ def set_guests(ctx: OperationContext, data: SessionGuestsIn) -> dict:
         "description": "Take the table away from a check without closing it (park it): the table frees, the check "
         "stays open in Sales with its guests, waiter and time, and can be seated again later.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "park table 4's check, they moved to the bar",
+                "free table 6 but keep their check open",
+                "take table 2 off its check, they'll come back later",
+            ),
+            "es": (
+                "aparca la cuenta de la mesa 4, se han ido a la barra",
+                "libera la mesa 6 pero deja su cuenta abierta",
+                "quita la mesa a la cuenta de la 2, luego vuelven",
+            ),
+        },
     },
 )
 def park_session(ctx: OperationContext, data: SessionRefIn) -> dict:
@@ -1032,10 +1209,23 @@ def park_session(ctx: OperationContext, data: SessionRefIn) -> dict:
     expose_api=True,
     ai={
         "description": "Seat a parked check at a free table again, with its guests, waiter and opening time; its "
-        "check of Sales takes the table's title.",
+        "check of Sales takes the table's title. The parked check goes by its id: find it with "
+        "table.session.list(status=parked), never ask the person for it.",
         "risk": "normal",
         # Seating the party again, by the waiter, never by an automation (TABLE-F24).
         "in_person": True,
+        "asks": {
+            "en": (
+                "seat the parked check at table 9",
+                "bring the check we parked back to table 2",
+                "they're back, give the parked check table 5",
+            ),
+            "es": (
+                "vuelve a sentar la cuenta aparcada en la mesa 9",
+                "la cuenta aparcada vuelve a la mesa 2",
+                "ya han vuelto, siéntame la cuenta aparcada en la 5",
+            ),
+        },
     },
 )
 def restore_session(ctx: OperationContext, data: SessionRestoreIn) -> dict:
@@ -1065,11 +1255,23 @@ def restore_session(ctx: OperationContext, data: SessionRestoreIn) -> dict:
     output=SessionOut,
     expose_api=True,
     ai={
-        "description": "Make an open check of Sales the check of a table's open check that has none yet (the till "
-        "opened it apart); it takes the table's title.",
+        "description": "Link an open check of Sales (opened apart, at the till or the bar) to a table's open check "
+        "that has none yet; it takes the table's title. Find the check of Sales by its title with "
+        "sale.order.list(search=...) and, at a table with two checks, the table's check with table.table.get; never "
+        "ask the person for an id. A party at a free table with a check of the till is seated with table.session.open.",
         "risk": "normal",
         # Bringing the party's check to its table, by the waiter, never by an automation (TABLE-F12).
         "in_person": True,
+        "asks": {
+            "en": (
+                "table 4 has no till check yet, give it the bar one",
+                "hook the open till check onto table 6",
+            ),
+            "es": (
+                "vincula la cuenta abierta de la barra con la mesa 4",
+                "engancha la cuenta abierta del TPV a la mesa 6",
+            ),
+        },
     },
 )
 def link_order(ctx: OperationContext, data: SessionLinkOrderIn) -> dict:
@@ -1096,8 +1298,19 @@ def link_order(ctx: OperationContext, data: SessionLinkOrderIn) -> dict:
     expose_api=True,
     ai={
         "description": "Delete a finished table check from the history (an open or parked one is refused). It is kept "
-        "as deleted, with its trail through the tables. Ask first.",
+        "as deleted, with its trail through the tables. It goes by its id: find the closed check the person names (its "
+        "table, its time) with table.session.list(status=closed), never ask them for it. Ask first.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "delete table 4's closed check from the history",
+                "remove that finished check of table 2",
+            ),
+            "es": (
+                "borra del historial la cuenta cerrada de la mesa 4",
+                "quita del historial la cuenta ya cobrada de la mesa 2",
+            ),
+        },
     },
 )
 def delete_session(ctx: OperationContext, data: ByIdIn) -> dict:
@@ -1175,6 +1388,16 @@ def _hold_event(ctx: OperationContext, name: str, hold: Hold) -> None:
         "description": "Set a table aside by hand for a party («keep table 6 for Pedro from 21:00 to 23:00, 4 people»): "
         "from an hour before it shows Reserved with the name. Asking again with the same reference changes the same hold.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "keep table 6 for Pedro from 9 to 11pm, 4 people",
+                "save table 3 for the Garcias tonight",
+            ),
+            "es": (
+                "guarda la 6 para Pedro de 21:00 a 23:00, 4 personas",
+                "apártame la mesa 3 para los García esta noche",
+            ),
+        },
     },
 )
 def place_hold(ctx: OperationContext, data: HoldPlaceIn) -> dict:
@@ -1212,6 +1435,16 @@ def place_hold(ctx: OperationContext, data: HoldPlaceIn) -> dict:
     ai={
         "description": "Release a table set aside (by the hold's reference): its name is forgotten.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "release the table we kept for Pedro",
+                "drop the hold on table 6",
+            ),
+            "es": (
+                "suelta la mesa que guardamos para Pedro",
+                "ya no hace falta apartar la mesa 6, libérala",
+            ),
+        },
     },
 )
 def release_hold(ctx: OperationContext, data: HoldReleaseIn) -> dict:
@@ -1421,6 +1654,16 @@ def _settings_row_locked() -> TableSettings:
         "description": "Change the room settings: whether seating asks for the guests, and after how many minutes an "
         "open check turns amber and red. Only what is sent changes.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "make tables turn red after 45 minutes",
+                "stop asking for guests when seating",
+            ),
+            "es": (
+                "que las mesas se pongan rojas a los 45 minutos",
+                "no preguntes los comensales al sentar",
+            ),
+        },
     },
 )
 def update_settings(ctx: OperationContext, data: SettingsIn) -> dict:
