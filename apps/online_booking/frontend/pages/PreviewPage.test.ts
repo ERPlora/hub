@@ -119,9 +119,9 @@ describe('PreviewPage', () => {
     expect(en.el('service-v1')?.textContent).toContain('€1,234.56 · 30 min');
   });
 
-  it('a price is in the business’s currency: złoty in a business in Poland, the figure alone until it answers (hub#577)', async () => {
+  it('a price is in the business’s currency: złoty in a business in Poland, a dash until it answers (hub#577, hub#947)', async () => {
     const s = await setup({ locale: 'es' });
-    expect(s.el('service-v1')?.textContent).toMatch(/\s20,00 · 30 min/);
+    expect(s.el('service-v1')?.textContent).toMatch(/\s— · 30 min/);
     await s.businessIn(POLISH);
     expect(s.el('service-v1')?.textContent).toContain('20,00\u00a0zł · 30 min');
     expect(s.find('ob-preview').text()).not.toContain('€');

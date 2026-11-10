@@ -45,7 +45,7 @@ function moneyOptions(money: Money | undefined, decimals: number): Intl.NumberFo
   return money ? { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol', ...digits } : digits;
 }
 
-/** Minor units as `money` in `locale` («1.150,50 €», «€150.50», «¥5,003»; «150,50» while the money is unknown);
+/** Minor units as `money` in `locale` («1.150,50 €», «€150.50», «¥5,003»; «—» while the money is unknown);
  *  nothing is «—». */
 export function formatMoney(cents: number | null | undefined, locale: string, money?: Money): string {
   return missing(cents) ? '—' : writeMoney(cents, locale, money);
