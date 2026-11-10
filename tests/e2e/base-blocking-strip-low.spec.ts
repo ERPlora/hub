@@ -5,9 +5,10 @@
 // 117 px and left `ion-content` 21 to 132 px between it, the top bar (60) and the tab bar (66). Under a browser's address
 // bar (568x264, 640x304) a row (143 px) cannot fit even with no strip at all (264 − 60 − 66 = 138): there the measure is a
 // floor, with the cart button whole. On a screen of normal height the strip is as it was, sentence and steps named.
-// Hub `a` with no issuer (parked for the run), its owner in Spanish, on the till, and last in English at the narrowest
-// phone on its side (568 px wide): the one line holds in both catalogues. The product `E2E-STRIPLOW-<run>` and the cash
-// register switched off for the run are put back after it.
+// Hub `a` with no issuer (parked for the run), its owner in Spanish, on the till, then in English at the narrowest
+// phone on its side (568 px wide): the one line holds in both catalogues. Last, with a touch pointer (hub#1074, ui#131):
+// «Configurar» grows to 44 px there and the strip still keeps its one line of 48 px and the till its room. The product
+// `E2E-STRIPLOW-<run>` and the cash register switched off for the run are put back after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, capture, record, settled, shown } from './helpers';
@@ -42,8 +43,10 @@ const NORMAL = [
   { label: '820x1180', width: 820, height: 1180 },
   { label: '375x667', width: 375, height: 667 },
 ] as const;
-/** One line: the 40 px of «Configurar» (the touch minimum) and 4 px above and under it. */
+/** One line: «Configurar» and 4 px above and under it, or by touch its 44 px target alone (ui#131): 48 px at most. */
 const ONE_LINE = 48;
+/** The touch target of `@erplora/ui` for a small button with a coarse pointer (ui#131). */
+const TOUCH_TARGET = 44;
 /** A fraction of a pixel of rounding between two boxes that touch. */
 const EDGE = 0.5;
 
@@ -208,6 +211,31 @@ test.describe('BASE-F01: in English, the strip on a phone on its side is one lin
       const box = await layout(where);
       measured[where] = { strip: box.strip.height, content: box.content.height };
       await capture(page, `${KEY}-en-${size.label}`);
+    });
+  }
+});
+
+test.describe('BASE-F01: by touch, «Configurar» is a 44 px target and the strip still one line with room for the till', () => {
+  test.beforeAll(async ({ browser }) => {
+    await context.close();
+    context = await browser.newContext({ baseURL: A, viewport: { width: 568, height: 320 }, locale: 'es-ES', hasTouch: true });
+    page = await context.newPage();
+    await tillIn(page, context, 'es');
+  });
+
+  for (const size of LOW) {
+    const room = 'least' in size ? `at least ${size.least} px for the till` : 'a whole row of the catalogue';
+    test(`${size.label} by touch: «Configurar» at least ${TOUCH_TARGET} px, one line and ${room}`, async () => {
+      const where = `${size.label} by touch`;
+      await page.setViewportSize({ width: size.width, height: size.height });
+      await isOneLine(where);
+      const box = await layout(where);
+      measured[where] = { strip: box.strip.height, content: box.content.height, configure: box.configure?.height };
+      expect(box.configure!.height, `«Configurar» as a touch target at ${where}`).toBeGreaterThanOrEqual(TOUCH_TARGET);
+      if ('least' in size) expect(box.content.height, `ion-content at ${where}`).toBeGreaterThanOrEqual(size.least);
+      else expect(await rowWhole(), `a whole row of the catalogue inside the till at ${where} (ion-content ${box.content.height} px)`).toBe(true);
+      await capture(page, `${KEY}-touch-${size.label}`);
+      await cartButtonWhole(where);
     });
   }
 });
