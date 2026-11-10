@@ -21,7 +21,7 @@ from apps.flow import events
 from apps.flow.models import Flow, FlowRun
 from apps.task.models import Task
 
-from .conftest import A, TASK_STEP, make_flow, run
+from .conftest import A, TASK_STEP, due_daily_flow, make_flow, run
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -66,16 +66,7 @@ def test_the_same_event_delivered_twice_at_once_runs_once():
 
 
 def test_two_workers_fire_a_due_schedule_once(monkeypatch):
-    from django.utils import timezone
-
-    now = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
-    monkeypatch.setattr(timezone, "now", lambda: now)
-    flow = make_flow(
-        trigger_kind=Flow.Trigger.SCHEDULE,
-        trigger_event="",
-        schedule={"every": "day", "time": "09:00"},
-        next_fire_at=dt.datetime(2026, 10, 15, 9, 0, tzinfo=MADRID),
-    )
+    flow = due_daily_flow(monkeypatch)
     fire = lambda: run("flow.schedule.fire_due", {}, system_context(A))  # noqa: E731
     results = at_once(fire, fire)
     assert not [result for result in results if isinstance(result, Exception)], results

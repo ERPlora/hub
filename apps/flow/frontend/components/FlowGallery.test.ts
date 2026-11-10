@@ -19,6 +19,7 @@ const ALL_EVENTS = [
   'reservation.reservation.created',
 ];
 const catalog = (events = ALL_EVENTS, actions = ['task.task.create', 'customer.note.add']): CatalogOut => ({
+  off_apps: [],
   events: events.map((name) => ({ name, app: name.split('.')[0], app_name: name.split('.')[0] })),
   actions: actions.map((name) => ({ name, kind: 'command', app: name.split('.')[0], app_name: name.split('.')[0], description: '', fields: [], outputs: [] })),
 });

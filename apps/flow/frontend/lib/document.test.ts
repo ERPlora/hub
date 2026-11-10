@@ -195,6 +195,7 @@ describe('the server says where it is wrong', () => {
 
 describe('the data a step can insert', () => {
   const catalog = {
+    off_apps: [],
     events: [],
     actions: [
       { name: 'task.task.create', kind: 'command', app: 'task', app_name: 'Tasks', description: '', fields: [], outputs: ['id', 'number'] },
@@ -226,7 +227,7 @@ describe('the data a step can insert', () => {
     // The catalog answers the paths the engine resolves (`step_data`), a list's insides never among them.
     const add = { name: 'cart_checkout.item.add', kind: 'command', app: 'cart_checkout', app_name: 'Cart', description: '', fields: [], outputs: ['item', 'item.unit_price', 'item.line_total', 'removed', 'cart', 'cart.total_amount'] };
     const steps: Step[] = [{ id: 's1', kind: 'command', operation: 'cart_checkout.item.add', params: {} }];
-    expect(dataChoices(steps, 1, null, { events: [], actions: [add] } as CatalogOut)).toEqual([
+    expect(dataChoices(steps, 1, null, { off_apps: [], events: [], actions: [add] } as CatalogOut)).toEqual([
       { path: 'steps.s1.item', group: 's1', example: undefined },
       { path: 'steps.s1.item.unit_price', group: 's1', example: undefined },
       { path: 'steps.s1.item.line_total', group: 's1', example: undefined },
