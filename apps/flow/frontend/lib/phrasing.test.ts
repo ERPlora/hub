@@ -31,6 +31,7 @@ function phrasing(locale: 'en' | 'es' = 'en'): Phrasing {
 }
 
 const CATALOG = {
+  off_apps: [],
   events: [
     { name: 'sale.sale.completed', app: 'sale', app_name: 'Sales' },
     { name: 'customer.group.deleted', app: 'customer', app_name: 'Customers' },

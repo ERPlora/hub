@@ -46,7 +46,7 @@ def tick(monkeypatch):
 
 def test_online_booking_declares_check_each_booking_and_automations_offers_it():
     assert [recipe["id"] for recipe in declared.RECIPES] == ["booked_online"]
-    recipe = recipes.find(REF)
+    recipe = recipes.find(A, REF)
     assert recipes.grants(recipe) == ["task.task.create"]
     assert recipes.words(recipe, "es")["name"] == "Revisar cada cita reservada por internet"
     assert recipes.build(recipe, "es")["steps"][0]["params"]["title"] == "Revisar la reserva por internet {{input.number}}"
