@@ -2963,19 +2963,19 @@ def _actor_label(ctx: OperationContext) -> str:
     ai=AI(
         description=(
             "Makes the device the person is using shared (a till several people use: PIN, a shift) or personal (one "
-            "person's: no PIN, 30 days). Only on the device itself. Use this, not access.settings_update, to turn "
-            "this computer into a shared till; access.settings_update changes the business-wide PIN rules."
+            "person's: no PIN, 30 days). Only on the device itself. Use this, not access.settings_update, to make "
+            "the device in hand shared or personal; access.settings_update changes the business-wide PIN rules."
         ),
         asks={
             "en": (
                 "make this tablet a shared till",
                 "this laptop is only mine, set it to personal",
-                "turn this computer into a shared till",
+                "use this laptop as the whole team's till, with a PIN",
             ),
             "es": (
                 "pon esta tablet como caja compartida",
                 "este portátil es solo mío, que no pida PIN",
-                "convierte este ordenador en una caja compartida",
+                "usa este portátil como caja de todo el equipo, con PIN",
             ),
         },
     ),
@@ -3014,12 +3014,12 @@ def _device(device_id) -> TrustedDevice:
             "en": (
                 "call this tablet Bar",
                 "rename the old iPad to Kitchen",
-                "name this computer Office computer QA",
+                "rename this device to Front desk",
             ),
             "es": (
                 "llama a esta tablet «Barra»",
                 "renombra el iPad viejo como «Terraza»",
-                "nombra este ordenador «Ordenador de oficina QA»",
+                "cambia el nombre de este dispositivo a «Caja 2»",
             ),
         },
     ),
@@ -3057,12 +3057,12 @@ def device_rename(ctx: OperationContext, data: DeviceRenameIn) -> dict:
             "en": (
                 "we lost the terrace tablet, remove it",
                 "kick the stolen phone out of the business",
-                "close the first device's access",
+                "cut off access for the phone we lost",
             ),
             "es": (
                 "hemos perdido la tablet de la terraza, quítala",
                 "echa del negocio el móvil que nos robaron",
-                "cierra el acceso del primer dispositivo",
+                "corta el acceso del móvil que se ha perdido",
             ),
         },
     ),
@@ -3091,12 +3091,12 @@ def device_remove(ctx: OperationContext, data: DeviceByIdIn) -> dict:
             "en": (
                 "clean out the devices nobody has used in 30 days",
                 "remove the old devices we don't use",
-                "retire the computers unused for 30 days",
+                "drop the computers nobody has opened in the last month",
             ),
             "es": (
                 "limpia los dispositivos que nadie usa desde hace 30 días",
                 "quita los aparatos viejos que ya no se usan",
-                "retira los equipos sin uso durante 30 días",
+                "da de baja los equipos que no se han usado en el último mes",
             ),
         },
     ),
@@ -3430,12 +3430,12 @@ def person_badge_set(ctx: OperationContext, data: BadgeSetIn) -> dict:
             "en": (
                 "Luis lost his card, take his badge away",
                 "remove Marta's badge",
-                "deactivate the employee's badge",
+                "cancel Pedro's card, he lost it",
             ),
             "es": (
                 "Luis ha perdido la tarjeta, quítale la placa",
                 "quita la placa de Marta",
-                "desactiva la placa de la empleada",
+                "anula la tarjeta de Pedro, que se le ha perdido",
             ),
         },
     ),
@@ -4753,13 +4753,13 @@ def _app_answer(label: str, row: activation.Activation, along: list[dict[str, st
                 "turn on the customers app",
                 "activate the bookings app",
                 "can you turn on the kitchen module?",
-                "make Reservations available again",
+                "bring back the time clock app I took off the menu",
             ),
             "es": (
                 "activa la app de clientes",
                 "ponme la app de cocina",
                 "activa el módulo de citas",
-                "vuelve a dejar Reservas disponible",
+                "recupera la app de fichajes que quité del menú",
             ),
         },
     },

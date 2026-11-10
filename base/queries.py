@@ -2603,12 +2603,12 @@ def file_list(ctx: OperationContext, data: FileListIn) -> dict:
             "en": (
                 "find the file Invoices/march.pdf",
                 "how big is the contract PDF?",
-                "read the size and type of QA Documents/note-qa.txt",
+                "what kind of document is the quote, and how much space does it take?",
             ),
             "es": (
                 "búscame el archivo Facturas/marzo.pdf",
                 "¿cuánto pesa ese archivo?",
-                "lee el tamaño y el tipo de Documentos QA/nota-qa.txt",
+                "¿de qué tipo es el documento del presupuesto y cuánto ocupa?",
             ),
         },
     ),
