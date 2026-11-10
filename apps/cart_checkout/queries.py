@@ -299,6 +299,18 @@ def _containing(**fragments) -> dict:
     output=CartPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me the open shopping carts",
+                "which online baskets were abandoned this week?",
+                "list the customers' carts that became orders",
+            ),
+            "es": (
+                "¿qué carritos de la tienda online siguen abiertos?",
+                "enséñame las cestas abandonadas de esta semana",
+                "lista los carritos de compra que acabaron en pedido",
+            ),
+        },
         "description": "List the shopping carts of the internal cart notebook (not the till's tickets) with their "
         "session code, customer's email and name, status (active, abandoned, converted, expired), items and "
         "total in minor units. Search by code, email or name.",
@@ -350,6 +362,18 @@ def list_carts(ctx: OperationContext, params: CartListIn) -> dict:
     output=CartDetailOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what's in Ana's shopping cart and how much is it?",
+                "show me the whole basket of session sess_a1b2c3",
+                "open the cart of marta@example.com, every line of it",
+            ),
+            "es": (
+                "¿qué lleva el carrito de Ana y cuánto suma?",
+                "enséñame entera la cesta de la sesión sess_a1b2c3",
+                "dame el carrito de marta@example.com con todo lo que lleva",
+            ),
+        },
         "description": "Get one shopping cart with all its lines (product, quantity, unit price, line total), "
         "named by its session code, by its customer's email or name, or by its id.",
         "risk": "normal",
@@ -371,6 +395,18 @@ def get_cart(ctx: OperationContext, data: CartRefIn) -> dict:
     output=ItemPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which products are in Ana's web basket?",
+                "list the lines of cart sess_a1b2c3 with their prices",
+                "which products did Marta leave in her cart?",
+            ),
+            "es": (
+                "¿qué productos hay en la cesta web de Ana?",
+                "lista las líneas del carrito sess_a1b2c3 con sus precios",
+                "¿cuántas unidades de cada producto lleva el carrito de Marta?",
+            ),
+        },
         "description": "List the lines of one shopping cart (named by its session code or id): product reference "
         "and name, SKU, quantity, unit price and line total in minor units.",
         "risk": "normal",
@@ -409,6 +445,16 @@ def list_items(ctx: OperationContext, params: ItemListIn) -> dict:
     output=ItemOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "at what price was the shampoo kept in Ana's cart?",
+                "show me one line of the web basket with its quantity",
+            ),
+            "es": (
+                "¿a qué precio quedó guardado el champú en el carrito de Ana?",
+                "enséñame una línea de la cesta web con su cantidad",
+            ),
+        },
         "description": "Get one line of a shopping cart by its id, with its quantity and the unit price kept on it.",
         "risk": "normal",
     },
@@ -428,6 +474,16 @@ def get_item(ctx: OperationContext, data: ItemRefIn) -> dict:
     output=OrderPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which online purchases are waiting to be paid?",
+                "list what the online shop sold this week",
+            ),
+            "es": (
+                "¿qué pedidos web siguen pendientes?",
+                "lista los pedidos de la tienda online de esta semana",
+            ),
+        },
         "description": "List the orders made from shopping carts with their number (OS-YYYYMMDD-NNNN), email, "
         "status (initiated, paid, failed, completed), payment method and total in minor units. They are not "
         "the till's sales and nothing in them is fiscal.",
@@ -479,6 +535,16 @@ def list_orders(ctx: OperationContext, params: OrderListIn) -> dict:
     output=OrderOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what status is OS-20261014-0003 in?",
+                "give me the shipping address of what Ana bought online",
+            ),
+            "es": (
+                "¿en qué estado está el pedido OS-20261014-0003?",
+                "dame la dirección de envío del pedido web de Ana",
+            ),
+        },
         "description": "Get one order with everything it has (addresses, shipping and payment methods, dates, "
         "notes, why it failed), named by its number (OS-20261014-0003) or its id.",
         "risk": "normal",

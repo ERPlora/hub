@@ -557,6 +557,7 @@ LIVE = {
 # of the assistant's QA (base/tests/test_assistant_asks.py) checks each ask reaches its tool, role by role.
 LIVE_ASSISTANT_ASKS_REQUIRED = (
     "base",
+    "cart_checkout",
     "customer",
     "inventory",
     "printing",
