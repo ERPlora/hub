@@ -143,6 +143,12 @@ function edit(): void {
   font-size: 1.05rem;
   --color: var(--ion-color-medium);
 }
+@media (pointer: coarse) {
+  .pos-heading__edit {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
 .pos-heading__context {
   display: flex;
   flex-wrap: wrap;
