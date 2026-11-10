@@ -553,7 +553,7 @@ def test_every_routed_command_declares_whether_a_cut_may_repeat_it():
         "base.support.report",
         "cart_checkout.checkout.initiate",
         "cash_register.session.open",
-        "combo.option.upload_image",
+        "combo.combo.upload_image",
         "flow.flow.run",
         "flow.question.answer",
         "flow.run.retry",
@@ -595,6 +595,8 @@ def test_every_routed_command_declares_whether_a_cut_may_repeat_it():
         "whatsapp_inbox.template.update",
         "whatsapp_inbox.template_sample.upload",
     }
+    unknown = exclusions - registry.keys()
+    assert not unknown
     wrong = []
     for operation in registry.values():
         if operation.kind != "command" or operation.name not in routed:

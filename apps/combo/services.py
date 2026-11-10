@@ -358,7 +358,6 @@ def set_image(ctx: OperationContext, data: ComboImageIn) -> dict:
 @operation(
     "combo.combo.upload_image",
     kind="command",
-    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=ComboImageUploadIn,
     output=ComboDetailOut,
