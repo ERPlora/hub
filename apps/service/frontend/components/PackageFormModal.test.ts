@@ -6,7 +6,11 @@
 import { Combo, InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import {
+  expectAmountLeftWaitsForMoney,
+  expectSaveWaitsForMoney,
+  expectWindowSaysMoneyUnreadable,
+} from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { business, click, ionValue, JAPANESE, type MountOptions, mountService, POLISH, settle } from '../__tests__/mount-service';
 import { PACKAGE, pkg } from '../__tests__/package';
 import PackageFormModal from './PackageFormModal.vue';
@@ -228,6 +232,19 @@ describe('PackageFormModal: in the business currency (service-business-currency)
     s.answer(200, PACKAGE);
     await click(s.save());
     expect(s.sent().map((call) => call.body)).toEqual([{ id: 'p1', discount_amount: 700 }]);
+  });
+
+  // hub#945 (SERVICE-F12): a closed price or an amount off typed with its currency's sign and left before the business
+  // answers is neither rewritten nor called «not an amount»; once it answers, it is read in its money.
+  it.each([
+    ['fixed_price', '¥9500', JAPANESE, 9500],
+    ['discount_amount', '7,50 zł', POLISH, 750],
+  ] as const)('the %s «%s» left before the business says its currency stays as typed and unmarked, then is read in it (hub#945)', async (name, typed, money, cents) => {
+    const s = await setup(pkg({ discount_type: 'fixed', discount_percent_bp: 0, discount_amount: 500 }), 'en', { business: null });
+    await expectAmountLeftWaitsForMoney({ amount: () => s.field(name), settle }, typed, () => s.result('base.business.get', business(money)));
+    s.answer(200, PACKAGE);
+    await click(s.save());
+    expect(s.sent().map((call) => call.body)).toEqual([{ id: 'p1', [name]: cents }]);
   });
 });
 

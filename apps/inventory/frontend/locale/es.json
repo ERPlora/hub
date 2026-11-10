@@ -32,6 +32,7 @@
       "importCsv": "Importar CSV",
       "exportCsv": "Exportar CSV",
       "noAmount": "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",
+      "negativeAmount": "Este importe no puede ser negativo.",
       "ambiguousAmount": "Este importe se puede leer de dos maneras: «{typed}» tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda.",
       "noQuantity": "Esto no es una cantidad. Escribe una cifra con hasta tres decimales, por ejemplo 2,5.",
       "stepHint": "En {unit}, de {step} en {step}"

@@ -125,8 +125,10 @@ configurar · Falta la categoría fiscal», entera mientras la fila tiene sitio 
 menú lateral abierto y la columna «Foto») y, si no, acabada en «…» con el texto entero al pasar el
 ratón; a su lado, la insignia roja «Agotado» si el artículo está agotado. Buscador «Buscar
 producto…» por nombre o SKU; orden por columna; filtros por nombre, SKU, precio desde/hasta, stock
-desde/hasta y estado («Sí», «No», «Sin configurar», «Agotado»); 50 por página; vista de tabla o de
-tarjetas.
+desde/hasta y estado («Sí», «No», «Sin configurar», «Agotado»): un extremo que no se puede leer lo dice debajo
+de su campo, con las mismas palabras que el precio del producto («Esto no es un importe…», «Este importe no
+puede ser negativo.», las dos lecturas de «1.250» o «Esto no es una cantidad…»), y no filtra; 50 por página;
+vista de tabla o de tarjetas.
 
 Botones de la tabla: **+** (dar de alta), importar CSV y exportar CSV, cada uno solo para quien
 tiene ese permiso. Por fila, a la vista: «Recibir stock» y «Contar stock» (con permiso de stock y
@@ -312,11 +314,12 @@ Inventario avisa a las demás apps de que hay un producto nuevo: Ventas lo ofrec
 TPV y el paso «Tu catálogo» de la puesta en marcha queda hecho (INVENTORY-F28).
 Si falla: «Guardar» está apagado mientras falten Nombre, SKU o categoría fiscal, y mientras el negocio no
 haya dicho todavía su moneda: el precio y el coste se leen en ella, y sin ella «1500» yenes se guardaría
-como 150 000. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+como 150 000; hasta entonces, salir del precio o del coste lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Guardar» se enciende (hub#938). Sin categorías
 fiscales sale «Todavía no hay categorías fiscales. Créalas en Impuestos: un producto no se puede
 vender sin saber cómo tributa.». Un importe ilegible: «Esto no es un importe. Escribe una cifra,
-por ejemplo 12,50.» o «Este importe se puede leer de dos maneras…». Una cantidad que no encaja en
+por ejemplo 12,50.» o «Este importe se puede leer de dos maneras…»; uno negativo: «Este importe no puede ser
+negativo.». Una cantidad que no encaja en
 la unidad: «La cantidad no respeta el incremento permitido para esta unidad». Un SKU que ya tiene
 otro producto vivo: «Ese SKU ya existe en el catálogo»; un EAN-13 repetido: «Ese EAN-13 ya lo tiene
 otro producto del catálogo». Una categoría fiscal que ya no está en Impuestos se rechaza, también si
@@ -597,7 +600,8 @@ albarán. Si se escribió coste, pasa a ser el coste del producto. Se aplica aun
 lleve control de stock. Si un artículo con control sube por encima de su umbral, avisa del cruce
 (INVENTORY-F18). Inventario avisa de que el stock cambió.
 Si falla: «Registrar recepción» está apagado sin cantidad, y mientras el negocio no haya dicho todavía su
-moneda: el coste se lee en ella, y sin ella «1500» yenes se guardaría como 150 000. Si la moneda no se
+moneda: el coste se lee en ella, y sin ella «1500» yenes se guardaría como 150 000; hasta entonces, salir del
+coste lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se
 puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el motivo) y ofrece
 «Reintentar», que la vuelve a pedir; en cuanto llega, «Registrar recepción» se enciende (hub#946). El
 recuento y la baja no leen importes: no la esperan. «La cantidad no respeta el incremento

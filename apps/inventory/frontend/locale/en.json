@@ -32,6 +32,7 @@
       "importCsv": "Import CSV",
       "exportCsv": "Export CSV",
       "noAmount": "This is not an amount. Type a figure, for example 12.50.",
+      "negativeAmount": "This amount cannot be negative.",
       "ambiguousAmount": "This amount can be read in two ways: «{typed}» could be {grouped} or {decimal}. Write the decimals so there is no doubt.",
       "noQuantity": "This is not a quantity. Type a figure with up to three decimals, for example 2.5.",
       "stepHint": "In {unit}, in steps of {step}"

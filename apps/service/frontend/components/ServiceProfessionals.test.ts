@@ -9,7 +9,7 @@ import { Combo, InlineFeedback } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
-import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { expectAmountLeftWaitsForMoney, expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { AssignmentOut } from '../operations';
 import type { Business } from '../../../../base/frontend/operations';
 import { business, click, errorFrame, flush, ionChecked, ionValue, JAPANESE, mountService, page, POLISH } from '../__tests__/mount-service';
@@ -92,6 +92,42 @@ describe('ServiceProfessionals: an own price typed before the business answers (
     sent: () => s.sent(),
     settle: flush,
     submit: null,
+  });
+
+  // hub#945: an own price typed with its currency's sign and left before the business answers is neither rewritten nor
+  // called «not an amount»; once it answers, it is read in its money. Assigning someone and a row's own price alike.
+  it.each([
+    {
+      window: 'assigning someone',
+      rows: [],
+      field: 'service-professionals-price',
+      typed: '¥1500',
+      money: JAPANESE,
+      save: 'service-professionals-assign',
+      status: 201,
+      answer: ROWS[0],
+      body: { service_id: 's1', member_id: 'm9', custom_price: 1500 },
+    },
+    {
+      window: 'someone’s own price',
+      rows: [row('a2', { custom_price: 2500, price: 2500 })],
+      field: 'service-professionals-price-a2',
+      typed: '12,50 zł',
+      money: POLISH,
+      save: 'service-professionals-save-a2',
+      status: 200,
+      answer: row('a2', { custom_price: 1250, price: 1250 }),
+      body: { id: 'a2', custom_price: 1250 },
+    },
+  ] as const)('$window: «$typed» left before the business says its currency stays as typed and unmarked, then is read in it (hub#945)', async (left) => {
+    const s = await setup({ business: null });
+    await s.show(page([...left.rows]));
+    if (left.rows.length === 0) s.member().vm.$emit('update:modelValue', { id: 'm9', label: 'Carla' });
+    await flush();
+    await expectAmountLeftWaitsForMoney({ amount: () => s.el(left.field), settle: flush }, left.typed, () => s.result('base.business.get', business(left.money)));
+    s.answer(left.status, left.answer);
+    await click(s.el(left.save));
+    expect(s.sent().map((call) => call.body)).toEqual([left.body]);
   });
 
   it.each(['1500', '¥1500'])('assigning someone at «%s»: «Assign» waits in grey, then 1500 yen', async (typed) => {
