@@ -250,7 +250,7 @@ def authoriser(ctx: OperationContext) -> str:
             ),
             "es": (
                 "¿a qué día estamos para el negocio?",
-                "¿en qué fecha va la caja ahora mismo?",
+                "¿qué día de negocio es hoy?",
             ),
         },
     ),

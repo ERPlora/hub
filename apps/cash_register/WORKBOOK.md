@@ -791,7 +791,12 @@ cajero del producto actual es un empleado.
 - **Administrador de Django con CRUD completo** (ronda 12, PLAN §17), solo en `hubs.erplora.com`; ids
   y fechas de solo lectura. Lo que guarda no pasa por las operaciones ni deja aviso.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en abrir,
-  cerrar, cerrar sola, apuntar y contar) y cada campo de `schemas.py` su `description`. La tarjeta de
+  cerrar, cerrar sola, apuntar y contar; y sus `asks`, 2–3 frases en `en` y `es` como las diría quien
+  la usa: Caja está en `LIVE_ASSISTANT_ASKS_REQUIRED`, `live.E020`, hub#1087) y cada campo de
+  `schemas.py` su `description`. `tests/test_assistant_asks.py` comprueba con las frases reales de la QA
+  del asistente (hub#1087) que cada una llega a su herramienta y, si nombra «el turno abierto», también
+  a `session.current`, que da su número; para el Hub, «arqueo», «recuento» y «conteo» son el arqueo
+  (`count`) y «moneda» o «divisa», la del negocio (`currency`) (`base.assistant.SYNONYMS`). La tarjeta de
   confirmación nombra cada dato por el `title` de su esquema (`gettext_noop`, con su `es` en el catálogo:
   «Cajón» para `register_name`, «Efectivo contado», «Notas de cierre») o, si no lo tiene, por el
   `verbose_name` de su campo en el modelo; un dato sin ninguno sale con el nombre técnico y lo para
