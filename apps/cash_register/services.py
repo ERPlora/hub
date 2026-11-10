@@ -129,6 +129,7 @@ def _locked_settings(ctx: OperationContext) -> tuple[Settings, bool]:
 @operation(
     "cash_register.settings.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cash_register.manage_settings",
     input=SettingsPatchIn,
     output=SettingsOut,
@@ -184,6 +185,7 @@ def _refuse_taken_name() -> Conflict:
 @operation(
     "cash_register.register.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cash_register.manage_settings",
     input=RegisterIn,
     output=RegisterOut,
@@ -209,6 +211,7 @@ def create_register(ctx: OperationContext, data: RegisterIn) -> dict:
 @operation(
     "cash_register.register.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cash_register.manage_settings",
     input=RegisterUpdateIn,
     output=RegisterOut,
@@ -410,6 +413,7 @@ def _open_for_writing(session_id, number) -> Session:
 @operation(
     "cash_register.session.close",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cash_register.close_session",
     input=SessionCloseIn,
     output=SessionRow,
@@ -449,6 +453,7 @@ def close_session(ctx: OperationContext, data: SessionCloseIn) -> dict:
 @operation(
     "cash_register.session.auto_close",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cash_register.close_session",
     input=EmptyIn,
     output=AutoCloseOut,
@@ -471,6 +476,7 @@ def auto_close(ctx: OperationContext, data: EmptyIn) -> dict:
 @operation(
     "cash_register.movement.add",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cash_register.add_movement",
     input=MovementAddIn,
     output=MovementRow,
@@ -520,6 +526,7 @@ def add_movement(ctx: OperationContext, data: MovementAddIn) -> dict:
 @operation(
     "cash_register.count.add",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cash_register.add_count",
     input=CountAddIn,
     output=CountOut,
@@ -600,6 +607,7 @@ def _report(ctx: OperationContext, session: Session, report: str) -> dict:
 @operation(
     "cash_register.session.print",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="cash_register.view_session",
     input=SessionGetIn,
     output=SessionPrintOut,

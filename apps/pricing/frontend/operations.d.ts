@@ -1,6 +1,7 @@
 // Types of the pricing app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from
 // apps/pricing/schemas.py. Written by hand, as the other apps', until V3 generates them from
-// `/api/openapi.json`. Keep it in step with schemas.py and `frontend/generated/operations.json`.
+// `/api/openapi.json`. Keep it in step with schemas.py (tests/test_queries.py compares the prices and RuleOut) and
+// `frontend/generated/operations.json`.
 // One input per operation (ninja's parity): no path parameters, an id travels in the input.
 // On the wire: money in whole cents; quantities and percents are decimals as JSON strings («10.000»,
 // «12.50»); dates ISO `YYYY-MM-DD`, moments ISO 8601.
@@ -141,12 +142,13 @@ export interface PriceItemOut {
   base_price: number | null;
   min_quantity: string;
   price: number;
+  /** The currency of its list, the one `price` is in (ISO 4217). */
+  currency: string;
   updated_at: string;
 }
 
-/** One price with the currency of its list, the one its price is in (ISO 4217). */
+/** One price with the label that names it outside its list. */
 export interface PriceItemDetailOut extends PriceItemOut {
-  currency: string;
   /** How it is named outside its list, in the reader's language: «Shampoo · VIP prices · from 10». */
   label: string;
 }
@@ -215,6 +217,8 @@ export interface RuleOut {
   rule_type: RuleType;
   percent: string | null;
   amount: number | null;
+  /** The currency `amount` is in (ISO 4217): the business's; a rule belongs to no list. */
+  currency: string;
   buy_quantity: number | null;
   get_quantity: number | null;
   tiers: Tier[];

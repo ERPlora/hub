@@ -1,0 +1,22 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"owner.es.task.comment.list","app":"task","tool":"task.comment.list","role":"owner","language":"es","phrase":"lee los comentarios de la tarea Revisar almacén QA, del más reciente al más antiguo","expect":"read","lookups":["task.task.list"]},
+    {"id":"owner.es.task.project.detail","app":"task","tool":"task.project.detail","role":"owner","language":"es","phrase":"abre el proyecto Operaciones QA y dime su código, color y si sigue activo","expect":"read","lookups":["task.project.list"]},
+    {"id":"owner.es.task.project.list","app":"task","tool":"task.project.list","role":"owner","language":"es","phrase":"¿qué proyectos de tareas tengo y cuántas tareas abiertas lleva cada uno?","expect":"read"},
+    {"id":"owner.es.task.task.detail","app":"task","tool":"task.task.detail","role":"owner","language":"es","phrase":"enséñame todos los detalles de la tarea Revisar almacén QA, incluido su número","expect":"read","lookups":["task.task.list"]},
+    {"id":"owner.es.task.task.list","app":"task","tool":"task.task.list","role":"owner","language":"es","phrase":"lista las tareas pendientes del equipo con prioridad, fecha límite, persona y proyecto","expect":"read"},
+    {"id":"owner.es.task.task.mine","app":"task","tool":"task.task.mine","role":"owner","language":"es","phrase":"¿qué tareas tengo asignadas a mí sin terminar y cuál vence antes?","expect":"read"},
+    {"id":"owner.es.task.task.subtasks","app":"task","tool":"task.task.subtasks","role":"owner","language":"es","phrase":"¿qué subtareas cuelgan de Revisar almacén QA y en qué orden se añadieron?","expect":"read","lookups":["task.task.list"]},
+    {"id":"owner.es.task.project.create","app":"task","tool":"task.project.create","role":"owner","language":"es","phrase":"crea el proyecto Operaciones QA con código QA-PROY y color azul","expect":"card","decide":"confirm"},
+    {"id":"owner.es.task.task.create","app":"task","tool":"task.task.create","role":"owner","language":"es","phrase":"crea la tarea Revisar almacén QA dentro de Operaciones QA, prioridad alta y fecha límite 15 de noviembre","expect":"card","decide":"confirm"},
+    {"id":"owner.es.task.comment.add","app":"task","tool":"task.comment.add","role":"owner","language":"es","phrase":"comenta en Revisar almacén QA: «Pendiente de llamar al proveedor QA»","expect":"card","decide":"confirm"},
+    {"id":"owner.es.task.project.delete","app":"task","tool":"task.project.delete","role":"owner","language":"es","phrase":"borra el proyecto Operaciones QA pero conserva sus tareas sin proyecto","expect":"card","decide":"cancel"},
+    {"id":"owner.es.task.project.update","app":"task","tool":"task.project.update","role":"owner","language":"es","phrase":"renombra Operaciones QA como «Operaciones diarias QA» y cámbialo a verde","expect":"card","decide":"cancel"},
+    {"id":"owner.es.task.task.assign","app":"task","tool":"task.task.assign","role":"owner","language":"es","phrase":"asígname a mí la tarea Revisar almacén QA","expect":"card","decide":"cancel"},
+    {"id":"owner.es.task.task.complete","app":"task","tool":"task.task.complete","role":"owner","language":"es","phrase":"marca Revisar almacén QA como terminada","expect":"card","decide":"cancel"},
+    {"id":"owner.es.task.task.delete","app":"task","tool":"task.task.delete","role":"owner","language":"es","phrase":"elimina Revisar almacén QA con sus subtareas y comentarios","expect":"card","decide":"cancel"},
+    {"id":"owner.es.task.task.set_status","app":"task","tool":"task.task.set_status","role":"owner","language":"es","phrase":"pon Revisar almacén QA en curso porque ya he empezado","expect":"card","decide":"cancel"},
+    {"id":"owner.es.task.task.update","app":"task","tool":"task.task.update","role":"owner","language":"es","phrase":"cambia Revisar almacén QA a prioridad urgente y añade la etiqueta inventario","expect":"card","decide":"cancel"}
+  ]
+}
