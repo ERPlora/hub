@@ -318,7 +318,17 @@ def filter_tasks(tasks: QuerySet[Task], params: TaskListIn) -> QuerySet[Task]:
     expose_api=True,
     ai={
         "description": "Lists the team's tasks (an employee, only their own) with their status, priority, "
-        "due date, assignee and project; filters by status, priority, project, assignee, overdue and dates."
+        "due date, assignee and project; filters by status, priority, project, assignee, overdue and dates.",
+        "asks": {
+            "en": (
+                "which tasks are still open?",
+                "show me the overdue tasks",
+            ),
+            "es": (
+                "¿qué tareas siguen abiertas?",
+                "enséñame las tareas vencidas",
+            ),
+        },
     },
 )
 def list_tasks(ctx: OperationContext, params: TaskListIn) -> dict:
@@ -337,7 +347,17 @@ def list_tasks(ctx: OperationContext, params: TaskListIn) -> dict:
     expose_api=True,
     ai={
         "description": "Lists the caller's own open tasks (assigned to their staff record): dated ones "
-        "first, the soonest due on top, then the undated ones; optionally only those due within N days."
+        "first, the soonest due on top, then the undated ones; optionally only those due within N days.",
+        "asks": {
+            "en": (
+                "which of the open tasks are mine?",
+                "what is left on my own to-do list?",
+            ),
+            "es": (
+                "¿qué tareas me tocan a mí?",
+                "¿qué tareas tengo yo sin acabar?",
+            ),
+        },
     },
 )
 def my_tasks(ctx: OperationContext, params: TaskMineIn) -> dict:
@@ -362,7 +382,19 @@ def my_tasks(ctx: OperationContext, params: TaskMineIn) -> dict:
     input=TaskRefIn,
     output=TaskOut,
     expose_api=True,
-    ai={"description": "Returns one task, by id, by its number (TSK-…) or by its title."},
+    ai={
+        "description": "Returns one task, by id, by its number (TSK-…) or by its title.",
+        "asks": {
+            "en": (
+                "show me the task TSK-0042",
+                "what does the task change the gas bottle say?",
+            ),
+            "es": (
+                "enséñame la tarea de cambiar la bombona",
+                "¿qué dice la tarea TSK-0042?",
+            ),
+        },
+    },
 )
 def task_detail(ctx: OperationContext, data: TaskRefIn) -> dict:
     caller = Caller(ctx)
@@ -377,7 +409,19 @@ def task_detail(ctx: OperationContext, data: TaskRefIn) -> dict:
     input=SubtaskListIn,
     output=TaskPage,
     expose_api=True,
-    ai={"description": "Lists the subtasks of a task (by id, number or title), in the order they were added."},
+    ai={
+        "description": "Lists the subtasks of a task (by id, number or title), in the order they were added.",
+        "asks": {
+            "en": (
+                "what subtasks does the Saturday opening task have?",
+                "list the subtasks of task TSK-0042",
+            ),
+            "es": (
+                "¿qué subtareas tiene la tarea de la apertura del sábado?",
+                "dime las subtareas de la TSK-0042",
+            ),
+        },
+    },
 )
 def list_subtasks(ctx: OperationContext, params: SubtaskListIn) -> dict:
     caller = Caller(ctx)
@@ -407,7 +451,19 @@ def comment_row(comment: Comment) -> dict:
     input=CommentListIn,
     output=CommentPage,
     expose_api=True,
-    ai={"description": "Lists the comments of a task (by id, number or title), the newest first."},
+    ai={
+        "description": "Lists the comments of a task (by id, number or title), the newest first.",
+        "asks": {
+            "en": (
+                "what comments are there on the task paint the front?",
+                "read me the comment thread of task TSK-0042",
+            ),
+            "es": (
+                "¿qué comentarios tiene la tarea de pintar la fachada?",
+                "léeme el hilo de comentarios de la TSK-0042",
+            ),
+        },
+    },
 )
 def list_comments(ctx: OperationContext, params: CommentListIn) -> dict:
     task = resolve_task(Caller(ctx), params.task_id, params.task)
@@ -487,7 +543,17 @@ def resolve_project(
     expose_api=True,
     ai={
         "description": "Lists the task projects with their code, colour, whether they are active and how "
-        "many tasks (and open tasks) each one has."
+        "many tasks (and open tasks) each one has.",
+        "asks": {
+            "en": (
+                "which task projects do we have?",
+                "list the active projects",
+            ),
+            "es": (
+                "¿qué proyectos tenemos?",
+                "lista los proyectos activos",
+            ),
+        },
     },
 )
 def list_projects(ctx: OperationContext, params: ProjectListIn) -> dict:
@@ -515,7 +581,19 @@ def list_projects(ctx: OperationContext, params: ProjectListIn) -> dict:
     input=ProjectRefIn,
     output=ProjectOut,
     expose_api=True,
-    ai={"description": "Returns one task project, by id, by its code or by its name."},
+    ai={
+        "description": "Returns one task project, by id, by its code or by its name.",
+        "asks": {
+            "en": (
+                "show me the Opening project",
+                "what colour is the Refit project and who runs it?",
+            ),
+            "es": (
+                "enséñame el proyecto Apertura del local",
+                "¿de qué color es el proyecto Reformas y quién lo lleva?",
+            ),
+        },
+    },
 )
 def project_detail(ctx: OperationContext, data: ProjectRefIn) -> dict:
     rows = annotated_projects(Project.objects.all(), Caller(ctx))
