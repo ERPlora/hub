@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a4eef16a2b4167cec78ba29a3d9e886a6c97807ad98930ec85b9a9e49820e1dc -->
+<!-- generated from WORKBOOK.md sha256:8e43ba46599843dd8e26231c691f10e3639c58194bde1b0ae29c14adb2d08693 -->
 
 ## What it is for and who it is for
 
@@ -459,7 +459,9 @@ Steps:
   3. Below, in this order: "Start with a business like yours" (only while the business is empty and for
      who administers it, BASE-F38), "My apps", "Finish setting up your business" and the board of
      panels.
-  4. At the bottom, two tabs: "Summary" (the above) and "Activity".
+  4. When the interface language changes, the names in "My apps" and the checklist's texts change in place,
+     without reloading or reopening the application.
+  5. At the bottom, two tabs: "Summary" (the above) and "Activity".
 In: the business's name and the device's date.
 Out: nothing saved.
 If it fails: a zone that does not load does not bring the others down; each one says its own. On a phone
@@ -1777,7 +1779,9 @@ Steps:
   4. In "Preferences", "Language" ("Use the business’s language", "Español", "English") and "Appearance" ("Theme
      palette", "Theme": "System (auto)", "Light", "Dark", and "Interface size": 80, 90, 100, 110 or 120%, default
      100%) are saved on choosing and applied at once on any device; "Use the business’s appearance" undoes their own
-     and returns the size to 100%.
+     and returns the size to 100%. The language reaches the whole open application, also the texts the server sends
+     (the side menu, "My apps", the checklist, the Home's panels and the bell), without reloading or going back to
+     Home.
 In: the profile of whoever has the session.
 Out: their name in this business (the one in the side menu, on the faces and in "Devices"), their photo, their language and their
 appearance, including the interface size, which follow them on any device they enter, with their PIN, badge or account. With "Use the

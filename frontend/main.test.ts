@@ -4,6 +4,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { nextTick } from 'vue';
 import { createMemoryHistory, createRouter, type NavigationFailure, type RouteRecordRaw } from 'vue-router';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -376,6 +377,42 @@ describe('main.ts', () => {
     expect(sdk.client.api.call).toHaveBeenCalledWith('base.session.me', {});
     await vi.waitFor(() => expect(session.value?.user?.label).toBe('Ana María'));
     expect(status.value).toBe('live');
+  });
+
+  // BASE-F64, BASE-F02 (hub#1038): the server writes the texts of every live read (the checklist, the panels, the bell)
+  // in the stream's language, so a new language reopens the tab's one stream, whichever screens are mounted.
+  it('reopens the live stream once when the session comes back in another language, and not for any other change', async () => {
+    // Its own client: every boot of this file listens to `sessionChanged` on the same window.
+    const own = { api: { call: vi.fn() }, stream: { reconnect: vi.fn() } };
+    vi.mocked(createLiveClient).mockReturnValueOnce(own as never);
+    vi.mocked(sdk.client.api.call).mockResolvedValue(ME);
+    fakeShell();
+    await main.boot({});
+    const { session } = shellOptions();
+    own.api.call.mockResolvedValue({ ...ME, user: { id: 'u1', label: 'Ana María' } });
+    sessionChanged();
+    await vi.waitFor(() => expect(session.value?.user?.label).toBe('Ana María'));
+    await nextTick();
+    expect(own.stream.reconnect).not.toHaveBeenCalled();
+    own.api.call.mockResolvedValue({ ...ME, language: 'en' });
+    sessionChanged();
+    await vi.waitFor(() => expect(session.value?.language).toBe('en'));
+    await nextTick();
+    expect(own.stream.reconnect).toHaveBeenCalledOnce();
+  });
+
+  it('does not reopen the live stream for the first session it reads (no embedded one): the stream opens in it', async () => {
+    renderShellHtml(null);
+    let answer!: (me: object) => void;
+    const own = { api: { call: vi.fn(() => new Promise((resolve) => (answer = resolve))) }, stream: { reconnect: vi.fn() } };
+    vi.mocked(createLiveClient).mockReturnValueOnce(own as never);
+    fakeShell();
+    await main.boot({});
+    const { status } = shellOptions();
+    answer(ME);
+    await vi.waitFor(() => expect(status.value).toBe('live'));
+    await nextTick();
+    expect(own.stream.reconnect).not.toHaveBeenCalled();
   });
 
   it('keeps the session it had when reading it again fails: a name not refreshed never signs anyone out', async () => {
