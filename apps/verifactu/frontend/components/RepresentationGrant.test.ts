@@ -8,6 +8,7 @@
 import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { type BrowserDownload, browserDownloads, insideTheAppSaving, outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
 import { click, EMPLOYEE, ionValue, mountVerifactu, settle } from '../__tests__/mount-verifactu';
 import type { ConfigOut, RepresentationOut } from '../operations';
 import RepresentationGrant from './RepresentationGrant.vue';
@@ -18,42 +19,19 @@ vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   toastError: vi.fn(() => Promise.resolve()),
 }));
 
-type TauriWindow = { __TAURI__?: { core: { invoke: (command: string, args?: unknown) => Promise<unknown> } } };
-
-/** The links the page clicked to hand the browser a file: their name and the bytes behind their object URL. */
-let downloads: { download: string; blob: Blob }[];
+/** The files the page handed the browser through a link. */
+let downloads: BrowserDownload[];
 
 beforeEach(() => {
   vi.mocked(toastSuccess).mockClear();
   vi.mocked(toastError).mockClear();
-  downloads = [];
-  const blobs = new Map<string, Blob>();
-  vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {
-    const url = `blob:model/${blobs.size}`;
-    blobs.set(url, blob as Blob);
-    return url;
-  });
-  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
-    downloads.push({ download: this.download, blob: blobs.get(this.getAttribute('href') ?? '') as Blob });
-  });
+  downloads = browserDownloads();
 });
 
 afterEach(() => {
-  delete (window as TauriWindow).__TAURI__;
+  outOfTheApp();
   vi.restoreAllMocks();
 });
-
-/** Inside the installed app: its bridge answers `save_download` with `answer` (a rejection when it is a string). */
-function insideTheApp(answer: { path: string } | string) {
-  const invoke = vi.fn(async (command: string) => {
-    if (command !== 'save_download') return undefined;
-    if (typeof answer === 'string') throw answer;
-    return answer;
-  });
-  (window as TauriWindow).__TAURI__ = { core: { invoke } };
-  return invoke;
-}
 
 const NONE: RepresentationOut = {
   status: 'none',
@@ -292,14 +270,14 @@ describe('the blank model', () => {
     await click(s.find('verifactu-grant-download').element);
     await settle();
     expect(s.sent()).toEqual([{ method: 'GET', path: '/api/verifactu/representation/model', query: {}, body: undefined }]);
-    expect(downloads.map((file) => file.download)).toEqual(['anexo-i.pdf']);
+    expect(downloads.map((file) => file.name)).toEqual(['anexo-i.pdf']);
     expect(downloads[0].blob.type).toBe('application/pdf');
     expect(new Uint8Array(await downloads[0].blob.arrayBuffer())).toEqual(new TextEncoder().encode('%PDF-1.4'));
     expect(s.find('verifactu-grant-downloaded').text()).toBe('Model downloaded. Sign it and upload it below.');
   });
 
   it('inside the installed app it is saved in Downloads by the app, which says where (hub#1041)', async () => {
-    const invoke = insideTheApp({ path: 'Download/anexo-i.pdf' });
+    const invoke = insideTheAppSaving({ path: 'Download/anexo-i.pdf' });
     const s = await setup();
     s.answer(200, MODEL);
     await click(s.find('verifactu-grant-download').element);
@@ -312,7 +290,7 @@ describe('the blank model', () => {
 
   it('inside the installed app a refusal is said, never «downloaded»', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    insideTheApp('downloads_unreachable');
+    insideTheAppSaving('downloads_unreachable');
     const s = await setup({}, { locale: 'es' });
     s.answer(200, MODEL);
     await click(s.find('verifactu-grant-download').element);

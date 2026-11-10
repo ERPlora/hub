@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
+import { browserDownloads, insideTheAppSaving, outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
 import { mountWebsite, settle } from '../__tests__/mount-website';
 import ShareDialog from './ShareDialog.vue';
 
@@ -12,8 +13,6 @@ vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   toastSuccess: toasts.success,
   toastError: toasts.error,
 }));
-
-type TauriWindow = { __TAURI__?: { core: { invoke: (command: string, args?: unknown) => Promise<unknown> } } };
 
 /** The hub's answer to the QR's address, as `website.qr.get` serves it: the image, as an attachment with its name. */
 function servesTheQr(): ReturnType<typeof vi.fn> {
@@ -45,7 +44,7 @@ async function dialog(props: Record<string, unknown> = {}, locale: 'en' | 'es' =
 }
 
 afterEach(() => {
-  delete (window as TauriWindow).__TAURI__;
+  outOfTheApp();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   toasts.success.mockReset();
@@ -67,39 +66,29 @@ describe('ShareDialog', () => {
 
   it('each download brings the QR with the session and hands it to the browser under its name', async () => {
     const fetch = servesTheQr();
-    const saved: { name: string; type: string }[] = [];
-    const blobs: Blob[] = [];
-    vi.spyOn(globalThis.URL, 'createObjectURL').mockImplementation((blob) => {
-      blobs.push(blob as Blob);
-      return `blob:qr/${blobs.length}`;
-    });
-    vi.spyOn(globalThis.URL, 'revokeObjectURL').mockImplementation(() => undefined);
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
-      saved.push({ name: this.download, type: blobs[blobs.length - 1].type });
-    });
+    const saved = browserDownloads();
     const { wrapper } = await dialog();
     await wrapper.get('[data-testid="website-share-png"]').trigger('click');
     await settle();
     await wrapper.get('[data-testid="website-share-svg"]').trigger('click');
     await settle();
     expect(fetch.mock.calls.map(([url]) => url)).toEqual(['/api/website/qr?format=png', '/api/website/qr?format=svg']);
-    expect(saved).toEqual([
-      { name: 'website-qr-pepe.png', type: 'image/png' },
-      { name: 'website-qr-pepe.svg', type: 'image/svg+xml' },
+    expect(saved.map((file) => [file.name, file.blob.type])).toEqual([
+      ['website-qr-pepe.png', 'image/png'],
+      ['website-qr-pepe.svg', 'image/svg+xml'],
     ]);
     expect(toasts.error).not.toHaveBeenCalled();
   });
 
   it('inside the installed app the QR goes to the app’s Downloads, which says where (hub#1041)', async () => {
     servesTheQr();
-    const invoke = vi.fn(async () => ({ path: 'Download/website-qr-pepe.png' }));
-    (window as TauriWindow).__TAURI__ = { core: { invoke } };
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const invoke = insideTheAppSaving({ path: 'Download/website-qr-pepe.png' });
+    const saved = browserDownloads();
     const { wrapper } = await dialog();
     await wrapper.get('[data-testid="website-share-png"]').trigger('click');
     await settle();
     expect(invoke).toHaveBeenCalledWith('save_download', { name: 'website-qr-pepe.png', dataBase64: btoa('\x89\x50') });
-    expect(click).not.toHaveBeenCalled();
+    expect(saved).toEqual([]);
     expect(toasts.success).toHaveBeenCalledWith('Saved to Download/website-qr-pepe.png');
   });
 

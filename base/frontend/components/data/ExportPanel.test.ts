@@ -5,6 +5,7 @@
 import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { insideTheAppSaving, outOfTheApp } from '../../__tests__/app-download';
 import { EMPLOYEE, flush, mountBase } from '../../__tests__/mount-base';
 import type { AppDatasets } from '../../operations';
 import ExportPanel from './ExportPanel.vue';
@@ -31,19 +32,6 @@ vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   toastError: vi.fn(() => Promise.resolve()),
 }));
 
-type TauriWindow = { __TAURI__?: { core: { invoke: (command: string, args?: unknown) => Promise<unknown> } } };
-
-/** Inside the installed app: `save_download` answers `answer` (a rejection when it is a string). */
-function insideTheApp(answer: { path: string } | string) {
-  const invoke = vi.fn(async (command: string) => {
-    if (command !== 'save_download') return undefined;
-    if (typeof answer === 'string') throw answer;
-    return answer;
-  });
-  (window as TauriWindow).__TAURI__ = { core: { invoke } };
-  return invoke;
-}
-
 let clicked: string[] = [];
 
 beforeEach(() => {
@@ -56,7 +44,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  delete (window as TauriWindow).__TAURI__;
+  outOfTheApp();
   vi.mocked(toastSuccess).mockClear();
   vi.mocked(toastError).mockClear();
   vi.restoreAllMocks();
@@ -138,7 +126,7 @@ describe('ExportPanel', () => {
   });
 
   it('inside the installed app the file is saved in Downloads by the app, which says where (hub#1041)', async () => {
-    const invoke = insideTheApp({ path: 'Download/bar-pepe_en.blueprint.zip' });
+    const invoke = insideTheAppSaving({ path: 'Download/bar-pepe_en.blueprint.zip' });
     const m = await panel();
     await m.wrapper.get('[data-testid="export-submit"]').trigger('click');
     await settle();
@@ -150,7 +138,7 @@ describe('ExportPanel', () => {
 
   it('inside the installed app a refusal is said and nothing claims the file was downloaded', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    insideTheApp('downloads_unreachable');
+    insideTheAppSaving('downloads_unreachable');
     const m = await panel();
     await m.wrapper.get('[data-testid="export-submit"]').trigger('click');
     await settle();
