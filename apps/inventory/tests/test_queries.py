@@ -165,7 +165,7 @@ def test_declarations(name, permission, input, output, expose_api):
         expose_api,
     )
     # The assistant's tool: one sentence for the model; a read carries no risk.
-    assert set(op.ai) == {"description"} and op.ai["description"]
+    assert set(op.ai) == {"description", "asks"} and op.ai["description"]
 
 
 # inventory.product.list

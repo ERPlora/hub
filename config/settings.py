@@ -558,6 +558,7 @@ LIVE = {
 LIVE_ASSISTANT_ASKS_REQUIRED = (
     "base",
     "customer",
+    "inventory",
     "printing",
     "sale",
     "table",
