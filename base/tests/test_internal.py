@@ -12,8 +12,8 @@ browser's, 410 once it ended, 503 while it is being prepared, 404 none), as the 
 
 The registry (plan 2026-10-17, §1.5; round 2026-10-30, S2a): ``PUT /internal/hubs/{id}`` registers a business (202
 ``requested`` with its own database to make, which the worker makes and then tells the SaaS ``ready``; 200 when it
-updates one that is ready), ``GET`` reads it (its status, never where its database is), ``DELETE`` cancels it and
-``POST …/restore`` brings it back. ``PUT …/state`` (the photo) keeps it on the registry's row, by the path's id, and
+updates one that is ready), ``GET`` reads it (its status and control's active freeze, never where its database is),
+``DELETE`` cancels it and ``POST …/restore`` brings it back. ``PUT …/state`` (the photo) keeps it on the registry's row, by the path's id, and
 applies its VeriFactu block and the business's status through ``verifactu.config.sync`` on the hub's slug.
 """
 
@@ -627,6 +627,39 @@ def test_get_answers_the_status_the_saas_waits_for(client, db):
     answer = signed(client, "get", f"/internal/hubs/{HUB_ID}", b"", with_v2=True)
     assert answer.status_code == 200
     assert (answer.json()["id"], answer.json()["slug"], answer.json()["status"]) == (HUB_ID, "acme", "ready")
+
+
+def test_get_tells_the_real_maintenance_and_recovers_after_it_is_lifted(client, db):
+    from live.context import system_context
+    from live.models import OutboxEvent
+
+    from base.registry import REGISTRY_SCOPE
+    from control.schemas import FreezeIn
+    from control.services import freeze_set
+
+    path = f"/internal/hubs/{HUB_ID}"
+    platform = system_context(REGISTRY_SCOPE)
+    Hub.objects.filter(pk=HUB_ID).update(state_version=7)
+    assert signed(client, "get", path, b"", with_v2=True).json()["maintenance"] is None
+
+    freeze_set(platform, FreezeIn(frozen=True, reason="Aurora upgrade"))
+    first = signed(client, "get", path, b"", with_v2=True)
+    repeated = signed(client, "get", path, b"", with_v2=True)
+
+    assert first.status_code == repeated.status_code == 200
+    assert first.json() == repeated.json()
+    maintenance = first.json()["maintenance"]
+    assert maintenance["frozen"] is True and maintenance["reason"] == "Aurora upgrade"
+    assert parse_datetime(maintenance["since"]) is not None
+    assert Hub.objects.get(pk=HUB_ID).state_version == 7
+    assert OutboxEvent.objects.filter(name="control.freeze.started").count() == 1
+
+    freeze_set(platform, FreezeIn(frozen=False))
+    recovered = signed(client, "get", path, b"", with_v2=True)
+
+    assert recovered.status_code == 200 and recovered.json()["maintenance"] is None
+    assert recovered.json()["state_version"] == 7
+    assert OutboxEvent.objects.filter(name="control.freeze.lifted").count() == 1
 
 
 @pytest.mark.parametrize("status", ["requested", "creating", "migrating", "seeding", "failed"])

@@ -1,0 +1,25 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"owner.es.pricing.catalog.get","app":"pricing","tool":"pricing.catalog.get","role":"owner","language":"es","phrase":"¿cómo se llaman en sus propias apps la categoría Cafetería QA y el grupo Empresas QA usados en Tarifas?","expect":"read"},
+    {"id":"owner.es.pricing.price_item.get","app":"pricing","tool":"pricing.price_item.get","role":"owner","language":"es","phrase":"abre el precio del Café en Mayorista QA con su cantidad mínima y moneda","expect":"read","lookups":["pricing.price_item.list"]},
+    {"id":"owner.es.pricing.price_item.list","app":"pricing","tool":"pricing.price_item.list","role":"owner","language":"es","phrase":"lista todos los precios de Mayorista QA y el precio del Café en cada tarifa","expect":"read"},
+    {"id":"owner.es.pricing.price_list.get","app":"pricing","tool":"pricing.price_list.get","role":"owner","language":"es","phrase":"detalla la tarifa Mayorista QA: grupo, fechas, IVA y si es la general","expect":"read","lookups":["pricing.price_list.list"]},
+    {"id":"owner.es.pricing.price_list.list","app":"pricing","tool":"pricing.price_list.list","role":"owner","language":"es","phrase":"¿qué tarifas tengo activas, para qué grupo son y cuántos precios lleva cada una?","expect":"read"},
+    {"id":"owner.es.pricing.price.resolve","app":"pricing","tool":"pricing.price.resolve","role":"owner","language":"es","phrase":"calcula qué precio aplicarías a dos Cafés para Ana QA y de qué tarifa y descuento sale","expect":"read"},
+    {"id":"owner.es.pricing.rule.get","app":"pricing","tool":"pricing.rule.get","role":"owner","language":"es","phrase":"explica la regla Descuento QA: tipo, valor, alcance, fechas y prioridad","expect":"read","lookups":["pricing.rule.list"]},
+    {"id":"owner.es.pricing.rule.list","app":"pricing","tool":"pricing.rule.list","role":"owner","language":"es","phrase":"¿qué descuentos automáticos tengo activos y a qué artículos o grupos se aplican?","expect":"read"},
+    {"id":"owner.es.pricing.price_list.create","app":"pricing","tool":"pricing.price_list.create","role":"owner","language":"es","phrase":"crea la tarifa Mayorista QA con código QA-MAYOR, en euros con IVA incluido y para Empresas QA","expect":"card","decide":"confirm"},
+    {"id":"owner.es.pricing.price_item.add","app":"pricing","tool":"pricing.price_item.add","role":"owner","language":"es","phrase":"pone en Mayorista QA el Café a 1,50 € desde una unidad","expect":"card","decide":"confirm"},
+    {"id":"owner.es.pricing.rule.create","app":"pricing","tool":"pricing.rule.create","role":"owner","language":"es","phrase":"crea Descuento QA: un 5 % en todos los productos, con código QA-DESC y prioridad 10","expect":"card","decide":"confirm"},
+    {"id":"owner.es.pricing.price_item.remove","app":"pricing","tool":"pricing.price_item.remove","role":"owner","language":"es","phrase":"quita el Café de Mayorista QA desde una unidad y deja que vuelva su precio de catálogo","expect":"card","decide":"cancel"},
+    {"id":"owner.es.pricing.price_item.update","app":"pricing","tool":"pricing.price_item.update","role":"owner","language":"es","phrase":"cambia el Café de Mayorista QA a 1,45 € y aplica ese precio desde dos unidades","expect":"card","decide":"cancel"},
+    {"id":"owner.es.pricing.price_list.deactivate","app":"pricing","tool":"pricing.price_list.deactivate","role":"owner","language":"es","phrase":"desactiva Mayorista QA sin borrar sus precios","expect":"card","decide":"confirm"},
+    {"id":"owner.es.pricing.price_list.activate","app":"pricing","tool":"pricing.price_list.activate","role":"owner","language":"es","phrase":"vuelve a activar Mayorista QA para las próximas ventas","expect":"card","decide":"confirm"},
+    {"id":"owner.es.pricing.price_list.set_default","app":"pricing","tool":"pricing.price_list.set_default","role":"owner","language":"es","phrase":"haz que Mayorista QA sea la tarifa general para todo el mundo","expect":"card","decide":"cancel"},
+    {"id":"owner.es.pricing.price_list.update","app":"pricing","tool":"pricing.price_list.update","role":"owner","language":"es","phrase":"renombra Mayorista QA como «Mayorista anual QA» y hazla válida durante todo 2027","expect":"card","decide":"cancel"},
+    {"id":"owner.es.pricing.rule.deactivate","app":"pricing","tool":"pricing.rule.deactivate","role":"owner","language":"es","phrase":"desactiva Descuento QA sin perder su configuración","expect":"card","decide":"confirm"},
+    {"id":"owner.es.pricing.rule.activate","app":"pricing","tool":"pricing.rule.activate","role":"owner","language":"es","phrase":"vuelve a activar Descuento QA para las nuevas ventas","expect":"card","decide":"confirm"},
+    {"id":"owner.es.pricing.rule.update","app":"pricing","tool":"pricing.rule.update","role":"owner","language":"es","phrase":"sube Descuento QA al 8 % y exige un mínimo de tres unidades","expect":"card","decide":"cancel"}
+  ]
+}
