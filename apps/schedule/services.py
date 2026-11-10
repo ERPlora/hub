@@ -174,6 +174,7 @@ def _override_event(ctx: OperationContext, name: str, row: Override) -> None:
 @operation(
     "schedule.week.set_day",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="schedule.change",
     input=SetDayIn,
     output=WeekOut,
@@ -202,6 +203,7 @@ def set_day(ctx: OperationContext, data: SetDayIn) -> dict:
 @operation(
     "schedule.week.confirm",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="schedule.change",
     input=NoParamsIn,
     output=WeekOut,
@@ -229,6 +231,7 @@ def confirm_week(ctx: OperationContext, data: NoParamsIn) -> dict:
 @operation(
     "schedule.special_day.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="schedule.add",
     input=SpecialDayIn,
     output=SpecialDayOut,
@@ -255,6 +258,7 @@ def create_special_day(ctx: OperationContext, data: SpecialDayIn) -> dict:
 @operation(
     "schedule.special_day.bulk_create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="schedule.add",
     input=BulkSpecialDayIn,
     output=BulkCreatedOut,
@@ -319,6 +323,7 @@ def bulk_create_special_days(ctx: OperationContext, data: BulkSpecialDayIn) -> d
 @operation(
     "schedule.special_day.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="schedule.change",
     input=SpecialDayPatchIn,
     output=SpecialDayOut,
@@ -358,6 +363,7 @@ def update_special_day(ctx: OperationContext, data: SpecialDayPatchIn) -> dict:
 @operation(
     "schedule.special_day.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="schedule.delete",
     input=SpecialDayRefIn,
     output=DeletedOut,
@@ -382,6 +388,7 @@ def delete_special_day(ctx: OperationContext, data: SpecialDayRefIn) -> dict:
 @operation(
     "schedule.override.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="schedule.add",
     input=OverrideIn,
     output=OverrideOut,
@@ -409,6 +416,7 @@ def create_override(ctx: OperationContext, data: OverrideIn) -> dict:
 @operation(
     "schedule.override.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="schedule.change",
     input=OverridePatchIn,
     output=OverrideOut,
@@ -451,6 +459,7 @@ def update_override(ctx: OperationContext, data: OverridePatchIn) -> dict:
 @operation(
     "schedule.override.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="schedule.delete",
     input=OverrideRefIn,
     output=DeletedOut,
@@ -475,6 +484,7 @@ def delete_override(ctx: OperationContext, data: OverrideRefIn) -> dict:
 @operation(
     "schedule.settings.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="schedule.manage_settings",
     input=SettingsIn,
     output=SettingsOut,

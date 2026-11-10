@@ -11,7 +11,7 @@ import { execSync } from 'node:child_process';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { CLAIM_ANSWER, DICTATION, GREETING, type Provider, startProvider, STEPS_SAID } from './assistant-provider';
+import { CLAIM_ANSWER, DICTATION, DONE, GREETING, NOT_DONE, type Provider, startProvider, STEPS_SAID } from './assistant-provider';
 import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, REPO_DIR, shot, shown, turnOffTurnedOn, turnOnMissing, untilStill, upgradeLandsInside } from './helpers';
 import { cleanPricing, CODE as PRICING_CODE, createProduct, post, TAG as PRICING_TAG } from './pricing-helpers';
 import { STACK } from './stack';
@@ -300,7 +300,7 @@ test('hub-e2e-capture — capture() keeps the panel open after a turn at 390, 83
   await home(page);
   await openPanel(page);
   await ask(page, 'Hola');
-  await expect(lastAnswer(page)).toHaveText(GREETING);
+  await expect(lastAnswer(page)).toHaveText(GREETING.en);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(lastAnswer(page)).toBeVisible();
@@ -320,7 +320,7 @@ test('hub-e2e-open-panel — on a phone the panel takes a question with Enter as
   await devtools.send('Animation.setPlaybackRate', { playbackRate: 0.05 });
   await openPanel(page);
   await ask(page, 'Hola');
-  await expect(lastAnswer(page)).toHaveText(GREETING);
+  await expect(lastAnswer(page)).toHaveText(GREETING.en);
 });
 
 test('BASE-G121 — «Ask the assistant» on the setup card opens it on the setup; a shortcut asks at once', async ({ page }) => {
@@ -336,7 +336,7 @@ test('BASE-G121 — «Ask the assistant» on the setup card opens it on the setu
   const sent = (await turn).postDataJSON() as { setup: boolean; messages: { role: string; content: string }[] };
   expect(sent.setup).toBe(true);
   expect(sent.messages.at(-1)).toEqual({ role: 'user', content: 'What is left to set up?' });
-  await expect(lastAnswer(page)).toContainText(GREETING);
+  await expect(lastAnswer(page)).toContainText(GREETING.en);
   // The setup's instructions went to the model with the checklist read again by the Hub (hub#373).
   const instructions = JSON.stringify(provider.seen.filter((s) => s.path === '/v1/chat/completions').at(-1)?.body);
   expect(instructions).toContain('checklist');
@@ -349,23 +349,23 @@ test('BASE-G111 BASE-G113 BASE-G114 — a question and its answer: written as it
   await openPanel(page);
   await ask(page, 'Hola');
   await expect(panel(page).locator('[data-testid="assistant-bubble-user"]').last()).toHaveText('Hola');
-  await expect(lastAnswer(page)).toHaveText(GREETING);
+  await expect(lastAnswer(page)).toHaveText(GREETING.en);
   await shots(page, 'BASE-G111');
 
   // «Stop» half-way: what was written stays, the bubble says it stopped.
   await ask(page, 'E2E-SLOW', { settle: false });
-  await expect(lastAnswer(page)).toContainText('Esta respuesta es larga');
+  await expect(lastAnswer(page)).toContainText('This answer is long');
   await panel(page).locator('[data-testid="assistant-stop"]').click();
   await expect(lastAnswer(page)).toContainText('Stopped.');
   await expect(panel(page).locator('[data-testid="assistant-send"]')).toBeVisible();
 
   await ask(page, 'E2E-FORMAT ¿Cómo van las ventas?');
   const answer = lastAnswer(page);
-  await expect(answer.locator('h3, h4, h5, h6').first()).toHaveText('Ventas de hoy');
-  await expect(answer.locator('strong').first()).toHaveText('120 €');
+  await expect(answer.locator('h3, h4, h5, h6').first()).toHaveText('Today’s sales');
+  await expect(answer.locator('strong').first()).toHaveText('€120');
   await expect(answer.locator('li')).toHaveCount(2);
   await expect(answer.locator('table tbody tr')).toHaveCount(2);
-  await expect(answer.locator('a[href="/settings#business"]')).toHaveText('Ajustes');
+  await expect(answer.locator('a[href="/settings#business"]')).toHaveText('Settings');
   const go = panel(page).locator('[data-testid="assistant-go"]');
   await expect(go).toHaveText(['Go to Settings']);
   await shots(page, 'BASE-G113', async () => {
@@ -393,7 +393,7 @@ test('BASE-G115 — a write waits on its card: «Run it» runs it as the person;
   await shots(page, 'BASE-G115', () => expect(card(page)).toBeVisible());
   await page.setViewportSize({ width: 1440, height: 900 });
   await decide(page, 'submit');
-  await expect(lastAnswer(page)).toContainText('Hecho.');
+  await expect(lastAnswer(page)).toContainText(DONE.en);
   await expect(panel(page).locator('[data-testid="assistant-receipt"]').last()).toContainText('Done: Create in Demo');
   const made = await api<{ rows: { name: string }[] }>(context, A, 'GET', `/demo/items?search=${encodeURIComponent(name)}`);
   expect(made.data.rows.map((row) => row.name)).toEqual([name]);
@@ -402,7 +402,7 @@ test('BASE-G115 — a write waits on its card: «Run it» runs it as the person;
   await ask(page, `E2E-CREATE ${other}`, { settle: false });
   await expect(card(page)).toBeVisible();
   await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await expect(lastAnswer(page)).toContainText(NOT_DONE.en);
   await expect(panel(page).locator('[data-testid="assistant-receipt"]').last()).toContainText('Not done, cancelled: Create in Demo');
   const none = await api<{ rows: unknown[] }>(context, A, 'GET', `/demo/items?search=${encodeURIComponent(other)}`);
   expect(none.data.rows).toEqual([]);
@@ -418,7 +418,7 @@ test('BASE-G119 — several things in a row: the read runs by itself, the write 
   await expect(card(page)).toBeVisible();
   await expect(card(page)).toContainText(`Create in Demo: ${name}`);
   await decide(page, 'submit');
-  await expect(lastAnswer(page)).toContainText('Hecho.');
+  await expect(lastAnswer(page)).toContainText(DONE.en);
   // The read went to the model with its result, without a card; one message spent for the whole turn.
   const chats = provider.seen.filter((s) => s.path === '/v1/chat/completions').slice(-3);
   expect(JSON.stringify(chats[1].body)).toContain('"role":"tool"');
@@ -440,7 +440,7 @@ test('BASE-F101 — several things in a row: what each round says is its own par
   await expect(panel(page).locator('[data-testid="assistant-send"]')).toBeVisible({ timeout: 30_000 });
   // Three rounds (before the read, before the write, after the card), one bubble, one paragraph each.
   await expect(answers(page)).toHaveCount(1);
-  await expect(lastAnswer(page).locator('.assistant-md > p')).toHaveText([...STEPS_SAID, 'No lo he hecho.']);
+  await expect(lastAnswer(page).locator('.assistant-md > p')).toHaveText([...STEPS_SAID.en, NOT_DONE.en]);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(lastAnswer(page)).toBeVisible();
@@ -476,7 +476,7 @@ test('BASE-G116 — a dangerous write lists its data and runs only after typing 
   const sent = page.waitForRequest((request) => request.url().endsWith('/api/assistant/turn') && Boolean(request.postDataJSON()?.decision));
   await decide(page, 'submit');
   expect((await sent).postDataJSON().decision).toMatchObject({ accepted: true, typed: '  Confirm ' });
-  await expect(lastAnswer(page)).toContainText('Hecho.');
+  await expect(lastAnswer(page)).toContainText(DONE.en);
   const gone = await api(context, A, 'GET', `/demo/items/detail?id=${item.data.id}`);
   expect(gone.status).toBe(404);
 });
@@ -1077,7 +1077,7 @@ test('BASE-G117 — an answer that says it changed something nothing changed is 
   await home(page);
   await openPanel(page);
   await ask(page, 'E2E-CLAIM crea la mesa 9');
-  await expect(lastAnswer(page)).toHaveText(CLAIM_ANSWER);
+  await expect(lastAnswer(page)).toHaveText(CLAIM_ANSWER.en);
   await expect(panel(page).locator('[data-testid="assistant-notice-claimed_change"]')).toContainText(
     'The assistant said it made a change, but no action was run. Nothing was changed.',
   );
@@ -1092,7 +1092,7 @@ test('BASE-G120 — the conversation stays in the tab across reloads, «New conv
   await ask(page, 'Hola');
   await page.reload();
   await expect(panel(page).locator('[data-testid="assistant-bubble-user"]')).toHaveText(['Hola']);
-  await expect(lastAnswer(page)).toHaveText(GREETING);
+  await expect(lastAnswer(page)).toHaveText(GREETING.en);
   await shots(page, 'BASE-G120');
   await page.setViewportSize({ width: 1440, height: 900 });
   await panel(page).locator('[data-testid="assistant-new"]').click();
@@ -1124,7 +1124,7 @@ test('BASE-G122 — from 80 % the foot says what is left and each answer moves i
   await page.setViewportSize({ width: 1440, height: 900 });
   // An answer spends one: the foot counts it at once, with no reload.
   await ask(page, 'Hola');
-  await expect(lastAnswer(page)).toHaveText(GREETING);
+  await expect(lastAnswer(page)).toHaveText(GREETING.en);
   await expect(foot).toHaveText(/^You have 4 of 30 messages left this month\. They renew on \S+ 1\.$/);
   spend(30);
   await ask(page, 'Hola');
@@ -1222,7 +1222,7 @@ test('BASE-G124 — without connection the foot says so; a cut or a service down
   await expect(panel(page).locator('[data-testid="assistant-failure"]').last()).toContainText('The assistant could not be reached.');
   await page.unroute('**/api/assistant/turn');
   await panel(page).locator('[data-testid="assistant-retry"]').last().click();
-  await expect(lastAnswer(page)).toHaveText(GREETING);
+  await expect(lastAnswer(page)).toHaveText(GREETING.en);
 });
 
 test('BASE-G118 — what the assistant can do is what the person can: a write the employee may not make is refused', async ({ browser, context }) => {
@@ -1234,7 +1234,7 @@ test('BASE-G118 — what the assistant can do is what the person can: a write th
   await ask(page, `E2E-CREATE ${name}`);
   await expect(card(page)).toBeHidden();
   await expect(panel(page).locator('[data-testid="assistant-receipt"]').last()).toContainText('Not done, not allowed: Create in Demo');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await expect(lastAnswer(page)).toContainText(NOT_DONE.en);
   // The tools offered to the model were only what this person may use.
   const tools = JSON.stringify((provider.seen.filter((s) => s.path === '/v1/chat/completions').at(-2)?.body as { tools?: unknown })?.tools);
   expect(tools).not.toContain('demo__item__create');

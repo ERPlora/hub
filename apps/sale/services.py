@@ -291,6 +291,7 @@ def _locked_settings(ctx: OperationContext) -> Settings:
 @operation(
     "sale.settings.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.manage_settings",
     input=SettingsPatchIn,
     output=SettingsOut,
@@ -337,6 +338,7 @@ def update_settings(ctx: OperationContext, data: SettingsPatchIn) -> dict:
 @operation(
     "sale.payment_method.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_paymentmethod",
     input=PaymentMethodIn,
     output=PaymentMethodOut,
@@ -393,6 +395,7 @@ def _department_out(ctx: OperationContext, department: Department) -> dict:
 @operation(
     "sale.department.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.manage_settings",
     input=DepartmentIn,
     output=DepartmentOut,
@@ -427,6 +430,7 @@ def create_department(ctx: OperationContext, data: DepartmentIn) -> dict:
 @operation(
     "sale.department.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.manage_settings",
     input=DepartmentUpdateIn,
     output=DepartmentOut,
@@ -462,6 +466,7 @@ def update_department(ctx: OperationContext, data: DepartmentUpdateIn) -> dict:
 @operation(
     "sale.department.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.manage_settings",
     input=DepartmentRefIn,
     output=DepartmentOut,
@@ -496,6 +501,7 @@ def delete_department(ctx: OperationContext, data: DepartmentRefIn) -> dict:
 @operation(
     "sale.quick_note.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.manage_settings",
     input=QuickNoteIn,
     output=QuickNoteOut,
@@ -525,6 +531,7 @@ def create_quick_note(ctx: OperationContext, data: QuickNoteIn) -> dict:
 @operation(
     "sale.quick_note.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.manage_settings",
     input=QuickNoteUpdateIn,
     output=QuickNoteOut,
@@ -557,6 +564,7 @@ def update_quick_note(ctx: OperationContext, data: QuickNoteUpdateIn) -> dict:
 @operation(
     "sale.quick_note.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.manage_settings",
     input=QuickNoteRefIn,
     output=QuickNoteOut,
@@ -688,6 +696,7 @@ def _open_check_of(appointment_id) -> Order | None:
 @operation(
     "sale.order.open",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderOpenIn,
     output=OrderOut,
@@ -750,6 +759,7 @@ def open_order(ctx: OperationContext, data: OrderOpenIn) -> dict:
 @operation(
     "sale.order.add_line",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderAddLineIn,
     output=OrderOut,
@@ -783,6 +793,7 @@ def add_line(ctx: OperationContext, data: OrderAddLineIn) -> dict:
 @operation(
     "sale.order.add_open_line",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.sell_open_price",
     input=OrderAddOpenLineIn,
     output=OrderOut,
@@ -815,6 +826,7 @@ def add_open_line(ctx: OperationContext, data: OrderAddOpenLineIn) -> dict:
 @operation(
     "sale.order.add_service_line",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderAddServiceLineIn,
     output=OrderOut,
@@ -849,6 +861,7 @@ def add_service_line(ctx: OperationContext, data: OrderAddServiceLineIn) -> dict
 @operation(
     "sale.order.add_combo_line",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderAddComboLineIn,
     output=OrderOut,
@@ -921,6 +934,7 @@ def _release_vouchers(ctx: OperationContext, lines) -> None:
 @operation(
     "sale.order.apply_voucher",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderApplyVoucherIn,
     output=OrderOut,
@@ -990,6 +1004,7 @@ def apply_voucher(ctx: OperationContext, data: OrderApplyVoucherIn) -> dict:
 @operation(
     "sale.order.remove_voucher",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderLineRefIn,
     output=OrderOut,
@@ -1026,6 +1041,7 @@ def remove_voucher(ctx: OperationContext, data: OrderLineRefIn) -> dict:
 @operation(
     "sale.order.update_line",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderUpdateLineIn,
     output=OrderOut,
@@ -1073,6 +1089,7 @@ def update_line(ctx: OperationContext, data: OrderUpdateLineIn) -> dict:
 @operation(
     "sale.order.set_line_staff",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderSetLineStaffIn,
     output=OrderOut,
@@ -1104,6 +1121,7 @@ def set_line_staff(ctx: OperationContext, data: OrderSetLineStaffIn) -> dict:
 @operation(
     "sale.order.split_line",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderLineRefIn,
     output=SplitLineOut,
@@ -1155,6 +1173,7 @@ def split_line(ctx: OperationContext, data: OrderLineRefIn) -> dict:
 @operation(
     "sale.order.remove_line",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderLineRefIn,
     output=OrderOut,
@@ -1199,6 +1218,7 @@ def remove_line(ctx: OperationContext, data: OrderLineRefIn) -> dict:
 @operation(
     "sale.order.void_line",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.void_sale",
     input=OrderVoidLineIn,
     output=OrderOut,
@@ -1352,6 +1372,7 @@ def fire(ctx: OperationContext, data: OrderFireIn) -> dict:
 @operation(
     "sale.order.split",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderSplitIn,
     output=OrderSplitOut,
@@ -1402,6 +1423,7 @@ def split(ctx: OperationContext, data: OrderSplitIn) -> dict:
 @operation(
     "sale.order.merge",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderMergeIn,
     output=OrderOut,
@@ -1471,6 +1493,7 @@ VOID_PERMISSION = "sale.void_sale"
 @operation(
     "sale.order.void",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     # An empty check (no live line, no charge) is voided by whoever builds checks: a party that leaves
     # without ordering needs no manager (TABLE-F21). One with something on it asks ``VOID_PERMISSION``.
     permission="sale.add_sale",
@@ -1500,6 +1523,7 @@ def void_order(ctx: OperationContext, data: OrderRefIn) -> dict:
 @operation(
     "sale.order.void_ordered",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     # The manager's door to the very same void for a check with something ordered or charged on it (SALE-F18):
     # its own permission is the void's, so a cashier's request is one a manager approves with their PIN (BASE-F84).
     permission=VOID_PERMISSION,
@@ -1605,6 +1629,7 @@ def _set_discount(
 @operation(
     "sale.order.set_discount",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderSetDiscountIn,
     output=OrderOut,
@@ -1631,6 +1656,7 @@ def set_discount(ctx: OperationContext, data: OrderSetDiscountIn) -> dict:
 @operation(
     "sale.order.set_discount_over_limit",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.discount_over_limit",
     input=OrderSetDiscountIn,
     output=OrderOut,
@@ -1685,6 +1711,7 @@ def _set_line_discount(
 @operation(
     "sale.order.set_line_discount",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderSetLineDiscountIn,
     output=OrderOut,
@@ -1711,6 +1738,7 @@ def set_line_discount(ctx: OperationContext, data: OrderSetLineDiscountIn) -> di
 @operation(
     "sale.order.set_line_discount_over_limit",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.discount_over_limit",
     input=OrderSetLineDiscountIn,
     output=OrderOut,
@@ -1739,6 +1767,7 @@ def set_line_discount_over_limit(
 @operation(
     "sale.order.set_label",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderSetLabelIn,
     output=OrderOut,
@@ -1769,6 +1798,7 @@ def set_label(ctx: OperationContext, data: OrderSetLabelIn) -> dict:
 @operation(
     "sale.order.set_appointment",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderSetAppointmentIn,
     output=OrderOut,
@@ -3338,6 +3368,7 @@ def print_sale(ctx: OperationContext, data: SalePrintIn) -> dict:
 @operation(
     "sale.order.print_bill",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.view_sale",
     input=OrderRefIn,
     output=PaperOut,
