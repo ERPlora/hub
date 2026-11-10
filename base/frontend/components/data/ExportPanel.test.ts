@@ -2,6 +2,7 @@
 // start), the language and the file's final name; «Backup of this business» or «Template to share»; the apps on with
 // «App» (registered) and «Data» (its data travels) and, under a marked «Data», one box per table with its rows —
 // personal data only in a backup —; «Select all» / «Deselect all»; «Export» saves the file and says so.
+import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { EMPLOYEE, flush, mountBase } from '../../__tests__/mount-base';
@@ -24,6 +25,25 @@ const APPS: AppDatasets[] = [
 
 const FILE = { filename: 'bar-pepe_en.blueprint.zip', content_type: 'application/zip', content_base64: 'UEsDBA==' };
 
+vi.mock('@erplora/ui/shell', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
+  toastSuccess: vi.fn(() => Promise.resolve()),
+  toastError: vi.fn(() => Promise.resolve()),
+}));
+
+type TauriWindow = { __TAURI__?: { core: { invoke: (command: string, args?: unknown) => Promise<unknown> } } };
+
+/** Inside the installed app: `save_download` answers `answer` (a rejection when it is a string). */
+function insideTheApp(answer: { path: string } | string) {
+  const invoke = vi.fn(async (command: string) => {
+    if (command !== 'save_download') return undefined;
+    if (typeof answer === 'string') throw answer;
+    return answer;
+  });
+  (window as TauriWindow).__TAURI__ = { core: { invoke } };
+  return invoke;
+}
+
 let clicked: string[] = [];
 
 beforeEach(() => {
@@ -36,6 +56,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  delete (window as TauriWindow).__TAURI__;
+  vi.mocked(toastSuccess).mockClear();
+  vi.mocked(toastError).mockClear();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   document.head.innerHTML = '';
@@ -112,6 +135,27 @@ describe('ExportPanel', () => {
     expect(query.getAll('datasets')).toEqual(['inventory.product']);
     expect(clicked).toEqual(['bar-pepe_en.blueprint.zip']);
     expect(m.wrapper.get('[data-testid="export-done"]').text()).toContain('bar-pepe_en.blueprint.zip downloaded.');
+  });
+
+  it('inside the installed app the file is saved in Downloads by the app, which says where (hub#1041)', async () => {
+    const invoke = insideTheApp({ path: 'Download/bar-pepe_en.blueprint.zip' });
+    const m = await panel();
+    await m.wrapper.get('[data-testid="export-submit"]').trigger('click');
+    await settle();
+    expect(invoke).toHaveBeenCalledWith('save_download', { name: 'bar-pepe_en.blueprint.zip', dataBase64: 'UEsDBA==' });
+    expect(clicked).toEqual([]);
+    expect(toastSuccess).toHaveBeenCalledWith('Saved to Download/bar-pepe_en.blueprint.zip');
+    expect(m.wrapper.get('[data-testid="export-done"]').text()).toContain('bar-pepe_en.blueprint.zip downloaded.');
+  });
+
+  it('inside the installed app a refusal is said and nothing claims the file was downloaded', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    insideTheApp('downloads_unreachable');
+    const m = await panel();
+    await m.wrapper.get('[data-testid="export-submit"]').trigger('click');
+    await settle();
+    expect(toastError).toHaveBeenCalledWith('This app cannot save files on a phone or tablet. Open your business in a browser to download it.');
+    expect(m.wrapper.find('[data-testid="export-done"]').exists()).toBe(false);
   });
 
   it('a template never takes personal data: its tables cannot be marked and say why', async () => {

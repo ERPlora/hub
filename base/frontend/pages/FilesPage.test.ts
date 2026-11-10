@@ -12,7 +12,7 @@ import { EMPLOYEE, errorFrame, flush, mountBase, OWNER, subId } from '../__tests
 import type { FileItem, FilesListing } from '../operations';
 import FilesPage from './FilesPage.vue';
 
-const mocks = vi.hoisted(() => ({ confirm: vi.fn(), saveFile: vi.fn(), syncSearchbarInputName: vi.fn() }));
+const mocks = vi.hoisted(() => ({ confirm: vi.fn(), saveFile: vi.fn(async () => true), syncSearchbarInputName: vi.fn() }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/components')>()),
   useConfirm: () => ({ confirm: mocks.confirm }),
@@ -27,10 +27,7 @@ vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/sdk')>()),
   fetchFile: vi.fn(),
 }));
-vi.mock('../lib/data', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../lib/data')>()),
-  saveFile: mocks.saveFile,
-}));
+vi.mock('../lib/download', () => ({ saveFile: mocks.saveFile }));
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub, IonPopover: IonModalStub };
@@ -421,7 +418,9 @@ describe('FilesPage · open and download (BASE-G84)', () => {
     await menu(m, 'marzo.pdf', 'download');
     await flush();
     expect(fetchFile).toHaveBeenCalledWith('/api/files/raw?path=marzo.pdf', 'application/pdf');
-    expect(mocks.saveFile).toHaveBeenCalledWith('marzo.pdf', blob);
+    expect(mocks.saveFile).toHaveBeenCalledWith('marzo.pdf', blob, expect.any(Function));
+    const t = mocks.saveFile.mock.calls[0][2] as (key: string, values: object) => string;
+    expect(t('base.download.savedTo', { path: 'Download/x' })).toBe('Saved to Download/x');
   });
 
   it('a download that fails says so, with why', async () => {

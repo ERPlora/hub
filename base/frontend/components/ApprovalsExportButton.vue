@@ -8,7 +8,7 @@ import { HubIcon, toastError } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { ref } from 'vue';
 
-import { saveFile } from '../lib/data';
+import { saveFile } from '../lib/download';
 import { useBaseI18n } from '../lib/i18n';
 import type { ApprovalExportQuery } from '../operations';
 
@@ -22,7 +22,7 @@ async function exportCsv(): Promise<void> {
   pending.value = true;
   try {
     const file = await client.api.call('base.approval.export', props.query);
-    saveFile(file.filename, new Blob([`﻿${file.csv}`], { type: file.content_type }));
+    await saveFile(file.filename, new Blob([`﻿${file.csv}`], { type: file.content_type }), t);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     void toastError(t('base.approvals.export.failed', { reason }));
