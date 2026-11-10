@@ -1,0 +1,296 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {
+      "id": "owner.es.reservation.availability.day",
+      "app": "reservation",
+      "tool": "reservation.availability.day",
+      "role": "owner",
+      "language": "es",
+      "phrase": "¿cómo está el servicio de mañana por la noche: cubiertos, reservas, bloqueos y huecos libres?",
+      "expect": "read"
+    },
+    {
+      "id": "owner.es.reservation.availability.tables",
+      "app": "reservation",
+      "tool": "reservation.availability.tables",
+      "role": "owner",
+      "language": "es",
+      "phrase": "¿qué mesas están libres mañana a las 21:00 para dos personas y cuáles quedan primero para elegir?",
+      "expect": "read"
+    },
+    {
+      "id": "owner.es.reservation.blocked_date.get",
+      "app": "reservation",
+      "tool": "reservation.blocked_date.get",
+      "role": "owner",
+      "language": "es",
+      "phrase": "abre el bloqueo Cierre QA y dime qué día y horario impide reservar y por qué",
+      "expect": "read",
+      "lookups": [
+        "reservation.blocked_date.list"
+      ]
+    },
+    {
+      "id": "owner.es.reservation.blocked_date.list",
+      "app": "reservation",
+      "tool": "reservation.blocked_date.list",
+      "role": "owner",
+      "language": "es",
+      "phrase": "¿qué días u horas están bloqueados para nuevas reservas y por qué motivo?",
+      "expect": "read"
+    },
+    {
+      "id": "owner.es.reservation.reservation.get",
+      "app": "reservation",
+      "tool": "reservation.reservation.get",
+      "role": "owner",
+      "language": "es",
+      "phrase": "abre la reserva de Ana QA de mañana con mesa, comensales, contacto y estado",
+      "expect": "read",
+      "lookups": [
+        "reservation.reservation.list"
+      ]
+    },
+    {
+      "id": "owner.es.reservation.reservation.list",
+      "app": "reservation",
+      "tool": "reservation.reservation.list",
+      "role": "owner",
+      "language": "es",
+      "phrase": "lista las reservas de esta semana con cliente, mesa, hora, personas y estado",
+      "expect": "read"
+    },
+    {
+      "id": "owner.es.reservation.settings.get",
+      "app": "reservation",
+      "tool": "reservation.settings.get",
+      "role": "owner",
+      "language": "es",
+      "phrase": "explícame las reglas de reservas: antelación, duración, confirmación y liberación de pendientes",
+      "expect": "read"
+    },
+    {
+      "id": "owner.es.reservation.time_slot.get",
+      "app": "reservation",
+      "tool": "reservation.time_slot.get",
+      "role": "owner",
+      "language": "es",
+      "phrase": "detalla la franja de reservas del viernes a las 20:00 y cuántas mesas y comensales admite",
+      "expect": "read",
+      "lookups": [
+        "reservation.time_slot.list"
+      ]
+    },
+    {
+      "id": "owner.es.reservation.time_slot.list",
+      "app": "reservation",
+      "tool": "reservation.time_slot.list",
+      "role": "owner",
+      "language": "es",
+      "phrase": "¿qué franjas semanales aceptan reservas y cuál es su aforo por franja?",
+      "expect": "read"
+    },
+    {
+      "id": "owner.es.reservation.waitlist.get",
+      "app": "reservation",
+      "tool": "reservation.waitlist.get",
+      "role": "owner",
+      "language": "es",
+      "phrase": "abre la entrada de Ana QA en la lista de espera y dime si está contactada o convertida",
+      "expect": "read",
+      "lookups": [
+        "reservation.waitlist.list"
+      ]
+    },
+    {
+      "id": "owner.es.reservation.waitlist.list",
+      "app": "reservation",
+      "tool": "reservation.waitlist.list",
+      "role": "owner",
+      "language": "es",
+      "phrase": "¿quién está en lista de espera, para qué día y cuántas personas, y a quién ya contacté?",
+      "expect": "read"
+    },
+    {
+      "id": "owner.es.reservation.blocked_date.create",
+      "app": "reservation",
+      "tool": "reservation.blocked_date.create",
+      "role": "owner",
+      "language": "es",
+      "phrase": "bloquea nuevas reservas el 26 de diciembre todo el día y llámalo Cierre QA 2",
+      "expect": "card",
+      "decide": "confirm"
+    },
+    {
+      "id": "owner.es.reservation.time_slot.create",
+      "app": "reservation",
+      "tool": "reservation.time_slot.create",
+      "role": "owner",
+      "language": "es",
+      "phrase": "crea una franja de reservas los viernes de 20:00 a 22:00 para cuatro reservas y hasta 16 comensales",
+      "expect": "card",
+      "decide": "confirm"
+    },
+    {
+      "id": "owner.es.reservation.waitlist.create",
+      "app": "reservation",
+      "tool": "reservation.waitlist.create",
+      "role": "owner",
+      "language": "es",
+      "phrase": "apunta a Ana QA en la lista de espera para mañana sobre las 22:00, dos personas",
+      "expect": "card",
+      "decide": "confirm"
+    },
+    {
+      "id": "owner.es.reservation.reservation.create",
+      "app": "reservation",
+      "tool": "reservation.reservation.create",
+      "role": "owner",
+      "language": "es",
+      "phrase": "reserva para Ana QA la mesa 2 el próximo viernes a las 21:00 para dos personas, con la nota «ventana QA»",
+      "expect": "card",
+      "decide": "confirm"
+    },
+    {
+      "id": "owner.es.reservation.blocked_date.delete",
+      "app": "reservation",
+      "tool": "reservation.blocked_date.delete",
+      "role": "owner",
+      "language": "es",
+      "phrase": "quita el bloqueo Cierre QA para volver a aceptar reservas ese día",
+      "expect": "card",
+      "decide": "cancel"
+    },
+    {
+      "id": "owner.es.reservation.reservation.cancel",
+      "app": "reservation",
+      "tool": "reservation.reservation.cancel",
+      "role": "owner",
+      "language": "es",
+      "phrase": "cancela la reserva de Ana QA de mañana porque no puede venir y libera la mesa",
+      "expect": "card",
+      "decide": "cancel"
+    },
+    {
+      "id": "owner.es.reservation.reservation.complete",
+      "app": "reservation",
+      "tool": "reservation.reservation.complete",
+      "role": "owner",
+      "language": "es",
+      "phrase": "completa la reserva de Ana QA de mañana, la mesa ya se ha ido",
+      "expect": "card",
+      "decide": "cancel"
+    },
+    {
+      "id": "owner.es.reservation.reservation.confirm",
+      "app": "reservation",
+      "tool": "reservation.reservation.confirm",
+      "role": "owner",
+      "language": "es",
+      "phrase": "confirma la reserva pendiente de Ana QA de mañana para mantenerle la mesa",
+      "expect": "card",
+      "decide": "cancel"
+    },
+    {
+      "id": "owner.es.reservation.reservation.delete",
+      "app": "reservation",
+      "tool": "reservation.reservation.delete",
+      "role": "owner",
+      "language": "es",
+      "phrase": "borra definitivamente la reserva de Ana QA del próximo viernes y libera la mesa 2",
+      "expect": "card",
+      "decide": "cancel"
+    },
+    {
+      "id": "owner.es.reservation.reservation.seat",
+      "app": "reservation",
+      "tool": "reservation.reservation.seat",
+      "role": "owner",
+      "language": "es",
+      "phrase": "sienta a Ana QA en la mesa de su reserva de mañana y abre la cuenta con dos comensales",
+      "expect": "card",
+      "decide": "cancel"
+    },
+    {
+      "id": "owner.es.reservation.reservation.update",
+      "app": "reservation",
+      "tool": "reservation.reservation.update",
+      "role": "owner",
+      "language": "es",
+      "phrase": "cambia la reserva de Ana QA de mañana a tres personas y anota «traen un carrito»",
+      "expect": "card",
+      "decide": "cancel"
+    },
+    {
+      "id": "owner.es.reservation.settings.update",
+      "app": "reservation",
+      "tool": "reservation.settings.update",
+      "role": "owner",
+      "language": "es",
+      "phrase": "admite reservas de una a doce personas, con dos horas de antelación y quince minutos para liberar pendientes",
+      "expect": "card",
+      "decide": "cancel"
+    },
+    {
+      "id": "owner.es.reservation.time_slot.delete",
+      "app": "reservation",
+      "tool": "reservation.time_slot.delete",
+      "role": "owner",
+      "language": "es",
+      "phrase": "elimina la franja de los viernes a las 20:00 sin tocar las reservas ya hechas",
+      "expect": "card",
+      "decide": "cancel"
+    },
+    {
+      "id": "owner.es.reservation.waitlist.convert",
+      "app": "reservation",
+      "tool": "reservation.waitlist.convert",
+      "role": "owner",
+      "language": "es",
+      "phrase": "convierte la entrada de Ana QA de la lista de espera en una reserva para mañana a las 22:00",
+      "expect": "card",
+      "decide": "cancel"
+    },
+    {
+      "id": "owner.es.reservation.waitlist.delete",
+      "app": "reservation",
+      "tool": "reservation.waitlist.delete",
+      "role": "owner",
+      "language": "es",
+      "phrase": "quita a Ana QA de la lista de espera porque ya no la necesita",
+      "expect": "card",
+      "decide": "cancel"
+    },
+    {
+      "id": "owner.es.reservation.waitlist.update",
+      "app": "reservation",
+      "tool": "reservation.waitlist.update",
+      "role": "owner",
+      "language": "es",
+      "phrase": "marca a Ana QA como contactada en la lista de espera y anota «prefiere terraza QA»",
+      "expect": "card",
+      "decide": "cancel"
+    },
+    {
+      "id": "owner.es.reservation.reservation.no_show",
+      "app": "reservation",
+      "tool": "reservation.reservation.no_show",
+      "role": "owner",
+      "language": "es",
+      "phrase": "marca que Ana QA no se presentó a su reserva de mañana y libera la mesa",
+      "expect": "card",
+      "decide": "cancel"
+    },
+    {
+      "id": "owner.es.reservation.reservation.release_unconfirmed",
+      "app": "reservation",
+      "tool": "reservation.reservation.release_unconfirmed",
+      "role": "owner",
+      "language": "es",
+      "phrase": "libera ahora las reservas pendientes que ya superaron el tiempo de cortesía sin confirmar",
+      "expect": "card",
+      "decide": "cancel"
+    }
+  ]
+}
