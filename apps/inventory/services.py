@@ -421,7 +421,7 @@ def delete_product(ctx: OperationContext, data: ProductRefIn) -> dict:
                 "put the coffee back on sale",
             ),
             "es": (
-                "marca el Té QA como agotado",
+                "marca el té con hielo como agotado",
                 "se nos han acabado los cruasanes, que no se vendan",
                 "vuelve a poner a la venta el café",
             ),
@@ -579,15 +579,16 @@ def print_label(ctx: OperationContext, data: ProductRefIn) -> dict:
     output=ProductCategoryLinkOut,
     expose_api=True,
     ai={
-        "description": "Put a product in a category so that the till groups it there.", "risk": "normal",
+        "description": "Put a product in a category so that the till groups it there.",
+        "risk": "normal",
         "asks": {
             "en": (
-                "put the Coffee in the Cafetería QA category",
+                "put the coffee in the Breakfasts category",
                 "classify the croissant as bakery",
                 "move the tea to the drinks family",
             ),
             "es": (
-                "clasifica el Café en la categoría Cafetería QA",
+                "clasifica el café en la categoría Desayunos",
                 "mete el cruasán en la familia Bollería",
                 "clasifica el té en la categoría Bebidas",
             ),
@@ -612,7 +613,8 @@ def add_product_category(ctx: OperationContext, data: ProductCategoryIn) -> dict
     output=ProductCategoryLinkOut,
     expose_api=True,
     ai={
-        "description": "Take a product out of a category.", "risk": "normal",
+        "description": "Take a product out of a category.",
+        "risk": "normal",
         "asks": {
             "en": (
                 "take the coffee out of the drinks category",
@@ -646,7 +648,8 @@ def remove_product_category(ctx: OperationContext, data: ProductCategoryIn) -> d
     output=CategoryOut,
     expose_api=True,
     ai={
-        "description": "Create a product category; its slug is made from the name when not given.", "risk": "normal",
+        "description": "Create a product category; its slug is made from the name when not given.",
+        "risk": "normal",
         "asks": {
             "en": (
                 "create a category called Desserts",

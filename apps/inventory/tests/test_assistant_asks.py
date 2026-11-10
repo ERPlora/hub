@@ -1,41 +1,39 @@
 """What layer 1 of the assistant's QA does not say of Inventory (docs plan 2026-10-31, the assistant's knowledge and
-QA, §3): how many tools it offers and the phrases the owner types for the ones the real-model QA found left out of
-the turn (hub#1080).
+QA, §3): how many tools it offers, and that the owner's requests of the real-model QA (hub#1080), in the owner's own
+words, are offered their existing operation.
 
 Every ask of every tool of inventory bringing its tool among the first ten, role by role, in both languages, is
 ``base/tests/test_assistant_asks.py``'s (inventory is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over
-the asks.
+the asks and the guard that no ask copies a probe of layer 2.
 """
 
 import pytest
+from live import assistant as shared
 from live.context import OperationContext, Scope
 from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
 from base.permissions import permissions_for
+from base.tests.test_assistant_asks import comparable, probe_phrases
 
 A = Scope("host", "a")
-#: How far down the tools a turn offers the tool of an ask may come: the QA's first ten (``base/tests/test_assistant_asks.py``).
-TOP = 10
 
-#: What the owner typed in the real-model QA of hub#1080 (``qa20261108.owner.es.inventory.*``), whose tool a turn did
-#: not offer, with the tool each one asks for, and the same asks in English.
-QA_ASKS = [
-    ("es", "inventory.movement.list", "¿qué entradas, salidas y ajustes de stock ha habido esta semana?"),
-    ("en", "inventory.movement.list", "show me the history of stock coming in and going out"),
-    ("es", "inventory.product_category.list", "¿en qué familia está cada artículo del TPV?"),
-    ("en", "inventory.product_category.list", "which category is each till item in?"),
-    ("es", "inventory.unit.list", "¿qué unidades de medida tengo configuradas en este negocio?"),
-    ("en", "inventory.unit.list", "what units of measure are set up in this business?"),
-    ("es", "inventory.stock.receive", "ha llegado un pedido: recibe 20 cafés con el albarán A-123"),
-    ("en", "inventory.stock.receive", "I just received 20 coffees, delivery note A-123"),
-    ("es", "inventory.product_category.add", "clasifica el Café en la categoría Cafetería QA"),
-    ("en", "inventory.product_category.add", "put the Coffee in the Cafetería QA category"),
-    ("es", "inventory.product.set_sold_out", "marca el Té QA como agotado"),
-    ("en", "inventory.product.set_sold_out", "mark the Tea as sold out for today"),
-    ("es", "inventory.stock.write_off", "da de baja 2 cafés que se han roto"),
-    ("en", "inventory.stock.write_off", "write off 2 coffees, they broke"),
+#: The requests of hub#1080's QA (``qa20261108.owner.es.inventory.*``), as the owner said them: each is offered its
+#: existing operation (among the ``MAX_TOOLS`` a turn offers, so the model can choose it), without being one of its
+#: asks.
+REPORTED = [
+    ("inventory.movement.list", "pásame el historial reciente de entradas, salidas y ajustes de almacén"),
+    ("inventory.product_category.list", "dime en qué familia está clasificado cada artículo que sale en el TPV"),
+    (
+        "inventory.unit.list",
+        "¿qué unidades tengo configuradas ahora mismo en Inventario para vender y medir productos, sin consultar la "
+        "documentación?",
+    ),
+    ("inventory.stock.receive", "registra que entran 20 cafés más a 0,55 € la unidad con el albarán ALB-QA-01"),
+    ("inventory.product_category.add", "clasifica el Café dentro de Cafetería QA para que aparezca ahí en el TPV"),
+    ("inventory.product.set_sold_out", "marca Té QA como agotado para que deje de ofrecerse sin darlo de baja"),
+    ("inventory.stock.write_off", "da de baja 2 unidades de Café por rotura durante la limpieza, motivo «mermas QA»"),
 ]
 
 
@@ -59,10 +57,51 @@ def test_inventory_offers_at_least_30_tools():
     assert len(tools) >= 30
 
 
+def test_the_reported_requests_are_the_probes_of_layer_2():
+    phrases = probe_phrases()
+    assert [phrases.get(comparable(phrase)) for _, phrase in REPORTED] == [
+        f"qa20261108.owner.es.{name}" for name, _ in REPORTED
+    ]
+
+
+def test_the_hub_reads_units_as_units_and_a_delivery_note_as_goods_received():
+    """``base.assistant.SYNONYMS``: «unidades» are the units of measure of ``inventory.unit.*`` and «el albarán» or
+    «la mercancía que entra» what ``inventory.stock.receive`` records, so the owner's words reach those tools without
+    their own asks; without the Hub's groups, none of them does (positive control)."""
+    unit, receive = shared.stem("unit"), shared.stem("receive")
+    for phrase, wanted in (
+        ("¿qué unidades tengo configuradas?", unit),
+        ("registra el albarán del proveedor", receive),
+        ("entran 20 cafés más", receive),
+    ):
+        concepts = shared.asked([phrase], assistant.SYNONYMS).concepts
+        assert any(wanted in concept for concept in concepts), phrase
+        assert not any(wanted in concept for concept in shared.asked([phrase]).concepts), phrase
+
+
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("language", "name", "phrase"), QA_ASKS)
-def test_what_the_owner_asked_in_the_qa_brings_its_tool_among_the_first_ten(catalog_of, language, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, language)
+@pytest.mark.parametrize(("name", "phrase"), REPORTED)
+def test_the_reported_inventory_request_offers_its_existing_operation(catalog_of, name, phrase):
+    tools = catalog_of(Membership.Role.OWNER, "es")
     assert name in tools  # positive control: the owner holds the tool, so its place is known
-    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
+    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name])["es"]}
+    offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
+    assert name in offered, (len(offered), offered[:10])
+
+
+#: How far down the tools a turn offers a request in the Hub's words may bring its tool: the QA's first ten
+#: (``base/tests/test_assistant_asks.py``).
+TOP = 10
+#: Goods received said as a business says it, in words that are none of the tool's asks nor a probe: «la mercancía» is
+#: what ``inventory.stock.receive`` records only through ``base.assistant.SYNONYMS`` (37th of 40 without them).
+GOODS_IN = [("inventory.stock.receive", "apunta la mercancía que nos ha traído hoy el proveedor")]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("name", "phrase"), GOODS_IN)
+def test_goods_received_in_the_hubs_words_bring_the_reception_among_the_first_ten(catalog_of, name, phrase):
+    tools = catalog_of(Membership.Role.OWNER, "es")
+    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name])["es"]}
+    assert comparable(phrase) not in probe_phrases()
+    offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
     assert name in offered[:TOP], (offered.index(name) + 1 if name in offered else None, offered[:TOP])
