@@ -11,7 +11,7 @@ import { promisify } from 'node:util';
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { type Provider, startProvider } from './assistant-provider';
+import { DONE, type Provider, startProvider } from './assistant-provider';
 import { capture, compactBar, HUB_DIR, psql, REPO_DIR, shown } from './helpers';
 import { confirmDialog, idFromUrl, parkedEvent, RELAY, signedIn } from './flow-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
@@ -120,7 +120,7 @@ for (const viewport of VIEWPORTS) {
       // The same run, still open, now finished: what the assistant did, step by step.
       const done = shown(page).locator('[data-testid^=flow-run-]').filter({ hasText: 'Finished well' }).first();
       await expect(done).toContainText('The assistant used «Look for tasks».');
-      await expect(done).toContainText('The assistant answered: «Hecho.»');
+      await expect(done).toContainText(`The assistant answered: «${DONE.en}»`);
       // Two turns of the model through the SaaS: the task, and the answer to its read; nobody was asked.
       const turns = provider.seen.filter((seen) => seen.path === '/v1/chat/completions').slice(before);
       expect(turns).toHaveLength(2);
@@ -165,7 +165,7 @@ for (const viewport of VIEWPORTS) {
       await expect(card).toBeVisible();
       await card.locator('[data-testid="assistant-confirm-submit"]').click();
       await expect(card).toBeHidden();
-      await expect(panel.locator('[data-testid="assistant-bubble-assistant"]').last()).toContainText('Hecho.');
+      await expect(panel.locator('[data-testid="assistant-bubble-assistant"]').last()).toContainText(DONE.en);
       // The chat stays open from page to page; on a phone it covers the page, so it is closed to look at Automations.
       await panel.locator('[data-testid="assistant-close"]').click();
       await expect(panel).not.toHaveAttribute('data-open', 'true');
