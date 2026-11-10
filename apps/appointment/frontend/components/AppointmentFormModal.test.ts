@@ -359,6 +359,13 @@ describe('AppointmentFormModal: Edit appointment', () => {
     ]);
   });
 
+  it('a charged appointment keeps its services and professional: both pickers are locked', async () => {
+    const s = await setup({ appointment: { ...BOOKED, sale_id: 'sale1' } });
+    expect([s.servicePicker().props('disabled'), s.staffPicker().props('disabled')]).toEqual([true, true]);
+    const open = await setup({ appointment: BOOKED });
+    expect([open.servicePicker().props('disabled'), open.staffPicker().props('disabled')]).toEqual([false, false]);
+  });
+
   it('a series occurrence asks the scope; «This and all following» edits the series from its date', async () => {
     const s = await setup({ appointment: { ...BOOKED, recurring_id: 'r1', occurrence_date: '2026-10-19' } });
     await ionValue(s.field('time'), '12:00', 'ionInput');

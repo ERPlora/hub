@@ -10,7 +10,7 @@
 // first asks «This appointment only» / «This and all following» (the latter edits the series from its
 // date). An overlap asks first (409 `appointment.overlap_needs_confirmation`: «Book anyway» sends it again
 // confirmed); any other refusal goes on top, a bad field under it, and what was typed stays.
-import { Combo, type ComboOption, ConfirmDialog, FormModal, InlineFeedback } from '@erplora/ui/components';
+import { type ComboOption, ConfirmDialog, FormModal, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonTextarea } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
@@ -27,6 +27,7 @@ import type { AppointmentOut, RecurringUpdateIn, UpdateIn } from '../operations'
 import AppointmentHistory from './AppointmentHistory.vue';
 import FreeSlots from './FreeSlots.vue';
 import ServicesField from './ServicesField.vue';
+import StaffField from './StaffField.vue';
 
 /** What a tapped slot of the grid brings. */
 export interface BookingPreset {
@@ -94,7 +95,6 @@ const past = computed(() => !!day.value && !!time.value && wallInput(day.value, 
 const ready = computed(
   () => (editing.value || !!customer.value) && services.value.length > 0 && !!staff.value && !!day.value && !!time.value,
 );
-const searchStaff = (query: string) => eligibleStaff(client, serviceIds.value, query);
 
 function sumMinutes(): string {
   const sum = services.value.reduce((acc, option) => acc + (termsOf(option.id)?.minutes ?? 0), 0);
@@ -368,17 +368,14 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             data-testid="appointment-form-total"
           >{{ $t('appointment.form.total') }}: {{ formatMoney(total, locale, money) }}</small>
         </div>
-        <Combo
-          testid="appointment-form-staff"
-          name="staff"
+        <StaffField
           :model-value="staff"
-          :search="searchStaff"
-          :label="t('appointment.form.staff')"
-          :placeholder="t('appointment.form.pickStaff')"
-          :empty-label="t('appointment.form.staffNone')"
+          :service-ids="serviceIds"
+          testid="appointment-form"
+          name="staff"
           :error-text="fieldErrors.staff"
-          :clearable="!ownStaff"
-          :disabled="!!ownStaff || charged"
+          :own="!!ownStaff"
+          :disabled="charged"
           @update:model-value="pickStaff"
         />
         <small
