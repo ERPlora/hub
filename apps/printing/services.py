@@ -959,7 +959,7 @@ def see_device(ctx: OperationContext, data: DeviceSeenIn) -> dict:
                 "make this station reach the kitchen printer too",
             ),
             "es": (
-                "renombra el equipo de impresión Barra 2",
+                "cambia el nombre del equipo de impresión Barra 2",
                 "haz que este equipo también llegue a la impresora de cocina",
             ),
         },
@@ -995,7 +995,7 @@ def update_device(ctx: OperationContext, data: DeviceUpdateIn) -> dict:
             ),
             "es": (
                 "retira el equipo Barra 2, ya no está",
-                "da de baja el equipo perdido de la barra",
+                "el equipo de la barra se ha perdido: retíralo",
             ),
         },
         "description": "Retire a device that prints (a till replaced or lost), by its registration id: it takes, confirms "

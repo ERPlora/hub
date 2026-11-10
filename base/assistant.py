@@ -110,7 +110,9 @@ APP_WORDS = shared.app_words
 #: panel); a ticket or a receipt is a sale's, as the till's screens say («Tickets hoy», «Ticket medio», the «Tique» it
 #: prints), never the kitchen's, which is named by its app («la cocina»); a «placa» is a person's badge; the «unidades»
 #: are Inventory's units of measure (``inventory.unit``), and a «albarán», the «mercancía» or what «entran» (never
-#: «entrada»: its stem is that of «entre») is the goods ``inventory.stock.receive`` records.
+#: «entrada»: its stem is that of «entre») is the goods ``inventory.stock.receive`` records. To «desactivar» names the
+#: deactivation itself (``staff.member.deactivate``, ``*.deactivate``), not only a switch off, and what one «pide» or
+#: «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``).
 SYNONYMS = (
     ("cuenta", "check", "tab", "order"),
     ("ticket", "tique", "recibo", "receipt", "sale"),
@@ -121,6 +123,8 @@ SYNONYMS = (
         "albaran", "mercancia", "entran", "recibir", "recibe", "recibido", "receive", "received", "goods",
         "delivery note",
     ),
+    ("desactiva", "desactivar", "deactivate"),
+    ("pido", "solicito", "solicitud", "request"),
 )
 #: The help a how-to question asks for (``live.assistant.HOWTO_POINTS``): it ranks by being one, not only by ``ALWAYS``.
 HOWTO = (DOCS_SEARCH,)
