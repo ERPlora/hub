@@ -38,6 +38,8 @@ def test_what_the_employee_may_not_do_is_not_in_their_catalogue():
     assert "sale.sale.void" in employee
 
 
+#: The requests of the QA of hub#1085, each as a person says it: a record of the QA's data names what it is («the
+#: QA Sweets section»), as no selection knows a bare name («Chuches QA») without the business's data.
 QA_PROBES = [
     ("es", "sale.order.split", "Pasa el cruasán de Cuenta QA a otra cuenta"),
     ("en", "sale.order.split", "Move the croissant from QA Check to another check"),
@@ -47,7 +49,7 @@ QA_PROBES = [
     ("en", "sale.order.add_service_line", "Add QA Haircut to the check"),
     ("es", "sale.order.add_combo_line", "Añade el Menú QA con sus platos"),
     ("en", "sale.order.add_combo_line", "Add the QA Menu with its dishes"),
-    ("es", "sale.order.add_open_line", "Apunta 4,75 € en Chuches QA"),
+    ("es", "sale.order.add_open_line", "Apunta 4,75 € a precio libre en Chuches QA"),
     ("en", "sale.order.add_open_line", "Key in 4.75 euros under QA Sweets"),
     ("es", "sale.order.apply_voucher", "Paga Corte QA con el bono de Ana"),
     ("en", "sale.order.apply_voucher", "Pay for QA Haircut with Ana's voucher"),
@@ -73,8 +75,8 @@ QA_PROBES = [
     ("en", "sale.sale.issue_documents", "Issue the pending documents"),
     ("es", "sale.sale.refund", "Devuelve 2 € de la venta"),
     ("en", "sale.sale.refund", "Refund 2 euros of the sale"),
-    ("es", "sale.department.update", "Renombra y ordena Chuches QA"),
-    ("en", "sale.department.update", "Rename and reorder QA Sweets"),
+    ("es", "sale.department.update", "Renombra la sección Chuches QA a Golosinas QA y ordénala la primera"),
+    ("en", "sale.department.update", "Rename the QA Sweets section to QA Candy and reorder it first"),
     ("es", "sale.quick_note.update", "Renombra la nota Sin cilantro QA"),
     ("en", "sale.quick_note.update", "Rename the No cilantro QA note"),
 ]
@@ -87,6 +89,19 @@ def test_the_reported_sales_request_offers_its_existing_operation(language, name
     assert name in tools
     offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
     assert name in offered[:10]
+
+
+def test_no_qa_probe_is_an_ask():
+    """The probes measure that the selection generalises (erplora-next docs plan 2026-10-31 §1.5): a probe copied into
+    the asks of its tool ranks its own words, layer 2 skips it as a copy of an ask, and a record of the QA's data
+    («Cuenta QA», «Chuches QA») is no phrase a business says."""
+    for language, name, phrase in QA_PROBES:
+        assert phrase not in asks_of(registry[name]).get(language, ()), phrase
+    for op in registry.values():
+        if op.app_label == "sale" and assistant.is_tool(op):
+            for phrases in asks_of(op).values():
+                for phrase in phrases:
+                    assert "QA" not in phrase.split(), (op.name, phrase)
 
 
 RESOLUTION_READS = {

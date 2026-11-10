@@ -439,12 +439,10 @@ def create_department(ctx: OperationContext, data: DepartmentIn) -> dict:
             "en": (
                 "move the drinks section to the standard VAT rate",
                 "rename the Misc section to Others",
-                "Rename and reorder QA Sweets",
             ),
             "es": (
                 "pon la sección de bebidas al IVA general",
                 "renombra el departamento «Varios» a «Otros»",
-                "Renombra y ordena Chuches QA",
             ),
         },
     ),
@@ -539,12 +537,10 @@ def create_quick_note(ctx: OperationContext, data: QuickNoteIn) -> dict:
             "en": (
                 "change the 'no salt' note to 'low salt'",
                 "move 'no ice' to the top of the notes",
-                "Rename the No cilantro QA note",
             ),
             "es": (
                 "cambia la nota «sin sal» por «poca sal»",
                 "sube «sin hielo» a la primera de las notas",
-                "Renombra la nota Sin cilantro QA",
             ),
         },
     ),
@@ -769,13 +765,11 @@ def open_order(ctx: OperationContext, data: OrderOpenIn) -> dict:
                 "add two coffees to table 4",
                 "put another beer on that tab",
                 "ring up a croissant",
-                "Add a coffee to QA Check",
             ),
             "es": (
                 "añade dos cafés a la mesa 4",
                 "ponle otra caña a la terraza",
                 "mete un cruasán en la cuenta",
-                "Añade un café a Cuenta QA",
             ),
         },
     ),
@@ -804,12 +798,10 @@ def add_line(ctx: OperationContext, data: OrderAddLineIn) -> dict:
             "en": (
                 "add 3.50 at an open price under bakery",
                 "key in 12 euros by hand in the drinks section",
-                "Key in 4.75 euros under QA Sweets",
             ),
             "es": (
                 "marca 3,50 € a precio libre en bollería",
                 "mete 12 € a mano en la sección de varios",
-                "Apunta 4,75 € en Chuches QA",
             ),
         },
     ),
@@ -841,12 +833,10 @@ def add_open_line(ctx: OperationContext, data: OrderAddOpenLineIn) -> dict:
             "en": (
                 "add a haircut to Ana's ticket",
                 "put the 45 euro colour on her check",
-                "Add QA Haircut to the check",
             ),
             "es": (
                 "añade un corte de pelo a la cuenta de Ana",
                 "cárgale también el lavado a su cuenta",
-                "Añade Corte QA a la cuenta",
             ),
         },
     ),
@@ -878,12 +868,10 @@ def add_service_line(ctx: OperationContext, data: OrderAddServiceLineIn) -> dict
             "en": (
                 "add a menu of the day with lentils, hake and flan",
                 "add two lunch menus to table 3",
-                "Add the QA Menu with its dishes",
             ),
             "es": (
                 "pon un menú del día con lentejas, merluza y flan",
                 "añade dos menús a la mesa 3",
-                "Añade el Menú QA con sus platos",
             ),
         },
     ),
@@ -954,12 +942,10 @@ def _release_vouchers(ctx: OperationContext, lines) -> None:
             "en": (
                 "use a session of Ana's voucher for the haircut",
                 "the massage goes on her pack of sessions",
-                "Pay for QA Haircut with Ana's voucher",
             ),
             "es": (
                 "usa una sesión del bono de Ana para el corte",
                 "el masaje se lo descuentas del bono",
-                "Paga Corte QA con el bono de Ana",
             ),
         },
     ),
@@ -1024,12 +1010,10 @@ def apply_voucher(ctx: OperationContext, data: OrderApplyVoucherIn) -> dict:
             "en": (
                 "don't use the voucher for the haircut after all",
                 "take the voucher off that line",
-                "Take the voucher off the line",
             ),
             "es": (
                 "al final no uses el bono en el corte",
                 "quita el bono de esa línea",
-                "Quita el bono de la línea",
             ),
         },
     ),
@@ -1063,13 +1047,11 @@ def remove_voucher(ctx: OperationContext, data: OrderLineRefIn) -> dict:
                 "make it three coffees instead of two",
                 "the dessert is on the house, it took too long",
                 "note on the burger: no onion",
-                "Correct the quantity and note of the coffees",
             ),
             "es": (
                 "que sean tres cafés en vez de dos",
                 "el postre va invitado, que ha tardado mucho",
                 "pon en la hamburguesa que sea sin cebolla",
-                "Corrige cantidad y nota de los cafés",
             ),
         },
     ),
@@ -1112,12 +1094,10 @@ def update_line(ctx: OperationContext, data: OrderUpdateLineIn) -> dict:
             "en": (
                 "the colour was done by Laura",
                 "put Marta on the haircut line",
-                "Assign the line to QA Sales Waiter",
             ),
             "es": (
                 "el tinte lo hizo Laura",
                 "pon a Marta en la línea del corte",
-                "Asigna la línea a Camarera Ventas QA",
             ),
         },
     ),
@@ -1241,12 +1221,10 @@ def remove_line(ctx: OperationContext, data: OrderLineRefIn) -> dict:
             "en": (
                 "void the burger that already went to the kitchen",
                 "cancel the fries we sent, they don't want them",
-                "Void a line sent to the kitchen",
             ),
             "es": (
                 "anula la hamburguesa que ya salió a cocina",
                 "cancela las bravas de la comanda, que no las quieren",
-                "Anula una línea enviada a cocina",
             ),
         },
     ),
@@ -1397,12 +1375,10 @@ def fire(ctx: OperationContext, data: OrderFireIn) -> dict:
             "en": (
                 "split table 4's bill in two",
                 "move the drinks to another check, they pay separately",
-                "Move the croissant from QA Check to another check",
             ),
             "es": (
                 "divide la cuenta de la mesa 4",
                 "pasa las bebidas a otra cuenta, que pagan aparte",
-                "Pasa el cruasán de Cuenta QA a otra cuenta",
             ),
         },
     ),
@@ -1787,12 +1763,10 @@ def set_line_discount_over_limit(
             "en": (
                 "call this check 'Ana, terrace'",
                 "name the tab Table 4",
-                "Change the name of the check",
             ),
             "es": (
                 "ponle de nombre «Ana — terraza» a la cuenta",
                 "llama a esta cuenta «Mesa 4»",
-                "Cambia el nombre de la cuenta",
             ),
         },
     ),
@@ -1820,12 +1794,10 @@ def set_label(ctx: OperationContext, data: OrderSetLabelIn) -> dict:
             "en": (
                 "this ticket is for Ana's 5 o'clock appointment",
                 "link the check to Marta's appointment",
-                "Link tomorrow's appointment",
             ),
             "es": (
                 "esta cuenta es de la cita de Ana de las 5",
                 "asocia la cuenta a la cita de Marta",
-                "Vincula la cita de mañana",
             ),
         },
     ),
@@ -2754,12 +2726,10 @@ def complete(ctx: OperationContext, data: CompleteIn) -> dict:
             "en": (
                 "charge it with 50% off, I'm authorising the discount",
                 "ring it up with a discount above the cap",
-                "Charge it with an authorised 60% discount",
             ),
             "es": (
                 "cóbralo con un 50 % de descuento, lo autorizo yo",
                 "cobra con el descuento aunque pase del máximo",
-                "Cobra con 60 % autorizado",
             ),
         },
     ),
@@ -2870,12 +2840,10 @@ def void_sale(ctx: OperationContext, data: VoidIn) -> dict:
             "en": (
                 "issue the invoice that got stuck for sale 12",
                 "issue the fiscal document that is still pending for that ticket",
-                "Issue the pending documents",
             ),
             "es": (
                 "emite ya la factura pendiente de la venta 12",
                 "saca el tique fiscal que se quedó colgado",
-                "Emite los documentos pendientes",
             ),
         },
     ),
@@ -3043,13 +3011,11 @@ def _refund_replay(data: RefundIn) -> dict | None:
                 "refund the last sale",
                 "give back 5 euros of ticket 7, the coffee was cold",
                 "she brought one shirt back, refund it",
-                "Refund 2 euros of the sale",
             ),
             "es": (
                 "devuélvele el dinero de la última venta",
                 "devuelve 5 € del ticket 7, que el café estaba frío",
                 "ha devuelto un producto, hazle el reembolso",
-                "Devuelve 2 € de la venta",
             ),
         },
     ),

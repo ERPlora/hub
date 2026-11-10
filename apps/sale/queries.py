@@ -2409,12 +2409,10 @@ def tender_options(sale: Sale) -> list[dict]:
             "en": (
                 "how much can I still give back on that sale?",
                 "what's left to refund on ticket 12?",
-                "Check what can be refunded",
             ),
             "es": (
                 "¿cuánto se puede devolver todavía de esa venta?",
                 "¿qué queda por devolver del ticket 12?",
-                "Consulta qué se puede devolver",
             ),
         },
     ),
@@ -2481,12 +2479,10 @@ def refund_row(refund: Refund) -> dict:
             "en": (
                 "what refunds did that sale have?",
                 "who gave money back on ticket 7?",
-                "Check the sale's refunds",
             ),
             "es": (
                 "¿qué devoluciones tiene esa venta?",
                 "¿quién hizo la devolución del ticket 7?",
-                "Consulta reembolsos de la venta",
             ),
         },
     ),
