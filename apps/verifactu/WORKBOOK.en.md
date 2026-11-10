@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3f840d64df6c80325aaa2fb788df843fb41ea68c04362463dae23a16053b52a5 -->
+<!-- generated from WORKBOOK.md sha256:8e6df85425a482c3abfddc5a4e03d1ed8dda7d5c0346757090ca70dfd7625883 -->
 
 ## What it is for and who it is for
 
@@ -605,10 +605,8 @@ If it fails: with no gateway configured, no producer's data or no route ready, n
 says why it waits (VERIFACTU-F17). A record is never taken as accepted without the AEAT's answer. A business
 outside Spain never sends anything: what was sealed before is kept as it is, without going out, and says why.
 A business's record is always presented as that business, never as ERPlora's hub (hub#454): the worker goes
-through each business in its database and on its scope. If the pass of ERPlora's hub sees a record with a tax ID other
-than ERPlora's, it presents it with the id erplora.com gave the business; without that id (its account's photo has not arrived yet) nothing is
-sent and the record waits with "ERPlora has not linked this business to its account on this server yet"
-(`hub_unregistered`; "Send now" → 409 `verifactu.hub_unregistered`) until the photo brings it.
+through each business in its database and on its scope, and each pass presents what its database holds as its
+business, whatever tax ID the record bears. ERPlora's hub's database holds ERPlora's records only (hub#602, hub#1130).
 Involved: VERIFACTU-F20, FLOW-F04 (the card of the Automations gallery that creates an urgent task when the AEAT
 rejects a record)
 
@@ -636,13 +634,12 @@ Steps:
 2. "Record {number}" opens with the invoice, the chain, the QR, the AEAT's answer and the XML.
 3. If it is not at the AEAT, "Not at the AEAT yet" says why ("ERPlora's sending gateway is not configured on this
    server", "your own certificate is not loaded or has expired", "the AEAT asked to wait until {time}", "the
-   gateway or the AEAT could not be reached ({detail})", "ERPlora has not linked this business to its account on
-   this server yet") and a single when: if everything it waits for clears by itself (the AEAT asked to wait, no
-   connection, no answer, an AEAT fault), "It goes out by itself with the next pass, in order, and declared as late
-   if it failed before. You do not have to do anything."; if it waits for something to be resolved (a refusal of
-   the gateway, which is not sent again by itself; the authorisation; the route; the server; the business not
-   linked), "It goes out by itself, in order and declared as late, as soon as that is resolved." (hub#454). Below,
-   the "Next attempt".
+   gateway or the AEAT could not be reached ({detail})") and a single when: if everything it waits for clears by
+   itself (the AEAT asked to wait, no connection, no answer, an AEAT fault), "It goes out by itself with the next
+   pass, in order, and declared as late if it failed before. You do not have to do anything."; if it waits for
+   something to be resolved (a refusal of the gateway, which is not sent again by itself; the authorisation; the
+   route; the server), "It goes out by itself, in order and declared as late, as soon as that is resolved."
+   (hub#454). Below, the "Next attempt".
 4. In a business outside Spain it only says "this business is not in Spain: VeriFactu is only for businesses in
    Spain, so nothing is sent to the AEAT", with no next attempt nor buttons to send, correct or cancel:
    it never goes out.
