@@ -26,7 +26,7 @@ import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { type Provider, startProvider } from './assistant-provider';
+import { DONE, NOT_DONE, type Provider, startProvider } from './assistant-provider';
 import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, psql, REPO_DIR, shot, shown, untilStill } from './helpers';
 import { createProduct, type Product } from './inventory-helpers';
 import { cleanDocumentsOf, stamp } from './sale-helpers';
@@ -267,9 +267,9 @@ test('CASH_REGISTER-F09 — «close the drawer with 250 € counted»: the summa
   // The summary, before the card: the session, the counted cash, the expected and the difference.
   const summary = lastAnswer(page);
   await expect(summary.locator('strong').first()).toHaveText(shift.number);
-  await expect(summary).toContainText(`Contado: ${euros(25000)}`);
-  await expect(summary).toContainText(`Esperado: ${euros(expected)}`);
-  await expect(summary).toContainText(`Diferencia: +${euros(25000 - expected)}`);
+  await expect(summary).toContainText(`Counted: ${euros(25000)}`);
+  await expect(summary).toContainText(`Expected: ${euros(expected)}`);
+  await expect(summary).toContainText(`Difference: +${euros(25000 - expected)}`);
   // The summary was the Hub's own reading, sent to the model as it is: never a figure the model made up.
   expect(toldSummary().summary).toMatchObject({ number: shift.number, closing_balance: 25000, expected_balance: expected });
   // The read never says it closed anything; the card is the dangerous one, naming the session and the count.
@@ -304,7 +304,7 @@ test('CASH_REGISTER-F09 — «close the drawer with 250 € counted»: the summa
 
   // «Cancel»: nothing closes.
   await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await expect(lastAnswer(page)).toContainText(NOT_DONE.en);
   await expect(receipts(page).last()).toContainText('Not done, cancelled: Close in Cash register');
   expect((await detailOf(context, shift.id)).status).toBe('open');
   for (const vp of VIEWPORTS) {
@@ -323,7 +323,7 @@ test('CASH_REGISTER-F09 — «close the drawer with 250 € counted»: the summa
   await card(page).locator('[data-testid="assistant-confirm-input"] input').fill('confirm');
   await expect(submit).toBeEnabled();
   await decide(page, 'submit');
-  await expect(lastAnswer(page)).toContainText('Hecho.');
+  await expect(lastAnswer(page)).toContainText(DONE.en);
   await expect(receipts(page).last()).toContainText('Done: Close in Cash register');
   const closed = await detailOf(context, shift.id);
   expect([closed.status, closed.expected_balance, closed.closing_balance, closed.difference]).toEqual([
@@ -393,10 +393,10 @@ test('CASH_REGISTER-F07 — with the blind count on, a cashier asking to close g
   await expect(card(page)).toBeVisible({ timeout: 30_000 });
   const summary = lastAnswer(page);
   await expect(summary.locator('strong').first()).toHaveText(shift.number);
-  await expect(summary).toContainText(`Contado: ${euros(25000)}`);
-  await expect(summary).toContainText('Arqueo ciego');
-  await expect(summary).not.toContainText('Esperado');
-  await expect(summary).not.toContainText('Diferencia');
+  await expect(summary).toContainText(`Counted: ${euros(25000)}`);
+  await expect(summary).toContainText('Blind count');
+  await expect(summary).not.toContainText('Expected');
+  await expect(summary).not.toContainText('Difference');
   // Not even the model got them: the summary sent to it carries neither.
   const told = toldSummary();
   expect(told.summary).toMatchObject({ number: shift.number, closing_balance: 25000, expected_balance: null, difference: null, expected_hidden: true });

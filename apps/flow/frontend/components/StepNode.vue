@@ -79,6 +79,14 @@ const action = computed(() => {
   return props.catalog?.actions.find((candidate) => candidate.name === step.operation);
 });
 
+/** The app, off in this business, of the action a saved step names: it is missing from the list for that (hub#1054). */
+const offApp = computed(() => {
+  const step = props.step;
+  if ((step.kind !== 'command' && step.kind !== 'query') || !step.operation || action.value) return undefined;
+  const app = step.operation.split('.', 1)[0];
+  return props.catalog?.off_apps?.find((off) => off.app === app);
+});
+
 const chosenAction = computed<ComboOption | null>(() => {
   const step = props.step;
   if ((step.kind !== 'command' && step.kind !== 'query') || !step.operation) return null;
@@ -536,7 +544,7 @@ const summary = computed(() => {
           :options="actions"
           :label="step.kind === 'query' ? $t('flow.steps.whatQuery') : $t('flow.steps.what')"
           :placeholder="step.kind === 'query' ? $t('flow.steps.chooseQuery') : $t('flow.steps.choose')"
-          :error-text="error('operation')"
+          :error-text="error('operation') ?? (offApp ? $t('flow.steps.appOff', { app: offApp.app_name }) : undefined)"
           :clearable="false"
           @update:model-value="setAction"
         />

@@ -163,6 +163,7 @@ def _save_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) ->
 @operation(
     "website.site.save",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="website.manage",
     input=SaveIn,
     output=SiteOut,
@@ -202,6 +203,7 @@ def save_site(ctx: OperationContext, data: SaveIn) -> dict:
 @operation(
     "website.site.publish",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="website.manage",
     input=NoIn,
     output=PublicationOut,
@@ -237,6 +239,7 @@ def publish_site(ctx: OperationContext, data: NoIn) -> dict:
 @operation(
     "website.site.unpublish",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="website.manage",
     input=NoIn,
     output=PublicationOut,

@@ -24,6 +24,7 @@ import {
 } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useLocale, useT } from '../composables/useT';
 import { dueTone, formatDay, formatMoment, isClosed, PRIORITY_TONE, STATUS_TONE } from '../lib/format';
@@ -81,10 +82,16 @@ const newSubtask = ref('');
 const newComment = ref('');
 const editOpen = ref(false);
 const deleteOpen = ref(false);
+useUnsavedFormOnOpen('task-sheet', () => ({ subtask: newSubtask.value, comment: newComment.value }), open);
 
 watch(current, () => {
   actionError.value = null;
   assignTo.value = null;
+  newSubtask.value = '';
+  newComment.value = '';
+});
+watch(open, (isOpen) => {
+  if (isOpen) return;
   newSubtask.value = '';
   newComment.value = '';
 });

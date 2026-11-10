@@ -46,8 +46,8 @@
       "enable": "Encender o pausar «{name}»",
       "duplicate": "Hacer una copia",
       "delete": "Borrar",
-      "bulkEnable": "Encenderlas",
-      "bulkPause": "Ponerlas en pausa",
+      "bulkEnable": "Encenderla | Encenderlas",
+      "bulkPause": "Ponerla en pausa | Ponerlas en pausa",
       "copied": "Copiada, y la copia está en pausa. No lleva ninguno de los permisos de la original: concédele lo que necesite antes de encenderla.",
       "deleteTitle": "¿Borrar «{name}»?",
       "deleteMessage": "Esto no se puede deshacer. Su historial se queda.",
@@ -320,7 +320,8 @@
         "month": "Todos los meses el día {day} a las {time}",
         "at": "Una vez, el {date}",
         "noDate": "Una vez, en la fecha que elijas"
-      }
+      },
+      "appOff": "Su app, {app}, está apagada en este negocio: enciéndela en Apps o elige otro aviso."
     },
     "steps": {
       "none": "Todavía no hay pasos. Añade lo primero que debe hacer esta automatización.",
@@ -409,7 +410,8 @@
         "onErrorHint": "El fallo queda escrito en este paso y los siguientes pueden mirar si falló.",
         "summaryRunIf": "Solo si: {clauses}",
         "summaryOnError": "Si falla, sigue"
-      }
+      },
+      "appOff": "Su app, {app}, está apagada en este negocio: enciéndela en Apps o elige otra acción."
     },
     "picker": {
       "title": "¿Qué dato?",
@@ -2818,7 +2820,8 @@
       "addPin": "Fijar un dato",
       "choosePin": "Elige un dato",
       "removePin": "Quitar «{datum}»",
-      "pinnedHint": "El asistente no los ve ni puede cambiarlos: se rellenan al pedírselo, y una herramienta con un dato fijo vacío no se usa."
+      "pinnedHint": "El asistente no los ve ni puede cambiarlos: se rellenan al pedírselo, y una herramienta con un dato fijo vacío no se usa.",
+      "toolOff": "«{action}» es de {app}, que está apagada en este negocio: enciéndela en Apps o quítala."
     }
   }
 }

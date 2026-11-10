@@ -53,9 +53,9 @@ describe('searchBookableServices', () => {
     expect(await searchBookableServices(api, 'en', new Map(), ZLOTY)('')).toEqual([{ id: 'c1', label: 'Haircut', hint: '30 min · zł\u00a022.50' }]);
   });
 
-  it('until the business answers, a price is its figure without a symbol, never euros', async () => {
+  it('until the business answers, a price is a dash, never euros', async () => {
     const { client: api } = client({ 'service.service.list_for_sale': () => ({ rows: [sale('c1', 'Haircut', { price: 2250 })] }) });
-    expect(await searchBookableServices(api, 'es', new Map(), undefined)('')).toEqual([{ id: 'c1', label: 'Haircut', hint: '30 min · 22,50' }]);
+    expect(await searchBookableServices(api, 'es', new Map(), undefined)('')).toEqual([{ id: 'c1', label: 'Haircut', hint: '30 min · —' }]);
   });
 });
 

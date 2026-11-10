@@ -218,6 +218,7 @@ def create_task(ctx: OperationContext, data: TaskIn) -> dict:
 @operation(
     "task.task.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="task.change",
     input=TaskPatchIn,
     output=TaskOut,
@@ -258,6 +259,7 @@ def update_task(ctx: OperationContext, data: TaskPatchIn) -> dict:
 @operation(
     "task.task.set_status",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="task.change",
     input=SetStatusIn,
     output=TaskOut,
@@ -279,6 +281,7 @@ def set_status(ctx: OperationContext, data: SetStatusIn) -> dict:
 @operation(
     "task.task.complete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="task.change",
     input=TaskRefIn,
     output=TaskOut,
@@ -301,6 +304,7 @@ def complete_task(ctx: OperationContext, data: TaskRefIn) -> dict:
 @operation(
     "task.task.assign",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="task.change",
     input=AssignIn,
     output=TaskOut,
@@ -335,6 +339,7 @@ def assign_task(ctx: OperationContext, data: AssignIn) -> dict:
 @operation(
     "task.task.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="task.delete",
     input=TaskRefIn,
     output=DeletedOut,
@@ -385,6 +390,7 @@ def release_member(ctx: OperationContext, data: MemberReleaseIn) -> dict:
 @operation(
     "task.comment.add",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="task.change",
     input=CommentIn,
     output=CommentOut,
@@ -448,6 +454,7 @@ def _project_exists() -> Conflict:
 @operation(
     "task.project.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="task.manage_project",
     input=ProjectIn,
     output=ProjectOut,
@@ -474,6 +481,7 @@ def create_project(ctx: OperationContext, data: ProjectIn) -> dict:
 @operation(
     "task.project.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="task.manage_project",
     input=ProjectPatchIn,
     output=ProjectOut,
@@ -512,6 +520,7 @@ def update_project(ctx: OperationContext, data: ProjectPatchIn) -> dict:
 @operation(
     "task.project.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="task.manage_project",
     input=ProjectRefIn,
     output=DeletedOut,

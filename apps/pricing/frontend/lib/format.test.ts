@@ -1,6 +1,6 @@
 // How the pricing screens paint money (in the business's currency, or in a list's), quantities, percents, days and a
 // validity. The business's currency is its country's (`base.business.get`, with the server's decimals); until it
-// answers an amount is a figure without a symbol, never a euro by default (flow pricing-business-currency).
+// answers an amount is a dash, never a euro by default (flow pricing-business-currency).
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -32,14 +32,12 @@ describe('format', () => {
   });
 
   it('the decimals are the server’s: the yen has none, the forint keeps its two (Intl gives it none)', () => {
-    expect(formatMoney(2450, 'en', { currency: 'JPY', decimals: 0 })).toBe('¥2,450');
-    expect(formatMoney(2450, 'en', { currency: 'HUF', decimals: 2 })).toBe('Ft\u00a024.50');
+    expect(formatMoney(1500, 'en', { currency: 'JPY', decimals: 0 })).toBe('¥1,500');
+    expect(formatMoney(123450, 'en', { currency: 'HUF', decimals: 2 })).toBe('Ft\u00a01,234.50');
   });
 
-  it('until the business answers, an amount is a figure without a symbol, never in euros', () => {
-    expect(formatMoney(1250, 'es')).toBe('12,50');
-    expect(formatMoney(1250, 'en', undefined)).toBe('12.50');
-    expect(formatMoney(123456, 'es')).toBe('1.234,56');
+  it('until the business answers, an amount is a dash, never in euros', () => {
+    expect([formatMoney(1250, 'es'), formatMoney(1250, 'en', undefined), formatMoney(123456, 'es')]).toEqual(['—', '—', '—']);
   });
 
   it('a list’s money is its currency with two decimals (the server takes no other); none without one', () => {

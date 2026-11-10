@@ -50,10 +50,10 @@ describe('ServicesField', () => {
     expect(s.wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[]]);
   });
 
-  it('offers each service with its price in the business’s currency, a figure alone until it answers (hub#577)', async () => {
+  it('offers each service with its price in the business’s currency, a dash until it answers (hub#577, hub#947)', async () => {
     const s = await setup();
     const offered = () => (s.combo().props('search') as (q: string) => Promise<unknown>)('col');
-    expect(await offered()).toEqual([{ id: 'colour', label: 'Colour', hint: '60 min · 45.00' }]);
+    expect(await offered()).toEqual([{ id: 'colour', label: 'Colour', hint: '60 min · —' }]);
     await s.live();
     await s.result('base.business.get', business(POLISH));
     expect(await offered()).toEqual([{ id: 'colour', label: 'Colour', hint: '60 min · zł\u00a045.00' }]);

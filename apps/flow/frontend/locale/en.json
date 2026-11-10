@@ -46,8 +46,8 @@
       "enable": "Turn «{name}» on or off",
       "duplicate": "Make a copy",
       "delete": "Delete",
-      "bulkEnable": "Turn them on",
-      "bulkPause": "Pause them",
+      "bulkEnable": "Turn it on | Turn them on",
+      "bulkPause": "Pause it | Pause them",
       "copied": "Copied, and the copy is paused. It has none of the original's permissions: allow what it needs before turning it on.",
       "deleteTitle": "Delete «{name}»?",
       "deleteMessage": "This cannot be undone. Its history stays.",
@@ -320,7 +320,8 @@
         "month": "Every month on day {day} at {time}",
         "at": "Once, on {date}",
         "noDate": "Once, on a date you choose"
-      }
+      },
+      "appOff": "Its app, {app}, is off in this business: turn it on in Apps, or choose another event."
     },
     "steps": {
       "none": "No steps yet. Add the first thing this automation should do.",
@@ -409,7 +410,8 @@
         "onErrorHint": "Its failure is written in this step and the next steps can check whether it failed.",
         "summaryRunIf": "Only if: {clauses}",
         "summaryOnError": "If it fails, it carries on"
-      }
+      },
+      "appOff": "Its app, {app}, is off in this business: turn it on in Apps, or choose another action."
     },
     "picker": {
       "title": "Which data?",
@@ -2818,7 +2820,8 @@
       "addPin": "Fix a datum",
       "choosePin": "Choose a datum",
       "removePin": "Unfix «{datum}»",
-      "pinnedHint": "The assistant never sees them nor can change them: they are filled in when it is asked, and a tool whose fixed datum is empty is not used."
+      "pinnedHint": "The assistant never sees them nor can change them: they are filled in when it is asked, and a tool whose fixed datum is empty is not used.",
+      "toolOff": "«{action}» is from {app}, which is off in this business: turn it on in Apps, or remove it."
     }
   }
 }

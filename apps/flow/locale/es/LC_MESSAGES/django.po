@@ -644,3 +644,9 @@ msgid ""
 msgstr ""
 "Esa acción ya no está permitida o disponible, así que el cambio del asistente "
 "no se ha hecho."
+
+msgid "«%(name)s» is from %(app)s, which is off in this business: turn it on in Apps, or choose another event."
+msgstr "«%(name)s» es de %(app)s, que está apagada en este negocio: enciéndela en Apps o elige otro aviso."
+
+msgid "«%(name)s» is from %(app)s, which is off in this business: turn it on in Apps, or choose another action."
+msgstr "«%(name)s» es de %(app)s, que está apagada en este negocio: enciéndela en Apps o elige otra acción."

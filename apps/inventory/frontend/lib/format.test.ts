@@ -24,9 +24,9 @@ describe('formatMoney', () => {
     expect(formatMoney(1210, 'en', { currency: 'JPY', decimals: 0 })).toBe('¥1,210');
   });
 
-  it('until the business’s currency is known a figure has no symbol, never the euro', () => {
-    expect(formatMoney(1250, 'es')).toBe('12,50');
-    expect(formatMoney(1250, 'en')).toBe('12.50');
+  it('until the business’s currency is known an amount is a dash, never the euro', () => {
+    expect(formatMoney(1250, 'es')).toBe('—');
+    expect(formatMoney(1250, 'en')).toBe('—');
   });
 
   // hub#525: Spanish CLDR waits for five digits; every screen of the Hub groups from four on.
@@ -34,7 +34,7 @@ describe('formatMoney', () => {
     expect(formatMoney(123456789, 'es', { currency: 'EUR', decimals: 2 })).toMatch(/^1\.234\.567,89\s€$/);
     expect(formatMoney(123456, 'en', { currency: 'EUR', decimals: 2 })).toBe('€1,234.56');
     expect(formatMoney(1500, 'es', { currency: 'JPY', decimals: 0 })).toMatch(/^1\.500\s¥$/);
-    expect(formatMoney(123456, 'es')).toBe('1.234,56');
+    expect(formatMoney(123456, 'es')).toBe('—');
     expect(formatMoney(99999, 'es', { currency: 'EUR', decimals: 2 })).toMatch(/^999,99\s€$/);
   });
 });

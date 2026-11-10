@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 
 import pydantic
 import pytest
-from django.utils import timezone
+from django.utils import timezone, translation
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 
@@ -98,6 +98,27 @@ def test_what_the_business_does_not_have_is_refused_by_field():
         "steps.1.operation": "«customer.customer.detail» only reads: use «Look something up».",
         "steps.2.operation": "«task.task.create» changes data: use «Do something».",
         "steps.3.operation": "That action does not exist in this business: «task.task.release_member».",
+    }
+    assert Flow.objects.count() == 0
+
+
+def test_an_event_or_a_step_of_an_app_that_is_off_says_so_and_how_to_bring_it_back(django_capture_on_commit_callbacks):
+    """Off is not «does not exist» (hub#1054): the refusal names the app and says where it is turned on."""
+    with django_capture_on_commit_callbacks(execute=True):
+        run("base.app.disable", {"app": "task"})
+    with pytest.raises(InvalidPayload) as refused:
+        run("flow.flow.create", {"trigger": {"kind": "event", "event": "task.task.created"}, "steps": [TASK_STEP]})
+    assert refused.value.fields == {
+        "trigger.event": "«task.task.created» is from Tasks, which is off in this business: turn it on in Apps, or "
+        "choose another event.",
+        "steps.0.operation": "«task.task.create» is from Tasks, which is off in this business: turn it on in Apps, or "
+        "choose another action.",
+    }
+    with translation.override("es"), pytest.raises(InvalidPayload) as refused:
+        run("flow.flow.create", {"steps": [TASK_STEP]}, ctx_for(language="es"))
+    assert refused.value.fields == {
+        "steps.0.operation": "«task.task.create» es de Tareas, que está apagada en este negocio: enciéndela en Apps o "
+        "elige otra acción.",
     }
     assert Flow.objects.count() == 0
 

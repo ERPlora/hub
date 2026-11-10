@@ -77,6 +77,7 @@ const staff = shallowRef<{ id: string | null; name: string | null }>({ id: null,
 const staffNames = shallowRef<Record<string, string>>({});
 const marks = shallowRef<string[]>([]);
 const preview = shallowRef<PreviewOut | undefined>();
+const previewError = shallowRef<string | null>(null);
 const charging = shallowRef(false);
 
 const till = useTill({
@@ -96,7 +97,10 @@ const openChecks = computed(() => Math.max(0, (openChecksLive.data.value?.total 
 
 watch(
   () => till.orderId.value,
-  () => (preview.value = undefined),
+  () => {
+    preview.value = undefined;
+    previewError.value = null;
+  },
 );
 watch(lines, (now) => {
   const ids = new Set(now.map((line) => line.id));
@@ -663,6 +667,7 @@ onBeforeUnmount(() => {
             :order="order"
             :label="order ? order.label : till.pendingLabel.value"
             :total="total"
+            :preview-error="previewError"
             :ticket-discount="preview?.ticket_discount_amount ?? 0"
             :marks="marks"
             :staff-names="staffNames"
@@ -727,6 +732,7 @@ onBeforeUnmount(() => {
           :valued="lines.length > 0"
           @order="onOrder"
           @preview="preview = $event"
+          @preview-error="previewError = $event"
           @gone="till.gone()"
         />
         <TableFollower

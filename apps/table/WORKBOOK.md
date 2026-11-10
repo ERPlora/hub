@@ -1082,7 +1082,7 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 24. **Fusionar no pierde lo cobrado** por la cuenta de origen antes de juntarla.
 25. **Los importes van en la moneda del negocio** (la de su país, con los decimales que cuenta el
     servidor; lo cobrado, en la moneda en que se cobró, que no se reescribe; mientras el negocio no
-    contesta, la cifra sin símbolo): el producto actual los pintaba siempre en euros
+    contesta, un importe es «—»): el producto actual los pintaba siempre en euros
     (`table-business-currency`).
 26. **Los importes agrupan los millares** también con cuatro cifras («1.234,56 €»; `formatMoney` de
     `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#658).

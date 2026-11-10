@@ -145,6 +145,7 @@ _PRODUCT_CONSTRAINTS = {
 @operation(
     "inventory.product.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.add_product",
     input=ProductIn,
     output=ProductOut,
@@ -207,6 +208,7 @@ def create_product(ctx: OperationContext, data: ProductIn) -> dict:
 @operation(
     "inventory.product.bulk_create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.import_product",
     input=ProductImportIn,
     output=ImportReportOut,
@@ -278,6 +280,7 @@ def bulk_create_products(ctx: OperationContext, data: ProductImportIn) -> dict:
 @operation(
     "inventory.product.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.change_product",
     input=ProductPatchIn,
     output=ProductOut,
@@ -331,6 +334,7 @@ def update_product(ctx: OperationContext, data: ProductPatchIn) -> dict:
 @operation(
     "inventory.product.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.delete_product",
     input=ProductRefIn,
     output=DeletedOut,
@@ -357,6 +361,7 @@ def delete_product(ctx: OperationContext, data: ProductRefIn) -> dict:
 @operation(
     "inventory.product.set_sold_out",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.change_product",
     input=ProductSoldOutIn,
     output=ProductOut,
@@ -387,6 +392,7 @@ PHOTOS = "inventory/products/"
 @operation(
     "inventory.product.set_image",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.change_product",
     input=ProductImageIn,
     output=ProductOut,
@@ -444,6 +450,7 @@ def _change_image(ctx: OperationContext, product: Product, image: str) -> None:
 @operation(
     "inventory.product.print_label",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.view_product",
     input=ProductRefIn,
     output=PrintLabelOut,
@@ -488,6 +495,7 @@ def print_label(ctx: OperationContext, data: ProductRefIn) -> dict:
 @operation(
     "inventory.product_category.add",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.change_product",
     input=ProductCategoryIn,
     output=ProductCategoryLinkOut,
@@ -506,6 +514,7 @@ def add_product_category(ctx: OperationContext, data: ProductCategoryIn) -> dict
 @operation(
     "inventory.product_category.remove",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.change_product",
     input=ProductCategoryIn,
     output=ProductCategoryLinkOut,
@@ -527,6 +536,7 @@ def remove_product_category(ctx: OperationContext, data: ProductCategoryIn) -> d
 @operation(
     "inventory.category.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.add_category",
     input=CategoryIn,
     output=CategoryOut,
@@ -549,6 +559,7 @@ def create_category(ctx: OperationContext, data: CategoryIn) -> dict:
 @operation(
     "inventory.category.bulk_create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.add_category",
     input=CategoryImportIn,
     output=ImportReportOut,
@@ -602,6 +613,7 @@ def bulk_create_categories(ctx: OperationContext, data: CategoryImportIn) -> dic
 @operation(
     "inventory.category.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.change_category",
     input=CategoryPatchIn,
     output=CategoryOut,
@@ -634,6 +646,7 @@ def update_category(ctx: OperationContext, data: CategoryPatchIn) -> dict:
 @operation(
     "inventory.category.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.delete_category",
     input=CategoryRefIn,
     output=DeletedOut,
@@ -662,6 +675,7 @@ def delete_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
 @operation(
     "inventory.stock.receive",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.adjust_stock",
     input=ReceiveIn,
     output=ProductsOut,
@@ -706,6 +720,7 @@ def receive_stock(ctx: OperationContext, data: ReceiveIn) -> dict:
 @operation(
     "inventory.stock.count",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.adjust_stock",
     input=CountIn,
     output=ProductOut,
@@ -733,6 +748,7 @@ def count_stock(ctx: OperationContext, data: CountIn) -> dict:
 @operation(
     "inventory.stock.write_off",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.adjust_stock",
     input=WriteOffIn,
     output=ProductOut,
@@ -766,6 +782,7 @@ def write_off_stock(ctx: OperationContext, data: WriteOffIn) -> dict:
 @operation(
     "inventory.config.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.manage_settings",
     input=ConfigPatchIn,
     output=ConfigOut,

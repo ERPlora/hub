@@ -45,7 +45,7 @@ function moneyOptions(money: Money | undefined, decimals: number): Intl.NumberFo
   return money ? { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol', ...digits } : digits;
 }
 
-/** Minor units as `money` in `locale` («1.150,50 €», «€150.50», «¥5,003»; «150,50» while the money is unknown);
+/** Minor units as `money` in `locale` («1.150,50 €», «€150.50», «¥5,003»; «—» while the money is unknown);
  *  nothing is «—». */
 export function formatMoney(cents: number | null | undefined, locale: string, money?: Money): string {
   return missing(cents) ? '—' : writeMoney(cents, locale, money);
@@ -59,11 +59,11 @@ export function formatFace(face: string, locale: string, money?: Money): string 
   return formatter(locale, `face-${money?.currency ?? ''}-${decimals}`, moneyOptions(money, decimals)).format(value);
 }
 
-/** A difference with its sign: «+5,10 €» over, «-4,90 €» short, zero without sign. */
+/** A difference with its sign: «+5,10 €» over, «-4,90 €» short, zero without sign; only a dash without money. */
 export function formatSignedMoney(cents: number | null | undefined, locale: string, money?: Money): string {
   if (missing(cents)) return '—';
   const written = formatMoney(cents, locale, money);
-  return (cents as number) > 0 ? `+${written}` : written;
+  return (cents as number) > 0 && written !== '—' ? `+${written}` : written;
 }
 
 /** Minor units as a money field holds them: ungrouped, with the reader's decimal sign («1250,50»). */

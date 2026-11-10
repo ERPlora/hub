@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:970e40ca5d15b1bc1f30cd03ed769f4ebd7f33b895a0c4a1989277272718a49c -->
+<!-- generated from WORKBOOK.md sha256:4ebaa585129e22e4d4cd9941184211714004c1aab5b549cce1acad7b03ecdaef -->
 
 ## What it is for and who it is for
 
@@ -459,7 +459,9 @@ Steps:
   3. Below, in this order: "Start with a business like yours" (only while the business is empty and for
      who administers it, BASE-F38), "My apps", "Finish setting up your business" and the board of
      panels.
-  4. At the bottom, two tabs: "Summary" (the above) and "Activity".
+  4. When the interface language changes, the names in "My apps" and the checklist's texts change in place,
+     without reloading or reopening the application.
+  5. At the bottom, two tabs: "Summary" (the above) and "Activity".
 In: the business's name and the device's date.
 Out: nothing saved.
 If it fails: a zone that does not load does not bring the others down; each one says its own. On a phone
@@ -512,9 +514,9 @@ Steps:
      there even while the list loads, when it is empty or when it could not be read.
   6. In the Android app, the phone's back button first closes whatever is open on top (a window, a sheet
      or the menu); a window that cannot be closed that way stays, and one that holds something typed and
-     not saved and asks for it (when creating and editing a product in Inventory and in the create and edit windows of Sales, Tables, Kitchen, Customers, Reservations, Appointments, Staff, Services, Time clock, Cart & Checkout, Cash register, Menus and combos, Modifiers, Payments, Price Lists, Invoicing, Printing, Schedule, Tasks, Taxes and the WhatsApp Inbox, in Inventory's category and stock windows and in "New API key") asks first "Discard
+     not saved and asks for it (when creating and editing a product in Inventory and in the create and edit windows of Sales, Tables, Kitchen, Customers, Reservations, Appointments, Staff, Services, Time clock, Cart & Checkout, Cash register, Menus and combos, Modifiers, Payments, Price Lists, Invoicing, Printing, Schedule, Tasks, Taxes and the WhatsApp Inbox, in Inventory's category and stock windows and in "New API key", in the cancellation-reason windows of Online bookings, Payments, Printing, Reservations, Services, VeriFactu and Kitchen (cancelling a ticket), in the reason for "Discard" on a failed event in System, in "New folder" and "Rename" in Files, in the product-import steps, in the Task and Project sheets and in quick customer creation at the till) asks first "Discard
      changes?": "Keep editing", or back again, leaves it as it was, and "Discard changes" closes it
-     (hub#1015, hub#1020, hub#1031). With nothing open, on a record or a new one it does the same as "Back"; on the main screen
+     (hub#1015, hub#1020, hub#1031, hub#1046). With nothing open, on a record or a new one it does the same as "Back"; on the main screen
      of an app it goes back to the Home, also when that screen was reached through a link; and on the Home
      it sends the app to the background.
 In: the apps of the person's menu (the same as the bar's "My apps" button).
@@ -528,7 +530,7 @@ any button), in a fresh load of the page, which already brings the new version; 
 the server does not answer (offline or on a flaky network), the person stays where they were and a notice says
 "Could not open <app>. Check the connection and try again." ("that page" when the screen is not an app's), with
 "Retry", which tries again and opens it as soon as the server answers.
-Involved: INVENTORY-F01, INVENTORY-F02, SALE-F35, TABLE-F01, KITCHEN-F01, CUSTOMER-F01, RESERVATION-F06, APPOINTMENT-F01, STAFF-F01, SERVICE-F01, ATTENDANCE-F08, CART_CHECKOUT-F01, CASH_REGISTER-F02, COMBO-F02, INVENTORY-F06, MODIFIER-F02, PAYMENT-F01, PRICING-F02, INVOICE-F03, PRINTING-F03, SCHEDULE-F04, TASK-F01, TAX-F02, WHATSAPP_INBOX-F29, BASE-F86
+Involved: INVENTORY-F01, INVENTORY-F02, SALE-F35, TABLE-F01, KITCHEN-F01, CUSTOMER-F01, RESERVATION-F06, APPOINTMENT-F01, STAFF-F01, SERVICE-F01, ATTENDANCE-F08, CART_CHECKOUT-F01, CASH_REGISTER-F02, COMBO-F02, INVENTORY-F06, MODIFIER-F02, PAYMENT-F01, PRICING-F02, INVOICE-F03, PRINTING-F03, SCHEDULE-F04, TASK-F01, TAX-F02, WHATSAPP_INBOX-F29, BASE-F86, ONLINE_BOOKING-F05, PAYMENT-F05, PRINTING-F14, RESERVATION-F09, SERVICE-F17, VERIFACTU-F30, BASE-F73, BASE-F75, INVENTORY-F09, TASK-F09, TASK-F10, TASK-F13, CUSTOMER-F18, KITCHEN-F22, BASE-F46
 
 ### BASE-F06 See the apps' panels on the Home
 Status: done
@@ -1510,7 +1512,8 @@ Steps:
      without a country (a demo) is in euros.
   3. On the Home, the amounts of the panels (such as "Sales, last 7 days") and of "Activity" are in that currency,
      with its symbol and its decimals, as a till of that country prints them: "zł" in a business in Poland, "€" in
-     one in Spain. While the business has not answered, the amount shows without a symbol, never in another currency.
+     one in Spain. While the business has not answered, the amount shows as "—", never in another currency or with
+     guessed decimals.
   4. The apps that show prices or amounts are in that same currency, Appointments too (each service's price when
      booking and the appointment's "Total") and the preview of Online booking (hub#577).
 In: the business's country.
@@ -1777,7 +1780,9 @@ Steps:
   4. In "Preferences", "Language" ("Use the business’s language", "Español", "English") and "Appearance" ("Theme
      palette", "Theme": "System (auto)", "Light", "Dark", and "Interface size": 80, 90, 100, 110 or 120%, default
      100%) are saved on choosing and applied at once on any device; "Use the business’s appearance" undoes their own
-     and returns the size to 100%.
+     and returns the size to 100%. The language reaches the whole open application, also the texts the server sends
+     (the side menu, "My apps", the checklist, the Home's panels and the bell), without reloading or going back to
+     Home.
 In: the profile of whoever has the session.
 Out: their name in this business (the one in the side menu, on the faces and in "Devices"), their photo, their language and their
 appearance, including the interface size, which follow them on any device they enter, with their PIN, badge or account. With "Use the
@@ -2815,7 +2820,7 @@ Involved: HUBS-F17, WEBSITE-F10
 
 ### BASE-F111 Wait for the database when it is cut for a moment
 <!-- origin: new (PLAN-DB, round 2026-11-04e, point 5: a restart, an AWS maintenance or the change of version cut the database for a few seconds; twin of erplora.com's ACCOUNTS-F50) gh:hub#831 -->
-Status: done (reads, what never started and Demo's changes; that the changes of the other apps repeat too is hub#1051)
+Status: done
 Actor: anyone of the business in the Hub, on the web or in the app, and any program connected through the API
 Screen: any of the Hub, Page «We will be back soon»
 Steps:
@@ -2825,8 +2830,8 @@ Steps:
      sooner, the screen arrives as always: the person only notices it took longer.
   3. What they were saving waits the same when it is known that nothing was applied: it never started (opening the
      business's database or checking who the person is), or it is a change that only touches the database and had not
-     been confirmed yet. Today Demo's changes are, the reference app's. It is saved only once and in its business, and
-     the notice to the other screens goes out after it is confirmed.
+     been confirmed yet. This covers Demo and the other apps' local commands. It is saved only once and in its business,
+     and the notice to the other screens goes out after it is confirmed.
   4. While it waits it holds none of the transactions at once the business's plan gives: the rest of the business's
      people go on working.
   5. If the time runs out, whoever opens the business's address in the browser sees «We will be back soon» with
@@ -2836,14 +2841,14 @@ In: nothing: the person does nothing different.
 Out: the same answer as always, a few seconds late; or, past the time, a 503 answer with `Retry-After` and never a server
 error. A program receives the code `database_unavailable`, or `base.hub_unavailable` if what does not answer is the
 business's database while it is opened.
-If it fails: what may have been applied is never repeated blindly, and each outcome says its own. A change of the other
-apps cut halfway or while it was being confirmed may have done something outside the database (numbering a task or a
-ticket, a charge, the submission to the AEAT, a WhatsApp): the person reads «The connection was lost while this was being
-saved. Check whether it was saved before trying again.» and a program, the code `database_outcome_unknown`. If the save
-had already been confirmed and the cut only took its answer, they read «It was saved, but the connection was lost before
-the answer arrived. Reload the page in a few seconds to see it.» (`database_answer_lost`). What is no cut (a query that
-takes too long, a fault of the program) stays the error it always was. erplora.com's calls to `/internal` and `/readyz`
-get their 503 at once, without waiting: erplora.com tries again on its own, and `/readyz` has to say the database is gone
-before its probes give up.
-Involved: ACCOUNTS-F50 (its twin on erplora.com), Demo (its changes repeat), the Hub's other waiting pages (a business
-being prepared or moving to another server: the same look); hub#831, hub#1051 and hub#1052
+If it fails: what may have been applied is never repeated blindly, and each outcome says its own. An excluded command,
+because it numbers, charges, generates a QR, submits to the AEAT, sends an email or a WhatsApp, calls a third party or
+writes outside its transaction (cache, sessions, control or the file store), cut halfway or while being confirmed: the
+person reads «The connection was lost while this was being saved. Check whether it was saved before trying again.» and a
+program, the code `database_outcome_unknown`. If the save had already been confirmed and the cut only took its answer,
+they read «It was saved, but the connection was lost before the answer arrived. Reload the page in a few seconds to see
+it.» (`database_answer_lost`). What is no cut (a query that takes too long, a fault of the program) stays the error it
+always was. erplora.com's calls to `/internal` and `/readyz` get their 503 at once, without waiting: erplora.com tries
+again on its own, and `/readyz` has to say the database is gone before its probes give up.
+Involved: ACCOUNTS-F50 (its twin on erplora.com), every app whose local changes repeat, the Hub's other waiting pages (a
+business being prepared or moving to another server: the same look); hub#831, hub#1051 and hub#1052
