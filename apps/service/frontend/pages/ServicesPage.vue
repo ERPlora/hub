@@ -26,8 +26,7 @@ import ServiceFormModal from '../components/ServiceFormModal.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney, useBusinessMoney } from '../lib/format';
-import { parseMoney } from '../lib/money';
+import { filterCents, formatMoney, useBusinessMoney } from '../lib/format';
 import type { PricingType, ServiceListIn, ServiceOut, ServiceStatus } from '../operations';
 import { serviceTabs } from '../tabs';
 
@@ -51,11 +50,7 @@ const filters = ref<DataTableFilters>({});
 const archivedView = computed(() => filters.value.status === 'archived');
 
 /** Minor units of the business's currency of a typed price filter; nothing when it is not an amount. */
-function cents(text: string | undefined): number | undefined {
-  if (!text) return undefined;
-  const read = parseMoney(text, money.value);
-  return read.ok && read.cents !== null ? read.cents : undefined;
-}
+const cents = (text: string | undefined): number | undefined => filterCents(text, money.value);
 const minutes = (text: string | undefined): number | undefined => (text && /^\d+$/.test(text.trim()) ? Number(text.trim()) : undefined);
 
 /** The table's filters as the query takes them: prices in minor units, minutes as numbers. */

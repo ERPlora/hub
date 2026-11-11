@@ -10,7 +10,7 @@ import { InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
-import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { expectAmountLeftWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations';
 import { localDay } from '../lib/format';
 import type { MethodOut, PaymentOut } from '../operations';
@@ -246,6 +246,21 @@ describe('PaymentFormModal', () => {
       s.answer(201, CREATED);
       await click(s.save());
       expect((s.sent()[0].body as { amount: number }).amount).toBe(150);
+    });
+
+    // hub#945 (PAYMENT-F02): an amount typed with its currency's sign and left before the business answers is neither
+    // rewritten nor called «not an amount»; once it answers, it is read in its money.
+    it.each([
+      ['¥1500', JAPANESE, 1500],
+      ['12,50 zł', POLISH, 1250],
+    ] as const)('«%s» left before the business says its currency stays as typed and unmarked, then is read in it (hub#945)', async (typed, money, amount) => {
+      const s = await setup('en', null);
+      await s.result(METHODS, page([BANK]));
+      await s.fill(typed);
+      await expectAmountLeftWaitsForMoney({ amount: () => s.field('amount'), settle }, typed, () => s.result('base.business.get', business(money)));
+      s.answer(201, CREATED);
+      await click(s.save());
+      expect((s.sent()[0].body as { amount: number }).amount).toBe(amount);
     });
   });
 });
