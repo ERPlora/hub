@@ -518,12 +518,12 @@ def list_records(ctx: OperationContext, params: RecordListIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "show me Ana's working day on Monday with its breaks",
+                "show me Nuria's working day on Monday with its breaks",
                 "where did Pedro clock in from yesterday?",
                 "who clocked Marta's day today?",
             ),
             "es": (
-                "enséñame la jornada de Ana del lunes con sus pausas",
+                "enséñame la jornada de Nuria del lunes con sus pausas",
                 "¿desde dónde fichó Pedro ayer?",
                 "¿quién fichó el día de Marta hoy?",
             ),
@@ -658,12 +658,12 @@ def export_records(ctx: OperationContext, params: RecordExportIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "who corrected Ana's working day?",
+                "who corrected Elena's working day?",
                 "show me this week's corrections of clock-ins",
                 "what was changed in yesterday's clock-in and why?",
             ),
             "es": (
-                "¿quién corrigió la jornada de Ana?",
+                "¿quién corrigió la jornada de Elena?",
                 "muéstrame las correcciones de fichajes de esta semana",
                 "¿qué se cambió en el fichaje de ayer y por qué?",
             ),

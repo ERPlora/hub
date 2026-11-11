@@ -523,12 +523,12 @@ def _correct(
     ai={
         "asks": {
             "en": (
-                "correct Ana's clock-out on Monday to 6 pm",
+                "correct Javier's clock-out on Monday to 6 pm",
                 "Pedro clocked in at 9 yesterday, fix his day",
                 "fix Marta's wrong clock-in with the reason «forgot to clock»",
             ),
             "es": (
-                "corrige la salida de Ana del lunes a las 18:00",
+                "corrige la salida de Javier del lunes a las 18:00",
                 "Pedro entró ayer a las 9, arregla su fichaje",
                 "arregla el fichaje mal hecho de Marta con el motivo «se olvidó de fichar»",
             ),
@@ -680,7 +680,7 @@ def review_stale(ctx: OperationContext, data: EmptyIn) -> dict:
             "en": (
                 "close the open day of the person I just terminated",
                 "Luis no longer works here: close his open clock-in",
-                "we let Ana go: close the working day she left open",
+                "we let Nuria go: close the working day she left open",
             ),
             "es": (
                 "cierra la jornada abierta de quien acabo de despedir",
