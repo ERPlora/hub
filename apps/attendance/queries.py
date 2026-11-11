@@ -827,7 +827,7 @@ def list_people(ctx: OperationContext, params: PersonListIn) -> dict:
             "en": (
                 "is Marta still active in the time clock?",
                 "give me Luis's details in the time clock",
-                "was Pedro terminated? check the time clock",
+                "has Pedro left the business? check the time clock",
             ),
             "es": (
                 "¿sigue activa Marta en el control horario?",

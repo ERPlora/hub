@@ -654,7 +654,7 @@ def update_settings(ctx: OperationContext, data: SettingsIn) -> dict:
             ),
             "es": (
                 "deja pendientes de revisión las jornadas que nadie cerró",
-                "revisa si alguien se olvidó de fichar la salida",
+                "comprueba si alguien se olvidó de fichar la salida",
                 "señala las jornadas abiertas desde hace demasiado",
             ),
         },
