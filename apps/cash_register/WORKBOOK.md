@@ -381,7 +381,8 @@ Pasos:
    efectivo contado y, si puedes ver el esperado, el esperado y la diferencia (con el arqueo ciego, a
    quien no lo ve no se lo dice: el asistente tampoco lo conoce, F07), y lo que la revisión del turno
    encuentre pendiente (F08).
-6. Después sale «¿Ejecutar esta acción?» con «Cerrar en Caja. Revisa cada dato antes de seguir.», la
+6. En esa misma respuesta, sin que tengas que volver a pedírselo, sale «¿Ejecutar esta acción?» con
+   «Cerrar en Caja. Revisa cada dato antes de seguir.», la
    sesión por su número (nunca por su código interno) y el efectivo contado y, en «Lo que va a pasar», lo que da el cierre: la «Sesión», el «Cajón»
    (si la sesión tiene uno), el «Esperado en el cajón» y la «Diferencia», con la moneda del negocio (con
    el arqueo ciego, a quien no ve el esperado no le salen esos dos, F07). Escribe «CONFIRMAR» y pulsa
