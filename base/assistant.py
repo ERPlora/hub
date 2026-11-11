@@ -218,6 +218,10 @@ SYNONYMS = (
     # combo: an «opción» or an «elección» of a course is a choice (``combo.option``), as of a modifier group
     # (``modifier.option``). Until ERPlora/live#61, «ordena» and «orden» also name a device: «ordenador»'s stem.
     ("opcion", "opciones", "eleccion", "elecciones", "option", "options", "choice", "choices"),
+    # modifier: the «predeterminada» option is the one a group brings chosen, its default (``is_default``), as the
+    # descriptions say it in English. Never «por defecto»: it is also the default of a shift, a working day or a
+    # threshold (Staff's and Inventory's settings), whose asks would then rank the options of a group.
+    ("predeterminada", "predeterminado", "predeterminadas", "predeterminados", "default"),
 )
 #: The help a how-to question asks for (``live.assistant.HOWTO_POINTS``): it ranks by being one, not only by ``ALWAYS``.
 HOWTO = (DOCS_SEARCH,)
