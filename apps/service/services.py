@@ -1224,8 +1224,8 @@ def _tell_sales(ctx: OperationContext, name: str, data: dict) -> Any:
         "sessions count for nobody's commission.",
         "risk": "normal",
         "asks": {
-            "en": ("sell Lucía the five-massage voucher", "Pilar has bought the laser pack, give it to her"),
-            "es": ("véndele a Lucía el bono de cinco masajes", "Pilar ha comprado el bono de láser, dáselo"),
+            "en": ("sell Inés the five-massage voucher", "Pilar has bought the laser pack, give it to her"),
+            "es": ("véndele a Inés el bono de cinco masajes", "Pilar ha comprado el bono de láser, dáselo"),
         },
     },
 )
@@ -1276,9 +1276,9 @@ def create_grant(ctx: OperationContext, data: GrantIn) -> dict:
         "service.grant.list (by its owner's name or phone, or its package).",
         "risk": "high",
         "asks": {
-            "en": ("void Lucía's voucher, it was sold by mistake", "void the voucher we just sold to Pilar"),
+            "en": ("void Inés's voucher, it was sold by mistake", "void the voucher we just sold to Pilar"),
             "es": (
-                "el bono de láser de Lucía fue una equivocación, anúlalo",
+                "el bono de láser de Inés fue una equivocación, anúlalo",
                 "anula el bono que acabamos de venderle a Pilar",
             ),
         },
@@ -1320,8 +1320,8 @@ def void_grant(ctx: OperationContext, data: VoidIn) -> dict:
         "from service.grant.list (by its owner's name or phone, or its package).",
         "risk": "high",
         "asks": {
-            "en": ("give Lucía two free sessions on her voucher", "extend Pilar's voucher by a month"),
-            "es": ("regálale dos sesiones a Lucía en su bono", "alarga un mes la caducidad del bono de Pilar"),
+            "en": ("give Inés two free sessions on her voucher", "extend Pilar's voucher by a month"),
+            "es": ("regálale dos sesiones a Inés en su bono", "alarga un mes la caducidad del bono de Pilar"),
         },
     },
 )
@@ -1371,10 +1371,10 @@ def adjust_grant(ctx: OperationContext, data: AdjustIn) -> dict:
         "left. The voucher's id comes from service.grant.list (by its owner's name or phone, or its package).",
         "risk": "normal",
         "asks": {
-            "en": ("use one session of Lucía's massage voucher", "mark a session of Pilar's voucher as spent"),
+            "en": ("use one session of Inés's massage voucher", "mark a session of Pilar's voucher as spent"),
             "es": (
-                "gasta una sesión del bono de masajes de Lucía",
-                "Rocío ha venido a su masaje, réstale una sesión del bono",
+                "gasta una sesión del bono de masajes de Inés",
+                "Paloma ha venido a su masaje, réstale una sesión del bono",
             ),
         },
     },
@@ -1556,11 +1556,11 @@ def _owner_name(session: Redemption) -> str:
         "risk": "normal",
         "asks": {
             "en": (
-                "hold a session of Lucía's voucher for her manicure",
+                "hold a session of Inés's voucher for her manicure",
                 "keep a session of Pilar's voucher on hold for her colour",
             ),
             "es": (
-                "aparta una sesión del bono de Lucía para su manicura",
+                "aparta una sesión del bono de Inés para su manicura",
                 "deja retenida una sesión del bono de Pilar para su tinte",
             ),
         },
@@ -1618,9 +1618,9 @@ def hold_session(ctx: OperationContext, data: HoldIn) -> dict:
         "holds is that line's voucher_session_id, from sale.order.get.",
         "risk": "normal",
         "asks": {
-            "en": ("release the session held for Lucía's manicure", "free the session Pilar's voucher had on hold"),
+            "en": ("release the session held for Inés's manicure", "free the session Pilar's voucher had on hold"),
             "es": (
-                "suelta la sesión retenida del bono de Lucía",
+                "suelta la sesión retenida del bono de Inés",
                 "libera la sesión que tenía apartada el bono de Pilar",
             ),
         },

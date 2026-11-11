@@ -1158,8 +1158,8 @@ def get_package(ctx: OperationContext, data: PackageRefIn) -> dict:
         "description": "List the vouchers sold, most recent first: the ones of a package, or the ones a customer owns "
         "(by name or phone), with the sessions used and left, the expiry and whether it was voided.",
         "asks": {
-            "en": ("which vouchers has Lucía bought?", "who has bought the laser pack?"),
-            "es": ("¿qué bonos tiene comprados Lucía?", "¿quién ha comprado el bono de láser?"),
+            "en": ("which vouchers has Inés bought?", "who has bought the laser pack?"),
+            "es": ("¿qué bonos tiene comprados Inés?", "¿quién ha comprado el bono de láser?"),
         },
     },
 )
@@ -1197,8 +1197,8 @@ def list_grants(ctx: OperationContext, params: GrantListIn) -> dict:
         "description": "Get one voucher sold by its id: its package, its owner, the day it was sold and its balance. "
         "The voucher's id comes from service.grant.list (by its owner's name or phone, or its package).",
         "asks": {
-            "en": ("get me the details of the voucher we sold Pilar", "what's the balance of Lucía's laser voucher?"),
-            "es": ("dame los detalles del bono que le vendimos a Pilar", "¿qué saldo tiene el bono de láser de Lucía?"),
+            "en": ("get me the details of the voucher we sold Pilar", "what's the balance of Inés's laser voucher?"),
+            "es": ("dame los detalles del bono que le vendimos a Pilar", "¿qué saldo tiene el bono de láser de Inés?"),
         },
     },
 )
@@ -1220,9 +1220,9 @@ def get_grant(ctx: OperationContext, data: ByIdIn) -> dict:
         "it pays and whether it is held, spent, released, expired or returned. The id of the session a line of a check "
         "holds is that line's voucher_session_id, from sale.order.get.",
         "asks": {
-            "en": ("is that session of Lucía's voucher still held?", "what happened to that voucher session?"),
+            "en": ("is that session of Inés's voucher still held?", "what happened to that voucher session?"),
             "es": (
-                "¿en qué estado está la sesión del bono de Lucía?",
+                "¿en qué estado está la sesión del bono de Inés?",
                 "¿esa sesión del bono ya se gastó o sigue retenida?",
             ),
         },
@@ -1289,9 +1289,9 @@ def list_orphans(ctx: OperationContext, params: PageIn) -> dict:
         "description": "Whether a voucher sold can be voided now and, if not, why (already_voided, in_use). The "
         "voucher's id comes from service.grant.list (by its owner's name or phone, or its package).",
         "asks": {
-            "en": ("can Lucía's voucher still be voided?", "is it too late to void Pilar's voucher?"),
+            "en": ("can Inés's voucher still be voided?", "is it too late to void Pilar's voucher?"),
             "es": (
-                "¿se puede anular todavía el bono de Lucía?",
+                "¿se puede anular todavía el bono de Inés?",
                 "¿el bono de Pilar ya tiene sesiones gastadas o aún se puede anular?",
             ),
         },
@@ -1328,9 +1328,9 @@ def void_refusal(grant: Grant) -> str:
         "description": "What can be adjusted on a voucher sold: sessions (if it has a limit) and its expiry (if it has "
         "one). The voucher's id comes from service.grant.list (by its owner's name or phone, or its package).",
         "asks": {
-            "en": ("what can I change on Lucía's voucher?", "can Pilar's voucher get a later expiry?"),
+            "en": ("what can I change on Inés's voucher?", "can Pilar's voucher get a later expiry?"),
             "es": (
-                "¿el bono de Lucía admite más sesiones o más días de caducidad?",
+                "¿el bono de Inés admite más sesiones o más días de caducidad?",
                 "¿se le puede alargar la caducidad al bono de Pilar?",
             ),
         },
@@ -1361,8 +1361,8 @@ def adjust_check(ctx: OperationContext, data: ByIdIn) -> dict:
         "why: voided, expired, no_uses_left or does_not_cover_service. The voucher's id comes from service.grant.list "
         "(by its owner's name or phone, or its package).",
         "asks": {
-            "en": ("can Lucía's voucher pay for a manicure?", "why can't Pilar's voucher be used?"),
-            "es": ("¿le sirve a Lucía su bono para una manicura?", "¿por qué no se puede gastar el bono de Pilar?"),
+            "en": ("can Inés's voucher pay for a manicure?", "why can't Pilar's voucher be used?"),
+            "es": ("¿le sirve a Inés su bono para una manicura?", "¿por qué no se puede gastar el bono de Pilar?"),
         },
     },
 )
@@ -1412,9 +1412,9 @@ def redeem_refusal(grant: Grant, state: Balance, service: Service | None) -> str
         "counted sessions before unlimited, then the one expiring first, the one already started, the one with fewest "
         "sessions left, the one bought first.",
         "asks": {
-            "en": ("which of Lucía's vouchers would pay for a massage?", "what vouchers can Pilar use for her colour?"),
+            "en": ("which of Inés's vouchers would pay for a massage?", "what vouchers can Pilar use for her colour?"),
             "es": (
-                "¿qué bonos de Lucía le sirven para el masaje?",
+                "¿qué bonos de Inés le sirven para el masaje?",
                 "¿qué bono se gastaría primero si Pilar viene a hacerse el tinte?",
             ),
         },

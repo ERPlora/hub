@@ -82,6 +82,75 @@ FIRST_TEN = frozenset({
     "service.settings.get",
 })
 
+#: What a person says in words of their own, neither an ask nor a probe of layer 2, one for each tool of Services: it is
+#: the tool's own asks that bring it among the first ten (measured on this branch: without them it is not), so the asks
+#: of any tool that stop reading as people speak fail here, tool by tool. The probes alone leave 23 of the 46 unwatched:
+#: their tools come by their name, their verb or the Hub's groups.
+OWN_WORDS = [
+    ("service.service.list", "dime todo lo que ofrecemos"),
+    ("service.service.get", "¿cuánto dura la manicura?"),
+    ("service.service.suggest_image", "¿qué dibujo de la biblioteca va con el masaje?"),
+    ("service.service.list_for_sale", "¿qué hay ahora mismo a la venta?"),
+    ("service.catalog.status", "¿cuántos servicios nos quedan sin su IVA puesto?"),
+    ("service.category.list", "¿en qué familias tenemos repartidos los servicios?"),
+    ("service.category.get", "¿qué hay dentro de la categoría de pestañas?"),
+    ("service.settings.get", "¿cuánto margen dejamos por defecto?"),
+    ("service.settings.update", "quiero que por defecto haya quince minutos de margen"),
+    ("service.assignment.list", "¿qué hace Raquel?"),
+    ("service.assignment.get", "¿cuánto le lleva a Raquel un tinte?"),
+    ("service.assignment.eligible", "¿hay alguien que pueda hacer pedicura?"),
+    ("service.assignment.assign", "Raquel también va a hacer manicuras"),
+    ("service.assignment.update", "ponle a Sonia la pedicura como lo principal"),
+    ("service.assignment.remove", "quita a Raquel de las pedicuras"),
+    ("service.package.list", "¿qué bonos tenemos para elegir?"),
+    ("service.package.get", "¿qué trae el bono de láser?"),
+    ("service.package.create", "quiero un bono de 8 sesiones de láser que caduque en un año"),
+    ("service.package.update", "el bono de láser ahora vale 450 €"),
+    ("service.package.delete", "el bono de pedicuras ya no se vende"),
+    ("service.grant.list", "¿qué ha comprado Inés?"),
+    ("service.grant.get", "¿cuánto saldo le queda a Pilar en su bono?"),
+    ("service.grant.list_orphans", "¿quedan bonos de clientas que ya no existen?"),
+    ("service.grant.void_check", "¿se puede deshacer todavía el bono de Pilar?"),
+    ("service.grant.adjust_check", "¿hasta dónde puedo estirar el bono de Pilar?"),
+    ("service.grant.redeem_check", "¿qué impide gastar el bono de Pilar?"),
+    ("service.grant.tender_options", "¿con qué bonos puede venir Pilar al masaje?"),
+    ("service.grant.create", "Inés se lleva el bono de láser"),
+    ("service.grant.redeem", "Pilar ha gastado una sesión de su bono de pedicuras"),
+    ("service.grant.void", "el bono de Pilar se vendió por equivocación"),
+    ("service.grant.adjust", "dale a Pilar dos semanas más de bono"),
+    ("service.movement.list", "¿quién ha tocado el bono de láser?"),
+    ("service.session.get", "¿qué pasó con la sesión retenida de Inés?"),
+    ("service.session.hold", "guárdale a Pilar una sesión del bono para el tinte"),
+    ("service.session.release", "Pilar no viene, deja libre su sesión"),
+    ("service.session.return", "han devuelto la venta del láser, que vuelvan las sesiones"),
+    ("service.session.settle", "cobrada la venta, gasta ya las sesiones apartadas"),
+    ("service.service.create", "da de alta el alisado de keratina a 90 €"),
+    ("service.service.bulk_create", "crea todos estos de una vez: cejas, pestañas y uñas"),
+    ("service.service.update", "la manicura pasa a costar 30 €"),
+    ("service.service.archive", "la permanente ya no la ofrecemos"),
+    ("service.service.restore", "recupera la permanente que archivamos"),
+    ("service.service.set_image", "quédate con la segunda que me has propuesto para el tinte"),
+    ("service.category.create", "agrupa los de uñas en uno nuevo llamado Manos"),
+    ("service.category.update", "mueve Uñas dentro de Estética"),
+    ("service.category.delete", "Varios sobra"),
+]
+#: How far down the tools a turn offers an ask brings its own (``base/tests/test_assistant_asks.py``).
+TOP = 10
+#: The asks of other apps that Services' asks and groups move down (measured on this branch against the same tree
+#: without them: none below the eighth, in any role): each keeps ``ROOM`` places free below the first ten for the next
+#: app that says its own.
+ROOM = 2
+MOVED = [
+    ("base.file.read", "es", "¿cuánto pesa ese archivo?"),
+    ("base.file.upload", "es", "archiva el documento que te adjunto"),
+    ("base.file.upload", "es", "guarda este PDF en los archivos"),
+    ("inventory.category.update", "es", "renombra la categoría Bebidas a Refrescos"),
+    ("sale.order.remove_voucher", "es", "al final no uses el bono en el corte"),
+    ("sale.payment_method.create", "en", "we take meal vouchers now"),
+    ("staff.member.detail", "es", "¿qué datos tiene la ficha de Lucía?"),
+    ("table.zone.update", "en", "take the terrace out of service, it's raining"),
+]
+
 #: The tools that take a record by its id alone, and the read that finds that id by what a person names it with (the
 #: customer who owns a voucher, the service and the professional of an assignment, the line of a check a session pays):
 #: its description says that read, so the model looks the record up instead of asking the person for an id they never
@@ -138,6 +207,12 @@ def offered_with_room(tools: dict[str, Operation], name: str, phrase: str) -> No
     assert found is not None and found <= WITH_ROOM, found
 
 
+def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
+    """``tools`` with ``name`` saying no asks: how a turn ranks it by its name, its description and the groups."""
+    op = tools[name]
+    return {**tools, name: dataclasses.replace(op, ai={key: value for key, value in op.ai.items() if key != "asks"})}
+
+
 def without_services_asks(tools: dict[str, Operation]) -> dict[str, Operation]:
     """``tools`` with Services' tools saying no asks: how a turn ranked them before Services said its own."""
     return {
@@ -191,6 +266,39 @@ def test_the_probes_that_come_close_stay_among_the_first_ten(catalog_of, probe):
 
 def test_the_close_probes_are_probes_of_services():
     assert FIRST_TEN <= {probe["tool"] for probe in PROBES}  # positive control: no name of the list is mistyped
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
+def test_a_request_in_the_owners_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
+    tools = catalog_of(Membership.Role.OWNER, "es")
+    assert comparable(phrase) not in probe_phrases()
+    assert comparable(phrase) not in {comparable(ask) for asks in shared.asks_of(tools[name]).values() for ask in asks}
+    found = place(tools, name, phrase)
+    assert found is not None and found <= TOP, found
+    before = without_its_asks(tools, name)
+    assert not shared.asks_of(before[name])  # positive control: the tool is ranked without its asks
+    unasked = place(before, name, phrase)
+    assert unasked is None or unasked > TOP, unasked
+
+
+def test_every_tool_of_services_has_its_own_words():
+    tools = {name for name, op in registry.items() if op.app_label == "service" and assistant.is_tool(op)}
+    assert [name for name, _ in OWN_WORDS] == list(dict.fromkeys(name for name, _ in OWN_WORDS))  # one each
+    assert {name for name, _ in OWN_WORDS} == tools
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@pytest.mark.parametrize(("name", "language", "ask"), MOVED)
+def test_services_leaves_room_to_the_asks_of_other_apps_it_moves(catalog_of, name, language, ask):
+    assert ask in shared.asks_of(registry[name])[language]  # positive control: it is still that tool's ask
+    places = {}
+    for role in Membership.Role:
+        tools = catalog_of(role, language)
+        if name in tools:
+            places[role] = place(tools, name, ask, language)
+    assert places  # positive control: some role holds the tool
+    assert {role: found for role, found in places.items() if found is None or found > TOP - ROOM} == {}
 
 
 @pytest.mark.parametrize(("name", "read"), sorted(FOUND_BY.items()))
