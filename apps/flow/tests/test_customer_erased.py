@@ -4,7 +4,8 @@ is cancelled, saying why, and forgets what its steps read; nothing is sent to he
 customers' runs go on, an automation that starts on the erasure still starts (FLOW-F21), a repeated delivery changes
 nothing and an erasure in another business leaves this one's runs alone. In the same pass, every run that names her card
 by its id, also one that has already ended, forgets the free texts its History keeps (hub#1227, FLOW-F16): an answer's
-note, what the assistant or another app answered, the title of a question in a «no»; what happened stays.
+note, what the assistant or another app answered, the title of a question in a «no»; what happened stays. A run started
+by hand or by a schedule is found too once it has ended (hub#1240): it keeps the ids of what its steps read.
 
 Through the real apps and the worker's real outbox relay (``worker``): Customers' own operation erases the card and
 writes its notice; one tick hands it to flow.
@@ -28,7 +29,10 @@ from apps.task.models import Task
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 
+from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
+
 from .conftest import A, ctx_for, make_run, run
+from .test_services_assistant_step import CHAT, said, wants
 
 EVA = {"name": "Eva Ruiz", "phone": "+34600111222", "email": "eva@example.com"}
 READ_HER_CARD = {"id": "s1", "kind": "query", "operation": "customer.customer.detail", "params": {"id": "input.id"}}
@@ -337,6 +341,80 @@ def test_a_run_that_ended_on_a_no_about_her_forgets_her_name_and_keeps_who_said_
         FlowRun.Status.CANCELLED, "flow.question_rejected", "tester",
     )
     assert [(e["outcome"], e.get("approved"), e.get("by")) for e in ended.log][-1] == ("answered", False, "tester")
+
+
+BY_HAND = {"kind": "manual"}
+FIND_EVA = {"id": "s1", "kind": "query", "operation": "customer.customer.list", "params": {"search": "Eva"}}
+
+
+def by_hand(worker, steps: list[dict], operations: list[str]) -> FlowRun:
+    """A run of an automation started by hand with nothing typed in: what started it names no card."""
+    ran = worker.request("flow.flow.run", {"id": automation(steps, operations, trigger=BY_HAND)})
+    worker()
+    return FlowRun.objects.get(pk=ran.id)
+
+
+@pytest.mark.django_db
+def test_a_run_by_hand_that_read_her_card_forgets_her_name_once_it_has_ended(worker):
+    # The issue's: «By hand → find "Eva" → ask "Call {name}?"», answered no with a note: it ended, so it no longer
+    # keeps what its steps read, and nothing that started it names her card.
+    eva = worker.request("customer.customer.create", EVA)
+    ask = {"id": "s2", "kind": "ask", "title": "Call {{steps.s1.name}}?", "details": "Her phone: {{steps.s1.phone}}"}
+    asking = by_hand(worker, [FIND_EVA, ask], ["customer.customer.list"])
+    run("flow.question.answer", {"id": str(Question.objects.get().id), "approve": False, "note": "Eva Ruiz moved"})
+    asking.refresh_from_db()
+    assert (asking.status, asking.input, asking.outputs) == (FlowRun.Status.CANCELLED, {}, {})
+    assert "Eva Ruiz" in stored(asking) and str(eva.id) not in stored(asking)  # positive control: the issue's gap
+
+    erase(worker, eva.id)
+    worker()
+
+    assert "Eva Ruiz" not in stored(asking) and "+34600111222" not in stored(asking)
+    said_now = run("flow.run.get", {"id": str(asking.id)}, ctx_for(language="es")).model_dump(mode="json")
+    assert "Eva Ruiz" not in json.dumps(said_now, ensure_ascii=False)
+    assert (asking.status, asking.error_code) == (FlowRun.Status.CANCELLED, "flow.question_rejected")
+
+
+@pytest.mark.django_db
+def test_a_run_whose_assistant_read_her_card_forgets_what_it_answered_about_her(gateway, worker):
+    # «By hand → ask the assistant», which reads her card with its tool and answers with her name: once its turn is
+    # over and the run has ended, nothing it keeps names her card by its id.
+    eva = worker.request("customer.customer.create", EVA)
+    helper = {"id": "s1", "kind": "assistant", "prompt": "Who should I call?", "tools": ["customer.customer.detail"]}
+    gateway.reply(CHAT, json=wants("customer__customer__detail", {"id": str(eva.id)}))
+    gateway.reply(CHAT, json=said("Call Eva Ruiz on +34600111222"))
+    answered = by_hand(worker, [helper], ["customer.customer.detail"])
+    assert (answered.status, answered.outputs) == (FlowRun.Status.SUCCEEDED, {})
+    assert "Eva Ruiz" in stored(answered) and str(eva.id) not in stored(answered)  # positive control
+
+    erase(worker, eva.id)
+    worker()
+
+    assert "Eva Ruiz" not in stored(answered) and "+34600111222" not in stored(answered)
+    assert [entry["outcome"] for entry in answered.log] == ["thinking", "assistant_used", "assistant_answered"]
+
+
+@pytest.mark.django_db
+def test_a_run_stopped_by_an_error_whose_card_the_hourly_pass_forgot_is_still_found():
+    # Stopped 8 days ago by another app: the hourly pass forgets what its steps read (FLOW-F24); the erasure still
+    # finds it, and a run that read another customer's card is left as it was.
+    eight_days_ago = timezone.now() - dt.timedelta(days=8)
+    failed, eva = run_that_read_her_card(
+        FlowRun.Status.FAILED, [A_DAY], resume_at=None, finished_at=eight_days_ago, error_code="task.title_taken",
+        error_message="Call Eva Ruiz is already a task",
+    )
+    ana = Customer.objects.create(name="Ana López")
+    others = make_run(failed.flow, status=FlowRun.Status.FAILED, input={}, finished_at=eight_days_ago,
+                      outputs={"s1": {"id": str(ana.id), "name": "Ana López"}}, error_code="task.title_taken",
+                      error_message="Call Ana López is already a task")
+    run("flow.run.prune", {}, system_context(A))
+    assert str(eva.id) not in stored(failed) and str(ana.id) not in stored(others)  # positive control
+    kept_by_others = stored(others)
+
+    assert run("flow.customer.erase", {"id": str(eva.id)}, system_context(A)).changed == 1
+
+    assert "Eva Ruiz" not in stored(failed)
+    assert stored(others) == kept_by_others
 
 
 #: What the engine itself said of a step it did not run, as the History keeps it: it names no person.

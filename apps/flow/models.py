@@ -138,6 +138,9 @@ class FlowRun(UUIDModel):
     log = models.JSONField(_("log"), default=list, blank=True)
     # ``steps.<id>``: what each step left for the next ones.
     outputs = models.JSONField(_("outputs"), default=dict, blank=True)
+    # The ids in what its steps left, kept when that is forgotten (the run ends, the assistant's turn is over, the
+    # hourly pass): never their data. Erasing a customer finds by them a run that read her card (CUSTOMER-F16).
+    read_ids = models.JSONField(_("ids it read"), default=list, db_default=[], blank=True)
     error_code = models.CharField(_("error code"), max_length=96, blank=True)
     # As it was said, in the automation's language: what an action of another app answered is shown so.
     error_message = models.TextField(_("error"), blank=True)
