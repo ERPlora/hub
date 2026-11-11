@@ -485,8 +485,8 @@ msgid "That discount is bigger than what it comes off."
 msgstr "Ese descuento es mayor que el importe del que se descuenta."
 
 #, python-format
-msgid "«%(name)s» cannot be charged: no tax rule applies to its tax category («%(category)s») here."
-msgstr "«%(name)s» no se puede cobrar: ninguna regla fiscal se aplica aquí a su categoría fiscal («%(category)s»)."
+msgid "«%(name)s» cannot be charged: no tax rule applies to its tax category «%(category)s» here. Create its rule in Taxes › Rules."
+msgstr "«%(name)s» no se puede cobrar: ninguna regla fiscal se aplica aquí a su categoría fiscal «%(category)s». Crea su regla en Impuestos › Reglas."
 
 msgid "That check does not exist."
 msgstr "Esa cuenta no existe."

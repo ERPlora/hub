@@ -328,7 +328,9 @@ líneas, las baldosas, la búsqueda, las cuentas abiertas y el botón flotante d
 mientras llega el total, porque sin ella no se sabe cuántos decimales tiene (en yenes, «Cobrar · 15,00» para
 1.500 ¥; hub#936); en cuanto la dice, sale la cifra con su signo. Si el servidor no puede valorar la
 cuenta (por ejemplo, porque falta una regla de IVA aplicable), el pie muestra su motivo en vez de dejar
-solo «—»; al poder valorarla, el aviso desaparece y vuelve el total, y al aparcar la cuenta no se
+solo «—»; sin regla, el motivo nombra el artículo y su categoría fiscal con el nombre que le da Impuestos, en
+el idioma de quien mira (p. ej. «Servicio — general», nunca su clave `service.generic`), y termina en «Crea
+su regla en Impuestos › Reglas.»; la hoja **Cobro** dice lo mismo (hub#1123). Al poder valorarla, el aviso desaparece y vuelve el total, y al aparcar la cuenta no se
 queda en el TPV vacío. La hoja **Cobro** sigue en
 «Calculando el total…», sin teclado y con «Cobrar» en gris, porque el total se pinta y lo entregado se lee en ella (sin ella,
 «1500» yenes entregados se cobraría como 150 000); si la moneda no se puede leer, sale el aviso con «Reintentar»
@@ -1381,7 +1383,9 @@ negocio no haya dicho todavía su moneda, porque el importe se lee y el precio s
 «1500» yenes entraría como 150 000), y el precio no sale todavía: «Usar —», y en la baldosa «—» o «Desde —»
 (nunca «Desde 65,00» para 6.500 ¥; hub#936). Un servicio sin categoría fiscal sale «Falta el IVA» y no entra («No se
 puede vender: sin categoría fiscal. Falta configurar el IVA.»); ese aviso se va solo en cuanto el servicio tiene
-categoría, sin tocar nada más, y también al salir de **Vender**. Uno archivado, «Ese servicio ya no se
+categoría, sin tocar nada más, y también al salir de **Vender**. Uno cuya categoría no tiene regla en el
+país del negocio entra, pero la cuenta no se valora ni se cobra: el pie lo dice como en SALE-F01, con el nombre
+de la categoría y dónde se crea su regla (hub#1123). Uno archivado, «Ese servicio ya no se
 ofrece…»; un importe fuera del mínimo y el máximo del servicio, «Ese importe está fuera de lo que admite
 el servicio (<mínimo> – <máximo>).». Un precio reservado que no casa con la cita: «Ese no es el precio
 que reservó la cita para este servicio: está cancelada, es de otra clienta, no reservó este servicio o

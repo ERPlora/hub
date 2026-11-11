@@ -558,6 +558,7 @@ LIVE = {
 # every app whose tools all say their asks is here. The list is written only here, one app per line (hub#1144).
 LIVE_ASSISTANT_ASKS_REQUIRED = (
     "base",
+    "cash_register",
     "customer",
     "inventory",
     "printing",
