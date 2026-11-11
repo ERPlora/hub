@@ -161,6 +161,41 @@ def probe_phrases() -> dict[str, str]:
     }
 
 
+# ── What an app's own test of its asks ranks with (``apps/<app>/tests/test_assistant_asks.py`` imports them) ────────
+
+
+@pytest.fixture
+def catalog_of(make_user):
+    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
+
+    def of(role: str, language: str) -> dict[str, Operation]:
+        user = make_user(f"asker-{role}", host=A.key, role=role)
+        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
+        return assistant.catalog(ctx)
+
+    return of
+
+
+def offered_place(tools: dict[str, Operation], name: str, phrase: str, language: str = "es") -> int | None:
+    """The place a turn offers ``name`` at for ``phrase`` (1 is first), ``None`` when it is not offered at all."""
+    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
+    return offered.index(name) + 1 if name in offered else None
+
+
+def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str) -> int | None:
+    """``offered_place`` of a tool the person holds for a ``phrase`` that is none of its asks in Spanish."""
+    assert name in tools  # positive control: the person holds the tool, so its place is known
+    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
+    return offered_place(tools, name, phrase)
+
+
+def assert_reported_are_owner_probes(reported: Iterable[tuple[str, str]]) -> None:
+    """Each ``(tool, phrase)`` an app's test reports is, word for word, the owner's Spanish probe of layer 2 of that
+    tool (``owner.es.<tool>``): the phrases are the QA's, never written to fit."""
+    phrases = probe_phrases()
+    assert [phrases.get(comparable(phrase)) for _, phrase in reported] == [f"owner.es.{name}" for name, _ in reported]
+
+
 def test_no_ask_copies_a_qa_probe_or_names_a_qa_record():
     """The probes measure that the selection generalises (docs plan 2026-10-31 §1.5): a probe written into its tool's
     asks ranks its own words and layer 2 skips it as a copy, and a record of the QA's data («Documentos QA/nota-qa.txt»,
