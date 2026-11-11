@@ -782,6 +782,18 @@ def test_its_restore_page_speaks_spanish(client, root):
     assert "Clúster temporal" in html and "Momento" in html
 
 
+@pytest.mark.parametrize("action", ["move_to_cluster", "restore_from_a_copy"])
+def test_a_confirmation_page_wraps_a_long_database_name_as_a_hubs_own_page_does(client, root, action):
+    """The chosen hubs are read-only rows of an aligned fieldset: the admin's forms sheet is what wraps a database name
+    wider than a phone (375 px) instead of pushing the page sideways."""
+    hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")
+
+    html = client.post(HUBS, {"action": action, "_selected_action": [str(hub.pk)]}, HTTP_HOST=PLATFORM).content.decode()
+
+    assert 'class="module aligned"' in html and f'<div class="readonly">{hub.db_name}</div>' in html
+    assert "admin/css/forms.css" in html
+
+
 def test_the_move_speaks_spanish():
     from django.utils import translation
     from django.utils.translation import gettext, ngettext

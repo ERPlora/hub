@@ -1,10 +1,12 @@
 {% extends "admin/base_site.html" %}
-{% load i18n %}
+{% load i18n static %}
 {% comment %}
 The confirmation page of an action of the Hub admin that asks for something first (control.admin.HubAdmin.confirmation):
 the chosen hubs, what the action does (block «intro»), its form and its button (block «submit»). Confirmed, the action
 asks each hub through its operation. «Move to cluster…» and «Restore from a copy…» extend it.
 {% endcomment %}
+{# The admin's forms sheet, as a hub's own page loads it: it lays out the aligned rows and wraps a long database name. #}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'admin/css/forms.css' %}">{% endblock extrastyle %}
 {% block breadcrumbs %}
 <div class="breadcrumbs">
   <a href="{% url 'admin:index' %}">{% translate "Home" %}</a>
