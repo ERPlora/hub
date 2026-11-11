@@ -30,7 +30,7 @@ const props = defineProps<{
 const emit = defineEmits<{ saved: [reservation: ReservationOut] }>();
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('reservation-form', () => ({ customer: customer.value, name: name.value, phone: phone.value, email: email.value, date: date.value, time: time.value, party: party.value, duration: duration.value, table: table.value, source: source.value, notes: notes.value, internalNotes: internalNotes.value }), open);
+const canDismiss = useUnsavedFormOnOpen('reservation-form', () => ({ customer: customer.value, name: name.value, phone: phone.value, email: email.value, date: date.value, time: time.value, party: party.value, duration: duration.value, table: table.value, source: source.value, notes: notes.value, internalNotes: internalNotes.value }), open);
 
 const t = useT();
 const client = useLiveClient();
@@ -202,6 +202,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="reservation-form"
     :title="title"
     :submit-label="editing ? $t('reservation.form.submitEdit') : $t('reservation.form.submitNew')"

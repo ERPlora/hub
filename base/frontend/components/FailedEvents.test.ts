@@ -231,11 +231,12 @@ describe('FailedEvents: Android Back with unsaved changes (hub#1046, BASE-F05)',
       inDoc('failed-event-discard-reason').dispatchEvent(new CustomEvent('ionInput', { detail: { value } }));
       await flush();
     };
-    const { expectUnsavedFormOnAndroidBack } = await import('../__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => inDoc('failed-event-discard-dialog'),
       change: () => typed('Invoiced by hand.'),
       restore: () => typed(''),
+      confirm: mocks.confirm,
     });
   });
 });

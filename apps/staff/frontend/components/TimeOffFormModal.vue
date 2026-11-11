@@ -23,7 +23,7 @@ const props = defineProps<{
 
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('staff-time-off-form', () => form.value, open);
+const canDismiss = useUnsavedFormOnOpen('staff-time-off-form', () => form.value, open);
 
 interface TimeOffForm {
   member_id: string;
@@ -103,6 +103,7 @@ async function save(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="staff-time-off-form"
     :title="title"
     :pending="pending"

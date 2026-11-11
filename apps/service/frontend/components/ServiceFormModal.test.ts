@@ -427,8 +427,8 @@ describe('ServiceFormModal: Android Back with unsaved changes (hub#1020, BASE-F0
   it('as opened closes; a change asks; restored as opened closes again', async () => {
     const s = await setup();
     await s.result('service.settings.get', SETTINGS);
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('service-form'),
       change: () => ionValue(s.field('name'), 'Haircut', 'ionInput'),
       restore: () => ionValue(s.field('name'), '', 'ionInput'),

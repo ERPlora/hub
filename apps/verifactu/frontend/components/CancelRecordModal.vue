@@ -21,7 +21,7 @@ const open = defineModel<boolean>('open', { required: true });
 const t = useT();
 const command = useCommand('verifactu.record.cancel');
 const reason = shallowRef('');
-useUnsavedFormOnOpen('verifactu-cancel', reason, open);
+const canDismiss = useUnsavedFormOnOpen('verifactu-cancel', reason, open);
 const missing = shallowRef(false);
 
 watch(
@@ -58,6 +58,7 @@ async function cancel(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="verifactu-cancel"
     role="alertdialog"
     submit-color="danger"

@@ -105,7 +105,7 @@ async function confirm(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen(
+const canDismiss = useUnsavedFormOnOpen(
   'printing-printer',
   () => ({ name: name.value, kind: kind.value, address: address.value, port: port.value, paper: paper.value, usage: usage.value, active: active.value }),
   open,
@@ -115,6 +115,7 @@ useUnsavedFormOnOpen(
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="printing-printer"
     :title="printer ? $t('printing.modal.edit') : $t('printing.modal.create')"
     :submit-label="$t('printing.modal.save')"

@@ -5,7 +5,8 @@
 // the window (its fields), which tells its overlay apart from any other open. The question is the ConfirmDialog of
 // `@erplora/ui` (`useConfirm`), so Back on it closes the question and the person keeps editing. It gives back the same
 // question for the window's own ways out (hub#1023): the `canDismiss` of its FormModal, which asks it on Cancel, the
-// close button, Escape and the backdrop while `dirty`, and lets it close at once when nothing is typed.
+// close button, Escape and the backdrop while `dirty`, and lets it close at once when nothing is typed. `useUnsavedForm`
+// and `useUnsavedFormOnOpen` give back the same question (hub#1156, BASE-F05), for every form window to hand its FormModal.
 import { useConfirm } from '@erplora/ui/components';
 import { computed, getCurrentInstance, type MaybeRefOrGetter, onScopeDispose, ref, toValue, watch } from 'vue';
 
@@ -47,22 +48,24 @@ export function useUnsavedChanges(inside: Inside, dirty: MaybeRefOrGetter<boolea
   return async () => !toValue(dirty) || confirmDiscard();
 }
 
-/** A form is dirty when its current fields differ from the snapshot taken when it opened. */
+/** A form is dirty when its current fields differ from the snapshot taken when it opened. Gives back its FormModal's
+ *  `canDismiss`. */
 export function useUnsavedForm(
   inside: Inside,
   current: MaybeRefOrGetter<unknown>,
   original: MaybeRefOrGetter<unknown>,
-): void {
+): () => Promise<boolean> {
   const dirty = computed(() => JSON.stringify(toValue(current)) !== JSON.stringify(toValue(original)));
-  useUnsavedChanges(inside, dirty);
+  return useUnsavedChanges(inside, dirty);
 }
 
-/** Snapshots after the window's own opening reset; a closed window never holds Back. */
+/** Snapshots after the window's own opening reset; a closed window never holds Back. Gives back its FormModal's
+ *  `canDismiss`. */
 export function useUnsavedFormOnOpen(
   inside: Inside,
   current: MaybeRefOrGetter<unknown>,
   open: MaybeRefOrGetter<boolean>,
-): void {
+): () => Promise<boolean> {
   const original = ref<string>();
   watch(
     () => toValue(open),
@@ -72,5 +75,5 @@ export function useUnsavedFormOnOpen(
     { immediate: true, flush: 'post' },
   );
   const dirty = computed(() => toValue(open) && original.value !== undefined && JSON.stringify(toValue(current)) !== original.value);
-  useUnsavedChanges(inside, dirty);
+  return useUnsavedChanges(inside, dirty);
 }

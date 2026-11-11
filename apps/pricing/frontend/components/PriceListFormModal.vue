@@ -147,7 +147,7 @@ async function save(): Promise<void> {
 }
 
 // A new list's currency, proposed from the business's when it answers after the window opened, is no change.
-useUnsavedFormOnOpen(
+const canDismiss = useUnsavedFormOnOpen(
   'pricing-list-form',
   () => ({ ...form.value, currency: !props.priceList && form.value.currency === (businessCurrency.value ?? '') ? null : form.value.currency }),
   open,
@@ -157,6 +157,7 @@ useUnsavedFormOnOpen(
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="pricing-list-form"
     :title="title"
     :submit-label="priceList ? $t('pricing.lists.form.save') : $t('pricing.lists.form.create')"

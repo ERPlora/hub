@@ -122,7 +122,7 @@ watch(open, (isOpen) => {
   if (!isOpen) reset();
 });
 
-useUnsavedFormOnOpen(
+const canDismiss = useUnsavedFormOnOpen(
   'whatsapp-inbox-template-form',
   () => ({ template: chosenId.value, values: values.value, sample: sample.value?.id ?? null }),
   open,
@@ -132,6 +132,7 @@ useUnsavedFormOnOpen(
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="whatsapp-inbox-template-form"
     :title="t('whatsapp_inbox.templates.sendTitle')"
     :submit-label="t('whatsapp_inbox.templates.send')"

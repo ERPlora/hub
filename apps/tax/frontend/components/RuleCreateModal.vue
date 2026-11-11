@@ -133,12 +133,13 @@ function cancel(): void {
   reset();
 }
 
-useUnsavedFormOnOpen('tax-rule-form', form, open);
+const canDismiss = useUnsavedFormOnOpen('tax-rule-form', form, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="tax-rule-form"
     :title="$t('tax.rules.form.title')"
     :submit-label="$t('tax.add')"
