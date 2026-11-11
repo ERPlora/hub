@@ -9,7 +9,6 @@ over the asks and the guard that no ask copies a probe of layer 2. What it canno
 without them.
 """
 
-import dataclasses
 import json
 from pathlib import Path
 
@@ -22,7 +21,7 @@ from live.operations import AI, Operation, registry
 from base import assistant
 from base.models import Membership
 from base.permissions import permissions_for
-from base.tests.test_assistant_asks import TOP, comparable, probe_phrases
+from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, comparable, probe_phrases
 
 A = Scope("host", "a")
 OWNER, ADMIN, MANAGER, EMPLOYEE = (
@@ -143,12 +142,6 @@ def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str) -> int 
     return offered_place(tools, name, phrase)
 
 
-def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
-    """``tools`` with ``name`` saying no asks: how a turn ranks it by its name and description alone."""
-    op = tools[name]
-    return {**tools, name: dataclasses.replace(op, ai={key: value for key, value in op.ai.items() if key != "asks"})}
-
-
 def test_modifiers_is_listed_so_layer_1_sweeps_every_ask_of_it():
     """Modifiers is in ``LIVE_ASSISTANT_ASKS_REQUIRED``: ``base/tests/test_assistant_asks.py`` ranks each of its asks
     for every role and language, and ``live.E020`` requires them of each of its tools."""
@@ -229,14 +222,7 @@ def test_the_probes_of_modifiers_are_read():
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
 def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    tools = catalog_of(OWNER, "es")
-    assert comparable(phrase) not in probe_phrases()
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= TOP, place
-    before = without_its_asks(tools, name)
-    assert not shared.asks_of(before[name])  # positive control: the tool is ranked without its asks
-    unasked = offered_place(before, name, phrase)
-    assert unasked is None or unasked > TOP, unasked
+    assert_its_asks_bring(catalog_of(OWNER, "es"), name, phrase, "es")
 
 
 def test_the_hub_reads_predeterminada_as_the_default():
