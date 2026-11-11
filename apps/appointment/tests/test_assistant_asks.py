@@ -76,7 +76,7 @@ BY_GROUP = [
     ("appointment.blocked_time.create", "pon un bloqueo a Inés el lunes de 9:00 a 11:00", "bloqueo"),
     ("appointment.recurring.delete", "quita las citas fijas de los martes de Lola", "citas fijas"),
 ]
-#: What a person says in words of their own, neither an ask nor a probe of layer 2, for the twenty-seven tools whose
+#: What a person says in words of their own, neither an ask nor a probe of layer 2, for the twenty-eight tools whose
 #: probe a turn already offers by their name and description alone: here it is their asks that bring the tool among
 #: the first ten, so asks that stop reading as people speak fail. None says a word of ``base.assistant.SYNONYMS`` that
 #: names the tool's own thing («bloqueo», «cita fija», «puede atender»): that word alone brings it.
@@ -108,6 +108,7 @@ OWN_WORDS = [
     ("appointment.blocked_time.list", "¿cuándo está cerrada la agenda este mes?"),
     ("appointment.recurring.activate", "Teresa vuelve después del parón, que siga lo suyo"),
     ("appointment.recurring.create", "Lola vendrá todos los martes a las 18:00"),
+    ("appointment.recurring.deactivate", "deja parado lo de Carmen hasta septiembre"),
     ("appointment.recurring.delete", "Carmen deja de venir cada semana: bórralo, pero sin tocar lo ya reservado"),
     ("appointment.recurring.list", "¿qué clientas siguen en marcha con hora fija?"),
     ("appointment.recurring.update", "Teresa vendrá los miércoles en vez de los martes de aquí en adelante"),
@@ -214,14 +215,13 @@ def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog
 
 
 def test_every_tool_is_caught_by_a_probe_or_by_words_of_its_own():
-    """Each tool of Appointments is in ``OWN_WORDS`` or its probe falls out of its room without its asks (the eight
+    """Each tool of Appointments is in ``OWN_WORDS`` or its probe falls out of its room without its asks (the seven
     whose probe ``REPORTED``, ``PROBES`` or ``TWINS`` already need them): a tool added later without either is seen."""
     without_own = set(appointment_tools()) - {name for name, _ in OWN_WORDS}
     assert without_own == {
         "appointment.appointment.complete",
         "appointment.appointment.history",
         "appointment.appointment.mark_no_show",
-        "appointment.recurring.deactivate",
         "appointment.recurring.get",
         "appointment.recurring.materialize",
         "appointment.settings.get",
