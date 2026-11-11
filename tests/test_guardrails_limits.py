@@ -50,12 +50,6 @@ def short_wait(monkeypatch) -> float:
     return SHORT_WAIT
 
 
-@pytest.fixture
-def no_wait(monkeypatch) -> None:
-    """A place is there the moment a transaction asks for it, or the transaction answers 503 at once."""
-    monkeypatch.setattr(limits, "SLOT_WAIT_SECONDS", 0)
-
-
 class Held:
     """Another thread's transaction in a hub's database, open (its first statement ran) until :meth:`end`, however long
     the test takes to get there: it waits for that fact, never for a clock a loaded machine outruns (hub#762)."""
@@ -176,9 +170,15 @@ def test_a_six_second_statement_in_a_free_hub_is_cancelled_by_its_statement_time
 
 
 @HUB_DB_COMMITTED
-def test_a_busy_hub_never_slows_another(hub_a, hub_b, no_wait):
-    """B gets in with no wait allowed at all while A's place is taken from before B asks until after B has its rows;
-    A, asked the same way, does not. Facts, not B's time against a threshold a loaded machine outruns (hub#762)."""
+def test_a_busy_hub_never_slows_another(hub_a, hub_b, short_wait, monkeypatch):
+    """B gets its rows without its limiter ever waiting for a place while A's place is taken from before B asks until
+    after B has them; A, asked the same way, waits and does not get in. Facts, not B's time against a threshold a
+    loaded machine outruns (hub#762): a B that waits on A, even one that gets in once the wait is over, fails at once."""
+
+    def b_waits(timeout=None):
+        raise AssertionError("B's limiter waited for a place while only A was busy")
+
+    monkeypatch.setattr(limits.limiter_for(hubs.HUB_B_ALIAS)._condition, "wait", b_waits)
     with held_open(hub_a):
         a_places = limits.limiter_for(hubs.HUB_A_ALIAS)
         assert a_places.in_use == 1
