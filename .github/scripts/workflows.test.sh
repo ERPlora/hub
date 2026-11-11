@@ -98,6 +98,14 @@ check("python, frontend and scripts wait for nothing",
 check("test (the required check) needs the three jobs",
       set(needs(tjobs.get("test", {}))) == {"python", "frontend", "scripts"})
 check("test reports even when a job fails or is cancelled", str(tjobs.get("test", {}).get("if", "")) == "always()")
+# A red shard of python's matrix (or a red job) only turns "test / test" red if test reads every job's result and
+# nothing turns a failure into a pass on the way: no continue-on-error, on a job or on a step (hub#1185).
+test_results = "\n".join(str((step.get("env") or {}).get("RESULTS", "")) for step in steps(tjobs.get("test", {})))
+check("test reads the result of python (every shard), frontend and scripts",
+      all(f"{name}=${{{{ needs.{name}.result }}}}" in test_results for name in ("python", "frontend", "scripts")))
+check("no job or step of test.yml continues on error, so no red shard is hidden",
+      not any("continue-on-error" in job or any("continue-on-error" in step for step in steps(job))
+              for job in tjobs.values()))
 python_runs, frontend_runs, scripts_runs = (runs(tjobs.get(name, {})) for name in ("python", "frontend", "scripts"))
 check("python runs pytest over a Postgres service",
       "pytest" in python_runs and "postgres" in (tjobs.get("python", {}).get("services") or {}))

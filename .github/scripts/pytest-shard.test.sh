@@ -59,7 +59,9 @@ shard() {
   printf '%s\n' 1000 "$((1000 + took))" > "$work/clock"
   : > "$work/calls"
   status=0
-  env PATH="$root/bin:$PATH" FAKE_CALLS="$work/calls" FAKE_CLOCK="$work/clock" "${settings[@]}" \
+  # ${settings[@]+...}: an empty array under set -u is an unbound variable for macOS's bash 3.2, which then ends the
+  # whole file with exit 0 through the EXIT trap, a green without a single case run.
+  env PATH="$root/bin:$PATH" FAKE_CALLS="$work/calls" FAKE_CLOCK="$work/clock" ${settings[@]+"${settings[@]}"} \
     bash "$here/pytest-shard.sh" "$@" > "$work/out.log" 2>&1 || status=$?
 }
 
