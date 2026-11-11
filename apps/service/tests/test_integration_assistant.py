@@ -580,6 +580,8 @@ def test_the_read_that_names_them_answers_in_the_readers_language(language, said
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 def test_the_read_that_names_them_needs_the_right_to_see_the_vouchers(hub_a, no_fallback):
     read = get("service.record.get")
+    # By name: with a lower one of Services («see services») the read would open to whoever never sees a voucher.
+    assert read.permission == "service.view_package_balance"
     with use_hub(hub_a), pytest.raises(PermissionDenied):
         read(person(hub_a, without=frozenset({read.permission})), read.input.model_validate({"sale_id": str(uuid.uuid7())}))
 
