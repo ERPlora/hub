@@ -105,8 +105,9 @@ def test_navigation_is_payments_and_methods_with_registered_icons():
 
 def test_every_operation_is_a_tool_of_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: every operation
-    # says what it does and its risk.
-    from live.operations import registry
+    # says what it does, its risk and what a person types to ask for it (its asks, live.E020: payment
+    # is listed in LIVE_ASSISTANT_ASKS_REQUIRED, hub#1090).
+    from live.operations import MIN_ASKS, registry
 
     operations = {
         name: op for name, op in registry.items() if name.startswith("payment.")
@@ -114,7 +115,11 @@ def test_every_operation_is_a_tool_of_the_assistant():
     assert set(operations) == COMMANDS | QUERIES
     for name, op in operations.items():
         assert op.kind == ("command" if name in COMMANDS else "query"), name
-        assert set(op.ai) == {"description", "risk"}, name
+        assert set(op.ai) == {"description", "risk", "asks"}, name
+        assert {
+            language: len(op.ai["asks"].get(language, ())) >= MIN_ASKS
+            for language in ("en", "es")
+        } == {"en": True, "es": True}, name
         assert op.ai["description"], name
         assert op.ai["risk"] == ("high" if name in HIGH_RISK else "normal"), name
         assert op.expose_api is True, name

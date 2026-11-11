@@ -192,6 +192,16 @@ def _bounds(**bounds) -> dict:
     output=PaymentPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which supplier transfers have not gone out yet?",
+                "show me this month's transfers to suppliers",
+            ),
+            "es": (
+                "¿qué transferencias a proveedores están todavía sin enviar?",
+                "enséñame las transferencias a proveedores de este mes",
+            ),
+        },
         "description": "List the business's outgoing payments (to suppliers, transfers, refunds that are "
         "not a sale's) with their reference, date, beneficiary, amount in minor units, method and status "
         "(draft, approved, sent, completed, cancelled). Not the till's charges: those are Sales.",
@@ -251,6 +261,16 @@ def list_payments(ctx: OperationContext, params: PaymentListIn) -> dict:
     output=PaymentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me everything about PAY-20261103-0002",
+                "which IBAN did the Makro transfer go to?",
+            ),
+            "es": (
+                "dame el detalle del PAY-20261103-0002",
+                "¿a qué IBAN fue la transferencia a Makro?",
+            ),
+        },
         "description": "Get one outgoing payment with everything it has (method, concept, IBAN, supplier's "
         "invoice, who recorded and changed it), named by its id or its reference (PAY-20261014-0003).",
         "risk": "normal",
@@ -271,6 +291,16 @@ def get_payment(ctx: OperationContext, data: PaymentRefIn) -> dict:
     output=MethodPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which bank accounts do we pay suppliers from?",
+                "where can an outgoing payment leave from?",
+            ),
+            "es": (
+                "¿desde qué cuentas o tarjetas pagamos a los proveedores?",
+                "¿de qué cuentas del banco salen los pagos a proveedores?",
+            ),
+        },
         "description": "List the accounts the business pays its outgoing payments from (bank accounts, "
         "company card, cash drawer), with their type and whether a new payment may use them. Not the "
         "till's tenders: those are Sales' payment methods.",
@@ -303,6 +333,17 @@ def list_methods(ctx: OperationContext, params: MethodListIn) -> dict:
     output=MethodOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what is the whole reference of the Sabadell bank account?",
+                "can the Santander bank account still take new payments?",
+            ),
+            "es": (
+                "dame la referencia entera de la cuenta del banco Sabadell",
+                "¿la tarjeta de empresa admite todavía pagos nuevos?",
+                "¿cuál es el número completo de la cuenta del banco Santander?",
+            ),
+        },
         "description": "Get one account the business pays from (named by its id or its name), with its whole "
         "account reference (the lists show it masked).",
         "risk": "normal",

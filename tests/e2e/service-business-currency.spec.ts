@@ -15,6 +15,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 import { A, api, capture, hostPage, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
 import { openTillCart } from './sale-helpers';
 import { cleanUp as cleanServices, named, noHorizontalScroll, pick, post, settled } from './service-helpers';
+import { dropCountryRules } from './tax-helpers';
 
 const KEY = 'FIX-HUB-SERVICE-PRICE-STORED-IN-HUNDREDTHS-WHATEVER-THE-CURRENCY';
 const SIZES = [
@@ -33,8 +34,6 @@ const RUN_ORDERS =
 
 /** `a`'s registration as the run found it (put back after). */
 let original: Registration;
-/** The Japanese rule the run creates for its service (any left by a killed run goes before it starts). */
-const JAPAN_RULES = "delete from tax_taxrule where country_code = 'JP'";
 /** A service and a voucher of the run, priced through the API in minor units (22,50 and 90,00 in euros). */
 let color = { id: '', name: '' };
 let voucher = { id: '', name: '' };
@@ -85,7 +84,8 @@ async function voucherRow(page: Page): Promise<Locator> {
 test.beforeAll(async ({ browser }) => {
   original = registrationOf('a');
   cleanAll();
-  psql(JAPAN_RULES);
+  // The Japanese rule the run creates for its service (any left by a killed run goes before it starts).
+  dropCountryRules('JP');
   const owner = await hostPage(browser, A, { next: '/service/services' });
   const colorName = named('Color');
   color = { id: (await post<{ id: string }>(owner.context, '/service/services', { name: colorName, price: 2250, tax_category_key: 'service.generic' })).id, name: colorName };
@@ -98,7 +98,7 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(async () => {
   if (original) await registerBusinessIn(original, original.country);
   cleanAll();
-  psql(JAPAN_RULES);
+  dropCountryRules('JP');
 });
 
 test(`${KEY}: service-business-currency a business in Japan saves «1500» as 1500 yen and the till charges ¥1,500 in 390, 834 and 1440`, async ({
