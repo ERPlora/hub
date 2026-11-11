@@ -14,7 +14,13 @@ from live.operations import registry
 
 from apps.sale.tests.conftest import ctx_for
 from base import assistant
-from base.tests.test_assistant_asks import assert_its_asks_bring, comparable, probe_phrases
+from base.tests.test_assistant_asks import (
+    assert_its_asks_bring,
+    comparable,
+    probe_phrases,
+    probes_of_layer_2,
+    without_its_asks,
+)
 
 LANGUAGES = ("en", "es")
 #: The phrases of sale's tools put to the turn at least, both languages together: a silent drop of asks fails.
@@ -41,12 +47,18 @@ def test_what_the_employee_may_not_do_is_not_in_their_catalogue():
     assert "sale.sale.void" in employee
 
 
-#: The owner's requests of layer 2 that were not offered their tool (hub#1183), word for word as the probes of
+#: How the owner asks layer 2 what the till takes (hub#1193): live reads no «abonar» as paying, so nothing in it names
+#: the payment methods, while «clientes» names the customers and «caja» the till; only the asks of
+#: ``sale.payment_method.list`` bring it, and ahead of them.
+PAYING_AT_THE_TILL = ("es", "sale.payment_method.list", "¿de qué maneras pueden abonarme los clientes en caja?")
+
+#: The owner's requests of layer 2 that were not offered their tool (hub#1183, hub#1193), word for word as the probes of
 #: ``tests/e2e/qa/probes/owner-es-sale-2026-11-08.json`` say them: the record named by its bare name («Chuches QA»),
 #: what the asks of each tool bring among the first ten.
 LAYER_2 = [
     ("es", "sale.department.update", "renombra Chuches QA como Golosinas QA y déjala la primera de la lista"),
     ("es", "sale.quick_note.update", "donde pone «Sin cilantro QA» escribe mejor «Nada de cilantro QA»"),
+    PAYING_AT_THE_TILL,
 ]
 
 #: The requests of the QA of hub#1085, each as a person says it: a record of the QA's data names what it is («the
@@ -111,12 +123,70 @@ def test_the_reported_sales_request_offers_its_existing_operation(language, name
     assert name in offered[:10]
 
 
+@pytest.mark.django_db
+def test_how_customers_may_pay_at_the_till_brings_the_payment_methods_before_the_customers_and_the_till():
+    """«¿De qué maneras pueden abonarme los clientes en caja?» asks for the payment methods of the till (hub#1193):
+    they come among the first eight, ahead of every tool of Customers and of Cash register its words name."""
+    language, name, phrase = PAYING_AT_THE_TILL
+    offered = [
+        op.name
+        for op in assistant.relevant(assistant.catalog(ctx_for("hub_owner", language=language)), [phrase], language)
+    ]
+    assert name in offered[:8], offered[:10]
+    named = [tool for tool in offered if tool.split(".")[0] in ("customer", "cash_register")]
+    assert named  # positive control: «clientes» and «caja» bring them
+    assert offered.index(name) < offered.index(named[0]), offered[:10]
+
+
+#: Who asks each probe of layer 2, as ``ctx_for`` names the role.
+ROLE_OF = {"owner": "hub_owner", "admin": "hub_admin", "manager": "hub_manager", "employee": "hub_employee"}
+
+
+@pytest.mark.django_db
+def test_the_asks_of_the_payment_methods_of_the_till_take_no_place_from_the_payments_methods():
+    """The payment methods of the till are no accounts the business pays its suppliers from (``payment.method.*``):
+    each probe of layer 2 of Payments that brings its tool among the first ten brings it at the same place with the
+    asks of ``sale.payment_method.list`` as without them (hub#1193)."""
+    moved = []
+    kept = 0
+    for probe in probes_of_layer_2():
+        if not probe["tool"].startswith("payment.method."):
+            continue
+        tools = assistant.catalog(ctx_for(ROLE_OF[probe["role"]], language=probe["language"]))
+        if probe["tool"] not in tools:
+            continue
+
+        def place(catalog, probe=probe):
+            offered = [op.name for op in assistant.relevant(catalog, [probe["phrase"]], probe["language"])]
+            return offered.index(probe["tool"]) + 1 if probe["tool"] in offered else None
+
+        asked = place(tools)
+        if asked is None or asked > 10:
+            continue
+        kept += 1
+        unasked = place(without_its_asks(tools, "sale.payment_method.list"))
+        if asked != unasked:
+            moved.append((probe["id"], unasked, asked))
+    assert kept  # positive control: some probe of Payments brings its tool among the first ten
+    assert moved == []
+
+
 #: Requests in words that are no ask nor probe, each brought among the first ten by its tool's asks and out of them
 #: without: undoing a line's voucher (``sale.order.remove_voucher``, whose asks no longer say the QA's «quita el bono de
 #: la línea» with one word changed, hub#1135); and, for ``sale.department.update`` and ``sale.quick_note.update``
 #: (hub#1183), one for each of their asks in each language, which falls out without that ask alone (it shares two of
-#: its stems at most, and fewer than half of its own), and the English twins of the probes of ``LAYER_2``.
+#: its stems at most, and fewer than half of its own), and the English twins of the probes of ``LAYER_2``; and so for
+#: ``sale.payment_method.list`` (hub#1193), but for «¿con qué me pueden pagar?», which ``PAYING_AT_THE_TILL`` needs
+#: instead (the asks of many other tools say «pueden»), and «¿se puede pagar con Bizum?», which says no word the others
+#: do not («Bizum» is in «do we accept Bizum?»).
 OWN_WORDS = [
+    ("en", "sale.payment_method.list", "would we take an Amex card?"),
+    ("en", "sale.payment_method.list", "are cheques from regulars accepted?"),
+    ("en", "sale.payment_method.list", "which card could they hand over?"),
+    ("en", "sale.payment_method.list", "tourists want to settle up, what else is there?"),
+    ("es", "sale.payment_method.list", "¿aceptamos el cheque gourmet?"),
+    ("es", "sale.payment_method.list", "¿qué maneras tenemos, además del efectivo?"),
+    ("es", "sale.payment_method.list", "¿con qué abonan los turistas normalmente?"),
     ("es", "sale.order.remove_voucher", "no lo uses en esta cuenta, mejor lo guarda"),
     ("en", "sale.order.remove_voucher", "she would rather not use it on the haircut"),
     ("en", "sale.department.update", "soft drinks belong on the standard band"),
