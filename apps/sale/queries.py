@@ -541,18 +541,21 @@ def held_methods(ids: Iterable[UUID]) -> set[UUID]:
     output=PaymentMethodPage,
     expose_api=True,
     ai=AI(
-        description="List the active payment methods in the order of the charge sheet, with their type (cash, card, "
-        "transfer, other) and whether the till settings let them charge today.",
+        description="List the active payment methods customers can pay with, in the order of the charge sheet, with "
+        "their type (cash, card, transfer, other) and whether the till settings let them charge today.",
         asks={
             "en": (
                 "which payment methods do we take?",
                 "do we accept Bizum?",
                 "what can they pay with here?",
+                "which ways of settling up do we offer?",
             ),
             "es": (
                 "¿qué formas de pago aceptamos?",
                 "¿se puede pagar con Bizum?",
                 "¿con qué me pueden pagar?",
+                "¿de cuántas maneras distintas se puede pagar aquí?",
+                "¿con qué medios de pago abonan los clientes aquí?",
             ),
         },
     ),
