@@ -120,14 +120,15 @@ describe('vite.config', () => {
       }
     }
 
-    it('are Vitest\'s own on an idle machine: 5 s a test, 10 s a hook, 1 s an expect.poll', async () => {
-      const idle = await configOn([2, 1, 1], 15);
+    it('are Vitest\'s own (5 s a test, 10 s a hook, 1 s an expect.poll) stretched by the run\'s own workers on an idle machine', async () => {
+      // 2 cores, 1 worker and no other load: 2 × 1 / 2.
+      const idle = await configOn([0, 0, 0], 2);
       expect(idle.test).toMatchObject({ testTimeout: 5_000, hookTimeout: 10_000, expect: { poll: { timeout: 1_000 } } });
       expect(idle.test?.provide).toEqual({ loadScale: 1 });
     });
 
-    it('stretch with the load: at 60 over 15 cores, eight times as long, and the setup is told the same scale', async () => {
-      const loaded = await configOn([60, 30, 10], 15);
+    it('stretch with the load: at 31 over 10 cores, with its 9 workers, eight times as long, and the setup is told the same', async () => {
+      const loaded = await configOn([31, 20, 5], 10);
       expect(loaded.test).toMatchObject({ testTimeout: 40_000, hookTimeout: 80_000, expect: { poll: { timeout: 8_000 } } });
       expect(loaded.test?.provide).toEqual({ loadScale: 8 });
     });

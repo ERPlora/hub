@@ -4,7 +4,7 @@
 // over 15 cores, CPU work ran 10 times slower and walking the hub's sources 170 times — and fell red at Vitest's fixed
 // 5 s with nothing broken. vite.config.ts reads the scale once, when the run starts, and stretches the test, hook and
 // `expect.poll` budgets by it; vitest.setup.ts stretches `vi.waitFor`'s. A test that really hangs still fails, by
-// its stretched budget (vitest.setup.test.ts proves it).
+// its stretched budget (vitest.setup.test.ts proves it). A load that rises in the middle of a run is not followed.
 import { availableParallelism, loadavg } from 'node:os';
 
 declare module 'vitest' {
@@ -19,12 +19,17 @@ const WAIT_FOR_TIMEOUT = 1_000;
 
 type WaitForOptions = number | { timeout?: number; interval?: number } | undefined;
 
-/** How many times slower than idle the machine runs a test now: 1 while its load (the busier of the last minute and
- *  the last five: a run lasts minutes) stays at half its cores or less, and twice the load per core above that —
- *  the CPU slowdown measured at load ~80 over 15 cores. Reading files slows more than that, and the margin of each
- *  budget over what its test takes idle covers it. 1 when the machine reports no load (Windows) or no number. */
-export function loadScale(load: readonly number[] = loadavg(), cores: number = availableParallelism()): number {
-  const scale = (2 * Math.max(load[0] ?? 0, load[1] ?? 0)) / cores;
+/** How many times slower than idle the machine will run a test: twice the load per core it will run under (the
+ *  CPU slowdown measured at load ~80 over 15 cores), and 1 while that load fits in half the cores. That load is the
+ *  machine's — the busier of the last minute and the last five: a run lasts minutes — plus the run's own `workers`
+ *  (Vitest's one per core but one), which the reading at the start cannot hold yet. Reading files slows more than
+ *  the CPU, and the margin of each budget over what its test takes idle covers it. 1 with no number to go by. */
+export function loadScale(
+  load: readonly number[] = loadavg(),
+  cores: number = availableParallelism(),
+  workers: number = Math.max(cores - 1, 1),
+): number {
+  const scale = (2 * (Math.max(load[0] ?? 0, load[1] ?? 0) + workers)) / cores;
   return Number.isFinite(scale) && scale > 1 ? scale : 1;
 }
 
