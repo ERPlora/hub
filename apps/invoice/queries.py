@@ -1061,7 +1061,7 @@ def rectification_preview(
         "asks": {
             "en": (
                 "is this year's invoice numbering ready?",
-                "do we have this year's series to start invoicing?",
+                "is the numbering set up for this year's invoices?",
             ),
             "es": (
                 "¿tenemos lista la numeración de este año?",
@@ -1171,7 +1171,7 @@ def _allocation(invoice: Invoice) -> dict:
         "asks": {
             "en": (
                 "which document got number FACT-2026-000017?",
-                "show me this year's numbering book",
+                "which number went to which document this year?",
             ),
             "es": (
                 "¿qué documento lleva el número FACT-2026-000017?",
@@ -1211,11 +1211,11 @@ def allocations(ctx: OperationContext, params: AllocationsIn) -> dict:
         "asks": {
             "en": (
                 "what company name and tax ID go on our invoices?",
-                "do we have the issuer of the invoices set?",
+                "get me the issuer of our invoices",
             ),
             "es": (
                 "¿qué razón social y CIF salen en nuestras facturas?",
-                "¿quién sale como emisor en nuestras facturas?",
+                "¿con qué emisor salen nuestras facturas?",
             ),
         },
         "description": "The issuer of the invoices: the business's legal name, tax ID and address, whether it is set "
