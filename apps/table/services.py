@@ -847,7 +847,7 @@ def open_session(ctx: OperationContext, data: SessionOpenIn) -> dict:
     ai={
         "description": "Close a table's check by hand and free the table if nothing else sits there. A check with "
         "something ordered still open in Sales is refused (charge it, move it or delete it first); an empty one is "
-        "voided in Sales. Ask first.",
+        "voided in Sales.",
         "risk": "high",
         "asks": {
             "en": (
@@ -906,7 +906,7 @@ def close_session(ctx: OperationContext, data: SessionCloseIn) -> dict:
         "description": "Move a table's check to a free or reserved table («move table 4 to 6»): same check of Sales "
         "(retitled), guests, waiter and notes; the old table frees if nothing else sits there. Use this, not "
         "sale.order.set_label: retitling a check moves nobody. Both tables go by their number (and zone); at a table "
-        "with two checks, the check's id comes from table.table.get. Ask first.",
+        "with two checks, the check's id comes from table.table.get.",
         "risk": "high",
         "asks": {
             "en": (
@@ -985,7 +985,7 @@ def _merge_target(data: SessionMergeIn, source: TableSession) -> TableSession:
     ai={
         "description": "Join a table's check into the open check of another table (or the other check of a split "
         "table): its lines move to that check in Sales, and its table frees if nothing else sits there. Tables go by "
-        "their number (and zone); the two checks of a split table, by the ids table.table.get lists. Ask first.",
+        "their number (and zone); the two checks of a split table, by the ids table.table.get lists.",
         "risk": "high",
         "asks": {
             "en": (
@@ -1299,7 +1299,7 @@ def link_order(ctx: OperationContext, data: SessionLinkOrderIn) -> dict:
     ai={
         "description": "Delete a finished table check from the history (an open or parked one is refused). It is kept "
         "as deleted, with its trail through the tables. It goes by its id: find the closed check the person names (its "
-        "table, its time) with table.session.list(status=closed), never ask them for it. Ask first.",
+        "table, its time) with table.session.list(status=closed), never ask them for it.",
         "risk": "high",
         "asks": {
             "en": (

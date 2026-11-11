@@ -21,7 +21,7 @@ from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 
 from base.images import MAX_UPLOAD_BASE64
-from base.schemas import CatalogImageOut, names
+from base.schemas import CatalogImageOut, exactly_one, names
 
 T = TypeVar("T")
 
@@ -69,7 +69,9 @@ VOUCHER_SESSIONS = gettext_noop("Voucher sessions")
 # asks, never by its id: a service, a category, a package and a customer by their names, a professional by their full
 # name; who does what by the service and the professional; a voucher sold and its sessions by the package, the owner and
 # the day it was sold or the service of the session, as two vouchers of one package may be told apart. The sale and its
-# line, the appointment and the line of an order are of apps Services does not require: the card leaves them out.
+# line, the appointment, the line of an open check and the refund or the void that gives sessions back are of apps
+# Services does not require: its own read names them by theirs (``service.record.get``, hub#756), the sale by its
+# number, a line by what it charges, the appointment as Appointments' cards say it and a refund or a void by its sale.
 A_SERVICE = names("service.service.get")
 A_CATEGORY = names("service.category.get")
 A_PACKAGE = names("service.package.get")
@@ -78,6 +80,12 @@ A_GRANT = names("service.grant.get", name=("label",))
 A_SESSION = names("service.session.get", name=("label",))
 A_MEMBER = names("staff.member.detail", name=("full_name",))
 A_CUSTOMER = names("customer.customer.detail")
+A_SALE = names("service.record.get", by="sale_id")
+A_SALE_LINE = names("service.record.get", by="sale_line_id")
+AN_APPOINTMENT = names("service.record.get", by="appointment_id")
+A_CHECK_LINE = names("service.record.get", by="order_line_id")
+A_RETURN = names("service.record.get", by="reference")
+ONE_RECORD = _("Say one record, by its id.")
 #: How far ahead of this server's clock a purchase may be dated (the till's clock may run fast).
 CLOCK_SKEW = timedelta(minutes=5)
 
@@ -268,6 +276,20 @@ class ByIdIn(In):
 
 class NoIn(In):
     pass
+
+
+class RecordRefIn(In):
+    """One record of Sales or Appointments a write of Services names, by its id: exactly one (``service.record.get``)."""
+
+    sale_id: UUID | None = Field(None, description="A sale of Sales.")
+    sale_line_id: UUID | None = Field(None, description="A line of a sale of Sales.")
+    appointment_id: UUID | None = Field(None, description="An appointment of Appointments.")
+    order_line_id: UUID | None = Field(None, description="A line of an open check of Sales.")
+    reference: UUID | None = Field(None, description="A refund of Sales, or a sale it voided.")
+
+    @model_validator(mode="after")
+    def _one(self):
+        return exactly_one(self, ONE_RECORD)
 
 
 # ── Services ──────────────────────────────────────────────────────────────────────────────────
@@ -949,9 +971,12 @@ class GrantIn(In):
         description="The sale that charged it (Sales), if it went through the till: its line stops counting for who "
         "sold it and each session counts for who does it. A voucher with an amount that does not say it counts for "
         "nobody as its sessions are done.",
+        json_schema_extra=A_SALE,
     )
     sale_line_id: UUID | None = Field(
-        None, description="The line of that sale that charged it; only needed when the sale charged several (Sales)."
+        None,
+        description="The line of that sale that charged it; only needed when the sale charged several (Sales).",
+        json_schema_extra=A_SALE_LINE,
     )
     granted_at: datetime | None = Field(
         None,
@@ -1114,10 +1139,10 @@ class RedeemIn(GrantRefIn):
     )
     member: Said | None = Field(None, description="The professional (Staff) who did it, by name.")
     appointment_id: UUID | None = Field(
-        None, description="The appointment it is spent on (Appointments), if any."
+        None, description="The appointment it is spent on (Appointments), if any.", json_schema_extra=AN_APPOINTMENT
     )
     sale_id: UUID | None = Field(
-        None, description="The sale it is spent on (Sales), if any."
+        None, description="The sale it is spent on (Sales), if any.", json_schema_extra=A_SALE
     )
     note: Note = Field("", description="A free note.")
 
@@ -1260,7 +1285,8 @@ class HoldIn(In):
         description="The service of the line; the voucher must cover it.", json_schema_extra=A_SERVICE
     )
     order_line_id: UUID = Field(
-        description="The line of the open check (Sales) the session pays: one session per line."
+        description="The line of the open check (Sales) the session pays: one session per line.",
+        json_schema_extra=A_CHECK_LINE,
     )
 
 
@@ -1275,7 +1301,7 @@ class SettleIn(In):
         title=VOUCHER_SESSIONS,
         description="The sessions held for the lines the sale charges.",
     )
-    sale_id: UUID = Field(description="The sale charged (Sales).")
+    sale_id: UUID = Field(description="The sale charged (Sales).", json_schema_extra=A_SALE)
     customer_id: UUID | None = Field(
         description="The sale's customer: it must own the vouchers.", json_schema_extra=A_CUSTOMER
     )
@@ -1291,6 +1317,7 @@ class ReturnIn(In):
     reference: UUID = Field(
         title=gettext_noop("Refund or void"),
         description="The refund, or the sale voided, that gives them back (Sales).",
+        json_schema_extra=A_RETURN,
     )
     reason: Note = Field("", description="Why, as the refund or the void says it.")
 
