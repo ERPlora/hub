@@ -49,6 +49,32 @@ export async function expectSaveWaitsForMoney(window: WaitingWindow, answer: () 
   expect(window.save()?.disabled, '«Save» grey once the business answered').toBe(false);
 }
 
+/** hub#945: an amount typed with its currency's sign («¥1500», «12,50 zł», «-0,50 zł») and left while the window waits
+ *  for the business's money stays as typed and is not called «not an amount»: without the money nothing can be
+ *  rewritten (its decimals are unknown) nor judged (its symbol is unknown). Once the business answers (`answer`), the
+ *  field says nothing either; the window's test then saves and checks what it reads. */
+export async function expectAmountLeftWaitsForMoney(
+  window: Pick<WaitingWindow, 'amount' | 'settle'>,
+  typed: string,
+  answer: () => Promise<unknown>,
+): Promise<void> {
+  const field = () => window.amount() as (Control & { value?: unknown }) | null;
+  const typing = field();
+  if (!typing) throw new Error('the window has no amount field');
+  typing.value = typed;
+  typing.dispatchEvent(new CustomEvent('ionInput', { detail: { value: typed }, bubbles: true }));
+  await window.settle();
+  field()?.dispatchEvent(new CustomEvent('ionBlur'));
+  await window.settle();
+  const whileWaiting = [field()?.value, field()?.errorText || undefined];
+  await answer();
+  await window.settle();
+  expect({ whileWaiting, onceAnswered: field()?.errorText || undefined }, '[as typed, no message] while waiting; no message once answered').toEqual({
+    whileWaiting: [typed, undefined],
+    onceAnswered: undefined,
+  });
+}
+
 /** The read of the business's money as a window's test drives it (hub#938). */
 export interface MoneyRead {
   /** The read fails: an error frame of `base.business.get` (`base.hub_busy`) on the stream. */
