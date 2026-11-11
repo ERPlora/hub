@@ -360,6 +360,28 @@ def test_the_read_says_not_found_for_a_voided_line(order):
         run("sale.record.get", {"line_id": str(line)})
 
 
+@pytest.mark.django_db
+@pytest.mark.parametrize(("language", "said"), [("en", "Refund of sale {}"), ("es", "Devolución de la venta {}")])
+def test_the_read_says_a_refund_by_the_sale_it_gives_back(sale, language, said):
+    """A refund has no number of its own: «Sales» lists it under its sale (SALE-F31, SALE-F32). Services' card names by it
+    the refund that gives back a voucher's sessions (hub#756)."""
+    refund = run(
+        "sale.sale.refund",
+        {"sale_id": str(sale.id), "reason": "Broken", "allocations": [{"payment_id": str(sale.payments[0].id), "amount": 100}]},
+    )
+    named = run("sale.record.get", {"refund_id": str(refund.refund_id)}, ctx_for(language=language))
+    assert named.name == said.format(sale.number)
+
+
+@pytest.mark.django_db
+def test_the_read_says_not_found_for_a_refund_that_is_not_there(sale):
+    """The id of a sale is no refund: the card of a void asks for the sale."""
+    for missing in (str(uuid.uuid4()), str(sale.id)):
+        with pytest.raises(NotFound) as caught:
+            run("sale.record.get", {"refund_id": missing})
+        assert caught.value.code == "sale.refund_not_found"
+
+
 def test_the_read_is_no_tool_of_the_assistant():
     assert assistant.is_tool(get("sale.record.get")) is False
 

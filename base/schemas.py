@@ -31,6 +31,21 @@ def in_currency_of(read: str, by: str = "id", code: str = "currency") -> dict:
     return {"currency": {"read": read, "by": by, "code": code}}
 
 
+def exactly_one(data: Any, message: Any) -> Any:
+    """``data``, the input of an app's read of the names its assistant's card shows (``sale.record.get``,
+    ``service.record.get``): one field per kind of record, of which exactly one is given; else ``message``, in the
+    app's own words, refuses it (a 422). For a ``model_validator(mode="after")``."""
+    if sum(getattr(data, name) is not None for name in type(data).model_fields) != 1:
+        raise ValueError(str(message))
+    return data
+
+
+class RecordNameOut(Schema):
+    """What an app's read of the names its assistant's card shows answers for a record (``exactly_one``)."""
+
+    name: str = Field(description="What the screens of its app call it, in the reader's language.")
+
+
 #: A device by its name or, with none, by what it is («Chrome · macOS»), as Settings › Devices says it.
 DEVICE_NAMES = ("name", "agent")
 
