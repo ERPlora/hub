@@ -210,6 +210,9 @@ Todo se puede pedir por las pantallas, el asistente y la API, con las mismas reg
 mismos permisos. Antes de cambiar o borrar un elemento o de añadirle una línea, el asistente pide confirmar con su
 tarjeta (BASE-F97), que nombra el elemento como lo nombran las pantallas, nunca por su id: por su nombre
 («Elemento: Mesa 4»), y el estado con su palabra («Abierto», «Hecho»). Lo que quien pregunta no puede ver no sale.
+El asistente llega a cada una por lo que la persona dice («¿cuántos elementos abiertos hay en Demo?», «borra el
+elemento Ensayo 2») y, si nombra un elemento como «el elemento …», le ofrece también la lista con la que lo busca por
+su nombre. Un elemento dicho solo por su nombre («borra Ensayo 2») todavía no lo encuentra (hub#1162).
 
 ### Lo que ofrece: consultas (leen, no cambian nada; todas se pueden seguir en vivo)
 
@@ -218,6 +221,7 @@ tarjeta (BASE-F97), que nombra el elemento como lo nombran las pantallas, nunca 
 | Los elementos, con búsqueda por nombre, filtro de estado y páginas (hasta 100 por página) | ver | F01–F05 | `demo.item.list` |
 | La ficha de un elemento con sus líneas | ver | F02–F05 | `demo.item.detail` |
 | Las cifras: total, abiertos, hechos y líneas | gestionar | F05 | `demo.item.stats` |
+| Cuántos elementos siguen abiertos (el contador de la campana) | ver | F05 | `demo.item.open_count` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -275,8 +279,13 @@ papel en ningún negocio.
   `unauthorized`, `app_inactive`, `app_entitlement_blocked`) deja de pintarlo con sus acciones
   (`ItemDetailPage.vue`, `GONE`); un fallo pasajero (`internal_error`) lo deja a la vista bajo el
   aviso. `permission_denied` se titula «No tienes permiso».
-- Cada operación es una herramienta del asistente: `ai=` con su descripción y, en las acciones, su
-  `risk` (`high` solo para borrar un elemento, que se lleva sus líneas y no se deshace).
+- Cada operación es una herramienta del asistente: `ai=` con su descripción, sus `asks` (las frases en `en` y `es`
+  con que una persona la pide; `live.E020`: Demo está en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1095) y, en las
+  acciones, su `risk` (`high` solo para borrar un elemento, que se lleva sus líneas y no se deshace). Los
+  `SYNONYMS` del Hub (`base/assistant.py`) leen «elemento» como `item`, así que «el elemento X» nombra lo que
+  tocan sus operaciones y trae la lista que lo busca por su nombre. Las frases reales de la QA del asistente
+  (`tests/e2e/qa/probes/*-es-demo-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno
+  (`tests/test_assistant_asks.py`); las que nombran el elemento solo por su nombre esperan, en `xfail`, a hub#1162.
 - La tarjeta de confirmación del asistente (BASE-F97, hub#670) nombra el elemento que una escritura señala por su id
   con la marca `refers` de `schemas.py` (`AN_ITEM`, en el `id` de `ByIdIn`, `ItemPatchIn` y `LineIn`), leída como
   quien pregunta con `demo.item.detail`: el elemento por su `name`, como la lista y el diálogo «Eliminar». Ese `id`
