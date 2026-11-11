@@ -12,6 +12,7 @@ from decimal import Decimal
 import psycopg
 import pytest
 from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from live.errors import Conflict, NotFound, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
@@ -206,6 +207,27 @@ def test_a_name_two_items_share_changes_nothing_and_records_nothing(name, schema
     assert sorted(Item.objects.values_list("id", "status")) == sorted([(first.id, "open"), (second.id, "open")])
     assert not ItemLine.objects.exists()
     assert outbox() == []
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("name", "schema", "rest"),
+    [
+        ("demo.item.update", ItemPatchIn, {"status": "done"}),
+        ("demo.item.delete", ItemRefIn, {}),
+        ("demo.item.add_line", LineIn, {"text": "Screws", "qty": "3"}),
+    ],
+)
+def test_each_write_locks_the_items_row_before_it_writes(name, schema, rest):
+    """The module's promise (two writes on the same item never interleave): the item found, by its id or its name, is
+    read again ``FOR UPDATE`` before anything is written."""
+    item = create("Autumn trial")
+    with CaptureQueriesContext(connection) as queries:
+        run(name, schema(called="Autumn trial", **rest))
+    statements = [query["sql"] for query in queries.captured_queries]
+    locked = next(at for at, sql in enumerate(statements) if "FOR UPDATE" in sql and str(item.id.hex) in sql.replace("-", ""))
+    written = next(at for at, sql in enumerate(statements) if sql.lstrip().startswith(("UPDATE", "DELETE", "INSERT")))
+    assert locked < written, statements
 
 
 @pytest.mark.django_db
