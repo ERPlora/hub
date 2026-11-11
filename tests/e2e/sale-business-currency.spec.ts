@@ -14,7 +14,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { A, login, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
-import { cleanSales, drawerOff, newestSaleOf, openTillCart, restoreDrawer, stamp } from './sale-helpers';
+import { cleanSales, drawerOff, newestSaleOf, openTillCart, restoreDrawer, stamp, tillReady } from './sale-helpers';
 import { createRule, dropCountryRules } from './tax-helpers';
 
 const KEY = 'FIX-HUB-SALE-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';
@@ -60,11 +60,6 @@ test.afterAll(async () => {
   restoreDrawer();
   dropCountryRules('PL');
 });
-
-async function tillReady(page: Page): Promise<void> {
-  await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
-  await shown(page).locator('[data-testid^=pos-product-], [data-testid=pos-grid-empty]').first().waitFor({ state: 'visible' });
-}
 
 /** Adds the shirt the way a person finds it: the magnifier, its SKU, the result. */
 async function addShirt(page: Page): Promise<void> {
