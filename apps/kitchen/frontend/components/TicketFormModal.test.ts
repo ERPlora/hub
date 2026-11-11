@@ -242,8 +242,8 @@ describe('TicketFormModal: fields refused with the same words (hub#888)', () => 
 describe('TicketFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
   it('as opened closes; a change asks; restored as opened closes again', async () => {
     const f = await form();
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => f.inDoc('kitchen-ticket-form'),
       change: () => ionValue(f.field('label'), 'Staff', 'ionInput'),
       restore: () => ionValue(f.field('label'), '', 'ionInput'),

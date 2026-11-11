@@ -332,8 +332,8 @@ describe('RuleFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)'
   it('editing: as opened closes; a change asks; restored as opened closes again', async () => {
     const s = await setupAnswered({ rule: rule() });
     const name = s.field('name').value as string;
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('pricing-rule-form'),
       change: () => ionValue(s.field('name'), 'Ten yen off', 'ionInput'),
       restore: () => ionValue(s.field('name'), name, 'ionInput'),

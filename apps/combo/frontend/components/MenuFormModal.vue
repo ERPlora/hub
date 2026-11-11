@@ -163,7 +163,7 @@ function retryPhoto(): void {
 }
 
 // An untouched price follows the business's money when it answers after the window opened: that is no change.
-useUnsavedFormOnOpen(
+const canDismiss = useUnsavedFormOnOpen(
   'combo-menu-form',
   () => {
     const stored = props.combo ? moneyFieldText(props.combo.price, locale.value, money.value) : '';
@@ -176,6 +176,7 @@ useUnsavedFormOnOpen(
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="combo-menu-form"
     :title="title"
     :submit-label="photo.uploading.value ? $t('base.imageField.uploading') : $t('combo.save')"

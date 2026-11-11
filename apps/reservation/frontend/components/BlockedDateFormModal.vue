@@ -14,7 +14,7 @@ import type { BlockedDateIn } from '../operations';
 const props = defineProps<{ day: string }>();
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('reservation-blocked-form', () => ({ date: date.value, reason: reason.value, wholeDay: wholeDay.value, from: from.value, until: until.value }), open);
+const canDismiss = useUnsavedFormOnOpen('reservation-blocked-form', () => ({ date: date.value, reason: reason.value, wholeDay: wholeDay.value, from: from.value, until: until.value }), open);
 
 const create = useCommand('reservation.blocked_date.create');
 const date = ref('');
@@ -62,6 +62,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="reservation-blocked-form"
     size="sm"
     :title="$t('reservation.availability.blockedForm.title')"

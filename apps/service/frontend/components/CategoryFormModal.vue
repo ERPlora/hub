@@ -22,7 +22,7 @@ const props = defineProps<{
 
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('service-category-form', () => form.value, open);
+const canDismiss = useUnsavedFormOnOpen('service-category-form', () => form.value, open);
 
 interface Form {
   name: string;
@@ -92,6 +92,7 @@ async function save(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="service-category-form"
     :title="title"
     :submit-label="category ? $t('service.categories.form.save') : $t('service.categories.form.create')"

@@ -111,12 +111,13 @@ async function save(): Promise<void> {
 
 /** As it opened: the method as the list shows it (account blank) until its whole account has been read. */
 const original = computed(() => fromMethod(props.method && (whole.value ?? { ...props.method, bank_account_ref: '' })));
-useUnsavedForm('payment-method-form', () => (open.value ? form.value : original.value), original);
+const canDismiss = useUnsavedForm('payment-method-form', () => (open.value ? form.value : original.value), original);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="payment-method-form"
     :title="title"
     :submit-label="method ? $t('payment.methods.form.save') : $t('payment.methods.form.create')"

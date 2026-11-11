@@ -76,7 +76,7 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen(
+const canDismiss = useUnsavedFormOnOpen(
   'schedule-override-form',
   () => ({ startDate: startDate.value, endDate: endDate.value, reason: reason.value, closed: closed.value, rows: rows.value }),
   open,
@@ -86,6 +86,7 @@ useUnsavedFormOnOpen(
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="schedule-override-form"
     :title="title"
     :submit-label="editing ? $t('schedule.save') : $t('schedule.overrides.form.submit')"

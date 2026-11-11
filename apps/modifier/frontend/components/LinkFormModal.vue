@@ -58,12 +58,13 @@ async function save(): Promise<void> {
 }
 
 // The kind only says where to search: what would be applied is the product or category picked.
-useUnsavedFormOnOpen('modifier-link-form', () => target.value?.id ?? null, open);
+const canDismiss = useUnsavedFormOnOpen('modifier-link-form', () => target.value?.id ?? null, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="modifier-link-form"
     :title="t('modifier.links.form.title', { group: group.name })"
     :submit-label="$t('modifier.links.form.submit')"
