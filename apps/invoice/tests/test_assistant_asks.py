@@ -151,7 +151,7 @@ OWN_WORDS = [
     (
         "en",
         "invoice.invoice.rectification_preview",
-        "before touching the Talleres Mercedes one, show me how the correction would look",
+        "before I fix the Talleres Mercedes one, what would come out of it, without issuing anything?",
     ),
     ("es", "invoice.refund.get", "del reintegro de ayer a Mercedes, ¿qué número le salió?"),
     ("en", "invoice.refund.get", "Mercedes was reimbursed yesterday: which number did her rectifying one get?"),
