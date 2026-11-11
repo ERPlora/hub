@@ -148,6 +148,38 @@ SYNONYMS = (
     # is the till's check line (``sale.order.*_line``) and a cart's line would take its place.
     ("unidades", "cantidad", "quantity"),
     ("cesta", "carrito", "cart", "basket"),
+    # flow: an automation (``flow.flow``), its steps and the question it waits on (``flow.question``) are named by their
+    # phrases and never by the word: «automatización» shares its stem with «automático» («la respuesta automática»),
+    # «pasos» with «pasó» («¿qué pasó con…?», so no «qué paso» nor «de paso») and «pregunta» with its verb («se les
+    # pregunta»). A run is its «ejecución» (``flow.run``), the assistant's draft its «borrador» (``flow.draft``; «borra»,
+    # «bórralo» and «borrada» stem apart from it) and a ready-made one an app brings its «receta» or «prefabricada»
+    # (``flow.recipe``).
+    (
+        "flujo", "flow", "an automation", "a new automation", "the automation", "this automation", "that automation",
+        "each automation", "any automation", "the automations", "my automations", "your automations",
+        "which automations", "what automations",
+        *(f"{one} automatizacion" for one in ("la", "una", "esta", "esa", "cada", "alguna", "ninguna", "otra")),
+        *(f"{one} automatizacion" for one in ("nueva", "mi", "tu", "su", "de")),
+        *(f"{many} automatizaciones" for many in ("las", "unas", "estas", "esas", "todas", "otras", "que", "cuantas")),
+        *(f"{many} automatizaciones" for many in ("mis", "tus", "sus", "nuestras", "de")),
+    ),
+    ("ejecucion", "ejecuciones", "run", "runs"),
+    (
+        "step", "steps", "paso a paso",
+        *(f"{one} paso" for one in ("el", "un", "ese", "este", "cada", "primer", "ultimo", "otro", "algun", "ningun")),
+        *(f"{one} paso" for one in ("mi", "tu", "su")),
+        *(f"{many} pasos" for many in ("los", "unos", "esos", "estos", "todos", "otros", "nuevos", "que", "cuantos")),
+        *(f"{many} pasos" for many in ("mis", "tus", "sus", "de")),
+    ),
+    (
+        "question", "questions",
+        *(f"{one} pregunta" for one in ("la", "una", "esa", "esta", "cada", "primera", "ultima", "otra", "alguna")),
+        *(f"{one} pregunta" for one in ("ninguna", "mi", "tu", "su")),
+        *(f"{many} preguntas" for many in ("las", "unas", "esas", "estas", "todas", "otras", "nuevas", "que")),
+        *(f"{many} preguntas" for many in ("cuantas", "mis", "tus", "sus", "de")),
+    ),
+    ("borrador", "borradores", "draft", "drafts"),
+    ("receta", "recetas", "prefabricada", "prefabricadas", "recipe", "recipes"),
     # modifier: the «predeterminada» option is the one a group brings chosen, its default (``is_default``), as the
     # descriptions say it in English. Never «por defecto»: it is also the default of a shift, a working day or a
     # threshold (Staff's and Inventory's settings), whose asks would then rank the options of a group.
