@@ -392,6 +392,16 @@ def _page(queryset, params, row) -> dict:
     output=InvoicePage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which invoices have we issued this month?",
+                "show me the invoices of Construcciones Lema that are still pending",
+            ),
+            "es": (
+                "¿qué facturas hemos emitido este mes?",
+                "busca las facturas de Construcciones Lema que siguen pendientes",
+            ),
+        },
         "description": "List the invoices, the last issued first: search by number, customer's name or tax ID; filter "
         "by status (issued, paid, cancelled), type (F1, F2 ticket, F3, R1–R5), series, source, issue dates and total "
         "(cents). Pages of up to 100."
@@ -434,6 +444,16 @@ def list_invoices(ctx: OperationContext, params: InvoiceListIn) -> dict:
     output=InvoiceOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "open invoice FACT-2026-000017",
+                "who was invoice FACT-2026-000017 made out to, and for how much?",
+            ),
+            "es": (
+                "abre la factura FACT-2026-000017",
+                "¿a quién se le hizo la factura FACT-2026-000017 y por cuánto?",
+            ),
+        },
         "description": "Read one invoice by its number (or id): its issuer, recipient, lines, tax breakdown, totals, "
         "status, and the documents it rectifies, replaces or is rectified or replaced by."
     },
@@ -450,6 +470,16 @@ def get_invoice(ctx: OperationContext, params: InvoiceGetIn) -> dict:
     output=BySourceOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which invoice belongs to sale 20261103-0012?",
+                "did sale 20261103-0012 end up with a ticket or a full invoice?",
+            ),
+            "es": (
+                "¿qué factura tiene la venta 20261103-0012?",
+                "¿con qué documento se quedó la venta 20261103-0012?",
+            ),
+        },
         "description": "The invoice in force of a sale (by the sale's number of the day or id): its ticket or invoice, "
         "or the full invoice that replaced its ticket. Found false while it has none."
     },
@@ -577,6 +607,16 @@ def render_document(invoice: Invoice, *, duplicate: bool = False, qr: dict | Non
     output=DocumentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me invoice FACT-2026-000017 as an A4 page",
+                "let me see the sheet of invoice FACT-2026-000017 as it is handed over",
+            ),
+            "es": (
+                "enséñame la factura FACT-2026-000017 en A4",
+                "enséñame la hoja de la factura FACT-2026-000017 tal como se entrega",
+            ),
+        },
         "description": "The printable A4 document of an invoice (by its number), a whole HTML page in the reader's "
         "language: issuer, recipient, lines, tax breakdown, totals and what it rectifies. duplicate marks a copy."
     },
@@ -599,6 +639,16 @@ GENERAL_CATEGORIES = ("product.generic", "service.generic")
     input=LineDefaultsIn,
     output=LineDefaultsOut,
     ai={
+        "asks": {
+            "en": (
+                "what VAT does a line I type by hand start with?",
+                "which rate would a manual invoice line get today?",
+            ),
+            "es": (
+                "¿con qué IVA empieza una línea escrita a mano?",
+                "¿qué tipo lleva de entrada una línea de una factura manual?",
+            ),
+        },
         "description": "The rate a line of a manual invoice starts with when its rate is typed: the territory's "
         "general rate from its own rule in Taxes, or none when the territory has no rule of its own tax. The tax "
         "it is declared with is the territory's, read with tax.settings.get (VAT, IGIC in the Canary Islands, "
@@ -628,6 +678,17 @@ def line_defaults(ctx: OperationContext, params: LineDefaultsIn) -> dict:
     output=RefundOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which rectifying invoice does the refund of sale 20261103-0012 have?",
+                "what was given back in the refund of sale 20261103-0012?",
+            ),
+            "es": (
+                "¿qué rectificativa tiene la devolución de la venta 20261103-0012?",
+                "¿qué se devolvió en la venta 20261103-0012 y con qué factura?",
+                "¿qué rectificativa salió del reintegro de la venta 20261103-0012?",
+            ),
+        },
         "description": "Name a refund of the Sales app by its id: the sale it gives back, what it gave back and the "
         "number of its rectifying invoice, if issued."
     },
@@ -661,6 +722,17 @@ def get_refund(ctx: OperationContext, params: RefundGetIn) -> dict:
     input=SeriesListIn,
     output=SeriesPage,
     ai={
+        "asks": {
+            "en": (
+                "which numbering series do we have?",
+                "list this year's invoice series",
+            ),
+            "es": (
+                "¿qué series de numeración tenemos?",
+                "enséñame las series de facturas de este año",
+                "¿qué prefijos usan nuestras series?",
+            ),
+        },
         "description": "List the numbering series (this year's first): code, name, type, year, prefix, format, the "
         "current number and the number the next document will carry. Search by code or name."
     },
@@ -707,6 +779,16 @@ def find_series(series_id, code: str | None, year: int | None) -> InvoiceSeries:
     output=SeriesPeekOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what number will the next invoice get?",
+                "which number comes next in the FACT series?",
+            ),
+            "es": (
+                "¿qué número llevará la próxima factura?",
+                "¿cuál es el siguiente número de la serie FACT?",
+            ),
+        },
         "description": "Preview the number the next document of a series (by its code, this year, or its id) will "
         "carry, written with its own format, WITHOUT using it; and whether its format can still change."
     },
@@ -732,6 +814,17 @@ def peek_next(ctx: OperationContext, params: SeriesPeekIn) -> dict:
     output=SeriesDetailOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me this year's FACT series",
+                "give me the details of the RECT series",
+            ),
+            "es": (
+                "enséñame la serie FACT de este año",
+                "¿cómo es la serie RECT?",
+                "dame el detalle de la serie RECT",
+            ),
+        },
         "description": "Get one numbering series, active or not, by its id or by its code (this year, or the year "
         "said): what the Series screen shows of it and how it is named (code, year and name)."
     },
@@ -891,6 +984,16 @@ def rectification_figures(
     output=RectificationPreviewOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "before rectifying invoice FACT-2026-000017, show me what would be issued",
+                "preview the rectifying invoice of FACT-2026-000017 without issuing it",
+            ),
+            "es": (
+                "antes de rectificar la factura FACT-2026-000017, enséñame cómo quedaría",
+                "¿qué rectificativa saldría de la FACT-2026-000017 si la corrijo ahora?",
+            ),
+        },
         "description": "The rectifying invoice that rectifying an invoice (by its number) with that reason and type "
         "would issue now, before issuing it: the invoice it rectifies (number, date, customer, total and what is left "
         "of it), its type (R1 by default, R5 for a ticket), the reason, this year's RECT series and the next number "
@@ -955,6 +1058,17 @@ def rectification_preview(
     input=NumberingStatusIn,
     output=NumberingStatusOut,
     ai={
+        "asks": {
+            "en": (
+                "is this year's invoice numbering ready?",
+                "do we have this year's series to start invoicing?",
+            ),
+            "es": (
+                "¿tenemos lista la numeración de este año?",
+                "¿hay series de este año para empezar a facturar?",
+                "¿falta preparar algo en la numeración del año nuevo?",
+            ),
+        },
         "description": "Whether this year's invoice numbering is set up: how many ordinary series (F1, F2, F3), "
         "rectifying series (R1–R5) and default series the business year has, and how many series in all."
     },
@@ -982,6 +1096,16 @@ def numbering_status(ctx: OperationContext, params: NumberingStatusIn) -> dict:
     output=GapPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "are there gaps in the invoice numbers?",
+                "is our invoice numbering correlative?",
+            ),
+            "es": (
+                "¿falta algún número entre las facturas?",
+                "¿la numeración de las facturas es correlativa?",
+            ),
+        },
         "description": "The gaps of the invoice numbering: one row per missing stretch inside a series and year (after "
         "which number, from which, the next one recorded and how many are missing). None means it is correlative."
     },
@@ -1044,6 +1168,16 @@ def _allocation(invoice: Invoice) -> dict:
     output=AllocationPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which document got number FACT-2026-000017?",
+                "show me this year's numbering book",
+            ),
+            "es": (
+                "¿qué documento lleva el número FACT-2026-000017?",
+                "enséñame el libro de números de este año",
+            ),
+        },
         "description": "The numbering book: one row per number handed out, by series, year and sequence, with the "
         "number written and the document behind it. Search by number or series code."
     },
@@ -1074,6 +1208,16 @@ def allocations(ctx: OperationContext, params: AllocationsIn) -> dict:
     input=IssuerGetIn,
     output=IssuerOut,
     ai={
+        "asks": {
+            "en": (
+                "what company name and tax ID go on our invoices?",
+                "do we have the issuer of the invoices set?",
+            ),
+            "es": (
+                "¿qué razón social y CIF salen en nuestras facturas?",
+                "¿quién sale como emisor en nuestras facturas?",
+            ),
+        },
         "description": "The issuer of the invoices: the business's legal name, tax ID and address, whether it is set "
         "up (without it no document is issued) and whether it came from the ERPlora account."
     },

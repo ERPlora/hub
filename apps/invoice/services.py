@@ -262,6 +262,17 @@ def _save_issuer(ctx: OperationContext, data: IssuerIn, **extra) -> Issuer:
     input=IssuerIn,
     output=IssuerOut,
     ai={
+        "asks": {
+            "en": (
+                "change the company name on our invoices to Lema Construcción SL",
+                "update the issuer's address to Calle Real 5",
+            ),
+            "es": (
+                "cambia la razón social de las facturas a Lema Construcción SL",
+                "pon la dirección del emisor en Calle Real 5",
+                "cambia en el emisor el domicilio a Calle Real 5",
+            ),
+        },
         "description": "Set the issuer of the invoices: the business's legal name, tax ID (a Spanish NIF or CIF is "
         "checked) and address. Every document issued from now on carries it; the ones issued keep theirs.",
         "risk": "high",
@@ -650,6 +661,16 @@ def _rule_key(category_key: str, *, field: str, on: dt.date) -> fiscal.FiscalKey
     input=InvoiceCreateIn,
     output=InvoiceOut,
     ai={
+        "asks": {
+            "en": (
+                "make an invoice for Construcciones Lema for two hours of work at 50 €",
+                "issue an invoice by hand to Fontanería Ortega",
+            ),
+            "es": (
+                "hazle una factura a Construcciones Lema por dos horas de trabajo a 50 €",
+                "emite a mano una factura para Fontanería Ortega",
+            ),
+        },
         "description": "Issue an invoice by hand, dated today and numbered in its series (an invoice F1 needs the "
         "customer's name, tax ID and address; a ticket series issues a simplified F2). Each line: description, "
         "quantity, unit price WITHOUT VAT in cents, and its VAT % or its tax category. The server computes the VAT, "
@@ -840,6 +861,16 @@ def _net_price(
     input=FromSaleIn,
     output=IssueOut,
     ai={
+        "asks": {
+            "en": (
+                "issue the ticket of sale 20261103-0012 now",
+                "sale 20261103-0012 has no invoice yet: issue it",
+            ),
+            "es": (
+                "emite ya el tique de la venta 20261103-0012",
+                "la venta 20261103-0012 se quedó sin factura: hazla",
+            ),
+        },
         "description": "Issue the fiscal document of a charged sale (by its id or its number of the day): its ticket "
         "(F2) or, if it was charged as an invoice, its full invoice (F1) with the customer's data. Read from the sale "
         "itself, born paid. It is also what happens by itself after every charge; asking again issues nothing.",
@@ -952,6 +983,16 @@ def _tell_sales(ctx: OperationContext, invoice: Invoice, written: str) -> None:
     input=SubstituteIn,
     output=IssueOut,
     ai={
+        "asks": {
+            "en": (
+                "turn the ticket of sale 20261103-0012 into a full invoice for Construcciones Lema",
+                "give the customer a full invoice with their details for their ticket",
+            ),
+            "es": (
+                "pasa el tique de la venta 20261103-0012 a factura completa a nombre de Construcciones Lema",
+                "el cliente pide su tique en factura con sus datos",
+            ),
+        },
         "description": "The customer asks for the full invoice of their ticket: issue a full invoice (F3) that replaces "
         "the ticket (by its number), with the customer's name, tax ID and address (or their card) and the ticket's "
         "very figures. The ticket is not touched. A ticket has one; asking again answers it without issuing another.",
@@ -1080,6 +1121,16 @@ def _rectify(
     input=RectifyIn,
     output=IssueOut,
     ai={
+        "asks": {
+            "en": (
+                "rectify invoice FACT-2026-000017, the amount was wrong",
+                "issue an R1 rectifying invoice for FACT-2026-000017",
+            ),
+            "es": (
+                "rectifica la factura FACT-2026-000017 por un error en el importe",
+                "haz una rectificativa R1 de la FACT-2026-000017",
+            ),
+        },
         "description": "Rectify an invoice (by its number) with a mandatory reason: a rectifying invoice dated today in "
         "this year's RECT series negates what is left of it, and the original is cancelled. Type R1 by default (R2–R4 "
         "to choose; a ticket is always R5). Do not send a date: any other day than today is refused. Money is given "
@@ -1170,6 +1221,16 @@ def _returned_by_key(refund: Refund) -> dict[fiscal.FiscalKey, tuple[int, str]] 
     input=FromRefundIn,
     output=IssueOut,
     ai={
+        "asks": {
+            "en": (
+                "issue the rectifying invoice of what was given back in sale 20261103-0012",
+                "the refund of Construcciones Lema still has no rectifying invoice",
+            ),
+            "es": (
+                "haz la factura en negativo de lo devuelto en la venta 20261103-0012",
+                "la devolución de Construcciones Lema aún no tiene su rectificativa",
+            ),
+        },
         "description": "Issue the rectifying invoice of a refund of the Sales app (by the refund's id): what the refund "
         "gave back, prorated over what is left of the sale's invoice (by differences); the refund that closes the sale "
         "takes exactly what is left and cancels the invoice. It also happens by itself after every refund; asking "
@@ -1220,6 +1281,16 @@ def rectify_from_refund(ctx: OperationContext, data: FromRefundIn) -> dict:
     input=FromVoidIn,
     output=IssueOut,
     ai={
+        "asks": {
+            "en": (
+                "issue the rectifying invoice of voided sale 20261103-0012",
+                "the cancelled sale 20261103-0012 still has no rectifying invoice",
+            ),
+            "es": (
+                "haz la rectificativa de la venta anulada 20261103-0012",
+                "a la anulación de la venta 20261103-0012 le falta su factura en negativo",
+            ),
+        },
         "description": "Issue the rectifying invoice of a voided sale (by the sale's id): the whole of what is left of "
         "its ticket negated (R5; R1 if the ticket was replaced by a full invoice), with the void's reason. It also "
         "happens by itself after every void; asking again issues nothing.",
@@ -1267,6 +1338,18 @@ def rectify_from_void(ctx: OperationContext, data: FromVoidIn) -> dict:
     input=MarkPaidIn,
     output=InvoiceOut,
     ai={
+        "asks": {
+            "en": (
+                "mark invoice FACT-2026-000017 as paid",
+                "Construcciones Lema has paid their invoice",
+            ),
+            "es": (
+                "la factura FACT-2026-000017 ya está pagada",
+                "Construcciones Lema ya ha pagado su factura",
+                "deja como cobrada la factura de Fontanería Ortega",
+                "Fontanería Ortega ya nos ha abonado su factura",
+            ),
+        },
         "description": "Mark an issued invoice (by its number) as paid now. No amount changes, no payment method is "
         "kept and the till is not touched; a paid, cancelled or rectifying invoice is refused.",
         "risk": "normal",
@@ -1315,6 +1398,16 @@ def _demote_defaults(year: int, keep: UUID | None = None) -> None:
     input=SeriesCreateIn,
     output=SeriesOut,
     ai={
+        "asks": {
+            "en": (
+                "create a new invoice series for the online shop",
+                "add a numbering series called Eventos for 2027",
+            ),
+            "es": (
+                "crea una serie nueva para las facturas de la tienda online",
+                "añade una serie de numeración Eventos para 2027",
+            ),
+        },
         "description": "Create a numbering series: code, name, type (F1–F3, R1–R5), year, prefix (default: the code), "
         "optional number format and the number its first document takes. Sales number in TICKET, FACT and RECT; "
         "another code serves manual invoices. Marking it default demotes the default series of its year.",
@@ -1366,6 +1459,16 @@ def create_series(ctx: OperationContext, data: SeriesCreateIn) -> dict:
     input=SeriesUpdateIn,
     output=SeriesOut,
     ai={
+        "asks": {
+            "en": (
+                "rename the Obras series to Works",
+                "deactivate the Obras invoice series",
+            ),
+            "es": (
+                "cambia el nombre de la serie Obras a Trabajos",
+                "desactiva la serie de facturas Obras",
+            ),
+        },
         "description": "Change a numbering series (by its id): name, active, default and, only while it has numbered "
         "nothing, its prefix, its format and its next number. Code, type, year and the counter never change.",
         "risk": "normal",
@@ -1615,6 +1718,16 @@ def _qr_of(ctx: OperationContext, invoice: Invoice) -> dict | None:
     output=PaperOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "print invoice FACT-2026-000017",
+                "print a duplicate of invoice FACT-2026-000017",
+            ),
+            "es": (
+                "imprime la factura FACT-2026-000017",
+                "imprímeme un duplicado de la factura FACT-2026-000017",
+            ),
+        },
         "description": "Print an invoice's A4 page (by its id or number) on the system printer, in the reader's "
         "language and with its VeriFactu QR; duplicate marks it as a copy. Each call prints one. Not queued "
         "(Printing off, no system printer, its VeriFactu record not there yet): say so; the screen prints it. It "

@@ -165,6 +165,13 @@ SYNONYMS = (
         "method", "methods", "cuenta bancaria", "cuentas bancarias", "cuenta del banco", "cuentas del banco",
         "bank account", "bank accounts",
     ),
+    # invoice: an invoice «pagada» or «pagado» is a paid one (``invoice.invoice.mark_paid``), as «paid» is in
+    # English, and so is one marked «como cobrada», named by its phrases: «cobrar» and «cobro» alone are a sale's
+    # charge.
+    (
+        "pagada", "pagadas", "pagado", "pagados", "paid", "como cobrada", "como cobradas", "como cobrado",
+        "como cobrados",
+    ),
     # flow: an automation (``flow.flow``), its steps and the question it waits on (``flow.question``) are named by their
     # phrases and never by the word: «automatización» shares its stem with «automático» («la respuesta automática»),
     # «pasos» with «pasó» («¿qué pasó con…?», so no «qué paso» nor «de paso») and «pregunta» with its verb («se les
