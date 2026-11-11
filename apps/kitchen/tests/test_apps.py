@@ -121,7 +121,7 @@ INTERNAL_READS = {"kitchen.station.get", "kitchen.item.get"}
 def test_every_operation_is_a_tool_of_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: the operation's
     # permission is its only door. A command says its risk; a read has none.
-    from live.operations import INTERNAL, registry
+    from live.operations import AI, INTERNAL, MIN_ASKS, registry
 
     operations = [op for name, op in registry.items() if name.startswith("kitchen.")]
     assert len(operations) == 32
@@ -132,6 +132,12 @@ def test_every_operation_is_a_tool_of_the_assistant():
             continue
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
+        if isinstance(op.ai_spec(), AI):  # a tool says what a person types to ask for it (live.E020)
+            expected |= {"asks"}
+            assert {language: len(op.ai.get("asks", {}).get(language, ())) >= MIN_ASKS for language in ("en", "es")} == {
+                "en": True,
+                "es": True,
+            }, op.name
         assert set(op.ai) == expected, op.name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, op.name

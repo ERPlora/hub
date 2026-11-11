@@ -560,6 +560,7 @@ LIVE_ASSISTANT_ASKS_REQUIRED = (
     "cash_register",
     "customer",
     "inventory",
+    "kitchen",
     "printing",
     "sale",
     "table",
