@@ -137,12 +137,16 @@ test(`${KEY}: service-business-currency a business in Japan saves «1500» as 15
   await expect(tile).toContainText('¥1,500');
   await tile.click();
   await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: YEN_SERVICE }).first()).toBeVisible();
-  // No rule for the service in Japan yet: the foot says why, in the server's words, and the total waits.
+  // No rule for the service in Japan yet: the foot says why, in the server's words, and the total waits. The
+  // category goes by the name Taxes gives it, never by its key, and the notice says where its rule is made (hub#1123).
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
     await openTillCart(page);
     const refusal = shown(page).locator('[data-testid=pos-preview-error]');
-    await expect(refusal, `refusal at ${size.name}`).toContainText('no tax rule applies');
+    await expect(refusal, `refusal at ${size.name}`).toContainText(
+      `«${YEN_SERVICE}» cannot be charged: no tax rule applies to its tax category «Service — generic» here. Create its rule in Taxes › Rules.`,
+    );
+    await expect(refusal, `refusal at ${size.name}`).not.toContainText('service.generic');
     await expect(refusal, `refusal at ${size.name}`).toBeInViewport();
     await expect(shown(page).locator('[data-testid=pos-total]'), `refusal at ${size.name}`).toHaveText('—');
     await settled(page);

@@ -112,9 +112,11 @@ APP_WORDS = shared.app_words
 #: are Inventory's units of measure (``inventory.unit``), and a «albarán», the «mercancía» or what «entran» (never
 #: «entrada»: its stem is that of «entre») is the goods ``inventory.stock.receive`` records; a «tarea» and a «proyecto»
 #: are Tasks' task and project (``task.task``, ``task.project``), and what one «comenta» its comment (``task.comment``),
-#: named by its phrases and never by the word: «comentario» shares its stem with «comensales», a table's guests. To
-#: «desactivar» names the deactivation itself (``staff.member.deactivate``, ``*.deactivate``), not only a switch off,
-#: and what one «pide» or «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``).
+#: named by its phrases and never by the word: «comentario» shares its stem with «comensales», a table's guests; an
+#: «arqueo», a «recuento» or a «conteo» of the drawer is a count of Cash register's (``cash_register.count``), and the
+#: «moneda» or «divisa» of the business is its currency (``cash_register.currency``). To «desactivar» names the
+#: deactivation itself (``staff.member.deactivate``, ``*.deactivate``), not only a switch off, and what one «pide» or
+#: «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``).
 SYNONYMS = (
     ("cuenta", "check", "tab", "order"),
     ("ticket", "tique", "recibo", "receipt", "sale"),
@@ -131,6 +133,8 @@ SYNONYMS = (
         "comment", "comments", "comenta en", "comenta que", "un comentario", "el comentario", "los comentarios",
         "sus comentarios", "que comentarios", "de comentarios",
     ),
+    ("arqueo", "recuento", "conteo", "count"),
+    ("divisa", "moneda", "currency"),
     # staff
     ("desactiva", "desactivar", "deactivate"),
     ("pido", "solicito", "solicitud", "request"),
