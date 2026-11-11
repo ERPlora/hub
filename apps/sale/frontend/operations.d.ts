@@ -550,10 +550,12 @@ export interface PreviewOut {
   /** The whole operation the cash limit looks at: on a check charged in parts, what it already charged
    *  plus all it has left (Ley 7/2012, art. 7); otherwise `total`. */
   operation_total: number;
-  /** From this operation total on, no cash at all (Spain: 100000); null = no limit. */
+  /** From this operation total on, no cash at all, in cents of `limits_currency` (Spain: 100000); null = no limit. */
   cash_limit: number | null;
-  /** Above this total, only an invoice (Spain: 300000); null = no limit. */
+  /** Above this total, only an invoice, in cents of `limits_currency` (Spain: 300000); null = no limit. */
   ticket_limit: number | null;
+  /** The currency (ISO 4217) the law writes both limits in, whatever the business charges in: `EUR`. */
+  limits_currency: string;
 }
 
 export interface SaleLineOut {

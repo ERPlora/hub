@@ -2,6 +2,7 @@
 
 import datetime as dt
 from decimal import Decimal
+from pathlib import Path
 from uuid import uuid7
 
 import pytest
@@ -11,7 +12,9 @@ from django.utils import timezone, translation
 from live.errors import NotFound, PermissionDenied
 
 from apps.sale.models import PaymentMethod, Sale
+from apps.sale.schemas import BreakdownOut, PreviewLineOut, PreviewOut
 from apps.sale.tests.conftest import ctx_for, run
+from base.tests.typed_operations import ts_fields
 
 pytestmark = pytest.mark.django_db
 
@@ -624,6 +627,20 @@ def test_the_preview_says_what_a_ticket_percent_takes_off_not_zero(product):
         {"lines": [{"product": "CHK"}], "discount_percent": "10"},
     )
     assert loose.ticket_discount_amount == 55
+
+
+OPERATIONS_TS = Path(__file__).resolve().parents[1] / "frontend" / "operations.d.ts"
+
+
+@pytest.mark.parametrize(
+    ("interface", "schema"),
+    [("PreviewOut", PreviewOut), ("PreviewLineOut", PreviewLineOut), ("BreakdownOut", BreakdownOut)],
+)
+def test_the_typed_preview_declares_its_schema_fields(interface, schema):
+    # The till and the checkout read the preview through these TypeScript types (vue-tsc checks them): a field
+    # the schema answers and the type does not declare is invisible to them, as the limits' currency was
+    # (hub#1122, as hub#942 in Cart and checkout and Pricing).
+    assert ts_fields(interface, OPERATIONS_TS) == set(schema.model_fields)
 
 
 # ── Open checks ─────────────────────────────────────────────────────────────────────────────────
