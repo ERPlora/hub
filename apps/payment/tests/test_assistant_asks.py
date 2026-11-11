@@ -105,6 +105,15 @@ def place(offered: list[str], name: str) -> int | None:
     return offered.index(name) + 1 if name in offered else None
 
 
+def assert_offered_with_room(tools: dict[str, Operation], name: str, phrase: str) -> None:
+    """``phrase``, a probe of layer 2, is none of the asks of tool ``name``, and a turn offers ``name`` for it among the
+    first ``WITH_ROOM``."""
+    assert name in tools  # positive control: the person holds the tool, so its place is known
+    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
+    offered = offered_to(tools, phrase)
+    assert name in offered[:WITH_ROOM], (place(offered, name), offered[:10])
+
+
 def test_payment_offers_its_thirteen_tools():
     """Payments' tools are its thirteen operations (``AI``, never ``INTERNAL``): a silent drop of tools fails."""
     tools = {name for name, op in registry.items() if op.app_label == "payment" and assistant.is_tool(op)}
@@ -133,11 +142,7 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_payment_request_offers_its_existing_operation(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    assert name in tools  # positive control: the owner holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    offered = offered_to(tools, phrase)
-    assert name in offered[:WITH_ROOM], (place(offered, name), offered[:10])
+    assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -152,10 +157,7 @@ def test_every_probe_of_payments_offers_its_tool_or_is_refused_without_being_one
     if probe["expect"] == "refused":
         assert name in NOT_THE_EMPLOYEES and name not in tools
         return
-    assert name in tools  # positive control: the role holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    offered = offered_to(tools, phrase)
-    assert name in offered[:WITH_ROOM], (place(offered, name), offered[:10])
+    assert_offered_with_room(tools, name, phrase)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
