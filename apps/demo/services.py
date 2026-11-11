@@ -32,6 +32,16 @@ ITEM_DONE = _("This item is closed: open it to add lines.")
         "description": "Creates a demo item with its name (up to 120 characters) and, if given, its status («open» "
         "or «done») and a note.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "create a demo item called Autumn trial",
+                "add a new item to Demo named Trial 2 with the note «check the sync»",
+            ),
+            "es": (
+                "crea el elemento «Ensayo de otoño» en la app Demo",
+                "nuevo elemento de demo: Ensayo 2, con la nota «revisar la sincronización»",
+            ),
+        },
     },
 )
 def create_item(ctx: OperationContext, data: ItemIn) -> Item | None:
@@ -51,6 +61,16 @@ def create_item(ctx: OperationContext, data: ItemIn) -> Item | None:
         "description": "Changes a demo item, by its id, only in what is sent: its name, its status («done» closes it "
         "to new lines, «open» reopens it) or its note.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "rename the demo item Trial 2 to «Winter trial»",
+                "mark the demo item Autumn trial as done",
+            ),
+            "es": (
+                "cambia el nombre del elemento «Ensayo 2» de Demo a «Ensayo de invierno»",
+                "da por hecho el elemento Ensayo de otoño de la demo y pon en su nota «revisado»",
+            ),
+        },
     },
 )
 def update_item(ctx: OperationContext, data: ItemPatchIn) -> Item | None:
@@ -76,6 +96,16 @@ def update_item(ctx: OperationContext, data: ItemPatchIn) -> Item | None:
     ai={
         "description": "Deletes a demo item, by its id, together with all its lines. It cannot be undone.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "delete the demo item Trial 2 and its lines",
+                "remove Autumn trial from Demo for good",
+            ),
+            "es": (
+                "borra el elemento «Ensayo 2» de Demo con sus líneas",
+                "quita de la demo el elemento Ensayo de otoño para siempre",
+            ),
+        },
     },
 )
 def delete_item(ctx: OperationContext, data: ByIdIn) -> dict:
@@ -95,6 +125,16 @@ def delete_item(ctx: OperationContext, data: ByIdIn) -> dict:
         "description": "Adds a line (a text and a quantity above zero) at the end of an open demo item, by its id; "
         "the same client_line_id sent again does not add it twice.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "add a line «screws» with quantity 3 to the demo item Trial 2",
+                "put a line «check the cables», 4 of them, on Autumn trial in Demo",
+            ),
+            "es": (
+                "añade una línea «tornillos» con cantidad 3 al elemento Ensayo 2 de Demo",
+                "pon una línea «revisar cables», cantidad 4, en el elemento Ensayo de otoño",
+            ),
+        },
     },
 )
 def add_line(ctx: OperationContext, data: LineIn) -> Item | None:

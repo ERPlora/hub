@@ -116,7 +116,8 @@ APP_WORDS = shared.app_words
 #: «arqueo», a «recuento» or a «conteo» of the drawer is a count of Cash register's (``cash_register.count``), and the
 #: «moneda» or «divisa» of the business is its currency (``cash_register.currency``). To «desactivar» names the
 #: deactivation itself (``staff.member.deactivate``, ``*.deactivate``), not only a switch off, and what one «pide» or
-#: «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``).
+#: «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``); an «elemento», as Demo's screens
+#: name one, is an item (``demo.item``).
 SYNONYMS = (
     ("cuenta", "check", "tab", "order"),
     ("ticket", "tique", "recibo", "receipt", "sale"),
@@ -138,6 +139,8 @@ SYNONYMS = (
     # staff
     ("desactiva", "desactivar", "deactivate"),
     ("pido", "solicito", "solicitud", "request"),
+    # demo
+    ("elemento", "elementos", "item", "items"),
 )
 #: The help a how-to question asks for (``live.assistant.HOWTO_POINTS``): it ranks by being one, not only by ``ALWAYS``.
 HOWTO = (DOCS_SEARCH,)
