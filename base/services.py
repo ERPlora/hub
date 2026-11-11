@@ -1190,9 +1190,11 @@ SERVED_STATUSES = (Hub.Status.READY, Hub.Status.CANCELLED, Hub.Status.ARCHIVING)
 def hubs_to_serve(now: dt.datetime) -> list[Hub]:
     """The hubs with their own database the worker relays the outbox and runs the tasks of, each in its database, by
     id: ready ones and businesses that left but keep it (cancelled, being archived); never one being made, dropped or
-    purged, a demo whose time is up, nor one moving to another cluster (its database is being copied)."""
+    purged, a demo whose time is up, nor one moving to another cluster or being restored (its database is being
+    copied)."""
     return list(
-        Hub.objects.filter(status__in=SERVED_STATUSES, moving_to__isnull=True)
+        Hub.objects.filter(status__in=SERVED_STATUSES)
+        .exclude(registry.copying())
         .exclude(db_name="")
         .exclude(is_demo=True, expires_at__lte=now)
         .select_related("cluster")
@@ -2487,8 +2489,9 @@ def offboarding_due(hub: Hub) -> bool:
 def past_retention(hub: Hub, now: dt.datetime) -> bool:
     """Whether ``hub`` is a business on its way out after its 90 days, ``now``: left that long ago, or already
     ``archiving`` or ``dropping``. Never a demo (their own way out: ``base.tenancy.provision``), the platform's hub, nor
-    one moving to another cluster (its database is being copied). Its ``next_attempt_at`` says when, not whether."""
-    if hub.is_demo or hub.is_platform or hub.moving_to_id is not None:
+    one moving to another cluster or being restored (its database is being copied). Its ``next_attempt_at`` says when,
+    not whether."""
+    if hub.is_demo or hub.is_platform or registry.is_copying(hub):
         return False
     if hub.status in (Hub.Status.ARCHIVING, Hub.Status.DROPPING):
         return True
@@ -2510,8 +2513,8 @@ def _next_past_retention(now: dt.datetime) -> UUID | None:
             Q(next_attempt_at__isnull=True) | Q(next_attempt_at__lte=now),
             is_demo=False,
             is_platform=False,
-            moving_to__isnull=True,
         )
+        .exclude(registry.copying())
         .exclude(Exists(HubDue.objects.filter(pk=OuterRef("pk"), lease_until__gt=now)))
         .order_by("cancelled_at", "id")
         .values_list("id", flat=True)
@@ -5004,10 +5007,12 @@ def app_retry(ctx: OperationContext, data: AppChangeIn) -> dict:
 
 def activation_hubs(now: dt.datetime) -> list[Hub]:
     """The hubs whose apps the worker sets up now (S3): ready, with their own database, whose ``hub_due`` came and
-    nobody holds. Never one being made, dropped or gone, a demo whose time is up, nor one moving to another cluster
-    (``moving_to``: tables made while its database is copied would stay behind; its ring waits for the move). By id."""
+    nobody holds. Never one being made, dropped or gone, a demo whose time is up, nor one moving to another cluster or
+    being restored (``registry.copying``: tables made while its database is copied would stay behind; its ring waits
+    for the copy). By id."""
     return list(
-        Hub.objects.filter(status=Hub.Status.READY, moving_to__isnull=True)
+        Hub.objects.filter(status=Hub.Status.READY)
+        .exclude(registry.copying())
         .exclude(db_name="")
         .exclude(is_demo=True, expires_at__lte=now)
         .filter(due__due_at__lte=now)

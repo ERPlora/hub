@@ -41,7 +41,10 @@ pass undoes it again, never taking it forward. Asked to cancel (``control.hub.mo
 the same way.
 
 The copies are dropped after :data:`MOVED_COPY_DAYS` (:func:`drop_old_copies`, in the same pass), with their rows;
-one that cannot be dropped now is tried again on the next pass.
+one that cannot be dropped now is tried again on the next pass. A restore's kept copies go the same way.
+
+Its steps are a restore's too (``base.tenancy.restore``, hub#1198): the same move with its origin and destination the
+other way round, the copy coming from a temporary cluster and the hub staying on its own.
 
 Every name is validated by ``base.tenancy.names`` and reaches SQL as ``sql.Identifier``; control is written through
 ``control.services`` only (its doors to the ORM).
@@ -392,15 +395,27 @@ def _make_destination(hub, target, roles: bootstrap.Names, ours=None) -> None:
         raise MoveStopped(f"control says {hub.db_name} on {target.name} is a hub's database: it is never dropped.")
     if ours is not None:
         ours()
+    _clone_emptied(hub, target, roles, template)
+
+
+def _clone_emptied(hub, cluster, roles: bootstrap.Names, template: str | None = None) -> None:
+    """``hub``'s database on ``cluster`` made anew: whatever has its name there dropped, cloned from the template of its
+    vertical there (``template``, found when not given) and the template's tables taken out. The caller makes sure
+    what has that name is never the hub's data."""
+    if template is None:
+        try:
+            template = provision.template_for(hub)
+        except services.ProvisioningFailed as missing:
+            raise MoveFailed("move_template_missing", missing) from missing
     try:
-        ops.drop_database(hub.db_name, cluster=target)
-        ops.clone_database(hub.db_name, template=template, cluster=target, roles=roles)
+        ops.drop_database(hub.db_name, cluster=cluster)
+        ops.clone_database(hub.db_name, template=template, cluster=cluster, roles=roles)
     except ops.TemplateMissing as missing:
         raise MoveFailed("move_template_missing", missing) from missing
     except ops.DatabaseOpsError as refused:
         raise MoveFailed("move_clone_failed", refused) from refused
     try:
-        with ops.connect_ops(hub.db_name, cluster=target) as conn, conn.transaction():
+        with ops.connect_ops(hub.db_name, cluster=cluster) as conn, conn.transaction():
             _empty(conn)
     except (psycopg.Error, ops.DatabaseOpsError) as error:
         raise MoveFailed("move_clone_failed", f"its template's tables could not be taken out: {error}") from error
@@ -589,8 +604,9 @@ def _rename_back(origin, copy_name: str, name: str) -> None:
 
 
 def _drop_copy(name: str, cluster) -> None:
-    """Drop the copy ``name`` on ``cluster`` (none: the settings' own server); only a moved copy's name passes."""
-    target = sql.Identifier(names.validate_moved(name, control=tenancy_connections.control_name()))
+    """Drop the copy ``name`` on ``cluster`` (none: the settings' own server); only the name of a copy a hub left
+    behind passes (moved, or kept by a restore)."""
+    target = sql.Identifier(names.validate_left_behind(name, control=tenancy_connections.control_name()))
     with ops.connect_ops(cluster=cluster) as conn:
         try:
             conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(target))

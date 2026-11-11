@@ -89,6 +89,25 @@ class HubMoveOut(Schema):
     moving_to: UUID | None
 
 
+class HubRestoreIn(Schema):
+    """Which hub is put back as it was at a moment, from the copy of it on which temporary cluster (hub#1198)."""
+
+    hub: UUID
+    cluster: UUID
+    at: dt.datetime = Field(description="The moment the copy on that cluster is of (its point-in-time restore).")
+
+
+class HubRestoreOut(Schema):
+    """The hub asked to be restored: the cluster it is on (none: the settings' own server), the temporary one its copy
+    comes from and the moment."""
+
+    id: UUID
+    slug: str
+    cluster: UUID | None
+    restoring_from: UUID | None
+    restore_point: dt.datetime | None
+
+
 class HubIdIn(Schema):
     """Which hub (``control.hub.move_cancel``)."""
 

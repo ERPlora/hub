@@ -48,7 +48,8 @@ once it ended (``base.usage``, 00:15 UTC, before the SaaS collects it at 01:15; 
 Neither runs with ``databases_only``. On the way out the worker waits for them :data:`BACKGROUND_GRACE_SECONDS` at most:
 a copy hears the stop, kills ``pg_dump`` and gives its lease back, and its work stays due. A third thread moves the hubs
 asked to move to another cluster and drops the copies they left behind after their days (``_moves``,
-``base.tenancy.move``, round 2026-10-30b of PLAN-DB, decision 3), likewise.
+``base.tenancy.move``, round 2026-10-30b of PLAN-DB, decision 3), likewise, and puts the hubs asked to be restored back
+as they were at a moment, from their copy on a temporary cluster (``base.tenancy.restore``, hub#1198).
 
 The order of a tick (review of hub#471): control's own outbox first; then the hubs with their own database
 (``_hubs``, round 2026-10-30 of PLAN-DB): each one it serves (ready, or a business that left but keeps its database,
@@ -97,7 +98,7 @@ from live.operations import get as get_operation
 
 from base import activation, catalog, metrics, outbound, queries, relay, scheduler, services, usage
 from base.services import reap_demos
-from base.tenancy import dumps, migrator, move, offboarding, provision
+from base.tenancy import dumps, migrator, move, offboarding, provision, restore
 from base.tenancy.connections import close_hub_aliases, close_this_threads_connections
 from base.schemas import AppActivationSettleIn, HubResetApplyIn
 from base.tenancy.context import use_control, use_hub
@@ -504,17 +505,20 @@ def _usage(now: dt.datetime) -> None:
 
 def _moves(now: dt.datetime, stop: threading.Event | None = None) -> None:
     """Move the hub asked longest ago to its new cluster and drop the copies past their days
-    (``base.tenancy.move.run_due``, round 2026-10-30b of PLAN-DB, decision 3), on control, in the worker's move thread
+    (``base.tenancy.move.run_due``, round 2026-10-30b of PLAN-DB, decision 3), then restore the hub asked longest ago
+    from its copy (``base.tenancy.restore.run_due``, hub#1198), on control, in the worker's move thread
     (:class:`Background`); a failure is logged and the next tick tries again. ``stop`` set stops the copy in course and
-    leaves the move for the next worker to go on."""
+    leaves it for the next worker to go on."""
+    cancelled = stop.is_set if stop is not None else None
     try:
         with use_control():
-            moved = move.run_due(now, cancelled=stop.is_set if stop is not None else None)
+            moved = move.run_due(now, cancelled=cancelled)
+            moved += restore.run_due(now, cancelled=cancelled)
     except Exception:
         logger.exception("worker: the moves' pass failed; the next tick tries again.")
     else:
         if moved:
-            logger.info("worker: worked on the move of %d hub(s).", moved)
+            logger.info("worker: worked on the move or the restore of %d hub(s).", moved)
     finally:
         close_old_connections()
 

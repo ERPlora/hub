@@ -20,6 +20,7 @@ from live.context import OperationContext, Scope, system_context
 from live.errors import AppInactive, NotFound, OperationError
 from live.operations import get as get_operation
 from live.operations import operation
+from psycopg import sql
 
 from apps.invoice.models import Invoice, Issuer
 from base import activation
@@ -1296,3 +1297,20 @@ def keeps_fiscal_documents() -> bool:
     """Whether this database holds its records for the tax authority (``fiscal_documents_kept`` on this app's config), of any status: a draft counts
     too, for what it asks is whether a database can go, and that cannot be undone."""
     return Record.objects.exists()
+
+
+def record_states(conn) -> dict:
+    """hub#1205: what each production record says of its life at the AEAT (its status, when it was sent, when it last
+    changed), by id, in the database of ``conn``; nothing where the app was never set up. ``conn`` is a direct
+    connection (``fiscal_record_states`` on this app's config: the platform's restore reads the business's database and
+    its copy, both closed to the app, and the copy has no alias), so it is read by its own SQL over the model's names,
+    never the ORM. Only the AEAT's production counts: its test environment files nothing."""
+    table = Record._meta.db_table
+    if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
+        return {}
+    read, where = ("id", "status", "transmitted_at", "updated_at"), "environment"
+    columns = {field: sql.Identifier(Record._meta.get_field(field).column) for field in (*read, where)}
+    query = sql.SQL("SELECT {} FROM {} WHERE {} = %s").format(
+        sql.SQL(", ").join(columns[field] for field in read), sql.Identifier(table), columns[where]
+    )
+    return {row[0]: tuple(row[1:]) for row in conn.execute(query, [Environment.PRODUCTION])}
