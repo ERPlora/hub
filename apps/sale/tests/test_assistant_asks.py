@@ -14,6 +14,7 @@ from live.operations import registry
 
 from apps.sale.tests.conftest import ctx_for
 from base import assistant
+from base.tests.test_assistant_asks import assert_its_asks_bring
 
 LANGUAGES = ("en", "es")
 #: The phrases of sale's tools put to the turn at least, both languages together: a silent drop of asks fails.
@@ -91,6 +92,21 @@ def test_the_reported_sales_request_offers_its_existing_operation(language, name
     assert name in tools
     offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
     assert name in offered[:10]
+
+
+#: Undoing a line's voucher in words that are no ask nor probe: ``sale.order.remove_voucher``'s asks bring it among the
+#: first ten (with them, 4th in Spanish and 7th in English); without them it falls out (33rd, and out of the ones a turn
+#: offers). Its asks no longer say the QA's «quita el bono de la línea» with one word changed (hub#1135).
+OWN_WORDS = [
+    ("es", "sale.order.remove_voucher", "no lo uses en esta cuenta, mejor lo guarda"),
+    ("en", "sale.order.remove_voucher", "she would rather not use it on the haircut"),
+]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("language", "name", "phrase"), OWN_WORDS)
+def test_a_voucher_undone_in_the_persons_own_words_reaches_its_tool_by_its_asks(language, name, phrase):
+    assert_its_asks_bring(assistant.catalog(ctx_for("hub_owner", language=language)), name, phrase, language)
 
 
 def test_no_qa_probe_is_an_ask():
