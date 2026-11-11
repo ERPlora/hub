@@ -137,13 +137,14 @@ SYNONYMS = (
     # phrases and never by the word: «automatización» shares its stem with «automático» («la respuesta automática»),
     # «pasos» with «pasó» («¿qué pasó con…?», so no «qué paso» nor «de paso») and «pregunta» with its verb («se les
     # pregunta»). A run is its «ejecución» (``flow.run``), the assistant's draft its «borrador» (``flow.draft``; «borra»,
-    # «bórralo» and «borrada» stem apart from it) and a ready-made one an app brings its «receta» (``flow.recipe``).
+    # «bórralo» and «borrada» stem apart from it) and a ready-made one an app brings its «receta» or «prefabricada»
+    # (``flow.recipe``).
     (
-        "flujo", "flow", "an automation", "the automation", "this automation", "that automation", "each automation",
-        "any automation", "the automations", "my automations", "your automations", "which automations",
-        "what automations",
-        *(f"{one} automatizacion" for one in ("la", "una", "esta", "esa", "cada", "alguna", "ninguna", "otra", "nueva")),
-        *(f"{one} automatizacion" for one in ("mi", "tu", "su", "de")),
+        "flujo", "flow", "an automation", "a new automation", "the automation", "this automation", "that automation",
+        "each automation", "any automation", "the automations", "my automations", "your automations",
+        "which automations", "what automations",
+        *(f"{one} automatizacion" for one in ("la", "una", "esta", "esa", "cada", "alguna", "ninguna", "otra")),
+        *(f"{one} automatizacion" for one in ("nueva", "mi", "tu", "su", "de")),
         *(f"{many} automatizaciones" for many in ("las", "unas", "estas", "esas", "todas", "otras", "que", "cuantas")),
         *(f"{many} automatizaciones" for many in ("mis", "tus", "sus", "nuestras", "de")),
     ),
@@ -159,11 +160,11 @@ SYNONYMS = (
         "question", "questions",
         *(f"{one} pregunta" for one in ("la", "una", "esa", "esta", "cada", "primera", "ultima", "otra", "alguna")),
         *(f"{one} pregunta" for one in ("ninguna", "mi", "tu", "su")),
-        *(f"{many} preguntas" for many in ("las", "unas", "esas", "estas", "todas", "otras", "nuevas", "que", "cuantas")),
-        *(f"{many} preguntas" for many in ("mis", "tus", "sus", "de")),
+        *(f"{many} preguntas" for many in ("las", "unas", "esas", "estas", "todas", "otras", "nuevas", "que")),
+        *(f"{many} preguntas" for many in ("cuantas", "mis", "tus", "sus", "de")),
     ),
     ("borrador", "borradores", "draft", "drafts"),
-    ("receta", "recetas", "recipe", "recipes"),
+    ("receta", "recetas", "prefabricada", "prefabricadas", "recipe", "recipes"),
 )
 #: The help a how-to question asks for (``live.assistant.HOWTO_POINTS``): it ranks by being one, not only by ``ALWAYS``.
 HOWTO = (DOCS_SEARCH,)

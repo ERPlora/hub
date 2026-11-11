@@ -126,16 +126,17 @@ PROBES = json.loads(
     )
 )["probes"]
 #: The Hub's groups of words of Automations (``base.assistant.SYNONYMS``), each by a word of its own, and a request that
-#: is neither an ask nor a probe whose tool only the group brings among the first ten: what it is for. A recipe's is the
-#: read that finds the recipe the person names (``FINDS``), as pausing one asks.
-GROUPS = {
-    "la automatizacion": ("flow.flow.detail", "¿qué hace la automatización de reseñas?"),
-    "ejecucion": ("flow.run.get", "¿cómo acabó la última ejecución de la de reseñas?"),
-    "los pasos": ("flow.flow.update", "borra el último paso de la de reseñas"),
-    "la pregunta": ("flow.question.answer", "contesta que sí a la pregunta de la de reseñas"),
-    "borrador": ("flow.draft.dismiss", "olvida el borrador de reseñas, no lo voy a usar"),
-    "receta": ("flow.recipe.list", "apaga la receta de las reseñas"),
-}
+#: is neither an ask nor a probe whose tool only the group brings among the first ten: what it is for. A recipe's is
+#: also the read that finds the recipe the person names (``FINDS``), as pausing one asks.
+GROUPS = [
+    ("la automatizacion", "flow.flow.detail", "¿qué hace la automatización de reseñas?"),
+    ("ejecucion", "flow.run.get", "¿cómo acabó la última ejecución de la de reseñas?"),
+    ("los pasos", "flow.flow.update", "borra el último paso de la de reseñas"),
+    ("la pregunta", "flow.question.answer", "contesta que sí a la pregunta de la de reseñas"),
+    ("borrador", "flow.draft.dismiss", "olvida el borrador de reseñas, no lo voy a usar"),
+    ("receta", "flow.recipe.list", "apaga la receta de las reseñas"),
+    ("receta", "flow.recipe.list", "¿hay automatizaciones prefabricadas para las citas?"),
+]
 TOP = 10
 
 
@@ -248,7 +249,7 @@ def test_a_word_that_only_shares_their_stem_names_no_automation_step_question_or
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("member", "name", "phrase"), [(member, *case) for member, case in GROUPS.items()])
+@pytest.mark.parametrize(("member", "name", "phrase"), GROUPS)
 def test_each_group_brings_its_tool_among_the_first_ten(catalog_of, member, name, phrase):
     """What a group of ``SYNONYMS`` is for, measured on what a turn offers and not on how a word reads: without it, the
     request's tool falls past the first ten."""

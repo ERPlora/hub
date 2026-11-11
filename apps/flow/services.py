@@ -1740,7 +1740,7 @@ def _may_say_yes(ctx: OperationContext, run: FlowRun) -> None:
             ),
             "es": (
                 "dile que sí a la automatización que espera mi respuesta",
-                "di que no, el cliente ya ha pagado",
+                "responde que no a la automatización de impagos, el cliente ya ha pagado",
             ),
         },
         "description": "Answer yes or no, with an optional note, to a question an automation asked and is waiting "
