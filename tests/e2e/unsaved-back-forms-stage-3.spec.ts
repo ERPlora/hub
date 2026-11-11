@@ -1,5 +1,6 @@
 // flow: BASE-F05 and one create form per app of hub#1032 (hub#1020's third and last stage; the walks are
-// `expectBackAsksOnDirtyForm` and, for its own ways out, `expectWaysOutAskOnDirtyForm`, hub#1156). The other windows of the stage are covered by their component tests.
+// `expectBackAsksOnDirtyForm` and, for its own ways out, `expectWaysOutAskOnDirtyForm`, hub#1156). The other windows of
+// the stage are covered by their component tests.
 import { test } from '@playwright/test';
 
 import { expectBackAsksOnDirtyForm, expectWaysOutAskOnDirtyForm, type UnsavedFormCase } from './unsaved-back-helpers';

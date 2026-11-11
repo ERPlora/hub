@@ -1,4 +1,5 @@
-// flow: BASE-F05 and one create form per app of hub#1020's first stage (the walks are `expectBackAsksOnDirtyForm` and, for its own ways out, `expectWaysOutAskOnDirtyForm`, hub#1156).
+// flow: BASE-F05 and one create form per app of hub#1020's first stage (the walks are `expectBackAsksOnDirtyForm`
+// and, for its own ways out, `expectWaysOutAskOnDirtyForm`, hub#1156).
 import { test } from '@playwright/test';
 
 import { expectBackAsksOnDirtyForm, expectWaysOutAskOnDirtyForm, type UnsavedFormCase } from './unsaved-back-helpers';
