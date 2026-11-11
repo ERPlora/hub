@@ -655,8 +655,10 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   `tests/test_assistant_asks.py` mide con las frases reales de la QA
   (`tests/e2e/qa/probes/owner-es-pricing-2026-11-08.json`), nunca con los propios `asks`: cada una ofrece su
   herramienta en la primera mitad de las 40, la de reactivar una regla antes que `payment.method.activate`, y
-  una frase propia por herramienta (ni `ask` ni sonda) la trae entre las diez primeras solo con sus `asks`;
-  el empleado no recibe ninguna escritura.
+  una frase propia por herramienta (ni `ask` ni sonda, con `assert_its_asks_bring` de la plataforma) la trae
+  entre las diez primeras solo con sus `asks`; el empleado no recibe ninguna escritura. Que reactivar una
+  tarifa o una regla salga antes que `base.app.enable` queda en `xfail` estricto hasta que live lea «activar»
+  como la acción (ERPlora/live#50): quien traiga ese puntero quita la marca.
 - La tarjeta de confirmación del asistente (BASE-F97) nombra cada registro que una escritura señala por su id
   con las marcas `refers` de `schemas.py` (`A_LIST`, `A_PRICE`, `A_RULE`, `A_PRODUCT`, `A_SERVICE`, `A_CATEGORY`,
   `A_GROUP`), leídas como quien pregunta: la tarifa y la regla por su nombre, el precio por su `label` («Champú ·
