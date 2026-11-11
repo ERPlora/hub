@@ -14,8 +14,9 @@ root="$(mktemp -d)"
 trap 'rm -rf "$root"' EXIT
 
 # The fake commands log each call to $FAKE_CALLS, one line per call.
-#   sudo <cmd...>: logs "sudo <cmd...>" and runs it as the caller.
+#   sudo <cmd...>: logs "sudo <cmd...>" and runs it as the caller, with FAKE_ROOT=1.
 #   sleep <n>: logs "sleep <n>" and returns at once.
+#   apt-get without sudo (no FAKE_ROOT): fails like apt run by the job's user, on dpkg's lock (exit 100).
 #   apt-get update: logs it and, like apt with an unreachable mirror, only warns (exit 0).
 #   apt-get install [--no-download] -o Dir::Cache::Archives=<dir> ... <packages>: like apt, a .deb
 #   already in <dir> is handed to dpkg without downloading it again (apt only checks its size), and dpkg
@@ -26,7 +27,7 @@ mkdir -p "$root/bin"
 cat > "$root/bin/sudo" <<'EOF'
 #!/usr/bin/env bash
 echo "sudo $*" >> "$FAKE_CALLS"
-exec "$@"
+FAKE_ROOT=1 exec "$@"
 EOF
 cat > "$root/bin/sleep" <<'EOF'
 #!/usr/bin/env bash
@@ -35,6 +36,10 @@ EOF
 cat > "$root/bin/apt-get" <<'EOF'
 #!/usr/bin/env bash
 echo "apt-get $*" >> "$FAKE_CALLS"
+if [ "${FAKE_ROOT:-}" != 1 ]; then
+  echo "E: Could not open lock file /var/lib/dpkg/lock-frontend - open (13: Permission denied)"
+  exit 100
+fi
 archives="" no_download=0 command=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -122,11 +127,12 @@ from_mirror() { grep '^apt-get install' "$work/calls" | grep -vc -- '--no-downlo
 # installed: green and no ::error:: was written.
 installed() { [ "$status" -eq 0 ] && ! grep -q '::error::' "$work/out.log"; }
 # left_for_the_cache: the .deb is in the archives folder, without apt's partial/ and lock (which
-# root keeps unreadable, so the cache could not save the folder), and the folder was handed back to
-# the job's user.
+# root keeps unreadable, so the cache could not save the folder, and so only root removes them), and
+# the folder was handed back to the job's user.
 left_for_the_cache() {
   [ -f "$work/archives/libfake_1.0_amd64.deb" ] && [ ! -e "$work/archives/partial" ] &&
-    [ ! -e "$work/archives/lock" ] && [ "$(calls "^sudo chown -R [^ ]+ $work/archives\$")" = 1 ]
+    [ ! -e "$work/archives/lock" ] && [ "$(calls "^sudo rm -rf $work/archives/partial $work/archives/lock\$")" = 1 ] &&
+    [ "$(calls "^sudo chown -R [^ ]+ $work/archives\$")" = 1 ]
 }
 # refused <regex>: red and an ::error:: matches <regex>.
 refused() { [ "$status" -ne 0 ] && grep -qE "::error::.*$1" "$work/out.log"; }
