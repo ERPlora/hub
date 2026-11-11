@@ -37,7 +37,7 @@ ROLES = tuple(Membership.Role)
 #: The apps whose tools all say their asks (``live.E020``): read from the settings, so each app that joins is tested.
 LISTED = tuple(settings.LIVE_ASSISTANT_ASKS_REQUIRED)
 #: The apps that completed their asks: once listed, an app stays listed.
-COMPLETED = {"base", "cash_register", "customer", "inventory", "printing", "sale", "table", "task", "website"}
+COMPLETED = {"base", "cash_register", "customer", "inventory", "printing", "sale", "service", "table", "task", "website"}
 #: How far down the tools a turn offers an ask may bring its own: ``ALWAYS`` takes the first places.
 TOP = 10
 
