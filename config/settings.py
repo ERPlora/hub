@@ -581,6 +581,7 @@ LIVE_ASSISTANT_ASKS_REQUIRED = (
     "table",
     "task",
     "tax",
+    "verifactu",
     "website",
     "whatsapp_inbox",
 )
