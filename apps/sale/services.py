@@ -1445,7 +1445,7 @@ def split(ctx: OperationContext, data: OrderSplitIn) -> dict:
         risk="normal",
         asks={
             "en": (
-                "merge tables 3 and 4",
+                "merge the checks of tables 3 and 4",
                 "put the bar tab together with table 2's",
             ),
             "es": (

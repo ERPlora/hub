@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:672cfb9b3b77a1e33898c95275cb48ed5927882cc4e09c9359577655c76862f5 -->
+<!-- generated from WORKBOOK.md sha256:5a35b07cae1c22ecd86916b859bb799a8cc2e63159196f462f38e6be7116a03e -->
 
 ## What it is for and who it is for
 
@@ -113,7 +113,9 @@ Missing tax category", whole while the row has room (also at 1280 px with the si
 "Photo" column) and, if not, ending in "…" with the whole text on mouse hover; next to it, the red
 "Sold out" badge if the item is sold out. Search box "Search product…" by name or SKU; sorting by
 column; filters by name, SKU, price from/to, stock from/to and status ("Yes", "No", "Not configured",
-"Sold out"); 50 per page; table or card view.
+"Sold out"): an end that cannot be read says so below its field, in the same words as the product's price ("This
+is not an amount…", "This amount cannot be negative.", the two readings of "1.250" or "This is not a
+quantity…"), and does not filter; 50 per page; table or card view.
 
 The table's buttons: **+** (create), import CSV and export CSV, each one only for whoever has that
 permission. Per row, in sight: "Receive stock" and "Count stock" (with stock permission and only on
@@ -168,8 +170,9 @@ window.
 Three windows in a row:
 
 1. "Check the import": a drop-down per column of the file ("Do not import" or the field; Name and
-   SKU carry an asterisk), "First {n} rows of {total}", the summary "{ready} row(s) ready · {failed}
-   with problems" with up to 10 reasons, and "Import {n} product(s)" and "Cancel".
+   SKU carry an asterisk), "First {n} rows of {total}", the summary "{ready} rows ready · {failed}
+   with problems" with up to 10 reasons, and "Import {n} products" and "Cancel"; with a single row
+   or product, in the singular ("First row of {total}", "1 row ready", "Import 1 product").
 2. If needed, "CSV tax categories": a block per tax text not recognised (or "Rows with no tax
    category") with "Pick" / "Create" / "Skip", and "Confirm & import".
 3. While it creates, above the table: "Importing {done}/{total}…" with "Stop". At the end, "Import
@@ -217,6 +220,8 @@ settings could not be loaded." with "Retry", never the factory values as if they
 In the category and stock movement windows (receive, count and write-off), the phone's Back button asks "Discard changes?" when something typed
 or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
 With the window as it opened, Back closes it without asking (BASE-F05); creating and editing a product ask the same (INVENTORY-F01, INVENTORY-F02).
+When creating and editing a product, "Cancel" ("Cancel editing"), the panel's "×", Escape and tapping outside the panel ask the
+same, in the browser too (hub#1023).
 
 ## Flows
 
@@ -283,11 +288,11 @@ Steps:
 5. If there are categories, search in "Categories" for the ones that group the product on the till
    and pick them one by one: each one shows below the field, with its button to remove it.
 6. Tap "Save" ("Saving…"). The panel closes and the product shows in the table with Status "Yes".
-7. In the Android app, the phone's back button with something typed or chosen and not saved (the photo
-   too) does not close the panel: it asks "Discard changes?" ("What you typed in this window has not been
-   saved."). "Keep editing", or back again, leaves the panel with what was typed; "Discard changes"
-   closes it without saving anything. With the panel as it opened, back closes it without asking
-   (hub#1015).
+7. With something typed or chosen and not saved (the photo too), neither "Cancel", nor the panel's "×", nor
+   Escape, nor tapping outside the panel, nor the phone's back button in the Android app close it: they ask
+   "Discard changes?" ("What you typed in this window has not been saved."). "Keep editing", or back again,
+   leaves the panel with what was typed; "Discard changes" closes it without saving anything and without
+   asking again. With the panel as it opened, any of them closes it without asking (hub#1015, hub#1023).
 In: the tax categories and their type, from Taxes; the units of measure and the product categories,
 from Inventory.
 Out: the product, active and linked to the ticked categories, in a single step: either it is saved
@@ -296,11 +301,11 @@ Inventory tells the other apps there is a new product: Sales offers it on the ti
 setup step "Your catalog" is done (INVENTORY-F28).
 If it fails: "Save" is off while Name, SKU or tax category are missing, and while the business has not
 yet said its currency: the price and the cost are read in it, and without it "1500" yen would be saved
-as 150,000. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+as 150,000; until then, leaving the price or the cost keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, "Save" lights up (hub#938). With no tax categories it says
 "There are no tax categories yet. Create them in Taxes: a product cannot be sold until it is known how
 it is taxed.". An unreadable amount: "This is not an amount. Type a figure, for example 12.50." or
-"This amount can be read in two ways…". A quantity that does not fit the unit: "The quantity does not
+"This amount can be read in two ways…"; a negative one: "This amount cannot be negative.". A quantity that does not fit the unit: "The quantity does not
 respect the step allowed for this unit". A SKU another live product already has: "That SKU already
 exists in the catalog"; a repeated EAN-13: "Another product of the catalog already has that EAN-13". A
 tax category that is no longer in Taxes is refused, also if it arrives through the assistant or the
@@ -317,9 +322,9 @@ Steps:
 2. Change what is needed. The SKU is locked ("The SKU is the product's identity: it is not edited").
    The stock is not edited here: it is received (INVENTORY-F13) or counted (INVENTORY-F14). The "Type"
    and the "Initial stock" do not show.
-3. Tap "Save changes". "Cancel editing" or closing the panel leaves it as it was. In the Android app,
-   the back button with a change not saved asks first, as when creating (INVENTORY-F01, step 7); with no
-   change, it closes the panel.
+3. Tap "Save changes". With a change not saved, "Cancel editing", the "×", Escape, tapping outside the
+   panel and, in the Android app, the back button ask first, as when creating (INVENTORY-F01, step 7), and
+   "Discard changes" leaves it as it was; with no change, they close the panel.
 4. The row shows the new data.
 In: the product as it is saved; the tax categories, from Taxes; the units and the product
 categories.
@@ -409,8 +414,9 @@ Actor: administrator, manager
 Screen: Categories
 Steps:
 1. In **Categories**, tap "Delete" on the row.
-2. The "Delete category" window says "<name> — N product(s) will lose this category (unlinked;
-   products are kept)". N counts the active products.
+2. The "Delete category" window says "<name> — N products will lose this category (unlinked;
+   products are kept)"; with one, "<name> — 1 product will lose this category (unlinked; the product
+   is kept)". N counts the active products.
 3. Tap "Delete and unlink" (or "Cancel").
 In: the chosen category.
 Out: the category is deleted and all its products, active or not, unlinked in the same step; the
@@ -449,9 +455,9 @@ Steps:
    English and with or without accents ("Name", "Code", "Price", "VAT"…). Change it or set "Do not
    import". Name, SKU, Price, Cost, Stock, Threshold, EAN-13, Description, Unit and Tax category can be
    imported; Name and SKU are required.
-3. Look at the "First {n} rows of {total}" and at the rehearsal of the whole file: "{ready} row(s) ready
-   · {failed} with problems", with the line and the reason of the first ten.
-4. Tap "Import {n} product(s)" (or "Cancel", which leaves no trace).
+3. Look at the "First {n} rows of {total}" and at the rehearsal of the whole file: "{ready} rows ready
+   · {failed} with problems" ("1 row ready" with one), with the line and the reason of the first ten.
+4. Tap "Import {n} products" ("Import 1 product" with one; or "Cancel", which leaves no trace).
 5. If some tax text is not recognised, or there are rows with no tax column ("Rows with no tax
    category"), "CSV tax categories" shows. For each one: "Pick" a category, "Create" one (Key and Name)
    or "Skip". Tap "Confirm & import". What is chosen for a text is saved in Taxes and the next import
@@ -566,7 +572,8 @@ one, the delivery note. If a cost was typed, it becomes the product's cost. It a
 has no stock control. If an item with control goes above its threshold, it tells of the crossing
 (INVENTORY-F18). Inventory tells that the stock changed.
 If it fails: "Record receipt" is off without a quantity, and while the business has not yet said its
-currency: the cost is read in it, and without it "1500" yen would be saved as 150,000. If the currency
+currency: the cost is read in it, and without it "1500" yen would be saved as 150,000; until then, leaving the
+cost keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency
 cannot be read, the window says so ("The business's currency could not be read", with the reason) and
 offers "Retry", which asks for it again; as soon as it arrives, "Record receipt" lights up (hub#946). The
 count and the write-off read no amounts: they do not wait for it. "The quantity does not respect the step allowed
@@ -951,8 +958,8 @@ Steps:
    language (in English if it is not Spanish). The tabs "All", "Hospitality", "Hair", "Beauty", "Retail",
    "Fitness" and "Spa and wellness" narrow by sector; they come 60 at a time with "Load more".
 3. Tap an image: the window closes and the form shows it in "Photo", with "Change" and "Remove photo".
-4. Tap "Save" or "Save changes": the photo stays on the item. "Cancel editing" or closing the panel
-   discards it.
+4. Tap "Save" or "Save changes": the photo stays on the item. "Cancel editing" or closing the panel asks
+   "Discard changes?" first and, with "Discard changes", discards it (INVENTORY-F01, step 7).
 5. Through the assistant: "put a photo on the white coffee". The assistant searches by the item's name,
    shows up to five candidate images by their title and asks which one; it never sets one on its own.
    When one is chosen, it asks for the one-tap confirmation card and sets it.

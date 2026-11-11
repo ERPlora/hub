@@ -114,8 +114,8 @@ catálogo», «No se vende por unidades en Inventario» o, en un menú «para ll
 llevar»; por fila, el asa, subir, bajar, «Agotado / Disponible», editar y quitar. Debajo, el buscador
 «Busca un producto…» (cada producto con su SKU y su precio), «Suplemento (<moneda>)», «Añadir elección» y
 «Añadir varios» (ventana con buscador y
-casillas, y el campo «Categoría» con «Marcar todos los de «{categoría}» (N)»: «Añadir N seleccionados»;
-lo que ya está en el plato sale marcado «Ya está en este plato»).
+casillas, y el campo «Categoría» con «Marcar todos los de «{categoría}» (N)»: «Añadir N seleccionados»
+(«Añadir 1 seleccionado» con uno); lo que ya está en el plato sale marcado «Ya está en este plato»).
 Al final, el formulario «Añadir un plato» (Nombre del plato, «Elecciones mínimas», «Elecciones
 máximas», la casilla «Se puede elegir la misma opción más de una vez» y «Guardar»), que pasa a
 «Plato · {nombre}» al editar uno.
@@ -197,11 +197,12 @@ Entra: nombre, nombre de cocina, precio, forma de venta, tipo de IVA, orden y «
 categorías de IVA las lee de Impuestos.
 Sale: el menú (avisa: menú nuevo).
 Si falla: «Guardar» está en gris mientras falte el nombre y mientras el negocio no haya dicho todavía su
-moneda, porque el precio se lee en ella (sin ella, «1500» yenes se guardaría como 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+moneda, porque el precio se lee en ella (sin ella, «1500» yenes se guardaría como 150 000); hasta entonces, salir del precio
+lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Guardar» se enciende (hub#938). Junto al
 campo: «El menú necesita un nombre.», «Un menú que se consume en el local
-necesita su propio tipo de IVA: sin él no se puede facturar.», «El precio de un menú no puede ser
-negativo. Para abaratar una opción, ponle un suplemento negativo.», «Esto no es un importe. Escribe
+necesita su propio tipo de IVA: sin él no se puede facturar.», «Este importe no puede ser
+negativo.» (para abaratar una opción, se le pone un suplemento negativo: COMBO-F06), «Esto no es un importe. Escribe
 una cifra, por ejemplo 12,50.» (también con el símbolo de otra moneda: «13,50 €» en un negocio de
 Polonia) y el de las dos lecturas posibles de un importe («1.250»), que cita lo escrito. Un tipo de IVA que no existe en Impuestos: «Ese tipo de IVA no existe en Impuestos.». Sin
 permiso de gestión no hay botón +.
@@ -276,9 +277,11 @@ Pasos:
 1. En la tarjeta del plato, escribe en «Busca un producto…» y elige el producto del catálogo de
    Inventario (busca por nombre y por SKU).
 2. Escribe el «Suplemento (<moneda>)», en la moneda del negocio, si sustituir cuesta más (o menos, con
-   signo negativo) que el precio cerrado; vacío es sin suplemento.
+   signo negativo: «-» o el botón «±» al final del campo, porque el teclado decimal de un móvil no tiene
+   signo menos) que el precio cerrado; vacío es sin suplemento.
 3. Pulsa «Añadir elección»: entra la última. Para varios de golpe, «Añadir varios»: marca las casillas
-   y pulsa «Añadir N seleccionados» (todos entran sin suplemento y en el orden en que se marcaron). Para
+   y pulsa «Añadir N seleccionados» («Añadir 1 seleccionado» con uno; todos entran sin suplemento y en
+   el orden en que se marcaron). Para
    una categoría entera, elígela en «Categoría»: la lista enseña sus productos y «Marcar todos los de
    «{categoría}» (N)» marca los que el plato aún no ofrece.
 4. Para cambiar el producto o el suplemento de una elección, pulsa su lápiz: el formulario dice
@@ -293,8 +296,10 @@ pueda elegir dos veces, activa «se puede elegir la misma opción más de una ve
 desactivado en Inventario: actívalo antes de ponerlo en un menú.», «Solo un producto que se vende y se
 cobra por unidades puede ser una elección de menú; «{producto}» se vende por {unidad}.», «Un plato admite
 como mucho 40 elecciones.» y los avisos de
-importe. «Añadir elección» (y «Guardar» al editar) está apagado mientras el negocio no haya dicho todavía
-su moneda: el suplemento se lee en ella, y sin ella «1500» yenes se guardaría como 150 000. Si la moneda no
+importe («Esto no es un importe. Escribe una cifra, por ejemplo 1,50, o -0,50 para descontar.» y el de las dos
+lecturas de «1.250»). «Añadir elección» (y «Guardar» al editar) está apagado mientras el negocio no haya dicho todavía
+su moneda: el suplemento se lee en ella, y sin ella «1500» yenes se guardaría como 150 000; hasta entonces, salir
+del suplemento lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥150» o «-0,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no
 se puede leer, el constructor lo dice una vez, encima de los platos («No se ha podido leer la moneda del
 negocio», con el motivo), y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, el botón se
 enciende (hub#946). «Añadir varios» sin nada marcado: «Marca al menos un producto.»; una búsqueda o una categoría
@@ -717,8 +722,8 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   (`reorder`). WCAG 2.5.7: todo lo que se arrastra se puede hacer sin arrastrar.
 - **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
   `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#654).
-- Los importes se leen con `lib/money.ts` (coma o punto, el «1.250» ambiguo se pregunta, el suplemento
-  admite signo) y se pintan con `lib/format.ts`, en la moneda del negocio (`useBusinessMoney` de `base`,
+- Los importes se escriben en el `MoneyInput` de `@erplora/ui/components` (el suplemento, con `signed` y su botón
+  ±) y se leen con su `parseMoney` (coma o punto, el «1.250» ambiguo se pregunta, el suplemento admite signo) y se pintan con `lib/format.ts`, en la moneda del negocio (`useBusinessMoney` de `base`,
   `base.business.get`): sus decimales, los del servidor, nunca los del navegador; su código o su símbolo es
   ruido al leer, el de otra moneda no. Mientras el negocio no contesta, un importe es «—» (nunca un
   euro ni decimales supuestos), el campo dice solo «Precio cerrado» o «Suplemento» y salir de él no lo reformatea. Si contesta (o
@@ -810,8 +815,8 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 - Una bebida refrescante con azúcar añadido va al 21 % para llevar y al 10 % en el local, pero Impuestos
   no tiene una categoría de fábrica que lo distinga (`restaurant.drink` va igual en los dos): no se mapea.
   Si hace falta, Impuestos tendrá que crear la pareja y añadirse aquí a `TAKEAWAY_CATEGORY`.
-- `useServerTable`, `useLiveList`, `useT` y el lector de importes (`MoneyInput`, con signo) están
-  copiados en cada app; ya pedido en `UI-REQUESTS.md` que suban a `@erplora/ui`.
+- `useServerTable`, `useLiveList` y `useT` están copiados en cada app; ya pedido en `UI-REQUESTS.md` que suban a
+  `@erplora/ui`. El campo de importe ya subió (hub#924).
 - **El asistente** sale como actor (F01–F06, F12, F13) y en los ejemplos de voz: es la operación con
   `ai=` y su ruta de la API, porque el asistente del Hub aún no existe (la misma lectura de las rondas
   CLOSE-DEMO y CLOSE-SERVICE de `PLAN-HUB.md`). Hasta que llegue, esos pasos se hacen por la API.

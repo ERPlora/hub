@@ -19,10 +19,9 @@ de aquí y cambia el sustituto en la misma PR del puntero.
 
 ## Componentes compartidos
 
-- **Lector de importes** (`lib/money.ts` + `components/MoneyInput.vue`): es el mismo de Servicios e
-  Inventario con el signo opcional (`signed`) que necesita el suplemento. Cada app lleva hoy su copia
-  porque una app no importa el código de otra; debería vivir en `@erplora/ui/components` como
-  `MoneyInput` con la prop `signed`. Al llegar, se borran las copias.
+- **Lector de importes**: llegó (hub#924, parte 2): `MenuFormModal` y `CourseCard` usan el `MoneyInput` de
+  `@erplora/ui/components` (el suplemento, con la prop `signed` y su botón ±) y leen con
+  `parseMoney(text, { money, signed })`; la copia de la app (`lib/money.ts` + `components/MoneyInput.vue`) se borró.
 - **`useLiveList` / `useServerTable` / `useT`**: copias de las de Impuestos, como en el resto de apps;
   mismo destino (`@erplora/ui/sdk`).
 - **Nombre de un buscador suelto** (`useSearchbarName`, la misma petición que `sale`): Ionic 8 anuncia el campo de

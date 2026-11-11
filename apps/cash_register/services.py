@@ -135,6 +135,18 @@ def _locked_settings(ctx: OperationContext) -> tuple[Settings, bool]:
     output=SettingsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "turn on the blind count",
+                "close the till by itself every night at 3 am",
+                "don't require a count to close the till",
+            ),
+            "es": (
+                "activa el arqueo ciego",
+                "que la caja se cierre sola cada noche a las 3",
+                "configura la caja para cerrar sin contar el efectivo",
+            ),
+        },
         "description": "Change how the drawer works, field by field: cash register on, opening float required, count "
         "required to close, negative balance allowed, blind count, daily auto-close and its hour («04:00»). What is not "
         "sent is kept.",
@@ -191,6 +203,16 @@ def _refuse_taken_name() -> Conflict:
     output=RegisterOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "add a drawer for the terrace",
+                "create another till drawer for the bar",
+            ),
+            "es": (
+                "añade el cajón de la terraza",
+                "da de alta otro cajón para la barra",
+            ),
+        },
         "description": "Create a drawer by its name (Bar, Terrace), one per physical drawer; it is offered when opening a "
         "session. Two drawers never share a name.",
         "risk": "normal",
@@ -217,6 +239,18 @@ def create_register(ctx: OperationContext, data: RegisterIn) -> dict:
     output=RegisterOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "rename the Bar drawer to Front",
+                "set the terrace drawer to inactive",
+                "activate the bar drawer again",
+            ),
+            "es": (
+                "cambia el nombre del cajón Barra a Entrada",
+                "pon el cajón de la terraza como inactivo",
+                "vuelve a poner activo el cajón de la barra",
+            ),
+        },
         "description": "Rename a drawer, or deactivate it (it is no longer offered when opening) and activate it again. "
         "Name it by its id or its current name. A drawer is never deleted.",
         "risk": "normal",
@@ -357,6 +391,16 @@ def _already_open() -> Conflict:
     output=SessionRow,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "open the till with a 150 € float",
+                "start the bar shift with 200 euros",
+            ),
+            "es": (
+                "abre la caja con 100 € de fondo",
+                "empieza el turno de la barra con 200 euros",
+            ),
+        },
         "description": "Open the cash session (the shift of the drawer) with its opening float in cents and, if the business "
         "has several drawers, the drawer by its name. One session open at a time; the system numbers it "
         "(S-AAMMDD-NNNN). A session forgotten past the daily cut-off is closed by itself first.",
@@ -419,11 +463,22 @@ def _open_for_writing(session_id, number) -> Session:
     output=SessionRow,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "close the till with 250 € counted",
+                "end the till shift, I counted 310 euros",
+            ),
+            "es": (
+                "cierra la caja con 250 € contados",
+                "termina el turno de caja, he contado 310 euros",
+            ),
+        },
         "description": "Close a cash session (the open one unless its number is said) with the cash counted in the drawer, "
         "in cents, and closing notes: the expected cash, the counted one and their difference (negative = short) are "
         "frozen for good. The count is required unless the settings say otherwise. A closed session is never reopened. "
-        "Read cash_register.session.closing_summary first with the same count, tell the person its summary, then close "
-        "naming the session by the number it gave.",
+        "Read cash_register.session.closing_summary first with the same count; then, in the same answer where you tell "
+        "the person its summary, call this tool naming the session by the number it gave: do not stop at the summary "
+        "nor wait for a yes in the chat, its card is where the person confirms.",
         "risk": "high",
         # Its card shows what closing gives, not only the session and the count it sends; a blind count's expected
         # stays hidden from whoever may not see it (FIX-HUB-CASH_REGISTER-ASSISTANT-CLOSE-CARD-WITHOUT-PREVIEW, BASE-F98).
@@ -459,6 +514,18 @@ def close_session(ctx: OperationContext, data: SessionCloseIn) -> dict:
     output=AutoCloseOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "run the till's daily auto-close now",
+                "close the forgotten sessions from earlier days",
+                "close the till shifts still open past the cut-off hour",
+            ),
+            "es": (
+                "lanza ya el cierre automático de la caja",
+                "cierra las sesiones olvidadas de días anteriores",
+                "cierra los turnos de caja que siguen abiertos tras la hora de corte",
+            ),
+        },
         "description": "The daily auto-close (the system runs it every 5 minutes): when it is on, close at the cut-off hour, "
         "without a count, every session still open from before the last cut-off. Nothing is due: nothing happens.",
         "risk": "high",
@@ -482,6 +549,16 @@ def auto_close(ctx: OperationContext, data: EmptyIn) -> dict:
     output=MovementRow,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "record 20 € taken out to pay the supplier",
+                "put 50 € of change from the safe in the till",
+            ),
+            "es": (
+                "apunta una salida de 35 € de la caja",
+                "mete 50 € de cambio en la caja",
+            ),
+        },
         "description": "Record cash brought into the drawer (type in: change from the safe) or taken out (type out: a "
         "supplier paid, money to the bank) in the open session (or the one whose number is said), with its amount in "
         "cents, always positive, and why. Cash by default; card, transfer or other do not count for the drawer. A "
@@ -532,6 +609,16 @@ def add_movement(ctx: OperationContext, data: MovementAddIn) -> dict:
     output=CountOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "record the opening count of the drawer",
+                "I counted three 20 € notes and eight 50 cent coins",
+            ),
+            "es": (
+                "apunta el arqueo de apertura del cajón",
+                "he contado 3 billetes de 20 y 8 monedas de 50 céntimos",
+            ),
+        },
         "description": "Record a count of the drawer of the open session (or the one whose number is said): opening (check "
         'the float) or closing (end of the shift). Give the notes and coins as {bills: {"50": 2}, coins: {"0.50": 3}} '
         "with face values in major units of the business's currency (the server adds them up), or the total in cents, "
@@ -613,6 +700,16 @@ def _report(ctx: OperationContext, session: Session, report: str) -> dict:
     output=SessionPrintOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "print the X report of the till",
+                "print the Z of last night's close",
+            ),
+            "es": (
+                "saca el informe X de cómo va la caja",
+                "imprime la Z del cierre de anoche",
+            ),
+        },
         "description": "Print the report of a cash session (by its id or number) on the receipt printer: the partial "
         "report (X) while it is open, the closing (Z) once closed, with its float, sales by payment method, refunds, "
         "cash in and out, comps, expected, counted and difference. Without Printing on or an active receipt printer, "

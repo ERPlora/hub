@@ -125,8 +125,10 @@ configurar · Falta la categoría fiscal», entera mientras la fila tiene sitio 
 menú lateral abierto y la columna «Foto») y, si no, acabada en «…» con el texto entero al pasar el
 ratón; a su lado, la insignia roja «Agotado» si el artículo está agotado. Buscador «Buscar
 producto…» por nombre o SKU; orden por columna; filtros por nombre, SKU, precio desde/hasta, stock
-desde/hasta y estado («Sí», «No», «Sin configurar», «Agotado»); 50 por página; vista de tabla o de
-tarjetas.
+desde/hasta y estado («Sí», «No», «Sin configurar», «Agotado»): un extremo que no se puede leer lo dice debajo
+de su campo, con las mismas palabras que el precio del producto («Esto no es un importe…», «Este importe no
+puede ser negativo.», las dos lecturas de «1.250» o «Esto no es una cantidad…»), y no filtra; 50 por página;
+vista de tabla o de tarjetas.
 
 Botones de la tabla: **+** (dar de alta), importar CSV y exportar CSV, cada uno solo para quien
 tiene ese permiso. Por fila, a la vista: «Recibir stock» y «Contar stock» (con permiso de stock y
@@ -180,9 +182,10 @@ de la ventana.
 Tres ventanas seguidas:
 
 1. «Revisa la importación»: un desplegable por columna del fichero («No importar» o el campo;
-   Nombre y SKU llevan asterisco), «Primeras {n} filas de {total}», el resumen «{ready} fila(s)
-   listas · {failed} con problemas» con hasta 10 motivos, e «Importar {n} producto(s)» y
-   «Cancelar».
+   Nombre y SKU llevan asterisco), «Primeras {n} filas de {total}», el resumen «{ready} filas
+   listas · {failed} con problemas» con hasta 10 motivos, e «Importar {n} productos» y
+   «Cancelar»; con una sola fila o un solo producto, en singular («Primera fila de {total}», «1 fila
+   lista», «Importar 1 producto»).
 2. Si hace falta, «Categorías fiscales del CSV»: un bloque por texto fiscal no reconocido (o
    «Filas sin categoría fiscal») con «Elegir» / «Crear» / «Omitir», y «Confirmar e importar».
 3. Mientras crea, encima de la tabla: «Importando {done}/{total}…» con «Parar». Al final,
@@ -232,6 +235,8 @@ fueran los del negocio.
 En las ventanas de categoría y de movimientos de stock (recibir, recuento y merma), el botón atrás del móvil pregunta «¿Descartar los cambios?»
 cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar cambios»
 cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05); el alta y la edición de producto preguntan igual (INVENTORY-F01, INVENTORY-F02).
+En el alta y la edición de producto preguntan lo mismo, también en el navegador, «Cancelar» («Cancelar edición»), la «×» del panel,
+Escape y tocar fuera del panel (hub#1023).
 
 ## Flujos
 
@@ -299,11 +304,12 @@ Pasos:
    una: cada una sale debajo del campo, con su botón para quitarla.
 6. Pulsa «Guardar» («Guardando…»). El panel se cierra y el producto sale en la tabla con Estado
    «Sí».
-7. En la aplicación de Android, el botón atrás del móvil con algo escrito o elegido sin guardar (la foto
-   también) no cierra el panel: pregunta «¿Descartar los cambios?» («Lo que has escrito en esta ventana no
-   se ha guardado.»). «Seguir editando», o atrás otra vez, deja el panel con lo escrito; «Descartar
-   cambios» lo cierra sin guardar nada. Con el panel como se abrió, atrás lo cierra sin preguntar
-   (hub#1015).
+7. Con algo escrito o elegido sin guardar (la foto también), ni «Cancelar», ni la «×» del panel, ni Escape, ni
+   tocar fuera del panel, ni en la aplicación de Android el botón atrás del móvil, lo cierran: preguntan
+   «¿Descartar los cambios?» («Lo que has escrito en esta ventana no se ha guardado.»). «Seguir editando»,
+   o atrás otra vez, deja el panel con lo escrito; «Descartar cambios» lo cierra sin guardar nada y sin
+   volver a preguntar. Con el panel como se abrió, cualquiera de ellos lo cierra sin preguntar (hub#1015,
+   hub#1023).
 Entra: las categorías fiscales y su tipo, de Impuestos; las unidades de medida y las categorías de
 producto, de Inventario.
 Sale: el producto, activo y enlazado a las categorías marcadas, en un solo paso: o se guarda
@@ -312,11 +318,12 @@ Inventario avisa a las demás apps de que hay un producto nuevo: Ventas lo ofrec
 TPV y el paso «Tu catálogo» de la puesta en marcha queda hecho (INVENTORY-F28).
 Si falla: «Guardar» está apagado mientras falten Nombre, SKU o categoría fiscal, y mientras el negocio no
 haya dicho todavía su moneda: el precio y el coste se leen en ella, y sin ella «1500» yenes se guardaría
-como 150 000. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+como 150 000; hasta entonces, salir del precio o del coste lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Guardar» se enciende (hub#938). Sin categorías
 fiscales sale «Todavía no hay categorías fiscales. Créalas en Impuestos: un producto no se puede
 vender sin saber cómo tributa.». Un importe ilegible: «Esto no es un importe. Escribe una cifra,
-por ejemplo 12,50.» o «Este importe se puede leer de dos maneras…». Una cantidad que no encaja en
+por ejemplo 12,50.» o «Este importe se puede leer de dos maneras…»; uno negativo: «Este importe no puede ser
+negativo.». Una cantidad que no encaja en
 la unidad: «La cantidad no respeta el incremento permitido para esta unidad». Un SKU que ya tiene
 otro producto vivo: «Ese SKU ya existe en el catálogo»; un EAN-13 repetido: «Ese EAN-13 ya lo tiene
 otro producto del catálogo». Una categoría fiscal que ya no está en Impuestos se rechaza, también si
@@ -334,9 +341,9 @@ Pasos:
 2. Cambia lo que haga falta. El SKU está bloqueado («El SKU es la identidad del producto: no se
    edita»). El stock no se edita aquí: se recibe (INVENTORY-F13) o se cuenta (INVENTORY-F14). El
    «Tipo» y el «Stock inicial» no salen.
-3. Pulsa «Guardar cambios». «Cancelar edición» o cerrar el panel lo deja como estaba. En la aplicación de
-   Android, el botón atrás con un cambio sin guardar pregunta antes, como en el alta (INVENTORY-F01, paso 7);
-   sin cambios, cierra el panel.
+3. Pulsa «Guardar cambios». Con un cambio sin guardar, «Cancelar edición», la «×», Escape, tocar fuera del panel
+   y, en la aplicación de Android, el botón atrás preguntan antes, como en el alta (INVENTORY-F01, paso 7), y
+   «Descartar cambios» lo deja como estaba; sin cambios, cierran el panel.
 4. La fila enseña los datos nuevos.
 Entra: el producto tal como está guardado; las categorías fiscales, de Impuestos; las unidades y
 las categorías de producto.
@@ -432,8 +439,9 @@ Actor: administrador, responsable
 Pantalla: Categorías
 Pasos:
 1. En **Categorías**, pulsa «Eliminar» en la fila.
-2. La ventana «Eliminar categoría» dice «<nombre> — N producto(s) quedarán sin esta categoría (se
-   desvinculan; los productos no se borran)». N cuenta los productos activos.
+2. La ventana «Eliminar categoría» dice «<nombre> — N productos quedarán sin esta categoría (se
+   desvinculan; los productos no se borran)»; con uno, «<nombre> — 1 producto quedará sin esta
+   categoría (se desvincula; el producto no se borra)». N cuenta los productos activos.
 3. Pulsa «Eliminar y desvincular» (o «Cancelar»).
 Entra: la categoría elegida.
 Sale: la categoría queda eliminada y todos sus productos, activos o no, desvinculados en el mismo
@@ -475,9 +483,9 @@ Pasos:
    inglés y con o sin tildes («Nombre», «Código», «Precio», «IVA»…). Cámbialo o pon «No importar».
    Se pueden importar Nombre, SKU, Precio, Coste, Stock, Umbral, EAN-13, Descripción, Unidad y
    Categoría fiscal; Nombre y SKU son obligatorias.
-3. Mira las «Primeras {n} filas de {total}» y el ensayo de todo el fichero: «{ready} fila(s) listas
-   · {failed} con problemas», con la línea y el motivo de las diez primeras.
-4. Pulsa «Importar {n} producto(s)» (o «Cancelar», que no deja rastro).
+3. Mira las «Primeras {n} filas de {total}» y el ensayo de todo el fichero: «{ready} filas listas
+   · {failed} con problemas» («1 fila lista» con una), con la línea y el motivo de las diez primeras.
+4. Pulsa «Importar {n} productos» («Importar 1 producto» con uno; o «Cancelar», que no deja rastro).
 5. Si algún texto fiscal no se reconoce, o hay filas sin columna fiscal («Filas sin categoría
    fiscal»), sale «Categorías fiscales del CSV». Para cada uno: «Elegir» una categoría, «Crear» una
    (Clave y Nombre) u «Omitir». Pulsa «Confirmar e importar». Lo que se elige para un texto se guarda
@@ -597,7 +605,8 @@ albarán. Si se escribió coste, pasa a ser el coste del producto. Se aplica aun
 lleve control de stock. Si un artículo con control sube por encima de su umbral, avisa del cruce
 (INVENTORY-F18). Inventario avisa de que el stock cambió.
 Si falla: «Registrar recepción» está apagado sin cantidad, y mientras el negocio no haya dicho todavía su
-moneda: el coste se lee en ella, y sin ella «1500» yenes se guardaría como 150 000. Si la moneda no se
+moneda: el coste se lee en ella, y sin ella «1500» yenes se guardaría como 150 000; hasta entonces, salir del
+coste lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se
 puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el motivo) y ofrece
 «Reintentar», que la vuelve a pedir; en cuanto llega, «Registrar recepción» se enciende (hub#946). El
 recuento y la baja no leen importes: no la esperan. «La cantidad no respeta el incremento
@@ -1008,7 +1017,8 @@ Pasos:
 3. Toca una imagen: la ventana se cierra y el formulario la enseña en «Foto», con «Cambiar» y «Quitar
    foto».
 4. Pulsa «Guardar» o «Guardar cambios»: la foto queda en el artículo. «Cancelar edición» o cerrar el
-   panel la descarta.
+   panel pregunta antes «¿Descartar los cambios?» y, con «Descartar cambios», la descarta (INVENTORY-F01,
+   paso 7).
 5. Por el asistente: «ponle foto al café con leche». El asistente busca por el nombre del artículo,
    enseña hasta cinco imágenes candidatas por su título y pregunta cuál; nunca pone una por su cuenta.
    Al elegir una, pide la tarjeta de confirmación de un clic y la pone.
