@@ -69,6 +69,42 @@ TWINS = [
     ("appointment.appointment.confirm", "online_booking.booking.confirm"),
     ("appointment.settings.update", "online_booking.settings.update"),
 ]
+#: What a person says in words of their own, neither an ask nor a probe of layer 2, for the twenty-seven tools whose
+#: probe a turn already offers by their name and description alone: here it is their asks that bring the tool among
+#: the first ten, so asks that stop reading as people speak fail. None says a word of ``base.assistant.SYNONYMS`` that
+#: names the tool's own thing («bloqueo», «cita fija», «puede atender»): that word alone brings it.
+OWN_WORDS = [
+    ("appointment.agenda.lanes", "¿qué tiene cada peluquera el jueves, en columnas?"),
+    ("appointment.appointment.bulk_create", "Lola quiere las cinco sesiones de golpe, todas o ninguna"),
+    ("appointment.appointment.bulk_delete", "fuera de una vez las tres duplicadas de Lola"),
+    ("appointment.appointment.cancel", "a Lola le ha surgido un viaje, que no venga el lunes"),
+    ("appointment.appointment.charge", "cobra lo de Julia de esta mañana"),
+    ("appointment.appointment.confirm", "acepta lo que pidió Lola para el jueves"),
+    (
+        "appointment.appointment.count_active_for_service",
+        "¿alguien lleva todavía el alisado de keratina en lo que tiene por delante?",
+    ),
+    ("appointment.appointment.count_to_confirm", "¿cuántas quedan pendientes de mi confirmación?"),
+    ("appointment.appointment.create", "Lola quiere venir el lunes a las 12:00 a hacerse un tinte con Inés"),
+    ("appointment.appointment.delete", "fuera del todo la de prueba del viernes"),
+    ("appointment.appointment.get", "¿de quién es la APT-0042 y qué teléfono dejó?"),
+    ("appointment.appointment.list", "¿quién viene el viernes?"),
+    ("appointment.appointment.list_for_customer", "¿Lola ha estado antes con nosotros? ¿y cuándo vuelve?"),
+    ("appointment.appointment.notices", "¿qué han reservado o anulado por sí mismas las clientas?"),
+    ("appointment.appointment.reschedule", "lo de Lola del jueves, una hora más tarde"),
+    ("appointment.appointment.start", "Lola ya ha llegado, que empiece lo suyo"),
+    ("appointment.appointment.update", "Lola no tolera el amoniaco, déjalo anotado en lo suyo"),
+    ("appointment.availability.check", "¿se puede citar a Lola el lunes a las 9:30?"),
+    ("appointment.availability.slots", "¿cuándo le cabe a Inés una manicura este sábado?"),
+    ("appointment.blocked_time.create", "que nadie reserve con Inés el viernes por la tarde, tiene formación"),
+    ("appointment.blocked_time.delete", "ya no hace falta cerrar el viernes por la tarde, desbloquéalo"),
+    ("appointment.blocked_time.list", "¿cuándo está cerrada la agenda este mes?"),
+    ("appointment.recurring.activate", "Teresa vuelve después del parón, que siga lo suyo"),
+    ("appointment.recurring.create", "Lola vendrá todos los martes a las 18:00"),
+    ("appointment.recurring.delete", "Carmen deja de venir cada semana: bórralo, pero sin tocar lo ya reservado"),
+    ("appointment.recurring.list", "¿qué clientas siguen en marcha con hora fija?"),
+    ("appointment.recurring.update", "Teresa vendrá los miércoles en vez de los martes de aquí en adelante"),
+]
 
 
 @pytest.fixture
@@ -155,6 +191,35 @@ def test_the_reported_request_offers_appointments_tool_before_online_bookings_tw
     phrase = dict(REPORTED)[name]
     place, twins = place_of_no_ask(tools, name, phrase), offered_place(tools, twin, phrase)
     assert place is not None and (twins is None or place < twins), (place, twins)
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
+def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
+    tools = catalog_of(Membership.Role.OWNER, "es")
+    assert comparable(phrase) not in probe_phrases()
+    place = place_of_no_ask(tools, name, phrase)
+    assert place is not None and place <= TOP, place
+    before = without_its_asks(tools, name)
+    assert not shared.asks_of(before[name])  # positive control: the tool is ranked without its asks
+    unasked = offered_place(before, name, phrase)
+    assert unasked is None or unasked > TOP, unasked
+
+
+def test_every_tool_is_caught_by_a_probe_or_by_words_of_its_own():
+    """Each tool of Appointments is in ``OWN_WORDS`` or its probe falls out of its room without its asks (the eight
+    whose probe ``REPORTED``, ``PROBES`` or ``TWINS`` already need them): a tool added later without either is seen."""
+    without_own = set(appointment_tools()) - {name for name, _ in OWN_WORDS}
+    assert without_own == {
+        "appointment.appointment.complete",
+        "appointment.appointment.history",
+        "appointment.appointment.mark_no_show",
+        "appointment.recurring.deactivate",
+        "appointment.recurring.get",
+        "appointment.recurring.materialize",
+        "appointment.settings.get",
+        "appointment.settings.update",
+    }
 
 
 def test_removing_a_block_named_by_its_title_points_at_the_list_that_finds_it():
