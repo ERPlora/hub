@@ -81,13 +81,13 @@ test('TASK-F13 task: Android Back asks before discarding a half-written task and
 });
 
 test('TASK-F13 task: «Close», Escape and a tap outside of the project sheet ask before discarding and close it untouched (hub#1233)', async ({ page }) => {
-  await expectWaysOutAskOnDirtyForm(page, PROJECT_SHEET, 'HUB-1233');
+  await expectWaysOutAskOnDirtyForm(page, PROJECT_SHEET, 'HUB-1233-project');
 });
 
 test('TASK-F09 task: «Close», Escape and a tap outside of the task sheet ask before discarding a half-written subtask (hub#1233)', async ({ page }) => {
-  await expectWaysOutAskOnDirtyForm(page, TASK_SHEET, 'HUB-1233');
+  await expectWaysOutAskOnDirtyForm(page, TASK_SHEET, 'HUB-1233-sheet');
 });
 
 test('CUSTOMER-F18 customer: the «×», Escape and a tap outside of the quick add of the till ask before discarding (hub#1233)', async ({ page }) => {
-  await expectWaysOutAskOnDirtyForm(page, QUICK_ADD, 'HUB-1233');
+  await expectWaysOutAskOnDirtyForm(page, QUICK_ADD, 'HUB-1233-quick-add');
 });
