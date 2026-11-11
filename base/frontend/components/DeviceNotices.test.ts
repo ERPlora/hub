@@ -1,7 +1,7 @@
 // The device's notices (APPOINTMENT-F28, the old hub's HUB_SHELL-F66): base follows `base.notice.list` live — the rows
 // the modules on tell, with their texts filled in — and the shell tells each new one once with the installed app's
 // system notice (`erplora_notify`); a browser has the bell. It paints nothing.
-import { ANDROID_NOTIFICATIONS, applySurface, PRIMER_ANSWERED_KEY, TOLD_KEY } from '@erplora/ui/shell';
+import { ANDROID_NOTIFICATIONS, applySurface, KEEP_LISTENING_COMMAND, PRIMER_ANSWERED_KEY, TOLD_KEY } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const alerts = vi.hoisted(() => ({ created: [] as Array<{ header?: string }> }));
@@ -57,6 +57,7 @@ afterEach(() => {
 });
 
 const notified = () => invoke.mock.calls.filter(([command]) => command === 'erplora_notify').map(([, args]) => args);
+const listened = () => invoke.mock.calls.filter(([command]) => command === KEEP_LISTENING_COMMAND).map(([, args]) => args);
 
 async function setup() {
   const m = await mountNotices();
@@ -109,6 +110,53 @@ describe('DeviceNotices', () => {
 
     expect(alerts.created.map((alert) => alert.header)).toEqual(['Let us keep you posted']);
     expect(localStorage.getItem(PRIMER_ANSWERED_KEY)).toBe('1');
+  });
+
+  // HUB_APP-F26 (hub#836): with the screen off Android freezes the page; the app keeps it listening while asked to.
+  it('keeps the installed app listening while the person hears something (a new kitchen ticket), and only once the hub said so', async () => {
+    invoke.mockImplementation(async (command: string) =>
+      command === 'plugin:erplora-android|check_permissions' ? { [ANDROID_NOTIFICATIONS]: true } : null,
+    );
+    const s = await setup();
+    await flush();
+    // Until base.notice.list answers, the app is asked nothing: a reload never stops what the page before left on.
+    expect(listened()).toEqual([]);
+
+    await s.show([], 1, ['kitchen.received']);
+    await vi.waitFor(() =>
+      expect(listened()).toEqual([
+        {
+          on: true,
+          title: 'ERPlora is listening',
+          body: "You'll be warned when something needs your attention, even with the screen off.",
+          channel: 'Notices with the screen off',
+        },
+      ]),
+    );
+    // The app that told turned off: nothing left to hear, so nothing to keep the device awake for.
+    await s.show([], 2, []);
+    await vi.waitFor(() => expect(listened().map((args) => (args as { on: boolean }).on)).toEqual([true, false]));
+  });
+
+  it('an installed app without the command (the 1.1.34) keeps working: the notices still go out and nothing shows', async () => {
+    alerts.created.length = 0;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    invoke.mockImplementation(async (command: string) => {
+      if (command === KEEP_LISTENING_COMMAND) throw 'erplora-android.keep_listening not allowed. Command not found';
+      return command === 'plugin:erplora-android|check_permissions' ? { [ANDROID_NOTIFICATIONS]: true } : null;
+    });
+    const s = await setup();
+
+    await s.show([], 1, ['kitchen.received']);
+    await vi.waitFor(() => expect(listened()).toHaveLength(1));
+    await s.show([BOOKED], 2, ['kitchen.received', 'appointment.booked']);
+    await vi.waitFor(() => expect(notified()).toHaveLength(1));
+
+    expect(listened()).toHaveLength(1);
+    expect(warn).toHaveBeenCalledOnce();
+    expect(s.wrapper.text()).toBe('');
+    expect(alerts.created).toEqual([]);
+    warn.mockRestore();
   });
 
   it('in a browser (no installed app) it does not even follow the notices: the bell is the browser\'s', async () => {

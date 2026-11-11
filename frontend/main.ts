@@ -14,6 +14,7 @@ import {
   type ShellSidebar,
   type ShellUserMenu,
   type ShellUserMenuItem,
+  stopNoticeListening,
   type ThemePalette,
   toastSuccess,
 } from '@erplora/ui/shell';
@@ -106,9 +107,14 @@ export function chromeLoaded(pieces: object = CHROME): Promise<unknown> {
   return Promise.race([loaded.finally(() => clearTimeout(timer)), waited]);
 }
 
-/** The Hub's sign out: the assistant's conversation of the tab is forgotten first (BASE-G120), then the shell's. */
-export function signOut(doc: Document = document): void {
+/**
+ * The Hub's sign out: the assistant's conversation of the tab is forgotten (BASE-G120) and the installed app stops
+ * listening with the screen off (HUB_APP-F26), waited for because once the form leaves this page is no longer the
+ * linked hub and the app refuses its orders; then the shell's.
+ */
+export async function signOut(doc: Document = document): Promise<void> {
   forgetAssistant();
+  await stopNoticeListening();
   logout(doc);
 }
 
@@ -248,7 +254,7 @@ export async function boot(
   // base's way in (APP-BASE-3): the idle lock of a till, the person's appearance, «Now serving» after a switch.
   startWayIn(doc, {
     translate: (key, values) => (app.config.globalProperties as unknown as { $t: Translate }).$t(key, values),
-    logout: () => signOut(doc),
+    logout: () => void signOut(doc),
     toast: (message) => void toastSuccess(message),
     paint: (mode, palette, scale) => applyUserThemePreferences(mode, palette as ThemePalette | null, undefined, scale),
     reset: resetUserThemePreferences,
