@@ -9,7 +9,7 @@
 // product's unit (its step stated); a refusal stays in the dialog under its field. A receipt reads its unit cost in the
 // business's money: «Record receipt» waits in grey until the business answers it, and says so with «Retry» if that
 // read fails (hub#946); a count or a write-off reads no amount and never waits.
-import { FormModal } from '@erplora/ui/components';
+import { FormModal, MoneyInput, parseMoney } from '@erplora/ui/components';
 import { type OutputOf, useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonItem, IonLabel, IonList, IonNote } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -20,9 +20,7 @@ import { useT } from '../composables/useT';
 import type { Unit } from '../composables/useUnits';
 import { errorFields } from '../lib/errors';
 import { formatQuantity, formatSignedQuantity, useBusinessMoney } from '../lib/format';
-import { parseMoney } from '../lib/money';
 import { quantityDifference, readQuantity } from '../lib/quantity';
-import MoneyInput from './MoneyInput.vue';
 import QuantityInput from './QuantityInput.vue';
 
 type Product = OutputOf<'inventory.product.list'>['rows'][number];
@@ -100,7 +98,7 @@ async function save(): Promise<void> {
   tried.value = true;
   const product = props.product;
   const quantity = read.value;
-  const unitCost = parseMoney(cost.value, business.value);
+  const unitCost = parseMoney(cost.value, { money: business.value });
   if (!product || !ready.value || !quantity.ok || quantity.value === null || !unitCost.ok) return;
   try {
     if (props.kind === 'receive') {
@@ -165,6 +163,7 @@ useUnsavedFormOnOpen('inventory-stock-form', () => ({ qty: qty.value, cost: cost
         v-if="kind === 'receive'"
         v-model="cost"
         testid="inventory-stock-cost"
+        :money="business"
         :label="business ? $t('inventory.stock.receiveCostIn', { currency: business.currency }) : $t('inventory.stock.receiveCost')"
         :error-text="fields.unit_cost"
         :show-error="tried"
