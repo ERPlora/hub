@@ -63,11 +63,9 @@ REPORTED = [
     ("pricing.rule.deactivate", "desactiva Descuento QA sin perder su configuración"),
     ("pricing.rule.activate", "vuelve a activar Descuento QA para las nuevas ventas"),
 ]
-#: What the model ran instead of bringing a list or a rule back: an app to turn on, a payment method to switch on.
-CHOSEN_INSTEAD = [
-    ("pricing.price_list.activate", "base.app.enable"),
-    ("pricing.rule.activate", "payment.method.activate"),
-]
+#: What the model ran instead of bringing a rule back: a payment method to switch on. (Bringing a price list back
+#: still comes after ``base.app.enable``: «activar» reads only as turning something on, ERPlora/live#50.)
+CHOSEN_INSTEAD = [("pricing.rule.activate", "payment.method.activate")]
 
 #: How far down the tools a turn offers (``MAX_TOOLS``, 40) a request of the QA may bring its tool: half of them, so
 #: twenty tools of the apps that say their asks later may climb past it before the model loses it.
@@ -82,7 +80,8 @@ PROBES = json.loads(
 
 #: What a person says in words of their own, neither an ask nor a probe of layer 2, one for each tool: it is their asks
 #: that bring the tool among the first ten (a «tarifa» or a «precio» named brings every tool of Price lists by its
-#: name, so none says it), and asks that stop reading as people speak fail.
+#: name, so none says it; nor «importe», which reads as Import's, «artículo», Inventory's product, or «sale», a sale),
+#: and asks that stop reading as people speak fail.
 OWN_WORDS = [
     ("pricing.price_list.list", "¿qué condiciones especiales tienen los distribuidores y los socios?"),
     ("pricing.price_list.get", "¿hasta qué día vale lo de Hostelería?"),
@@ -91,7 +90,7 @@ OWN_WORDS = [
     ("pricing.price_list.set_default", "a partir de ahora lo de Distribuidores es lo normal para todos"),
     ("pricing.price_list.deactivate", "congela lo de verano hasta el año que viene"),
     ("pricing.price_list.activate", "recupera lo de invierno para los distribuidores"),
-    ("pricing.price_item.list", "¿qué importes lleva lo de Hostelería, artículo por artículo?"),
+    ("pricing.price_item.list", "¿cómo tengo puesto el croissant en Hostelería y en las demás?"),
     ("pricing.price_item.get", "¿desde cuántas unidades vale lo del croissant en Socios?"),
     ("pricing.price_item.add", "mete el croissant a 1,20 en lo de Socios"),
     ("pricing.price_item.update", "el croissant de Hostelería ahora va a 1,30"),
@@ -102,7 +101,7 @@ OWN_WORDS = [
     ("pricing.rule.update", "la promo de verano ahora que rebaje un 15 %"),
     ("pricing.rule.deactivate", "para el 2x1 de zumos, pero guárdalo para el año que viene"),
     ("pricing.rule.activate", "recupera el 2x1 de zumos de otros veranos"),
-    ("pricing.catalog.get", "¿qué grupo es ese identificador que sale en lo de Socios?"),
+    ("pricing.catalog.get", "¿a qué grupo corresponde ese identificador de lo de Socios?"),
     ("pricing.price.resolve", "¿a cuánto le saldrían tres croissants a Nuria?"),
 ]
 
