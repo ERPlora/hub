@@ -23,7 +23,9 @@ from base.tests.test_assistant_asks import (
     assert_its_asks_bring,
     assert_reported_are_owner_probes,
     context_of,  # noqa: F401 (a fixture: the tests below take it by name)
+    offered_place,
     place_of_no_ask,
+    without_its_asks,
 )
 
 #: Invoicing's assistant tools: its reads (invoices, their A4 page and what a sale or a refund has, a manual line's
@@ -319,3 +321,29 @@ def test_each_tool_of_invoicing_has_its_own_words_in_each_language():
 )
 def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(context_of, language, name, phrase):
     assert_its_asks_bring(assistant.catalog(context_of(Membership.Role.OWNER, language)), name, phrase, language)
+
+
+#: The tools of Sales whose asks speak of an invoice, by language: printing a sale's copy and what a sale issues by
+#: default. Said as «she wants a copy of the invoice» and «quiero que salga factura por defecto» they tied with the
+#: thirteen ``invoice.invoice.*`` and lost by name (invoice < sale): ninth and seventh, places the ten of
+#: ``base/tests/test_assistant_asks.py`` still allow, so nothing else sees them go back.
+SALES_OF_AN_INVOICE = [("en", "sale.sale.print", "invoice"), ("es", "sale.settings.update", "factura")]
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("language", "name", "word"), SALES_OF_AN_INVOICE, ids=[n for _, n, _ in SALES_OF_AN_INVOICE])
+def test_invoicings_asks_take_no_place_from_the_asks_of_sales_that_speak_of_an_invoice(
+    context_of, language, name, word
+):
+    """An ask of Sales that says «factura» or «invoice» brings its tool to the very place it has without the asks of
+    Invoicing: the words of the twenty-five tools here push no request of the till down (hub#1102)."""
+    tools = assistant.catalog(context_of(Membership.Role.OWNER, language))
+    unasked = tools
+    for tool in TOOLS:
+        unasked = without_its_asks(unasked, tool)
+    asks = [ask for ask in shared.asks_of(tools[name])[language] if word in ask]
+    assert asks  # positive control: Sales still speaks of an invoice there
+    places = {
+        ask: (offered_place(tools, name, ask, language), offered_place(unasked, name, ask, language)) for ask in asks
+    }
+    assert {ask: place for ask, place in places.items() if place[0] is None or place[0] != place[1]} == {}
