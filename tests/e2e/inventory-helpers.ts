@@ -86,6 +86,29 @@ export async function pickCombo(page: Page, field: Locator, query: string, text:
 /** The dialog of a FormModal (Ionic moves it to ion-app). */
 export const dialog = (page: Page, testid: string): Locator => page.locator(`ion-modal[data-testid=${testid}]`);
 
+/** Opens the dialog `testid` with `open` and resolves once Ionic has presented it (hub#1023). A fresh `ion-modal` shows
+ *  before then, while Ionic still loads it, and takes no tap, Escape nor Back yet: the press lands on the screen behind
+ *  (Back went Home under a window that opened a moment later). */
+export async function presentedDialog(page: Page, testid: string, open: () => Promise<void>): Promise<Locator> {
+  const done = page.evaluate(
+    (id) =>
+      new Promise<void>((resolve) => {
+        const seen = (event: Event) => {
+          if ((event.target as Element).getAttribute('data-testid') !== id) return;
+          document.removeEventListener('ionModalDidPresent', seen);
+          resolve();
+        };
+        document.addEventListener('ionModalDidPresent', seen);
+      }),
+    testid,
+  );
+  await open();
+  await done;
+  const shownDialog = dialog(page, testid);
+  await expect(shownDialog).toBeVisible();
+  return shownDialog;
+}
+
 /** Types into an Ionic field. */
 export async function fill(scope: Locator, testid: string, value: string): Promise<void> {
   const input = scope.locator(`[data-testid=${testid}] input, [data-testid=${testid}] textarea`).first();
