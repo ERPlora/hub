@@ -1,11 +1,11 @@
-"""What layer 1 of the assistant's QA says of Time clock (erplora-next docs/plans/2026-10-31-asistente-conocimiento-y-qa.md,
-§3): which tools it offers, what an employee is never offered, and that the owner's requests of the real-model QA
+"""What layer 1 of the assistant's QA says of Time clock (docs plan 2026-10-31, the assistant's knowledge and QA, §3):
+which tools it offers, what an employee is never offered, and that the owner's requests of the real-model QA
 (hub#1099), in the owner's own words, are offered their existing operation.
 
 Every ask of every tool of attendance bringing its tool among the first ten, role by role, in English and in Spanish,
-out of the catalogue of a business with every app on and ranked as a turn ranks, is ``base/tests/test_assistant_asks.py``'s
-(attendance is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over its asks and the guard that no ask
-copies a probe of layer 2.
+out of the catalogue of a business with every app on and ranked as a turn ranks, is
+``base/tests/test_assistant_asks.py``'s (attendance is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020``
+over its asks and the guard that no ask copies a probe of layer 2.
 """
 
 import json
@@ -41,8 +41,14 @@ NOT_THE_EMPLOYEES = {
 #: person's record of the time clock fell out of the tools a turn offers (``MAX_TOOLS``) once Cash register's tools,
 #: whose asks say «abre», were listed (hub#1139).
 REPORTED = [
-    ("attendance.settings.update", "exige ubicación al fichar desde un móvil personal, con un radio de 250 metros alrededor del local"),
-    ("attendance.person.detail", "abre la ficha de personal de Fichaje QA en el control horario y dime si sigue activa"),
+    (
+        "attendance.settings.update",
+        "exige ubicación al fichar desde un móvil personal, con un radio de 250 metros alrededor del local",
+    ),
+    (
+        "attendance.person.detail",
+        "abre la ficha de personal de Fichaje QA en el control horario y dime si sigue activa",
+    ),
 ]
 
 #: How far down the tools a turn offers (``MAX_TOOLS``, 40) a probe of the QA may bring its tool: half of them, so the
