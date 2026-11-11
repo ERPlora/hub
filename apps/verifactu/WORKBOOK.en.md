@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8e6df85425a482c3abfddc5a4e03d1ed8dda7d5c0346757090ca70dfd7625883 -->
+<!-- generated from WORKBOOK.md sha256:473c2825c74927b8414993db32ab44fab7642b607b887e3cedd131a7c58e58db -->
 
 ## What it is for and who it is for
 
@@ -234,7 +234,7 @@ Screen notices: the result of each action in a strip on top (green if it went we
 | VERIFACTU-F15 | Send the record to the AEAT and collect its answer | done — the worker sends it through the SaaS gateway; without `VERIFACTU_GATEWAY_URL` the records wait in the queue |
 | VERIFACTU-F16 | Look up the records and their status | done |
 | VERIFACTU-F17 | See the detail of a record and why it waits | done |
-| VERIFACTU-F18 | Verify the QR at the AEAT's site | partial — in the installed app the AEAT's site does not open yet: the app has yet to accept its addresses (ERPlora/app#20) |
+| VERIFACTU-F18 | Verify the QR at the AEAT's site | partial — a record has yet to be checked in the installed app, which opens the AEAT's site since version 1.1.34 |
 | VERIFACTU-F19 | Give the QR and the fiscal status to the ticket and the invoice | done (Sales and Printing ask for it by name) |
 | VERIFACTU-F20 | Send later what could not go out (automatic contingency) | done — the worker runs it every minute, in each business |
 | VERIFACTU-F21 | Process the queue by hand | done |
@@ -649,7 +649,8 @@ If it fails: "Record not found" or the failure's message.
 Involved: VERIFACTU-F15
 
 ### VERIFACTU-F18 Verify the QR at the AEAT's site
-Status: partial — in the installed app the AEAT's site does not open yet: the app has yet to accept its addresses (ERPlora/app#20)
+Status: partial — a record has yet to be checked in the installed app: since version 1.1.34 the app opens the AEAT's site in
+the device's browser, but it has not been tried on a device yet
 Actor: employee, manager, administrator, customer
 Screen: Records
 Steps:

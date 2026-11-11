@@ -65,12 +65,13 @@ async function save(): Promise<void> {
   void toastSuccess(t(props.tag ? 'customer.tags.updated' : 'customer.tags.created'));
 }
 
-useUnsavedFormOnOpen('customer-tag-form', () => ({ name: name.value, color: color.value, active: active.value }), open);
+const canDismiss = useUnsavedFormOnOpen('customer-tag-form', () => ({ name: name.value, color: color.value, active: active.value }), open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="customer-tag-form"
     :title="title"
     :pending="pending"

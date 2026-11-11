@@ -46,12 +46,13 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen('tax-rule-end', validTo, open);
+const canDismiss = useUnsavedFormOnOpen('tax-rule-end', validTo, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="tax-rule-end"
     size="sm"
     :title="$t('tax.rules.end.title')"

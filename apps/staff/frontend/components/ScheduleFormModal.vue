@@ -40,7 +40,7 @@ const props = withDefaults(
 
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('staff-schedule-form', () => form.value, open);
+const canDismiss = useUnsavedFormOnOpen('staff-schedule-form', () => form.value, open);
 
 const t = useT();
 /** The business's default working day (Staff › Settings, STAFF-F22): what a new week proposes. */
@@ -109,6 +109,7 @@ const HOURS = [
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="staff-schedule-form"
     :title="title"
     :submit-label="schedule ? $t('staff.save') : $t('staff.schedules.form.create')"

@@ -282,8 +282,9 @@ if SHARED_DB_USER:
 # «prepared statement _pg3_N does not exist»). The sidecar listens on the task's own loopback, so TLS goes from
 # PgBouncer to Aurora, not to it.
 PGBOUNCER_HOST = config("PGBOUNCER_HOST", default="")
-# PgBouncer's connections per database, each task's (aws stacks/*/apps.tf: 6 in prod, 3 in pre): no plan gets more
-# transactions at once than this (base.tenancy.limits), or what passes it would wait in PgBouncer and fail uncounted.
+# PgBouncer's connections per database, each task's (ERPlora/aws stacks/prod/apps.tf: 48 in prod and in pre): no plan
+# gets more transactions at once than this (base.tenancy.limits), or what passes it would wait in PgBouncer and fail
+# uncounted.
 PGBOUNCER_MAX_DB_CONNECTIONS = config("PGBOUNCER_MAX_DB_CONNECTIONS", default=6, cast=int)
 DATABASES["hub_template"] = {
     "ENGINE": "django.db.backends.postgresql",

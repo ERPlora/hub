@@ -140,7 +140,7 @@ async function save(): Promise<void> {
 }
 
 // An untouched supplement follows the business's money when it answers after the window opened: that is no change.
-useUnsavedFormOnOpen(
+const canDismiss = useUnsavedFormOnOpen(
   'modifier-option-form',
   () => {
     const stored = props.option ? moneyFieldText(props.option.price_delta, locale.value, money.value) : '';
@@ -153,6 +153,7 @@ useUnsavedFormOnOpen(
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="modifier-option-form"
     :title="title"
     :submit-label="option ? $t('modifier.options.form.save') : $t('modifier.options.form.create')"

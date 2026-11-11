@@ -53,12 +53,13 @@ async function confirm(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen('cash-register-register', name, open);
+const canDismiss = useUnsavedFormOnOpen('cash-register-register', name, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     size="sm"
     testid="cash-register-register"
     :title="register ? $t('cash_register.registers.modal.rename') : $t('cash_register.registers.modal.create')"

@@ -814,7 +814,7 @@ cajero del producto actual es un empleado.
   negocio, pero de cualquier territorio; un negocio de Canarias, Ceuta o Melilla con solo las reglas de fábrica
   (IVA) no ve el aviso, aunque el TPV no le deja cobrar esas categorías y le dice por qué. Es comportamiento
   nuevo: aplazado de la migración (ronda FIX-TAX-REGION-NATIONAL-FALLBACK de `PLAN-HUB.md`;
-  `tax:setup-notice-territory` en `MIGRATION.md`).
+  `tax:setup-notice-territory` en `## 6` de `archive/migration/MIGRATION.md` de `ERPlora/erplora-next`).
 - **«Hoy» en la zona del negocio**: en la fase 1 es el de Madrid (`settings.TIME_ZONE`), también en
   Canarias, donde un cambio de tipo empieza una hora antes de su medianoche (la zona horaria del negocio en
   dos fuentes es una contradicción señalada en la ronda CLOSE-SCHEDULE de `PLAN-HUB.md`). No se mueve sola: la vista
@@ -824,8 +824,8 @@ cajero del producto actual es un empleado.
 - **Tipos de fábrica de IGIC, IPSI, recargo de equivalencia o de otros países**: no se siembran, a propósito
   (un tipo inventado se declararía); los crea el negocio (TAX-F04, TAX-F06, TAX-F11).
 - **`useServerTable`/`useLiveList` y `formatPercent`/`formatDate` en `@erplora/ui`**: siguen en
-  [`UI-REQUESTS.md`](UI-REQUESTS.md), sin llegar a `ui`; propuestos para `## 6` de `MIGRATION.md` como
-  `tax:ui-live-server-table` y `tax:ui-percent-date-format`.
+  [`UI-REQUESTS.md`](UI-REQUESTS.md), sin llegar a `ui`; anotados en `## 6` de `archive/migration/MIGRATION.md` de
+  `ERPlora/erplora-next` como `tax:ui-live-server-table` y `tax:ui-percent-date-format`.
 
 ## Lo que NO hace, a propósito
 

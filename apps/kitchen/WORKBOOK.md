@@ -1097,5 +1097,5 @@ que no tiene ningún papel: solo el sistema (`*`).
 - Cursos de verdad, retener y lanzar (kitchen#71): fuera del MVP («Referencia adoptada»).
 - Vaciar de golpe las comandas cobradas antes de pasar la cocina a papel (kitchen#158): hoy se sirven a
   mano (KITCHEN-F26, F27). Comportamiento nuevo, después del MVP.
-- Alérgenos de punta a punta (pm#115): hoy una alergia es solo texto de la nota (KITCHEN-F07).
+- Alérgenos de punta a punta (hub#1195): hoy una alergia es solo texto de la nota (KITCHEN-F07).
   Comportamiento nuevo, después del MVP.

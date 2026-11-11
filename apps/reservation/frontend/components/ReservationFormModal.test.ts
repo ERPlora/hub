@@ -264,8 +264,8 @@ describe('ReservationFormModal: why it was cancelled (RESERVATION-F09, F13)', ()
 describe('ReservationFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
   it('as opened closes; a change asks; restored as opened closes again', async () => {
     const s = await setup();
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('reservation-form'),
       change: () => ionValue(s.field('guest_name'), 'Ana', 'ionInput'),
       restore: () => ionValue(s.field('guest_name'), '', 'ionInput'),

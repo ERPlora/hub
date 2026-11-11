@@ -831,12 +831,13 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 - **Alta en lote (STAFF-F07)**: es del asistente y de la API, como en el producto actual; no tiene
   pantalla. Importar el equipo desde un fichero CSV (staff de services#152 del producto actual) no
   existía y no se porta: el alta a mano o por el asistente cubre a un equipo de peluquería o de sala.
-- **Borrar los ocho ajustes retirados** (STAFF-F22, hub#177): sus columnas (`min_advance_booking`,
-  `max_daily_hours`, `overtime_threshold`, `show_staff_photos`, `show_staff_bio`, `allow_staff_selection`,
-  `notify_new_appointment`, `notify_cancellation`) y el CHECK `staff_settings_ranges` siguen en
-  `staff_staffsettings` hasta el paso contract (expand/contract, PLAN-DB), con su migración reversible,
-  una vez desplegado hub#177; va a `## 6` de `MIGRATION.md`. Al borrarlas, `apps/flow/tests/test_i18n.py`
-  (recorre las columnas de cada modelo) dirá qué entradas del catálogo de Automatizaciones sobran.
+- **Borrar los ocho ajustes retirados** (STAFF-F22, hub#177): sus columnas (`min_advance_booking`, `max_daily_hours`,
+  `overtime_threshold`, `show_staff_photos`, `show_staff_bio`, `allow_staff_selection`, `notify_new_appointment`,
+  `notify_cancellation`) y el CHECK `staff_settings_ranges` siguen en `staff_staffsettings` hasta el paso contract
+  (expand/contract, PLAN-DB), con su migración reversible, una vez desplegado hub#177; está en `## 6` de
+  `archive/migration/MIGRATION.md` de `ERPlora/erplora-next` (`staff:settings-contract`). Al borrarlas,
+  `apps/flow/tests/test_i18n.py` (recorre las columnas de cada modelo) dirá qué entradas del catálogo de
+  Automatizaciones sobran.
 - **Comisiones en el menú**: es una pestaña de Personal para quien ve la compensación, no una entrada de
   menú, porque una entrada no puede depender de un permiso (`live.meta.Nav`, «Cómo son las páginas»).
   El producto actual no tenía la pantalla.
@@ -906,8 +907,8 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   Servicios**, con sus mismas reglas: SERVICE-F31, F32 y F33 (hub#107; `requires = ["tax", "staff",
   "customer"]`). Guardan el id de un servicio, y una app solo referencia las de su `requires`; en el
   mercado (Fresha, Square Appointments, Vagaro, Mangomint, Odoo Appointments) se asignan en el
-  servicio. Ninguna funcionalidad se pierde: cambia de app (`scripts/migration/renames.tsv`,
-  2026-10-20).
+  servicio. Ninguna funcionalidad se pierde: cambia de app (renombrados el 2026-10-20: STAFF-F10, F11 y F12
+  son SERVICE-F31, F32 y F33).
 - **Las tres lecturas de disponibilidad por instante** (`day_at`, `days_ahead`, `team_day_at`)
   existían porque un comando viejo solo podía leer con parámetros literales; ahora Citas llama a
   `staff.availability.for_member` con el día que calcula ella, y la respuesta es la misma.
