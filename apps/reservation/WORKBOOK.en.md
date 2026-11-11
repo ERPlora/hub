@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5d6bc04cdb71e92fdebbcdc205e4830825c83301964e3e1f684db70309b60aa1 -->
+<!-- generated from WORKBOOK.md sha256:a06f8953f29fae7d4b5b566d32abbc61c8d044e4e2668f898737581aa5d8f1c0 -->
 
 ## What it is for and who it is for
 
@@ -337,8 +337,8 @@ Steps:
    table and time, or releases it if it is left without a table (TABLE-F26).
 3. A seated, completed, cancelled or no-show reservation only changes its notes.
 4. By voice: "move Ana's reservation to table 7 on the terrace". Before changing it, the assistant's card
-   says the reservation by its customer, its day and its time and the new table with its zone
-   ("7 (Terrace)"), never by a code.
+   says the reservation by its customer, its day and its time and the new table with its zone, as Tables
+   names it ("Change in Reservations: Ana García · 15 Oct 2026 · 21:00 · 7 (Terrace)"), never by a code.
 In: the changed fields. The new phone is saved in international format, as on a new reservation; the
 same number written another way (with spaces or without the prefix) is not a change.
 Out: the changed reservation (announces: `reservation.reservation.updated`).

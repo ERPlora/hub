@@ -355,8 +355,8 @@ Pasos:
    nuevas, o la suelta si se queda sin mesa (TABLE-F26).
 3. Una reserva sentada, completada, cancelada o no presentada solo cambia sus notas.
 4. Por voz: «pasa la reserva de Ana a la 7 de la terraza». Antes de cambiarla, la tarjeta del asistente
-   dice la reserva por su cliente, su día y su hora y la mesa nueva con su zona («7 (Terraza)»), nunca por
-   un código.
+   dice la reserva por su cliente, su día y su hora y la mesa nueva con su zona, como la nombra Mesas
+   («Cambiar en Reservas: Ana García · 15 oct 2026 · 21:00 · 7 (Terraza)»), nunca por un código.
 Entra: los campos cambiados. El teléfono nuevo se guarda en formato internacional, como en el alta; el
 mismo número escrito de otra forma (con espacios o sin el prefijo) no es un cambio.
 Sale: la reserva cambiada (avisa: `reservation.reservation.updated`).
