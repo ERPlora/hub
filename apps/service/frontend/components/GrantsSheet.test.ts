@@ -7,10 +7,11 @@ import { StatusPill } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Business } from '../../../../base/frontend/operations';
-import { business, click, flush, MANAGER, EMPLOYEE, mountService, page, POLISH, settle } from '../__tests__/mount-service';
+import { business, click, flush, MANAGER, EMPLOYEE, mountService, OWNER, page, POLISH, settle } from '../__tests__/mount-service';
 import { grant } from '../__tests__/grant';
 import { PACKAGE } from '../__tests__/package';
 import GrantAdjustModal from './GrantAdjustModal.vue';
+import GrantRedeemModal from './GrantRedeemModal.vue';
 import GrantVoidModal from './GrantVoidModal.vue';
 import GrantsSheet from './GrantsSheet.vue';
 
@@ -83,6 +84,30 @@ describe('GrantsSheet', () => {
     expect([adjusting.props('open'), adjusting.props('grant')]).toEqual([true, ROWS[0]]);
   });
 
+  // SERVICE-F21 (hub#1058): a session is spent outside the till from the row of a live voucher, by whoever may spend one.
+  it('offers «Spend a session» on every live voucher, and opens its dialog on that voucher and package', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    expect(['g1', 'g2', 'g3'].map((id) => s.inDoc(`service-grants-redeem-${id}`)?.textContent?.trim() ?? null)).toEqual([
+      'Spend a session',
+      'Spend a session',
+      null,
+    ]);
+    await click(s.inDoc('service-grants-redeem-g2'));
+    await flush();
+    const redeeming = s.wrapper.findComponent(GrantRedeemModal);
+    expect([redeeming.props('open'), redeeming.props('grant'), redeeming.props('pkg')]).toEqual([true, ROWS[1], PACKAGE]);
+  });
+
+  it('an employee spends sessions too; who may not spend them sees no button', async () => {
+    const employee = await setup(EMPLOYEE);
+    await employee.show(page(ROWS));
+    expect(employee.inDoc('service-grants-redeem-g1')).not.toBeNull();
+    const reader = await setup({ ...OWNER, permissions: OWNER.permissions.filter((p) => p !== 'service.redeem_package') });
+    await reader.show(page(ROWS));
+    expect(reader.inDoc('service-grants-redeem-g1')).toBeNull();
+  });
+
   it('an employee sees the sales but neither adjusts nor voids', async () => {
     const s = await setup(EMPLOYEE);
     await s.show(page(ROWS));
@@ -102,5 +127,6 @@ describe('GrantsSheet', () => {
     expect(s.text('g1')).toContain('2 usadas · quedan 3');
     expect(s.text('g1')).toContain('Cliente: Lucía Pérez');
     expect(s.inDoc('service-grants-title')?.textContent).toContain('Bonos vendidos — Bono 5 cortes');
+    expect(s.inDoc('service-grants-redeem-g1')?.textContent?.trim()).toBe('Gastar una sesión');
   });
 });

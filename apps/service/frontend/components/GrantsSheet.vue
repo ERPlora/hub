@@ -2,8 +2,9 @@
 // SERVICE-F16 «Ver quién ha comprado un bono»: «Sold vouchers — {package}» follows `service.grant.list`
 // live, the most recent first, 20 at a time: Active or Voided, the customer (their reference when the
 // card is gone), the date, the amount (in the business's currency), sessions used and left (or «no limit»), the sale, the expiry,
-// what was given or corrected afterwards and, on a voided one, who, when and why. Adjust (SERVICE-F18)
-// and Void (SERVICE-F17) show where they apply and for whoever may, and open their dialogs.
+// what was given or corrected afterwards and, on a voided one, who, when and why. Spend a session (SERVICE-F21, on every
+// live voucher), Adjust (SERVICE-F18) and Void (SERVICE-F17) show where they apply and for whoever may, and open their
+// dialogs.
 import { InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
@@ -14,6 +15,7 @@ import { useLocale, useT } from '../composables/useT';
 import { formatDate, formatMoney, useBusinessMoney } from '../lib/format';
 import type { GrantOut, PackageOut } from '../operations';
 import GrantAdjustModal from './GrantAdjustModal.vue';
+import GrantRedeemModal from './GrantRedeemModal.vue';
 import GrantVoidModal from './GrantVoidModal.vue';
 import SheetModal from './SheetModal.vue';
 
@@ -30,6 +32,8 @@ const voiding = ref<GrantOut | null>(null);
 const voidOpen = ref(false);
 const adjusting = ref<GrantOut | null>(null);
 const adjustOpen = ref(false);
+const redeeming = ref<GrantOut | null>(null);
+const redeemOpen = ref(false);
 
 function askVoid(grant: GrantOut): void {
   voiding.value = grant;
@@ -38,6 +42,10 @@ function askVoid(grant: GrantOut): void {
 function askAdjust(grant: GrantOut): void {
   adjusting.value = grant;
   adjustOpen.value = true;
+}
+function askRedeem(grant: GrantOut): void {
+  redeeming.value = grant;
+  redeemOpen.value = true;
 }
 
 const day = (value: string | null) => formatDate(value, locale.value);
@@ -131,6 +139,15 @@ const day = (value: string | null) => formatDate(value, locale.value);
         </div>
         <div class="service-sheet-list__actions">
           <ion-button
+            v-if="grant.status === 'active' && session.can('service.redeem_package')"
+            size="small"
+            fill="clear"
+            :data-testid="`service-grants-redeem-${grant.id}`"
+            @click="askRedeem(grant)"
+          >
+            {{ t('service.grants.redeem') }}
+          </ion-button>
+          <ion-button
             v-if="grant.can_adjust && session.can('service.adjust_grant')"
             size="small"
             fill="clear"
@@ -160,6 +177,11 @@ const day = (value: string | null) => formatDate(value, locale.value);
   <GrantAdjustModal
     v-model:open="adjustOpen"
     :grant="adjusting"
+  />
+  <GrantRedeemModal
+    v-model:open="redeemOpen"
+    :grant="redeeming"
+    :pkg="pkg"
   />
 </template>
 
