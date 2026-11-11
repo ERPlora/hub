@@ -988,6 +988,7 @@ def _tell_sales(ctx: OperationContext, invoice: Invoice, written: str) -> None:
             "en": (
                 "turn the ticket of sale 20261103-0012 into a full invoice for Carpintería Lema",
                 "give the customer a full invoice with their details for their ticket",
+                "turn the simplified one of sale 20261103-0012 into a full one",
             ),
             "es": (
                 "pasa el tique de la venta 20261103-0012 a factura completa a nombre de Carpintería Lema",
@@ -1343,6 +1344,7 @@ def rectify_from_void(ctx: OperationContext, data: FromVoidIn) -> dict:
             "en": (
                 "mark invoice FACT-2025-000317 as paid",
                 "Carpintería Lema has paid their invoice",
+                "Fontanería Ortega settled their invoice yesterday",
             ),
             "es": (
                 "la factura FACT-2025-000317 ya está pagada",
@@ -1403,6 +1405,7 @@ def _demote_defaults(year: int, keep: UUID | None = None) -> None:
             "en": (
                 "create a new invoice series for the online shop",
                 "add a numbering series called Eventos for 2027",
+                "add a series for the airport shop",
             ),
             "es": (
                 "crea una serie nueva para las facturas de la tienda online",
