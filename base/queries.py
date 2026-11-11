@@ -692,7 +692,7 @@ BUSY_WINDOW_DAYS = 7
             "es": (
                 "¿cuánto espacio me queda?",
                 "¿cuántas peticiones llevamos este mes?",
-                "¿cuántas personas hay activas ahora?",
+                "¿cuántas personas están usando el Hub ahora?",
                 "¿se me queda corto el plan?",
             ),
         },
