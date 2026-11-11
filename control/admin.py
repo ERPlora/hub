@@ -14,6 +14,11 @@ hubs with their database (round 2026-10-30b of PLAN-DB, decision 1 of Ioan; tran
   ``control.cluster.sizes``, once per cluster on the page, kept ten minutes; a cluster that cannot be measured is said
   in a warning and its hubs show no size.
 
+- **«Restore from a copy…»** (hub#1198, BASE-F114) asks ``control.hub.restore`` for each chosen hub, with the temporary
+  cluster its copy is on and the moment it is of; the worker restores it (``base.tenancy.restore``), or refuses it for
+  its fiscal records, and then the hub's page says why in its ``last_error``, as the worker noted it. While it is
+  restored, the hub's cluster says where the copy comes from, as a move says where it goes.
+
 - **Freeze** is the one switch that freezes the platform for a database upgrade (hub#930; PLAN-DB round 2026-11-04e,
   «Congelar»): ticked, the worker makes, drops and moves no database and ``migrate_hubs`` refuses to start, while the
   relay, the tasks and VeriFactu go on. Its form saves through ``control.freeze.set`` (shows on its field what it
@@ -24,6 +29,7 @@ Only the platform's admins (staff and superuser) add, change, close or delete; s
 permissions). Nothing here writes the ORM: every write is an operation, called with the staff member's context.
 """
 
+import datetime as dt
 from collections.abc import Callable
 
 import pydantic
@@ -42,9 +48,20 @@ from live.errors import OperationError
 
 from base import admin as base_admin
 from base.registry import REGISTRY_SCOPE, database_is_made
+from base.tenancy.move import MOVED_COPY_DAYS
 from control.models import Cluster, Freeze, Hub
 from control.queries import cluster_sizes, freeze_get
-from control.schemas import ClusterIdIn, ClusterIn, ClusterSizesIn, ClusterUpdateIn, FreezeGetIn, FreezeIn, HubIdIn, HubMoveIn
+from control.schemas import (
+    ClusterIdIn,
+    ClusterIn,
+    ClusterSizesIn,
+    ClusterUpdateIn,
+    FreezeGetIn,
+    FreezeIn,
+    HubIdIn,
+    HubMoveIn,
+    HubRestoreIn,
+)
 from control.services import (
     CLUSTER_FIELDS,
     cluster_close,
@@ -54,6 +71,7 @@ from control.services import (
     freeze_set,
     hub_move,
     hub_move_cancel,
+    hub_restore,
 )
 
 
@@ -285,8 +303,26 @@ class MoveToClusterForm(forms.Form):
     )
 
 
-#: The confirmation page of «Move to cluster…».
+class RestoreFromACopyForm(forms.Form):
+    """The temporary cluster the chosen hubs' copy is on (a point-in-time restore of their cluster, registered closed to
+    new hubs) and the moment it is of; ``control.hub.restore`` checks the rest, hub by hub."""
+
+    cluster = forms.ModelChoiceField(
+        queryset=Cluster.objects.filter(is_open=False).order_by("name"),
+        label=pgettext_lazy("restore", "Temporary cluster"),
+        empty_label=None,
+    )
+    at = forms.DateTimeField(
+        label=pgettext_lazy("restore", "Moment"),
+        help_text=gettext_lazy(
+            "The moment the temporary cluster was restored to, with its time zone: 2026-11-09T14:30:00Z is UTC."
+        ),
+    )
+
+
+#: The confirmation pages of «Move to cluster…» and «Restore from a copy…».
 MOVE_TEMPLATE = "admin/control/hub/move_to_cluster.html"
+RESTORE_TEMPLATE = "admin/control/hub/restore_from_a_copy.html"
 
 
 class ClusterListFilter(admin.RelatedFieldListFilter):
@@ -319,8 +355,8 @@ class HubAdmin(base_admin.HubAdmin):
         "created_at",
     )
     list_filter = ("status", ("cluster", ClusterListFilter), "schema_state", "is_demo")
-    list_select_related = ("cluster", "moving_to")
-    actions = [*base_admin.HubAdmin.actions, "move_to_cluster", "cancel_the_move"]
+    list_select_related = ("cluster", "moving_to", "restoring_from")
+    actions = [*base_admin.HubAdmin.actions, "move_to_cluster", "cancel_the_move", "restore_from_a_copy"]
     # Never a form's field, even on the page of a hub on no cluster, where ``on_cluster`` takes its place.
     exclude = ("cluster",)
 
@@ -337,25 +373,10 @@ class HubAdmin(base_admin.HubAdmin):
         (``control.hub.move``): the worker moves it, its host answering 503 «maintenance» meanwhile."""
         form = MoveToClusterForm(request.POST if "apply" in request.POST else None)
         if not form.is_bound or not form.is_valid():
-            context = {
-                **self.admin_site.each_context(request),
-                "title": gettext("Move to cluster"),
-                "opts": self.model._meta,
-                "hubs": queryset,
-                "form": form,
-                "action_checkbox_name": helpers.ACTION_CHECKBOX_NAME,
-            }
-            return TemplateResponse(request, MOVE_TEMPLATE, context)
+            return self.confirmation(request, queryset, form, "move_to_cluster", gettext("Move to cluster"), MOVE_TEMPLATE)
         target = form.cleaned_data["cluster"]
         ctx = staff_context(request)
-        asked = 0
-        for hub in queryset:
-            try:
-                hub_move(ctx, HubMoveIn(hub=hub.pk, cluster=target.pk))
-            except OperationError as refused:
-                self.message_user(request, f"{hub.slug}: {refused.message}", messages.ERROR)
-                continue
-            asked += 1
+        asked = self.ask_each(request, queryset, lambda hub: hub_move(ctx, HubMoveIn(hub=hub.pk, cluster=target.pk)))
         if asked:
             self.message_user(
                 request,
@@ -373,14 +394,7 @@ class HubAdmin(base_admin.HubAdmin):
     def cancel_the_move(self, request: HttpRequest, queryset) -> None:
         """Ask the worker to undo each chosen hub's move (``control.hub.move_cancel``): back on its own cluster."""
         ctx = staff_context(request)
-        asked = 0
-        for hub in queryset:
-            try:
-                hub_move_cancel(ctx, HubIdIn(id=hub.pk))
-            except OperationError as refused:
-                self.message_user(request, f"{hub.slug}: {refused.message}", messages.ERROR)
-                continue
-            asked += 1
+        asked = self.ask_each(request, queryset, lambda hub: hub_move_cancel(ctx, HubIdIn(id=hub.pk)))
         if asked:
             self.message_user(
                 request,
@@ -393,7 +407,72 @@ class HubAdmin(base_admin.HubAdmin):
                 messages.SUCCESS,
             )
 
+    @admin.action(description=gettext_lazy("Restore from a copy…"), permissions=["restore"])
+    def restore_from_a_copy(self, request: HttpRequest, queryset):
+        """Choose the temporary cluster the hubs' copy is on and the moment it is of on a confirmation page, then ask
+        each chosen hub to be put back as it was (``control.hub.restore``): the worker restores it, its host answering
+        503 «maintenance» meanwhile, or refuses it for its fiscal records, the reason in its ``last_error``."""
+        form = RestoreFromACopyForm(request.POST if "apply" in request.POST else None)
+        if not form.is_bound or not form.is_valid():
+            return self.confirmation(
+                request,
+                queryset,
+                form,
+                "restore_from_a_copy",
+                gettext("Restore from a copy"),
+                RESTORE_TEMPLATE,
+                kept_days=MOVED_COPY_DAYS,
+            )
+        source, at = form.cleaned_data["cluster"], form.cleaned_data["at"]
+        ctx = staff_context(request)
+        asked = self.ask_each(
+            request, queryset, lambda hub: hub_restore(ctx, HubRestoreIn(hub=hub.pk, cluster=source.pk, at=at))
+        )
+        if asked:
+            self.message_user(
+                request,
+                ngettext(
+                    "%(count)d hub will be restored from %(cluster)s as it was at %(moment)s: closed for a few minutes "
+                    "while it is restored. If it is refused, its page says why under «last error».",
+                    "%(count)d hubs will be restored from %(cluster)s as they were at %(moment)s: each closed for a few "
+                    "minutes while it is restored. If one is refused, its page says why under «last error».",
+                    asked,
+                )
+                % {"count": asked, "cluster": source.name, "moment": f"{at.astimezone(dt.UTC):%Y-%m-%d %H:%M} UTC"},
+                messages.SUCCESS,
+            )
+        return None
+
+    def confirmation(self, request: HttpRequest, hubs, form: forms.Form, action: str, title: str, template: str, **more):
+        """The confirmation page of ``action`` for ``hubs``: what it does and its ``form``, asked again until valid."""
+        context = {
+            **self.admin_site.each_context(request),
+            "title": title,
+            "opts": self.model._meta,
+            "hubs": hubs,
+            "form": form,
+            "action": action,
+            "action_checkbox_name": helpers.ACTION_CHECKBOX_NAME,
+            **more,
+        }
+        return TemplateResponse(request, template, context)
+
+    def ask_each(self, request: HttpRequest, hubs, ask: Callable[[Hub], object]) -> int:
+        """Ask ``ask`` (an operation) of each hub: what it refuses is said with the hub's slug; how many were asked."""
+        asked = 0
+        for hub in hubs:
+            try:
+                ask(hub)
+            except OperationError as refused:
+                self.message_user(request, f"{hub.slug}: {refused.message}", messages.ERROR)
+                continue
+            asked += 1
+        return asked
+
     def has_move_permission(self, request: HttpRequest) -> bool:
+        return is_platform_admin(request)
+
+    def has_restore_permission(self, request: HttpRequest) -> bool:
         return is_platform_admin(request)
 
     def get_changelist(self, request: HttpRequest, **kwargs):
@@ -419,7 +498,11 @@ class HubAdmin(base_admin.HubAdmin):
             here = default_server()
         else:
             here = self.get_empty_value_display()
-        return f"{here} → {hub.moving_to.name}" if hub.moving_to_id else here
+        if hub.moving_to_id:
+            return f"{here} → {hub.moving_to.name}"
+        if hub.restoring_from_id:
+            return f"{here} ← {hub.restoring_from.name}"
+        return here
 
     @admin.display(description=pgettext_lazy("hub database", "size"))
     def database_size(self, hub: Hub) -> str:
