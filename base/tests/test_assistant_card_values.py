@@ -407,11 +407,6 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
 #: number here, and none comes in.
 UNNAMED_REFERENCES = {
     "invoice": 1,
-    # The sale and the appointment a voucher or a session came from, the line of a sale that charged a voucher, the line
-    # of an order that holds a session and the reference of a return: data of apps Services does not require, so it
-    # reads none of them and base.E009 refuses a mark (hub#756). The one that came in, the sale's line (hub#769), is the
-    # same datum as the sale beside it on service.grant.create: naming them is that issue's to decide.
-    "service": 7,
     "verifactu": 6,
 }
 

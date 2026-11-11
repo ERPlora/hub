@@ -732,7 +732,8 @@ class OrderFireIn(Closed):
 
 
 class RecordRefIn(Closed):
-    """One record a write of Sales names, by its id: exactly one (``sale.record.get``)."""
+    """One record of Sales, or of an app it asks, that the assistant's card names by its id: exactly one
+    (``sale.record.get``)."""
 
     department_id: UUID | None = Field(None, description="A section of the open price.")
     quick_note_id: UUID | None = Field(None, description="A quick note.")
@@ -741,6 +742,7 @@ class RecordRefIn(Closed):
     line_id: UUID | None = Field(None, description="A line of an open check.")
     sale_line_id: UUID | None = Field(None, description="A line of a sale.")
     payment_id: UUID | None = Field(None, description="A tender of a sale.")
+    refund_id: UUID | None = Field(None, description="A refund of a sale.")
     product_id: UUID | None = Field(None, description="A product of Inventory.")
     service_id: UUID | None = Field(None, description="A service of Services.")
     combo_id: UUID | None = Field(None, description="A menu of Menus.")
