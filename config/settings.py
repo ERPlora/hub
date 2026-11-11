@@ -563,6 +563,7 @@ LIVE_ASSISTANT_ASKS_REQUIRED = (
     "cart_checkout",
     "cash_register",
     "customer",
+    "flow",
     "inventory",
     "printing",
     "reservation",
