@@ -13,6 +13,7 @@ from ninja import Schema
 from pydantic import Field
 
 from apps.demo.models import Item
+from base.schemas import names
 from base.tenancy import context
 from base.tenancy.tests import hubs
 from base.tests.test_services_assistant import ASK, MANAGER, asked, call, turn
@@ -223,6 +224,68 @@ def test_what_a_dangerous_write_said_it_will_do_is_held_too(till):
     assert [(field["name"], field["value"]) for field in again["confirm"]["preview"]] == [("expected_cents", 4500)]
     done = yes_to(again)
     assert [row["outcome"] for row in done["executed"]] == ["ok"] and CLOSED == ["t1"]
+
+
+# ── Each way a card finds its record, on its own ──────────────────────────────────────────────────────────────────────
+
+
+class CalledIn(Schema):
+    """An item by its name, which the card reads to say it (a mark by name, as an image by its file's name)."""
+
+    called: str = Field(json_schema_extra=names("demo.item.detail", by="called"))
+
+
+class SaidIn(Schema):
+    """An item by its name, which the card says as sent: only the write's check finds it."""
+
+    called: str
+
+
+class TouchedOut(Schema):
+    touched: str
+
+
+TOUCHED: list[str] = []
+
+
+def by_its_name(name: str, input: type[Schema], **ai) -> Operation:
+    return Operation(
+        name=name,
+        kind="command",
+        permission="demo.manage",
+        input=input,
+        output=TouchedOut,
+        expose_api=False,
+        ai={"description": "Touches a demo item said by its name.", **ai},
+        fn=lambda ctx, data: TOUCHED.append(data.called) or {"touched": data.called},
+    )
+
+
+#: A card that reads the item by the name said, with no check; a card that says the name as sent, with its check.
+READ_BY_ITS_MARK = by_its_name("demo.item.touch_named", CalledIn)
+FOUND_BY_ITS_CHECK = by_its_name("demo.item.touch_checked", SaidIn, check="demo.item.detail")
+
+
+@pytest.fixture(params=[READ_BY_ITS_MARK, FOUND_BY_ITS_CHECK], ids=["its-mark", "its-check"])
+def touch(request, monkeypatch):
+    monkeypatch.setitem(registry, request.param.name, request.param)
+    TOUCHED.clear()
+    return request.param
+
+
+def test_the_record_a_card_found_by_its_mark_or_by_its_check_is_held_alone(touch):
+    """Each of the two ways on its own: «Mesa 4» renamed «Barra» and another «Mesa 4» created before the yes, the
+    words on the card the same — another record —: nothing runs; with nothing changed, the yes runs."""
+    first = Item.objects.create(name="Mesa 4")
+    plan = turn(call(touch.name, {"called": "mesa 4"}))
+    assert said(plan) == [("called", "Mesa 4" if touch is READ_BY_ITS_MARK else "mesa 4")]
+    Item.objects.filter(pk=first.pk).update(name="Barra")
+    Item.objects.create(name="Mesa 4")
+
+    again = yes_to(plan)
+
+    assert (again["executed"], TOUCHED) == ([], [])
+    assert [row["outcome"] for row in yes_to(again)["executed"]] == ["ok"] and TOUCHED == ["mesa 4"]
 
 
 # ── Each business on its own ──────────────────────────────────────────────────────────────────────────────────────────
