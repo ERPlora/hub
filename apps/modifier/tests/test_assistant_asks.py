@@ -1,11 +1,12 @@
-"""What layer 1 of the assistant's QA does not say of Modifiers (docs plan 2026-10-31, the assistant's knowledge and QA,
-§3): how many tools it offers, what an employee is never offered, and that the requests of the real-model QA (hub#1092),
-in the person's own words, are offered their existing operation.
+"""What layer 1 of the assistant's QA does not say of Modifiers (docs plan 2026-10-31, the assistant's knowledge and
+QA, §3): how many tools it offers, what an employee is never offered, and that the requests of the real-model QA
+(hub#1092), in the person's own words, are offered their existing operation.
 
 Every ask of every tool of Modifiers bringing its tool among the first ten, role by role, in both languages, is
-``base/tests/test_assistant_asks.py``'s (Modifiers is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over
-the asks and the guard that no ask copies a probe of layer 2. What it cannot see is whether the asks matter at all (an ask
-ranks its own words): here, one request per tool in words of its own reaches the tool by its asks and not without them.
+``base/tests/test_assistant_asks.py``'s (Modifiers is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020``
+over the asks and the guard that no ask copies a probe of layer 2. What it cannot see is whether the asks matter at all
+(an ask ranks its own words): here, one request per tool in words of its own reaches the tool by its asks and not
+without them.
 """
 
 import dataclasses
@@ -50,19 +51,24 @@ NOT_THE_EMPLOYEES = {
 #: among the ones a turn offers (``MAX_TOOLS``), so the model looked in Inventory, sent the owner to the screen, chose a
 #: tool of Customers or told the employee it could not value a dish with its option.
 REPORTED = [
-    (OWNER, "modifier.group.for_target", "¿qué extras tendré que preguntar al vender un Café, tanto los suyos como los de su familia?"),
+    (OWNER, "modifier.group.for_target",
+     "¿qué extras tendré que preguntar al vender un Café, tanto los suyos como los de su familia?"),
     (OWNER, "modifier.link.get", "muéstrame la asignación concreta entre Endulzante QA y el Café"),
-    (OWNER, "modifier.option.list", "lista las opciones de Endulzante QA, su precio adicional y cuál viene marcada por defecto"),
+    (OWNER, "modifier.option.list",
+     "lista las opciones de Endulzante QA, su precio adicional y cuál viene marcada por defecto"),
     (OWNER, "modifier.link.attach", "haz que el TPV pregunte Endulzante QA siempre que se venda un Café"),
-    (OWNER, "modifier.group.delete", "elimina Endulzante QA con su opción y sus asignaciones, sin cambiar los pedidos antiguos"),
+    (OWNER, "modifier.group.delete",
+     "elimina Endulzante QA con su opción y sus asignaciones, sin cambiar los pedidos antiguos"),
     (OWNER, "modifier.group.update", "convierte Endulzante QA en obligatorio y permite elegir hasta dos opciones"),
-    (OWNER, "modifier.link.detach", "deja de solicitar Endulzante QA al vender Café, pero conserva el grupo para otros productos"),
-    (OWNER, "modifier.option.update", "renombra Sin azúcar QA como «Sin azúcar ni edulcorante QA» y quítala como opción predeterminada"),
+    (OWNER, "modifier.link.detach",
+     "deja de solicitar Endulzante QA al vender Café, pero conserva el grupo para otros productos"),
+    (OWNER, "modifier.option.update",
+     "renombra Sin azúcar QA como «Sin azúcar ni edulcorante QA» y quítala como opción predeterminada"),
     (EMPLOYEE, "modifier.selection.resolve", "¿cuánto cuesta un Café con Sin azúcar QA y qué nota manda a cocina?"),
 ]
-#: «sin cambiar los pedidos antiguos» is read as asking to change them (``live.assistant.asked``): every write of an order,
-#: and every one taking a sort order, outranks the deletion asked for, whatever its asks say. Strict: once live reads the
-#: negation the probe passes, and whoever brings that pointer removes the mark.
+#: «sin cambiar los pedidos antiguos» is read as asking to change them (``live.assistant.asked``): every write of an
+#: order, and every one taking a sort order, outranks the deletion asked for, whatever its asks say. Strict: once live
+#: reads the negation the probe passes, and whoever brings that pointer removes the mark.
 LIVE_60 = pytest.mark.xfail(
     strict=True, reason="ERPlora/live#60: «sin cambiar …» is read as asking to change, so the deletion is not offered"
 )
@@ -79,9 +85,9 @@ PROBES = [
     for probe in json.loads(path.read_text(encoding="utf-8"))["probes"]
 ]
 
-#: What a person says in words of their own, neither an ask nor a probe of layer 2 nor an ask of its tool but for a word,
-#: one per tool of Modifiers: here it is the tool's asks that bring it among the first ten, so asks that stop reading as
-#: people speak, or that another change empties, fail.
+#: What a person says in words of their own, neither an ask nor a probe of layer 2 nor an ask of its tool but for a
+#: word, one per tool of Modifiers: here it is the tool's asks that bring it among the first ten, so asks that stop
+#: reading as people speak, or that another change empties, fail.
 OWN_WORDS = [
     ("modifier.group.list", "¿qué tengo montado para acompañar los platos?"),
     ("modifier.group.get", "¿cuál es el máximo de Punto de la carne?"),
@@ -143,8 +149,8 @@ def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operat
 
 
 def test_modifiers_is_listed_so_layer_1_sweeps_every_ask_of_it():
-    """Modifiers is in ``LIVE_ASSISTANT_ASKS_REQUIRED``: ``base/tests/test_assistant_asks.py`` ranks each of its asks for
-    every role and language, and ``live.E020`` requires them of each of its tools."""
+    """Modifiers is in ``LIVE_ASSISTANT_ASKS_REQUIRED``: ``base/tests/test_assistant_asks.py`` ranks each of its asks
+    for every role and language, and ``live.E020`` requires them of each of its tools."""
     assert "modifier" in settings.LIVE_ASSISTANT_ASKS_REQUIRED
 
 
@@ -197,9 +203,10 @@ def test_the_reported_modifier_request_offers_its_existing_operation(catalog_of,
     ids=[probe["id"] for probe in PROBES],
 )
 def test_every_probe_of_modifiers_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
-    """The owner's and the employee's phrases of layer 2, the ones the model answered right too: a tool of Modifiers that
-    a new ask elsewhere pushes out of the first half of the ones a turn offers fails here before the real-model QA sees
-    it. A write an employee asks for is refused by not being theirs at all (``NOT_THE_EMPLOYEES``), never by ranking."""
+    """The owner's and the employee's phrases of layer 2, the ones the model answered right too: a tool of Modifiers
+    that a new ask elsewhere pushes out of the first half of the ones a turn offers fails here before the real-model QA
+    sees it. A write an employee asks for is refused by not being theirs at all (``NOT_THE_EMPLOYEES``), never by
+    ranking."""
     assert (probe["app"], probe["language"]) == ("modifier", "es")
     role = ROLE_OF_PROBE[probe["role"]]
     tools = catalog_of(role, probe["language"])
@@ -232,8 +239,8 @@ def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog
 
 
 def test_the_hub_reads_predeterminada_as_the_default():
-    """A «predeterminada» option is the one a group brings chosen (``is_default``): the Hub reads the word as the default
-    the English descriptions and the option's data say."""
+    """A «predeterminada» option is the one a group brings chosen (``is_default``): the Hub reads the word as the
+    default the English descriptions and the option's data say."""
     said = shared.asked(["quítala como opción predeterminada"], assistant.SYNONYMS).concepts
     assert any({shared.stem("predeterminada"), shared.stem("default")} <= concept for concept in said)
 
