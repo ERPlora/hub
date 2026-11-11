@@ -1865,6 +1865,12 @@ msgstr "Ahora no se puede leer el plan del asistente."
 msgid "ERPlora's documentation could not be searched now."
 msgstr "Ahora no se puede buscar en la documentación de ERPlora."
 
+#. The line an answer of the assistant ends with, before the documentation it comes from (hub#1079).
+#: base/queries.py
+msgctxt "assistant answer"
+msgid "Source"
+msgstr "Fuente"
+
 #: base/models.py
 msgctxt "location"
 msgid "Main"

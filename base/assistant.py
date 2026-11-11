@@ -116,7 +116,9 @@ APP_WORDS = shared.app_words
 #: «arqueo», a «recuento» or a «conteo» of the drawer is a count of Cash register's (``cash_register.count``), and the
 #: «moneda» or «divisa» of the business is its currency (``cash_register.currency``). To «desactivar» names the
 #: deactivation itself (``staff.member.deactivate``, ``*.deactivate``), not only a switch off, and what one «pide» or
-#: «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``).
+#: «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``). A «bono» (a voucher, a pack) is
+#: Services' voucher, the one of the catalogue (``service.package``) or the one sold to a customer (``service.grant``),
+#: and an «asignación» (what one «asigna») is a professional's assignment to a service (``service.assignment``).
 SYNONYMS = (
     ("cuenta", "check", "tab", "order"),
     ("ticket", "tique", "recibo", "receipt", "sale"),
@@ -135,6 +137,9 @@ SYNONYMS = (
     ),
     ("arqueo", "recuento", "conteo", "count"),
     ("divisa", "moneda", "currency"),
+    # service
+    ("bono", "bonos", "voucher", "vouchers", "pack", "packs", "package", "packages", "grant", "grants"),
+    ("asignacion", "asignaciones", "assignment", "assignments"),
     # staff
     ("desactiva", "desactivar", "deactivate"),
     ("pido", "solicito", "solicitud", "request"),
@@ -793,8 +798,9 @@ Answer in {language_name}, short and plain, as a colleague who knows the app. Us
 - Name a record to the person by its name, as the screens do: never write an id (a code such as 0190a3b4-…) in the
   answer, not in a table either.
 - For questions about how ERPlora works (how to do something, what an option means, plans), search the documentation
-  with `base__docs__search` and answer only from what it returns, citing the section; if it returns nothing, say the
-  documentation does not cover it.
+  with `base__docs__search` and answer only from what it returns; end that answer with the `cite` of each excerpt you
+  used, at least one, as it comes and in a line of its own; if it returns nothing, say the documentation does not
+  cover it.
 - To change something, call its tool: the person sees a card and confirms it before it runs. If the tool comes back
   «not confirmed» or with an error, nothing changed: say so, and never say it was done.
 - Amounts: a datum a tool marks `"money": true` takes the amount in the minor unit of its currency, whatever its
