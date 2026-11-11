@@ -107,6 +107,27 @@ check("pytest runs in parallel (pytest-xdist)", "pytest" in python_runs and " -n
 check("python fetches ERPlora/blueprints into ../blueprints before pytest",
       "ERPlora/blueprints.git ../blueprints" in python_runs
       and python_runs.index("ERPlora/blueprints.git") < python_runs.index("pytest"))
+# WeasyPrint's libraries are installed without Ubuntu's mirror (hub#1222: a DNS outage of the mirror kept every run red
+# for hours, and retries alone would spend minutes the python job does not have): their .deb files come from GitHub's
+# cache, one entry per runner image and per test.yml, through apt-install.sh, which only goes to the mirror without
+# them and retries it then.
+python_steps = steps(tjobs.get("python", {}))
+weasyprint = next((step for step in python_steps if step.get("name") == "WeasyPrint's libraries"), {})
+weasyprint_run = str(weasyprint.get("run", "")).split()
+check("WeasyPrint's libraries are installed with apt-install.sh",
+      weasyprint_run[:2] == ["bash", ".github/scripts/apt-install.sh"] and len(weasyprint_run) > 3
+      and "apt-get" not in weasyprint_run)
+archives = weasyprint_run[2] if len(weasyprint_run) > 2 else None
+apt_cache = next((step for step in python_steps if str(step.get("uses", "")).startswith("actions/cache@")
+                  and (step.get("with") or {}).get("path") == archives), None)
+check("their archives come from GitHub's cache, restored before the install and saved after it",
+      apt_cache is not None and python_steps.index(apt_cache) < python_steps.index(weasyprint))
+apt_key = str(((apt_cache or {}).get("with") or {}).get("key", ""))
+image = next((step for step in python_steps if step.get("id") and f"steps.{step['id']}.outputs." in apt_key), None)
+check("the cache keeps one entry per runner image and per test.yml (where the package list lives)",
+      image is not None and apt_cache is not None and python_steps.index(image) < python_steps.index(apt_cache)
+      and all(name in str(image.get("run", "")) for name in ("$ImageOS", "$ImageVersion"))
+      and "hashFiles('.github/workflows/test.yml')" in apt_key)
 check("frontend runs lint, typecheck, Vitest and the build",
       all(f"pnpm {task}" in frontend_runs for task in ("lint", "typecheck", "test", "build")))
 check("scripts runs actionlint, shellcheck and the script tests",

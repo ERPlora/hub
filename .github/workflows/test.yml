@@ -48,9 +48,20 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      # WeasyPrint's libraries (apps/invoice/pdf.py), as the Dockerfile installs them.
+      # WeasyPrint's libraries (apps/invoice/pdf.py), as the Dockerfile installs them. Their .deb files live in GitHub's
+      # cache, one entry per runner image and per version of this file (where the package list is), so a run installs
+      # them without Ubuntu's mirror: a DNS outage of the mirror kept every run red for hours (hub#1222). Without the
+      # cache, apt-install.sh downloads them, retrying the mirror, and the cache saves them at the end of the job.
+      - name: The runner image
+        id: runner-image
+        run: echo "version=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+      - name: WeasyPrint's libraries from GitHub's cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/apt-archives
+          key: apt-${{ steps.runner-image.outputs.version }}-${{ hashFiles('.github/workflows/test.yml') }}
       - name: WeasyPrint's libraries
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0
+        run: bash .github/scripts/apt-install.sh ~/.cache/apt-archives libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0
       # PostgreSQL 18's client, as the Dockerfile's postgresql-client-18: base/tenancy/dumps.py copies a hub's database
       # with pg_dump (and its tests read the copy with pg_restore). The runner's own client is older, and pg_dump refuses
       # a newer server, so 18's bin goes first in the PATH.
