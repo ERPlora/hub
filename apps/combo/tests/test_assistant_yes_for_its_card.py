@@ -57,6 +57,27 @@ def as_admin(language: str = "es"):
     return dataclasses.replace(ctx_for("hub_admin"), language=language)
 
 
+def assistant_writes() -> list:
+    """The writes of Menus that are assistant tools."""
+    return [
+        op
+        for op in registry.values()
+        if op.app_label == "combo" and op.kind == "command" and isinstance(op.ai_spec(), AI)
+    ]
+
+
+def id_mark(op) -> dict | None:
+    """How the assistant's card names the record ``op``'s ``id`` says: as a menu, a course or a choice."""
+    return getattr(op.input.model_fields.get("id"), "json_schema_extra", None)
+
+
+def no_card_but_the_model_hears(plan: dict, code: str) -> None:
+    """No card that would act on anything: the model hears ``code`` and asks the person which one."""
+    assert (plan["confirm"], plan["pending"]) == (None, [])
+    assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", code)]
+    assert json.loads(plan["append"][0]["content"])["error"]["code"] == code
+
+
 def said_on(plan: dict) -> list[tuple[str, object]]:
     return [(field["name"], field["value"]) for field in plan["confirm"]["fields"] if field["name"] == "combo"]
 
@@ -113,9 +134,7 @@ def test_a_name_two_menus_fit_draws_no_card_and_the_model_hears_it(write):
 
     plan = turn_as(as_admin(), call(write, by_its_name("vegano", combo)[write]))
 
-    assert (plan["confirm"], plan["pending"]) == (None, [])
-    assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", "combo.combo_ambiguous")]
-    assert json.loads(plan["append"][0]["content"])["error"]["code"] == "combo.combo_ambiguous"
+    no_card_but_the_model_hears(plan, "combo.combo_ambiguous")
 
 
 @pytest.mark.parametrize("write", WRITES)
@@ -130,15 +149,7 @@ def test_every_assistant_write_of_menus_that_takes_a_menu_by_its_name_is_here():
     """No write whose record is the menu, said by its name, escapes these cases: each tool of Menus whose input names
     the menu itself by its id (``id``, marked as a menu) or by its name (``combo``): not a course's or a choice's, whose
     ``combo`` is the menu they belong to."""
-    taking = {
-        op.name
-        for op in registry.values()
-        if op.app_label == "combo"
-        and op.kind == "command"
-        and isinstance(op.ai_spec(), AI)
-        and "combo" in op.input.model_fields
-        and getattr(op.input.model_fields.get("id"), "json_schema_extra", None) == A_MENU
-    }
+    taking = {op.name for op in assistant_writes() if "combo" in op.input.model_fields and id_mark(op) == A_MENU}
     assert taking == set(WRITES)
 
 
@@ -282,9 +293,7 @@ def test_a_name_two_courses_or_choices_fit_draws_no_card_and_the_model_hears_it(
 
     plan = turn_as(as_admin(), call(write, course_or_choice(write, "Menú vegano")))
 
-    assert (plan["confirm"], plan["pending"]) == (None, [])
-    assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", code)]
-    assert json.loads(plan["append"][0]["content"])["error"]["code"] == code
+    no_card_but_the_model_hears(plan, code)
 
 
 @pytest.mark.parametrize("write", COURSE_OR_CHOICE_WRITES)
@@ -303,22 +312,13 @@ def test_a_menu_two_fit_draws_no_card_rather_than_one_without_the_menu(write):
     vegan_desserts()
     vegan_desserts("Menú vegano sin gluten")
     plan = turn_as(as_admin(), call(write, course_or_choice(write, "vegano")))
-    assert (plan["confirm"], plan["pending"]) == (None, [])
-    assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", "combo.combo_ambiguous")]
+    no_card_but_the_model_hears(plan, "combo.combo_ambiguous")
 
 
 def test_every_assistant_write_of_menus_that_takes_a_course_or_a_choice_by_its_name_is_here():
     """No write whose record is a course (``id`` marked as a course) or a choice (marked as a choice) escapes these
     cases."""
-    taking = {
-        op.name
-        for op in registry.values()
-        if op.app_label == "combo"
-        and op.kind == "command"
-        and isinstance(op.ai_spec(), AI)
-        and getattr(op.input.model_fields.get("id"), "json_schema_extra", None) in (A_COURSE, A_CHOICE)
-    }
-    assert taking == set(BY_NAME)
+    assert {op.name for op in assistant_writes() if id_mark(op) in (A_COURSE, A_CHOICE)} == set(BY_NAME)
 
 
 # ── The mark and the check go together ───────────────────────────────────────────────────────────────────────────────
@@ -329,11 +329,8 @@ def test_a_write_reads_the_menu_said_by_its_name_on_its_card_only_when_it_checks
     fails and the card names nobody it cannot read): only a write that checks its record reads its menu by its name."""
     reading = {
         op.name
-        for op in registry.values()
-        if op.app_label == "combo"
-        and op.kind == "command"
-        and isinstance(op.ai_spec(), AI)
-        and any(field.json_schema_extra == A_MENU_BY_NAME for field in op.input.model_fields.values())
+        for op in assistant_writes()
+        if any(field.json_schema_extra == A_MENU_BY_NAME for field in op.input.model_fields.values())
     }
     assert reading == set(CHECKS)
 
