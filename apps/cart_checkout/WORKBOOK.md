@@ -513,11 +513,16 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
   nunca es una unidad de medida de Inventario). «Línea» no lleva sinónimo hacia las líneas del carrito
   (`item`): es la de las cuentas del TPV (`sale.order.*_line`) y les robaría el puesto. Los asks en inglés
   de los pedidos no dicen «order», que el Hub lee como la cuenta del TPV («cuenta»), ni los de leer y
-  quitar líneas «total»: empujaban asks de Ventas y Mesas fuera de las diez primeras.
+  quitar líneas «total»: empujaban asks de Ventas y Mesas fuera de las diez primeras. Tampoco nombran a
+  las personas de las sondas de la QA («Ana», «Marta»): con ellas, cualquier frase de otra app sobre
+  «Ana QA» subía las herramientas del carrito y una de Citas salía de las 40. Y la lectura de un pedido no
+  dice «pedido» en español, que es también lo que «han pedido» en una mesa (`sale.order.get`). El Hub no
+  conoce el verbo «vaciar»: vaciar llega por sus `asks` y por «cesta».
   `tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
   (`tests/e2e/qa/probes/owner-es-cart_checkout-2026-11-08.json`), nunca con los propios `asks`: cada una
-  ofrece su herramienta, la de cambiar la cantidad antes que la ficha de producto y, con las que cambian
-  o quitan una línea, una lectura del carrito que da su id; el empleado solo recibe las seis lecturas.
+  ofrece su herramienta, la de cambiar la cantidad antes que la ficha de producto, la de vaciar una cesta
+  que sigue activa antes que borrarla o quitarle una línea y, con las que cambian o quitan una línea, una
+  lectura del carrito que da su id; el empleado solo recibe las seis lecturas.
 - Datos personales (CART_CHECKOUT-F14): `cart_checkout.customer.erase` vacía email, nombre, notas y
   motivo de abandono de los carritos con ese email (también los borrados) y email, direcciones, notas y
   motivo de fallo de sus pedidos, en una transacción con las filas bloqueadas; su aviso lleva los números,
