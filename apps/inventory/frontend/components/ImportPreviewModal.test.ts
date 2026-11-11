@@ -1,7 +1,8 @@
 // «Check the import» (WORKBOOK INVENTORY-F09, step 1), the old preview: one select per column of the
 // file («Do not import» or the field; Name and SKU carry an asterisk), «First {n} rows of {total}»
-// under the field each column goes to, the server's rehearsal of the whole file («{ready} row(s)
-// ready · {failed} with problems» with up to ten reasons), and «Import {n} product(s)» / «Cancel».
+// under the field each column goes to, the server's rehearsal of the whole file («{ready} rows
+// ready · {failed} with problems» with up to ten reasons), and «Import {n} products» / «Cancel»; one
+// row or product is said in the singular (hub#1124).
 // Without Name and SKU mapped it says so and cannot import.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -43,7 +44,13 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
   await flush();
   const el = (id: string) => document.querySelector<Control>(`[data-testid="${id}"]`);
   const all = (id: string) => [...document.querySelectorAll<Control>(`[data-testid="${id}"]`)];
-  return { ...m, el, all };
+  /** The rehearsal's own sentence, without the reasons and the skipped note it holds below it. */
+  const summary = () => {
+    const box = el('inventory-import-summary')?.cloneNode(true) as HTMLElement | undefined;
+    box?.querySelectorAll('[data-testid="inventory-import-reason"], [data-testid="inventory-import-skipped"]').forEach((child) => child.remove());
+    return box?.textContent?.trim();
+  };
+  return { ...m, el, all, summary };
 }
 
 describe('ImportPreviewModal', () => {
@@ -80,11 +87,11 @@ describe('ImportPreviewModal', () => {
 
   it('says what the rehearsal found, with up to ten reasons and the rows already in the catalog', async () => {
     const s = await setup();
-    expect(s.el('inventory-import-summary')?.textContent).toContain('5 row(s) ready · 12 with problems');
+    expect(s.summary()).toBe('5 rows ready · 12 with problems');
     expect(s.all('inventory-import-reason')).toHaveLength(10);
     expect(s.all('inventory-import-reason')[0].textContent?.trim()).toBe('Line 2: Price is not a number');
-    expect(s.el('inventory-import-skipped')?.textContent?.trim()).toBe('1 row(s) already in the catalog will be skipped.');
-    expect(s.el('inventory-import-preview-submit')?.textContent?.trim()).toBe('Import 5 product(s)');
+    expect(s.el('inventory-import-skipped')?.textContent?.trim()).toBe('1 row already in the catalog will be skipped.');
+    expect(s.el('inventory-import-preview-submit')?.textContent?.trim()).toBe('Import 5 products');
     s.el('inventory-import-preview-submit')!.click();
     await flush();
     expect(s.wrapper.emitted('confirm')).toHaveLength(1);
@@ -114,10 +121,32 @@ describe('ImportPreviewModal', () => {
   it('speaks Spanish', async () => {
     const s = await setup({}, 'es');
     expect(s.el('inventory-import-preview')?.getAttribute('aria-label')).toBe('Revisa la importación');
-    expect(s.el('inventory-import-summary')?.textContent).toContain('5 fila(s) listas · 12 con problemas');
+    expect(s.summary()).toBe('5 filas listas · 12 con problemas');
   });
 });
 
+
+// hub#1124: «row(s)» and «product(s)» are gone. One row or product reads in the singular and two in the
+// plural, in both languages: the rows shown, the rows ready, the rows skipped and the import button.
+describe('ImportPreviewModal: singular and plural (hub#1124, INVENTORY-F09)', () => {
+  const sized = (n: number) => ({
+    table: parseCsv(['Nombre;Código;Notas', ...Array.from({ length: n }, (_, i) => `P${i};S${i};n${i}`)].join('\n')),
+    rehearsal: { ...READY, report: { ...READY.report, total: n + 1, ready: n, skipped: n, failed: [] } },
+  });
+
+  it.each([
+    { locale: 'en' as const, n: 1, rows: 'First row of 1', summary: '1 row ready · 0 with problems', skipped: '1 row already in the catalog will be skipped.', submit: 'Import 1 product' },
+    { locale: 'en' as const, n: 2, rows: 'First 2 rows of 2', summary: '2 rows ready · 0 with problems', skipped: '2 rows already in the catalog will be skipped.', submit: 'Import 2 products' },
+    { locale: 'es' as const, n: 1, rows: 'Primera fila de 1', summary: '1 fila lista · 0 con problemas', skipped: '1 fila que ya está en el catálogo se omitirá.', submit: 'Importar 1 producto' },
+    { locale: 'es' as const, n: 2, rows: 'Primeras 2 filas de 2', summary: '2 filas listas · 0 con problemas', skipped: '2 filas que ya están en el catálogo se omitirán.', submit: 'Importar 2 productos' },
+  ])('$n ($locale): «$submit»', async ({ locale, n, rows, summary, skipped, submit }) => {
+    const s = await setup(sized(n), locale);
+    expect(s.el('inventory-import-rows-title')?.textContent?.trim()).toBe(rows);
+    expect(s.summary()).toBe(summary);
+    expect(s.el('inventory-import-skipped')?.textContent?.trim()).toBe(skipped);
+    expect(s.el('inventory-import-preview-submit')?.textContent?.trim()).toBe(submit);
+  });
+});
 
 describe('ImportPreviewModal: Android Back with unsaved changes (hub#1046, BASE-F05)', () => {
   it('as opened closes; a change asks; restored as opened closes again', async () => {

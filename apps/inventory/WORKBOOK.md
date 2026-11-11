@@ -180,9 +180,10 @@ de la ventana.
 Tres ventanas seguidas:
 
 1. «Revisa la importación»: un desplegable por columna del fichero («No importar» o el campo;
-   Nombre y SKU llevan asterisco), «Primeras {n} filas de {total}», el resumen «{ready} fila(s)
-   listas · {failed} con problemas» con hasta 10 motivos, e «Importar {n} producto(s)» y
-   «Cancelar».
+   Nombre y SKU llevan asterisco), «Primeras {n} filas de {total}», el resumen «{ready} filas
+   listas · {failed} con problemas» con hasta 10 motivos, e «Importar {n} productos» y
+   «Cancelar»; con una sola fila o un solo producto, en singular («Primera fila de {total}», «1 fila
+   lista», «Importar 1 producto»).
 2. Si hace falta, «Categorías fiscales del CSV»: un bloque por texto fiscal no reconocido (o
    «Filas sin categoría fiscal») con «Elegir» / «Crear» / «Omitir», y «Confirmar e importar».
 3. Mientras crea, encima de la tabla: «Importando {done}/{total}…» con «Parar». Al final,
@@ -432,8 +433,9 @@ Actor: administrador, responsable
 Pantalla: Categorías
 Pasos:
 1. En **Categorías**, pulsa «Eliminar» en la fila.
-2. La ventana «Eliminar categoría» dice «<nombre> — N producto(s) quedarán sin esta categoría (se
-   desvinculan; los productos no se borran)». N cuenta los productos activos.
+2. La ventana «Eliminar categoría» dice «<nombre> — N productos quedarán sin esta categoría (se
+   desvinculan; los productos no se borran)»; con uno, «<nombre> — 1 producto quedará sin esta
+   categoría (se desvincula; el producto no se borra)». N cuenta los productos activos.
 3. Pulsa «Eliminar y desvincular» (o «Cancelar»).
 Entra: la categoría elegida.
 Sale: la categoría queda eliminada y todos sus productos, activos o no, desvinculados en el mismo
@@ -475,9 +477,9 @@ Pasos:
    inglés y con o sin tildes («Nombre», «Código», «Precio», «IVA»…). Cámbialo o pon «No importar».
    Se pueden importar Nombre, SKU, Precio, Coste, Stock, Umbral, EAN-13, Descripción, Unidad y
    Categoría fiscal; Nombre y SKU son obligatorias.
-3. Mira las «Primeras {n} filas de {total}» y el ensayo de todo el fichero: «{ready} fila(s) listas
-   · {failed} con problemas», con la línea y el motivo de las diez primeras.
-4. Pulsa «Importar {n} producto(s)» (o «Cancelar», que no deja rastro).
+3. Mira las «Primeras {n} filas de {total}» y el ensayo de todo el fichero: «{ready} filas listas
+   · {failed} con problemas» («1 fila lista» con una), con la línea y el motivo de las diez primeras.
+4. Pulsa «Importar {n} productos» («Importar 1 producto» con uno; o «Cancelar», que no deja rastro).
 5. Si algún texto fiscal no se reconoce, o hay filas sin columna fiscal («Filas sin categoría
    fiscal»), sale «Categorías fiscales del CSV». Para cada uno: «Elegir» una categoría, «Crear» una
    (Clave y Nombre) u «Omitir». Pulsa «Confirmar e importar». Lo que se elige para un texto se guarda
