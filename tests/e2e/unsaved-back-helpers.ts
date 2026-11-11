@@ -27,7 +27,13 @@ const VIEWPORTS = [
   { label: '375x667', width: 375, height: 667 },
 ];
 
-const question = (page: Page) => page.locator('ion-modal.ep-confirm-dialog').last();
+/** «Discard changes?»: base's question (ConfirmDialog), on top of the window; the newest one (a closed one stays parked
+ *  hidden). Ionic moves its name and role into its shadow DOM, so it is found by its class and its words. */
+export const question = (page: Page): Locator => page.locator('ion-modal.ep-confirm-dialog').last();
+/** Its title, in either language. */
+export const QUESTION = /Discard changes\?|¿Descartar los cambios\?/;
+/** No question on screen. */
+export const noQuestion = (page: Page) => expect(page.locator('ion-modal.ep-confirm-dialog:visible')).toHaveCount(0);
 
 /** `shots` names the captures of the question (`<shots>-<app>-<size>`). */
 export async function expectBackAsksOnDirtyForm(page: Page, item: UnsavedFormCase, shots: string): Promise<void> {
@@ -48,7 +54,7 @@ export async function expectBackAsksOnDirtyForm(page: Page, item: UnsavedFormCas
     await pressBack(page);
     const asked = question(page);
     await expect(asked).toBeVisible();
-    await expect(asked).toContainText(/Discard changes\?|¿Descartar los cambios\?/);
+    await expect(asked).toContainText(QUESTION);
     await expect(form).toBeVisible();
     await capture(page, `${shots}-${item.app}-${viewport.label}`);
 
@@ -66,7 +72,7 @@ export async function expectBackAsksOnDirtyForm(page: Page, item: UnsavedFormCas
     await expect(field).toHaveValue('');
     await pressBack(page);
     await expect(form).toBeHidden();
-    await expect(page.locator('ion-modal.ep-confirm-dialog:visible')).toHaveCount(0);
+    await noQuestion(page);
   }
   if (process.env.E2E_SAVE_STORAGE_STATE) await page.context().storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 }
