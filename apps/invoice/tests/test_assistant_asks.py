@@ -141,7 +141,7 @@ OWN_WORDS = [
     (
         "es",
         "invoice.invoice.rectification_preview",
-        "¿cómo quedaría en negativo lo de Talleres Mercedes antes de hacerlo?",
+        "quiero ver antes cómo quedaría lo de Talleres Mercedes si lo corrijo",
     ),
     ("es", "invoice.refund.get", "del reintegro de ayer a Mercedes, ¿qué número le salió?"),
     ("es", "invoice.issuer.get", "¿qué CIF y domicilio figuran como nuestros en lo que emitimos?"),
