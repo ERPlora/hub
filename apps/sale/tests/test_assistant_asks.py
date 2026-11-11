@@ -14,7 +14,7 @@ from live.operations import registry
 
 from apps.sale.tests.conftest import ctx_for
 from base import assistant
-from base.tests.test_assistant_asks import assert_its_asks_bring
+from base.tests.test_assistant_asks import assert_its_asks_bring, comparable, probe_phrases
 
 LANGUAGES = ("en", "es")
 #: The phrases of sale's tools put to the turn at least, both languages together: a silent drop of asks fails.
@@ -41,8 +41,17 @@ def test_what_the_employee_may_not_do_is_not_in_their_catalogue():
     assert "sale.sale.void" in employee
 
 
+#: The owner's requests of layer 2 that were not offered their tool (hub#1183), word for word as the probes of
+#: ``tests/e2e/qa/probes/owner-es-sale-2026-11-08.json`` say them: the record named by its bare name («Chuches QA»),
+#: what the asks of each tool bring among the first ten.
+LAYER_2 = [
+    ("es", "sale.department.update", "renombra Chuches QA como Golosinas QA y déjala la primera de la lista"),
+    ("es", "sale.quick_note.update", "donde pone «Sin cilantro QA» escribe mejor «Nada de cilantro QA»"),
+]
+
 #: The requests of the QA of hub#1085, each as a person says it: a record of the QA's data names what it is («the
-#: QA Sweets section»), as no selection knows a bare name («Chuches QA») without the business's data.
+#: QA Sweets section»), as no selection knows a bare name («Chuches QA») without the business's data; and the probes
+#: of ``LAYER_2``, said as they are.
 QA_PROBES = [
     ("es", "sale.order.split", "Pasa el cruasán de Cuenta QA a otra cuenta"),
     ("en", "sale.order.split", "Move the croissant from QA Check to another check"),
@@ -78,11 +87,19 @@ QA_PROBES = [
     ("en", "sale.sale.issue_documents", "Issue the pending documents"),
     ("es", "sale.sale.refund", "Devuelve 2 € de la venta"),
     ("en", "sale.sale.refund", "Refund 2 euros of the sale"),
-    ("es", "sale.department.update", "Renombra la sección Chuches QA a Golosinas QA y ordénala la primera"),
     ("en", "sale.department.update", "Rename the QA Sweets section to QA Candy and reorder it first"),
-    ("es", "sale.quick_note.update", "Renombra la nota Sin cilantro QA"),
     ("en", "sale.quick_note.update", "Rename the No cilantro QA note"),
+    *LAYER_2,
 ]
+
+
+def test_the_reported_requests_of_layer_2_are_its_probes_word_for_word():
+    """A paraphrase of a probe («Renombra la sección Chuches QA…») passed while the owner's own words were never
+    offered their tool (hub#1183): the cases of ``LAYER_2`` are the probes of their tool, as layer 2 says them."""
+    phrases = probe_phrases()
+    assert [phrases.get(comparable(phrase)) for _, _, phrase in LAYER_2] == [
+        f"qa20261108.owner.es.{name}" for _, name, _ in LAYER_2
+    ]
 
 
 @pytest.mark.django_db
@@ -94,18 +111,38 @@ def test_the_reported_sales_request_offers_its_existing_operation(language, name
     assert name in offered[:10]
 
 
-#: Undoing a line's voucher in words that are no ask nor probe: ``sale.order.remove_voucher``'s asks bring it among the
-#: first ten (with them, 4th in Spanish and 7th in English); without them it falls out (33rd, and out of the ones a turn
-#: offers). Its asks no longer say the QA's «quita el bono de la línea» with one word changed (hub#1135).
+#: Requests in words that are no ask nor probe, each brought among the first ten by its tool's asks and out of them
+#: without: undoing a line's voucher (``sale.order.remove_voucher``, whose asks no longer say the QA's «quita el bono de
+#: la línea» with one word changed, hub#1135); and, for ``sale.department.update`` and ``sale.quick_note.update``
+#: (hub#1183), one for each of their asks in each language, which falls out without that ask alone (it shares two of
+#: its stems at most, and fewer than half of its own), and the English twins of the probes of ``LAYER_2``.
 OWN_WORDS = [
     ("es", "sale.order.remove_voucher", "no lo uses en esta cuenta, mejor lo guarda"),
     ("en", "sale.order.remove_voucher", "she would rather not use it on the haircut"),
+    ("en", "sale.department.update", "soft drinks belong on the standard band"),
+    ("en", "sale.department.update", "the Misc heading would look better as Others"),
+    ("en", "sale.department.update", "rename Sweets as Candy and put it first in the list"),
+    ("en", "sale.department.update", "sweets are cheaper on VAT"),
+    ("en", "sale.department.update", "rename Sweets to Candy and leave it first on the list"),
+    ("es", "sale.department.update", "los refrescos y demás bebidas, que paguen el tipo general"),
+    ("es", "sale.department.update", "«Varios» mejor como «Otros», que suena más claro"),
+    ("es", "sale.department.update", "la bollería casera, la primera de todas, junto al mostrador"),
+    ("es", "sale.department.update", "que las chuches tributen menos"),
+    ("en", "sale.quick_note.update", "the salt one: low sodium, as the doctor asked"),
+    ("en", "sale.quick_note.update", "our ice one has to sit right at the top, above the rest"),
+    ("en", "sale.quick_note.update", "the lactose one would be clearer as 'dairy free' instead"),
+    ("en", "sale.quick_note.update", "swap 'spicy' for 'a bit spicy'"),
+    ("en", "sale.quick_note.update", "where it says 'No cilantro' write 'No coriander' instead"),
+    ("es", "sale.quick_note.update", "lo de la sal ponlo más suave"),
+    ("es", "sale.quick_note.update", "lo del hielo tiene que salir el primero cuando apunto bebidas frías"),
+    ("es", "sale.quick_note.update", "que en la de los frutos secos diga «trazas»"),
+    ("es", "sale.quick_note.update", "en la de «sin trigo», escribe «sin harina»"),
 ]
 
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(("language", "name", "phrase"), OWN_WORDS)
-def test_a_voucher_undone_in_the_persons_own_words_reaches_its_tool_by_its_asks(language, name, phrase):
+def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(language, name, phrase):
     assert_its_asks_bring(assistant.catalog(ctx_for("hub_owner", language=language)), name, phrase, language)
 
 
