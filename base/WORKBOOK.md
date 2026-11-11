@@ -2604,7 +2604,9 @@ Pasos:
      «21:30»); un valor de una lista cerrada, con el nombre que le da su app («Mostrador», no el valor interno),
      también el de un dato que su app no llama como el campo que lo nombra («Rectificativa: resto de causas (R4)», no «R4»); y
      un registro, por su nombre cuando su app deja leerlo a quien pregunta («Persona: Eva Gil»): si no, la tarjeta
-     no lo pone, nunca por su código. Tampoco pone la clave con que su app evita hacer dos veces lo mismo si se
+     no lo pone, nunca por su código. Un registro que se dijo con palabras se busca como lo buscará la acción, también
+     dentro de otro (un plato dentro de su menú), y sale el que encuentra («Plato: Postres caseros» cuando se dijo
+     «postres»); si esas palabras valen para varios o para ninguno, salen tal como se dijeron. Tampoco pone la clave con que su app evita hacer dos veces lo mismo si se
      reintenta (cobrar, enviar un WhatsApp, imprimir): nadie puede juzgarla, y la acción la recibe igual al
      ejecutarse. Todo sale en el idioma de la persona, también el nombre de cada dato
      cuando la tarjeta lo pone en su línea (BASE-F98): el mismo con que lo llama su app, nunca un nombre

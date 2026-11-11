@@ -358,7 +358,10 @@ varios grupos o para ninguno, no sale ninguna tarjeta: el asistente oye ««sals
 Salsas picantes. Di cuál.» y pregunta cuál, o «Este grupo no existe.». El «sí» vale solo para lo que enseñó la
 tarjeta: si antes de confirmar alguien crea un grupo que encaja mejor con lo dicho («Salsa» cuando la tarjeta decía
 «Salsas picantes»), no se toca nada y sale la tarjeta nueva. Al añadir una opción a un grupo o al aplicarlo dicho por
-su nombre, el grupo todavía sale como se dijo, y una opción dicha por su nombre también (hub#1245).
+su nombre, la tarjeta enseña igual el grupo que encontró y el «sí» vale solo para él; si lo dicho vale para varios
+grupos, la tarjeta lo enseña tal como se dijo y la acción pregunta cuál. Una opción dicha por su nombre sale como la
+encuentra, con su grupo («Opción: Alioli (Salsas picantes)» cuando se dijo «ali»), o tal como se dijo si vale para
+varias (hub#1245).
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -519,11 +522,12 @@ cajero del producto actual es un empleado.
   de dibujar la tarjeta, el turno busca el registro como lo hará la escritura, un nombre que encaja con varios grupos o
   con ninguno vuelve al modelo, y la huella de la tarjeta lleva el id de lo encontrado, así que el «sí» vale solo para
   ello (hub#1208, hub#1218; `tests/test_assistant_yes_for_its_card.py`, con el trinquete de las escrituras que
-  comprueban y las que leen el grupo por su nombre). El `group` de `_OwningGroup` y de `LinkIn`
-  (`modifier.option.create`, `modifier.link.attach`) no lleva marca: no hay lectura cuya entrada quepa en la suya
-  (`base.E012`), y sin `check` un nombre que vale para varios grupos dejaría el grupo fuera de la tarjeta; ni la lleva
-  el `option` dicho por su nombre, que necesita su grupo para encontrarse. Tres casos en `xfail(strict=True)` en ese
-  mismo fichero (hub#1245). Con ese `check`, `modifier.link.detach` por el asistente rechaza antes de la tarjeta un
+  comprueban y las que leen el grupo o la opción por su nombre). La marca lleva `as_said` (`base.schemas.names`,
+  hub#1245): lo que no se puede leer (vale para varios, para ninguno, sin persona) sale como se dijo, así que el
+  `group` de `_OwningGroup` y de `LinkIn` (`modifier.option.create`, `modifier.link.attach`, sin lectura cuya entrada
+  quepa en la suya, `base.E012`) también la lleva: su huella lleva el grupo encontrado y el «sí» vale solo para él. El
+  `option` dicho por su nombre se lee con su grupo (`AN_OPTION_BY_NAME`, `within` `group_id` y `group`). Con ese
+  `check`, `modifier.link.detach` por el asistente rechaza antes de la tarjeta un
   enganche a algo borrado (`modifier.link.get` solo lee `LIVE_LINK`); la operación lo sigue soltando por su id. Y un
   registro que llega por su id junto al nombre de otro grupo enseña los dos grupos en la tarjeta, porque la marca lee
   un nombre que la escritura no usa: otro caso en `xfail(strict=True)` (hub#1250).

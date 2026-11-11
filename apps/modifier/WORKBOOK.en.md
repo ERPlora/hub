@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7b519c112224d83d4e7b32cc34972e81bc8144d8317cb95dbff47240c58a3e4a -->
+<!-- generated from WORKBOOK.md sha256:c2fc5c630c91ce2d4ad5aba4e1e6bbcbd399c019e1b319e59172ffb2b62b9d8b -->
 
 ## What it is for and who it is for
 
@@ -348,7 +348,10 @@ was said fits several groups or none, no card comes up: the assistant hears "«s
 sauces, Sweet sauces. Say which one." and asks which one, or "This group does not exist.". The "yes" counts only for
 what the card showed: if, before confirming, someone creates a group that fits better what was said ("Sauce" when the
 card said "Spicy sauces"), nothing is touched and the new card comes up. When adding an option to a group or applying
-it said by its name, the group still comes up as it was said, and so does an option said by its name (hub#1245).
+it said by its name, the card shows the group it found all the same and the "yes" counts only for it; if what was said
+fits several groups, the card shows it as it was said and the action asks which one. An option said by its name comes
+up as it is found, with its group ("Option: Aioli (Spicy sauces)" when "aio" was said), or as it was said if it fits
+several (hub#1245).
 
 ### What it offers: queries (they read, they change nothing)
 
