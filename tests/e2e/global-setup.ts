@@ -213,8 +213,10 @@ function assertSingleWorker(workers: number): void {
 
 /** What `run_worker` logs once it registered the apps and scheduled their tasks (`base/worker.py`). */
 export const WORKER_READY = 'worker: waiting for work';
-/** How long the worker gets to register the apps in the SaaS and schedule their tasks. */
-export const WORKER_START_TIMEOUT_MS = 60_000;
+/** How long the worker gets to register the apps in the SaaS and schedule their tasks. A loaded machine (load average
+ *  50–90, swapping) took about 3 min just to import Django, silent until then (hub#759); a worker that dies or cannot
+ *  start stops the run at once, so this only bounds one that hangs alive. */
+export const WORKER_START_TIMEOUT_MS = 5 * 60_000;
 /** How much of the worker's output a failure quotes. */
 const WORKER_OUTPUT_TAIL = 4_000;
 
@@ -277,6 +279,11 @@ export function startWorker(
     worker.once('exit', (code) => {
       clearTimeout(timer);
       reject(new Error(`The ${where} exited with ${code ?? 'a signal'} before it waited for work:\n${said()}`));
+    });
+    // A fork that fails (EAGAIN on a loaded machine, `uv` missing) emits 'error' and never 'exit'.
+    worker.once('error', (error) => {
+      clearTimeout(timer);
+      reject(new Error(`The ${where} could not start: ${error.message}`));
     });
   });
 }
