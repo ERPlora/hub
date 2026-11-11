@@ -325,12 +325,12 @@ def get_group(ctx: OperationContext, data: GroupRefIn) -> dict:
         "the list of what a group applies to names it.",
         "asks": {
             "en": (
-                "which category is Pizzas when it takes add-ons?",
-                "find the Sandwiches category the extras apply to",
+                "how is Pizzas named when it takes add-ons?",
+                "find Sandwiches to hang extras on it",
             ),
             "es": (
-                "¿cuál es la familia Pizzas que lleva suplementos?",
-                "¿qué familia de suplementos es Bocadillos?",
+                "¿cómo se identifica Bocadillos al colgarle suplementos?",
+                "busca Pizzas, la de los extras",
             ),
         },
     },

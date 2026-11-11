@@ -105,8 +105,6 @@ OWN_WORDS = [
 #: A request with «predeterminada» that is no ask nor probe: the option a group brings chosen is its default
 #: (``is_default``), as the descriptions say in English; without the Hub reading the word so, it is no tool's datum.
 BY_DEFAULT = "la salsa de la casa ya no tiene que salir como predeterminada"
-#: The places an ask of another app keeps free below the first ten: the asks of the next app to say its own take them.
-ROOM = 2
 
 
 @pytest.fixture
@@ -121,11 +119,13 @@ def catalog_of(make_user):
     return of
 
 
-def offered_place(tools: dict[str, Operation], name: str, phrase: str, synonyms=assistant.SYNONYMS) -> int | None:
-    """The place a turn in Spanish offers ``name`` at for ``phrase`` (1 is first), ``None`` when it is not offered; with
-    the Hub's ``synonyms`` unless others are given."""
+def offered_place(
+    tools: dict[str, Operation], name: str, phrase: str, synonyms=assistant.SYNONYMS, language: str = "es"
+) -> int | None:
+    """The place a turn in ``language`` offers ``name`` at for ``phrase`` (1 is first), ``None`` when it is not offered;
+    with the Hub's ``synonyms`` unless others are given."""
     ranking = {**assistant.RANKING, "synonyms": synonyms}
-    offered = [op.name for op in shared.relevant(tools, [phrase], "es", **ranking)]
+    offered = [op.name for op in shared.relevant(tools, [phrase], language, **ranking)]
     return offered.index(name) + 1 if name in offered else None
 
 
@@ -251,12 +251,21 @@ def test_a_request_with_predeterminada_reaches_the_change_of_an_option_by_the_hu
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@pytest.mark.parametrize("language", ["en", "es"])
 @pytest.mark.parametrize("role", [OWNER, ADMIN, MANAGER])
-def test_renaming_a_category_of_inventory_takes_no_place_from_the_category_modifiers_look_up(catalog_of, role):
-    """``modifier.category.get`` names a category of Inventory, so its asks say «familia» and «category»: Inventory's
-    asks to change a category keep their room below the first ten (``inventory.category.update`` fell from the 7th to
-    the 8th when Modifiers said its asks)."""
-    tools = catalog_of(role, "es")
-    asks = shared.asks_of(tools["inventory.category.update"])["es"]
-    places = {ask: offered_place(tools, "inventory.category.update", ask) for ask in asks}
-    assert {ask: place for ask, place in places.items() if place is None or place > TOP - ROOM} == {}
+def test_changing_a_category_of_inventory_comes_before_the_category_modifiers_look_up(catalog_of, role, language):
+    """``modifier.category.get`` finds a category of Inventory by its name: the category is its thing, so its asks never
+    say «familia», «categoría» nor «category», and Inventory's asks to change a category keep it below them. Said in its
+    asks, «renombra la categoría Bebidas a Refrescos» put it above ``inventory.category.update`` (7th to 8th, and 9th
+    with the category reads of Services): live reads «renombra» as a rename, which no tool of Inventory is."""
+    tools = catalog_of(role, language)
+    asks = shared.asks_of(tools["inventory.category.update"])[language]
+    assert "modifier.category.get" in tools  # positive control: the lookup is in the catalogue, so its place is known
+    places = {
+        ask: (
+            offered_place(tools, "inventory.category.update", ask, language=language),
+            offered_place(tools, "modifier.category.get", ask, language=language),
+        )
+        for ask in asks
+    }
+    assert {ask: (own, lookup) for ask, (own, lookup) in places.items() if lookup is not None and lookup < own} == {}
