@@ -78,11 +78,9 @@ def test_a_turn_streams_the_answer_of_the_gateway(client, make_user, gateway):
 
 def test_a_write_the_model_asked_for_comes_as_a_card_and_the_gateway_waits(client, make_user, gateway):
     client.force_login(make_user("ana", host="a", role="hub_manager"))
-    call = {"call_id": "c1", "name": "demo__item__create", "arguments": '{"name": "Mesa 4"}'}
-    asked = {"role": "assistant", "content": "", "tool_calls": [
-        {"id": "c1", "type": "function", "function": {"name": "demo__item__create", "arguments": '{"name": "Mesa 4"}'}}
-    ]}
-    got = frames(post(client, "/assistant/turn", {"messages": [ASK, asked], "pending": [call], "continuation": "tok"}))
+    body = _create_turn()
+    [call] = body["pending"]
+    got = frames(post(client, "/assistant/turn", {key: value for key, value in body.items() if key != "decision"}))
     assert [frame["type"] for frame in got] == ["confirm", "done"]
     assert got[0]["card"]["operation"] == "demo.item.create"
     # hub#1208: the call its card waits on comes with the fingerprint of what the card showed, in the card's frame and
@@ -97,13 +95,9 @@ def test_a_write_the_model_asked_for_comes_as_a_card_and_the_gateway_waits(clien
 
 def test_the_yes_runs_it_and_the_turn_goes_on_with_its_result(client, make_user, gateway):
     client.force_login(make_user("ana", host="a", role="hub_manager"))
-    call = {"call_id": "c1", "name": "demo__item__create", "arguments": '{"name": "Mesa 4"}'}
-    asked = {"role": "assistant", "content": "", "tool_calls": [
-        {"id": "c1", "type": "function", "function": {"name": "demo__item__create", "arguments": '{"name": "Mesa 4"}'}}
-    ]}
-    body = _answering_its_card(client, {"messages": [ASK, asked], "pending": [call], "continuation": "tok"})
+    body = _answering_its_card(client, _create_turn())
     gateway.turn({"type": "text_delta", "text": "Hecho."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
-    got = frames(post(client, "/assistant/turn", {**body, "decision": {"call_id": "c1", "accepted": True}}))
+    got = frames(post(client, "/assistant/turn", body))
     assert [frame["type"] for frame in got] == ["executed", "text", "done"]
     assert (got[0]["name"], got[0]["outcome"]) == ("demo.item.create", "ok")
     result, answer = got[-1]["append"]

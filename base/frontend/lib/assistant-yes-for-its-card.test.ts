@@ -30,14 +30,20 @@ function scripted(...answers: TurnFrame[][]) {
   return { post, bodies };
 }
 
+/** The panel of the Hub's turn `post`, after «elimina mesa»: waiting on the card of its first answer. */
+async function waitingOnItsCard(post: ReturnType<typeof scripted>['post']) {
+  const assistant = createAssistant({ post, storage: memoryStorage(), openStorage: memoryStorage() });
+  assistant.forUser('u1');
+  await assistant.ask('elimina mesa');
+  return assistant;
+}
+
 describe('the yes goes with what its card showed (hub#1208)', () => {
   it('gives back the call its card waits on as the turn gave it, its fingerprint included', async () => {
     const { post, bodies } = scripted(cardFrames('Mesa 4', shown('a'.repeat(64))), [
       { type: 'done', append: [], pending: [], continuation: null },
     ]);
-    const assistant = createAssistant({ post, storage: memoryStorage(), openStorage: memoryStorage() });
-    assistant.forUser('u1');
-    await assistant.ask('elimina mesa');
+    const assistant = await waitingOnItsCard(post);
 
     await assistant.decide(true, 'CONFIRMAR');
 
@@ -51,9 +57,7 @@ describe('the yes goes with what its card showed (hub#1208)', () => {
       cardFrames('Mesa', shown('b'.repeat(64))),
       [{ type: 'done', append: [], pending: [], continuation: null }],
     );
-    const assistant = createAssistant({ post, storage: memoryStorage(), openStorage: memoryStorage() });
-    assistant.forUser('u1');
-    await assistant.ask('elimina mesa');
+    const assistant = await waitingOnItsCard(post);
 
     await assistant.decide(true, 'CONFIRMAR');
 
