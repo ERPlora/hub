@@ -7,8 +7,9 @@ la espera que pide la AEAT. Lo que no puede salir espera en la cola y sale solo;
 registro nuevo. Solo para negocios de España (Canarias, Ceuta y Melilla incluidas); fuera, se porta como apagada.
 
 - **Estado**: completa (2026-10-27): 31 de los 35 flujos `VERIFACTU-F01` … `F35` están `hecho`; F07, F23 y F33,
-  `descartado` con su motivo (y las claves `G` del registro de migración, también `descartado`), y F18, `parcial`
-  por ERPlora/app#20 (cerrada el 2026-11-04 por ERPlora/app#21; el WORKBOOK aún lo da por `parcial`).
+  `descartado` con su motivo (y las claves `G` del registro de migración, también `descartado`), y F18, `parcial`:
+  falta cotejar un registro en la app instalada, que abre la sede de la AEAT desde la 1.1.34 (ERPlora/app#20,
+  cerrada el 2026-11-04 por ERPlora/app#21).
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta
   «Para quien lo mantiene»). Lo que se cambie de la app se cambia antes allí.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md).

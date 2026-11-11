@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Picks the environment a run of deploy.yml or rollback.yml works on, from its branch: main → prod,
-# pre → pre (the team's pre-production, pre.erplora.com; aws-next README, "Contrato"). Writes to
+# pre → pre (the team's pre-production, pre.erplora.com; ERPlora/aws README, "Contrato"). Writes to
 # $GITHUB_OUTPUT:
 #   environment     prod | pre
 #   ecr_repository  erplora/<project> | erplora/<project>-pre (pre has repositories of its own, so its
@@ -69,7 +69,7 @@ else
 fi
 role_arn="${!role_variable:-}"
 if [ -z "$role_arn" ]; then
-  fail "empty repository variable $role_variable, the deploy role of $environment (aws-next README)"
+  fail "empty repository variable $role_variable, the deploy role of $environment (ERPlora/aws README)"
 fi
 
 {

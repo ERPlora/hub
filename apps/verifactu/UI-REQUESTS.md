@@ -4,11 +4,11 @@ Lo que la app necesita del submódulo `packages/ui` y no puede añadir ella mism
 no llegue, la app usa lo indicado en «Mientras tanto».
 
 **Al cerrar la app** (CLOSE-VERIFACTU, 2026-10-27), contra `ERPlora/ui` `origin/main` defc6c0:
-`ion:shield-checkmark-outline` ya está registrado en `src/shell/icons.ts` (ui#34) y sale de esta lista: la app lo pinta
-desde este cierre (hub#281) en su icono, Recuperación, el paso y el panel del Inicio. Lo demás no ha llegado, todo tiene
-sustituto en uso y ningún flujo está roto. Queda propuesto para `## 6` de `MIGRATION.md` como
-`verifactu:ui-icons`, `verifactu:ui-money-format`, `verifactu:ui-page-tabs`, `verifactu:ui-format-moment` y
-`verifactu:ui-file-drop`.
+`ion:shield-checkmark-outline` ya está registrado en `src/shell/icons.ts` (ui#34) y sale de esta lista: la app lo
+pinta desde este cierre (hub#281) en su icono, Recuperación, el paso y el panel del Inicio. Lo demás no ha llegado,
+todo tiene sustituto en uso y ningún flujo está roto. Queda propuesto para `## 6` de `archive/migration/MIGRATION.md`
+de `ERPlora/erplora-next` como `verifactu:ui-icons`, `verifactu:ui-money-format`, `verifactu:ui-page-tabs`,
+`verifactu:ui-format-moment` y `verifactu:ui-file-drop`.
 
 | Petición | Para qué | Mientras tanto |
 |---|---|---|

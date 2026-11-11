@@ -1789,8 +1789,6 @@ Resueltas en los planes, y fuera de esta lista:
 
 ### Lo que queda fuera
 
-- **Una traducción al español marcada «fuzzy» sale en inglés y el test de traducciones no lo ve**, hub#569.
-- **La tarjeta de confirmación del asistente no dice qué registro toca una escritura**, hub#571.
 - **Los iconos de WhatsApp, Enviar y los adjuntos, y el hilo de chat compartido**: siguen pedidos a `@erplora/ui`
   ([`UI-REQUESTS.md`](UI-REQUESTS.md)).
 - **Relacionada, de otras apps**: el Inicio no dice de un vistazo si WhatsApp funciona (hub#573, BASE-F02): pide
