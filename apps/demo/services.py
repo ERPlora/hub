@@ -16,7 +16,7 @@ from live.outbox import record_event
 from apps.demo import events
 from apps.demo.models import Item, ItemLine
 from apps.demo.queries import ITEM_NOT_FOUND, load_detail
-from apps.demo.schemas import ByIdIn, DeletedOut, ItemDetailOut, ItemIn, ItemPatchIn, LineIn
+from apps.demo.schemas import DeletedOut, ItemDetailOut, ItemIn, ItemPatchIn, ItemRefIn, LineIn
 
 ITEM_DONE = _("This item is closed: open it to add lines.")
 
@@ -91,7 +91,7 @@ def update_item(ctx: OperationContext, data: ItemPatchIn) -> Item | None:
     kind="command",
     repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="demo.manage",
-    input=ByIdIn,
+    input=ItemRefIn,
     output=DeletedOut,
     ai={
         "description": "Deletes a demo item, by its id, together with all its lines. It cannot be undone.",
@@ -108,7 +108,7 @@ def update_item(ctx: OperationContext, data: ItemPatchIn) -> Item | None:
         },
     },
 )
-def delete_item(ctx: OperationContext, data: ByIdIn) -> dict:
+def delete_item(ctx: OperationContext, data: ItemRefIn) -> dict:
     _locked(data.id).delete()
     record_event(ctx, events.ITEM_DELETED, {"id": str(data.id)})
     return {"id": data.id}

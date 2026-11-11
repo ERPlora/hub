@@ -1,14 +1,12 @@
 """What layer 1 of the assistant's QA does not say of Demo (docs plan 2026-10-31, the assistant's knowledge and QA, §3):
 how many tools it offers, what an employee is never offered, and that the requests of the real-model QA (hub#1095), in
-the words each role said them, are offered their existing operation, and with it the read that finds the item by its
-name.
+the words each role said them, are offered their existing operation, which takes the item by its name too (hub#1162).
 
 Every ask of every tool of demo bringing its tool among the first ten, role by role, in both languages, is
 ``base/tests/test_assistant_asks.py``'s (demo is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over the
 asks and the guard that no ask copies a probe of layer 2.
 """
 
-import dataclasses
 import json
 from pathlib import Path
 
@@ -21,7 +19,7 @@ from live.operations import AI, Operation, registry
 from base import assistant
 from base.models import Membership
 from base.permissions import permissions_for
-from base.tests.test_assistant_asks import comparable, probe_phrases
+from base.tests.test_assistant_asks import assert_its_asks_bring, comparable, probe_phrases
 
 A = Scope("host", "a")
 OWNER, EMPLOYEE = Membership.Role.OWNER, Membership.Role.EMPLOYEE
@@ -55,16 +53,12 @@ REPORTED = [
     ),
     (EMPLOYEE, "demo.item.open_count", "¿cuántos ejemplos siguen abiertos ahora?"),
 ]
-#: The read that finds an item by its name (``search``): every tool but the list and the counts takes the item's id, so
-#: a request that names the item is offered the list beside its tool, never left to ask the person for the id.
+#: The read that finds an item by a piece of its name (``search``): a request that names the item as «el elemento …» is
+#: offered it beside its tool.
 BY_NAME = "demo.item.list"
+#: The tools on one item: they take it by its id or by its name (``ItemRefIn``), so a request that names the item by its
+#: own name alone («elimina Ejemplo QA…»), with no word of Demo's that would bring the list, acts on it (hub#1162).
 NAMES_AN_ITEM = {"demo.item.detail", "demo.item.update", "demo.item.delete", "demo.item.add_line"}
-#: A request that names its item by the item's own name alone («elimina Ejemplo QA…»), with no word that says it is
-#: an item, is offered its tool but not the list: nothing in its words is Demo's, so only a write that takes the item by
-#: its name too (as the Hub's catalogues do: a group, a tag, a drawer, a menu) acts on it from the chat (hub#1162).
-BY_ITS_NAME_ALONE = pytest.mark.xfail(
-    strict=True, reason="ERPlora/hub#1162: an item said by its own name alone names nothing of Demo's"
-)
 
 #: How far down the tools a turn offers (``MAX_TOOLS``, 40) a probe of the QA may bring its tool: half of them, so
 #: twenty tools of the apps that say their asks later may climb past it before the model loses it.
@@ -97,22 +91,10 @@ def offered_to(tools: dict[str, Operation], phrase: str) -> list[str]:
     return [op.name for op in assistant.relevant(tools, [phrase], "es")]
 
 
-def place_in(tools: dict[str, Operation], name: str, phrase: str) -> int | None:
-    """The place a turn offers ``name`` at for ``phrase`` (1 is first), ``None`` when it is not offered at all."""
-    offered = offered_to(tools, phrase)
-    return offered.index(name) + 1 if name in offered else None
-
-
 def is_own_words(tools: dict[str, Operation], phrase: str) -> bool:
     """Whether ``phrase`` is neither an ask in Spanish of any tool of ``tools`` nor a probe of layer 2."""
     asks = {comparable(ask) for op in tools.values() for ask in shared.asks_of(op).get("es", ())}
     return comparable(phrase) not in asks | set(probe_phrases())
-
-
-def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
-    """``tools`` with ``name`` saying no asks: how a turn ranks it by its name and description alone."""
-    op = tools[name]
-    return {**tools, name: dataclasses.replace(op, ai={key: value for key, value in op.ai.items() if key != "asks"})}
 
 
 def test_demo_offers_at_least_8_tools():
@@ -178,15 +160,7 @@ OWN_WORDS = [
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
 def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    tools = catalog_of(OWNER, "es")
-    assert name in tools  # positive control: the owner holds the tool, so its place is known
-    assert is_own_words(tools, phrase)
-    place = place_in(tools, name, phrase)
-    assert place is not None and place <= TOP, place
-    before = without_its_asks(tools, name)
-    assert not shared.asks_of(before[name])  # positive control: the tool is ranked without its asks
-    unasked = place_in(before, name, phrase)
-    assert unasked is None or unasked > TOP, unasked
+    assert_its_asks_bring(catalog_of(OWNER, "es"), name, phrase, "es")
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
@@ -211,33 +185,42 @@ def test_the_reported_demo_request_offers_its_existing_operation(catalog_of, rol
     assert name in offered, (len(offered), offered[:10])
 
 
-#: Every probe of layer 2 whose tool takes the item's id, as its role said it: the ones that say «elemento» are offered
-#: the list that finds the item; the ones that name it by its own name alone wait for hub#1162.
+#: Every probe of layer 2 whose tool acts on one item, as its role said it: all but the owner's detail («enséñame el
+#: elemento «Ejemplo QA»…») name the item by its own name alone, and none is offered the list that finds it.
 NAMING_PROBES = [
-    pytest.param(
-        PROBE_ROLE[probe["role"]],
-        probe["phrase"],
-        id=probe["id"],
-        marks=() if probe["id"] == "qa20261108.owner.es.demo.item.detail" else BY_ITS_NAME_ALONE,
-    )
+    pytest.param(PROBE_ROLE[probe["role"]], probe["tool"], probe["phrase"], id=probe["id"])
     for probe in OFFERED_PROBES
     if probe["tool"] in NAMES_AN_ITEM
 ]
 
 
-def test_the_probes_that_name_an_item_are_the_four_tools_by_its_id_of_both_roles():
+def test_the_probes_that_name_an_item_are_the_four_tools_on_an_item_of_both_roles():
     """Positive control of the parametrization below: the owner's four and the employee's two (detail, a line)."""
-    assert len(NAMING_PROBES) == 6
-    assert sum(not case.marks for case in NAMING_PROBES) == 1
+    assert sorted(case.values[1] for case in NAMING_PROBES) == [
+        "demo.item.add_line", "demo.item.add_line", "demo.item.delete", "demo.item.detail", "demo.item.detail",
+        "demo.item.update",
+    ]
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
-@pytest.mark.parametrize(("role", "phrase"), NAMING_PROBES)
-def test_a_probe_that_names_an_item_is_offered_the_read_that_finds_it(catalog_of, role, phrase):
+@pytest.mark.parametrize(("role", "name", "phrase"), NAMING_PROBES)
+def test_a_probe_that_names_an_item_is_offered_its_tool_which_takes_the_item_by_its_name(catalog_of, role, name, phrase):
+    """The tool the probe is offered takes the item as the person said it, so the model sends «Ejemplo QA» and never
+    asks for the item's id, whether or not the list that finds it comes beside it."""
     tools = catalog_of(role, "es")
-    assert BY_NAME in tools  # positive control: the role holds the list
     offered = offered_to(tools, phrase)
-    assert BY_NAME in offered, (len(offered), offered[:10])
+    assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:10])
+    parameters = shared.tool_spec(tools[name])["parameters"]
+    assert "item" in parameters["properties"] and "id" in parameters["properties"]
+    assert not {"id", "item"} & set(parameters.get("required", ()))
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+def test_the_owners_probe_that_says_elemento_is_offered_the_list_that_finds_it_too(catalog_of):
+    """«enséñame el elemento «Ejemplo QA»…»: the Hub's «elemento» brings the list beside the detail (positive control of
+    the one above: what it no longer needs, a turn still offers when the person's words say it)."""
+    [phrase] = [case.values[2] for case in NAMING_PROBES if case.id == "qa20261108.owner.es.demo.item.detail"]
+    assert BY_NAME in offered_to(catalog_of(OWNER, "es"), phrase)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role

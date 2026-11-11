@@ -6,11 +6,14 @@ from decimal import Decimal
 
 import pytest
 from django.utils import timezone
-from live.errors import NotFound, PermissionDenied
+from live.context import Scope
+from live.errors import Conflict, NotFound, PermissionDenied
 from live.operations import get
 
 from apps.demo.models import Item, ItemLine
-from apps.demo.schemas import ByIdIn, ItemCountOut, ItemDetailOut, ItemListIn, ItemPage, ItemStatsIn, ItemStatsOut
+from apps.demo.schemas import ItemCountOut, ItemDetailOut, ItemListIn, ItemPage, ItemRefIn, ItemStatsIn, ItemStatsOut
+from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
 
 from .conftest import ctx_for
 
@@ -40,7 +43,7 @@ def make(name, status="open", lines=0, minutes_ago=0):
     ("name", "permission", "input", "output", "expose_api"),
     [
         ("demo.item.list", "demo.view", ItemListIn, ItemPage, True),
-        ("demo.item.detail", "demo.view", ByIdIn, ItemDetailOut, False),
+        ("demo.item.detail", "demo.view", ItemRefIn, ItemDetailOut, False),
         ("demo.item.stats", "demo.manage", ItemStatsIn, ItemStatsOut, False),
         ("demo.item.open_count", "demo.view", ItemStatsIn, ItemCountOut, False),
     ],
@@ -105,7 +108,7 @@ def test_detail_with_its_lines_in_order():
     second = ItemLine.objects.create(item=item, text="Tea", qty=Decimal("2.500"), position=2)
     first = ItemLine.objects.create(item=item, text="Coffee", qty=Decimal("1"), position=1, client_line_id=uuid.uuid7())
 
-    detail = run("demo.item.detail", ByIdIn(id=item.id), "hub_employee")
+    detail = run("demo.item.detail", ItemRefIn(id=item.id), "hub_employee")
 
     assert (detail.id, detail.name, detail.line_count) == (item.id, "Table one", 2)
     assert [(line.id, line.text, line.qty, line.position, line.client_line_id) for line in detail.lines] == [
@@ -116,8 +119,81 @@ def test_detail_with_its_lines_in_order():
 
 def test_detail_of_a_missing_item_is_not_found():
     with pytest.raises(NotFound) as excinfo:
-        run("demo.item.detail", ByIdIn(id=uuid.uuid7()))
+        run("demo.item.detail", ItemRefIn(id=uuid.uuid7()))
     assert (excinfo.value.status, excinfo.value.code) == (404, "not_found")
+
+
+# An item by its name (hub#1162): the same name, in any case, before one that contains it; the first that fits decides.
+
+
+def named(said: str, role: str = "hub_employee"):
+    return run("demo.item.detail", ItemRefIn(item=said), role)
+
+
+def test_detail_by_its_name_whatever_its_case():
+    item = make("Autumn trial", lines=2)
+    make("Bar")
+    detail = named("autumn TRIAL")
+    assert (detail.id, detail.name, len(detail.lines)) == (item.id, "Autumn trial", 2)
+
+
+def test_detail_by_a_part_of_its_name_when_only_one_has_it():
+    item = make("Autumn trial")
+    make("Bar")
+    assert named("autumn").id == item.id
+
+
+def test_the_same_name_comes_before_one_that_contains_it():
+    trial = make("Trial", minutes_ago=5)
+    make("Trial 2", minutes_ago=1)  # more recently changed, and it contains «Trial» too
+    assert named("trial").id == trial.id
+
+
+def test_the_id_wins_over_the_name():
+    bar = make("Bar")
+    make("Autumn trial")
+    assert run("demo.item.detail", ItemRefIn(id=bar.id, item="Autumn trial")).id == bar.id
+
+
+def test_two_items_called_the_same_are_a_conflict_that_names_them():
+    """Item names are not unique: whoever asks is told which ones fit, never handed one of them."""
+    make("Autumn trial")
+    make("Autumn trial", status="done")
+    with pytest.raises(Conflict) as excinfo:
+        named("autumn trial")
+    assert (excinfo.value.status, excinfo.value.code) == (409, "demo.item_ambiguous")
+
+
+def test_several_that_contain_what_is_said_are_named_in_the_conflict():
+    make("Trial 1")
+    make("Trial 2")
+    make("Bar")
+    with pytest.raises(Conflict) as excinfo:
+        named("trial")
+    assert excinfo.value.code == "demo.item_ambiguous"
+    said = str(excinfo.value)
+    assert "Trial 1" in said and "Trial 2" in said and "Bar" not in said
+
+
+def test_a_name_no_item_has_is_not_found():
+    make("Bar")
+    with pytest.raises(NotFound) as excinfo:
+        named("Autumn trial")
+    assert (excinfo.value.status, excinfo.value.code) == (404, "not_found")
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.usefixtures("no_test_fallback")
+def test_a_name_of_another_business_names_nothing_here(hub_a, hub_b):
+    """Each business in its own database, as production: an item of A is not found by its name in B."""
+    in_a = ctx_for("hub_employee", Scope("host", hub_a.slug))
+    in_b = ctx_for("hub_employee", Scope("host", hub_b.slug))
+    with use_hub(hub_a):
+        item = Item.objects.create(name="Autumn trial")
+        assert get("demo.item.detail")(in_a, ItemRefIn(item="Autumn trial")).id == item.id  # positive control
+    with use_hub(hub_b):
+        with pytest.raises(NotFound):
+            get("demo.item.detail")(in_b, ItemRefIn(item="Autumn trial"))
 
 
 # demo.item.stats

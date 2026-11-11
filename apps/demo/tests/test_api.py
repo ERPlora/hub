@@ -150,6 +150,36 @@ def test_a_missing_or_malformed_id(admin_client):
     assert (malformed.status_code, set(malformed.json()["error"]["fields"])) == (422, {"id"})
 
 
+@pytest.mark.django_db
+def test_an_item_is_named_by_its_name_over_http(admin_client):
+    """hub#1162: the detail and the writes on an item take it by its name when its id is not known."""
+    item_id = post(admin_client, "/demo/items", {"name": "Autumn trial"}).json()["id"]
+    assert get(admin_client, "/demo/items/detail", item="autumn trial").json()["id"] == item_id
+    line = post(admin_client, "/demo/items/add_line", {"item": "Autumn trial", "text": "Screws", "qty": 3})
+    assert (line.status_code, line.json()["id"]) == (200, item_id)
+    deleted = post(admin_client, "/demo/items/delete", {"item": "Autumn trial"})
+    assert (deleted.status_code, deleted.json()) == (200, {"id": item_id})
+
+
+@pytest.mark.django_db
+def test_without_its_id_or_its_name_the_item_is_422_on_its_field(admin_client):
+    detail = get(admin_client, "/demo/items/detail")
+    assert (detail.status_code, set(detail.json()["error"]["fields"])) == (422, {"item"})
+    update = post(admin_client, "/demo/items/update", {"status": "done"})
+    assert (update.status_code, set(update.json()["error"]["fields"])) == (422, {"item"})
+
+
+@pytest.mark.django_db
+def test_a_name_two_items_share_is_409_and_one_none_has_404(admin_client):
+    for _ in range(2):
+        post(admin_client, "/demo/items", {"name": "Autumn trial"})
+    several = post(admin_client, "/demo/items/delete", {"item": "Autumn trial"})
+    assert (several.status_code, several.json()["error"]["code"]) == (409, "demo.item_ambiguous")
+    none = get(admin_client, "/demo/items/detail", item="Winter trial")
+    assert (none.status_code, none.json()["error"]["code"]) == (404, "not_found")
+    assert get(admin_client, "/demo/items").json()["total"] == 2
+
+
 # The whole CRUD
 
 

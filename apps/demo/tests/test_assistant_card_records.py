@@ -20,6 +20,7 @@ from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_services_assistant import asked, call
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
 SCREENS = {
@@ -198,3 +199,95 @@ def test_an_item_of_another_business_is_left_out(hub_a, hub_b):
         assert shown("demo.item.delete", {"id": str(item.id)}, ctx=in_a) == {"id": "Mesa 4"}  # positive control
     with use_hub(hub_b):
         assert shown("demo.item.delete", {"id": str(item.id)}, ctx=in_b) == {}
+
+
+# ── An item said by its name (hub#1162) ───────────────────────────────────────────────────────────────────────────────
+
+#: Each write of Demo and the datum of it that names an item by its name, when its id is not known.
+BY_ITS_NAME = [
+    ("demo.item.add_line", {"text": "Café", "qty": 1}),
+    ("demo.item.delete", {}),
+    ("demo.item.update", {"status": "done"}),
+]
+#: The request of the issue, the owner's probe of layer 2 (``qa20261108.owner.es.demo.item.delete``): the item said by
+#: its own name alone, with no word that says it is an item of Demo.
+DELETE_BY_ITS_NAME = "elimina Ejemplo QA junto con todas sus líneas; entiendo que no se puede deshacer"
+
+
+def owner_in(language: str = "es") -> OperationContext:
+    return dataclasses.replace(ctx_for("hub_owner"), language=language)
+
+
+def turn_of(ctx: OperationContext, said: str, write: dict, decision: dict | None = None) -> dict:
+    """``base.assistant.turn`` after the model asked for ``write`` on the person's request ``said``."""
+    op = get("base.assistant.turn")
+    data = {"messages": [{"role": "user", "content": said}, asked(write)], "pending": [write], "decision": decision}
+    return op(ctx, op.input.model_validate(data)).model_dump(mode="json")
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("write", "rest"), BY_ITS_NAME)
+def test_a_write_on_an_item_said_by_its_name_says_the_item_it_finds(write, rest):
+    """The card reads the item by what was said, as the write will find it: the item's own name, even when only part
+    of it was said, under the word its screen calls one."""
+    Item.objects.create(name="Mesa 4")
+    Item.objects.create(name="Barra")
+    for language in ("es", "en"):
+        field = fields_of(write, {"item": "mesa", **rest}, language)["item"]
+        assert (field["value"], field["label"]) == ("Mesa 4", SCREENS[language]["detail"]["title"]), (write, language)
+
+
+@pytest.mark.django_db
+def test_an_employee_who_sees_the_items_is_told_which_one_by_its_name():
+    Item.objects.create(name="Mesa 4")
+    assert shown("demo.item.add_line", {"item": "Mesa 4"}, ctx=ctx_for("hub_employee")) == {"item": "Mesa 4"}
+    assert shown("demo.item.add_line", {"item": "Mesa 4"}, ctx=without("demo.view")) == {}
+
+
+@pytest.mark.django_db
+def test_the_item_of_the_issue_said_by_its_own_name_alone_gets_its_card_and_goes_with_the_yes():
+    """«elimina Ejemplo QA junto con todas sus líneas»: the model sends the name it heard, never asks for the UUID; the
+    card says «Elemento: Ejemplo QA» and nothing is deleted until the person types the word."""
+    item = Item.objects.create(name="Ejemplo QA")
+    write = call("demo.item.delete", {"item": "Ejemplo QA"})
+
+    plan = turn_of(owner_in(), DELETE_BY_ITS_NAME, write)
+
+    card = plan["confirm"]
+    assert (card["operation"], card["risk"]) == ("demo.item.delete", "high")
+    assert [(field["name"], field["label"], field["value"]) for field in card["fields"]] == [
+        ("item", SCREENS["es"]["detail"]["title"], "Ejemplo QA")
+    ]
+    assert (plan["pending"], plan["executed"]) == ([write], [])
+    assert Item.objects.filter(pk=item.pk).exists()
+
+    yes = {"call_id": "c1", "accepted": True, "typed": card["confirm_word"]}
+    done = turn_of(owner_in(), DELETE_BY_ITS_NAME, write, decision=yes)
+
+    assert done["executed"][0]["outcome"] == "ok"
+    assert not Item.objects.filter(pk=item.pk).exists()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("write", "rest"), BY_ITS_NAME)
+def test_a_name_two_items_share_draws_no_card_and_the_model_hears_it(write, rest):
+    """Two items called the same: no card that would act on either; the model hears ``demo.item_ambiguous`` and asks
+    the person which one (BASE-G115: the data are checked before any card is drawn)."""
+    Item.objects.create(name="Ejemplo QA")
+    Item.objects.create(name="Ejemplo QA", note="the other one")
+    asked_for = call(write, {"item": "Ejemplo QA", **rest})
+
+    plan = turn_of(owner_in(), DELETE_BY_ITS_NAME, asked_for)
+
+    assert (plan["confirm"], plan["pending"]) == (None, [])
+    assert (plan["executed"][0]["outcome"], plan["executed"][0]["code"]) == ("error", "demo.item_ambiguous")
+    assert json.loads(plan["append"][0]["content"])["error"]["code"] == "demo.item_ambiguous"
+    assert Item.objects.count() == 2
+
+
+@pytest.mark.django_db
+def test_a_name_no_item_has_draws_no_card():
+    Item.objects.create(name="Barra")
+    plan = turn_of(owner_in(), DELETE_BY_ITS_NAME, call("demo.item.delete", {"item": "Ejemplo QA"}))
+    assert (plan["confirm"], plan["executed"][0]["code"]) == (None, "not_found")
+    assert Item.objects.count() == 1

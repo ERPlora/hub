@@ -10,7 +10,7 @@ from live.errors import NotFound
 from live.operations import operation
 
 from apps.demo.models import Item, ItemLine
-from apps.demo.schemas import ByIdIn, ItemCountOut, ItemDetailOut, ItemListIn, ItemPage, ItemStatsIn, ItemStatsOut
+from apps.demo.schemas import ItemCountOut, ItemDetailOut, ItemListIn, ItemPage, ItemRefIn, ItemStatsIn, ItemStatsOut
 
 ITEM_NOT_FOUND = _("This item no longer exists.")
 
@@ -57,7 +57,7 @@ def list_items(ctx: OperationContext, params: ItemListIn) -> dict:
     "demo.item.detail",
     kind="query",
     permission="demo.view",
-    input=ByIdIn,
+    input=ItemRefIn,
     output=ItemDetailOut,
     ai={
         "description": "Returns one demo item by its id: its name, status and note, and its lines (text and "
@@ -74,7 +74,7 @@ def list_items(ctx: OperationContext, params: ItemListIn) -> dict:
         },
     },
 )
-def item_detail(ctx: OperationContext, data: ByIdIn) -> Item:
+def item_detail(ctx: OperationContext, data: ItemRefIn) -> Item:
     item = load_detail(data.id)
     if item is None:
         raise NotFound(ITEM_NOT_FOUND)

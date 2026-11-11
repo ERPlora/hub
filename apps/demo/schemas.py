@@ -47,7 +47,7 @@ class ItemListIn(PageIn):
     status: Status | None = None
 
 
-class ByIdIn(Schema):
+class ItemRefIn(Schema):
     id: UUID = Field(title=T_ITEM, json_schema_extra=AN_ITEM)
 
 
