@@ -4,10 +4,12 @@
 # <archives> is the folder test.yml keeps in GitHub's cache (actions/cache), one entry per runner image.
 # 1. From the cache: apt installs from the .deb files in <archives> without downloading anything nor
 #    refreshing its lists, so Ubuntu's mirror is not needed (hub#1222: a DNS outage of the mirror kept
-#    every run red for hours). apt checks each .deb against the runner image's signed lists.
-# 2. Without them (a new runner image, an evicted cache): apt refreshes its lists and downloads into
-#    <archives>, ATTEMPTS attempts in all, RETRY_DELAY_SECONDS apart, and the folder is left readable
-#    for the cache to save. apt itself already tries the mirror list of the runner (Azure's mirror,
+#    every run red for hours). Only this repository's runs write the cache, as with setup-uv's.
+# 2. Without them (a new runner image, an evicted cache) or when they do not install: the .deb files of
+#    the cache are dropped, since apt only checks the size of the ones it finds and would hand a broken
+#    one to dpkg again; apt refreshes its lists and downloads into <archives>, ATTEMPTS attempts in all,
+#    RETRY_DELAY_SECONDS apart, and the folder is left readable for the cache to save (it is only
+#    saved under a new key). apt itself already tries the mirror list of the runner (Azure's mirror,
 #    archive.ubuntu.com, security.ubuntu.com); with the mirror out of reach each attempt takes about
 #    5 minutes (3 for the lists, 1 to 2 for the download), so the defaults give up after about 15
 #    minutes, inside the python job's 30, with an ::error:: that names the packages.
@@ -44,7 +46,8 @@ if apt_install --no-download "$@"; then
   echo "installed $* from GitHub's cache"
   exit 0
 fi
-echo "GitHub's cache has no .deb of $* for this runner image: downloading from Ubuntu's mirror"
+echo "GitHub's cache has no .deb of $* that installs on this runner image: downloading them from Ubuntu's mirror"
+sudo find "$archives" -maxdepth 1 -name '*.deb' -delete
 
 attempt=1
 until sudo apt-get update && apt_install "$@"; do

@@ -17,11 +17,11 @@ trap 'rm -rf "$root"' EXIT
 #   sudo <cmd...>: logs "sudo <cmd...>" and runs it as the caller.
 #   sleep <n>: logs "sleep <n>" and returns at once.
 #   apt-get update: logs it and, like apt with an unreachable mirror, only warns (exit 0).
-#   apt-get install [--no-download] -o Dir::Cache::Archives=<dir> ... <packages>: with --no-download it
-#   installs only when <dir> holds the package's .deb, as apt does from its archives; without it, it
-#   takes the next word of the plan in $FAKE_PLAN (the last one repeats): ok downloads the .deb into
-#   <dir> (leaving apt's partial/ and lock behind, as apt does) and installs, fail is the mirror's DNS
-#   error (exit 100).
+#   apt-get install [--no-download] -o Dir::Cache::Archives=<dir> ... <packages>: like apt, a .deb
+#   already in <dir> is handed to dpkg without downloading it again (apt only checks its size), and dpkg
+#   fails on a broken one; with --no-download and no .deb it fails at once; otherwise it takes the next
+#   word of the plan in $FAKE_PLAN (the last one repeats): ok downloads the .deb into <dir> (leaving
+#   apt's partial/ and lock behind, as apt does) and installs, fail is the mirror's DNS error (exit 100).
 mkdir -p "$root/bin"
 cat > "$root/bin/sudo" <<'EOF'
 #!/usr/bin/env bash
@@ -49,12 +49,16 @@ if [ "$command" = update ]; then
   echo "W: Failed to fetch mirror+file:/etc/apt/apt-mirrors.txt/dists/noble/InRelease  Temporary failure resolving 'azure.archive.ubuntu.com'"
   exit 0
 fi
-if [ "$no_download" = 1 ]; then
-  if [ -f "$deb" ]; then
+if [ -f "$deb" ]; then
+  if [ "$(cat "$deb")" = "a package" ]; then
     echo "installed from $archives"
     exit 0
   fi
-  echo "E: Can't find a source to download version '1.0' of 'libfake:amd64'"
+  echo "E: Sub-process /usr/bin/dpkg returned an error code (1)"
+  exit 100
+fi
+if [ "$no_download" = 1 ]; then
+  echo "E: Unable to fetch some archives, maybe run apt-get update or try with --fix-missing?"
   exit 100
 fi
 read -r -a plan < "$FAKE_PLAN"
@@ -74,19 +78,24 @@ exit 100
 EOF
 chmod +x "$root/bin/sudo" "$root/bin/sleep" "$root/bin/apt-get"
 
-# install <plan> [cached] [VAR=value...]: runs apt-install.sh for libfake and libother with the fake
-# commands, ATTEMPTS=3 and RETRY_DELAY_SECONDS=7 unless a VAR overrides them; "cached" puts the .deb in
-# the archives folder first, as a cache hit does. Sets status (its exit code) and work:
-# $work/out.log (its output), $work/calls (the fake commands' calls) and $work/archives.
+# install <plan> [cached|broken] [VAR=value...]: runs apt-install.sh for libfake and libother with the
+# fake commands, ATTEMPTS=3 and RETRY_DELAY_SECONDS=7 unless a VAR overrides them; "cached" puts the
+# .deb in the archives folder first, as a cache hit does, and "broken" a .deb dpkg refuses. Sets status
+# (its exit code) and work: $work/out.log (its output), $work/calls (the fake commands' calls) and
+# $work/archives.
 install() {
   local plan="$1"
   shift
   work="$(mktemp -d "$root/case.XXXXXX")"
   printf '%s\n' "$plan" > "$work/plan"
   : > "$work/calls"
-  if [ "${1:-}" = cached ]; then
+  if [ "${1:-}" = cached ] || [ "${1:-}" = broken ]; then
     mkdir -p "$work/archives"
-    echo "a package" > "$work/archives/libfake_1.0_amd64.deb"
+    if [ "$1" = cached ]; then
+      echo "a package" > "$work/archives/libfake_1.0_amd64.deb"
+    else
+      echo "a broken package" > "$work/archives/libfake_1.0_amd64.deb"
+    fi
     shift
   fi
   status=0
@@ -146,6 +155,12 @@ check "each retry waits RETRY_DELAY_SECONDS and refreshes the lists again" \
 
 install "fail fail ok"
 check "passing failures are retried until the last attempt" 'installed && [ "$(from_mirror)" = 3 ]'
+
+# apt only checks the size of a .deb already in its archives: one dpkg refuses (or one of another
+# version than the image's lists) would be handed to dpkg again on every attempt.
+install "ok" broken
+check "a .deb of the cache that does not install is downloaded again from the mirror" \
+  'installed && [ "$(from_mirror)" = 1 ] && [ "$(cat "$work/archives/libfake_1.0_amd64.deb")" = "a package" ]'
 
 # --- failures that do not pass --------------------------------------------------------------------
 install "fail"
