@@ -800,7 +800,8 @@ def test_a_dangerous_write_shows_what_its_app_says_it_will_do_read_as_the_person
 
 
 def test_a_write_without_a_preview_reads_nothing_and_its_card_is_as_before():
-    assert assistant.preview(ctx(), get("demo.item.delete"), {"id": "x"}) == (None, None)
+    # A write with neither a preview nor a check (``demo.item.delete`` checks its item since hub#1162).
+    assert assistant.preview(ctx(), get("demo.item.create"), {"name": "x"}) == (None, None)
     assert set(assistant.card(get("demo.item.delete"), {"id": "x"}, "es")) == {
         "operation", "app", "app_name", "action", "risk", "fields", "count", "confirm_word", "blocked",
     }

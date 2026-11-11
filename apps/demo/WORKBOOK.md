@@ -210,9 +210,14 @@ Todo se puede pedir por las pantallas, el asistente y la API, con las mismas reg
 mismos permisos. Antes de cambiar o borrar un elemento o de añadirle una línea, el asistente pide confirmar con su
 tarjeta (BASE-F97), que nombra el elemento como lo nombran las pantallas, nunca por su id: por su nombre
 («Elemento: Mesa 4»), y el estado con su palabra («Abierto», «Hecho»). Lo que quien pregunta no puede ver no sale.
-El asistente llega a cada una por lo que la persona dice («¿cuántos elementos abiertos hay en Demo?», «borra el
-elemento Ensayo 2») y, si nombra un elemento como «el elemento …», le ofrece también la lista con la que lo busca por
-su nombre. Un elemento dicho solo por su nombre («borra Ensayo 2») todavía no lo encuentra (hub#1162).
+El asistente llega a cada una por lo que la persona dice («¿cuántos elementos abiertos hay en Demo?», «borra Ensayo
+2») y, si nombra un elemento como «el elemento …», le ofrece también la lista con la que lo busca por su nombre.
+La ficha y las acciones sobre un elemento (cambiarlo, borrarlo, añadirle una línea) lo toman por su id o por su
+nombre, como lo dice la persona: el mismo nombre, sin distinguir mayúsculas, antes que uno que lo contenga
+(«borra otoño» encuentra «Ensayo de otoño» si es el único que lo lleva), y la tarjeta enseña el elemento que se va a
+tocar, con su nombre entero. Si lo dicho encaja con varios elementos, no sale ninguna tarjeta: el asistente oye
+«Hay varios elementos que se llaman «Ensayo»: Ensayo 1, Ensayo 2. Di cuál.» y pregunta cuál; si no encaja con
+ninguno, «Ningún elemento se llama «Ensayo»».
 
 ### Lo que ofrece: consultas (leen, no cambian nada; todas se pueden seguir en vivo)
 
@@ -272,8 +277,10 @@ papel en ningún negocio.
   POST), porque cada ruta toma **un** parámetro igual a la entrada de su operación.
 - La línea es idempotente por `(elemento, client_line_id)` (restricción `demo_line_client_id_unique`);
   `add_line` bloquea la fila del elemento, así que dos líneas a la vez no comparten posición.
-- Errores: 422 `invalid_payload` con `fields` por campo (mensaje en el idioma de la petición); 404
-  `not_found` («Este elemento ya no existe»); 409 `demo.item_done` (línea en un elemento hecho); 403
+- Errores: 422 `invalid_payload` con `fields` por campo (mensaje en el idioma de la petición; sin `id` ni nombre,
+  en `called`: «Di qué elemento: su id o su nombre»); 404 `not_found` («Este elemento ya no existe»; por un nombre
+  que no tiene nadie, «Ningún elemento se llama «…»»); 409 `demo.item_done` (línea en un elemento hecho); 409
+  `demo.item_ambiguous` (un nombre que encaja con varios elementos, con ellos, hasta cinco); 403
   `permission_denied`; 401 `unauthorized`; 404 `app_inactive`. En la ficha, un error de la consulta
   viva que dice que el elemento ya no es de quien mira (`not_found`, `permission_denied`,
   `unauthorized`, `app_inactive`, `app_entitlement_blocked`) deja de pintarlo con sus acciones
@@ -285,10 +292,23 @@ papel en ningún negocio.
   `SYNONYMS` del Hub (`base/assistant.py`) leen «elemento» como `item`, así que «el elemento X» nombra lo que
   tocan sus operaciones y trae la lista que lo busca por su nombre. Las frases reales de la QA del asistente
   (`tests/e2e/qa/probes/*-es-demo-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno
-  (`tests/test_assistant_asks.py`); las que nombran el elemento solo por su nombre esperan, en `xfail`, a hub#1162.
+  (`tests/test_assistant_asks.py`), y las que nombran el elemento solo por su nombre («elimina Ejemplo QA…») llegan a
+  una herramienta que lo toma por ese nombre (hub#1162).
+- Un elemento por su id o por su nombre (hub#1162): `ItemRefIn` (`id` o `called`; el id gana), del que heredan
+  `ItemPatchIn` y `LineIn`, y `queries.find_item`, que lo busca (el mismo nombre sin distinguir mayúsculas, después
+  uno que lo contenga; el primero que encaja decide; los cambiados más recientemente primero) y lo bloquea en las
+  escrituras. Es el patrón de los menús (`combo.find_combo`) y las tareas (`task.resolve_task`). El nombre viaja como
+  `called` y no como `item`: el turno sube 1 punto a cada herramienta que toma un dato que la frase nombra
+  (`live.assistant.relevant`), e «item»/«elemento» nombran también las cosas de Carrito y Tarifas; con `item`, tres
+  `asks` de `inventory.product.bulk_create` bajaban del 4.º al 8.º, y con `called` no se mueve ningún `ask` ni sonda
+  del Hub. Las tres escrituras declaran `check: demo.item.detail` (`base.assistant.checked`): antes de dibujar la
+  tarjeta, el turno busca el elemento como lo hará la escritura, y un nombre que encaja con varios o con ninguno
+  vuelve al modelo en lugar de una tarjeta que fallaría tras el sí.
 - La tarjeta de confirmación del asistente (BASE-F97, hub#670) nombra el elemento que una escritura señala por su id
-  con la marca `refers` de `schemas.py` (`AN_ITEM`, en el `id` de `ByIdIn`, `ItemPatchIn` y `LineIn`), leída como
-  quien pregunta con `demo.item.detail`: el elemento por su `name`, como la lista y el diálogo «Eliminar». Ese `id`
+  con la marca `refers` de `schemas.py` (`AN_ITEM`, en el `id` de `ItemRefIn`, `ItemPatchIn` y `LineIn`), leída como
+  quien pregunta con `demo.item.detail`: el elemento por su `name`, como la lista y el diálogo «Eliminar». Dicho por
+  su nombre, `called` lleva la misma marca leída por ese nombre (`AN_ITEM_BY_NAME`), así que la tarjeta dice el
+  elemento que la escritura va a encontrar, no solo lo dicho. Ese `id`
   lleva el título de su pantalla (`T_ITEM`: «Elemento», «Item»), nunca «Registro». Sin persona detrás, sin `demo.view`,
   con un id de otro negocio o de algo que ya no está, el elemento queda fuera, nunca su id
   (`tests/test_assistant_card_records.py`); el trinquete `UNNAMED_REFERENCES` de
