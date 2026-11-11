@@ -75,7 +75,7 @@ def create_item(ctx: OperationContext, data: ItemIn) -> Item | None:
 def update_item(ctx: OperationContext, data: ItemPatchIn) -> Item | None:
     """Changes only the fields sent (``null`` leaves one as it is); no change, no event."""
     item = find_item(data, lock=True)
-    sent = data.model_dump(exclude_unset=True, exclude_none=True, exclude={"id", "item"})
+    sent = data.model_dump(exclude_unset=True, exclude_none=True, exclude={"id", "called"})
     changes = {field: value for field, value in sent.items() if getattr(item, field) != value}
     if changes:
         for field, value in changes.items():

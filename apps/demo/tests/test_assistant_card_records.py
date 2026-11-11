@@ -233,15 +233,15 @@ def test_a_write_on_an_item_said_by_its_name_says_the_item_it_finds(write, rest)
     Item.objects.create(name="Mesa 4")
     Item.objects.create(name="Barra")
     for language in ("es", "en"):
-        field = fields_of(write, {"item": "mesa", **rest}, language)["item"]
+        field = fields_of(write, {"called": "mesa", **rest}, language)["called"]
         assert (field["value"], field["label"]) == ("Mesa 4", SCREENS[language]["detail"]["title"]), (write, language)
 
 
 @pytest.mark.django_db
 def test_an_employee_who_sees_the_items_is_told_which_one_by_its_name():
     Item.objects.create(name="Mesa 4")
-    assert shown("demo.item.add_line", {"item": "Mesa 4"}, ctx=ctx_for("hub_employee")) == {"item": "Mesa 4"}
-    assert shown("demo.item.add_line", {"item": "Mesa 4"}, ctx=without("demo.view")) == {}
+    assert shown("demo.item.add_line", {"called": "Mesa 4"}, ctx=ctx_for("hub_employee")) == {"called": "Mesa 4"}
+    assert shown("demo.item.add_line", {"called": "Mesa 4"}, ctx=without("demo.view")) == {}
 
 
 @pytest.mark.django_db
@@ -249,14 +249,14 @@ def test_the_item_of_the_issue_said_by_its_own_name_alone_gets_its_card_and_goes
     """«elimina Ejemplo QA junto con todas sus líneas»: the model sends the name it heard, never asks for the UUID; the
     card says «Elemento: Ejemplo QA» and nothing is deleted until the person types the word."""
     item = Item.objects.create(name="Ejemplo QA")
-    write = call("demo.item.delete", {"item": "Ejemplo QA"})
+    write = call("demo.item.delete", {"called": "Ejemplo QA"})
 
     plan = turn_of(owner_in(), DELETE_BY_ITS_NAME, write)
 
     card = plan["confirm"]
     assert (card["operation"], card["risk"]) == ("demo.item.delete", "high")
     assert [(field["name"], field["label"], field["value"]) for field in card["fields"]] == [
-        ("item", SCREENS["es"]["detail"]["title"], "Ejemplo QA")
+        ("called", SCREENS["es"]["detail"]["title"], "Ejemplo QA")
     ]
     assert (plan["pending"], plan["executed"]) == ([write], [])
     assert Item.objects.filter(pk=item.pk).exists()
@@ -275,7 +275,7 @@ def test_a_name_two_items_share_draws_no_card_and_the_model_hears_it(write, rest
     the person which one (BASE-G115: the data are checked before any card is drawn)."""
     Item.objects.create(name="Ejemplo QA")
     Item.objects.create(name="Ejemplo QA", note="the other one")
-    asked_for = call(write, {"item": "Ejemplo QA", **rest})
+    asked_for = call(write, {"called": "Ejemplo QA", **rest})
 
     plan = turn_of(owner_in(), DELETE_BY_ITS_NAME, asked_for)
 
@@ -288,6 +288,6 @@ def test_a_name_two_items_share_draws_no_card_and_the_model_hears_it(write, rest
 @pytest.mark.django_db
 def test_a_name_no_item_has_draws_no_card():
     Item.objects.create(name="Barra")
-    plan = turn_of(owner_in(), DELETE_BY_ITS_NAME, call("demo.item.delete", {"item": "Ejemplo QA"}))
+    plan = turn_of(owner_in(), DELETE_BY_ITS_NAME, call("demo.item.delete", {"called": "Ejemplo QA"}))
     assert (plan["confirm"], plan["executed"][0]["code"]) == (None, "not_found")
     assert Item.objects.count() == 1

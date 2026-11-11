@@ -94,7 +94,7 @@ def test_patch_only_carries_what_was_sent():
     patch = ItemPatchIn(id=ID, note="")
     assert patch.model_dump(exclude_unset=True) == {"id": ID, "note": ""}
     assert invalid_fields(ItemPatchIn, id=ID, name="") == {"name"}
-    assert invalid_fields(ItemPatchIn) == {"item"}
+    assert invalid_fields(ItemPatchIn) == {"called"}
 
 
 def test_an_id_is_a_uuid():
@@ -114,29 +114,29 @@ NAMING_AN_ITEM = [
 
 @pytest.mark.parametrize(("schema", "rest"), NAMING_AN_ITEM)
 def test_an_item_is_named_by_its_id_or_by_its_name(schema, rest):
-    assert (schema(id=ID, **rest).id, schema(id=ID, **rest).item) == (ID, None)
-    named = schema(item="  Autumn trial ", **rest)
-    assert (named.id, named.item) == (None, "Autumn trial")
+    assert (schema(id=ID, **rest).id, schema(id=ID, **rest).called) == (ID, None)
+    named = schema(called="  Autumn trial ", **rest)
+    assert (named.id, named.called) == (None, "Autumn trial")
 
 
 @pytest.mark.parametrize(("schema", "rest"), NAMING_AN_ITEM)
 def test_without_its_id_or_its_name_the_item_is_what_is_missing(schema, rest):
     [error] = errors_of(schema, **rest)
-    assert (error["loc"], error["msg"]) == (("item",), f"Value error, {NO_ITEM}")
+    assert (error["loc"], error["msg"]) == (("called",), f"Value error, {NO_ITEM}")
 
 
 @pytest.mark.parametrize("said", ["", "   ", "x" * 121])
 def test_an_items_name_is_said_as_an_item_is_named(said):
-    assert invalid_fields(ItemRefIn, item=said) == {"item"}
+    assert invalid_fields(ItemRefIn, called=said) == {"called"}
 
 
 def test_the_card_names_the_item_a_name_finds_by_reading_it():
     """The assistant's card says the item the write will act on, read by the name the model sent (base/assistant.py
     ``REFERS``): «Item: Autumn trial» even when the person said «autumn», never only what was said."""
     properties = ItemRefIn.model_json_schema()["properties"]
-    assert properties["item"]["refers"] == {"read": "demo.item.detail", "by": "item", "name": ["name"]}
+    assert properties["called"]["refers"] == {"read": "demo.item.detail", "by": "called", "name": ["name"]}
     assert properties["id"]["refers"] == {"read": "demo.item.detail", "by": "id", "name": ["name"]}
-    assert properties["item"]["title"] == properties["id"]["title"] == "Item"
+    assert properties["called"]["title"] == properties["id"]["title"] == "Item"
 
 
 def test_line_in():

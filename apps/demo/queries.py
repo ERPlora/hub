@@ -149,7 +149,7 @@ def find_item(ref: ItemRefIn, *, lock: bool = False, rows: QuerySet[Item] | None
     """
     item_id = ref.id
     if item_id is None:
-        said = ref.item
+        said = ref.called
         named = Item.objects.order_by("-updated_at", "id")
         for fitting in (named.filter(name__iexact=said), named.filter(name__icontains=said)):
             candidates = list(fitting[:MAX_CANDIDATES])

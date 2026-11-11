@@ -24,7 +24,7 @@ LineText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1,
 # the write will find («Autumn trial» when the person said «autumn»), not only what was said.
 T_ITEM = gettext_noop("Item")
 AN_ITEM = names("demo.item.detail")
-AN_ITEM_BY_NAME = names("demo.item.detail", by="item")
+AN_ITEM_BY_NAME = names("demo.item.detail", by="called")
 NO_ITEM = _("Say which item: its id or its name.")
 
 
@@ -52,11 +52,17 @@ class ItemListIn(PageIn):
 
 
 class ItemRefIn(Schema):
-    """An item by its ``id`` or, when the id is not known, by its name as a person says it (``item``; the same name in
-    any case before one that contains it: ``queries.find_item``). The id wins."""
+    """An item by its ``id`` or, when the id is not known, by its name as a person says it (``called``; the same name
+    in any case before one that contains it: ``queries.find_item``). The id wins.
+
+    The name travels as ``called``, not as ``item``: a turn ranks a tool 1 higher for each datum it takes that the
+    question names (``live.assistant.relevant``), and «item» (and «elemento», ``base.assistant.SYNONYMS``) is what the
+    cart's and the price lists' items are called too (``cart_checkout``, ``pricing``), so an ``item`` datum would lift
+    Demo's four tools in their requests (measured on hub#1162: three asks of ``inventory.product.bulk_create`` went
+    from 4th to 8th); ``called`` moves no ask nor probe of the Hub."""
 
     id: UUID | None = Field(None, title=T_ITEM, json_schema_extra=AN_ITEM)
-    item: Name | None = Field(
+    called: Name | None = Field(
         None,
         validate_default=True,
         title=T_ITEM,
@@ -64,7 +70,7 @@ class ItemRefIn(Schema):
         json_schema_extra=AN_ITEM_BY_NAME,
     )
 
-    @field_validator("item")
+    @field_validator("called")
     @classmethod
     def _said(cls, value: str | None, info: ValidationInfo) -> str | None:
         """The name is required when the id is not given (and the id itself is valid: a malformed one is its own

@@ -211,8 +211,8 @@ def test_a_probe_that_names_an_item_is_offered_its_tool_which_takes_the_item_by_
     offered = offered_to(tools, phrase)
     assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:10])
     parameters = shared.tool_spec(tools[name])["parameters"]
-    assert "item" in parameters["properties"] and "id" in parameters["properties"]
-    assert not {"id", "item"} & set(parameters.get("required", ()))
+    assert "called" in parameters["properties"] and "id" in parameters["properties"]
+    assert not {"id", "called"} & set(parameters.get("required", ()))
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)

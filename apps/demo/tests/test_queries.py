@@ -127,7 +127,7 @@ def test_detail_of_a_missing_item_is_not_found():
 
 
 def named(said: str, role: str = "hub_employee"):
-    return run("demo.item.detail", ItemRefIn(item=said), role)
+    return run("demo.item.detail", ItemRefIn(called=said), role)
 
 
 def test_detail_by_its_name_whatever_its_case():
@@ -152,7 +152,7 @@ def test_the_same_name_comes_before_one_that_contains_it():
 def test_the_id_wins_over_the_name():
     bar = make("Bar")
     make("Autumn trial")
-    assert run("demo.item.detail", ItemRefIn(id=bar.id, item="Autumn trial")).id == bar.id
+    assert run("demo.item.detail", ItemRefIn(id=bar.id, called="Autumn trial")).id == bar.id
 
 
 def test_two_items_called_the_same_are_a_conflict_that_names_them():
@@ -190,10 +190,10 @@ def test_a_name_of_another_business_names_nothing_here(hub_a, hub_b):
     in_b = ctx_for("hub_employee", Scope("host", hub_b.slug))
     with use_hub(hub_a):
         item = Item.objects.create(name="Autumn trial")
-        assert get("demo.item.detail")(in_a, ItemRefIn(item="Autumn trial")).id == item.id  # positive control
+        assert get("demo.item.detail")(in_a, ItemRefIn(called="Autumn trial")).id == item.id  # positive control
     with use_hub(hub_b):
         with pytest.raises(NotFound):
-            get("demo.item.detail")(in_b, ItemRefIn(item="Autumn trial"))
+            get("demo.item.detail")(in_b, ItemRefIn(called="Autumn trial"))
 
 
 # demo.item.stats

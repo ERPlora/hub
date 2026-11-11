@@ -156,7 +156,7 @@ def test_update_by_its_name_changes_only_what_was_sent():
     create("Bar")
     OutboxEvent.objects.all().delete()
 
-    detail = run("demo.item.update", ItemPatchIn(item="autumn trial", name="Winter trial", status="done"))
+    detail = run("demo.item.update", ItemPatchIn(called="autumn trial", name="Winter trial", status="done"))
 
     assert (detail.id, detail.name, detail.status, detail.note) == (item.id, "Winter trial", "done", "keep")
     assert outbox() == [(events.ITEM_UPDATED, "a", {"id": str(item.id)})]
@@ -169,7 +169,7 @@ def test_delete_by_its_name_says_and_records_the_id_of_the_item_it_deleted():
     bar = create("Bar")
     OutboxEvent.objects.all().delete()
 
-    assert run("demo.item.delete", ItemRefIn(item="Autumn trial")) == DeletedOut(id=item.id)
+    assert run("demo.item.delete", ItemRefIn(called="Autumn trial")) == DeletedOut(id=item.id)
 
     assert list(Item.objects.values_list("id", flat=True)) == [bar.id]
     assert not ItemLine.objects.exists()
@@ -181,7 +181,7 @@ def test_add_line_by_its_name():
     item = create("Autumn trial")
     create("Bar")
 
-    detail = run("demo.item.add_line", LineIn(item="Autumn trial", text="Screws", qty="3"))
+    detail = run("demo.item.add_line", LineIn(called="Autumn trial", text="Screws", qty="3"))
 
     assert (detail.id, [(line.text, line.qty) for line in detail.lines]) == (item.id, [("Screws", Decimal("3"))])
 
@@ -200,7 +200,7 @@ def test_a_name_two_items_share_changes_nothing_and_records_nothing(name, schema
     OutboxEvent.objects.all().delete()
 
     with pytest.raises(Conflict) as excinfo:
-        run(name, schema(item="Autumn trial", **rest))
+        run(name, schema(called="Autumn trial", **rest))
 
     assert excinfo.value.code == "demo.item_ambiguous"
     assert sorted(Item.objects.values_list("id", "status")) == sorted([(first.id, "open"), (second.id, "open")])
@@ -212,7 +212,7 @@ def test_a_name_two_items_share_changes_nothing_and_records_nothing(name, schema
 def test_a_write_on_a_name_no_item_has_is_not_found():
     create("Bar")
     with pytest.raises(NotFound):
-        run("demo.item.delete", ItemRefIn(item="Autumn trial"))
+        run("demo.item.delete", ItemRefIn(called="Autumn trial"))
     assert Item.objects.count() == 1
 
 
