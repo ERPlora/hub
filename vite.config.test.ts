@@ -1,5 +1,7 @@
+// @vitest-environment node
 // The Vite config is a contract with Django (`packages/live/live/spa.py` and `LIVE["spa"]` in
-// `config/settings.py`): the dev server URLs and the manifest Django reads come from here.
+// `config/settings.py`): the dev server URLs and the manifest Django reads come from here. In Node, where the config
+// runs: under happy-dom a stand-in for `node:os` never reaches the config's own import of it.
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { PluginOption } from 'vite';
@@ -99,5 +101,39 @@ describe('vite.config', () => {
     // As packages/ui's; proven by its own test (vitest.setup.test.ts), which the suite collects.
     expect(config.test?.setupFiles).toEqual(['./vitest.setup.ts']);
     expect(config.test?.include).toEqual(expect.arrayContaining(['vitest.setup.test.ts']));
+  });
+
+  // hub#765: on a loaded machine a test that reads files or imports a module cold runs many times slower, and fell
+  // red at the fixed 5 s with nothing broken. A test that really hangs still fails: vitest.setup.test.ts proves it.
+  describe('the time budgets, read from the machine when the run starts (hub#765)', () => {
+    async function configOn(load: number[], cores: number) {
+      vi.doMock('node:os', async (importOriginal) => ({
+        ...(await importOriginal<typeof import('node:os')>()),
+        loadavg: () => load,
+        availableParallelism: () => cores,
+      }));
+      vi.resetModules();
+      try {
+        return (await import('./vite.config')).default;
+      } finally {
+        vi.doUnmock('node:os');
+      }
+    }
+
+    it('are Vitest\'s own on an idle machine: 5 s a test, 10 s a hook, 1 s an expect.poll', async () => {
+      const idle = await configOn([2, 1, 1], 15);
+      expect(idle.test).toMatchObject({ testTimeout: 5_000, hookTimeout: 10_000, expect: { poll: { timeout: 1_000 } } });
+      expect(idle.test?.provide).toEqual({ loadScale: 1 });
+    });
+
+    it('stretch with the load: at 60 over 15 cores, eight times as long, and the setup is told the same scale', async () => {
+      const loaded = await configOn([60, 30, 10], 15);
+      expect(loaded.test).toMatchObject({ testTimeout: 40_000, hookTimeout: 80_000, expect: { poll: { timeout: 8_000 } } });
+      expect(loaded.test?.provide).toEqual({ loadScale: 8 });
+    });
+
+    it('collects the test of its own scale', () => {
+      expect(config.test?.include).toEqual(expect.arrayContaining(['vitest.load.test.ts']));
+    });
   });
 });
