@@ -731,7 +731,11 @@ def load_grant(ctx: OperationContext, grant_id: UUID) -> dict:
     ai={
         "description": "List the services of the catalog with their category, pricing, price, duration and status "
         "(active, unconfigured = no tax category so it cannot be charged, archived). status=archived lists the "
-        "archived ones."
+        "archived ones.",
+        "asks": {
+            "en": ("what services do we offer?", "which services are archived?"),
+            "es": ("¿qué servicios ofrecemos?", "enséñame los servicios archivados"),
+        },
     },
 )
 def list_services(ctx: OperationContext, params: ServiceListIn) -> dict:
@@ -783,7 +787,12 @@ def list_services(ctx: OperationContext, params: ServiceListIn) -> dict:
     output=ServiceOut,
     expose_api=True,
     ai={
-        "description": "Get one service with everything it has, named by its id or its name (an archived one by its id)."
+        "description": "Get one service with everything it has, named by its id or its name (an archived one by its "
+        "id).",
+        "asks": {
+            "en": ("how much is the men's haircut and how long does it take?", "pull up the highlights service"),
+            "es": ("¿cuánto cuesta y cuánto dura el tinte de raíz?", "dame los datos del servicio de manicura"),
+        },
     },
 )
 def get_service(ctx: OperationContext, data: ServiceRefIn) -> dict:
@@ -800,7 +809,14 @@ def get_service(ctx: OperationContext, data: ServiceRefIn) -> dict:
     ai={
         "description": "Propose images of ERPlora's shared image library for a service's photo («ponle foto al corte "
         "de señora»), the service named by its id or its name: the best matches for its name first, each with its title and its reference (catalog:<folder>/<name>). It "
-        "never sets one: show them, and set the one the person picks with service.service.set_image."
+        "never sets one: show them, and set the one the person picks with service.service.set_image.",
+        "asks": {
+            "en": (
+                "suggest a drawing from the library for the beard trim",
+                "which library drawing fits the manicure service?",
+            ),
+            "es": ("propón dibujos de la biblioteca para la manicura", "¿qué dibujo le pondrías al servicio de tinte?"),
+        },
     },
 )
 def suggest_image(ctx: OperationContext, data: ServiceImageSuggestIn) -> dict:
@@ -825,7 +841,11 @@ def suggest_image(ctx: OperationContext, data: ServiceImageSuggestIn) -> dict:
     expose_api=True,
     ai={
         "description": "The catalog to sell and to book: the offered services with their pricing, price, duration, "
-        "category and tax category; needs_tax_setup marks the ones that cannot be charged yet."
+        "category and tax category; needs_tax_setup marks the ones that cannot be charged yet.",
+        "asks": {
+            "en": ("which services can I sell right now?", "what services are ready to be sold and booked?"),
+            "es": ("¿qué servicios se pueden vender ahora mismo?", "pásame la lista de servicios a la venta"),
+        },
     },
 )
 def list_for_sale(ctx: OperationContext, params: ServiceForSaleIn) -> dict:
@@ -847,7 +867,11 @@ def list_for_sale(ctx: OperationContext, params: ServiceForSaleIn) -> dict:
     output=CatalogStatusOut,
     expose_api=True,
     ai={
-        "description": "How many services are offered, how many can be charged and how many still need a tax category."
+        "description": "How many services are offered, how many can be charged and how many still need a tax category.",
+        "asks": {
+            "en": ("how many services in the catalogue can't be charged yet?", "how is the services catalogue doing?"),
+            "es": ("¿cuántos servicios siguen sin su IVA?", "¿cómo va el catálogo de servicios?"),
+        },
     },
 )
 def catalog_status(ctx: OperationContext, data: NoIn) -> dict:
@@ -874,7 +898,12 @@ def catalog_status(ctx: OperationContext, data: NoIn) -> dict:
     output=CategoryPage,
     expose_api=True,
     ai={
-        "description": "List the service categories by their order, with their parent and how many offered services each has."
+        "description": "List the service categories by their order, with their parent and how many offered services "
+        "each has.",
+        "asks": {
+            "en": ("what service categories do we have?", "how are the services split into categories?"),
+            "es": ("¿qué categorías de servicios hay?", "enséñame las familias de servicios"),
+        },
     },
 )
 def list_categories(ctx: OperationContext, params: CategoryListIn) -> dict:
@@ -899,7 +928,13 @@ def list_categories(ctx: OperationContext, params: CategoryListIn) -> dict:
     input=CategoryRefIn,
     output=CategoryOut,
     expose_api=True,
-    ai={"description": "Get one service category, named by its id or its name."},
+    ai={
+        "description": "Get one service category, named by its id or its name.",
+        "asks": {
+            "en": ("get me the colour category with its services", "which category is the nails one under?"),
+            "es": ("dame la categoría de color con sus servicios", "¿de qué categoría cuelga la de uñas?"),
+        },
+    },
 )
 def get_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
     return _category_row(find_category(data.id, data.category, rows=_categories()))
@@ -916,7 +951,15 @@ def get_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
     output=SettingsOut,
     expose_api=True,
     ai={
-        "description": "The service settings: the duration, buffer, tax category and online booking a new service takes."
+        "description": "The service settings: the duration, buffer, tax category and online booking a new service "
+        "takes.",
+        "asks": {
+            "en": ("how long does a new service last by default?", "what buffer do new services get by default?"),
+            "es": (
+                "¿qué duración por defecto tiene un servicio nuevo?",
+                "¿qué margen tienen por defecto los servicios?",
+            ),
+        },
     },
 )
 def get_settings(ctx: OperationContext, data: NoIn) -> dict:
@@ -935,7 +978,15 @@ def get_settings(ctx: OperationContext, data: NoIn) -> dict:
     expose_api=True,
     ai={
         "description": "List who performs each service: the professionals of a service, or the services of a "
-        "professional, with their own duration and price and their main service first."
+        "professional, with their own duration and price and their main service first.",
+        "asks": {
+            "en": ("who does what in the salon?", "what is Sonia assigned to?"),
+            "es": (
+                "¿qué tiene asignado Raquel?",
+                "¿a quién tenemos asignadas las mechas?",
+                "¿quién se encarga de los tintes?",
+            ),
+        },
     },
 )
 def list_assignments(ctx: OperationContext, params: AssignmentListIn) -> dict:
@@ -963,7 +1014,15 @@ def list_assignments(ctx: OperationContext, params: AssignmentListIn) -> dict:
     expose_api=True,
     ai={
         "description": "Get one professional's assignment to a service by its id: the service, the professional and "
-        "their own duration and price, if any."
+        "their own duration and price, if any. The assignment's id comes from service.assignment.list (by the "
+        "service's or the professional's name).",
+        "asks": {
+            "en": (
+                "show me Raquel's assignment to the beard trim",
+                "what are Sonia's own price and time for highlights?",
+            ),
+            "es": ("dame la asignación de Sonia al tinte, con su precio", "¿cuánto tarda Raquel en hacer unas mechas?"),
+        },
     },
 )
 def get_assignment(ctx: OperationContext, data: ByIdIn) -> dict:
@@ -984,7 +1043,11 @@ def get_assignment(ctx: OperationContext, data: ByIdIn) -> dict:
     ai={
         "description": "Who may perform a service: the active, bookable professionals with an active assignment, "
         "with their own duration and price, main service first. Empty = nobody declared (the diary then lets the "
-        "whole bookable team do it)."
+        "whole bookable team do it).",
+        "asks": {
+            "en": ("who can do a keratin treatment?", "who is able to do a manicure, and at what price?"),
+            "es": ("¿quién puede hacer un alisado de keratina?", "¿quién del salón puede hacer la pedicura?"),
+        },
     },
 )
 def eligible(ctx: OperationContext, params: EligibleIn) -> dict:
@@ -1035,7 +1098,11 @@ def eligible(ctx: OperationContext, params: EligibleIn) -> dict:
     expose_api=True,
     ai={
         "description": "List the vouchers of the catalog with their lines, discount, closed price, uses and validity. "
-        "status=deleted lists the deleted ones somebody bought."
+        "status=deleted lists the deleted ones somebody bought.",
+        "asks": {
+            "en": ("list our vouchers", "show me the session packs on offer"),
+            "es": ("enséñame la lista de bonos", "dime qué bonos ofrecemos y cuántas sesiones trae cada uno"),
+        },
     },
 )
 def list_packages(ctx: OperationContext, params: PackageListIn) -> dict:
@@ -1064,7 +1131,11 @@ def list_packages(ctx: OperationContext, params: PackageListIn) -> dict:
     output=PackageOut,
     expose_api=True,
     ai={
-        "description": "Get one voucher of the catalog with its lines, named by its id or its name."
+        "description": "Get one voucher of the catalog with its lines, named by its id or its name.",
+        "asks": {
+            "en": ("what's in the ten-session laser voucher?", "show me the details of the massage pack"),
+            "es": ("¿qué incluye el bono de diez sesiones de láser?", "dame los detalles del bono de masajes"),
+        },
     },
 )
 def get_package(ctx: OperationContext, data: PackageRefIn) -> dict:
@@ -1085,7 +1156,11 @@ def get_package(ctx: OperationContext, data: PackageRefIn) -> dict:
     expose_api=True,
     ai={
         "description": "List the vouchers sold, most recent first: the ones of a package, or the ones a customer owns "
-        "(by name or phone), with the sessions used and left, the expiry and whether it was voided."
+        "(by name or phone), with the sessions used and left, the expiry and whether it was voided.",
+        "asks": {
+            "en": ("which vouchers has Inés bought?", "who has bought the laser pack?"),
+            "es": ("¿qué bonos tiene comprados Inés?", "¿quién ha comprado el bono de láser?"),
+        },
     },
 )
 def list_grants(ctx: OperationContext, params: GrantListIn) -> dict:
@@ -1119,7 +1194,12 @@ def list_grants(ctx: OperationContext, params: GrantListIn) -> dict:
     output=GrantDetailOut,
     expose_api=True,
     ai={
-        "description": "Get one voucher sold by its id: its package, its owner, the day it was sold and its balance."
+        "description": "Get one voucher sold by its id: its package, its owner, the day it was sold and its balance. "
+        "The voucher's id comes from service.grant.list (by its owner's name or phone, or its package).",
+        "asks": {
+            "en": ("get me the details of the voucher we sold Pilar", "what's the balance of Inés's laser voucher?"),
+            "es": ("dame los detalles del bono que le vendimos a Pilar", "¿qué saldo tiene el bono de láser de Inés?"),
+        },
     },
 )
 def get_grant(ctx: OperationContext, data: ByIdIn) -> dict:
@@ -1137,7 +1217,15 @@ def get_grant(ctx: OperationContext, data: ByIdIn) -> dict:
     expose_api=True,
     ai={
         "description": "Get one session of a voucher sold by its id: the voucher it comes from, its owner, the service "
-        "it pays and whether it is held, spent, released, expired or returned."
+        "it pays and whether it is held, spent, released, expired or returned. The id of the session a line of a check "
+        "holds is that line's voucher_session_id, from sale.order.get.",
+        "asks": {
+            "en": ("is that session of Inés's voucher still held?", "what happened to that voucher session?"),
+            "es": (
+                "¿en qué estado está la sesión del bono de Inés?",
+                "¿esa sesión del bono ya se gastó o sigue retenida?",
+            ),
+        },
     },
 )
 def get_session(ctx: OperationContext, data: SessionRefIn) -> dict:
@@ -1158,7 +1246,11 @@ def get_session(ctx: OperationContext, data: SessionRefIn) -> dict:
     expose_api=True,
     ai={
         "description": "List the live vouchers whose customer card was deleted or erased, most recent first, with "
-        "what is left and the customer's reference (no personal data)."
+        "what is left and the customer's reference (no personal data).",
+        "asks": {
+            "en": ("which vouchers have no customer left?", "show me the vouchers whose client was erased"),
+            "es": ("¿qué bonos se han quedado sin clienta?", "enséñame los bonos de fichas borradas"),
+        },
     },
 )
 def list_orphans(ctx: OperationContext, params: PageIn) -> dict:
@@ -1194,7 +1286,15 @@ def list_orphans(ctx: OperationContext, params: PageIn) -> dict:
     output=VoidCheckOut,
     expose_api=True,
     ai={
-        "description": "Whether a voucher sold can be voided now and, if not, why (already_voided, in_use)."
+        "description": "Whether a voucher sold can be voided now and, if not, why (already_voided, in_use). The "
+        "voucher's id comes from service.grant.list (by its owner's name or phone, or its package).",
+        "asks": {
+            "en": ("can Inés's voucher still be voided?", "is it too late to void Pilar's voucher?"),
+            "es": (
+                "¿se puede anular todavía el bono de Inés?",
+                "¿el bono de Pilar ya tiene sesiones gastadas o aún se puede anular?",
+            ),
+        },
     },
 )
 def void_check(ctx: OperationContext, data: ByIdIn) -> dict:
@@ -1225,7 +1325,15 @@ def void_refusal(grant: Grant) -> str:
     output=AdjustCheckOut,
     expose_api=True,
     ai={
-        "description": "What can be adjusted on a voucher sold: sessions (if it has a limit) and its expiry (if it has one)."
+        "description": "What can be adjusted on a voucher sold: sessions (if it has a limit) and its expiry (if it has "
+        "one). The voucher's id comes from service.grant.list (by its owner's name or phone, or its package).",
+        "asks": {
+            "en": ("what can I change on Inés's voucher?", "can Pilar's voucher get a later expiry?"),
+            "es": (
+                "¿el bono de Inés admite más sesiones o más días de caducidad?",
+                "¿se le puede alargar la caducidad al bono de Pilar?",
+            ),
+        },
     },
 )
 def adjust_check(ctx: OperationContext, data: ByIdIn) -> dict:
@@ -1250,7 +1358,12 @@ def adjust_check(ctx: OperationContext, data: ByIdIn) -> dict:
     expose_api=True,
     ai={
         "description": "Whether a session of a voucher sold can be spent now (optionally on a service) and, if not, "
-        "why: voided, expired, no_uses_left or does_not_cover_service."
+        "why: voided, expired, no_uses_left or does_not_cover_service. The voucher's id comes from service.grant.list "
+        "(by its owner's name or phone, or its package).",
+        "asks": {
+            "en": ("can Inés's voucher pay for a manicure?", "why can't Pilar's voucher be used?"),
+            "es": ("¿le sirve a Inés su bono para una manicura?", "¿por qué no se puede gastar el bono de Pilar?"),
+        },
     },
 )
 def redeem_check(ctx: OperationContext, data: RedeemCheckIn) -> dict:
@@ -1297,7 +1410,14 @@ def redeem_refusal(grant: Grant, state: Balance, service: Service | None) -> str
         "description": "The vouchers a customer (by id, name or phone) owns that can pay a line of a service now: they "
         "cover it, have sessions left and have not expired. The first one is the one the till spends first, with why: "
         "counted sessions before unlimited, then the one expiring first, the one already started, the one with fewest "
-        "sessions left, the one bought first."
+        "sessions left, the one bought first.",
+        "asks": {
+            "en": ("which of Inés's vouchers would pay for a massage?", "what vouchers can Pilar use for her colour?"),
+            "es": (
+                "¿qué bonos de Inés le sirven para el masaje?",
+                "¿qué bono se gastaría primero si Pilar viene a hacerse el tinte?",
+            ),
+        },
     },
 )
 def tender_options(ctx: OperationContext, params: TenderOptionsIn) -> dict:
@@ -1403,7 +1523,11 @@ def _first_reason(eligible: list) -> str:
     expose_api=True,
     ai={
         "description": "The movements of a voucher of the catalog, most recent first: every session spent and every "
-        "courtesy (adjusted) or correction (corrected), of every customer, with who and why."
+        "courtesy (adjusted) or correction (corrected), of every customer, with who and why.",
+        "asks": {
+            "en": ("what has happened with the massage voucher?", "who has spent sessions of the laser pack?"),
+            "es": ("¿qué movimientos ha tenido el bono de masajes?", "¿quién ha gastado sesiones del bono de láser?"),
+        },
     },
 )
 def list_movements(ctx: OperationContext, params: MovementListIn) -> dict:
