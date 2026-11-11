@@ -1439,7 +1439,7 @@ diciendo cuáles (409 `*_ambiguous`).
 | Por cada cobro de una venta, lo devuelto y lo que queda, y por cada línea lo que ya volvió | ver ventas | F31 | `sale.refund.options` |
 | Las devoluciones de una venta, con el estado y el número de su rectificativa | ver ventas | F31 | `sale.refund.list` |
 | La devolución grabada con una clave | ver ventas | F31 | `sale.refund.by_idempotency_key` |
-| El nombre de un registro que una escritura de Ventas toca, por su id: solo para la tarjeta del asistente; lo que no existe o quien pregunta no puede leer no se nombra | ver ventas | F20, F35 | `sale.record.get` |
+| El nombre de un registro que una escritura de Ventas toca, por su id, y el de una devolución, por su venta («Devolución de la venta 20261014-0007»), con el que Servicios nombra la que devuelve sesiones (SERVICE-F26): solo para la tarjeta del asistente; lo que no existe o quien pregunta no puede leer no se nombra | ver ventas | F20, F32, F35 | `sale.record.get` |
 
 Las ventas, las cifras, las cuentas, la previsión del cobro, los medios de pago, los ajustes, las
 secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.

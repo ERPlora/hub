@@ -565,6 +565,7 @@ LIVE_ASSISTANT_ASKS_REQUIRED = (
     "demo",
     "flow",
     "inventory",
+    "kitchen",
     "printing",
     "reservation",
     "sale",

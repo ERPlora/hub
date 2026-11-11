@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a55f368d62521fbdcc9712c0e1090eaa08c851c6209faeba5b6847f0f7ff3835 -->
+<!-- generated from WORKBOOK.md sha256:fa4f019b0f86e9ea24cea4585d26b160890935121935a1f188989575e1742031 -->
 
 ## What it is for and who it is for
 
@@ -1392,7 +1392,7 @@ id, its name or its type ("cash", "card"). If a name matches several, it is refu
 | For each payment of a sale, what was refunded and what is left, and for each line what already came back | see sales | F31 | `sale.refund.options` |
 | A sale's refunds, with the state and the number of their corrective invoice | see sales | F31 | `sale.refund.list` |
 | The refund recorded with a key | see sales | F31 | `sale.refund.by_idempotency_key` |
-| The name of a record a write of Sales touches, by its id: only for the assistant's card; what does not exist or the person asking may not read goes unnamed | see sales | F20, F35 | `sale.record.get` |
+| The name of a record a write of Sales touches, by its id, and that of a refund, by its sale ("Refund of sale 20261014-0007"), by which Services names the one that gives sessions back (SERVICE-F26): only for the assistant's card; what does not exist or the person asking may not read goes unnamed | see sales | F20, F32, F35 | `sale.record.get` |
 
 The sales, the figures, the checks, the charge preview, the payment methods, the settings, the sections,
 the quick notes and what is refundable can be followed live.
