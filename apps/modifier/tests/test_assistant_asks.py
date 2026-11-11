@@ -65,14 +65,6 @@ REPORTED = [
      "renombra Sin azúcar QA como «Sin azúcar ni edulcorante QA» y quítala como opción predeterminada"),
     (EMPLOYEE, "modifier.selection.resolve", "¿cuánto cuesta un Café con Sin azúcar QA y qué nota manda a cocina?"),
 ]
-#: «sin cambiar los pedidos antiguos» is read as asking to change them (``live.assistant.asked``): every write of an
-#: order, and every one taking a sort order, outranks the deletion asked for, whatever its asks say. Strict: once live
-#: reads the negation the probe passes, and whoever brings that pointer removes the mark.
-LIVE_60 = pytest.mark.xfail(
-    strict=True, reason="ERPlora/live#60: «sin cambiar …» is read as asking to change, so the deletion is not offered"
-)
-BLOCKED_BY_LIVE_60 = {"qa20261108.owner.es.modifier.group.delete"}
-
 #: How far down the tools a turn offers (``MAX_TOOLS``, 40) a request of the QA may bring its tool: half of them, so
 #: twenty tools of the apps that say their asks later may climb past it before the model loses it.
 WITH_ROOM = 20
@@ -175,15 +167,7 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(
-    ("role", "name", "phrase"),
-    [
-        pytest.param(role, name, phrase, marks=LIVE_60) if f"qa20261108.owner.es.{name}" in BLOCKED_BY_LIVE_60
-        else pytest.param(role, name, phrase)
-        for role, name, phrase in REPORTED
-    ],
-    ids=[f"{role}-{name}" for role, name, _ in REPORTED],
-)
+@pytest.mark.parametrize(("role", "name", "phrase"), REPORTED, ids=[f"{role}-{name}" for role, name, _ in REPORTED])
 def test_the_reported_modifier_request_offers_its_existing_operation(catalog_of, role, name, phrase):
     tools = catalog_of(role, "es")
     place = place_of_no_ask(tools, name, phrase)
@@ -191,11 +175,7 @@ def test_the_reported_modifier_request_offers_its_existing_operation(catalog_of,
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(
-    "probe",
-    [pytest.param(probe, marks=LIVE_60 if probe["id"] in BLOCKED_BY_LIVE_60 else ()) for probe in PROBES],
-    ids=[probe["id"] for probe in PROBES],
-)
+@pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_modifiers_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
     """The owner's and the employee's phrases of layer 2, the ones the model answered right too: a tool of Modifiers
     that a new ask elsewhere pushes out of the first half of the ones a turn offers fails here before the real-model QA
@@ -216,7 +196,6 @@ def test_the_probes_of_modifiers_are_read():
     """Positive control of the parametrisation above: both roles' files are read, every probe of the two."""
     assert {ROLE_OF_PROBE[probe["role"]] for probe in PROBES} == {OWNER, EMPLOYEE}
     assert len(PROBES) == 23  # the owner's seventeen, one per tool, and six of the employee's
-    assert BLOCKED_BY_LIVE_60 <= {probe["id"] for probe in PROBES}
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)

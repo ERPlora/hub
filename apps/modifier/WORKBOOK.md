@@ -489,8 +489,8 @@ cajero del producto actual es un empleado.
   soltarlos, y cambiar o borrar grupos y opciones desde el chat (MODIFIER-F03 a F07) llegan a su operación: las frases
   reales de la QA del asistente (`tests/e2e/qa/probes/*-es-modifier-2026-11-08.json`, del dueño y del empleado) quedan
   entre las 20 primeras herramientas del turno, y una frase propia por herramienta solo llega con sus `asks`
-  (`tests/test_assistant_asks.py`). La sonda de borrar un grupo «sin cambiar los pedidos antiguos» sigue fuera: live
-  lee «sin cambiar» como una orden de cambiar (ERPlora/live#60; `xfail` estricto hasta su puntero).
+  (`tests/test_assistant_asks.py`), también la de borrar un grupo «sin cambiar los pedidos antiguos», desde que live
+  deja de leer «sin cambiar» como una orden de cambiar (ERPlora/live#60).
 - **La tarjeta de confirmación del asistente** (BASE-F97) nombra cada registro que una escritura señala por su id con
   las marcas `refers` de `schemas.py` (`A_GROUP`, `AN_OPTION`, `A_LINK`, `A_PRODUCT`, `A_CATEGORY`), leídas como quien
   pregunta: el grupo, el producto y la categoría por su nombre, la opción por su nombre y su grupo, porque dos grupos
