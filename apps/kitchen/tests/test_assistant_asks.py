@@ -1,11 +1,15 @@
-"""What layer 1 of the assistant's QA says of Kitchen (erplora-next docs/plans/2026-10-31-asistente-conocimiento-y-qa.md):
-which tools it offers, to whom, and the requests the real-model QA found unreachable (hub#1088).
+"""What layer 1 of the assistant's QA says of Kitchen (erplora-next
+docs/plans/2026-10-31-asistente-conocimiento-y-qa.md, the assistant's knowledge and QA): which tools it offers, to whom,
+and the requests the real-model QA found unreachable (hub#1088).
 
 Every ask of every tool of kitchen bringing its tool among the first ten, role by role, in English and in Spanish, out
 of the catalogue of a business with every app on and ranked as a turn ranks, is ``base/tests/test_assistant_asks.py``'s
 (kitchen is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over its asks. Here, the people's own words:
 a «comanda» is Sales' order to live (``order``, a table's check), so without Kitchen's asks its tickets, dishes and
-routing were not among the tools a turn offers and the model answered with a check of Sales or with no tool at all.
+routing were not among the tools a turn offers and the model answered with a check of Sales or with no tool at all. The
+Hub says what the kitchen's words name (``base.assistant.SYNONYMS``): «la comanda» is also a kitchen ticket, an
+«estación» or «el puesto» a station, «urgente» or «prisa» a rush, the «enrutado» the routing, a dish marked «como
+listo» or «como hecho» is bumped and one sent back «a pendientes» or «a preparación» recalled.
 """
 
 import json
@@ -80,7 +84,11 @@ REPORTED = [
         "kitchen.routing.clear",
         "quita la regla que enviaba el Café a Plancha QA; a partir de ahora seguirá su familia",
     ),
-    ("employee", "kitchen.ticket.reprint", "vuelve a imprimir la comanda «Comida personal QA», que el papel se ha manchado"),
+    (
+        "employee",
+        "kitchen.ticket.reprint",
+        "vuelve a imprimir la comanda «Comida personal QA», que el papel se ha manchado",
+    ),
 ]
 
 #: How far down the tools a turn offers (``MAX_TOOLS``, 40) a probe of the QA may bring its tool: half of them, so
@@ -94,6 +102,32 @@ PROBES = [
     for probe in json.loads(path.read_text(encoding="utf-8"))["probes"]
 ]
 ROLES = {"owner": Membership.Role.OWNER, "employee": Membership.Role.EMPLOYEE}
+#: The dishes said «listos» (ready): live reads «listo» and «listos» with the stem of the action list, so every list of
+#: the Hub ranks before marking them ready or bringing them back (ERPlora/live#54). They are offered, below the half:
+#: «como listos» and «a pendientes» name them (``base.assistant.SYNONYMS``), and without those groups they are not.
+LISTO_READ_AS_LIST = {"kitchen.item.bump", "kitchen.item.recall"}
+
+
+def needs_live_54(*case, name: str):
+    """``case`` failing strictly while live reads «listos» as the action list, when it is of ``LISTO_READ_AS_LIST``."""
+    if name not in LISTO_READ_AS_LIST:
+        return pytest.param(*case)
+    return pytest.param(*case, marks=pytest.mark.xfail(strict=True, reason=(
+        "ERPlora/live#54: «listo» and «listos» have the stem of the action list"
+    )))
+
+
+#: The Hub's own words of the kitchen (``base.assistant.SYNONYMS``), in phrases nobody wrote as asks nor as probes, one
+#: per group: each brings its tool among the first ten, and none does without its group. The two said «listos» wait for
+#: live to read it (ERPlora/live#54); with it they come 4th and 5th, and 11th or not at all without their group.
+KITCHEN_WORDS = [
+    ("¿cuántas comandas llevamos esta noche?", "kitchen.ticket.list"),
+    ("lista los puestos con su impresora", "kitchen.station.list"),
+    ("quita la urgencia a la mesa 3", "kitchen.ticket.set_rush"),
+    ("¿qué enrutado tienen los productos de la carta?", "kitchen.routing.list"),
+    ("da como listos los calamares de la 2", "kitchen.item.bump"),
+    ("las bravas que di como listos vuelven a pendientes", "kitchen.item.recall"),
+]
 
 
 @pytest.fixture
@@ -138,7 +172,11 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("role", "name", "phrase"), REPORTED, ids=[f"{role}-{name}" for role, name, _ in REPORTED])
+@pytest.mark.parametrize(
+    ("role", "name", "phrase"),
+    [needs_live_54(*case, name=case[1]) for case in REPORTED],
+    ids=[f"{role}-{name}" for role, name, _ in REPORTED],
+)
 def test_the_reported_kitchen_request_is_offered_its_tool_without_being_its_asks(catalog_of, role, name, phrase):
     tools = catalog_of(ROLES[role], "es")
     assert name in tools  # positive control: the person holds the tool, so the model can receive it
@@ -148,7 +186,9 @@ def test_the_reported_kitchen_request_is_offered_its_tool_without_being_its_asks
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
+@pytest.mark.parametrize(
+    "probe", [needs_live_54(probe, name=probe["tool"]) for probe in PROBES], ids=[probe["id"] for probe in PROBES]
+)
 def test_every_probe_of_kitchen_offers_its_tool_to_who_may_run_it(catalog_of, probe):
     """The owner's and the employee's phrases of layer 2, the ones the model answered right too: a tool of Kitchen that
     a new ask elsewhere pushes far down the ones a turn offers fails here before the real-model QA sees it; what the
@@ -164,3 +204,33 @@ def test_every_probe_of_kitchen_offers_its_tool_to_who_may_run_it(catalog_of, pr
     assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
     place = offered_place(tools, name, phrase, probe["language"])
     assert place is not None and place <= WITH_ROOM, place
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(
+    ("role", "name", "phrase"),
+    [case for case in REPORTED if case[1] in LISTO_READ_AS_LIST],
+    ids=[f"{role}-{name}" for role, name, _ in REPORTED if name in LISTO_READ_AS_LIST],
+)
+def test_until_live_reads_listo_the_dishes_said_listos_are_still_offered(catalog_of, role, name, phrase):
+    """While ERPlora/live#54 is open the dishes said «listos» rank below the half, but within what a turn offers: before
+    Kitchen said its asks and its words they were not offered at all."""
+    tools = catalog_of(ROLES[role], "es")
+    assert offered_place(tools, name, phrase, "es") is not None
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(
+    ("phrase", "name"),
+    [needs_live_54(*case, name=case[1]) for case in KITCHEN_WORDS],
+    ids=[name for _, name in KITCHEN_WORDS],
+)
+def test_the_kitchens_own_words_bring_the_tool_they_mean_among_the_first_ten(catalog_of, phrase, name):
+    tools = catalog_of(ROLES["owner"], "es")
+    assert name in tools  # positive control: the owner holds it, so only the selection can leave it out
+    assert comparable(phrase) not in probe_phrases()  # nobody's probe: the phrase measures the words, not a copy
+    assert all(
+        comparable(phrase) != comparable(ask) for op in tools.values() for ask in shared.asks_of(op).get("es", ())
+    )
+    place = offered_place(tools, name, phrase, "es")
+    assert place is not None and place <= 10, place

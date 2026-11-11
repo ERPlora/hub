@@ -915,6 +915,16 @@ def _chips(views: list[TicketView], stations: dict[UUID, Station]) -> list[dict]
     output=BoardOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what's cooking right now?",
+                "what's left on the grill?",
+            ),
+            "es": (
+                "¿qué tiene pendiente ahora la plancha?",
+                "¿qué hay en marcha en la pantalla?",
+            ),
+        },
         "description": "The kitchen display: the tickets being cooked (rush first, then VIP, then the oldest) and "
         "the ones waiting at the pass, with their dishes, for every station or one («what is pending on the "
         "grill»). Also what the cash close asks: the tickets not served yet."
@@ -953,6 +963,16 @@ def board(ctx: OperationContext, params: BoardIn) -> dict:
     output=AllDayOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how many burgers are left to cook?",
+                "how many of each dish do we still have to make?",
+            ),
+            "es": (
+                "¿cuántas hamburguesas quedan por hacer?",
+                "dame el total de platos pendientes de cada puesto",
+            ),
+        },
         "description": "What is left to cook, added up per dish and station across every ticket being cooked, most "
         "first; for one station if named («how many burgers are left on the grill»)."
     },
@@ -1066,6 +1086,16 @@ def _final_row(ticket: Ticket) -> dict:
     output=TicketPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what got cancelled on the display today?",
+                "list this morning's rushes",
+            ),
+            "es": (
+                "¿qué se anuló ayer en la pantalla?",
+                "busca las urgentes de esta mañana",
+            ),
+        },
         "description": "List the kitchen tickets, newest first, searching their number or label (Table 4) and "
         "filtering by status, type or priority («which tickets were cancelled today»)."
     },
@@ -1121,6 +1151,16 @@ NOTICES_WINDOW = dt.timedelta(hours=24)
     output=NoticesOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "any new rounds just in?",
+                "what has just come in?",
+            ),
+            "es": (
+                "¿hay alguna comanda nueva?",
+                "¿qué acaba de llegar a la pantalla?",
+            ),
+        },
         "description": "The new kitchen tickets, the newest first, with their destination, dishes and waiter; "
         "a round fired by Sales is included before the relay saves it, with the same id it keeps afterwards."
     },
@@ -1225,6 +1265,16 @@ def find_ticket_view(ref: TicketRefIn, settings: KitchenSettings) -> TicketView:
     output=TicketOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how far along is number 12?",
+                "show me number 12 with its dishes",
+            ),
+            "es": (
+                "¿cómo van los platos de la 12?",
+                "¿qué platos le quedan a la 7?",
+            ),
+        },
         "description": "One kitchen ticket with its dishes and their state, by its id, its number («ticket 12») or "
         "its label («how is table 4 going»)."
     },
@@ -1273,6 +1323,16 @@ def get_item(ctx: OperationContext, params: ItemRefIn) -> dict:
     output=TicketsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which rounds has table 4's check sent?",
+                "show me the rounds of this check",
+            ),
+            "es": (
+                "¿qué rondas ha mandado la cuenta de la mesa 4?",
+                "¿cómo van los platos de esta cuenta?",
+            ),
+        },
         "description": "The kitchen tickets of a check of Sales (its rounds, also the ones of a check merged into "
         "it), the newest round first, with their dishes and their state."
     },
@@ -1328,6 +1388,16 @@ def station_row(station: Station, in_progress: int, routes: int) -> dict:
     output=StationPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which stations do we have?",
+                "list the stations and what goes to each",
+            ),
+            "es": (
+                "¿qué estaciones tenemos?",
+                "lista las estaciones y lo que va a cada una",
+            ),
+        },
         "description": "List the kitchen stations (grill, bar…) with their destination, printer, dishes in "
         "progress and how many products and categories go to them, searching by name."
     },
@@ -1398,6 +1468,16 @@ def get_station(ctx: OperationContext, params: StationRefIn) -> dict:
     output=RoutingPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "where do the drinks go?",
+                "which station gets the desserts?",
+            ),
+            "es": (
+                "¿a qué estación van las bebidas?",
+                "enséñame el enrutado de los postres",
+            ),
+        },
         "description": "Which products and categories go to which station («where do the drinks go»), for every "
         "station or one, searching by the product's or category's name."
     },
@@ -1455,6 +1535,16 @@ def list_routing(ctx: OperationContext, params: RoutingListIn) -> dict:
     output=SettingsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "after how many minutes does the display turn amber?",
+                "is the display's sound on?",
+            ),
+            "es": (
+                "¿a los cuántos minutos se pone en rojo la pantalla?",
+                "¿suena la pantalla cuando entra algo?",
+            ),
+        },
         "description": "The kitchen display settings: the clock, the amber and red minutes, the sound, the pass on "
         "paper, whether the kitchen works from the screen and the default ticket type."
     },
@@ -1486,6 +1576,16 @@ def log_row(entry: LogEntry, names: dict[str, str] | None = None) -> dict:
     output=LogPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "who voided number 12?",
+                "what happened on the display yesterday?",
+            ),
+            "es": (
+                "¿quién anuló la comanda 12?",
+                "enséñame el historial de platos de ayer",
+            ),
+        },
         "description": "The kitchen's history, newest first: what happened (received, dish ready, served, "
         "cancelled…), on which ticket and dish, who did it and when; searching the ticket's number or the notes, "
         "by action and by days."

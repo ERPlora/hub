@@ -613,6 +613,16 @@ def _print_round(ctx: OperationContext, ticket: Ticket) -> str | None:
     output=TicketOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "send what is left on table 4, urgent",
+                "fire another round of this check",
+            ),
+            "es": (
+                "manda lo que falta de la mesa 4, urgente",
+                "envía otra ronda de esta cuenta",
+            ),
+        },
         "description": "Send to the kitchen what is pending on an open check, as a new round, normal or rush "
         "(«send table 4 to the kitchen, urgent»): Sales marks the lines sent and the kitchen opens the ticket and "
         "prints it on its stations' printers.",
@@ -661,6 +671,16 @@ def send(ctx: OperationContext, data: TicketSendIn) -> dict:
     input=TicketReceiveIn,
     output=ReceivedOut,
     ai={
+        "asks": {
+            "en": (
+                "take in the round table 4 just fired",
+                "open the last round sent from table 2",
+            ),
+            "es": (
+                "abre la ronda que acaba de mandar la mesa 4",
+                "recibe la ronda de la mesa 2",
+            ),
+        },
         "description": "Open the kitchen ticket of a round Sales already fired (the reaction to a round sent), with "
         "its priority, channel and who sent it, and print it. Receiving it twice opens it once.",
         "risk": "normal",
@@ -768,6 +788,16 @@ def find_category(category_id: UUID | None, said: str | None) -> Category:
     output=TicketOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "put through a crew meal with two burgers",
+                "add a dish to remake by hand",
+            ),
+            "es": (
+                "haz una comanda a mano para rehacer una ensalada",
+                "crea una comanda con dos bocadillos para el almuerzo",
+            ),
+        },
         "description": "Make a kitchen ticket by hand, with no check (a staff meal, a dish to remake): its type, "
         "where it goes, notes and its dishes (products of the catalogue by name, or free text), each to its station.",
         "risk": "normal",
@@ -863,6 +893,16 @@ def _pass(
     output=TicketOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "start cooking number 12",
+                "begin cooking number 7 now",
+            ),
+            "es": (
+                "empieza con la comanda 12",
+                "inicia ya la comanda 7",
+            ),
+        },
         "description": "Start cooking a ticket («fire table 4»): it and its dishes go to preparing.",
         "risk": "normal",
     },
@@ -888,6 +928,16 @@ def start_ticket(ctx: OperationContext, data: TicketRefIn) -> dict:
     output=TicketOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "everything on number 12 is ready for the pass",
+                "number 7 is ready to go, all of it",
+            ),
+            "es": (
+                "la comanda 12 ya está acabada entera",
+                "la 7 ya está hecha, que vaya al pase",
+            ),
+        },
         "description": "Mark a whole ticket ready, every dish of it («table 4 is ready»): it goes to the pass.",
         "risk": "normal",
     },
@@ -914,6 +964,16 @@ def ready_ticket(ctx: OperationContext, data: TicketRefIn) -> dict:
     output=TicketOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "number 12 has gone out",
+                "number 7 is out of the pass",
+            ),
+            "es": (
+                "la 12 ya ha salido del pase",
+                "la comanda 7 ya se ha entregado",
+            ),
+        },
         "description": "Mark a ready ticket served («table 4 is out»): it leaves the pass.",
         "risk": "normal",
     },
@@ -939,6 +999,16 @@ def serve_ticket(ctx: OperationContext, data: TicketRefIn) -> dict:
     output=TicketOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "bring number 12 back from the pass, it is not finished",
+                "we marked number 7 ready by mistake, recall it",
+            ),
+            "es": (
+                "recupera la 12 del pase, que no estaba acabada",
+                "la comanda 7 vuelve a preparación, falta algo",
+            ),
+        },
         "description": "Recall a ticket marked ready by mistake: it goes back to preparing with its ready dishes.",
         "risk": "normal",
     },
@@ -965,6 +1035,16 @@ def recall_ticket(ctx: OperationContext, data: TicketRefIn) -> dict:
     output=TicketOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "cancel number 12, they left",
+                "void number 7 on the display, the bill stays as it is",
+            ),
+            "es": (
+                "anula la comanda 12, se han ido",
+                "cancela la comanda 7 aunque ya esté empezada",
+            ),
+        },
         "description": "Cancel a kitchen ticket that is still on the line, with an optional reason: it leaves the "
         "kitchen display and a void slip prints. The check in the till does not change.",
         "risk": "high",
@@ -1009,6 +1089,16 @@ def cancel_ticket(ctx: OperationContext, data: TicketCancelIn) -> dict:
     output=DeletedOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "delete the crew meal I made by hand",
+                "remove the cancelled manual one, number 12",
+            ),
+            "es": (
+                "borra la comanda que hice a mano para rehacer la ensalada",
+                "elimina la comanda manual 12, ya anulada",
+            ),
+        },
         "description": "Delete a kitchen ticket made by hand that is to prepare or cancelled (one from a check is "
         "cancelled instead).",
         "risk": "high",
@@ -1042,6 +1132,16 @@ def delete_ticket(ctx: OperationContext, data: TicketRefIn) -> dict:
     output=TicketOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "number 12 is in a hurry, rush it",
+                "take the rush off number 7",
+            ),
+            "es": (
+                "la 12 tiene prisa, ponla la primera",
+                "la comanda 7 ya no es urgente",
+            ),
+        },
         "description": "Rush a ticket that is being cooked («table 4 is in a hurry»), or take the rush away: a rush "
         "jumps to the front of every display and prints a short notice where its dishes are still to do.",
         "risk": "normal",
@@ -1085,6 +1185,16 @@ def set_rush(ctx: OperationContext, data: TicketRushIn) -> dict:
     output=TicketOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "reprint number 12 for the grill",
+                "print another copy of number 7, the paper jammed",
+            ),
+            "es": (
+                "reimprime la comanda 12",
+                "la comanda 7 se ha roto, reimprímela",
+            ),
+        },
         "description": "Print a kitchen ticket again, as a copy, on its stations' printers.",
         "risk": "normal",
     },
@@ -1143,6 +1253,16 @@ def _targets(ticket: Ticket, data: ItemBumpIn, statuses) -> list[TicketItem]:
     output=TicketOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "the fries for number 2 are done",
+                "the grill has finished the steaks",
+            ),
+            "es": (
+                "ya están las hamburguesas de la 4",
+                "marca como hechas las patatas de la plancha",
+            ),
+        },
         "description": "Mark dishes ready: some of a ticket, or all of it on one station («the burgers of table 4 "
         "are ready», «grill is done with ticket 12»). The first one starts the ticket; with nothing left to do it "
         "goes to the pass. A dish already ready stays as it is.",
@@ -1203,6 +1323,16 @@ def bump_items(ctx: OperationContext, data: ItemBumpIn) -> dict:
     output=TicketOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "the steak for number 4 isn't done after all, bring it back",
+                "I marked the fries done by mistake, put them back to do",
+            ),
+            "es": (
+                "las patatas de la 2 no estaban hechas, recupéralas",
+                "me he equivocado con la hamburguesa de la 4: déjala otra vez pendiente",
+            ),
+        },
         "description": "Bring back dishes marked ready by mistake (some, or all of a ticket on one station); a ticket "
         "at the pass goes back to preparing. A dish still to do stays as it is.",
         "risk": "normal",
@@ -1285,6 +1415,16 @@ def _save_station(station: Station, **save) -> None:
     output=StationOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "add a desserts station",
+                "create a pastry station that prints on paper",
+            ),
+            "es": (
+                "crea la estación Postres",
+                "añade una estación de barra que imprima en papel",
+            ),
+        },
         "description": "Create a kitchen station (grill, bar, desserts) with its colour, whether it goes to the "
         "screen, to paper or both, and its printer (the kitchen or bar function, or a printer by its name).",
         "risk": "normal",
@@ -1306,6 +1446,16 @@ def create_station(ctx: OperationContext, data: StationIn) -> dict:
     output=StationOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "rename the grill station to Barbecue",
+                "make the desserts station screen only",
+            ),
+            "es": (
+                "deja la estación Barra solo en pantalla",
+                "cambia el nombre de la estación de postres",
+            ),
+        },
         "description": "Change a station, named by its id or its name: its name, colour, destination, printer, "
         "position, or switch it off (new dishes then go by their category, or to no station).",
         "risk": "normal",
@@ -1335,6 +1485,16 @@ def update_station(ctx: OperationContext, data: StationPatchIn) -> dict:
     output=DeletedOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "delete the desserts station",
+                "remove the old pastry station",
+            ),
+            "es": (
+                "elimina la estación de postres",
+                "borra la estación Barra, ya no la usamos",
+            ),
+        },
         "description": "Delete a station (it leaves the lists; the tickets already sent keep its name). Refused while "
         "products or categories are routed to it or it has dishes to cook.",
         "risk": "high",
@@ -1416,6 +1576,16 @@ def _route_event(ctx: OperationContext, station: Station, product, category) -> 
     output=RouteOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "drinks go to the grill station",
+                "send the desserts to the pastry station from now on",
+            ),
+            "es": (
+                "que las bebidas vayan a la estación Barra",
+                "enruta los postres a la estación Postres",
+            ),
+        },
         "description": "Send a product or a category of the catalogue to a station («drinks go to the bar»), "
         "replacing where it went before. Only the rounds sent from now on follow it.",
         "risk": "normal",
@@ -1456,6 +1626,16 @@ def set_route(ctx: OperationContext, data: RoutingSetIn) -> dict:
     output=RouteOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "stop sending the coffee to the grill station",
+                "remove the routing of the desserts",
+            ),
+            "es": (
+                "quita el enrutado de los postres",
+                "quita el enrutado del café, que vaya con su familia",
+            ),
+        },
         "description": "Take away where a product or a category goes: from now on it goes by its category, or to no "
         "station.",
         "risk": "normal",
@@ -1486,6 +1666,16 @@ def clear_route(ctx: OperationContext, data: RoutingClearIn) -> dict:
     output=SettingsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "mute the display",
+                "make the display turn red after 20 minutes",
+            ),
+            "es": (
+                "pon más bajo el sonido de la pantalla",
+                "que la pantalla avise en ámbar a los 10 minutos",
+            ),
+        },
         "description": "Change the kitchen display settings (only what is sent): the clock, the amber and red minutes, "
         "the sound and its tone and volume, the pass on paper, whether the kitchen works from the screen, the "
         "default ticket type.",

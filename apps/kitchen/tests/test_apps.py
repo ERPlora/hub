@@ -134,10 +134,8 @@ def test_every_operation_is_a_tool_of_the_assistant():
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
         if isinstance(op.ai_spec(), AI):  # a tool says what a person types to ask for it (live.E020)
             expected |= {"asks"}
-            assert {language: len(op.ai.get("asks", {}).get(language, ())) >= MIN_ASKS for language in ("en", "es")} == {
-                "en": True,
-                "es": True,
-            }, op.name
+            said = {language: len(op.ai.get("asks", {}).get(language, ())) for language in ("en", "es")}
+            assert min(said.values()) >= MIN_ASKS, (op.name, said)
         assert set(op.ai) == expected, op.name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, op.name
