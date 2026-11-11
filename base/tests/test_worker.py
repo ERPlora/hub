@@ -853,7 +853,7 @@ def test_with_databases_only_no_hub_moves(monkeypatch, calls, tasks, due, outbox
 
 
 def test_the_moves_pass_runs_on_control_and_hears_the_stop(monkeypatch):
-    from base.tenancy import move
+    from base.tenancy import move, restore
 
     monkeypatch.undo()
     seen: list[tuple[str, bool]] = []
@@ -866,10 +866,25 @@ def test_the_moves_pass_runs_on_control_and_hears_the_stop(monkeypatch):
         return 1
 
     monkeypatch.setattr(move, "run_due", run_due)
+    monkeypatch.setattr(restore, "run_due", lambda now, *, cancelled: seen.append(("restores", cancelled())) or 0)
 
     worker._moves(ten(0), stop)
 
-    assert seen == [(context.CONTROL, False), (context.CONTROL, True)]
+    assert seen == [(context.CONTROL, False), (context.CONTROL, True), ("restores", True)]
+
+
+def test_the_moves_pass_restores_the_hubs_asked_too_on_control(monkeypatch):
+    # hub#1198: a hub put back as it was at a moment, in the same thread as the moves (both copy a database).
+    from base.tenancy import move, restore
+
+    monkeypatch.undo()
+    seen: list[tuple[str, dt.datetime]] = []
+    monkeypatch.setattr(move, "run_due", lambda now, *, cancelled: 0)
+    monkeypatch.setattr(restore, "run_due", lambda now, *, cancelled: seen.append((context.current().kind, now)) or 1)
+
+    worker._moves(ten(0), threading.Event())
+
+    assert seen == [(context.CONTROL, ten(0))]
 
 
 def test_a_moves_pass_that_fails_is_logged_and_the_next_tick_tries_again(monkeypatch, caplog):

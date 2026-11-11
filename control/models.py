@@ -182,8 +182,21 @@ class Hub(models.Model):
         verbose_name=_("moving to"),
     )
     # Its move is to be undone (``control.hub.move_cancel``, or an undo that could not finish): the worker puts it back
-    # on its origin on its next pass, never taking it forward.
+    # on its origin on its next pass, never taking it forward. Its restore's too (below): its own database back.
     move_undo_asked_at = models.DateTimeField(_("move undo asked"), null=True, blank=True)
+    # Its database put back as it was at a moment (hub#1198; PLAN-DB §13, «Restaurar un hub»): asked in the Hub admin
+    # (``control.hub.restore``) and done by the worker (``base.tenancy.restore``). ``restoring_from`` is the temporary
+    # cluster its copy is on (a point-in-time restore of its own, closed to new hubs), set while it is to do: its host
+    # answers 503 «maintenance» meanwhile, and that cluster cannot be deleted. ``restore_point``, the moment.
+    restoring_from = models.ForeignKey(
+        Cluster,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="restores",
+        verbose_name=_("restoring from"),
+    )
+    restore_point = models.DateTimeField(_("restore point"), null=True, blank=True)
 
     class Meta:
         db_table = "base_hub"
@@ -397,7 +410,9 @@ class MovedCopy(UUIDModel):
     """The database a hub left behind on the server it moved from (round 2026-10-30b of PLAN-DB, decision 3; tranche
     S7): its ``<control>_move_<hex>`` (``base.tenancy.names``), closed to the app, kept a few days in case the move must
     be undone by hand, then dropped by the worker with its row (``base.tenancy.move``). ``cluster`` empty: the settings'
-    own server. One per database name and server: a newer move off the same server replaces the older copy.
+    own server. One per database name and server: a newer move off the same server replaces the older copy. A restore
+    keeps the hub's database it replaced the same way (``<control>_old_<hex>``, its own UUIDv7: hub#1198,
+    ``base.tenancy.restore``), one per restore.
 
     Written before the worker renames the hub's database, without ``moved_at`` while the move goes on: the hub's data
     is in that copy then, whatever else of that name the servers hold, so a move cut short is undone or gone on from it

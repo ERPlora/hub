@@ -522,6 +522,17 @@ class TestTheRegistryGate:
         assert (api.status_code, api["Retry-After"], api.json()["error"]["code"]) == (503, "30", "base.hub_maintenance")
         assert "for a few minutes" in api.json()["error"]["message"]
 
+    # A hub put back as it was at a moment (hub#1198; control.hub.restore): closed while its copy is restored.
+    def test_a_hub_being_restored_is_503_under_maintenance_and_asks_to_come_back(self, client, hub):
+        from control.models import Cluster
+
+        hub("acme", restoring_from=Cluster.objects.create(name="restore", host="writer-restore.example", is_open=False))
+        page = browse(client, "/", "acme.localhost:8000")
+        api = client.get("/api/me", HTTP_HOST="acme.localhost:8000")
+        assert (page.status_code, page["Retry-After"]) == (503, "30")
+        assert "This business is under maintenance" in page.content.decode()
+        assert (api.status_code, api.json()["error"]["code"]) == (503, "base.hub_maintenance")
+
     def test_a_hub_under_maintenance_says_so_in_spanish(self, client, hub):
         from control.models import Cluster
 

@@ -411,6 +411,50 @@ msgstr ""
 "La base de datos de este hub es demasiado grande para moverla con una copia: "
 "necesita replicación lógica."
 
+#: services.py (control.hub.restore; hub#1198)
+msgid "This hub is being restored from a copy."
+msgstr "Este hub se está restaurando desde una copia."
+
+msgid "The hub's database is not on that cluster: there is no copy to restore it from."
+msgstr "La base de datos del hub no está en ese clúster: no hay copia desde la que restaurarla."
+
+msgid "This hub's database is too large to restore with a copy."
+msgstr "La base de datos de este hub es demasiado grande para restaurarla con una copia."
+
+msgid "Only a ready hub with a database of its own is restored."
+msgstr "Solo se restaura un hub listo con base de datos propia."
+
+msgid "A demo is not restored: it ends on its own."
+msgstr "Una demo no se restaura: termina sola."
+
+msgid "The copy comes from a temporary cluster restored to that moment, never from the hub's own."
+msgstr "La copia sale de un clúster temporal restaurado a ese momento, nunca del propio del hub."
+
+msgid "A copy is restored only from a cluster closed to new hubs: a temporary one."
+msgstr "Solo se restaura una copia desde un clúster cerrado a hubs nuevos: uno temporal."
+
+msgid "Hubs live on that cluster: the copy comes from a temporary one with none."
+msgstr "En ese clúster viven hubs: la copia sale de uno temporal sin ninguno."
+
+msgid "That moment has not come yet."
+msgstr "Ese momento todavía no ha llegado."
+
+msgid ""
+"%(count)d VeriFactu record of production was made, changed or sent after "
+"that moment: restoring would repeat numbers the AEAT already has."
+msgid_plural ""
+"%(count)d VeriFactu records of production were made, changed or sent after "
+"that moment: restoring would repeat numbers the AEAT already has."
+msgstr[0] ""
+"%(count)d registro VeriFactu de producción se creó, cambió o envió después "
+"de ese momento: restaurar repetiría números que la AEAT ya tiene."
+msgstr[1] ""
+"%(count)d registros VeriFactu de producción se crearon, cambiaron o enviaron "
+"después de ese momento: restaurar repetiría números que la AEAT ya tiene."
+msgstr[2] ""
+"%(count)d registros VeriFactu de producción se crearon, cambiaron o enviaron "
+"después de ese momento: restaurar repetiría números que la AEAT ya tiene."
+
 #: admin.py and templates/admin/control/hub/move_to_cluster.html
 msgid "Move to cluster…"
 msgstr "Mover a otro clúster…"
@@ -466,6 +510,12 @@ msgstr[2] ""
 
 msgid "move undo asked"
 msgstr "deshacer el traslado pedido"
+
+msgid "restoring from"
+msgstr "restaurando desde"
+
+msgid "restore point"
+msgstr "momento a restaurar"
 
 msgid "noted at"
 msgstr "anotada el"

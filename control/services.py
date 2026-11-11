@@ -18,6 +18,11 @@ on control (the registry's scope) and records its event in control's outbox in t
   only to an open one with room (as a new hub is placed, counting the hubs on their way there), and only a database
   small enough for a copy (:data:`MOVE_MAX_BYTES`, measured on its server: ``control.queries``); a larger one needs
   logical replication, which the Hub does not do yet. Its host answers 503 «maintenance» until the worker is done.
+- ``control.hub.restore`` asks the worker to put a ready hub's database back as it was at a moment (hub#1198,
+  ``base.tenancy.restore``): from the copy of it on a temporary cluster (a point-in-time restore of its own, registered
+  closed to new hubs, with no hub on it), small enough for a copy, and never while the hub's database has production
+  VeriFactu records made, changed or sent after that moment (``base.tenancy.restore.records_after``: it only reads; the
+  worker looks again once the business is closed). Its host answers 503 «maintenance» until the worker is done.
 
 Each locks the cluster's row first, as the placement does, so a hub placed at the same time is either counted or
 placed after.
@@ -57,6 +62,8 @@ from control.schemas import (
     HubIdIn,
     HubMoveIn,
     HubMoveOut,
+    HubRestoreIn,
+    HubRestoreOut,
 )
 
 #: What a cluster is registered with (``ClusterIn``), in the model's own names.
@@ -86,7 +93,7 @@ def _holds_anything(cluster: Cluster) -> bool:
     copy or a leftover of a move kept there."""
     return (
         living_hubs(cluster).exists()
-        or Hub.objects.filter(moving_to=cluster).exists()
+        or Hub.objects.filter(Q(moving_to=cluster) | Q(restoring_from=cluster)).exists()
         or MovedCopy.objects.filter(cluster=cluster).exists()
         or LeftoverDatabase.objects.filter(cluster=cluster).exists()
     )
@@ -199,7 +206,7 @@ def cluster_delete(ctx: OperationContext, data: ClusterIdIn) -> dict:
     """Delete a cluster that no hub's row points at; one that holds any is refused with how many."""
     platform_admin_only(ctx)
     cluster = _locked(data.id)
-    held = Hub.objects.filter(Q(cluster=cluster) | Q(moving_to=cluster)).count()
+    held = Hub.objects.filter(Q(cluster=cluster) | Q(moving_to=cluster) | Q(restoring_from=cluster)).count()
     if held:
         raise Conflict(
             ngettext(
@@ -257,6 +264,8 @@ def hub_move(ctx: OperationContext, data: HubMoveIn) -> dict:
         raise _move_refused(gettext("A demo does not move: it ends on its own."), "control.hub_is_demo")
     if hub.moving_to_id is not None:
         raise _move_refused(gettext("This hub is already moving."), "control.hub_moving")
+    if hub.restoring_from_id is not None:
+        raise _restoring()
     if hub.cluster_id == target.pk:
         raise _move_refused(gettext("This hub is on that cluster already."), "control.hub_already_there")
     if not target.is_open:
@@ -305,6 +314,99 @@ def hub_move_cancel(ctx: OperationContext, data: HubIdIn) -> dict:
     hub.save(update_fields=["move_undo_asked_at", "last_error", "updated_at"])
     record_event(ctx, events.HUB_MOVE_CANCEL_REQUESTED, {"id": str(hub.pk), "slug": hub.slug})
     return {"id": hub.pk, "slug": hub.slug, "cluster": hub.cluster_id, "moving_to": hub.moving_to_id}
+
+
+def _restoring() -> Conflict:
+    return _move_refused(gettext("This hub is being restored from a copy."), "control.hub_restoring")
+
+
+def _copy_to_restore(hub: Hub, source: Cluster) -> None:
+    """Refuse unless the copy of ``hub``'s database is on ``source`` under its name, small enough for a copy (as a move:
+    ``MOVE_MAX_BYTES``)."""
+    size = queries.measure(source, [hub.db_name]).get(hub.db_name)
+    if size is None:
+        raise _move_refused(
+            gettext("The hub's database is not on that cluster: there is no copy to restore it from."),
+            "control.restore_copy_missing",
+        )
+    if size > MOVE_MAX_BYTES:
+        raise _move_refused(
+            gettext("This hub's database is too large to restore with a copy."), "control.hub_too_large"
+        )
+
+
+# Not an assistant tool: the platform's admins, in the Hub admin.
+@operation(
+    "control.hub.restore", kind="command", permission=None, input=HubRestoreIn, output=HubRestoreOut, ai=INTERNAL
+)
+def hub_restore(ctx: OperationContext, data: HubRestoreIn) -> dict:
+    """Ask the worker to put the ready hub ``data.hub``'s database back as it was at ``data.at``, from its copy on the
+    temporary cluster ``data.cluster``."""
+    from base.tenancy import restore
+
+    platform_admin_only(ctx)
+    hub = Hub.objects.select_for_update(of=("self",)).select_related("cluster").filter(pk=data.hub).first()
+    if hub is None:
+        raise NotFound(gettext("No hub has this id."))
+    source = _locked(data.cluster)
+    if hub.status != Hub.Status.READY or not hub.db_name:
+        raise _move_refused(
+            gettext("Only a ready hub with a database of its own is restored."), "control.hub_not_restorable"
+        )
+    if hub.is_demo:
+        raise _move_refused(gettext("A demo is not restored: it ends on its own."), "control.hub_is_demo")
+    if hub.moving_to_id is not None:
+        raise _move_refused(gettext("This hub is already moving."), "control.hub_moving")
+    if hub.restoring_from_id is not None:
+        raise _restoring()
+    if hub.cluster_id == source.pk:
+        raise _move_refused(
+            gettext("The copy comes from a temporary cluster restored to that moment, never from the hub's own."),
+            "control.restore_from_own_cluster",
+        )
+    if source.is_open:
+        raise _move_refused(
+            gettext("A copy is restored only from a cluster closed to new hubs: a temporary one."),
+            "control.cluster_open",
+        )
+    if living_hubs(source).exists():
+        raise _move_refused(
+            gettext("Hubs live on that cluster: the copy comes from a temporary one with none."),
+            "control.cluster_holds_hubs",
+        )
+    if data.at > timezone.now():
+        message = gettext("That moment has not come yet.")
+        raise InvalidPayload(message, code="control.restore_point_ahead", fields={"at": message})
+    _copy_to_restore(hub, source)
+    after = restore.records_after(hub, data.at)
+    if after:
+        raise _move_refused(
+            ngettext(
+                "%(count)d VeriFactu record of production was made, changed or sent after that moment: restoring "
+                "would repeat numbers the AEAT already has.",
+                "%(count)d VeriFactu records of production were made, changed or sent after that moment: restoring "
+                "would repeat numbers the AEAT already has.",
+                after,
+            )
+            % {"count": after},
+            "control.restore_fiscal_records",
+        )
+    hub.restoring_from = source
+    hub.restore_point = data.at
+    hub.last_error = ""
+    hub.save(update_fields=["restoring_from", "restore_point", "last_error", "updated_at"])
+    record_event(
+        ctx,
+        events.HUB_RESTORE_REQUESTED,
+        {"id": str(hub.pk), "slug": hub.slug, "from": str(source.pk), "at": data.at.isoformat()},
+    )
+    return {
+        "id": hub.pk,
+        "slug": hub.slug,
+        "cluster": hub.cluster_id,
+        "restoring_from": source.pk,
+        "restore_point": data.at,
+    }
 
 
 def _who(ctx: OperationContext) -> str:
@@ -362,9 +464,16 @@ def hubs_moving() -> list[UUID]:
     return list(Hub.objects.filter(moving_to__isnull=False).order_by("updated_at", "pk").values_list("pk", flat=True))
 
 
+def hubs_restoring() -> list[UUID]:
+    """The hubs asked to be restored (or whose restore is being undone), the longest asked first (hub#1198)."""
+    return list(
+        Hub.objects.filter(restoring_from__isnull=False).order_by("updated_at", "pk").values_list("pk", flat=True)
+    )
+
+
 def moving_row(hub_id: UUID) -> Hub | None:
-    """``hub_id``'s row with the cluster it is on and the one it is moving to, as it is now."""
-    return Hub.objects.select_related("cluster", "moving_to").filter(pk=hub_id).first()
+    """``hub_id``'s row with the cluster it is on and the one it is moving to or restored from, as it is now."""
+    return Hub.objects.select_related("cluster", "moving_to", "restoring_from").filter(pk=hub_id).first()
 
 
 def _ours(hub: Hub, target_id: UUID, owner: str, *, forward: bool, lock: bool = False) -> None:
@@ -372,12 +481,23 @@ def _ours(hub: Hub, target_id: UUID, owner: str, *, forward: bool, lock: bool = 
     forward, nobody asked to undo it. ``lock``: the lease's row is locked too (the switch, in its transaction)."""
     if hub.moving_to_id != target_id:
         raise MoveTaken(f"{hub.slug} no longer moves to {target_id}: another worker finished or undid it.")
+    _held(hub, owner, forward=forward, lock=lock)
+
+
+def _restoring_ours(hub: Hub, source_id: UUID, owner: str, *, forward: bool, lock: bool = False) -> None:
+    """:func:`_ours` for a restore: it is still restored from ``source_id``."""
+    if hub.restoring_from_id != source_id:
+        raise MoveTaken(f"{hub.slug} is no longer restored from {source_id}: another worker finished or undid it.")
+    _held(hub, owner, forward=forward, lock=lock)
+
+
+def _held(hub: Hub, owner: str, *, forward: bool, lock: bool) -> None:
     # Whoever holds it: one that ran out and nobody took is still ``owner``'s (``base.services.renew_lease`` too).
     leases = HubDue.objects.select_for_update() if lock else HubDue.objects
     if not leases.filter(pk=hub.pk, lease_owner=owner).exists():
         raise MoveTaken(f"the lease of {hub.slug} is no longer {owner}'s.")
     if forward and hub.move_undo_asked_at is not None:
-        raise MoveTaken(f"the move of {hub.slug} is to be undone.")
+        raise MoveTaken(f"the copy of {hub.slug} is to be undone.")
 
 
 def still_ours(hub_id: UUID, target_id: UUID, owner: str, *, forward: bool = True) -> None:
@@ -386,6 +506,15 @@ def still_ours(hub_id: UUID, target_id: UUID, owner: str, *, forward: bool = Tru
     if hub is None:
         raise MoveTaken(f"the hub {hub_id} is gone.")
     _ours(hub, target_id, owner, forward=forward)
+
+
+def still_restoring(hub_id: UUID, source_id: UUID, owner: str, *, forward: bool = True) -> None:
+    """Before a drop, a rename or the end of a restore: ``MoveTaken`` unless it is still ``owner``'s
+    (:func:`_restoring_ours`)."""
+    hub = Hub.objects.filter(pk=hub_id).first()
+    if hub is None:
+        raise MoveTaken(f"the hub {hub_id} is gone.")
+    _restoring_ours(hub, source_id, owner, forward=forward)
 
 
 def attributed(cluster_id: UUID | None, db_name: str, *, besides: UUID | None = None) -> bool:
@@ -408,24 +537,48 @@ def move_finished(
         hub.moving_to = None
         hub.last_error = ""
         hub.save(update_fields=["cluster", "moving_to", "last_error", "updated_at"])
-        MovedCopy.objects.update_or_create(
-            cluster_id=origin,
-            db_name=copy_name,
-            defaults={"hub_id": hub_id, "moved_at": at, "schema_state": "", "schema_apps": None},
-        )
+        _dated(hub_id, origin, copy_name, at)
+
+
+def _dated(hub_id: UUID, cluster_id: UUID | None, copy_name: str, at: dt.datetime) -> None:
+    """The copy ``copy_name`` on ``cluster_id`` left behind at ``at``: its note dated (its days count from then)."""
+    MovedCopy.objects.update_or_create(
+        cluster_id=cluster_id,
+        db_name=copy_name,
+        defaults={"hub_id": hub_id, "moved_at": at, "schema_state": "", "schema_apps": None},
+    )
+
+
+def restore_finished(
+    hub_id: UUID, source_id: UUID, cluster_id: UUID | None, kept_name: str, at: dt.datetime, *, owner: str
+) -> None:
+    """End the restore of ``hub_id`` and date the database it replaced, kept on its cluster (none: the settings' own
+    server), in one transaction on its locked row; ``MoveTaken`` when the restore is no longer ``owner``'s (nothing
+    written then). The schema record is the new database's, which its migration wrote."""
+    with _control_transaction():
+        hub = Hub.objects.select_for_update().get(pk=hub_id)
+        _restoring_ours(hub, source_id, owner, forward=True, lock=True)
+        hub.restoring_from = None
+        hub.restore_point = None
+        hub.last_error = ""
+        hub.save(update_fields=["restoring_from", "restore_point", "last_error", "updated_at"])
+        _dated(hub_id, cluster_id, kept_name, at)
 
 
 def move_undone(hub_id: UUID, origin: UUID | None, copy_name: str, error: str) -> None:
-    """The move of ``hub_id`` was undone: ready where it was, with why, no longer asked to be undone, its note forgotten
-    and the schema record of its origin given back (the destination's migration wrote its own meanwhile)."""
+    """The move (or the restore) of ``hub_id`` was undone: ready where it was on its own database, with why, no longer
+    asked to be undone, its note forgotten and the schema record of before given back (the migration of the database
+    it was copied to wrote its own meanwhile)."""
     with _control_transaction():
         hub = Hub.objects.select_for_update().get(pk=hub_id)
         note = MovedCopy.objects.filter(hub=hub, cluster_id=origin, db_name=copy_name, moved_at__isnull=True).first()
-        fields = ["moving_to", "move_undo_asked_at", "last_error", "updated_at"]
+        fields = ["moving_to", "restoring_from", "restore_point", "move_undo_asked_at", "last_error", "updated_at"]
         if note is not None and note.schema_state:
             hub.schema_state, hub.schema_apps = note.schema_state, note.schema_apps or {}
             fields += ["schema_state", "schema_apps"]
         hub.moving_to = None
+        hub.restoring_from = None
+        hub.restore_point = None
         hub.move_undo_asked_at = None
         hub.last_error = error[:2000]
         hub.save(update_fields=fields)
@@ -434,8 +587,8 @@ def move_undone(hub_id: UUID, origin: UUID | None, copy_name: str, error: str) -
 
 
 def move_stuck(hub_id: UUID, error: str) -> None:
-    """The move of ``hub_id`` failed and could not be undone yet: still moving (its host closed), asked to be undone on
-    the next pass, never taken forward."""
+    """The move (or the restore) of ``hub_id`` failed and could not be undone yet: still copying (its host closed),
+    asked to be undone on the next pass, never taken forward."""
     with _control_transaction():
         Hub.objects.filter(pk=hub_id).update(
             last_error=error[:2000], move_undo_asked_at=timezone.now(), updated_at=timezone.now()
@@ -443,7 +596,7 @@ def move_stuck(hub_id: UUID, error: str) -> None:
 
 
 def pending_copy(hub_id: UUID) -> MovedCopy | None:
-    """The note of ``hub_id``'s move in course (no ``moved_at`` yet), if any."""
+    """The note of ``hub_id``'s move or restore in course (no ``moved_at`` yet), if any."""
     return MovedCopy.objects.select_related("cluster").filter(hub_id=hub_id, moved_at__isnull=True).first()
 
 
