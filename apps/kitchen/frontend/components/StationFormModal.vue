@@ -20,7 +20,7 @@ const props = defineProps<{
 
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('kitchen-station-form', () => form.value, open);
+const canDismiss = useUnsavedFormOnOpen('kitchen-station-form', () => form.value, open);
 const emit = defineEmits<{ saved: [station: StationOut] }>();
 
 /** The palette of the old module's chips; the first is the factory colour. */
@@ -114,6 +114,7 @@ async function save(): Promise<void> {
     :pending="pending"
     :error="error"
     :submit-disabled="!form.name.trim()"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

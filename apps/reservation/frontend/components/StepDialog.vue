@@ -27,7 +27,7 @@ const noShow = useCommand('reservation.reservation.no_show');
 const remove = useCommand('reservation.reservation.delete');
 const command = computed(() => ({ cancel, no_show: noShow, delete: remove })[props.kind]);
 const reason = ref('');
-useUnsavedFormOnOpen('reservation-step-cancel', reason, open);
+const canDismiss = useUnsavedFormOnOpen('reservation-step-cancel', reason, open);
 
 const KEYS: Record<StepKind, string> = { cancel: 'cancel', no_show: 'noShow', delete: 'delete' };
 const key = computed(() => KEYS[props.kind]);
@@ -73,6 +73,7 @@ async function confirm(): Promise<void> {
     submit-color="danger"
     :pending="command.pending.value"
     :error="command.error.value"
+    :can-dismiss="canDismiss"
     @submit="confirm"
   >
     <p>{{ message }}</p>

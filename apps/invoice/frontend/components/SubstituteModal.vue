@@ -54,7 +54,7 @@ async function issue(): Promise<void> {
   emit('substituted', answer.invoice);
 }
 
-useUnsavedFormOnOpen('invoice-substitute', recipient, open);
+const canDismiss = useUnsavedFormOnOpen('invoice-substitute', recipient, open);
 </script>
 
 <template>
@@ -67,6 +67,7 @@ useUnsavedFormOnOpen('invoice-substitute', recipient, open);
     :pending="command.pending.value"
     :error="error"
     :submit-disabled="!recipientComplete(recipient)"
+    :can-dismiss="canDismiss"
     @submit="issue"
   >
     <template #default="{ fieldErrors }">

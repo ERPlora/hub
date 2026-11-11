@@ -38,7 +38,7 @@ function cancel(): void {
   error.value = null;
 }
 
-useUnsavedFormOnOpen('tax-category-form', form, open);
+const canDismiss = useUnsavedFormOnOpen('tax-category-form', form, open);
 </script>
 
 <template>
@@ -50,6 +50,7 @@ useUnsavedFormOnOpen('tax-category-form', form, open);
     :pending="pending"
     :error="error"
     :submit-disabled="!complete"
+    :can-dismiss="canDismiss"
     @submit="save"
     @cancel="cancel"
   >

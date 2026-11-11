@@ -20,7 +20,7 @@ const props = withDefaults(defineProps<{ defaultType?: OrderType }>(), { default
 
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('kitchen-ticket-form', () => ({ type: type.value, label: label.value, notes: notes.value, dishes: dishes.value.map(({ product, name, quantity, notes }) => ({ product, name, quantity, notes })) }), open);
+const canDismiss = useUnsavedFormOnOpen('kitchen-ticket-form', () => ({ type: type.value, label: label.value, notes: notes.value, dishes: dishes.value.map(({ product, name, quantity, notes }) => ({ product, name, quantity, notes })) }), open);
 const emit = defineEmits<{ saved: [ticket: TicketOut] }>();
 
 const TYPES: readonly OrderType[] = ['dine_in', 'takeaway', 'delivery'];
@@ -123,6 +123,7 @@ async function save(): Promise<void> {
     :pending="command.pending.value"
     :error="command.error.value"
     :submit-disabled="!ready"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

@@ -18,7 +18,7 @@ import type { GrantOut } from '../operations';
 const props = defineProps<{ grant: GrantOut | null }>();
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('service-grant-adjust', () => ({ direction: direction.value, uses: uses.value, days: days.value, reason: reason.value }), open);
+const canDismiss = useUnsavedFormOnOpen('service-grant-adjust', () => ({ direction: direction.value, uses: uses.value, days: days.value, reason: reason.value }), open);
 
 const t = useT();
 const locale = useLocale();
@@ -93,6 +93,7 @@ async function confirm(): Promise<void> {
     :pending="adjusting.pending.value"
     :error="adjusting.error.value"
     :submit-disabled="!moves || !reason.trim()"
+    :can-dismiss="canDismiss"
     @submit="confirm"
   >
     <template #default="{ fieldErrors }">

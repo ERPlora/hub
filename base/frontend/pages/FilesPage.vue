@@ -266,8 +266,8 @@ async function download(item: FileItem): Promise<void> {
 const renaming = ref<Entry | null>(null);
 const renameOpen = ref(false);
 const renameName = ref('');
-useUnsavedFormOnOpen('files-new-folder-dialog', folderName, folderOpen);
-useUnsavedFormOnOpen('files-rename-dialog', renameName, renameOpen);
+const canDismissNewFolder = useUnsavedFormOnOpen('files-new-folder-dialog', folderName, folderOpen);
+const canDismissRename = useUnsavedFormOnOpen('files-rename-dialog', renameName, renameOpen);
 const renameError = computed(() =>
   rename.error.value ? { message: reasonOf(rename.error.value, renameName.value) } : null,
 );
@@ -805,6 +805,7 @@ async function askDelete(entry: Entry): Promise<void> {
       :pending="createFolder.pending.value"
       :error="folderError"
       :submit-disabled="!folderName.trim()"
+      :can-dismiss="canDismissNewFolder"
       @submit="makeFolder()"
       @cancel="folderOpen = false"
     >
@@ -830,6 +831,7 @@ async function askDelete(entry: Entry): Promise<void> {
       :pending="rename.pending.value"
       :error="renameError"
       :submit-disabled="!renameName.trim()"
+      :can-dismiss="canDismissRename"
       @submit="doRename()"
       @cancel="renameOpen = false"
     >

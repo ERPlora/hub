@@ -107,7 +107,7 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen('modifier-group-form', form, open);
+const canDismiss = useUnsavedFormOnOpen('modifier-group-form', form, open);
 </script>
 
 <template>
@@ -119,6 +119,7 @@ useUnsavedFormOnOpen('modifier-group-form', form, open);
     :pending="pending"
     :error="error"
     :submit-disabled="!form.name.trim()"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

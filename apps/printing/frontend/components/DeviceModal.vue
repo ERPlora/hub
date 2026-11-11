@@ -75,7 +75,7 @@ async function confirm(): Promise<void> {
 }
 
 // A Set has no JSON of its own: the ticked printers are compared as a sorted list.
-useUnsavedFormOnOpen('printing-device', () => ({ name: name.value, printers: [...chosen.value].sort() }), open);
+const canDismiss = useUnsavedFormOnOpen('printing-device', () => ({ name: name.value, printers: [...chosen.value].sort() }), open);
 </script>
 
 <template>
@@ -87,6 +87,7 @@ useUnsavedFormOnOpen('printing-device', () => ({ name: name.value, printers: [..
     :cancel-label="$t('printing.devices.modal.cancel')"
     :pending="pending"
     :error="error"
+    :can-dismiss="canDismiss"
     @submit="confirm"
   >
     <div class="printing-device">

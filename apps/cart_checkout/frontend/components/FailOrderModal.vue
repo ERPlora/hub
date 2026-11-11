@@ -44,7 +44,7 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen('cart-checkout-fail', reason, open);
+const canDismiss = useUnsavedFormOnOpen('cart-checkout-fail', reason, open);
 </script>
 
 <template>
@@ -60,6 +60,7 @@ useUnsavedFormOnOpen('cart-checkout-fail', reason, open);
     :pending="fail.pending.value"
     :error="fail.error.value"
     :submit-disabled="!reason.trim()"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

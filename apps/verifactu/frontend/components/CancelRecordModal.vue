@@ -21,7 +21,7 @@ const open = defineModel<boolean>('open', { required: true });
 const t = useT();
 const command = useCommand('verifactu.record.cancel');
 const reason = shallowRef('');
-useUnsavedFormOnOpen('verifactu-cancel', reason, open);
+const canDismiss = useUnsavedFormOnOpen('verifactu-cancel', reason, open);
 const missing = shallowRef(false);
 
 watch(
@@ -66,6 +66,7 @@ async function cancel(): Promise<void> {
     :cancel-label="$t('verifactu.cancel')"
     :pending="command.pending.value"
     :error="error"
+    :can-dismiss="canDismiss"
     @submit="cancel"
   >
     <p

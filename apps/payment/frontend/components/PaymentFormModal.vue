@@ -114,7 +114,7 @@ function goToMethods(): void {
   void router.push('/payment/methods');
 }
 
-useUnsavedFormOnOpen('payment-form', form, open);
+const canDismiss = useUnsavedFormOnOpen('payment-form', form, open);
 </script>
 
 <template>
@@ -126,6 +126,7 @@ useUnsavedFormOnOpen('payment-form', form, open);
     :pending="creation.pending.value"
     :error="creation.error.value"
     :submit-disabled="!complete"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

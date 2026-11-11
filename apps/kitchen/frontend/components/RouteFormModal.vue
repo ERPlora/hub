@@ -25,7 +25,7 @@ const props = withDefaults(
 
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('kitchen-route-form', () => ({ stationId: stationId.value, kind: kind.value, target: target.value }), open);
+const canDismiss = useUnsavedFormOnOpen('kitchen-route-form', () => ({ stationId: stationId.value, kind: kind.value, target: target.value }), open);
 const emit = defineEmits<{ saved: [route: RouteOut] }>();
 
 type Kind = 'product' | 'category';
@@ -82,6 +82,7 @@ async function save(): Promise<void> {
     :pending="command.pending.value"
     :error="command.error.value"
     :submit-disabled="!stationId || !target"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <div class="kitchen-route-form">

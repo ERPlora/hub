@@ -121,7 +121,7 @@ function tick(app: string, kind: ApiKind, on: boolean): void {
 /** The apps with a box ticked: a box ticked and unticked again is no change. */
 const tickedScopes = () => Object.fromEntries(Object.entries(form.value.scopes).filter(([, kinds]) => kinds.length > 0));
 
-useUnsavedFormOnOpen(
+const canDismiss = useUnsavedFormOnOpen(
   'api-key-form',
   () => ({ name: form.value.name, rate: rateText.value, mode: form.value.mode, scopes: tickedScopes() }),
   creating,
@@ -278,6 +278,7 @@ async function confirmRevoke(): Promise<void> {
       :pending="create.pending.value"
       :submit-disabled="!canCreate"
       :error="createError"
+      :can-dismiss="canDismiss"
       @submit="submitCreate()"
       @cancel="creating = false"
     >

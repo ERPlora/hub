@@ -30,7 +30,7 @@ const props = withDefaults(
 
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('table-form', () => form.value, open);
+const canDismiss = useUnsavedFormOnOpen('table-form', () => form.value, open);
 
 const SHAPES: readonly TableShape[] = ['square', 'round', 'rectangle'];
 const NO_ZONE = '';
@@ -144,6 +144,7 @@ async function remove(): Promise<void> {
     :title="editing ? $t('table.form.titleEdit') : $t('table.form.titleNew')"
     :pending="pending"
     :error="error"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

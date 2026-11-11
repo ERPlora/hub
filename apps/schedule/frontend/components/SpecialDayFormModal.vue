@@ -86,7 +86,7 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen(
+const canDismiss = useUnsavedFormOnOpen(
   'schedule-special-day-form',
   () => ({ date: date.value, name: name.value, closed: closed.value, rows: rows.value, recurring: recurring.value, notes: notes.value }),
   open,
@@ -102,6 +102,7 @@ useUnsavedFormOnOpen(
     :submit-disabled="!complete"
     :pending="pending"
     :error="error"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

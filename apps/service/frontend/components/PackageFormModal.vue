@@ -27,7 +27,7 @@ const props = defineProps<{
 }>();
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedForm('service-package-form', () => open.value ? comparable(form.value) : original.value, () => original.value);
+const canDismiss = useUnsavedForm('service-package-form', () => open.value ? comparable(form.value) : original.value, () => original.value);
 
 interface Line {
   key: number;
@@ -214,6 +214,7 @@ async function save(): Promise<void> {
     :pending="pending"
     :error="error"
     :submit-disabled="!money || !form.name.trim() || (!pkg && completeLines.length === 0)"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

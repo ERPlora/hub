@@ -1,7 +1,7 @@
-// flow: BASE-F05 and one create form per app of hub#1020's first stage (the walk is `expectBackAsksOnDirtyForm`).
+// flow: BASE-F05 and one create form per app of hub#1020's first stage (the walks are `expectBackAsksOnDirtyForm` and, for its own ways out, `expectWaysOutAskOnDirtyForm`, hub#1156).
 import { test } from '@playwright/test';
 
-import { expectBackAsksOnDirtyForm, type UnsavedFormCase } from './unsaved-back-helpers';
+import { expectBackAsksOnDirtyForm, expectWaysOutAskOnDirtyForm, type UnsavedFormCase } from './unsaved-back-helpers';
 
 const CASES: UnsavedFormCase[] = [
   { app: 'sale', flow: 'SALE-F36', route: '/sale/quick-notes', add: 'sale-quick-notes-add', form: 'sale-quick-note-form', field: 'sale-quick-note-form-text' },
@@ -17,5 +17,9 @@ const CASES: UnsavedFormCase[] = [
 for (const item of CASES) {
   test(`${item.flow} ${item.app}: Android Back asks before discarding a dirty form and closes a clean one`, async ({ page }) => {
     await expectBackAsksOnDirtyForm(page, item, 'HUB-1020');
+  });
+
+  test(`${item.flow} ${item.app}: Cancel, ×, Escape and a tap outside ask before discarding a dirty form and close a clean one (hub#1156)`, async ({ page }) => {
+    await expectWaysOutAskOnDirtyForm(page, item, 'HUB-1156');
   });
 }

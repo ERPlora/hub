@@ -58,7 +58,7 @@ async function save(): Promise<void> {
 }
 
 // The kind only says where to search: what would be applied is the product or category picked.
-useUnsavedFormOnOpen('modifier-link-form', () => target.value?.id ?? null, open);
+const canDismiss = useUnsavedFormOnOpen('modifier-link-form', () => target.value?.id ?? null, open);
 </script>
 
 <template>
@@ -70,6 +70,7 @@ useUnsavedFormOnOpen('modifier-link-form', () => target.value?.id ?? null, open)
     :pending="attach.pending.value"
     :error="attach.error.value"
     :submit-disabled="!target"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <div class="modifier-form">

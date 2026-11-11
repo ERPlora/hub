@@ -86,7 +86,7 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen('inventory-category-form', form, open);
+const canDismiss = useUnsavedFormOnOpen('inventory-category-form', form, open);
 </script>
 
 <template>
@@ -99,6 +99,7 @@ useUnsavedFormOnOpen('inventory-category-form', form, open);
     :pending="pending"
     :error="error"
     :submit-disabled="!form.name.trim()"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <div class="category-form">

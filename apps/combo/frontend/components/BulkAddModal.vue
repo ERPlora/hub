@@ -135,7 +135,7 @@ async function save(): Promise<void> {
 }
 
 // What is searched or narrowed only filters the list: what would be added is what is ticked.
-useUnsavedFormOnOpen('combo-bulk', picked, open);
+const canDismiss = useUnsavedFormOnOpen('combo-bulk', picked, open);
 </script>
 
 <template>
@@ -146,6 +146,7 @@ useUnsavedFormOnOpen('combo-bulk', picked, open);
     :submit-label="$t('combo.bulk.addCount', { n: picked.length })"
     :pending="add.pending.value"
     :error="add.error.value"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <div

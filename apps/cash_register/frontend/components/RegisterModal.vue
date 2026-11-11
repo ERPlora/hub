@@ -53,7 +53,7 @@ async function confirm(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen('cash-register-register', name, open);
+const canDismiss = useUnsavedFormOnOpen('cash-register-register', name, open);
 </script>
 
 <template>
@@ -66,6 +66,7 @@ useUnsavedFormOnOpen('cash-register-register', name, open);
     :cancel-label="$t('cash_register.registers.modal.cancel')"
     :pending="pending"
     :error="error"
+    :can-dismiss="canDismiss"
     @submit="confirm"
   >
     <ion-input

@@ -105,7 +105,7 @@ async function save(): Promise<void> {
 }
 
 // What would be sent, so the business's clock answering after it opened is not a change of the person's.
-useUnsavedFormOnOpen(
+const canDismiss = useUnsavedFormOnOpen(
   'attendance-correct',
   () => ({
     clockIn: instant(clockIn.value, props.record?.clock_in_at ?? null),
@@ -126,6 +126,7 @@ useUnsavedFormOnOpen(
     :pending="pending"
     :submit-disabled="!zone"
     :error="problem"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

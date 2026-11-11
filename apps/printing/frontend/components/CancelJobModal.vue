@@ -23,7 +23,7 @@ const t = useT();
 const locale = useLocale();
 const cancel = useCommand('printing.job.cancel');
 const reason = shallowRef('');
-useUnsavedFormOnOpen('printing-cancel-job', reason, open);
+const canDismiss = useUnsavedFormOnOpen('printing-cancel-job', reason, open);
 
 watch(
   open,
@@ -63,6 +63,7 @@ async function confirm(): Promise<void> {
     :cancel-label="$t('printing.jobs.cancel.back')"
     :pending="cancel.pending.value"
     :error="error"
+    :can-dismiss="canDismiss"
     @submit="confirm"
   >
     <div class="printing-cancel">

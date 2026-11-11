@@ -114,7 +114,7 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedForm('task-form', () => (open.value ? form.value : original.value), original);
+const canDismiss = useUnsavedForm('task-form', () => (open.value ? form.value : original.value), original);
 </script>
 
 <template>
@@ -126,6 +126,7 @@ useUnsavedForm('task-form', () => (open.value ? form.value : original.value), or
     :pending="pending"
     :error="error"
     :submit-disabled="!form.title.trim()"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

@@ -54,7 +54,7 @@ async function save(): Promise<void> {
   void toastSuccess(t('customer.create.created', { name: customer.name }));
 }
 
-useUnsavedFormOnOpen('customer-create', () => form.value, open);
+const canDismiss = useUnsavedFormOnOpen('customer-create', () => form.value, open);
 </script>
 
 <template>
@@ -65,6 +65,7 @@ useUnsavedFormOnOpen('customer-create', () => form.value, open);
     :pending="pending"
     :error="failure"
     :submit-disabled="!form.name.trim()"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <CustomerForm

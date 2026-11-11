@@ -324,7 +324,7 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen(ID, form, open);
+const canDismiss = useUnsavedFormOnOpen(ID, form, open);
 </script>
 
 <template>
@@ -338,6 +338,7 @@ useUnsavedFormOnOpen(ID, form, open);
     :pending="pending"
     :error="error"
     :submit-disabled="!complete"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

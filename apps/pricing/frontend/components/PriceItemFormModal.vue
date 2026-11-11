@@ -104,7 +104,7 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen('pricing-item-form', form, open);
+const canDismiss = useUnsavedFormOnOpen('pricing-item-form', form, open);
 </script>
 
 <template>
@@ -116,6 +116,7 @@ useUnsavedFormOnOpen('pricing-item-form', form, open);
     :pending="pending"
     :error="error"
     :submit-disabled="!ready"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

@@ -21,7 +21,7 @@ const props = withDefaults(
   { pending: false },
 );
 const open = defineModel<boolean>('open', { default: false });
-useUnsavedFormOnOpen('inventory-import-tax', () => props.unresolved, open);
+const canDismiss = useUnsavedFormOnOpen('inventory-import-tax', () => props.unresolved, open);
 const emit = defineEmits<{ setChoice: [text: string, patch: Partial<TaxChoice>]; confirm: []; cancel: [] }>();
 
 /** «Pick» without a category or «Create» without a key: nothing to apply yet. */
@@ -45,6 +45,7 @@ function setMode(item: UnresolvedText, event: CustomEvent<{ value?: unknown }>):
     :submit-label="$t('inventory.import.taxConfirm')"
     :submit-disabled="incomplete"
     :pending="pending"
+    :can-dismiss="canDismiss"
     @submit="emit('confirm')"
     @cancel="emit('cancel')"
   >

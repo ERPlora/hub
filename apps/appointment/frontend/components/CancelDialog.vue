@@ -18,7 +18,7 @@ import type { AppointmentRow } from '../operations';
 const props = defineProps<{ appointment: AppointmentRow | null }>();
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('appointment-cancel', () => reason.value, open);
+const canDismiss = useUnsavedFormOnOpen('appointment-cancel', () => reason.value, open);
 
 const t = useT();
 const locale = useLocale();
@@ -61,6 +61,7 @@ async function confirm(): Promise<void> {
     submit-color="danger"
     :pending="cancel.pending.value"
     :error="cancel.error.value"
+    :can-dismiss="canDismiss"
     @submit="confirm"
   >
     <p>

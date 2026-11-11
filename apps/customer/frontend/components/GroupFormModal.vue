@@ -77,7 +77,7 @@ async function save(): Promise<void> {
   void toastSuccess(t(props.group ? 'customer.groups.updated' : 'customer.groups.created'));
 }
 
-useUnsavedFormOnOpen('customer-group-form', () => ({ name: name.value, description: description.value, color: color.value, order: order.value, active: active.value }), open);
+const canDismiss = useUnsavedFormOnOpen('customer-group-form', () => ({ name: name.value, description: description.value, color: color.value, order: order.value, active: active.value }), open);
 </script>
 
 <template>
@@ -88,6 +88,7 @@ useUnsavedFormOnOpen('customer-group-form', () => ({ name: name.value, descripti
     :pending="pending"
     :error="failure"
     :submit-disabled="!name.trim()"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <div class="customer-config-form">

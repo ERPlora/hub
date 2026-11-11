@@ -86,7 +86,7 @@ watch(seriesCode, (code) => {
 });
 /** The window always opens blank, its line at the territory's rate (which may arrive after it opened). */
 const opened = () => ({ series: openedSeries.value, recipient: recipientFrom(null), notes: '', lines: [blankLine(1, defaultRate.value)] });
-useUnsavedForm(
+const canDismiss = useUnsavedForm(
   'invoice-create',
   () => (open.value ? { series: seriesCode.value, recipient: recipient.value, notes: notes.value, lines: lines.value } : opened()),
   opened,
@@ -140,6 +140,7 @@ async function issue(): Promise<void> {
     :pending="command.pending.value"
     :error="error"
     :submit-disabled="!ready"
+    :can-dismiss="canDismiss"
     @submit="issue"
   >
     <template #default="{ fieldErrors }">

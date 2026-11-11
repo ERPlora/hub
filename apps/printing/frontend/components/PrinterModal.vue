@@ -105,7 +105,7 @@ async function confirm(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen(
+const canDismiss = useUnsavedFormOnOpen(
   'printing-printer',
   () => ({ name: name.value, kind: kind.value, address: address.value, port: port.value, paper: paper.value, usage: usage.value, active: active.value }),
   open,
@@ -121,6 +121,7 @@ useUnsavedFormOnOpen(
     :cancel-label="$t('printing.modal.cancel')"
     :pending="pending"
     :error="error"
+    :can-dismiss="canDismiss"
     @submit="confirm"
   >
     <div class="printing-printer">

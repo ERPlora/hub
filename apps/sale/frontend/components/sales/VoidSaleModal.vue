@@ -62,7 +62,7 @@ async function confirm(): Promise<void> {
   emit('voided');
 }
 
-useUnsavedFormOnOpen('sale-void', () => reason.value, open);
+const canDismiss = useUnsavedFormOnOpen('sale-void', () => reason.value, open);
 </script>
 
 <template>
@@ -77,6 +77,7 @@ useUnsavedFormOnOpen('sale-void', () => reason.value, open);
     :cancel-label="$t('sale.void.cancel')"
     :pending="command.pending.value"
     :error="error"
+    :can-dismiss="canDismiss"
     @submit="confirm"
   >
     <p

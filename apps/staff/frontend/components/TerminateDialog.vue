@@ -19,7 +19,7 @@ const props = defineProps<{
 
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('staff-member-terminate', () => ({ lastDay: lastDay.value, reason: reason.value }), open);
+const canDismiss = useUnsavedFormOnOpen('staff-member-terminate', () => ({ lastDay: lastDay.value, reason: reason.value }), open);
 
 const lastDay = ref('');
 const reason = ref('');
@@ -61,6 +61,7 @@ async function terminate(): Promise<void> {
     :submit-label="$t('staff.members.terminate.confirm')"
     :pending="pending"
     :error="error"
+    :can-dismiss="canDismiss"
     @submit="terminate"
   >
     <template #default="{ fieldErrors }">

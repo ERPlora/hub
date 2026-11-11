@@ -39,7 +39,7 @@ const discarding = ref<FailedEvent | null>(null);
 const discardOpen = ref(false);
 const reason = ref('');
 // A typed reason is unsaved: Android's Back asks before dropping it (hub#1046, BASE-F05).
-useUnsavedFormOnOpen('failed-event-discard-dialog', reason, discardOpen);
+const canDismiss = useUnsavedFormOnOpen('failed-event-discard-dialog', reason, discardOpen);
 
 const when = (iso: string) =>
   new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso));
@@ -219,6 +219,7 @@ async function confirmDiscard(): Promise<void> {
       :confirm-label="t('base.system.failed.discardConfirm.confirm')"
       :cancel-label="t('base.system.failed.discardConfirm.cancel')"
       :pending="discard.pending.value"
+      :can-dismiss="canDismiss"
       @confirm="confirmDiscard()"
       @cancel="discardOpen = false"
     >

@@ -114,7 +114,7 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen('inventory-stock-form', () => ({ qty: qty.value, cost: cost.value, reason: reason.value }), open);
+const canDismiss = useUnsavedFormOnOpen('inventory-stock-form', () => ({ qty: qty.value, cost: cost.value, reason: reason.value }), open);
 </script>
 
 <template>
@@ -126,6 +126,7 @@ useUnsavedFormOnOpen('inventory-stock-form', () => ({ qty: qty.value, cost: cost
     :pending="pending"
     :error="error"
     :submit-disabled="!ready || waitsForMoney"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <div class="stock-form">

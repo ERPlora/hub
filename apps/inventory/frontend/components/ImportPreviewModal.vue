@@ -32,7 +32,7 @@ const props = withDefaults(
   { pending: false },
 );
 const open = defineModel<boolean>('open', { default: false });
-useUnsavedFormOnOpen('inventory-import-preview', () => props.mapping, open);
+const canDismiss = useUnsavedFormOnOpen('inventory-import-preview', () => props.mapping, open);
 const emit = defineEmits<{ setMapping: [index: number, field: ProductImportField | '']; confirm: []; cancel: [] }>();
 
 const { t } = useT();
@@ -72,6 +72,7 @@ function pick(index: number, value: unknown): void {
     :submit-label="$t('inventory.import.confirm', { n: ready })"
     :submit-disabled="!canImport"
     :pending="pending"
+    :can-dismiss="canDismiss"
     @submit="emit('confirm')"
     @cancel="emit('cancel')"
   >

@@ -20,7 +20,7 @@ const props = defineProps<{
 
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('staff-role-form', () => form.value, open);
+const canDismiss = useUnsavedFormOnOpen('staff-role-form', () => form.value, open);
 
 interface RoleForm {
   name: string;
@@ -92,6 +92,7 @@ async function save(): Promise<void> {
     :pending="pending"
     :error="error"
     :submit-disabled="!form.name.trim()"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

@@ -140,7 +140,7 @@ async function save(): Promise<void> {
 }
 
 // An untouched supplement follows the business's money when it answers after the window opened: that is no change.
-useUnsavedFormOnOpen(
+const canDismiss = useUnsavedFormOnOpen(
   'modifier-option-form',
   () => {
     const stored = props.option ? moneyFieldText(props.option.price_delta, locale.value, money.value) : '';
@@ -159,6 +159,7 @@ useUnsavedFormOnOpen(
     :pending="pending"
     :error="error"
     :submit-disabled="!money || !form.name.trim()"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

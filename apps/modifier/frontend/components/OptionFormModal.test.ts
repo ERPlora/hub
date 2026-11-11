@@ -292,8 +292,8 @@ describe('OptionFormModal: a business whose money cannot be read (hub#938)', () 
 describe('OptionFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
   it('editing: as opened closes; a change asks; restored as opened closes again', async () => {
     const s = await setup(SODA);
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('modifier-option-form'),
       change: () => ionValue(s.field('name'), 'Cola', 'ionInput'),
       restore: () => ionValue(s.field('name'), SODA.name, 'ionInput'),

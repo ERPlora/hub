@@ -76,7 +76,7 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen(
+const canDismiss = useUnsavedFormOnOpen(
   'schedule-override-form',
   () => ({ startDate: startDate.value, endDate: endDate.value, reason: reason.value, closed: closed.value, rows: rows.value }),
   open,
@@ -92,6 +92,7 @@ useUnsavedFormOnOpen(
     :submit-disabled="!complete"
     :pending="pending"
     :error="error"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

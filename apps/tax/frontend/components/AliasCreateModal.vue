@@ -57,7 +57,7 @@ function cancel(): void {
   reset();
 }
 
-useUnsavedFormOnOpen('tax-alias-form', form, open);
+const canDismiss = useUnsavedFormOnOpen('tax-alias-form', form, open);
 </script>
 
 <template>
@@ -69,6 +69,7 @@ useUnsavedFormOnOpen('tax-alias-form', form, open);
     :pending="pending"
     :error="error"
     :submit-disabled="!complete"
+    :can-dismiss="canDismiss"
     @submit="save"
     @cancel="cancel"
   >

@@ -32,7 +32,7 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen('task-project-form', form, open);
+const canDismiss = useUnsavedFormOnOpen('task-project-form', form, open);
 </script>
 
 <template>
@@ -44,6 +44,7 @@ useUnsavedFormOnOpen('task-project-form', form, open);
     :pending="creation.pending.value"
     :error="creation.error.value"
     :submit-disabled="!form.code.trim() || !form.name.trim()"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

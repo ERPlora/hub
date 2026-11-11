@@ -73,7 +73,7 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen('schedule-day-form', () => ({ weekday: weekday.value, closed: closed.value, rows: rows.value }), open);
+const canDismiss = useUnsavedFormOnOpen('schedule-day-form', () => ({ weekday: weekday.value, closed: closed.value, rows: rows.value }), open);
 </script>
 
 <template>
@@ -84,6 +84,7 @@ useUnsavedFormOnOpen('schedule-day-form', () => ({ weekday: weekday.value, close
     :submit-label="$t('schedule.hours.form.submit')"
     :pending="saving.pending.value"
     :error="saving.error.value"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

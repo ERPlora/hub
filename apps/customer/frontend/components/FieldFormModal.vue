@@ -86,7 +86,7 @@ async function save(): Promise<void> {
   void toastSuccess(t(props.field ? 'customer.fields.updated' : 'customer.fields.created'));
 }
 
-useUnsavedFormOnOpen('customer-field-form', () => ({ name: name.value, fieldType: fieldType.value, options: options.value, order: order.value, required: required.value, active: active.value }), open);
+const canDismiss = useUnsavedFormOnOpen('customer-field-form', () => ({ name: name.value, fieldType: fieldType.value, options: options.value, order: order.value, required: required.value, active: active.value }), open);
 </script>
 
 <template>
@@ -97,6 +97,7 @@ useUnsavedFormOnOpen('customer-field-form', () => ({ name: name.value, fieldType
     :pending="pending"
     :error="failure"
     :submit-disabled="!name.trim()"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <div class="customer-config-form">

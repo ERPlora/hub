@@ -15,7 +15,7 @@ defineProps<{ sale: Pick<SaleRow, 'id' | 'number'> | null }>();
 
 const open = defineModel<boolean>('open', { required: true });
 
-useUnsavedChanges('sale-refund', () => form.value?.unsaved ?? false);
+const canDismiss = useUnsavedChanges('sale-refund', () => form.value?.unsaved ?? false);
 const emit = defineEmits<{ refunded: [] }>();
 
 const form = useTemplateRef<InstanceType<typeof RefundForm>>('form');
@@ -32,6 +32,7 @@ function refunded(): void {
     testid="sale-refund"
     role="alertdialog"
     :title="$t('sale.refund.title', { number: sale?.number ?? '' })"
+    :can-dismiss="canDismiss"
     @submit="form?.confirm()"
   >
     <RefundForm

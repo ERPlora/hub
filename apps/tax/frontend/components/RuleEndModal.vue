@@ -46,7 +46,7 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen('tax-rule-end', validTo, open);
+const canDismiss = useUnsavedFormOnOpen('tax-rule-end', validTo, open);
 </script>
 
 <template>
@@ -60,6 +60,7 @@ useUnsavedFormOnOpen('tax-rule-end', validTo, open);
     :pending="pending"
     :error="error"
     :submit-disabled="!validTo"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

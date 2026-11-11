@@ -15,7 +15,7 @@ import { WEEKDAYS } from '../lib/weekdays';
 const props = defineProps<{ weekday: number }>();
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('reservation-slot-form', () => ({ day: day.value, start: start.value, end: end.value, max: max.value, maxCovers: maxCovers.value }), open);
+const canDismiss = useUnsavedFormOnOpen('reservation-slot-form', () => ({ day: day.value, start: start.value, end: end.value, max: max.value, maxCovers: maxCovers.value }), open);
 
 const t = useT();
 const create = useCommand('reservation.time_slot.create');
@@ -73,6 +73,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
     :pending="create.pending.value"
     :error="failure"
     :submit-disabled="!ready"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

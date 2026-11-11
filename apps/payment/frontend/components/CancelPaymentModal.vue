@@ -23,7 +23,7 @@ const open = defineModel<boolean>('open', { default: false });
 const t = useT();
 const cancel = useCommand('payment.payment.cancel');
 const reason = ref('');
-useUnsavedFormOnOpen('payment-cancel', reason, open);
+const canDismiss = useUnsavedFormOnOpen('payment-cancel', reason, open);
 const title = computed(() => t('payment.payments.cancelForm.title', { reference: props.payment?.reference ?? '' }));
 
 watch(
@@ -60,6 +60,7 @@ async function save(): Promise<void> {
     :pending="cancel.pending.value"
     :error="cancel.error.value"
     :submit-disabled="!reason.trim()"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

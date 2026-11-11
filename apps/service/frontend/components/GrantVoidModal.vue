@@ -22,7 +22,7 @@ const locale = useLocale();
 const money = useBusinessMoney();
 const voiding = useCommand('service.grant.void');
 const reason = ref('');
-useUnsavedFormOnOpen('service-grant-void', reason, open);
+const canDismiss = useUnsavedFormOnOpen('service-grant-void', reason, open);
 
 watch(open, (isOpen) => {
   if (!isOpen) return;
@@ -63,6 +63,7 @@ async function confirm(): Promise<void> {
     :pending="voiding.pending.value"
     :error="voiding.error.value"
     :submit-disabled="!reason.trim()"
+    :can-dismiss="canDismiss"
     @submit="confirm"
   >
     <template #default="{ fieldErrors }">

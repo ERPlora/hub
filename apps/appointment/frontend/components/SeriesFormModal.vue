@@ -41,7 +41,7 @@ const emit = defineEmits<{
 }>();
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('series-form', () => ({ customer: customer.value, services: services.value, staff: staff.value, frequency: frequency.value, weekday: weekday.value, startDate: startDate.value, from: from.value, time: time.value, minutes: minutesTouched.value ? minutes.value : openedMinutes.value, endDate: endDate.value, occurrences: occurrences.value }), open);
+const canDismiss = useUnsavedFormOnOpen('series-form', () => ({ customer: customer.value, services: services.value, staff: staff.value, frequency: frequency.value, weekday: weekday.value, startDate: startDate.value, from: from.value, time: time.value, minutes: minutesTouched.value ? minutes.value : openedMinutes.value, endDate: endDate.value, occurrences: occurrences.value }), open);
 
 const t = useT();
 const client = useLiveClient();
@@ -202,6 +202,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
     :pending="pending"
     :error="error"
     :submit-disabled="!ready"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">
