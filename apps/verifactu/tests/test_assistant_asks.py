@@ -25,12 +25,19 @@ from base import assistant
 from base.models import Membership
 # ``context_of`` is base's fixture (a member of business ``a``, which has every app on, with a role and a language):
 # imported here, pytest hands it to the tests of this module as it does to base's.
-from base.tests.test_assistant_asks import assert_its_asks_bring, comparable, context_of, probe_phrases
+from base.tests.test_assistant_asks import (
+    assert_its_asks_bring,
+    comparable,
+    context_of,
+    place_of_no_ask,
+    probe_phrases,
+)
 
 #: The requests of hub#1089's QA (``tests/e2e/qa/probes/owner-es-verifactu-2026-11-08.json``), as the owner said them,
 #: and nothing of the tools' ``asks``: before VeriFactu said its asks, none of these tools was among the ones a turn
 #: offers (``MAX_TOOLS``) but the queue's retry (24th), so the model answered it had no tool, sent the owner to the
-#: Recovery screen or created another test invoice instead of sealing the record of the one already issued.
+#: Recovery screen or created another test invoice instead of sealing the record of the one already issued. The last
+#: one the model answered right, but Taxes' asks (hub#1166: «fiscal», «registro») took it out of the ones a turn offers.
 REPORTED = [
     ("verifactu.stats.events_recent", "¿cuáles son los cinco acontecimientos fiscales más recientes?"),
     (
@@ -46,6 +53,10 @@ REPORTED = [
     (
         "verifactu.record.create",
         "sella y encadena el registro de la factura de prueba si aún no existiera, con su QR y su lugar en la cola",
+    ),
+    (
+        "verifactu.diagnostic.last",
+        "¿qué resultado dio la última comprobación de conexión con la vía de envío fiscal?",
     ),
 ]
 #: What the owner says in short of the two writes of the issue, beside the QA's long phrases: validating the chain and
@@ -155,19 +166,6 @@ def owners_catalog(context_of, language: str = "es") -> dict[str, Operation]:
     return assistant.catalog(context_of(Membership.Role.OWNER, language))
 
 
-def offered(tools: dict[str, Operation], phrase: str, language: str = "es") -> list[str]:
-    """The tools a turn offers for ``phrase``, best first, ranked as ``base.assistant.RANKING`` says."""
-    return [op.name for op in assistant.relevant(tools, [phrase], language)]
-
-
-def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str, language: str = "es") -> int | None:
-    """The place (1 is first) a turn offers ``name`` at for ``phrase``, none of its asks; ``None`` if not offered."""
-    assert name in tools  # positive control: the person holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get(language, ())}
-    ranked = offered(tools, phrase, language)
-    return ranked.index(name) + 1 if name in ranked else None
-
-
 def verifactu_tools() -> list[str]:
     return sorted(name for name, op in registry.items() if op.app_label == "verifactu" and assistant.is_tool(op))
 
@@ -214,7 +212,7 @@ def test_sealing_the_record_of_an_issued_invoice_comes_before_creating_another_t
     """hub#1089: the owner asked to seal the record of the test invoice already issued, and the model created another
     test invoice (``verifactu.test_invoice.create``): sealing the record of an issued invoice goes ahead of it."""
     tools = owners_catalog(context_of)
-    ranked = offered(tools, dict(REPORTED)["verifactu.record.create"])
+    ranked = [op.name for op in assistant.relevant(tools, [dict(REPORTED)["verifactu.record.create"]], "es")]
     assert "verifactu.record.create" in ranked
     assert "verifactu.test_invoice.create" in tools  # positive control: the owner may create one
     later = ranked.index("verifactu.test_invoice.create") if "verifactu.test_invoice.create" in ranked else len(ranked)
@@ -234,6 +232,7 @@ def test_every_probe_of_verifactu_offers_its_tool_to_whoever_may_run_it(context_
     """The phrases of layer 2 of VeriFactu, the ones the model answered right too: a tool of VeriFactu that a new ask
     elsewhere pushes out of the first half of the ones a turn offers fails here before the real-model QA sees it. What
     the employee asks of a write only who runs the business holds is a refusal: the tool is not theirs to be offered."""
+    assert probe["language"] == "es"  # the QA of VeriFactu asked in Spanish: base's place_of_no_ask ranks in it
     role = {"owner": Membership.Role.OWNER, "employee": Membership.Role.EMPLOYEE}[probe["role"]]
     tools = assistant.catalog(context_of(role, probe["language"]))
     if probe["expect"] == "refused":
@@ -241,7 +240,7 @@ def test_every_probe_of_verifactu_offers_its_tool_to_whoever_may_run_it(context_
         assert probe["tool"] in owners_catalog(context_of, probe["language"])
         assert probe["tool"] not in tools
         return
-    place = place_of_no_ask(tools, probe["tool"], probe["phrase"], probe["language"])
+    place = place_of_no_ask(tools, probe["tool"], probe["phrase"])
     assert place is not None and place <= WITH_ROOM, place
 
 
