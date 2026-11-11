@@ -12,16 +12,18 @@ from pathlib import Path
 
 import pytest
 from django.conf import settings
-from live import assistant as shared
-from live.context import OperationContext, Scope
 from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import assert_its_asks_bring, comparable, probe_phrases
+from base.tests.test_assistant_asks import (
+    assert_its_asks_bring,
+    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
+    comparable,
+    place_of_no_ask,
+    probe_phrases,
+)
 
-A = Scope("host", "a")
 #: Taxes' assistant tools: its reads (the calculator, categories, rules, aliases and the business's tax region) and
 #: its writes (categories, aliases, rules one by one or in a batch, their end, deactivation and reactivation, and the
 #: region). ``tax.rule.get`` is ``INTERNAL``: it only names a rule on a confirmation card.
@@ -97,37 +99,23 @@ OWN_WORDS = [
     ("tax.rule.countries", "¿para qué países están puestos los impuestos?"),
     ("tax.alias.list", "¿qué alias guardé para leer los ficheros de productos?"),
     ("tax.alias.resolve", "el texto «IGIC 7», ¿a qué categoría corresponde?"),
-    ("tax.settings.get", "¿el negocio paga IGIC?"),
+    ("tax.settings.get", "¿llevamos IGIC en la tienda?"),
     ("tax.category.create", "haz una categoría para el calzado con su IVA"),
     ("tax.alias.create", "guarda el alias «menú diario» para la comida"),
     ("tax.rule.create", "el pan va al 4 %: dale su regla de IVA"),
     ("tax.rule.bulk_create", "mete de golpe los tipos de IVA de Francia de 2026"),
     ("tax.rule.end", "el tipo del calzado se acaba en julio: dale a su regla su último día"),
-    ("tax.rule.deactivate", "apaga por ahora la regla del calzado"),
-    ("tax.rule.activate", "que vuelva a valer la regla del calzado"),
-    ("tax.settings.update", "pasa la fiscalidad del negocio a Ceuta"),
+    ("tax.rule.deactivate", "deja en suspenso el IVA del calzado"),
+    ("tax.rule.activate", "recupera el IVA del calzado"),
+    ("tax.settings.update", "nos mudamos a Ceuta: que los impuestos sean los de allí"),
 ]
 
 
 def assert_offered_with_room(tools: dict[str, Operation], name: str, phrase: str) -> None:
     """That ``phrase``, a person's real words of layer 2 and none of the asks of tool ``name``, brings it among the first
     ``WITH_ROOM`` a turn offers."""
-    assert name in tools  # positive control: the person holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
-    assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:10])
-
-
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
+    place = place_of_no_ask(tools, name, phrase)
+    assert place is not None and place <= WITH_ROOM, place
 
 
 def test_tax_offers_its_eighteen_tools():
