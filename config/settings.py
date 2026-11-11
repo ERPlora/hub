@@ -579,6 +579,7 @@ LIVE_ASSISTANT_ASKS_REQUIRED = (
     "staff",
     "table",
     "task",
+    "tax",
     "website",
     "whatsapp_inbox",
 )

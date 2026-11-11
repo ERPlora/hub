@@ -333,6 +333,18 @@ def calculate_tax(
     input=CalculateIn,
     output=CalculationOut,
     ai={
+        "asks": {
+            "en": (
+                "how much VAT does a 12 euro meal carry?",
+                "work out the tax of 50 euros at the reduced rate",
+                "calculate base, tax and total for a 30 € book",
+            ),
+            "es": (
+                "¿cuánto IVA lleva un menú de 15 euros?",
+                "calcula el impuesto de 40 € de cerveza con el IVA incluido",
+                "¿qué base y qué total salen de 100 € en la categoría de libros?",
+            ),
+        },
         "description": "Resolve and calculate the tax of an amount in cents for a tax category (its key, name or "
         "alias), in the business's country and region unless a country is named: base, tax, total, the rate and "
         "the fiscal qualification of the operation. Without an applicable rule it fails instead of guessing a rate."
@@ -406,6 +418,18 @@ def current_rates(categories: list[TaxCategory], country_code: str, region_code:
     output=CategoryPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "list the tax categories",
+                "which VAT categories can a product have?",
+                "show me the tax categories with their rate today",
+            ),
+            "es": (
+                "lista las categorías de impuestos",
+                "¿qué categorías fiscales hay y qué tipo tiene cada una?",
+                "muéstrame las categorías de IVA con su porcentaje",
+            ),
+        },
         "description": "List the active tax categories (the key products and services link to), with the "
         "rate each one has today in a country and region (the business's unless a country is named); search by "
         "key, name or description."
@@ -468,6 +492,18 @@ def category_by_reference(text: str) -> TaxCategory | None:
     output=CategoryOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "does the tax category for books exist?",
+                "check that the tax category product.books exists",
+                "what is the Spanish name of the VAT category for food?",
+            ),
+            "es": (
+                "¿existe la categoría fiscal de libros?",
+                "¿cómo se llama en español la categoría de impuestos product.books?",
+                "dame la categoría fiscal de los medicamentos",
+            ),
+        },
         "description": "Get one tax category by its key, its name or an alias, with its name in the reader's "
         "language (to check that a category exists before linking a product or a service to it)."
     },
@@ -557,6 +593,18 @@ _RULE_COLUMNS = {"tax_category_key": "category__key"}
     output=RulePage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me the tax rules",
+                "which VAT rates apply in Spain?",
+                "list the deactivated tax rules of Portugal",
+            ),
+            "es": (
+                "muéstrame las reglas de impuestos",
+                "¿a qué tipo está hoy el IVA de los libros en España?",
+                "¿qué porcentaje tiene cada regla de IVA de Portugal y desde cuándo?",
+            ),
+        },
         "description": "List the tax rules (the rate of a category in a country or region between two dates, "
         "with its fiscal qualification: subject, exempt, not subject or reverse charge, and its components such "
         "as the equivalence surcharge). Active ones by default; filter by country, region, category, tax type, "
@@ -621,6 +669,18 @@ def list_rules(ctx: OperationContext, params: RuleListIn) -> dict:
     input=RuleStatusIn,
     output=RuleStatusOut,
     ai={
+        "asks": {
+            "en": (
+                "do I have the tax rules the till needs to start selling?",
+                "does the till have the tax rules it needs to sell?",
+                "how many tax rules are in force in Spain today?",
+            ),
+            "es": (
+                "¿le falta alguna regla de impuestos al negocio para poder vender?",
+                "¿hay alguna regla de IVA en vigor para poder cobrar?",
+                "¿cuántas reglas fiscales están en vigor hoy en España?",
+            ),
+        },
         "description": "Whether the business's taxes are configured: how many active root tax rules of its country "
         "(or of the one named) are in force today, and whether Taxes brings that country's rules ready (only "
         "Spain's). Zero means the till cannot price what the business sells until it creates them in Rules."
@@ -671,6 +731,18 @@ def parent_candidates(
     input=RuleParentIn,
     output=RulePage,
     ai={
+        "asks": {
+            "en": (
+                "which rule can the equivalence surcharge hang from?",
+                "list the main VAT rules a surcharge can go under in Spain",
+                "what parent rules are there for a component of the books category?",
+            ),
+            "es": (
+                "¿bajo qué regla raíz puedo poner el recargo de equivalencia de la cerveza?",
+                "lista las reglas principales que admiten un recargo en España",
+                "¿qué reglas pueden ser padre de un componente de la categoría de libros?",
+            ),
+        },
         "description": "List the root tax rules a component (such as the equivalence surcharge) may hang from "
         "in a country, region and category: the ones tax.rule.create accepts as its parent_id."
     },
@@ -700,7 +772,22 @@ def list_parent_candidates(ctx: OperationContext, params: RuleParentIn) -> dict:
     permission="tax.view",
     input=RuleCountriesIn,
     output=RuleCountriesOut,
-    ai={"description": "List the countries the business has tax rules for (all of them, or only active or deactivated)."},
+    ai={
+        "asks": {
+            "en": (
+                "which countries do I have tax rules for?",
+                "in which countries are my VAT rules deactivated?",
+                "show the countries of my VAT rules",
+            ),
+            "es": (
+                "¿de qué países hay reglas fiscales en el negocio?",
+                "¿qué países tienen alguna regla de IVA desactivada?",
+                "lista los países con impuestos configurados",
+            ),
+        },
+        "description": "List the countries the business has tax rules for (all of them, or only active or "
+        "deactivated).",
+    },
 )
 def rule_countries(ctx: OperationContext, params: RuleCountriesIn) -> dict:
     rules = TaxRule.objects.all()
@@ -734,6 +821,18 @@ _ALIAS_COLUMNS = {"tax_category_key": "category__key"}
     output=AliasPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "list the tax aliases",
+                "which aliases of tax categories does the importer know?",
+                "what words of a spreadsheet does the importer read as a VAT category?",
+            ),
+            "es": (
+                "lista los alias de las categorías fiscales",
+                "¿qué alias de impuestos reconoce el importador de inventario?",
+                "enséñame los alias que el importador traduce a una categoría de IVA",
+            ),
+        },
         "description": "List the active category aliases (an outside text such as «beer» or «IVA 10» → the key "
         "of a tax category) that the CSV importer of inventory recognises."
     },
@@ -796,6 +895,18 @@ def resolve_category_text(text: str) -> tuple[str | None, str | None]:
     output=AliasResolveOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which tax category does the text «IVA 10» mean?",
+                "read «beer» as a tax category",
+                "what VAT category would the importer give to «menú del día»?",
+            ),
+            "es": (
+                "¿qué categoría de impuestos significa el texto «cerveza»?",
+                "el importador ha leído «IVA 10»: ¿qué categoría fiscal es?",
+                "traduce «licor» a una categoría de IVA",
+            ),
+        },
         "description": "Read an outside text (a CSV cell such as «IVA 10», «beer» or «comida») as a tax "
         "category: by its key, its name in any language, or a learned alias. Nothing when nothing matches."
     },
@@ -827,6 +938,18 @@ def settings_row(settings: TaxSettings | None) -> dict:
     input=SettingsGetIn,
     output=TaxSettingsOut,
     ai={
+        "asks": {
+            "en": (
+                "which tax region is the business in?",
+                "is the business under VAT, IGIC or IPSI?",
+                "what tax territory does the business operate in?",
+            ),
+            "es": (
+                "¿qué fiscalidad tiene el negocio: península, Canarias, Ceuta o Melilla?",
+                "¿cobro IVA o IGIC?",
+                "dime la región de impuestos del negocio",
+            ),
+        },
         "description": "Read the business's tax region and country: the jurisdiction every sale and invoice is "
         "charged in. ES-CN is the Canary Islands (IGIC), ES-CE Ceuta and ES-ML Melilla (IPSI); empty is the "
         "whole country (VAT). Also the regions it may keep."

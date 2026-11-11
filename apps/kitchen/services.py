@@ -1630,10 +1630,12 @@ def set_route(ctx: OperationContext, data: RoutingSetIn) -> dict:
             "en": (
                 "stop sending the coffee to the grill station",
                 "remove the routing of the desserts",
+                "delete the rule that sends the salads to the cold station",
             ),
             "es": (
                 "quita el enrutado de los postres",
                 "quita el enrutado del café, que vaya con su familia",
+                "borra la regla que manda las ensaladas a la estación de fríos",
             ),
         },
         "description": "Take away where a product or a category goes: from now on it goes by its category, or to no "
