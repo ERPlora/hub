@@ -6,6 +6,7 @@ from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_
 from live.operations import INTERNAL, registry
 
 from apps.combo import queries, services  # noqa: F401  (importing them registers the operations)
+from base import assistant
 
 PERMISSIONS = ["combo.view", "combo.manage"]
 QUERIES = {
@@ -142,6 +143,10 @@ def test_every_operation_tells_the_assistant_what_it_does():
         assert isinstance(op.ai, dict), name
         assert str(op.ai.get("description", "")).strip(), name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
+        # What a person types to ask for it (``asks``, hub#1091): combo is listed in LIVE_ASSISTANT_ASKS_REQUIRED. The
+        # upload of the form's own photo and the reaction to Inventory's deletion declare ``ai`` and are no tool.
+        if assistant.is_tool(op):
+            expected.add("asks")
         assert set(op.ai) == expected, name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, name
