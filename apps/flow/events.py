@@ -9,7 +9,9 @@ event to ``react`` with its id and its actor; ``flow.run.react`` runs as the sys
 transaction, and starts at most one run per automation and event, so a repeated delivery changes
 nothing. Its own events start no automation; the one it hears is ``flow.run.parked``: a run parked on a
 «Call another system» step gets its call made by the worker (``flow.run.call``, FLOW-F27), never inside
-the request that parked it.
+the request that parked it. A card whose personal data Customers erased (``customer.customer.erased``,
+CUSTOMER-F16) first stops the runs that could still go on with her data and makes them forget it
+(``flow.customer.erase``), in the same transaction, and then starts what waits for that event.
 """
 
 from typing import Any
@@ -37,6 +39,9 @@ QUESTION_ASKED = "flow.question.asked"
 QUESTION_ANSWERED = "flow.question.answered"
 QUESTION_EXPIRED = "flow.question.expired"
 
+# Other apps' events (their WORKBOOKs fix the payloads).
+CUSTOMER_ERASED = "customer.customer.erased"
+
 FLOW_EVENTS = [
     FLOW_CREATED,
     FLOW_UPDATED,
@@ -53,8 +58,9 @@ ALL = [*FLOW_EVENTS, *RUN_EVENTS, *DRAFT_EVENTS, *SECRET_EVENTS, *QUESTION_EVENT
 
 #: Any event, as ``live.live_registry.ALL_EVENTS`` names it.
 ANY_EVENT = "*"
-#: Event → the operation of this app that reacts to it: every event of another app, and its own parked runs.
-REACTIONS = {ANY_EVENT: "flow.run.react", RUN_PARKED: "flow.run.call"}
+#: Event → the operation of this app that reacts to it: every event of another app, its own parked runs and,
+#: before the automations it starts, an erased card.
+REACTIONS = {ANY_EVENT: "flow.run.react", RUN_PARKED: "flow.run.call", CUSTOMER_ERASED: "flow.customer.erase"}
 
 
 def react(
@@ -65,12 +71,16 @@ def react(
     event_id: UUID | str,
     actor: str = "",
 ):
-    """Start, as the system, the automations of ``scope`` that wait for the event ``name``.
+    """Start, as the system, the automations of ``scope`` that wait for the event ``name``; an erased card first
+    stops the runs that keep her data (``flow.customer.erase``).
 
     ``None`` for flow's own events, which no automation waits for.
     """
     if name.startswith("flow."):
         return None
+    if name == CUSTOMER_ERASED:
+        forget = get(REACTIONS[CUSTOMER_ERASED])
+        forget(system_context(scope), forget.input.model_validate(payload))
     reaction = get(REACTIONS[ANY_EVENT])
     data = reaction.input.model_validate(
         {"event_id": event_id, "event": name, "payload": payload, "actor": actor}
