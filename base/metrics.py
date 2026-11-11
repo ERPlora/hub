@@ -7,6 +7,8 @@ dimension (``ERPLORA_ENVIRONMENT``):
 - ``ERPlora/Hubs`` (:func:`registry_metrics`, control's registry in one query): ``HubsRequestedAgeSeconds``, since when
   the oldest hub still being prepared waits (requested, creating, migrating, seeding, or failed and retried);
   ``HubsFailed``, how many failed; ``DemosDropPending``, since when the oldest demo that ended waits to be dropped;
+  and (:class:`StuckActivations`) ``AppsActivationStuck``, how many apps of every ready business are stuck turning on
+  (waiting for their tables for more than 10 minutes, or failed; hub#610), each business read in its own database;
 - ``ERPlora/Fiscal`` (:class:`FiscalBacklog`): ``OldestPendingAgeSeconds``, since when the oldest production record
   waits to reach the tax authority. The queue is the records themselves (PLAN-DB §8, «la cola son los propios
   registros»), so every app that keeps one answers ``fiscal_pending_since()`` on its ``LiveAppConfig`` (VeriFactu),
@@ -14,9 +16,10 @@ dimension (``ERPLORA_ENVIRONMENT``):
   without its own, whose host answers 503 until ``manage.py cut_shared_hubs``, is never read).
 
 What is measured is the list :func:`default_collectors` gives: one more measure is one more function there, taking the
-time and the stop request and giving its :class:`Metric` s. A measure that fails is logged and missing from that pass,
-so its alarm (``treat_missing_data = "breaching"``, aws ``stacks/prod/alarms.tf``) also speaks for a blind worker;
-CloudWatch refusing a namespace is logged at ERROR and sent again the next pass; nothing stops the worker.
+time and the stop request and giving its :class:`Metric` s (one read in each business, one more :class:`HubReadings`).
+A measure that fails is logged and missing from that pass, so its alarm (``treat_missing_data = "breaching"``, aws
+``stacks/prod/alarms.tf``) also speaks for a blind worker; CloudWatch refusing a namespace is logged at ERROR and sent
+again the next pass; nothing stops the worker.
 
 Only where ``METRICS_ENABLED`` is on (prod's worker, whose task role may call ``PutMetricData`` on these two
 namespaces): pre has no such permission, nor local development or the tests, and there nothing runs (said once).
@@ -27,6 +30,7 @@ import logging
 import os
 import threading
 import time
+from abc import ABC, abstractmethod
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from functools import partial
@@ -37,10 +41,11 @@ from django.db import close_old_connections
 from live.context import Scope
 from live.meta import all_live_app_configs
 
-from base import relay, services
+from base import queries, relay, services
 from base.tenancy.connections import close_hub_aliases
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.limits import HubBusy
+from control.models import Hub
 from control.queries import registry_health
 
 logger = logging.getLogger(__name__)
@@ -49,9 +54,9 @@ HUBS_NAMESPACE = "ERPlora/Hubs"
 FISCAL_NAMESPACE = "ERPlora/Fiscal"
 #: How often the worker publishes; the alarms read 5-minute periods.
 INTERVAL_SECONDS = 60.0
-#: How long one pass may read the hubs with their own database for the fiscal backlog; the next pass goes on after
-#: the last hub read, each hub's last reading kept meanwhile.
-FISCAL_PASS_SECONDS = 20.0
+#: How long one pass may read the hubs with their own database for one measure (the fiscal backlog, the apps stuck
+#: turning on); the next pass goes on after the last hub read, each hub's last reading kept meanwhile.
+HUBS_PASS_SECONDS = 20.0
 #: The region when the task does not say it (the platform's, PLAN-AWS).
 DEFAULT_REGION = "eu-west-1"
 #: The ``Scope`` kind of a business's hub (``base.worker._serve_hub``).
@@ -106,34 +111,50 @@ def fiscal_pending_since(apps_on: Collection[str] | None = None) -> dt.datetime 
     return min(found, default=None)
 
 
-class FiscalBacklog:
-    """``ERPlora/Fiscal`` ``OldestPendingAgeSeconds``: the oldest fiscal record still to send, of every business.
+class HubReadings(ABC):
+    """A measure read in each business with its own database the worker serves, one hub at a time in its own database
+    (``use_hub``), never in one query across them.
 
-    The hubs with their own database the worker serves (``base.services.hubs_to_serve``: ready, or a business that
-    left whose records must still reach the tax authority; never one without its own database, since S5 there is no
-    shared one) are read in turn, each in its database where the app is on, for ``budget`` seconds a pass; each one's
-    last reading is kept until it is read again, and forgotten when it is no longer served. A hub that cannot be read
-    (busy: a warning; any other failure: an error with its trace) keeps its last reading or, without one that says
-    something waits, waits since its first failure. A stop request ends the pass before the next hub.
+    The hubs :meth:`hubs` gives (``base.services.hubs_to_serve``: ready, or a business that left whose records must
+    still reach the tax authority; never one without its own database, since S5 there is no shared one) are read in
+    turn for ``budget`` seconds a pass; each one's last reading is kept until it is read again, and forgotten when it is
+    no longer read. A hub that cannot be read (busy: a warning; any other failure: an error with its trace) keeps its
+    last reading (:meth:`unreadable` says what it is without one). A stop request ends the pass before the next hub.
     """
 
-    def __init__(self, budget: float = FISCAL_PASS_SECONDS) -> None:
+    #: What a hub's reading is, as the log names it.
+    what = "reading"
+
+    def __init__(self, budget: float = HUBS_PASS_SECONDS) -> None:
         self.budget = budget
-        self._since: dict = {}
+        self._readings: dict = {}
         self._last = None
 
     def __call__(self, now: dt.datetime, stop: threading.Event) -> list[Metric]:
         self._read_hubs(now, stop)
-        found = [since for since in self._since.values() if since is not None]
-        oldest = min(found, default=None)
-        return [Metric(FISCAL_NAMESPACE, "OldestPendingAgeSeconds", seconds_since(oldest, now), "Seconds")]
+        return self.metrics(list(self._readings.values()), now)
+
+    def hubs(self, now: dt.datetime) -> list:
+        """The hubs to read, by id (on control)."""
+        return services.hubs_to_serve(now)
+
+    @abstractmethod
+    def read(self, hub, now: dt.datetime):
+        """``hub``'s reading, in its own database (the active context)."""
+
+    @abstractmethod
+    def metrics(self, readings: list, now: dt.datetime) -> list[Metric]:
+        """The metrics of the last reading of every hub."""
+
+    def unreadable(self, hub, now: dt.datetime) -> None:
+        """A hub that could not be read keeps its last reading; without one, it has none."""
 
     def _read_hubs(self, now: dt.datetime, stop: threading.Event) -> None:
         with use_control():
-            hubs = services.hubs_to_serve(now)
+            hubs = self.hubs(now)
         served = {hub.pk for hub in hubs}
-        for gone in set(self._since) - served:
-            del self._since[gone]
+        for gone in set(self._readings) - served:
+            del self._readings[gone]
         start = next((index for index, hub in enumerate(hubs) if self._last is not None and hub.pk > self._last), 0)
         started = time.monotonic()
         for read, hub in enumerate(hubs[start:] + hubs[:start]):
@@ -145,30 +166,64 @@ class FiscalBacklog:
     def _read(self, hub, now: dt.datetime) -> None:
         try:
             with use_hub(hub):
-                self._since[hub.pk] = fiscal_pending_since(relay.active_apps(Scope(HUB_SCOPE_KIND, hub.slug)))
+                self._readings[hub.pk] = self.read(hub, now)
         except HubBusy:
             # The plan's limit doing its work (a Free hub has one place in this process): no trace, it is no fault.
-            logger.warning("worker: the hub %s is busy; its fiscal backlog is read on the next pass.", hub.slug)
-            self._failed(hub, now)
+            logger.warning("worker: the hub %s is busy; its %s is read on the next pass.", hub.slug, self.what)
+            self.unreadable(hub, now)
         except Exception:
             logger.exception(
-                "worker: the fiscal backlog of the hub %s could not be read; its last reading stays.", hub.slug
+                "worker: the %s of the hub %s could not be read; its last reading stays.", self.what, hub.slug
             )
-            self._failed(hub, now)
+            self.unreadable(hub, now)
         finally:
             close_hub_aliases(hub)
 
-    def _failed(self, hub, now: dt.datetime) -> None:
-        """A hub that could not be read keeps its last reading; without one that says something waits (never read since
-        the worker started, or nothing waited last time), it waits since this first failure: what cannot be read is
-        never «nothing to send», and the alarm pages once that is older than its threshold."""
-        if self._since.get(hub.pk) is None:
-            self._since[hub.pk] = now
+
+class FiscalBacklog(HubReadings):
+    """``ERPlora/Fiscal`` ``OldestPendingAgeSeconds``: the oldest fiscal record still to send, of every business the
+    worker serves, each read in its database where the app is on. A hub that cannot be read keeps its last reading or,
+    without one that says something waits, waits since its first failure."""
+
+    what = "fiscal backlog"
+
+    def read(self, hub, now: dt.datetime) -> dt.datetime | None:
+        return fiscal_pending_since(relay.active_apps(Scope(HUB_SCOPE_KIND, hub.slug)))
+
+    def metrics(self, readings: list, now: dt.datetime) -> list[Metric]:
+        oldest = min((since for since in readings if since is not None), default=None)
+        return [Metric(FISCAL_NAMESPACE, "OldestPendingAgeSeconds", seconds_since(oldest, now), "Seconds")]
+
+    def unreadable(self, hub, now: dt.datetime) -> None:
+        """Without a last reading that says something waits (never read since the worker started, or nothing waited
+        last time), it waits since this first failure: what cannot be read is never «nothing to send», and the alarm
+        pages once that is older than its threshold."""
+        if self._readings.get(hub.pk) is None:
+            self._readings[hub.pk] = now
+
+
+class StuckActivations(HubReadings):
+    """``ERPlora/Hubs`` ``AppsActivationStuck``: how many apps of every ready business are stuck turning on
+    (``base.queries.activations_stuck``: waiting for their tables for more than 10 minutes, or failed; hub#610,
+    PLAN-DB §7), each business read in its own database; 0 when none is. Only the ready ones: a business that left
+    keeps its database for its fiscal records, and nobody waits there for an app. A business that cannot be read counts
+    nothing until it is read: the fiscal backlog already pages for it."""
+
+    what = "count of stuck apps"
+
+    def hubs(self, now: dt.datetime) -> list:
+        return [hub for hub in super().hubs(now) if hub.status == Hub.Status.READY]
+
+    def read(self, hub, now: dt.datetime) -> int:
+        return queries.activations_stuck(hub.slug, now)
+
+    def metrics(self, readings: list, now: dt.datetime) -> list[Metric]:
+        return [Metric(HUBS_NAMESPACE, "AppsActivationStuck", float(sum(readings)), "Count")]
 
 
 def default_collectors() -> list[Collector]:
-    """What each pass measures: the registry's metrics and the fiscal backlog."""
-    return [registry_metrics, FiscalBacklog()]
+    """What each pass measures: the registry's metrics, the fiscal backlog and the apps stuck turning on."""
+    return [registry_metrics, FiscalBacklog(), StuckActivations()]
 
 
 def cloudwatch_client():

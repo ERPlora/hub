@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e8b2e8f3b4bb2fd2eb85363378db4a826043e531bcc57753b752b77bc832d3b2 -->
+<!-- generated from WORKBOOK.md sha256:9f609d294750885203d87b37b19401701cd0ff2d45e8d7f932e8127d93be5b94 -->
 
 ## What it is for and who it is for
 
@@ -415,7 +415,7 @@ On the Employees screens and the API documentation:
 | BASE-F110 | Open the business's website on its own domain | done |
 | BASE-F111 | Wait for the database when it is cut for a moment | done |
 | BASE-F112 | Save a downloaded file inside the app | done |
-| BASE-F113 | Keep warning with the screen off (Android app) | partial — the installed app does not have the order to stay listening yet (hub#836) |
+| BASE-F113 | Keep warning with the screen off (Android app) | done |
 | BASE-F114 | Put a business back as it was at a past moment from the Hub admin | done |
 
 ### BASE-F01 See what the business still has to set up
@@ -2892,8 +2892,7 @@ Involved: HUB_APP-F30 (ERPlora/app), BASE-F35, BASE-F74, BASE-F85, BASE-F90, VER
 INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
 
 ### BASE-F113 Keep warning with the screen off (Android app)
-Status: partial — the Hub's part is done, but the installed app does not have the order to stay listening yet: version
-1.1.34 removed it (ERPlora/app#25) and it comes back with the second part of hub#836
+Status: done
 Actor: system
 Screen: none; on Android, the ongoing notification "ERPlora is listening"
 Steps:
@@ -2910,7 +2909,7 @@ Steps:
 In: the notices the person hears and what Android says about the notices.
 Out: the order to the app to stay listening or to stop. Nothing is kept in the Hub.
 If it fails: with the notices refused ("Not now" to our question, or refused on Android), with nothing to warn about or
-without knowing what Android says, the app is not kept awake. An app without this order (1.1.34) refuses it: the Hub
+without knowing what Android says, the app is not kept awake. An app without this order (1.1.34 and 1.1.35) refuses it: the Hub
 notes it in the console, does not ask again on that page and the person sees no error; the notices arrive with the app
 on screen, as before. If Android does not let it start, the same, and it is asked again at the next sign-in. While the
 Hub does not know yet whether there is something to warn about, it asks the app nothing: reloading the page neither

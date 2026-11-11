@@ -568,12 +568,13 @@ las compras, el gastado, la última compra y la fecha de alta, las compras y los
 y qué se guardó). El aviso de datos borrados (`customer.customer.erased`) lo escuchan WhatsApp,
 Servicios, Citas, Reservas, Reservas online y Mesas para vaciar sus copias, y Automatizaciones, que cancela
 las ejecuciones que aún podían seguir con sus datos (esperando, preguntando o reanudables) y les hace
-olvidar lo que leyeron: ninguna le manda ya nada. Ventas y Facturación conservan su copia fiscal (es un
-documento fiscal).
+olvidar lo que leyeron: ninguna le manda ya nada; y toda ejecución que nombra su ficha, también una ya
+terminada, olvida los textos libres de su historial que pueden llevar su nombre (FLOW-F16). Ventas y
+Facturación conservan su copia fiscal (es un documento fiscal).
 Si falla: «Este cliente ya no está disponible.» si no existe. Repetirlo no cambia los datos ni
 duplica la auditoría, pero vuelve a avisar.
 Implicados: RESERVATION-F22, SERVICE-F29, WHATSAPP_INBOX-F11, APPOINTMENT-F24, ONLINE_BOOKING-F12, TABLE-F31,
-FLOW-F23, FLOW-F24
+FLOW-F16, FLOW-F23, FLOW-F24
 
 ### CUSTOMER-F17 Asignar un cliente a la venta en el TPV
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f09 fi:modules/customers#slot-sales-pos-customer_context-erp-customers-pos-search old:customers/workflow/con-otros-modulos.md#customers-f17 wf:peluqueria-dia#rec_peluqueria-f10 -->

@@ -4527,8 +4527,9 @@ ACTIVATION_LOCKED_SECONDS = 30
 #: How long an app asked by a newer code waits for a worker of that code (PLAN-DB §7: any other worker queues it +60 s).
 ACTIVATION_NEWER_CODE_SECONDS = 60
 #: How long an app waits for a worker of its code before it fails as ``code_behind`` (PLAN-DB §7: 10 minutes, the
-#: alarm's threshold): after a rollback none is coming, and the business tries again, asked by the code that runs now.
-ACTIVATION_CODE_BEHIND_AFTER = dt.timedelta(minutes=10)
+#: alarm's threshold, ``activation.STUCK_AFTER``): after a rollback none is coming, and the business tries again, asked
+#: by the code that runs now.
+ACTIVATION_CODE_BEHIND_AFTER = activation.STUCK_AFTER
 
 
 class AppLimitReached(OperationError):

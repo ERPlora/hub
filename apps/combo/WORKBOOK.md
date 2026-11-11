@@ -267,7 +267,10 @@ Sale: el plato (avisa: plato nuevo, cambiado, reordenado o retirado).
 Si falla: junto al campo: «El plato necesita un nombre.», «El máximo ({max}) queda por debajo del
 mínimo ({min}): nadie podría satisfacer nunca este plato.» y «Ese menú ya tiene un plato «{nombre}».».
 Un mínimo o un máximo por encima de 50 se rechaza, igual que más de 20 platos en un menú («Un menú
-admite como mucho 20 platos.»). Si el servidor rechaza, el formulario lo dice y no pierde lo escrito.
+admite como mucho 20 platos.»). Si el servidor rechaza, el formulario lo dice y no pierde lo escrito. Por el
+asistente, al cambiar o retirar un plato dicho por su nombre, un nombre que vale para varios platos o para ninguno no
+saca tarjeta, y si antes del «sí» otro plato u otro menú encaja mejor con lo dicho no se toca nada y sale la tarjeta
+nueva (BASE-F97).
 Implicados: ninguno
 
 ### COMBO-F06 Elegir los productos de cada plato y su suplemento
@@ -307,7 +310,9 @@ negocio», con el motivo), y ofrece «Reintentar», que la vuelve a pedir; en cu
 enciende (hub#946). «Añadir varios» sin nada marcado: «Marca al menos un producto.»; una búsqueda o una categoría
 sin productos: «Ningún producto coincide.». Si el catálogo no carga, el buscador lo dice con
 «Reintentar». Un producto que aún no existe se crea antes en Inventario: el buscador lo encuentra en
-cuanto se guarda.
+cuanto se guarda. Por el asistente, al cambiar o quitar una elección dicha por su producto, un nombre que vale para
+varias elecciones o para ninguna no saca tarjeta, y si antes del «sí» otra elección u otro menú encaja mejor con lo
+dicho no se toca nada y sale la tarjeta nueva (BASE-F97).
 Implicados: INVENTORY-F27
 
 ### COMBO-F07 Elegir un menú al vender
@@ -530,7 +535,12 @@ para varios menús o para ninguno, no sale ninguna tarjeta: el asistente oye «H
 «vegano»: Menú vegano, Menú vegano sin gluten. Di cuál.» y pregunta cuál, o «Ese menú no existe en este negocio.». El
 «sí» vale solo para el menú que enseñó la tarjeta: si antes de confirmar alguien crea uno que encaja mejor con lo dicho
 («Menú» cuando la tarjeta decía «Menú vegano»), no se toca nada y sale la tarjeta nueva. Un plato o una elección
-dichos por su nombre, y el menú al que pertenecen, todavía salen como se dijeron (hub#1231).
+dichos por su nombre al cambiarlos o retirarlos se buscan igual, dentro de su menú: si lo dicho vale para varios o para
+ninguno, o su menú para varios, no sale ninguna tarjeta y el asistente pregunta cuál; la tarjeta enseña el menú al que
+pertenecen con su nombre entero, y el «sí» vale solo para el plato o la elección que encontró: si antes de confirmar
+alguien añade uno que encaja mejor con lo dicho («Postres» cuando se encontró «Postres caseros») o un menú que encaja
+mejor, no se toca nada y sale la tarjeta nueva (hub#1231). El plato y la elección todavía salen en la tarjeta como se
+dijeron, y al añadir u ordenar platos y elecciones también su menú, sin que el «sí» quede fijado a él (hub#1245).
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -721,9 +731,16 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   `combo.group.reorder`; `combo.combo.upload_image` no es herramienta) declaran `check: combo.combo.get`
   (`base.assistant.checked`): antes de dibujar la tarjeta, el turno busca el menú como lo hará la escritura, un nombre
   que encaja con varios o con ninguno vuelve al modelo, y la huella de la tarjeta lleva el id del menú encontrado, así
-  que el «sí» vale solo para él (hub#1208, hub#1217; `tests/test_assistant_yes_for_its_card.py`). El `combo` de
-  `_ComboOfIn` y los `group` y `product` dichos por su nombre aún no llevan marca ni sus escrituras `check`: dos casos
-  en `xfail(strict=True)` en ese mismo fichero (hub#1231). Las listas
+  que el «sí» vale solo para él (hub#1208, hub#1217; `tests/test_assistant_yes_for_its_card.py`). Las escrituras de un
+  plato o una elección por su id o por su nombre dentro del menú declaran el `check` de su propio registro
+  (`combo.group.update` y `combo.group.delete`, `combo.group.get`; `combo.option.update` y `combo.option.delete`,
+  `combo.option.get`; el del menú leería el id del plato como el de un menú), y el `combo` de su entrada
+  (`_CheckedOfIn`, base de `GroupRefIn` y `OptionRefIn`) lleva `A_MENU_BY_NAME` (hub#1231). La marca y el `check` van
+  juntos: leído por su nombre sin comprobarlo antes, un menú que encaja con varios saldría de la tarjeta, así que las
+  altas y los órdenes (`_ComboOfIn`/`_GroupOfIn`, sin lectura cuya entrada quepa en la suya, `base.E012`) no lo marcan
+  (trinquete `test_a_write_reads_the_menu_said_by_its_name_on_its_card_only_when_it_checks_it`). El `group` y el
+  `product` dichos por su nombre no llevan marca: la plataforma lee un dato marcado por su nombre con él solo, y sin su
+  menú la lectura fallaría siempre (hub#1245, dos casos en `xfail(strict=True)` en ese mismo fichero). Las listas
   cerradas de sus escrituras (cómo se vende el menú) ya llevan su etiqueta en `en` + `es` por los `choices` del
   modelo.
 - El admin de Django del Hub tiene **CRUD completo** sobre los tres modelos (ronda 12, PLAN §17); una

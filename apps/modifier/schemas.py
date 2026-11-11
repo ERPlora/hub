@@ -50,6 +50,11 @@ KITCHEN_TICKET_NAME = gettext_noop("Kitchen ticket name")
 # asks, never by its id: a group, a product and a category by their names; an option by its name and its group, because
 # two groups may have an option with one name; a link by its group and what it hangs from.
 A_GROUP = names("modifier.group.get")
+# A group said by its name, when its id is not known: a group belongs to nothing, so the card reads it by that name
+# alone, as the write will find it, and shows the group the write acts on («Salsas picantes» when the person said
+# «salsa»), not only the words said. Only on the data of the writes that check their record before the card: read
+# without a check, a name two groups fit would leave the group off the card (hub#1218).
+A_GROUP_BY_NAME = names("modifier.group.get", by="group")
 AN_OPTION = names("modifier.option.get", name=("label",))
 A_LINK = names("modifier.link.get", name=("label",))
 A_PRODUCT = names("inventory.product.get")
@@ -124,7 +129,9 @@ class Page(Schema, Generic[T]):
 class GroupRefIn(_Input):
     id: UUID | None = Field(None, title=GROUP, description="The group's id.", json_schema_extra=A_GROUP)
     group: Said | None = Field(
-        None, description="The group's name, when its id is not known (e.g. «Sauces»)."
+        None,
+        description="The group's name, when its id is not known (e.g. «Sauces»).",
+        json_schema_extra=A_GROUP_BY_NAME,
     )
 
     @model_validator(mode="after")
@@ -263,6 +270,7 @@ class OptionRefIn(_Input):
     group: Said | None = Field(
         None,
         description="Its group's name, when two groups have an option with that name.",
+        json_schema_extra=A_GROUP_BY_NAME,
     )
 
     @model_validator(mode="after")
@@ -369,7 +377,7 @@ class LinkRefIn(_Target):
     id: UUID | None = Field(None, title=APPLIES_TO, description="The link's id.", json_schema_extra=A_LINK)
     group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=A_GROUP)
     group: Said | None = Field(
-        None, description="The group's name, when its id is not known."
+        None, description="The group's name, when its id is not known.", json_schema_extra=A_GROUP_BY_NAME
     )
 
     @model_validator(mode="after")

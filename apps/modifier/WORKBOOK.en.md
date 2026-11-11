@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0a0540af0cbe5663d43533d9573287c682dbc768e76bfc6032c9aeb86f529493 -->
+<!-- generated from WORKBOOK.md sha256:7b519c112224d83d4e7b32cc34972e81bc8144d8317cb95dbff47240c58a3e4a -->
 
 ## What it is for and who it is for
 
@@ -187,7 +187,9 @@ single operation (announces: group deleted). What was already ordered or sold do
 freezes the supplement in the line.
 If it fails: the same refusals as when creating; lowering the maximum below the options that already
 come by default, "This group has more options chosen by default than its maximum.". A group that does
-not exist, "This group does not exist.".
+not exist, "This group does not exist.". Through the assistant, a name that fits several groups or none brings up
+no card, and if before the "yes" another group fits better what was said, nothing is changed or deleted and the new
+card comes up (BASE-F97).
 Involved: SALE-F11
 
 ### MODIFIER-F04 Add, change or remove the options of a group
@@ -218,7 +220,9 @@ empty name or one repeated in the group, a supplement that is not an amount, a t
 category that does not exist in Taxes or more default options than the maximum show next to their
 field. An option with its own tax category is charged on a separate line, which cannot be worth zero or
 less: "An option with its own tax category is billed on a line of its own: its supplement must be more
-than zero.". A group holds up to 100 options.
+than zero.". A group holds up to 100 options. Through the assistant, when changing or removing an option, a group
+said by its name that fits several or none brings up no card, and if before the "yes" another group fits better what
+was said, nothing is touched and the new card comes up (BASE-F97).
 Involved: SALE-F11
 
 ### MODIFIER-F05 Link a group to products or categories, and unlink it
@@ -237,7 +241,10 @@ Out: the link (announces: link made or removed). At the till, the item asks for 
 **all** its categories, each group only once.
 If it fails: a product or a category that does not exist or is deleted, "This product does not exist in
 this hub." or "This category no longer exists."; a link that already exists, "This group already
-applies there.".
+applies there.". Through the assistant, unlinking a group said by its name that fits several or none brings up no
+card, and if before the "yes" another group fits better what was said, nothing is unlinked and the new card comes up
+(BASE-F97). A link to a product or a category already deleted brings up no card either ("This group does not apply
+there."): MODIFIER-F09 removes it.
 Involved: INVENTORY-F01, INVENTORY-F06
 
 ### MODIFIER-F06 Choose the options when selling an item
@@ -333,7 +340,15 @@ own session) and the API, with the same rules and the same permissions. Designed
 named by its id or its name ("group Sauces"), an option by its id or its name and its group ("option No
 onion of Extras"), a product by its id, its SKU or its name and a category by its id or its name. If a
 name fits several, it is refused saying which ones (409 `*_ambiguous`). Before changing anything, the assistant asks
-for confirmation with its card (BASE-F97), which names each record as the screens name it, never by its id.
+for confirmation with its card (BASE-F97), which names each record as the screens name it, never by its id. A group
+said by its name when changing or deleting it, when changing or removing one of its options or when unlinking it from a
+product or a category is looked up as the action will look it up (the same name before one that contains it), and the
+card shows the group that will be touched, with its full name ("Group: Spicy sauces" when "sauce" was said). If what
+was said fits several groups or none, no card comes up: the assistant hears "«sauces» names several groups: Spicy
+sauces, Sweet sauces. Say which one." and asks which one, or "This group does not exist.". The "yes" counts only for
+what the card showed: if, before confirming, someone creates a group that fits better what was said ("Sauce" when the
+card said "Spicy sauces"), nothing is touched and the new card comes up. When adding an option to a group or applying
+it said by its name, the group still comes up as it was said, and so does an option said by its name (hub#1245).
 
 ### What it offers: queries (they read, they change nothing)
 

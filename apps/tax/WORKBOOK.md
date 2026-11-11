@@ -758,10 +758,10 @@ cajero del producto actual es un empleado.
   empleado no puede hacer (las escrituras, `tax.manage`) ni se le ofrece. Además, una frase propia por
   herramienta (`OWN_WORDS`, ni ask ni sonda) que solo llega entre las diez primeras por sus `asks`: cambiar
   las de cualquier herramienta lo ve un test. live lee «activar» y «desactivar» como las acciones `activate` y
-  `deactivate` desde ERPlora/live#70, pero toma la app que nombra un complemento con «de» («la regla española
-  de product.qa»: Productos) por lo que se enciende: hasta ERPlora/live#73, reactivar y desactivar una regla
-  en esas frases de la QA salen detrás de encender o apagar una app (`base.app.enable`/`disable`); lo fija un
-  `xfail` estricto que se pone rojo con ese puntero.
+  `deactivate` desde ERPlora/live#70, y «regla» como `rule` desde ERPlora/live#73: aunque «de product.qa»
+  nombre Productos, en esas frases de la QA reactivar y desactivar la regla salen antes que encender o apagar
+  una app (`base.app.enable`/`disable`), y lo vigila
+  `test_the_reported_request_offers_its_tool_before_the_switch_of_an_app`.
   Sin sinónimos propios en
   `base.assistant.SYNONYMS`: «desactiva» ya lo lee el grupo de Personal (hub#1103), y una palabra suelta
   para «termina» o «activa» arrastraría las tareas terminadas o las reglas «activas» de una lista.

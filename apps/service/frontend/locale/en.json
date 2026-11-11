@@ -204,7 +204,7 @@
     },
     "grants": {
       "title": "Sold vouchers",
-      "hint": "Every customer who bought this voucher, with the sessions used and left. A live voucher can get extra sessions or a later expiry as a courtesy, or have sessions removed to correct its balance; a sale nothing was used from can be voided.",
+      "hint": "Every customer who bought this voucher, with the sessions used and left. On a live voucher you can spend a session done outside the till, give extra sessions or a later expiry as a courtesy, or remove sessions to correct its balance; a sale nothing was used from can be voided.",
       "empty": "Nobody has bought this voucher yet.",
       "error": "Could not load the sold vouchers",
       "status": {
@@ -222,6 +222,7 @@
       "given": "Given afterwards: +{uses} session(s), +{days} day(s)",
       "corrected": "Corrected afterwards: −{uses} session(s)",
       "voidedBy": "Voided by {who} on {when}",
+      "redeem": "Spend a session",
       "adjust": "Adjust",
       "void": "Void"
     },
@@ -250,6 +251,27 @@
       "expiresOn": "expires {when}",
       "neverExpires": "never expires",
       "confirm": "Adjust"
+    },
+    "redeem": {
+      "title": "Spend a session",
+      "message": "Mark one session of {customer}'s «{package}» voucher as delivered, outside the till.",
+      "service": "Service",
+      "servicePlaceholder": "Choose the service",
+      "member": "Professional",
+      "memberHelp": "Who did it: what the session is worth counts in their production in Sales. Optional.",
+      "note": "Note",
+      "balance": "{n} session left · {after} after this one | {n} sessions left · {after} after this one",
+      "unlimited": "No session limit",
+      "checking": "Checking the voucher…",
+      "refused": "This session cannot be spent",
+      "reason": {
+        "voided": "This voucher was voided: it can no longer be used.",
+        "expired": "This voucher has expired.",
+        "no_uses_left": "This voucher has no sessions left.",
+        "does_not_cover_service": "This voucher does not cover that service."
+      },
+      "checkError": "The voucher could not be checked",
+      "confirm": "Spend session"
     },
     "movements": {
       "title": "Voucher movements",

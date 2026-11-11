@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:10432a7b759c7417929a173c1847e2dc2c9f1cc4b42972756310a86939fba565 -->
+<!-- generated from WORKBOOK.md sha256:7f40168d9ff25396680a669bfa473b1c731b4f1f53eb0ff0c96c0e45eec3322d -->
 
 ## What it is for and who it is for
 
@@ -135,7 +135,15 @@ and **Load more** with "Showing {shown} of {total}" when there are more:
 - **Sold vouchers**: one row per purchase, with **Active** or **Voided**, the customer, the date, the
   amount, "{used} used · {remaining} left" (or "· no limit"), "Expires …" or "Never expires" and what
   was given or corrected afterwards; on a voided one, "Voided by {who} on {when}" and the reason.
-  **Adjust** and **Void** buttons where they apply. Empty: "Nobody has bought this voucher yet.".
+  **Spend a session** (on a voucher neither voided nor expired and with a session left, or with no limit),
+  **Adjust** and **Void** buttons where they apply and for whoever may.
+  Empty: "Nobody has bought this voucher yet.".
+  - **Spend a session** opens its dialog: "Mark one session of <customer>'s "<voucher>" voucher as delivered,
+    outside the till.", the balance "{n} sessions left · {after} after this one" ("1 session left · 0 after this
+    one"; "No session limit" on one without a limit), **Service** ("Choose the service", only those the voucher
+    covers; with a single one, already chosen), **Professional** (Staff's team; "Who did it: what the session is
+    worth counts in their production in Sales. Optional."), **Note** and the **Cancel** and **Spend session**
+    buttons. While it checks the voucher, "Checking the voucher…".
 - **Vouchers with no customer**: the live vouchers whose card was deleted or anonymised, with
   "{remaining} session(s) left", "No session limit" or "Fully used", the voucher, the amount, "Customer
   deleted on {when}", "Expired" if it is and "Customer reference: <identifier>". Empty: "No voucher has
@@ -190,7 +198,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | SERVICE-F18 | Give sessions, extend the expiry or correct the balance | done |
 | SERVICE-F19 | See a voucher's movements | done |
 | SERVICE-F20 | A voucher expires | done |
-| SERVICE-F21 | Spend a session outside the checkout | done (assistant and API) |
+| SERVICE-F21 | Spend a session outside the checkout | done |
 | SERVICE-F22 | Pay a line with a voucher | done (with Sales, SALE-F27) |
 | SERVICE-F23 | Release the session if the line or the check goes away | done |
 | SERVICE-F24 | Mark the sessions as spent when charging | done (not granting the vouchers sold on the receipt: see "What is left out") |
@@ -507,10 +515,11 @@ Steps:
 3. **Load more** brings the next page; **Close** goes back to the table.
 In: the purchases of that voucher and the name of each customer (Customers); for a deleted card, its
 identifier.
-Out: nothing; read only. **Adjust** and **Void** show where they apply and for whoever may.
+Out: nothing; read only. **Spend a session** (SERVICE-F21), **Adjust** and **Void** show where they apply and
+for whoever may.
 If it fails: empty, "Nobody has bought this voucher yet."; if it cannot be read, "Could not load the sold
 vouchers" with the reason.
-Involved: SERVICE-F17, SERVICE-F18
+Involved: SERVICE-F17, SERVICE-F18, SERVICE-F21
 
 ### SERVICE-F17 Void a voucher sold by mistake
 Status: done
@@ -582,14 +591,24 @@ expired.".
 Involved: SERVICE-F18, SERVICE-F21
 
 ### SERVICE-F21 Spend a session outside the checkout
-Status: done (assistant and API)
+Status: done
 Actor: employee, manager, assistant
-Screen: assistant
+Screen: Packages, assistant
 Steps:
-1. If you want, ask the assistant first whether a session of that voucher could be spent and why not.
-2. Ask the assistant to spend a session of a voucher the customer bought, and if you want say which
+1. In **Packages**, in the voucher's row tap **Sold vouchers** and, on the customer's purchase, **Spend a
+   session**. The button shows on a voucher neither voided nor expired and with a session left (or with no limit):
+   on an expired or used-up one the row already says so, and **Adjust** (SERVICE-F18) gives it days or sessions back.
+2. The dialog checks when it opens, and each time you change the service, whether it can be spent: if not, it says
+   why ("This session cannot be spent" and the reason) and **Spend session** cannot be tapped; if so, it shows the
+   balance, "3 sessions left · 2 after this one".
+3. Choose the **Service** that was done (among those the voucher covers; with a single one it is already chosen),
+   if you want the **Professional** who did it and a **Note**, and tap **Spend session**. The dialog closes and the
+   row's balance drops at once. With something chosen or typed, **Cancel**, the "×", Escape or a tap outside ask
+   "Discard changes?" first.
+4. With the assistant: if you want, ask it first whether a session of that voucher could be spent and why not.
+5. Ask the assistant to spend a session of a voucher the customer bought, and if you want say which
    service was done, which professional did it ("Ana did it") and link it to the appointment or the sale.
-3. The assistant's confirmation card names the voucher, the service and the professional and, if you link them, the
+6. The assistant's confirmation card names the voucher, the service and the professional and, if you link them, the
    appointment as Appointments' cards say it ("Lucía Pérez · Tuesday, Nov. 3, 2026 · 10:00 · Ana López") and the sale
    by its number; confirm it.
 In: the purchase of the voucher; the service and the professional of Staff's team who did it; the
@@ -604,11 +623,16 @@ production. Without Sales in the business, the session is spent all the same and
 no production to count it in. It issues no tax document.
 If it fails: "This voucher was voided: it can no longer be used.", "This voucher has no sessions left.",
 "This voucher has expired.", "This voucher does not cover that service. A voucher of haircuts pays for
-haircuts, not for the shampoo." or "That voucher sale does not exist in this business.". A professional who is
+haircuts, not for the shampoo." or "That voucher sale does not exist in this business.". In the dialog, the reason
+shows before spending, under "This session cannot be spent" ("This voucher was voided: it can no longer be used.",
+"This voucher has expired.", "This voucher has no sessions left." or "This voucher does not cover that service.":
+seen by whoever had the sheet open when another till spent the last session or the voucher expired);
+if it cannot be checked, "The voucher could not be checked" with the reason, and on spending the server decides;
+its refusal stays in the dialog without losing what was chosen. A professional who is
 not on the team (or has already left), "That staff member does not exist in this business."; a name that fits
 several, "There are several staff members called "…": …. Say which one.". Nothing is spent. Two tills that
 spend the last session at the same time go in line and the second one gets the real reason.
-Involved: SERVICE-F19, SERVICE-F20, SERVICE-F24, SALE-F28, STAFF-F21
+Involved: SERVICE-F16, SERVICE-F19, SERVICE-F20, SERVICE-F24, SALE-F28, STAFF-F21
 
 ### SERVICE-F22 Pay a line with a voucher
 Status: done (with Sales, SALE-F27)

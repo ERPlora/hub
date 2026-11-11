@@ -219,6 +219,9 @@ SYNONYMS = (
      "los puestos", "que puesto", "que puestos", "cada puesto", "por puesto"),
     ("urgente", "urgentes", "urgencia", "prisa", "rush", "urgent"),
     ("enrutado", "enrutados", "enrutar", "enruta", "enrutamiento", "routing", "route", "routes"),
+    # the «regla» that sends a product or a family to a station is its routing (``kitchen.routing``): live reads
+    # «regla» as any rule («rule», as Taxes' and Pricing's, ERPlora/live#73), and the QA says it of the routing.
+    ("regla", "routing"),
     ("bump", "como listo", "como listos", "como lista", "como listas", "como hecho", "como hechos", "como hecha",
      "como hechas"),
     ("recall", "a pendientes", "a pendiente", "a preparacion", "a preparar"),
