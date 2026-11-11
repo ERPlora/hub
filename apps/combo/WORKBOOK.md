@@ -684,6 +684,17 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   es por operación, no por campo) y todo campo de entrada lleva `description`. Salvo dos lecturas internas
   (`ai=INTERNAL`, sin API) que solo nombran un registro en la tarjeta del asistente: `combo.option.get` (hub#561) y
   `combo.group.get` (hub#669); el modelo lee los platos y las elecciones con su menú.
+- **Asks del asistente** (hub#1091): las 18 herramientas dicen lo que una persona escribe para pedir cada una, en `en`
+  y `es` (`combo` está en `LIVE_ASSISTANT_ASKS_REQUIRED` y `base/tests/test_assistant_asks.py` exige que cada frase
+  traiga su herramienta entre las diez primeras, por rol). Sin ellos, «ordena las opciones de…» ofrecía antes cambiar el
+  menú, la elección o una impresora que reordenar, y el modelo borraba las elecciones y las creaba de nuevo.
+  `base.assistant.SYNONYMS` lee «opción» y «elección» como la elección de un plato (`combo.option`, también
+  `modifier.option`). `tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
+  (`tests/e2e/qa/probes/*-es-combo-*.json` y las de preparar la venta), nunca con los propios `asks`, y con una frase
+  propia por herramienta que solo la trae con sus asks; el empleado no recibe ninguna escritura. Trampas medidas:
+  «ordena» y «orden» tienen la raíz de «ordenador» y nombran también los dispositivos (ERPlora/live#61), «ejecutivo»
+  la de «ejecución» (Automatizaciones), «paso» es la palabra de los pasos de una automatización y «del día», «euros» o
+  «café» en los asks suben las herramientas de Menús en las peticiones de Ventas e Inventario que lo dicen.
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#669): nombra el registro que una escritura señala por su
   id con las marcas `refers` de `schemas.py`, leídas como quien pregunta: el menú por su `name` con
   `combo.combo.get` (`A_MENU`: el `id` de `ComboRefIn` y el `combo_id` de `_ComboOfIn`), el plato por su `name` con
