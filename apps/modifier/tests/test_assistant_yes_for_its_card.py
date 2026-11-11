@@ -7,7 +7,8 @@ before any card (``check``): the group's own read when the group is the record, 
 group said by its name finds them. The card says the group it found («Salsas picantes» when the person said «salsa»),
 a name two groups fit or none has draws no card, and a yes after another group fits the name better runs nothing and
 shows the new card, as Demo (hub#1206) and Menus (hub#1217) do (MODIFIER-F03, MODIFIER-F04, MODIFIER-F05,
-BASE-F97).
+BASE-F97). Adding an option to a group or applying it, which cannot check it, reads it the same way and says it as said
+when two fit; an option said by its name is read with its group (hub#1245).
 """
 
 import json
@@ -39,9 +40,12 @@ CHECKS = {
 }
 WRITES = sorted(CHECKS)
 #: The writes that take a group by its name with no read whose input fits theirs to check it with (``base.E012``:
-#: ``modifier.group.get`` takes an ``id``, which adding an option or applying a group has not): their card says the
-#: group as it was said (hub#1245).
+#: ``modifier.group.get`` takes an ``id``, which adding an option or applying a group has not): their card reads the
+#: group by its name all the same, so the yes holds to it, and says it as said when two fit (hub#1245).
 UNCHECKED = ("modifier.link.attach", "modifier.option.create")
+#: How the card reads a group and an option said by their names: an option inside its group, when it is told.
+A_GROUP_SAID = names("modifier.group.get", by="group", as_said=True)
+AN_OPTION_SAID = names("modifier.option.get", by="option", within=("group_id", "group"), name=("label",), as_said=True)
 
 
 def by_its_name(said: str) -> dict[str, dict]:
@@ -199,16 +203,23 @@ def test_only_the_writes_that_take_a_group_by_its_name_check_their_record():
     assert {name: read for name, read in declared.items() if read is not None} == CHECKS
 
 
-def test_a_write_reads_the_group_said_by_its_name_on_its_card_only_when_it_checks_it():
-    """Read by its name with no check before it, a name two groups fit would leave the group off the card (the read
-    fails and the card names nobody it cannot read): only a write that checks its record reads its group by its name."""
-    reading = {
-        op.name
+def test_every_write_that_takes_a_group_or_an_option_by_its_name_reads_it_and_says_it_as_said_when_it_cannot():
+    """With or without a check before it, a group said by its name is read on its card, and stays on it as said when it
+    cannot be read (two fit): never off it. An option, with its group."""
+    marks = {
+        (op.name, datum): op.input.model_fields[datum].json_schema_extra
         for op in modifier_writes()
-        if "group" in op.input.model_fields
-        and op.input.model_fields["group"].json_schema_extra == names("modifier.group.get", by="group")
+        for datum in ("group", "option")
+        if datum in op.input.model_fields
     }
-    assert reading == set(CHECKS)
+    assert {key for key, mark in marks.items() if key[1] == "group" and mark == A_GROUP_SAID} == {
+        (name, "group") for name in [*CHECKS, *UNCHECKED]
+    }
+    assert {key for key, mark in marks.items() if key[1] == "option" and mark == AN_OPTION_SAID} == {
+        ("modifier.option.delete", "option"),
+        ("modifier.option.update", "option"),
+    }
+    assert {key for key, mark in marks.items() if mark not in (A_GROUP_SAID, AN_OPTION_SAID)} == set()
 
 
 @pytest.mark.parametrize("write", UNCHECKED)
@@ -219,14 +230,12 @@ def test_a_group_two_fit_stays_on_the_card_of_a_write_that_cannot_check_it(write
     assert fields_of(write, by_its_name("salsas")[write], "es")["group"]["value"] == "salsas"
 
 
-# ── Not yet: a group added to or applied by its name, and an option said by its name (hub#1245) ─────────────────────
-# Adding an option to a group or applying a group, said by its name, has no read whose input fits to check it with, so
-# the card says the group as said and nothing holds the yes to it; an option said by its name needs its group to be
-# found, and the platform reads a datum by its name with that datum alone (``base.assistant._reference``), so its card
-# says it as said. Strict: once the platform reads them with their neighbours, these pass and their marks go.
+# ── A group added to or applied by its name, and an option said by its name (hub#1245) ───────────────────────────────
+# Adding an option to a group or applying a group, said by its name, has no read whose input fits to check it with: its
+# card reads the group by its name all the same, so the group it found goes in its fingerprint and the yes holds to it.
+# An option said by its name is read with its group (``within``), as the write finds it.
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="hub#1245: a group said by its name, with no check")
 @pytest.mark.parametrize("write", UNCHECKED)
 def test_the_yes_to_adding_or_applying_touches_only_the_group_its_card_showed(write):
     """«salsa» shows «salsa»; somebody creates «Salsa» before the yes: the yes adds or applies nothing."""
@@ -235,12 +244,26 @@ def test_the_yes_to_adding_or_applying_touches_only_the_group_its_card_showed(wr
     assert state() == before
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="hub#1245: an option said by its name needs its group")
+@pytest.mark.parametrize("write", UNCHECKED)
+def test_a_write_that_cannot_check_it_says_the_group_it_finds(write):
+    a_group("Salsas picantes")
+    assert fields_of(write, by_its_name("salsa")[write], "es")["group"]["value"] == "Salsas picantes"
+
+
 @pytest.mark.parametrize("write", ["modifier.option.delete", "modifier.option.update"])
 def test_the_card_says_the_option_it_finds(write):
     a_group("Salsas picantes")
     arguments = {**by_its_name("salsa")[write], "option": "ali"}
     assert fields_of(write, arguments, "es")["option"]["value"] == "Alioli (Salsas picantes)"
+
+
+@pytest.mark.parametrize("write", ["modifier.option.delete", "modifier.option.update"])
+def test_an_option_two_groups_have_stays_on_the_card_as_said(write):
+    """«ali» with no group: «Alioli» of «Salsas picantes» and of «Salsas dulces» fit, and the card says «ali»."""
+    a_group("Salsas picantes")
+    a_group("Salsas dulces")
+    arguments = {key: value for key, value in by_its_name("salsa")[write].items() if key != "group"}
+    assert fields_of(write, {**arguments, "option": "ali"}, "es")["option"]["value"] == "ali"
 
 
 # ── A link to something Inventory deleted, until MODIFIER-F09 lets it go ─────────────────────────────────────────────
