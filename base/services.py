@@ -4775,6 +4775,7 @@ def _app_answer(label: str, row: activation.Activation, along: list[dict[str, st
                 "ponme la app de cocina",
                 "activa el módulo de citas",
                 "recupera la app de fichajes que quité del menú",
+                "vuelve a dejar disponible la app de tareas",
             ),
         },
     },
