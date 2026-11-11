@@ -8,19 +8,20 @@ each.
 """
 
 import pytest
-from live.context import OperationContext, Scope
 from live.errors import Conflict
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
 from apps.customer.models import Customer
 from apps.customer.schemas import MergeIn
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
+from base.tests.test_assistant_asks import (
+    assert_its_asks_bring,
+    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
+)
 
 from .conftest import ctx_for
 
-A = Scope("host", "a")
 #: Writes on cards and settings that only the owner and the admin hold, none of them a manager approves: an employee's
 #: assistant is never offered them (an approvable write is, as its button on the screen: running it asks a manager).
 NOT_THE_EMPLOYEES = {
@@ -29,20 +30,6 @@ NOT_THE_EMPLOYEES = {
     "customer.group.delete",
     "customer.tag.delete",
 }
-
-
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(
-            scope=A, actor=user.username, permissions=permissions_for(user, A), language=language
-        )
-        return assistant.catalog(ctx)
-
-    return of
 
 
 def test_customer_offers_at_least_30_tools():
@@ -60,17 +47,14 @@ def test_an_employee_is_never_offered_what_only_the_owner_may_do(catalog_of):
     assert "customer.customer.create" in employee  # positive control: the employee's own writes are there
 
 
-#: What the owner or a manager asks about a customer's orders, with the tool of Customers that answers it: its own asks
-#: and phrases nobody wrote yet. With every app on, these tools tied on the tenth place with other apps' order tools and
+#: What the owner or a manager asks about a customer's orders, with the tool of Customers that answers it: phrases
+#: nobody wrote as its asks (the sweep of ``base/tests/test_assistant_asks.py`` already ranks those, so one here would
+#: measure nothing; hub#1135). With every app on, these tools tied on the tenth place with other apps' order tools and
 #: got in only by name (hub#594): one more phrase about «pedido» elsewhere left them out.
-ORDER_ASKS = [
-    ("en", "customer.order.list", "what orders does Pedro have?"),
+ORDER_PHRASES = [
     ("en", "customer.order.list", "show me Pedro's orders"),
-    ("es", "customer.order.list", "¿qué pedidos tiene el cliente Pedro?"),
     ("es", "customer.order.list", "¿qué pedidos ha hecho Ana?"),
-    ("en", "customer.order.customer", "who's on this order?"),
     ("en", "customer.order.customer", "which customer is this order for?"),
-    ("es", "customer.order.customer", "¿de quién es este pedido?"),
     ("es", "customer.order.customer", "¿a qué cliente pertenece este pedido?"),
 ]
 #: The first places a turn offers that these tools come within: three short of the QA's first ten
@@ -81,12 +65,51 @@ WITH_ROOM = 7
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.MANAGER])
-@pytest.mark.parametrize(("language", "name", "phrase"), ORDER_ASKS)
+@pytest.mark.parametrize(("language", "name", "phrase"), ORDER_PHRASES)
 def test_a_customers_orders_bring_the_tool_of_customers_with_room_to_spare(catalog_of, role, language, name, phrase):
     tools = catalog_of(role, language)
     assert name in tools  # positive control: the role holds the tool, so its place is known
     offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
     assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:WITH_ROOM])
+
+
+#: A customer's orders in words that are no ask nor probe and that only their tool's asks bring among the first ten,
+#: one per tool and language: the phrases above come by name too (without ``customer.order.customer``'s asks, the
+#: Spanish and the English one still come 7th or before), so a change to the asks is seen here (hub#1135). With its
+#: asks, each is 4th to 5th for the owner and the manager; without them, 12th to 28th.
+OWN_WORDS = [
+    ("en", "customer.order.list", "what has Ana ordered so far?"),
+    ("es", "customer.order.list", "¿qué pedidos ha hecho Ana?"),
+    ("en", "customer.order.customer", "tell me whose order this is"),
+    ("es", "customer.order.customer", "¿a nombre de quién va este pedido?"),
+]
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.MANAGER])
+@pytest.mark.parametrize(("language", "name", "phrase"), OWN_WORDS)
+def test_a_customers_orders_in_the_persons_own_words_reach_their_tool_by_its_asks(
+    catalog_of, role, language, name, phrase
+):
+    assert_its_asks_bring(catalog_of(role, language), name, phrase, language)
+
+
+@pytest.mark.django_db
+def test_a_phrase_that_says_nothing_of_the_asks_is_refused_as_a_persons_own_words(catalog_of):
+    """Positive control of ``assert_its_asks_bring``: a probe of layer 2, an ask with a word added, a phrase that
+    brings ``customer.order.customer`` by name alone («which customer is this order for?», ``ORDER_PHRASES``: 4th
+    with its asks, 7th without them) and one of another matter that does not bring it at all measure nothing of its
+    asks, and each is refused for what it is."""
+    tools = catalog_of(Membership.Role.OWNER, "en")
+    probe = "¿a qué cliente pertenece la Cuenta QA que está abierta en el TPV?"
+    with pytest.raises(AssertionError, match="it is a probe of layer 2"):
+        assert_its_asks_bring(tools, "customer.order.customer", probe, "en")
+    with pytest.raises(AssertionError, match="it is an ask but for a word"):
+        assert_its_asks_bring(tools, "customer.order.customer", "who's on this order now?", "en")
+    with pytest.raises(AssertionError, match="it comes without its asks"):
+        assert_its_asks_bring(tools, "customer.order.customer", "which customer is this order for?", "en")
+    with pytest.raises(AssertionError, match="its asks do not bring it"):
+        assert_its_asks_bring(tools, "customer.order.customer", "what's the weather like in Madrid?", "en")
 
 
 #: A merge asked by the two phones, in words that are none of its ``asks``: the Spanish one is the phrase of the

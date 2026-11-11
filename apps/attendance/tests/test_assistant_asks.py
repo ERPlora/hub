@@ -20,7 +20,7 @@ from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import (
     TOP,
-    assert_reached_by_its_asks,
+    assert_its_asks_bring,
     assert_reported_are_owner_probes,
     catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
     offered_place,
@@ -133,7 +133,7 @@ def test_every_probe_of_the_time_clock_offers_its_tool_without_being_one_of_its_
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
 def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_reached_by_its_asks(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
+    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role

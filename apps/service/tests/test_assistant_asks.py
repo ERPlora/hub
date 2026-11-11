@@ -21,7 +21,7 @@ from live.operations import AI, Operation, registry
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import (
-    assert_reached_by_its_asks,
+    assert_its_asks_bring,
     assert_reported_are_owner_probes,
     catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
     comparable,
@@ -250,7 +250,7 @@ def test_the_close_probes_are_probes_of_services():
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
 def test_a_request_in_the_owners_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_reached_by_its_asks(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
+    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
 
 
 def test_every_tool_of_services_has_its_own_words():

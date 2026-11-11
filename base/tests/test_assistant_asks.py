@@ -9,10 +9,12 @@ which has every module on: the largest catalogue a role can have). What a role m
 all. An app joins the list in the same pull request that completes its asks, and stays in it while any of its tools
 says one; the ones still missing are reported per app (``AsksBacklog``), never failed. How many asks of each listed
 app reach their tool without their own words (``own_asks=False``: how a person's new phrase would) is reported too
-(``AsksReach``), never failed.
+(``AsksReach``), never failed. What an app's own test ranks as a person's words is none of its asks, nor one but for
+a word, and no ask is a probe of layer 2 of its tool but for a word: either would measure the asks' own words.
 """
 
 import dataclasses
+import importlib
 import json
 import re
 import unicodedata
@@ -20,6 +22,7 @@ import warnings
 from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 from django.conf import settings
@@ -186,30 +189,11 @@ def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str) -> int 
     return offered_place(tools, name, phrase)
 
 
-def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
-    """``tools`` with ``name`` saying no asks: how a turn ranks it by its name, its description and the groups alone."""
-    op = tools[name]
-    return {**tools, name: dataclasses.replace(op, ai={key: value for key, value in op.ai.items() if key != "asks"})}
-
-
 def assert_reported_are_owner_probes(reported: Iterable[tuple[str, str]]) -> None:
     """Each ``(tool, phrase)`` an app's test reports is, word for word, the owner's Spanish probe of layer 2 of that
     tool (``owner.es.<tool>``): the phrases are the QA's, never written to fit."""
     phrases = probe_phrases()
     assert [phrases.get(comparable(phrase)) for _, phrase in reported] == [f"owner.es.{name}" for name, _ in reported]
-
-
-def assert_reached_by_its_asks(tools: dict[str, Operation], name: str, phrase: str) -> None:
-    """A request in the person's own words (``OWN_WORDS`` of an app's test: neither an ask nor a probe) brings ``name``
-    among the first ``TOP`` by its asks, and without them it does not: asks that stop reading as people speak fail."""
-    assert comparable(phrase) not in probe_phrases()
-    assert comparable(phrase) not in {comparable(ask) for asks in shared.asks_of(tools[name]).values() for ask in asks}
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= TOP, place
-    before = without_its_asks(tools, name)
-    assert not shared.asks_of(before[name])  # positive control: the tool is ranked without its asks
-    unasked = offered_place(before, name, phrase)
-    assert unasked is None or unasked > TOP, unasked
 
 
 def test_no_ask_copies_a_qa_probe_or_names_a_qa_record():
@@ -231,6 +215,201 @@ def test_no_ask_copies_a_qa_probe_or_names_a_qa_record():
                     qa.append((op.name, ask))
     assert copied == []
     assert qa == []
+
+
+def alike(one: str, other: str) -> bool:
+    """Whether two phrases, ``comparable``, are the same words but for one at most: one changed, added or dropped."""
+    shorter, longer = sorted((comparable(one).split(), comparable(other).split()), key=len)
+    if len(longer) - len(shorter) > 1:
+        return False
+    if len(longer) == len(shorter):
+        return sum(word != said for word, said in zip(shorter, longer, strict=True)) <= 1
+    return any(longer[:at] + longer[at + 1 :] == shorter for at in range(len(longer)))
+
+
+def probes_of_layer_2() -> list[dict]:
+    """Every probe of layer 2, as its file says it: its ``id``, ``tool``, ``role``, ``language`` and ``phrase``."""
+    return [probe for path in sorted(PROBES.glob("*.json")) for probe in json.loads(path.read_text("utf-8"))["probes"]]
+
+
+def asks_by_tool(label: str | None = None) -> dict[str, tuple[str, ...]]:
+    """The asks of each tool of the Hub, or of app ``label``, in every language."""
+    return {
+        op.name: tuple(ask for phrases in shared.asks_of(op).values() for ask in phrases)
+        for op in registry.values()
+        if assistant.is_tool(op) and label in (None, op.app_label)
+    }
+
+
+def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
+    """``tools`` with tool ``name`` saying no asks (its description and name stay): where a phrase would bring it
+    without them, so an app's test shows that its asks, and not only its name, bring a person's own words."""
+    op = tools[name]
+    return {**tools, name: dataclasses.replace(op, ai=dataclasses.replace(op.ai_spec(), asks={}))}
+
+
+def assert_its_asks_bring(tools: dict[str, Operation], name: str, phrase: str, language: str) -> None:
+    """That ``phrase``, in a person's own words (no probe of layer 2, no ask of tool ``name`` nor one but for a word),
+    brings ``name`` among the first ``TOP`` by its asks: with them it is there, ``without_its_asks`` it is not. The
+    test of an app that calls it for each of its tools sees any change to their asks (hub#1135, hub#1165)."""
+    assert name in tools  # positive control: the person holds the tool, so its place is known
+    assert comparable(phrase) not in probe_phrases(), "it is a probe of layer 2"
+    said = [ask for asks in shared.asks_of(tools[name]).values() for ask in asks if alike(ask, phrase)]
+    assert not said, ("it is an ask but for a word at most", said)
+    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
+    place = offered.index(name) + 1 if name in offered else None
+    assert name in offered[:TOP], ("its asks do not bring it", place, offered[:TOP])
+    unasked = [op.name for op in assistant.relevant(without_its_asks(tools, name), [phrase], language)]
+    assert name not in unasked[:TOP], ("it comes without its asks", unasked.index(name) + 1)
+
+
+def near_copies(asks: dict[str, tuple[str, ...]], probes: Iterable[dict]) -> list[tuple[str, str, str]]:
+    """The asks (of each tool, in ``asks``) that are a probe of their own tool but for one word (``alike``), as (tool,
+    ask, probe): layer 2 compares a probe with the asks of its tool only, so another tool's phrase one word off is
+    another request («abre la caja», «cierra la caja»)."""
+    return [
+        (probe["tool"], ask, probe["id"])
+        for probe in probes
+        for ask in asks.get(probe["tool"], ())
+        if alike(ask, probe["phrase"])
+    ]
+
+
+#: What ``pytest.param`` makes: a case with its own marks or id, whose ``values`` are the ones the test receives.
+PARAM = type(pytest.param())
+
+
+def ranked_phrases(module: ModuleType) -> list[tuple[str, str | None, str]]:
+    """What the tests of ``module`` rank as a person's words, as (test, tool, phrase): each value of a parametrized
+    ``phrase``, with the tool of the ``name`` beside it (``None`` without one), and the ``phrase`` of each parametrized
+    probe of layer 2, with its ``tool``."""
+    found = []
+    for test, function in vars(module).items():
+        if not test.startswith("test_") or not callable(function):
+            continue
+        for mark in getattr(function, "pytestmark", ()):
+            if mark.name != "parametrize":
+                continue
+            names, cases = mark.args[:2]
+            names = [name.strip() for name in names.split(",")] if isinstance(names, str) else list(names)
+            for case in cases:
+                values = case.values if isinstance(case, PARAM) else case if len(names) > 1 else (case,)
+                bound = dict(zip(names, values, strict=True))
+                if isinstance(bound.get("phrase"), str):
+                    found.append((test, bound.get("name"), bound["phrase"]))
+                found += [
+                    (test, value.get("tool"), value["phrase"])
+                    for value in bound.values()
+                    if isinstance(value, dict) and isinstance(value.get("phrase"), str)
+                ]
+    return found
+
+
+def tautologies(module: ModuleType, asks: dict[str, tuple[str, ...]]) -> list[tuple[str, str, str]]:
+    """The phrases the tests of ``module`` rank as a person's words (``ranked_phrases``) that are one of ``asks`` (the
+    asks of the app's tools), or one of their tool's asks but for one word (``alike``), as (test, phrase, ask)."""
+    every = {comparable(ask): ask for said in asks.values() for ask in said}
+    found = []
+    for test, tool, phrase in ranked_phrases(module):
+        ask = every.get(comparable(phrase)) or next((ask for ask in asks.get(tool, ()) if alike(ask, phrase)), None)
+        if ask is not None:
+            found.append((test, phrase, ask))
+    return found
+
+
+def test_an_ask_that_is_a_probe_of_its_tool_but_for_one_word_is_a_copy():
+    """Positive control of the guard below, on a probe and asks of its own: an ask that says the probe of its tool with
+    a word changed, added or dropped is caught as the copy it is; one two words off, or another tool's, is another
+    request («abre la caja» is no copy of «cierra la caja»)."""
+    probe = {"id": "qa.example", "tool": "x.menu.list", "phrase": "¿Qué menús hay dados de alta?"}
+    asks = {
+        "x.menu.list": (
+            "que menus hay dados de alta",  # the probe itself, comparable
+            "¿qué menús hay dados de baja?",  # a word changed
+            "¿qué menús hay dados de alta ahora?",  # a word added
+            "¿qué menús hay de alta?",  # a word dropped
+            "¿qué menús hay dados de alta ahora mismo?",  # two words: another phrase
+            "¿cuántos menús tenemos?",
+        ),
+        "x.menu.delete": ("¿qué menús hay dados de baja?",),  # another tool's: another request
+    }
+    assert near_copies(asks, [probe]) == [
+        ("x.menu.list", "que menus hay dados de alta", "qa.example"),
+        ("x.menu.list", "¿qué menús hay dados de baja?", "qa.example"),
+        ("x.menu.list", "¿qué menús hay dados de alta ahora?", "qa.example"),
+        ("x.menu.list", "¿qué menús hay de alta?", "qa.example"),
+    ]
+
+
+def test_no_ask_is_a_qa_probe_of_its_tool_but_for_one_word():
+    """``test_no_ask_copies_a_qa_probe_or_names_a_qa_record`` compares the exact text; an ask that is its tool's probe
+    with one word changed ranks the probe by the ask's own words just the same, and layer 2
+    (``tests/e2e/assistant-probes.ts``), which skips only the exact copies, measures nothing with it (hub#1135)."""
+    probes = probes_of_layer_2()
+    asks = asks_by_tool()
+    assert len(probes) > 100 and len(asks) > 100  # positive control: the probes and the tools' asks are read
+    assert near_copies(asks, probes) == []
+
+
+def test_a_test_that_ranks_an_ask_of_its_app_as_a_persons_words_is_caught():
+    """Positive control of the sweep below, on a test module of its own: what its tests rank as a person's words (a
+    parametrized ``phrase``, with the tool of the ``name`` beside it, or a parametrized probe of layer 2) is caught when
+    it is one of the app's asks, or one of its tool's asks but for one word; a phrase in the person's own words (an
+    ``OWN_WORDS`` one, hub#1165: no ask, no probe) is not."""
+    asks = {"x.menu.list": ("¿qué menús hay dados de alta?",), "x.menu.get": ("enséñame el menú del día",)}
+    module = ModuleType("example")
+
+    @pytest.mark.parametrize(
+        ("name", "phrase"),
+        [
+            ("x.menu.list", "¿Qué menús hay dados de alta?"),  # its own ask
+            ("x.menu.list", "¿qué menús hay dados de alta ahora?"),  # its own ask but for one word
+            ("x.menu.list", "¿qué menús tenemos para hoy?"),  # in the person's own words
+            pytest.param("x.menu.list", "Enséñame el menú del día", id="another-tools-ask"),  # an ask of the app
+        ],
+    )
+    def test_reported(name, phrase): ...
+
+    probe = {"id": "qa.x", "tool": "x.menu.get", "phrase": "enséñame el menú del jueves"}
+
+    @pytest.mark.parametrize("probe", [probe])
+    def test_every_probe(probe): ...
+
+    @pytest.mark.parametrize(("language", "phrase"), [("es", "enséñame el menú del día"), ("es", "y el de mañana")])
+    def test_without_a_tool(language, phrase): ...
+
+    module.test_reported, module.test_every_probe, module.test_without_a_tool = (
+        test_reported,
+        test_every_probe,
+        test_without_a_tool,
+    )
+    module.helper = test_reported  # not a test: what it would rank is no test's
+    assert tautologies(module, asks) == [
+        ("test_reported", "¿Qué menús hay dados de alta?", "¿qué menús hay dados de alta?"),
+        ("test_reported", "¿qué menús hay dados de alta ahora?", "¿qué menús hay dados de alta?"),
+        ("test_reported", "Enséñame el menú del día", "enséñame el menú del día"),
+        ("test_every_probe", "enséñame el menú del jueves", "enséñame el menú del día"),
+        ("test_without_a_tool", "enséñame el menú del día", "enséñame el menú del día"),
+    ]
+
+
+#: The test of each app's asks: what it ranks as a person's words is what the layer measures of the app.
+APP_TESTS = sorted(Path(settings.BASE_DIR).glob("apps/*/tests/test_assistant_asks.py"))
+
+
+def test_no_test_of_an_app_ranks_one_of_its_asks_as_a_persons_words():
+    """The sweep above already brings every ask among the first ten, so a test of an app that ranks one of its asks (or
+    one of its tool's asks but for one word) as what a person says measures nothing: green while the person's own
+    words leave the tool out (hub#1126 and hub#1128, caught only by hand). The words a person says are the probes of
+    layer 2 and phrases nobody wrote as asks, and every app's test ranks some (hub#1135)."""
+    assert len(APP_TESTS) >= 10  # positive control: the tests of the apps are read
+    found = {}
+    for path in APP_TESTS:
+        label = path.parts[-3]
+        module = importlib.import_module(f"apps.{label}.tests.test_assistant_asks")
+        assert ranked_phrases(module), label  # every app's test ranks a person's words, and they are read
+        found[label] = tautologies(module, asks_by_tool(label))
+    assert {label: said for label, said in found.items() if said} == {}
 
 
 #: The requests of hub#1083's QA (``qa20261108.owner.es.base.*``), as the owner said them: each is offered its existing
