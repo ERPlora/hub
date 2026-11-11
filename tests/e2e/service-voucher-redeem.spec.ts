@@ -6,7 +6,7 @@
 // anything is spent. The dialog is captured at the fleet's three sizes, without sideways scroll.
 import { expect, type Locator, test } from '@playwright/test';
 
-import { A, api, shot } from './helpers';
+import { A, api, capture } from './helpers';
 import { chargeByApi, cleanSales } from './sale-helpers';
 import { cleanUp, named, noHorizontalScroll, ownerPage, pick, post, rowAction, settled, VIEWPORTS } from './service-helpers';
 
@@ -34,7 +34,7 @@ test('Sold vouchers: a session spent outside the till, choosing the service and 
       await settled(page);
       await noHorizontalScroll(page, `${name} ${width}x${height}`);
       await expect(reached).toBeInViewport();
-      await page.screenshot({ path: shot(`${name}-${width}x${height}`) });
+      await capture(page, `${name}-${width}x${height}`);
     }
     await page.setViewportSize(VIEWPORTS.desktop);
   };
