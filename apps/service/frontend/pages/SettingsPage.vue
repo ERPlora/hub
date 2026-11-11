@@ -6,10 +6,10 @@
 // changed (`service.settings.update`), so it never undoes someone else's change, and a refusal says itself
 // as a FormModal does. The default tax category is searched in Taxes; empty removes it: the server knows it
 // by its key (`default_tax_category_key`), in what is sent and in a refusal.
-import { Combo, type ComboOption, InlineFeedback, SettingsFormFooter, useSettingsForm } from '@erplora/ui/components';
+import { Combo, type ComboOption, InlineFeedback, SettingsFormFooter, SettingsNumberField, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonInput, IonSpinner, IonToggle } from '@ionic/vue';
+import { IonSpinner, IonToggle } from '@ionic/vue';
 import { computed } from 'vue';
 
 import PageNotices from '../components/PageNotices.vue';
@@ -61,9 +61,6 @@ function toForm(settings: SettingsOut): Form {
       : null,
   };
 }
-
-const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
-const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 </script>
 
 <template>
@@ -110,21 +107,14 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         <h2 class="service-settings__title">
           {{ $t('service.settings.title') }}
         </h2>
-        <ion-input
+        <SettingsNumberField
           v-for="field in NUMBERS"
           :key="field"
-          :data-testid="`service-settings-${field}`"
-          type="number"
-          inputmode="numeric"
-          :min="field === 'default_duration' ? 1 : 0"
-          :value="form[field]"
+          :settings="settingsForm"
+          :field="field"
+          :testid="`service-settings-${field}`"
           :label="t(LABELS[field])"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
-          :error-text="fieldErrors[field]"
-          :class="invalid(fieldErrors[field])"
-          @ion-input="set(field, text($event.detail.value))"
+          :min="field === 'default_duration' ? 1 : 0"
         />
         <Combo
           testid="service-settings-default_tax_category"

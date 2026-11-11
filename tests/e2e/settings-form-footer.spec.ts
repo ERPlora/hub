@@ -4,9 +4,10 @@
 // as the form in the other six. Measured on a desktop and on a phone, in each of the eight pages; the screenshots of
 // the sweep (ui-clip-sweep.sh) show the rest. And on a phone every one of them fits the screen, in English and in
 // Spanish: Tables (hub#866: 378 px wide in English, 425 in Spanish, «Guardar» cut to «Gua») and Reservations in English
-// (hub#906: 382 px) ran past the screen's edge, a switch's long label on one line widening the whole form. Whatever
-// this file turns on, it turns off again (hub#480).
-// flow: APPOINTMENT-F19, ATTENDANCE-F04, KITCHEN-F26, ONLINE_BOOKING-F07, RESERVATION-F03, SERVICE-F11, STAFF-F22, TABLE-F08
+// (hub#906: 382 px) ran past the screen's edge, a switch's long label on one line widening the whole form. Their number
+// fields are one piece too (hub#982: `SettingsNumberField`): in every page, Inventory's included, a refused one turns red
+// with its reason under it. Whatever this file turns on, it turns off again (hub#480).
+// flow: APPOINTMENT-F19, ATTENDANCE-F04, INVENTORY-F19, KITCHEN-F26, ONLINE_BOOKING-F07, RESERVATION-F03, SERVICE-F11, STAFF-F22, TABLE-F08
 import { type Page, expect, test } from '@playwright/test';
 
 import { A, capture, horizontalOverflow, login, shown, signedInSpanish, turnOffTurnedOn, turnOnMissing } from './helpers';
@@ -22,6 +23,20 @@ const PAGES = [
   { path: '/service/settings', hook: 'service-settings' },
   { path: '/staff/settings', hook: 'staff-settings' },
   { path: '/table/settings', hook: 'table-settings' },
+] as const;
+/** A number field of each settings page that `-5` is refused in (both groups of Reservations), and the prefix of its
+ *  page's hooks. Time clock judges its hours on screen before sending, and says it under the field the same way. */
+const NUMBER_FIELDS = [
+  { path: '/appointment/settings', hook: 'appointment-settings', field: 'appointment-settings-default_duration' },
+  { path: '/attendance/settings', hook: 'attendance-settings', field: 'attendance-settings-auto_close_after_hours' },
+  { path: '/inventory/settings', hook: 'inventory-settings', field: 'inventory-settings-threshold' },
+  { path: '/kitchen/settings', hook: 'kitchen-settings', field: 'kitchen-settings-warning_minutes' },
+  { path: '/online_booking/settings', hook: 'ob-settings', field: 'ob-settings-max_upcoming_per_customer' },
+  { path: '/reservation/settings', hook: 'reservation-settings', field: 'reservation-settings-default_duration_minutes' },
+  { path: '/reservation/settings', hook: 'reservation-settings', field: 'reservation-settings-min_party_size' },
+  { path: '/service/settings', hook: 'service-settings', field: 'service-settings-default_duration' },
+  { path: '/staff/settings', hook: 'staff-settings', field: 'staff-settings-default_break_duration' },
+  { path: '/table/settings', hook: 'table-settings', field: 'table-settings-timer_warning_minutes' },
 ] as const;
 /** The eight apps and what they require, in the order they can be turned on. */
 const NEEDED = ['customer', 'tax', 'staff', 'service', 'schedule', 'appointment', 'attendance', 'sale', 'inventory', 'kitchen', 'online_booking', 'table', 'reservation'];
@@ -58,6 +73,23 @@ test('every settings page ends with «Save» at the end of the form, at its own 
       expect.soft(Math.abs(button.x + button.width - (whole.x + whole.width)), `${where} ends where the form ends`).toBeLessThanOrEqual(1);
       expect.soft(button.width, `${where} is as wide as its words, not a bar`).toBeLessThan(whole.width / 2);
     }
+  }
+});
+
+test('a refused number field turns red with its reason under it, in every settings page', async ({ page }) => {
+  await login(page, A, NUMBER_FIELDS[0].path);
+  // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
+  if (process.env.E2E_SAVE_STORAGE_STATE) await page.context().storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+  for (const { path, hook, field } of NUMBER_FIELDS) {
+    await page.goto(`${A}${path}`);
+    const box = shown(page).locator(`[data-testid="${field}"]`);
+    await box.locator('input').fill('-5');
+    await shown(page).locator(`[data-testid="${hook}-save"]`).click();
+    await expect(box, `${field} is red`).toHaveClass(/\bion-invalid\b/);
+    await expect(box.locator('.error-text'), `${field} says why`).toHaveText(/\S/);
+    await expect(box.locator('.error-text'), `${field} says why`).toBeVisible();
+    await box.scrollIntoViewIfNeeded();
+    await capture(page, `settings-refused-${field}`);
   }
 });
 
