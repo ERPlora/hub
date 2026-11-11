@@ -12,6 +12,7 @@ Hub says what the kitchen's words name (``base.assistant.SYNONYMS``): «la coman
 listo» or «como hecho» is bumped and one sent back «a pendientes» or «a preparación» recalled.
 """
 
+import dataclasses
 import json
 from pathlib import Path
 
@@ -24,7 +25,7 @@ from live.operations import AI, Operation, registry
 from base import assistant
 from base.models import Membership
 from base.permissions import permissions_for
-from base.tests.test_assistant_asks import comparable, probe_phrases
+from base.tests.test_assistant_asks import TOP, comparable, probe_phrases
 
 A = Scope("host", "a")
 #: What only who runs the kitchen holds (``KitchenConfig.role_permissions``): cancelling or deleting a ticket, the
@@ -114,6 +115,33 @@ KITCHEN_WORDS = [
     ("da como listos los calamares de la 2", "kitchen.item.bump"),
     ("las bravas que di como listos vuelven a pendientes", "kitchen.item.recall"),
 ]
+#: What a person says in words of their own, neither an ask nor a probe of layer 2 (nor an ask with a word changed),
+#: for the nineteen tools whose probes a turn offers without their asks too (by their name, their description or the
+#: Hub's words above): here it is their asks that bring the tool among the first ten, so asks that stop reading as
+#: people speak fail. Language, tool, phrase.
+OWN_WORDS = [
+    ("es", "kitchen.ticket.list", "dime las que se anularon esta mañana"),
+    ("es", "kitchen.ticket.notices", "¿qué ha llegado hace un momento?"),
+    ("en", "kitchen.ticket.get", "which dishes of number 9 are still to go?"),
+    ("es", "kitchen.ticket.by_order", "¿la cuenta de la 6 ha mandado alguna ronda?"),
+    ("en", "kitchen.station.list", "which ones have we got and what goes to each of them?"),
+    ("es", "kitchen.settings.get", "¿a qué minuto pasa a ámbar?"),
+    ("es", "kitchen.log.list", "¿qué se hizo ayer con los platos de la plancha?"),
+    ("es", "kitchen.ticket.receive", "que salga en pantalla la ronda que han mandado de la 6"),
+    ("es", "kitchen.ticket.create", "rehaz a mano la ensalada de la 5"),
+    ("en", "kitchen.ticket.start", "get number 9 cooking now"),
+    ("es", "kitchen.ticket.cancel", "que no se haga la 9, se han ido"),
+    ("es", "kitchen.ticket.delete", "esa que hice a mano ya está anulada: bórrala"),
+    ("es", "kitchen.ticket.set_rush", "que la 9 salga la primera"),
+    ("es", "kitchen.item.bump", "las croquetas de la 3 ya están hechas"),
+    ("es", "kitchen.station.create", "quiero una estación para los postres"),
+    ("es", "kitchen.station.update", "que la Barra solo salga en pantalla"),
+    ("es", "kitchen.station.delete", "ya no usamos la de postres, quítala"),
+    ("es", "kitchen.routing.set", "las bebidas, que salgan por la Barra"),
+    ("es", "kitchen.settings.update", "la pantalla suena demasiado, bájale el sonido"),
+]
+#: The places an ask of another app keeps free below the first ten: the asks of the next app to say its own take them.
+ROOM = 2
 
 
 @pytest.fixture
@@ -132,6 +160,25 @@ def offered_place(tools: dict[str, Operation], name: str, phrase: str, language:
     """Where a turn that says ``phrase`` offers the tool ``name`` (1 the first), or ``None`` when it does not."""
     offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
     return offered.index(name) + 1 if name in offered else None
+
+
+def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str, language: str) -> int | None:
+    """``offered_place`` of a tool the person holds for a ``phrase`` that is none of its asks in ``language``."""
+    assert name in tools  # positive control: the person holds the tool, so its place is known
+    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get(language, ())}
+    return offered_place(tools, name, phrase, language)
+
+
+def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
+    """``tools`` with ``name`` saying no asks: how a turn ranks it by its name, its description and the Hub's words."""
+    op = tools[name]
+    return {**tools, name: dataclasses.replace(op, ai={key: value for key, value in op.ai.items() if key != "asks"})}
+
+
+def nobodys_words(tools: dict[str, Operation], phrase: str, language: str) -> bool:
+    """Whether ``phrase`` is no probe of layer 2 and no ask of any tool: it measures the words, never a copy."""
+    asks = {comparable(ask) for op in tools.values() for ask in shared.asks_of(op).get(language, ())}
+    return comparable(phrase) not in probe_phrases() and comparable(phrase) not in asks
 
 
 def test_kitchen_offers_at_least_29_tools():
@@ -160,10 +207,7 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("role", "name", "phrase"), REPORTED, ids=[f"{role}-{name}" for role, name, _ in REPORTED])
 def test_the_reported_kitchen_request_is_offered_its_tool_without_being_its_asks(catalog_of, role, name, phrase):
-    tools = catalog_of(ROLES[role], "es")
-    assert name in tools  # positive control: the person holds the tool, so the model can receive it
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    place = offered_place(tools, name, phrase, "es")
+    place = place_of_no_ask(catalog_of(ROLES[role], "es"), name, phrase, "es")
     assert place is not None and place <= WITH_ROOM, place
 
 
@@ -180,9 +224,7 @@ def test_every_probe_of_kitchen_offers_its_tool_to_who_may_run_it(catalog_of, pr
         assert name not in tools
         assert name in catalog_of(Membership.Role.OWNER, probe["language"])  # positive control: it is a real tool
         return
-    assert name in tools  # positive control: the person holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    place = offered_place(tools, name, phrase, probe["language"])
+    place = place_of_no_ask(tools, name, phrase, probe["language"])
     assert place is not None and place <= WITH_ROOM, place
 
 
@@ -190,10 +232,32 @@ def test_every_probe_of_kitchen_offers_its_tool_to_who_may_run_it(catalog_of, pr
 @pytest.mark.parametrize(("phrase", "name"), KITCHEN_WORDS, ids=[name for _, name in KITCHEN_WORDS])
 def test_the_kitchens_own_words_bring_the_tool_they_mean_among_the_first_ten(catalog_of, phrase, name):
     tools = catalog_of(ROLES["owner"], "es")
-    assert name in tools  # positive control: the owner holds it, so only the selection can leave it out
-    assert comparable(phrase) not in probe_phrases()  # nobody's probe: the phrase measures the words, not a copy
-    assert all(
-        comparable(phrase) != comparable(ask) for op in tools.values() for ask in shared.asks_of(op).get("es", ())
-    )
-    place = offered_place(tools, name, phrase, "es")
-    assert place is not None and place <= 10, place
+    assert nobodys_words(tools, phrase, "es")
+    place = place_of_no_ask(tools, name, phrase, "es")
+    assert place is not None and place <= TOP, place
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("language", "name", "phrase"), OWN_WORDS, ids=[name for _, name, _ in OWN_WORDS])
+def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, language, name, phrase):
+    tools = catalog_of(ROLES["owner"], language)
+    assert nobodys_words(tools, phrase, language)
+    place = place_of_no_ask(tools, name, phrase, language)
+    assert place is not None and place <= TOP, place
+    before = without_its_asks(tools, name)
+    assert not shared.asks_of(before[name])  # positive control: the tool is ranked without its asks
+    unasked = offered_place(before, name, phrase, language)
+    assert unasked is None or unasked > TOP, unasked
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@pytest.mark.parametrize("role", list(Membership.Role))
+def test_kitchen_takes_no_place_from_who_has_been_serving_tables(catalog_of, role):
+    """«Serving» names ``kitchen.ticket.serve``, whose asks say «servida»: Tables' «who has been serving tables?» came
+    11th with them, past the tenth place ``base/tests/test_assistant_asks.py`` allows (it was tenth already). Its asks
+    in English keep two places free."""
+    tools = catalog_of(role, "en")
+    assert {"table.waiter.list", "kitchen.ticket.serve"} <= set(tools)  # positive control: both compete in the ranking
+    asks = shared.asks_of(tools["table.waiter.list"])["en"]
+    places = {ask: offered_place(tools, "table.waiter.list", ask, "en") for ask in asks}
+    assert {ask: place for ask, place in places.items() if place is None or place > TOP - ROOM} == {}
