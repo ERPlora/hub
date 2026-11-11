@@ -759,7 +759,7 @@ def purchase_divergences(ctx: OperationContext, params: DivergencesIn) -> dict:
     ai=AI(
         "Whether a customer agreed to be sent marketing (offers, news) by email, SMS, WhatsApp, phone or post: the "
         "consent in force, one row per purpose and channel, granted or withdrawn. The last fact wins, so a "
-        "withdrawal is in force on the next read. Ask it before writing to anybody.",
+        "withdrawal is in force on the next read. Read it before writing to anybody.",
         asks={
             "en": ("can I send Luis marketing emails?", "has Marta agreed to WhatsApp messages?"),
             "es": (

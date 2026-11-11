@@ -910,7 +910,7 @@ def complete(ctx: OperationContext, data: AppointmentRefIn) -> dict:
     expose_api=True,
     ai={
         "description": "Record that the customer did not show up, once the appointment's time has passed (pending or "
-        "confirmed, not charged). Ask the person before doing it.",
+        "confirmed, not charged).",
         "risk": "high",
     },
 )
@@ -946,7 +946,7 @@ def mark_no_show(ctx: OperationContext, data: AppointmentRefIn) -> dict:
     ai={
         "description": "Cancel an appointment (pending, confirmed or no-show; not a charged one), with an optional "
         "reason; its time becomes free. on_behalf_of_customer=true (with the customer) when she cancels herself: it "
-        "must be hers and the business's cancellation policy applies. Ask the person before doing it.",
+        "must be hers and the business's cancellation policy applies.",
         "risk": "high",
         # An automation cancels anybody's (``is_own``), so a yes to it is only of someone who may too (FLOW-F28).
         "yes_permission": CHANGE_ALL,
@@ -1011,7 +1011,7 @@ def _delete(ctx: OperationContext, appointment: Appointment) -> None:
     expose_api=True,
     ai={
         "description": "Delete an appointment from the agenda (it is archived, not destroyed): pending, confirmed, "
-        "cancelled or no-show and not charged. Cancelling keeps the record and is usually what is wanted; ask first.",
+        "cancelled or no-show and not charged. Cancelling keeps the record and is usually what is wanted.",
         "risk": "high",
     },
 )
@@ -1030,7 +1030,7 @@ def delete_appointment(ctx: OperationContext, data: AppointmentRefIn) -> dict:
     output=BulkDeletedOut,
     expose_api=True,
     ai={
-        "description": "Delete several appointments at once (all or none). Ask first.",
+        "description": "Delete several appointments at once (all or none).",
         "risk": "high",
     },
 )
@@ -1059,7 +1059,7 @@ def bulk_delete(ctx: OperationContext, data: BulkDeleteIn) -> dict:
         "description": "Charge an appointment at the till: opens a check in Sales linked to it, titled with the customer "
         "and the appointment's number, with a line per service at the price booked and the professional who did it, "
         "so a voucher of the customer can pay one. While that check is open, charging again goes back to it. "
-        "Charging the check then marks the appointment charged and completed. Ask first.",
+        "Charging the check then marks the appointment charged and completed.",
         "risk": "high",
     },
 )
@@ -1210,7 +1210,7 @@ def create_blocked_time(ctx: OperationContext, data: BlockedTimeCreateIn) -> dic
     output=DeletedOut,
     expose_api=True,
     ai={
-        "description": "Remove a blocked period: its time can be booked again. Ask first.",
+        "description": "Remove a blocked period: its time can be booked again.",
         "risk": "high",
     },
 )
@@ -1660,7 +1660,7 @@ def activate_series(ctx: OperationContext, data: RecurringRefIn) -> dict:
     output=RecurringDeletedOut,
     expose_api=True,
     ai={
-        "description": "Delete a repeating appointment; the appointments already booked are kept. Ask first.",
+        "description": "Delete a repeating appointment; the appointments already booked are kept.",
         "risk": "high",
     },
 )
