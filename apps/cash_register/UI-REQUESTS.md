@@ -22,13 +22,13 @@ Al registrarlos, cambiar `frontend/pages/SessionsPage.vue` (acciones), `frontend
 
 ## Dinero en `@erplora/ui/components/format`
 
-- **Qué**: el signo explícito de las diferencias en el formateador de dinero y un lector de importes tecleados
-  («150,50», «1.250,50», «1.250» ambiguo) con su motivo de rechazo, los dos en la moneda del negocio.
-- **Hoy**: el importe ya lo escribe `formatMoney` de `@erplora/ui/components` (hub#653); en
-  `frontend/lib/money.ts` queda lo propio (`formatMoney` con «—» para lo que no hay, `formatSignedMoney`,
-  `formatFace` —un billete o moneda entera sin decimales, «500 €»—, `moneyFieldText`, `readMoney`,
-  `moneyRefusal`). Ventas tiene el suyo en `apps/sale/frontend/lib/format.ts`: los dos se borran cuando llegue
-  el compartido.
+- **Qué**: el signo explícito de las diferencias en el formateador de dinero, en la moneda del negocio.
+- **Hoy**: el importe ya lo escribe `formatMoney` de `@erplora/ui/components` (hub#653), y lo tecleado en las
+  ventanas lo lee el campo común, `MoneyInput` con su `parseMoney` (ui#116; la Caja, desde hub#1160). En
+  `frontend/lib/money.ts` queda lo propio (`formatMoney` con «—» para lo que no hay, `formatSignedMoney` y
+  `formatFace` —un billete o moneda entera sin decimales, «500 €»—) y `readMoney`, que solo lee los filtros de
+  importe de la lista hasta hub#1196. Ventas tiene su formateador en `apps/sale/frontend/lib/format.ts`: los dos se
+  borran cuando llegue el compartido.
 
 ## Lista de detalle (`ok-detail-list`)
 

@@ -1,13 +1,15 @@
 // Money of the drawer screens. The server keeps money in whole cents; a person reads it in the page's
 // language and types it as she reads it. An amount is written with the platform's `formatMoney` (its thousands
 // grouped from four digits on, as every screen writes them); this is the one place the app adds to it what is its
-// own (nothing is «—», a note without decimals, a difference with its sign) and turns what is typed into cents.
-// Every money field goes through `readMoney`: empty, an amount, or why it is not one.
+// own (nothing is «—», a note without decimals, a difference with its sign). What is typed in a window is read by the
+// platform's money field (`MoneyInput` and its `parseMoney`, `@erplora/ui/components`), as every amount of the Hub
+// (hub#1160); `readMoney` only reads the list's amount filters (empty, an amount, or why it is not one), until hub#1196
+// takes them to the platform's reader.
 // The money is the business's (`useBusinessMoney`: its country's currency and the decimals the server counts it
 // in): the screens pass it, and until it is known an amount is a figure with two decimals and no symbol, never the
 // euro by default. Its decimals come from the server, never from the browser's Intl (which gives none to the forint).
 
-import { decimalMark, formatMoney as writeMoney } from '@erplora/ui/components';
+import { formatMoney as writeMoney } from '@erplora/ui/components';
 
 import type { Money } from '../../../../base/frontend/lib/home';
 
@@ -66,11 +68,6 @@ export function formatSignedMoney(cents: number | null | undefined, locale: stri
   return (cents as number) > 0 && written !== '—' ? `+${written}` : written;
 }
 
-/** Minor units as a money field holds them: ungrouped, with the reader's decimal sign («1250,50»). */
-export function moneyFieldText(cents: number, locale: string, decimals = 2): string {
-  return (cents / 10 ** decimals).toFixed(decimals).replace('.', decimalMark(locale));
-}
-
 /** The text with Intl's no-break spaces as plain ones (what a test or a search compares). */
 export function plain(text: string): string {
   return text.replace(/[\u00a0\u202f]/g, ' ');
@@ -105,8 +102,8 @@ function currencyMarks(currency: string): string[] {
   return [...new Set(marks)].sort((a, b) => b.length - a.length);
 }
 
-/** What a person typed in a money field, read once for every field of the app, in minor units of a
- *  currency of `decimals` (2 in EUR). Empty is no amount; «1.250» in euros reads two ways and says so. The
+/** What a person typed in an amount filter of the sessions list, in minor units of a currency of `decimals` (2 in
+ *  EUR). Empty is no amount; «1.250» in euros reads two ways and says so. The
  *  business's `currency` written before or after the figure («150,50 zł») is no part of it. */
 export function readMoney(raw: string | number | null | undefined, decimals = 2, currency?: string): MoneyRead {
   const typed = String(raw ?? '').trim();
@@ -141,29 +138,4 @@ export function readMoney(raw: string | number | null | undefined, decimals = 2,
   match = DECIMAL.exec(text);
   if (match && decimals > 0 && match[2].length <= decimals) return { ok: true, cents: minor(match[1], match[2], decimals) };
   return { ok: false, reason: 'notAnAmount' };
-}
-
-/** What a person typed in a window's money field, read in the business's `money` — its decimals and its currency. The
- *  money is required: a window reads nothing before the business answers (hub#921: «1500» yen read with two
- *  decimals would be sent as 150000). */
-export function readAmount(raw: string, money: Money): MoneyRead {
-  return readMoney(raw, money.decimals, money.currency);
-}
-
-/** Why a money field cannot be sent, in the app's words; `null` when it is an amount or empty. */
-export function moneyRefusal(
-  read: MoneyRead,
-  t: (key: string, named?: Record<string, unknown>) => string,
-  locale: string,
-  money?: Money,
-): string | null {
-  if (read.ok) return null;
-  if (read.reason === 'ambiguous') {
-    return t('cash_register.money.ambiguous', {
-      typed: read.typed,
-      grouped: formatMoney(read.grouped, locale, money),
-      decimal: formatMoney(read.decimal, locale, money),
-    });
-  }
-  return t(`cash_register.money.${read.reason}`);
 }

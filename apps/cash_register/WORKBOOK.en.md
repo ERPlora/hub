@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4d2639effbb6ebf667af36bcac14d9388421707876994417cbd46ab0c18c898c -->
+<!-- generated from WORKBOOK.md sha256:07bdc49b937965ba179d54b31f94e4ae54ba7197dfab976f8408c9013341526b -->
 
 ## What it is for and who it is for
 
@@ -80,6 +80,12 @@ and the four amounts) and table or card view. Per row: "Detail" always and, in t
   "Total counted" field. "Register count" and "Cancel".
 - **Close session · S-…**: the shift review, "Expected in the drawer" and "Difference" live (if whoever
   closes may see them), "Counted cash", "Closing notes", "Close session" and "Cancel".
+
+The amounts ("Opening float", "Amount", the "Total counted" typed by hand and "Counted cash") are typed in the same
+field as a price everywhere else in the Hub, and read the same way (hub#1160): the label floats inside the field, on
+leaving it what was typed is rewritten in the page's format ("12.555" becomes "12555.00": €12,555.00) and, if it is
+not an amount, it says so underneath ("0.515" or "abc": "This is not an amount. Type a figure, for example 12.50.";
+"-5": "This amount cannot be negative."; "1,250": "This amount can be read in two ways…").
 
 Success shows as a green notice ("Session opened", "Cash-in recorded (…)", "Count recorded · total
 counted …", "Session S-… closed · expected … · counted … · difference …"); a refusal, inside the window,
@@ -223,7 +229,9 @@ business, whatever the drawer; if two devices open at once, only one opens and t
 notice); with the float required and the float empty or zero, "This business requires an opening float:
 give the cash the drawer starts with." under the field; a deactivated drawer or one that does not exist,
 "That drawer is not available."; an unreadable amount ("This is not an amount. Type a figure, for example
-12.50."), a negative or an ambiguous one ("1,250") is stopped before sending. "Open session" is grey while
+12.50."), a negative ("This amount cannot be negative.") or an ambiguous one ("1,250") is said under the field on
+leaving it or on tapping "Open session", and nothing is sent; "12.555" is not ambiguous: it is €12,555.00, as in a
+price (hub#1160). "Open session" is grey while
 the business has not yet said its currency, because the float is read in it (without it, "1500" yen would
 be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, "Open session" lights up (hub#938).
@@ -265,7 +273,8 @@ count towards the expected cash.
 Out: the movement, in the name of whoever records it (announces: `cash_register.movement.added`). The
 sign is set by the system according to the type.
 If it fails: "This cash-out would leave the drawer below zero and a negative balance is not allowed." if
-the settings do not allow it; a zero, unreadable or negative amount is stopped before sending; the
+the settings do not allow it; a zero ("Invalid amount"), unreadable, negative or ambiguous amount is said under the
+field and nothing is sent (it is read as in F03); the
 session closed on another device: "That cash session is closed: a closed session takes no new
 movements.". "Register" is grey while the business has not yet said its currency, because the amount is
 read in it (without it, "1500" yen would be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
@@ -294,7 +303,8 @@ system with the currency's decimals; a total typed by hand (or sent through the 
 and prevails over the breakdown.
 If it fails: a closed session, "That cash session is closed: a closed session takes no new movements."; a
 note or coin that is not of the business's currency, under the breakdown; with neither breakdown nor
-total, "Count the drawer: give its notes and coins or its total.".
+total, "Count the drawer: give its notes and coins or its total."; a total typed by hand that is not an amount says
+so under the field on leaving it (it is read as in F03) and "Register count" stays grey.
 Involved: CASH_REGISTER-F09
 
 ### CASH_REGISTER-F07 Blind count: who sees the expected cash
@@ -377,7 +387,8 @@ cash; what is charged or recorded by card, transfer or other does not count), co
 `cash_register.session.closed`). The Sales lines of the shift are copied into the session: whatever
 happens afterwards (a void of a sale from yesterday) goes to the open shift, never to this one.
 If it fails: "Type the counted cash to close the session." with the field empty (the screen always asks
-for it; the required count setting enforces it on the assistant and the API too). "Close session" is grey
+for it; the required count setting enforces it on the assistant and the API too); an unreadable, negative or
+ambiguous one is said under the field and closes nothing (it is read as in F03). "Close session" is grey
 while the business has not yet said its currency, and the last closing count is not written in the field
 until then: the counted cash is written and read in it (without it, "1500" yen would be saved as 150,000
 and a count of 1500 yen would show as "15.00"). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
