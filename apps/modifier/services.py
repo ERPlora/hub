@@ -134,6 +134,7 @@ def create_group(ctx: OperationContext, data: GroupIn) -> dict:
     ai={
         "description": "Change a modifier group, named by its id or its name; what is not sent is kept.",
         "risk": "normal",
+        "check": "modifier.group.get",
         "asks": {
             "en": (
                 "make the Sauces group required",
@@ -190,6 +191,7 @@ def update_group(ctx: OperationContext, data: GroupPatchIn) -> dict:
         "description": "Delete a modifier group, named by its id or its name, with all its options and the "
         "products and categories it applied to; what was already ordered keeps its copy.",
         "risk": "high",
+        "check": "modifier.group.get",
         "asks": {
             "en": (
                 "delete the Sauces group and all its choices",
@@ -273,6 +275,7 @@ def create_option(ctx: OperationContext, data: OptionIn) -> dict:
         "its name, its supplement, its own tax category or whether it comes chosen by default; what is not sent is "
         "kept, and an empty tax category gives it back the dish's.",
         "risk": "normal",
+        "check": "modifier.option.get",
         "asks": {
             "en": (
                 "raise the extra cheese to one euro",
@@ -329,6 +332,7 @@ def update_option(ctx: OperationContext, data: OptionPatchIn) -> dict:
         "description": "Delete an option, named by its id or its name (and its group when two have one so named); "
         "what was already ordered keeps its copy.",
         "risk": "high",
+        "check": "modifier.option.get",
         "asks": {
             "en": (
                 "remove barbecue sauce from the Sauces group",
@@ -406,6 +410,7 @@ def attach_link(ctx: OperationContext, data: LinkIn) -> dict:
         "description": "Stop applying a modifier group to a product or a category: by the link's id, or by the group "
         "and the product (id, SKU or name) or category (id or name). It can be applied again later.",
         "risk": "normal",
+        "check": "modifier.link.get",
         "asks": {
             "en": (
                 "stop asking for sauces with the pizza",
