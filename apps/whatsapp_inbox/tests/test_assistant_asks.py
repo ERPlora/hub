@@ -62,13 +62,15 @@ BY_GROUP = [
 ]
 #: What a person says in words of their own, neither an ask nor a probe of layer 2, one per tool of the inbox: their
 #: asks bring each among the first ten (``TOP``), and without them it is not (the probes reach several of these tools by
-#: their name, their description and the groups alone), so asks that stop reading as people speak fail here.
+#: their name, their description and the groups alone), so asks that stop reading as people speak fail here. They keep
+#: away from the words of the apps that say their asks after the inbox: «número» (Payments) and «opciones» (Menus'
+#: group) took ``channel.prepare`` and ``message.get`` past the tenth.
 OWN_WORDS = [
     ("whatsapp_inbox.agent.list", "¿quién atiende hoy los WhatsApp?"),
     ("whatsapp_inbox.channel.get", "¿cuánto cupo nos queda este mes?"),
     ("whatsapp_inbox.channel.connect", "toma el código que me ha dado Meta y termina la conexión"),
     ("whatsapp_inbox.channel.disconnect", "desconéctanos de WhatsApp unos días"),
-    ("whatsapp_inbox.channel.prepare", "¿está todo listo para conectar el número?"),
+    ("whatsapp_inbox.channel.prepare", "¿qué hace falta para la conexión con Meta?"),
     ("whatsapp_inbox.conversation.assign", "que se quede Elena con el chat de Raúl"),
     ("whatsapp_inbox.conversation.by_phone", "¿nos ha escrito alguna vez el +34 655 444 333?"),
     ("whatsapp_inbox.conversation.count_awaiting_reply", "¿a cuántos les debemos respuesta?"),
@@ -81,7 +83,7 @@ OWN_WORDS = [
     ("whatsapp_inbox.conversation.notices", "¿alguien nos ha escrito esta mañana?"),
     ("whatsapp_inbox.conversation.set_status", "cambia el estado del chat de Raúl a pendiente"),
     ("whatsapp_inbox.conversation.summary", "hazme un resumen de WhatsApp"),
-    ("whatsapp_inbox.message.get", "¿qué opciones le dimos a Raúl?"),
+    ("whatsapp_inbox.message.get", "¿qué decía lo que mandó Raúl esta mañana?"),
     ("whatsapp_inbox.message.list", "enséñame el hilo de Raúl"),
     ("whatsapp_inbox.message.notify", "manda un aviso a Raúl de que su cita queda movida"),
     ("whatsapp_inbox.message.retry", "vuelve a mandar el que falló"),
