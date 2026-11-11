@@ -59,7 +59,8 @@ def stops_in_the_chat(description: str) -> list[str]:
     return found
 
 
-#: The tools that still say it, each with the open pull request that edits its file (hub#1140, 2026-11-11).
+#: The tools that still say it, each with the open pull request that edits its file (hub#1140, 2026-11-11); hub#1175
+#: fixes them once those merge and empties the list.
 PENDING = {
     "attendance.record.correct": "ERPlora/hub#1165 edits apps/attendance/services.py",
     "cash_register.session.close": "ERPlora/hub#1158 edits apps/cash_register/services.py (and fixes it)",
