@@ -116,9 +116,10 @@ def test_the_reported_printing_requests_are_offered_their_tool_without_being_its
 #: «retira» asks to retire, delete, remove and withdraw, and «el equipo» reads as the staff
 #: (``live.assistant.SYNONYMS``), so an ask that said «retira el equipo Barra 2» fell to the edge of the ten (10th) and
 #: this phrase with it (13th). With «el dispositivo» in the ask it is 8th for the owner, the admin and the manager, and
-#: 13th without its asks.
+#: 13th without its asks; it shares one stem with an ask («dispositivo») and says no «retira», which brings the tool by
+#: its own name.
 OWN_WORDS = [
-    ("es", "printing.device.retire", "el dispositivo Terraza 1 ya no está, que no imprima más"),
+    ("es", "printing.device.retire", "ese dispositivo de la entrada desapareció; que no imprima nunca más"),
 ]
 
 
