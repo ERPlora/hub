@@ -525,7 +525,7 @@ def list_records(ctx: OperationContext, params: RecordListIn) -> dict:
             "es": (
                 "enséñame la jornada de Nuria del lunes con sus pausas",
                 "¿desde dónde fichó Pedro ayer?",
-                "¿quién fichó el día de Marta hoy?",
+                "¿quién fichó hoy por Marta?",
             ),
         },
         "description": "One working day with its breaks, where it was clocked from and who clocked it; "
