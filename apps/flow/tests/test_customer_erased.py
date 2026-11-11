@@ -58,8 +58,30 @@ def stored(row: FlowRun) -> str:
     return json.dumps([row.input, row.outputs, row.error_message], default=str, ensure_ascii=False)
 
 
+def run_that_read_her_card(status: str, steps: list[dict], **fields) -> tuple[FlowRun, Customer]:
+    """A run of an automation started by hand, parked as ``status``, whose first step left her card."""
+    flow = Flow.objects.create(name="By hand", trigger_kind=Flow.Trigger.MANUAL, steps=steps, enabled=True)
+    customer = Customer.objects.create(name="Eva Ruiz")
+    fields.setdefault("resume_at", timezone.now() + dt.timedelta(days=1))
+    parked = make_run(flow, status=status, input={}, outputs={"s1": {"id": str(customer.id), "name": "Eva Ruiz"}}, **fields)
+    return parked, customer
+
+
 def erase(worker, customer_id) -> None:
     worker.request("customer.customer.erase", {"id": str(customer_id), "reason": "She asked (RGPD)"})
+
+
+ERASED_TASK = {"id": "s9", "kind": "command", "operation": "task.task.create", "params": {"title": "Erased {{input.id}}"}}
+
+
+def started_by_her_erasure(worker, steps: list[dict]) -> tuple[FlowRun, str]:
+    """The run that an automation waiting for the erasure starts when her card is erased, and the card's id."""
+    automation(steps, ["task.task.create"], trigger={"kind": "event", "event": "customer.customer.erased"})
+    eva = worker.request("customer.customer.create", EVA)
+    worker()
+    erase(worker, eva.id)
+    worker()
+    return FlowRun.objects.get(event_name="customer.customer.erased"), str(eva.id)
 
 
 @pytest.mark.django_db
@@ -246,19 +268,57 @@ def test_a_run_that_only_read_her_card_is_cancelled_too():
 
 
 @pytest.mark.django_db
-def test_an_automation_that_starts_on_the_erasure_still_starts(worker):
-    automation(
-        [{"id": "s1", "kind": "command", "operation": "task.task.create", "params": {"title": "Erased {{input.id}}"}}],
-        ["task.task.create"],
-        trigger={"kind": "event", "event": "customer.customer.erased"},
+def test_a_run_calling_another_system_with_her_card_is_cancelled_and_a_late_answer_changes_nothing():
+    # The call left with no lock held (FLOW-F27): its answer comes back after the erasure and finds the run closed.
+    call = {"id": "s2", "kind": "http", "method": "POST", "url": "https://example.com/orders", "timeout": 5}
+    calling, customer = run_that_read_her_card(FlowRun.Status.CALLING, [A_DAY, call], step_index=1)
+
+    assert run("flow.customer.erase", {"id": str(customer.id)}, system_context(A)).changed == 1
+
+    late = run("flow.run.record_call", {"id": str(calling.id), "kind": "ok", "status": 200, "body": {"name": "Eva Ruiz"}},
+               system_context(A))
+    assert late.count == 0
+    calling.refresh_from_db()
+    assert (calling.status, calling.error_code, calling.outputs) == (FlowRun.Status.CANCELLED, "flow.customer_erased", {})
+
+
+@pytest.mark.django_db
+def test_a_question_of_the_run_answered_before_forgets_its_note_and_keeps_its_answer():
+    # Two «Ask someone first» steps: the first was answered yes with a note about her, the second still waits.
+    asking, customer = run_that_read_her_card(FlowRun.Status.ASKING, [A_DAY])
+    flow = asking.flow
+    soon = timezone.now() + dt.timedelta(days=1)
+    answered = Question.objects.create(
+        run=asking, flow=flow, step_id="s2", title="Call Eva Ruiz?", details="Her phone: +34600111222",
+        expires_at=soon, status=Question.Status.APPROVED, decided_by="tester", note="Eva Ruiz prefers the morning",
     )
-    eva = worker.request("customer.customer.create", EVA)
-    worker()
-    erase(worker, eva.id)
-    worker()
-    started = FlowRun.objects.get(event_name="customer.customer.erased")
+    pending = Question.objects.create(run=asking, flow=flow, step_id="s3", title="Send Eva Ruiz a gift?", expires_at=soon)
+
+    assert run("flow.customer.erase", {"id": str(customer.id)}, system_context(A)).changed == 1
+
+    answered.refresh_from_db()
+    pending.refresh_from_db()
+    assert (answered.status, answered.title, answered.details, answered.note) == (Question.Status.APPROVED, "", "", "")
+    assert (pending.status, pending.title) == (Question.Status.CANCELLED, "")
+
+
+@pytest.mark.django_db
+def test_a_run_the_erasure_itself_starts_is_not_cancelled_by_it(worker, clock):
+    # The erasure first stops what kept her data and only then starts what waits for it: the run it starts, which
+    # names the card by its id and waits a day, is not one of those it cancels.
+    started, her_id = started_by_her_erasure(worker, [A_DAY, ERASED_TASK])
+
+    assert (started.status, started.input) == (FlowRun.Status.WAITING, {"id": her_id})
+    clock(timezone.now() + dt.timedelta(days=2))
+    assert run("flow.run.resume_due", {}, system_context(A)).count == 1
+    assert list(Task.objects.values_list("title", flat=True)) == [f"Erased {her_id}"]
+
+
+@pytest.mark.django_db
+def test_an_automation_that_starts_on_the_erasure_still_starts(worker):
+    started, her_id = started_by_her_erasure(worker, [ERASED_TASK])
     assert started.status == FlowRun.Status.SUCCEEDED
-    assert list(Task.objects.values_list("title", flat=True)) == [f"Erased {eva.id}"]
+    assert list(Task.objects.values_list("title", flat=True)) == [f"Erased {her_id}"]
 
 
 @pytest.mark.django_db
