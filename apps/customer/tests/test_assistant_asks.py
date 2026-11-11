@@ -60,17 +60,14 @@ def test_an_employee_is_never_offered_what_only_the_owner_may_do(catalog_of):
     assert "customer.customer.create" in employee  # positive control: the employee's own writes are there
 
 
-#: What the owner or a manager asks about a customer's orders, with the tool of Customers that answers it: its own asks
-#: and phrases nobody wrote yet. With every app on, these tools tied on the tenth place with other apps' order tools and
+#: What the owner or a manager asks about a customer's orders, with the tool of Customers that answers it: phrases
+#: nobody wrote as its asks (the sweep of ``base/tests/test_assistant_asks.py`` already ranks those, so one here would
+#: measure nothing; hub#1135). With every app on, these tools tied on the tenth place with other apps' order tools and
 #: got in only by name (hub#594): one more phrase about «pedido» elsewhere left them out.
-ORDER_ASKS = [
-    ("en", "customer.order.list", "what orders does Pedro have?"),
+ORDER_PHRASES = [
     ("en", "customer.order.list", "show me Pedro's orders"),
-    ("es", "customer.order.list", "¿qué pedidos tiene el cliente Pedro?"),
     ("es", "customer.order.list", "¿qué pedidos ha hecho Ana?"),
-    ("en", "customer.order.customer", "who's on this order?"),
     ("en", "customer.order.customer", "which customer is this order for?"),
-    ("es", "customer.order.customer", "¿de quién es este pedido?"),
     ("es", "customer.order.customer", "¿a qué cliente pertenece este pedido?"),
 ]
 #: The first places a turn offers that these tools come within: three short of the QA's first ten
@@ -81,7 +78,7 @@ WITH_ROOM = 7
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.MANAGER])
-@pytest.mark.parametrize(("language", "name", "phrase"), ORDER_ASKS)
+@pytest.mark.parametrize(("language", "name", "phrase"), ORDER_PHRASES)
 def test_a_customers_orders_bring_the_tool_of_customers_with_room_to_spare(catalog_of, role, language, name, phrase):
     tools = catalog_of(role, language)
     assert name in tools  # positive control: the role holds the tool, so its place is known

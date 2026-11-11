@@ -6,14 +6,16 @@ the catalogue of a business with every app on and ranked as a turn ranks, is ``b
 (sale is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over its asks.
 """
 
+import dataclasses
 import re
 
 import pytest
 from live.assistant import asks_of
-from live.operations import registry
+from live.operations import Operation, registry
 
 from apps.sale.tests.conftest import ctx_for
 from base import assistant
+from base.tests.test_assistant_asks import TOP, alike, comparable, probe_phrases
 
 LANGUAGES = ("en", "es")
 #: The phrases of sale's tools put to the turn at least, both languages together: a silent drop of asks fails.
@@ -91,6 +93,33 @@ def test_the_reported_sales_request_offers_its_existing_operation(language, name
     assert name in tools
     offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
     assert name in offered[:10]
+
+
+#: Undoing a line's voucher in words that are no ask nor probe: ``sale.order.remove_voucher``'s asks bring it among the
+#: first ten (with them, 4th in Spanish and 7th in English); without them it falls out (33rd, and out of the ones a turn
+#: offers). Its asks no longer say the QA's «quita el bono de la línea» with one word changed (hub#1135).
+OWN_WORDS = [
+    ("es", "sale.order.remove_voucher", "no lo uses en esta cuenta, mejor lo guarda"),
+    ("en", "sale.order.remove_voucher", "she would rather not use it on the haircut"),
+]
+
+
+def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
+    op = tools[name]
+    return {**tools, name: dataclasses.replace(op, ai=dataclasses.replace(op.ai_spec(), asks={}))}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("language", "name", "phrase"), OWN_WORDS)
+def test_a_voucher_undone_in_the_persons_own_words_reaches_its_tool_by_its_asks(language, name, phrase):
+    tools = assistant.catalog(ctx_for("hub_owner", language=language))
+    assert name in tools  # positive control: the owner holds it, so its place is known
+    assert comparable(phrase) not in probe_phrases()
+    assert not [ask for said in asks_of(tools[name]).values() for ask in said if alike(ask, phrase)]
+    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
+    assert name in offered[:TOP], (offered.index(name) + 1 if name in offered else None, offered[:TOP])
+    unasked = [op.name for op in assistant.relevant(without_its_asks(tools, name), [phrase], language)]
+    assert name not in unasked[:TOP]  # what brings it is its asks, so a change to them is seen here
 
 
 def test_no_qa_probe_is_an_ask():
