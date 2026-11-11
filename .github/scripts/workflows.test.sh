@@ -111,7 +111,7 @@ check("python fetches ERPlora/blueprints into ../blueprints before pytest",
 # for hours, and retries alone would spend minutes the python job does not have): their .deb files come from GitHub's
 # cache, one entry per runner image and per test.yml, through apt-install.sh, which only goes to the mirror without
 # them and retries it then. The cache is saved right after the download, not at the end of the job: the end only saves
-# when every test passes, and other runs would miss it for the 20 to 30 minutes of pytest.
+# when every test passes, and other runs would miss it for the minutes of pytest.
 python_steps = steps(tjobs.get("python", {}))
 weasyprint = next((step for step in python_steps if step.get("name") == "WeasyPrint's libraries"), {})
 weasyprint_run = str(weasyprint.get("run", "")).split()
@@ -140,6 +140,33 @@ check("the cache keeps one entry per runner image and per test.yml (where the pa
       image is not None and apt_restore is not None and python_steps.index(image) < python_steps.index(apt_restore)
       and all(name in str(image.get("run", "")) for name in ("$ImageOS", "$ImageVersion"))
       and "hashFiles('.github/workflows/test.yml')" in apt_key)
+# pytest is spread over a matrix of shards (hub#1185): a single job ran the whole suite, which grows every day, and
+# GitHub's runners take from 18 to 29 min on the same commit, so a slow one hit the job's 30 minutes and turned PRs and
+# main's deploy red without a failing test. Each shard runs its share through pytest-shard.sh with the index and total
+# GitHub gives the job (strategy.job-index, strategy.job-total), so the shards cover the whole suite whatever the size
+# of the matrix; a failing shard cancels none of the others, so every failure shows; and the job's timeout stays where
+# it was, with a warning from the shard before it gets near.
+python_job = tjobs.get("python", {})
+strategy = python_job.get("strategy") or {}
+matrix = strategy.get("matrix") or {}
+shards = matrix.get("shard")
+check("python runs as a matrix of at least 2 shards, named 1 to N, and nothing else",
+      isinstance(shards, list) and len(shards) >= 2 and shards == list(range(1, len(shards) + 1)) and set(matrix) == {"shard"})
+check("a failing shard cancels none of the others (fail-fast: false)", strategy.get("fail-fast") is False)
+check("the python job keeps its 30-minute timeout", python_job.get("timeout-minutes") == 30)
+shard_step = next((step for step in python_steps if "pytest-shard.sh" in str(step.get("run", ""))), {})
+shard_env = shard_step.get("env") or {}
+shard_run = [shard_env.get(word.strip('"')[1:], word) if word.strip('"').startswith("$") else word
+             for word in str(shard_step.get("run", "")).split()]
+check("pytest runs through pytest-shard.sh with the job's index and total in the matrix",
+      shard_run[:4] == ["bash", ".github/scripts/pytest-shard.sh", "${{ strategy.job-index }}", "${{ strategy.job-total }}"])
+warn_minutes = shard_run[4] if len(shard_run) > 4 else ""
+check("the shard warns before the job's timeout, with room to add a shard",
+      warn_minutes.isdigit() and 0 < int(warn_minutes) <= python_job.get("timeout-minutes", 0) * 2 // 3)
+check("each shard runs pytest in parallel (pytest-xdist)", " -n " in " ".join(shard_run[5:]) + " ")
+check("pytest runs only through pytest-shard.sh", "pytest " not in python_runs.replace(str(shard_step.get("run")), ""))
+lock = (folder.resolve().parent.parent / "uv.lock").read_text()
+check("pytest-split, which pytest-shard.sh runs, is locked in uv.lock", '\nname = "pytest-split"\n' in lock)
 check("frontend runs lint, typecheck, Vitest and the build",
       all(f"pnpm {task}" in frontend_runs for task in ("lint", "typecheck", "test", "build")))
 check("scripts runs actionlint, shellcheck and the script tests",
