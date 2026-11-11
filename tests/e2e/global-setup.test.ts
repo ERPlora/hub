@@ -538,6 +538,12 @@ describe('globalSetup', () => {
 
 
 describe('startWorker', () => {
+  // hub#759: with the machine loaded (load average 50–90, swapping) the worker took about 3 min to import Django and
+  // say it waits for work, silent until then; a 60 s budget failed the run before its first spec, with no output.
+  const LOADED_START_MS = 3 * 60_000;
+  /** The longest a run waits for a worker that hangs alive and never waits for work. */
+  const HUNG_WORKER_MAX_MS = 5 * 60_000;
+
   /** A `run_worker` child as `spawn` returns it: its two outputs, its exit and the signals it was sent. */
   class FakeWorker extends EventEmitter {
     stdout = new EventEmitter();
@@ -611,10 +617,71 @@ describe('startWorker', () => {
       const failed = expect(up).rejects.toThrow(`did not wait for work within ${WORKER_START_TIMEOUT_MS / 1000} s`);
 
       worker.stderr.emit('data', Buffer.from('WARNING base.worker worker: shared schema not migrated yet\n'));
-      await vi.advanceTimersByTimeAsync(WORKER_START_TIMEOUT_MS);
+      await vi.advanceTimersByTimeAsync(HUNG_WORKER_MAX_MS);
 
       await failed;
       expect(worker.signals).toEqual(['SIGTERM']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('is up when a loaded machine takes minutes to start it, silent until it waits for work', async () => {
+    vi.useFakeTimers();
+    try {
+      const { worker, spawn } = spawned();
+      const up = startWorker('hub_e2e_8030', 'saas_e2e_8031', spawn, {});
+      const outcome = up.then(
+        () => 'up',
+        (error: Error) => error.message,
+      );
+
+      await vi.advanceTimersByTimeAsync(LOADED_START_MS);
+      worker.stderr.emit('data', Buffer.from(`INFO base.worker ${WORKER_READY} (3 app(s) registered).\n`));
+
+      expect(await outcome).toBe('up');
+      expect(worker.signals).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops the run the moment the worker dies, leaving no wait behind however long the start budget is', async () => {
+    vi.useFakeTimers();
+    try {
+      const { worker, spawn } = spawned();
+      const up = startWorker('hub_e2e_8030', 'saas_e2e_8031', spawn, {});
+      const outcome = up.then(
+        () => 'up',
+        (error: Error) => error.message,
+      );
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      worker.stderr.emit('data', Buffer.from('django.db.utils.OperationalError: database "hub_e2e_8030" does not exist\n'));
+      worker.exit(1);
+
+      expect(await outcome).toMatch(/exited with 1 before it waited for work[\s\S]*does not exist/);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops the run at once when the worker cannot even start, which spawn reports without any exit', async () => {
+    vi.useFakeTimers();
+    try {
+      const { worker, spawn } = spawned();
+      const up = startWorker('hub_e2e_8030', 'saas_e2e_8031', spawn, {});
+      const outcome = up.then(
+        () => 'up',
+        (error: Error) => error.message,
+      );
+
+      // What Node does when the fork fails on a loaded machine (or `uv` is gone): 'error' and 'close', never 'exit'.
+      worker.emit('error', Object.assign(new Error('spawn uv EAGAIN'), { code: 'EAGAIN' }));
+
+      expect(await outcome).toMatch(/run_worker of the e2e \(DB_NAME=hub_e2e_8030\) could not start: spawn uv EAGAIN/);
+      expect(vi.getTimerCount()).toBe(0);
     } finally {
       vi.useRealTimers();
     }
