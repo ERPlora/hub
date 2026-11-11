@@ -8,6 +8,7 @@ the SaaS has migrated the ``shared`` schema (the first deploy, 2026-10-14): it w
 registers once the tables exist.
 """
 
+import math
 import os
 import queue
 import signal
@@ -28,7 +29,9 @@ from shared.models import App, AppDoc
 
 HUB_DIR = Path(__file__).resolve().parent.parent.parent
 STOP_TIMEOUT = 30  # ECS's stopTimeout of the worker task
-STARTUP = 60
+# What the real process gets to write each line it is waited for: a loaded machine took minutes to import Django
+# (hub#759). A process that ends stops the wait at once (its output ends), so this only bounds one that hangs alive.
+STARTUP = 5 * 60
 
 
 @pytest.fixture
@@ -173,6 +176,69 @@ def wait_for(lines: queue.Queue, text: str, seen: list[str]) -> None:
         if text in line:
             return
     pytest.fail(f"the worker never wrote {text!r}; its output:\n{''.join(seen)}")
+
+
+class LoadedMachine:
+    """``wait_for``'s clock and queue on a machine of its own: the worker's next line comes ``after`` seconds of
+    silence (``None``: its output ends, the process is gone); once read, nothing more comes, as from a real queue."""
+
+    def __init__(self, after: float, line: str | None):
+        self.now = 0.0
+        self.after = after
+        self.line = line
+        self.read = False
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def get(self, timeout: float) -> str | None:
+        if self.read or self.after > timeout:
+            self.now += timeout
+            raise queue.Empty
+        self.now += self.after
+        self.read = True
+        return self.line
+
+
+@pytest.fixture
+def loaded(monkeypatch):
+    """Puts ``wait_for`` on a ``LoadedMachine``'s clock; the test reads from the same machine."""
+
+    def on(after: float, line: str | None) -> LoadedMachine:
+        machine = LoadedMachine(after, line)
+        monkeypatch.setattr(sys.modules[__name__], "time", machine)
+        return machine
+
+    return on
+
+
+def test_wait_for_gives_a_loaded_machine_minutes_to_start_the_worker(loaded):
+    # hub#759: at load 20–23 with `-n 4`, the real process said nothing for 60 s and the test failed with an empty
+    # output; the same file alone, at the same load, passed in 73 s. Load 50–90 took about 3 min to import Django.
+    machine = loaded(after=3 * 60, line="INFO base.worker worker: started\n")
+    seen: list[str] = []
+
+    wait_for(machine, "worker: started", seen)
+
+    assert seen == ["INFO base.worker worker: started\n"]
+
+
+def test_wait_for_stops_the_moment_the_worker_ends_without_writing_it(loaded):
+    machine = loaded(after=1, line=None)
+
+    with pytest.raises(pytest.fail.Exception, match="never wrote 'worker: started'"):
+        wait_for(machine, "worker: started", [])
+
+    assert machine.now == 1
+
+
+def test_wait_for_gives_up_within_five_minutes_on_a_worker_that_hangs_silent(loaded):
+    machine = loaded(after=math.inf, line="INFO base.worker worker: started\n")
+
+    with pytest.raises(pytest.fail.Exception, match="never wrote 'worker: started'"):
+        wait_for(machine, "worker: started", [])
+
+    assert 0 < machine.now <= 5 * 60
 
 
 def start_worker() -> tuple[subprocess.Popen, queue.Queue]:

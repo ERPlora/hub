@@ -3,7 +3,9 @@
 // says it holds something, Android's Back on it asks «Discard changes?» — «Keep editing» or «Discard changes» — and
 // closes it only on «Discard changes»; with nothing typed Back closes it at once, as before. `inside` is an element of
 // the window (its fields), which tells its overlay apart from any other open. The question is the ConfirmDialog of
-// `@erplora/ui` (`useConfirm`), so Back on it closes the question and the person keeps editing.
+// `@erplora/ui` (`useConfirm`), so Back on it closes the question and the person keeps editing. It gives back the same
+// question for the window's own ways out (hub#1023): the `canDismiss` of its FormModal, which asks it on Cancel, the
+// close button, Escape and the backdrop while `dirty`, and lets it close at once when nothing is typed.
 import { useConfirm } from '@erplora/ui/components';
 import { computed, getCurrentInstance, type MaybeRefOrGetter, onScopeDispose, ref, toValue, watch } from 'vue';
 
@@ -27,23 +29,22 @@ function elementOf(inside: Inside, instance: ReturnType<typeof getCurrentInstanc
   };
 }
 
-/** Called from `setup()`: the question belongs to the app of the window that asks it. */
-export function useUnsavedChanges(inside: Inside, dirty: MaybeRefOrGetter<boolean>): void {
+/** Called from `setup()`: the question belongs to the app of the window that asks it. Resolves `true` when the window
+ *  may close (nothing typed, or «Discard changes»): its FormModal's `canDismiss`. */
+export function useUnsavedChanges(inside: Inside, dirty: MaybeRefOrGetter<boolean>): () => Promise<boolean> {
   const { t } = useBaseI18n();
   const { confirm } = useConfirm();
-  const letGo = holdUnsavedChanges({
-    inside: elementOf(inside, getCurrentInstance()),
-    dirty: () => toValue(dirty),
-    confirmDiscard: () =>
-      confirm({
-        title: t('base.unsavedChanges.title'),
-        message: t('base.unsavedChanges.message'),
-        tone: 'danger',
-        confirmLabel: t('base.unsavedChanges.discard'),
-        cancelLabel: t('base.unsavedChanges.keep'),
-      }),
-  });
+  const confirmDiscard = () =>
+    confirm({
+      title: t('base.unsavedChanges.title'),
+      message: t('base.unsavedChanges.message'),
+      tone: 'danger',
+      confirmLabel: t('base.unsavedChanges.discard'),
+      cancelLabel: t('base.unsavedChanges.keep'),
+    });
+  const letGo = holdUnsavedChanges({ inside: elementOf(inside, getCurrentInstance()), dirty: () => toValue(dirty), confirmDiscard });
   onScopeDispose(letGo);
+  return async () => !toValue(dirty) || confirmDiscard();
 }
 
 /** A form is dirty when its current fields differ from the snapshot taken when it opened. */
