@@ -85,7 +85,7 @@ PROBES = [
 OWN_WORDS = [
     ("modifier.group.list", "¿qué tengo montado para acompañar los platos?"),
     ("modifier.group.get", "¿cuál es el máximo de Punto de la carne?"),
-    ("modifier.category.get", "Pizzas, ¿cuál es para colgarle suplementos?"),
+    ("modifier.category.get", "localiza Bocadillos para colgarle extras"),
     ("modifier.option.list", "¿qué opciones de salsa tengo y qué cuestan?"),
     ("modifier.option.get", "¿cuánto se suma por la opción Sin gluten?"),
     ("modifier.link.list", "dime los platos que llevan Extras"),
