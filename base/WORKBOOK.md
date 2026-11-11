@@ -3662,6 +3662,12 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   `run_tool` (la operación como la persona; `PermissionDenied`, `AppInactive` y `Unauthorized` → `refused`) y las
   puertas firmadas del SaaS (`/internal/assistant/chat/stream`, `usage`, `report`, `docs/search`,
   `/internal/speech/transcribe` y `/internal/speech/synthesize`, con el HMAC de `base.signing`).
+- **La tarjeta es la confirmación** (hub#1140): ninguna descripción `ai=` de una herramienta manda preguntar,
+  confirmar o esperar un sí en el chat antes de llamarla («Ask first.», «confirm it first», «tell the person…, then…»):
+  con esa frase el modelo pregunta en el chat y la tarjeta no sale (Reservas, hub#1105; Mesas; Caja, hub#1138). Lo
+  guarda `tests/test_guardrails_assistant.py` sobre todas las herramientas del Hub; lo citado («…», `código`, nombres con
+  punto) y lo negado no cuentan, y su `PENDING` (las que aún lo dicen, cada una con la PR abierta que edita su fichero)
+  solo baja.
 - Operaciones del asistente, todas con `base.view_home` y `ai=` «Not an assistant tool»: `base.assistant.turn`
   (command: corre las lecturas pendientes, para en la tarjeta de una escritura hasta su `decision`, corta a las
   `MAX_ROUNDS` = 6 rondas con `assistant.too_many_steps`; el «sí» a una escritura que la persona no puede hacer y un

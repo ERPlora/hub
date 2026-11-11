@@ -1034,7 +1034,10 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 - **Hora del negocio**: `base.business.business_zone` (la zona del hub); las retenciones de Reservas
   traen fecha y hora de pared y se guardan con esa zona. «Hoy» en el plano es el día del negocio.
 - **Asistente**: cada operación declara `ai` (descripción; `risk: "high"` en cerrar, trasladar,
-  fusionar, borrar zonas, mesas y cuentas) y cada campo de `schemas.py` su `description`.
+  fusionar, borrar zonas, mesas y cuentas) y cada campo de `schemas.py` su `description`. Ninguna
+  descripción manda preguntar antes: la tarjeta es la confirmación, y el «Ask first.» que llevaban
+  cerrar, pasar, juntar y borrar una cuenta hacía que el asistente preguntara en el chat sin sacarla
+  (hub#1140; lo guarda `tests/test_guardrails_assistant.py` para todo el Hub).
 - **En persona** (`ai.in_person`, revisión 2026-10-30): sentar, volver a sentar, dividir y enlazar una
   cuenta (`table.session.open`, `.restore`, `.split` y `.link_order`). Automatizaciones no las ofrece ni
   las concede, y un paso que se hubiera colado se rechaza al correr (`flow.high_risk`, FLOW-F12): las
