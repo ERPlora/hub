@@ -39,6 +39,7 @@ opened), so what a business has costs no call; only what that row does not list 
 cache. Tables are never dropped: a row that lists a module is right however old it is, one that does not may be behind.
 """
 
+import datetime as dt
 import logging
 from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager, nullcontext
@@ -66,6 +67,8 @@ FAILED = "failed"
 STATES = (ON, OFF, CREATING, FAILED)
 #: What the business wants on: on, or on its way (its tables being made, or tried again after failing).
 WANTED = frozenset({ON, CREATING, FAILED})
+#: How long an app may wait for its tables before it counts as stuck (PLAN-DB §7: the alarm past 10 minutes; hub#610).
+STUCK_AFTER = dt.timedelta(minutes=10)
 
 #: The modules off in a business, kept in Django's cache (Valkey in production, only as a cache) per host: the gate
 #: of every operation of a module, the relay and the menu ask it, and the rows are read once per business. A change
