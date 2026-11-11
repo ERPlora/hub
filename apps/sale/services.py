@@ -443,10 +443,13 @@ def create_department(ctx: OperationContext, data: DepartmentIn) -> dict:
             "en": (
                 "move the drinks section to the standard VAT rate",
                 "rename the Misc section to Others",
+                "put the bakery section first",
             ),
             "es": (
                 "pon la sección de bebidas al IVA general",
                 "renombra el departamento «Varios» a «Otros»",
+                "pon la bollería la primera de las secciones",
+                "las chuches pásalas al IVA reducido",
             ),
         },
     ),
@@ -544,10 +547,13 @@ def create_quick_note(ctx: OperationContext, data: QuickNoteIn) -> dict:
             "en": (
                 "change the 'no salt' note to 'low salt'",
                 "move 'no ice' to the top of the notes",
+                "the note should read 'gluten free' instead of 'no gluten'",
             ),
             "es": (
                 "cambia la nota «sin sal» por «poca sal»",
                 "sube «sin hielo» a la primera de las notas",
+                "la nota que pone «sin gluten», que diga «apto para celíacos»",
+                "escribe «sin lactosa» en vez de «sin leche»",
             ),
         },
     ),
