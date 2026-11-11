@@ -13,6 +13,7 @@ const sdk = vi.hoisted(() => ({ client: { api: { call: (() => undefined) as (...
 vi.mock('@erplora/ui/shell', () => ({
   createShell: vi.fn(),
   logout: vi.fn(),
+  stopNoticeListening: vi.fn(async () => {}),
   toastSuccess: vi.fn(),
   applyUserThemePreferences: vi.fn(),
   resetUserThemePreferences: vi.fn(),
@@ -28,7 +29,7 @@ vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
   provideLiveClient: vi.fn(),
 }));
 
-import { createShell, logout } from '@erplora/ui/shell';
+import { createShell, logout, stopNoticeListening } from '@erplora/ui/shell';
 import { ApiError, createLiveClient, provideLiveClient } from '@erplora/ui/sdk';
 import { assistantConfig, assistantMessages, configureAssistant } from '@erplora/ui/components';
 import { approvalPass } from '../base/frontend/lib/approval';
@@ -120,10 +121,25 @@ describe('main.ts', () => {
   });
 
   // BASE-G120: signing out forgets the assistant's conversation of the tab, from the menu and from the idle lock.
-  it('signing out forgets the conversation with the assistant, then leaves', () => {
+  it('signing out forgets the conversation with the assistant, then leaves', async () => {
     sessionStorage.setItem('erplora.assistant.history', JSON.stringify({ user: 'u1', bubbles: [], conversation: [] }));
-    main.signOut();
+    await main.signOut();
     expect(sessionStorage.getItem('erplora.assistant.history')).toBeNull();
+    expect(logout).toHaveBeenCalledOnce();
+  });
+
+  // HUB_APP-F26 (hub#836): once the form leaves, this page is no longer the linked hub and the app refuses its orders.
+  it('signing out stops the listening with the screen off and waits for the app before leaving', async () => {
+    let stopped!: () => void;
+    vi.mocked(stopNoticeListening).mockReturnValueOnce(new Promise<void>((resolve) => (stopped = resolve)));
+
+    const leaving = main.signOut();
+    await Promise.resolve();
+    expect(stopNoticeListening).toHaveBeenCalledOnce();
+    expect(logout).not.toHaveBeenCalled();
+
+    stopped();
+    await leaving;
     expect(logout).toHaveBeenCalledOnce();
   });
 
@@ -333,7 +349,8 @@ describe('main.ts', () => {
       fakeShell();
       await main.boot({});
       expect(logout).not.toHaveBeenCalled();
-      vi.advanceTimersByTime(60_000);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(stopNoticeListening).toHaveBeenCalledOnce();
       expect(logout).toHaveBeenCalledOnce();
     } finally {
       vi.useRealTimers();

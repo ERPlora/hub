@@ -25,7 +25,8 @@ from typing import Any
 
 import pydantic
 from django.db import IntegrityError
-from django.db.models.functions import Coalesce
+from django.db.models import Q, TextField
+from django.db.models.functions import Cast, Coalesce
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope, system_context
@@ -84,9 +85,11 @@ from apps.flow.schemas import (
     AnswerIn,
     AssistantRoundIn,
     AssistantRoundOut,
+    ChangedOut,
     ClaimAssistantOut,
     ClaimCallOut,
     CreateIn,
+    CustomerErasedIn,
     DeletedOut,
     DraftOut,
     DraftProposeIn,
@@ -2087,6 +2090,74 @@ def react(ctx: OperationContext, data: ReactIn) -> dict:
                 continue
         _advance(ctx, run, flow, now)
     return {"started": started, "skipped": skipped}
+
+
+#: The runs that may still go on with what they keep (FLOW-F23, F27, F28); one stopped by an error goes on only if
+#: it is resumed (FLOW-F24, ``resume_problem``).
+GOING_ON = (FlowRun.Status.WAITING, FlowRun.Status.CALLING, FlowRun.Status.ASKING)
+
+
+def _naming(card: str):
+    """The runs whose kept data name the card ``card``: its id in what started them (the notice of Customers or of
+    another app, ``customer_id``) or in what their steps read (the card itself, a sale, an appointment…)."""
+    return FlowRun.objects.annotate(
+        input_text=Cast("input", TextField()), outputs_text=Cast("outputs", TextField())
+    ).filter(Q(input_text__contains=card) | Q(outputs_text__contains=card))
+
+
+@operation(
+    "flow.customer.erase",
+    kind="command",
+    permission=SYSTEM,
+    input=CustomerErasedIn,
+    output=ChangedOut,
+    ai={
+        "description": "System only: the platform's reaction to customer.customer.erased (Customers): every run that "
+        "could still go on with that customer's data (waiting, calling another system, asking someone, or stopped "
+        "by an error and resumable) is cancelled, saying why, and forgets what its steps read and what its "
+        "questions said; one stopped by an error that can no longer be resumed forgets what its steps read.",
+        "risk": "normal",
+    },
+)
+def erase_customer(ctx: OperationContext, data: CustomerErasedIn) -> dict:
+    now = timezone.now()
+    resumable_since = now - dt.timedelta(days=RESUME_DAYS)
+    holding = _naming(str(data.id)).filter(
+        Q(status__in=GOING_ON)
+        | Q(status=FlowRun.Status.FAILED) & (~Q(outputs={}) | Q(finished_at__gte=resumable_since))
+    )
+    found = list(holding.values_list("pk", "flow_id"))
+    if not found:
+        return {"changed": 0}
+    # The order of every write: the automations, then their runs, then their questions.
+    list(
+        Flow.objects.select_for_update()
+        .filter(pk__in={flow_id for _pk, flow_id in found})
+        .order_by("id")
+        .values_list("pk", flat=True)
+    )
+    changed = 0
+    for run in (
+        holding.filter(pk__in=[pk for pk, _flow_id in found])
+        .select_related("flow")
+        .select_for_update(of=("self",))
+        .order_by("id")
+    ):
+        if run.status == FlowRun.Status.FAILED and resume_problem(run, now) is not None:
+            if not run.outputs:
+                continue
+            # It can no longer go on: only what its steps read goes, its history stays as it ended.
+            run.outputs = {}
+            run.save(update_fields=["outputs"])
+        else:
+            questions = Question.objects.filter(run=run)
+            questions.filter(status=Question.Status.PENDING).update(status=Question.Status.CANCELLED, decided_at=now)
+            # Filled in from what the steps read (``{{steps.s1.name}}``): her name may be in them.
+            questions.update(title="", details="", note="")
+            with translation.override(run.flow.language):
+                _finish(ctx, run, FlowRun.Status.CANCELLED, now, _own("flow.customer_erased"))
+        changed += 1
+    return {"changed": changed}
 
 
 @operation(

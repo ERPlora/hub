@@ -883,6 +883,7 @@ SECRETS_KEY_GONE = _(
 )
 CANCELLED_PAUSED = _("Cancelled: the automation was paused while it waited.")
 CANCELLED_DELETED = _("Cancelled: the automation was deleted.")
+CANCELLED_ERASED = _("Cancelled: the customer's personal data were erased.")
 ANSWERED_NO = _("Cancelled: %(who)s answered no to «%(title)s».")
 NOBODY_ANSWERED = _("Cancelled: nobody answered «%(title)s» in time.")
 ASSISTANT_ROUNDS = _("The assistant took its %(n)s turns without finishing, so it stopped.")
@@ -925,6 +926,7 @@ REASONS = {
     "flow.secrets_key_missing": SECRETS_KEY_GONE,
     "flow.paused": CANCELLED_PAUSED,
     "flow.deleted": CANCELLED_DELETED,
+    "flow.customer_erased": CANCELLED_ERASED,
     "flow.question_rejected": ANSWERED_NO,
     "flow.question_expired": NOBODY_ANSWERED,
     "flow.assistant_too_many_rounds": ASSISTANT_ROUNDS,

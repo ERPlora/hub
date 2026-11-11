@@ -38,6 +38,7 @@ COMMANDS = {
     "flow.draft.propose",
     "flow.draft.dismiss",
     "flow.run.react",
+    "flow.customer.erase",
     "flow.schedule.fire_due",
     "flow.run.resume_due",
     "flow.run.prune",
@@ -72,10 +73,11 @@ HIGH_RISK = {
     "flow.recipe.disable",
     "flow.recipe.restore",
 }
-# Run only by the platform: the reactions (to every event, and to a run parked on a call) and the
-# scheduled tasks.
+# Run only by the platform: the reactions (to every event, to a run parked on a call and to an erased
+# card) and the scheduled tasks.
 SYSTEM = {
     "flow.run.react",
+    "flow.customer.erase",
     "flow.run.call",
     "flow.schedule.fire_due",
     "flow.run.resume_due",

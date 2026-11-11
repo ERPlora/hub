@@ -421,6 +421,7 @@ En la pantalla Archivos:
 | BASE-F108 | Reportar un problema a soporte | hecho |
 | BASE-F109 | Borrar un negocio eliminado pasados sus 90 días | parcial — un negocio con documentos guarda su base de datos hasta que exista el archivo fiscal (hub#738) |
 | BASE-F110 | Abrir la web del negocio por su dominio propio | hecho |
+| BASE-F113 | Seguir avisando con la pantalla apagada (app de Android) | parcial — la app instalada aún no tiene la orden de quedarse a la escucha (hub#836) |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -1799,7 +1800,7 @@ Pasos:
 Entra: la sesión.
 Sale: la sesión cerrada en el negocio; la de erplora.com, solo si la persona lo confirma.
 Si falla: si el negocio no contesta, la sesión caduca sola.
-Implicados: ninguno
+Implicados: BASE-F113 (en la app de Android, antes de salir deja de estar a la escucha)
 
 ### BASE-F62 Decidir si este dispositivo es compartido o personal
 <!-- origen: old-hub:HUB_SHELL-F11 -->
@@ -3014,6 +3015,32 @@ archivos. Actualízala para descargar.»; cualquier otro fallo (un nombre que la
 ERPlora (Datos y copias › Copias) bajan por un enlace firmado y no pasan por aquí.
 Implicados: HUB_APP-F30 (ERPlora/app), BASE-F35, BASE-F74, BASE-F85, BASE-F90, VERIFACTU-F05, ATTENDANCE-F10,
 INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
+
+### BASE-F113 Seguir avisando con la pantalla apagada (app de Android)
+<!-- origen: old-hub:HUB_APP-F26 old-hub:hub#2307 (la parte del Hub de HUB_APP-F26 de ERPlora/app) gh:hub#836 -->
+Estado: parcial — la parte del Hub está hecha, pero la app instalada aún no tiene la orden de quedarse a la escucha: la
+1.1.34 la quitó (ERPlora/app#25) y vuelve con la segunda parte de hub#836
+Actor: sistema
+Pantalla: ninguna; en Android, el aviso fijo «ERPlora está a la escucha»
+Pasos:
+  1. En la app de ERPlora, una persona entra en el negocio y oye algún aviso (una comanda nueva de Cocina, una cita
+     que pidió la clienta, un cliente que espera respuesta en WhatsApp), y Android no tiene negados los avisos.
+  2. Después de la pregunta de los avisos, si toca (HUB_APP-F07), el Hub pide a la app que se quede a la escucha, con
+     las palabras de su aviso fijo en el idioma de la persona: «ERPlora está a la escucha» y «Te avisará cuando algo
+     necesite tu atención, aunque la pantalla esté apagada.», en el canal «Avisos con la pantalla apagada».
+  3. Con la pantalla apagada o la app en segundo plano, los avisos siguen llegando al momento (KITCHEN-F16,
+     APPOINTMENT-F28).
+  4. Al cerrar la sesión, también por inactividad (BASE-F61), o cuando ya no queda nada que avisar (la app que avisaba
+     se desactiva), el Hub pide a la app que deje de escuchar; al cerrar la sesión, antes de salir de la página.
+Entra: los avisos que oye la persona y lo que dice Android de los avisos.
+Sale: la orden a la app de quedarse a la escucha o de dejarlo. En el Hub no se guarda nada.
+Si falla: con los avisos negados («Ahora no» a nuestra pregunta, o negados en Android), sin nada que avisar o sin saber
+qué dice Android, la app no se queda despierta. Una app sin esta orden (la 1.1.34) la rechaza: el Hub lo anota en la
+consola, no se la vuelve a pedir en esa página y la persona no ve ningún error; los avisos llegan con la app en
+pantalla, como antes. Si Android no deja empezar, igual, y se vuelve a pedir en la siguiente entrada. Mientras el Hub
+no sabe aún si hay algo que avisar, no pide nada a la app: recargar la página no la para ni la vuelve a encender.
+Cerrar la sesión nunca espera a la app más de 2 segundos. En un navegador no hay app a la que pedírselo.
+Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APPOINTMENT-F28, BASE-F61; hub#836
 
 ## Para quien lo mantiene
 
