@@ -62,18 +62,13 @@ REPORTED = [
     ("pricing.rule.deactivate", "desactiva Descuento QA sin perder su configuración"),
     ("pricing.rule.activate", "vuelve a activar Descuento QA para las nuevas ventas"),
 ]
-#: «activar» reads only as turning something on (an app, a setting), never as the action ``activate``: bringing a price
-#: list or a rule back is offered, but after ``base.app.enable``. Strict, so the pointer of live that reads the verb
-#: turns these red and whoever brings it takes the mark off: the order is then held like the payment method's.
-UNTIL_LIVE_READS_ACTIVATE = pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="ERPlora/live#50: VERBS has no «activate», «activar» is only enable"
-)
 #: What the model ran instead of bringing a rule back, a payment method to switch on, and what it looked for instead of
-#: bringing a price list back, an app.
+#: bringing a price list back, an app. live reads «activar» as the action ``activate`` too, not only as turning
+#: something on (ERPlora/live#70), so bringing a price list or a rule back goes ahead of ``base.app.enable``.
 CHOSEN_INSTEAD = [
     ("pricing.rule.activate", "payment.method.activate"),
-    pytest.param("pricing.price_list.activate", "base.app.enable", marks=UNTIL_LIVE_READS_ACTIVATE),
-    pytest.param("pricing.rule.activate", "base.app.enable", marks=UNTIL_LIVE_READS_ACTIVATE),
+    ("pricing.price_list.activate", "base.app.enable"),
+    ("pricing.rule.activate", "base.app.enable"),
 ]
 
 #: How far down the tools a turn offers (``MAX_TOOLS``, 40) a request of the QA may bring its tool: half of them, so

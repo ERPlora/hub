@@ -152,8 +152,8 @@ TRANSITIONS = {
             ),
         },
         "description": "Adds a staff member (a person who works in the business). Their role is one of the "
-        "business's active roles: read them with staff.role.list first, and if the role asked for is not there, "
-        "ask the person before creating it.",
+        "business's active roles: read them with staff.role.list first. A role it does not have is refused at once "
+        "and nothing is created: say which roles it has instead.",
         "risk": "normal",
         # hub#538: a role the business does not have is told to the model before the card, not after the yes.
         "check": "staff.role.resolve",

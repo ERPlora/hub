@@ -895,8 +895,9 @@ def rectification_figures(
         "would issue now, before issuing it: the invoice it rectifies (number, date, customer, total and what is left "
         "of it), its type (R1 by default, R5 for a ticket), the reason, this year's RECT series and the next number "
         "(NOT reserved: say it as the next one), today's date, and its base, tax, total and lines in negative. Changes "
-        "nothing and takes no number. Read it before rectifying and tell the person this preview; when the invoice "
-        "cannot be rectified it says why, and there is nothing to rectify."
+        "nothing and takes no number. To rectify, read it with the reason and type said and, in the same answer "
+        "where you tell the person this preview, call invoice.invoice.rectify: do not wait for a yes in the chat. "
+        "When the invoice cannot be rectified it says why, and there is nothing to rectify."
     },
 )
 def rectification_preview(

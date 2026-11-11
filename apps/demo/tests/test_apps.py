@@ -92,11 +92,22 @@ def test_every_operation_tells_the_assistant_what_it_does():
         assert isinstance(op.ai, dict), name
         assert str(op.ai.get("description", "")).strip(), name
         # What it does, what a person types to ask for it (its ``asks``, ``live.E020``: demo is listed in
-        # ``LIVE_ASSISTANT_ASKS_REQUIRED``) and, of a write, its risk.
+        # ``LIVE_ASSISTANT_ASKS_REQUIRED``), of a write its risk and, of a write on an item, its check.
         expected = {"description", "asks", "risk"} if op.kind == "command" else {"description", "asks"}
-        assert set(op.ai) == expected, name
+        assert set(op.ai) == expected | ({"check"} if name in ON_AN_ITEM else set()), name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, name
+
+
+#: The writes on one item, which take it by its id or its name.
+ON_AN_ITEM = {"demo.item.update", "demo.item.delete", "demo.item.add_line"}
+
+
+def test_a_write_on_an_item_finds_it_before_its_card():
+    """hub#1162 (BASE-G115, ``base.assistant.checked``): the item said by its name is looked for before the assistant
+    draws the card, so a name two items share, or none has, is told to the model instead of a card that would fail
+    after the person's yes."""
+    assert {name for name, op in demo_operations().items() if op.ai.get("check") == "demo.item.detail"} == ON_AN_ITEM
 
 
 def test_deleting_an_item_is_the_only_high_risk_command():

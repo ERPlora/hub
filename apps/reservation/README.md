@@ -72,8 +72,8 @@ CI=1 pnpm e2e tests/e2e/reservation-whatsapp.spec.ts   # pila con SaaS, proveedo
 
 ## Qué queda fuera
 
-- **hub#547** — Una traducción al español marcada «fuzzy» sale en inglés y su test de traducciones no la ve.
-- **hub#548** — Dos textos en español salen con las palabras de otra app («origen» en vez de «reservada por»).
+- Ya no están fuera: hub#547 (una traducción «fuzzy» salía en inglés sin que su test la viera) se cerró el
+  2026-11-04 y hub#548 (dos textos con las palabras de otra app), el 2026-11-05.
 - Lo que no hace a propósito (depósitos, recordatorios, plano, calendarios externos…) y lo que espera a otras apps
   (asignación automática, mesas unidas, cola de la puerta con SMS): «Lo que NO hace, a propósito» y «Lo que queda
   fuera» del WORKBOOK.

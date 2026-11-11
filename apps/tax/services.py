@@ -84,6 +84,18 @@ RULE_ALREADY_INACTIVE = _("That rule is already deactivated.")
     input=CategoryIn,
     output=CategoryOut,
     ai={
+        "asks": {
+            "en": (
+                "create a tax category for books",
+                "add a VAT category called Takeaway food",
+                "new tax category product.flowers named Flowers",
+            ),
+            "es": (
+                "da de alta una categoría fiscal para los libros",
+                "añade una categoría de IVA que se llame Comida para llevar",
+                "nueva categoría de impuestos product.flores con el nombre Flores",
+            ),
+        },
         "description": "Create a tax category with its key (the one products and services link to, such as "
         "product.books) and its name. It brings no rate: create its rule next.",
         "risk": "normal",
@@ -127,6 +139,18 @@ def _category(reference: str, field: str = "tax_category_key") -> TaxCategory:
     input=AliasIn,
     output=AliasOut,
     ai={
+        "asks": {
+            "en": (
+                "teach the importer that «IVA 10» means the reduced food category",
+                "learn that «cerveza» is the beer tax category",
+                "add the tax alias «licores» for spirits",
+            ),
+            "es": (
+                "que el importador entienda «cerveza» como la categoría del alcohol",
+                "añade el alias «IVA reducido» para la categoría de comida",
+                "guarda «menú» como otro nombre de la categoría fiscal de restauración",
+            ),
+        },
         "description": "Teach an outside text (a CSV cell such as «cerveza» or «IVA 10») to mean a tax category, "
         "so the next import of inventory recognises it. Kept lowercase with single spaces.",
         "risk": "normal",
@@ -270,6 +294,18 @@ def _coherent_parent(data: RuleIn, category: TaxCategory) -> TaxRule:
     input=RuleIn,
     output=RuleOut,
     ai={
+        "asks": {
+            "en": (
+                "create a 21 % VAT rule for books in Spain",
+                "add a tax rule of 10 % for food from 1 January",
+                "new exempt tax rule for medical services in Spain",
+            ),
+            "es": (
+                "crea una regla de IVA del 10 % para la comida en España",
+                "añade una regla fiscal exenta para los servicios médicos",
+                "nueva regla de impuestos del 4 % para los libros desde el 1 de enero",
+            ),
+        },
         "description": "Create a tax rule: the rate in % of a tax category in a country (or one of its regions) "
         "between two dates, with its fiscal qualification (operation_class: subject, or exempt, not subject or "
         "reverse charge, which charge no tax and take rate 0; exempt_reason, regime_key). With parent_id it is "
@@ -301,6 +337,18 @@ def create_rule(ctx: OperationContext, data: RuleIn) -> dict:
     input=RuleBulkIn,
     output=RuleBulkOut,
     ai={
+        "asks": {
+            "en": (
+                "create the 2026 VAT rates of Portugal in one go",
+                "import several tax rules at once",
+                "add these three tax rules together: books 4 %, food 10 % and general 21 %",
+            ),
+            "es": (
+                "crea de una vez todas las reglas de IVA de Portugal para 2026",
+                "importa varias reglas fiscales en un lote",
+                "añade juntas tres reglas de impuestos: libros al 4 %, comida al 10 % y general al 21 %",
+            ),
+        },
         "description": "Create up to 100 root tax rules at once (for example the 2026 VAT rates of a country), "
         "each with the checks of tax.rule.create: either all are saved or none, and every refusal names its "
         "row. Components are created one by one with tax.rule.create.",
@@ -397,6 +445,18 @@ def _latest_deactivated(rules: list[TaxRule]) -> TaxRule | None:
     output=RuleOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "end the 10 % VAT rule on 31 December",
+                "set an end date on the tax rule for books",
+                "the reduced rate stops applying after 30 June: end its tax rule",
+            ),
+            "es": (
+                "pon fecha de fin a la regla del IVA de los libros",
+                "en España el tipo reducido de hostelería vale hasta el 30 de junio: ponle fecha de fin a su regla",
+                "la regla del IVA de la comida no se aplica después del 31 de diciembre: termínala ese día",
+            ),
+        },
         "description": "Set the last day (inclusive) a tax rule applies, named by its id or by its country, "
         "region and category (the rule in force today). This is how a rate change is scheduled: end the current "
         "rule the day before the new rate starts, then create the new rule from that day. Issued invoices do "
@@ -452,6 +512,18 @@ def _switch(ctx: OperationContext, rule: TaxRule, active: bool) -> dict:
     input=RuleRefIn,
     output=RuleOut,
     ai={
+        "asks": {
+            "en": (
+                "deactivate the tax rule for books",
+                "stop applying the 10 % VAT rule for now",
+                "deactivate the Portuguese tax rule for food for a while",
+            ),
+            "es": (
+                "desactiva la regla de IVA de los libros",
+                "deja de aplicar por ahora la regla fiscal del 10 %",
+                "desactiva de momento la regla de impuestos de España para la comida",
+            ),
+        },
         "description": "Deactivate a tax rule so it no longer applies to new operations, named by its id or by its "
         "country, region and category (the rule in force today). Its rate, dates and components are kept and "
         "issued invoices do not change; tax.rule.activate brings it back.",
@@ -471,6 +543,18 @@ def deactivate_rule(ctx: OperationContext, data: RuleRefIn) -> dict:
     output=RuleOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "reactivate the tax rule for books",
+                "turn the 10 % VAT rule back on",
+                "bring back the deactivated tax rule of Portugal",
+            ),
+            "es": (
+                "reactiva la regla de IVA de los libros",
+                "vuelve a poner en marcha en España la regla de impuestos de la comida",
+                "recupera la regla fiscal de Portugal que está desactivada",
+            ),
+        },
         "description": "Bring a deactivated tax rule back so it applies to new operations again, named by its id "
         "or by its country, region and category (the most recent deactivated one). Refused if it would now "
         "overlap another active rule of the same country, region and category.",
@@ -509,6 +593,18 @@ def _actor(ctx: OperationContext) -> str:
     input=TaxSettingsIn,
     output=TaxSettingsOut,
     ai={
+        "asks": {
+            "en": (
+                "set the business's tax region to the Canary Islands",
+                "we are in Ceuta: charge IPSI instead of VAT",
+                "go back to the national VAT, with no special region",
+            ),
+            "es": (
+                "cambia la región fiscal del negocio a Canarias",
+                "estamos en Melilla: pasa el negocio al IPSI",
+                "quita la región de Canarias y vuelve al IVA de la península",
+            ),
+        },
         "description": "Keep the business's tax region: ES-CN (Canary Islands, IGIC), ES-CE (Ceuta, IPSI), ES-ML "
         "(Melilla, IPSI), or empty for the whole country (VAT). From then on every sale and invoice charges the "
         "rule of that region; a category without one cannot be charged there until it has it (the national VAT "

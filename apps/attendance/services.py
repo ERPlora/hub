@@ -536,7 +536,7 @@ def _correct(
         "description": "Corrects the clock-in and clock-out of a working day with a mandatory reason (the "
         "day's history keeps the before, the after, the reason and who). Without a clock-out the day is "
         "open again. Refused when the hours overlap another day of the same person. This rewrites the "
-        "legal working-day record: confirm the times and the reason first.",
+        "legal working-day record.",
         "risk": "high",
     },
 )

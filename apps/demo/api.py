@@ -8,7 +8,7 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.demo import queries, services
-from apps.demo.schemas import ByIdIn, ItemIn, ItemListIn, ItemPatchIn, LineIn
+from apps.demo.schemas import ItemIn, ItemListIn, ItemPatchIn, ItemRefIn, LineIn
 
 router = Router(tags=["demo"])
 
@@ -19,7 +19,7 @@ async def item_list(request, params: Query[ItemListIn]):
 
 
 @bind(router, "demo.item.detail", "/demo/items/detail")
-async def item_detail(request, params: Query[ByIdIn]):
+async def item_detail(request, params: Query[ItemRefIn]):
     return await run_operation(request, queries.item_detail, params)
 
 
@@ -39,7 +39,7 @@ async def item_update(request, data: ItemPatchIn):
 
 
 @bind(router, "demo.item.delete", "/demo/items/delete")
-async def item_delete(request, data: ByIdIn):
+async def item_delete(request, data: ItemRefIn):
     return await run_operation(request, services.delete_item, data)
 
 

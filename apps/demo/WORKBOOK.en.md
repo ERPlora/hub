@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ed1b858cafd3a95d8138fb66090cdb68c7ebdc4125565cc4b4cb8a358c1d9dd5 -->
+<!-- generated from WORKBOOK.md sha256:08c4c8a73bf98476fc13e6db6237e64e6a83b145eff6e8f8e834305134d400c3 -->
 
 ## What it is for and who it is for
 
@@ -196,9 +196,13 @@ Everything can be requested through the screens, the assistant and the API, with
 rules and the same permissions. Before changing or deleting an item or adding a line to it, the assistant asks for
 confirmation with its card (BASE-F97), which names the item as the screens name it, never by its id: by its name
 ("Item: Mesa 4"), and the status by its word ("Open", "Done"). What the person asking cannot see is left out.
-The assistant reaches each of them by what the person says ("¿cuántos elementos abiertos hay en Demo?", "borra el
-elemento Ensayo 2") and, when they name an item as "the item …", it also offers the list it finds it by its name
-with. An item said by its name alone ("borra Ensayo 2") it does not find yet (hub#1162).
+The assistant reaches each of them by what the person says ("¿cuántos elementos abiertos hay en Demo?", "borra Ensayo
+2") and, when they name an item as "the item …", it also offers the list it finds it by its name with.
+The detail and the actions on an item (changing it, deleting it, adding a line to it) take it by its id or by its
+name, as the person says it: the same name, ignoring case, before one that contains it ("borra otoño" finds "Ensayo de
+otoño" when it is the only one that has it), and the card shows the item that will be touched, by its whole name. When
+what was said fits several items, no card comes up: the assistant hears "There are several items called "Ensayo":
+Ensayo 1, Ensayo 2. Say which one." and asks which; when it fits none, "No item is called "Ensayo"".
 
 ### What it offers: queries (they read and change nothing; all of them can be followed live)
 

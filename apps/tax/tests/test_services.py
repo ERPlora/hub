@@ -101,7 +101,7 @@ def test_declarations(name, input, output, expose_api, risk):
     assert (
         op.ai["description"].strip()
         and op.ai["risk"] == risk
-        and set(op.ai) == {"description", "risk"}
+        and set(op.ai) == {"asks", "description", "risk"}  # asks: what a person says to ask for it (hub#1094)
     )
 
 

@@ -12,9 +12,8 @@ no yes either) is read sentence by sentence with :func:`stops_in_the_chat`, prov
 (the positive controls) and by sentences that must pass. Its known limit: it reads prose, so a new wording of the same
 instruction («get their OK beforehand») passes until it is added here; :data:`IN_THE_CHAT` says which ones it reads.
 
-:data:`PENDING` names the tools that still say it, each with the open pull request that edits its file (they are fixed
-after it merges, never inside somebody else's branch); each one must still be a tool and still say it, so the list
-only shrinks: an entry fixed without being dropped fails here.
+No tool is left out: the last nine that still said it (Time tracking, Automations, Staff and Invoicing, kept aside while
+pull requests edited their files) were fixed by hub#1175, and a new one fails here.
 """
 
 import re
@@ -39,6 +38,8 @@ IN_THE_CHAT = (
     re.compile(r"\b(?:tell|show)\b[^.]*\b(?:the\s+person|them)\b[^.]*\bthen\b", re.IGNORECASE),
     # «wait for their yes»
     re.compile(r"\bwait\b[^.]*\b(?:yes|ok|okay|confirmation|go-ahead|answer|reply)\b", re.IGNORECASE),
+    # «Read it before rectifying and tell the person this preview»: the read before a write tells it and stops there
+    re.compile(r"\bbefore\b[^.]*\b(?:tell|show)\b[^.]*\b(?:the\s+person|them)\b", re.IGNORECASE),
 )
 
 #: A negation right before the instruction («do not stop at the summary nor wait for a yes», «never ask them first»):
@@ -57,21 +58,6 @@ def stops_in_the_chat(description: str) -> list[str]:
                 found.append(sentence.strip())
                 break
     return found
-
-
-#: The tools that still say it, each with the open pull request that edits its file (hub#1140, 2026-11-11); hub#1175
-#: fixes them once those merge and empties the list.
-PENDING = {
-    "attendance.record.correct": "ERPlora/hub#1165 edits apps/attendance/services.py",
-    "flow.flow.delete": "ERPlora/hub#1164 edits apps/flow/services.py",
-    "flow.flow.run": "ERPlora/hub#1164 edits apps/flow/services.py",
-    "flow.question.answer": "ERPlora/hub#1164 edits apps/flow/services.py",
-    "flow.recipe.restore": "ERPlora/hub#1164 edits apps/flow/services.py",
-    "flow.run.retry": "ERPlora/hub#1164 edits apps/flow/services.py",
-    "flow.secret.delete": "ERPlora/hub#1164 edits apps/flow/services.py",
-    "invoice.invoice.rectify": "ERPlora/hub#1159 edits apps/invoice/services.py",
-    "staff.member.create": "ERPlora/hub#1168 edits apps/staff/services.py",
-}
 
 
 def tools() -> dict[str, str]:
@@ -95,6 +81,11 @@ def test_the_guard_reads_the_old_texts_and_their_wordings():
         "Read the preview first, show them the total, then charge it.",
         "Call it once the person says yes; wait for their yes in the chat.",
         "Check the role with staff.role.list; if it is not there, ask the person before creating it.",  # Staff
+        # The read before a write, hub#1175: it tells the preview and stops there, before the write's card.
+        "Changes nothing and takes no number. Read it before rectifying and tell the person this preview; when the "
+        "invoice cannot be rectified it says why.",  # Invoicing
+        "Changes nothing. Read it before closing and tell the person this summary; with none, no.",  # the old till
+        "Before you run it, show them what it would send.",
     ]
     assert [text for text in said if not stops_in_the_chat(text)] == []
 
@@ -112,6 +103,10 @@ def test_the_guard_lets_through_what_no_instruction_to_ask_in_the_chat_is():
         "A name that fits several apps is refused naming them: ask the person which one.",
         "Read them with staff.role.list first.",
         "Read it before writing to anybody.",
+        "The summary of closing the drawer, before closing it: what closing would give.",  # a read says what it is for
+        "To rectify, read it with the same reason and type and, in the same answer where you tell the person this "
+        "preview, call this tool: its card is the confirmation.",
+        "A role the business does not have is refused before the card: name the roles it has and let the person pick.",
     ]
     assert {text: stops_in_the_chat(text) for text in fine if stops_in_the_chat(text)} == {}
 
@@ -119,10 +114,5 @@ def test_the_guard_lets_through_what_no_instruction_to_ask_in_the_chat_is():
 def test_no_tool_tells_the_model_to_ask_in_the_chat_before_its_card():
     described = tools()
     assert "table.session.close" in described  # the sweep reaches the apps' tools, not only the platform's
-    told = {name: stops_in_the_chat(text) for name, text in described.items() if name not in PENDING}
+    told = {name: stops_in_the_chat(text) for name, text in described.items()}
     assert {name: sentences for name, sentences in told.items() if sentences} == {}
-
-
-def test_each_pending_tool_still_is_a_tool_that_says_it():
-    described = tools()
-    assert {name: why for name, why in PENDING.items() if not stops_in_the_chat(described.get(name, ""))} == {}

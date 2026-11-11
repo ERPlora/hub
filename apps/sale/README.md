@@ -44,9 +44,9 @@ teclearla y la línea pagada con un bono).
 | Quién la lee | Inventario y Clientes (avisos de venta cobrada, anulada y devuelta), Facturación (la requiere: venta, líneas y devoluciones), Caja (la requiere: las ventas de cada turno), Cocina (las comandas), Mesas y Citas (abren y mueven cuentas con sus operaciones) |
 | Pantallas | `/sale/pos`, `/sale/sales`, `/sale/quick-notes`, `/sale/departments` y `/sale/settings` |
 | Inicio | los paneles «Ventas hoy», «Tickets hoy», «Ventas últimos 7 días» y «Actividad reciente» |
-| Operaciones | 19 consultas (`queries.py`) y 40 acciones (`services.py`), todas con `ai=`; 57 con ruta en `/api/sale/…` (`sale.customer.reassign` y `sale.sale.record_invoice` no tienen ruta: son las reacciones, solo el sistema) |
-| Eventos | 22 propios (`sale.sale.*`, `sale.order.*`, `sale.payment_method.created`, `sale.settings.updated`, `sale.department.*` y `sale.quick_note.*`; `events.py`); reacciona a `customer.customer.merged` y a `invoice.invoice.issued` |
-| Migraciones | `0001_initial` … `0013_order_merged_into` |
+| Operaciones | 21 consultas (`queries.py`) y 43 acciones (`services.py`), todas con `ai=`; 58 con ruta en `/api/sale/…` (sin ruta: las reacciones `sale.customer.reassign` y `sale.sale.record_invoice`, solo el sistema, y `sale.record.get`, `sale.sale.voucher_sold`, `sale.sale.voucher_unsold` y `sale.voucher_session.record`) |
+| Eventos | 24 propios (`sale.sale.*`, `sale.voucher_session.recorded`, `sale.order.*`, `sale.payment_method.created`, `sale.settings.updated`, `sale.department.*` y `sale.quick_note.*`; `events.py`); reacciona a `customer.customer.merged` y a `invoice.invoice.issued` |
+| Migraciones | `0001_initial` … `0017_vouchersession` |
 | Admin | Django admin en `hubs.erplora.com`: medios de pago, ajustes, secciones, notas rápidas y las cuentas abiertas con sus líneas editables; las ventas, sus líneas, sus cobros y el contador del día en solo lectura, sin alta ni borrado (de la venta, solo las notas) |
 
 Las decisiones de diseño (la cuenta cobra al precio con que se pidió, la venta no cambia, el número del día con
@@ -74,11 +74,10 @@ CI=1 pnpm e2e tests/e2e/sale-pos.spec.ts tests/e2e/sale-sales.spec.ts tests/e2e/
 
 - **hub#562** — El cobro del TPV no deja añadir propina (SALE-G06): cruza Ventas y Caja y la propina nunca entra
   en la base ni el IVA del tique; el producto la aplazó tras el MVP.
-- **hub#558**, **hub#560** y **hub#561** — fallos vistos en la migración: dos pruebas del precio libre que fallan
-  por tiempo con la máquina cargada, seis textos en español con las palabras de otra app y la tarjeta del asistente
-  que no dice qué registro toca una escritura de Ventas.
-- **hub#442** — el aviso de agotado se queda en el TPV tras volver a poner el artículo a la venta (en la cadena de
-  arreglos de Ventas).
+- Ya no están fuera, cerradas entre el 2026-11-03 y el 2026-11-06: hub#558, hub#560 y hub#561 (fallos vistos en la
+  migración: dos pruebas del precio libre que fallaban por tiempo con la máquina cargada, seis textos en español con
+  las palabras de otra app y la tarjeta del asistente que no decía qué registro toca una escritura de Ventas) y
+  hub#442 (el aviso de agotado se quedaba en el TPV tras volver a poner el artículo a la venta).
 - Lo que no hace a propósito (mesas y clientes en la cuenta, numerar facturas, hablar con la AEAT, el datáfono o la
   báscula, comensal por línea, reabrir una venta cobrada…) y lo demás que queda fuera: «Lo que NO hace, a
   propósito» y «Lo que queda fuera» del WORKBOOK.

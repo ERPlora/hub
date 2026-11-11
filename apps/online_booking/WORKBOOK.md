@@ -127,7 +127,7 @@ Fechas y horas salen en el reloj del negocio y con el formato del idioma de quie
 ### ONLINE_BOOKING-F01 La clienta reserva desde la página de reservas
 <!-- origen: fi:modules/online_booking#command-online_booking-bookings-create-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f01 -->
 Estado: hecho (operaciones y vista previa; la página pública es de `base`)
-Actor: clienta (sin sesión)
+Actor: clienta (sin sesión); propietario o administrador, con la vista previa o con el asistente
 Pantalla: página pública de reservas (`base`); en desarrollo, la vista previa
 Pasos:
 1. Abre la página del negocio: título, mensaje de bienvenida, logo y color de los Ajustes.
@@ -151,8 +151,9 @@ la ficha de la clienta **enlazada por su teléfono** o creada si no existe (`cus
 origen «web»), y el aviso `online_booking.booking.created`. Si la ficha no tiene email, el que escribió
 queda como contacto de la cita (la ficha no se toca). Con «Sin preferencia», la cita es del primer
 profesional (por orden de nombre) que tiene libre esa hora. Nada de lo que responde la página dice el nombre
-de la ficha de ese móvil. Quien abra la vista previa desde dentro (propietario o administrador) reserva con
-las mismas reglas que la clienta: nunca con las excepciones del mostrador.
+de la ficha de ese móvil. Quien reserva desde dentro (propietario o administrador), con la vista previa o
+pidiéndoselo al asistente («resérvale por internet, como lo haría la clienta…»: su tarjeta es la
+confirmación), reserva con las mismas reglas que la clienta: nunca con las excepciones del mostrador.
 Si falla: no se escribe nada. La página apagada («Este negocio no acepta reservas online ahora mismo.»); un
 servicio que no se reserva online; elegir profesional cuando el negocio no lo permite; la hora ya no está
 libre o no cumple las reglas (el motivo de Citas); el móvil que no es un número válido; falta el email
@@ -227,10 +228,11 @@ Implicados: APPOINTMENT-F05
 ### ONLINE_BOOKING-F06 Borrar una reserva
 <!-- origen: fi:modules/online_booking#command-online_booking-bookings-delete-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f06 -->
 Estado: hecho
-Actor: propietario, administrador
+Actor: propietario, administrador, asistente
 Pantalla: Reservas
 Pasos:
-1. Pulsa **Borrar** y confirma «¿Borrar la reserva APT-…? Es mejor cancelarla, que conserva su historial.».
+1. Pulsa **Borrar** y confirma «¿Borrar la reserva APT-…? Es mejor cancelarla, que conserva su historial.»
+   (o pídeselo al asistente: su tarjeta es la confirmación).
 2. La reserva desaparece de la bandeja y de la agenda (borrado lógico: el dato no se pierde).
 Entra: una reserva online que no está en curso, completada ni cobrada.
 Sale: `appointment.appointment.deleted`.
@@ -240,7 +242,7 @@ Implicados: APPOINTMENT-F11
 ### ONLINE_BOOKING-F07 Configurar la página de reservas
 <!-- origen: fi:modules/online_booking#command-online_booking-settings-upsert-sql-transaccional fi:modules/online_booking#query-online_booking-settings-get old:online_booking/WORKFLOW.md#online_booking-f07 -->
 Estado: hecho
-Actor: propietario, administrador
+Actor: propietario, administrador, asistente
 Pantalla: Ajustes
 Pasos:
 1. Cambia los campos de **Página pública** y de **Reglas de reserva** y pulsa **Guardar**: «Configuración
@@ -339,7 +341,8 @@ Implicados: APPOINTMENT-F24, CUSTOMER-F16
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien habla) y la
 API, con las mismas reglas y permisos. Una reserva se nombra por su id, su número (`APT-…`) o **como lo dice
 una persona**: la clienta (nombre, teléfono o email) y el día («la de Ana de mañana»); sin día, su próxima
-reserva online. Si vale para varias, se dicen cuáles y se pide el número.
+reserva online. Si vale para varias, se dicen cuáles y se pide el número. Por voz, las de la página se piden
+como «la reserva de internet de Olga» o «lo que tengo en la bandeja».
 
 ### Lo que ofrece: consultas
 
@@ -362,7 +365,8 @@ reserva online. Si vale para varias, se dicen cuáles y se pide el número.
 | Guarda la configuración (y las reglas de Citas) | ajustes (+ ajustes de Citas para las reglas) | F07 | `online_booking.settings.update` |
 | Reserva y cancela desde la página (públicas) | `online_booking.public` | F01, F11 | `online_booking.public.book`, `.cancel` |
 
-No-show, cancelar y borrar son de **riesgo alto** para el asistente: pide confirmación antes. Las acciones de
+No-show, cancelar y borrar son de **riesgo alto** para el asistente: su tarjeta pide la confirmación antes de
+hacerlo, sin preguntarlo antes en el chat (BASE-F97). Las acciones de
 la bandeja las hace Citas con el permiso de quien actúa: hace falta el de esta app **y** el de Citas.
 
 ### Lo que avisa
