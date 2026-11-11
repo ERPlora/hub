@@ -4,6 +4,7 @@
 // `ion-select` popover, a row action inline or behind the row's «⋮»).
 import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
+import { countryRulesCleanup } from './country-rules';
 import { A, api, capture, horizontalOverflow, psql, shown } from './helpers';
 
 /** 390×844, 834×1112 and 1440×900: a phone, a tablet and a desk. */
@@ -59,6 +60,12 @@ export interface Rule {
   valid_from: string | null;
   valid_to: string | null;
   is_active: boolean;
+}
+
+/** Deletes, in hub `a`, every rule of `country` (not Spain): the one a spec mounted to sell in a business it moved there,
+ *  and any a killed run left (country-rules.ts). */
+export function dropCountryRules(country: string): void {
+  psql(countryRulesCleanup(country));
 }
 
 /** Creates a rule through the API (setup) and returns it. */
