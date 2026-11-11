@@ -22,6 +22,7 @@ from live.models import OutboxEvent
 
 from base.registry import REGISTRY_SCOPE
 from base.tenancy import credentials
+from base.tenancy.tests.hubs import HUB_DATABASES
 from control import services
 from control.models import Cluster, Hub
 from control.schemas import ClusterIdIn, ClusterIn, ClusterUpdateIn
@@ -774,6 +775,16 @@ class TestRestore:
             services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=a_cluster().pk))
 
         assert refused.value.code == "control.hub_restoring"
+
+    @pytest.mark.django_db(databases=HUB_DATABASES)
+    def test_measures_the_copy_and_reads_the_records_on_the_real_servers(self, admin_ctx, hub_a):
+        from django.db import connections
+
+        # The temporary cluster's row points at the session's server, where the hub's database stands for its copy.
+        default = connections.settings["default"]
+        source = self.temporary(host=default["HOST"], port=default["PORT"])
+
+        assert self.ask(admin_ctx, hub_a, source).restoring_from == source.pk
 
     def test_support_may_not_and_unknown_ones_are_not_found(self, admin_ctx, checked):
         from control.schemas import HubRestoreIn
