@@ -9,12 +9,13 @@
 // own works as before, and a timer put on a fake clock dies with that clock — it cannot outlive the page.
 // A page mounted alone paints the icons the running app paints (`createShell` registers them when the app starts), and
 // Ionic's elements attach as in a browser (`fillHappyDomGaps`, as packages/ui's own setup does).
+// A `vi.waitFor` waits as long as the machine's load says, as each test and hook does (vitest.load.ts, hub#765).
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { fillHappyDomGaps } from '@erplora/ui/testing';
 import { enableAutoUnmount } from '@vue/test-utils';
-import { afterEach, beforeEach } from 'vitest';
+import { afterEach, beforeEach, inject, vi } from 'vitest';
 import { render, toRaw } from 'vue';
 
 // The hub does not depend on ionicons itself: its registry is global (`window.Ionicons`), so the copy @erplora/ui
@@ -22,6 +23,7 @@ import { render, toRaw } from 'vue';
 // itself, as its barrel would boot the whole shell.
 import { addIcons } from './packages/ui/node_modules/ionicons';
 import { ION_ICONS } from './packages/ui/src/shell/icons';
+import { scaleWaitFor } from './vitest.load';
 
 type Timer = ReturnType<typeof setTimeout>;
 type Handler = (...args: unknown[]) => void;
@@ -71,6 +73,10 @@ globalThis.clearInterval = ((id?: Timer) => {
   if (id != null) armed.delete(toRaw(id));
   real.clearInterval(id);
 }) as typeof clearInterval;
+
+// Its one second, or the budget a test names, stretched by the scale vite.config.ts read from the machine.
+const waitFor = vi.waitFor;
+vi.waitFor = ((callback, options) => waitFor(callback, scaleWaitFor(options, inject('loadScale')))) as typeof vi.waitFor;
 
 /** Unmounts what @vue/test-utils mounted since the last call and is still mounted. */
 let unmountMounted = (): void => {};
