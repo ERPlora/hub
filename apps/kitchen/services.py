@@ -971,7 +971,7 @@ def ready_ticket(ctx: OperationContext, data: TicketRefIn) -> dict:
             ),
             "es": (
                 "la 12 ya ha salido del pase",
-                "la comanda 7 ya se ha entregado",
+                "da por servida la comanda 7",
             ),
         },
         "description": "Mark a ready ticket served («table 4 is out»): it leaves the pass.",
@@ -1669,11 +1669,11 @@ def clear_route(ctx: OperationContext, data: RoutingClearIn) -> dict:
         "asks": {
             "en": (
                 "mute the display",
-                "make the display turn red after 20 minutes",
+                "make the display go red sooner",
             ),
             "es": (
                 "pon más bajo el sonido de la pantalla",
-                "que la pantalla avise en ámbar a los 10 minutos",
+                "que la pantalla avise antes en ámbar",
             ),
         },
         "description": "Change the kitchen display settings (only what is sent): the clock, the amber and red minutes, "

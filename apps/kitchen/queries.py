@@ -1537,7 +1537,7 @@ def list_routing(ctx: OperationContext, params: RoutingListIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "after how many minutes does the display turn amber?",
+                "after how many minutes does the display go amber?",
                 "is the display's sound on?",
             ),
             "es": (
