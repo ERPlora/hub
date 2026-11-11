@@ -312,18 +312,24 @@ def test_the_close_card_shows_the_session_its_drawer_the_expected_and_the_differ
     assert assistant.preview_of(get("cash_register.session.close"))["fields"] == PREVIEWED
 
 
+def what_closing_the_bar_gives(session) -> list[tuple]:
+    """The preview of closing «Barra» with 250.00 € counted, after a 100.00 € float and a 1.50 € coffee: its session,
+    its drawer, 101.50 € expected and 148.50 € over."""
+    return [("number", session.number), ("register_name", "Barra"), ("expected_balance", 10150), ("difference", 14850)]
+
+
+def previewed(card: dict) -> list[tuple]:
+    """The data of ``card``'s preview, by name and value."""
+    return [(field["name"], field["value"]) for field in card["preview"]]
+
+
 def test_the_card_the_person_sees_carries_that_preview_and_closes_nothing(coffee):
     session = at_the_bar(10000)
     charge()
     plan = turn(call("cash_register.session.close", {"session": session.number, "closing_balance": 25000}))
     card = plan["confirm"]
     assert (card["operation"], card["confirm_word"]) == ("cash_register.session.close", "CONFIRMAR")
-    assert [(field["name"], field["value"]) for field in card["preview"]] == [
-        ("number", session.number),
-        ("register_name", "Barra"),
-        ("expected_balance", 10150),
-        ("difference", 14850),
-    ]
+    assert previewed(card) == what_closing_the_bar_gives(session)
     # The difference reaches the person's card marked signed, the rest not (the turn's schema dropped the mark:
     # FIX-HUB-BASE-ASSISTANT-CARD-POSITIVE-DIFFERENCE-WITHOUT-SIGN).
     assert [field["name"] for field in card["preview"] if field["signed"]] == ["difference"]
@@ -347,12 +353,7 @@ def test_the_employees_answer_that_tells_the_summary_and_calls_the_close_brings_
     plan = turn(close, role="hub_employee", messages=[asked_by, asked(summary), *read["append"], said])
     card = plan["confirm"]
     assert (card["operation"], card["confirm_word"], card["blocked"]) == ("cash_register.session.close", "CONFIRMAR", False)
-    assert [(field["name"], field["value"]) for field in card["preview"]] == [
-        ("number", session.number),
-        ("register_name", "Barra"),
-        ("expected_balance", 10150),
-        ("difference", 14850),
-    ]
+    assert previewed(card) == what_closing_the_bar_gives(session)
     assert plan["pending"] == [close]
     assert Session.objects.get(pk=session.id).status == Session.Status.OPEN
 
