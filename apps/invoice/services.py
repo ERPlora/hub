@@ -266,6 +266,7 @@ def _save_issuer(ctx: OperationContext, data: IssuerIn, **extra) -> Issuer:
             "en": (
                 "change the company name on our invoices to Carpintería Lema SL",
                 "update the issuer's address to Calle Real 5",
+                "we moved: put Calle Real 5 as the issuer's address",
             ),
             "es": (
                 "cambia la razón social de las facturas a Carpintería Lema SL",

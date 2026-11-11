@@ -682,6 +682,7 @@ def line_defaults(ctx: OperationContext, params: LineDefaultsIn) -> dict:
             "en": (
                 "which rectifying invoice does the refund of sale 20261103-0012 have?",
                 "what was given back in the refund of sale 20261103-0012?",
+                "which rectifying invoice came from the reimbursement of sale 20261103-0012?",
             ),
             "es": (
                 "¿qué rectificativa tiene la devolución de la venta 20261103-0012?",
@@ -1062,6 +1063,8 @@ def rectification_preview(
             "en": (
                 "is this year's invoice numbering ready?",
                 "is the numbering set up for this year's invoices?",
+                "are the numbers ready for the new year?",
+                "is the numbering ready for January?",
             ),
             "es": (
                 "¿tenemos lista la numeración de este año?",
@@ -1100,6 +1103,7 @@ def numbering_status(ctx: OperationContext, params: NumberingStatusIn) -> dict:
             "en": (
                 "are there gaps in the invoice numbers?",
                 "is our invoice numbering correlative?",
+                "did we skip any invoice number?",
             ),
             "es": (
                 "¿falta algún número entre las facturas?",
@@ -1172,6 +1176,7 @@ def _allocation(invoice: Invoice) -> dict:
             "en": (
                 "which document got number FACT-2025-000317?",
                 "which number went to which document this year?",
+                "show me this year's ledger of numbers handed out",
             ),
             "es": (
                 "¿qué documento lleva el número FACT-2025-000317?",

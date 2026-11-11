@@ -129,51 +129,84 @@ PAID = (
 )
 
 #: What a person says in words of their own, neither an ask nor a probe of layer 2 (nor an ask with a word changed), one
-#: per tool: it is their asks that bring each among the first ten (``assert_its_asks_bring``), so asks that stop reading
-#: as people speak fail. None shares more than two stems with any one ask or probe of its tool, nor half of its own.
-#: Language, tool, phrase.
+#: per tool and language: it is their asks that bring each among the first ten (``assert_its_asks_bring``), so asks
+#: that stop reading as people speak fail. None shares more than two stems with any one ask or probe of its tool, nor
+#: half of its own. Language, tool, phrase.
 OWN_WORDS = [
     ("es", "invoice.invoice.list", "busca lo que le hemos emitido a Talleres Mercedes"),
+    ("en", "invoice.invoice.list", "look up everything we issued to Talleres Mercedes"),
     ("es", "invoice.invoice.get", "quiero ver por dentro la FACT-2025-000412"),
+    ("en", "invoice.invoice.get", "read me FACT-2025-000412 from top to bottom"),
+    ("es", "invoice.invoice.document", "¿cómo se ve en hoja lo que le dimos a Talleres Mercedes?"),
     ("en", "invoice.invoice.document", "how does the sheet we handed to Talleres Mercedes look?"),
     ("es", "invoice.invoice.by_source", "lo que vendimos esta mañana en la 20261111-0007, ¿con qué papel quedó?"),
+    ("en", "invoice.invoice.by_source", "this morning's 20261111-0007: which paper did it end up with?"),
     ("es", "invoice.invoice.line_defaults", "si meto a mano una línea de unas gafas, ¿qué porcentaje le sale?"),
+    ("en", "invoice.invoice.line_defaults", "typing glasses in manually, what percentage would you put on them?"),
     (
         "es",
         "invoice.invoice.rectification_preview",
         "quiero ver antes cómo quedaría lo de Talleres Mercedes si lo corrijo",
     ),
+    (
+        "en",
+        "invoice.invoice.rectification_preview",
+        "before touching the Talleres Mercedes one, show me how the correction would look",
+    ),
     ("es", "invoice.refund.get", "del reintegro de ayer a Mercedes, ¿qué número le salió?"),
+    ("en", "invoice.refund.get", "Mercedes was reimbursed yesterday: which number did her rectifying one get?"),
     ("es", "invoice.issuer.get", "¿qué CIF y domicilio figuran como nuestros en lo que emitimos?"),
+    ("en", "invoice.issuer.get", "whose name heads everything we issue?"),
     ("es", "invoice.numbering.allocations", "¿a qué se le dio el 000123 en el libro?"),
+    ("en", "invoice.numbering.allocations", "who got 000123, according to the ledger?"),
     ("es", "invoice.numbering.gaps", "¿nos hemos saltado alguno al numerar?"),
+    ("en", "invoice.numbering.gaps", "did we skip any number somewhere along the way?"),
     ("es", "invoice.numbering.status", "¿podemos empezar a emitir en 2027 o falta preparar algo?"),
+    ("en", "invoice.numbering.status", "come January, are all our numbers ready to roll?"),
     ("es", "invoice.series.list", "¿con qué prefijos y letras numeramos este año cada cosa que emitimos?"),
+    ("en", "invoice.series.list", "what letters go in front of each number we hand out this year?"),
     ("es", "invoice.series.get", "quiero el detalle de la FACT de este año, sin tocar nada"),
+    ("en", "invoice.series.get", "tell me the details of this year's FACT, without touching anything"),
     ("es", "invoice.series.peek_next", "sin gastarlo todavía, ¿qué número va después en la FACT?"),
+    ("en", "invoice.series.peek_next", "without spending it yet, which one follows in FACT?"),
     (
         "es",
         "invoice.invoice.create",
         "a Talleres Mercedes le debemos una por la reparación de ayer: hazla a mano, 120 €",
     ),
+    ("en", "invoice.invoice.create", "bill Talleres Mercedes by hand for yesterday's repair, 120 €"),
     (
         "es",
         "invoice.invoice.create_from_sale",
         "la de esta mañana, la 20261111-0007, se quedó sin documento: genéralo ya",
     ),
+    ("en", "invoice.invoice.create_from_sale", "the 20261111-0007 from this morning is missing its ticket"),
     ("es", "invoice.invoice.substitute", "ese tique de ayer pásalo a nombre de Talleres Mercedes"),
+    ("en", "invoice.invoice.substitute", "the man with yesterday's receipt wants it in his company's name"),
     ("es", "invoice.invoice.mark_paid", "Talleres Gómez ya nos ha abonado la FACT-2025-000412"),
+    ("en", "invoice.invoice.mark_paid", "Talleres Gómez has settled FACT-2025-000412"),
     ("es", "invoice.invoice.print", "saca en papel la FACT-2025-000412"),
+    ("en", "invoice.invoice.print", "FACT-2025-000412 on paper for the binder, please"),
     ("es", "invoice.invoice.rectify", "la de Talleres Mercedes tiene un error en el importe: hazle su negativo"),
+    ("en", "invoice.invoice.rectify", "the Talleres Mercedes one has the wrong amount: fix it with an R1"),
     (
         "es",
         "invoice.invoice.rectify_from_refund",
         "a lo que le devolvimos a Mercedes le falta el documento que lo resta",
     ),
+    (
+        "en",
+        "invoice.invoice.rectify_from_refund",
+        "what we gave back to Mercedes this morning still has no negative document",
+    ),
     ("es", "invoice.invoice.rectify_from_void", "la 20261111-0003 la anulé y aún no tiene su negativo"),
+    ("en", "invoice.invoice.rectify_from_void", "after scrapping 20261111-0003 we still lack its negative"),
     ("es", "invoice.issuer.update", "ya no estamos en la calle de antes: el domicilio ahora es Avenida Castilla 8"),
+    ("en", "invoice.issuer.update", "our company moved to Avenida Castilla 8: change where it is"),
     ("es", "invoice.series.create", "para la feria de 2027 quiero una numeración propia, aparte de la normal"),
+    ("en", "invoice.series.create", "for the 2027 fair we want numbering of our own, apart from the usual one"),
     ("es", "invoice.series.update", "renombra la de Obras como Reformas"),
+    ("en", "invoice.series.update", "please rename the Obras one: Reformas suits it better"),
 ]
 
 
@@ -272,11 +305,17 @@ def test_an_invoice_said_paid_brings_marking_it_paid_by_the_hubs_words(context_o
     assert "invoice.invoice.mark_paid" not in unnamed[:NEAR_THE_TOP], unnamed[:NEAR_THE_TOP]
 
 
-def test_each_tool_of_invoicing_has_its_own_words():
-    assert sorted(name for _, name, _ in OWN_WORDS) == sorted(TOOLS)
+def test_each_tool_of_invoicing_has_its_own_words_in_each_language():
+    """One phrase per tool and language: only the asks of the language a phrase is said in bring it, so a tool with
+    words of its own in one language only leaves its asks in the other unmeasured (hub#1216)."""
+    assert sorted((name, language) for language, name, _ in OWN_WORDS) == sorted(
+        (name, language) for name in TOOLS for language in ("en", "es")
+    )
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("language", "name", "phrase"), OWN_WORDS, ids=[name for _, name, _ in OWN_WORDS])
+@pytest.mark.parametrize(
+    ("language", "name", "phrase"), OWN_WORDS, ids=[f"{name}-{language}" for language, name, _ in OWN_WORDS]
+)
 def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(context_of, language, name, phrase):
     assert_its_asks_bring(assistant.catalog(context_of(Membership.Role.OWNER, language)), name, phrase, language)
