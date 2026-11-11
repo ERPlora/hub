@@ -54,19 +54,19 @@ REPORTED = [
     ),
     (EMPLOYEE, "demo.item.open_count", "¿cuántos ejemplos siguen abiertos ahora?"),
 ]
-#: The read that finds an item by its name (``search``): every tool but the list and the counts takes the item's id, so a
-#: request that names the item is offered the list beside its tool, never left to ask the person for the id.
+#: The read that finds an item by its name (``search``): every tool but the list and the counts takes the item's id, so
+#: a request that names the item is offered the list beside its tool, never left to ask the person for the id.
 BY_NAME = "demo.item.list"
 NAMES_AN_ITEM = {"demo.item.detail", "demo.item.update", "demo.item.delete", "demo.item.add_line"}
-#: A request that names its item by the item's own name alone («elimina Ejemplo QA…»), with no word that says it is an
-#: item, is offered its tool but not the list: nothing in its words is Demo's, so only a write that takes the item by its
-#: name too (as the Hub's catalogues do: a group, a tag, a drawer, a menu) acts on it from the chat (ERPlora/hub#1162).
+#: A request that names its item by the item's own name alone («elimina Ejemplo QA…»), with no word that says it is
+#: an item, is offered its tool but not the list: nothing in its words is Demo's, so only a write that takes the item by
+#: its name too (as the Hub's catalogues do: a group, a tag, a drawer, a menu) acts on it from the chat (hub#1162).
 BY_ITS_NAME_ALONE = pytest.mark.xfail(
     strict=True, reason="ERPlora/hub#1162: an item said by its own name alone names nothing of Demo's"
 )
 
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a probe of the QA may bring its tool: half of them, so twenty
-#: tools of the apps that say their asks later may climb past it before the model loses it.
+#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a probe of the QA may bring its tool: half of them, so
+#: twenty tools of the apps that say their asks later may climb past it before the model loses it.
 WITH_ROOM = 20
 #: Every probe of layer 2 of Demo, both roles: the reported ones and the ones the model got right.
 PROBES = [
@@ -126,8 +126,8 @@ def test_the_hub_reads_an_elemento_as_an_item():
         assert not any(item in concept for concept in shared.asked([phrase]).concepts), phrase
 
 
-#: Phrases that are neither asks nor probes, each with the tool of Demo it asks for: the Hub's «elemento» brings it among
-#: the first ten offered (``TOP`` of layer 1), and the write brings the read that finds its item by its name.
+#: Phrases that are neither asks nor probes, each with the tool of Demo it asks for: the Hub's «elemento» brings it
+#: among the first ten offered (``TOP`` of layer 1), and the write brings the read that finds its item by its name.
 ELEMENTO = [
     ("demo.item.list", "¿qué elementos están hechos?"),
     ("demo.item.delete", "borra el elemento Ensayo 7"),
@@ -138,7 +138,8 @@ ELEMENTO = [
 @pytest.mark.parametrize(("name", "phrase"), ELEMENTO)
 def test_a_phrase_that_names_an_elemento_is_offered_its_tool_and_the_read_that_finds_it(catalog_of, name, phrase):
     tools = catalog_of(OWNER, "es")
-    assert all(comparable(phrase) != comparable(ask) for op in tools.values() for ask in shared.asks_of(op).get("es", ()))
+    asks = {comparable(ask) for op in tools.values() for ask in shared.asks_of(op).get("es", ())}
+    assert comparable(phrase) not in asks
     assert comparable(phrase) not in probe_phrases()
     offered = offered_to(tools, phrase)
     assert name in offered[:10], (offered.index(name) + 1 if name in offered else None, offered[:10])
