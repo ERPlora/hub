@@ -8,7 +8,7 @@
 // (hub#938). «Editing package — {name}» changes
 // everything but the lines (shown, fixed) and sends only what changed; an emptied closed price,
 // validity or uses removes it (null). Refusals stay in the dialog, under their field.
-import { Combo, type ComboOption, FormModal, InlineFeedback } from '@erplora/ui/components';
+import { Combo, type ComboOption, FormModal, InlineFeedback, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -18,10 +18,8 @@ import { useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useLocale, useT } from '../composables/useT';
 import { type Money, percentFieldText, readPercentBp, useBusinessMoney } from '../lib/format';
-import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchServices } from '../lib/pickers';
 import type { DiscountType, PackageIn, PackageOut, PackagePatchIn } from '../operations';
-import MoneyInput from './MoneyInput.vue';
 
 const props = defineProps<{
   /** The package being edited; `null` = «New package». */
@@ -139,7 +137,7 @@ const wholeOrNull = (value: string): number | null => {
 };
 /** Minor units of a money field (empty = none); `undefined` when it is not an amount (the field says why). */
 const minor = (value: string, currency: Money): number | null | undefined => {
-  const read = parseMoney(value, currency);
+  const read = parseMoney(value, { money: currency });
   return read.ok ? read.cents : undefined;
 };
 
@@ -270,6 +268,7 @@ async function save(): Promise<void> {
           v-else
           testid="service-package-form-discount_amount"
           :model-value="form.amount"
+          :money="money"
           :label="money ? t('service.packages.form.discountAmountIn', { currency: money.currency }) : t('service.packages.form.discountAmount')"
           :error-text="fieldErrors.discount_amount"
           :show-error="tried"
@@ -278,6 +277,7 @@ async function save(): Promise<void> {
         <MoneyInput
           testid="service-package-form-fixed_price"
           :model-value="form.fixedPrice"
+          :money="money"
           :label="money ? t('service.packages.form.fixedPriceIn', { currency: money.currency }) : t('service.packages.form.fixedPrice')"
           :helper-text="t('service.packages.form.fixedPriceHelp')"
           :error-text="fieldErrors.fixed_price"

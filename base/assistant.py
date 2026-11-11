@@ -116,7 +116,10 @@ APP_WORDS = shared.app_words
 #: «arqueo», a «recuento» or a «conteo» of the drawer is a count of Cash register's (``cash_register.count``), and the
 #: «moneda» or «divisa» of the business is its currency (``cash_register.currency``). To «desactivar» names the
 #: deactivation itself (``staff.member.deactivate``, ``*.deactivate``), not only a switch off, and what one «pide» or
-#: «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``).
+#: «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``). A «bono» (a voucher, a pack) is
+#: Services' voucher, the one of the catalogue (``service.package``) or the one sold to a customer (``service.grant``),
+#: and an «asignación» (what one «asigna») is a professional's assignment to a service (``service.assignment``). An
+#: «elemento», as Demo's screens name one, is an item (``demo.item``).
 SYNONYMS = (
     ("cuenta", "check", "tab", "order"),
     ("ticket", "tique", "recibo", "receipt", "sale"),
@@ -135,9 +138,51 @@ SYNONYMS = (
     ),
     ("arqueo", "recuento", "conteo", "count"),
     ("divisa", "moneda", "currency"),
+    # service
+    ("bono", "bonos", "voucher", "vouchers", "pack", "packs", "package", "packages", "grant", "grants"),
+    ("asignacion", "asignaciones", "assignment", "assignments"),
     # staff
     ("desactiva", "desactivar", "deactivate"),
     ("pido", "solicito", "solicitud", "request"),
+    # cart_checkout: a «cesta» or a «carrito» is a shopping cart (``cart_checkout.cart``), and «unidades» or «cantidad»,
+    # as «tres unidades», the quantity a line takes (never «cantidad» as Inventory's unit of measure). Never «línea»: it
+    # is the till's check line (``sale.order.*_line``) and a cart's line would take its place.
+    ("unidades", "cantidad", "quantity"),
+    ("cesta", "carrito", "cart", "basket"),
+    # flow: an automation (``flow.flow``), its steps and the question it waits on (``flow.question``) are named by their
+    # phrases and never by the word: «automatización» shares its stem with «automático» («la respuesta automática»),
+    # «pasos» with «pasó» («¿qué pasó con…?», so no «qué paso» nor «de paso») and «pregunta» with its verb («se les
+    # pregunta»). A run is its «ejecución» (``flow.run``), the assistant's draft its «borrador» (``flow.draft``; «borra»,
+    # «bórralo» and «borrada» stem apart from it) and a ready-made one an app brings its «receta» or «prefabricada»
+    # (``flow.recipe``).
+    (
+        "flujo", "flow", "an automation", "a new automation", "the automation", "this automation", "that automation",
+        "each automation", "any automation", "the automations", "my automations", "your automations",
+        "which automations", "what automations",
+        *(f"{one} automatizacion" for one in ("la", "una", "esta", "esa", "cada", "alguna", "ninguna", "otra")),
+        *(f"{one} automatizacion" for one in ("nueva", "mi", "tu", "su", "de")),
+        *(f"{many} automatizaciones" for many in ("las", "unas", "estas", "esas", "todas", "otras", "que", "cuantas")),
+        *(f"{many} automatizaciones" for many in ("mis", "tus", "sus", "nuestras", "de")),
+    ),
+    ("ejecucion", "ejecuciones", "run", "runs"),
+    (
+        "step", "steps", "paso a paso",
+        *(f"{one} paso" for one in ("el", "un", "ese", "este", "cada", "primer", "ultimo", "otro", "algun", "ningun")),
+        *(f"{one} paso" for one in ("mi", "tu", "su")),
+        *(f"{many} pasos" for many in ("los", "unos", "esos", "estos", "todos", "otros", "nuevos", "que", "cuantos")),
+        *(f"{many} pasos" for many in ("mis", "tus", "sus", "de")),
+    ),
+    (
+        "question", "questions",
+        *(f"{one} pregunta" for one in ("la", "una", "esa", "esta", "cada", "primera", "ultima", "otra", "alguna")),
+        *(f"{one} pregunta" for one in ("ninguna", "mi", "tu", "su")),
+        *(f"{many} preguntas" for many in ("las", "unas", "esas", "estas", "todas", "otras", "nuevas", "que")),
+        *(f"{many} preguntas" for many in ("cuantas", "mis", "tus", "sus", "de")),
+    ),
+    ("borrador", "borradores", "draft", "drafts"),
+    ("receta", "recetas", "prefabricada", "prefabricadas", "recipe", "recipes"),
+    # demo
+    ("elemento", "elementos", "item", "items"),
 )
 #: The help a how-to question asks for (``live.assistant.HOWTO_POINTS``): it ranks by being one, not only by ``ALWAYS``.
 HOWTO = (DOCS_SEARCH,)
@@ -785,8 +830,9 @@ Answer in {language_name}, short and plain, as a colleague who knows the app. Us
 - Name a record to the person by its name, as the screens do: never write an id (a code such as 0190a3b4-…) in the
   answer, not in a table either.
 - For questions about how ERPlora works (how to do something, what an option means, plans), search the documentation
-  with `base__docs__search` and answer only from what it returns, citing the section; if it returns nothing, say the
-  documentation does not cover it.
+  with `base__docs__search` and answer only from what it returns; end that answer with the `cite` of each excerpt you
+  used, at least one, as it comes and in a line of its own; if it returns nothing, say the documentation does not
+  cover it.
 - To change something, call its tool: the person sees a card and confirms it before it runs. If the tool comes back
   «not confirmed» or with an error, nothing changed: say so, and never say it was done.
 - Amounts: a datum a tool marks `"money": true` takes the amount in the minor unit of its currency, whatever its

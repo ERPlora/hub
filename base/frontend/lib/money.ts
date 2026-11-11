@@ -2,7 +2,7 @@
 // says it — the registry of this hub, never a call to erplora.com. Followed live (a change on erplora.com is pushed
 // and arrives), one subscription for the whole tab however many pieces ask (the SDK shares it), and unknown until the
 // business answers: an amount is then a dash, never in the euro by default nor with guessed decimals.
-import { formatMoney as writeMoney } from '@erplora/ui/components';
+import { formatMoney as writeMoney, parseMoney } from '@erplora/ui/components';
 import { type ApiError, useLive } from '@erplora/ui/sdk';
 import { computed, type ComputedRef, type Ref } from 'vue';
 
@@ -11,6 +11,14 @@ import type { Money } from './home';
 /** Minor units in `money`, in `locale`, its thousands grouped («1.234,50 €», «€22.50», «¥1,500»; «—» while it is
  *  unknown): the platform's way of writing an amount, for the screens whose amount is always a number. */
 export const formatMoney: (cents: number, locale: string, money?: Money) => string = writeMoney;
+
+/** Minor units of an amount end typed in a table filter, read like the money field (`parseMoney`) in `money`;
+ *  nothing when it is empty or cannot be read, so that end does not filter (never «from 0»; hub#924). */
+export function filterCents(text: string | undefined, money?: Money): number | undefined {
+  if (!text) return undefined;
+  const read = parseMoney(text, { money });
+  return read.ok && read.cents !== null ? read.cents : undefined;
+}
 
 export function useBusinessMoney(): ComputedRef<Money | undefined> {
   return useBusinessMoneyRead().money;

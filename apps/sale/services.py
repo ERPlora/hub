@@ -1024,11 +1024,11 @@ def apply_voucher(ctx: OperationContext, data: OrderApplyVoucherIn) -> dict:
         asks={
             "en": (
                 "don't use the voucher for the haircut after all",
-                "take the voucher off that line",
+                "leave the voucher unused on this check",
             ),
             "es": (
                 "al final no uses el bono en el corte",
-                "quita el bono de esa línea",
+                "deja el bono sin usar en esta cuenta",
             ),
         },
     ),
@@ -1445,7 +1445,7 @@ def split(ctx: OperationContext, data: OrderSplitIn) -> dict:
         risk="normal",
         asks={
             "en": (
-                "merge tables 3 and 4",
+                "merge the checks of tables 3 and 4",
                 "put the bar tab together with table 2's",
             ),
             "es": (
