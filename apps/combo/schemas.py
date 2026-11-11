@@ -238,7 +238,16 @@ class _GroupOfIn(_ComboOfIn):
             raise ValueError(str(SAY_WHICH_COURSE))
 
 
-class GroupRefIn(_ComboOfIn):
+class _CheckedOfIn(_ComboOfIn):
+    """The menu a course or a choice belongs to, for the writes that check their record before their card
+    (``combo.group.get``, ``combo.option.get``): said by its name, the card reads it by that name as the check finds it
+    («Menú vegano» when the person said «vegano»; hub#1231). Only there: with no check before it, a name two menus fit
+    would leave the menu off the card, so adding or ordering courses and choices says it as said."""
+
+    combo: Reference | None = Field(None, description=D_COMBO, json_schema_extra=A_MENU_BY_NAME)
+
+
+class GroupRefIn(_CheckedOfIn):
     id: UUID | None = Field(None, title=T_COURSE, description=D_GROUP_ID, json_schema_extra=A_COURSE)
     group: Reference | None = Field(None, description=D_GROUP)
 
@@ -251,7 +260,7 @@ class GroupRefIn(_ComboOfIn):
         return self
 
 
-class OptionRefIn(_ComboOfIn):
+class OptionRefIn(_CheckedOfIn):
     id: UUID | None = Field(
         None,
         title=T_CHOICE,
