@@ -51,7 +51,8 @@ def short_wait(monkeypatch) -> float:
 
 
 class Held:
-    """Another thread's transaction in a hub's database, open (its first statement ran) until :meth:`end`."""
+    """Another thread's transaction in a hub's database, open (its first statement ran) until :meth:`end`, however long
+    the test takes to get there: it waits for that fact, never for a clock a loaded machine outruns (hub#762)."""
 
     def __init__(self, hub) -> None:
         self.hub = hub
@@ -67,7 +68,7 @@ class Held:
                 with transaction.atomic(using=alias), connections[alias].cursor() as cursor:
                     cursor.execute("SELECT 1")
                     self.opened.set()
-                    self.done.wait(10)
+                    self.done.wait()
         except Exception as exc:  # noqa: BLE001 - reported to the test, which fails on it
             self.failure.append(exc)
         finally:
@@ -80,15 +81,17 @@ class Held:
 
 @contextmanager
 def held_open(hub) -> Iterator[Held]:
+    """``hub``'s place taken by :class:`Held` for the whole block. Both waits are for a fact the thread always reaches —
+    its transaction open or failed, then ended — and the place is given back even when opening it failed."""
     held = Held(hub)
     held.thread.start()
-    assert held.opened.wait(5)
-    assert held.failure == []
     try:
+        held.opened.wait()
+        assert held.failure == []
         yield held
     finally:
         held.end()
-        held.thread.join(5)
+        held.thread.join()
     assert held.failure == []
 
 
@@ -167,16 +170,24 @@ def test_a_six_second_statement_in_a_free_hub_is_cancelled_by_its_statement_time
 
 
 @HUB_DB_COMMITTED
-def test_a_busy_hub_never_slows_another(hub_a, hub_b, short_wait):
+def test_a_busy_hub_never_slows_another(hub_a, hub_b, short_wait, monkeypatch):
+    """B gets its rows without its limiter ever waiting for a place while A's place is taken from before B asks until
+    after B has them; A, asked the same way, waits and does not get in. Facts, not B's time against a threshold a
+    loaded machine outruns (hub#762): a B that waits on A, even one that gets in once the wait is over, fails at once."""
+
+    def b_waits(timeout=None):
+        raise AssertionError("B's limiter waited for a place while only A was busy")
+
+    monkeypatch.setattr(limits.limiter_for(hubs.HUB_B_ALIAS)._condition, "wait", b_waits)
     with held_open(hub_a):
-        started = time.monotonic()
+        a_places = limits.limiter_for(hubs.HUB_A_ALIAS)
+        assert a_places.in_use == 1
         listed_in_b = list_items(hub_b)
-        in_b = time.monotonic() - started
+        assert a_places.in_use == 1
         with pytest.raises(limits.HubBusy):
             list_items(hub_a)
 
     assert listed_in_b == []
-    assert in_b < short_wait
 
 
 # ── Every way in obeys it: the live executor, the API, the admin ────────────────────────────────────────────────────
@@ -266,6 +277,8 @@ def test_an_api_request_on_a_busy_hub_answers_503_with_the_envelope(client, hub_
 
     with held_open(hub_a):
         busy = client.get("/api/demo/items", HTTP_HOST=host)
+        # A's place is still taken once the answer is back: busy all along, however late the request came.
+        assert limits.limiter_for(hubs.HUB_A_ALIAS).in_use == 1
     free = client.get("/api/demo/items", HTTP_HOST=host)
 
     assert busy.status_code == 503
