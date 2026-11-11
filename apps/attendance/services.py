@@ -342,7 +342,7 @@ def clock_in(ctx: OperationContext, data: ClockInIn) -> dict:
             "es": (
                 "fíchame la salida",
                 "ficha la salida de Pedro",
-                "me voy a casa, termina mi jornada",
+                "me voy a casa, acaba mi jornada",
             ),
         },
         "description": "Clocks out («clock me out», «ficha la salida de Ana»): closes the open working day "
@@ -442,8 +442,8 @@ def start_break(ctx: OperationContext, data: BreakIn) -> dict:
             ),
             "es": (
                 "ya he vuelto de la pausa",
-                "termina el descanso de Luis",
-                "vuelvo de comer, acaba mi pausa",
+                "acaba el descanso de Luis",
+                "vuelvo de comer, sigo con mi jornada",
             ),
         },
         "description": "Ends the running break of the caller, or of the person named («I'm back»).",
@@ -653,7 +653,7 @@ def update_settings(ctx: OperationContext, data: SettingsIn) -> dict:
                 "mark the working days left open too long",
             ),
             "es": (
-                "marca para revisar las jornadas que nadie cerró",
+                "deja pendientes de revisión las jornadas que nadie cerró",
                 "revisa si alguien se olvidó de fichar la salida",
                 "señala las jornadas abiertas desde hace demasiado",
             ),
@@ -685,7 +685,7 @@ def review_stale(ctx: OperationContext, data: EmptyIn) -> dict:
             "es": (
                 "cierra la jornada abierta de quien acabo de despedir",
                 "Luis ya no trabaja aquí, cierra su fichaje abierto",
-                "termina el día que dejó abierto la empleada que se fue",
+                "la empleada que se fue dejó el día abierto: ciérralo",
             ),
         },
         "description": "Closes, at this moment and with a correction of the system, the open working day of "

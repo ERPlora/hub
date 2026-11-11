@@ -868,7 +868,7 @@ def person_detail(ctx: OperationContext, params: PersonRefIn) -> dict:
             "es": (
                 "¿qué radio permite el control horario?",
                 "¿se pide la ubicación al fichar con el móvil?",
-                "¿tras cuántas horas se revisa un día olvidado?",
+                "¿a partir de cuántas horas se avisa de un día olvidado?",
             ),
         },
         "description": "The time clock settings: whether a personal device must share its location and be "
