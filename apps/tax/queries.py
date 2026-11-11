@@ -501,7 +501,7 @@ def category_by_reference(text: str) -> TaxCategory | None:
             "es": (
                 "¿existe la categoría fiscal de libros?",
                 "¿cómo se llama en español la categoría de impuestos product.books?",
-                "dame la categoría fiscal de las bebidas",
+                "dame la categoría fiscal de los medicamentos",
             ),
         },
         "description": "Get one tax category by its key, its name or an alias, with its name in the reader's "
@@ -738,7 +738,7 @@ def parent_candidates(
                 "what parent rules are there for a component of the books category?",
             ),
             "es": (
-                "¿bajo qué regla raíz puedo poner el recargo de equivalencia de las bebidas?",
+                "¿bajo qué regla raíz puedo poner el recargo de equivalencia de la cerveza?",
                 "lista las reglas principales que admiten un recargo en España",
                 "¿qué reglas pueden ser padre de un componente de la categoría de libros?",
             ),
@@ -904,7 +904,7 @@ def resolve_category_text(text: str) -> tuple[str | None, str | None]:
             "es": (
                 "¿qué categoría de impuestos significa el texto «cerveza»?",
                 "el importador ha leído «IVA 10»: ¿qué categoría fiscal es?",
-                "traduce «bebida» a una categoría de IVA",
+                "traduce «licor» a una categoría de IVA",
             ),
         },
         "description": "Read an outside text (a CSV cell such as «IVA 10», «beer» or «comida») as a tax "

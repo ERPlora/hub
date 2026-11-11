@@ -143,10 +143,10 @@ def _category(reference: str, field: str = "tax_category_key") -> TaxCategory:
             "en": (
                 "teach the importer that «IVA 10» means the reduced food category",
                 "learn that «cerveza» is the beer tax category",
-                "add the tax alias «bebidas» for drinks",
+                "add the tax alias «licores» for spirits",
             ),
             "es": (
-                "que el importador entienda «cerveza» como la categoría de bebidas alcohólicas",
+                "que el importador entienda «cerveza» como la categoría del alcohol",
                 "añade el alias «IVA reducido» para la categoría de comida",
                 "guarda «menú» como otro nombre de la categoría fiscal de restauración",
             ),
