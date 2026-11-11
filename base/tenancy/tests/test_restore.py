@@ -29,10 +29,12 @@ import itertools
 import uuid
 
 import pytest
-from django.apps import apps as django_apps
+from django.utils import timezone
+from live.meta import all_live_app_configs
 from psycopg import sql
 from psycopg.types.json import Jsonb
 
+from apps.sale.apps import SaleConfig
 from base import services
 from base.tenancy import identity, move, names, restore
 from base.tenancy import connections as tenancy_connections
@@ -50,6 +52,9 @@ BEFORE = THEN - dt.timedelta(days=1)
 AFTER = THEN + dt.timedelta(hours=1)
 AS_THEN = "as it was at the moment"
 SINCE = "written after the moment"
+#: The apps whose records reach the tax authority: each answers the restore what its records say
+#: (``fiscal_record_states`` on its ``LiveAppConfig``).
+FILE_WITH_THE_TAX_AUTHORITY = {"verifactu"}
 
 
 @pytest.fixture(autouse=True)
@@ -184,6 +189,18 @@ def kept_copy(hub: Hub) -> MovedCopy:
     return kept
 
 
+def taken_after_the_schema(monkeypatch, hub: Hub) -> None:
+    """Another worker takes ``hub``'s lease once its schema is at the code's leaf: right before the end."""
+    real = move._ensure_schema
+
+    def then_taken(restored, cluster, heartbeat=None):
+        real(restored, cluster, heartbeat)
+        with use_control():
+            HubDue.objects.filter(pk=hub.pk).update(lease_owner="other:1")
+
+    monkeypatch.setattr(move, "_ensure_schema", then_taken)
+
+
 class TestARestore:
     def test_the_hub_gets_the_copys_data_and_its_own_is_kept_aside(self, restores):
         source = restores.cluster()
@@ -228,7 +245,9 @@ class TestARestore:
         source = restores.cluster()
         hub = restores.hub(source=source)
         with use_control():
-            HubDue.objects.create(hub=hub, due_at=AT, lease_until=AT + dt.timedelta(minutes=1), lease_owner="other:1")
+            HubDue.objects.create(
+                hub=hub, due_at=AT, lease_until=timezone.now() + dt.timedelta(minutes=1), lease_owner="other:1"
+            )
 
         assert run(restores) == 0
 
@@ -241,6 +260,22 @@ class TestARestore:
         assert run(restores) == 0
 
         assert marker(hub.db_name) == [AS_THEN, SINCE]
+
+    def test_the_lease_is_taken_by_the_clock_never_by_the_ticks_start(self, restores):
+        # A move before it in the same tick may have taken minutes: the restore's lease is born whole, never run out.
+        hub = restores.hub(source=restores.cluster())
+        leases: list[dt.datetime] = []
+
+        def source(restored):
+            with use_control():
+                leases.append(HubDue.objects.get(pk=hub.pk).lease_until)
+            return restores.source(restored)
+
+        claimed = timezone.now()
+        with use_control():
+            restore.run_due(claimed - 2 * restore.LEASE, source=source)
+
+        assert leases and leases[0] >= claimed + restore.LEASE
 
     def test_its_copy_on_the_temporary_cluster_has_the_hubs_own_name_by_default(self, restores):
         hub = restores.hub(source=restores.cluster())
@@ -293,6 +328,19 @@ class TestClosedToTheApp:
         assert fresh(hub).restoring_from_id is None
         assert hubs.reaches(app_role, hub.db_name)
         assert marker(hub.db_name) == [AS_THEN, SINCE]
+
+    def test_a_lease_taken_right_before_the_end_never_opens_the_new_database_to_the_app(
+        self, restores, app_role, monkeypatch
+    ):
+        # The worker that lost the hub's lease leaves the new database closed: whoever holds it now ends the restore.
+        hub = restores.hub(source=restores.cluster())
+        hubs.grant_connect(app_role, hub.db_name)
+        taken_after_the_schema(monkeypatch, hub)
+
+        run(restores, roles=hubs.app_roles(app_role))
+
+        assert fresh(hub).restoring_from_id is not None
+        assert not hubs.reaches(app_role, hub.db_name)
 
 
 class TestAFailurePutsItsOwnBack:
@@ -467,12 +515,25 @@ class TestTheFiscalGuard:
 
         assert (fresh(hub).restoring_from_id, fresh(hub).last_error) == (None, "")
 
-    def test_the_columns_read_are_verifactus_own(self):
-        record = django_apps.get_model("verifactu", "Record")
-        assert record._meta.db_table == restore.RECORDS_TABLE
-        assert record.Environment.PRODUCTION == restore.PRODUCTION
-        for column in ("environment", "status", "updated_at", "transmitted_at"):
-            assert record._meta.get_field(column).column == column
+    def test_every_app_whose_records_reach_the_tax_authority_answers_it(self):
+        answering = {config.label for config in all_live_app_configs() if hasattr(config, "fiscal_record_states")}
+
+        assert answering == FILE_WITH_THE_TAX_AUTHORITY
+
+    def test_what_any_app_answers_of_its_records_is_compared(self, restores, monkeypatch):
+        # The restore asks the apps, never reads a table of its own: any app's answer that differs stops it.
+        hub = restores.hub(source=restores.cluster())
+
+        def states(config, conn):
+            return {1: ("sent after the moment",)} if conn.info.dbname == hub.db_name else {1: ("as it was",)}
+
+        monkeypatch.setattr(SaleConfig, "fiscal_record_states", states, raising=False)
+
+        run(restores)
+
+        hub = fresh(hub)
+        assert hub.restoring_from_id is None and hub.last_error.startswith("restore_fiscal_records")
+        assert marker(hub.db_name) == [AS_THEN, SINCE]
 
     def test_a_production_record_the_copy_does_not_have_the_table_for_stops_it(self, restores):
         hub = restores.hub(source=restores.cluster())
@@ -508,14 +569,7 @@ class TestTwoWorkers:
     def test_a_lease_another_worker_took_before_the_end_is_never_ended_here(self, restores, monkeypatch, caplog):
         source = restores.cluster()
         hub = restores.hub(source=source)
-        real = move._ensure_schema
-
-        def then_taken(restored, cluster, heartbeat=None):
-            real(restored, cluster, heartbeat)
-            with use_control():
-                HubDue.objects.filter(pk=hub.pk).update(lease_owner="other:1")
-
-        monkeypatch.setattr(move, "_ensure_schema", then_taken)
+        taken_after_the_schema(monkeypatch, hub)
 
         run(restores)
 

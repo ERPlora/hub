@@ -10,12 +10,13 @@ time, under the hub's lease (``hub_due``, provisioning's: ``move.LEASE``, renewe
 
 1. **Copied**: ``pg_dump`` of the hub's database on the temporary cluster (:func:`source_name`; nobody uses it), before
    the business is closed.
-2. **Checked, fiscal**: each production VeriFactu record of its database is compared with the copy's (its status, when
-   it was sent, when it last changed): one the copy lacks (made after the moment) or has otherwise (sent, answered or
-   changed after it) stops the restore, nothing changed and the business never closed. Putting the copy in its place
-   would repeat numbers the AEAT has (VERIFACTU-F28 anchors the chain again but does not move the invoice series on)
-   and drop invoices the business must keep. The copy itself says what it holds, whatever moment was given. It only
-   reads: nothing fiscal is changed or sent.
+2. **Checked, fiscal**: every app whose records reach the tax authority answers what each of them says in its database
+   and in the copy (``fiscal_record_states`` on its ``LiveAppConfig``, through a direct connection: both are closed to
+   the app and the copy has no alias), and the answers are compared: a record the copy lacks (made after the moment)
+   or has otherwise (sent, answered or changed after it) stops the restore, nothing changed and the business never
+   closed. Putting the copy in its place would repeat numbers the tax authority has and drop invoices the business
+   must keep. The copy itself says what it holds, whatever moment was given. It only reads: nothing fiscal is changed
+   or sent.
 3. **Closed**: its own database is closed to the app as a move closes its origin (``CONNECT`` and ``TEMPORARY`` taken
    from the environment's ``hub_app`` and ``hub_admin``, every other session ended): nothing writes in it from here on.
    The fiscal check is repeated then: the business could invoice until it was closed (it is opened again if it stops).
@@ -47,9 +48,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 import psycopg
-from django.apps import apps as django_apps
 from django.utils import timezone
-from psycopg import sql
+from live.meta import all_live_app_configs
 
 from base import services
 from base.tenancy import bootstrap, dumps, move, names, ops
@@ -62,12 +62,6 @@ logger = logging.getLogger(__name__)
 LEASE = move.LEASE
 #: What ``last_error`` says after the reason of a restore that could not be undone yet.
 UNDO_FAILED_MARK = " (restore_undo_failed: "
-#: VeriFactu's records (``apps.verifactu``, read only): its table and the environment that reaches the AEAT for real.
-RECORDS_APP, RECORDS_MODEL = "verifactu", "Record"
-RECORDS_TABLE = "verifactu_record"
-PRODUCTION = "production"
-#: What a record says of its life at the AEAT: compared between the hub's database and the copy.
-RECORD_STATE_SQL = "SELECT id, status, transmitted_at, updated_at FROM {} WHERE environment = %s"
 
 
 def source_name(hub) -> str:
@@ -87,7 +81,8 @@ def run_due(
     ``cancelled``: whether the worker is stopping; ``source``: where each hub's copy is on its temporary cluster."""
     now = now or timezone.now()
     for hub_id in control_services.hubs_restoring():
-        if services.claim_hub(hub_id, now, LEASE) is None:
+        # By the clock, never ``now``: a move before it in the same tick may have taken longer than the lease.
+        if services.claim_hub(hub_id, timezone.now(), LEASE) is None:
             continue
         try:
             restore_hub(hub_id, now=now, roles=roles, cancelled=cancelled, source=source)
@@ -267,42 +262,35 @@ def _put_back(hub, kept_name: str, roles: bootstrap.Names, ours) -> None:
 # ── The fiscal guard: it only reads ──────────────────────────────────────────────────────────────────────────────────
 
 
-def _records_table() -> str:
-    """VeriFactu's records table, or empty where its app is not installed (no record can exist then)."""
-    try:
-        django_apps.get_model(RECORDS_APP, RECORDS_MODEL)
-    except LookupError:
-        return ""
-    return RECORDS_TABLE
-
-
-def _production_records(name: str, cluster) -> dict:
-    """What each production VeriFactu record of the database ``name`` on ``cluster`` says of its life at the AEAT, by
-    id; none without the table (the app was never set up there)."""
-    table = _records_table()
-    if not table:
+def _fiscal_records(name: str, cluster) -> dict:
+    """What each record of the database ``name`` on ``cluster`` that reaches the tax authority says, by its app and
+    id, as every app that keeps such records answers it (``fiscal_record_states``); none when no app does."""
+    asking = [
+        (config.label, ask)
+        for config in all_live_app_configs()
+        if (ask := getattr(config, "fiscal_record_states", None)) is not None
+    ]
+    if not asking:
         return {}
     with ops.connect_ops(name, cluster=cluster) as conn:
-        if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
-            return {}
-        query = sql.SQL(RECORD_STATE_SQL).format(sql.Identifier(table))
-        return {row[0]: tuple(row[1:]) for row in conn.execute(query, [PRODUCTION])}
+        return {(label, record): state for label, ask in asking for record, state in ask(conn).items()}
 
 
 def _refuse_fiscal_changes(name: str, cluster, copy: str, origin) -> None:
-    """Step 3: ``restore_fiscal_records`` when a production record of ``name`` is not, as it is, in the copy."""
+    """Step 2: ``restore_fiscal_records`` when a record of ``name`` that reaches the tax authority is not, as it is,
+    in the copy."""
     try:
-        now = _production_records(name, cluster)
+        now = _fiscal_records(name, cluster)
         if not now:
             return
-        then = _production_records(copy, origin)
+        then = _fiscal_records(copy, origin)
     except (psycopg.Error, ops.DatabaseOpsError) as error:
-        raise move.MoveFailed("restore_fiscal_unread", f"its VeriFactu records could not be read: {error}") from error
-    changed = sum(1 for record_id, state in now.items() if then.get(record_id) != state)
+        raise move.MoveFailed("restore_fiscal_unread", f"its fiscal records could not be read: {error}") from error
+    changed = sum(1 for record, state in now.items() if then.get(record) != state)
     if changed:
         raise move.MoveFailed(
             "restore_fiscal_records",
-            f"production VeriFactu records made, sent or changed after the copy: {changed}; restoring it would "
-            "repeat numbers the AEAT already has",
+            f"fiscal records made, sent or changed after the copy: {changed}; restoring it would repeat numbers the "
+            "tax authority already has",
         )
 
