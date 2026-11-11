@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9f3e3d07b5ffbdef0cd0c6b6285793a5d6665974b2a056bb0d320fc09cb7939e -->
+<!-- generated from WORKBOOK.md sha256:63de40657ccb2a6ee940f8fbbb1f5d0058ad518f5845fad3f32538c95457bd4b -->
 
 ## What it is for and who it is for
 
@@ -227,7 +227,9 @@ In: the chosen menu (by id or by name).
 Out: the menu, its courses and its choices deleted in a single operation (announces: menu withdrawn,
 with its name). The tickets issued carry their copy and can still be read.
 If it fails: the dialog says why and stays open; a menu that no longer exists, "That menu does not
-exist in this business.". An open check that already had it charges it as it was ordered (COMBO-F08).
+exist in this business.". An open check that already had it charges it as it was ordered (COMBO-F08). Through the
+assistant, a name that fits several menus or none brings up no card, and if before the "yes" another menu fits better
+what was said, nothing is withdrawn and the new card comes up (BASE-F97).
 Involved: SALE-F12
 
 ### COMBO-F05 Set up the courses of a menu
@@ -496,7 +498,14 @@ its card (BASE-F97), which names each record as the screens name it, never by it
 ("Menu: Menu of the day"), the course by its name ("Course: Starters"), the choice by its product's name ("Choice:
 Lentils"), the product by its name ("New product: Soup") and, when reordering courses or choices or adding several
 products, each one by its name and in the order sent ("Courses: Mains, Starters"). What the person asking cannot see,
-or what no longer exists, is left out.
+or what no longer exists, is left out. A menu said by its name when changing it, withdrawing it, giving it a photo or
+reordering its courses is looked up as the action will look it up (the same name before one that contains it), and the
+card shows the menu that will be touched, with its full name ("Menu: Vegan menu" when "vegan" was said). If what was
+said fits several menus or none, no card comes up: the assistant hears "There are several menus called "vegan": Vegan
+menu, Gluten-free vegan menu. Say which one." and asks which one, or "That menu does not exist in this business.". The
+"yes" counts only for the menu the card showed: if, before confirming, someone creates one that fits better what was
+said ("Menu" when the card said "Vegan menu"), nothing is touched and the new card comes up. A course or a choice said
+by its name, and the menu they belong to, still come up as they were said (hub#1231).
 
 ### What it offers: queries (they read, they change nothing)
 

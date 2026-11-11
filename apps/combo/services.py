@@ -276,6 +276,7 @@ def create_combo(ctx: OperationContext, data: ComboIn) -> dict:
         "tax category changes how it is billed.",
         # Per operation, not per field: it may change how the menu is billed (supply_kind, tax_category_key).
         "risk": "high",
+        "check": "combo.combo.get",
         "asks": {
             "en": (
                 "bring the vegan menu down to 11.90",
@@ -331,6 +332,7 @@ def update_combo(ctx: OperationContext, data: ComboPatchIn) -> dict:
         "description": "Withdraw a menu for good, with its courses and choices. Tickets already issued keep "
         "their copy. To stop selling it for a while, set it off sale instead.",
         "risk": "high",
+        "check": "combo.combo.get",
         "asks": {
             "en": (
                 "delete the summer menu for good",
@@ -374,6 +376,7 @@ PHOTOS = "combo/combos/"
         "or its name: an image of ERPlora's shared library by its reference (catalog:<folder>/<name>, from combo.combo.suggest_image or "
         "base.catalog_image.search), or empty to show none (its initials).",
         "risk": "normal",
+        "check": "combo.combo.get",
         "asks": {
             "en": (
                 "put a photo on the tasting menu",
@@ -581,6 +584,7 @@ def delete_group(ctx: OperationContext, data: GroupRefIn) -> dict:
         "description": "Put the courses of a menu in a new order (the order the till asks them in): give every "
         "course id, in order.",
         "risk": "normal",
+        "check": "combo.combo.get",
         "asks": {
             "en": (
                 "reorder the courses of the kids' menu: starter, main, dessert",

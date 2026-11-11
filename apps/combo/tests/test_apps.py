@@ -48,6 +48,14 @@ HIGH_RISK = {
     "combo.option.delete",
     "combo.option.drop_product",
 }
+#: The writes of the assistant whose record is the menu, said by its id or by its name: each one checks it with the
+#: menu's read before its card (hub#1217), so a name two menus fit or none has draws no card.
+CHECKED_BY_THE_MENU = {
+    "combo.combo.delete",
+    "combo.combo.set_image",
+    "combo.combo.update",
+    "combo.group.reorder",
+}
 
 
 def combo_app():
@@ -147,6 +155,9 @@ def test_every_operation_tells_the_assistant_what_it_does():
         # upload of the form's own photo and the reaction to Inventory's deletion declare ``ai`` and are no tool.
         if assistant.is_tool(op):
             expected.add("asks")
+        if name in CHECKED_BY_THE_MENU:
+            expected.add("check")
+            assert op.ai["check"] == "combo.combo.get", name
         assert set(op.ai) == expected, name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, name

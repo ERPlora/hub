@@ -57,6 +57,9 @@ T_CHOICE = gettext_noop("Choice")
 # asks, never by its id: a menu and a course by their name and a choice by its product's, as the builder's «Withdraw»
 # and «Remove» dialogs say them; a product of Inventory by its name, as Inventory's screens say it.
 A_MENU = names("combo.combo.get")
+# A menu said by its name, when its id is not known: the card reads it by that name too, as the write will find it, so
+# it shows the menu the write acts on («Menú vegano» when the person said «vegano»), not only the words said (hub#1217).
+A_MENU_BY_NAME = names("combo.combo.get", by="combo")
 A_COURSE = names("combo.group.get")
 A_CHOICE = names("combo.option.get", name=("product_name",))
 A_PRODUCT = names("inventory.product.get")
@@ -181,7 +184,7 @@ class Page(Schema, Generic[T]):
 
 class ComboRefIn(In):
     id: UUID | None = Field(None, title=T_MENU, description=D_COMBO_ID, json_schema_extra=A_MENU)
-    combo: Reference | None = Field(None, description=D_COMBO)
+    combo: Reference | None = Field(None, description=D_COMBO, json_schema_extra=A_MENU_BY_NAME)
 
     @model_validator(mode="after")
     def _combo_named(self):
