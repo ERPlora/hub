@@ -755,7 +755,12 @@ cajero del producto actual es un empleado.
   asistente mandaba a la pantalla o buscaba una automatización. `tests/test_assistant_asks.py` mide con las
   frases reales de la QA de la capa 2 (`tests/e2e/qa/probes/owner-es-tax-2026-11-08.json` y la del
   empleado), nunca con los propios `asks`: cada una trae su herramienta entre las 20 primeras, y lo que el
-  empleado no puede hacer (las escrituras, `tax.manage`) ni se le ofrece. Sin sinónimos propios en
+  empleado no puede hacer (las escrituras, `tax.manage`) ni se le ofrece. Además, una frase propia por
+  herramienta (`OWN_WORDS`, ni ask ni sonda) que solo llega entre las diez primeras por sus `asks`: cambiar
+  las de cualquier herramienta lo ve un test. Hasta que live lea «activar» y «desactivar» como las acciones
+  `activate` y `deactivate` (ERPlora/live#50), reactivar y desactivar una regla salen detrás de encender o
+  apagar una app (`base.app.enable`/`disable`); lo fija un `xfail` estricto que se pone rojo con ese puntero.
+  Sin sinónimos propios en
   `base.assistant.SYNONYMS`: «desactiva» ya lo lee el grupo de Personal (hub#1103), y una palabra suelta
   para «termina» o «activa» arrastraría las tareas terminadas o las reglas «activas» de una lista.
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#678): nombra la regla que una escritura señala por su id

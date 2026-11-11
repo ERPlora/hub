@@ -19,7 +19,7 @@ from live.operations import AI, Operation, registry
 from base import assistant
 from base.models import Membership
 from base.permissions import permissions_for
-from base.tests.test_assistant_asks import comparable, probe_phrases
+from base.tests.test_assistant_asks import assert_its_asks_bring, comparable, probe_phrases
 
 A = Scope("host", "a")
 #: Taxes' assistant tools: its reads (the calculator, categories, rules, aliases and the business's tax region) and
@@ -70,6 +70,43 @@ PROBES = [
     for probe in json.loads(path.read_text(encoding="utf-8"))["probes"]
 ]
 ROLES = {"owner": Membership.Role.OWNER, "employee": Membership.Role.EMPLOYEE}
+#: «activar» and «desactivar» read only as turning something on or off (an app, a setting), never as the actions
+#: ``activate`` and ``deactivate``: bringing a rule back or switching it off is offered, but after the app's switch the
+#: model reached for instead. Strict, so the pointer of live that reads the verbs turns these red and whoever brings it
+#: takes the mark off: the order is then held.
+UNTIL_LIVE_READS_THE_VERBS = pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="ERPlora/live#50: VERBS has no «activate» nor «deactivate»; «activar» is only enable, «desactivar» disable",
+)
+#: What a turn offers ahead of the reported requests to bring a rule back or to switch it off: an app's switch.
+CHOSEN_INSTEAD = [
+    pytest.param("tax.rule.activate", "base.app.enable", marks=UNTIL_LIVE_READS_THE_VERBS),
+    pytest.param("tax.rule.deactivate", "base.app.disable", marks=UNTIL_LIVE_READS_THE_VERBS),
+]
+#: What a person says in words of their own, neither an ask nor a probe of layer 2, one for each tool: it is their asks
+#: that bring the tool among the first ten, and without them it is not there (hub#1135, hub#1165), so asks that stop
+#: reading as people speak fail. None shares more than two stems with any one ask of its tool.
+OWN_WORDS = [
+    ("tax.rate.calculate", "de 60 € en libros, ¿qué parte se va en IVA?"),
+    ("tax.category.list", "¿qué tipos de IVA puedo dar a un producto?"),
+    ("tax.category.get", "¿existe ya algo para el calzado entre las categorías de impuestos?"),
+    ("tax.rule.list", "¿a cuánto tengo el tipo del calzado y desde cuándo?"),
+    ("tax.rule.status", "¿el negocio tiene ya impuestos en vigor para arrancar?"),
+    ("tax.rule.parent_candidates", "¿qué reglas sirven de padre para el recargo del calzado?"),
+    ("tax.rule.countries", "¿para qué países están puestos los impuestos?"),
+    ("tax.alias.list", "¿qué alias guardé para leer los ficheros de productos?"),
+    ("tax.alias.resolve", "el texto «IGIC 7», ¿a qué categoría corresponde?"),
+    ("tax.settings.get", "¿el negocio paga IGIC?"),
+    ("tax.category.create", "haz una categoría para el calzado con su IVA"),
+    ("tax.alias.create", "guarda el alias «menú diario» para la comida"),
+    ("tax.rule.create", "el pan va al 4 %: dale su regla de IVA"),
+    ("tax.rule.bulk_create", "mete de golpe los tipos de IVA de Francia de 2026"),
+    ("tax.rule.end", "el tipo del calzado se acaba en julio: dale a su regla su último día"),
+    ("tax.rule.deactivate", "apaga por ahora la regla del calzado"),
+    ("tax.rule.activate", "que vuelva a valer la regla del calzado"),
+    ("tax.settings.update", "pasa la fiscalidad del negocio a Ceuta"),
+]
 
 
 @pytest.fixture
@@ -133,3 +170,24 @@ def test_every_probe_of_taxes_offers_its_tool_to_whoever_may_run_it(catalog_of, 
     assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
     offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
     assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:10])
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("name", "instead"), CHOSEN_INSTEAD)
+def test_the_reported_request_offers_its_tool_before_the_switch_of_an_app(catalog_of, name, instead):
+    tools = catalog_of(Membership.Role.OWNER, "es")
+    offered = [op.name for op in assistant.relevant(tools, [dict(REPORTED)[name]], "es")]
+    assert instead in tools  # positive control: what comes ahead is a tool of the owner too
+    assert name in offered, offered[:10]
+    assert instead not in offered or offered.index(name) < offered.index(instead), offered[:10]
+
+
+def test_every_tool_of_taxes_has_its_own_words():
+    assert [name for name, _ in OWN_WORDS] == list(dict.fromkeys(name for name, _ in OWN_WORDS))  # one each
+    assert {name for name, _ in OWN_WORDS} == TOOLS
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
+def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
+    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
