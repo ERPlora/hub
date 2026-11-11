@@ -423,7 +423,7 @@ En la pantalla Archivos:
 | BASE-F110 | Abrir la web del negocio por su dominio propio | hecho |
 | BASE-F111 | Esperar a la base de datos cuando se corta un momento | hecho |
 | BASE-F112 | Guardar un archivo descargado dentro de la app | hecho |
-| BASE-F113 | Seguir avisando con la pantalla apagada (app de Android) | parcial — la app instalada aún no tiene la orden de quedarse a la escucha (hub#836) |
+| BASE-F113 | Seguir avisando con la pantalla apagada (app de Android) | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -3024,8 +3024,7 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
 
 ### BASE-F113 Seguir avisando con la pantalla apagada (app de Android)
 <!-- origen: old-hub:HUB_APP-F26 old-hub:hub#2307 (la parte del Hub de HUB_APP-F26 de ERPlora/app) gh:hub#836 -->
-Estado: parcial — la parte del Hub está hecha, pero la app instalada aún no tiene la orden de quedarse a la escucha: la
-1.1.34 la quitó (ERPlora/app#25) y vuelve con la segunda parte de hub#836
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna; en Android, el aviso fijo «ERPlora está a la escucha»
 Pasos:
@@ -3041,7 +3040,7 @@ Pasos:
 Entra: los avisos que oye la persona y lo que dice Android de los avisos.
 Sale: la orden a la app de quedarse a la escucha o de dejarlo. En el Hub no se guarda nada.
 Si falla: con los avisos negados («Ahora no» a nuestra pregunta, o negados en Android), sin nada que avisar o sin saber
-qué dice Android, la app no se queda despierta. Una app sin esta orden (la 1.1.34) la rechaza: el Hub lo anota en la
+qué dice Android, la app no se queda despierta. Una app sin esta orden (la 1.1.34 y la 1.1.35) la rechaza: el Hub lo anota en la
 consola, no se la vuelve a pedir en esa página y la persona no ve ningún error; los avisos llegan con la app en
 pantalla, como antes. Si Android no deja empezar, igual, y se vuelve a pedir en la siguiente entrada. Mientras el Hub
 no sabe aún si hay algo que avisar, no pide nada a la app: recargar la página no la para ni la vuelve a encender.
