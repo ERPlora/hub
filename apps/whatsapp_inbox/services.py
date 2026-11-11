@@ -984,6 +984,7 @@ def _sent_message(key: UUID) -> Message | None:
                 "responde a Nuria: nos vemos mañana a las 10",
                 "envía la plantilla de recordatorio al +34 600 111 222",
                 "escríbele a Jorge por WhatsApp que abrimos a las 9",
+                "responde por WhatsApp a Nuria que su cita sigue en pie",
             ),
         },
         "description": "Sends a WhatsApp message to a customer («reply to Ana», «send the reminder template to "

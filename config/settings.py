@@ -557,6 +557,7 @@ LIVE = {
 # of the assistant's QA (base/tests/test_assistant_asks.py) checks each ask reaches its tool, role by role, and that
 # every app whose tools say asks is here. The list is written only here, one app per line (hub#1144).
 LIVE_ASSISTANT_ASKS_REQUIRED = (
+    "appointment",
     "attendance",
     "base",
     "cart_checkout",
