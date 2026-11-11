@@ -611,29 +611,24 @@ class TestRestore:
     """``control.hub.restore`` asks the worker to put a ready hub's database back as it was at a moment, from the copy
     of it on a temporary cluster (``base.tenancy.restore``): its host answers 503 «maintenance» from now until the
     worker is done. The copy comes only from a cluster closed to new hubs with none on it, and never while the hub's
-    database has production VeriFactu records made, changed or sent after that moment."""
+    database has a production VeriFactu record the copy lacks or has otherwise: the worker refuses that one, nothing
+    changed (``base/tenancy/tests/test_restore.py``), for it reads both databases with the migrator."""
 
     MOMENT = dt.datetime(2026, 11, 9, 14, 30, tzinfo=dt.UTC)
 
     @pytest.fixture
     def checked(self, monkeypatch):
-        """The copy measures 5 MB on the temporary cluster, and the hub has no fiscal record after the moment."""
-        from base.tenancy import restore
+        """The copy measures 5 MB on the temporary cluster."""
         from control import queries
 
-        seen: dict[str, list] = {"measured": [], "fiscal": []}
+        measured: list[tuple[object, list[str]]] = []
 
         def measure(cluster, names):
-            seen["measured"].append((cluster, names))
+            measured.append((cluster, names))
             return {name: 5 * 1024 * 1024 for name in names}
 
-        def records_after(hub, moment):
-            seen["fiscal"].append((hub.pk, moment))
-            return 0
-
         monkeypatch.setattr(queries, "measure", measure)
-        monkeypatch.setattr(restore, "records_after", records_after)
-        return seen
+        return measured
 
     @staticmethod
     def a_hub(**fields) -> Hub:
@@ -669,8 +664,8 @@ class TestRestore:
             source.pk,
             self.MOMENT,
         )
-        # The copy is measured where it is, under the hub's own name; the fiscal records read in the hub's database.
-        assert checked == {"measured": [(source, [hub.db_name])], "fiscal": [(hub.pk, self.MOMENT)]}
+        # The copy is measured where it is, under the hub's own name.
+        assert checked == [(source, [hub.db_name])]
         assert events("control.hub.restore_requested") == [
             {"id": str(hub.pk), "slug": "acme", "from": str(source.pk), "at": self.MOMENT.isoformat()}
         ]
@@ -703,7 +698,7 @@ class TestRestore:
             with pytest.raises(Conflict) as refused:
                 self.ask(admin_ctx, hub, source)
             assert refused.value.code == code
-        assert checked["fiscal"] == []
+        assert checked == []
 
     def test_the_copy_comes_only_from_a_closed_temporary_cluster_never_its_own(self, admin_ctx, checked):
         own = self.temporary(name="own", host="writer-own.example")
@@ -750,21 +745,6 @@ class TestRestore:
             assert refused.value.code == code
         hub.refresh_from_db()
         assert hub.restoring_from_id is None
-
-    def test_production_records_after_the_moment_refuse_it_nothing_asked(self, admin_ctx, checked, monkeypatch):
-        from base.tenancy import restore
-
-        hub = self.a_hub()
-        monkeypatch.setattr(restore, "records_after", lambda hub, moment: 2)
-
-        with pytest.raises(Conflict) as refused:
-            self.ask(admin_ctx, hub, self.temporary())
-
-        assert refused.value.code == "control.restore_fiscal_records"
-        assert "2" in str(refused.value)
-        hub.refresh_from_db()
-        assert hub.restoring_from_id is None
-        assert events("control.hub.restore_requested") == []
 
     def test_a_move_is_refused_while_the_hub_is_restored(self, admin_ctx, checked):
         from control.schemas import HubMoveIn

@@ -10,15 +10,15 @@ time, under the hub's lease (``hub_due``, provisioning's: ``move.LEASE``, renewe
 
 1. **Copied**: ``pg_dump`` of the hub's database on the temporary cluster (:func:`source_name`; nobody uses it), before
    the business is closed.
-2. **Closed**: its own database is closed to the app as a move closes its origin (``CONNECT`` and ``TEMPORARY`` taken
+2. **Checked, fiscal**: each production VeriFactu record of its database is compared with the copy's (its status, when
+   it was sent, when it last changed): one the copy lacks (made after the moment) or has otherwise (sent, answered or
+   changed after it) stops the restore, nothing changed and the business never closed. Putting the copy in its place
+   would repeat numbers the AEAT has (VERIFACTU-F28 anchors the chain again but does not move the invoice series on)
+   and drop invoices the business must keep. The copy itself says what it holds, whatever moment was given. It only
+   reads: nothing fiscal is changed or sent.
+3. **Closed**: its own database is closed to the app as a move closes its origin (``CONNECT`` and ``TEMPORARY`` taken
    from the environment's ``hub_app`` and ``hub_admin``, every other session ended): nothing writes in it from here on.
-3. **Checked, fiscal**: with nothing writing any more, each production VeriFactu record of its database is compared with
-   the copy's (its status, when it was sent, when it last changed): one the copy lacks (made after the moment) or has
-   otherwise (sent, answered or changed after it) stops the restore, nothing changed, the business opened again.
-   Putting the copy in its place would repeat numbers the AEAT has (VERIFACTU-F28 anchors the chain again but does not
-   move the invoice series on) and drop invoices the business must keep. It only reads: nothing fiscal is changed or
-   sent. ``control.hub.restore`` refused before on the moment (:func:`records_after`); the copy itself says it here,
-   whatever moment was given.
+   The fiscal check is repeated then: the business could invoice until it was closed (it is opened again if it stops).
 4. **Kept**: renamed ``<control>_old_<hex>`` (``names.kept_db_name``, a UUIDv7 of its own), noted in control first
    (``MovedCopy`` without ``moved_at``: the hub's data is in it while the restore goes on).
 5. **Made**: a new database of its name on its own cluster, cloned from its vertical's template there, emptied of the
@@ -48,14 +48,12 @@ from pathlib import Path
 
 import psycopg
 from django.apps import apps as django_apps
-from django.db import connections as django_connections
 from django.utils import timezone
 from psycopg import sql
 
 from base import services
 from base.tenancy import bootstrap, dumps, move, names, ops
 from base.tenancy import connections as tenancy_connections
-from base.tenancy.context import current_alias, use_hub
 from control import services as control_services
 
 logger = logging.getLogger(__name__)
@@ -70,10 +68,6 @@ RECORDS_TABLE = "verifactu_record"
 PRODUCTION = "production"
 #: What a record says of its life at the AEAT: compared between the hub's database and the copy.
 RECORD_STATE_SQL = "SELECT id, status, transmitted_at, updated_at FROM {} WHERE environment = %s"
-#: The production records made, changed or sent after a moment.
-RECORDS_AFTER_SQL = (
-    "SELECT count(*) FROM {} WHERE environment = %s AND (created_at > %s OR updated_at > %s OR transmitted_at > %s)"
-)
 
 
 def source_name(hub) -> str:
@@ -192,19 +186,23 @@ def _back(hub, kept_name: str, roles, ours, *, reason: str) -> None:
 
 
 def _close_and_keep(hub, kept_name: str, roles: bootstrap.Names, ours, copy: str, origin) -> None:
-    """Steps 2 to 4 on the hub's cluster: its database closed to the app, its fiscal records compared with the copy's,
-    then noted (with its schema record) and renamed to its kept copy. A restore cut after its rename (its kept copy
-    noted and there) goes on from the kept copy; without the hub's database or such a copy, there is nothing to keep."""
+    """Steps 2 to 4 on the hub's cluster: its fiscal records compared with the copy's, its database closed to the app
+    and compared again, then noted (with its schema record) and renamed to its kept copy. A restore cut after its
+    rename (its kept copy noted and there) goes on from the kept copy; without the hub's database or such a copy, there
+    is nothing to keep."""
     name, cluster = hub.db_name, hub.cluster
     try:
         with ops.connect_ops(cluster=cluster) as conn:
             present = move._present(conn, name, kept_name)
-            kept_already = control_services.pending_copy(hub.id) is not None and kept_name in present
-            if not kept_already and name not in present:
-                raise move.MoveFailed("restore_database_missing", f"{name} is not on its cluster")
+        kept_already = control_services.pending_copy(hub.id) is not None and kept_name in present
+        if not kept_already and name not in present:
+            raise move.MoveFailed("restore_database_missing", f"{name} is not on its cluster")
+        live = kept_name if kept_already else name
+        _refuse_fiscal_changes(live, cluster, copy, origin)
+        with ops.connect_ops(cluster=cluster) as conn:
             ours()
-            move._close(conn, kept_name if kept_already else name, roles)
-        _refuse_fiscal_changes(kept_name if kept_already else name, cluster, copy, origin)
+            move._close(conn, live, roles)
+        _refuse_fiscal_changes(live, cluster, copy, origin)
         if kept_already:
             return
         control_services.copy_pending(
@@ -308,17 +306,3 @@ def _refuse_fiscal_changes(name: str, cluster, copy: str, origin) -> None:
             "would repeat numbers the AEAT already has",
         )
 
-
-def records_after(hub, moment: dt.datetime) -> int:
-    """How many production VeriFactu records of ``hub``'s database were made, changed or sent after ``moment`` (none
-    without the table): what ``control.hub.restore`` refuses on. It only reads, as the app does (``use_hub``)."""
-    table = _records_table()
-    if not table:
-        return 0
-    with use_hub(hub), django_connections[current_alias()].cursor() as cursor:
-        cursor.execute("SELECT to_regclass(%s)", [table])
-        if cursor.fetchone()[0] is None:
-            return 0
-        quoted = django_connections[current_alias()].ops.quote_name(table)
-        cursor.execute(RECORDS_AFTER_SQL.format(quoted), [PRODUCTION, moment, moment, moment])
-        return cursor.fetchone()[0]

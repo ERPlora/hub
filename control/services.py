@@ -20,9 +20,9 @@ on control (the registry's scope) and records its event in control's outbox in t
   logical replication, which the Hub does not do yet. Its host answers 503 «maintenance» until the worker is done.
 - ``control.hub.restore`` asks the worker to put a ready hub's database back as it was at a moment (hub#1198,
   ``base.tenancy.restore``): from the copy of it on a temporary cluster (a point-in-time restore of its own, registered
-  closed to new hubs, with no hub on it), small enough for a copy, and never while the hub's database has production
-  VeriFactu records made, changed or sent after that moment (``base.tenancy.restore.records_after``: it only reads; the
-  worker looks again once the business is closed). Its host answers 503 «maintenance» until the worker is done.
+  closed to new hubs, with no hub on it), small enough for a copy. Its host answers 503 «maintenance» until the worker
+  is done. The worker refuses it, nothing changed, while the hub's database has a production VeriFactu record the copy
+  lacks or has otherwise (it reads both with the migrator, which the web does not have; it only reads).
 
 Each locks the cluster's row first, as the placement does, so a hub placed at the same time is either counted or
 placed after.
@@ -342,8 +342,6 @@ def _copy_to_restore(hub: Hub, source: Cluster) -> None:
 def hub_restore(ctx: OperationContext, data: HubRestoreIn) -> dict:
     """Ask the worker to put the ready hub ``data.hub``'s database back as it was at ``data.at``, from its copy on the
     temporary cluster ``data.cluster``."""
-    from base.tenancy import restore
-
     platform_admin_only(ctx)
     hub = Hub.objects.select_for_update(of=("self",)).select_related("cluster").filter(pk=data.hub).first()
     if hub is None:
@@ -378,19 +376,6 @@ def hub_restore(ctx: OperationContext, data: HubRestoreIn) -> dict:
         message = gettext("That moment has not come yet.")
         raise InvalidPayload(message, code="control.restore_point_ahead", fields={"at": message})
     _copy_to_restore(hub, source)
-    after = restore.records_after(hub, data.at)
-    if after:
-        raise _move_refused(
-            ngettext(
-                "%(count)d VeriFactu record of production was made, changed or sent after that moment: restoring "
-                "would repeat numbers the AEAT already has.",
-                "%(count)d VeriFactu records of production were made, changed or sent after that moment: restoring "
-                "would repeat numbers the AEAT already has.",
-                after,
-            )
-            % {"count": after},
-            "control.restore_fiscal_records",
-        )
     hub.restoring_from = source
     hub.restore_point = data.at
     hub.last_error = ""

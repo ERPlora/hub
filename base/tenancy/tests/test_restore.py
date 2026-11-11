@@ -391,6 +391,18 @@ class TestTheFiscalGuard:
         assert marker(hub.db_name) == [AS_THEN, SINCE]
         assert not MovedCopy.objects.filter(hub=hub).exists()
 
+    def test_a_record_already_there_refuses_it_before_the_business_is_ever_closed(self, restores, monkeypatch):
+        hub = restores.hub(source=restores.cluster())
+        a_record(hub.db_name, created_at=AFTER, updated_at=AFTER)
+        closed: list[str] = []
+        real = move._close
+        monkeypatch.setattr(move, "_close", lambda conn, name, roles: closed.append(name) or real(conn, name, roles))
+
+        run(restores)
+
+        assert closed == []
+        assert fresh(hub).last_error.startswith("restore_fiscal_records")
+
     def test_a_record_made_before_and_sent_after_stops_it(self, restores):
         hub = restores.hub(source=restores.cluster())
         record = a_record(restores.copies[hub.id], status="pending")
@@ -456,6 +468,13 @@ class TestTheFiscalGuard:
 
         assert (fresh(hub).restoring_from_id, fresh(hub).last_error) == (None, "")
 
+    def test_the_columns_read_are_verifactus_own(self):
+        record = django_apps.get_model("verifactu", "Record")
+        assert record._meta.db_table == restore.RECORDS_TABLE
+        assert record.Environment.PRODUCTION == restore.PRODUCTION
+        for column in ("environment", "status", "updated_at", "transmitted_at"):
+            assert record._meta.get_field(column).column == column
+
     def test_a_production_record_the_copy_does_not_have_the_table_for_stops_it(self, restores):
         hub = restores.hub(source=restores.cluster())
         with hubs._maintenance(restores.copies[hub.id]) as conn:
@@ -465,36 +484,6 @@ class TestTheFiscalGuard:
         run(restores)
 
         assert fresh(hub).last_error.startswith("restore_fiscal_records")
-
-
-class TestTheRecordsAfterTheMoment:
-    """What ``control.hub.restore`` refuses on, before anything is closed: the production records of the hub's database
-    made, changed or sent after the moment. It only reads."""
-
-    def test_made_changed_or_sent_after_it_count_testing_and_before_do_not(self, restores):
-        hub = restores.hub(source=None)
-        a_record(hub.db_name, created_at=AFTER)
-        a_record(hub.db_name, updated_at=AFTER)
-        a_record(hub.db_name, transmitted_at=AFTER)
-        a_record(hub.db_name, transmitted_at=BEFORE)
-        a_record(hub.db_name, environment="testing", created_at=AFTER, updated_at=AFTER, transmitted_at=AFTER)
-
-        assert restore.records_after(hub, THEN) == 3
-        assert restore.records_after(hub, AFTER) == 0
-
-    def test_without_verifactus_table_there_are_none(self, restores):
-        hub = restores.hub(source=None)
-        with hubs._maintenance(hub.db_name) as conn:
-            conn.execute("DROP TABLE verifactu_record CASCADE")
-
-        assert restore.records_after(hub, THEN) == 0
-
-    def test_the_columns_read_are_verifactus_own(self):
-        record = django_apps.get_model("verifactu", "Record")
-        assert record._meta.db_table == restore.RECORDS_TABLE
-        assert record.Environment.PRODUCTION == restore.PRODUCTION
-        for column in ("environment", "status", "created_at", "updated_at", "transmitted_at"):
-            assert record._meta.get_field(column).column == column
 
 
 class TestTwoWorkers:
