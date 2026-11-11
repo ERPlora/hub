@@ -237,6 +237,16 @@ def _reordered(rows, wanted: list[UUID]) -> None:
         "restaurant.food»). Eaten in needs its tax category; to take away it is split per dish. Then add its "
         "courses and choices.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "create a vegan menu at 12.50 to eat in",
+                "set up a new takeaway combo at 9",
+            ),
+            "es": (
+                "crea un menú vegano a 12,50 para comer aquí",
+                "da de alta un combo para llevar a 9",
+            ),
+        },
     },
 )
 def create_combo(ctx: OperationContext, data: ComboIn) -> dict:
@@ -266,6 +276,16 @@ def create_combo(ctx: OperationContext, data: ComboIn) -> dict:
         "tax category changes how it is billed: confirm it with the person.",
         # Per operation, not per field: it may change how the menu is billed (supply_kind, tax_category_key).
         "risk": "high",
+        "asks": {
+            "en": (
+                "bring the vegan menu down to 11.90",
+                "take the summer menu off sale for now",
+            ),
+            "es": (
+                "rebaja el menú vegano a 11,90",
+                "quita de la venta el menú de verano por ahora",
+            ),
+        },
     },
 )
 def update_combo(ctx: OperationContext, data: ComboPatchIn) -> dict:
@@ -311,6 +331,16 @@ def update_combo(ctx: OperationContext, data: ComboPatchIn) -> dict:
         "description": "Withdraw a menu for good, with its courses and choices. Tickets already issued keep "
         "their copy. To stop selling it for a while, set it off sale instead.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "delete the summer menu for good",
+                "get rid of the Christmas menu, we won't sell it again",
+            ),
+            "es": (
+                "retira para siempre el menú de verano",
+                "elimina el menú de Navidad, ya no lo vamos a vender",
+            ),
+        },
     },
 )
 def delete_combo(ctx: OperationContext, data: ComboRefIn) -> dict:
@@ -344,6 +374,16 @@ PHOTOS = "combo/combos/"
         "or its name: an image of ERPlora's shared library by its reference (catalog:<folder>/<name>, from combo.combo.suggest_image or "
         "base.catalog_image.search), or empty to show none (its initials).",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "put a photo on the tasting menu",
+                "use the paella drawing as the summer menu's picture",
+            ),
+            "es": (
+                "ponle foto al menú degustación",
+                "usa el dibujo de la paella como imagen del menú de verano",
+            ),
+        },
     },
 )
 def set_image(ctx: OperationContext, data: ComboImageIn) -> dict:
@@ -413,6 +453,16 @@ def _name_free(combo_id: UUID, name: str, exclude: UUID | None = None) -> None:
         "description": "Add a course to a menu («add Starters to the menu of the day, pick 1»): it goes last. "
         "min_choices 1 or more makes it compulsory; max_choices 0 is no limit.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "add a Desserts course to the vegan menu, pick one",
+                "the kids' menu needs a Drinks course",
+            ),
+            "es": (
+                "añade el plato Postres al menú vegano, a elegir uno",
+                "el menú infantil necesita un plato de bebidas",
+            ),
+        },
     },
 )
 def create_group(ctx: OperationContext, data: GroupIn) -> dict:
@@ -447,6 +497,16 @@ def create_group(ctx: OperationContext, data: GroupIn) -> dict:
         "description": "Change a course: its name, minimum and maximum picks, or whether a choice may repeat. "
         "Only the fields sent change; it keeps its place.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "let them pick two starters instead of one",
+                "make the drinks course optional for kids",
+            ),
+            "es": (
+                "que se puedan elegir dos entrantes en vez de uno",
+                "haz opcional el plato de bebida del infantil",
+            ),
+        },
     },
 )
 def update_group(ctx: OperationContext, data: GroupPatchIn) -> dict:
@@ -489,6 +549,16 @@ def update_group(ctx: OperationContext, data: GroupPatchIn) -> dict:
     ai={
         "description": "Remove a course from its menu, with its choices.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "remove the Desserts course from the vegan menu",
+                "the kids' menu no longer has a drinks course",
+            ),
+            "es": (
+                "quita los postres del menú vegano",
+                "el menú infantil ya no lleva plato de bebida",
+            ),
+        },
     },
 )
 def delete_group(ctx: OperationContext, data: GroupRefIn) -> dict:
@@ -511,6 +581,16 @@ def delete_group(ctx: OperationContext, data: GroupRefIn) -> dict:
         "description": "Put the courses of a menu in a new order (the order the till asks them in): give every "
         "course id, in order.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "reorder the courses of the kids' menu: starter, main, dessert",
+                "the dessert course should come before the main one",
+            ),
+            "es": (
+                "ordena los platos del menú infantil: entrante, segundo y postre",
+                "en el menú vegano, que el postre vaya antes que el segundo",
+            ),
+        },
     },
 )
 def reorder_groups(ctx: OperationContext, data: GroupReorderIn) -> dict:
@@ -546,6 +626,16 @@ def _product_free(
         "description": "Offer a product as a choice of a course («put the lentils in Starters of the menu of the "
         "day», «hake in Mains with 2 euros supplement»): it goes last. The supplement adds to the closed price.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "add the salad as a starter in the vegan menu",
+                "offer the steak as a main with 3 extra",
+            ),
+            "es": (
+                "incorpora la ensalada a los entrantes del menú vegano",
+                "que se pueda elegir entrecot de segundo con 3 de suplemento",
+            ),
+        },
     },
 )
 def create_option(ctx: OperationContext, data: OptionIn) -> dict:
@@ -581,6 +671,16 @@ def create_option(ctx: OperationContext, data: OptionIn) -> dict:
         "description": "Offer several products at once in a course, without supplement, in the order given; all "
         "or nothing.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "add soup, salad and gazpacho as starters all at once",
+                "put several desserts in the kids' menu in one go",
+            ),
+            "es": (
+                "añade de golpe sopa, ensalada y gazpacho de entrante, en este orden y todos sin suplemento",
+                "mete varios postres a la vez en el menú infantil",
+            ),
+        },
     },
 )
 def bulk_create_options(ctx: OperationContext, data: OptionBulkIn) -> dict:
@@ -619,6 +719,16 @@ def bulk_create_options(ctx: OperationContext, data: OptionBulkIn) -> dict:
         "description": "Change a choice: its supplement, mark it sold out («no flan today in the menu of the "
         "day»: is_available false) or back on offer, or replace its product. It keeps its place.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "the custard is sold out in the kids' menu",
+                "make the steak supplement 4 in the vegan menu",
+            ),
+            "es": (
+                "se han acabado las natillas del menú infantil",
+                "el entrecot del menú vegano pasa a llevar 4 de suplemento",
+            ),
+        },
     },
 )
 def update_option(ctx: OperationContext, data: OptionPatchIn) -> dict:
@@ -666,7 +776,20 @@ def update_option(ctx: OperationContext, data: OptionPatchIn) -> dict:
     input=OptionRefIn,
     output=DeletedOut,
     expose_api=True,
-    ai={"description": "Remove a choice from its course.", "risk": "high"},
+    ai={
+        "description": "Remove a choice from its course.",
+        "risk": "high",
+        "asks": {
+            "en": (
+                "take the gazpacho off the starters of the vegan menu",
+                "we no longer offer soup in the kids' menu",
+            ),
+            "es": (
+                "quita el gazpacho de los entrantes del menú vegano",
+                "ya no damos sopa en el menú infantil",
+            ),
+        },
+    },
 )
 def delete_option(ctx: OperationContext, data: OptionRefIn) -> dict:
     option = find_option(
@@ -696,6 +819,16 @@ def delete_option(ctx: OperationContext, data: OptionRefIn) -> dict:
         "description": "Put the choices of a course in a new order (the order the till shows them in): give every "
         "choice id, in order.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "put the salad first among the starters of the vegan menu",
+                "sort the desserts of the kids' menu: ice cream, custard, fruit",
+            ),
+            "es": (
+                "que la ensalada salga la primera entre los entrantes del menú vegano",
+                "ordena los postres del menú infantil: helado, natillas y fruta",
+            ),
+        },
     },
 )
 def reorder_options(ctx: OperationContext, data: OptionReorderIn) -> dict:
