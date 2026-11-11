@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8852b0101eaf8405d93c9a1ab716adb92824c89bba7c081d042ac96555bc0a4f -->
+<!-- generated from WORKBOOK.md sha256:2c5aea91e0d92aa12cbe359f7f643f9966d20e5ec172691bceb73801c56f8caa -->
 
 ## What it is for and who it is for
 
@@ -2316,9 +2316,9 @@ Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
   1. With the session open, they tap the "Assistant" sparkles in the top bar, next to the bell. Tapping them again
-     closes it. On a phone, the sparkles and the bell (and "erplora.com", for whoever has it) go together in "More
-     options" (with the bell's number), so the title stays centred: there, "Assistant" opens the panel and
-     "Notifications", the bell.
+     closes it. On a phone, the sparkles and the bell go together in "More options" (with the bell's number), so the
+     title stays centred: there, "Assistant" opens the panel as soon as the menu has finished closing, so what they
+     type straight away goes to the chat's box and Enter sends it; and "Notifications" opens the bell.
   2. The panel comes in from the right. On a tablet or a computer it takes a column beside the screen and pushes it:
      they can keep working with the panel open. On a phone it covers the screen, over a dark veil.
   3. It closes with the "Close" ×, with the Esc key (wherever the cursor is, except in a window open over the
@@ -2350,8 +2350,9 @@ Steps:
      sent until this one ends.
   5. If they ask how something is done in ERPlora, what an option means or what a plan includes ("How do I open the
      cash register?"), the assistant searches ERPlora's documentation (the help, each app's and the plans) and answers
-     only with what it says, citing which section it comes from; if the documentation does not cover it, it says so
-     instead of making it up.
+     only with what it says, and ends the answer with a "Source: …" line naming the section it comes from (its
+     headings or, when it has none, its path), so the person can check it and read more; if the documentation does not
+     cover it, it says so instead of making it up.
   6. If the assistant ends without saying anything, the bubble reads "(no answer)".
   7. "Stop" cuts what was left: what was already written stays, with "Stopped." below.
   8. Under each finished answer, "Read aloud" reads it with the device's voice, if it has one, and "Stop reading"

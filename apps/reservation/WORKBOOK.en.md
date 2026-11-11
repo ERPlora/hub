@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:acf500fca0bdc481a246a3d4ffd7f5aebd8163e8ba6c9558d52ef539a9d23025 -->
+<!-- generated from WORKBOOK.md sha256:f17398c6b28e4149182a20720096bccd01038115ee9ac48d2a9ab8a75ca98c4b -->
 
 ## What it is for and who it is for
 
@@ -212,7 +212,7 @@ Involved: RESERVATION-F05, RESERVATION-F06
 
 ### RESERVATION-F02 Block a day or some hours
 Status: done
-Actor: manager
+Actor: manager, assistant
 Screen: Availability → Blocked dates
 Steps:
 1. Tap "Add blocked date", type the date and the reason (holiday, closure, private event).
@@ -448,7 +448,7 @@ Involved: RESERVATION-F16, CUSTOMER-F10
 
 ### RESERVATION-F15 Mark as contacted or remove from the waitlist
 Status: done
-Actor: employee, manager
+Actor: employee, manager, assistant
 Screen: Waitlist (row → "Contacted", "Remove")
 Steps:
 1. "Contacted" when they are called: the row says "Yes".
@@ -554,7 +554,7 @@ Involved: RESERVATION-F07, RESERVATION-F17, WHATSAPP_INBOX-F26
 
 ### RESERVATION-F20 Delete a reservation
 Status: done
-Actor: administrator, owner
+Actor: administrator, owner, assistant
 Screen: Reservations (row → "Delete")
 Steps:
 1. "Delete" and confirm. Cancelling is better: it keeps the reason.
@@ -620,7 +620,10 @@ Everything can be asked for through the screens, the assistant (by voice or by t
 own session) and the API, with the same rules and the same permissions. Designed for voice: a reservation
 is named by its id or by the customer's name or phone with its date ("Ana's reservation tomorrow"); a
 table by its id or by its number ("table 5"), with the zone if the number is repeated; a customer by their
-id, their name or their phone. If a reference matches several, it is refused saying which ones (409
+id, their name or their phone; a waitlist entry, by the name or phone of whoever waits; a blocked date, by
+its date or by its reason ("the holiday closure"), which the assistant looks up in the list of blocks.
+Somebody already on the waitlist is booked by the assistant converting their entry (F16), never with a
+separate reservation. If a reference matches several, it is refused saying which ones (409
 `*_ambiguous`). Changing and cancelling can also be asked for on behalf of the customer themselves
 (`on_behalf_of`, their card; today, from WhatsApp): only their reservation, with their customer rules and
 without touching the table, the internal notes nor booking anyway (F18).

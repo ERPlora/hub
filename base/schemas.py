@@ -1892,6 +1892,12 @@ class DocsExcerptOut(Schema):
     text: str
     score: float = Field(description="How close it is to the question: 1 the same meaning, 0 nothing in common.")
     lang: str
+    #: Written by the Hub, not by erplora.com (hub#1079): the model ends its answer with it as it comes.
+    cite: str = Field(
+        default="",
+        description="The line the answer ends with to say where it comes from: «Source: <its headings>», in the "
+        "person's language.",
+    )
 
 
 class DocsSearchOut(Schema):

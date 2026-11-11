@@ -2431,9 +2431,10 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
 Pasos:
   1. Con la sesión abierta, pulsa los destellos «Asistente» de la barra de arriba, al lado de la campana. Volver a
-     pulsarlos lo cierra. En un móvil, los destellos y la campana (y «erplora.com», para quien lo tiene) van juntos
-     en «Más opciones» (con el número de la campana), para que el título siga centrado: ahí, «Asistente» abre el
-     panel y «Notificaciones», la campana.
+     pulsarlos lo cierra. En un móvil, los destellos y la campana van juntos en «Más opciones» (con el número de la
+     campana), para que el título siga centrado: ahí, «Asistente» abre el panel en cuanto el menú termina de
+     cerrarse, así que lo que se escribe enseguida va a la caja del chat y el Intro lo envía; y «Notificaciones»
+     abre la campana.
   2. El panel entra por la derecha. En una tableta o un ordenador ocupa una columna al lado de la pantalla y la
      empuja: se puede seguir trabajando con el panel abierto. En un móvil tapa la pantalla, sobre un velo oscuro.
   3. Se cierra con la × «Cerrar», con la tecla Esc (esté donde esté el cursor, salvo en una ventana abierta encima
@@ -2467,7 +2468,9 @@ Pasos:
      pregunta, pero no se envía hasta que acaba esta.
   5. Si pregunta cómo se hace algo en ERPlora, qué significa una opción o qué incluye un plan («¿Cómo abro la caja?»),
      el asistente busca en la documentación de ERPlora (la ayuda, la de cada app y los planes) y contesta solo con lo
-     que dice, citando de qué sección sale; si la documentación no lo cubre, lo dice en lugar de inventarlo.
+     que dice, y termina la respuesta con una línea «Fuente: …» que nombra la sección de la que sale (sus títulos o, si
+     no los tiene, su ruta), para que la persona pueda comprobarla y leer más; si la documentación no lo cubre, lo dice
+     en lugar de inventarlo.
   6. Si el asistente acaba sin decir nada, la burbuja dice «(sin respuesta)».
   7. «Detener» corta lo que faltaba: lo ya escrito se queda, con «Detenido.» debajo.
   8. Bajo cada respuesta terminada, «Leer en voz alta» la lee con la voz del dispositivo, si la tiene, y «Dejar de
@@ -3698,9 +3701,12 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   esquema acepta) y el turno lee esa respuesta (`prepared_docs`, `searched_docs`); fuera de un turno pregunta en el
   momento. Lo que la pasarela no contesta (409 sin proveedor, 503, 429, una respuesta que no es el contrato, sin red)
   es 503 `base.assistant_unavailable`, «Ahora no se puede buscar en la documentación de ERPlora.», que el modelo
-  cuenta: nunca fragmentos inventados. Las instrucciones mandan contestar el «cómo se hace» solo con lo que devuelve,
-  citando la sección, y decir que la documentación no lo cubre si no devuelve nada; la regla de no inventar un
-  registro sigue. Su pantalla de recibo es `help` («Ayuda»; el chat solo pinta recibos de escrituras). Necesita la
+  cuenta: nunca fragmentos inventados. Cada extracto vuelve con su `cite`, la línea con la que la respuesta lo cita,
+  escrita por el Hub en el idioma de la persona: «Fuente: <heading>» (`pgettext("assistant answer", "Source")`), o su
+  `path` si no trae títulos (hub#1079: la respuesta daba los pasos sin nombrar ningún extracto). Las instrucciones
+  mandan contestar el «cómo se hace» solo con lo que devuelve y terminar la respuesta con el `cite` de cada extracto
+  usado, al menos uno, tal cual y en su propia línea, y decir que la documentación no lo cubre si no devuelve nada; la
+  regla de no inventar un registro sigue. Su pantalla de recibo es `help` («Ayuda»; el chat solo pinta recibos de escrituras). Necesita la
   puerta de ERPlora/saas#178 desplegada: sin ella contesta 503. Tests: `base/tests/test_queries_docs_search.py`,
   `test_assistant.py` (catálogo, `ALWAYS`, instrucciones, «Ayuda») y `test_api_assistant.py` (el turno, y que la
   pasarela se espera fuera de su transacción).

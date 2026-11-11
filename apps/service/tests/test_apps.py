@@ -126,8 +126,10 @@ def test_navigation_is_the_three_tabs_of_the_old_module_with_registered_icons():
 
 def test_every_operation_is_a_tool_of_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: the operation's
-    # permission is its only door. A command says its risk; a read has none.
-    from live.operations import registry
+    # permission is its only door. A command says its risk; a read has none. A tool says what a
+    # person types to ask for it, in both languages (live.E020: Services is listed in
+    # LIVE_ASSISTANT_ASKS_REQUIRED, hub#1104).
+    from live.operations import AI, MIN_ASKS, registry
 
     operations = [op for name, op in registry.items() if name.startswith("service.")]
     # 45 + the service's image (SERVICE-F34, F35): set_image, upload_image, suggest_image
@@ -136,6 +138,10 @@ def test_every_operation_is_a_tool_of_the_assistant():
     for op in operations:
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
+        if isinstance(op.ai_spec(), AI):
+            expected |= {"asks"}
+            said = {language: len(op.ai.get("asks", {}).get(language, ())) for language in ("en", "es")}
+            assert min(said.values()) >= MIN_ASKS, (op.name, said)
         assert set(op.ai) == expected, op.name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, op.name

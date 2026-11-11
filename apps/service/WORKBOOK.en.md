@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c02e31200ce5fe03a4af33c1b4a6fdc295420d1508357a4dfe42825efbe83178 -->
+<!-- generated from WORKBOOK.md sha256:96e08969ef96de22b345990104f3fc7cb3f7277084f01db9b38a6df31b984bc4 -->
 
 ## What it is for and who it is for
 
@@ -220,7 +220,9 @@ Steps:
 4. Choose the Tax category (they are the ones of Taxes, by their name and their rate; the one of the
    Settings comes chosen if there is one). Without it **Create service** cannot be tapped; nor while the
    business has not yet said its currency, because the price is read in it (without it, "1500" yen would be
-   saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+   saved as 150,000); until then, leaving the price keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and
+   as soon as the currency arrives they are read in it (hub#945).
+   If the currency cannot be read, the window says so ("The business's currency could not be read", with the
    reason) and offers "Retry", which asks for it again; as soon as it arrives, **Create service** lights up (hub#938).
 5. Tap **Create service**: the form closes and the service shows in the table as **Active**.
 In: the categories of Services and the active tax categories of Taxes.
@@ -273,7 +275,7 @@ Involved: SALE-F09
 
 ### SERVICE-F04 Archive a service
 Status: done
-Actor: owner, administrator
+Actor: owner, administrator, assistant
 Screen: Services
 Steps:
 1. In the service's row tap **Archive**.
@@ -294,7 +296,7 @@ Involved: APPOINTMENT-F01, APPOINTMENT-F26
 
 ### SERVICE-F05 See and restore the archived services
 Status: done
-Actor: manager
+Actor: manager, assistant
 Screen: Services
 Steps:
 1. In **Filters**, choose **Archived** in Status and tap **Apply**: the table shows only the archived ones.
@@ -430,7 +432,8 @@ redeemed."; a repeated service, an archived one or one that does not exist; an u
 amount, below its field; a name another live voucher already has, "There is already a package with that
 name. Pick another name.". "Create package" (and "Save changes" when editing it, SERVICE-F13) is grey while
 the business has not yet said its currency, because the closed price and the discount are read in it
-(without it, "1500" yen would be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+(without it, "1500" yen would be saved as 150,000); until then, leaving the closed price or the discount keeps it as
+typed, without inventing decimals for it or judging it: "¥9500" or "7,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, the button lights up (hub#938).
 Involved: SERVICE-F14, SERVICE-F22
 
@@ -494,7 +497,7 @@ Involved: SERVICE-F14, SERVICE-F28, CUSTOMER-F01
 
 ### SERVICE-F16 See who has bought a voucher
 Status: done
-Actor: employee, manager
+Actor: employee, manager, assistant
 Screen: Packages
 Steps:
 1. In the voucher's row tap **Sold vouchers** (for a deleted one, with Status on **Deleted**).
@@ -549,7 +552,7 @@ Involved: SERVICE-F16, SERVICE-F20
 
 ### SERVICE-F19 See a voucher's movements
 Status: done
-Actor: employee, manager
+Actor: employee, manager, assistant
 Screen: Packages
 Steps:
 1. In the voucher's row tap **Movements**.
@@ -802,7 +805,7 @@ price; their main service only changes if it is said.
 If it fails: inside the section, "That staff member does not exist in this business.", a name that fits
 several (the list to choose from) or the amount unreadable or negative. **Assign** is off while the
 business has not yet said its currency: the own price is read in it, and without it "1500" yen would be
-saved as 150,000; if it cannot be read, "Editing service" says so at the top ("The business's currency
+saved as 150,000 (leaving the own price keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945)); if it cannot be read, "Editing service" says so at the top ("The business's currency
 could not be read", with the reason) and offers "Retry"; as soon as it arrives, **Assign** lights up
 (hub#946). While the list arrives it shows
 "Loading…"; if it cannot be read, "The professionals could not be loaded." with the reason and

@@ -25,8 +25,8 @@ Al registrarlos, cambiar a la vez `apps.py` (`icon` y `navigation`), `frontend/t
   `customer`, `sale`, `invoice`). Ya están pedidas en `apps/sale/UI-REQUESTS.md` e
   `apps/invoice/UI-REQUESTS.md` («Tabla de servidor viva»; en el registro, `cart_checkout:`, `combo:`,
   `tax:` y `kitchen:ui-live-server-table`).
-- **Dinero**: `frontend/lib/money.ts` (leer lo que se teclea, sin adivinar un «1.250») y
-  `frontend/components/MoneyInput.vue`. Es la misma pieza que piden `cash_register:ui-money-format`,
-  `cart_checkout:ui-money-reader` y `combo:ui-money-reader`.
+- **Dinero**: llegó (hub#924, parte 2): «Nuevo pago» usa el `MoneyInput` de `@erplora/ui/components` y la
+  página y la ventana leen con `parseMoney(text, { money })`; la copia de la app (`frontend/lib/money.ts` y
+  `frontend/components/MoneyInput.vue`) se borró.
 
 Cuando lleguen a `@erplora/ui`, se borran de aquí con sus tests.
