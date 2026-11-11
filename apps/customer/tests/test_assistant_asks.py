@@ -17,6 +17,7 @@ from apps.customer.schemas import MergeIn
 from base import assistant
 from base.models import Membership
 from base.permissions import permissions_for
+from base.tests.test_assistant_asks import assert_its_asks_bring
 
 from .conftest import ctx_for
 
@@ -84,6 +85,45 @@ def test_a_customers_orders_bring_the_tool_of_customers_with_room_to_spare(catal
     assert name in tools  # positive control: the role holds the tool, so its place is known
     offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
     assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:WITH_ROOM])
+
+
+#: A customer's orders in words that are no ask nor probe and that only their tool's asks bring among the first ten,
+#: one per tool and language: the phrases above come by name too (without ``customer.order.customer``'s asks, the
+#: Spanish and the English one still come 7th or before), so a change to the asks is seen here (hub#1135). With its
+#: asks, each is 4th to 5th for the owner and the manager; without them, 12th to 28th.
+OWN_WORDS = [
+    ("en", "customer.order.list", "what has Ana ordered so far?"),
+    ("es", "customer.order.list", "¿qué pedidos ha hecho Ana?"),
+    ("en", "customer.order.customer", "tell me whose order this is"),
+    ("es", "customer.order.customer", "¿a nombre de quién va este pedido?"),
+]
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.MANAGER])
+@pytest.mark.parametrize(("language", "name", "phrase"), OWN_WORDS)
+def test_a_customers_orders_in_the_persons_own_words_reach_their_tool_by_its_asks(
+    catalog_of, role, language, name, phrase
+):
+    assert_its_asks_bring(catalog_of(role, language), name, phrase, language)
+
+
+@pytest.mark.django_db
+def test_a_phrase_that_says_nothing_of_the_asks_is_refused_as_a_persons_own_words(catalog_of):
+    """Positive control of ``assert_its_asks_bring``: a probe of layer 2, an ask with a word added, a phrase that
+    brings ``customer.order.customer`` by name alone («which customer is this order for?», ``ORDER_PHRASES``: 4th
+    with its asks, 7th without them) and one of another matter that does not bring it at all measure nothing of its
+    asks, and each is refused for what it is."""
+    tools = catalog_of(Membership.Role.OWNER, "en")
+    probe = "¿a qué cliente pertenece la Cuenta QA que está abierta en el TPV?"
+    with pytest.raises(AssertionError, match="it is a probe of layer 2"):
+        assert_its_asks_bring(tools, "customer.order.customer", probe, "en")
+    with pytest.raises(AssertionError, match="it is an ask but for a word"):
+        assert_its_asks_bring(tools, "customer.order.customer", "who's on this order now?", "en")
+    with pytest.raises(AssertionError, match="it comes without its asks"):
+        assert_its_asks_bring(tools, "customer.order.customer", "which customer is this order for?", "en")
+    with pytest.raises(AssertionError, match="its asks do not bring it"):
+        assert_its_asks_bring(tools, "customer.order.customer", "what's the weather like in Madrid?", "en")
 
 
 #: A merge asked by the two phones, in words that are none of its ``asks``: the Spanish one is the phrase of the

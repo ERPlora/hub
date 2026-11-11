@@ -213,6 +213,21 @@ def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operat
     return {**tools, name: dataclasses.replace(op, ai=dataclasses.replace(op.ai_spec(), asks={}))}
 
 
+def assert_its_asks_bring(tools: dict[str, Operation], name: str, phrase: str, language: str) -> None:
+    """That ``phrase``, in a person's own words (no probe of layer 2, no ask of tool ``name`` nor one but for a word),
+    brings ``name`` among the first ``TOP`` by its asks: with them it is there, ``without_its_asks`` it is not. The
+    test of an app that calls it for each of its tools sees any change to their asks (hub#1135, hub#1165)."""
+    assert name in tools  # positive control: the person holds the tool, so its place is known
+    assert comparable(phrase) not in probe_phrases(), "it is a probe of layer 2"
+    said = [ask for asks in shared.asks_of(tools[name]).values() for ask in asks if alike(ask, phrase)]
+    assert not said, ("it is an ask but for a word at most", said)
+    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
+    place = offered.index(name) + 1 if name in offered else None
+    assert name in offered[:TOP], ("its asks do not bring it", place, offered[:TOP])
+    unasked = [op.name for op in assistant.relevant(without_its_asks(tools, name), [phrase], language)]
+    assert name not in unasked[:TOP], ("it comes without its asks", unasked.index(name) + 1)
+
+
 def near_copies(asks: dict[str, tuple[str, ...]], probes: Iterable[dict]) -> list[tuple[str, str, str]]:
     """The asks (of each tool, in ``asks``) that are a probe of their own tool but for one word (``alike``), as (tool,
     ask, probe): layer 2 compares a probe with the asks of its tool only, so another tool's phrase one word off is

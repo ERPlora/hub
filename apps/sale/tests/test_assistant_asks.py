@@ -14,7 +14,7 @@ from live.operations import registry
 
 from apps.sale.tests.conftest import ctx_for
 from base import assistant
-from base.tests.test_assistant_asks import TOP, alike, comparable, probe_phrases, without_its_asks
+from base.tests.test_assistant_asks import assert_its_asks_bring
 
 LANGUAGES = ("en", "es")
 #: The phrases of sale's tools put to the turn at least, both languages together: a silent drop of asks fails.
@@ -106,14 +106,7 @@ OWN_WORDS = [
 @pytest.mark.django_db
 @pytest.mark.parametrize(("language", "name", "phrase"), OWN_WORDS)
 def test_a_voucher_undone_in_the_persons_own_words_reaches_its_tool_by_its_asks(language, name, phrase):
-    tools = assistant.catalog(ctx_for("hub_owner", language=language))
-    assert name in tools  # positive control: the owner holds it, so its place is known
-    assert comparable(phrase) not in probe_phrases()
-    assert not [ask for said in asks_of(tools[name]).values() for ask in said if alike(ask, phrase)]
-    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
-    assert name in offered[:TOP], (offered.index(name) + 1 if name in offered else None, offered[:TOP])
-    unasked = [op.name for op in assistant.relevant(without_its_asks(tools, name), [phrase], language)]
-    assert name not in unasked[:TOP]  # what brings it is its asks, so a change to them is seen here
+    assert_its_asks_bring(assistant.catalog(ctx_for("hub_owner", language=language)), name, phrase, language)
 
 
 def test_no_qa_probe_is_an_ask():
