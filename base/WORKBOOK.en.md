@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9f609d294750885203d87b37b19401701cd0ff2d45e8d7f932e8127d93be5b94 -->
+<!-- generated from WORKBOOK.md sha256:7e446edad986302c017881f162ffdf62d23540abfbcec4fd884217ccef8d3fbc -->
 
 ## What it is for and who it is for
 
@@ -520,11 +520,11 @@ Steps:
      or the menu); a window that cannot be closed that way stays, and one that holds something typed and
      not saved and asks for it (when creating and editing a product in Inventory and in the create and edit windows of Sales, Tables, Kitchen, Customers, Reservations, Appointments, Staff, Services, Time clock, Cart & Checkout, Cash register, Menus and combos, Modifiers, Payments, Price Lists, Invoicing, Printing, Schedule, Tasks, Taxes and the WhatsApp Inbox, in Inventory's category and stock windows and in "New API key", in the cancellation-reason windows of Online bookings, Payments, Printing, Reservations, Services, VeriFactu and Kitchen (cancelling a ticket), in the reason for "Discard" on a failed event in System, in "New folder" and "Rename" in Files, in the product-import steps, in the Task and Project sheets and in quick customer creation at the till) asks first "Discard
      changes?": "Keep editing", or back again, leaves it as it was, and "Discard changes" closes it
-     (hub#1015, hub#1020, hub#1031, hub#1046). Those same windows ask the same question when "Cancel", the "×" or
-     Escape is pressed and on a tap outside, on the phone and on the computer, and with nothing typed they close
-     without asking (hub#1023, hub#1156); not yet the Task and Project sheets nor quick customer creation at the till
-     (hub#1233), nor Cash register's open shift, cash in or out, count and close windows (hub#1234), which only ask with
-     the back button. With nothing open, on a record or a new one it does the same as "Back"; on the main screen
+     (hub#1015, hub#1020, hub#1031, hub#1046). Those same windows ask the same question when "Cancel", "Close", the
+     "×" or Escape is pressed and on a tap outside, on the phone and on the computer, and with nothing typed they close
+     without asking (hub#1023, hub#1156; the Task and Project sheets and quick customer creation at the till,
+     hub#1233); not yet Cash register's open shift, cash in or out, count and close windows (hub#1234), which only
+     ask with the back button. With nothing open, on a record or a new one it does the same as "Back"; on the main screen
      of an app it goes back to the Home, also when that screen was reached through a link; and on the Home
      it sends the app to the background.
 In: the apps of the person's menu (the same as the bar's "My apps" button).
