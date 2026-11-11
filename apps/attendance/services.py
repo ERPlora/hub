@@ -260,6 +260,18 @@ def _end_break(ctx: OperationContext, record: Record, at: dt.datetime) -> bool:
     output=RecordOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "clock me in",
+                "clock Pedro in now",
+                "I've just arrived, start my working day",
+            ),
+            "es": (
+                "fíchame la entrada",
+                "ficha la entrada de Pedro",
+                "acabo de llegar, empieza mi jornada",
+            ),
+        },
         "description": "Clocks in («clock me in», «ficha la entrada de Ana»): opens the working day of the "
         "caller, or of the person named, at the server's time. Refused when the person already has an "
         "open day or, from a personal device, when it is outside the workplace radius.",
@@ -321,6 +333,18 @@ def clock_in(ctx: OperationContext, data: ClockInIn) -> dict:
     output=RecordOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "clock me out",
+                "clock Pedro out now",
+                "I'm leaving, end my working day",
+            ),
+            "es": (
+                "fíchame la salida",
+                "ficha la salida de Pedro",
+                "me voy a casa, termina mi jornada",
+            ),
+        },
         "description": "Clocks out («clock me out», «ficha la salida de Ana»): closes the open working day "
         "of the caller, or of the person named, at the server's time, ending the running break. Never "
         "blocked by the location.",
@@ -360,6 +384,18 @@ def clock_out(ctx: OperationContext, data: ClockOutIn) -> dict:
     output=RecordOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "I'm going on my lunch break",
+                "put Luis on a break",
+                "start a break for me",
+            ),
+            "es": (
+                "me voy a comer, empieza mi pausa",
+                "inicia una pausa para Luis",
+                "empiezo un descanso",
+            ),
+        },
         "description": "Starts a break inside the open working day of the caller, or of the person named "
         "(«I'm going on a break»).",
         "risk": "normal",
@@ -398,6 +434,18 @@ def start_break(ctx: OperationContext, data: BreakIn) -> dict:
     output=RecordOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "I'm back from my break",
+                "end Luis's break",
+                "back to work after lunch",
+            ),
+            "es": (
+                "ya he vuelto de la pausa",
+                "termina el descanso de Luis",
+                "vuelvo de comer, acaba mi pausa",
+            ),
+        },
         "description": "Ends the running break of the caller, or of the person named («I'm back»).",
         "risk": "normal",
     },
@@ -473,6 +521,18 @@ def _correct(
     output=RecordOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "correct Ana's clock-out on Monday to 6 pm",
+                "Pedro clocked in at 9 yesterday, fix his day",
+                "fix Marta's wrong clock-in with the reason «forgot to clock»",
+            ),
+            "es": (
+                "corrige la salida de Ana del lunes a las 18:00",
+                "Pedro entró ayer a las 9, arregla su fichaje",
+                "arregla el fichaje mal hecho de Marta con el motivo «se olvidó de fichar»",
+            ),
+        },
         "description": "Corrects the clock-in and clock-out of a working day with a mandatory reason (the "
         "day's history keeps the before, the after, the reason and who). Without a clock-out the day is "
         "open again. Refused when the hours overlap another day of the same person. This rewrites the "
@@ -535,6 +595,18 @@ REQUIRED_SETTINGS = ("require_location", "geofence_radius_m", "auto_close_after_
     output=SettingsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "ask for the location when someone clocks in from their own phone",
+                "set the allowed radius to 500 metres",
+                "flag forgotten days after 10 hours",
+            ),
+            "es": (
+                "exige estar en el local para fichar desde el teléfono",
+                "cambia el radio permitido a 500 metros",
+                "cambia a 10 horas el aviso de jornada olvidada",
+            ),
+        },
         "description": "Changes the time clock settings (only the fields sent): whether a personal device "
         "must be within the workplace radius to clock in, the radius, the workplace coordinates and after "
         "how many hours a forgotten day is flagged for review.",
@@ -574,6 +646,18 @@ def update_settings(ctx: OperationContext, data: SettingsIn) -> dict:
     input=EmptyIn,
     output=ReviewOut,
     ai={
+        "asks": {
+            "en": (
+                "flag the forgotten clock-outs for review",
+                "check now for days nobody closed",
+                "mark the working days left open too long",
+            ),
+            "es": (
+                "marca para revisar las jornadas que nadie cerró",
+                "revisa si alguien se olvidó de fichar la salida",
+                "señala las jornadas abiertas desde hace demasiado",
+            ),
+        },
         "description": "Flags for review every working day still open after the hours of the settings "
         "(a forgotten clock-out). It never invents a clock-out. The scheduled task runs it every 15 minutes.",
         "risk": "normal",
@@ -592,6 +676,18 @@ def review_stale(ctx: OperationContext, data: EmptyIn) -> dict:
     input=TerminatedIn,
     output=ClosedOut,
     ai={
+        "asks": {
+            "en": (
+                "close the open day of the person I just terminated",
+                "Luis no longer works here: close his open clock-in",
+                "we let Ana go: close the working day she left open",
+            ),
+            "es": (
+                "cierra la jornada abierta de quien acabo de despedir",
+                "Luis ya no trabaja aquí, cierra su fichaje abierto",
+                "termina el día que dejó abierto la empleada que se fue",
+            ),
+        },
         "description": "Closes, at this moment and with a correction of the system, the open working day of "
         "a staff member who was terminated in Staff (its reaction to staff.member.terminated).",
         "risk": "normal",

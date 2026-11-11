@@ -408,6 +408,18 @@ def business_date(instant: dt.datetime) -> dt.date:
     output=CurrentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how long have I worked today?",
+                "am I clocked in right now?",
+                "show me my working day so far",
+            ),
+            "es": (
+                "¿cuánto llevo trabajado hoy?",
+                "¿estoy fichado ahora?",
+                "¿cómo va mi jornada?",
+            ),
+        },
         "description": "Your working day today («my day», «am I clocked in?»): your staff record, whether "
         "you are clocked in or on a break and since when, today's worked and break time and your last "
         "ten days."
@@ -469,6 +481,18 @@ def current(ctx: OperationContext, params: EmptyIn) -> dict:
     output=RecordPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "list this week's clock-ins",
+                "show Luis's working days in October",
+                "which days did Carmen clock in this month?",
+            ),
+            "es": (
+                "lista los fichajes de esta semana",
+                "muéstrame las jornadas de Luis en octubre",
+                "¿qué días ha fichado Carmen este mes?",
+            ),
+        },
         "description": "Lists working days (clock-in, clock-out, breaks, worked time, status) with filters "
         "by person (id or name), dates and status, «mine» for your own; an employee only sees their own."
     },
@@ -492,6 +516,18 @@ def list_records(ctx: OperationContext, params: RecordListIn) -> dict:
     output=RecordDetailOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me Ana's working day on Monday with its breaks",
+                "where did Pedro clock in from yesterday?",
+                "who clocked Marta's day today?",
+            ),
+            "es": (
+                "enséñame la jornada de Ana del lunes con sus pausas",
+                "¿desde dónde fichó Pedro ayer?",
+                "¿quién fichó el día de Marta hoy?",
+            ),
+        },
         "description": "One working day with its breaks, where it was clocked from and who clocked it; "
         "someone else's only for whoever sees the team or corrects days."
     },
@@ -564,6 +600,18 @@ def _flag(value: bool | None) -> str:
     output=ExportOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "export this month's clock-ins to CSV",
+                "download October's working days for the labour inspection",
+                "give me last week's working days as a CSV",
+            ),
+            "es": (
+                "exporta los fichajes del mes en CSV",
+                "descarga las jornadas de octubre para la inspección de trabajo",
+                "saca en CSV las jornadas de la semana pasada",
+            ),
+        },
         "description": "Exports the working days of the filter (every page) as a CSV for the accountant or a "
         "labour inspection: date, person, clock-in, clock-out, break and worked minutes, status and "
         "whether it was clocked within the workplace radius. An employee exports only their own."
@@ -608,6 +656,18 @@ def export_records(ctx: OperationContext, params: RecordExportIn) -> dict:
     output=CorrectionPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "who corrected Ana's working day?",
+                "show me this week's corrections of clock-ins",
+                "what was changed in yesterday's clock-in and why?",
+            ),
+            "es": (
+                "¿quién corrigió la jornada de Ana?",
+                "muéstrame las correcciones de fichajes de esta semana",
+                "¿qué se cambió en el fichaje de ayer y por qué?",
+            ),
+        },
         "description": "The history of corrections of a working day (or of all of them): the times before "
         "and after, the reason, who and when, newest first. An employee sees the history of their own days."
     },
@@ -647,6 +707,18 @@ def present_records() -> QuerySet:
     output=PresencePage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "who is clocked in right now?",
+                "who is on a break at the moment?",
+                "tell me who is still working and since when",
+            ),
+            "es": (
+                "¿quién está fichado ahora mismo?",
+                "¿quién está en pausa en este momento?",
+                "dime quién sigue trabajando y desde qué hora",
+            ),
+        },
         "description": "Who is clocked in right now («who is in?»): how many and who, since when and whether "
         "they are on a break. A day waiting for review does not count."
     },
@@ -678,6 +750,18 @@ def list_presence(ctx: OperationContext, params: PresenceListIn) -> dict:
     output=PresenceCountOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how many are in right now?",
+                "how many people have clocked in and are still here?",
+                "count who is clocked in now",
+            ),
+            "es": (
+                "¿cuántos hay fichados ahora?",
+                "¿cuánta gente está dentro en este momento?",
+                "número de fichados ahora mismo",
+            ),
+        },
         "description": "How many people are clocked in right now («how many are in?»), the Home's «Clocked in "
         "now». A day waiting for review does not count; for who they are, attendance.presence.list."
     },
@@ -707,6 +791,18 @@ def person_out(member: Member) -> dict:
     output=PersonPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "whose clock-ins can I see?",
+                "list the people of the time clock",
+                "find Marta in the time clock",
+            ),
+            "es": (
+                "¿de quién puedo ver los fichajes?",
+                "lista la gente del control horario",
+                "busca a Marta en el control horario",
+            ),
+        },
         "description": "The people whose working days can be listed: every staff record that is not "
         "terminated, and the terminated ones that have days (kept four years). Search by name."
     },
@@ -727,6 +823,18 @@ def list_people(ctx: OperationContext, params: PersonListIn) -> dict:
     output=PersonOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "is Marta still active in the time clock?",
+                "give me Luis's details in the time clock",
+                "was Pedro terminated? check the time clock",
+            ),
+            "es": (
+                "¿sigue activa Marta en el control horario?",
+                "dame la ficha de Luis en el control horario",
+                "¿está dado de baja Pedro en el control horario?",
+            ),
+        },
         "description": "One person of the time clock by id, as the «Person» filter names them: their name and "
         "the staff record's status. Your own for whoever clocks; anyone for whoever sees the team, clocks others "
         "or corrects days."
@@ -751,6 +859,18 @@ def person_detail(ctx: OperationContext, params: PersonRefIn) -> dict:
     output=SettingsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what radius does the time clock allow?",
+                "does clocking in from a phone ask for the location?",
+                "after how many hours is a forgotten day flagged?",
+            ),
+            "es": (
+                "¿qué radio permite el control horario?",
+                "¿se pide la ubicación al fichar con el móvil?",
+                "¿tras cuántas horas se revisa un día olvidado?",
+            ),
+        },
         "description": "The time clock settings: whether a personal device must share its location and be "
         "within the workplace radius to clock in, the radius, the workplace and after how many hours a "
         "forgotten day is flagged for review."
