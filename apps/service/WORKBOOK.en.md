@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:bdc0e9f4130b2694a234e3a8a76969fce73201f15d10bd7b24896397170afa2f -->
+<!-- generated from WORKBOOK.md sha256:96e08969ef96de22b345990104f3fc7cb3f7277084f01db9b38a6df31b984bc4 -->
 
 ## What it is for and who it is for
 
@@ -275,7 +275,7 @@ Involved: SALE-F09
 
 ### SERVICE-F04 Archive a service
 Status: done
-Actor: owner, administrator
+Actor: owner, administrator, assistant
 Screen: Services
 Steps:
 1. In the service's row tap **Archive**.
@@ -296,7 +296,7 @@ Involved: APPOINTMENT-F01, APPOINTMENT-F26
 
 ### SERVICE-F05 See and restore the archived services
 Status: done
-Actor: manager
+Actor: manager, assistant
 Screen: Services
 Steps:
 1. In **Filters**, choose **Archived** in Status and tap **Apply**: the table shows only the archived ones.
@@ -497,7 +497,7 @@ Involved: SERVICE-F14, SERVICE-F28, CUSTOMER-F01
 
 ### SERVICE-F16 See who has bought a voucher
 Status: done
-Actor: employee, manager
+Actor: employee, manager, assistant
 Screen: Packages
 Steps:
 1. In the voucher's row tap **Sold vouchers** (for a deleted one, with Status on **Deleted**).
@@ -552,7 +552,7 @@ Involved: SERVICE-F16, SERVICE-F20
 
 ### SERVICE-F19 See a voucher's movements
 Status: done
-Actor: employee, manager
+Actor: employee, manager, assistant
 Screen: Packages
 Steps:
 1. In the voucher's row tap **Movements**.
