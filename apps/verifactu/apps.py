@@ -197,21 +197,8 @@ class VerifactuConfig(LiveAppConfig):
 
     def fiscal_record_states(self, conn) -> dict:
         """hub#1205: the platform asks (``base.tenancy.restore``) before it puts a business's database back as it was
-        at a moment, in its database and in the copy: what each production record says of its life at the AEAT (its
-        status, when it was sent, when it last changed), by id; nothing where the app was never set up. ``conn`` is a
-        direct connection to one of them (both are closed to the app and the copy has no alias), so it is read by its
-        own SQL over the model's names, never the ORM. Only the AEAT's production counts: its test environment files
-        nothing."""
-        from psycopg import sql
+        at a moment, in its database and in the copy, through ``conn``, a direct connection to one of them: what each
+        production record says of its life at the AEAT, by id (``queries.record_states``)."""
+        from apps.verifactu import queries  # the models are not loaded yet when this module is
 
-        from apps.verifactu.models import Environment, Record  # the models are not loaded yet when this module is
-
-        table = Record._meta.db_table
-        if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
-            return {}
-        read, where = ("id", "status", "transmitted_at", "updated_at"), "environment"
-        columns = {field: sql.Identifier(Record._meta.get_field(field).column) for field in (*read, where)}
-        query = sql.SQL("SELECT {} FROM {} WHERE {} = %s").format(
-            sql.SQL(", ").join(columns[field] for field in read), sql.Identifier(table), columns[where]
-        )
-        return {row[0]: tuple(row[1:]) for row in conn.execute(query, [Environment.PRODUCTION])}
+        return queries.record_states(conn)
