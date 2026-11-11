@@ -89,12 +89,13 @@ async function issue(): Promise<void> {
 }
 
 // Once the rectifying invoice is issued the window only shows it: nothing typed is left unsaved.
-useUnsavedFormOnOpen('invoice-rectify', () => ({ reason: reason.value, type: type.value }), () => open.value && !done.value);
+const canDismiss = useUnsavedFormOnOpen('invoice-rectify', () => ({ reason: reason.value, type: type.value }), () => open.value && !done.value);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="invoice-rectify"
     role="alertdialog"
     submit-color="danger"

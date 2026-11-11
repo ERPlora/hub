@@ -108,13 +108,13 @@ describe('RectifyModal', () => {
 describe('RectifyModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
   it('as opened closes; a reason or a type asks; restored as opened closes again', async () => {
     const s = await setup();
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('invoice-rectify'),
       change: () => ionValue(s.reason(), 'Wrong price', 'ionInput'),
       restore: () => ionValue(s.reason(), '', 'ionInput'),
     });
-    await expectUnsavedFormOnAndroidBack({
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('invoice-rectify'),
       change: () => ionValue(s.type(), 'R4'),
       restore: () => ionValue(s.type(), 'R1'),

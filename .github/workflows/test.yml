@@ -1,8 +1,8 @@
 name: test
 
 # The tests of every push (ci.yml on any branch but main and pre; deploy.yml on main and pre before
-# it deploys), in three jobs that run side by side: python (pytest over Postgres, spread over the
-# runner's CPUs with pytest-xdist), frontend (the SPA's lint, typecheck, Vitest and build) and
+# it deploys), in three jobs that run side by side: python (pytest over Postgres, in a matrix of shards,
+# each spread over its runner's CPUs with pytest-xdist), frontend (the SPA's lint, typecheck, Vitest and build) and
 # scripts (workflow and script lints and the script tests). The job `test` waits for the three: called
 # as the job `test`, its check is "test / test", the one main and pre require.
 
@@ -13,9 +13,18 @@ permissions:
   contents: read
 
 jobs:
+  # pytest in shards (hub#1185): the suite grows every day and GitHub's runners take from 18 to 29 min over the same
+  # commit, so a single job of 30 minutes was cut without a failing test, PRs and main's deploy with it. Each job of
+  # the matrix runs its share (.github/scripts/pytest-shard.sh, from the job's index and the matrix's size, so the
+  # shards always cover the whole suite) and warns past 20 minutes: then the matrix gets another shard. A failing shard
+  # cancels none of the others, so every failure shows; "test / test" needs them all.
   python:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     permissions:
       contents: read
     services:
@@ -52,7 +61,7 @@ jobs:
       # cache, one entry per runner image and per version of this file (where the package list is), so a run installs
       # them without Ubuntu's mirror: a DNS outage of the mirror kept every run red for hours (hub#1222). Without the
       # cache, apt-install.sh downloads them, retrying the mirror, and they are saved right away: the end of the job
-      # would only save them once every test passed, 20 to 30 minutes later.
+      # would only save them once every test of the shard passed, minutes later.
       - name: The runner image
         id: runner-image
         run: echo "version=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
@@ -99,8 +108,13 @@ jobs:
           cache-dependency-glob: uv.lock
       # --locked: uv.lock must match pyproject.toml.
       - run: uv sync --locked
-      # One xdist worker per vCPU of the runner (4), each on its own test database.
-      - run: uv run --locked pytest -q -n 4
+      # This job's shard, with one xdist worker per vCPU of the runner (4), each on its own test database, and its
+      # slowest tests at the end of the log.
+      - name: pytest, this job's shard of the suite
+        env:
+          SHARD_INDEX: ${{ strategy.job-index }}
+          SHARD_TOTAL: ${{ strategy.job-total }}
+        run: bash .github/scripts/pytest-shard.sh "$SHARD_INDEX" "$SHARD_TOTAL" 20 -q -n 4 --durations=20
 
   frontend:
     runs-on: ubuntu-24.04

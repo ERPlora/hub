@@ -214,3 +214,61 @@ describe('hub#1020 — useUnsavedForm: the current fields against those the wind
     m.wrapper.unmount();
   });
 });
+
+// hub#1156 · BASE-F05 — the form windows ask on their own ways out too: `useUnsavedForm` and `useUnsavedFormOnOpen`
+// give back the same question as `useUnsavedChanges`, the `canDismiss` each window hands its FormModal. As opened (or
+// restored as opened) it lets the window close at once; with something typed it asks «Discard changes?».
+describe('hub#1156 — useUnsavedForm and useUnsavedFormOnOpen give back the window’s `canDismiss`', () => {
+  it('useUnsavedForm: as opened it lets the window close at once; changed, it asks and «Keep editing» keeps it', async () => {
+    const shown = shownWindow();
+    const current = ref({ name: '' });
+    const original = ref({ name: '' });
+    let canDismiss!: () => Promise<boolean>;
+    // eslint-disable-next-line vue/one-component-per-file
+    const Window = defineComponent({
+      setup() {
+        canDismiss = useUnsavedForm(() => shown.fields, current, original);
+        return () => h('p');
+      },
+    });
+    await mountBase(Window);
+    await expect(canDismiss()).resolves.toBe(true);
+    expect(question('Discard changes?')).toBeNull();
+
+    current.value = { name: 'Butchery' };
+    await flush();
+    const answer = canDismiss();
+    await flush();
+    button('Discard changes?', 'cancel')!.click();
+    await expect(answer).resolves.toBe(false);
+
+    current.value = { name: '' };
+    await flush();
+    await expect(canDismiss()).resolves.toBe(true);
+  });
+
+  it('useUnsavedFormOnOpen: as opened it lets the window close at once; changed, «Discard changes» lets it close', async () => {
+    const shown = shownWindow();
+    const open = ref(true);
+    const current = ref({ name: '' });
+    let canDismiss!: () => Promise<boolean>;
+    // eslint-disable-next-line vue/one-component-per-file
+    const Window = defineComponent({
+      setup() {
+        canDismiss = useUnsavedFormOnOpen(() => shown.fields, current, open);
+        return () => h('p');
+      },
+    });
+    await mountBase(Window, { locale: 'es' });
+    await flush();
+    await expect(canDismiss()).resolves.toBe(true);
+    expect(question('¿Descartar los cambios?')).toBeNull();
+
+    current.value = { name: 'Pescadería' };
+    await flush();
+    const answer = canDismiss();
+    await flush();
+    button('¿Descartar los cambios?', 'submit')!.click();
+    await expect(answer).resolves.toBe(true);
+  });
+});
