@@ -567,6 +567,19 @@ def test_the_read_that_names_them_is_no_tool_and_takes_one_record():
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.parametrize(("language", "said"), [("es", "Anulación de la venta {}"), ("en", "Void of sale {}")])
+def test_the_read_that_names_them_answers_in_the_readers_language(language, said, hub_a, no_fallback):
+    """Whatever language is active where it is asked from (a request in the other one, a nested call)."""
+    other = {"es": "en", "en": "es"}[language]
+    read = get("service.record.get")
+    with use_hub(hub_a):
+        till = a_till(hub_a, a_salon())
+        with translation.override(other):
+            named = read(person(hub_a, language=language), read.input.model_validate({"reference": str(till["voided"])}))
+    assert named.name == said.format(till["voided_number"])
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 def test_the_read_that_names_them_needs_the_right_to_see_the_vouchers(hub_a, no_fallback):
     read = get("service.record.get")
     with use_hub(hub_a), pytest.raises(PermissionDenied):
