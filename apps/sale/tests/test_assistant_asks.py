@@ -113,14 +113,15 @@ def test_the_reported_sales_request_offers_its_existing_operation(language, name
 
 #: Requests in words that are no ask nor probe, each brought among the first ten by its tool's asks and out of them
 #: without: undoing a line's voucher (``sale.order.remove_voucher``, whose asks no longer say the QA's «quita el bono de
-#: la línea» with one word changed, hub#1135), moving a section of the open price and correcting a quick note's text
-#: (hub#1183).
+#: la línea» with one word changed, hub#1135), and moving a section of the open price, changing its VAT or rewriting a
+#: quick note (hub#1183), one for each ask that brings the probe of ``LAYER_2``: without that ask alone it falls out.
 OWN_WORDS = [
     ("es", "sale.order.remove_voucher", "no lo uses en esta cuenta, mejor lo guarda"),
     ("en", "sale.order.remove_voucher", "she would rather not use it on the haircut"),
-    ("es", "sale.department.update", "los refrescos, que vayan los primeros entre las secciones"),
-    ("en", "sale.department.update", "the ice cream one should come first among the sections"),
-    ("es", "sale.quick_note.update", "corrige la de «sin gluten»: escribe «sin trigo»"),
+    ("es", "sale.department.update", "los refrescos, que vayan los primeros"),
+    ("es", "sale.department.update", "que las chuches tributen menos"),
+    ("es", "sale.quick_note.update", "que en la de los frutos secos diga «trazas»"),
+    ("es", "sale.quick_note.update", "en la de «sin trigo», escribe «sin harina»"),
     ("en", "sale.quick_note.update", "make the lactose one say dairy free instead"),
 ]
 

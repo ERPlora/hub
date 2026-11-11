@@ -443,7 +443,6 @@ def create_department(ctx: OperationContext, data: DepartmentIn) -> dict:
             "en": (
                 "move the drinks section to the standard VAT rate",
                 "rename the Misc section to Others",
-                "put the bakery section first",
             ),
             "es": (
                 "pon la sección de bebidas al IVA general",
