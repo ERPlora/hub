@@ -114,7 +114,9 @@ APP_WORDS = shared.app_words
 #: are Tasks' task and project (``task.task``, ``task.project``), and what one «comenta» its comment (``task.comment``),
 #: named by its phrases and never by the word: «comentario» shares its stem with «comensales», a table's guests; an
 #: «arqueo», a «recuento» or a «conteo» of the drawer is a count of Cash register's (``cash_register.count``), and the
-#: «moneda» or «divisa» of the business is its currency (``cash_register.currency``).
+#: «moneda» or «divisa» of the business is its currency (``cash_register.currency``); a «bono» (a voucher, a pack) is
+#: Services' voucher, the one of the catalogue (``service.package``) or the one sold to a customer (``service.grant``),
+#: and an «asignación» (what one «asigna») is a professional's assignment to a service (``service.assignment``).
 SYNONYMS = (
     ("cuenta", "check", "tab", "order"),
     ("ticket", "tique", "recibo", "receipt", "sale"),
@@ -133,6 +135,8 @@ SYNONYMS = (
     ),
     ("arqueo", "recuento", "conteo", "count"),
     ("divisa", "moneda", "currency"),
+    ("bono", "bonos", "voucher", "vouchers", "pack", "packs", "package", "packages", "grant", "grants"),
+    ("asignacion", "asignaciones", "assignment", "assignments"),
 )
 #: The help a how-to question asks for (``live.assistant.HOWTO_POINTS``): it ranks by being one, not only by ``ALWAYS``.
 HOWTO = (DOCS_SEARCH,)
