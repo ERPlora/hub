@@ -47,10 +47,13 @@ test('INVENTORY-F09: a CSV is checked first, its unknown tax text is asked for, 
   await expect(columns).toHaveCount(5);
   // The rehearsal of the whole file: 2 ready, 1 with a problem (its line and reason), 1 already there.
   const summary = preview.locator('[data-testid=inventory-import-summary]');
-  await expect(summary).toContainText(/2 (row\(s\) ready|fila\(s\) listas) · 1/);
+  await expect(summary).toContainText(/2 (rows ready|filas listas) · 1/);
   await expect(preview.locator('[data-testid=inventory-import-reason]')).toHaveCount(1);
   await expect(preview.locator('[data-testid=inventory-import-reason]')).toContainText(/(Line|Línea) 4/);
   await expect(preview.locator('[data-testid=inventory-import-skipped]')).toBeVisible();
+  // hub#1124: the one row already there is said in the singular, the two to import in the plural.
+  await expect(preview.locator('[data-testid=inventory-import-skipped]')).toHaveText(/^\s*1 (row already in the catalog will be skipped|fila que ya está en el catálogo se omitirá)\.\s*$/);
+  await expect(preview.locator('[data-testid=inventory-import-preview-submit]')).toHaveText(/^\s*(Import 2 products|Importar 2 productos)\s*$/);
   await page.screenshot({ path: shot('inventory-import-preview-1280') });
   await shootFlow(page, 'INVENTORY-F09');
   await preview.locator('[data-testid=inventory-import-preview-submit]').click();
@@ -112,7 +115,7 @@ test('INVENTORY-F06/F07/F10: a category is created, edited and deleted; a CSV of
     await page.locator(`ion-popover [data-testid=inventory-categories-row-${id}-delete]`).click();
   }
   const confirm = page.locator('ion-modal.ep-form-modal').filter({ hasText: /Delete and unlink|Eliminar y desvincular/ });
-  await expect(confirm).toContainText(/0 (product\(s\) will lose|producto\(s\) quedarán)/);
+  await expect(confirm).toContainText(/0 (products will lose|productos quedarán)/);
   await page.screenshot({ path: shot('inventory-category-delete-1280') });
   await shootFlow(page, 'INVENTORY-F07');
   await confirm.locator('.ep-form-modal__submit').click();

@@ -154,13 +154,13 @@
       "previewHint": "Dinos qué columna es cada cosa. No se crea nada hasta que confirmes.",
       "ignore": "No importar",
       "required": "{field} *",
-      "rowsTitle": "Primeras {n} filas de {total}",
+      "rowsTitle": "Primera fila de {total} | Primeras {n} filas de {total}",
       "checking": "Revisando el fichero entero…",
-      "summary": "{ready} fila(s) listas · {failed} con problemas",
-      "skippedNote": "{n} fila(s) que ya están en el catálogo se omitirán.",
+      "summary": "{ready} fila lista · {failed} con problemas | {ready} filas listas · {failed} con problemas",
+      "skippedNote": "{n} fila que ya está en el catálogo se omitirá. | {n} filas que ya están en el catálogo se omitirán.",
       "lineReason": "Línea {line}: {reason}",
       "missingRequired": "Asigna las columnas de Nombre y SKU: sin ellas no se puede crear ningún producto.",
-      "confirm": "Importar {n} producto(s)",
+      "confirm": "Importar {n} producto | Importar {n} productos",
       "emptyFile": "El fichero no tiene filas que importar.",
       "readError": "No se pudo leer el fichero",
       "checkError": "No se pudo revisar el fichero",
@@ -239,7 +239,7 @@
       },
       "delete": {
         "title": "Eliminar categoría",
-        "message": "{name} — {n} producto(s) quedarán sin esta categoría (se desvinculan; los productos no se borran)",
+        "message": "{name} — {n} producto quedará sin esta categoría (se desvincula; el producto no se borra) | {name} — {n} productos quedarán sin esta categoría (se desvinculan; los productos no se borran)",
         "confirm": "Eliminar y desvincular",
         "error": "No se pudo eliminar la categoría"
       }

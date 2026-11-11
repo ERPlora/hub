@@ -114,8 +114,8 @@ catálogo», «No se vende por unidades en Inventario» o, en un menú «para ll
 llevar»; por fila, el asa, subir, bajar, «Agotado / Disponible», editar y quitar. Debajo, el buscador
 «Busca un producto…» (cada producto con su SKU y su precio), «Suplemento (<moneda>)», «Añadir elección» y
 «Añadir varios» (ventana con buscador y
-casillas, y el campo «Categoría» con «Marcar todos los de «{categoría}» (N)»: «Añadir N seleccionados»;
-lo que ya está en el plato sale marcado «Ya está en este plato»).
+casillas, y el campo «Categoría» con «Marcar todos los de «{categoría}» (N)»: «Añadir N seleccionados»
+(«Añadir 1 seleccionado» con uno); lo que ya está en el plato sale marcado «Ya está en este plato»).
 Al final, el formulario «Añadir un plato» (Nombre del plato, «Elecciones mínimas», «Elecciones
 máximas», la casilla «Se puede elegir la misma opción más de una vez» y «Guardar»), que pasa a
 «Plato · {nombre}» al editar uno.
@@ -280,7 +280,8 @@ Pasos:
    signo negativo: «-» o el botón «±» al final del campo, porque el teclado decimal de un móvil no tiene
    signo menos) que el precio cerrado; vacío es sin suplemento.
 3. Pulsa «Añadir elección»: entra la última. Para varios de golpe, «Añadir varios»: marca las casillas
-   y pulsa «Añadir N seleccionados» (todos entran sin suplemento y en el orden en que se marcaron). Para
+   y pulsa «Añadir N seleccionados» («Añadir 1 seleccionado» con uno; todos entran sin suplemento y en
+   el orden en que se marcaron). Para
    una categoría entera, elígela en «Categoría»: la lista enseña sus productos y «Marcar todos los de
    «{categoría}» (N)» marca los que el plato aún no ofrece.
 4. Para cambiar el producto o el suplemento de una elección, pulsa su lápiz: el formulario dice

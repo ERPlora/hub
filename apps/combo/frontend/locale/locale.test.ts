@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { pluralsInParentheses } from '../../../../base/frontend/__tests__/catalogue-plurals';
 import en from './en.json';
 import es from './es.json';
 
@@ -52,6 +53,10 @@ describe('combo catalogues (en source + es)', () => {
 
   it('combos#14: in Spanish a course of a menu is a «plato», never a «curso»', () => {
     for (const [key, message] of ES) expect(message, key).not.toMatch(/\bcursos?\b/i);
+  });
+
+  it('hub#1124: say a count in the singular or the plural, never «(s)»', () => {
+    expect(pluralsInParentheses(EN, ES)).toEqual([]);
   });
 
   it('have no empty message', () => {
@@ -112,7 +117,7 @@ describe('combo catalogues (en source + es)', () => {
       ['combo.choices.empty', 'No choices yet: nobody can resolve this course.', 'Aún no hay elecciones: nadie puede resolver este plato.'],
       ['combo.choices.add', 'Add choice', 'Añadir elección'],
       ['combo.bulk.open', 'Add several', 'Añadir varios'],
-      ['combo.bulk.addCount', 'Add {n} selected', 'Añadir {n} seleccionados'],
+      ['combo.bulk.addCount', 'Add {n} selected | Add {n} selected', 'Añadir {n} seleccionado | Añadir {n} seleccionados'],
       ['combo.live.reconnecting', 'Reconnecting…', 'Reconectando…'],
       ['combo.live.appInactive', 'This app is not active in this business', 'Esta app no está activa en este negocio'],
       ['combo.noPermission', 'You do not have permission', 'No tienes permiso'],

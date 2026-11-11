@@ -145,7 +145,7 @@
       "open": "Añadir varios",
       "title": "Añadir productos a este plato",
       "search": "Busca un producto…",
-      "addCount": "Añadir {n} seleccionados",
+      "addCount": "Añadir {n} seleccionado | Añadir {n} seleccionados",
       "already": "Ya está en este plato",
       "none": "Marca al menos un producto.",
       "empty": "Aún no hay productos en el catálogo.",
