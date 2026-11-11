@@ -15,7 +15,7 @@
 // of the dialog — «Cancel» («Cancel editing»), its «×», Escape, a tap outside and, on the installed app, Android's Back —
 // asks «Discard changes?» («Keep editing» / «Discard changes») instead of closing it (hub#1015, hub#1023:
 // `useUnsavedChanges` of base, its question as the FormModal's `canDismiss`); as it opened, they close it at once.
-import { FormModal, InlineFeedback } from '@erplora/ui/components';
+import { FormModal, InlineFeedback, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
 import { type InputOf, type OutputOf, useCommand } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
 import { IonButton, IonCheckbox, IonInput, IonNote, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
@@ -29,9 +29,7 @@ import { useT } from '../composables/useT';
 import type { Unit } from '../composables/useUnits';
 import { errorFields } from '../lib/errors';
 import { type Money, useBusinessMoney } from '../lib/format';
-import { moneyFieldText, parseMoney } from '../lib/money';
 import { readQuantity } from '../lib/quantity';
-import MoneyInput from './MoneyInput.vue';
 import ProductCategoriesField from './ProductCategoriesField.vue';
 import QuantityInput from './QuantityInput.vue';
 import TaxCategorySelect from './TaxCategorySelect.vue';
@@ -178,8 +176,8 @@ const text = (value: unknown): string => (value === null || value === undefined 
 
 /** The fields read as the API takes them, in the business's `money`, or `null` when an amount or a quantity cannot be read. */
 function read(money: Money) {
-  const price = parseMoney(form.value.price, money);
-  const cost = parseMoney(form.value.cost, money);
+  const price = parseMoney(form.value.price, { money });
+  const cost = parseMoney(form.value.cost, { money });
   const initial = readQuantity(form.value.initialStock);
   const threshold = readQuantity(form.value.threshold);
   if (!price.ok || !cost.ok || !initial.ok || !threshold.ok) return null;
@@ -313,6 +311,7 @@ function retryPhoto(): void {
       <MoneyInput
         v-model="form.price"
         testid="inventory-product-price"
+        :money="business"
         :label="$t('inventory.form.price')"
         :error-text="fields.price"
         :show-error="tried"
@@ -320,6 +319,7 @@ function retryPhoto(): void {
       <MoneyInput
         v-model="form.cost"
         testid="inventory-product-cost"
+        :money="business"
         :label="business ? $t('inventory.form.costIn', { currency: business.currency }) : $t('inventory.form.cost')"
         :error-text="fields.cost"
         :show-error="tried"

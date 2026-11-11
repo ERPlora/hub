@@ -233,7 +233,9 @@ Pasos:
    una Categoría o deja «Sin categoría».
 4. Elige la Categoría fiscal (son las de Impuestos, por su nombre y su tipo; viene la de los Ajustes
    si hay una). Sin ella **Crear servicio** no se puede pulsar; tampoco mientras el negocio no haya dicho
-   todavía su moneda, porque el precio se lee en ella (sin ella, «1500» yenes se guardaría como 150 000).
+   todavía su moneda, porque el precio se lee en ella (sin ella, «1500» yenes se guardaría como 150 000);
+   hasta entonces, salir del precio lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en
+   cuanto llega la moneda se leen en ella (hub#945).
    Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
    motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, **Crear servicio** se enciende (hub#938).
 5. Pulsa **Crear servicio**: el formulario se cierra y el servicio sale en la tabla como **Activo**.
@@ -287,7 +289,7 @@ Implicados: SALE-F09
 ### SERVICE-F04 Archivar un servicio
 <!-- origen: fi:modules/services#command-services-services-delete-sql-transaccional old:services/workflow/catalogo.md#services-f04 -->
 Estado: hecho
-Actor: propietario, administrador
+Actor: propietario, administrador, asistente
 Pantalla: Servicios
 Pasos:
 1. En la fila del servicio pulsa **Archivar**.
@@ -309,7 +311,7 @@ Implicados: APPOINTMENT-F01, APPOINTMENT-F26
 ### SERVICE-F05 Ver y restaurar los servicios archivados
 <!-- origen: old:services/workflow/catalogo.md#services-f05 -->
 Estado: hecho
-Actor: responsable
+Actor: responsable, asistente
 Pantalla: Servicios
 Pasos:
 1. En **Filtros**, elige **Archivado** en Estado y pulsa **Aplicar**: la tabla enseña solo los archivados.
@@ -451,7 +453,8 @@ canjear.»; un servicio repetido, archivado o que no existe; un importe ilegible
 su campo; un nombre que ya tiene otro bono vivo, «Ya hay un paquete con ese nombre. Elige otro
 nombre.». «Crear paquete» (y «Guardar cambios» al editarlo, SERVICE-F13) está en gris mientras el negocio
 no haya dicho todavía su moneda, porque el precio cerrado y el descuento se leen en ella (sin ella,
-«1500» yenes se guardaría como 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+«1500» yenes se guardaría como 150 000); hasta entonces, salir del precio cerrado o del descuento lo deja como se
+escribió, sin inventarle decimales ni juzgarlo: «¥9500» o «7,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, el botón se enciende (hub#938).
 Implicados: SERVICE-F14, SERVICE-F22
 
@@ -517,7 +520,7 @@ Implicados: SERVICE-F14, SERVICE-F28, CUSTOMER-F01
 ### SERVICE-F16 Ver quién ha comprado un bono
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f13 old:services/workflow/bonos.md#services-f16 -->
 Estado: hecho
-Actor: empleado, responsable
+Actor: empleado, responsable, asistente
 Pantalla: Bonos y paquetes
 Pasos:
 1. En la fila del bono pulsa **Bonos vendidos** (de uno eliminado, con Estado en **Eliminado**).
@@ -575,7 +578,7 @@ Implicados: SERVICE-F16, SERVICE-F20
 ### SERVICE-F19 Ver los movimientos de un bono
 <!-- origen: old:services/workflow/bonos.md#services-f19 -->
 Estado: hecho
-Actor: empleado, responsable
+Actor: empleado, responsable, asistente
 Pantalla: Bonos y paquetes
 Pasos:
 1. En la fila del bono pulsa **Movimientos**.
@@ -834,7 +837,7 @@ su servicio principal solo cambia si se dice.
 Si falla: dentro de la sección, «Ese miembro del personal no existe en este negocio.», un nombre que
 vale para varios (la lista para elegir) o el importe ilegible o negativo. **Asignar** está apagado
 mientras el negocio no haya dicho todavía su moneda: el precio propio se lee en ella, y sin ella «1500»
-yenes se guardaría como 150 000; si no se puede leer, «Editando servicio» lo dice arriba («No se ha podido
+yenes se guardaría como 150 000 (salir del precio propio lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945)); si no se puede leer, «Editando servicio» lo dice arriba («No se ha podido
 leer la moneda del negocio», con el motivo) y ofrece «Reintentar»; en cuanto llega, **Asignar** se
 enciende (hub#946). Mientras llega la lista sale
 «Cargando…»; si no se puede leer, «No se han podido cargar los profesionales.» con el motivo y
@@ -1200,7 +1203,20 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   piden `service.system`, que no tiene ningún papel.
 - Asistente: toda operación declara `ai` (descripción; en las acciones, `risk`: `high` en archivar,
   eliminar categorías y bonos, anular, ajustar, alta de golpe y ajustes) y todo campo de entrada su
-  `description`.
+  `description`. Cada herramienta dice además sus `asks`, las frases en `en` y `es` con que una persona la
+  pide (`live.E020`: Servicios está en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1104), y los `SYNONYMS` del Hub
+  (`base/assistant.py`) leen «bono» como el bono del catálogo y el vendido (`service.package`,
+  `service.grant`) y «asignación», o lo que se «asigna», como la asignación de un profesional a un servicio
+  (`service.assignment`). Así ver, vender, gastar, anular y ajustar bonos, retener y soltar sesiones,
+  restaurar un servicio y asignar, cambiar o quitar un profesional desde el chat (SERVICE-F04, F05, F14 a
+  F20, F31 y F32) llegan a su operación: las frases reales de la QA del asistente
+  (`tests/e2e/qa/probes/owner-es-service-2026-11-08.json`) quedan entre las 20 primeras herramientas del
+  turno, cada herramienta tiene una frase propia que solo llega a ella por sus `asks`, y ni las `asks` ni
+  los grupos de Servicios adelantan sus bonos, sesiones o asignaciones a una petición de Citas o de las
+  cuentas de Ventas (`tests/test_assistant_asks.py`). Lo que solo se toma por su
+  id (un bono vendido, una sesión, una asignación) dice en su descripción qué lectura lo encuentra
+  (`service.grant.list`, la línea de `sale.order.get`, `service.assignment.list`), para que el asistente lo
+  busque en vez de pedir un id.
 - La tarjeta de confirmación del asistente (BASE-F97) nombra cada registro que una escritura señala por su id con las
   marcas `refers` de `schemas.py` (`A_SERVICE`, `A_CATEGORY`, `A_PACKAGE`, `AN_ASSIGNMENT`, `A_GRANT`, `A_SESSION`,
   `A_MEMBER`, `A_CUSTOMER`), leídas como quien pregunta: el servicio, la categoría, el bono y la clienta por su nombre,

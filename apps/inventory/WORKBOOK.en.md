@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d9bbee9039acf59517c09bc806d72f7480b0dde60b8bdeb1df731fe57f4c8cc9 -->
+<!-- generated from WORKBOOK.md sha256:5a35b07cae1c22ecd86916b859bb799a8cc2e63159196f462f38e6be7116a03e -->
 
 ## What it is for and who it is for
 
@@ -113,7 +113,9 @@ Missing tax category", whole while the row has room (also at 1280 px with the si
 "Photo" column) and, if not, ending in "…" with the whole text on mouse hover; next to it, the red
 "Sold out" badge if the item is sold out. Search box "Search product…" by name or SKU; sorting by
 column; filters by name, SKU, price from/to, stock from/to and status ("Yes", "No", "Not configured",
-"Sold out"); 50 per page; table or card view.
+"Sold out"): an end that cannot be read says so below its field, in the same words as the product's price ("This
+is not an amount…", "This amount cannot be negative.", the two readings of "1.250" or "This is not a
+quantity…"), and does not filter; 50 per page; table or card view.
 
 The table's buttons: **+** (create), import CSV and export CSV, each one only for whoever has that
 permission. Per row, in sight: "Receive stock" and "Count stock" (with stock permission and only on
@@ -299,11 +301,11 @@ Inventory tells the other apps there is a new product: Sales offers it on the ti
 setup step "Your catalog" is done (INVENTORY-F28).
 If it fails: "Save" is off while Name, SKU or tax category are missing, and while the business has not
 yet said its currency: the price and the cost are read in it, and without it "1500" yen would be saved
-as 150,000. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+as 150,000; until then, leaving the price or the cost keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, "Save" lights up (hub#938). With no tax categories it says
 "There are no tax categories yet. Create them in Taxes: a product cannot be sold until it is known how
 it is taxed.". An unreadable amount: "This is not an amount. Type a figure, for example 12.50." or
-"This amount can be read in two ways…". A quantity that does not fit the unit: "The quantity does not
+"This amount can be read in two ways…"; a negative one: "This amount cannot be negative.". A quantity that does not fit the unit: "The quantity does not
 respect the step allowed for this unit". A SKU another live product already has: "That SKU already
 exists in the catalog"; a repeated EAN-13: "Another product of the catalog already has that EAN-13". A
 tax category that is no longer in Taxes is refused, also if it arrives through the assistant or the
@@ -570,7 +572,8 @@ one, the delivery note. If a cost was typed, it becomes the product's cost. It a
 has no stock control. If an item with control goes above its threshold, it tells of the crossing
 (INVENTORY-F18). Inventory tells that the stock changed.
 If it fails: "Record receipt" is off without a quantity, and while the business has not yet said its
-currency: the cost is read in it, and without it "1500" yen would be saved as 150,000. If the currency
+currency: the cost is read in it, and without it "1500" yen would be saved as 150,000; until then, leaving the
+cost keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency
 cannot be read, the window says so ("The business's currency could not be read", with the reason) and
 offers "Retry", which asks for it again; as soon as it arrives, "Record receipt" lights up (hub#946). The
 count and the write-off read no amounts: they do not wait for it. "The quantity does not respect the step allowed

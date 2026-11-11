@@ -9,13 +9,7 @@
 import type { Money } from '../../../../base/frontend/lib/home';
 
 export type { Money };
-export { formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';
-
-/** The decimals of an amount while the currency is unknown. */
-const UNKNOWN_DECIMALS = 2;
-
-/** The decimals of an amount in `money` (2 in EUR and HUF, 0 in JPY): its minor unit; two while it is unknown. */
-export const moneyDecimals = (money?: Money): number => money?.decimals ?? UNKNOWN_DECIMALS;
+export { filterCents, formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';
 
 const formats = new Map<string, Intl.NumberFormat>();
 const days = new Map<string, Intl.DateTimeFormat>();
