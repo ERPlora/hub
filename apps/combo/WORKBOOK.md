@@ -241,7 +241,9 @@ Entra: el menú elegido (por id o por nombre).
 Sale: el menú, sus platos y sus elecciones borrados en una sola operación (avisa: menú retirado, con
 su nombre). Los tiques emitidos llevan su copia y se siguen leyendo.
 Si falla: el diálogo dice por qué y sigue abierto; un menú que ya no existe, «Ese menú no existe en
-este negocio.». Una cuenta abierta que ya lo llevaba lo cobra como se pidió (COMBO-F08).
+este negocio.». Una cuenta abierta que ya lo llevaba lo cobra como se pidió (COMBO-F08). Por el asistente, un nombre
+que vale para varios menús o para ninguno no saca tarjeta, y si antes del «sí» otro menú encaja mejor con lo dicho no
+se retira nada y sale la tarjeta nueva (BASE-F97).
 Implicados: SALE-F12
 
 ### COMBO-F05 Montar los platos de un menú
@@ -521,7 +523,14 @@ tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunc
 nombre («Menú: Menú del día»), el plato por su nombre («Plato: Primeros»), la elección por el nombre de su producto
 («Elección: Lentejas»), el producto por su nombre («Producto nuevo: Sopa») y, al ordenar platos o elecciones o al
 añadir varios productos, cada uno por su nombre y en el orden enviado («Platos: Segundos, Primeros»). Lo que quien
-pregunta no puede ver, o lo que ya no existe, no sale.
+pregunta no puede ver, o lo que ya no existe, no sale. Un menú dicho por su nombre al cambiarlo, retirarlo, ponerle foto
+u ordenar sus platos se busca como lo buscará la acción (el mismo nombre antes que uno que lo contenga), y la tarjeta
+enseña el menú que se va a tocar, con su nombre entero («Menú: Menú vegano» cuando se dijo «vegano»). Si lo dicho vale
+para varios menús o para ninguno, no sale ninguna tarjeta: el asistente oye «Hay varios menús que se llaman
+«vegano»: Menú vegano, Menú vegano sin gluten. Di cuál.» y pregunta cuál, o «Ese menú no existe en este negocio.». El
+«sí» vale solo para el menú que enseñó la tarjeta: si antes de confirmar alguien crea uno que encaja mejor con lo dicho
+(«Menú» cuando la tarjeta decía «Menú vegano»), no se toca nada y sale la tarjeta nueva. Un plato o una elección
+dichos por su nombre, y el menú al que pertenecen, todavía salen como se dijeron (hub#1231).
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -706,7 +715,15 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   catálogo de la app), nunca «Registro»; `combo_id`, `group_id` y `product_id` ya salen así por el `verbose_name`
   de la clave del modelo. Sin persona detrás, sin `combo.view` o `inventory.view_product`, con un id de otro negocio
   o de algo retirado, el registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`); el trinquete
-  `UNNAMED_REFERENCES` de `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca. Las listas
+  `UNNAMED_REFERENCES` de `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca. Dicho por
+  su nombre, el `combo` de `ComboRefIn` lleva la misma marca leída por ese nombre (`A_MENU_BY_NAME`), y las cuatro
+  herramientas cuya entrada es `ComboRefIn` (`combo.combo.update`, `combo.combo.delete`, `combo.combo.set_image` y
+  `combo.group.reorder`; `combo.combo.upload_image` no es herramienta) declaran `check: combo.combo.get`
+  (`base.assistant.checked`): antes de dibujar la tarjeta, el turno busca el menú como lo hará la escritura, un nombre
+  que encaja con varios o con ninguno vuelve al modelo, y la huella de la tarjeta lleva el id del menú encontrado, así
+  que el «sí» vale solo para él (hub#1208, hub#1217; `tests/test_assistant_yes_for_its_card.py`). El `combo` de
+  `_ComboOfIn` y los `group` y `product` dichos por su nombre aún no llevan marca ni sus escrituras `check`: dos casos
+  en `xfail(strict=True)` en ese mismo fichero (hub#1231). Las listas
   cerradas de sus escrituras (cómo se vende el menú) ya llevan su etiqueta en `en` + `es` por los `choices` del
   modelo.
 - El admin de Django del Hub tiene **CRUD completo** sobre los tres modelos (ronda 12, PLAN §17); una

@@ -137,3 +137,32 @@ def test_every_assistant_write_of_menus_that_takes_a_menu_by_its_name_is_here():
         and getattr(op.input.model_fields.get("id"), "json_schema_extra", None) == names("combo.combo.get")
     }
     assert taking == set(WRITES)
+
+
+# ── A course said by its name, and the menu it belongs to (hub#1231) ──────────────────────────────────────────────────
+# A course and a choice said by their name, and the menu of a course or a choice said by its name, are not read by the
+# card yet (``group`` and ``combo`` of ``_ComboOfIn``, no check): nothing holds the yes to them. Strict: once Menus
+# names what it finds for them, these pass and their marks go.
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="hub#1231: its card reads no course said by its name")
+def test_the_yes_touches_only_the_course_its_card_showed_although_another_fits_the_name_better_meanwhile():
+    combo = make_combo("Menú vegano")
+    make_group(combo, "Postres caseros")
+    done = yes_to_its_card(
+        as_admin(), "combo.group.delete", {"combo": "Menú vegano", "group": "postres"},
+        meanwhile=lambda: make_group(combo, "Postres"),
+    )
+    assert done["executed"] == []
+    assert sorted(combo.groups.values_list("name", flat=True)) == ["Postres", "Postres caseros"]
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="hub#1231: its card reads no menu a course belongs to")
+def test_the_yes_touches_only_the_course_of_the_menu_its_card_showed_although_another_menu_fits_the_name_better_meanwhile():
+    make_group(make_combo("Menú vegano"), "Postres")
+    done = yes_to_its_card(
+        as_admin(), "combo.group.delete", {"combo": "menú", "group": "postres"},
+        meanwhile=lambda: make_group(make_combo("Menú"), "Postres"),
+    )
+    assert done["executed"] == []
+    assert Combo.objects.filter(groups__name="Postres").count() == 2
