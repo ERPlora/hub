@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:08c4c8a73bf98476fc13e6db6237e64e6a83b145eff6e8f8e834305134d400c3 -->
+<!-- generated from WORKBOOK.md sha256:5a6fe49f9453fb75540886c332e030e1cac026b0002c653909dca6fefbfe2274 -->
 
 ## What it is for and who it is for
 
@@ -202,7 +202,10 @@ The detail and the actions on an item (changing it, deleting it, adding a line t
 name, as the person says it: the same name, ignoring case, before one that contains it ("borra otoño" finds "Ensayo de
 otoño" when it is the only one that has it), and the card shows the item that will be touched, by its whole name. When
 what was said fits several items, no card comes up: the assistant hears "There are several items called "Ensayo":
-Ensayo 1, Ensayo 2. Say which one." and asks which; when it fits none, "No item is called "Ensayo"".
+Ensayo 1, Ensayo 2. Say which one." and asks which; when it fits none, "No item is called "Ensayo"". The yes holds only
+for the item the card showed (BASE-F97): if before confirming someone creates one that fits what was said better
+("Mesa" when the card said "Mesa 4") or the item is renamed, nothing is touched and the new card shows; if it was
+deleted, the assistant says so.
 
 ### What it offers: queries (they read and change nothing; all of them can be followed live)
 

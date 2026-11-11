@@ -456,8 +456,9 @@ se sustituyó por una factura completa: rectifica la factura completa.». Dos re
 de la misma factura: la segunda espera a la primera y se rechaza sin gastar número. Sin permiso no
 aparece la acción. Al asistente, sobre una rectificativa, una cancelada o un tique sustituido te dice
 por qué con esos mismos avisos y no sale la confirmación; si otra rectificativa se emite entre la vista
-previa y tu confirmación, la tuya toma el número siguiente; si otro dispositivo rectifica esa factura
-antes de que confirmes, no se emite otra: sale «La factura ya está cancelada.».
+previa y tu confirmación, la tuya no se emite: sale otra vez la confirmación con el número siguiente, y
+se emite con él cuando la confirmes (BASE-F97); si otro dispositivo rectifica esa factura antes de que
+confirmes, no se emite otra: sale «La factura ya está cancelada.».
 Implicados: SALE-F31
 
 ### INVOICE-F09 La rectificativa al devolver una venta entera

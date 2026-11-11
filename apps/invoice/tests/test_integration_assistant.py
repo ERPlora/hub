@@ -22,6 +22,7 @@ from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_services_assistant import answered, waiting
 
 LOCALE = Path(apps.get_app_config("invoice").path) / "frontend/locale"
 SCREENS = json.loads((LOCALE / "es.json").read_text())["invoice"]
@@ -193,7 +194,7 @@ def test_the_rectification_waits_on_its_dangerous_card_naming_the_invoice_and_th
         ("number", original.number),
         ("reason", REASON),
     ]
-    assert plan["pending"] == [rectify]
+    assert waiting(plan) == [rectify]
     assert not rectifications().exists()
 
 
@@ -201,7 +202,7 @@ def test_typing_the_word_issues_the_rectification_the_preview_said(issuer, today
     original = an_invoice()
     seen = run("invoice.invoice.rectification_preview", {"number": original.number, "reason": REASON})
     rectify = call("invoice.invoice.rectify", {"number": seen.original.number, "reason": REASON})
-    plan = turn(rectify, decision={"call_id": "c1", "accepted": True, "typed": " confirmar "})
+    plan = answered(rectify, decision={"call_id": "c1", "accepted": True, "typed": " confirmar "}, turn_of=turn)
     assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("ok", "")]
     rect = rectifications().get()
     assert (rect.rectifies_id, rect.number, rect.invoice_type, rect.total_amount, rect.issue_date, rect.created_by) == (
@@ -237,7 +238,7 @@ def test_a_rectification_dated_another_day_is_refused_even_with_the_word_typed(i
     original = an_invoice()
     yesterday = str(today - dt.timedelta(days=1))
     rectify = call("invoice.invoice.rectify", {"number": original.number, "reason": REASON, "issue_date": yesterday})
-    plan = turn(rectify, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
+    plan = answered(rectify, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"}, turn_of=turn)
     assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", "invoice.rectify_date_not_allowed")]
     assert Invoice.objects.get(pk=original.id).status == "issued"
     assert not rectifications().exists()
@@ -311,8 +312,9 @@ def test_the_card_the_person_sees_carries_that_preview_and_takes_no_number(issue
 def test_typing_the_word_issues_exactly_the_number_the_card_said(issuer, today):
     original = an_invoice()
     rectify = call("invoice.invoice.rectify", {"number": original.number, "reason": REASON})
-    said = {field["name"]: field["value"] for field in turn(rectify)["confirm"]["preview"]}
-    turn(rectify, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
+    drawn = turn(rectify)
+    said = {field["name"]: field["value"] for field in drawn["confirm"]["preview"]}
+    turn(*drawn["pending"], decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
     rect = rectifications().get()
     assert (rect.number, name_of(rect.invoice_type, "es"), rect.base_amount, rect.tax_amount, rect.total_amount) == (
         said["next_number"],
@@ -323,15 +325,24 @@ def test_typing_the_word_issues_exactly_the_number_the_card_said(issuer, today):
     )
 
 
-def test_another_rectification_issued_after_the_card_takes_its_number_and_this_one_the_next(issuer, today):
-    """The card says the next number, not one kept for it (INVOICE-F08, «Si falla»)."""
+def test_another_rectification_issued_after_the_card_takes_its_number_and_the_yes_shows_the_next_first(issuer, today):
+    """The card says the next number, not one kept for it (INVOICE-F08, «Si falla»): another rectification issued
+    before the yes takes it, and the yes issues nothing — the card comes again with the next number — until it is
+    answered (hub#1208: a yes is for what its card showed)."""
     original, other = an_invoice(), an_invoice()
     rectify = call("invoice.invoice.rectify", {"number": original.number, "reason": REASON})
-    said = {field["name"]: field["value"] for field in turn(rectify)["confirm"]["preview"]}["next_number"]
+    drawn = turn(rectify)
+    said = {field["name"]: field["value"] for field in drawn["confirm"]["preview"]}["next_number"]
     first = run("invoice.invoice.rectify", {"number": other.number, "reason": "otro"}).invoice
-    turn(rectify, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
-    mine = rectifications().get(rectifies_id=original.id)
-    assert (first.number, mine.number) == (said, f"RECT-{today.year}-000002")
+    yes = {"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"}
+
+    again = turn(*drawn["pending"], decision=yes)
+
+    assert again["executed"] == [] and not rectifications().filter(rectifies_id=original.id).exists()
+    shown = {field["name"]: field["value"] for field in again["confirm"]["preview"]}["next_number"]
+    assert (first.number, shown) == (said, f"RECT-{today.year}-000002")
+    turn(*again["pending"], decision=yes)
+    assert rectifications().get(rectifies_id=original.id).number == shown
 
 
 def test_asked_straight_to_rectify_what_cannot_be_the_card_does_not_come_and_says_why(issuer):
@@ -412,7 +423,9 @@ def test_the_model_and_the_write_keep_the_code_the_card_names(issuer):
     arguments = {"number": original.number, "reason": REASON, "rectification_type": "R4"}
     told = json.loads(turn(call("invoice.invoice.rectification_preview", arguments))["append"][0]["content"])
     assert told["invoice_type"] == "R4"
-    plan = turn(call("invoice.invoice.rectify", arguments), decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
+    plan = answered(
+        call("invoice.invoice.rectify", arguments), decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"}, turn_of=turn
+    )
     assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("ok", "")]
     assert rectifications().get().invoice_type == "R4"
 
