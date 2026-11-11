@@ -750,6 +750,18 @@ def _return_page(value) -> str:
     input=ChannelPrepareIn,
     output=ChannelPrepareOut,
     ai={
+        "asks": {
+            "en": (
+                "can I connect WhatsApp yet?",
+                "what's missing to connect our WhatsApp number?",
+                "is WhatsApp ready to connect from Settings?",
+            ),
+            "es": (
+                "¿se puede preparar ya la conexión de WhatsApp?",
+                "¿qué me falta para conectar el número de WhatsApp?",
+                "¿está todo preparado para conectar WhatsApp en Ajustes?",
+            ),
+        },
         "description": "Whether the business's WhatsApp number can be connected from Settings now (Meta's window "
         "opens there, and only a person in it connects a number), and why not: WhatsApp not set up on erplora.com "
         "yet, or the window not available yet.",
@@ -783,6 +795,18 @@ def prepare_connect(ctx: OperationContext, data: ChannelPrepareIn) -> dict:
     input=ChannelConnectIn,
     output=ChannelConnectOut,
     ai={
+        "asks": {
+            "en": (
+                "connect our WhatsApp number with the code from Meta",
+                "finish connecting WhatsApp, here is the code",
+                "link the business's WhatsApp with this one-time code",
+            ),
+            "es": (
+                "quiero conectar el WhatsApp del negocio: aquí tienes el código",
+                "termina de conectar el número con este código de Meta",
+                "enlaza nuestro WhatsApp con el código de un solo uso",
+            ),
+        },
         "description": "Connect the business's WhatsApp number chosen in Meta's window, with the one-time code that "
         "window returned (it lasts 30 seconds). Only Meta's window in Settings gives that code: to connect a "
         "number, ask the person to press «Connect WhatsApp» in Settings.",
@@ -825,6 +849,18 @@ def _connected(answer: dict) -> ChannelConnectOut | None:
     input=ChannelDisconnectIn,
     output=ChannelDisconnectOut,
     ai={
+        "asks": {
+            "en": (
+                "disconnect our WhatsApp number",
+                "stop using WhatsApp in the Hub for now",
+                "unlink the business's WhatsApp but keep the chats",
+            ),
+            "es": (
+                "desconecta el WhatsApp del negocio",
+                "deja de usar nuestro número de WhatsApp por ahora",
+                "quita la conexión de WhatsApp sin perder los chats",
+            ),
+        },
         "description": "Disconnect the business's WhatsApp number (erplora.com stops using it): the inbox no longer "
         "receives nor sends until it is connected again from Settings; the conversations kept stay.",
         "risk": "high",
@@ -938,6 +974,18 @@ def _sent_message(key: UUID) -> Message | None:
     output=MessageOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "reply to Nuria: see you tomorrow at 10",
+                "send the reminder template to +34 600 111 222",
+                "write to Jorge on WhatsApp that we open at 9",
+            ),
+            "es": (
+                "responde a Nuria: nos vemos mañana a las 10",
+                "envía la plantilla de recordatorio al +34 600 111 222",
+                "escríbele a Jorge por WhatsApp que abrimos a las 9",
+            ),
+        },
         "description": "Sends a WhatsApp message to a customer («reply to Ana», «send the reminder template to "
         "+34 600 111 222»): free text only within 24 hours of the customer's last message, otherwise an approved "
         "template with its variables; marketing templates only to customers who consented. Give a new "
@@ -1055,6 +1103,18 @@ def _queue_message(
     output=MessageOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "retry the WhatsApp message that didn't go out",
+                "resend the failed message to Nuria",
+                "that message got stuck, try it again",
+            ),
+            "es": (
+                "reintenta el WhatsApp que no se envió",
+                "vuelve a mandar el mensaje fallido a Nuria",
+                "ese mensaje se quedó atascado, pruébalo otra vez",
+            ),
+        },
         "description": "Hands a message that has not left (erplora.com did not answer or did not confirm it) to "
         "erplora.com again, with the same key: it is never sent twice.",
         "risk": "high",
@@ -1110,6 +1170,18 @@ def _in_language(ctx: OperationContext, data: NotifyIn) -> NotifyIn:
     output=MessageOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "let Nuria know on WhatsApp that her order is ready",
+                "notify +34 600 111 222 on WhatsApp that the table is booked",
+                "tell Jorge on WhatsApp his appointment moved to Friday",
+            ),
+            "es": (
+                "manda un aviso por WhatsApp a Nuria: ya puede recoger su pedido",
+                "notifica al +34 600 111 222 por WhatsApp que tiene la mesa reservada",
+                "dile a Jorge por WhatsApp que su cita pasa al viernes",
+            ),
+        },
         "description": "Tells a customer something by WhatsApp (an appointment or a reservation confirmed…), only in "
         "the live conversation of exactly that international number (+34600111222): never a new conversation, "
         "never a number written any other way. Free text within 24 hours of the customer's last message, "
@@ -1363,6 +1435,18 @@ def resume_deliveries(ctx: OperationContext, data: ResumeIn) -> dict:
     output=ConversationOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "mark Nuria's chat as read",
+                "clear the unread count of Jorge's conversation",
+                "I've seen Elena's WhatsApp, mark it read",
+            ),
+            "es": (
+                "da por leído el chat de Nuria",
+                "pon a cero los no leídos de la conversación de Jorge",
+                "ya he visto el WhatsApp de Elena, quítale el sin leer",
+            ),
+        },
         "description": "Marks a WhatsApp conversation as read: its unread counter goes back to zero.",
         "risk": "normal",
     },
@@ -1430,6 +1514,18 @@ def _assignee(ctx: OperationContext, data: AssignIn) -> HubUser | None:
     output=ConversationOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "assign Nuria's conversation to Jorge",
+                "I'll take the conversation with Elena",
+                "unassign Raúl's WhatsApp",
+            ),
+            "es": (
+                "asigna la conversación de Nuria a Jorge",
+                "me quedo yo con la conversación de Elena",
+                "quita la asignación del WhatsApp de Raúl",
+            ),
+        },
         "description": "Assigns a WhatsApp conversation to a person of the team («assign Ana's conversation to "
         "Luis», «take it»: assignee me), or to nobody. Only managers assign somebody else or take it from "
         "somebody; «only if unassigned» never takes it from anybody.",
@@ -1479,6 +1575,18 @@ def assign(ctx: OperationContext, data: AssignIn) -> dict:
     output=ConversationOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "change the status of Nuria's conversation to closed",
+                "set Jorge's chat to pending",
+                "reopen the WhatsApp conversation with Elena",
+            ),
+            "es": (
+                "cambia a cerrada la conversación de Nuria",
+                "deja pendiente el chat de Jorge",
+                "vuelve a abrir la conversación de Elena",
+            ),
+        },
         "description": "Marks a WhatsApp conversation open, pending (waiting for the customer) or closed (done); "
         "a new message from the customer opens it again.",
         "risk": "high",
@@ -1507,6 +1615,18 @@ def set_status(ctx: OperationContext, data: SetStatusIn) -> dict:
     output=FlaggedOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "flag Nuria's chat as needing attention",
+                "the bot didn't understand Jorge: flag the conversation",
+                "a person needs to look at Elena's WhatsApp",
+            ),
+            "es": (
+                "pon en atención la conversación de Jorge",
+                "la respuesta automática no entendió a Nuria, que la mire una persona",
+                "señala el chat de Elena: necesita a alguien del negocio",
+            ),
+        },
         "description": "Marks an open WhatsApp conversation «Needs attention»: an automatic answer could not answer "
         "the customer, so she waits for a person even after its apology; somebody of the business answering, or "
         "changing its status, takes it away. A pending or closed conversation is left as it is.",
@@ -1533,6 +1653,18 @@ def flag(ctx: OperationContext, data: ConversationRefIn) -> dict:
     output=ConversationOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "link Nuria's WhatsApp to her customer card",
+                "put Elena's WhatsApp chat on her customer card",
+                "unlink the customer from Jorge's conversation",
+            ),
+            "es": (
+                "une el WhatsApp de Nuria a su ficha de cliente",
+                "haz la ficha de cliente desde esta conversación",
+                "quita la ficha de cliente de la conversación de Jorge",
+            ),
+        },
         "description": "Joins a WhatsApp conversation to a customer card (by id or by the card's exact name, phone "
         "or email), creates the card from the WhatsApp name and number, or takes the card off.",
         "risk": "normal",
@@ -1685,6 +1817,18 @@ def record_erasure(ctx: OperationContext, data: RecordErasureIn) -> dict:
     input=ConversationRefIn,
     output=ErasedOut,
     ai={
+        "asks": {
+            "en": (
+                "erase all of Nuria's WhatsApp data, she asked us to",
+                "delete this number's chat under GDPR",
+                "wipe the messages and notes of +34 600 111 222",
+            ),
+            "es": (
+                "borra todos sus datos de WhatsApp a Nuria, nos lo ha pedido",
+                "elimina el chat de este número por protección de datos",
+                "borra los datos del +34 600 111 222 en WhatsApp",
+            ),
+        },
         "description": "Erases a number's WhatsApp data at the person's request (GDPR): the number, the name, "
         "every text, attachment and note of the conversation, here and at erplora.com. Irreversible; if they "
         "write again, a new conversation starts.",
@@ -1711,6 +1855,18 @@ def erase(ctx: OperationContext, data: ConversationRefIn) -> dict:
     output=NoteOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "add a note to Nuria's chat: call her back after five",
+                "leave an internal note on Jorge's conversation",
+                "write down on Elena's WhatsApp that she prefers Tuesdays",
+            ),
+            "es": (
+                "añade una nota al chat de Nuria: llamarla después de las cinco",
+                "apunta en el WhatsApp de Elena que prefiere los martes",
+                "escribe una nota interna en la conversación de Jorge",
+            ),
+        },
         "description": "Leaves an internal note on a WhatsApp conversation for the team; the customer never sees it.",
         "risk": "normal",
     },
@@ -1742,6 +1898,18 @@ def add_note(ctx: OperationContext, data: NoteAddIn) -> dict:
     output=NoteDeletedOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "delete my note on Nuria's chat",
+                "remove the internal note about the deposit",
+                "take off the note I left on Jorge's conversation",
+            ),
+            "es": (
+                "borra la nota del chat de Nuria",
+                "elimina la nota interna sobre la señal",
+                "quita la nota que dejé en la conversación de Jorge",
+            ),
+        },
         "description": "Deletes an internal note of a WhatsApp conversation: one's own, or anybody's for a manager.",
         "risk": "high",
     },
@@ -1850,6 +2018,18 @@ def _sample_bytes(data: TemplateSampleUploadIn) -> tuple[bytes, str]:
     output=TemplateSampleOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "use this photo as a WhatsApp template header",
+                "upload this PDF for the template's header",
+                "keep this video for the header of the template",
+            ),
+            "es": (
+                "esta foto es para la cabecera de la plantilla de WhatsApp",
+                "sube este PDF para la cabecera de la plantilla",
+                "quiero este vídeo arriba en la plantilla de WhatsApp",
+            ),
+        },
         "description": "Keeps the file of a WhatsApp template's header the person attached (a JPEG or PNG photo up "
         "to 5 MB, an MP4 video up to 16 MB or a PDF up to 25 MB) and answers its id, to give as header_sample when "
         "creating or changing the template: Meta reviews the template with it.",
@@ -1889,6 +2069,18 @@ def upload_sample(ctx: OperationContext, data: TemplateSampleUploadIn) -> dict:
     output=TemplateOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "create a WhatsApp template to remind appointments",
+                "make a marketing template with a 10% offer",
+                "add a template that says your order is ready",
+            ),
+            "es": (
+                "crea una plantilla de WhatsApp para recordar citas",
+                "haz una plantilla de marketing con una oferta del 10 %",
+                "añade una plantilla con el texto: gracias por tu visita",
+            ),
+        },
         "description": "Creates a WhatsApp message template (name, language, utility or marketing, header, text with "
         "{{1}}… and an example of each, footer, buttons) and sends it to Meta for review. Give a new submit_key per "
         "save (the same one if you retry it): it is registered once.",
@@ -1941,6 +2133,18 @@ def _changeable(row: Template, content: dict) -> None:
     output=TemplateOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "change the text of the reminder template",
+                "edit the welcome template and send it for review again",
+                "update the promo template's footer",
+            ),
+            "es": (
+                "cambia el texto de la plantilla de recordatorio",
+                "edita la plantilla de bienvenida y mándala otra vez a revisión",
+                "actualiza el pie de la plantilla de la promoción",
+            ),
+        },
         "description": "Changes a WhatsApp template (not its name or language) and sends it to Meta for review "
         "again; until Meta takes the change, the approved one keeps being the one sent. Not while Meta reviews it.",
         "risk": "high",
@@ -1977,6 +2181,18 @@ def update_template(ctx: OperationContext, data: TemplateUpdateIn) -> dict:
     output=TemplateOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "retry sending the template to Meta",
+                "the reminder template never reached Meta, try again",
+                "send Meta again the template deletion it did not confirm",
+            ),
+            "es": (
+                "vuelve a mandar la plantilla a Meta",
+                "la plantilla de recordatorio no llegó a Meta, reinténtalo",
+                "reintenta en Meta el borrado de la plantilla que no confirmó",
+            ),
+        },
         "description": "Hands a template that did not reach Meta (or a deletion Meta has not confirmed) to "
         "erplora.com again: never registered twice.",
         "risk": "normal",
@@ -2009,6 +2225,18 @@ def retry_template(ctx: OperationContext, data: TemplateRefIn) -> dict:
     output=TemplateOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "delete the welcome template",
+                "remove the old promo template from WhatsApp",
+                "get rid of the English reminder template",
+            ),
+            "es": (
+                "ya no queremos la plantilla de bienvenida, bórrala",
+                "elimina la plantilla vieja de la promoción",
+                "quita la plantilla de recordatorio en inglés",
+            ),
+        },
         "description": "Deletes a WhatsApp template here and at Meta (that language only). Irreversible: an approved "
         "template takes days to be approved again.",
         "risk": "high",

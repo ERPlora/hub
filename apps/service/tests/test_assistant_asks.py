@@ -16,15 +16,18 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 from live import assistant as shared
-from live.context import OperationContext, Scope
 from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import comparable, probe_phrases
-
-A = Scope("host", "a")
+from base.tests.test_assistant_asks import (
+    assert_its_asks_bring,
+    assert_reported_are_owner_probes,
+    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
+    comparable,
+    probe_phrases,
+)
+from base.tests.test_assistant_asks import offered_place as place
 PROBES_DIR = Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes"
 
 #: The requests of hub#1104's QA (``tests/e2e/qa/probes/owner-es-service-2026-11-08.json``) as the owner said them, and
@@ -182,35 +185,12 @@ def neighbour_probes() -> list[dict]:
     ]
 
 
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
-
-
-def place(tools: dict[str, Operation], name: str, phrase: str, language: str = "es") -> int | None:
-    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
-    return offered.index(name) + 1 if name in offered else None
-
-
 def offered_with_room(tools: dict[str, Operation], name: str, phrase: str) -> None:
     """``phrase`` is none of ``name``'s asks, and a turn offers ``name`` for it among the first ``WITH_ROOM``."""
     assert name in tools  # positive control: the owner holds the tool, so its place is known
     assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
     found = place(tools, name, phrase)
     assert found is not None and found <= WITH_ROOM, found
-
-
-def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
-    """``tools`` with ``name`` saying no asks: how a turn ranks it by its name, its description and the groups."""
-    op = tools[name]
-    return {**tools, name: dataclasses.replace(op, ai={key: value for key, value in op.ai.items() if key != "asks"})}
 
 
 def without_services_asks(tools: dict[str, Operation]) -> dict[str, Operation]:
@@ -231,8 +211,7 @@ def test_services_offers_at_least_46_tools():
 
 
 def test_the_reported_requests_are_the_probes_of_layer_2():
-    phrases = probe_phrases()
-    assert [phrases.get(comparable(phrase)) for _, phrase in REPORTED] == [f"owner.es.{name}" for name, _ in REPORTED]
+    assert_reported_are_owner_probes(REPORTED)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -271,15 +250,7 @@ def test_the_close_probes_are_probes_of_services():
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
 def test_a_request_in_the_owners_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    assert comparable(phrase) not in probe_phrases()
-    assert comparable(phrase) not in {comparable(ask) for asks in shared.asks_of(tools[name]).values() for ask in asks}
-    found = place(tools, name, phrase)
-    assert found is not None and found <= TOP, found
-    before = without_its_asks(tools, name)
-    assert not shared.asks_of(before[name])  # positive control: the tool is ranked without its asks
-    unasked = place(before, name, phrase)
-    assert unasked is None or unasked > TOP, unasked
+    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
 
 
 def test_every_tool_of_services_has_its_own_words():

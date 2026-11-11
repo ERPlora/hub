@@ -19,8 +19,9 @@ uploads and the listings after each walk the files once. What the apps keep is c
 stays exact for the plan's limit.
 
 These functions take the store and the hub's id, and raise ``live`` errors in the language that is active: the
-operations (``base.queries``, ``base.services``) give them the hub of the request and the plan's space. One does not:
-:func:`delete_hub_files`, which empties the whole prefix of a hub that is gone, for the worker that purges it.
+operations (``base.queries``, ``base.services``) give them the hub of the request and the plan's space. Two do not:
+:func:`delete_hub_files`, which empties the whole prefix of a hub that is gone, for the worker that purges it, and
+:func:`hubs_in_store`, the hubs whose prefix holds anything, for ``manage.py delete_leftover_hub_files``.
 """
 
 import datetime as dt
@@ -28,6 +29,7 @@ import itertools
 import logging
 import os
 import posixpath
+import re
 import unicodedata
 import uuid
 from collections.abc import Iterator
@@ -83,6 +85,8 @@ STORE_ERRORS = (OSError, BotoCoreError, ClientError)
 NOT_A_FOLDER = (FileNotFoundError, NotADirectoryError, FileExistsError)
 #: The keys one ``DeleteObjects`` takes at most.
 S3_DELETE_BATCH = 1000
+#: A top folder of the store that is a hub's prefix, as :func:`base.storage.hub_prefix` names it: its id's 32 hex.
+HUB_PREFIX = re.compile(r"hub-([0-9a-f]{32})")
 
 Preview = Literal["image", "pdf", "text", "table", "json", "audio", "video", ""]
 #: The type a file is served with and how the screen shows it, by extension. Our own table, not ``mimetypes``: the
@@ -744,6 +748,19 @@ def delete_hub_files(store: Storage, hub: uuid.UUID) -> None:
     except (*STORE_ERRORS, OperationError) as error:
         cause = error.__cause__ or error
         raise HubFilesNotDeleted(f"{prefix}: {type(cause).__name__}: {cause}") from error
+
+
+def hubs_in_store(store: Storage) -> list[uuid.UUID]:
+    """The hubs whose prefix holds anything in the store, by id: its top folders named as a hub's prefix
+    (:data:`HUB_PREFIX`). Anything else at the top, as ``shared/`` (the blueprints' catalog) or ``_inventory/`` (S3's
+    inventory), is no hub's and is left out; a disk where nothing was kept yet holds none. What the store could not do
+    is 503 ``base.file_store_unavailable``, never «no hub»."""
+    with _store():
+        try:
+            folders, _names = store.listdir("")
+        except NOT_A_FOLDER:
+            return []
+    return sorted(uuid.UUID(found[1]) for folder in folders if (found := HUB_PREFIX.fullmatch(folder)))
 
 
 def _delete_s3_keys(store: S3Storage, prefix: str, keys: list[str]) -> None:

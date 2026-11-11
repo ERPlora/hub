@@ -74,7 +74,6 @@ CI=1 pnpm e2e tests/e2e/reservation-whatsapp.spec.ts   # pila con SaaS, proveedo
 
 - **hub#547** — Una traducción al español marcada «fuzzy» sale en inglés y su test de traducciones no la ve.
 - **hub#548** — Dos textos en español salen con las palabras de otra app («origen» en vez de «reservada por»).
-- **hub#550** — La tarjeta de confirmación del asistente dice la mesa solo por su número, sin su zona.
 - Lo que no hace a propósito (depósitos, recordatorios, plano, calendarios externos…) y lo que espera a otras apps
   (asignación automática, mesas unidas, cola de la puerta con SMS): «Lo que NO hace, a propósito» y «Lo que queda
   fuera» del WORKBOOK.

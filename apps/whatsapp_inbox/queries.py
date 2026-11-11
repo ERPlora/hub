@@ -421,6 +421,18 @@ _SORTS = {
     output=ConversationPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me all the WhatsApp conversations",
+                "which chats assigned to me are unread?",
+                "list the closed conversations of the inbox",
+            ),
+            "es": (
+                "muéstrame todas las conversaciones de la bandeja",
+                "¿qué chats tengo asignados sin leer?",
+                "enséñame las conversaciones cerradas de WhatsApp",
+            ),
+        },
         "description": "Lists the business's WhatsApp conversations, latest activity first: search by the "
         "customer's or profile's name or by the number written any way; filter by status (open, pending, "
         "closed), assignment (me, none, a person) or unread."
@@ -476,6 +488,18 @@ def list_conversations(ctx: OperationContext, params: ConversationListIn) -> dic
     output=ConversationDetailOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "open Nuria's WhatsApp conversation",
+                "who has Jorge's chat and what status is it in?",
+                "can I still write freely to Elena or only with a template?",
+            ),
+            "es": (
+                "abre el chat de WhatsApp de Nuria",
+                "¿quién lleva la conversación de Jorge y en qué estado está?",
+                "¿a Elena todavía le puedo escribir sin plantilla?",
+            ),
+        },
         "description": "One WhatsApp conversation, named by its id, its number or the customer's name: its "
         "customer card, who has it, its status, and whether a free text can be sent now (within 24 hours of "
         "the customer's last message) or only an approved template."
@@ -493,6 +517,18 @@ def conversation_get(ctx: OperationContext, data: ConversationRefIn) -> dict:
     output=ByPhoneOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "is there a WhatsApp chat with +34 600 123 456?",
+                "find the live conversation of +44 7700 900123",
+                "has +34 622 000 111 written to us on WhatsApp?",
+            ),
+            "es": (
+                "¿tenemos un chat abierto con el +34 600 123 456?",
+                "busca la conversación del +34 622 000 111",
+                "¿nos ha escrito por WhatsApp el +34 699 555 444?",
+            ),
+        },
         "description": "The live conversation of an exact international number (+34600111222), or none. A "
         "number not in international format matches nobody: used to tell a customer something by WhatsApp."
     },
@@ -519,6 +555,18 @@ def conversation_by_phone(ctx: OperationContext, data: ByPhoneIn) -> dict:
     output=SummaryOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how is the WhatsApp inbox doing?",
+                "give me a summary of the inbox",
+                "give me the inbox figures: open, unread and waiting chats",
+            ),
+            "es": (
+                "¿cómo va la bandeja de WhatsApp?",
+                "dame un resumen de la bandeja de entrada",
+                "¿cuántos chats hay abiertos, sin leer o esperándonos?",
+            ),
+        },
         "description": "How the WhatsApp inbox stands: open conversations, those with unread messages, those "
         "waiting for an answer from the business, and whether this month's messages of the plan are spent."
     },
@@ -544,6 +592,18 @@ def conversation_summary(ctx: OperationContext, data: SummaryIn) -> dict:
     output=AwaitingCountOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how many WhatsApp conversations are awaiting a reply?",
+                "how many chats still need our reply?",
+                "count the conversations waiting for an answer",
+            ),
+            "es": (
+                "¿cuántos chats de WhatsApp esperan que les respondamos?",
+                "¿a cuánta gente le debemos una respuesta por WhatsApp?",
+                "¿cuántas conversaciones siguen sin respuesta?",
+            ),
+        },
         "description": "How many WhatsApp customers are waiting for an answer from the business: open "
         "conversations whose last message is the customer's."
     },
@@ -564,6 +624,18 @@ NOTICES_WINDOW = dt.timedelta(hours=24)
     output=NoticesOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "who has written to us on WhatsApp lately?",
+                "any WhatsApp notices from customers waiting?",
+                "what did the last people who wrote on WhatsApp say?",
+            ),
+            "es": (
+                "¿quién nos ha escrito últimamente por WhatsApp?",
+                "¿hay avisos de WhatsApp de gente esperando?",
+                "¿qué dijeron los últimos que escribieron por WhatsApp?",
+            ),
+        },
         "description": "The WhatsApp customers left waiting for an answer lately, the newest first: who, what she "
         "wrote last and when (each new message of hers is news again)."
     },
@@ -602,6 +674,18 @@ def notices(ctx: OperationContext, data: NoticesIn) -> dict:
     output=MessagePage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me the messages of Nuria's chat",
+                "read me the WhatsApp thread with Jorge",
+                "were our last messages to Elena delivered and read?",
+            ),
+            "es": (
+                "enséñame los mensajes del chat de Nuria",
+                "léeme el hilo de WhatsApp con Jorge",
+                "¿le han llegado a Elena nuestros mensajes y los ha leído?",
+            ),
+        },
         "description": "The messages of a WhatsApp conversation (named by its id, number or customer's name), "
         "newest first: who said what and when, attachments, and whether each one sent was delivered and read."
     },
@@ -624,6 +708,18 @@ def list_messages(ctx: OperationContext, params: MessageListIn) -> dict:
     output=MessageGetOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "open the message Nuria just sent",
+                "what did that WhatsApp message say and when did it arrive?",
+                "which options did we give her in the message she is answering?",
+            ),
+            "es": (
+                "abre el mensaje que acaba de mandar Nuria",
+                "¿qué decía ese mensaje de WhatsApp y cuándo llegó?",
+                "¿qué opciones le dimos en el mensaje al que responde?",
+            ),
+        },
         "description": "One WhatsApp message by its id (the one an automation started on): what it says, who said it "
         "and when, its conversation's exact international number, what to call the customer, whether anything "
         "can be sent now and the options the business last offered her, which she may be answering."
@@ -680,6 +776,18 @@ def last_offered(message: Message) -> str:
     output=NotePage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what notes does Nuria's conversation have?",
+                "show me the internal notes on Jorge's chat",
+                "did anyone leave a note on this WhatsApp?",
+            ),
+            "es": (
+                "¿qué notas tiene la conversación de Nuria?",
+                "enséñame las notas internas del chat de Jorge",
+                "¿alguien dejó una nota en este WhatsApp?",
+            ),
+        },
         "description": "The internal notes of a WhatsApp conversation, newest first: what the team wrote about it."
     },
 )
@@ -851,6 +959,18 @@ def template_out(row: Template) -> dict:
     output=TemplatePage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which WhatsApp templates has Meta approved?",
+                "list our message templates",
+                "is the welcome template still in review?",
+            ),
+            "es": (
+                "¿cuáles de mis plantillas ha aprobado Meta?",
+                "enséñame las plantillas de mensajes",
+                "¿sigue en revisión la plantilla de bienvenida?",
+            ),
+        },
         "description": "The business's WhatsApp message templates as Meta judged them (APPROVED ones can be "
         "sent), with their text and how many variables they take; search by name."
     },
@@ -897,6 +1017,18 @@ def get_template(ctx: OperationContext, data: TemplateRefIn) -> dict:
     output=TemplateSampleOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which file is the header of that template?",
+                "is the template's header a photo, a video or a PDF?",
+                "how big is the header file I uploaded?",
+            ),
+            "es": (
+                "¿qué archivo lleva de cabecera la plantilla?",
+                "¿la cabecera de la plantilla es una foto, un vídeo o un PDF?",
+                "¿cuánto pesa el archivo de cabecera que subí?",
+            ),
+        },
         "description": "One file of a WhatsApp template's header by its id (the one whatsapp_inbox.template_sample."
         "upload answered): its name, whether it is a photo, a video or a document, and its size."
     },
@@ -917,6 +1049,18 @@ def template_sample_detail(ctx: OperationContext, data: TemplateSampleRefIn) -> 
     output=ChannelOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "is our WhatsApp number connected?",
+                "how many WhatsApp messages have we sent this month?",
+                "how much of the plan's WhatsApp allowance is left?",
+            ),
+            "es": (
+                "¿tenemos conectado el número de WhatsApp?",
+                "¿cuánto consumo de WhatsApp llevamos este mes?",
+                "¿cuánto cupo de WhatsApp nos queda en el plan?",
+            ),
+        },
         "description": "The business's WhatsApp number as erplora.com reports it (connected or not) and the "
         "messages sent this month against the plan's allowance."
     },
@@ -963,6 +1107,18 @@ def team(ctx: OperationContext, roles: dict[str, str] | None = None) -> QuerySet
     input=AgentListIn,
     output=AgentPage,
     ai={
+        "asks": {
+            "en": (
+                "which agents can answer the WhatsApp inbox?",
+                "which of our people answer WhatsApp conversations?",
+                "find Jorge among the WhatsApp agents",
+            ),
+            "es": (
+                "¿quién del equipo atiende la bandeja de WhatsApp?",
+                "¿qué personas pueden llevar las conversaciones de WhatsApp?",
+                "busca a Jorge entre los agentes de WhatsApp",
+            ),
+        },
         "description": "The people of the business a WhatsApp conversation can be assigned to; search by name."
     },
 )

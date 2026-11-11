@@ -567,6 +567,7 @@ LIVE_ASSISTANT_ASKS_REQUIRED = (
     "inventory",
     "kitchen",
     "online_booking",
+    "pricing",
     "printing",
     "reservation",
     "sale",
@@ -576,6 +577,7 @@ LIVE_ASSISTANT_ASKS_REQUIRED = (
     "table",
     "task",
     "website",
+    "whatsapp_inbox",
 )
 
 # Email: the console locally; in production the SES API signed by the task role (no static keys,

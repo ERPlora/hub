@@ -126,6 +126,10 @@ APP_WORDS = shared.app_words
 #: Services' voucher, the one of the catalogue (``service.package``) or the one sold to a customer (``service.grant``),
 #: and an «asignación» (what one «asigna») is a professional's assignment to a service (``service.assignment``). An
 #: «elemento», as Demo's screens name one, is an item (``demo.item``).
+#: A «plantilla» and a «mensaje» are the WhatsApp inbox's template and message (``whatsapp_inbox.template``,
+#: ``whatsapp_inbox.message``), as «template» and «message» already are in English; a business template
+#: (``base.blueprint``) or the staff a «plantilla» also names are said with their own words beside it («plantilla de
+#: negocio», «el personal»).
 SYNONYMS = (
     ("cuenta", "check", "tab", "order"),
     ("ticket", "tique", "recibo", "receipt", "sale"),
@@ -202,6 +206,9 @@ SYNONYMS = (
     ("bump", "como listo", "como listos", "como lista", "como listas", "como hecho", "como hechos", "como hecha",
      "como hechas"),
     ("recall", "a pendientes", "a pendiente", "a preparacion", "a preparar"),
+    # whatsapp_inbox
+    ("plantilla", "plantillas", "template", "templates"),
+    ("mensaje", "mensajes", "message", "messages"),
 )
 #: The help a how-to question asks for (``live.assistant.HOWTO_POINTS``): it ranks by being one, not only by ``ALWAYS``.
 HOWTO = (DOCS_SEARCH,)
