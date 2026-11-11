@@ -731,7 +731,7 @@ class TestTheKeptCopiesGoAfterTheirDays:
         assert marker(first.db_name) == [AS_THEN, SINCE] and marker(second.db_name) == [AS_THEN]
 
 
-# ── Asked in the Hub admin (BASE-F113) ────────────────────────────────────────────────────────────────────────────────
+# ── Asked in the Hub admin (BASE-F114) ────────────────────────────────────────────────────────────────────────────────
 
 #: Where the Hub admin is, and its hubs.
 PLATFORM = "hubs.localhost:8000"

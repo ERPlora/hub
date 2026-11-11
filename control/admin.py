@@ -14,7 +14,7 @@ hubs with their database (round 2026-10-30b of PLAN-DB, decision 1 of Ioan; tran
   ``control.cluster.sizes``, once per cluster on the page, kept ten minutes; a cluster that cannot be measured is said
   in a warning and its hubs show no size.
 
-- **«Restore from a copy…»** (hub#1198, BASE-F113) asks ``control.hub.restore`` for each chosen hub, with the temporary
+- **«Restore from a copy…»** (hub#1198, BASE-F114) asks ``control.hub.restore`` for each chosen hub, with the temporary
   cluster its copy is on and the moment it is of; the worker restores it (``base.tenancy.restore``), or refuses it for
   its fiscal records, and then the hub's page says why in its ``last_error``, as the worker noted it. While it is
   restored, the hub's cluster says where the copy comes from, as a move says where it goes.

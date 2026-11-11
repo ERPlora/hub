@@ -616,7 +616,7 @@ AT_MOMENT = dt.datetime(2026, 11, 9, 14, 30, tzinfo=dt.UTC)
 
 
 class TestRestoreFromACopy:
-    """«Restore from a copy…» (hub#1198, BASE-F113): the platform's admins choose hubs, then the temporary cluster their
+    """«Restore from a copy…» (hub#1198, BASE-F114): the platform's admins choose hubs, then the temporary cluster their
     copy is on (one closed to new hubs) and the moment it is of, on a confirmation page; each is asked through
     ``control.hub.restore`` with that moment, and what the operation refuses is said hub by hub. Support never sees it,
     and the operation itself refuses anyone but the platform's admins (403)."""
