@@ -559,6 +559,7 @@ LIVE_ASSISTANT_ASKS_REQUIRED = (
     "base",
     "customer",
     "inventory",
+    "payment",
     "printing",
     "sale",
     "table",
