@@ -1023,8 +1023,9 @@ que no tiene ningún papel: solo el sistema (`*`).
   cada frase que las dice. Para el Hub (`base.assistant.SYNONYMS`), «la comanda» (por sus frases: «la comanda», «qué
   comandas», «las comandas de…»; la palabra sola sigue siendo la cuenta de Ventas para live) es la comanda de cocina
   (`ticket`), una «estación» y «el puesto» la estación, «urgente» o «prisa» la urgencia (`set_rush`), el «enrutado»
-  el enrutado, un plato «como listo» o «como hecho» se marca listo (`item.bump`) y lo que vuelve «a pendientes» o «a
-  preparación» se recupera (`*.recall`). `tests/test_assistant_asks.py` comprueba con las frases reales de la QA del
+  y la «regla» que manda un plato a una estación el enrutado (live lee «regla» como cualquier regla, la de Impuestos
+  o la de Tarifas, desde ERPlora/live#73), un plato «como listo» o «como hecho» se marca listo (`item.bump`) y lo que
+  vuelve «a pendientes» o «a preparación» se recupera (`*.recall`). `tests/test_assistant_asks.py` comprueba con las frases reales de la QA del
   asistente (hub#1088, dueño y empleado) que cada una trae su herramienta en la primera mitad de las que ofrece un
   turno (F04, F09, F11, F12, F14, F18–F25), que el empleado no recibe lo que es solo de quien lleva la cocina, y una
   frase por grupo de sinónimos que sin él no llega. Marcar platos «listos» (F11, F12) necesita además que live lea

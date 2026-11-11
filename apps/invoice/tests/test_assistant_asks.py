@@ -101,18 +101,14 @@ WITH_ROOM = 20
 #: How far down the tools a turn offers the requests hub#1102 is about bring theirs: among the first eight, the three
 #: ``ALWAYS`` in front, so the model sees the write it was asked for near the top and calls it.
 NEAR_THE_TOP = 8
-#: What live reads of «sin tocar caja ni cambiar importes»: the «cambiar» after «ni» as asked (only the infinitive right
-#: after «sin» is not, ERPlora/live#60), so the writes that change something go ahead of marking the invoice paid: 12th,
-#: and 5th once «ni» reads as «sin». Strict, so the pointer of live that reads it turns this red and its mark goes.
-UNTIL_LIVE_READS_NI = pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="ERPlora/live#74: «ni cambiar» after «sin …» reads as asked to change"
-)
 #: The requests hub#1102 is about, each with its tool: the owner's words of the issue («marca como cobrada la
-#: FACT-2026-000001», «rectifícala con una R1») and the two probes of the QA it reports.
+#: FACT-2026-000001», «rectifícala con una R1») and the two probes of the QA it reports. In «sin tocar caja ni cambiar
+#: importes» live reads the «cambiar» after «ni» as not asked, as the infinitive right after «sin» (ERPlora/live#74), so
+#: marking the invoice paid is no longer behind the writes that change something (12th before, 5th since).
 THE_ISSUES = [
     pytest.param("invoice.invoice.mark_paid", "marca como cobrada la FACT-2026-000001", id="mark_paid-said"),
     pytest.param("invoice.invoice.rectify", "rectifícala con una R1", id="rectify-said"),
-    pytest.param(*REPORTED[0], marks=UNTIL_LIVE_READS_NI, id="mark_paid-probe"),
+    pytest.param(*REPORTED[0], id="mark_paid-probe"),
     pytest.param(*REPORTED[1], id="rectify-probe"),
 ]
 #: Every probe of layer 2 of Invoicing, the owner's real phrases of the QA: the three above and the ones the model got

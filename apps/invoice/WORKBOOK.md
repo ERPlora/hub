@@ -1186,7 +1186,8 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   (`tests/e2e/qa/probes/owner-es-invoice-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno,
   «marca como cobrada la FACT-2026-000001» y «rectifícala con una R1» entre las 8 primeras, y una frase propia por
   herramienta solo llega con sus `asks` (`tests/test_assistant_asks.py`). La sonda «…sin tocar caja ni cambiar
-  importes» aún sale 12.ª: live lee el «cambiar» detrás de «ni» como pedido (ERPlora/live#74).
+  importes» sale 5.ª (12.ª antes de ERPlora/live#74): live ya no lee como pedido el «cambiar» detrás de «ni» cuando
+  hay un «sin» antes.
 
 ### Decisiones (dudas abiertas del producto actual, resueltas con el mercado)
 

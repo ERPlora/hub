@@ -199,7 +199,8 @@ operación (avisa: grupo borrado). Lo ya pedido o vendido no cambia: Ventas cong
 línea.
 Si falla: los mismos rechazos que al crear; bajar el máximo por debajo de las opciones que ya salen por
 defecto, «Este grupo tiene más opciones por defecto que su máximo.». Un grupo que no existe, «Este
-grupo no existe.».
+grupo no existe.». Por el asistente, un nombre que vale para varios grupos o para ninguno no saca tarjeta, y si
+antes del «sí» otro grupo encaja mejor con lo dicho no se cambia ni se borra nada y sale la tarjeta nueva (BASE-F97).
 Implicados: SALE-F11
 
 ### MODIFIER-F04 Añadir, cambiar o quitar las opciones de un grupo
@@ -230,7 +231,9 @@ nombre vacío o repetido en el grupo, un suplemento que no es un importe, una ca
 fiscal que no existe en Impuestos o más opciones por defecto que el máximo salen junto a su campo. Una
 opción con categoría fiscal propia se cobra en una línea aparte, que no puede valer cero ni menos: «Una
 opción con su propia categoría fiscal se cobra en una línea aparte: su suplemento tiene que ser mayor
-que cero.». Un grupo admite hasta 100 opciones.
+que cero.». Un grupo admite hasta 100 opciones. Por el asistente, al cambiar o quitar una opción, un grupo dicho por
+su nombre que vale para varios o para ninguno no saca tarjeta, y si antes del «sí» otro grupo encaja mejor con lo dicho
+no se toca nada y sale la tarjeta nueva (BASE-F97).
 Implicados: SALE-F11
 
 ### MODIFIER-F05 Enganchar un grupo a productos o categorías, y soltarlo
@@ -249,7 +252,10 @@ Entra: el grupo y el producto o la categoría, de Inventario (por su id, o por s
 Sale: el enganche (avisa: enganche hecho o soltado). En el TPV, el artículo pregunta sus grupos y los
 de **todas** sus categorías, cada grupo una sola vez.
 Si falla: un producto o una categoría que no existe o está borrado, «Este producto no existe en este
-hub.» o «Esta categoría ya no existe.»; un enganche que ya existe, «Este grupo ya se aplica ahí.».
+hub.» o «Esta categoría ya no existe.»; un enganche que ya existe, «Este grupo ya se aplica ahí.». Por el
+asistente, al soltar un grupo dicho por su nombre que vale para varios o para ninguno no sale tarjeta, y si antes del
+«sí» otro grupo encaja mejor con lo dicho no se suelta nada y sale la tarjeta nueva (BASE-F97). Un enganche a un
+producto o una categoría ya borrados tampoco saca tarjeta («Este grupo no se aplica ahí.»): lo suelta MODIFIER-F09.
 Implicados: INVENTORY-F01, INVENTORY-F06
 
 ### MODIFIER-F06 Elegir las opciones al vender un artículo
@@ -344,7 +350,15 @@ persona) y la API, con las mismas reglas y los mismos permisos. Pensado para la 
 por su id o su nombre («grupo Salsas»), una opción por su id o su nombre y su grupo («opción Sin cebolla
 de Extras»), un producto por su id, su SKU o su nombre y una categoría por su id o su nombre. Si un
 nombre casa con varios, se rechaza diciendo cuáles (409 `*_ambiguous`). Antes de cambiar nada, el asistente pide
-confirmar con su tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunca por su id.
+confirmar con su tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunca por su id. Un grupo
+dicho por su nombre al cambiarlo o borrarlo, al cambiar o quitar una de sus opciones o al soltarlo de un producto o una
+categoría se busca como lo buscará la acción (el mismo nombre antes que uno que lo contenga), y la tarjeta enseña el
+grupo que se va a tocar, con su nombre entero («Grupo: Salsas picantes» cuando se dijo «salsa»). Si lo dicho vale para
+varios grupos o para ninguno, no sale ninguna tarjeta: el asistente oye ««salsas» nombra varios grupos: Salsas dulces,
+Salsas picantes. Di cuál.» y pregunta cuál, o «Este grupo no existe.». El «sí» vale solo para lo que enseñó la
+tarjeta: si antes de confirmar alguien crea un grupo que encaja mejor con lo dicho («Salsa» cuando la tarjeta decía
+«Salsas picantes»), no se toca nada y sale la tarjeta nueva. Al añadir una opción a un grupo o al aplicarlo dicho por
+su nombre, el grupo todavía sale como se dijo, y una opción dicha por su nombre también (hub#1245).
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -496,7 +510,23 @@ cajero del producto actual es un empleado.
   pregunta: el grupo, el producto y la categoría por su nombre, la opción por su nombre y su grupo, porque dos grupos
   pueden tener una opción con el mismo nombre, y el enganche por su grupo y lo que engancha. El id lleva su título
   («Grupo», «Opción», «Se aplica a»), nunca «Registro». Sin persona detrás, sin permiso, con un id de otro negocio o
-  con un enganche a algo borrado, el registro queda fuera, nunca su id (hub#672).
+  con un enganche a algo borrado, el registro queda fuera, nunca su id (hub#672). Dicho por su nombre, el `group` de
+  `GroupRefIn`, `OptionRefIn` y `LinkRefIn` lleva la misma marca leída por ese nombre (`A_GROUP_BY_NAME`, un grupo no
+  pertenece a nada: se busca solo por su nombre), y las cinco escrituras cuya entrada es una de ellas declaran su
+  `check` (`base.assistant.checked`): `modifier.group.update` y `modifier.group.delete`, `modifier.group.get`;
+  `modifier.option.update` y `modifier.option.delete`, `modifier.option.get`; `modifier.link.detach`,
+  `modifier.link.get` (su `id` es la opción o el enganche: `modifier.group.get` lo leería como el de un grupo). Antes
+  de dibujar la tarjeta, el turno busca el registro como lo hará la escritura, un nombre que encaja con varios grupos o
+  con ninguno vuelve al modelo, y la huella de la tarjeta lleva el id de lo encontrado, así que el «sí» vale solo para
+  ello (hub#1208, hub#1218; `tests/test_assistant_yes_for_its_card.py`, con el trinquete de las escrituras que
+  comprueban y las que leen el grupo por su nombre). El `group` de `_OwningGroup` y de `LinkIn`
+  (`modifier.option.create`, `modifier.link.attach`) no lleva marca: no hay lectura cuya entrada quepa en la suya
+  (`base.E012`), y sin `check` un nombre que vale para varios grupos dejaría el grupo fuera de la tarjeta; ni la lleva
+  el `option` dicho por su nombre, que necesita su grupo para encontrarse. Tres casos en `xfail(strict=True)` en ese
+  mismo fichero (hub#1245). Con ese `check`, `modifier.link.detach` por el asistente rechaza antes de la tarjeta un
+  enganche a algo borrado (`modifier.link.get` solo lee `LIVE_LINK`); la operación lo sigue soltando por su id. Y un
+  registro que llega por su id junto al nombre de otro grupo enseña los dos grupos en la tarjeta, porque la marca lee
+  un nombre que la escritura no usa: otro caso en `xfail(strict=True)` (hub#1250).
 - **Administrador de Django con CRUD completo** (ronda 12, PLAN §17), solo en `hubs.erplora.com` y para
   el staff: lo que guarda no pasa por las operaciones ni deja aviso, y no aplica sus reglas propias (las
   opciones por defecto dentro del máximo, las 100 opciones por grupo); la base de datos sí le rechaza
