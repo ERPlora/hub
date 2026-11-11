@@ -1383,14 +1383,17 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   erplora.com, que lo cuenta en UTC y rechaza por él (`usage_month`): el Hub lo lee en ese mismo reloj
   (`clock.allowance_month`, hub#771), porque en el del negocio llamaría gastado o nuevo a un mes horas antes que él.
 - **Las 32 herramientas del asistente dicen sus `asks`** en `en` y `es` (hub#1108): `whatsapp_inbox` está en
-  `LIVE_ASSISTANT_ASKS_REQUIRED`, y `base/tests/test_assistant_asks.py` exige que cada frase traiga su herramienta
-  entre las diez primeras, rol a rol. `tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
-  (`tests/e2e/qa/probes/owner-es-whatsapp_inbox-2026-11-08.json`), nunca con los propios `asks`: cada una entre las
-  20 primeras de las 40 que se ofrecen. `base.assistant.SYNONYMS` lleva «plantilla» = template y «mensaje» = message
-  (en inglés ya se leían así): sin ellos, `template.retry` quedaba el 81.º y una petición de plantilla nueva perdía
-  frente a cualquier alta del Hub. Trampas al escribir `asks`: «contesta» comparte raíz con «conteo» (recuento de
-  Caja), «listo» se leía como `list`, «recordatorio» suma a los `record` de VeriFactu y Control horario, y un nombre
-  de persona suma en cada sonda que lo diga (por eso Nuria, Jorge, Elena y Raúl, que no dice ninguna).
+  `LIVE_ASSISTANT_ASKS_REQUIRED`, y `base/tests/test_assistant_asks.py` exige que cada frase traiga su herramienta entre
+  las diez primeras, rol a rol. `tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
+  (`tests/e2e/qa/probes/owner-es-whatsapp_inbox-2026-11-08.json`), nunca con los propios `asks`: cada una entre las 20
+  primeras de las 40 que se ofrecen. Además, cada herramienta tiene una frase propia (`OWN_WORDS`, ni ask ni sonda) que
+  solo entra entre las diez primeras con sus `asks`: neutralizarlos en una sola herramienta hace caer su caso, y los
+  asks que esta app obligó a reescribir (las plantillas de negocio de `base` y la carga de Personal) guardan dos puestos
+  de margen. `base.assistant.SYNONYMS` lleva «plantilla» = template y «mensaje» = message (en inglés ya se leían así):
+  sin ellos, `template.retry` quedaba el 81.º y una petición de plantilla nueva perdía frente a cualquier alta del Hub.
+  Trampas al escribir `asks`: «contesta» comparte raíz con «conteo» (recuento de Caja), «listo» se leía como `list`,
+  «recordatorio» suma a los `record` de VeriFactu y Control horario, y un nombre de persona suma en cada sonda que lo
+  diga (por eso Nuria, Jorge, Elena y Raúl, que no dice ninguna).
 
 ### Retención (RGPD)
 
