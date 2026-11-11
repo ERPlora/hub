@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d879931bf2dafb84ed371c55ee8be2a2092d97b95f794ad532076656e8fe975b -->
+<!-- generated from WORKBOOK.md sha256:31c99494f5ad3530268b93c8810edd2c57b6b28452c0eb50f81f4fc6a020b372 -->
 
 ## What it is for and who it is for
 
@@ -413,6 +413,8 @@ On the Employees screens and the API documentation:
 | BASE-F108 | Report a problem to support | done |
 | BASE-F109 | Delete a deleted business after its 90 days | partial — a business with documents keeps its database until the fiscal archive exists (hub#738) |
 | BASE-F110 | Open the business's website on its own domain | done |
+| BASE-F111 | Wait for the database when it is cut for a moment | done |
+| BASE-F112 | Save a downloaded file inside the app | done |
 | BASE-F113 | Keep warning with the screen off (Android app) | partial — the installed app does not have the order to stay listening yet (hub#836) |
 | BASE-F114 | Put a business back as it was at a past moment from the Hub admin | done |
 

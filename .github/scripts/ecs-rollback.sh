@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Puts the hub's services of one environment back on the ACTIVE revision right before the one their
 # PRIMARY deployment runs and records that revision's image tag in /erplora/<environment>/hub/image_tag
-# (aws-next README, "Imagen"). Each environment has its own ECS cluster, erplora-<environment>.
+# (ERPlora/aws README, "Imagen"). Each environment has its own ECS cluster, erplora-<environment>.
 # prod: cluster erplora-prod, services hub and worker, families erplora-prod-*, image erplora/hub;
 # pre: cluster erplora-pre, services hub-pre and worker-pre, families erplora-pre-*, image
 # erplora/hub-pre.
@@ -16,7 +16,7 @@
 #      ROLLOUT_TIMEOUT_SECONDS fails too;
 #   3. records the tag only then, so a failed rollback leaves the parameter as it was.
 # Migrations are NOT undone: the previous code must work on the current schema (expand/contract).
-# Scheduled hub tasks run the latest ACTIVE worker revision (aws-next scheduler.tf), so they keep
+# Scheduled hub tasks run the latest ACTIVE worker revision (ERPlora/aws stacks/prod/scheduler.tf), so they keep
 # the newer image until the next deploy; to go back everywhere, deploy the previous release.
 #
 # Env: CONFIRM (exactly ROLLBACK), AWS_REGION, ENVIRONMENT (prod | pre); optional CLUSTER
@@ -106,7 +106,7 @@ for i in "${!services[@]}"; do
     echo "::error::$previous is no revision of $ENVIRONMENT ($carries); nothing was changed" >&2
     exit 1
   fi
-  # The app's container is named after the family's short name (aws-next modules/ecs-service).
+  # The app's container is named after the family's short name (ERPlora/aws modules/ecs-service).
   image="$(jq -r --arg name "$name" '[.taskDefinition.containerDefinitions[] | select(.name == $name) | .image][0] // "none"' \
     <<< "$definition")"
   if [[ "$image" != */$repository:* ]]; then

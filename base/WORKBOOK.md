@@ -421,6 +421,8 @@ En la pantalla Archivos:
 | BASE-F108 | Reportar un problema a soporte | hecho |
 | BASE-F109 | Borrar un negocio eliminado pasados sus 90 días | parcial — un negocio con documentos guarda su base de datos hasta que exista el archivo fiscal (hub#738) |
 | BASE-F110 | Abrir la web del negocio por su dominio propio | hecho |
+| BASE-F111 | Esperar a la base de datos cuando se corta un momento | hecho |
+| BASE-F112 | Guardar un archivo descargado dentro de la app | hecho |
 | BASE-F113 | Seguir avisando con la pantalla apagada (app de Android) | parcial — la app instalada aún no tiene la orden de quedarse a la escucha (hub#836) |
 | BASE-F114 | Devolver un negocio a un momento pasado desde el admin de Hubs | hecho |
 
@@ -3439,7 +3441,7 @@ Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado
   {json}` en ERROR del logger `base.error_report` (host, usuario, pantalla, mensaje y traza recortados); el logging
   va a la consola y de ahí a CloudWatch (`config/settings.py` `LOGGING`). Tests: `base/tests/test_error_report.py`,
   `base/frontend/lib/error-report.test.ts`.
-- Pantalla: `SystemPage.vue` con `SystemResources.vue`, `SystemRelease.vue`, `FailedEvents.vue` (descartar en
+- Pantalla: `SystemPage.vue` con `SystemUsage.vue`, `SystemRelease.vue`, `FailedEvents.vue` (descartar en
   `ConfirmDialog` con motivo; reenviar todos con `confirm`) y `SystemLog.vue` (`DataTable` con tarjetas en el móvil).
   e2e: `tests/e2e/base-system.spec.ts` (tres tamaños, dos hubs, campana → `#events`).
 
@@ -3930,8 +3932,9 @@ Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado
   F07/F09/F10/F13/F14/F17/F18 (la cola de `/ws/print`). Sus specs: `cash-register-*`, `table-flows`, `reservation-book`,
   `sale-*` (con `sale-invoice-chain`), `modifier-till`, `kitchen-*`, `invoice-sale`, `verifactu-flows`,
   `printing-*`, `appointment-*`, `staff-commissions`, `service-flows` y `customer-flows`. Lo que aún no está entero
-  lo dice su app: PRINTING-F02 (buscar la impresora en la red) es `descartado` (app#17: en una red sin salida a internet la app del
-  dispositivo no barre la red), y de SERVICE-F14 la venta del bono en el
+  lo dice su app: PRINTING-F02 (buscar la impresora en la red) es `parcial` (la app la barre también sin salida a
+  internet desde la 1.1.34, pero falta probarlo en un dispositivo con una impresora de verdad), y de SERVICE-F14 la
+  venta del bono en el
   TPV está en «Lo que queda fuera» de Servicios.
 - Del contrato viejo no sigue lo que era proceso de aquella flota: §2 (método: el QA no arregla y abre issues por
   repo), §2b (el banco de pruebas en PRE con `spawn-hub.sh`), §3 (contar 25–27 módulos y sus `module.json`), §9 (la

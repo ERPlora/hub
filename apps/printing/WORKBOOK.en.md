@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:cdbb36c226e620e965b9b8b0dd67d7a4ffa129edcb16d2c7292f6c3a86088f4b -->
+<!-- generated from WORKBOOK.md sha256:868caee8930f82c5e81f2dde3aaabff2ccd0fdb6579cb46d17dcff878c2a0a84 -->
 
 ## What it is for and who it is for
 
@@ -179,7 +179,7 @@ the window without saving. With the window as it opened, Back closes it without 
 | ID | Flow | Vertical | Status |
 |---|---|---|---|
 | PRINTING-F01 | See how printing is going | common | done |
-| PRINTING-F02 | Find a network printer without typing its address | common | discarded — on a network without internet access the device's app does not go through the network (app#17) |
+| PRINTING-F02 | Find a network printer without typing its address | common | partial — the search on a network without internet access has yet to be tried on a device |
 | PRINTING-F03 | Add a printer by its address | common | done |
 | PRINTING-F04 | Assign what comes out of each printer | common | done |
 | PRINTING-F05 | Do a test print | common | done |
@@ -243,10 +243,10 @@ minute does not make it ring (a device that restarts is not an alarm).
 Involved: PRINTING-F14, PRINTING-F18, CASH_REGISTER-F08, BASE-F01
 
 ### PRINTING-F02 Find a network printer without typing its address
-Status: discarded — the search is in Printers and the ERPlora app on the device does it for the
-business opened from it at erplora.com, but on a network without internet access the app does not go
-through the network and only finds the printers that announce themselves; that printer is added by its address (PRINTING-F03)
-(app#17)
+Status: partial — the search is in Printers and the ERPlora app on the device does it for the
+business opened from it at erplora.com; since version 1.1.34 of the app, also on a network without internet
+access (it goes through the network of its Wi-Fi or its cable). It has yet to be tried on a device, with a real
+printer, on such a network
 Actor: administrator, manager
 Screen: Printers
 Steps:
