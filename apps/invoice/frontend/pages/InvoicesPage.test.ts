@@ -16,6 +16,7 @@ import type { InvoiceRowOut } from '../operations';
 import InvoicesPage from './InvoicesPage.vue';
 import source from './InvoicesPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
+import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn() }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({
@@ -237,11 +238,12 @@ describe('InvoicesPage: the live list', () => {
 
   it('an amount it cannot read, or a «to» day before its «from», is said under it and neither filters nor narrows', async () => {
     const s = await setup();
+    await s.result('base.business.get', business());
     await s.show(EMPTY);
     expect(s.prop('filterErrors')).toEqual({});
     await s.filter({ total_amount_from: 'doce', issue_date_from: '2026-10-14', issue_date_to: '2026-10-01' });
     expect(s.prop('filterErrors')).toEqual({
-      total_amount_from: 'Type an amount, like 12.50',
+      total_amount_from: 'This is not an amount. Type a figure, for example 12.50.',
       issue_date_to: 'The end date cannot be before the start date.',
     });
     expect(s.params()).toEqual([{ sort: 'issued_at', dir: 'desc', limit: 50, offset: 0 }]);
@@ -421,8 +423,12 @@ describe('InvoicesPage: the rest', () => {
     expect(s.rows()[0].findAll('[role="cell"]').slice(2, 5).map((c) => plain(c.text().trim()))).toEqual(['12,10 €', 'Emitida', '14/10/2026']);
     expect(s.prop('searchPlaceholder')).toBe('Buscar facturas…');
     expect(s.prop<Array<{ label: string }>>('filterFields').map((f) => f.label)).toEqual(['Serie', 'Origen']);
+    await s.result('base.business.get', business());
     await s.filter({ total_amount_to: 'mil', issue_date_from: '2026-10-14', issue_date_to: '2026-10-01' });
-    expect(s.prop('filterErrors')).toEqual({ total_amount_to: 'Escribe un importe, como 12,50', issue_date_to: 'La fecha final no puede ser anterior a la inicial.' });
+    expect(s.prop('filterErrors')).toEqual({
+      total_amount_to: 'Esto no es un importe. Escribe una cifra, por ejemplo 12,50.',
+      issue_date_to: 'La fecha final no puede ser anterior a la inicial.',
+    });
   });
 });
 
@@ -430,5 +436,18 @@ describe('InvoicesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+});
+
+describe('InvoicesPage: «Total» is read as every amount of the Hub (hub#1196)', () => {
+  itReadsAmountFiltersAsTheHub({
+    ends: ['total_amount_from', 'total_amount_to'],
+    params: ['total_amount_from', 'total_amount_to'],
+    async open(money) {
+      const s = await setup();
+      await s.result('base.business.get', business({ currency: money.currency, currency_decimals: money.decimals }));
+      await s.show(PAGE);
+      return { filter: s.filter, query: () => s.params().at(-1) as Record<string, unknown>, says: () => s.prop('filterErrors') };
+    },
   });
 });

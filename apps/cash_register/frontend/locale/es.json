@@ -81,9 +81,6 @@
         "body": "Se cerrará sola al abrir la siguiente sesión."
       }
     },
-    "filters": {
-      "amountInvalid": "Esto no es un importe."
-    },
     "open": {
       "title": "Abrir sesión de caja",
       "register": "Cajón",

@@ -1,6 +1,7 @@
 // Test helper of the cart_checkout app's pages and components, as `mount-service.ts` is the service app's: the SDK's
 // live harness (fake clock, fake network serving the stream and the API) on the hub's op → route map,
-// the shell's i18n with the cart_checkout catalogues merged in, a session and a memory router.
+// the shell's i18n with base's and the cart_checkout catalogues merged in (as the shell loads them all), a session
+// and a memory router.
 // Dialogs: a test that opens one mocks `@ionic/vue`'s IonModal with FormModal's `IonModalStub`
 // (imported from its own file in the mock factory: this helper loads @ionic/vue, the factory must not).
 import { createShellI18n, provideSession, type SessionMe } from '@erplora/ui/shell';
@@ -16,6 +17,8 @@ import {
   resultFrame,
   type StreamCall,
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+import baseEn from '../../../../base/frontend/locale/en.json';
+import baseEs from '../../../../base/frontend/locale/es.json';
 import type { Business } from '../../../../base/frontend/operations';
 import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
 import en from '../locale/en.json';
@@ -82,7 +85,7 @@ export async function mountCartCheckout(component: Component, options: MountOpti
   const wrapper = mount(component, {
     props: options.props,
     global: {
-      plugins: [router, createShellI18n({ locale: options.locale ?? 'en', messages: { en, es } })],
+      plugins: [router, createShellI18n({ locale: options.locale ?? 'en', messages: { en: { ...baseEn, ...en }, es: { ...baseEs, ...es } } })],
       provide: { ...app._context.provides, [LIVE_CLIENT_KEY as symbol]: harness.client },
       stubs: options.stubs,
     },

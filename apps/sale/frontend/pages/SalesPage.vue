@@ -36,9 +36,9 @@ import { useBusinessDay } from '../components/sales/useBusinessDay';
 import VoidSaleModal from '../components/sales/VoidSaleModal.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney, type Money, moneyOf, useBusinessMoney } from '../lib/format';
+import { amountFilterErrors, formatMoney, type Money, moneyOf, useBusinessMoney } from '../lib/format';
 import { refusal } from '../lib/refusal';
-import { filterQuery, filtersInUse, hasDateRange, invalidAmounts, paymentMethodSearch, reversedDates, SALE_STATUSES } from '../lib/salesFilters';
+import { filterQuery, filtersInUse, hasDateRange, paymentMethodSearch, reversedDates, SALE_STATUSES, TOTAL_ENDS } from '../lib/salesFilters';
 import type { SaleListIn, SaleRow } from '../operations';
 import { saleTabs } from '../tabs';
 
@@ -100,10 +100,11 @@ const blocked = computed(() => (error.value?.code === 'app_inactive' || error.va
 /** A filter the server refused (a 422 of the list): said under the filter, the rows stay. */
 const refusedFilters = computed(() => error.value?.fields ?? {});
 const tableError = computed(() => (status.value === 'error' && !Object.keys(refusedFilters.value).length ? error.value?.message : undefined));
-/** Under each filter: what it cannot read or a reversed range, else what the server refused. */
+/** Under each filter: what it cannot read (an amount, as every amount filter of the Hub says it: hub#1196) or a
+ *  reversed range, else what the server refused. */
 const filterErrors = computed<Record<string, string>>(() => ({
   ...refusedFilters.value,
-  ...Object.fromEntries(invalidAmounts(filters.value, business.value).map((key) => [key, t('sale.sales.filters.amountInvalid')])),
+  ...amountFilterErrors(filters.value, TOTAL_ENDS, { t, locale: locale.value, money: business.value }),
   ...(reversedDates(filters.value) ? { date_to: t('sale.sales.filters.dateOrder') } : {}),
 }));
 

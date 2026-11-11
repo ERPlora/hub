@@ -23,6 +23,7 @@ import SalesWeek from '../components/sales/SalesWeek.vue';
 import SalesPage from './SalesPage.vue';
 import source from './SalesPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
+import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
@@ -359,7 +360,10 @@ describe('SalesPage: search, filters, sort and pages', () => {
     await s.show(EMPTY);
     expect(s.prop('filterErrors')).toEqual({});
     await s.filter({ total_max: 'doce', date_from: '2026-10-14', date_to: '2026-10-01' });
-    expect(s.prop('filterErrors')).toEqual({ total_max: 'Type an amount, like 12.50', date_to: 'The end date cannot be before the start date.' });
+    expect(s.prop('filterErrors')).toEqual({
+      total_max: 'This is not an amount. Type a figure, for example 12.50.',
+      date_to: 'The end date cannot be before the start date.',
+    });
     expect(s.list()).toEqual([{ ...TODAY, sort: 'created_at', dir: 'desc', limit: 50, offset: 0 }]);
     expect((s.find('sales-range').element as HTMLElement & { value?: unknown }).value).toBe('today');
     await s.show(EMPTY);
@@ -570,7 +574,10 @@ describe('SalesPage: the rest', () => {
     type Column = { key: string; filter?: { options?: Array<{ label: string }> } };
     expect(s.prop<Column[]>('columns').find((c) => c.key === 'status')?.filter?.options?.map((o) => o.label)).toEqual(['Completada', 'Anulada', 'Devuelta']);
     await s.filter({ total_min: 'mil', date_from: '2026-10-14', date_to: '2026-10-01' });
-    expect(s.prop('filterErrors')).toEqual({ total_min: 'Escribe un importe, como 12,50', date_to: 'La fecha final no puede ser anterior a la inicial.' });
+    expect(s.prop('filterErrors')).toEqual({
+      total_min: 'Esto no es un importe. Escribe una cifra, por ejemplo 12,50.',
+      date_to: 'La fecha final no puede ser anterior a la inicial.',
+    });
   });
 });
 
@@ -578,5 +585,17 @@ describe('SalesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+});
+
+describe('SalesPage: «Total» is read as every amount of the Hub (hub#1196)', () => {
+  itReadsAmountFiltersAsTheHub({
+    ends: ['total_min', 'total_max'],
+    params: ['total_min', 'total_max'],
+    async open(money) {
+      const s = await setup({ business: business({ currency: money.currency, currency_decimals: money.decimals }) });
+      await s.show(PAGE);
+      return { filter: s.filter, query: () => s.list().at(-1) as Record<string, unknown>, says: () => s.prop('filterErrors') };
+    },
   });
 });

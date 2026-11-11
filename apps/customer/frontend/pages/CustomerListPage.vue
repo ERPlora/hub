@@ -26,8 +26,8 @@ import CustomerImportButton from '../components/CustomerImportButton.vue';
 import CustomerStats from '../components/CustomerStats.vue';
 import ImportReport from '../components/ImportReport.vue';
 import { STAGES } from '../lib/customerForm';
-import { filterParams, filtersInUse, SOURCES, unreadableAmounts } from '../lib/customerFilters';
-import { useBusinessMoney } from '../lib/money';
+import { filterParams, filtersInUse, SOURCES, SPENT_ENDS } from '../lib/customerFilters';
+import { amountFilterErrors, useBusinessMoney } from '../lib/money';
 import { formatPhone } from '../lib/phoneDisplay';
 import { customerTabs } from '../lib/tabs';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
@@ -103,10 +103,9 @@ const filterFields = computed<DataTableFilterField[]>(() => [
   },
 ]);
 
-/** An amount of «Spent» it cannot read, said under its field (it does not filter). */
-const filterErrors = computed(() =>
-  Object.fromEntries(unreadableAmounts(filters.value, money.value).map((name) => [name, t('customer.filters.amountInvalid')])),
-);
+/** An amount of «Spent» it cannot read, said under its field as every amount filter of the Hub says it (hub#1196);
+ *  it does not filter. */
+const filterErrors = computed(() => amountFilterErrors(filters.value, SPENT_ENDS, { t, locale: locale.value, money: money.value }));
 
 const actions = computed<DataTableAction<CustomerRow>[]>(() => [
   { id: 'open', label: t('customer.list.view'), icon: 'ion:chevron-forward-outline', pinned: true },
