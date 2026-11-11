@@ -729,3 +729,73 @@ class TestTheKeptCopiesGoAfterTheirDays:
 
         first, second = MovedCopy.objects.filter(hub=hub).order_by("moved_at")
         assert marker(first.db_name) == [AS_THEN, SINCE] and marker(second.db_name) == [AS_THEN]
+
+
+# ── Asked in the Hub admin (BASE-F113) ────────────────────────────────────────────────────────────────────────────────
+
+#: Where the Hub admin is, and its hubs.
+PLATFORM = "hubs.localhost:8000"
+HUBS = "/admin/control/hub/"
+
+
+@pytest.fixture
+def platform_admin(client, restores):
+    """The test client signed in on the Hub admin as a platform admin (staff and superuser), committed as the restores'
+    rows are; the user, its session and the events its requests recorded go after the test."""
+    from django.contrib.auth import get_user_model
+    from live.models import OutboxEvent
+
+    with use_control():
+        user = get_user_model().objects.create_superuser(username=f"root-{uuid.uuid4().hex[:8]}", password="pw")
+        client.force_login(user)
+    yield client
+    with use_control():
+        client.logout()
+        OutboxEvent.objects.filter(payload__id__in=[str(hub.pk) for hub in restores.hubs]).delete()
+        user.delete()
+
+
+class TestAskedInTheHubAdmin:
+    """The flow end to end: a platform admin asks it with «Restore from a copy…» (``control.hub.restore``), the worker's
+    pass restores the hub or refuses it, and the Hub admin says what happened, the refusal as the worker noted it."""
+
+    @staticmethod
+    def ask(client, hub: Hub, temporary: Cluster) -> None:
+        data = {
+            "action": "restore_from_a_copy",
+            "_selected_action": [str(hub.pk)],
+            "apply": "yes",
+            "cluster": str(temporary.pk),
+            "at": THEN.isoformat(),
+        }
+        client.post(HUBS, data, HTTP_HOST=PLATFORM, follow=True)
+
+    @staticmethod
+    def its_page(client, hub: Hub) -> str:
+        response = client.get(f"{HUBS}{hub.pk}/change/", HTTP_HOST=PLATFORM)
+        assert response.status_code == 200
+        return response.content.decode()
+
+    def test_the_hub_gets_the_copys_data(self, restores, platform_admin):
+        hub = restores.hub(source=None)
+        temporary = restores.cluster()
+
+        self.ask(platform_admin, hub, temporary)
+        assert (fresh(hub).restoring_from_id, fresh(hub).restore_point) == (temporary.pk, THEN)
+        assert run(restores) == 1
+
+        assert marker(hub.db_name) == [AS_THEN]
+        assert fresh(hub).restoring_from_id is None and kept_copy(hub).moved_at is not None
+
+    def test_one_refused_for_its_fiscal_records_says_why_on_the_hubs_page(self, restores, platform_admin):
+        hub = restores.hub(source=None)
+        a_record(hub.db_name, created_at=AFTER, updated_at=AFTER)
+
+        self.ask(platform_admin, hub, restores.cluster())
+        run(restores)
+
+        assert marker(hub.db_name) == [AS_THEN, SINCE] and fresh(hub).restoring_from_id is None
+        assert (
+            "restore_fiscal_records: fiscal records made, sent or changed after the copy: 1; restoring it would repeat "
+            "numbers the tax authority already has"
+        ) in self.its_page(platform_admin, hub)
