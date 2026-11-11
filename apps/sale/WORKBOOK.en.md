@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9879914d0065cd7f95ca67ca3f4424a9b4ea2b9ec92e6e16635793e1f1951ec3 -->
+<!-- generated from WORKBOOK.md sha256:a55f368d62521fbdcc9712c0e1090eaa08c851c6209faeba5b6847f0f7ff3835 -->
 
 ## What it is for and who it is for
 
@@ -314,7 +314,9 @@ the tiles, the search, the open checks and the floating button say "—", and th
 total is on its way, because without it the number of decimals is unknown (in yen, "Charge · 15.00" for ¥1,500;
 hub#936); as soon as it says it, the figure shows with its sign. If the server cannot value the check
 (for example, because no applicable VAT rule exists), the foot says why instead of leaving only "—";
-when it can value it, the notice clears and the total returns, and parking the check does not leave it
+without a rule, the reason names the article and its tax category by the name Taxes gives it, in the
+reader's language (e.g. "Service — generic", never its key `service.generic`), and ends with "Create its
+rule in Taxes › Rules."; the **Charge** sheet says the same (hub#1123). When it can value it, the notice clears and the total returns, and parking the check does not leave it
 on the empty till. The **Charge** sheet stays on "Working out
 the total…", with no keypad and "Charge" grey, because the total is painted and the amount tendered read in
 it (without it, "1500" yen tendered would be charged as 150,000); if the currency cannot be read, the notice
@@ -1334,7 +1336,9 @@ has not yet said its currency, because the amount is read and the price written 
 yen would go in as 150,000), and the price does not show yet: "Use —", and on the tile "—" or "From —" (never
 "From 65.00" for ¥6,500; hub#936). A service without a tax category shows "VAT missing" and does not go in
 ("Cannot be sold: no tax category. VAT needs to be set up."); that notice goes away on its own as soon as the service has a
-category, without touching anything else, and also on leaving **Sell**. An archived one, "That service is
+category, without touching anything else, and also on leaving **Sell**. One whose category has no rule in the
+business's country goes in, but the check is neither valued nor charged: the foot says so as in SALE-F01, with
+the category's name and where its rule is made (hub#1123). An archived one, "That service is
 no longer offered…"; an amount outside the service's minimum and maximum, "That amount is outside what the
 service allows (<minimum> – <maximum>).". A booked price that does not match the appointment: "That is not the price the appointment
 booked for this service: it is cancelled, it is another customer's, it did not book this service or it
