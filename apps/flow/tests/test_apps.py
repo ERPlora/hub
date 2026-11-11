@@ -7,6 +7,8 @@ from django.utils import translation
 from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
 from live.operations import INTERNAL, registry
 
+from base import assistant
+
 PERMISSIONS = ["flow.view", "flow.manage", "flow.answer", "flow.answer_manager"]
 QUERIES = {
     "flow.operation.get",
@@ -208,6 +210,8 @@ def test_every_operation_tells_the_assistant_what_it_does(flow_operations):
         assert isinstance(op.ai, dict), name
         assert str(op.ai.get("description", "")).strip(), name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
+        if assistant.is_tool(op):  # what a person says to ask for it (hub#1106); the engine's are no tool
+            expected |= {"asks"}
         assert set(op.ai) == expected, name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, name
