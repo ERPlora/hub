@@ -150,6 +150,13 @@ def test_delete_of_a_missing_item_is_not_found():
 
 # Each write on an item by its name (hub#1162), as the read finds it: ``tests/test_queries.py``.
 
+#: Each write on one item, its input and the rest of what it needs.
+ON_AN_ITEM = [
+    ("demo.item.update", ItemPatchIn, {"status": "done"}),
+    ("demo.item.delete", ItemRefIn, {}),
+    ("demo.item.add_line", LineIn, {"text": "Screws", "qty": "3"}),
+]
+
 
 @pytest.mark.django_db
 def test_update_by_its_name_changes_only_what_was_sent():
@@ -188,14 +195,7 @@ def test_add_line_by_its_name():
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize(
-    ("name", "schema", "rest"),
-    [
-        ("demo.item.update", ItemPatchIn, {"status": "done"}),
-        ("demo.item.delete", ItemRefIn, {}),
-        ("demo.item.add_line", LineIn, {"text": "Screws", "qty": "3"}),
-    ],
-)
+@pytest.mark.parametrize(("name", "schema", "rest"), ON_AN_ITEM)
 def test_a_name_two_items_share_changes_nothing_and_records_nothing(name, schema, rest):
     first, second = create("Autumn trial"), create("Autumn trial")
     OutboxEvent.objects.all().delete()
@@ -210,14 +210,7 @@ def test_a_name_two_items_share_changes_nothing_and_records_nothing(name, schema
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize(
-    ("name", "schema", "rest"),
-    [
-        ("demo.item.update", ItemPatchIn, {"status": "done"}),
-        ("demo.item.delete", ItemRefIn, {}),
-        ("demo.item.add_line", LineIn, {"text": "Screws", "qty": "3"}),
-    ],
-)
+@pytest.mark.parametrize(("name", "schema", "rest"), ON_AN_ITEM)
 def test_each_write_locks_the_items_row_before_it_writes(name, schema, rest):
     """The module's promise (two writes on the same item never interleave): the item found, by its id or its name, is
     read again ``FOR UPDATE`` before anything is written."""
