@@ -175,6 +175,15 @@ def test_several_that_contain_what_is_said_are_named_in_the_conflict():
     assert "Trial 1" in said and "Trial 2" in said and "Bar" not in said
 
 
+def test_a_name_that_fits_many_items_names_the_five_changed_last():
+    for number in range(1, 8):
+        make(f"Trial {number}", minutes_ago=number)
+    with pytest.raises(Conflict) as excinfo:
+        named("trial")
+    said = str(excinfo.value)
+    assert [f"Trial {number}" in said for number in range(1, 8)] == [True] * 5 + [False] * 2
+
+
 def test_a_name_no_item_has_is_not_found():
     make("Bar")
     with pytest.raises(NotFound) as excinfo:
