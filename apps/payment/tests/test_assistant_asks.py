@@ -188,7 +188,9 @@ def test_a_tender_of_the_till_is_never_taken_for_where_the_business_pays_its_sup
 
 #: Where the business pays from in the Hub's words (``base.assistant.SYNONYMS``): a «cuenta bancaria» or «cuenta del
 #: banco», never the table's check a «cuenta» alone is, and a «bank account», are a Payments' method, as «method» is.
-BANK_ACCOUNT = ("cuenta bancaria", "cuentas bancarias", "cuenta del banco", "cuentas del banco", "bank account")
+BANK_ACCOUNT = (
+    "cuenta bancaria", "cuentas bancarias", "cuenta del banco", "cuentas del banco", "bank account", "bank accounts",
+)
 #: In phrases nobody wrote as asks nor as probes, each brings its tool among the first ten, and none does without them.
 PAYMENT_WORDS = [
     ("payment.method.list", "¿qué cuentas bancarias tenemos?"),
