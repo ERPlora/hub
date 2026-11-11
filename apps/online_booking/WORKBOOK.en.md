@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e93c92d1f2ca2470e7e951da39014be8a013be94659c54dff311bced5565f9ac -->
+<!-- generated from WORKBOOK.md sha256:1a5d440ba82dcccdbe5bc3f6640aa9d4a0119329226abe2f9a9313018c975d9d -->
 
 ## What it is for and who it is for
 
@@ -117,7 +117,7 @@ Dates and times show on the business's clock and in the format of the language o
 
 ### ONLINE_BOOKING-F01 The customer books from the booking page
 Status: done (operations and preview; the public page is `base`'s)
-Actor: customer (no session)
+Actor: customer (no session); owner or administrator, with the preview or with the assistant
 Screen: public booking page (`base`); in development, the preview
 Steps:
 1. She opens the business's page: title, welcome message, logo and colour from the Settings.
@@ -142,7 +142,8 @@ the customer's card **linked by her phone** or created if it does not exist (`cu
 origin "web"), and the notice `online_booking.booking.created`. If the card has no email, the one she wrote
 stays as the appointment's contact (the card is not touched). With "No preference", the appointment goes to
 the first professional (by name order) who has that time free. Nothing the page answers tells the name
-of the card of that mobile. Whoever opens the preview from inside (owner or administrator) books with
+of the card of that mobile. Whoever books from inside (owner or administrator), with the preview or by
+asking the assistant ("book her online, as the customer would…": its card is the confirmation), books with
 the same rules as the customer: never with the front desk's exceptions.
 If it fails: nothing is written. The page switched off ("This business does not take online bookings right now."); a
 service that is not booked online; picking a professional when the business does not allow it; the time is no longer
@@ -213,10 +214,11 @@ Involved: APPOINTMENT-F05
 
 ### ONLINE_BOOKING-F06 Delete a booking
 Status: done
-Actor: owner, administrator
+Actor: owner, administrator, assistant
 Screen: Bookings
 Steps:
-1. Press **Delete** and confirm "Delete booking APT-…? It is better to cancel it, which keeps its history.".
+1. Press **Delete** and confirm "Delete booking APT-…? It is better to cancel it, which keeps its history."
+   (or ask the assistant for it: its card is the confirmation).
 2. The booking disappears from the inbox and from the diary (soft delete: the data is not lost).
 In: an online booking that is not in progress, completed or charged.
 Out: `appointment.appointment.deleted`.
@@ -225,7 +227,7 @@ Involved: APPOINTMENT-F11
 
 ### ONLINE_BOOKING-F07 Set up the booking page
 Status: done
-Actor: owner, administrator
+Actor: owner, administrator, assistant
 Screen: Settings
 Steps:
 1. Change the fields of **Public page** and of **Booking rules** and press **Save**: "Settings
@@ -319,7 +321,8 @@ Involved: APPOINTMENT-F24, CUSTOMER-F16
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of the person speaking) and the
 API, with the same rules and permissions. A booking is named by its id, its number (`APT-…`) or **the way a
 person says it**: the customer (name, phone or email) and the day ("Ana's for tomorrow"); with no day, her next
-online booking. If it fits several, they are listed and the number is asked for.
+online booking. If it fits several, they are listed and the number is asked for. By voice, the page's ones are
+asked for as "Olga's internet booking" or "what I have in the inbox".
 
 ### What it offers: queries
 
@@ -342,7 +345,8 @@ online booking. If it fits several, they are listed and the number is asked for.
 | Saves the settings (and the rules of Appointments) | settings (+ Appointments settings for the rules) | F07 | `online_booking.settings.update` |
 | Books and cancels from the page (public) | `online_booking.public` | F01, F11 | `online_booking.public.book`, `.cancel` |
 
-No-show, cancel and delete are **high risk** for the assistant: it asks for confirmation first. The actions of
+No-show, cancel and delete are **high risk** for the assistant: its card asks for confirmation before doing
+it, without asking first in the chat (BASE-F97). The actions of
 the inbox are done by Appointments with the permission of whoever acts: it takes this app's **and** Appointments'.
 
 ### What it announces
