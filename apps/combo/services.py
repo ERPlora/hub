@@ -273,7 +273,7 @@ def create_combo(ctx: OperationContext, data: ComboIn) -> dict:
     ai={
         "description": "Change a menu: name, kitchen name, closed price, how it is sold, tax category, order, or "
         "put it on sale / withdraw it from the till. Only the fields sent change. Changing how it is sold or its "
-        "tax category changes how it is billed: confirm it with the person.",
+        "tax category changes how it is billed.",
         # Per operation, not per field: it may change how the menu is billed (supply_kind, tax_category_key).
         "risk": "high",
         "asks": {
