@@ -110,7 +110,8 @@ check("python fetches ERPlora/blueprints into ../blueprints before pytest",
 # WeasyPrint's libraries are installed without Ubuntu's mirror (hub#1222: a DNS outage of the mirror kept every run red
 # for hours, and retries alone would spend minutes the python job does not have): their .deb files come from GitHub's
 # cache, one entry per runner image and per test.yml, through apt-install.sh, which only goes to the mirror without
-# them and retries it then.
+# them and retries it then. The cache is saved right after the download, not at the end of the job: the end only saves
+# when every test passes, and other runs would miss it for the 20 to 30 minutes of pytest.
 python_steps = steps(tjobs.get("python", {}))
 weasyprint = next((step for step in python_steps if step.get("name") == "WeasyPrint's libraries"), {})
 weasyprint_run = str(weasyprint.get("run", "")).split()
@@ -118,14 +119,25 @@ check("WeasyPrint's libraries are installed with apt-install.sh",
       weasyprint_run[:2] == ["bash", ".github/scripts/apt-install.sh"] and len(weasyprint_run) > 3
       and "apt-get" not in weasyprint_run)
 archives = weasyprint_run[2] if len(weasyprint_run) > 2 else None
-apt_cache = next((step for step in python_steps if str(step.get("uses", "")).startswith("actions/cache@")
-                  and (step.get("with") or {}).get("path") == archives), None)
-check("their archives come from GitHub's cache, restored before the install and saved after it",
-      apt_cache is not None and python_steps.index(apt_cache) < python_steps.index(weasyprint))
-apt_key = str(((apt_cache or {}).get("with") or {}).get("key", ""))
+
+
+def cache_step(action):
+    """The step of python that runs actions/cache/<action> over the install's archives, or None."""
+    return next((step for step in python_steps if str(step.get("uses", "")).startswith(f"actions/cache/{action}@")
+                 and (step.get("with") or {}).get("path") == archives), None)
+
+
+apt_restore, apt_save = cache_step("restore"), cache_step("save")
+check("their archives are restored from GitHub's cache before the install",
+      apt_restore is not None and python_steps.index(apt_restore) < python_steps.index(weasyprint))
+check("and saved right after it, under the same key, only when the cache missed",
+      apt_save is not None and apt_restore is not None and python_steps.index(apt_save) == python_steps.index(weasyprint) + 1
+      and (apt_save.get("with") or {}).get("key") == f"${{{{ steps.{apt_restore.get('id')}.outputs.cache-primary-key }}}}"
+      and str(apt_save.get("if", "")) == f"steps.{apt_restore.get('id')}.outputs.cache-hit != 'true'")
+apt_key = str(((apt_restore or {}).get("with") or {}).get("key", ""))
 image = next((step for step in python_steps if step.get("id") and f"steps.{step['id']}.outputs." in apt_key), None)
 check("the cache keeps one entry per runner image and per test.yml (where the package list lives)",
-      image is not None and apt_cache is not None and python_steps.index(image) < python_steps.index(apt_cache)
+      image is not None and apt_restore is not None and python_steps.index(image) < python_steps.index(apt_restore)
       and all(name in str(image.get("run", "")) for name in ("$ImageOS", "$ImageVersion"))
       and "hashFiles('.github/workflows/test.yml')" in apt_key)
 check("frontend runs lint, typecheck, Vitest and the build",
