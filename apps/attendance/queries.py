@@ -866,7 +866,7 @@ def person_detail(ctx: OperationContext, params: PersonRefIn) -> dict:
                 "after how many hours is a forgotten day flagged?",
             ),
             "es": (
-                "dime de cuántos metros es el radio para fichar",
+                "dame el radio permitido para fichar",
                 "¿se pide la ubicación al fichar con el móvil?",
                 "¿a partir de cuántas horas se avisa de un día olvidado?",
             ),
