@@ -1208,8 +1208,9 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   restaurar un servicio y asignar, cambiar o quitar un profesional desde el chat (SERVICE-F04, F05, F14 a
   F20, F31 y F32) llegan a su operación: las frases reales de la QA del asistente
   (`tests/e2e/qa/probes/owner-es-service-2026-11-08.json`) quedan entre las 20 primeras herramientas del
-  turno, y ni las `asks` ni los grupos de Servicios adelantan sus bonos, sesiones o asignaciones a una
-  petición de Citas o de las cuentas de Ventas (`tests/test_assistant_asks.py`). Lo que solo se toma por su
+  turno, cada herramienta tiene una frase propia que solo llega a ella por sus `asks`, y ni las `asks` ni
+  los grupos de Servicios adelantan sus bonos, sesiones o asignaciones a una petición de Citas o de las
+  cuentas de Ventas (`tests/test_assistant_asks.py`). Lo que solo se toma por su
   id (un bono vendido, una sesión, una asignación) dice en su descripción qué lectura lo encuentra
   (`service.grant.list`, la línea de `sale.order.get`, `service.assignment.list`), para que el asistente lo
   busque en vez de pedir un id.
