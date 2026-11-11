@@ -302,7 +302,7 @@ def _refuse_fiscal_changes(name: str, cluster, copy: str, origin) -> None:
     if changed:
         raise move.MoveFailed(
             "restore_fiscal_records",
-            f"{changed} VeriFactu record(s) of production were made, sent or changed after the copy: restoring it "
-            "would repeat numbers the AEAT already has",
+            f"production VeriFactu records made, sent or changed after the copy: {changed}; restoring it would "
+            "repeat numbers the AEAT already has",
         )
 

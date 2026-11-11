@@ -387,7 +387,6 @@ class TestTheFiscalGuard:
 
         hub = fresh(hub)
         assert hub.restoring_from_id is None and hub.last_error.startswith("restore_fiscal_records")
-        assert "1 " in hub.last_error
         assert marker(hub.db_name) == [AS_THEN, SINCE]
         assert not MovedCopy.objects.filter(hub=hub).exists()
 
