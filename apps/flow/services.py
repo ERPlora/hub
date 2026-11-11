@@ -516,7 +516,7 @@ def duplicate_flow(ctx: OperationContext, data: FlowRefIn) -> dict:
             ),
         },
         "description": "Delete an automation, by its id or its name: it stops at once, what was waiting is "
-        "cancelled and its history stays. Cannot be undone: confirm it first.",
+        "cancelled and its history stays. Cannot be undone.",
         "risk": "high",
     },
 )
@@ -742,7 +742,7 @@ def disable_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
         },
         "description": "Give a ready-made automation back the version its app brings today: its name, trigger, steps "
         "and exactly the recipe's permissions replace the owner's changes; it stays on or paused as it is and keeps "
-        "its history. Confirm it: what the owner changed is lost.",
+        "its history. What the owner changed is lost.",
         "risk": "high",
     },
 )
@@ -852,7 +852,7 @@ def set_secret(ctx: OperationContext, data: SecretSetIn) -> dict:
             ),
         },
         "description": "Delete a secret by its name: the automations whose calls use it will fail with "
-        "`flow.secret_not_found` until it is saved again. Confirm it first.",
+        "`flow.secret_not_found` until it is saved again.",
         "risk": "high",
     },
 )
@@ -1745,7 +1745,7 @@ def _may_say_yes(ctx: OperationContext, run: FlowRun) -> None:
         },
         "description": "Answer yes or no, with an optional note, to a question an automation asked and is waiting "
         "on (from `flow.question.list`): a yes carries it on, a no does what its step says. Only the role it was "
-        "asked of, or whoever runs the business. It is the person's decision: confirm it with them first.",
+        "asked of, or whoever runs the business. The yes or the no is the one the person said, never your own.",
         "risk": "high",
     },
 )
@@ -2202,7 +2202,7 @@ def resume_due(ctx: OperationContext, data: DueIn) -> dict:
         },
         "description": "Run an automation now, for real, by its id or its name («run the weekly review now»), "
         "with `input` as what its steps read. Only when it is on; to see what it would do without effects, "
-        "use `flow.flow.test`. Confirm it first.",
+        "use `flow.flow.test`.",
         "risk": "high",
     },
 )
@@ -2245,7 +2245,7 @@ def run_now(ctx: OperationContext, data: RunIn) -> dict:
         "description": "Resume a run that stopped by an error at the step that failed, once its cause is fixed "
         "(a permission granted, an app turned on, the other system back): the steps before it are not "
         "repeated and it goes on with the steps it started with. Only within 7 days, with the automation on. "
-        "It does things for real: confirm it first.",
+        "It does things for real.",
         "risk": "high",
     },
 )

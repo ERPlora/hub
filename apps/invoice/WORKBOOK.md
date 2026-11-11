@@ -434,8 +434,8 @@ Pasos:
    siguiente número de la serie «RECT» del año (no queda reservado: lo toma al emitirse), la fecha de
    hoy, sus líneas y la base, los impuestos y el total en negativo; si la factura ya tenía rectificativas
    por diferencias, también lo que queda por rectificar de ella.
-5. Después sale «¿Ejecutar esta acción?» con el «Número» de la factura y el «Motivo» y, en
-   «Lo que va a pasar», la rectificativa que va a nacer: el «Tipo de rectificativa» por su nombre, nunca solo
+5. En esa misma respuesta, sin que tengas que volver a pedírselo, sale «¿Ejecutar esta acción?» con el
+   «Número» de la factura y el «Motivo» y, en «Lo que va a pasar», la rectificativa que va a nacer: el «Tipo de rectificativa» por su nombre, nunca solo
    por su código («Rectificativa: resto de causas (R4)»; también si el asistente lo pide al rectificar), el
    «Siguiente número» de la serie (tampoco queda reservado) y la «Base imponible», el «Impuesto» y el «Total»
    en negativo, con la moneda del negocio. Escribe «CONFIRMAR» y pulsa «Ejecutar». Se emite esa misma rectificativa,
@@ -1162,6 +1162,10 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   un destinatario extranjero sale con las palabras del formulario (`ForeignIdType`, los `choices` del campo);
   el tipo de rectificativa aún sale con su código (R1–R4): `live` solo etiqueta por los `choices` de un campo
   del modelo con el mismo nombre, y ninguno se llama `rectification_type`.
+  Rectificar y su vista previa (`invoice.invoice.rectify`, `invoice.invoice.rectification_preview`) dicen que la
+  vista previa se cuenta en la misma respuesta que llama a rectificar, como el cierre de Caja: con «tell the person
+  its preview, then rectify» el asistente enseñaba la vista previa y nunca la tarjeta (hub#1175, hub#1102; lo guarda
+  `tests/test_guardrails_assistant.py` para todo el Hub).
 
 ### Decisiones (dudas abiertas del producto actual, resueltas con el mercado)
 
