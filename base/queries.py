@@ -692,7 +692,7 @@ BUSY_WINDOW_DAYS = 7
             "es": (
                 "¿cuánto espacio me queda?",
                 "¿cuántas peticiones llevamos este mes?",
-                "¿cuántas personas hay activas ahora?",
+                "¿cuántas personas están usando el Hub ahora?",
                 "¿se me queda corto el plan?",
             ),
         },
@@ -2689,11 +2689,21 @@ def docs_search(ctx: OperationContext, data: DocsSearchIn) -> DocsSearchOut:
     ASSISTANT-F28): erplora.com's one index, never one of the Hub's. What it cannot answer is an error the assistant
     relays, never excerpts made up."""
     try:
-        return DocsSearchOut.model_validate(assistant.searched_docs(ctx, query=data.query, limit=data.limit))
+        found = DocsSearchOut.model_validate(assistant.searched_docs(ctx, query=data.query, limit=data.limit))
     except (assistant.GatewayError, ValidationError):
         with translation.override(ctx.language):
             message = gettext("ERPlora's documentation could not be searched now.")
         raise OperationError(message, code="base.assistant_unavailable", status=503) from None
+    # Each excerpt with the line the answer cites it by (hub#1079): its headings, else its path, after «Source» in the
+    # person's language, for the model to write as it comes.
+    with translation.override(ctx.language):
+        source = pgettext("assistant answer", "Source")
+    return DocsSearchOut(
+        results=[
+            excerpt.model_copy(update={"cite": f"{source}: {excerpt.heading or excerpt.path}"})
+            for excerpt in found.results
+        ]
+    )
 
 
 # ── Locations (round 2026-10-24b, multi-location) ──────────────────────────────────────────────────────────────────

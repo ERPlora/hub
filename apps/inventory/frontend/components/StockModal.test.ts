@@ -8,9 +8,13 @@
 // Quantities in the product's unit and its step; a refusal stays in the dialog under its field.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import {
+  expectAmountLeftWaitsForMoney,
+  expectSaveWaitsForMoney,
+  expectWindowSaysMoneyUnreadable,
+} from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations';
-import { business, errorFrame, flush, mountInventory, ok, product, refusal, subId, UNITS } from '../__tests__/mount-inventory';
+import { business, errorFrame, flush, mountInventory, ok, POLISH, product, refusal, subId, UNITS } from '../__tests__/mount-inventory';
 import StockModal from './StockModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -113,6 +117,32 @@ describe('StockModal: goods receipt', () => {
     await expectSaveWaitsForMoney(window, () => s.result(s.call, 'base.business.get', business({ currency: 'JPY', currency_decimals: 0 })));
     await s.submit();
     expect(s.sent('/api/inventory/stock/receive')).toEqual({ items: [{ product_id: 'p1', qty: '3', unit_cost: 1500 }] });
+  });
+
+  // hub#945 (INVENTORY-F13): a unit cost typed with its currency's sign and left before the business answers is neither
+  // rewritten nor called «not an amount»; once it answers, it is read in its money.
+  it.each([
+    ['¥1500', { currency: 'JPY', currency_decimals: 0 }, 1500],
+    ['12,50 zł', { currency: 'PLN', currency_decimals: 2 }, 1250],
+  ] as const)('a unit cost «%s» left before the business says its currency stays as typed and unmarked, then is read in it (hub#945)', async (typed, money, cents) => {
+    const s = await setup('receive', {}, 'en', null);
+    await s.type('inventory-stock-qty', '3');
+    await expectAmountLeftWaitsForMoney({ amount: () => s.el('inventory-stock-cost'), settle: flush }, typed, () =>
+      s.result(s.call, 'base.business.get', business(money)),
+    );
+    s.net.onApi(() => ok({ rows: [product({ stock: '8.000' })] }));
+    await s.submit();
+    expect(s.sent('/api/inventory/stock/receive')).toEqual({ items: [{ product_id: 'p1', qty: '3', unit_cost: cents }] });
+  });
+
+  // INVENTORY-F13, hub#924: the unit cost is judged in the business's money: a euro one is no złoty amount in Poland.
+  it('in Poland a unit cost «13,50 €» says it is not an amount once left, and nothing is recorded', async () => {
+    const s = await setup('receive', {}, 'en', business(POLISH));
+    await s.type('inventory-stock-qty', '3');
+    await s.type('inventory-stock-cost', '13,50 €');
+    await s.leave('inventory-stock-cost');
+    await s.submit();
+    expect([s.el('inventory-stock-cost')?.errorText, s.calls('/api/inventory/stock/receive')]).toEqual(['This is not an amount. Type a figure, for example 12.50.', []]);
   });
 
   it("a quantity off the unit's step says so under the quantity and stays", async () => {

@@ -8,7 +8,7 @@
 import { Combo, ConfirmDialog, StatusPill } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { expectAmountLeftWaitsForMoney, expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { business, click, EMPLOYEE, ionValue, JAPANESE, type MountOptions, mountCombo, page, POLISH, settle } from '../__tests__/mount-combo';
 import type { GroupOut, OptionOut } from '../operations';
 import BulkAddModal from './BulkAddModal.vue';
@@ -245,7 +245,8 @@ describe('CourseCard: in the business’s currency', () => {
     s.picker().vm.$emit('update:modelValue', { id: 'p9', label: 'Sole' });
     await ionValue(s.el('combo-course-g1-delta'), '1,50 €', 'ionInput');
     await click(s.el('combo-course-g1-save'));
-    expect(s.el('combo-course-g1-delta').errorText).toBe('This is not an amount. Type a figure, for example 12.50.');
+    // The platform's signed money field (hub#924, as in Modifiers): it says how a discount is written too.
+    expect(s.el('combo-course-g1-delta').errorText).toBe('This is not an amount. Type a figure, for example 1.50, or -0.50 for a discount.');
     expect(s.posts()).toEqual([]);
   });
 
@@ -300,5 +301,41 @@ describe('CourseCard: in the business’s currency', () => {
     s.answer(200, option({}));
     await click(s.el('combo-course-g1-save'));
     expect(s.posts()).toEqual([{ method: 'POST', path: '/api/combo/options/update', query: {}, body: { id: 'o1', price_delta: 350 } }]);
+  });
+
+  // hub#945 (COMBO-F06): a supplement typed with its sign and left before the business answers is neither rewritten
+  // nor called «not an amount»; once it answers, it is read in its money.
+  it.each([
+    ['¥150', JAPANESE, 150],
+    ['-0,50 zł', POLISH, -50],
+  ] as const)('«%s» left before the business says its currency stays as typed and unmarked, then is read in it (hub#945)', async (typed, money, delta) => {
+    const s = await setup(COURSE, { business: null });
+    s.picker().vm.$emit('update:modelValue', { id: 'p9', label: 'Sole' });
+    await settle();
+    await expectAmountLeftWaitsForMoney({ amount: () => s.el('combo-course-g1-delta'), settle }, typed, () => s.result('base.business.get', business(money)));
+    s.answer(201, option({ id: 'o9' }));
+    await click(s.el('combo-course-g1-save'));
+    expect(s.posts()).toEqual([{ method: 'POST', path: '/api/combo/options', query: {}, body: { group_id: 'g1', product_id: 'p9', price_delta: delta } }]);
+  });
+
+  // COMBO-F06, hub#924: the supplement is the platform's money field with a sign, as in Modifiers: a phone's decimal
+  // keyboard has no minus, so «±» at the end of the field turns it into a discount (a cheaper choice) and back.
+  it('«±» turns a supplement into a discount and back; the discount is saved negative', async () => {
+    const s = await setup(COURSE, { business: business(POLISH) });
+    s.picker().vm.$emit('update:modelValue', { id: 'p9', label: 'Sole' });
+    await ionValue(s.el('combo-course-g1-delta'), '1,50', 'ionInput');
+    const sign = s.el('combo-course-g1-delta-sign');
+    await click(sign);
+    const discount = s.el('combo-course-g1-delta').value;
+    await click(sign);
+    const back = s.el('combo-course-g1-delta').value;
+    await click(sign);
+    s.answer(201, option({ id: 'o9' }));
+    await click(s.el('combo-course-g1-save'));
+    expect({ discount, back, sent: s.posts().at(-1)?.body }).toEqual({
+      discount: '-1,50',
+      back: '1,50',
+      sent: { group_id: 'g1', product_id: 'p9', price_delta: -150 },
+    });
   });
 });

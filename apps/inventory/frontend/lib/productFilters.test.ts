@@ -46,4 +46,11 @@ describe('productFilters', () => {
     expect(filtersInUse({ sku: 'CAF', price_min: '1', price_max: '2' })).toBe(3);
     expect(filtersInUse({ price_min: 'doce' })).toBe(0);
   });
+
+  // hub#924: the price ends are read in the business's money, like the price field: its złoty, never a euro.
+  it('reads the price ends in the business’s money: «12,50 zł» filters in Poland, «13,50 €» cannot be read there', () => {
+    const PLN = { currency: 'PLN', decimals: 2 };
+    const typed = { price_min: '13,50 €', price_max: '12,50 zł' };
+    expect([filterParams(typed, PLN), unreadableEnds(typed, PLN)]).toEqual([{ price_max: 1250 }, [{ name: 'price_min', problem: { ok: false, reason: 'not_amount' } }]]);
+  });
 });

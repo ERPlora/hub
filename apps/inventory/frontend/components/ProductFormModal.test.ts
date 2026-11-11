@@ -9,7 +9,11 @@
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import {
+  expectAmountLeftWaitsForMoney,
+  expectSaveWaitsForMoney,
+  expectWindowSaysMoneyUnreadable,
+} from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations';
 import { unsavedChangesIn } from '../../../../base/frontend/lib/system-back';
 import { ionModalStubOf } from '../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub';
@@ -320,6 +324,15 @@ describe('ProductFormModal: editing', () => {
       expect(s.el('inventory-product-cost')?.label).toBe('Cost (PLN)');
     });
 
+    // hub#924: the cost is judged in the business's money, like the price: a euro one is no złoty amount in Poland.
+    it('in Poland a cost «13,50 €» says it is not an amount, and nothing is saved', async () => {
+      const s = await setup({}, { business: business(POLISH) });
+      await s.fillRequired();
+      await s.type('inventory-product-cost', '13,50 €');
+      await s.submit();
+      expect([s.el('inventory-product-cost')?.errorText, s.calls('/api/inventory/products')]).toEqual(['This is not an amount. Type a figure, for example 12.50.', []]);
+    });
+
     it('while the business is not read, «Cost» without a currency, never the euro', async () => {
       const s = await setup({}, { business: null });
       expect(s.el('inventory-product-cost')?.label).toBe('Cost');
@@ -401,6 +414,30 @@ describe('ProductFormModal: editing', () => {
       expect(s.calls('/api/inventory/products/update')).toHaveLength(0);
       expect(s.el('inventory-product-price')?.errorText).toBe(NOT_AMOUNT);
     });
+
+    // hub#945 (INVENTORY-F01): a price or a cost typed with its currency's sign and left before the business answers is
+    // neither rewritten nor called «not an amount»; once it answers, it is read in its money.
+    it.each([
+      ['price', '¥1500', JAPANESE, 1500],
+      ['cost', '12,50 zł', POLISH, 1250],
+    ] as const)('the %s «%s» left before the business says its currency stays as typed and unmarked, then is read in it (hub#945)', async (name, typed, money, cents) => {
+      const s = await setup({ product: product({ price: 220, cost: 80 }) }, { business: null });
+      await expectAmountLeftWaitsForMoney({ amount: () => s.el(`inventory-product-${name}`), settle: flush }, typed, () => s.answer(money));
+      s.net.onApi(() => ok(product({ [name]: cents })));
+      await s.submit();
+      expect(s.sent('/api/inventory/products/update')).toEqual({ id: 'p1', [name]: cents });
+    });
+  });
+
+  // INVENTORY-F01, hub#924: a price is never negative, and the field says that, not that «-2» is no amount.
+  it('a negative price says it cannot be negative, and nothing is sent', async () => {
+    const s = await setup();
+    await s.fillRequired();
+    await s.type('inventory-product-price', '-2');
+    s.el('inventory-product-price')!.dispatchEvent(new CustomEvent('ionBlur'));
+    await flush();
+    await s.submit();
+    expect([s.el('inventory-product-price')?.errorText, s.calls('/api/inventory/products')]).toEqual(['This amount cannot be negative.', []]);
   });
 });
 

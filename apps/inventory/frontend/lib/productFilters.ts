@@ -2,11 +2,10 @@
 // the table's funnel holds them (by the list's parameter names, as typed; a filter not in use is absent)
 // and as `inventory.product.list` takes them: the price in cents (typed in the business's money, inventory#115) and the
 // stock as an exact quantity. An end it cannot read does not filter: the table says why under it.
-import type { DataTableFilters } from '@erplora/ui/components';
+import { type DataTableFilters, type MoneyRead, parseMoney } from '@erplora/ui/components';
 import type { InputOf } from '@erplora/ui/sdk';
 
 import type { Money } from './format';
-import { type MoneyRead, parseMoney } from './money';
 import { readQuantity } from './quantity';
 
 type ProductListIn = InputOf<'inventory.product.list'>;
@@ -28,7 +27,7 @@ export interface UnreadableEnd {
 export function unreadableEnds(values: DataTableFilters, money?: Money): UnreadableEnd[] {
   const out: UnreadableEnd[] = [];
   for (const name of MONEY_ENDS) {
-    const read = parseMoney(values[name] ?? '', money);
+    const read = parseMoney(values[name] ?? '', { money });
     if (!read.ok) out.push({ name, problem: read });
   }
   for (const name of QUANTITY_ENDS) if (!readQuantity(values[name] ?? '').ok) out.push({ name, problem: 'not_quantity' });
@@ -43,7 +42,7 @@ export function filterParams(values: DataTableFilters, money?: Money): Partial<P
   if (name) out.name = name;
   if (sku) out.sku = sku;
   for (const end of MONEY_ENDS) {
-    const read = parseMoney(values[end] ?? '', money);
+    const read = parseMoney(values[end] ?? '', { money });
     if (read.ok && read.cents !== null) out[end] = read.cents;
   }
   for (const end of QUANTITY_ENDS) {
