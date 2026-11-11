@@ -188,15 +188,9 @@ def test_a_tender_of_the_till_is_never_taken_for_where_the_business_pays_its_sup
     assert all(tender < at for at in outgoing), (tender, outgoing)
 
 
-#: What only live can fix: it reads «habilitar» and «activar» as turning something on (``enable``, an app's
-#: ``base.app.enable``) and never as the action ``activate`` of a tool, so the request to bring Banco QA back is offered
-#: behind turning an app on (ERPlora/live#50). When live reads it, this passes and its mark goes.
-UNTIL_LIVE_READS_ACTIVATE = pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="ERPlora/live#50: live has no verb activate, «habilitar» is enable"
-)
-
-
-@UNTIL_LIVE_READS_ACTIVATE
+#: live reads «habilitar» and «activar» as the action ``activate`` of a tool too, not only as turning something on
+#: (``enable``, an app's ``base.app.enable``; ERPlora/live#70), so the request to bring Banco QA back is offered ahead
+#: of turning an app on.
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_the_reported_request_to_bring_a_method_back_goes_ahead_of_turning_an_app_on(catalog_of):
     offered = offered_to(catalog_of(Membership.Role.OWNER, "es"), dict(REPORTED)["payment.method.activate"])
