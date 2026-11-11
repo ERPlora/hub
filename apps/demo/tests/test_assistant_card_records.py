@@ -258,14 +258,37 @@ def test_the_item_of_the_issue_said_by_its_own_name_alone_gets_its_card_and_goes
     assert [(field["name"], field["label"], field["value"]) for field in card["fields"]] == [
         ("called", SCREENS["es"]["detail"]["title"], "Ejemplo QA")
     ]
-    assert (plan["pending"], plan["executed"]) == ([write], [])
+    [waiting] = plan["pending"]
+    assert ({key: waiting[key] for key in write}, plan["executed"]) == (write, [])
     assert Item.objects.filter(pk=item.pk).exists()
 
     yes = {"call_id": "c1", "accepted": True, "typed": card["confirm_word"]}
-    done = turn_of(owner_in(), DELETE_BY_ITS_NAME, write, decision=yes)
+    done = turn_of(owner_in(), DELETE_BY_ITS_NAME, waiting, decision=yes)
 
     assert done["executed"][0]["outcome"] == "ok"
     assert not Item.objects.filter(pk=item.pk).exists()
+
+
+@pytest.mark.django_db
+def test_the_yes_deletes_only_the_item_its_card_showed_although_another_fits_the_name_better_meanwhile():
+    """hub#1208: «elimina mesa» shows «Mesa 4»; somebody creates «Mesa» before the yes. The yes, with the call as the
+    turn gave it back (the panel's way), deletes nothing: the card now says «Mesa», and only its yes deletes it."""
+    shown = Item.objects.create(name="Mesa 4")
+    plan = turn_of(owner_in(), "elimina mesa", call("demo.item.delete", {"called": "mesa"}))
+    assert [(field["name"], field["value"]) for field in plan["confirm"]["fields"]] == [("called", "Mesa 4")]
+    other = Item.objects.create(name="Mesa")
+    [waiting] = plan["pending"]
+    yes = {"call_id": "c1", "accepted": True, "typed": plan["confirm"]["confirm_word"]}
+
+    again = turn_of(owner_in(), "elimina mesa", waiting, decision=yes)
+
+    assert again["executed"] == []
+    assert [(field["name"], field["value"]) for field in again["confirm"]["fields"]] == [("called", "Mesa")]
+    assert Item.objects.filter(pk=shown.pk).exists() and Item.objects.filter(pk=other.pk).exists()
+    [waiting] = again["pending"]
+    done = turn_of(owner_in(), "elimina mesa", waiting, decision=yes)
+    assert [row["outcome"] for row in done["executed"]] == ["ok"]
+    assert list(Item.objects.values_list("pk", flat=True)) == [shown.pk]
 
 
 @pytest.mark.django_db

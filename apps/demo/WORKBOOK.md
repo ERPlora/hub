@@ -217,7 +217,9 @@ nombre, como lo dice la persona: el mismo nombre, sin distinguir mayúsculas, an
 («borra otoño» encuentra «Ensayo de otoño» si es el único que lo lleva), y la tarjeta enseña el elemento que se va a
 tocar, con su nombre entero. Si lo dicho encaja con varios elementos, no sale ninguna tarjeta: el asistente oye
 «Hay varios elementos que se llaman «Ensayo»: Ensayo 1, Ensayo 2. Di cuál.» y pregunta cuál; si no encaja con
-ninguno, «Ningún elemento se llama «Ensayo»».
+ninguno, «Ningún elemento se llama «Ensayo»». El «sí» vale solo para el elemento que enseñó la tarjeta (BASE-F97): si
+antes de confirmar alguien crea uno que encaja mejor con lo dicho («Mesa» cuando la tarjeta decía «Mesa 4») o el
+elemento cambia de nombre, no se toca nada y sale la tarjeta nueva; si lo han borrado, el asistente lo cuenta.
 
 ### Lo que ofrece: consultas (leen, no cambian nada; todas se pueden seguir en vivo)
 
@@ -308,7 +310,9 @@ papel en ningún negocio.
   con la marca `refers` de `schemas.py` (`AN_ITEM`, en el `id` de `ItemRefIn`, `ItemPatchIn` y `LineIn`), leída como
   quien pregunta con `demo.item.detail`: el elemento por su `name`, como la lista y el diálogo «Eliminar». Dicho por
   su nombre, `called` lleva la misma marca leída por ese nombre (`AN_ITEM_BY_NAME`), así que la tarjeta dice el
-  elemento que la escritura va a encontrar, no solo lo dicho. Ese `id`
+  elemento que la escritura va a encontrar, no solo lo dicho; con eso y su `check`, la huella de la tarjeta lleva el id
+  del elemento encontrado y el «sí» vale solo para él (hub#1208, `base/tests/test_assistant_yes_for_its_card.py` y
+  `test_the_yes_deletes_only_the_item_its_card_showed_although_another_fits_the_name_better_meanwhile`). Ese `id`
   lleva el título de su pantalla (`T_ITEM`: «Elemento», «Item»), nunca «Registro». Sin persona detrás, sin `demo.view`,
   con un id de otro negocio o de algo que ya no está, el elemento queda fuera, nunca su id
   (`tests/test_assistant_card_records.py`); el trinquete `UNNAMED_REFERENCES` de

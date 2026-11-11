@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1235770ac62e750cb0ec7c93d339e9669f8016c6cedf8f7b92f0a80c81fac16e -->
+<!-- generated from WORKBOOK.md sha256:a9d7b2cc130600ee293cdf929b4d6468368c298398bc8295401a38bc753076a2 -->
 
 ## What it is for and who it is for
 
@@ -437,8 +437,9 @@ rectify the full invoice.". Two rectifications of the same invoice at once: the 
 first and is refused without using a number. Without permission the action does not appear. To the
 assistant, on a rectifying invoice, a cancelled one or a replaced ticket, it tells you why with those
 same notices and the confirmation does not come; if another rectifying invoice is issued between the
-preview and your confirmation, yours takes the next number; if another device rectifies that invoice
-before you confirm, no other is issued: "The invoice is already cancelled." comes.
+preview and your confirmation, yours is not issued: the confirmation comes again with the next number,
+and it is issued with it once you confirm (BASE-F97); if another device rectifies that invoice before
+you confirm, no other is issued: "The invoice is already cancelled." comes.
 Involved: SALE-F31
 
 ### INVOICE-F09 The rectifying invoice when refunding a whole sale

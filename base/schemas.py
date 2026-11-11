@@ -1745,11 +1745,19 @@ class FileDeletedOut(Schema):
 
 class AssistantCallIn(Schema):
     """A tool the model asked for, as the gateway gave it: its id, its name (``demo__item__create``) and its
-    arguments as the model wrote them (JSON text)."""
+    arguments as the model wrote them (JSON text); ``shown``, set by the Hub on the one whose card waits, the
+    fingerprint of what that card showed, which the panel gives back with the calls that wait (hub#1208: the yes is
+    for that card)."""
 
     call_id: str = Field(min_length=1, max_length=200)
     name: str = Field(min_length=1, max_length=200)
     arguments: str = Field(default="{}", max_length=1_000_000)
+    shown: str = Field(
+        default="",
+        max_length=64,
+        description="The fingerprint of what the card of this call showed (``base.assistant.fingerprint``); empty "
+        "while no card was drawn for it.",
+    )
 
 
 class AssistantDecisionIn(Schema):
