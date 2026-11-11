@@ -74,11 +74,13 @@ def test_an_error_message_follows_the_language_of_the_request(client, make_user)
 
 
 @pytest.mark.django_db
-def test_a_name_two_items_share_is_told_in_the_language_of_the_request(client, make_user):
-    """hub#1162: the 409 names the items in the person's language, as the 404 above."""
+def test_a_name_that_fits_several_items_or_none_is_told_in_the_language_of_the_request(client, make_user):
+    """hub#1162: the 409 names the items, and the 404 the name nobody has, in the person's language."""
     client.force_login(make_user("boss", host="a", role="hub_admin"))
     for _ in range(2):
         Item.objects.create(name="Ensayo")
     response = client.get("/api/demo/items/detail", {"called": "ensayo"}, HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE="es")
     assert response.status_code == 409
     assert response.json()["error"]["message"] == "Hay varios elementos que se llaman «ensayo»: Ensayo, Ensayo. Di cuál."
+    none = client.get("/api/demo/items/detail", {"called": "Otoño"}, HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE="es")
+    assert (none.status_code, none.json()["error"]["message"]) == (404, "Ningún elemento se llama «Otoño».")
