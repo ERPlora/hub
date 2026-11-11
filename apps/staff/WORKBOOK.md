@@ -266,7 +266,7 @@ Implicados: ATTENDANCE-F01, TASK-F03
 ### STAFF-F04 Crear, editar y retirar un rol
 <!-- origen: fi:modules/staff#command-staff-roles-create fi:modules/staff#query-staff-roles-list old:staff/workflow/ficha.md#staff-f04 -->
 Estado: hecho (servidor y pantalla)
-Actor: propietario, administrador, responsable
+Actor: propietario, administrador, responsable, asistente
 Pantalla: Roles
 Pasos:
 1. En **Roles**, pulsa **+**, escribe el Nombre (obligatorio, hasta 100) y, si quieres, Descripción y
@@ -284,7 +284,7 @@ Implicados: ninguno
 ### STAFF-F05 Desactivar a un profesional
 <!-- origen: fi:modules/staff#command-handler-wasm-staff-members-deactivate-deactivate_staff_member old:staff/workflow/ficha.md#staff-f05 -->
 Estado: hecho (servidor y pantalla)
-Actor: propietario, administrador
+Actor: propietario, administrador, asistente
 Pantalla: Personal
 Pasos:
 1. En la fila, pulsa **Desactivar** y confirma «¿Sacar a {nombre} de la agenda? Deja de ser
@@ -468,7 +468,7 @@ Implicados: ninguno
 ### STAFF-F18 Aprobar o rechazar una ausencia
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f03 fi:modules/staff#command-staff-time_off-set_status old:staff/workflow/ausencias.md#staff-f18 -->
 Estado: hecho (servidor y pantalla)
-Actor: propietario, administrador, responsable
+Actor: propietario, administrador, responsable, asistente
 Pantalla: Ausencias
 Pasos:
 1. Localiza la ausencia **Pendiente** (el filtro de Estado ayuda).
@@ -779,9 +779,15 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   sumar.
 - Los avisos solo llevan identificadores: nunca el motivo de una baja ni de una ausencia (datos
   personales, y la baja por enfermedad es un dato de salud).
-- Asistente: toda operación declara `ai={"description", "risk"}` (`risk` solo en las acciones; `high`
+- Asistente: toda operación declara `ai={"description", "risk", "asks"}` (`risk` solo en las acciones; `high`
   en editar una ficha, que puede cambiar la compensación, desactivar, dar de baja y eliminar un
   horario) y todo campo de entrada lleva `description`; las mismas descripciones salen en el OpenAPI.
+  Los `asks` son 3 frases en `en` y `es` por herramienta, como las diría quien la usa (`live.E020`: Personal está
+  en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1103), con personas inventadas y nunca un dato de la QA.
+  `tests/test_assistant_asks.py` comprueba que las frases reales de la QA del asistente
+  (`tests/e2e/qa/probes/*-es-staff-*.json`) llegan a su herramienta entre las que ofrece un turno sin ser sus
+  `asks`, y `base.assistant.SYNONYMS` lee «desactiva» como la desactivación y «pido» o «una solicitud» como la
+  solicitud de una ausencia, acciones que ningún verbo del asistente nombra.
   La tarjeta de confirmación nombra cada dato por el `title` de su esquema (`gettext_noop`, con su
   `es` en el catálogo: «Semana», «Miembros del personal») o, si no lo tiene, por el `verbose_name`
   de su campo en el modelo, el que da la ficha; un dato sin ninguno sale con el nombre técnico y lo
