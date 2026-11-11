@@ -573,7 +573,17 @@ def _words(text: str | None) -> list[str]:
         "description": "VeriFactu's configuration: the environment (testing or production), the sending route (ERPlora "
         "files for the business, or its own certificate), the own certificate uploaded here (holder and expiry, never "
         "its material), the signed authorisation's state as the ERPlora account says, the software producer's details, the responsible declaration, and what keeps "
-        "records from leaving now."
+        "records from leaving now.",
+        "asks": {
+            "en": (
+                "which route files our invoices with the AEAT, and are we still in testing?",
+                "what keeps VeriFactu from filing with the AEAT?",
+            ),
+            "es": (
+                "¿con qué vía remitimos a Hacienda y en qué entorno estamos?",
+                "¿por qué no se pueden mandar los registros a la AEAT?",
+            ),
+        },
     },
 )
 def get_config(ctx: OperationContext, data: NoInput) -> ConfigOut:
@@ -606,7 +616,17 @@ SORTS = {
         "rejected), record type, invoice type, environment, issue date and total in cents. Each row says whether a "
         "registration the AEAT rejected or accepted with errors is already corrected (correction_status corrected, "
         "corrected_by_id the record that corrects it) or still to correct (pending); correction_status=pending lists "
-        "only the ones still to correct, correction_status=corrected only the corrected ones."
+        "only the ones still to correct, correction_status=corrected only the corrected ones.",
+        "asks": {
+            "en": (
+                "list the VeriFactu registrations sealed in October",
+                "which rejected registrations still need correcting?",
+            ),
+            "es": (
+                "lista los registros de VeriFactu de octubre",
+                "¿qué registros rechazados quedan por subsanar?",
+            ),
+        },
     },
 )
 def list_records(ctx: OperationContext, data: RecordListIn) -> dict:
@@ -662,7 +682,17 @@ def list_records(ctx: OperationContext, data: RecordListIn) -> dict:
     ai={
         "description": "One VeriFactu record, by its id or by its invoice's number (e.g. TICKET-2026-000012): its "
         "invoice's figures, its chain (sequence, fingerprint, previous one), its QR link, its XML, the AEAT's answer "
-        "(CSV, code, message), its attempts and why it is not in the AEAT yet."
+        "(CSV, code, message), its attempts and why it is not in the AEAT yet.",
+        "asks": {
+            "en": (
+                "give me the XML and fingerprint of VeriFactu entry 12",
+                "why has the AEAT not taken VeriFactu entry 12?",
+            ),
+            "es": (
+                "dame el XML y la huella del registro 12",
+                "¿qué respondió Hacienda al registro 12?",
+            ),
+        },
     },
 )
 def get_record(ctx: OperationContext, data: RecordGetIn) -> RecordOut:
@@ -725,7 +755,17 @@ def get_record(ctx: OperationContext, data: RecordGetIn) -> RecordOut:
     expose_api=True,
     ai={
         "description": "The VeriFactu record of an invoice (by the invoice's id): its QR link and image, its CSV and "
-        "its status, for the ticket or the invoice; none when the invoice has no record yet."
+        "its status, for the ticket or the invoice; none when the invoice has no record yet.",
+        "asks": {
+            "en": (
+                "what QR does invoice F-2026-0007 carry?",
+                "get me the VeriFactu registration of this invoice",
+            ),
+            "es": (
+                "¿qué QR lleva la factura F-2026-0007?",
+                "dame el registro de VeriFactu de esta factura",
+            ),
+        },
     },
 )
 def by_invoice(ctx: OperationContext, data: ByInvoiceIn) -> ByInvoiceOut:
@@ -767,7 +807,17 @@ def _queue_row(record: Record) -> dict:
     output=Page[QueueRowOut],
     ai={
         "description": "The queue: the VeriFactu records that are not in the AEAT yet (pending, or sent without "
-        "answer), in the order they go out, with their attempts, next attempt and last error."
+        "answer), in the order they go out, with their attempts, next attempt and last error.",
+        "asks": {
+            "en": (
+                "what is queued for the AEAT?",
+                "show me the VeriFactu contingency queue",
+            ),
+            "es": (
+                "¿qué registros esperan en la cola de Hacienda?",
+                "enséñame la contingencia de VeriFactu",
+            ),
+        },
     },
 )
 def list_queue(ctx: OperationContext, data: ContingencyListIn) -> dict:
@@ -796,7 +846,17 @@ def list_queue(ctx: OperationContext, data: ContingencyListIn) -> dict:
     output=Page[EventOut],
     ai={
         "description": "VeriFactu's audit events, newest first, each message in the reader's language: search by the "
-        "words shown (in Spanish or English), filter by type, severity and day."
+        "words shown (in Spanish or English), filter by type, severity and day.",
+        "asks": {
+            "en": (
+                "search VeriFactu's audit trail for errors",
+                "which serious warnings did VeriFactu note down?",
+            ),
+            "es": (
+                "busca errores en el historial de auditoría de VeriFactu",
+                "¿qué incidencias graves ha apuntado VeriFactu?",
+            ),
+        },
     },
 )
 def list_events(ctx: OperationContext, data: EventListIn) -> dict:
@@ -834,7 +894,17 @@ def list_events(ctx: OperationContext, data: EventListIn) -> dict:
     expose_api=True,
     ai={
         "description": "How many VeriFactu records are not in the AEAT yet, rejected, accepted and in total: whether "
-        "everything reached the AEAT."
+        "everything reached the AEAT.",
+        "asks": {
+            "en": (
+                "has everything reached the AEAT?",
+                "is anything rejected or still not with the AEAT?",
+            ),
+            "es": (
+                "¿ha llegado todo a Hacienda o falta algo?",
+                "¿queda algo pendiente o rechazado sin llegar a la AEAT?",
+            ),
+        },
     },
 )
 def compliance_summary(ctx: OperationContext, data: NoInput) -> ComplianceSummaryOut:
@@ -897,7 +967,19 @@ def oldest_unsent_at() -> dt.datetime | None:
     permission=VIEW,
     input=NoInput,
     output=RecordsByStatusOut,
-    ai={"description": "How many VeriFactu records are in each status."},
+    ai={
+        "description": "How many VeriFactu records are in each status.",
+        "asks": {
+            "en": (
+                "break the VeriFactu registrations down by status",
+                "VeriFactu per status: accepted, rejected and queued",
+            ),
+            "es": (
+                "reparto de los registros de VeriFactu por estado",
+                "registros aceptados, rechazados y en espera, por estado",
+            ),
+        },
+    },
 )
 def records_by_status(ctx: OperationContext, data: NoInput) -> RecordsByStatusOut:
     counts = dict(Record.objects.values_list("status").annotate(total=Count("id")))
@@ -916,7 +998,17 @@ def records_by_status(ctx: OperationContext, data: NoInput) -> RecordsByStatusOu
     input=NoInput,
     output=ContingencySummaryOut,
     ai={
-        "description": "The queue in short: how many records wait, how many are due now, and whether it is failing."
+        "description": "The queue in short: how many records wait, how many are due now, and whether it is failing.",
+        "asks": {
+            "en": (
+                "sum up the VeriFactu contingency: is it failing?",
+                "how many filings to the AEAT wait, and how many are due?",
+            ),
+            "es": (
+                "resume la contingencia de VeriFactu: ¿está fallando?",
+                "¿cuántos envíos a Hacienda esperan y cuántos tocan ya?",
+            ),
+        },
     },
 )
 def contingency_summary(ctx: OperationContext, data: NoInput) -> ContingencySummaryOut:
@@ -936,7 +1028,19 @@ def contingency_summary(ctx: OperationContext, data: NoInput) -> ContingencySumm
     permission=VIEW,
     input=EventsRecentIn,
     output=EventsOut,
-    ai={"description": "The latest VeriFactu audit events."},
+    ai={
+        "description": "The latest VeriFactu audit events.",
+        "asks": {
+            "en": (
+                "what has happened lately in VeriFactu?",
+                "show the ten latest fiscal events",
+            ),
+            "es": (
+                "¿qué ha pasado últimamente en VeriFactu?",
+                "dame los diez sucesos fiscales más recientes",
+            ),
+        },
+    },
 )
 def events_recent(ctx: OperationContext, data: EventsRecentIn) -> EventsOut:
     events = Event.objects.select_related("record").order_by("-created_at", "-id")[
@@ -969,7 +1073,17 @@ def aeat_row(row: AeatRecord) -> dict:
     ai={
         "description": "The last photo of what the AEAT holds (from the last «Query AEAT»), the newest first: "
         "search by invoice number, fingerprint or CSV; filter by its state at the AEAT (Correcto, "
-        "AceptadoConErrores, Anulado) and issue date."
+        "AceptadoConErrores, Anulado) and issue date.",
+        "asks": {
+            "en": (
+                "what does the AEAT hold of ours, per the last query?",
+                "show what the AEAT has on file for us",
+            ),
+            "es": (
+                "¿qué registros nuestros constan en la AEAT según la última consulta?",
+                "enséñame lo que dice Hacienda que tiene nuestro",
+            ),
+        },
     },
 )
 def list_aeat_records(ctx: OperationContext, data: AeatRecordListIn) -> dict:
@@ -1018,7 +1132,17 @@ def chain_out(head: Chain) -> ChainOut:
     output=ChainStatusOut,
     ai={
         "description": "The VeriFactu chains of an issuer (Invoicing's issuer by default): last sequence, last "
-        "fingerprint, anchors and the last validation's verdict."
+        "fingerprint, anchors and the last validation's verdict.",
+        "asks": {
+            "en": (
+                "how is the VeriFactu chain doing?",
+                "what is the current fingerprint and sequence?",
+            ),
+            "es": (
+                "¿cómo va la cadena de VeriFactu?",
+                "¿cuál es la huella actual y en qué secuencia vamos?",
+            ),
+        },
     },
 )
 def chain_status(ctx: OperationContext, data: IssuerIn) -> ChainStatusOut:
@@ -1037,7 +1161,19 @@ def chain_status(ctx: OperationContext, data: IssuerIn) -> ChainStatusOut:
     permission=VIEW,
     input=NoInput,
     output=DiagnosticLastOut,
-    ai={"description": "The result of the last VeriFactu connection test, or none."},
+    ai={
+        "description": "The result of the last VeriFactu connection test, or none.",
+        "asks": {
+            "en": (
+                "what did the last connection diagnostic say?",
+                "did the last VeriFactu diagnostic pass?",
+            ),
+            "es": (
+                "¿qué dio el último diagnóstico de conexión con Hacienda?",
+                "¿pasó VeriFactu el último diagnóstico?",
+            ),
+        },
+    },
 )
 def last_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticLastOut:
     event = (
@@ -1131,7 +1267,17 @@ def saas_unreachable() -> OperationError:
         "description": "The official model of the representation authorisation (Anexo I of the AEAT's Convenio "
         "17) with the business's legal name, tax ID and address from Invoicing already written in, a PDF the "
         "business prints and signs by hand, or signs with AutoFirma, before sending it for ERPlora to file on its "
-        "behalf."
+        "behalf.",
+        "asks": {
+            "en": (
+                "download the representation form filled in with our details",
+                "give me the Anexo I to sign for ERPlora",
+            ),
+            "es": (
+                "descarga el modelo de apoderamiento para ERPlora relleno",
+                "dame el Anexo I con nuestros datos para firmarlo",
+            ),
+        },
     },
 )
 def representation_model(ctx: OperationContext, data: NoInput) -> RepresentationModelOut:

@@ -4065,41 +4065,48 @@ def _assistant_refusal(outcome: str, code: str, message: str) -> "assistant.Tool
 
 
 def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):
-    """Run one pending ``call`` (a read alone; a write with the person's yes) → ``(outcome, card)``: the card when the
-    write still waits for its answer, with what it will do when its app declares a preview (BASE-F98); one that
-    cannot be read is the write's outcome, and no card is shown. Neither is one for data the write would refuse
-    (live#17): the model hears which (``invalid_payload``) and asks again with them corrected."""
+    """Run one pending ``call`` (a read alone; a write with the person's yes) → ``(outcome, card, shown)``: the card
+    when the write still waits for its answer, with what it will do when its app declares a preview (BASE-F98), and
+    the fingerprint of what it shows (``shown``, ``assistant.fingerprint``); one that cannot be read is the write's
+    outcome, and no card is shown. Neither is one for data the write would refuse (live#17): the model hears which
+    (``invalid_payload``) and asks again with them corrected. The yes is for the card it answers (hub#1208): drawn
+    again, a card that no longer shows what ``call.shown`` says — a record found by its name is another, a name or what
+    it will do changed — runs nothing and is shown anew; a «no» or a word typed wrong never needs it."""
     op = assistant.operation_of(call.name, tools)
     if op is None:
-        return _assistant_refusal("refused", "not_available", NOT_AVAILABLE), None
+        return _assistant_refusal("refused", "not_available", NOT_AVAILABLE), None, ""
     if stopped:
-        return _assistant_refusal("cancelled", "base.assistant_stopped", STOPPED), None
+        return _assistant_refusal("cancelled", "base.assistant_stopped", STOPPED), None, ""
     if op.kind == "query":
-        return assistant.run_tool(ctx, op, call.arguments), None
+        return assistant.run_tool(ctx, op, call.arguments), None, ""
     try:
         arguments = json.loads(call.arguments or "{}")
     except ValueError:
         arguments = None
     if not isinstance(arguments, dict):
-        return assistant.run_tool(ctx, op, call.arguments), None
+        return assistant.run_tool(ctx, op, call.arguments), None, ""
     refused = assistant.invalid_arguments(op, arguments)
     if refused is not None:
-        return refused, None
-    card = assistant.card(op, arguments, ctx.language, ctx)
-    if decision is None or decision.call_id != call.call_id:
-        if card["blocked"]:
-            return None, card
-        failure, preview = assistant.preview(ctx, op, arguments)
-        if failure is not None:
-            return failure, None
-        return None, {**card, "preview": preview}
+        return refused, None, ""
+    found: list = []
+    card = assistant.card(op, arguments, ctx.language, ctx, found=found)
+    answered = decision is not None and decision.call_id == call.call_id
     if card["blocked"]:
-        return _assistant_refusal("cancelled", "base.assistant_not_from_chat", NOT_FROM_THE_CHAT), None
-    if decision.stop:
-        return _assistant_refusal("cancelled", "base.assistant_stopped", STOPPED), None
-    if not decision.accepted or not assistant.confirmed(card, decision.typed):
-        return _assistant_refusal("cancelled", "base.assistant_not_confirmed", NOT_CONFIRMED), None
-    return assistant.run_tool(_assistant_approved(ctx, op, call.arguments), op, call.arguments), None
+        if not answered:
+            return None, card, ""
+        return _assistant_refusal("cancelled", "base.assistant_not_from_chat", NOT_FROM_THE_CHAT), None, ""
+    if answered and decision.stop:
+        return _assistant_refusal("cancelled", "base.assistant_stopped", STOPPED), None, ""
+    if answered and (not decision.accepted or not assistant.confirmed(card, decision.typed)):
+        return _assistant_refusal("cancelled", "base.assistant_not_confirmed", NOT_CONFIRMED), None, ""
+    failure, preview = assistant.preview(ctx, op, arguments, found=found)
+    if failure is not None:
+        return failure, None, ""
+    drawn = {**card, "preview": preview}
+    shown = assistant.fingerprint(drawn, found)
+    if not answered or call.shown != shown:
+        return None, drawn, shown
+    return assistant.run_tool(_assistant_approved(ctx, op, call.arguments), op, call.arguments), None, ""
 
 
 def _assistant_approved(ctx: OperationContext, op, arguments: str) -> OperationContext:
@@ -4132,8 +4139,9 @@ def _assistant_approved(ctx: OperationContext, op, arguments: str) -> OperationC
 )
 def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
     """A turn of the Hub's assistant made ready (BASE-G111, G115…G119, G121): the reads the model asked for run as the
-    person; a write shows its card and runs only with the person's yes (``decision``; «Cancel all» = ``stop``); a tool
-    this person was not offered never runs. Then what goes to the gateway: the tools of what was asked, by relevance,
+    person; a write shows its card and runs only with the person's yes (``decision``; «Cancel all» = ``stop``), and
+    only on what that card showed (hub#1208: the call it waits on goes back with its ``shown``); a tool this person
+    was not offered never runs. Then what goes to the gateway: the tools of what was asked, by relevance,
     and the instructions (with the person's role and the writes a manager must approve, hub#585; with the checklist,
     read again, in ``setup``). Past ``assistant.MAX_ROUNDS`` rounds of tools it goes no further (``stop``)."""
     if ctx.actor is None:
@@ -4147,8 +4155,10 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
     card = None
     while pending:
         call = pending[0]
-        outcome, card = _assistant_answer(ctx, tools, call, decision, stopped=stopped)
+        outcome, card, shown = _assistant_answer(ctx, tools, call, decision, stopped=stopped)
         if outcome is None:
+            # The call its card waits on goes back with what the card showed: the yes comes with it (hub#1208).
+            pending[0] = call.model_copy(update={"shown": shown})
             break
         if decision is not None and decision.call_id == call.call_id:
             stopped = decision.stop

@@ -1159,6 +1159,26 @@ app: gh:verifactu#139). Tests: `test_apps.py` (declaración, textos `en` + `es`,
 `test_queries.py` (`route_ready_for_production`), `RecentEventsPanel.test.ts` y la e2e
 `tests/e2e/fix-verifactu-setup-hooks.spec.ts`.
 
+### El asistente: lo que dice la persona para cada herramienta (hub#1089)
+
+Las 31 herramientas dicen sus `asks`, las frases en `en` y `es` con que una persona las pide (`live.E020`: VeriFactu
+está en `LIVE_ASSISTANT_ASKS_REQUIRED` y `base/tests/test_assistant_asks.py` exige que cada frase traiga su herramienta
+entre las diez primeras, por rol). Sin ellos, «los cinco acontecimientos fiscales más recientes», «valida la cadena»,
+«adelanta el registro de la cola» o «sella el registro de la factura de prueba» no traían su herramienta entre las que
+ve el modelo (VERIFACTU-F13, F22, F26, F31): contestaba que no tenía herramienta, mandaba a la pantalla de
+Recuperación o creaba otra factura de prueba. Hablan de «Hacienda», «AEAT», «huella», «cadena», «cola» y
+«contingencia», y nombran un registro por su número («el registro 12») o por su factura. Nunca dicen «presenta» (la
+raíz de la presencia de Control horario), «sella» (el asistente lo lee como una venta), «producción» (un producto),
+«comprueba» (una compra; las tres, ERPlora/live#71), «pregunta» (las preguntas de Automatizaciones), «este mes», «factura» en la de prueba
+(empuja las sondas de numeración de Facturación), ni en inglés «record» (la raíz de «recordatorio», de WhatsApp) o
+«waiting» (la de «waiter»). `tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
+(`tests/e2e/qa/probes/*-es-verifactu-*.json`), nunca con los propios asks, y con una frase propia por herramienta que
+solo la trae con sus asks; el empleado no recibe las escrituras que no puede hacer, y ningún test sale de la máquina
+(ni la AEAT de pruebas ni la de producción). Límite medido: la sonda de pasar a producción («activa el envío real…
+comprobando antes que la cuenta y la autorización estén listas») se ofrece pasado el 30.º puesto de 40, porque «la
+cuenta» (la de ERPlora) se lee como la cuenta de una mesa y van delante las escrituras de Ventas que la toman (`xfail`
+estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase la trae la 6.ª).
+
 ### La cadena, la huella y el QR
 
 - **Huella** (`chain.py`): SHA-256 en hexadecimal **mayúsculas** de

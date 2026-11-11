@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:05321b27dc13f7fc69dd3e890087528d643d1781e36979419804b35d92fc9749 -->
+<!-- generated from WORKBOOK.md sha256:e8f2d57c7c59130a51faea98f47968775948e1645494743688008233901f9495 -->
 
 ## What it is for and who it is for
 
@@ -2500,8 +2500,12 @@ Out: if accepted, the action done in its app, with the same event as if its butt
 If it fails: an action its app refuses goes back to the assistant as an error and it tells it; the receipt reads
 "Not done, it failed: …". Data the action does not take (a country or a currency that does not exist, a value
 outside its list) never reach the card: they go back to the assistant, which corrects them, and the person confirms
-only once. If the page is reloaded with the card open nothing is done, and the answer ends in "The answer was cut
-off." with "Try again".
+only once. "Run it" holds only for what the card shows: if it changes before it is tapped — the action finds another
+record by its name, because someone created one that fits what was said better ("Mesa" when the card said "Mesa 4"),
+the record is renamed, or what "What will happen" says is no longer the same —, nothing is done and the new card
+shows, to be confirmed again; if what it found is no longer there, no card shows and the assistant tells it as its
+error. "Cancel" and a typed word that does not match count the same even if it changed. If the page is reloaded with
+the card open nothing is done, and the answer ends in "The answer was cut off." with "Try again".
 Involved: BASE-F98, BASE-F99, BASE-F101
 
 ### BASE-F98 Dangerous actions: type to confirm, or not from the chat
