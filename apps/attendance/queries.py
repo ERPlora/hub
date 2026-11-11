@@ -800,7 +800,7 @@ def person_out(member: Member) -> dict:
             "es": (
                 "¿de quién puedo ver los fichajes?",
                 "lista la gente del control horario",
-                "busca a Marta en el control horario",
+                "¿a quién puedo elegir en el filtro «Persona»?",
             ),
         },
         "description": "The people whose working days can be listed: every staff record that is not "
@@ -832,7 +832,7 @@ def list_people(ctx: OperationContext, params: PersonListIn) -> dict:
             "es": (
                 "¿sigue activa Marta en el control horario?",
                 "dame la ficha de Luis en el control horario",
-                "¿está dado de baja Pedro en el control horario?",
+                "¿Pedro sigue de alta para fichar?",
             ),
         },
         "description": "One person of the time clock by id, as the «Person» filter names them: their name and "
@@ -866,7 +866,7 @@ def person_detail(ctx: OperationContext, params: PersonRefIn) -> dict:
                 "after how many hours is a forgotten day flagged?",
             ),
             "es": (
-                "¿qué radio permite el control horario?",
+                "¿de cuántos metros es el radio para fichar?",
                 "¿se pide la ubicación al fichar con el móvil?",
                 "¿a partir de cuántas horas se avisa de un día olvidado?",
             ),
