@@ -41,9 +41,9 @@ WRITES = {
     "combo.option.reorder",
 }
 #: The request of hub#1091's QA as the owner said it, and nothing of the tools' ``asks``: before Menus and combos said
-#: its asks, «ordena» read as a change of anything and «opciones» named no choice of a menu, so the turn offered the
-#: changes of a menu, of a choice and of a printer ahead of putting the choices in order, and the model chose to delete
-#: the choices and create them again.
+#: its asks, «opciones» named no choice of a menu and «ordena» named a device too (the stem of «ordenador»,
+#: ERPlora/live#61), so the turn offered the changes of a menu, of a choice and of a printer ahead of putting the
+#: choices in order, and the model chose to delete the choices and create them again.
 REPORTED = (
     "combo.option.reorder",
     "ordena las opciones de Platos QA del Menú QA así: flan, merluza, lentejas y café, incluyendo todas",
