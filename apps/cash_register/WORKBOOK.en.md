@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5b8615537a03db301b0c2b167a79923b4395e9e2b31702103d98a49e98003888 -->
+<!-- generated from WORKBOOK.md sha256:4d2639effbb6ebf667af36bcac14d9388421707876994417cbd46ab0c18c898c -->
 
 ## What it is for and who it is for
 
@@ -361,7 +361,8 @@ Steps:
    the counted cash and, if you may see the expected cash, the expected cash and the difference (with the
    blind count it does not tell them to whoever may not see them: the assistant does not know them
    either, F07), and whatever the shift review finds still open (F08).
-6. Then "Run this action?" shows with "Close in Cash register. Check each datum before going on.", the
+6. In that same answer, without you having to ask again, "Run this action?" shows with "Close in Cash
+   register. Check each datum before going on.", the
    session by its number (never by its internal code) and the counted cash and, in "What will happen", what closing gives: the "Session", the
    "Drawer" (if the session has one), the "Expected in the drawer" and the "Difference", in the business's
    currency (with the blind count, whoever may not see the expected cash does not get those two, F07).
