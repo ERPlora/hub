@@ -561,6 +561,7 @@ LIVE_ASSISTANT_ASKS_REQUIRED = (
     "base",
     "cart_checkout",
     "cash_register",
+    "combo",
     "customer",
     "demo",
     "flow",

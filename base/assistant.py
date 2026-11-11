@@ -209,6 +209,9 @@ SYNONYMS = (
     # whatsapp_inbox
     ("plantilla", "plantillas", "template", "templates"),
     ("mensaje", "mensajes", "message", "messages"),
+    # combo: an «opción» or an «elección» of a course is a choice (``combo.option``), as of a modifier group
+    # (``modifier.option``). Until ERPlora/live#61, «ordena» and «orden» also name a device: «ordenador»'s stem.
+    ("opcion", "opciones", "eleccion", "elecciones", "option", "options", "choice", "choices"),
 )
 #: The help a how-to question asks for (``live.assistant.HOWTO_POINTS``): it ranks by being one, not only by ``ALWAYS``.
 HOWTO = (DOCS_SEARCH,)

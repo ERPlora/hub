@@ -434,7 +434,17 @@ def _page(rows: list, total: int, params) -> dict:
     expose_api=True,
     ai={
         "description": "List the menus and combos with their closed price, how they are sold (eaten in or to "
-        "take away) and whether they are on sale; search by name."
+        "take away) and whether they are on sale; search by name.",
+        "asks": {
+            "en": (
+                "which set menus do we have?",
+                "list all our combos and how much each one costs",
+            ),
+            "es": (
+                "¿qué menús tenemos montados?",
+                "dime los combos que tenemos y cuánto vale cada uno",
+            ),
+        },
     },
 )
 def list_combos(ctx: OperationContext, params: ComboListIn) -> dict:
@@ -468,7 +478,17 @@ def list_combos(ctx: OperationContext, params: ComboListIn) -> dict:
     expose_api=True,
     ai={
         "description": "One menu with its courses and the choices of each (product, supplement, sold out or not), "
-        "whether the till offers it and why not. Name it by id or by name («menu of the day»)."
+        "whether the till offers it and why not. Name it by id or by name («menu of the day»).",
+        "asks": {
+            "en": (
+                "what does the kids' menu come with?",
+                "show me the vegan menu with its courses, choices and supplements",
+            ),
+            "es": (
+                "¿qué lleva el menú infantil?",
+                "enséñame el menú vegano con sus platos, elecciones y suplementos",
+            ),
+        },
     },
 )
 def get_combo(ctx: OperationContext, data: ComboRefIn) -> dict:
@@ -517,7 +537,17 @@ def get_group(ctx: OperationContext, data: GroupRefIn) -> dict:
     ai={
         "description": "Propose images of ERPlora's shared image library for a menu's photo («ponle foto al menú del "
         "día»), the menu named by its id or its name: the best matches for its name first, each with its title and its reference (catalog:<folder>/<name>). It "
-        "never sets one: show them, and set the one the person picks with combo.combo.set_image."
+        "never sets one: show them, and set the one the person picks with combo.combo.set_image.",
+        "asks": {
+            "en": (
+                "suggest a picture for the kids' menu",
+                "which library images would suit the summer menu?",
+            ),
+            "es": (
+                "sugiéreme una foto para el menú infantil",
+                "¿qué imágenes de la biblioteca le pegan al menú de verano?",
+            ),
+        },
     },
 )
 def suggest_image(ctx: OperationContext, data: ComboImageSuggestIn) -> dict:
@@ -544,7 +574,17 @@ def suggest_image(ctx: OperationContext, data: ComboImageSuggestIn) -> dict:
     expose_api=True,
     ai={
         "description": "The menus the till can sell now, with their courses and the choices on offer (product and "
-        "supplement); a menu that cannot be completed or is off sale is left out."
+        "supplement); a menu that cannot be completed or is off sale is left out.",
+        "asks": {
+            "en": (
+                "which menus can customers choose today?",
+                "which set menus are on offer at the counter today?",
+            ),
+            "es": (
+                "¿qué menús se pueden pedir ya?",
+                "¿qué menús hay hoy en el mostrador y qué ofrece cada plato?",
+            ),
+        },
     },
 )
 def list_for_sale(ctx: OperationContext, params: ForSaleIn) -> dict:
@@ -817,7 +857,17 @@ def resolve_line(combo: Combo, data: ResolveIn, targets: frozenset[str]) -> dict
     ai={
         "description": "Price a menu line with what the customer picked («menu of the day with lentils, hake and "
         "water»): checks each course, adds the supplements and says how its VAT is billed — one line, or one "
-        "line per dish with the amount split. It saves nothing; the till charges with it."
+        "line per dish with the amount split. It saves nothing; the till charges with it.",
+        "asks": {
+            "en": (
+                "how much is the tasting menu with the steak and water?",
+                "work out the kids' menu with pasta and juice, without charging it",
+            ),
+            "es": (
+                "¿cuánto sale el menú degustación con el entrecot y agua?",
+                "calcula el menú infantil con macarrones y zumo, sin cobrarlo",
+            ),
+        },
     },
 )
 def resolve(ctx: OperationContext, data: ResolveIn) -> dict:
