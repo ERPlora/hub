@@ -126,7 +126,7 @@ OWN_WORDS = [
     ("en", "sale.department.update", "rename Sweets to Candy and leave it first on the list"),
     ("es", "sale.department.update", "los refrescos y demás bebidas, que paguen el tipo general"),
     ("es", "sale.department.update", "«Varios» mejor como «Otros», que suena más claro"),
-    ("es", "sale.department.update", "los refrescos, que vayan los primeros"),
+    ("es", "sale.department.update", "la bollería casera, la primera de todas, junto al mostrador"),
     ("es", "sale.department.update", "que las chuches tributen menos"),
     ("en", "sale.quick_note.update", "the salt one: low sodium, as the doctor asked"),
     ("en", "sale.quick_note.update", "our ice one has to sit right at the top, above the rest"),
@@ -134,7 +134,7 @@ OWN_WORDS = [
     ("en", "sale.quick_note.update", "swap 'spicy' for 'a bit spicy'"),
     ("en", "sale.quick_note.update", "where it says 'No cilantro' write 'No coriander' instead"),
     ("es", "sale.quick_note.update", "lo de la sal ponlo más suave"),
-    ("es", "sale.quick_note.update", "el hielo, que salga arriba del todo"),
+    ("es", "sale.quick_note.update", "lo del hielo tiene que salir el primero cuando apunto bebidas frías"),
     ("es", "sale.quick_note.update", "que en la de los frutos secos diga «trazas»"),
     ("es", "sale.quick_note.update", "en la de «sin trigo», escribe «sin harina»"),
 ]
