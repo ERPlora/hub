@@ -450,8 +450,9 @@ def _book(
                 "reserva por internet como lo haría la clienta, con cualquiera que esté libre",
             ),
         },
-        "description": "Book from the public booking page as the customer: services, a professional or anyone, a "
-        "free time, her name and mobile. Hands back the appointment number and her personal link token.",
+        "description": "Book from the public booking page as the customer: services (their ids, from "
+        "online_booking.public.services), a professional or anyone, a free time (one of online_booking.public.slots), "
+        "her name and mobile. Hands back the appointment number and her personal link token.",
         "risk": "normal",
     },
 )

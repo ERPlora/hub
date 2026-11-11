@@ -131,6 +131,18 @@ def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(context
     assert_its_asks_bring(owners_catalog(context_of), name, phrase, "es")
 
 
+#: Where booking as the customer sends the model for what it takes (hub#1107: «payload inválido» and
+#: ``assistant.too_many_steps``): the services are sent by their ids, which the page's services give, and the time is
+#: one of the page's free times.
+POINTERS = ["online_booking.public.services", "online_booking.public.slots"]
+
+
+@pytest.mark.parametrize("pointed", POINTERS)
+def test_booking_as_the_customer_points_at_the_reads_that_give_what_it_takes(pointed):
+    assert pointed in online_booking_tools()  # the tool it names is one the model can call
+    assert pointed in shared.description(registry["online_booking.public.book"])
+
+
 def test_every_tool_of_online_booking_has_a_phrase_of_its_own():
     """``OWN_WORDS`` covers every tool once: a tool whose asks no phrase of a person's own reaches would let its asks
     change unseen (the sweep of ``base`` ranks only the asks themselves)."""
