@@ -56,6 +56,12 @@ def by_name(found: list[Metric]) -> dict[str, Metric]:
     return {metric.name: metric for metric in found}
 
 
+def logged_once_with_its_trace(caplog, said: str) -> None:
+    """``said`` was logged once, as an error with its trace."""
+    (logged,) = [record for record in caplog.records if record.getMessage() == said]
+    assert (logged.levelname, logged.exc_info is not None) == ("ERROR", True)
+
+
 # ── The registry's measures ─────────────────────────────────────────────────────────────────────────────────────────
 
 
@@ -235,9 +241,9 @@ def test_a_hub_that_cannot_be_read_keeps_its_last_reading_and_is_logged(hub_a, h
     with caplog.at_level(logging.ERROR, logger="base.metrics"):
         assert oldest_age(backlog(now, never())) == pytest.approx(1200.0, abs=1)
 
-    said = f"worker: the fiscal backlog of the hub {hub_a.slug} could not be read; its last reading stays."
-    (logged,) = [record for record in caplog.records if record.getMessage() == said]
-    assert (logged.levelname, logged.exc_info is not None) == ("ERROR", True)
+    logged_once_with_its_trace(
+        caplog, f"worker: the fiscal backlog of the hub {hub_a.slug} could not be read; its last reading stays."
+    )
 
 
 @hub_db
@@ -438,15 +444,16 @@ def test_a_business_that_cannot_be_read_keeps_its_last_count_and_is_logged(hub_a
     with caplog.at_level(logging.ERROR, logger="base.metrics"):
         assert stuck_count(counted(now, never())) == 1.0
 
-    said = f"worker: the count of stuck apps of the hub {hub_a.slug} could not be read; its last reading stays."
-    (logged,) = [record for record in caplog.records if record.getMessage() == said]
-    assert (logged.levelname, logged.exc_info is not None) == ("ERROR", True)
+    logged_once_with_its_trace(
+        caplog, f"worker: the count of stuck apps of the hub {hub_a.slug} could not be read; its last reading stays."
+    )
 
 
 @hub_db
 @pytest.mark.usefixtures("no_test_fallback")
 def test_a_business_never_read_that_cannot_be_read_counts_nothing(hub_a, hub_b, monkeypatch):
     """Unlike the fiscal backlog, a business that cannot be read is no stuck app: that alarm already pages for it."""
+
     def broken(host, at):
         raise RuntimeError("database gone")
 
