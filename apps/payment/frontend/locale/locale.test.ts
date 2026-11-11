@@ -109,7 +109,6 @@ describe('payment catalogues (en source + es)', () => {
       ['payment.loading', 'Loading…', 'Cargando…'],
       ['payment.payments.empty', 'No payments.', 'Sin pagos.'],
       ['payment.payments.cancelForm.reason', 'Cancellation reason', 'Motivo de cancelación'],
-      ['payment.money.notAmount', 'This is not an amount. Type a figure, for example 12.50.', 'Esto no es un importe. Escribe una cifra, por ejemplo 12,50.'],
       ['payment.money.notPositive', 'The amount of a payment must be greater than 0.', 'El importe de un pago tiene que ser mayor que 0.'],
       ['payment.payments.form.methodsError', 'Payment methods could not be loaded.', 'No se han podido cargar los métodos de pago.'],
       ['payment.live.retry', 'Retry', 'Reintentar'],

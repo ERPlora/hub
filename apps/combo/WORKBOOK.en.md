@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1e179ef5e8cedd2ead08a56192f417f838ca47731c1d75594ebe993aa0a16123 -->
+<!-- generated from WORKBOOK.md sha256:9f3e3d07b5ffbdef0cd0c6b6285793a5d6665974b2a056bb0d320fc09cb7939e -->
 
 ## What it is for and who it is for
 
@@ -183,11 +183,12 @@ In: name, kitchen name, price, way of selling, VAT category, order and "On sale"
 categories from Taxes.
 Out: the menu (announces: new menu).
 If it fails: "Save" is grey while the name is missing and while the business has not yet said its
-currency, because the price is read in it (without it, "1500" yen would be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+currency, because the price is read in it (without it, "1500" yen would be saved as 150,000); until then, leaving the price
+keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, "Save" lights up (hub#938). Next to the
 field: "The menu needs a name.", "A menu eaten in needs its own VAT category:
-without it, it cannot be billed.", "A menu price cannot be below zero. To make a choice cheaper, give it
-a negative supplement instead.", "This is not an amount. Type a figure, for example 12.50." (also with
+without it, it cannot be billed.", "This amount cannot be
+negative." (to make a choice cheaper, it gets a negative supplement: COMBO-F06), "This is not an amount. Type a figure, for example 12.50." (also with
 another currency's sign: "€13.50" in a business in Poland) and the one about the two possible readings of an amount ("1.250"), which quotes what was typed. A VAT category that
 does not exist in Taxes: "That tax category does not exist in Taxes.". Without the right to manage
 there is no + button.
@@ -260,7 +261,8 @@ Steps:
 1. On the course's card, type in "Search a product…" and choose the product from Inventory's
    catalogue (it searches by name and by SKU).
 2. Type the "Supplement (<currency>)", in the business's currency, if substituting costs more (or less,
-   with a minus sign) than the closed price; empty is no supplement.
+   with a minus sign: "-" or the "±" button at the end of the field, because a phone's decimal keyboard has no
+   minus) than the closed price; empty is no supplement.
 3. Tap "Add choice": it goes in last. For several at once, "Add several": tick the boxes
    and tap "Add N selected" ("Add 1 selected" with one; all go in without a supplement and in the order
    they were ticked). For
@@ -277,9 +279,10 @@ If it fails: "Pick a catalogue product first.", "This course already offers that
 be picked twice, switch on «the same option may be picked more than once».", "“{product}” is
 deactivated in Inventory: activate it before putting it in a menu.", "Only a product sold and priced
 by the unit can be a menu choice; “{product}” is sold by {unit}.", "A course holds
-40 choices at most." and the amount warnings. "Add choice" (and "Save" when editing) is off while the
+40 choices at most." and the amount warnings ("This is not an amount. Type a figure, for example 1.50, or -0.50 for a
+discount." and the one about the two readings of "1.250"). "Add choice" (and "Save" when editing) is off while the
 business has not yet said its currency: the supplement is read in it, and without it "1500" yen would be
-saved as 150,000. If the currency cannot be read, the builder says so once, above the courses ("The
+saved as 150,000; until then, leaving the supplement keeps it as typed, without inventing decimals for it or judging it: "¥150" or "-0,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the builder says so once, above the courses ("The
 business's currency could not be read", with the reason), and offers "Retry", which asks for it again; as
 soon as it arrives, the button lights up (hub#946). "Add several" with nothing ticked: "Tick at least one
 product first."; a search or a category with no products: "No products match.". If the

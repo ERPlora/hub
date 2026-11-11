@@ -12,15 +12,9 @@ import { formatMoney as writeMoney } from '../../../../base/frontend/lib/money';
 import type { PaymentOut, PaymentStatus } from '../operations';
 
 export type { Money };
-export { useBusinessMoney } from '../../../../base/frontend/lib/money';
-
-/** The decimals of an amount while its money is unknown. */
-const NO_MONEY_DECIMALS = 2;
+export { filterCents, useBusinessMoney } from '../../../../base/frontend/lib/money';
 
 const days = new Map<string, Intl.DateTimeFormat>();
-
-/** The decimals of `value` (2 in EUR and HUF, 0 in JPY): its minor unit; two while unknown. */
-export const moneyDecimals = (value?: Money): number => value?.decimals ?? NO_MONEY_DECIMALS;
 
 /** Whole minor units of `value` in `locale` («12,50 €», «€12.50», «zł 12.50», «¥1,999»; «—» while unknown). */
 export function formatMoney(minor: number, locale: string, value?: Money): string {

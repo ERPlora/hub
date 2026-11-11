@@ -5,7 +5,7 @@ import { afterEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { defineComponent, h } from 'vue';
 
 import { business, errorFrame, flush, mountBase, POLISH, subId } from '../__tests__/mount-base';
-import { formatMoney, useBusinessMoney, useBusinessMoneyRead } from './money';
+import { filterCents, formatMoney, useBusinessMoney, useBusinessMoneyRead } from './money';
 
 /** `pieces` pieces of one screen, each asking for the business's currency. */
 const Probe = defineComponent({
@@ -32,6 +32,26 @@ describe('formatMoney', () => {
 
   it('only takes a number: an amount that may be missing does not compile', () => {
     expectTypeOf(formatMoney).parameter(0).toEqualTypeOf<number>();
+  });
+});
+
+// hub#924: an amount end of a table filter (Payments, Services) is read like the money field, in the business's money;
+// one it cannot read does not filter, never «from 0».
+describe('filterCents', () => {
+  it('reads a typed end in the money, its symbol included, and leaves out what is empty, not an amount or negative', () => {
+    const PLN = { currency: 'PLN', decimals: 2 };
+    const JPY = { currency: 'JPY', decimals: 0 };
+    expect(['12,50 zł', '1.234,5', '', undefined, 'doce', '-5', '13,50 €', '1.250'].map((typed) => filterCents(typed, PLN))).toEqual([
+      1250,
+      123450,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ]);
+    expect([filterCents('¥1500', JPY), filterCents('1500', undefined), filterCents('¥1500', undefined)]).toEqual([1500, 150000, undefined]);
   });
 });
 

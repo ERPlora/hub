@@ -102,6 +102,7 @@ const inactive = computed(() => error.value?.code === 'app_inactive');
 function unreadableMessage({ name, problem }: UnreadableEnd): string {
   if (problem === 'not_quantity') return t('inventory.common.noQuantity');
   if (problem.reason === 'not_amount') return t('inventory.common.noAmount');
+  if (problem.reason === 'negative') return t('inventory.common.negativeAmount');
   return t('inventory.common.ambiguousAmount', {
     typed: (filters.value[name] ?? '').trim(),
     grouped: formatMoney(problem.grouped, locale.value, business.value),
