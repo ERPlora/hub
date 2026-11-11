@@ -649,8 +649,10 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   nombre de las herramientas ya las trae con esas palabras, y en sus frases subían las 20 de Tarifas en
   toda pregunta de precios de Ventas y Carrito. Tampoco «lista»/«listas», «members» (es el personal),
   «importe» (se lee como Importar), «artículo», «euros», «impuesto»/«IVA», «automáticas» (Automatizaciones),
-  «desactiva» (sube las de Personal) ni nombres de las sondas de la QA («Mayorista», «Café», «Ana»): nombran
-  las tarifas por su nombre («la de Hostelería») y cada herramienta tiene el suyo. Medido sobre todos los
+  «desactiva» (sube las de Personal), «configurado» (live lee su raíz «confi» también como «confirma» y la
+  ponía detrás de los `*.confirm` de Citas y Reservas online; ERPlora/live#68) ni nombres de las sondas de
+  la QA («Mayorista», «Café», «Ana»): nombran las tarifas por su nombre («la de Hostelería») y cada
+  herramienta tiene el suyo. Medido sobre todos los
   `asks` del Hub y las 857 sondas de la capa 2: ningún ask de otra app pierde puesto.
   `tests/test_assistant_asks.py` mide con las frases reales de la QA
   (`tests/e2e/qa/probes/owner-es-pricing-2026-11-08.json`), nunca con los propios `asks`: cada una ofrece su

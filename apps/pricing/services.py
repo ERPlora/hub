@@ -844,7 +844,7 @@ def _switch_rule(ctx: OperationContext, data: RuleRefIn, active: bool) -> dict:
             "es": (
                 "apaga el 2x1 de zumos hasta el año que viene",
                 "suspende el 2x1 de los zumos de momento",
-                "para el 2x1 de zumos, pero que siga configurado",
+                "para el 2x1 de zumos, que ya lo retomaremos",
             ),
         },
         "description": "Deactivate a discount rule (by its id, code or name) so it no longer takes anything off new "
