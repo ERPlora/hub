@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:28a8fba3cb6bc59af238150e5758ea0b3c1c71306ff4723eda4931bf76e89044 -->
+<!-- generated from WORKBOOK.md sha256:7f40168d9ff25396680a669bfa473b1c731b4f1f53eb0ff0c96c0e45eec3322d -->
 
 ## What it is for and who it is for
 
@@ -135,7 +135,8 @@ and **Load more** with "Showing {shown} of {total}" when there are more:
 - **Sold vouchers**: one row per purchase, with **Active** or **Voided**, the customer, the date, the
   amount, "{used} used · {remaining} left" (or "· no limit"), "Expires …" or "Never expires" and what
   was given or corrected afterwards; on a voided one, "Voided by {who} on {when}" and the reason.
-  **Spend a session** (on a live voucher), **Adjust** and **Void** buttons where they apply and for whoever may.
+  **Spend a session** (on a voucher neither voided nor expired and with a session left, or with no limit),
+  **Adjust** and **Void** buttons where they apply and for whoever may.
   Empty: "Nobody has bought this voucher yet.".
   - **Spend a session** opens its dialog: "Mark one session of <customer>'s "<voucher>" voucher as delivered,
     outside the till.", the balance "{n} sessions left · {after} after this one" ("1 session left · 0 after this
@@ -594,8 +595,9 @@ Status: done
 Actor: employee, manager, assistant
 Screen: Packages, assistant
 Steps:
-1. In **Packages**, in the voucher's row tap **Sold vouchers** and, on the customer's purchase (a live voucher),
-   **Spend a session**.
+1. In **Packages**, in the voucher's row tap **Sold vouchers** and, on the customer's purchase, **Spend a
+   session**. The button shows on a voucher neither voided nor expired and with a session left (or with no limit):
+   on an expired or used-up one the row already says so, and **Adjust** (SERVICE-F18) gives it days or sessions back.
 2. The dialog checks when it opens, and each time you change the service, whether it can be spent: if not, it says
    why ("This session cannot be spent" and the reason) and **Spend session** cannot be tapped; if so, it shows the
    balance, "3 sessions left · 2 after this one".
@@ -623,7 +625,8 @@ If it fails: "This voucher was voided: it can no longer be used.", "This voucher
 "This voucher has expired.", "This voucher does not cover that service. A voucher of haircuts pays for
 haircuts, not for the shampoo." or "That voucher sale does not exist in this business.". In the dialog, the reason
 shows before spending, under "This session cannot be spent" ("This voucher was voided: it can no longer be used.",
-"This voucher has expired.", "This voucher has no sessions left." or "This voucher does not cover that service.");
+"This voucher has expired.", "This voucher has no sessions left." or "This voucher does not cover that service.":
+seen by whoever had the sheet open when another till spent the last session or the voucher expired);
 if it cannot be checked, "The voucher could not be checked" with the reason, and on spending the server decides;
 its refusal stays in the dialog without losing what was chosen. A professional who is
 not on the team (or has already left), "That staff member does not exist in this business."; a name that fits

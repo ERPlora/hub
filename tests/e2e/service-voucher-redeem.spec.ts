@@ -2,8 +2,8 @@
 // apps: a voucher of 5 haircuts charged at the till for 90.00 and granted saying its sale; in «Sold vouchers» the
 // receptionist taps «Spend a session», the only service it covers comes chosen, she picks Ana from the team, sees
 // «5 sessions left · 4 after this one» and spends it: the row drops to «1 used · 4 left» by itself and Ana's
-// production in Sales rises by the session's worth (90.00 ÷ 5). A voucher with nothing left says why before
-// anything is spent. The dialog is captured at the fleet's three sizes, without sideways scroll.
+// production in Sales rises by the session's worth (90.00 ÷ 5). A voucher with nothing left offers no session to
+// spend: its row says «5 used · 0 left». The dialog is captured at the fleet's three sizes, without sideways scroll.
 import { expect, type Locator, test } from '@playwright/test';
 
 import { A, api, capture } from './helpers';
@@ -71,13 +71,10 @@ test('Sold vouchers: a session spent outside the till, choosing the service and 
   await expect(row).toContainText('0 used · 5 left');
   await atEachSize('service-grants-redeem', sheet.locator(`[data-testid=service-grants-redeem-${lucias.id}]`));
 
-  // A voucher with nothing left: the check says why, and nothing can be spent.
-  await sheet.locator(`[data-testid=service-grants-redeem-${martas.id}]`).click();
+  // A voucher with nothing left: its row says so and offers no session to spend (Adjust gives it sessions back).
+  await expect(sheet.locator(`[data-testid=service-grants-row-${martas.id}]`)).toContainText('0 left');
+  await expect(sheet.locator(`[data-testid=service-grants-redeem-${martas.id}]`)).toHaveCount(0);
   const dialog = page.locator('ion-modal[data-testid=service-grant-redeem]');
-  await expect(dialog.locator('[data-testid=service-grant-redeem-refused]')).toContainText('This voucher has no sessions left.');
-  await expect(dialog.locator('[data-testid=service-grant-redeem-submit]')).toHaveAttribute('aria-disabled', 'true');
-  await dialog.locator('[data-testid=service-grant-redeem-cancel]').click();
-  await expect(dialog).toBeHidden();
 
   // Lucía's: the only service it covers comes chosen; Ana is picked from the team.
   await sheet.locator(`[data-testid=service-grants-redeem-${lucias.id}]`).click();

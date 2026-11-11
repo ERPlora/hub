@@ -142,13 +142,51 @@ describe('GrantRedeemModal', () => {
     expect(s.el('service-grant-redeem-submit').disabled).toBe(false);
   });
 
-  it('a refusal of the spend stays in the dialog', async () => {
-    const s = await setup();
+  /** Spend, refused by the server: the voucher expired between the check and the tap. */
+  async function refusedSpend(s: Awaited<ReturnType<typeof setup>>): Promise<string> {
     s.answerBy({ [CHECK]: [200, ok()], [REDEEM]: [409, { error: { code: 'service.grant_expired', message: 'This voucher has expired.' } }] });
     await click(s.el('service-grant-redeem-submit'));
     await settle();
-    expect(s.inDoc('service-grant-redeem-error')?.textContent).toContain('This voucher has expired.');
+    return s.inDoc('service-grant-redeem-error')?.textContent ?? '';
+  }
+
+  it('a refusal of the spend stays in the dialog', async () => {
+    const s = await setup();
+    expect(await refusedSpend(s)).toContain('This voucher has expired.');
     expect(s.wrapper.emitted('update:open')?.at(-1)).not.toEqual([false]);
+  });
+
+  it('only the newest check answers: a slower one for the service left behind does not paint over it', async () => {
+    const m = await mountService(GrantRedeemModal, { props: { open: false, grant: grant(), pkg: TWO_SERVICES } });
+    const pending: Record<string, (response: Response) => void> = {};
+    m.net.onApi(
+      ({ url }) => new Promise<Response>((resolve) => (pending[new URL(url, 'http://a.localhost').searchParams.get('service_id') ?? ''] = resolve)),
+    );
+    const answer = (body: RedeemCheckOut) => Response.json(body, { status: 200 });
+    await m.wrapper.setProps({ open: true });
+    await settle();
+    await ionValue(m.inDoc('service-grant-redeem-service') as Control, 's1');
+    await settle();
+    await ionValue(m.inDoc('service-grant-redeem-service') as Control, 's2');
+    await settle();
+    pending.s2(answer(ok()));
+    await settle();
+    pending.s1(answer(ok({ redeemable: false, reason: 'does_not_cover_service' })));
+    await settle();
+    expect(m.inDoc('service-grant-redeem-refused')).toBeNull();
+    expect((m.inDoc('service-grant-redeem-submit') as Control).disabled).toBe(false);
+  });
+
+  it('opened again after a refusal, it starts clean: no old error, professional or note', async () => {
+    const s = await setup();
+    s.member().vm.$emit('update:modelValue', { id: 'm9', label: 'Ana López' });
+    await ionValue(s.el('service-grant-redeem-note'), 'came late', 'ionInput');
+    expect(await refusedSpend(s)).toContain('This voucher has expired.');
+    await s.wrapper.setProps({ open: false });
+    await s.wrapper.setProps({ open: true });
+    await settle();
+    expect(s.inDoc('service-grant-redeem-error')?.textContent ?? '').not.toContain('This voucher has expired.');
+    expect([s.member().props('modelValue'), s.el('service-grant-redeem-note').value]).toEqual([null, '']);
   });
 
   it('speaks Spanish', async () => {
@@ -191,6 +229,17 @@ describe('GrantRedeemModal: unsaved changes ask before any way out (hub#1023, BA
     await flush();
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
     expect(s.el('service-grant-redeem-note').value).toBe('came late');
+  });
+
+  it('another service chosen holds Android Back too; back on the one it opened with, it lets go', async () => {
+    const s = await setup({ pkg: TWO_SERVICES });
+    const overlay = s.inDoc('service-grant-redeem')!;
+    await ionValue(s.el('service-grant-redeem-service'), 's2');
+    await settle();
+    expect(unsavedChangesIn(overlay)).toBeDefined();
+    await ionValue(s.el('service-grant-redeem-service'), '');
+    await settle();
+    expect(unsavedChangesIn(overlay)).toBeUndefined();
   });
 
   it('a professional chosen holds Android Back; cleared, it lets go', async () => {

@@ -148,7 +148,8 @@ Hojas que se abren encima, todas con **Cerrar**, «Cargando…» mientras llegan
 - **Bonos vendidos**: una fila por compra, con **Activo** o **Anulado**, la clienta, la fecha, el
   importe, «{used} usadas · quedan {remaining}» (o «· sin límite»), «Caduca el …» o «No caduca» y lo
   regalado o corregido después; en una anulada, «Anulado por {who} el {when}» y el motivo. Botones
-  **Gastar una sesión** (en un bono vivo), **Ajustar** y **Anular** cuando proceden y para quien puede.
+  **Gastar una sesión** (en un bono sin anular ni caducar y al que le queda alguna sesión, o sin límite),
+  **Ajustar** y **Anular** cuando proceden y para quien puede.
   Vacía: «Nadie ha comprado este bono todavía.».
   - **Gastar una sesión** abre su ventana: «Da por entregada una sesión del bono «<bono>» de <clienta>, fuera
     del cobro.», el saldo «Quedan {n} sesiones · {after} después de esta» («Queda 1 sesión · 0 después de
@@ -621,8 +622,9 @@ Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Bonos y paquetes, asistente
 Pasos:
-1. En **Bonos y paquetes**, en la fila del bono pulsa **Bonos vendidos** y, en la compra de la clienta (un bono
-   vivo), **Gastar una sesión**.
+1. En **Bonos y paquetes**, en la fila del bono pulsa **Bonos vendidos** y, en la compra de la clienta, **Gastar una
+   sesión**. El botón sale en un bono sin anular ni caducar y al que le queda alguna sesión (o sin límite): en uno
+   caducado o agotado la fila ya lo dice, y **Ajustar** (SERVICE-F18) le devuelve días o sesiones.
 2. La ventana comprueba al abrirse, y cada vez que cambias de servicio, si se puede gastar: si no, dice por qué
    («No se puede gastar esta sesión» y el motivo) y **Gastar sesión** no se puede pulsar; si sí, enseña el saldo,
    «Quedan 3 sesiones · 2 después de esta».
@@ -650,7 +652,8 @@ Si falla: «Este bono está anulado: ya no se puede usar.», «Este bono ya no t
 disponibles.», «Este bono ha caducado.», «Este bono no cubre ese servicio. Un bono de cortes paga
 cortes, no el champú.» o «Esa venta de bono no existe en este negocio.». En la ventana, el motivo sale antes
 de gastar, debajo de «No se puede gastar esta sesión» («Este bono está anulado: ya no se puede usar.», «Este bono
-ha caducado.», «Este bono ya no tiene sesiones disponibles.» o «Este bono no cubre ese servicio.»); si no se
+ha caducado.», «Este bono ya no tiene sesiones disponibles.» o «Este bono no cubre ese servicio.»: lo ve quien
+tenía la hoja abierta cuando otra caja gastó la última sesión o el bono caducó); si no se
 puede comprobar, «No se ha podido comprobar el bono» con el motivo, y al gastar decide el servidor; su negativa
 se queda en la ventana sin perder lo elegido. Una profesional que no está en el
 equipo (o ya se dio de baja), «Ese miembro del personal no existe en este negocio.»; un nombre que vale para

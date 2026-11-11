@@ -2,8 +2,8 @@
 // SERVICE-F16 «Ver quién ha comprado un bono»: «Sold vouchers — {package}» follows `service.grant.list`
 // live, the most recent first, 20 at a time: Active or Voided, the customer (their reference when the
 // card is gone), the date, the amount (in the business's currency), sessions used and left (or «no limit»), the sale, the expiry,
-// what was given or corrected afterwards and, on a voided one, who, when and why. Spend a session (SERVICE-F21, on every
-// live voucher), Adjust (SERVICE-F18) and Void (SERVICE-F17) show where they apply and for whoever may, and open their
+// what was given or corrected afterwards and, on a voided one, who, when and why. Spend a session (SERVICE-F21, on a
+// voucher not voided, not expired and with a session left), Adjust (SERVICE-F18) and Void (SERVICE-F17) show where they apply and for whoever may, and open their
 // dialogs.
 import { InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { useSession } from '@erplora/ui/shell';
@@ -47,6 +47,10 @@ function askRedeem(grant: GrantOut): void {
   redeeming.value = grant;
   redeemOpen.value = true;
 }
+
+/** Where «Spend a session» applies: a voucher not voided, not expired and with a session left (or no limit). The
+ *  server still has the last word (`service.grant.redeem_check`, in the dialog). */
+const spendable = (grant: GrantOut): boolean => grant.status === 'active' && !grant.is_expired && grant.remaining !== 0;
 
 const day = (value: string | null) => formatDate(value, locale.value);
 </script>
@@ -139,7 +143,7 @@ const day = (value: string | null) => formatDate(value, locale.value);
         </div>
         <div class="service-sheet-list__actions">
           <ion-button
-            v-if="grant.status === 'active' && session.can('service.redeem_package')"
+            v-if="spendable(grant) && session.can('service.redeem_package')"
             size="small"
             fill="clear"
             :data-testid="`service-grants-redeem-${grant.id}`"

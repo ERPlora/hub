@@ -85,7 +85,7 @@ describe('GrantsSheet', () => {
   });
 
   // SERVICE-F21 (hub#1058): a session is spent outside the till from the row of a live voucher, by whoever may spend one.
-  it('offers «Spend a session» on every live voucher, and opens its dialog on that voucher and package', async () => {
+  it('offers «Spend a session» on every voucher that can still be used, and opens its dialog on that voucher and package', async () => {
     const s = await setup();
     await s.show(page(ROWS));
     expect(['g1', 'g2', 'g3'].map((id) => s.inDoc(`service-grants-redeem-${id}`)?.textContent?.trim() ?? null)).toEqual([
@@ -97,6 +97,21 @@ describe('GrantsSheet', () => {
     await flush();
     const redeeming = s.wrapper.findComponent(GrantRedeemModal);
     expect([redeeming.props('open'), redeeming.props('grant'), redeeming.props('pkg')]).toEqual([true, ROWS[1], PACKAGE]);
+  });
+
+  // The market's pattern (and this sheet's: Adjust and Void show only where they apply): a voucher that has expired or
+  // has no sessions left offers nothing to spend; its row already says why, and Adjust gives it sessions or days back.
+  it('offers no «Spend a session» on a voucher that has expired or has no sessions left; an unlimited one keeps it', async () => {
+    const s = await setup();
+    await s.show(
+      page([
+        grant({ id: 'spent', used: 5, remaining: 0 }),
+        grant({ id: 'late', is_expired: true, expires_at: '2026-10-30T10:00:00Z' }),
+        grant({ id: 'open', max_uses: null, remaining: null }),
+      ]),
+    );
+    expect(['spent', 'late', 'open'].map((id) => s.inDoc(`service-grants-redeem-${id}`) !== null)).toEqual([false, false, true]);
+    expect(s.inDoc('service-grants-adjust-spent')).not.toBeNull();
   });
 
   it('an employee spends sessions too; who may not spend them sees no button', async () => {
