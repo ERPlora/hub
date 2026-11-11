@@ -6,16 +6,15 @@ the catalogue of a business with every app on and ranked as a turn ranks, is ``b
 (sale is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over its asks.
 """
 
-import dataclasses
 import re
 
 import pytest
 from live.assistant import asks_of
-from live.operations import Operation, registry
+from live.operations import registry
 
 from apps.sale.tests.conftest import ctx_for
 from base import assistant
-from base.tests.test_assistant_asks import TOP, alike, comparable, probe_phrases
+from base.tests.test_assistant_asks import TOP, alike, comparable, probe_phrases, without_its_asks
 
 LANGUAGES = ("en", "es")
 #: The phrases of sale's tools put to the turn at least, both languages together: a silent drop of asks fails.
@@ -102,11 +101,6 @@ OWN_WORDS = [
     ("es", "sale.order.remove_voucher", "no lo uses en esta cuenta, mejor lo guarda"),
     ("en", "sale.order.remove_voucher", "she would rather not use it on the haircut"),
 ]
-
-
-def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
-    op = tools[name]
-    return {**tools, name: dataclasses.replace(op, ai=dataclasses.replace(op.ai_spec(), asks={}))}
 
 
 @pytest.mark.django_db

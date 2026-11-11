@@ -13,6 +13,7 @@ app reach their tool without their own words (``own_asks=False``: how a person's
 a word, and no ask is a probe of layer 2 of its tool but for a word: either would measure the asks' own words.
 """
 
+import dataclasses
 import importlib
 import json
 import re
@@ -205,6 +206,13 @@ def asks_by_tool(label: str | None = None) -> dict[str, tuple[str, ...]]:
     }
 
 
+def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
+    """``tools`` with tool ``name`` saying no asks (its description and name stay): where a phrase would bring it
+    without them, so an app's test shows that its asks, and not only its name, bring a person's own words."""
+    op = tools[name]
+    return {**tools, name: dataclasses.replace(op, ai=dataclasses.replace(op.ai_spec(), asks={}))}
+
+
 def near_copies(asks: dict[str, tuple[str, ...]], probes: Iterable[dict]) -> list[tuple[str, str, str]]:
     """The asks (of each tool, in ``asks``) that are a probe of their own tool but for one word (``alike``), as (tool,
     ask, probe): layer 2 compares a probe with the asks of its tool only, so another tool's phrase one word off is
@@ -342,9 +350,8 @@ APP_TESTS = sorted(Path(settings.BASE_DIR).glob("apps/*/tests/test_assistant_ask
 def test_no_test_of_an_app_ranks_one_of_its_asks_as_a_persons_words():
     """The sweep above already brings every ask among the first ten, so a test of an app that ranks one of its asks (or
     one of its tool's asks but for one word) as what a person says measures nothing: green while the person's own
-    words leave the tool out (hub#1126 and hub#1128, caught only by hand; Sales' asks said its QA's «Quita el bono de
-    la línea» as «… de esa línea»). The words a person says are the probes of layer 2 and phrases nobody wrote as asks,
-    and every app's test ranks some (hub#1135)."""
+    words leave the tool out (hub#1126 and hub#1128, caught only by hand). The words a person says are the probes of
+    layer 2 and phrases nobody wrote as asks, and every app's test ranks some (hub#1135)."""
     assert len(APP_TESTS) >= 10  # positive control: the tests of the apps are read
     found = {}
     for path in APP_TESTS:
