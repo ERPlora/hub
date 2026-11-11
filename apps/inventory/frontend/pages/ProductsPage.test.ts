@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { business, EMPLOYEE, errorFrame, flush, mountInventory, ok, page, POLISH, product, refusal, subId, UNITS, type ApiCall, type MountOptions } from '../__tests__/mount-inventory';
+import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import CsvButtons from '../components/CsvButtons.vue';
 import ImportPreviewModal from '../components/ImportPreviewModal.vue';
 import ProductDetailModal from '../components/ProductDetailModal.vue';
@@ -23,7 +24,6 @@ import { formatMoney } from '../lib/format';
 import ProductsPage from './ProductsPage.vue';
 import source from './ProductsPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn(), save: vi.fn() }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({

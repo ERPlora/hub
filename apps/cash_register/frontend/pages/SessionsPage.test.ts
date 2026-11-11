@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { business, EMPLOYEE, errorFrame, flush, type MountOptions, mountCash, words } from '../__tests__/mount-cash-register';
+import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import CashFigures from '../components/CashFigures.vue';
 import CloseSessionModal from '../components/CloseSessionModal.vue';
 import CountModal from '../components/CountModal.vue';
@@ -21,7 +22,6 @@ import UnassignedModal from '../components/UnassignedModal.vue';
 import type { SessionRow } from '../operations';
 import SessionsPage from './SessionsPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');

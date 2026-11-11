@@ -19,15 +19,16 @@ import {
   errorFrame,
   flush,
   JAPANESE,
-  type MountOptions,
   mountCartCheckout,
+  type MountOptions,
   page,
   POLISH,
+  totalFilter,
 } from '../__tests__/mount-cart-checkout';
+import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import CartFormModal from '../components/CartFormModal.vue';
 import CartsPage from './CartsPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn() }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({
@@ -436,18 +437,5 @@ describe('CartsPage: the business’s currency (cart-checkout-business-currency)
 });
 
 describe('CartsPage: «Total» is read as every amount of the Hub (hub#1196)', () => {
-  itReadsAmountFiltersAsTheHub({
-    ends: ['total_amount_from', 'total_amount_to'],
-    params: ['total_amount_min', 'total_amount_max'],
-    async open(money) {
-      const s = await setup();
-      await s.result('base.business.get', business({ currency: money.currency, currency_decimals: money.decimals }));
-      await s.show(page(ROWS));
-      const filter = async (values: Record<string, string>) => {
-        s.table().vm.$emit('filtersChange', values);
-        await flush();
-      };
-      return { filter, query: () => s.list().at(-1) as Record<string, unknown>, says: () => s.prop('filterErrors') };
-    },
-  });
+  itReadsAmountFiltersAsTheHub(totalFilter(setup, page(ROWS)));
 });

@@ -17,6 +17,7 @@ import {
   resultFrame,
   type StreamCall,
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+import type { AmountFilterList } from '../../../../base/frontend/__tests__/amount-filter';
 import baseEn from '../../../../base/frontend/locale/en.json';
 import baseEs from '../../../../base/frontend/locale/es.json';
 import type { Business } from '../../../../base/frontend/operations';
@@ -227,3 +228,32 @@ export function page<T>(rows: T[], total = rows.length, limit = 50, offset = 0) 
 }
 
 export type { LiveClient };
+
+/** What a list page's test setup gives: the business's answer, its first page, its table and the list's query. */
+export interface TotalFilterPage {
+  result: (op: OpName, data: unknown) => Promise<void>;
+  show: (data: unknown) => Promise<void>;
+  table: () => { vm: { $emit: (event: string, ...args: unknown[]) => void } };
+  prop: <T = unknown>(name: string) => T;
+  list: () => unknown[];
+}
+
+/** The «Total» filter of Carts or Orders as the Hub's table of amount filter texts drives it (hub#1196,
+ *  `itReadsAmountFiltersAsTheHub`): the page that `setup` mounts, in the business's money, with `rows` on its first
+ *  page; the funnel applies the ends as typed. */
+export function totalFilter(setup: () => Promise<TotalFilterPage>, rows: unknown): AmountFilterList {
+  return {
+    ends: ['total_amount_from', 'total_amount_to'],
+    params: ['total_amount_min', 'total_amount_max'],
+    async open(money) {
+      const s = await setup();
+      await s.result('base.business.get', business({ currency: money.currency, currency_decimals: money.decimals }));
+      await s.show(rows);
+      const filter = async (values: Record<string, string>) => {
+        s.table().vm.$emit('filtersChange', values);
+        await flush();
+      };
+      return { filter, query: () => s.list().at(-1) as Record<string, unknown>, says: () => s.prop<Record<string, string>>('filterErrors') };
+    },
+  };
+}

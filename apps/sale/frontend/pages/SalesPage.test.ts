@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { business, BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountSale, POLISH } from '../__tests__/mount-sale';
+import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import DocumentModal from '../components/document/DocumentModal.vue';
 import ReprintJob from '../components/document/ReprintJob.vue';
 import RefundModal from '../components/sales/RefundModal.vue';
@@ -23,7 +24,6 @@ import SalesWeek from '../components/sales/SalesWeek.vue';
 import SalesPage from './SalesPage.vue';
 import source from './SalesPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),

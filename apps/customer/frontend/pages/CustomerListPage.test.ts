@@ -25,6 +25,7 @@ import {
   subId,
   VIEWER,
 } from '../__tests__/mount-customer';
+import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import CustomerCreateModal from '../components/CustomerCreateModal.vue';
 import CustomerExportButton from '../components/CustomerExportButton.vue';
 import CustomerStats from '../components/CustomerStats.vue';
@@ -32,7 +33,6 @@ import ImportReport from '../components/ImportReport.vue';
 import CustomerListPage from './CustomerListPage.vue';
 import source from './CustomerListPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');

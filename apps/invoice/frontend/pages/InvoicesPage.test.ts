@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { answerIssuer, business, BYE, EMPLOYEE, errorFrame, flush, MANAGER, type MountOptions, mountInvoice, POLISH, redNotices, said } from '../__tests__/mount-invoice';
+import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import InvoiceCreateModal from '../components/InvoiceCreateModal.vue';
 import RectifyModal from '../components/RectifyModal.vue';
 import { plain } from '../lib/format';
@@ -16,7 +17,6 @@ import type { InvoiceRowOut } from '../operations';
 import InvoicesPage from './InvoicesPage.vue';
 import source from './InvoicesPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn() }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({

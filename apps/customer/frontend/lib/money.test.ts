@@ -7,14 +7,13 @@ import { describe, expect, it } from 'vitest';
 
 import { type Money, recordMoney } from './money';
 
-const EUR: Money = { currency: 'EUR', decimals: 2 };
+/** The business's money, when the record has none of its own. */
 const PLN: Money = { currency: 'PLN', decimals: 2 };
-const JPY: Money = { currency: 'JPY', decimals: 0 };
 
 describe('recordMoney', () => {
   it('is the record’s own currency with its decimals: a record is never rewritten', () => {
-    expect(recordMoney({ currency: 'EUR', currency_decimals: 2 }, PLN)).toEqual(EUR);
-    expect(recordMoney({ currency: 'JPY', currency_decimals: 0 }, PLN)).toEqual(JPY);
+    expect(recordMoney({ currency: 'EUR', currency_decimals: 2 }, PLN)).toEqual({ currency: 'EUR', decimals: 2 });
+    expect(recordMoney({ currency: 'JPY', currency_decimals: 0 }, PLN)).toEqual({ currency: 'JPY', decimals: 0 });
   });
 
   it('is the business’s when the record has no currency of its own', () => {
