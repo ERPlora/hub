@@ -102,6 +102,16 @@ _CHECKS = {
         "description": "Create a modifier group (e.g. «Sauces», «Doneness») with how many options must be chosen "
         "(a minimum of 1 or more makes it required; a maximum of 0 is no ceiling) and whether one can repeat.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "create a sauces group for the pizzas",
+                "new Doneness group, required, one choice only",
+            ),
+            "es": (
+                "crea un grupo de salsas para las pizzas",
+                "nuevo grupo Punto de la carne, obligatorio y de una sola opción",
+            ),
+        },
     },
 )
 def create_group(ctx: OperationContext, data: GroupIn) -> dict:
@@ -124,6 +134,16 @@ def create_group(ctx: OperationContext, data: GroupIn) -> dict:
     ai={
         "description": "Change a modifier group, named by its id or its name; what is not sent is kept.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "make the Sauces group required",
+                "change Extras so up to three can be picked",
+            ),
+            "es": (
+                "haz que el grupo Salsas sea obligatorio",
+                "cambia el grupo Extras para que se puedan elegir hasta tres",
+            ),
+        },
     },
 )
 def update_group(ctx: OperationContext, data: GroupPatchIn) -> dict:
@@ -170,6 +190,16 @@ def update_group(ctx: OperationContext, data: GroupPatchIn) -> dict:
         "description": "Delete a modifier group, named by its id or its name, with all its options and the "
         "products and categories it applied to; what was already ordered keeps its copy.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "delete the Sauces group and all its choices",
+                "remove the Doneness modifier group",
+            ),
+            "es": (
+                "borra el grupo Salsas con todas sus opciones y asignaciones",
+                "elimina el grupo de suplementos Punto de la carne, los tiques antiguos no cambian",
+            ),
+        },
     },
 )
 def delete_group(ctx: OperationContext, data: GroupRefIn) -> dict:
@@ -195,6 +225,16 @@ def delete_group(ctx: OperationContext, data: GroupRefIn) -> dict:
         "(negative is a discount, 0 is free); a tax category of its own only when it taxes differently from the "
         "dish; optionally chosen by default.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "add barbecue sauce to the Sauces group for 50 cents",
+                "add Double cheese to Extras at one euro",
+            ),
+            "es": (
+                "mete una opción gratis de salsa de yogur en Salsas",
+                "que Salsas tenga una opción nueva, Alioli, que venga por defecto",
+            ),
+        },
     },
 )
 def create_option(ctx: OperationContext, data: OptionIn) -> dict:
@@ -229,9 +269,20 @@ def create_option(ctx: OperationContext, data: OptionIn) -> dict:
     input=OptionPatchIn,
     output=OptionOut,
     ai={
-        "description": "Change an option, named by its id or its name (and its group when two have one so named); "
-        "what is not sent is kept; an empty tax category gives it back the dish's.",
+        "description": "Change an option, named by its id or its name (and its group when two have one so named): "
+        "its name, its supplement, its own tax category or whether it comes chosen by default; what is not sent is "
+        "kept, and an empty tax category gives it back the dish's.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "raise the extra cheese to one euro",
+                "the house sauce should no longer come preselected",
+            ),
+            "es": (
+                "sube a un euro el extra de queso",
+                "que la opción Sin gluten deje de ser la predeterminada",
+            ),
+        },
     },
 )
 def update_option(ctx: OperationContext, data: OptionPatchIn) -> dict:
@@ -278,6 +329,16 @@ def update_option(ctx: OperationContext, data: OptionPatchIn) -> dict:
         "description": "Delete an option, named by its id or its name (and its group when two have one so named); "
         "what was already ordered keeps its copy.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "remove barbecue sauce from the Sauces group",
+                "delete the Gluten free option from Extras",
+            ),
+            "es": (
+                "quita la salsa barbacoa del grupo Salsas",
+                "borra la opción Sin gluten de Extras, lo ya enviado se queda como está",
+            ),
+        },
     },
 )
 def delete_option(ctx: OperationContext, data: OptionRefIn) -> dict:
@@ -302,6 +363,16 @@ def delete_option(ctx: OperationContext, data: OptionRefIn) -> dict:
         "description": "Apply a modifier group (named by its id or name) to a product (by its id, SKU or name) or to "
         "a category (by its id or name), so that the till asks for it when that is sold.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "make the till ask for doneness with the sirloin",
+                "apply the Sauces group to the whole Pizzas category",
+            ),
+            "es": (
+                "que el TPV pregunte siempre la salsa al vender una pizza",
+                "aplica el grupo Salsas a toda la familia Pizzas",
+            ),
+        },
     },
 )
 def attach_link(ctx: OperationContext, data: LinkIn) -> dict:
@@ -335,6 +406,16 @@ def attach_link(ctx: OperationContext, data: LinkIn) -> dict:
         "description": "Stop applying a modifier group to a product or a category: by the link's id, or by the group "
         "and the product (id, SKU or name) or category (id or name). It can be applied again later.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "stop asking for sauces with the pizza",
+                "unlink the Extras group from the sirloin",
+            ),
+            "es": (
+                "deja de preguntar las salsas con la pizza",
+                "suelta el grupo Extras del entrecot pero consérvalo para los demás productos",
+            ),
+        },
     },
 )
 def detach_link(ctx: OperationContext, data: LinkRefIn) -> dict:
