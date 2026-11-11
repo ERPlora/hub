@@ -651,6 +651,18 @@ def activation_next_at(host: str) -> dt.datetime | None:
     return waiting.aggregate(next=Min("next_attempt_at"))["next"]
 
 
+def activations_stuck(host: str, now: dt.datetime) -> int:
+    """How many apps of ``host``'s business are stuck turning on (hub#610; PLAN-DB §7): ``creating`` since it was asked
+    for more than ``activation.STUCK_AFTER`` before ``now`` (``changed_at``: a schema held or a newer code's request
+    puts it off without moving it), or ``failed``, at once: an error the business already sees, and each retry moves its
+    ``changed_at``. Only the apps this code knows."""
+    return (
+        AppActivation.objects.filter(host=host, app__in=list(activation.module_graph()))
+        .filter(Q(state=activation.CREATING, changed_at__lt=now - activation.STUCK_AFTER) | Q(state=activation.FAILED))
+        .count()
+    )
+
+
 def _first_screen(ctx: OperationContext, config: Any) -> str | None:
     """The first entry of the module's menu, for a person who may see the module; else none."""
     if not config.navigation or not _can_see(ctx, config):
