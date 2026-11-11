@@ -6,7 +6,11 @@
 import { Combo, InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import {
+  expectAmountLeftWaitsForMoney,
+  expectSaveWaitsForMoney,
+  expectWindowSaysMoneyUnreadable,
+} from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { ServiceOut, SettingsOut } from '../operations';
 import { business, click, ionValue, JAPANESE, type MountOptions, mountService, page, POLISH, settle } from '../__tests__/mount-service';
 import ServiceFormModal from './ServiceFormModal.vue';
@@ -224,6 +228,19 @@ describe('ServiceFormModal: in the business currency (service-business-currency)
   it('says «Price» without a code until the business answers', async () => {
     const s = await setup(null, 'en', true, { business: null });
     expect(s.field('price').label).toBe('Price');
+  });
+
+  // hub#945 (SERVICE-F01): a price typed with its currency's sign and left before the business answers is neither
+  // rewritten nor called «not an amount»; once it answers, it is read in its money.
+  it.each([
+    ['¥1600', JAPANESE, 1600],
+    ['12,50 zł', POLISH, 1250],
+  ] as const)('«%s» left before the business says its currency stays as typed and unmarked, then is read in it (hub#945)', async (typed, money, price) => {
+    const s = await setup({ ...CUT, price: 1500 }, 'en', true, { business: null });
+    await expectAmountLeftWaitsForMoney({ amount: () => s.field('price'), settle }, typed, () => s.result('base.business.get', business(money)));
+    s.answer(200, CUT);
+    await click(s.save());
+    expect(s.sent().map((call) => call.body)).toEqual([{ id: 's1', price }]);
   });
 
   it('the business answers with the form open: the untouched price is rewritten in its decimals and not sent', async () => {

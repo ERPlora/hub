@@ -9,7 +9,7 @@
 // amount is in the business's currency, its country's, with its decimals; a dash (and just «Supplement»)
 // until the business answers, never a euro. «Add choice» / «Save» wait in grey until then: the supplement is read in
 // that currency (hub#946); the builder's page says it, with «Retry», if the business's money cannot be read.
-import { Combo, type ComboOption, ConfirmDialog, InlineFeedback, StatusPill } from '@erplora/ui/components';
+import { Combo, type ComboOption, ConfirmDialog, InlineFeedback, MoneyInput, moneyFieldText, parseMoney, StatusPill } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonReorder, IonReorderGroup } from '@ionic/vue';
@@ -17,12 +17,10 @@ import { computed, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
 import { formatDelta, useBusinessMoney } from '../lib/format';
-import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchProducts } from '../lib/pickers';
 import { courseRule } from '../lib/rules';
 import type { GroupOut, OptionOut, OptionPatchIn, OptionStatus } from '../operations';
 import BulkAddModal from './BulkAddModal.vue';
-import MoneyInput from './MoneyInput.vue';
 
 /** Sold out, here or in Inventory (INVENTORY-F29): it comes back, a warning; the rest needs fixing. */
 const SOLD_OUT: ReadonlySet<OptionStatus> = new Set(['sold_out', 'product_sold_out']);
@@ -399,6 +397,7 @@ async function save(): Promise<void> {
           v-model="delta"
           signed
           :testid="`${prefix}-delta`"
+          :money="money"
           :label="money ? t('combo.choices.deltaIn', { currency: money.currency }) : t('combo.choices.delta')"
           :error-text="fields.price_delta"
           :show-error="tried"

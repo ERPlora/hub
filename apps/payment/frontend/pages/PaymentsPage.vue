@@ -27,8 +27,7 @@ import PaymentFormModal from '../components/PaymentFormModal.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { formatDay, formatMoney, paymentMoney, STATUS_TONE, useBusinessMoney } from '../lib/format';
-import { parseMoney } from '../lib/money';
+import { filterCents, formatDay, formatMoney, paymentMoney, STATUS_TONE, useBusinessMoney } from '../lib/format';
 import type { PaymentListIn, PaymentOut, PaymentStatus } from '../operations';
 import { paymentTabs } from '../tabs';
 
@@ -53,11 +52,7 @@ const table = useServerTable({ sort: '-payment_date' });
 const filters = ref<DataTableFilters>({});
 
 /** Minor units of a typed amount bound, in the business's currency; nothing when it is not an amount (never «from 0»). */
-function cents(text: string | undefined): number | undefined {
-  if (!text) return undefined;
-  const read = parseMoney(text, money.value);
-  return read.ok && read.cents !== null ? read.cents : undefined;
-}
+const cents = (text: string | undefined): number | undefined => filterCents(text, money.value);
 
 /** The table's filters as the query takes them: each end of the dates as sent, amounts in minor units. */
 const query = computed<Partial<PaymentListIn>>(() => {

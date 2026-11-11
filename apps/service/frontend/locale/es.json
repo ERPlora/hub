@@ -24,11 +24,6 @@
     "showing": "Se muestran {shown} de {total}",
     "none": "—",
     "minutes": "{n} min",
-    "money": {
-      "notAmount": "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",
-      "ambiguous": "Este importe se puede leer de dos maneras: «{typed}» tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda.",
-      "negative": "Este importe no puede ser negativo."
-    },
     "pricing": {
       "fixed": "Precio fijo",
       "hourly": "Por hora",

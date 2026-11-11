@@ -11,7 +11,7 @@
 // in the form, under their field, with what was typed (the old pm#513). The attempt key is born with
 // each opening and travels on every send of it: a retry after a lost answer records one payment, never
 // two (the old payments#8); the next «New payment» is another attempt.
-import { FormModal, InlineFeedback } from '@erplora/ui/components';
+import { FormModal, InlineFeedback, MoneyInput, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -21,9 +21,7 @@ import BusinessMoneyError from '../../../../base/frontend/components/BusinessMon
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useT } from '../composables/useT';
 import { localDay, useBusinessMoney } from '../lib/format';
-import { parseMoney } from '../lib/money';
 import type { PaymentOut } from '../operations';
-import MoneyInput from './MoneyInput.vue';
 
 const open = defineModel<boolean>('open', { default: false });
 const emit = defineEmits<{ created: [payment: PaymentOut] }>();
@@ -85,7 +83,7 @@ function amountError(fieldErrors: Readonly<Record<string, string>>): string | un
 async function save(): Promise<void> {
   tried.value = true;
   if (!money.value) return; // The business has not answered: its currency's decimals are unknown.
-  const read = parseMoney(form.value.amount, money.value);
+  const read = parseMoney(form.value.amount, { money: money.value });
   if (!read.ok) return; // The field says why.
   if (read.cents === null || read.cents <= 0) {
     notPositive.value = true;
@@ -208,6 +206,7 @@ useUnsavedFormOnOpen('payment-form', form, open);
           testid="payment-form-amount"
           name="amount"
           :model-value="form.amount"
+          :money="money"
           :label="money ? t('payment.payments.form.amountIn', { currency: money.currency }) : t('payment.payments.form.amount')"
           :error-text="amountError(fieldErrors)"
           :show-error="tried"
