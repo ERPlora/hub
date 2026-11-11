@@ -113,16 +113,30 @@ def test_the_reported_sales_request_offers_its_existing_operation(language, name
 
 #: Requests in words that are no ask nor probe, each brought among the first ten by its tool's asks and out of them
 #: without: undoing a line's voucher (``sale.order.remove_voucher``, whose asks no longer say the QA's «quita el bono de
-#: la línea» with one word changed, hub#1135), and moving a section of the open price, changing its VAT or rewriting a
-#: quick note (hub#1183), one for each ask that brings the probe of ``LAYER_2``: without that ask alone it falls out.
+#: la línea» with one word changed, hub#1135); and, for ``sale.department.update`` and ``sale.quick_note.update``
+#: (hub#1183), one for each of their asks in each language, which falls out without that ask alone (it shares two of
+#: its stems at most, and fewer than half of its own), and the English twins of the probes of ``LAYER_2``.
 OWN_WORDS = [
     ("es", "sale.order.remove_voucher", "no lo uses en esta cuenta, mejor lo guarda"),
     ("en", "sale.order.remove_voucher", "she would rather not use it on the haircut"),
+    ("en", "sale.department.update", "soft drinks belong on the standard band"),
+    ("en", "sale.department.update", "the Misc heading would look better as Others"),
+    ("en", "sale.department.update", "rename Sweets as Candy and put it first in the list"),
+    ("en", "sale.department.update", "sweets are cheaper on VAT"),
+    ("en", "sale.department.update", "rename Sweets to Candy and leave it first on the list"),
+    ("es", "sale.department.update", "los refrescos y demás bebidas, que paguen el tipo general"),
+    ("es", "sale.department.update", "«Varios» mejor como «Otros», que suena más claro"),
     ("es", "sale.department.update", "los refrescos, que vayan los primeros"),
     ("es", "sale.department.update", "que las chuches tributen menos"),
+    ("en", "sale.quick_note.update", "the salt one: low sodium, as the doctor asked"),
+    ("en", "sale.quick_note.update", "our ice one has to sit right at the top, above the rest"),
+    ("en", "sale.quick_note.update", "the lactose one would be clearer as 'dairy free' instead"),
+    ("en", "sale.quick_note.update", "swap 'spicy' for 'a bit spicy'"),
+    ("en", "sale.quick_note.update", "where it says 'No cilantro' write 'No coriander' instead"),
+    ("es", "sale.quick_note.update", "lo de la sal ponlo más suave"),
+    ("es", "sale.quick_note.update", "el hielo, que salga arriba del todo"),
     ("es", "sale.quick_note.update", "que en la de los frutos secos diga «trazas»"),
     ("es", "sale.quick_note.update", "en la de «sin trigo», escribe «sin harina»"),
-    ("en", "sale.quick_note.update", "make the lactose one say dairy free instead"),
 ]
 
 
