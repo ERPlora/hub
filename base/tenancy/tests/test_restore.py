@@ -548,7 +548,7 @@ class TestTheRecordsAfterTheMoment:
 
     def test_made_changed_or_sent_after_it_count_testing_and_before_do_not(self, restores):
         hub = restores.hub(source=None)
-        a_record(hub.db_name, created_at=AFTER, updated_at=AFTER)
+        a_record(hub.db_name, created_at=AFTER)
         a_record(hub.db_name, updated_at=AFTER)
         a_record(hub.db_name, transmitted_at=AFTER)
         a_record(hub.db_name, transmitted_at=BEFORE)
@@ -611,6 +611,25 @@ class TestTwoWorkers:
         assert kept_copy(hub).moved_at is None
         assert "base.tenancy.restore.stopped" in caplog.text
 
+    def test_a_lease_taken_right_before_the_end_is_checked_again_on_the_locked_row(self, restores, monkeypatch, caplog):
+        source = restores.cluster()
+        hub = restores.hub(source=source)
+        real = control_services.restore_finished
+
+        def taken_then_ended(*args, **kwargs):
+            with use_control():
+                HubDue.objects.filter(pk=hub.pk).update(lease_owner="other:1")
+            return real(*args, **kwargs)
+
+        monkeypatch.setattr(control_services, "restore_finished", taken_then_ended)
+
+        run(restores)
+
+        hub = fresh(hub)
+        assert (hub.restoring_from_id, hub.last_error) == (source.pk, "")
+        assert kept_copy(hub).moved_at is None
+        assert "base.tenancy.restore.stopped" in caplog.text
+
     def test_a_restore_another_worker_ended_meanwhile_is_never_touched_again(self, restores, monkeypatch, caplog):
         source = restores.cluster()
         hub = restores.hub(source=source)
@@ -627,6 +646,26 @@ class TestTwoWorkers:
 
         assert marker(fresh(hub).db_name) == [AS_THEN, SINCE]
         assert not MovedCopy.objects.filter(hub=hub).exists()
+        assert "base.tenancy.restore.stopped" in caplog.text
+
+    def test_a_restore_another_worker_ended_right_before_the_rename_never_renames_its_database(
+        self, restores, monkeypatch, caplog
+    ):
+        hub = restores.hub(source=restores.cluster())
+        real = restore._refuse_fiscal_changes
+
+        def checked_then_ended(*args, **kwargs):
+            real(*args, **kwargs)
+            with use_control():
+                Hub.objects.filter(pk=hub.pk).update(restoring_from=None, restore_point=None)
+
+        monkeypatch.setattr(restore, "_refuse_fiscal_changes", checked_then_ended)
+
+        run(restores)
+
+        assert marker(hub.db_name) == [AS_THEN, SINCE]
+        control = tenancy_connections.control_name()
+        assert not [name for name in databases() if names.is_kept(name, control=control)]
         assert "base.tenancy.restore.stopped" in caplog.text
 
     def test_an_undo_asked_is_never_taken_forward(self, restores):
