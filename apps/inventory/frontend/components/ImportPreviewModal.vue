@@ -171,7 +171,7 @@ function pick(index: number, value: unknown): void {
       :tone="report.failed.length ? 'warning' : 'success'"
       data-testid="inventory-import-summary"
     >
-      {{ $t('inventory.import.summary', { ready: report.ready, failed: report.failed.length }) }}
+      {{ $t('inventory.import.summary', { ready: report.ready, failed: report.failed.length }, report.ready) }}
       <ul
         v-if="report.failed.length"
         class="import-preview__reasons"

@@ -558,6 +558,7 @@ LIVE = {
 LIVE_ASSISTANT_ASKS_REQUIRED = (
     "base",
     "cart_checkout",
+    "cash_register",
     "customer",
     "inventory",
     "printing",

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:672cfb9b3b77a1e33898c95275cb48ed5927882cc4e09c9359577655c76862f5 -->
+<!-- generated from WORKBOOK.md sha256:b1859be142332f0929432659f748d7cbd07ac2064e4cf70b192f4b36536775ae -->
 
 ## What it is for and who it is for
 
@@ -168,8 +168,9 @@ window.
 Three windows in a row:
 
 1. "Check the import": a drop-down per column of the file ("Do not import" or the field; Name and
-   SKU carry an asterisk), "First {n} rows of {total}", the summary "{ready} row(s) ready · {failed}
-   with problems" with up to 10 reasons, and "Import {n} product(s)" and "Cancel".
+   SKU carry an asterisk), "First {n} rows of {total}", the summary "{ready} rows ready · {failed}
+   with problems" with up to 10 reasons, and "Import {n} products" and "Cancel"; with a single row
+   or product, in the singular ("First row of {total}", "1 row ready", "Import 1 product").
 2. If needed, "CSV tax categories": a block per tax text not recognised (or "Rows with no tax
    category") with "Pick" / "Create" / "Skip", and "Confirm & import".
 3. While it creates, above the table: "Importing {done}/{total}…" with "Stop". At the end, "Import
@@ -409,8 +410,9 @@ Actor: administrator, manager
 Screen: Categories
 Steps:
 1. In **Categories**, tap "Delete" on the row.
-2. The "Delete category" window says "<name> — N product(s) will lose this category (unlinked;
-   products are kept)". N counts the active products.
+2. The "Delete category" window says "<name> — N products will lose this category (unlinked;
+   products are kept)"; with one, "<name> — 1 product will lose this category (unlinked; the product
+   is kept)". N counts the active products.
 3. Tap "Delete and unlink" (or "Cancel").
 In: the chosen category.
 Out: the category is deleted and all its products, active or not, unlinked in the same step; the
@@ -449,9 +451,9 @@ Steps:
    English and with or without accents ("Name", "Code", "Price", "VAT"…). Change it or set "Do not
    import". Name, SKU, Price, Cost, Stock, Threshold, EAN-13, Description, Unit and Tax category can be
    imported; Name and SKU are required.
-3. Look at the "First {n} rows of {total}" and at the rehearsal of the whole file: "{ready} row(s) ready
-   · {failed} with problems", with the line and the reason of the first ten.
-4. Tap "Import {n} product(s)" (or "Cancel", which leaves no trace).
+3. Look at the "First {n} rows of {total}" and at the rehearsal of the whole file: "{ready} rows ready
+   · {failed} with problems" ("1 row ready" with one), with the line and the reason of the first ten.
+4. Tap "Import {n} products" ("Import 1 product" with one; or "Cancel", which leaves no trace).
 5. If some tax text is not recognised, or there are rows with no tax column ("Rows with no tax
    category"), "CSV tax categories" shows. For each one: "Pick" a category, "Create" one (Key and Name)
    or "Skip". Tap "Confirm & import". What is chosen for a text is saved in Taxes and the next import
