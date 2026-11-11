@@ -308,9 +308,11 @@ test('hub-e2e-capture — capture() keeps the panel open after a turn at 390, 83
   }
 });
 
-// hub#742: on a phone the panel opens from «More options», and while Ionic dismisses that menu its focus trap keeps the
-// keyboard out of the composer: Enter reached nothing and «Hola» stayed in the box. The menu's way out is slowed, so a
-// run never gets past that moment by luck (a loaded machine did).
+// hub#742, hub#1121: on a phone the panel opens from «More options», and while Ionic dismisses that menu its focus trap
+// pulls the keyboard back into it: the Enter written in the box reached a row of the menu (it opened the bell's list)
+// and «Hola» stayed in the box. The panel opens once the menu has gone. The menu's way out is slowed, so a run never gets
+// past that moment by luck (a loaded machine did), and the question is written as soon as the box is there, with no
+// wait for the menu, as a person does.
 test('hub-e2e-open-panel — on a phone the panel takes a question with Enter as soon as it has opened from «More options»', async ({ page }) => {
   await login(page, A, '/');
   await page.setViewportSize({ width: 390, height: 844 });
@@ -318,9 +320,12 @@ test('hub-e2e-open-panel — on a phone the panel takes a question with Enter as
   const devtools = await page.context().newCDPSession(page);
   await devtools.send('Animation.enable');
   await devtools.send('Animation.setPlaybackRate', { playbackRate: 0.05 });
-  await openPanel(page);
+  await opener(page).click();
+  await page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]').click();
   await ask(page, 'Hola');
   await expect(lastAnswer(page)).toHaveText(GREETING.en);
+  // Nothing of the menu caught the keys: neither the menu nor the bell's list is left on screen.
+  await expect(page.locator('ion-popover:not(.overlay-hidden)')).toHaveCount(0);
 });
 
 test('BASE-G121 — «Ask the assistant» on the setup card opens it on the setup; a shortcut asks at once', async ({ page }) => {

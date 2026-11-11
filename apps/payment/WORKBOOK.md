@@ -171,7 +171,8 @@ Pasos:
    registra una sola vez.
 Entra: los datos del formulario; la moneda del negocio, la de su país (un pago que no dice su moneda se
 registra en ella, también por el asistente o la API). Mientras la app no sabe todavía la moneda del
-negocio, el campo dice «Importe» y «Registrar pago» espera. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+negocio, el campo dice «Importe» y «Registrar pago» espera; salir del importe lo deja como se escribió,
+sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Registrar pago» se enciende (hub#938).
 Por el asistente o la API, el método se dice
 por su id o por su nombre, el importe va en la unidad menor de la moneda (céntimos en euros) y, si se
@@ -458,7 +459,7 @@ pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ve
   por su lado).
   Listas con `DataTable` de servidor (`useServerTable` + `useLiveList`, copias de las de `service`),
   formularios en `FormModal` (`PaymentFormModal`, `MethodFormModal`, `CancelPaymentModal`), importes
-  con `MoneyInput` y `lib/money.ts`.
+  con el `MoneyInput` de `@erplora/ui/components` y su `parseMoney` (hub#924).
 - Los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `useGrouping: 'always'` en
   `lib/format.ts`, porque el CLDR del español espera a cinco: hub#1090, que salió de payments#20), como
   Carrito y Tarifas.
@@ -492,7 +493,7 @@ Tests:
 | `filter_boxes_match_the_manifest.contract` | `tests/test_queries.py` (cada filtro de la página existe en `PaymentListIn`) y `PaymentsPage.test.ts` |
 | `payment_currency.hub` / `.postgres` | `tests/test_services.py` (moneda explícita, inválida) y `tests/test_business_currency.py` (la del país del negocio, por la operación, la ruta y una API key; cada hub la suya) |
 | `text_filters_narrow_by_fragment.pg` | `tests/test_queries.py` (referencia y beneficiario por trozo, sin cruzar de negocio) |
-| `handler` (Rust): importe en céntimos, ≤ 0 rechazado, HALF_UP | `tests/test_schemas.py` y `frontend/lib/money.test.ts` |
+| `handler` (Rust): importe en céntimos, ≤ 0 rechazado, HALF_UP | `tests/test_schemas.py` y `packages/ui/src/components/MoneyInput/money.test.ts` (el lector común, hub#924) |
 | `erp-payments-list.test.ts`, `list-paging.test.ts`, `form-error-in-panel.test.ts`, `list-load-error.test.ts`, `amount-filter.test.ts` | `frontend/pages/PaymentsPage.test.ts`, `components/PaymentFormModal.test.ts`, `components/CancelPaymentModal.test.ts` |
 | `lib/enums.test.ts`, `money-display-guard.test.ts` | `frontend/lib/format.test.ts` |
 

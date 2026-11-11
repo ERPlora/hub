@@ -184,12 +184,15 @@ describe('hub#1015 — a window with unsaved changes asks before Back throws the
     expect(modal.dismiss).not.toHaveBeenCalled();
   });
 
-  it('«Discard changes» closes the window as Back would have (role `backdrop`)', async () => {
+  // hub#1023: the window's FormModal asks the same question as its `canDismiss` on any dismissal Ionic sees; the shell
+  // already asked, so it closes it as who asked (Ionic's role `handler`, which skips `canDismiss`) — never a second one.
+  it('«Discard changes» closes the window as who already asked (role `handler`): its own `canDismiss` is not asked again', async () => {
     const modal = presentOverlay('ion-modal');
     signUp(modal, { answer: true });
 
     await expect(closeTopmostLayer(document, window)).resolves.toBe('held');
-    await vi.waitFor(() => expect(modal.dismiss).toHaveBeenCalledWith(undefined, 'backdrop'));
+    await vi.waitFor(() => expect(modal.dismiss).toHaveBeenCalledWith(undefined, 'handler'));
+    expect(modal.dismiss).toHaveBeenCalledTimes(1);
   });
 
   it('with nothing typed it closes at once, without asking', async () => {

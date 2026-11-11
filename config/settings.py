@@ -559,10 +559,12 @@ LIVE = {
 LIVE_ASSISTANT_ASKS_REQUIRED = (
     "attendance",
     "base",
+    "cart_checkout",
     "cash_register",
     "customer",
     "inventory",
     "printing",
+    "reservation",
     "sale",
     "staff",
     "table",
