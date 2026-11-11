@@ -422,6 +422,8 @@ EXCERPT = {
     "score": 0.91,
     "lang": "es",
 }
+#: What the model reads of it: the excerpt with the line its answer cites it by (hub#1079).
+CITED = {**EXCERPT, "cite": "Fuente: Caja > Abrir la caja"}
 SEARCH = {"call_id": "d1", "name": "base__docs__search", "arguments": '{"query": "¿Cómo abro la caja?"}'}
 SEARCH_ASKED = {"role": "assistant", "content": "", "tool_calls": [
     {"id": "d1", "type": "function", "function": {"name": "base__docs__search", "arguments": SEARCH["arguments"]}}
@@ -439,11 +441,28 @@ def test_a_how_to_question_gets_the_excerpts_of_the_documentation_as_its_tool_re
     assert [frame["type"] for frame in got] == ["executed", "text", "done"]
     assert (got[0]["name"], got[0]["outcome"], got[0]["app_name"]) == ("base.docs.search", "ok", "Ayuda")
     result = got[-1]["append"][0]
-    assert (result["tool_call_id"], json.loads(result["content"])) == ("d1", {"results": [EXCERPT]})
+    assert (result["tool_call_id"], json.loads(result["content"])) == ("d1", {"results": [CITED]})
     [asked] = gateway.sent(DOCS)
     assert asked.body == {"hub": "a", "query": "¿Cómo abro la caja?", "language": "es", "limit": 8}
     assert signed(asked)
     assert gateway.sent("/internal/assistant/chat/stream")[0].body["messages"][-1]["tool_call_id"] == "d1"
+
+
+def test_the_model_answers_a_how_to_question_told_to_end_it_with_the_cite_of_its_excerpt(client, make_user, gateway):
+    """hub#1079: «¿cómo se hace una factura a partir de un tique?» got the steps and no excerpt they came from. What
+    the model reads next is the excerpt with the line its answer cites it by, in the person's language, and the
+    instruction to end the answer with it; nothing of the business ran for it, only the search."""
+    client.force_login(make_user("ana", host="a", role="hub_owner"))
+    gateway.reply(DOCS, json={"results": [EXCERPT]})
+    gateway.turn({"type": "text_delta", "text": "Desde Caja > Abrir."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
+
+    body = {"messages": [HOW, SEARCH_ASKED], "pending": [SEARCH], "continuation": "tok"}
+    got = frames(post(client, "/assistant/turn", body, HTTP_ACCEPT_LANGUAGE="es"))
+
+    assert [(frame["name"], frame["kind"]) for frame in got if frame["type"] == "executed"] == [("base.docs.search", "query")]
+    [tool] = [message for message in gateway.sent("/internal/assistant/chat/stream")[0].body["messages"] if message["role"] == "tool"]
+    assert [excerpt["cite"] for excerpt in json.loads(tool["content"])["results"]] == ["Fuente: Caja > Abrir la caja"]
+    assert "end that answer with the `cite` of each excerpt you used" in _instructions_sent(gateway)
 
 
 def test_documentation_that_cannot_be_searched_is_told_to_the_model_never_made_up(client, make_user, gateway):
