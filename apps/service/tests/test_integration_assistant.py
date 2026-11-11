@@ -9,6 +9,7 @@ of Services sends reaches the card by the name the Services screens give it, nev
 the field («Absorbed Id», «Tax Category Key», «Items»). The card is base's (``base.assistant.card``); the names are
 service's: the titles of its schemas and the ``verbose_name`` of its models, with their Spanish in its catalog."""
 
+import dataclasses
 import datetime as dt
 import gettext
 import json
@@ -17,15 +18,18 @@ from pathlib import Path
 
 import pytest
 from django.apps import apps
-from django.utils import translation
+from django.utils import formats, timezone, translation
 from live.context import OperationContext, Scope
+from live.errors import AppInactive, Conflict, PermissionDenied
 from live.meta import all_live_app_configs, permissions_for_role
-from live.operations import get, registry
+from live.operations import INTERNAL, get, registry
+from pydantic import ValidationError
 
 from apps.customer.models import Customer
 from apps.service.models import Assignment, Grant, Package
 from apps.service.schemas import MAX_CENTS
 from base import assistant
+from base.business import business_zone
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_assistant import named_by_the_screen
@@ -122,14 +126,17 @@ def test_the_card_names_the_services_a_package_includes_as_its_form():
     assert labels(assistant.card(create, arguments, "en")) == [SCREENS_EN["packages"]["form"]["lines"]]
 
 
-def test_the_card_names_the_refund_or_void_that_gives_sessions_back():
-    """Sales gives back the sessions spent in a sale it refunds or voids: the card names that document by what it is,
-    with service's own words, not with the «Referencia» another app's catalog lends to pydantic's «Reference»."""
-    give_back = get("service.session.return")
-    assert labels(assistant.card(give_back, {"reference": "x"}, "es")) == ["Devolución o anulación"]
-    assert labels(assistant.card(give_back, {"reference": "x"}, "en")) == ["Refund or void"]
+def test_the_card_titles_the_refund_or_void_that_gives_sessions_back_by_services_own_words():
+    """Sales gives back the sessions spent in a sale it refunds or voids: the card titles that document by what it is,
+    with service's own words, not with the «Referencia» another app's catalog lends to pydantic's «Reference» (the
+    card that names a real refund under it: test_a_write_of_services_names_the_sale_the_lines_the_appointment_…)."""
+    reference = assistant._schema(get("service.session.return"))["properties"]["reference"]
+    assert named_by_service(get("service.session.return"), "reference", reference.get("title"))
     with translation.override("es"):
+        assert translation.gettext(reference["title"]) == "Devolución o anulación"
         assert translation.gettext("Reference") == "Referencia"  # the lent word the guardrail must not take for one
+    with translation.override("en"):
+        assert translation.gettext(reference["title"]) == "Refund or void"
 
 
 # ── The records a write names by their id (hub#676) ──────────────────────────────────────────────────────────────────
@@ -159,17 +166,41 @@ NAMED = {
 }
 #: The sessions a write names at once, by their ids.
 OVER_SESSIONS = ("service.session.return", "service.session.settle")
-#: What no read of Services may name: the sale, the appointment and the line of an order are of apps it does not require,
-#: and the reference of a return is the refund or the void of a sale. Their card leaves them out (hub#756).
-LEFT_OUT = {
-    "service.grant.create:sale_id",
-    "service.grant.create:sale_line_id",
-    "service.grant.redeem:appointment_id",
-    "service.grant.redeem:sale_id",
-    "service.session.hold:order_line_id",
-    "service.session.return:reference",
-    "service.session.settle:sale_id",
+#: What a write of Services names by its id that is Sales' or Appointments', which Services does not require: the sale,
+#: the line of a sale, the appointment, the line of an open check and the refund or the void that gives sessions back.
+#: Services' own read names each by the read of its app, as whoever asks (``service.record.get``, hub#756).
+TILL = {
+    "service.grant.create": {"sale_id": "sale", "sale_line_id": "sale_line"},
+    "service.grant.redeem": {"sale_id": "sale", "appointment_id": "appointment"},
+    "service.session.hold": {"order_line_id": "check_line"},
+    "service.session.return": {"reference": "refund"},
+    "service.session.settle": {"sale_id": "sale"},
 }
+TILL_TITLES = {
+    "es": {
+        "appointment": "Cita",
+        "check_line": "Línea de la cuenta",
+        "refund": "Devolución o anulación",
+        "sale": "Venta",
+        "sale_line": "Línea de venta",
+    },
+    "en": {
+        "appointment": "Appointment",
+        "check_line": "Check line",
+        "refund": "Refund or void",
+        "sale": "Sale",
+        "sale_line": "Sale line",
+    },
+}
+#: The read of another app ``service.record.get`` names each record of ``TILL`` by.
+BEHIND_OF = {
+    "sale": "sale.sale.get",
+    "sale_line": "sale.record.get",
+    "check_line": "sale.record.get",
+    "refund": "sale.record.get",
+    "appointment": "appointment.appointment.get",
+}
+BEHIND = tuple(sorted(set(BEHIND_OF.values())))
 TITLES = {
     "es": {
         "assignment": "Profesional del servicio",
@@ -272,6 +303,98 @@ def said(language: str = "es") -> dict:
     }
 
 
+def run(ctx: OperationContext, name: str, data: dict):
+    op = get(name)
+    return op(ctx, op.input.model_validate(data))
+
+
+def a_till(hub, salon: dict) -> dict:
+    """What Sales and Appointments show of ``a_salon``'s day, made by their own operations: an open check with a «Tinte»
+    line, a sale of a «Tinte» part of which was refunded, a second sale that was voided, and Lucía Pérez's «Corte» with
+    Ana López a week from today at 10:00 (inside the time ahead Appointments books)."""
+    from apps.schedule.models import ScheduleSettings, WeekDay
+
+    owner = person(hub, "hub_owner")
+    dye = run(owner, "service.service.create", {"name": "Tinte", "price": 3000, "tax_category_key": "service.generic"})
+    # By card: cash would ask for an open cash session.
+    card = next(row for row in run(owner, "sale.payment_method.list", {}).rows if row.type == "card")
+    check = run(owner, "sale.order.open", {"service_lines": [{"service_id": str(dye.id)}]})
+
+    def charged(key: str):
+        lines = [{"service_id": str(dye.id)}]
+        return run(owner, "sale.sale.complete", {"idempotency_key": key, "service_lines": lines, "payments": [{"method_id": str(card.id)}]})
+
+    sale, voided = charged("till-756-0001"), charged("till-756-0002")
+    refund = run(
+        owner,
+        "sale.sale.refund",
+        {"sale_id": str(sale.id), "reason": "Mal color", "allocations": [{"payment_id": str(sale.payments[0].id), "amount": 500}]},
+    )
+    run(owner, "sale.sale.void", {"sale_id": str(voided.id), "reason": "Cobrada dos veces"})
+    # Open every hour: the appointment is booked whatever the business's opening hours.
+    WeekDay.objects.all().delete()
+    ScheduleSettings.objects.all().delete()
+    day = booked_on()
+    booked = run(
+        owner,
+        "appointment.appointment.create",
+        {
+            "customer_id": str(salon["customer"]),
+            "services": [{"service_id": str(salon["service"])}],
+            "staff_id": str(salon["member"]),
+            "start": f"{day.isoformat()}T10:00:00",
+        },
+    )
+    return {
+        "sale": sale.id,
+        "number": sale.number,
+        "sale_line": sale.lines[0].id,
+        "appointment": booked.id,
+        "day": day,
+        "check_line": check.lines[0].id,
+        "refund": refund.refund_id,
+        "voided": voided.id,
+        "voided_number": voided.number,
+    }
+
+
+def booked_on() -> dt.date:
+    """The day of the appointment of ``a_till``: a week from today, at the business's hour."""
+    return timezone.localtime(timezone.now(), business_zone()).date() + dt.timedelta(days=7)
+
+
+def as_appointments_says(day: dt.date, language: str) -> str:
+    """``day`` with its weekday first, as Appointments says the day of an appointment («martes, 2 de marzo de 2027»)."""
+    with translation.override(language):
+        return f"{formats.date_format(day, 'l')}, {formats.date_format(day, 'DATE_FORMAT')}"
+
+
+def said_at_the_till(till: dict, language: str = "es") -> dict:
+    """How the card names each record of ``a_till``: the sale by its number, the lines by what they charge, the
+    appointment as Appointments' cards say it and the refund by the sale it gives back."""
+    refund = {"es": "Devolución de la venta {}", "en": "Refund of sale {}"}[language]
+    return {
+        "sale": till["number"],
+        "sale_line": "Tinte",
+        "appointment": f"Lucía Pérez · {as_appointments_says(till["day"], language)} · 10:00 · Ana López",
+        "check_line": "Tinte",
+        "refund": refund.format(till["number"]),
+    }
+
+
+def till_cards(till: dict, ctx: OperationContext | None, language: str = "es") -> dict:
+    """The card of each write of ``TILL`` naming every record of Sales or Appointments it names by its id."""
+    return {
+        write: assistant.card(get(write), {datum: str(till[kind]) for datum, kind in data.items()}, language, ctx)
+        for write, data in TILL.items()
+    }
+
+
+def named_at_the_till(till: dict, language: str = "es") -> dict:
+    names = said_at_the_till(till, language)
+    return {write: {datum: names[kind] for datum, kind in data.items()} for write, data in TILL.items()}
+
+
 def cards(salon: dict, ctx: OperationContext | None, language: str = "es") -> dict:
     """The card of each write of ``NAMED`` naming every record it names by its id, as ``ctx``'s person would confirm it."""
     return {
@@ -292,31 +415,195 @@ def left_out_of_every_card() -> dict:
 def test_every_record_a_write_of_services_names_by_its_id_is_listed_here():
     """Positive control of the tests below: a new reference of a write of Services comes in here, with its name."""
     writes = [get(name) for name in TOOLS]
-    known = {tuple(known.split(":")) for known in LEFT_OUT}
+    till = {(write, datum) for write, data in TILL.items() for datum in data}
     assert {
-        op.name: found for op in writes if (found := {datum for datum in references(op) if (op.name, datum) not in known})
+        op.name: found for op in writes if (found := {datum for datum in references(op) if (op.name, datum) not in till})
     } == {write: set(data) for write, data in NAMED.items()}
+    assert {(op.name, datum) for op in writes for datum in references(op)} >= till
 
 
-def test_the_only_records_a_write_of_services_leaves_unnamed_are_the_six_of_the_ratchet():
-    """The sale, the appointment and the line of an order are of apps Services does not require, and the reference of a
-    return is what gives it back: nothing else. This is what ``base``'s ratchet counts, by name."""
-    assert {f"{name}:{path}" for name in TOOLS for path in unnamed(get(name))[0]} == LEFT_OUT
+def test_no_write_of_services_leaves_a_record_unnamed():
+    """The sale, the appointment and the lines are of apps Services does not require, and the reference of a return is
+    what gives it back: all of them are named too (hub#756). ``base``'s ratchet counts none of Services."""
+    assert {f"{name}:{path}" for name in TOOLS for path in unnamed(get(name))[0]} == set()
+
+
+# ── What Sales and Appointments name, by their own reads (hub#756) ─────────────────────────────────────────────────
+
+
+def titled(card: dict) -> dict:
+    """Each datum of ``card`` by its title and the name it says."""
+    return {field["name"]: (field["label"], field["value"]) for field in card["fields"]}
+
+
+def assert_left_out(shown: dict) -> None:
+    """Every card of ``TILL`` leaves out what Sales and Appointments name, and none of them says it by its id."""
+    assert {write: values(card) for write, card in shown.items()} == dict.fromkeys(TILL, {})
+    assert all(no_id(card) for card in shown.values())
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_the_card_of_a_write_paints_none_of_the_six_nor_an_id(hub_a, no_fallback):
-    """The reference of a return, the sale of a voucher: left out, never by its id, whoever asks."""
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_a_write_of_services_names_the_sale_the_lines_the_appointment_and_the_refund_as_their_screens_do(
+    language, hub_a, no_fallback
+):
+    """«Véndele el bono de la venta de esta mañana», «gasta la sesión en la cita de Lucía»: the card says which sale (by
+    its number), which line (by what it charges), which appointment (as Appointments' cards say it) and which refund
+    gives the sessions back (by its sale), each under the title its screens give it («Venta», never «Id»), never by an
+    id."""
     with use_hub(hub_a):
-        salon = a_salon()
-        admin = person(hub_a)
-        arguments: dict[str, dict] = {}
-        for known in LEFT_OUT:
-            write, datum = known.split(":")
-            arguments.setdefault(write, {})[datum] = str(salon["grant"])
-        shown = {write: assistant.card(get(write), data, "es", admin) for write, data in arguments.items()}
-    assert {write: values(card) for write, card in shown.items()} == dict.fromkeys(arguments, {})
+        till = a_till(hub_a, a_salon())
+        shown = till_cards(till, person(hub_a, language=language), language)
+    names, titles = said_at_the_till(till, language), TILL_TITLES[language]
+    assert {write: titled(card) for write, card in shown.items()} == {
+        write: {datum: (titles[kind], names[kind]) for datum, kind in data.items()} for write, data in TILL.items()
+    }
     assert all(no_id(card) for card in shown.values())
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.parametrize(("language", "said"), [("es", "Anulación de la venta {}"), ("en", "Void of sale {}")])
+def test_the_sessions_a_void_gives_back_name_the_sale_voided(language, said, hub_a, no_fallback):
+    """SERVICE-F27: Sales gives back the sessions of a sale it voids with the sale itself as the document."""
+    with use_hub(hub_a):
+        till = a_till(hub_a, a_salon())
+        card = assistant.card(
+            get("service.session.return"), {"reference": str(till["voided"])}, language, person(hub_a, language=language)
+        )
+    assert values(card) == {"reference": said.format(till["voided_number"])}
+
+
+@pytest.fixture(params=["off", "absent"])
+def turn_off_sales_and_appointments(request, monkeypatch):
+    """What turns Sales and Appointments, which Services does not require, off in the business or uninstalls them."""
+
+    def off(ctx, data):
+        raise AppInactive("Off.")
+
+    def turn_off():
+        for read in BEHIND:
+            if request.param == "absent":
+                monkeypatch.delitem(registry, read)
+            else:
+                monkeypatch.setitem(registry, read, dataclasses.replace(registry[read], fn=off))
+
+    return turn_off
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_without_sales_and_appointments_the_card_leaves_them_out_never_by_their_id(
+    hub_a, no_fallback, turn_off_sales_and_appointments
+):
+    with use_hub(hub_a):
+        till = a_till(hub_a, a_salon())
+        named = till_cards(till, person(hub_a))
+        turn_off_sales_and_appointments()
+        shown = till_cards(till, person(hub_a))
+    assert {write: values(card) for write, card in named.items()} == named_at_the_till(till)  # positive control
+    assert_left_out(shown)
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_who_may_not_see_sales_nor_appointments_reads_none_of_them_on_the_card(hub_a, no_fallback):
+    """The reads of Sales and Appointments run as whoever asks: without their rights, Services names nothing of theirs."""
+    hidden = frozenset({"sale.view_sale", "appointment.view_appointment", "appointment.view_own_appointment"})
+    ctx = person(hub_a, without=hidden)
+    # Positive control: Services' own read is theirs to run; only what it asks of the others is not.
+    assert ctx.has(get("service.record.get").permission)
+    with use_hub(hub_a):
+        shown = till_cards(a_till(hub_a, a_salon()), ctx)
+    assert_left_out(shown)
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_an_employee_reads_the_sale_and_the_lines_but_not_an_appointment_of_someone_else(hub_a, no_fallback):
+    """An employee sees her own appointments only (Appointments' rule): another's is left out, never by its id."""
+    with use_hub(hub_a):
+        till = a_till(hub_a, a_salon())
+        shown = till_cards(till, person(hub_a, "hub_employee"))
+    expected = named_at_the_till(till)
+    expected["service.grant.redeem"].pop("appointment_id")
+    assert {write: values(card) for write, card in shown.items() if write in expected} == expected
+    assert all(no_id(card) for card in shown.values())
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_nobody_behind_the_request_reads_nothing_of_sales_nor_appointments(hub_a, no_fallback):
+    with use_hub(hub_a):
+        shown = till_cards(a_till(hub_a, a_salon()), None)
+    assert_left_out(shown)
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_a_sale_or_an_appointment_that_is_not_there_is_left_out_never_by_its_id(hub_a, no_fallback):
+    gone = {kind: uuid.uuid7() for kind in TILL_TITLES["es"]}
+    with use_hub(hub_a):
+        shown = till_cards(gone, person(hub_a))
+    assert_left_out(shown)
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_a_sale_or_an_appointment_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fallback):
+    with use_hub(hub_b):
+        theirs = a_till(hub_b, a_salon())
+        named_in_b = till_cards(theirs, person(hub_b))
+    with use_hub(hub_a):
+        shown = till_cards(theirs, person(hub_a))
+    assert {write: values(card) for write, card in named_in_b.items()} == named_at_the_till(theirs)  # positive control
+    assert_left_out(shown)
+
+
+# ── The read that names them ─────────────────────────────────────────────────────────────────────────────────────────
+
+
+def test_the_read_that_names_them_is_no_tool_and_takes_one_record():
+    read = get("service.record.get")
+    assert (read.kind, read.ai, read.expose_api) == ("query", INTERNAL, False)
+    for data in ({}, {"sale_id": str(uuid.uuid7()), "appointment_id": str(uuid.uuid7())}, {"nothing": "x"}):
+        with pytest.raises(ValidationError):
+            read.input.model_validate(data)
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.parametrize(("language", "said"), [("es", "Anulación de la venta {}"), ("en", "Void of sale {}")])
+def test_the_read_that_names_them_answers_in_the_readers_language(language, said, hub_a, no_fallback):
+    """Whatever language is active where it is asked from (a request in the other one, a nested call)."""
+    other = {"es": "en", "en": "es"}[language]
+    read = get("service.record.get")
+    with use_hub(hub_a):
+        till = a_till(hub_a, a_salon())
+        with translation.override(other):
+            named = read(person(hub_a, language=language), read.input.model_validate({"reference": str(till["voided"])}))
+    assert named.name == said.format(till["voided_number"])
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_the_read_that_names_them_needs_the_right_to_see_the_vouchers(hub_a, no_fallback):
+    read = get("service.record.get")
+    # By name: with a lower one of Services («see services») the read would open to whoever never sees a voucher.
+    assert read.permission == "service.view_package_balance"
+    with use_hub(hub_a), pytest.raises(PermissionDenied):
+        read(person(hub_a, without=frozenset({read.permission})), read.input.model_validate({"sale_id": str(uuid.uuid7())}))
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.parametrize(
+    ("datum", "code"),
+    [
+        ("sale_id", "service.sales_unavailable"),
+        ("sale_line_id", "service.sales_unavailable"),
+        ("order_line_id", "service.sales_unavailable"),
+        ("reference", "service.sales_unavailable"),
+        ("appointment_id", "service.appointments_unavailable"),
+    ],
+)
+def test_without_their_app_the_read_says_it_is_unavailable(datum, code, hub_a, no_fallback, monkeypatch):
+    for name in BEHIND:
+        monkeypatch.delitem(registry, name)
+    read = get("service.record.get")
+    with use_hub(hub_a), pytest.raises(Conflict) as caught:
+        read(person(hub_a), read.input.model_validate({datum: str(uuid.uuid7())}))
+    assert caught.value.code == code
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
@@ -469,21 +756,30 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
     nothing to recognise, just in the common case. Every role a business gives, every write that names a record."""
     unread: list[tuple[str, str, str]] = []
     checked = 0
+    named: dict[str, dict] = {}
+    for listed in (NAMED, {write: {"ids": "session"} for write in OVER_SESSIONS}, TILL):
+        for write, data in listed.items():
+            named[write] = {**named.get(write, {}), **data}
     for role in ROLES:
         mine = ctx_for(role)
-        for name, data in {**NAMED, **{write: {"ids": "session"} for write in OVER_SESSIONS}}.items():
+        for name, data in named.items():
             op = get(name)
             if not mine.has(op.permission):
                 continue
             schema = op.input.model_json_schema()
             defs = schema.get("$defs", {})
-            for datum in data:
+            for datum, kind in data.items():
                 checked += 1
                 prop = assistant._resolved(schema["properties"][datum], defs)
                 marked = assistant.refers_of(assistant._resolved(prop["items"], defs) if "items" in prop else prop)
-                if marked is None or not mine.has(registry[marked["read"]].permission):
+                reads = [marked["read"]] if marked else []
+                # What Sales or Appointments name, by the read of theirs that Services' own read asks.
+                reads += [BEHIND_OF[kind]] if kind in BEHIND_OF else []
+                if marked is None or not all(mine.has(registry[read].permission) for read in reads):
                     unread.append((role, name, datum))
     # Positive control: the owner and the admin run them all, the manager and the employee what their roles give them
-    # (the settle's ``customer_id`` is replaced by its ``ids`` here; the four roles that spend a session say who did it).
-    assert checked == 91
+    # (the four roles that spend a session say who did it): 91, plus the settle's ``customer_id`` beside its ``ids`` for
+    # each of the four, plus the sale, its lines, the appointment and the refund of the five writes of the till: 6 for
+    # the employee, who gives back no session, and 7 for each of the other three (hub#756).
+    assert checked == 91 + 4 + 27
     assert unread == []

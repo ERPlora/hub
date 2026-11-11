@@ -71,7 +71,6 @@ from apps.sale.schemas import (
     ProductLineIn,
     QuickNoteListIn,
     QuickNotePage,
-    RecordOut,
     RecordRefIn,
     RefundByKeyIn,
     RefundByKeyOut,
@@ -106,6 +105,7 @@ from base.business import currency_decimals
 from base.models import Approval
 from base.operations import call
 from base.ordering import list_order
+from base.schemas import RecordNameOut
 
 #: The currency Spanish law writes its limits in (Ley 7/2012, RD 1619/2012): the law's, not the business's.
 LIMITS_CURRENCY = "EUR"
@@ -150,6 +150,10 @@ APPOINTMENT_UNAVAILABLE = _("Appointments is not active in this business.")
 STAFF_UNAVAILABLE = _("Staff is not active in this business.")
 LINE_NOT_FOUND = _("That line does not exist.")
 TENDER_NOT_FOUND = _("That tender does not exist.")
+REFUND_NOT_FOUND = _("That refund does not exist.")
+#: How a refund is said where something names it (the card of Services' write that gives back the sessions a refund
+#: returns, hub#756): it has no number of its own, «Sales» lists it under its sale.
+REFUND_OF_SALE = _("Refund of sale %(number)s")
 BOOKED_PRICE_MISMATCH = _(
     "That is not the price the appointment booked for this service: it is cancelled, it is another "
     "customer's, it did not book this service or it booked it cheaper."
@@ -1330,6 +1334,14 @@ def _tender_name(ctx: OperationContext, payment_id: UUID) -> str:
     return method_display_name(tender.method_name)
 
 
+def _refund_name(ctx: OperationContext, refund_id: UUID) -> str:
+    refund = Refund.objects.select_related("sale").filter(pk=refund_id).first()
+    if refund is None:
+        raise NotFound(str(REFUND_NOT_FOUND), code="sale.refund_not_found")
+    with translation.override(ctx.language):
+        return str(REFUND_OF_SALE) % {"number": refund.sale.number}
+
+
 def _named_by(read: str, unavailable_code: str, name: str = "name"):
     """The name an app Sales does not require gives its record, by its own read and as whoever asks."""
     return lambda ctx, record_id: getattr(call_app(ctx, read, {"id": record_id}, unavailable_code), name)
@@ -1344,6 +1356,7 @@ RECORD_NAMES = {
     "line_id": _check_line_name,
     "sale_line_id": _sale_line_name,
     "payment_id": _tender_name,
+    "refund_id": _refund_name,
     "product_id": _named_by("inventory.product.get", "sale.catalog_unavailable"),
     "service_id": _named_by("service.service.get", "sale.services_unavailable"),
     "combo_id": _named_by("combo.combo.get", "sale.combo_unavailable"),
@@ -1360,7 +1373,7 @@ RECORD_NAMES = {
     kind="query",
     permission="sale.view_sale",
     input=RecordRefIn,
-    output=RecordOut,
+    output=RecordNameOut,
     ai=INTERNAL,
 )
 def get_record(ctx: OperationContext, data: RecordRefIn) -> dict:
