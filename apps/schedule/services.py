@@ -182,6 +182,17 @@ def _override_event(ctx: OperationContext, name: str, row: Override) -> None:
         "description": "Sets the opening hours of one day of the usual week (by number, 0 = Monday, or by name): "
         "closed, or its intervals (split shifts, past midnight, 00:00–00:00 for 24 hours). Replaces what the day had.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "set the usual Saturday to 10:00 to 14:00",
+                "we stay closed on Mondays from now on",
+            ),
+            "es": (
+                "los sábados quedan de 10:00 a 14:00 desde ya",
+                "los lunes no abrimos, déjalos de descanso",
+                "los martes hacemos jornada partida, de 9 a 13 y de 16 a 20, y sustituye lo que había",
+            ),
+        },
     },
 )
 def set_day(ctx: OperationContext, data: SetDayIn) -> dict:
@@ -211,6 +222,16 @@ def set_day(ctx: OperationContext, data: SetDayIn) -> dict:
         "description": "Confirms the usual week as it is saved (the default one set up for the business) without "
         "changing any hour.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "the default opening is fine, confirm it as it is",
+                "confirm the default opening as it is, without changing a thing",
+            ),
+            "es": (
+                "lo que propusiste para abrir me vale, confírmalo tal cual",
+                "da por buena la apertura por defecto sin cambiar nada",
+            ),
+        },
     },
 )
 def confirm_week(ctx: OperationContext, data: NoParamsIn) -> dict:
@@ -238,6 +259,17 @@ def confirm_week(ctx: OperationContext, data: NoParamsIn) -> dict:
     ai={
         "description": "Adds a special day: a date closed (a holiday) or with other opening hours, once or every year.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "the 15th of August is a local holiday, we stay closed",
+                "add New Year's Eve as a special date open until 18:00",
+            ),
+            "es": (
+                "el 15 de agosto es fiesta local y no abrimos",
+                "en Nochevieja abrimos solo hasta las 18:00, apúntalo como fecha especial",
+                "apunta la fiesta del patrón como festivo todos los años",
+            ),
+        },
     },
 )
 def create_special_day(ctx: OperationContext, data: SpecialDayIn) -> dict:
@@ -266,6 +298,17 @@ def create_special_day(ctx: OperationContext, data: SpecialDayIn) -> dict:
         "description": "Adds several special days at once (up to 366, such as the year's holidays); a day whose date "
         "is taken or whose hours are not valid is skipped with its reason and the rest go in.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "load all the national holidays of next year at once",
+                "add these three holidays together: 1 May, 15 August and 12 October",
+            ),
+            "es": (
+                "carga de golpe todos los festivos nacionales del año que viene",
+                "apunta de una vez Año Nuevo y Reyes, el 1 y el 6 de enero, los dos cerrados",
+                "mete juntos estos tres festivos: 1 de mayo, 15 de agosto y 12 de octubre",
+            ),
+        },
     },
 )
 def bulk_create_special_days(ctx: OperationContext, data: BulkSpecialDayIn) -> dict:
@@ -331,6 +374,16 @@ def bulk_create_special_days(ctx: OperationContext, data: BulkSpecialDayIn) -> d
         "description": "Corrects a special day (by id, name or date): its date, name, closed or hours, yearly or "
         "notes; only what is sent changes, and sent intervals replace them all.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "on the Epiphany holiday we will open in the morning after all",
+                "move the Christmas special date to the 26th",
+            ),
+            "es": (
+                "el festivo de Reyes al final abrimos de 10 a 14",
+                "corrige la fecha especial de Navidad: es el 26, no el 25",
+            ),
+        },
     },
 )
 def update_special_day(ctx: OperationContext, data: SpecialDayPatchIn) -> dict:
@@ -371,6 +424,16 @@ def update_special_day(ctx: OperationContext, data: SpecialDayPatchIn) -> dict:
         "description": "Deletes a special day (by id, name or date) and its hours; its date is free again. Cannot be "
         "undone.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "remove the local holiday, we open as usual after all",
+                "delete the Christmas Eve special date",
+            ),
+            "es": (
+                "borra el festivo del pueblo, al final abrimos como siempre",
+                "quita la fecha especial de Nochebuena",
+            ),
+        },
     },
 )
 def delete_special_day(ctx: OperationContext, data: SpecialDayRefIn) -> dict:
@@ -396,6 +459,17 @@ def delete_special_day(ctx: OperationContext, data: SpecialDayRefIn) -> dict:
         "description": "Adds a temporary change of the opening hours for a range of dates (holidays, summer hours, "
         "works): closed, or the same intervals every day of the range.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "we close from 1 to 15 August for the holidays",
+                "in July and August we keep a summer timetable, 8:00 to 15:00",
+            ),
+            "es": (
+                "añade un cierre del negocio por obras del 3 al 9 de marzo",
+                "en julio y agosto hacemos horario de verano, de 8:00 a 15:00",
+                "cerramos el puente de noviembre por vacaciones, del 1 al 3",
+            ),
+        },
     },
 )
 def create_override(ctx: OperationContext, data: OverrideIn) -> dict:
@@ -424,6 +498,17 @@ def create_override(ctx: OperationContext, data: OverrideIn) -> dict:
         "description": "Corrects a temporary change (by id, reason or a date it covers): its dates, reason, closed or "
         "hours; only what is sent changes, and sent intervals replace them all.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "the summer holidays end on the 20th, not on the 15th",
+                "make the summer opening last until the end of September",
+            ),
+            "es": (
+                "las vacaciones de verano acaban el 20 y no el 15",
+                "alarga la apertura de verano hasta finales de septiembre",
+                "corrige las fechas de las obras: empiezan el lunes 3",
+            ),
+        },
     },
 )
 def update_override(ctx: OperationContext, data: OverridePatchIn) -> dict:
@@ -467,6 +552,16 @@ def update_override(ctx: OperationContext, data: OverridePatchIn) -> dict:
         "description": "Deletes a temporary change (by id, reason or a date it covers) and its hours; the usual week "
         "rules those dates again. Cannot be undone.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "cancel the summer closure, this year we stay open",
+                "drop the summer opening and go back to normal",
+            ),
+            "es": (
+                "quita el cierre de vacaciones, este verano abrimos",
+                "anula la apertura de verano y vuelve a lo de siempre",
+            ),
+        },
     },
 )
 def delete_override(ctx: OperationContext, data: OverrideRefIn) -> dict:
@@ -492,6 +587,16 @@ def delete_override(ctx: OperationContext, data: OverrideRefIn) -> dict:
         "description": "Changes the day the opening week starts on (1 = Monday … 7 = Sunday): only the order of the "
         "week's table, never an hour.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "start the week on Sunday on the calendar",
+                "I want the week to begin on Monday",
+            ),
+            "es": (
+                "cambia el inicio de semana al lunes",
+                "ordena la semana del calendario empezando por el domingo",
+            ),
+        },
     },
 )
 def update_settings(ctx: OperationContext, data: SettingsIn) -> dict:

@@ -85,7 +85,7 @@ from apps.invoice.schemas import (
 )
 from apps.sale import pricing
 from apps.sale.models import OrderLine, Refund, Sale, Settings
-from apps.sale.queries import TICKET_LIMIT, business_country, find_sale, money_text
+from apps.sale.queries import TICKET_LIMIT, business_country, find_sale, money_text, tax_category_name
 from apps.tax.models import TaxRule
 from apps.tax.queries import (
     business_tax_kind,
@@ -152,7 +152,9 @@ SALE_NOT_INVOICED = _(
 )
 SALE_NOT_VOIDED = _("The sale %(number)s is not voided.")
 UNKNOWN_CATEGORY = _("There is no tax category «%(category)s».")
-NO_TAX_RULE = _("No tax rule applies today to the tax category «%(category)s».")
+NO_TAX_RULE = _(
+    "No tax rule applies today to the tax category «%(category)s». Create its rule in Taxes › Rules."
+)
 LINE_UNDERFLOW = _(
     "Line %(line)s: %(quantity)s at that price comes to 0.00, so no invoice was issued."
 )
@@ -627,7 +629,7 @@ def _manual_series(
 def _rule_key(category_key: str, *, field: str, on: dt.date) -> fiscal.FiscalKey:
     resolution = resolve_tax(category_key=category_key, on=on)
     if resolution is None:
-        message = str(NO_TAX_RULE) % {"category": category_key}
+        message = str(NO_TAX_RULE) % {"category": tax_category_name(category_key)}
         raise Conflict(message, code="invoice.no_tax_rule", fields={field: message})
     return fiscal.FiscalKey(
         tax=resolution.tax_kind,

@@ -118,7 +118,8 @@ APP_WORDS = shared.app_words
 #: deactivation itself (``staff.member.deactivate``, ``*.deactivate``), not only a switch off, and what one «pide» or
 #: «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``). A «bono» (a voucher, a pack) is
 #: Services' voucher, the one of the catalogue (``service.package``) or the one sold to a customer (``service.grant``),
-#: and an «asignación» (what one «asigna») is a professional's assignment to a service (``service.assignment``).
+#: and an «asignación» (what one «asigna») is a professional's assignment to a service (``service.assignment``). An
+#: «elemento», as Demo's screens name one, is an item (``demo.item``).
 #: A «plantilla» and a «mensaje» are the WhatsApp inbox's template and message (``whatsapp_inbox.template``,
 #: ``whatsapp_inbox.message``), as «template» and «message» already are in English; a business template
 #: (``base.blueprint``) or the staff a «plantilla» also names are said with their own words beside it («plantilla de
@@ -184,6 +185,8 @@ SYNONYMS = (
     ),
     ("borrador", "borradores", "draft", "drafts"),
     ("receta", "recetas", "prefabricada", "prefabricadas", "recipe", "recipes"),
+    # demo
+    ("elemento", "elementos", "item", "items"),
     # whatsapp_inbox
     ("plantilla", "plantillas", "template", "templates"),
     ("mensaje", "mensajes", "message", "messages"),
