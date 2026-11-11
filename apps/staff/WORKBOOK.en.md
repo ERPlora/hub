@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:26d6285d0f63d6dada5cd52918144b51aaf5190b2d5d7c243e957eb868587e88 -->
+<!-- generated from WORKBOOK.md sha256:27cec7d72e2dc9898c562b178b34416f3997f1728b2994d6c84463aaacab7cf4 -->
 
 ## What it is for and who it is for
 
@@ -246,7 +246,7 @@ Involved: ATTENDANCE-F01, TASK-F03
 
 ### STAFF-F04 Create, edit and retire a role
 Status: done (server and screen)
-Actor: owner, administrator, manager
+Actor: owner, administrator, manager, assistant
 Screen: Roles
 Steps:
 1. In **Roles**, tap **+**, write the Name (required, up to 100) and, if you want, Description and Color,
@@ -263,7 +263,7 @@ Involved: none
 
 ### STAFF-F05 Deactivate a professional
 Status: done (server and screen)
-Actor: owner, administrator
+Actor: owner, administrator, assistant
 Screen: Staff
 Steps:
 1. In the row, tap **Deactivate** and confirm "Take {name} off the floor? They stop being bookable;
@@ -433,7 +433,7 @@ Involved: none
 
 ### STAFF-F18 Approve or reject time off
 Status: done (server and screen)
-Actor: owner, administrator, manager
+Actor: owner, administrator, manager, assistant
 Screen: Time Off
 Steps:
 1. Find the **Pending** time off (the Status filter helps).
