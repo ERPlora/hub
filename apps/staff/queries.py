@@ -128,6 +128,18 @@ TIME_OFF_ORDER = {
     output=MemberPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "who works on the team?",
+                "list the active staff",
+                "show me the staff with their roles",
+            ),
+            "es": (
+                "¿quién trabaja en el equipo?",
+                "lista de empleados activos",
+                "muéstrame la plantilla con sus roles",
+            ),
+        },
         "description": "Lists the staff members (the directory) with their status and role; never their pay."
     },
 )
@@ -179,6 +191,18 @@ def filter_members(members: QuerySet[Member], params: MemberListIn) -> QuerySet[
     output=MemberDetailOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "Lucía's staff record: role, status and phone",
+                "Pablo's contact details",
+                "what role does Ana have and is she still active?",
+            ),
+            "es": (
+                "¿qué datos tiene la ficha de Lucía?",
+                "datos de contacto de Pablo",
+                "¿qué rol tiene Ana y sigue activa?",
+            ),
+        },
         "description": "Returns the record of one staff member, by id or by name; never their pay."
     },
 )
@@ -194,6 +218,18 @@ def member_detail(ctx: OperationContext, data: MemberRefIn) -> Member:
     output=MineOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what is my own staff record?",
+                "how much do I earn per hour and what is my commission?",
+                "my details linked to my user",
+            ),
+            "es": (
+                "¿qué ficha de empleado es la mía?",
+                "mi comisión y lo que gano por hora",
+                "mis datos vinculados a mi usuario",
+            ),
+        },
         "description": "Returns the staff record of the current user, with their own hourly rate and "
         "commission; empty when the user has no record."
     },
@@ -226,6 +262,18 @@ def current_record(ctx: OperationContext, data: CurrentMemberIn) -> dict:
     input=CompensationListIn,
     output=CompensationPage,
     ai={
+        "asks": {
+            "en": (
+                "how much does each person earn per hour?",
+                "hourly rates and HR notes",
+                "show me Pablo's hourly rate, commission and private notes",
+            ),
+            "es": (
+                "¿cuánto gana por hora cada persona?",
+                "lo que gana cada uno por hora y sus notas internas",
+                "enséñame el sueldo y las notas privadas de Pablo",
+            ),
+        },
         "description": "Lists the hourly rate, commission and private HR notes of the staff members."
     },
 )
@@ -245,6 +293,18 @@ def compensation(ctx: OperationContext, params: CompensationListIn) -> dict:
     input=MemberStatsIn,
     output=MemberStatsOut,
     ai={
+        "asks": {
+            "en": (
+                "how many active staff are there?",
+                "summary: active, on leave and away today",
+                "how many time-off requests are waiting for approval?",
+            ),
+            "es": (
+                "¿cuántos empleados activos hay?",
+                "resumen: activos, de baja y ausentes hoy",
+                "¿cuántas ausencias faltan por aprobar?",
+            ),
+        },
         "description": "Returns staff statistics: members by status, members away today and time-off "
         "requests waiting for an answer."
     },
@@ -270,6 +330,18 @@ def member_stats(ctx: OperationContext, data: MemberStatsIn) -> dict:
     output=CommissionPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what commission rate does each professional have?",
+                "the team's commission sheet with each one's linked user",
+                "what percentage does Lucía get as commission?",
+            ),
+            "es": (
+                "¿con qué comisión trabaja cada profesional?",
+                "hoja de comisiones del equipo con el usuario vinculado de cada uno",
+                "¿qué porcentaje se lleva Lucía de comisión?",
+            ),
+        },
         "description": "Returns each staff member who can earn a commission (active or on leave) with "
         "their record id, the user id their record hangs from and their commission rate. What each one "
         "earned in a period is staff.commission.report."
@@ -298,6 +370,18 @@ EARNING = (Member.Status.ACTIVE, Member.Status.ON_LEAVE)
     output=CommissionReportOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how much commission did each stylist earn this week?",
+                "work out the team's commissions for yesterday",
+                "sales and commission per professional this month",
+            ),
+            "es": (
+                "¿cuánto ha ganado de comisión cada estilista esta semana?",
+                "calcula las comisiones del equipo de ayer",
+                "comisiones ganadas por cada profesional en lo que va de mes",
+            ),
+        },
         "description": "The commission each professional earned in a period of business days: today by "
         "default, yesterday, this week, this month or two days of your own. Per person: what they sold "
         "(refunds and the vouchers they sold taken off, the value of the voucher sessions they did added), their rate and their "
@@ -525,6 +609,18 @@ def resolve_role(ctx: OperationContext, params: RoleResolveIn) -> dict:
     output=RolePage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what roles does the business have?",
+                "list the roles with how many people hold each",
+                "which roles can I give a new employee?",
+            ),
+            "es": (
+                "muéstrame los roles que tengo creados",
+                "lista los roles con cuánta gente tiene cada uno",
+                "¿qué roles puedo darle a un empleado nuevo?",
+            ),
+        },
         "description": "Lists the roles of the business (catalogue labels such as stylist or waiter; "
         "they grant no permission) with how many active people hold each."
     },
@@ -584,6 +680,18 @@ def with_member_count(roles: QuerySet[Role]) -> QuerySet[Role]:
     output=SchedulePage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which schedules does Lucía have?",
+                "list Pablo's schedules",
+                "what schedule is Ana on now?",
+            ),
+            "es": (
+                "¿qué horarios tiene Lucía?",
+                "lista los horarios de Pablo",
+                "¿con qué horario está Ana ahora?",
+            ),
+        },
         "description": "Lists the work schedules of a staff member (by id or by name), each with its "
         "weekly working hours and breaks."
     },
@@ -603,7 +711,21 @@ def list_schedules(ctx: OperationContext, params: ScheduleListIn) -> dict:
     permission="staff.view",
     input=ByIdIn,
     output=ScheduleDetailOut,
-    ai={"description": "Returns one work schedule with its weekly working hours."},
+    ai={
+        "asks": {
+            "en": (
+                "show me Lucía's schedule day by day",
+                "what time is Pablo's break each day of his schedule?",
+                "the hours of Ana's summer schedule",
+            ),
+            "es": (
+                "enséñame el horario de Lucía día por día",
+                "¿a qué hora descansa Pablo cada día de su horario?",
+                "las horas del horario de verano de Ana",
+            ),
+        },
+        "description": "Returns one work schedule with its weekly working hours.",
+    },
 )
 def schedule_detail(ctx: OperationContext, data: ByIdIn) -> Schedule:
     schedule = load_schedule(data.id)
@@ -632,6 +754,18 @@ def load_schedule(schedule_id: UUID) -> Schedule | None:
     output=AvailabilityOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "can Lucía work on Saturday afternoon?",
+                "which days is Pablo free this month, counting his vacation?",
+                "at what times can Ana see clients on Monday?",
+            ),
+            "es": (
+                "¿Lucía puede trabajar el sábado por la tarde?",
+                "¿qué días tiene libres Pablo este mes, contando sus vacaciones?",
+                "¿a qué horas puede atender Ana el lunes?",
+            ),
+        },
         "description": "Returns when a staff member can work on each day of a date range: the shifts of "
         "the schedule that governs the day minus their approved time off. The authoritative answer to "
         "when a professional can work."
@@ -762,6 +896,18 @@ def _subtract(
     input=TimeOffListIn,
     output=TimeOffPage,
     ai={
+        "asks": {
+            "en": (
+                "list all the time off",
+                "which vacations are there this month?",
+                "Lucía's pending time off",
+            ),
+            "es": (
+                "lista todas las ausencias",
+                "vacaciones de este mes",
+                "ausencias pendientes de Lucía",
+            ),
+        },
         "description": "Lists the time-off requests of the staff (without their reason), filtered by "
         "person, status, type or dates."
     },
@@ -803,6 +949,18 @@ def list_time_off(ctx: OperationContext, params: TimeOffListIn) -> dict:
     input=ByIdIn,
     output=TimeOffDetailOut,
     ai={
+        "asks": {
+            "en": (
+                "open Pablo's time off and tell me who approved it",
+                "what reason and notes does Ana's vacation have?",
+                "why is Lucía absent on Monday?",
+            ),
+            "es": (
+                "¿quién aprobó las vacaciones de Pablo?",
+                "¿qué motivo y notas tiene la ausencia de Ana?",
+                "¿por qué falta Lucía el lunes?",
+            ),
+        },
         "description": "Returns one time-off request with its reason, notes and who approved it."
     },
 )
@@ -848,6 +1006,18 @@ def _days_of(time_off: TimeOff, language: str) -> str:
     input=TodayIn,
     output=TimeOffPage,
     ai={
+        "asks": {
+            "en": (
+                "who is off today?",
+                "who is away today on approved leave?",
+                "is anyone on vacation today?",
+            ),
+            "es": (
+                "¿quién falta hoy?",
+                "¿quién libra hoy?",
+                "¿hay alguien de vacaciones hoy?",
+            ),
+        },
         "description": "Lists the approved time off covering today: who is away today."
     },
 )
@@ -867,6 +1037,18 @@ def away_today(ctx: OperationContext, params: TodayIn) -> dict:
     output=TimeOffDetailPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "my time-off requests",
+                "have they approved my vacation?",
+                "what state are my days off in?",
+            ),
+            "es": (
+                "¿cómo están mis ausencias?",
+                "estado de mis vacaciones y días libres",
+                "¿me han aprobado mis días libres?",
+            ),
+        },
         "description": "Lists the time-off requests of the current user, with their reason and notes."
     },
 )
@@ -954,6 +1136,18 @@ def _name_approvers(rows: list[TimeOff]) -> None:
     input=SettingsGetIn,
     output=SettingsOut,
     ai={
+        "asks": {
+            "en": (
+                "what working day does a new schedule propose by default?",
+                "what are the default shift hours?",
+                "which break does a new schedule suggest?",
+            ),
+            "es": (
+                "¿qué jornada propone por defecto un horario nuevo?",
+                "¿cuál es el horario por defecto de los turnos?",
+                "¿cuánto descanso trae por defecto un turno recién creado?",
+            ),
+        },
         "description": "Returns the default working day that a new schedule proposes (start, end and break)."
     },
 )

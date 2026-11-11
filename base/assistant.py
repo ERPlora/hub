@@ -120,7 +120,9 @@ APP_WORDS = shared.app_words
 #: are Tasks' task and project (``task.task``, ``task.project``), and what one «comenta» its comment (``task.comment``),
 #: named by its phrases and never by the word: «comentario» shares its stem with «comensales», a table's guests; an
 #: «arqueo», a «recuento» or a «conteo» of the drawer is a count of Cash register's (``cash_register.count``), and the
-#: «moneda» or «divisa» of the business is its currency (``cash_register.currency``).
+#: «moneda» or «divisa» of the business is its currency (``cash_register.currency``). To «desactivar» names the
+#: deactivation itself (``staff.member.deactivate``, ``*.deactivate``), not only a switch off, and what one «pide» or
+#: «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``).
 SYNONYMS = (
     ("cuenta", "check", "tab", "order"),
     ("ticket", "tique", "recibo", "receipt", "sale"),
@@ -139,6 +141,10 @@ SYNONYMS = (
     ),
     ("arqueo", "recuento", "conteo", "count"),
     ("divisa", "moneda", "currency"),
+    # staff
+    ("desactiva", "desactivar", "deactivate"),
+    ("pido", "solicito", "solicitud", "request"),
+    # kitchen
     (
         "ticket", "la comanda", "una comanda", "unas comandas", "esta comanda", "esa comanda", "su comanda",
         "sus comandas", "que comanda", "que comandas", "cuantas comandas", "otra comanda", "alguna comanda",
