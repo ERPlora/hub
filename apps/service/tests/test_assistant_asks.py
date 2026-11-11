@@ -112,6 +112,14 @@ def place(tools: dict[str, Operation], name: str, phrase: str, language: str = "
     return offered.index(name) + 1 if name in offered else None
 
 
+def offered_with_room(tools: dict[str, Operation], name: str, phrase: str) -> None:
+    """``phrase`` is none of ``name``'s asks, and a turn offers ``name`` for it among the first ``WITH_ROOM``."""
+    assert name in tools  # positive control: the owner holds the tool, so its place is known
+    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
+    found = place(tools, name, phrase)
+    assert found is not None and found <= WITH_ROOM, found
+
+
 def without_services_asks(tools: dict[str, Operation]) -> dict[str, Operation]:
     """``tools`` with Services' tools saying no asks: how a turn ranked them before Services said its own."""
     return {
@@ -138,10 +146,7 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_service_request_offers_its_existing_operation(catalog_of, name, phrase):
     tools = catalog_of(Membership.Role.OWNER, "es")
-    assert name in tools  # positive control: the owner holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    found = place(tools, name, phrase)
-    assert found is not None and found <= WITH_ROOM, found
+    offered_with_room(tools, name, phrase)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -152,10 +157,7 @@ def test_every_probe_of_services_offers_its_tool_without_being_one_of_its_asks(c
     assert (probe["app"], probe["role"], probe["language"]) == ("service", "owner", "es")
     tools = catalog_of(Membership.Role.OWNER, probe["language"])
     name, phrase = probe["tool"], probe["phrase"]
-    assert name in tools  # positive control: the owner holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    found = place(tools, name, phrase)
-    assert found is not None and found <= WITH_ROOM, found
+    offered_with_room(tools, name, phrase)
 
 
 @pytest.mark.parametrize(("name", "read"), sorted(FOUND_BY.items()))
