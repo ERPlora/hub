@@ -91,7 +91,9 @@ def test_every_operation_tells_the_assistant_what_it_does():
     for name, op in demo_operations().items():
         assert isinstance(op.ai, dict), name
         assert str(op.ai.get("description", "")).strip(), name
-        expected = {"description", "risk"} if op.kind == "command" else {"description"}
+        # What it does, what a person types to ask for it (its ``asks``, ``live.E020``: demo is listed in
+        # ``LIVE_ASSISTANT_ASKS_REQUIRED``) and, of a write, its risk.
+        expected = {"description", "asks", "risk"} if op.kind == "command" else {"description", "asks"}
         assert set(op.ai) == expected, name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, name
