@@ -159,6 +159,31 @@ def test_only_a_moved_copy_passes_as_one_never_a_hub_a_demo_or_a_template():
             names.validate_moved(other, control="hub")
 
 
+# ── The database a restore replaced, kept aside (hub#1198; base.tenancy.restore) ────────────────────────────────────
+
+
+def test_a_kept_copy_is_its_control_databases_old_and_the_hex_of_its_own_uuid7():
+    kept = uuid.uuid7()
+    assert names.kept_db_name("hub", kept) == f"hub_old_{kept.hex}"
+    assert names.kept_db_name("pre_hub", kept) == f"pre_hub_old_{kept.hex}"
+    # It fits after the longest control database, as a demo's does.
+    assert names.kept_db_name("c" * names.MAX_CONTROL, kept)
+    assert names.is_kept(f"hub_old_{HEX}", control="hub")
+
+
+def test_a_left_behind_copy_is_a_moved_or_a_kept_one_never_a_hub_a_demo_or_a_template():
+    for copy in (f"hub_move_{HEX}", f"hub_old_{HEX}"):
+        assert names.is_left_behind(copy, control="hub")
+        assert names.validate_left_behind(copy, control="hub") == copy
+    for other in (f"hub_{HEX}", f"hub_demo_{HEX}", "hub_template", f"pre_hub_old_{HEX}", f"hub_old_{HEX[:-1]}"):
+        assert not names.is_left_behind(other, control="hub")
+        with pytest.raises(names.InvalidDatabaseName):
+            names.validate_left_behind(other, control="hub")
+    # Neither is a hub's own database to drop with it (``ops.drop_database``).
+    with pytest.raises(names.InvalidDatabaseName):
+        names.validate_hub(f"hub_old_{HEX}", control="hub")
+
+
 def test_a_moved_copy_is_no_hubs_own_database_to_drop_with_it():
     # ``validate_hub`` (``ops.drop_database``) takes a hub's or a demo's database only: a copy is dropped by the move.
     with pytest.raises(names.InvalidDatabaseName):

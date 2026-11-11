@@ -722,8 +722,12 @@ Sale: la ejecución sigue (`flow.run.resumed`) y termina o vuelve a esperar. Una
 hacer no deja ningún aviso.
 Si falla: si la automatización está en pausa al despertar, la ejecución se cancela («Cancelada: la
 automatización se puso en pausa mientras esperaba.»); si está borrada, también («Cancelada: la
-automatización se borró.»).
-Implicados: FLOW-F03, FLOW-F07, FLOW-F11, FLOW-F16
+automatización se borró.»). Si mientras espera se borran los datos personales del cliente del que guarda algo
+(CUSTOMER-F16: lo que la arrancó o lo que leyeron sus pasos nombra su ficha), se cancela en ese momento, sin
+esperar a despertar, y olvida lo que leyeron sus pasos: «Cancelada: se borraron los datos personales del
+cliente.». No le manda nada ni le crea nada; lo mismo una que llama a otro sistema o que pregunta a alguien
+(su pregunta se cierra y se queda sin sus textos). Las ejecuciones de los demás clientes siguen.
+Implicados: FLOW-F03, FLOW-F07, FLOW-F11, FLOW-F16, CUSTOMER-F16
 
 ### FLOW-F24 Reanudar una ejecución desde el paso que falló
 <!-- origen: old-hub:HUB-F103 gh:hub#952 -->
@@ -751,8 +755,11 @@ ningún paso (una cadena, un «Solo cuando…» ilegible), en algo que necesita 
 llamada a una dirección privada o mal escrita (los mismos pasos volverían a fallar), «Esta ejecución no se
 puede reanudar…: ejecútala de nuevo entera»; pasados 7 días, «…ya no se puede reanudar…»;
 una ya reanudada, «Solo se puede reanudar una ejecución que se paró por un error…»: nunca se reanuda dos
-veces. Ninguna se reanuda sola.
-Implicados: FLOW-F12, FLOW-F15, FLOW-F16
+veces. Ninguna se reanuda sola. Si se borran los datos personales del cliente del que guarda algo (CUSTOMER-F16),
+la que aún se podía reanudar se cancela («Cancelada: se borraron los datos personales del cliente.»), olvida lo
+que leyeron sus pasos y ya no se reanuda; en sus pasos sigue el que había fallado. Una que ya no se podía reanudar
+solo olvida lo que leyeron sus pasos.
+Implicados: FLOW-F12, FLOW-F15, FLOW-F16, CUSTOMER-F16
 
 ### FLOW-F25 «Solo si…» y «Si falla, sigue» en cada paso
 <!-- origen: old-hub:HUB-F97 -->
@@ -1277,6 +1284,7 @@ preguntas; una pregunta hecha a otro rol) no sale en la tarjeta.
 | Deja un borrador del asistente | gestionar | F17 | `flow.draft.propose` |
 | Descarta un borrador | gestionar | F19 | `flow.draft.dismiss` |
 | Arranca las automatizaciones de un aviso | solo la plataforma | F21 | `flow.run.react` |
+| Al borrar los datos de un cliente, cancela las ejecuciones que aún podían seguir con lo suyo y les hace olvidar lo que leyeron (CUSTOMER-F16) | solo la plataforma | F23, F24 | `flow.customer.erase` |
 | Arranca las de horario o fecha que toca | solo la plataforma | F22 | `flow.schedule.fire_due` |
 | Sigue las ejecuciones cuya espera terminó | solo la plataforma | F23 | `flow.run.resume_due` |
 | Reanuda una ejecución parada por un error en el paso que falló | gestionar | F24 | `flow.run.retry` |
@@ -1333,6 +1341,10 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   (`whatsapp_inbox.template_sample.detail`); al ejecutarse, la bandeja manda solo un archivo de este negocio.
 - **A su propio `flow.run.parked`**: cuando una ejecución espera a «Llamar a otro sistema», el worker hace la
   llamada (`flow.run.call`, FLOW-F27); nunca la petición que la dejó esperando.
+- **Al borrado de los datos de un cliente** (`customer.customer.erased`, CUSTOMER-F16): antes de arrancar lo que
+  espera ese aviso, y en la misma entrega, cancela las ejecuciones que esperan, llaman, preguntan o se pueden
+  reanudar y cuyo dato guardado nombra esa ficha (`flow.customer.erase`, FLOW-F23 y F24); lo que leyeron sus pasos y
+  los textos de sus preguntas se vacían. Repetir el aviso no cambia nada.
 - De la plataforma: la zona horaria del negocio (los horarios) y los avisos del outbox (el último de un
   tipo, para Probar y los ejemplos).
 
@@ -1844,8 +1856,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   se enciende desde la galería de Automatizaciones; la pantalla de cada app puede llamar a `flow.recipe.enable`
   cuando la tenga.
 - **Límites en un permiso** («solo con este cliente»): se concede la acción entera.
-- **Borrar al momento lo que leyó una ejecución que espera** cuando se borran los datos de un cliente
-  (hub#1225): una ejecución terminada no guarda nada de lo que leyeron sus pasos, pero una que espera
-  conserva la ficha que leyó hasta que despierta (como mucho 30 días) y la usa al seguir; una parada por un
-  error, los 7 días en que se puede reanudar. Borrarla en el acto pide que esta app reaccione también al aviso
-  del borrado de un cliente (`customer.customer.erased`), que hoy solo la arranca como a cualquier otro aviso.
+- **El historial de las ejecuciones ya terminadas tras borrar los datos de un cliente** (hub#1227): las que aún
+  podían seguir se cancelan y olvidan lo que leyeron (FLOW-F23, F24), pero una terminada guarda 90 días los textos
+  libres que pueden llevar su nombre (el motivo de un «no» con el título de la pregunta, la nota de una respuesta,
+  lo que contestó el asistente) y lo que traía el aviso que la arrancó, que en las otras apps está por revisar.

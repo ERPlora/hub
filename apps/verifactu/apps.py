@@ -194,3 +194,11 @@ class VerifactuConfig(LiveAppConfig):
         from apps.verifactu import queries  # the models are not loaded yet when this module is
 
         return queries.keeps_fiscal_documents()
+
+    def fiscal_record_states(self, conn) -> dict:
+        """hub#1205: the platform asks (``base.tenancy.restore``) before it puts a business's database back as it was
+        at a moment, in its database and in the copy, through ``conn``, a direct connection to one of them: what each
+        production record says of its life at the AEAT, by id (``queries.record_states``)."""
+        from apps.verifactu import queries  # the models are not loaded yet when this module is
+
+        return queries.record_states(conn)

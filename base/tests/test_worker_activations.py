@@ -738,24 +738,25 @@ def test_each_app_is_made_alone_with_what_it_requires_on_the_platforms_template(
     assert not hubs.hub_tables(others) & tables(a)
 
 
-def test_a_hub_moving_to_another_cluster_is_not_entered_until_its_move_ends(business):
-    """Its database is being copied (S7, ``base.tenancy.move``): tables made meanwhile would stay behind on the old
-    cluster. Its ring waits; once the move ends, the app is set up."""
+@pytest.mark.parametrize("copying", ["moving_to", "restoring_from"])
+def test_a_hub_whose_database_is_copied_is_not_entered_until_its_copy_ends(business, copying):
+    """Its database is being copied (S7, ``base.tenancy.move``; hub#1198, ``base.tenancy.restore``): tables made
+    meanwhile would stay behind in the database it leaves. Its ring waits; once the copy ends, the app is set up."""
     from control.models import Cluster
 
     a = business("a")
     turn_on(a)
     target = Cluster.objects.create(name=f"w6-{a.id.hex[-8:]}", host="127.0.0.1", port=5432)
-    Hub.objects.filter(pk=a.pk).update(moving_to=target)
+    Hub.objects.filter(pk=a.pk).update(**{copying: target})
     try:
         with hubs.watched() as sent:
             run_pass()
         assert not [alias for alias in sent if a.id.hex in alias]
         assert row(a).state == CREATING and due_at(a) is not None
 
-        Hub.objects.filter(pk=a.pk).update(moving_to=None)
+        Hub.objects.filter(pk=a.pk).update(**{copying: None})
         run_pass()
         assert row(a).state == ON
     finally:
-        Hub.objects.filter(pk=a.pk).update(moving_to=None)
+        Hub.objects.filter(pk=a.pk).update(**{copying: None})
         target.delete()

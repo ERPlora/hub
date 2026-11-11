@@ -205,6 +205,19 @@ def test_a_hub_naming_a_template_never_gets_an_alias(vertical):
     assert django_connections.settings is before
 
 
+@pytest.mark.parametrize("left_behind", [names.moved_db_name, names.kept_db_name])
+def test_a_hub_naming_a_copy_left_behind_never_gets_an_alias(left_behind):
+    # A moved or a restored hub's old database is closed to the app and only ever dropped (base.tenancy.move,
+    # base.tenancy.restore): never reached as a hub's own.
+    hub = SimpleNamespace(id=uuid.uuid7(), slug="acme", db_name=left_behind(connections.control_name(), uuid.uuid7()))
+    hub.cluster = None
+    before = django_connections.settings
+
+    with pytest.raises(names.InvalidDatabaseName, match="left behind"):
+        connections.register_hub_alias(hub)
+    assert django_connections.settings is before
+
+
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 def test_working_in_a_hub_leaves_no_connection_open_to_its_template(hub_a, hub_databases):
     hubs.assert_nobody_on(hub_databases.template)

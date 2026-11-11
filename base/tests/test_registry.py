@@ -1,6 +1,7 @@
 """base.registry: what the host gate and the apps read of the registry of hubs (plan 2026-10-17, §1.2)."""
 
 import datetime as dt
+import uuid
 
 import pytest
 from django.utils import timezone
@@ -111,3 +112,26 @@ def test_under_the_suite_s_fallback_a_business_without_its_own_database_is_serve
 
     assert registry.refusal(hub) is None
     assert registry.database_is_made(hub)
+
+
+def test_a_hub_is_closed_while_its_database_is_copied_moved_or_restored():
+    # Its host answers 503 «maintenance» and the worker leaves it (base.tenancy.move, base.tenancy.restore; hub#1198).
+    assert registry.is_copying(Hub(moving_to_id=uuid.uuid7())) is True
+    assert registry.is_copying(Hub(restoring_from_id=uuid.uuid7())) is True
+    assert registry.is_copying(Hub()) is False
+    assert registry.is_restoring(Hub(restoring_from_id=uuid.uuid7())) is True
+    assert registry.is_restoring(Hub(moving_to_id=uuid.uuid7())) is False
+    assert registry.refusal(Hub(status=Hub.Status.READY, db_name="x", restoring_from_id=uuid.uuid7())).code == (
+        registry.HUB_MAINTENANCE
+    )
+
+
+def test_the_rows_closed_for_a_copy_are_the_moving_and_the_restored_ones():
+    from control.models import Cluster
+
+    cluster = Cluster.objects.create(name="restore", host="writer-restore.example", is_open=False)
+    moving = Hub.objects.create(slug="moving", moving_to=cluster)
+    restored = Hub.objects.create(slug="restored", restoring_from=cluster)
+    Hub.objects.create(slug="open")
+
+    assert set(Hub.objects.filter(registry.copying()).values_list("slug", flat=True)) == {moving.slug, restored.slug}

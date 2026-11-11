@@ -4,7 +4,8 @@
 // one once with the installed app's system notice and opens its screen on a tap. Mounted once beside the pane while
 // a person is signed in (`chrome.background`); it paints nothing. Only inside the installed app: a browser has the
 // bell, so it does not even follow the query. Where the person hears some notice (`sources`), the shell asks
-// Android once to let the app notify, with our sentence first.
+// Android once to let the app notify, with our sentence first, and keeps the app listening with the screen off
+// (HUB_APP-F26); until the query answers, `ask` is unknown and the app is asked nothing.
 import { useLive } from '@erplora/ui/sdk';
 import { useDeviceNotices, useSurface } from '@erplora/ui/shell';
 import { computed, defineComponent } from 'vue';
@@ -18,7 +19,7 @@ const Listening = defineComponent({
     const { data } = useLive('base.notice.list', {});
     useDeviceNotices(
       computed(() => data.value?.notices),
-      { ask: computed(() => (data.value?.sources.length ?? 0) > 0) },
+      { ask: computed(() => (data.value ? data.value.sources.length > 0 : undefined)) },
     );
     return () => null;
   },

@@ -650,3 +650,6 @@ msgstr "«%(name)s» es de %(app)s, que está apagada en este negocio: enciénde
 
 msgid "«%(name)s» is from %(app)s, which is off in this business: turn it on in Apps, or choose another action."
 msgstr "«%(name)s» es de %(app)s, que está apagada en este negocio: enciéndela en Apps o elige otra acción."
+
+msgid "Cancelled: the customer's personal data were erased."
+msgstr "Cancelada: se borraron los datos personales del cliente."

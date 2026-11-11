@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:52279a27eead66e33b5468a6232c03c4953db354d8d1fdeb28632e5177bc4d43 -->
+<!-- generated from WORKBOOK.md sha256:398203cc2a4a0229a7bd035da10cb7cba69a74fbc125b8fae196e1e084d26017 -->
 
 ## What it is for and who it is for
 
@@ -675,8 +675,13 @@ In: the runs that are waiting and the time they wake up.
 Out: the run carries on (`flow.run.resumed`) and finishes or waits again. A pass with nothing to do leaves
 no notice.
 If it fails: if the automation is paused when it wakes up, the run is cancelled ("Cancelled: the automation
-was paused while it waited."); if it is deleted, too ("Cancelled: the automation was deleted.").
-Involved: FLOW-F03, FLOW-F07, FLOW-F11, FLOW-F16
+was paused while it waited."); if it is deleted, too ("Cancelled: the automation was deleted."). If, while it
+waits, the personal data of a customer it keeps something of are erased (CUSTOMER-F16: what started it or what
+its steps read names her card), it is cancelled right then, without waiting to wake up, and forgets what its
+steps read: "Cancelled: the customer's personal data were erased.". It sends her nothing and creates nothing for
+her; the same for one calling another system or asking someone (its question is closed and left without its
+texts). The other customers' runs carry on.
+Involved: FLOW-F03, FLOW-F07, FLOW-F11, FLOW-F16, CUSTOMER-F16
 
 ### FLOW-F24 Resume a run from the step that failed
 Status: done
@@ -703,8 +708,11 @@ automation does not exist in this business."; one that stopped before doing any 
 unreadable "Only when…"), at something that needs a person in front or at a call to a private or badly
 written address (the same steps would fail again), "This run cannot be resumed…: run it again whole"; after
 7 days, "…can no longer be resumed…"; one already resumed, "Only a run that stopped by an error at one of its
-steps can be resumed…": it is never resumed twice. None resumes by itself.
-Involved: FLOW-F12, FLOW-F15, FLOW-F16
+steps can be resumed…": it is never resumed twice. None resumes by itself. If the personal data of a customer it
+keeps something of are erased (CUSTOMER-F16), one that could still be resumed is cancelled ("Cancelled: the
+customer's personal data were erased."), forgets what its steps read and is no longer resumed; its steps still
+show the one that had failed. One that could no longer be resumed only forgets what its steps read.
+Involved: FLOW-F12, FLOW-F15, FLOW-F16, CUSTOMER-F16
 
 ### FLOW-F25 "Only if…" and "If it fails, it carries on" on each step
 Status: done
@@ -1225,6 +1233,7 @@ question asked of another role) does not show on the card.
 | Leaves an assistant's draft | manage | F17 | `flow.draft.propose` |
 | Discards a draft | manage | F19 | `flow.draft.dismiss` |
 | Starts the automations of a notice | only the platform | F21 | `flow.run.react` |
+| When a customer's data are erased, cancels the runs that could still go on with hers and makes them forget what they read (CUSTOMER-F16) | only the platform | F23, F24 | `flow.customer.erase` |
 | Starts the scheduled or dated ones that are due | only the platform | F22 | `flow.schedule.fire_due` |
 | Carries on the runs whose wait is over | only the platform | F23 | `flow.run.resume_due` |
 | Resumes a run stopped by an error at the step that failed | manage | F24 | `flow.run.retry` |
@@ -1282,6 +1291,10 @@ Notices carry ids, never names or contents.
   business.
 - **To its own `flow.run.parked`**: when a run waits for "Call another system", the worker makes the call
   (`flow.run.call`, FLOW-F27); never the request that left it waiting.
+- **To the erasure of a customer's data** (`customer.customer.erased`, CUSTOMER-F16): before starting what waits
+  for that notice, and in the same delivery, it cancels the runs that wait, call, ask or can be resumed and whose
+  kept data name that card (`flow.customer.erase`, FLOW-F23 and F24); what their steps read and their questions'
+  texts are emptied. Repeating the notice changes nothing.
 - From the platform: the business's time zone (the schedules) and the outbox's notices (the last one of a
   kind, for Try it and the examples).
 

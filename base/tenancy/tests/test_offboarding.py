@@ -106,6 +106,7 @@ def test_nobody_is_retired_before_the_90_days_nor_a_demo_the_platform_or_one_mov
     assert services.past_retention(Hub(**left | {"is_demo": True}), now) is False
     assert services.past_retention(Hub(**left | {"is_platform": True}), now) is False
     assert services.past_retention(Hub(**left | {"moving_to_id": uuid.uuid7()}), now) is False
+    assert services.past_retention(Hub(**left | {"restoring_from_id": uuid.uuid7()}), now) is False
     assert services.past_retention(Hub(status=Hub.Status.READY, db_name="x"), now) is False
     assert services.past_retention(Hub(status=Hub.Status.ARCHIVING, db_name="x"), now) is True
     assert services.past_retention(Hub(status=Hub.Status.DROPPING, db_name="x"), now) is True
@@ -590,11 +591,12 @@ def test_the_platform_and_a_demo_are_never_taken_this_way(business, dumps_bucket
     assert not HubDump.objects.filter(hub=hub).exists()
 
 
-def test_a_business_moving_to_another_cluster_is_left_until_it_lands(business, dumps_bucket, moto_s3):
+@pytest.mark.parametrize("copying", ["moving_to", "restoring_from"])
+def test_a_business_whose_database_is_copied_is_left_until_its_copy_ends(business, dumps_bucket, moto_s3, copying):
     hub = business(left_days_ago=91)
     cluster = Cluster.objects.create(name=f"elsewhere-{uuid.uuid7().hex[-8:]}", host="127.0.0.1", port=5432, is_open=False)
     try:
-        Hub.objects.filter(pk=hub.pk).update(moving_to=cluster)
+        Hub.objects.filter(pk=hub.pk).update(**{copying: cluster})
 
         run_pass()
 
@@ -602,7 +604,7 @@ def test_a_business_moving_to_another_cluster_is_left_until_it_lands(business, d
         assert hub.status == "cancelled"
         assert hub.db_name in databases()
     finally:
-        Hub.objects.filter(moving_to=cluster).update(moving_to=None)
+        Hub.objects.filter(**{copying: cluster}).update(**{copying: None})
         cluster.delete()
 
 

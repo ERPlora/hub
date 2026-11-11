@@ -1,0 +1,731 @@
+"""A hub's database put back as it was at a moment, from a copy on a temporary cluster (hub#1198; PLAN-DB §13
+«Restaurar un hub»).
+
+``control.hub.restore`` asks; the worker restores (``base.tenancy.restore.run_due``), under the hub's lease, one hub at
+a time, with the move's own steps (``base.tenancy.move``) and its origin and destination the other way round:
+
+1. the copy of the hub's database is dumped from the temporary cluster (a point-in-time restore of its own, closed to
+   new hubs); its host answers 503 «maintenance» already;
+2. its database is closed to the app (``CONNECT`` taken from the environment's ``hub_app`` and ``hub_admin``, their
+   sessions ended), so nothing writes in it from here on;
+3. with nothing writing any more, each production VeriFactu record of it is compared with the copy's: one the copy
+   lacks or has otherwise (made, sent, answered or changed after the moment) stops the restore, nothing changed;
+4. it is kept aside as ``<control>_old_<hex>`` (its own UUIDv7), noted in control first (``MovedCopy``);
+5. a new database of its name is made from its vertical's template on its own cluster, emptied and filled with the
+   copy's ``pg_restore``, its identity checked and its schema brought to the code's leaf (``ensure_schema``);
+6. control ends the restore and dates the kept copy, in one transaction.
+
+Any failure before the end puts the hub's own database back, nothing lost: the new database dropped, the kept copy
+renamed back and opened to the app again, the hub ready with the reason in ``last_error``. A lease that went to another
+worker is left to it. The kept copies are dropped after ``move.MOVED_COPY_DAYS`` with the moves' copies.
+
+Real databases on the session's server: the temporary cluster's row points at the same server (CI has one), so the
+copy there has a name of its own (``run_due(source=…)``); in AWS it has the hub's, as a restore of the whole cluster
+keeps it.
+"""
+
+import datetime as dt
+import itertools
+import uuid
+
+import pytest
+from django.utils import timezone
+from live.meta import all_live_app_configs
+from psycopg import sql
+from psycopg.types.json import Jsonb
+
+from apps.sale.apps import SaleConfig
+from base import services
+from base.tenancy import identity, move, names, restore
+from base.tenancy import connections as tenancy_connections
+from base.tenancy.context import use_control
+from base.tenancy.tests import hubs
+from control import services as control_services
+from control.models import Cluster, Hub, HubDue, MovedCopy
+
+pytestmark = pytest.mark.usefixtures("no_test_fallback")
+
+AT = dt.datetime(2026, 11, 11, 12, 0, tzinfo=dt.UTC)
+#: The moment the copy is of.
+THEN = AT - dt.timedelta(days=2)
+BEFORE = THEN - dt.timedelta(days=1)
+AFTER = THEN + dt.timedelta(hours=1)
+AS_THEN = "as it was at the moment"
+SINCE = "written after the moment"
+#: The apps whose records reach the tax authority: each answers the restore what its records say
+#: (``fiscal_record_states`` on its ``LiveAppConfig``).
+FILE_WITH_THE_TAX_AUTHORITY = {"verifactu"}
+
+
+@pytest.fixture(autouse=True)
+def nothing_checked_yet(monkeypatch):
+    monkeypatch.setattr(identity, "_verified", set())
+
+
+databases, marker, says_it_is = hubs.control_databases, hubs.marker, hubs.says_it_is
+
+
+def write(name: str, note: str) -> None:
+    with hubs._maintenance(name) as conn:
+        conn.execute("INSERT INTO w8a_marker VALUES (%s)", [note])
+
+
+_numbers = itertools.count(1)
+
+
+def a_record(name: str, *, environment: str = "production", **fields) -> uuid.UUID:
+    """A VeriFactu record in the database ``name``, every column the table requires filled, ``fields`` over them. The
+    table's foreign keys are taken out of that database first: a record stands here without its invoice, and a copy of
+    it restores as it is."""
+    record_id = uuid.uuid7()
+    number = next(_numbers)
+    by_type = {
+        "uuid": lambda length: uuid.uuid7(),
+        "character varying": lambda length: f"x{number}"[: length or 64],
+        "text": lambda length: "",
+        "integer": lambda length: number,
+        "bigint": lambda length: number,
+        "smallint": lambda length: number,
+        "boolean": lambda length: False,
+        "date": lambda length: BEFORE.date(),
+        "timestamp with time zone": lambda length: BEFORE,
+        "jsonb": lambda length: Jsonb({}),
+    }
+    with hubs._maintenance(name) as conn:
+        for (constraint,) in conn.execute(
+            "SELECT conname FROM pg_constraint WHERE conrelid = 'verifactu_record'::regclass AND contype = 'f'"
+        ).fetchall():
+            conn.execute(sql.SQL("ALTER TABLE verifactu_record DROP CONSTRAINT {}").format(sql.Identifier(constraint)))
+        required = conn.execute(
+            "SELECT column_name, data_type, character_maximum_length FROM information_schema.columns "
+            "WHERE table_name = 'verifactu_record' AND is_nullable = 'NO'"
+        ).fetchall()
+        values = {column: by_type[kind](length) for column, kind, length in required}
+        lengths = {column: length for column, _kind, length in required}
+        # A cancellation: no amounts to fill (``verifactu_record_amounts_by_type``); its fingerprint as long as one is.
+        values |= {
+            "id": record_id,
+            "record_type": "anulacion",
+            "fingerprint": "f" * lengths["fingerprint"],
+            "environment": environment,
+            "status": "accepted",
+            "created_at": BEFORE,
+            "updated_at": BEFORE,
+        }
+        values |= fields
+        conn.execute(
+            sql.SQL("INSERT INTO verifactu_record ({}) VALUES ({})").format(
+                sql.SQL(", ").join(map(sql.Identifier, values)), sql.SQL(", ").join(sql.Placeholder() * len(values))
+            ),
+            list(values.values()),
+        )
+    return record_id
+
+
+def change_record(name: str, record_id: uuid.UUID, **fields) -> None:
+    with hubs._maintenance(name) as conn:
+        conn.execute(
+            sql.SQL("UPDATE verifactu_record SET {} WHERE id = %s").format(
+                sql.SQL(", ").join(sql.SQL("{} = %s").format(sql.Identifier(column)) for column in fields)
+            ),
+            [*fields.values(), record_id],
+        )
+
+
+class Restores(hubs.CopiedHubs):
+    """The rows and databases of one test, dropped and deleted after it."""
+
+    def __init__(self, template: str):
+        super().__init__(template)
+        #: The copy of each hub on its temporary cluster (the session's server: a name of its own).
+        self.copies: dict[uuid.UUID, str] = {}
+
+    def cluster(self, name: str = "restore", **fields) -> Cluster:
+        """A temporary cluster: closed to new hubs, on the session's server."""
+        return super().cluster(name, **({"is_open": False} | fields))
+
+    def hub(self, *, source: Cluster | None, cluster: Cluster | None = None, **fields) -> Hub:
+        """A ready hub on the settings' own server whose database is a clone of the template with its identity and a
+        table of its own; its copy on ``source`` is that database as it was at the moment, and the hub wrote one more
+        row since. Asked to be restored from ``source``."""
+        hub_id = uuid.uuid7()
+        control = tenancy_connections.control_name()
+        name = self.database(hub_id, AS_THEN)
+        copy = names.hub_db_name(control, uuid.uuid7())
+        with hubs._maintenance() as conn:
+            conn.execute(
+                sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(
+                    names.identifier(copy, control=control), names.identifier(name, control=control)
+                )
+            )
+        write(name, SINCE)
+        self.copies[hub_id] = copy
+        asked = {"cluster": cluster, "restoring_from": source, "restore_point": THEN if source is not None else None}
+        return self.ready_hub(hub_id, name, **(asked | fields))
+
+    def source(self, hub) -> str:
+        return self.copies[hub.id]
+
+
+@pytest.fixture
+def restores(django_db_blocker, hub_databases):
+    with django_db_blocker.unblock():
+        made = Restores(hub_databases.template)
+        yield made
+        made.clean()
+
+
+def fresh(hub: Hub) -> Hub:
+    return Hub.objects.select_related("cluster", "restoring_from").get(pk=hub.pk)
+
+
+def run(restores: Restores, now: dt.datetime = AT, **kwargs) -> int:
+    with use_control():
+        return restore.run_due(now, source=restores.source, **kwargs)
+
+
+def kept_copy(hub: Hub) -> MovedCopy:
+    [kept] = MovedCopy.objects.filter(hub=hub)
+    return kept
+
+
+def taken_after_the_schema(monkeypatch, hub: Hub) -> None:
+    """Another worker takes ``hub``'s lease once its schema is at the code's leaf: right before the end."""
+    real = move._ensure_schema
+
+    def then_taken(restored, cluster, heartbeat=None):
+        real(restored, cluster, heartbeat)
+        with use_control():
+            HubDue.objects.filter(pk=hub.pk).update(lease_owner="other:1")
+
+    monkeypatch.setattr(move, "_ensure_schema", then_taken)
+
+
+class TestARestore:
+    def test_the_hub_gets_the_copys_data_and_its_own_is_kept_aside(self, restores):
+        source = restores.cluster()
+        # Its schema noted behind (the copy is from before a deploy): brought to the code's leaf.
+        hub = restores.hub(source=source, schema_state=Hub.SchemaState.BEHIND)
+        control = tenancy_connections.control_name()
+
+        assert run(restores) == 1
+
+        hub = fresh(hub)
+        assert (hub.restoring_from_id, hub.restore_point, hub.cluster_id) == (None, None, None)
+        assert (hub.status, hub.last_error, hub.schema_state) == ("ready", "", "current")
+        assert marker(hub.db_name) == [AS_THEN] and says_it_is(hub.db_name) == [hub.id]
+        kept = kept_copy(hub)
+        assert (kept.cluster_id, kept.moved_at) == (None, AT)
+        assert names.is_kept(kept.db_name, control=control)
+        assert marker(kept.db_name) == [AS_THEN, SINCE]
+        # The temporary cluster's copy is only read.
+        assert marker(restores.copies[hub.id]) == [AS_THEN]
+        assert not HubDue.objects.filter(pk=hub.pk).exists()
+
+    def test_a_hub_on_a_cluster_is_restored_on_it_and_its_copy_is_kept_there(self, restores):
+        own = restores.cluster("own", is_open=True)
+        hub = restores.hub(source=restores.cluster(), cluster=own)
+
+        run(restores)
+
+        hub = fresh(hub)
+        assert (hub.cluster_id, hub.restoring_from_id) == (own.pk, None)
+        assert kept_copy(hub).cluster_id == own.pk
+        assert marker(hub.db_name) == [AS_THEN]
+
+    def test_one_hub_a_pass_the_longest_asked_first(self, restores):
+        source = restores.cluster()
+        first, second = restores.hub(source=source), restores.hub(source=source)
+
+        assert run(restores) == 1
+
+        assert (fresh(first).restoring_from_id, fresh(second).restoring_from_id) == (None, source.pk)
+
+    def test_a_hub_whose_lease_another_worker_holds_is_left_to_it(self, restores):
+        source = restores.cluster()
+        hub = restores.hub(source=source)
+        with use_control():
+            HubDue.objects.create(
+                hub=hub, due_at=AT, lease_until=timezone.now() + dt.timedelta(minutes=1), lease_owner="other:1"
+            )
+
+        assert run(restores) == 0
+
+        assert fresh(hub).restoring_from_id == source.pk
+        assert marker(hub.db_name) == [AS_THEN, SINCE]
+
+    def test_nothing_asked_nothing_done(self, restores):
+        hub = restores.hub(source=None)
+
+        assert run(restores) == 0
+
+        assert marker(hub.db_name) == [AS_THEN, SINCE]
+
+    def test_the_lease_is_taken_by_the_clock_never_by_the_ticks_start(self, restores):
+        # A move before it in the same tick may have taken minutes: the restore's lease is born whole, never run out.
+        hub = restores.hub(source=restores.cluster())
+        leases: list[dt.datetime] = []
+
+        def source(restored):
+            with use_control():
+                leases.append(HubDue.objects.get(pk=hub.pk).lease_until)
+            return restores.source(restored)
+
+        claimed = timezone.now()
+        with use_control():
+            restore.run_due(claimed - 2 * restore.LEASE, source=source)
+
+        assert leases and leases[0] >= claimed + restore.LEASE
+
+    def test_its_copy_on_the_temporary_cluster_has_the_hubs_own_name_by_default(self, restores):
+        hub = restores.hub(source=restores.cluster())
+
+        assert restore.source_name(hub) == hub.db_name
+
+
+class TestClosedToTheApp:
+    """While it is restored, the environment's app roles reach neither its database nor the new one; after it, the new
+    one is theirs and the kept copy is not; after a failure, its own is theirs again. A role of the test plays
+    ``hub_app``."""
+
+    @pytest.fixture
+    def app_role(self, restores):
+        with hubs.an_app_role() as role:
+            yield role
+
+    def test_while_it_is_restored_the_app_is_out_and_after_it_reaches_the_new_database_only(
+        self, restores, app_role, monkeypatch
+    ):
+        hub = restores.hub(source=restores.cluster())
+        hubs.grant_connect(app_role, hub.db_name)
+        seen: list[tuple[bool, bool]] = []
+        real = move._restore
+
+        def restoring(path, name, cluster, heartbeat, cancelled=None):
+            kept = control_services.pending_copy(hub.id).db_name
+            seen.append((hubs.reaches(app_role, name), hubs.reaches(app_role, kept)))
+            return real(path, name, cluster, heartbeat, cancelled)
+
+        monkeypatch.setattr(move, "_restore", restoring)
+
+        run(restores, roles=hubs.app_roles(app_role))
+
+        assert seen == [(False, False)]
+        kept = kept_copy(fresh(hub)).db_name
+        assert (hubs.reaches(app_role, hub.db_name), hubs.reaches(app_role, kept)) == (True, False)
+
+    def test_after_a_failure_the_app_reaches_its_own_database_again(self, restores, app_role, monkeypatch):
+        hub = restores.hub(source=restores.cluster())
+        hubs.grant_connect(app_role, hub.db_name)
+
+        def broken(*args, **kwargs):
+            raise move.MoveFailed("move_restore_failed", "the restore broke on purpose")
+
+        monkeypatch.setattr(move, "_restore", broken)
+
+        run(restores, roles=hubs.app_roles(app_role))
+
+        assert fresh(hub).restoring_from_id is None
+        assert hubs.reaches(app_role, hub.db_name)
+        assert marker(hub.db_name) == [AS_THEN, SINCE]
+
+    def test_a_lease_taken_right_before_the_end_never_opens_the_new_database_to_the_app(
+        self, restores, app_role, monkeypatch
+    ):
+        # The worker that lost the hub's lease leaves the new database closed: whoever holds it now ends the restore.
+        hub = restores.hub(source=restores.cluster())
+        hubs.grant_connect(app_role, hub.db_name)
+        taken_after_the_schema(monkeypatch, hub)
+
+        run(restores, roles=hubs.app_roles(app_role))
+
+        assert fresh(hub).restoring_from_id is not None
+        assert not hubs.reaches(app_role, hub.db_name)
+
+
+class TestAFailurePutsItsOwnBack:
+    """Whatever step fails before the end, the hub is ready on its own database with every row it had."""
+
+    @pytest.mark.parametrize(
+        ("where", "step"),
+        [
+            (move, "_dump"),
+            (move, "_restore"),
+            (move, "_verify_identity"),
+            (move, "_ensure_schema"),
+            (restore, "_finish"),
+        ],
+    )
+    def test_the_hub_is_ready_on_its_own_data_and_says_why(self, restores, monkeypatch, where, step):
+        hub = restores.hub(source=restores.cluster(), schema_state=Hub.SchemaState.BEHIND, schema_apps={"w8a": "0001"})
+
+        def broken(*args, **kwargs):
+            raise RuntimeError(f"{step} broke on purpose")
+
+        monkeypatch.setattr(where, step, broken)
+
+        assert run(restores) == 1
+
+        hub = fresh(hub)
+        assert (hub.restoring_from_id, hub.restore_point, hub.move_undo_asked_at) == (None, None, None)
+        assert hub.status == "ready"
+        assert hub.last_error.startswith("restore_") and "broke on purpose" in hub.last_error
+        assert marker(hub.db_name) == [AS_THEN, SINCE] and says_it_is(hub.db_name) == [hub.id]
+        # Its schema record as it was: the new database's migration had written its own meanwhile.
+        assert (hub.schema_state, hub.schema_apps) == ("behind", {"w8a": "0001"})
+        control = tenancy_connections.control_name()
+        assert not [name for name in databases() if names.is_kept(name, control=control)]
+        assert not MovedCopy.objects.filter(hub=hub).exists()
+        assert not HubDue.objects.filter(pk=hub.pk).exists()
+
+    def test_a_copy_that_says_it_is_another_hub_is_refused(self, restores):
+        hub = restores.hub(source=restores.cluster())
+        with hubs._maintenance(restores.copies[hub.id]) as conn:
+            conn.execute("UPDATE base_hub_identity SET hub_id = %s", [uuid.uuid7()])
+
+        run(restores)
+
+        hub = fresh(hub)
+        assert hub.restoring_from_id is None and hub.last_error.startswith("restore_identity_mismatch")
+        assert marker(hub.db_name) == [AS_THEN, SINCE] and says_it_is(hub.db_name) == [hub.id]
+
+    def test_a_copy_missing_on_the_temporary_cluster_ends_it_with_why_its_own_untouched(self, restores):
+        hub = restores.hub(source=restores.cluster())
+        with hubs._maintenance() as conn:
+            hubs._drop(conn, restores.copies[hub.id], tenancy_connections.control_name())
+
+        run(restores)
+
+        hub = fresh(hub)
+        assert hub.restoring_from_id is None and hub.last_error.startswith("restore_dump_failed")
+        assert marker(hub.db_name) == [AS_THEN, SINCE]
+
+    def test_its_own_database_missing_ends_it_with_why(self, restores):
+        hub = restores.hub(source=restores.cluster())
+        with hubs._maintenance() as conn:
+            hubs._drop(conn, hub.db_name, tenancy_connections.control_name())
+
+        run(restores)
+
+        hub = fresh(hub)
+        assert hub.restoring_from_id is None and hub.last_error.startswith("restore_database_missing")
+        assert hub.db_name not in databases()
+
+    def test_the_new_database_is_never_made_while_its_own_is_not_kept_aside(self, restores, monkeypatch):
+        # A rename that did not happen: the hub's name still holds its data, which nothing drops for a new one.
+        hub = restores.hub(source=restores.cluster())
+        monkeypatch.setattr(move, "_rename", lambda conn, old, new: None)
+
+        run(restores)
+
+        hub = fresh(hub)
+        assert hub.restoring_from_id is None and hub.last_error.startswith("restore_copy_missing")
+        assert marker(hub.db_name) == [AS_THEN, SINCE]
+
+
+class TestTheFiscalGuard:
+    """It only reads: a production record of the hub's database that the copy lacks or has otherwise stops it with the
+    business closed, nothing changed; the restore would repeat numbers the AEAT has and drop invoices to keep."""
+
+    def test_a_production_record_made_after_the_moment_stops_it(self, restores):
+        hub = restores.hub(source=restores.cluster())
+        a_record(hub.db_name, created_at=AFTER, updated_at=AFTER)
+
+        run(restores)
+
+        hub = fresh(hub)
+        assert hub.restoring_from_id is None and hub.last_error.startswith("restore_fiscal_records")
+        assert marker(hub.db_name) == [AS_THEN, SINCE]
+        assert not MovedCopy.objects.filter(hub=hub).exists()
+
+    def test_a_record_already_there_refuses_it_before_the_business_is_ever_closed(self, restores, monkeypatch):
+        hub = restores.hub(source=restores.cluster())
+        a_record(hub.db_name, created_at=AFTER, updated_at=AFTER)
+        closed: list[str] = []
+        real = move._close
+        monkeypatch.setattr(move, "_close", lambda conn, name, roles: closed.append(name) or real(conn, name, roles))
+
+        run(restores)
+
+        assert closed == []
+        assert fresh(hub).last_error.startswith("restore_fiscal_records")
+
+    def test_a_record_made_before_and_sent_after_stops_it(self, restores):
+        hub = restores.hub(source=restores.cluster())
+        record = a_record(restores.copies[hub.id], status="pending")
+        a_record(hub.db_name, id=record, status="pending")
+        change_record(hub.db_name, record, status="accepted", transmitted_at=AFTER, updated_at=AFTER)
+
+        run(restores)
+
+        assert fresh(hub).last_error.startswith("restore_fiscal_records")
+        assert marker(hub.db_name) == [AS_THEN, SINCE]
+
+    @pytest.mark.parametrize(
+        "changed",
+        [{"updated_at": AFTER}, {"transmitted_at": AFTER}, {"status": "accepted_with_errors"}],
+    )
+    def test_a_record_that_changed_in_anything_compared_stops_it(self, restores, changed):
+        hub = restores.hub(source=restores.cluster())
+        record = a_record(restores.copies[hub.id])
+        a_record(hub.db_name, id=record)
+        change_record(hub.db_name, record, **changed)
+
+        run(restores)
+
+        assert fresh(hub).last_error.startswith("restore_fiscal_records")
+
+    def test_testing_records_and_production_ones_as_they_were_do_not_stop_it(self, restores):
+        hub = restores.hub(source=restores.cluster())
+        unchanged = a_record(restores.copies[hub.id])
+        a_record(hub.db_name, id=unchanged)
+        a_record(hub.db_name, environment="testing", created_at=AFTER, updated_at=AFTER)
+
+        run(restores)
+
+        hub = fresh(hub)
+        assert (hub.restoring_from_id, hub.last_error) == (None, "")
+        assert marker(hub.db_name) == [AS_THEN]
+
+    def test_it_looks_again_once_the_business_is_closed(self, restores, monkeypatch):
+        # The business could invoice until it was closed: a record made right before is seen.
+        hub = restores.hub(source=restores.cluster())
+        real = move._close
+        made: list[uuid.UUID] = []
+
+        def close(conn, name, roles):
+            if not made:
+                made.append(a_record(hub.db_name, created_at=AFTER, updated_at=AFTER))
+            real(conn, name, roles)
+
+        monkeypatch.setattr(move, "_close", close)
+
+        run(restores)
+
+        assert made and fresh(hub).last_error.startswith("restore_fiscal_records")
+        assert marker(hub.db_name) == [AS_THEN, SINCE]
+
+    def test_without_verifactus_table_nothing_stops_it(self, restores):
+        hub = restores.hub(source=restores.cluster())
+        for name in (hub.db_name, restores.copies[hub.id]):
+            with hubs._maintenance(name) as conn:
+                conn.execute("DROP TABLE verifactu_record CASCADE")
+
+        run(restores)
+
+        assert (fresh(hub).restoring_from_id, fresh(hub).last_error) == (None, "")
+
+    def test_every_app_whose_records_reach_the_tax_authority_answers_it(self):
+        answering = {config.label for config in all_live_app_configs() if hasattr(config, "fiscal_record_states")}
+
+        assert answering == FILE_WITH_THE_TAX_AUTHORITY
+
+    def test_what_any_app_answers_of_its_records_is_compared(self, restores, monkeypatch):
+        # The restore asks the apps, never reads a table of its own: any app's answer that differs stops it.
+        hub = restores.hub(source=restores.cluster())
+
+        def states(config, conn):
+            return {1: ("sent after the moment",)} if conn.info.dbname == hub.db_name else {1: ("as it was",)}
+
+        monkeypatch.setattr(SaleConfig, "fiscal_record_states", states, raising=False)
+
+        run(restores)
+
+        hub = fresh(hub)
+        assert hub.restoring_from_id is None and hub.last_error.startswith("restore_fiscal_records")
+        assert marker(hub.db_name) == [AS_THEN, SINCE]
+
+    def test_a_production_record_the_copy_does_not_have_the_table_for_stops_it(self, restores):
+        hub = restores.hub(source=restores.cluster())
+        with hubs._maintenance(restores.copies[hub.id]) as conn:
+            conn.execute("DROP TABLE verifactu_record CASCADE")
+        a_record(hub.db_name)
+
+        run(restores)
+
+        assert fresh(hub).last_error.startswith("restore_fiscal_records")
+
+
+class TestTwoWorkers:
+    """A worker whose lease ran out never acts on a restore another one took over: before each drop, rename or the end
+    it checks it still holds the lease and that the hub is still restored from its cluster."""
+
+    def test_a_lease_lost_meanwhile_is_left_to_its_new_holder_untouched(self, restores, monkeypatch):
+        source = restores.cluster()
+        hub = restores.hub(source=source)
+
+        def stolen(*args, **kwargs):
+            raise services.ProvisioningStopped("another worker holds it now")
+
+        monkeypatch.setattr(move, "_restore", stolen)
+
+        run(restores)
+
+        hub = fresh(hub)
+        # Nothing undone nor noted: the holder goes on from the kept copy (see TestResuming).
+        assert (hub.restoring_from_id, hub.last_error) == (source.pk, "")
+        assert marker(kept_copy(hub).db_name) == [AS_THEN, SINCE]
+
+    def test_a_lease_another_worker_took_before_the_end_is_never_ended_here(self, restores, monkeypatch, caplog):
+        source = restores.cluster()
+        hub = restores.hub(source=source)
+        taken_after_the_schema(monkeypatch, hub)
+
+        run(restores)
+
+        hub = fresh(hub)
+        assert (hub.restoring_from_id, hub.last_error) == (source.pk, "")
+        assert kept_copy(hub).moved_at is None
+        assert "base.tenancy.restore.stopped" in caplog.text
+
+    def test_a_lease_taken_right_before_the_end_is_checked_again_on_the_locked_row(self, restores, monkeypatch, caplog):
+        source = restores.cluster()
+        hub = restores.hub(source=source)
+        real = control_services.restore_finished
+
+        def taken_then_ended(*args, **kwargs):
+            with use_control():
+                HubDue.objects.filter(pk=hub.pk).update(lease_owner="other:1")
+            return real(*args, **kwargs)
+
+        monkeypatch.setattr(control_services, "restore_finished", taken_then_ended)
+
+        run(restores)
+
+        hub = fresh(hub)
+        assert (hub.restoring_from_id, hub.last_error) == (source.pk, "")
+        assert kept_copy(hub).moved_at is None
+        assert "base.tenancy.restore.stopped" in caplog.text
+
+    def test_a_restore_another_worker_ended_meanwhile_is_never_touched_again(self, restores, monkeypatch, caplog):
+        source = restores.cluster()
+        hub = restores.hub(source=source)
+        real = move._dump
+
+        def dump(copied, cluster, path, heartbeat, cancelled=None):
+            real(copied, cluster, path, heartbeat, cancelled)
+            with use_control():
+                Hub.objects.filter(pk=hub.pk).update(restoring_from=None, restore_point=None)
+
+        monkeypatch.setattr(move, "_dump", dump)
+
+        run(restores)
+
+        assert marker(fresh(hub).db_name) == [AS_THEN, SINCE]
+        assert not MovedCopy.objects.filter(hub=hub).exists()
+        assert "base.tenancy.restore.stopped" in caplog.text
+
+    def test_a_restore_another_worker_ended_right_before_the_rename_never_renames_its_database(
+        self, restores, monkeypatch, caplog
+    ):
+        hub = restores.hub(source=restores.cluster())
+        real = restore._refuse_fiscal_changes
+        checks: list[str] = []
+
+        def checked_then_ended(*args, **kwargs):
+            real(*args, **kwargs)
+            checks.append(args[0])
+            # The second check, with the business closed: right before the rename, another worker ends it.
+            if len(checks) == 2:
+                with use_control():
+                    Hub.objects.filter(pk=hub.pk).update(restoring_from=None, restore_point=None)
+
+        monkeypatch.setattr(restore, "_refuse_fiscal_changes", checked_then_ended)
+
+        run(restores)
+
+        assert len(checks) == 2
+        assert marker(hub.db_name) == [AS_THEN, SINCE]
+        control = tenancy_connections.control_name()
+        assert not [name for name in databases() if names.is_kept(name, control=control)]
+        assert "base.tenancy.restore.stopped" in caplog.text
+
+    def test_an_undo_asked_is_never_taken_forward(self, restores):
+        hub = restores.hub(source=restores.cluster())
+        with use_control():
+            Hub.objects.filter(pk=hub.pk).update(move_undo_asked_at=AT, last_error="restore_unexpected: before")
+
+        run(restores)
+
+        hub = fresh(hub)
+        assert (hub.restoring_from_id, hub.move_undo_asked_at) == (None, None)
+        assert hub.last_error == "restore_unexpected: before"
+        assert marker(hub.db_name) == [AS_THEN, SINCE]
+
+
+class TestResuming:
+    def test_a_restore_cut_after_its_own_was_kept_aside_goes_on_from_the_kept_copy(self, restores):
+        source = restores.cluster()
+        hub = restores.hub(source=source)
+        control = tenancy_connections.control_name()
+        kept = names.kept_db_name(control, uuid.uuid7())
+        # Where a worker stopped: the kept copy noted as holding the data, then the rename.
+        with use_control():
+            MovedCopy.objects.create(hub=hub, cluster=None, db_name=kept, moved_at=None)
+        with hubs._maintenance() as conn:
+            conn.execute(
+                sql.SQL("ALTER DATABASE {} RENAME TO {}").format(
+                    names.identifier(hub.db_name, control=control), names.identifier(kept, control=control)
+                )
+            )
+
+        run(restores)
+
+        hub = fresh(hub)
+        assert (hub.restoring_from_id, hub.last_error) == (None, "")
+        assert marker(hub.db_name) == [AS_THEN] and marker(kept) == [AS_THEN, SINCE]
+        assert kept_copy(hub).moved_at == AT
+
+    def test_an_undo_that_failed_is_tried_again_as_an_undo(self, restores, monkeypatch):
+        source = restores.cluster()
+        hub = restores.hub(source=source)
+
+        def broken(*args, **kwargs):
+            raise RuntimeError("broke on purpose")
+
+        with monkeypatch.context() as patched:
+            patched.setattr(move, "_ensure_schema", broken)
+            patched.setattr(restore, "_put_back", broken)
+            run(restores)
+
+        stuck = fresh(hub)
+        assert stuck.restoring_from_id == source.pk and "restore_undo_failed" in stuck.last_error
+        assert stuck.move_undo_asked_at is not None
+        assert marker(kept_copy(stuck).db_name) == [AS_THEN, SINCE]
+
+        run(restores)
+
+        hub = fresh(hub)
+        assert (hub.restoring_from_id, hub.move_undo_asked_at) == (None, None)
+        # The reason of the restore's failure, not of the undo that failed meanwhile.
+        assert hub.last_error == "restore_unexpected: RuntimeError: broke on purpose"
+        assert marker(hub.db_name) == [AS_THEN, SINCE]
+        assert not MovedCopy.objects.filter(hub=hub).exists()
+
+
+class TestTheKeptCopiesGoAfterTheirDays:
+    def test_a_kept_copy_past_its_days_is_dropped_with_its_row_by_the_moves_pass(self, restores):
+        hub = restores.hub(source=restores.cluster())
+        run(restores)
+        kept = kept_copy(fresh(hub)).db_name
+
+        with use_control():
+            move.run_due(AT + dt.timedelta(days=move.MOVED_COPY_DAYS) - dt.timedelta(minutes=1))
+        assert kept in databases()
+
+        with use_control():
+            move.run_due(AT + dt.timedelta(days=move.MOVED_COPY_DAYS))
+        assert kept not in databases() and not MovedCopy.objects.filter(hub=hub).exists()
+        assert marker(fresh(hub).db_name) == [AS_THEN]
+
+    def test_two_restores_within_the_days_keep_both_copies(self, restores):
+        source = restores.cluster()
+        hub = restores.hub(source=source)
+        run(restores)
+        with use_control():
+            Hub.objects.filter(pk=hub.pk).update(restoring_from=source, restore_point=THEN)
+
+        run(restores, AT + dt.timedelta(hours=1))
+
+        first, second = MovedCopy.objects.filter(hub=hub).order_by("moved_at")
+        assert marker(first.db_name) == [AS_THEN, SINCE] and marker(second.db_name) == [AS_THEN]

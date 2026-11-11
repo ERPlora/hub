@@ -143,6 +143,11 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
         PLATFORM,
         "The Hub admin's «Cancel the move», for the platform's admins (staff and superuser); the worker undoes it.",
     ),
+    "control.hub.restore": (
+        PLATFORM,
+        "The Hub admin puts a hub back as it was at a moment, for the platform's admins (staff and superuser); the "
+        "worker restores it.",
+    ),
     "staff.account.list": (
         CHECKED_INSIDE,
         "staff.add_member or staff.change_member (the «Hub user» selector of the record's form, STAFF-F03).",

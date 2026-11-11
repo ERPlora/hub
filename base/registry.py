@@ -87,6 +87,22 @@ def is_moving(hub: Hub) -> bool:
     return hub.moving_to_id is not None
 
 
+def is_restoring(hub: Hub) -> bool:
+    """Whether ``hub``'s database is being put back as it was at a moment (``control.hub.restore``,
+    ``base.tenancy.restore``; hub#1198): closed meanwhile."""
+    return hub.restoring_from_id is not None
+
+
+def is_copying(hub: Hub) -> bool:
+    """Whether ``hub``'s database is being copied, moved or restored: its host is closed and the worker leaves it."""
+    return is_moving(hub) or is_restoring(hub)
+
+
+def copying() -> Q:
+    """The rows :func:`is_copying` says are closed while their database is copied, as a query."""
+    return Q(moving_to__isnull=False) | Q(restoring_from__isnull=False)
+
+
 def is_preparing(hub: Hub) -> bool:
     """Whether ``hub`` is not ready yet (requested, being prepared, or its preparation failed and is retried)."""
     return hub.status in PREPARING_STATUSES
@@ -140,9 +156,9 @@ def refusal(hub: Hub | None, *, ended: bool = True) -> Refusal | None:
     """Why the host of ``hub`` does not serve the app, or ``None`` while it does; in the active language.
 
     The host gate's rule (``base.middleware``), in its order: no row 404, gone 410, still being prepared 503, moving
-    to another cluster 503 (maintenance), a business of phase 1 without its own database 503 too (maintenance, until
-    its cut gives it one: S5, ``base.tenancy.cut``), suspended for an unpaid invoice 402. An open live stream and the
-    print socket hear it again before each run
+    to another cluster or being restored from a copy 503 (maintenance), a business of phase 1 without its own
+    database 503 too (maintenance, until its cut gives it one: S5, ``base.tenancy.cut``), suspended for an unpaid
+    invoice 402. An open live stream and the print socket hear it again before each run
     (``base.operations.HubContextBuilder.refresh``). ``ended=False`` leaves out that it ended (a demo's login still
     answers then)."""
     if hub is None:
@@ -151,7 +167,7 @@ def refusal(hub: Hub | None, *, ended: bool = True) -> Refusal | None:
         return Refusal(410, HUB_GONE, gettext("This hub is no longer available."))
     if is_preparing(hub):
         return Refusal(503, HUB_PREPARING, gettext("This hub is still being prepared; try again in a few seconds."))
-    if is_moving(hub) or not (hub.db_name or serves_hubs_without_database()):
+    if is_copying(hub) or not (hub.db_name or serves_hubs_without_database()):
         return Refusal(503, HUB_MAINTENANCE, gettext("This hub is under maintenance for a few minutes; try again shortly."))
     if is_suspended(hub):
         return Refusal(402, HUB_SUSPENDED, gettext("This business is suspended until its unpaid invoice is paid."))
