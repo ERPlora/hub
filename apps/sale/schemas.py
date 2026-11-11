@@ -19,7 +19,7 @@ from pydantic import ConfigDict, StringConstraints, field_validator, model_valid
 
 from apps.customer.tax_ids import InvalidCountry, normalize_country
 from apps.tax.schemas import TerritoryTaxKind
-from base.schemas import names
+from base.schemas import exactly_one, names
 
 T = TypeVar("T")
 
@@ -754,13 +754,7 @@ class RecordRefIn(Closed):
 
     @model_validator(mode="after")
     def _one(self):
-        if sum(getattr(self, name) is not None for name in type(self).model_fields) != 1:
-            raise ValueError(str(ONE_RECORD))
-        return self
-
-
-class RecordOut(Schema):
-    name: str = Field(description="What the screens call it, in the reader's language.")
+        return exactly_one(self, ONE_RECORD)
 
 
 class OrderListIn(PageIn):

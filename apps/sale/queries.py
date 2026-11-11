@@ -71,7 +71,6 @@ from apps.sale.schemas import (
     ProductLineIn,
     QuickNoteListIn,
     QuickNotePage,
-    RecordOut,
     RecordRefIn,
     RefundByKeyIn,
     RefundByKeyOut,
@@ -106,6 +105,7 @@ from base.business import currency_decimals
 from base.models import Approval
 from base.operations import call
 from base.ordering import list_order
+from base.schemas import RecordNameOut
 
 #: The currency Spanish law writes its limits in (Ley 7/2012, RD 1619/2012): the law's, not the business's.
 LIMITS_CURRENCY = "EUR"
@@ -1373,7 +1373,7 @@ RECORD_NAMES = {
     kind="query",
     permission="sale.view_sale",
     input=RecordRefIn,
-    output=RecordOut,
+    output=RecordNameOut,
     ai=INTERNAL,
 )
 def get_record(ctx: OperationContext, data: RecordRefIn) -> dict:

@@ -21,7 +21,7 @@ from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 
 from base.images import MAX_UPLOAD_BASE64
-from base.schemas import CatalogImageOut, names
+from base.schemas import CatalogImageOut, exactly_one, names
 
 T = TypeVar("T")
 
@@ -289,13 +289,7 @@ class RecordRefIn(In):
 
     @model_validator(mode="after")
     def _one(self):
-        if sum(getattr(self, name) is not None for name in type(self).model_fields) != 1:
-            raise ValueError(str(ONE_RECORD))
-        return self
-
-
-class RecordOut(Schema):
-    name: str = Field(description="What the screens of its app call it, in the reader's language.")
+        return exactly_one(self, ONE_RECORD)
 
 
 # ── Services ──────────────────────────────────────────────────────────────────────────────────

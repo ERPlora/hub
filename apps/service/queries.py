@@ -59,7 +59,6 @@ from apps.service.schemas import (
     ByIdIn,
     CatalogStatusOut,
     GrantDetailOut,
-    RecordOut,
     RecordRefIn,
     SessionDetailOut,
     SessionRefIn,
@@ -101,6 +100,7 @@ from base import images
 from base.business import babel_locale, business_zone
 from base.operations import call
 from base.queries import business_language, image_library
+from base.schemas import RecordNameOut
 from base.ordering import list_order_for
 
 SERVICE_NOT_FOUND = _("That service does not exist in this business.")
@@ -1293,7 +1293,7 @@ RECORD_NAMES = {
     kind="query",
     permission="service.view_package_balance",
     input=RecordRefIn,
-    output=RecordOut,
+    output=RecordNameOut,
     ai=INTERNAL,
 )
 def get_record(ctx: OperationContext, data: RecordRefIn) -> dict:

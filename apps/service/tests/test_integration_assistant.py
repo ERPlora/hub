@@ -129,7 +129,7 @@ def test_the_card_names_the_services_a_package_includes_as_its_form():
 def test_the_card_titles_the_refund_or_void_that_gives_sessions_back_by_services_own_words():
     """Sales gives back the sessions spent in a sale it refunds or voids: the card titles that document by what it is,
     with service's own words, not with the «Referencia» another app's catalog lends to pydantic's «Reference» (the
-    card that names it, with a real refund: test_each_record_of_the_till_is_titled_as_the_screens_title_it)."""
+    card that names a real refund under it: test_a_write_of_services_names_the_sale_the_lines_the_appointment_…)."""
     reference = assistant._schema(get("service.session.return"))["properties"]["reference"]
     assert named_by_service(get("service.session.return"), "reference", reference.get("title"))
     with translation.override("es"):
@@ -431,6 +431,17 @@ def test_no_write_of_services_leaves_a_record_unnamed():
 # ── What Sales and Appointments name, by their own reads (hub#756) ─────────────────────────────────────────────────
 
 
+def titled(card: dict) -> dict:
+    """Each datum of ``card`` by its title and the name it says."""
+    return {field["name"]: (field["label"], field["value"]) for field in card["fields"]}
+
+
+def assert_left_out(shown: dict) -> None:
+    """Every card of ``TILL`` leaves out what Sales and Appointments name, and none of them says it by its id."""
+    assert {write: values(card) for write, card in shown.items()} == dict.fromkeys(TILL, {})
+    assert all(no_id(card) for card in shown.values())
+
+
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_a_write_of_services_names_the_sale_the_lines_the_appointment_and_the_refund_as_their_screens_do(
@@ -438,23 +449,16 @@ def test_a_write_of_services_names_the_sale_the_lines_the_appointment_and_the_re
 ):
     """«Véndele el bono de la venta de esta mañana», «gasta la sesión en la cita de Lucía»: the card says which sale (by
     its number), which line (by what it charges), which appointment (as Appointments' cards say it) and which refund
-    gives the sessions back (by its sale), never by an id."""
+    gives the sessions back (by its sale), each under the title its screens give it («Venta», never «Id»), never by an
+    id."""
     with use_hub(hub_a):
         till = a_till(hub_a, a_salon())
         shown = till_cards(till, person(hub_a, language=language), language)
-    assert {write: values(card) for write, card in shown.items()} == named_at_the_till(till, language)
-    assert [write for write, card in shown.items() if not no_id(card)] == []
-
-
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-@pytest.mark.parametrize("language", ["es", "en"])
-def test_each_record_of_the_till_is_titled_as_the_screens_title_it(language, hub_a, no_fallback):
-    with use_hub(hub_a):
-        till = a_till(hub_a, a_salon())
-        shown = till_cards(till, person(hub_a, language=language), language)
-    assert {write: {field["name"]: field["label"] for field in card["fields"]} for write, card in shown.items()} == {
-        write: {datum: TILL_TITLES[language][kind] for datum, kind in data.items()} for write, data in TILL.items()
+    names, titles = said_at_the_till(till, language), TILL_TITLES[language]
+    assert {write: titled(card) for write, card in shown.items()} == {
+        write: {datum: (titles[kind], names[kind]) for datum, kind in data.items()} for write, data in TILL.items()
     }
+    assert all(no_id(card) for card in shown.values())
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
@@ -496,22 +500,19 @@ def test_without_sales_and_appointments_the_card_leaves_them_out_never_by_their_
         turn_off_sales_and_appointments()
         shown = till_cards(till, person(hub_a))
     assert {write: values(card) for write, card in named.items()} == named_at_the_till(till)  # positive control
-    assert {write: values(card) for write, card in shown.items()} == dict.fromkeys(TILL, {})
-    assert all(no_id(card) for card in shown.values())
+    assert_left_out(shown)
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 def test_who_may_not_see_sales_nor_appointments_reads_none_of_them_on_the_card(hub_a, no_fallback):
     """The reads of Sales and Appointments run as whoever asks: without their rights, Services names nothing of theirs."""
     hidden = frozenset({"sale.view_sale", "appointment.view_appointment", "appointment.view_own_appointment"})
+    ctx = person(hub_a, without=hidden)
+    # Positive control: Services' own read is theirs to run; only what it asks of the others is not.
+    assert ctx.has(get("service.record.get").permission)
     with use_hub(hub_a):
-        till = a_till(hub_a, a_salon())
-        ctx = person(hub_a, without=hidden)
-        # Positive control: Services' own read is theirs to run; only what it asks of the others is not.
-        assert ctx.has(get("service.record.get").permission)
-        shown = till_cards(till, ctx)
-    assert {write: values(card) for write, card in shown.items()} == dict.fromkeys(TILL, {})
-    assert all(no_id(card) for card in shown.values())
+        shown = till_cards(a_till(hub_a, a_salon()), ctx)
+    assert_left_out(shown)
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
@@ -530,8 +531,7 @@ def test_an_employee_reads_the_sale_and_the_lines_but_not_an_appointment_of_some
 def test_nobody_behind_the_request_reads_nothing_of_sales_nor_appointments(hub_a, no_fallback):
     with use_hub(hub_a):
         shown = till_cards(a_till(hub_a, a_salon()), None)
-    assert {write: values(card) for write, card in shown.items()} == dict.fromkeys(TILL, {})
-    assert all(no_id(card) for card in shown.values())
+    assert_left_out(shown)
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
@@ -539,8 +539,7 @@ def test_a_sale_or_an_appointment_that_is_not_there_is_left_out_never_by_its_id(
     gone = {kind: uuid.uuid7() for kind in TILL_TITLES["es"]}
     with use_hub(hub_a):
         shown = till_cards(gone, person(hub_a))
-    assert {write: values(card) for write, card in shown.items()} == dict.fromkeys(TILL, {})
-    assert all(no_id(card) for card in shown.values())
+    assert_left_out(shown)
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
@@ -551,8 +550,7 @@ def test_a_sale_or_an_appointment_of_hub_b_is_never_named_on_a_card_of_hub_a(hub
     with use_hub(hub_a):
         shown = till_cards(theirs, person(hub_a))
     assert {write: values(card) for write, card in named_in_b.items()} == named_at_the_till(theirs)  # positive control
-    assert {write: values(card) for write, card in shown.items()} == dict.fromkeys(TILL, {})
-    assert all(no_id(card) for card in shown.values())
+    assert_left_out(shown)
 
 
 # ── The read that names them ─────────────────────────────────────────────────────────────────────────────────────────
