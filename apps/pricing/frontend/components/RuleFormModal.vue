@@ -250,7 +250,7 @@ async function save(): Promise<void> {
 }
 
 // An untouched amount follows the business's money when it answers after the window opened: that is no change.
-useUnsavedFormOnOpen(
+const canDismiss = useUnsavedFormOnOpen(
   'pricing-rule-form',
   () => {
     const stored = moneyFieldText(props.rule?.amount ?? null, locale.value, money.value);
@@ -263,6 +263,7 @@ useUnsavedFormOnOpen(
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="pricing-rule-form"
     :title="title"
     :submit-label="rule ? $t('pricing.rules.form.save') : $t('pricing.rules.form.create')"

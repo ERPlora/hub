@@ -102,8 +102,8 @@ describe('LinkFormModal', () => {
 describe('LinkFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
   it('as opened closes; a product picked asks; cleared again closes again', async () => {
     const s = await setup();
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('modifier-link-form'),
       change: async () => {
         s.target().vm.$emit('update:modelValue', { id: 'p1', label: 'Burger' });

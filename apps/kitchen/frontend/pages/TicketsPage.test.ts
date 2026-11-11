@@ -219,8 +219,8 @@ describe('TicketsPage: Android Back with unsaved changes (hub#1046, BASE-F05)', 
     const s = await setup();
     await s.show([PENDING]);
     await s.action('cancel', PENDING);
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('kitchen-tickets-cancel'),
       change: () => ionValue(s.inDoc('kitchen-tickets-cancel-reason'), 'Guest left', 'ionInput'),
       restore: () => ionValue(s.inDoc('kitchen-tickets-cancel-reason'), '', 'ionInput'),

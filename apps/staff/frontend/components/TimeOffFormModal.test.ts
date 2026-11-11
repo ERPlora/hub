@@ -200,8 +200,8 @@ describe('TimeOffFormModal: fields refused with the same words (hub#888)', () =>
 describe('TimeOffFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
   it('as opened closes; a change asks; restored as opened closes again', async () => {
     const s = await setup('request');
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('staff-time-off-form'),
       change: () => ionValue(s.field('reason'), 'Family trip', 'ionInput'),
       restore: () => ionValue(s.field('reason'), '', 'ionInput'),

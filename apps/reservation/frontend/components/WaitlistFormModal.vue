@@ -18,7 +18,7 @@ const props = defineProps<{ day: string }>();
 const emit = defineEmits<{ saved: [entry: WaitlistOut] }>();
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('reservation-waitlist-form', () => ({ customer: customer.value, name: name.value, phone: phone.value, date: date.value, time: time.value, party: party.value, notes: notes.value }), open);
+const canDismiss = useUnsavedFormOnOpen('reservation-waitlist-form', () => ({ customer: customer.value, name: name.value, phone: phone.value, date: date.value, time: time.value, party: party.value, notes: notes.value }), open);
 
 const create = useCommand('reservation.waitlist.create');
 const customer = ref<CustomerSnapshot | null>(null);
@@ -79,6 +79,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="reservation-waitlist-form"
     :title="$t('reservation.waitlist.form.title')"
     :submit-label="$t('reservation.waitlist.form.submit')"

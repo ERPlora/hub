@@ -194,8 +194,8 @@ describe('CorrectionModal: fields refused with the same words (hub#888)', () => 
 describe('CorrectionModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
   it('as opened closes; a change asks; restored as opened closes again', async () => {
     const s = await setup();
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('attendance-correct'),
       change: () => ionValue(s.field('reason'), 'Forgot to clock out', 'ionInput'),
       restore: () => ionValue(s.field('reason'), '', 'ionInput'),

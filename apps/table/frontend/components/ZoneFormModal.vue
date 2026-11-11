@@ -29,7 +29,7 @@ const props = withDefaults(
 
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('table-zone-form', () => form.value, open);
+const canDismiss = useUnsavedFormOnOpen('table-zone-form', () => form.value, open);
 const emit = defineEmits<{ saved: [zone: ZoneOut] }>();
 
 const COLORS: readonly ZoneColor[] = ['primary', 'secondary', 'tertiary', 'success', 'warning', 'danger', 'medium'];
@@ -120,6 +120,7 @@ async function save(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="table-zone-form"
     :title="title"
     :pending="pending"

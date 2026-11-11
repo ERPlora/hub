@@ -114,12 +114,13 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen('inventory-stock-form', () => ({ qty: qty.value, cost: cost.value, reason: reason.value }), open);
+const canDismiss = useUnsavedFormOnOpen('inventory-stock-form', () => ({ qty: qty.value, cost: cost.value, reason: reason.value }), open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     :title="$t(texts.title, { name: product?.name ?? '' })"
     testid="inventory-stock-form"
     :submit-label="$t(texts.submit)"

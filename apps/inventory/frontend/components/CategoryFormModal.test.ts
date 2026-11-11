@@ -135,8 +135,8 @@ describe('CategoryFormModal: Android Back with unsaved changes (hub#1031, BASE-F
   it('editing: as opened closes; a change asks; restored as opened closes again', async () => {
     const s = await setup({ category: category() });
     const name = (s.el('inventory-category-name') as Control).value as string;
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.el('inventory-category-form'),
       change: () => s.type('inventory-category-name', 'Desserts'),
       restore: () => s.type('inventory-category-name', name),

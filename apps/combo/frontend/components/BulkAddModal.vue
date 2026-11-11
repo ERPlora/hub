@@ -135,12 +135,13 @@ async function save(): Promise<void> {
 }
 
 // What is searched or narrowed only filters the list: what would be added is what is ticked.
-useUnsavedFormOnOpen('combo-bulk', picked, open);
+const canDismiss = useUnsavedFormOnOpen('combo-bulk', picked, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="combo-bulk"
     :title="$t('combo.bulk.title')"
     :submit-label="$t('combo.bulk.addCount', { n: picked.length })"

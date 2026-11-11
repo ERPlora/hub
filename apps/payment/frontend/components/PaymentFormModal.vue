@@ -114,12 +114,13 @@ function goToMethods(): void {
   void router.push('/payment/methods');
 }
 
-useUnsavedFormOnOpen('payment-form', form, open);
+const canDismiss = useUnsavedFormOnOpen('payment-form', form, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="payment-form"
     :title="$t('payment.payments.form.title')"
     :submit-label="$t('payment.payments.form.submit')"
