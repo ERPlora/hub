@@ -82,6 +82,10 @@ PROBES = [
 #: The probe of going live: «la cuenta» (ERPlora's account) is read as a table's check, so every write of Sales that
 #: takes a check and «activa» turns on goes ahead of it; it is offered, past the first half.
 GO_LIVE = "qa20261108.owner.es.verifactu.config.go_live"
+#: Why that probe is marked: whoever brings the pointer of live with ERPlora/live#76 sees it pass and takes it off.
+UNTIL_LIVE_TELLS_THE_ACCOUNT_FROM_A_CHECK = pytest.mark.xfail(
+    strict=True, raises=AssertionError, reason="ERPlora/live#76: «la cuenta» of ERPlora is read as a table's check"
+)
 #: What a person says in words of their own, neither an ask nor a probe of layer 2, one per tool of VeriFactu: each
 #: reaches its tool among the first ten by its asks and not without them, so asks that stop reading as people speak fail
 #: here, tool by tool. None says more than two content words of any one of its asks or of its probes, nor half of its
@@ -223,7 +227,7 @@ def test_sealing_the_record_of_an_issued_invoice_comes_before_creating_another_t
 @pytest.mark.parametrize(
     "probe",
     [
-        pytest.param(probe, marks=pytest.mark.xfail(strict=True, reason=GO_LIVE)) if probe["id"] == GO_LIVE else probe
+        pytest.param(probe, marks=UNTIL_LIVE_TELLS_THE_ACCOUNT_FROM_A_CHECK) if probe["id"] == GO_LIVE else probe
         for probe in PROBES
     ],
     ids=[probe["id"] for probe in PROBES],

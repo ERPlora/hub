@@ -1174,9 +1174,9 @@ raíz de la presencia de Control horario), «sella» (el asistente lo lee como u
 (`tests/e2e/qa/probes/*-es-verifactu-*.json`), nunca con los propios asks, y con una frase propia por herramienta que
 solo la trae con sus asks; el empleado no recibe las escrituras que no puede hacer, y ningún test sale de la máquina
 (ni la AEAT de pruebas ni la de producción). Límite medido: la sonda de pasar a producción («activa el envío real…
-comprobando antes que la cuenta y la autorización estén listas») se ofrece en el 32.º puesto de 40, porque «la cuenta»
-(la de ERPlora) se lee como la cuenta de una mesa y van delante las escrituras de Ventas que la toman (`xfail`
-estricto en el test).
+comprobando antes que la cuenta y la autorización estén listas») se ofrece pasado el 30.º puesto de 40, porque «la
+cuenta» (la de ERPlora) se lee como la cuenta de una mesa y van delante las escrituras de Ventas que la toman (`xfail`
+estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase la trae la 6.ª).
 
 ### La cadena, la huella y el QR
 
