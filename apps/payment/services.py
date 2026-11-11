@@ -121,6 +121,16 @@ def _save_method(method: PaymentMethod, **kwargs) -> None:
     output=MethodOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "add the Santander bank account to pay suppliers from",
+                "set up a new bank account for outgoing payments",
+            ),
+            "es": (
+                "da de alta la cuenta bancaria del Santander para pagar a proveedores",
+                "añade la tarjeta de empresa para los pagos salientes",
+            ),
+        },
         "description": "Create an account the business pays its outgoing payments from (a bank account, the "
         "company card, the cash drawer), with its unique name, its type and an optional account reference. "
         "Not a tender of the till: those are Sales' payment methods.",
@@ -153,6 +163,16 @@ def create_method(ctx: OperationContext, data: MethodIn) -> dict:
     output=MethodOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "rename the Sabadell bank account to Main bank",
+                "change the number of the Santander bank account",
+            ),
+            "es": (
+                "cambia el nombre de la cuenta del banco Sabadell a Banco principal",
+                "cambia el número de la cuenta bancaria del Santander",
+            ),
+        },
         "description": "Change a payment method (named by its id or its name): only the fields sent change. "
         "The payments that used it keep it.",
         "risk": "normal",
@@ -212,6 +232,16 @@ def _set_active(ctx: OperationContext, data: MethodRefIn, active: bool) -> dict:
     output=MethodOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "stop using the Sabadell bank account for new payments",
+                "the old Santander bank account must not take outgoing payments any more",
+            ),
+            "es": (
+                "que la cuenta del Sabadell ya no se use en pagos nuevos",
+                "la tarjeta de empresa antigua ya no vale para los pagos salientes",
+            ),
+        },
         "description": "Deactivate a payment method (named by its id or its name): a new payment can no "
         "longer use it; the payments that used it keep it. It is never deleted.",
         "risk": "normal",
@@ -230,6 +260,16 @@ def deactivate_method(ctx: OperationContext, data: MethodRefIn) -> dict:
     output=MethodOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "let the Sabadell bank account be used for payments again",
+                "reactivate the Santander bank account for outgoing payments",
+            ),
+            "es": (
+                "reactiva la cuenta bancaria del Sabadell para los pagos",
+                "que la tarjeta de empresa vuelva a servir para pagar a proveedores",
+            ),
+        },
         "description": "Activate a deactivated payment method again (named by its id or its name), so new "
         "payments can use it.",
         "risk": "normal",
@@ -319,6 +359,16 @@ def _recorded(data: PaymentIn, currency: str) -> dict | None:
     output=PaymentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "record a 120 € transfer to Makro for their invoice",
+                "note down 80 € owed to the electrician as a draft",
+            ),
+            "es": (
+                "apunta una transferencia de 120 € a Makro desde el Sabadell",
+                "deja anotados 80 € para el electricista, sin mover dinero",
+            ),
+        },
         "description": "Record an outgoing payment (to a supplier, a transfer, a refund that is not a sale's) "
         "as a draft, with its reference of the day: the active method it leaves from (by id or name), the "
         "day, the amount in minor units (12,50 € = 1250), the beneficiary and optionally the concept, IBAN, "
@@ -438,6 +488,16 @@ def _step(
     output=PaymentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "give the go-ahead to the 120 € draft to Makro",
+                "authorise the electrician's transfer",
+            ),
+            "es": (
+                "aprueba el borrador de 120 € a Makro",
+                "autoriza la transferencia al electricista",
+            ),
+        },
         "description": "Approve a draft outgoing payment (named by its id or its reference): it authorises it "
         "to be paid. Only a draft can be approved.",
         "risk": "high",
@@ -463,6 +523,16 @@ def approve_payment(ctx: OperationContext, data: PaymentRefIn) -> dict:
     output=PaymentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "I've made the Makro transfer at the bank, mark it as sent",
+                "the electrician's money has gone out from the bank",
+            ),
+            "es": (
+                "ya he hecho la transferencia a Makro desde el banco: márcala como enviada",
+                "lo del electricista ya ha salido del banco",
+            ),
+        },
         "description": "Mark an approved outgoing payment as sent to the bank or the beneficiary (named by its "
         "id or its reference). It records what a person did; it sends nothing.",
         "risk": "high",
@@ -488,6 +558,16 @@ def mark_sent(ctx: OperationContext, data: PaymentRefIn) -> dict:
     output=PaymentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "Makro has received the money, mark it as completed",
+                "the electrician's transfer has arrived, that one is done",
+            ),
+            "es": (
+                "Makro ya ha recibido el dinero: dalo por completado",
+                "al electricista ya le ha llegado la transferencia",
+            ),
+        },
         "description": "Mark a sent outgoing payment as completed, once the beneficiary has received it (named "
         "by its id or its reference). It is final.",
         "risk": "high",
@@ -513,6 +593,16 @@ def mark_completed(ctx: OperationContext, data: PaymentRefIn) -> dict:
     output=PaymentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "cancel the Makro transfer, it was a duplicate",
+                "call off the electrician's transfer, we gave him cash",
+            ),
+            "es": (
+                "anula la transferencia a Makro, estaba repetida",
+                "cancela lo del electricista porque ya se le dio en efectivo",
+            ),
+        },
         "description": "Cancel an outgoing payment that is not completed (named by its id or its reference), "
         "with the mandatory reason, which stays on the payment. It cannot be undone: record another one.",
         "risk": "high",

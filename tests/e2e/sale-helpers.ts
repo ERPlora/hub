@@ -77,6 +77,12 @@ export async function newestSaleOf(context: BrowserContext, sku: string): Promis
  *  `apps/sale/frontend/pages/PosPage.vue` (`PHONE`, `NARROW_TILL`): this window, or a till narrower than that. */
 const TILL_PHONE = { media: '(max-width: 820px), (max-height: 500px)', narrowerThan: 700 };
 
+/** The till (`/sale/pos`) painted: its frame, and its grid's first product or its empty state. */
+export async function tillReady(page: Page): Promise<void> {
+  await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
+  await shown(page).locator('[data-testid^=pos-product-], [data-testid=pos-grid-empty]').first().waitFor({ state: 'visible' });
+}
+
 /**
  * Whether the till on screen is a phone's, once it has laid itself out for the window. It does so a frame after a
  * resize (its media query and its ResizeObserver): read straight after `setViewportSize`, the cart button is the

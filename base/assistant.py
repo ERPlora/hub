@@ -159,6 +159,12 @@ SYNONYMS = (
     # is the till's check line (``sale.order.*_line``) and a cart's line would take its place.
     ("unidades", "cantidad", "quantity"),
     ("cesta", "carrito", "cart", "basket"),
+    # payment: where the business pays its suppliers from is a payment method (``payment.method``), and so is its «cuenta
+    # bancaria» or «cuenta del banco», named by its phrases: a «cuenta» alone is a table's check.
+    (
+        "method", "methods", "cuenta bancaria", "cuentas bancarias", "cuenta del banco", "cuentas del banco",
+        "bank account", "bank accounts",
+    ),
     # flow: an automation (``flow.flow``), its steps and the question it waits on (``flow.question``) are named by their
     # phrases and never by the word: «automatización» shares its stem with «automático» («la respuesta automática»),
     # «pasos» with «pasó» («¿qué pasó con…?», so no «qué paso» nor «de paso») and «pregunta» with its verb («se les
@@ -209,6 +215,9 @@ SYNONYMS = (
     # whatsapp_inbox
     ("plantilla", "plantillas", "template", "templates"),
     ("mensaje", "mensajes", "message", "messages"),
+    # combo: an «opción» or an «elección» of a course is a choice (``combo.option``), as of a modifier group
+    # (``modifier.option``). Until ERPlora/live#61, «ordena» and «orden» also name a device: «ordenador»'s stem.
+    ("opcion", "opciones", "eleccion", "elecciones", "option", "options", "choice", "choices"),
 )
 #: The help a how-to question asks for (``live.assistant.HOWTO_POINTS``): it ranks by being one, not only by ``ALWAYS``.
 HOWTO = (DOCS_SEARCH,)
