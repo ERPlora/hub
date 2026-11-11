@@ -983,12 +983,12 @@ def current_session(ctx: OperationContext, params: EmptyIn) -> dict:
         "asks": {
             "en": (
                 "show me the report of session S-261014-0001",
-                "how did yesterday's till shift go?",
+                "how did Monday's till shift go?",
                 "what difference did last night's session give and with what float did it start?",
             ),
             "es": (
                 "enséñame el informe de la sesión S-261014-0001",
-                "¿cómo fue el turno de caja de ayer?",
+                "¿cómo fue el turno de caja del lunes?",
                 "¿qué diferencia dio la sesión de anoche y con cuánto fondo empezó?",
             ),
         },
@@ -1068,8 +1068,9 @@ def shift_review(ctx: OperationContext) -> dict:
         "unless its number is said) would give with the cash counted in cents: its number, the counted cash and, "
         "unless a blind count hides them from the reader, the expected cash and the difference (negative = short); and "
         "what is still pending at the close (open checks, kitchen tickets not served, prints that did not come out). "
-        "Changes nothing. Read it before closing and tell the person this summary; with the count required and none "
-        "said, it asks for the count."
+        "Changes nothing. To close, read it with the count said and, in the same answer where you tell the person this "
+        "summary, call cash_register.session.close: its card is the confirmation. With the count required and none said, "
+        "it asks for the count."
     },
 )
 def closing_summary(ctx: OperationContext, params: ClosingSummaryIn) -> dict:
