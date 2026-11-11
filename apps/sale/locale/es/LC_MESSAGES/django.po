@@ -1017,3 +1017,9 @@ msgstr "No censado"
 
 msgid "Service"
 msgstr "Servicio"
+
+msgid "That refund does not exist."
+msgstr "Esa devolución no existe."
+
+msgid "Refund of sale %(number)s"
+msgstr "Devolución de la venta %(number)s"

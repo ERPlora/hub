@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:96e08969ef96de22b345990104f3fc7cb3f7277084f01db9b38a6df31b984bc4 -->
+<!-- generated from WORKBOOK.md sha256:10432a7b759c7417929a173c1847e2dc2c9f1cc4b42972756310a86939fba565 -->
 
 ## What it is for and who it is for
 
@@ -464,7 +464,9 @@ Screen: assistant
 Steps:
 1. Ask the assistant to grant the voucher to the customer (by her name or her phone), with the amount
    charged and the sale that charged it. If that sale charged several lines, also which of them.
-2. The voucher shows in **Sold vouchers** of that voucher (SERVICE-F16).
+2. The assistant's confirmation card names the voucher, the customer, the sale by its number
+   ("20261014-0007") and the line by what it charges; confirm it.
+3. The voucher shows in **Sold vouchers** of that voucher (SERVICE-F16).
 In: the voucher of the catalogue, live and active, and the customer (Customers).
 Out: a sold voucher with the owner, the date, the amount and the "Uses" and the "Validity" of the
 catalogue frozen; the expiry counts from that moment (`service.grant.granted`). No tax document comes
@@ -587,7 +589,9 @@ Steps:
 1. If you want, ask the assistant first whether a session of that voucher could be spent and why not.
 2. Ask the assistant to spend a session of a voucher the customer bought, and if you want say which
    service was done, which professional did it ("Ana did it") and link it to the appointment or the sale.
-3. The assistant's confirmation card names the voucher, the service and the professional; confirm it.
+3. The assistant's confirmation card names the voucher, the service and the professional and, if you link them, the
+   appointment as Appointments' cards say it ("Lucía Pérez · Tuesday, Nov. 3, 2026 · 10:00 · Ana López") and the sale
+   by its number; confirm it.
 In: the purchase of the voucher; the service and the professional of Staff's team who did it; the
 appointment and the sale, as a reference.
 Out: a **Delivered** session at once (`service.grant.redeemed`), which counts against the "Uses" and takes
@@ -914,7 +918,11 @@ voucher are named by their id or by their name; a professional, by their name; a
 her phone. If a name fits several, it says which and asks to choose (409
 `service.service_ambiguous`, `service.category_ambiguous`, `service.package_ambiguous`,
 `staff.ambiguous_member`, `customer.customer_ambiguous`). Before changing anything, the assistant asks for
-confirmation with its card (BASE-F97), which names each record as the screens name it, never by its id.
+confirmation with its card (BASE-F97), which names each record as the screens name it, never by its id; also what
+belongs to Sales or Appointments: the sale by its number, its line and the check's line by what they charge, the
+appointment as Appointments' cards say it and the refund or the void that gives sessions back by its sale ("Refund of
+sale 20261014-0007", "Void of sale 20261014-0007"). With Sales or Appointments off, or if whoever asks may not see it,
+that datum does not show, never its id.
 
 ### What it offers: queries (they read and change nothing)
 
@@ -934,6 +942,7 @@ confirmation with its card (BASE-F97), which names each record as the screens na
 | An assignment by its id: the service, the professional and their own minutes and price, with the `label` the assistant's card (BASE-F97) names it by | view services | F32 | `service.assignment.get` |
 | A sold voucher by its id: the voucher, the customer, the day it was sold and its balance, with its `label` | view voucher balances | F17, F18, F21, F22 | `service.grant.get` |
 | A session of a sold voucher by its id: the voucher, the customer, the service and its status, with its `label` | view voucher balances | F23, F24, F26, F27 | `service.session.get` |
+| The name of a sale, a line of a sale or of the check, an appointment or the refund or void that gives sessions back, by its id, read in Sales or Appointments as whoever asks: only for the assistant's card, no tool; Sales or Appointments off, 409 `service.sales_unavailable` or `service.appointments_unavailable` | view voucher balances | F14, F21, F22, F24, F26, F27 | `service.record.get` |
 | The sold vouchers, of a voucher or of a customer, with their balance | view voucher balances | F15, F16 | `service.grant.list` |
 | The vouchers with no customer | view vouchers with no customer | F30 | `service.grant.list_orphans` |
 | Whether a sold voucher can be voided and why not | void vouchers | F17 | `service.grant.void_check` |
@@ -1046,6 +1055,10 @@ with the session of whoever sells, as it does with Inventory.
   this way, so none counts twice. Without Sales in the business it is not called.
   Services keeps the sale and the check's line as opaque identifiers (`sale_id`,
   `order_line_id`): Sales is not a requirement of Services nor Services of Sales.
+- **What the assistant's card names of Sales and Appointments**: `service.record.get` calls by their name, with the
+  session of whoever asks, `sale.sale.get` (the sale's number), `sale.record.get` (a line of the sale with
+  `sale_line_id`, one of the check with `line_id` and a refund with `refund_id`, "Refund of sale …") and
+  `appointment.appointment.get` (the appointment's `label`). A `reference` that is no refund is the sale voided.
 
 ### Who can do what
 
