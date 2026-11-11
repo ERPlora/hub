@@ -1681,7 +1681,25 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Asistente**: toda operación declara `ai={"description"…}` (`risk` solo en las acciones; `high` al
   encender o pausar, conceder, ejecutar y borrar) y todo campo de entrada lleva `description`. Las escrituras de
   `flow.system` (solo la plataforma) empiezan por «System only» y `flow.secret.set` por «Not an assistant tool»:
-  el asistente no las ofrece a nadie, ni al superusuario (`tests/test_integration_assistant.py`).
+  el asistente no las ofrece a nadie, ni al superusuario (`tests/test_integration_assistant.py`). Las 30 que sí son
+  herramienta declaran además sus `asks`: lo que una persona escribe para pedir cada una, en `en` y `es` (hub#1106;
+  `flow` está en `LIVE_ASSISTANT_ASKS_REQUIRED` y `base/tests/test_assistant_asks.py` exige que cada frase traiga su
+  herramienta entre las diez primeras, por rol: el propietario y el administrador las 30, el encargado y el empleado
+  solo las tres de las preguntas). Sin ellos, abrir un borrador o descartarlo, el detalle, las ejecuciones, conceder
+  permisos, activar, ejecutar y renombrar quedaban fuera de las 40 herramientas que se ofrecen en un turno (FLOW-F03,
+  F09, F12, F14 a F19 y F34) y el asistente decía que no podía o buscaba cuentas del TPV. `base.assistant.SYNONYMS`
+  (bloque `# flow`) lee «la automatización» como una automatización, «la ejecución» como una ejecución, «los pasos»
+  como sus pasos, «la pregunta» como la de una automatización, «el borrador» como un borrador y «la receta» o «la
+  prefabricada» como una receta. La automatización, los pasos y la pregunta se nombran por frase y nunca por la palabra
+  suelta: «automatización» comparte raíz con «automático» («la respuesta automática» subía Automatizaciones en la
+  Bandeja de WhatsApp), «pasos» es «pasó» sin tilde («¿qué pasó con…?») y «pregunta» también es verbo («se les
+  pregunta»); «borra» y «bórralo» tienen otra raíz que «borrador». `tests/test_assistant_asks.py` mide con las 30 frases
+  reales de la QA de la capa 2 (`tests/e2e/qa/probes/owner-es-flow-2026-11-08.json`), nunca con los propios `asks`: cada
+  una se ofrece, y con ella la lectura que encuentra su registro cuando la herramienta solo toma un id (el borrador, la
+  ejecución, la receta; sin ella el modelo pedía el id). Tres siguen sin ofrecerse cuando la automatización se nombra
+  solo por su nombre propio, porque `live` no da el peso del verbo pedido: «activa X» a `flow.flow.set_enabled`,
+  «renombra X» a `flow.flow.update` y «permite a X…» a `flow.flow.grant` (ERPlora/live#53; sus casos están marcados
+  `xfail(strict=True)` y se desmarcan cuando entre el arreglo). Con «la automatización» en la frase sí se ofrecen.
 - El admin de Django del Hub tiene **CRUD completo** sobre `Flow`, `FlowRun`, `Draft` y `Question`; de `Secret`, solo
   ver el nombre y borrar (un valor no se escribe ni se lee desde el admin). Una escritura cruda del admin no
   deja aviso.
