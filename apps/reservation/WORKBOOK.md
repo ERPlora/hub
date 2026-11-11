@@ -299,7 +299,8 @@ Pasos:
 3. La reserva nace Pendiente (o Confirmada, si se confirman solas: entonces retiene su mesa).
 4. Por voz: «reserva para 4 mañana a las 21 a nombre de Ana, en la mesa 5». Antes de apuntarla, la
    tarjeta del asistente dice para quién, por el nombre de su ficha, el día y la hora («Crear en Reservas:
-   Ana García · 15 oct 2026 · 21:00»), y lleva la mesa por su número, nunca por un código.
+   Ana García · 15 oct 2026 · 21:00»), y lleva la mesa con su zona, como la nombra Mesas («5 (Terraza)»: el
+   número se repite entre zonas), nunca por un código.
 Entra: cliente (o nombre y teléfono), fecha, hora, comensales, mesa, duración, origen, notas. El
 teléfono se guarda en formato internacional, como en Clientes (`+34` y las cifras seguidas, sin
 espacios), también el que se teclea con la ficha ya elegida; uno escrito con el prefijo de otro país
@@ -353,6 +354,9 @@ Pasos:
    llena con «Reservar igualmente». Si estaba confirmada, Mesas mueve su retención a la mesa y la hora
    nuevas, o la suelta si se queda sin mesa (TABLE-F26).
 3. Una reserva sentada, completada, cancelada o no presentada solo cambia sus notas.
+4. Por voz: «pasa la reserva de Ana a la 7 de la terraza». Antes de cambiarla, la tarjeta del asistente
+   dice la reserva por su cliente, su día y su hora y la mesa nueva con su zona («7 (Terraza)»), nunca por
+   un código.
 Entra: los campos cambiados. El teléfono nuevo se guarda en formato internacional, como en el alta; el
 mismo número escrito de otra forma (con espacios o sin el prefijo) no es un cambio.
 Sale: la reserva cambiada (avisa: `reservation.reservation.updated`).
@@ -657,7 +661,8 @@ como lo nombran las pantallas de Reservas, nunca por su código: una reserva, po
 hora («Ana García · 15 oct 2026 · 21:00»; sin nombre, por su teléfono; con los datos del cliente borrados,
 por el día y la hora); una entrada de la lista de espera, igual; una franja, por su día de la semana y sus
 horas («Jueves · 20:00–23:30»); una fecha bloqueada, por su día y, si no es entera, sus horas; el cliente,
-por el nombre de su ficha, y la mesa, por su número. En una acción peligrosa, la etiqueta dice qué es:
+por el nombre de su ficha, y la mesa, con su zona («5 (Terraza)»), como la nombra Mesas.
+En una acción peligrosa, la etiqueta dice qué es:
 «Reserva», «Franja», «Fecha bloqueada» o «Entrada de la lista de espera», nunca «Registro». Un registro
 que quien confirma no puede ver (por ejemplo, la ficha de un cliente sin permiso para ver clientes) no
 sale en la tarjeta.
@@ -873,7 +878,8 @@ la que solo se le autorizó reservar.
   `.time_slot.get`, `.blocked_date.get`), que da su `label` en el idioma de quien la pide (`queries.py`,
   `*_label`: día mediano y hora corta de CLDR, como dice la tarjeta una fecha); el cliente
   (`customer_id`, `on_behalf_of`), `customer.customer.detail` por su `name`; la mesa, `table.table.get`
-  por su `number`. El id de una reserva, franja, fecha bloqueada o entrada lleva además su `title`, con su
+  por su `label`, su número con su zona (`table_label` de Mesas, hub#550).
+  El id de una reserva, franja, fecha bloqueada o entrada lleva además su `title`, con su
   español en `locale/`: la tarjeta peligrosa lo nombra por lo que es, nunca «Registro». El trinquete de
   `base/tests/test_assistant_card_values.py` no deja entrar uno sin marca ni una escritura peligrosa de la
   plataforma o Reservas sin título.
