@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e62a117e263dfb227e2e6e8b19a830bc93de156afdf53c85c49520e88f767163 -->
+<!-- generated from WORKBOOK.md sha256:1e179ef5e8cedd2ead08a56192f417f838ca47731c1d75594ebe993aa0a16123 -->
 
 ## What it is for and who it is for
 
@@ -102,7 +102,8 @@ category to take away"; per row, the handle, move up, move down, "Sold out / Ava
 remove. Below, the search box "Search a product…" (each product with its SKU and its price), "Supplement
 (<currency>)", "Add choice" and "Add several"
 (window with a search box and checkboxes, and the "Category" field with "Tick all of “{category}”
-(N)": "Add N selected"; what is already in the course comes ticked "Already in this course").
+(N)": "Add N selected" ("Add 1 selected" with one); what is already in the course comes ticked "Already
+in this course").
 At the end, the "Add a course" form (Course name, "Minimum picks", "Maximum picks", the checkbox "The
 same option may be picked more than once" and "Save"), which becomes "Course · {name}" when editing
 one.
@@ -261,7 +262,8 @@ Steps:
 2. Type the "Supplement (<currency>)", in the business's currency, if substituting costs more (or less,
    with a minus sign) than the closed price; empty is no supplement.
 3. Tap "Add choice": it goes in last. For several at once, "Add several": tick the boxes
-   and tap "Add N selected" (all go in without a supplement and in the order they were ticked). For
+   and tap "Add N selected" ("Add 1 selected" with one; all go in without a supplement and in the order
+   they were ticked). For
    a whole category, choose it in "Category": the list shows its products and "Tick all of
    “{category}” (N)" ticks the ones the course does not offer yet.
 4. To change the product or the supplement of a choice, tap its pencil: the form says

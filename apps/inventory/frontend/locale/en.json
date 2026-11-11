@@ -153,13 +153,13 @@
       "previewHint": "Tell us which column is which. Nothing is created until you confirm.",
       "ignore": "Do not import",
       "required": "{field} *",
-      "rowsTitle": "First {n} rows of {total}",
+      "rowsTitle": "First row of {total} | First {n} rows of {total}",
       "checking": "Checking the whole file…",
-      "summary": "{ready} row(s) ready · {failed} with problems",
-      "skippedNote": "{n} row(s) already in the catalog will be skipped.",
+      "summary": "{ready} row ready · {failed} with problems | {ready} rows ready · {failed} with problems",
+      "skippedNote": "{n} row already in the catalog will be skipped. | {n} rows already in the catalog will be skipped.",
       "lineReason": "Line {line}: {reason}",
       "missingRequired": "Map the Name and SKU columns: without them no product can be created.",
-      "confirm": "Import {n} product(s)",
+      "confirm": "Import {n} product | Import {n} products",
       "emptyFile": "The file has no rows to import.",
       "readError": "The file could not be read",
       "checkError": "The file could not be checked",
@@ -238,7 +238,7 @@
       },
       "delete": {
         "title": "Delete category",
-        "message": "{name} — {n} product(s) will lose this category (unlinked; products are kept)",
+        "message": "{name} — {n} product will lose this category (unlinked; the product is kept) | {name} — {n} products will lose this category (unlinked; products are kept)",
         "confirm": "Delete and unlink",
         "error": "The category could not be deleted"
       }

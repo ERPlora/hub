@@ -150,7 +150,7 @@
       "open": "Add several",
       "title": "Add products to this course",
       "search": "Search a product…",
-      "addCount": "Add {n} selected",
+      "addCount": "Add {n} selected | Add {n} selected",
       "already": "Already in this course",
       "none": "Tick at least one product first.",
       "empty": "No products in the catalogue yet.",

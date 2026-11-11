@@ -142,12 +142,27 @@ describe('CategoriesPage: create, edit and delete', () => {
     await s.act('delete');
     expect(mocks.confirm).toHaveBeenCalledWith({
       title: 'Delete category',
-      message: 'Drinks — 2 product(s) will lose this category (unlinked; products are kept)',
+      message: 'Drinks — 2 products will lose this category (unlinked; products are kept)',
       confirmLabel: 'Delete and unlink',
       tone: 'danger',
     });
     const [call] = s.calls('/api/inventory/categories/delete');
     expect(s.body(call)).toEqual({ id: 'c1' });
+  });
+
+  // hub#1124: «product(s)» is gone; one product is singular and two are plural, in both languages.
+  it.each([
+    { locale: 'en' as const, count: 1, message: 'Drinks — 1 product will lose this category (unlinked; the product is kept)' },
+    { locale: 'en' as const, count: 2, message: 'Drinks — 2 products will lose this category (unlinked; products are kept)' },
+    { locale: 'es' as const, count: 1, message: 'Drinks — 1 producto quedará sin esta categoría (se desvincula; el producto no se borra)' },
+    { locale: 'es' as const, count: 2, message: 'Drinks — 2 productos quedarán sin esta categoría (se desvinculan; los productos no se borran)' },
+  ])('«Delete» with $count product ($locale, INVENTORY-F07): «$message»', async ({ locale, count, message }) => {
+    const s = await setup({ locale });
+    const row = category({ product_count: count });
+    await s.show(page([row], 1, 25));
+    mocks.confirm.mockResolvedValue(false);
+    await s.act('delete', row);
+    expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({ message }));
   });
 
   it('cancelled, nothing is deleted; refused, the reason is said above the table', async () => {
