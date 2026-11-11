@@ -116,7 +116,10 @@ APP_WORDS = shared.app_words
 #: «arqueo», a «recuento» or a «conteo» of the drawer is a count of Cash register's (``cash_register.count``), and the
 #: «moneda» or «divisa» of the business is its currency (``cash_register.currency``). To «desactivar» names the
 #: deactivation itself (``staff.member.deactivate``, ``*.deactivate``), not only a switch off, and what one «pide» or
-#: «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``).
+#: «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``). A «plantilla» and a «mensaje» are
+#: the WhatsApp inbox's template and message (``whatsapp_inbox.template``, ``whatsapp_inbox.message``), as «template»
+#: and «message» already are in English; a business template (``base.blueprint``) or the staff a «plantilla» also
+#: names are said with their own words beside it («plantilla de negocio», «el personal»).
 SYNONYMS = (
     ("cuenta", "check", "tab", "order"),
     ("ticket", "tique", "recibo", "receipt", "sale"),
@@ -138,6 +141,9 @@ SYNONYMS = (
     # staff
     ("desactiva", "desactivar", "deactivate"),
     ("pido", "solicito", "solicitud", "request"),
+    # whatsapp_inbox
+    ("plantilla", "plantillas", "template", "templates"),
+    ("mensaje", "mensajes", "message", "messages"),
 )
 #: The help a how-to question asks for (``live.assistant.HOWTO_POINTS``): it ranks by being one, not only by ``ALWAYS``.
 HOWTO = (DOCS_SEARCH,)

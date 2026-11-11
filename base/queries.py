@@ -950,12 +950,12 @@ IMPORTS_SHOWN = 50
         ),
         asks={
             "en": (
-                "which templates can I start from?",
+                "which business templates can I start from?",
                 "show me the business templates",
                 "is there a template for a bakery?",
             ),
             "es": (
-                "¿qué plantillas hay?",
+                "¿qué plantillas de negocio hay?",
                 "¿tenéis alguna plantilla para una panadería?",
                 "enséñame los modelos de negocio para empezar",
             ),

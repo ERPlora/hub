@@ -188,7 +188,7 @@ def create_member(ctx: OperationContext, data: MemberIn) -> Member | None:
             "es": (
                 "añade de golpe a Lucía, Pablo y Ana al equipo",
                 "da de alta a estos tres camareros nuevos juntos",
-                "carga toda la plantilla de una vez",
+                "carga a todo el personal de una vez",
             ),
         },
         "description": "Adds several staff members at once (up to 100); a row with a problem is skipped "
