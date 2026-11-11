@@ -242,3 +242,20 @@ def test_changing_a_category_of_inventory_comes_before_the_category_modifiers_lo
         for ask in asks
     }
     assert {ask: (own, lookup) for ask, (own, lookup) in places.items() if lookup is not None and lookup < own} == {}
+
+
+#: The places an ask of another app keeps free below the first ten: the asks of the next app to say its own take them.
+ROOM = 2
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@pytest.mark.parametrize("language", ["en", "es"])
+@pytest.mark.parametrize("role", [OWNER, ADMIN, MANAGER, EMPLOYEE])
+def test_the_group_behind_a_price_list_keeps_its_room_beside_the_groups_of_modifiers(catalog_of, role, language):
+    """A modifier group is the thing «grupo» names, and its asks say it: Pricing's ask for the customer group behind a
+    price list («¿qué grupo hay detrás de la de socios?») fell from the 5th to the 7th when Modifiers said its asks, so
+    it keeps its room below the first ten for the next app to say its own."""
+    tools = catalog_of(role, language)
+    asks = shared.asks_of(tools["pricing.catalog.get"])[language]
+    places = {ask: offered_place(tools, "pricing.catalog.get", ask, language=language) for ask in asks}
+    assert {ask: place for ask, place in places.items() if place is None or place > TOP - ROOM} == {}
