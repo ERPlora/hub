@@ -9,8 +9,10 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { business, click, errorFrame, flush, ionValue, JAPANESE, mountCash } from '../__tests__/mount-cash-register';
+import { itReadsAmountsAsTheHub, itReadsWhatWasLeftOnceTheMoneyArrives } from '../__tests__/money-field';
 import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { plain } from '../lib/money';
+import type { Business } from '../../../../base/frontend/operations';
 import CloseSessionForm from './CloseSessionForm.vue';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
@@ -46,7 +48,7 @@ const queue = (usages: ReturnType<typeof usage>[] = []) => ({
   failed: usages.reduce((sum, row) => sum + row.failed, 0),
 });
 
-async function setup(locale: 'en' | 'es' = 'en', options: { business?: null } = {}) {
+async function setup(locale: 'en' | 'es' = 'en', options: { business?: Business | null } = {}) {
   const m = await mountCash(CloseSessionForm, { props: { session: SESSION }, locale, ...options });
   await m.live();
   const counted = () => m.inDoc('cash-register-close-counted');
@@ -265,4 +267,19 @@ describe('CloseSessionForm: a business whose money cannot be read (hub#938)', ()
     await ionValue(s.counted(), '1500', 'ionInput');
     await expectWindowSaysMoneyUnreadable(s, 'cash-register-close-submit', s.sent);
   });
+});
+
+describe('CloseSessionForm: the counted cash, read as every amount of the Hub', () => {
+  const window = {
+    open: async (business?: Business | null) => {
+      const s = await setup('en', { business });
+      await s.ready();
+      return s;
+    },
+    field: 'cash-register-close-counted',
+    submit: 'cash-register-close-submit',
+    amount: (body: Record<string, unknown>) => body.closing_balance,
+  };
+  itReadsAmountsAsTheHub(window);
+  itReadsWhatWasLeftOnceTheMoneyArrives(window);
 });

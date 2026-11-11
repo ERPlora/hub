@@ -6,7 +6,9 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { click, expectWaitsForTheYen, ionValue, mountCash } from '../__tests__/mount-cash-register';
+import { itReadsAmountsAsTheHub, itReadsWhatWasLeftOnceTheMoneyArrives } from '../__tests__/money-field';
 import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import type { Business } from '../../../../base/frontend/operations';
 import OpenSessionModal from './OpenSessionModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -151,4 +153,20 @@ describe('OpenSessionModal: Android Back with unsaved changes (hub#1031, BASE-F0
       restore: () => ionValue(s.inDoc('cash-register-open-balance'), '', 'ionInput'),
     });
   });
+});
+
+describe('OpenSessionModal: the float, read as every amount of the Hub', () => {
+  const window = {
+    open: async (business?: Business | null) => {
+      const m = await mountCash(OpenSessionModal, { props: { open: true }, business });
+      await m.live();
+      await m.result(REGISTERS, page([]));
+      return m;
+    },
+    field: 'cash-register-open-balance',
+    submit: 'cash-register-open-submit',
+    amount: (body: Record<string, unknown>) => body.opening_balance,
+  };
+  itReadsAmountsAsTheHub(window);
+  itReadsWhatWasLeftOnceTheMoneyArrives(window);
 });

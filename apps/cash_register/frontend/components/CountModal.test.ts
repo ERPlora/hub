@@ -7,6 +7,7 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { click, ionValue, mountCash, settle } from '../__tests__/mount-cash-register';
+import { itReadsAmountsAsTheHub } from '../__tests__/money-field';
 import { plain } from '../lib/money';
 import CountModal from './CountModal.vue';
 
@@ -144,5 +145,18 @@ describe('CountModal: Android Back with unsaved changes (hub#1031, BASE-F05)', (
       change: () => ionValue(s.box('50'), '2', 'ionInput'),
       restore: () => ionValue(s.box('50'), '', 'ionInput'),
     });
+  });
+});
+
+describe('CountModal: the total typed by hand, read as every amount of the Hub', () => {
+  itReadsAmountsAsTheHub({
+    open: async () => {
+      const s = await setup();
+      await s.result(CURRENCY, { ...EUR, bills: [], coins: [] });
+      return s;
+    },
+    field: 'cash-register-count-total-input',
+    submit: 'cash-register-count-submit',
+    amount: (body) => body.total,
   });
 });
