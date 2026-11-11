@@ -12,6 +12,8 @@ import { erploraVite } from '@erplora/ui/vite';
 import { defaultAllowedOrigins } from 'vite';
 import { defineConfig } from 'vitest/config';
 
+import { loadScale } from './vitest.load';
+
 const DEV_HOST = 'localhost';
 // 5173 unless a second checkout runs beside another one (the e2e of a branch): Django reads the same
 // VITE_DEV_PORT (`config/settings.py`).
@@ -19,6 +21,9 @@ const DEV_PORT = Number(process.env.VITE_DEV_PORT ?? 5173);
 if (!Number.isInteger(DEV_PORT) || DEV_PORT <= 0 || DEV_PORT >= 65536) {
   throw new Error(`VITE_DEV_PORT must be a TCP port, not ${process.env.VITE_DEV_PORT}.`);
 }
+
+// How many times slower than idle the machine runs when the run starts: Vitest's budgets stretch by it (hub#765).
+const LOAD_SCALE = loadScale();
 
 export default defineConfig({
   // From the string: under happy-dom (tests) the global `URL` is not Node's.
@@ -47,10 +52,17 @@ export default defineConfig({
   },
   test: {
     environment: 'happy-dom',
-    include: ['frontend/**/*.test.ts', 'base/frontend/**/*.test.ts', 'apps/*/frontend/**/*.test.ts', 'vite.config.test.ts', 'vitest.setup.test.ts', 'eslint.config.test.ts', 'tsconfig.test.ts', 'tests/e2e/*.test.ts'],
+    include: ['frontend/**/*.test.ts', 'base/frontend/**/*.test.ts', 'apps/*/frontend/**/*.test.ts', 'vite.config.test.ts', 'vitest.setup.test.ts', 'vitest.load.test.ts', 'eslint.config.test.ts', 'tsconfig.test.ts', 'tests/e2e/*.test.ts'],
     // Vitest's default `exclude` drops every `vite.config.*` and `eslint.config.*`.
     exclude: ['**/node_modules/**', '**/dist/**'],
     // No real timer outlives a test (hub#197, hub#199).
     setupFiles: ['./vitest.setup.ts'],
+    // Vitest's own budgets (5 s a test, 10 s a hook, 1 s an `expect.poll`) on an idle machine, stretched on a loaded
+    // one, where a test that touches the disk runs many times slower with nothing broken (hub#765); the setup
+    // stretches `vi.waitFor`'s by the same scale. A budget a test names itself is its own.
+    testTimeout: Math.round(5_000 * LOAD_SCALE),
+    hookTimeout: Math.round(10_000 * LOAD_SCALE),
+    expect: { poll: { timeout: Math.round(1_000 * LOAD_SCALE) } },
+    provide: { loadScale: LOAD_SCALE },
   },
 });

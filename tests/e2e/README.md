@@ -130,6 +130,13 @@ Reglas que el e2e hace cumplir:
   se les adelanta. Si el worker sale antes de decir «waiting for work», o ni siquiera arranca, la ejecución para en el
   acto con lo que dijo; si sigue vivo sin decirlo, para a los 5 minutos (con la máquina cargada, solo importar Django le
   llevó unos 3, hub#759).
+- Los negocios de la pila van con los límites de Gratis (una transacción a la vez, `base.tenancy.limits`): con la máquina
+  cargada, la página que una spec acaba de abrir puede ocupar ese hueco más de lo que espera el servidor, y el Hub contesta
+  503 `base.hub_busy` a la preparación que viene detrás. Ese 503 no ejecutó nada, así que `api` (`hub-api.ts`, el camino de
+  todos los ayudantes al API del Hub: `turnOn`, `manualFlow`, `createProduct`, los `post` de las specs…) repite la misma
+  petición tras el `Retry-After` del servidor (1 s), hasta 6 intentos, y deja una línea por intento en la salida; si sigue
+  ocupado, falla con `HubStillBusy` diciendo la ruta, los intentos y la respuesta. Cualquier otra respuesta, también otro
+  503, es de quien llama. El tope del plan no se toca (hub#795).
 - Las specs entran con las cuentas de demo del SaaS (`owner@example.com` y `employee@example.com`, con acceso a `a` y
   `b`), que crea `manage.py demo_seed` del SaaS (en la receta, por medio de `whatsapp_hub_seed.py`, abajo). `global-setup.ts`
   las busca en la BD del SaaS de la pila (`E2E_SAAS_DB`, por defecto `saas_e2e_<Hub+1>`; con un solo `select`, sin escribir

@@ -24,8 +24,9 @@ RUN pnpm install --frozen-lockfile
 COPY packages/ui packages/ui
 # `pnpm build`'s vue-tsc checks tsconfig.app.json, the SPA's project alone (no tests): the build-time scripts the
 # tests import (scripts/, gen:app-icons) are not needed here. Vite's esbuild reads tsconfig.json and the projects
-# it references (tsconfig.test.ts): without them it compiles class fields otherwise and ships another bundle.
-COPY tsconfig*.json vite.config.ts ./
+# it references (tsconfig.test.ts): without them it compiles class fields otherwise and ships another bundle. Vite
+# loads its config before anything else, with the root files it imports (vitest.load.ts, tsconfig.test.ts too).
+COPY tsconfig*.json vite.config.ts vitest.load.ts ./
 # What the SPA is made of: the shell entry, base's Home (main.ts imports and globs it) and each app's frontend.
 # Every file `pnpm build` reads must be copied here: tsconfig.test.ts checks it against this stage.
 COPY frontend frontend

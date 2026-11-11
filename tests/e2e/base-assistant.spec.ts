@@ -918,7 +918,8 @@ test('RESERVATION-F06 — booking a table, the card names the customer; moving a
   await page.setViewportSize({ width: 1440, height: 900 });
   await home(page);
   await openPanel(page);
-  // Booking: for whom (the customer's card by its name), the day and the time; the table goes among its data, by number.
+  // Booking: for whom (the customer's card by its name), the day and the time; the table goes among its data, with its
+  // zone (hub#550).
   const booking = { customer_id: customer.id, date, time: '21:30:00', party_size: 2, table_id: table.id, source: 'in_person' };
   await ask(page, `E2E-ASK reservation__reservation__create ${JSON.stringify(booking)}`, { settle: false });
   await expect(card(page)).toBeVisible();
@@ -931,12 +932,13 @@ test('RESERVATION-F06 — booking a table, the card names the customer; moving a
   }
   await cancelAtComputerSize(page);
 
-  // Moving it to table 7: which reservation, as the book's dialog says it, and the new table by its number.
+  // Moving it to table 7: which reservation, as the book's dialog says it, and the new table with its zone, as Tables
+  // names it («7 (E2E Card …)»: the number repeats across zones, hub#550).
   await ask(page, `E2E-ASK reservation__reservation__update ${JSON.stringify({ id: booked.id, table_id: table.id })}`, { settle: false });
   await expect(card(page)).toBeVisible();
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText(`Cambiar en Reservas: ${label} · 7`);
+    await expect(card(page)).toContainText(`Cambiar en Reservas: ${label} · 7 (E2E Card ${stamp})`);
     for (const raw of [date, ...ids]) await expect(card(page)).not.toContainText(raw);
     await captureStill(page, `${KEY}-${vp.label}`);
   }

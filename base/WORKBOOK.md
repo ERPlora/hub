@@ -3541,6 +3541,14 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   (`drop_failed: HubFilesNotDeleted: …`, `files_purge_failed: …`) y se reintenta; nunca queda `purged` con ficheros. El
   bucket tiene versionado: la clave deja su marcador de borrado y la versión antigua se va a los 90 días por la regla
   `noncurrent` de aws (`s3.tf`). Tests: `base/tests/test_files_delete_hub.py`, `test_offboarding.py`, `test_provision.py`.
+- Lo que dejaron las purgas de antes de hub#781 (una fila `purged` no vuelve a pasar por la purga) se borra una vez con
+  `manage.py delete_leftover_hub_files` (hub#785): busca en el almacén las carpetas de arriba con forma de prefijo de hub
+  (`base.files.hubs_in_store`, `hub-<hex>`) y, después de listarlas, lee el registro (`base.services.gone_hubs`): solo
+  cuenta un hub `purged` o sin fila (la lápida de una demo, olvidada a los `DEMO_TOMBSTONE_DAYS`) cuyo prefijo aún guarda
+  claves. Cualquier otro estado conserva sus ficheros, `shared/`, `_inventory/` y lo que no es un prefijo de hub no se
+  miran, y no abre la base de datos de ningún hub. Sin `--delete` solo lista (prefijo, motivo, claves y bytes); con él
+  borra cada uno con `delete_hub_files`, y un prefijo que falla no para a los demás y deja el comando en error. Corre como
+  tarea suelta de la familia `worker`, la que borra del bucket. Test: `base/tests/test_delete_leftover_hub_files.py`.
 - **`/p/media/<hex>/<nombre>`** (`base/media.py`, FIX-HUB-BASE-MEDIA-DOES-NOT-SERVE-WHATSAPP-INBOX-SAMPLES): sirve, desde el
   host de su hub y nunca el de otro, solo las carpetas del almacén que declara cada app en su `LiveAppConfig`:
   `public_media` (cualquiera; caché pública de un año: `website/img/`, las imágenes de la web) y `members_media` (solo una
