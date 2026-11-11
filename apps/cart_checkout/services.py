@@ -163,6 +163,16 @@ def _cart_event(ctx: OperationContext, name: str, cart: Cart) -> None:
     output=CartOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "start a shopping cart for Carmen, carmen@example.com",
+                "create a new web basket for an anonymous visit",
+            ),
+            "es": (
+                "crea un carrito para Carmen, carmen@example.com",
+                "crea una cesta web nueva para una visita anónima",
+            ),
+        },
         "description": "Create a shopping cart in the internal cart notebook, for a customer (email and name) or "
         "for an anonymous session code, which must be unique. Leave the currency out unless the customer asked "
         "for another one: the cart then takes the business's currency. Not the till.",
@@ -205,6 +215,16 @@ def create_cart(ctx: OperationContext, data: CartIn) -> dict:
     output=CartOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "mark Carmen's cart as abandoned",
+                "the customer left the web basket unfinished, set it as abandoned",
+            ),
+            "es": (
+                "marca como abandonado el carrito de Carmen",
+                "la clienta dejó la cesta web sin terminar: dala por abandonada",
+            ),
+        },
         "description": "Mark an active shopping cart as abandoned, when the customer did not finish (named by its "
         "session code, its customer or its id), with an optional reason. It keeps its lines.",
         "risk": "normal",
@@ -230,6 +250,16 @@ def mark_abandoned(ctx: OperationContext, data: AbandonIn) -> dict:
     output=CartOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "delete Carmen's shopping cart",
+                "remove the web basket of session sess_a1b2c3 but keep its orders",
+            ),
+            "es": (
+                "borra el carrito de Carmen",
+                "elimina la cesta web de la sesión sess_a1b2c3 sin tocar sus pedidos",
+            ),
+        },
         "description": "Delete a shopping cart in any status (named by its session code, its customer or its id). "
         "Its orders stay; its session code becomes free for another cart. It cannot be undone.",
         "risk": "high",
@@ -253,6 +283,18 @@ def delete_cart(ctx: OperationContext, data: CartRefIn) -> dict:
     output=CartOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "empty Carmen's shopping cart",
+                "clear every line of the web basket but keep it active",
+                "leave cart sess_a1b2c3 with no products",
+            ),
+            "es": (
+                "vacía la cesta web de Carmen",
+                "vacía el carrito sess_a1b2c3 sin borrarlo",
+                "deja el carrito de Nuria sin ningún producto, que siga abierto",
+            ),
+        },
         "description": "Empty an active shopping cart (named by its session code, its customer or its id): every "
         "line goes and its totals go back to zero; the cart stays active.",
         "risk": "normal",
@@ -277,6 +319,16 @@ def clear_cart(ctx: OperationContext, data: CartRefIn) -> dict:
     output=CleanupOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "expire the shopping carts that are past their date",
+                "mark the overdue web baskets as expired",
+            ),
+            "es": (
+                "caduca los carritos que ya vencieron",
+                "da por caducadas las cestas web que pasaron su fecha",
+            ),
+        },
         "description": "Mark as expired every active shopping cart whose expiry has passed, and say how many. A "
         "scheduled task runs it every quarter of an hour.",
         "risk": "normal",
@@ -319,6 +371,16 @@ def _line_and_cart(item_id) -> tuple[CartItem, Cart]:
     output=ItemChangeOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "add two shampoos to Carmen's cart",
+                "put a bottle of wine at 12 euros each in the web basket",
+            ),
+            "es": (
+                "añade dos champús al carrito de Carmen",
+                "mete un vino a 12 € cada uno en la cesta web",
+            ),
+        },
         "description": "Add a product line to an active shopping cart (named by its session code, its customer or "
         "its id): the product's reference and name as free text, the quantity (up to three decimals) and the "
         "unit price in minor units of the cart's currency (its currency_decimals: 12.50 is 1250 with two, ¥1,250 is "
@@ -369,6 +431,16 @@ def add_item(ctx: OperationContext, data: ItemAddIn) -> dict:
     output=ItemChangeOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "change the shampoo in Carmen's cart to two units",
+                "set the wine in the web basket to five units, same price",
+            ),
+            "es": (
+                "cambia el champú del carrito de Carmen a dos unidades",
+                "pon cinco unidades del vino de la cesta web, al mismo precio",
+            ),
+        },
         "description": "Change the quantity of a line of an active shopping cart (by the line's id); 0 removes the "
         "line. Its total uses the price kept on the line, and the cart's totals are recomputed.",
         "risk": "normal",
@@ -406,6 +478,16 @@ def update_item(ctx: OperationContext, data: ItemUpdateIn) -> dict:
     output=ItemChangeOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "take the shampoo out of Carmen's cart",
+                "remove the wine line from Nuria's web basket",
+            ),
+            "es": (
+                "quita el champú del carrito de Carmen",
+                "elimina el vino de la cesta web de Nuria",
+            ),
+        },
         "description": "Remove a line from an active shopping cart (by the line's id); the cart's totals are "
         "recomputed.",
         "risk": "normal",
@@ -440,6 +522,16 @@ def _number(day) -> int:
     output=OrderOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "turn Carmen's cart into an order",
+                "place the order of Nuria's web basket with home delivery",
+            ),
+            "es": (
+                "convierte el carrito de Carmen en un pedido",
+                "tramita el pedido de la cesta web de Nuria con envío a casa",
+            ),
+        },
         "description": "Start an order from an active shopping cart with lines (named by its session code, its "
         "customer or its id): it gets its number of the day and copies the cart's total. Optionally the "
         "customer's email (else the cart's), addresses, shipping and payment methods and notes. It is not the "
@@ -525,6 +617,16 @@ def _refuse(refusal, order: Order) -> Conflict:
     output=OrderOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "mark order OS-20261014-0003 as paid",
+                "the customer already paid the web order by bank transfer",
+            ),
+            "es": (
+                "marca como pagado el pedido OS-20261014-0003",
+                "el cliente ya ha pagado el pedido web por transferencia",
+            ),
+        },
         "description": "Mark an initiated order as paid (named by its number or its id), after the customer paid "
         "some other way. It records a mark: it is not the till, charges nothing and creates no sale, invoice or "
         "cash movement. Never use it to charge a customer at the counter.",
@@ -547,6 +649,16 @@ def mark_paid(ctx: OperationContext, data: OrderRefIn) -> dict:
     output=OrderOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "the payment of OS-20261014-0003 failed",
+                "the bank declined the payment of Carmen's online purchase",
+            ),
+            "es": (
+                "el pago del pedido OS-20261014-0003 ha fallado",
+                "el banco rechazó el pago del pedido web de Carmen",
+            ),
+        },
         "description": "Record that the payment of an initiated or paid order failed (named by its number or its "
         "id), with the mandatory reason, which stays on the order. A paid order that fails leaves no refund.",
         "risk": "high",
@@ -575,6 +687,16 @@ def fail_order(ctx: OperationContext, data: FailIn) -> dict:
     output=OrderOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "complete the paid order OS-20261014-0003",
+                "finish Carmen's web order, it's already paid",
+            ),
+            "es": (
+                "completa el pedido pagado OS-20261014-0003",
+                "da por terminado el pedido web de Carmen, que ya está pagado",
+            ),
+        },
         "description": "Complete a paid order (named by its number or its id): it becomes completed and its cart "
         "converted, in one step. Nothing fiscal or of stock happens.",
         "risk": "normal",
@@ -605,6 +727,16 @@ def complete_order(ctx: OperationContext, data: OrderRefIn) -> dict:
     output=CustomerEraseOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "erase carmen@example.com's personal data from the carts",
+                "wipe nuria@example.com from the web orders",
+            ),
+            "es": (
+                "aplica el derecho al olvido a carmen@example.com en los carritos",
+                "quita el email y las direcciones de nuria@example.com de los pedidos web",
+            ),
+        },
         "description": "Erase a customer's personal data (right to erasure), named by their exact email: every "
         "cart with that email, deleted ones too, loses the email, the name, the notes and the abandonment "
         "reason, and every order with that email or from one of those carts loses the email, the addresses, "

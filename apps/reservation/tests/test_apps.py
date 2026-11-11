@@ -3,6 +3,8 @@
 from django.apps import apps
 from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
 
+from base import assistant
+
 PERMISSIONS = [
     "reservation.view_reservation",
     "reservation.add_reservation",
@@ -184,6 +186,8 @@ def test_every_operation_is_a_tool_of_the_assistant():
     for op in operations:
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
+        if assistant.is_tool(op):  # what a person types to ask for it (live.E020: reservation is listed)
+            expected = expected | {"asks"}
         if op.name in IN_PERSON:
             expected = expected | {"in_person"}
         assert set(op.ai) == expected, op.name
