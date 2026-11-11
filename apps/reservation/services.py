@@ -446,11 +446,22 @@ def _loaded(ctx: OperationContext, reservation: Reservation) -> dict:
     output=ReservationOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "book a table for 4 tomorrow at 9 pm for Luis",
+                "reservation for Marta on Saturday at 2 pm, six people",
+            ),
+            "es": (
+                "reserva mesa para cuatro mañana a las 21:00 a nombre de Luis",
+                "apunta una reserva para Marta el sábado a las 14:00, seis personas",
+            ),
+        },
         "description": "Takes a reservation («a table for 4 tomorrow at 21:00 for Ana, phone 600 111 222, table 5»): "
         "the guest's customer card (by id, name or phone; with only a name and phone, the card with that phone or a new "
         "one), the day, time and guests, optionally the table, duration, source and notes. It must pass the book's gate "
         "(guests, time, blocked days, opening hours, a slot with room, a free table); it is born pending, or confirmed "
-        "when the book confirms by itself, which holds its table.",
+        "when the book confirms by itself, which holds its table. Somebody already on the waitlist is booked with "
+        "reservation.waitlist.convert, which marks their entry converted.",
         "risk": "normal",
     },
 )
@@ -535,6 +546,16 @@ CONTACT_FIELDS = ("guest_name", "guest_phone", "guest_email")
     output=ReservationOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "move Luis's booking to 10 pm",
+                "Marta's reservation is now for six",
+            ),
+            "es": (
+                "pasa la reserva de Luis a las 22:00",
+                "la reserva de Marta ahora es de seis personas",
+            ),
+        },
         "description": "Changes a reservation (by id, or by its guest and day): its day, time, guests, duration, table "
         "(or `no_table` to leave it without one), the guest's name, phone or email, or its notes. Only what is sent "
         "changes; the change passes the same gate as booking. A confirmed reservation moves its hold on the floor plan. "
@@ -688,6 +709,16 @@ def judged_as(reservation: Reservation, data: ReservationPatchIn) -> str:
     output=ReservationOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "confirm Luis's booking for Saturday",
+                "Marta called to say she is coming: confirm her reservation",
+            ),
+            "es": (
+                "confirma la reserva de Luis del sábado",
+                "Marta ha llamado para decir que viene: confírmale la reserva",
+            ),
+        },
         "description": "Confirms a pending reservation (by id, or by its guest and day). With a table, the floor plan "
         "shows it Reserved from an hour before.",
         "risk": "normal",
@@ -712,6 +743,16 @@ def confirm_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
     output=ReservationOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "Luis's booking has arrived, seat them",
+                "seat Marta's party at their reserved table",
+            ),
+            "es": (
+                "ha llegado la reserva de Luis, pásalos a su mesa",
+                "ya están aquí los de la reserva de Marta, dales su mesa",
+            ),
+        },
         "description": "Seats a pending or confirmed reservation when the party arrives (by id, or by its guest and "
         "day). If its table is free, the party is seated there in Tables with its guests and customer: the table's "
         "check opens in Sales. A table that is taken is refused (free it or move the reservation first), unless "
@@ -782,6 +823,16 @@ def seat_at_table(ctx: OperationContext, reservation: Reservation):
     output=ReservationOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "Luis's party has left, complete the booking",
+                "mark Marta's reservation as completed",
+            ),
+            "es": (
+                "los de la reserva de Luis ya se han ido, ciérrala",
+                "da por terminada la reserva de Marta",
+            ),
+        },
         "description": "Completes a seated reservation when the party leaves (by id, or by its guest and day).",
         "risk": "normal",
     },
@@ -803,8 +854,18 @@ def complete_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
     output=ReservationOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "cancel Luis's booking for Saturday",
+                "Marta can't make it, call off her reservation",
+            ),
+            "es": (
+                "anula la reserva de Luis del sábado",
+                "Marta no puede venir, cancélale la reserva",
+            ),
+        },
         "description": "Cancels a pending or confirmed reservation (by id, or by its guest and day), with an optional "
-        "reason: its place and its table are freed. Ask first.",
+        "reason: its place and its table are freed.",
         "risk": "high",
     },
 )
@@ -827,8 +888,18 @@ def cancel_reservation(ctx: OperationContext, data: CancelIn) -> dict:
     output=ReservationOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "Luis never turned up for his booking",
+                "mark Marta's reservation as a no-show",
+            ),
+            "es": (
+                "Luis no ha aparecido a su reserva",
+                "marca la reserva de Marta como no presentada",
+            ),
+        },
         "description": "Marks a pending or confirmed reservation as a no-show (by id, or by its guest and day): its "
-        "place and its table are freed. Ask first.",
+        "place and its table are freed.",
         "risk": "high",
     },
 )
@@ -850,8 +921,18 @@ def no_show_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
     output=DeletedOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "delete Luis's reservation for good",
+                "erase Marta's duplicate booking",
+            ),
+            "es": (
+                "elimina del todo la reserva de Luis",
+                "borra la reserva repetida de Marta",
+            ),
+        },
         "description": "Deletes a reservation from the book for good (by id, or by its guest and day); its table is "
-        "freed. Cancelling keeps it with its reason: prefer it. Ask first.",
+        "freed. When the person asks to delete or erase it; to call it off and keep it with its reason is to cancel it.",
         "risk": "high",
     },
 )
@@ -876,6 +957,16 @@ def delete_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
     output=ReleasedOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "let go of the bookings nobody confirmed",
+                "release the unconfirmed reservations whose time has passed",
+            ),
+            "es": (
+                "suelta las reservas que nadie ha confirmado",
+                "suelta las reservas de hoy que siguen pendientes y ya pasó su hora",
+            ),
+        },
         "description": "Releases the pending reservations nobody confirmed whose time passed more than the book's "
         "window (15 minutes): they are cancelled as «unconfirmed» and free their place. Runs every quarter of an hour; "
         "safe to run by hand.",
@@ -920,6 +1011,16 @@ def release_unconfirmed(ctx: OperationContext, data: NoIn) -> dict:
     output=TimeSlotOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "add a booking slot on Saturdays from 1 pm to 4 pm",
+                "take reservations on Sunday evenings from 8 to 11",
+            ),
+            "es": (
+                "nueva franja de reservas: sábados de 13:00 a 16:00",
+                "acepta reservas los domingos por la noche de 20:00 a 23:00",
+            ),
+        },
         "description": "Creates a slot the book takes reservations in: a weekday (0 = Monday … 6 = Sunday), from and "
         "to, how many reservations fit and, optionally, how many guests. Slots of a day never overlap.",
         "risk": "normal",
@@ -961,8 +1062,18 @@ def create_slot(ctx: OperationContext, data: TimeSlotIn) -> dict:
     output=DeletedOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "remove the Monday lunch slot",
+                "stop taking bookings in the Sunday 8 pm slot",
+            ),
+            "es": (
+                "quita la franja de los lunes a mediodía",
+                "ya no damos cenas los domingos: borra esa franja de reservas",
+            ),
+        },
         "description": "Removes a slot (by id, or by its weekday and start): no more reservations are taken in it; the "
-        "ones it had stay. Ask first.",
+        "ones it had stay.",
         "risk": "high",
     },
 )
@@ -987,6 +1098,16 @@ def delete_slot(ctx: OperationContext, data: TimeSlotRefIn) -> dict:
     output=BlockedDateOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "block bookings on 24 December",
+                "close reservations next Monday evening for a private event",
+            ),
+            "es": (
+                "bloquea el día de Año Nuevo para que nadie reserve",
+                "bloquea el lunes por la noche para un evento privado",
+            ),
+        },
         "description": "Blocks a day for reservations (a holiday, a closure, a private event), whole or only some hours "
         "(from, until). The reservations it already had stay.",
         "risk": "normal",
@@ -1027,8 +1148,19 @@ def create_blocked(ctx: OperationContext, data: BlockedDateIn) -> dict:
     output=DeletedOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "unblock 24 December for bookings",
+                "remove the block of the holiday closure",
+            ),
+            "es": (
+                "desbloquea el 24 de diciembre",
+                "ya no cerramos por vacaciones, quita ese bloqueo",
+                "borra el bloqueo del día de Navidad",
+            ),
+        },
         "description": "Unblocks a blocked date (by id, or by its date when it is blocked once): reservations are taken "
-        "again. Ask first.",
+        "again. A block named by its reason («the Christmas closure») is found in reservation.blocked_date.list.",
         "risk": "high",
     },
 )
@@ -1057,6 +1189,16 @@ def delete_blocked(ctx: OperationContext, data: BlockedDateRefIn) -> dict:
     output=WaitlistOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "put Luis on the waitlist for Saturday, four people",
+                "add Marta to tonight's waitlist",
+            ),
+            "es": (
+                "añade a Luis a la lista de espera del sábado",
+                "mete a Marta en la lista de espera de esta noche",
+            ),
+        },
         "description": "Writes somebody on the waitlist for a day, around a time, for a number of guests: the guest's "
         "card (by id, name or phone; with a name and phone, the card with that phone or a new one).",
         "risk": "normal",
@@ -1094,6 +1236,16 @@ def create_entry(ctx: OperationContext, data: WaitlistIn) -> dict:
     output=WaitlistOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "I already called Luis from the waitlist",
+                "note on Marta's waitlist entry that she comes with a baby",
+            ),
+            "es": (
+                "cambia a Luis de la lista de espera a contactado",
+                "anota en la espera de Marta que viene con un bebé",
+            ),
+        },
         "description": "Marks a waitlist entry as contacted (or not) and changes its notes (by id, or by its guest).",
         "risk": "normal",
     },
@@ -1120,9 +1272,19 @@ def update_entry(ctx: OperationContext, data: WaitlistPatchIn) -> dict:
     output=ConvertedOut,
     expose_api=True,
     ai={
-        "description": "Turns a waitlist entry into a reservation with its own data (guest, day, preferred time, guests, "
-        "notes) and the default duration. It only checks the blocked days, the opening hours and a slot with room; "
-        "the entry is marked converted.",
+        "asks": {
+            "en": (
+                "turn Luis's waitlist entry into a booking",
+                "a spot opened up: convert Marta's waitlist entry",
+            ),
+            "es": (
+                "pasa a Luis de la lista de espera a reserva",
+                "se ha liberado sitio: dale la reserva a Marta de la lista de espera",
+            ),
+        },
+        "description": "Turns a waitlist entry (by id, or by its guest's name or phone) into a reservation with its own "
+        "data (guest, day, preferred time, guests, notes) and the default duration. It only checks the blocked days, "
+        "the opening hours and a slot with room; the entry is marked converted.",
         "risk": "normal",
     },
 )
@@ -1180,7 +1342,17 @@ def convert_entry(ctx: OperationContext, data: WaitlistConvertIn) -> dict:
     output=DeletedOut,
     expose_api=True,
     ai={
-        "description": "Takes somebody off the waitlist (by id, or by their name or phone). Ask first.",
+        "asks": {
+            "en": (
+                "take Luis off the waitlist",
+                "remove Marta from the waiting list",
+            ),
+            "es": (
+                "elimina a Luis de la lista de espera",
+                "borra a Marta de la lista de espera",
+            ),
+        },
+        "description": "Takes somebody off the waitlist (by id, or by their name or phone).",
         "risk": "high",
     },
 )
@@ -1205,6 +1377,16 @@ def delete_entry(ctx: OperationContext, data: WaitlistRefIn) -> dict:
     output=SettingsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "change the reservation settings to take bookings 30 days ahead",
+                "confirm the reservations automatically",
+            ),
+            "es": (
+                "deja reservar con hasta 30 días de antelación",
+                "haz que las reservas se confirmen solas",
+            ),
+        },
         "description": "Changes the book's rules: fewest and most guests, notice for online and WhatsApp, days ahead, "
         "default duration, automatic confirmation, phone or email required, and the minutes after which an unconfirmed "
         "reservation is released. Only what is sent changes.",

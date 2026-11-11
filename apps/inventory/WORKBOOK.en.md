@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b1859be142332f0929432659f748d7cbd07ac2064e4cf70b192f4b36536775ae -->
+<!-- generated from WORKBOOK.md sha256:d9bbee9039acf59517c09bc806d72f7480b0dde60b8bdeb1df731fe57f4c8cc9 -->
 
 ## What it is for and who it is for
 
@@ -218,6 +218,8 @@ settings could not be loaded." with "Retry", never the factory values as if they
 In the category and stock movement windows (receive, count and write-off), the phone's Back button asks "Discard changes?" when something typed
 or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
 With the window as it opened, Back closes it without asking (BASE-F05); creating and editing a product ask the same (INVENTORY-F01, INVENTORY-F02).
+When creating and editing a product, "Cancel" ("Cancel editing"), the panel's "×", Escape and tapping outside the panel ask the
+same, in the browser too (hub#1023).
 
 ## Flows
 
@@ -284,11 +286,11 @@ Steps:
 5. If there are categories, search in "Categories" for the ones that group the product on the till
    and pick them one by one: each one shows below the field, with its button to remove it.
 6. Tap "Save" ("Saving…"). The panel closes and the product shows in the table with Status "Yes".
-7. In the Android app, the phone's back button with something typed or chosen and not saved (the photo
-   too) does not close the panel: it asks "Discard changes?" ("What you typed in this window has not been
-   saved."). "Keep editing", or back again, leaves the panel with what was typed; "Discard changes"
-   closes it without saving anything. With the panel as it opened, back closes it without asking
-   (hub#1015).
+7. With something typed or chosen and not saved (the photo too), neither "Cancel", nor the panel's "×", nor
+   Escape, nor tapping outside the panel, nor the phone's back button in the Android app close it: they ask
+   "Discard changes?" ("What you typed in this window has not been saved."). "Keep editing", or back again,
+   leaves the panel with what was typed; "Discard changes" closes it without saving anything and without
+   asking again. With the panel as it opened, any of them closes it without asking (hub#1015, hub#1023).
 In: the tax categories and their type, from Taxes; the units of measure and the product categories,
 from Inventory.
 Out: the product, active and linked to the ticked categories, in a single step: either it is saved
@@ -318,9 +320,9 @@ Steps:
 2. Change what is needed. The SKU is locked ("The SKU is the product's identity: it is not edited").
    The stock is not edited here: it is received (INVENTORY-F13) or counted (INVENTORY-F14). The "Type"
    and the "Initial stock" do not show.
-3. Tap "Save changes". "Cancel editing" or closing the panel leaves it as it was. In the Android app,
-   the back button with a change not saved asks first, as when creating (INVENTORY-F01, step 7); with no
-   change, it closes the panel.
+3. Tap "Save changes". With a change not saved, "Cancel editing", the "×", Escape, tapping outside the
+   panel and, in the Android app, the back button ask first, as when creating (INVENTORY-F01, step 7), and
+   "Discard changes" leaves it as it was; with no change, they close the panel.
 4. The row shows the new data.
 In: the product as it is saved; the tax categories, from Taxes; the units and the product
 categories.
@@ -953,8 +955,8 @@ Steps:
    language (in English if it is not Spanish). The tabs "All", "Hospitality", "Hair", "Beauty", "Retail",
    "Fitness" and "Spa and wellness" narrow by sector; they come 60 at a time with "Load more".
 3. Tap an image: the window closes and the form shows it in "Photo", with "Change" and "Remove photo".
-4. Tap "Save" or "Save changes": the photo stays on the item. "Cancel editing" or closing the panel
-   discards it.
+4. Tap "Save" or "Save changes": the photo stays on the item. "Cancel editing" or closing the panel asks
+   "Discard changes?" first and, with "Discard changes", discards it (INVENTORY-F01, step 7).
 5. Through the assistant: "put a photo on the white coffee". The assistant searches by the item's name,
    shows up to five candidate images by their title and asks which one; it never sets one on its own.
    When one is chosen, it asks for the one-tap confirmation card and sets it.
