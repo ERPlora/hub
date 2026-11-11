@@ -1832,8 +1832,6 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 
 - **Mandar un correo a un cliente desde una automatización** (FLOW-F31 lo manda por WhatsApp): el Hub todavía
   no manda correos a clientes.
-- **Arreglos pendientes, abiertos como issues** (`migration-leftover`): el límite de pago en efectivo o de ticket
-  de la vista previa de un cobro que deja un paso sale en céntimos (hub#926).
 - **«Necesita tu atención»** (eventos que no se entregaron): el reparto del worker ya entrega los avisos a esta
   app y, tras 8 intentos fallidos, da uno por perdido y lo deja anotado; la pantalla que los enseña y los vuelve a
   intentar es la administración de los avisos (PLAN-HUB bloque 7), de la plataforma, y todavía no existe.
@@ -1847,6 +1845,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   cuando la tenga.
 - **Límites en un permiso** («solo con este cliente»): se concede la acción entera.
 - **Borrar al momento lo que leyó una ejecución que espera** cuando se borran los datos de un cliente
-  (pm#637): una ejecución terminada no guarda nada de lo que leyeron sus pasos, pero una que espera
-  conserva la ficha que leyó hasta que despierta (como mucho 30 días). Borrarla en el acto pide que esta app
-  reaccione también al aviso del borrado de un cliente, que hoy solo la arranca como a cualquier otro aviso.
+  (hub#1225): una ejecución terminada no guarda nada de lo que leyeron sus pasos, pero una que espera
+  conserva la ficha que leyó hasta que despierta (como mucho 30 días) y la usa al seguir; una parada por un
+  error, los 7 días en que se puede reanudar. Borrarla en el acto pide que esta app reaccione también al aviso
+  del borrado de un cliente (`customer.customer.erased`), que hoy solo la arranca como a cualquier otro aviso.

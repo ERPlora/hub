@@ -248,7 +248,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 | VERIFACTU-F15 | Enviar el registro a la AEAT y recoger su respuesta | hecho — lo envía el worker por la pasarela del SaaS; sin `VERIFACTU_GATEWAY_URL` los registros esperan en la cola |
 | VERIFACTU-F16 | Consultar los registros y su estado | hecho |
 | VERIFACTU-F17 | Ver el detalle de un registro y por qué espera | hecho |
-| VERIFACTU-F18 | Cotejar el QR en la sede de la AEAT | parcial — en la app instalada la sede de la AEAT aún no abre: falta que la app acepte sus direcciones (ERPlora/app#20) |
+| VERIFACTU-F18 | Cotejar el QR en la sede de la AEAT | parcial — falta cotejar un registro en la app instalada, que abre la sede de la AEAT desde la versión 1.1.34 |
 | VERIFACTU-F19 | Dar el QR y el estado fiscal al tique y a la factura | hecho (Ventas e Impresión lo piden por nombre) |
 | VERIFACTU-F20 | Enviar después lo que no pudo salir (contingencia automática) | hecho — la corre el worker cada minuto, en cada negocio |
 | VERIFACTU-F21 | Procesar la cola a mano | hecho |
@@ -671,7 +671,8 @@ Implicados: VERIFACTU-F15
 
 ### VERIFACTU-F18 Cotejar el QR en la sede de la AEAT
 <!-- origen: fi:hub/domain#modulo-chain-formatos-aeat-huella-sha-256-url-qr old:verifactu/workflow/registro-y-envio.md#verifactu-f18 wf:cadena-fiscal#rec_fiscal-f08 -->
-Estado: parcial — en la app instalada la sede de la AEAT aún no abre: falta que la app acepte sus direcciones (ERPlora/app#20)
+Estado: parcial — falta cotejar un registro en la app instalada: desde la versión 1.1.34 la app abre la sede de la AEAT en
+el navegador del dispositivo, pero aún no se ha probado en un dispositivo
 Actor: empleado, responsable, administrador, cliente
 Pantalla: Registros
 Pasos:
@@ -1208,7 +1209,7 @@ app: gh:verifactu#139). Tests: `test_apps.py` (declaración, textos `en` + `es`,
   `xmldsig-core-schema.xsd` de la W3C; SHA-256 en `tests/test_xsd.py`.
 - **SistemaInformatico** (`producer.py`): `NombreRazon` ERPLORA CLOUD SL, `NIF` B27593136,
   `NombreSistemaInformatico` ERPlora Hub, `IdSistemaInformatico` EC, `TipoUsoPosibleSoloVerifactu` S y
-  `TipoUsoPosibleMultiOT` S, los de la declaración responsable v1 firmada (`saas-next/public/declaracion/v1`);
+  `TipoUsoPosibleMultiOT` S, los de la declaración responsable v1 firmada (`saas/public/declaracion/v1` de `ERPlora/saas`);
   `Version` = `APP_VERSION` (el commit de la imagen; `dev` en local), `NumeroInstalacion` = el identificador
   del negocio (el ámbito; en la fase 2, el id del hub) e `IndicadorMultiplesOT` **S siempre** (`MULTIPLE_OT`):
   ERPlora es una plataforma para muchos negocios, un sistema multi-obligado por definición, así que no depende de

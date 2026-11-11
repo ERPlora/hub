@@ -10,7 +10,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 failures=0
 
 # A task definition as `describe-task-definition --include TAGS` returns it, with the roles and the
-# Environment tag Terraform gives it (aws-next modules/ecs-service: erplora-<env>-<name>-task and
+# Environment tag Terraform gives it (ERPlora/aws modules/ecs-service: erplora-<env>-<name>-task and
 # -execution); the tag and the roles may be overridden.
 # task_definition <family> <containers JSON> [<Environment tag, "" = none> [<task role> [<execution role>]]]
 task_definition() {

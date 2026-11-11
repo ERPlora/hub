@@ -612,13 +612,14 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
   escribe el negocio o el asistente (SCHEDULE-F07).
 - **Fechas y horas en el orden del idioma del Hub** escritas a mano (`dd/mm/aaaa`, «2:30 pm», «1430»): los
   campos usan `ion-input type="date|time"` hasta que `@erplora/ui` tenga `TimeField` y `DateField`
-  (`UI-REQUESTS.md`; los piden también Personal, Citas, Asistencia y Reservas online), propuesto para `## 6`
-  de `MIGRATION.md` como `schedule:ui-time-date-fields`.
+  (`UI-REQUESTS.md`; los piden también Personal, Citas, Asistencia y Reservas online), anotado en `## 6`
+  de `archive/migration/MIGRATION.md` de `ERPlora/erplora-next` como `schedule:ui-time-date-fields`.
 - **«Abrir ajustes del hub»** desde Ajustes: el Hub aún no tiene ajustes de zona horaria a los que ir (la
   zona la manda el SaaS al dar de alta el hub; ver «Zona horaria» en «Para quien lo mantiene»).
-- **El icono de estrella** de la pestaña **Días especiales** (el del producto actual): `@erplora/ui` aún no lo
-  tiene y se usa el de calendario (`UI-REQUESTS.md`; Servicios pide la misma estrella en
-  `FIX-UI-SHELL-ICONS-SERVICE-TASK`), propuesto para `## 6` de `MIGRATION.md` como `schedule:ui-icons`.
+- **El icono de estrella** de la pestaña **Días especiales** (el del producto actual): `ion:star-outline` ya está
+  registrado en `@erplora/ui` (lo usa Servicios desde `FIX-UI-SHELL-ICONS-SERVICE-TASK`), pero la pestaña y el menú
+  siguen con el de calendario hasta que la app lo use (`UI-REQUESTS.md`); anotado en `## 6` de
+  `archive/migration/MIGRATION.md` de `ERPlora/erplora-next` como `schedule:ui-icons`.
 
 ## Cómo son las páginas (para quien lo mantiene)
 

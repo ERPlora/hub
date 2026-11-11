@@ -4,7 +4,8 @@ Lo que las páginas de Reservas necesitan de `@erplora/ui` (y de otras apps) y t
 tanto usan lo más parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
 Cerrado al cerrar la app (2026-10-31, contra `@erplora/ui` en `673e625`). Ninguna petición rompe un flujo: todas
-tienen su sustituto en uso. Cada una lleva la clave con la que pasa a `## 6` de `MIGRATION.md`.
+tienen su sustituto en uso. Cada una lleva la clave con la que pasa a `## 6` de `archive/migration/MIGRATION.md` de
+`ERPlora/erplora-next`.
 
 ## Ya en `@erplora/ui`, sin usar todavía (`reservation:ui-use-landed`)
 

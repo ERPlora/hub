@@ -192,7 +192,7 @@ cierra sin preguntar (BASE-F05).
 | ID | Flujo | Vertical | Estado |
 |---|---|---|---|
 | PRINTING-F01 | Ver cómo va la impresión | común | hecho |
-| PRINTING-F02 | Encontrar una impresora de la red sin escribir su dirección | común | descartado — en una red sin salida a internet la app del dispositivo no recorre la red (app#17) |
+| PRINTING-F02 | Encontrar una impresora de la red sin escribir su dirección | común | parcial — falta probar en un dispositivo la búsqueda en una red sin salida a internet |
 | PRINTING-F03 | Añadir una impresora por su dirección | común | hecho |
 | PRINTING-F04 | Asignar qué sale por cada impresora | común | hecho |
 | PRINTING-F05 | Hacer una prueba de impresión | común | hecho |
@@ -257,10 +257,10 @@ Implicados: PRINTING-F14, PRINTING-F18, CASH_REGISTER-F08, BASE-F01
 
 ### PRINTING-F02 Encontrar una impresora de la red sin escribir su dirección
 <!-- origen: old-hub:HUB_APP-F07 old-hub:HUB_APP-F08 old-hub:HUB_APP-F09 old-hub:HUB_APP-F15 old-hub:HUB_APP-F16 old-hub:HUB_SHELL-F138 old-hub:HUB_SHELL-F140 old-hub:HUB_APP-F13 old-hub:HUB_PERIPHERALS-F01 old-hub:HUB_PERIPHERALS-F03 old:printing/workflow/impresoras.md#printing-f02 qa:modules/printing/discover-printers qa:verticals/restaurant/10-hardware-offline-and-recovery -->
-Estado: descartado — la búsqueda está en Impresoras y la hace la app de ERPlora del dispositivo para el
-negocio que se abre desde ella en erplora.com, pero en una red sin salida a internet la app no recorre la red
-y solo encuentra las impresoras que se anuncian solas; esa impresora se añade por su dirección (PRINTING-F03)
-(app#17)
+Estado: parcial — la búsqueda está en Impresoras y la hace la app de ERPlora del dispositivo para el
+negocio que se abre desde ella en erplora.com; desde la versión 1.1.34 de la app, también en una red sin salida a
+internet (recorre la red de su wifi o de su cable). Falta probarlo en un dispositivo, con una impresora de verdad,
+en una red así
 Actor: administrador, responsable
 Pantalla: Impresoras
 Pasos:
@@ -1027,17 +1027,15 @@ la enseña. Tests: `tests/test_apps.py`, `tests/test_integration_home.py` y
 
 ### Lo que queda fuera
 
-- **Encontrar la impresora en una red sin salida a internet (PRINTING-F02)**, app#17: la app del
-  dispositivo saca la red que barre de su ruta hacia internet, y sin ella solo lista lo que se anuncia por
-  mDNS. Lo del Hub está («Buscar impresoras», sus avisos y el alta por la dirección, PRINTING-F03).
+- **Probar en un dispositivo la búsqueda en una red sin salida a internet (PRINTING-F02)**: desde la 1.1.34 la
+  app del dispositivo barre también la red de cada dirección privada suya (su wifi o su cable), no solo la de su
+  ruta hacia internet (`discovery.rs` de `ERPlora/app`, app#19); falta probarlo en la tablet con una impresora de
+  verdad en una red así. Lo del Hub está («Buscar impresoras», sus avisos y el alta por la dirección, PRINTING-F03).
 - **El ancho del papel en la app del dispositivo**: `escpos.rs` imprime 32 caracteres por línea en todo
   papel; el ancho se guarda y viaja con el trabajo (`paper_width`) a la espera de que la app lo use
   (`UI-REQUESTS.md`, «App nativa»).
 - **El icono de Impresión**: `ion:print-outline` no está registrado en `@erplora/ui`; lo sustituye
   `lucide:receipt` (`UI-REQUESTS.md`, «Iconos»).
-- **Relacionada, de otras apps**: en la app Android, el diálogo del dispositivo que usan Ventas, Caja y
-  Facturación cuando no hay impresora de tiques no se abre (hub#455; SALE-F21, SALE-F29, INVOICE-F18,
-  CASH_REGISTER-F16). Toca el «como antes» de PRINTING-F07, F08, F09 y F17.
 
 ### Lo que NO hace, a propósito
 

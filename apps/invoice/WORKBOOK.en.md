@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fbc76c308952b20505efe9e230a34db986c57ef861eec3732139b2570df788a9 -->
+<!-- generated from WORKBOOK.md sha256:f85c78aaa6da60e4f3e3df06fdb6013e7331a8d4123fbcdcecc54ef6cfce81bb -->
 
 ## What it is for and who it is for
 
@@ -622,7 +622,7 @@ Steps:
    "Disc." column with the discount without VAT), the breakdown and the totals.
 3. With **VeriFactu**, read below the "VeriFactu receipt": the status of the record at the AEAT, its
    "CSV" once the AEAT has answered and the QR, which can be scanned or opened with "Check at the tax
-   agency ↗" (in the installed app, in the device's browser, as soon as the app accepts that address: ERPlora/app#20).
+   agency ↗" (in the installed app, in the device's browser: VERIFACTU-F18).
 4. "Rectifies", "Replaces", "Replaced by" and the rectifying invoices open the linked document.
 5. "← Back" goes back to the list.
 In: the invoice and its lines and, with VeriFactu, its record.
