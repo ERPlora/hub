@@ -37,6 +37,9 @@ Quién la usa:
   el bloqueo por su título, su día, su hora y su profesional («Bloqueo: Formación · lunes, 16 de
   noviembre de 2026 · 14:00 · Ana López»). Lo que quien pregunta no puede ver, o lo que ya no existe, no
   sale.
+  Por voz, un bloqueo se nombra por su título o su día («quita el bloqueo de la formación»: el asistente
+  lo busca entre los bloqueos desde hoy, sin preguntar la fecha) y una serie por su clienta («la cita
+  fija de Lucía», «la serie semanal de Lucía»).
 
 ## Referencia adoptada
 
@@ -491,7 +494,7 @@ Implicados: ninguno
 ### APPOINTMENT-F15 Pausar, reactivar o borrar una serie
 <!-- origen: fi:modules/appointments#command-appointments-recurring-delete old:appointments/workflow/periodicas.md#appointments-f15 -->
 Estado: hecho
-Actor: empleado (las suyas), responsable
+Actor: empleado (las suyas), responsable, asistente
 Pantalla: Periódicas
 Pasos:
 1. Apaga el interruptor **Activa** para que deje de reservar; enciéndelo para reactivarla.
@@ -576,7 +579,7 @@ Implicados: CUSTOMER-F26, ONLINE_BOOKING-F01
 ### APPOINTMENT-F19 Ajustar las reglas de reserva
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f07 wf:whatsapp-cita#rec_wa_cita-f06 fi:modules/appointments#command-appointments-settings-upsert fi:modules/appointments#query-appointments-settings-get fi:modules/appointments#settings-bloque old:appointments/workflow/agenda.md#appointments-f19 -->
 Estado: hecho
-Actor: propietario, administrador
+Actor: propietario, administrador, asistente
 Pantalla: Ajustes
 Pasos:
 1. Abre la pestaña **Ajustes** de Citas.

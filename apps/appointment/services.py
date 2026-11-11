@@ -458,6 +458,16 @@ def _member_for_booking(
     output=AppointmentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "make an appointment for Lucía on Friday at 5 pm with Inés for a colour",
+                "put Julia down for an appointment tomorrow at 10",
+            ),
+            "es": (
+                "dale cita a Lucía el viernes a las 17:00 para un tinte con Inés",
+                "crea una cita para Julia mañana a las 10:00",
+            ),
+        },
         "description": "Book an appointment: a customer (by name, phone or email), one or more services (by name) and a "
         "professional (by name) at a wall-clock time of the business (e.g. tomorrow at 10:00 with Ana for a haircut). "
         "Names, prices and lengths are frozen from the catalog. It is refused with its reason when the business is "
@@ -502,6 +512,16 @@ def create_appointment(ctx: OperationContext, data: AppointmentCreateIn) -> dict
     output=AppointmentsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "book Carmen's five sessions every Monday at 4 pm in one go",
+                "make three appointments for Julia at once, all or none",
+            ),
+            "es": (
+                "dale de golpe a Carmen sus cinco sesiones, los lunes a las 16:00",
+                "mete tres citas a Julia a la vez, todas o ninguna",
+            ),
+        },
         "description": "Book several times at once (1 to 50) for the same customer, services and professional (a "
         "voucher's sessions, a course). All or none: the first time that does not fit refuses the whole batch with "
         "its reason.",
@@ -711,6 +731,16 @@ def _move(
     output=AppointmentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "move Sara's appointment to Thursday at 11",
+                "push Clara's 5 pm appointment back an hour",
+            ),
+            "es": (
+                "pasa la cita de Sara al jueves a las 11:00",
+                "retrasa una hora la cita de las 17:00 de Clara",
+            ),
+        },
         "description": "Move an appointment (by its number or id) to another wall-clock time, change its length, hand "
         "it to another professional (by name) or change its services; only pending or confirmed, uncharged ones move. "
         "Judged like a new booking. on_behalf_of_customer=true (with the customer) when she asks herself: it must be "
@@ -745,6 +775,16 @@ def reschedule(ctx: OperationContext, data: RescheduleIn) -> dict:
     output=AppointmentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "add to Lucía's appointment that she is allergic to ammonia",
+                "fix the phone number on Julia's appointment",
+            ),
+            "es": (
+                "cambia las notas de la cita de Lucía: es alérgica al amoniaco",
+                "corrige el teléfono de la cita de Julia",
+            ),
+        },
         "description": "Edit an appointment: only what is sent changes — its notes (the visit's notes, e.g. the colour "
         "formula, in any state), the customer's phone (saved as +34…) or email on it, and, judged like a move, its "
         "time, length, professional or services.",
@@ -834,6 +874,16 @@ def _transition(
     output=AppointmentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "confirm Teresa's pending appointment",
+                "accept the appointment Paula is waiting on",
+            ),
+            "es": (
+                "da por buena la cita pendiente de Teresa",
+                "acepta la cita que tiene pendiente Paula",
+            ),
+        },
         "description": "Confirm a pending appointment (a booking the customer made, waiting for review).",
         "risk": "normal",
     },
@@ -859,6 +909,16 @@ def confirm(ctx: OperationContext, data: AppointmentRefIn) -> dict:
     output=AppointmentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "Clara is here, start her appointment",
+                "Sara just walked in for her 10 o'clock",
+            ),
+            "es": (
+                "ya está aquí Clara, empieza su cita",
+                "ha llegado Sara a su cita de las 10:00, ponla en curso",
+            ),
+        },
         "description": "The customer arrived: start the service of a pending or confirmed appointment.",
         "risk": "normal",
     },
@@ -884,6 +944,17 @@ def start(ctx: OperationContext, data: AppointmentRefIn) -> dict:
     output=AppointmentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "Julia's appointment is finished",
+                "mark Pilar's appointment as completed",
+            ),
+            "es": (
+                "ya hemos acabado con la cita de Julia",
+                "da por completada la cita de Pilar",
+                "ya está prestado el tinte de Clara, da su cita por acabada",
+            ),
+        },
         "description": "Complete an appointment in progress (or confirmed). Charging it also completes it.",
         "risk": "normal",
     },
@@ -909,6 +980,17 @@ def complete(ctx: OperationContext, data: AppointmentRefIn) -> dict:
     output=AppointmentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "Inés never showed up for her appointment",
+                "mark Carmen's appointment as a no-show",
+            ),
+            "es": (
+                "Inés no vino a su cita",
+                "apunta que Carmen faltó a la cita de ayer",
+                "Beatriz no se ha presentado a su cita de las 12:00",
+            ),
+        },
         "description": "Record that the customer did not show up, once the appointment's time has passed (pending or "
         "confirmed, not charged).",
         "risk": "high",
@@ -944,6 +1026,16 @@ def mark_no_show(ctx: OperationContext, data: AppointmentRefIn) -> dict:
     output=AppointmentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "cancel Beatriz's appointment on Friday",
+                "Sara can't make it, call off her appointment",
+            ),
+            "es": (
+                "anula la cita del viernes de Beatriz",
+                "a Sara le ha surgido algo, cancela su cita del jueves",
+            ),
+        },
         "description": "Cancel an appointment (pending, confirmed or no-show; not a charged one), with an optional "
         "reason; its time becomes free. on_behalf_of_customer=true (with the customer) when she cancels herself: it "
         "must be hers and the business's cancellation policy applies.",
@@ -1010,6 +1102,16 @@ def _delete(ctx: OperationContext, appointment: Appointment) -> None:
     output=DeletedOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "delete Lucía's appointment from the agenda",
+                "erase that test appointment of Friday",
+            ),
+            "es": (
+                "borra de la agenda la cita de Lucía",
+                "quita del todo la cita de prueba del viernes",
+            ),
+        },
         "description": "Delete an appointment from the agenda (it is archived, not destroyed): pending, confirmed, "
         "cancelled or no-show and not charged. Cancelling keeps the record and is usually what is wanted.",
         "risk": "high",
@@ -1030,6 +1132,16 @@ def delete_appointment(ctx: OperationContext, data: AppointmentRefIn) -> dict:
     output=BulkDeletedOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "delete these three appointments at once",
+                "remove all of Clara's appointments next week in one go",
+            ),
+            "es": (
+                "borra de una vez las tres citas de Clara",
+                "elimina juntas todas las citas de prueba del lunes",
+            ),
+        },
         "description": "Delete several appointments at once (all or none).",
         "risk": "high",
     },
@@ -1056,6 +1168,16 @@ def bulk_delete(ctx: OperationContext, data: BulkDeleteIn) -> dict:
     output=ChargeOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "charge Julia's appointment",
+                "send Paula's appointment to the checkout",
+            ),
+            "es": (
+                "cobra la cita de Julia",
+                "hazle la cuenta a la cita de Paula",
+            ),
+        },
         "description": "Charge an appointment at the till: opens a check in Sales linked to it, titled with the customer "
         "and the appointment's number, with a line per service at the price booked and the professional who did it, "
         "so a voucher of the customer can pay one. While that check is open, charging again goes back to it. "
@@ -1162,6 +1284,16 @@ def _charge_out(appointment: Appointment, order) -> dict:
     output=BlockedTimeOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "block the agenda on Christmas Eve",
+                "block Inés's Friday afternoon for a training",
+            ),
+            "es": (
+                "bloquea la agenda el día de Nochebuena",
+                "bloquea la tarde del viernes de Inés por una formación",
+            ),
+        },
         "description": "Block a period of the agenda (a holiday, a training, a professional's break): for the whole "
         "business or one professional (by name), between two wall-clock times or whole days (all_day). Nobody books it.",
         "risk": "normal",
@@ -1210,7 +1342,18 @@ def create_blocked_time(ctx: OperationContext, data: BlockedTimeCreateIn) -> dic
     output=DeletedOut,
     expose_api=True,
     ai={
-        "description": "Remove a blocked period: its time can be booked again.",
+        "asks": {
+            "en": (
+                "remove the block on Friday afternoon",
+                "unblock the agenda on Christmas Eve",
+            ),
+            "es": (
+                "quita el bloqueo del viernes por la tarde",
+                "desbloquea la agenda de Nochebuena",
+            ),
+        },
+        "description": "Remove a blocked period: its time can be booked again. One the person names by its title or "
+        "its day is found with appointment.blocked_time.list, from today on when no day is said.",
         "risk": "high",
     },
 )
@@ -1344,6 +1487,16 @@ def _materialize_out(series: Recurring, report: dict) -> dict:
     output=MaterializeOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "book Teresa every Tuesday at 6 pm from next week",
+                "book Carmen in every other Thursday at noon",
+            ),
+            "es": (
+                "cita fija para Teresa todos los martes a las 18:00",
+                "crea una cita que se repita los jueves para Carmen",
+            ),
+        },
         "description": "Create a repeating appointment (every day, week, two weeks or month) for a customer, services "
         "and a professional (all by name) at a wall-clock time, from a date, optionally until a date or for a number "
         "of appointments; it books the dates of the booking window at once and lists the dates that did not fit with "
@@ -1399,6 +1552,16 @@ def create_series(ctx: OperationContext, data: RecurringCreateIn) -> dict:
     output=MaterializeOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "fill in the dates still missing in Teresa's weekly appointment",
+                "generate the next appointments of every repeating one",
+            ),
+            "es": (
+                "reserva las fechas que faltan de la cita fija de Teresa",
+                "rellena las próximas fechas de las citas que se repiten",
+            ),
+        },
         "description": "Book the dates of a repeating appointment's window not booked yet (at most 50 a run; run it "
         "again from next_from until there is none). A date that does not fit is skipped and listed with its reason; a "
         "date cancelled by hand is never booked again.",
@@ -1429,6 +1592,16 @@ def materialize(ctx: OperationContext, data: MaterializeIn) -> dict:
     output=RecurringUpdatedOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "from next week, move Teresa's repeating appointment to Wednesdays",
+                "change Carmen's weekly appointment to 11 am from now on",
+            ),
+            "es": (
+                "desde la semana que viene, la cita fija de Teresa pasa a los miércoles",
+                "cambia la cita fija de Carmen a las 11:00 de aquí en adelante",
+            ),
+        },
         "description": "Edit a repeating appointment from one of its dates on (this and all following): its time, "
         "length, repetition, weekday, professional (by name) or services. Before that date nothing changes (the series "
         "is split); appointments already charged, in progress or completed are left alone; the booked ones that still "
@@ -1626,6 +1799,16 @@ def _set_active(ctx: OperationContext, series_id: UUID, active: bool) -> dict:
     output=RecurringOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "pause Teresa's repeating appointment",
+                "stop Carmen's weekly appointment for the summer",
+            ),
+            "es": (
+                "deja en pausa la cita fija de Teresa",
+                "desactiva la cita semanal de Carmen en verano",
+            ),
+        },
         "description": "Pause a repeating appointment: it stops booking dates; the ones booked are kept.",
         "risk": "normal",
     },
@@ -1643,6 +1826,16 @@ def deactivate_series(ctx: OperationContext, data: RecurringRefIn) -> dict:
     output=RecurringOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "resume Teresa's paused repeating appointment",
+                "reactivate Carmen's weekly appointment",
+            ),
+            "es": (
+                "reanuda la cita fija de Teresa",
+                "retoma la cita semanal de Carmen que estaba parada",
+            ),
+        },
         "description": "Reactivate a paused repeating appointment (it books nothing by itself: materialize does).",
         "risk": "normal",
     },
@@ -1660,6 +1853,16 @@ def activate_series(ctx: OperationContext, data: RecurringRefIn) -> dict:
     output=RecurringDeletedOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "delete Teresa's repeating appointment but keep the ones booked",
+                "remove Carmen's weekly appointment for good",
+            ),
+            "es": (
+                "borra la cita fija de Teresa y deja las que ya tiene",
+                "quita la serie de Carmen sin tocar sus citas",
+            ),
+        },
         "description": "Delete a repeating appointment; the appointments already booked are kept.",
         "risk": "high",
     },
@@ -1687,6 +1890,16 @@ def delete_series(ctx: OperationContext, data: RecurringRefIn) -> dict:
     output=SettingsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "require two hours' notice to book an appointment",
+                "stop auto-confirming the appointments customers book",
+            ),
+            "es": (
+                "pide al menos un día de antelación para las citas",
+                "que las citas de las clientas no se confirmen solas",
+            ),
+        },
         "description": "Change the booking rules; only what is sent changes (e.g. turn off auto-confirming the "
         "customer's own bookings, or set the minimum notice).",
         "risk": "normal",

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:80ab42cb337d0c6fb59f8e98634fd3c0aea7feb2535299b3ece1e2f0600299d7 -->
+<!-- generated from WORKBOOK.md sha256:b0b79f16139d13f4a111f568fe1e7f33e81029ebba9eeda60664c12ecf66996a -->
 
 ## What it is for and who it is for
 
@@ -27,6 +27,9 @@ Who uses it:
   appointment: Lucía Pérez · Every week · Monday · 10:00") and the blocked period by its title, its day,
   its time and its professional ("Blocked period: Training · Monday, Nov. 16, 2026 · 14:00 · Ana
   López"). What the person asking may not see, or what no longer exists, is left out.
+  By voice, a blocked period is named by its title or its day ("remove the training block": the
+  assistant looks for it among the blocked periods from today on, without asking for the date) and a
+  series by its customer ("Lucía's standing appointment", "Lucía's weekly series").
 
 ## Reference adopted
 
@@ -478,7 +481,7 @@ Involved: none
 
 ### APPOINTMENT-F15 Pause, reactivate or delete a series
 Status: done
-Actor: employee (their own), manager
+Actor: employee (their own), manager, assistant
 Screen: Repeating
 Steps:
 1. Turn off the **Active** switch so that it stops booking; turn it on to reactivate it.
@@ -563,7 +566,7 @@ Involved: CUSTOMER-F26, ONLINE_BOOKING-F01
 
 ### APPOINTMENT-F19 Adjust the booking rules
 Status: done
-Actor: owner, administrator
+Actor: owner, administrator, assistant
 Screen: Settings
 Steps:
 1. Open the Appointments **Settings** tab.
