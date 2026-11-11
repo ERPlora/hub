@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:07bdc49b937965ba179d54b31f94e4ae54ba7197dfab976f8408c9013341526b -->
+<!-- generated from WORKBOOK.md sha256:b8c5f7ec0b9f9ceaf14d9513e9432347f9cb5abc7e81489684200785ff39abeb -->
 
 ## What it is for and who it is for
 
@@ -68,7 +68,11 @@ the cash figures: "Current session" and "Recent discrepancies" (CASH_REGISTER-F1
 on the **Home** panels). Then the table of
 sessions, from the most recent to the oldest, 50 per page: Session, Opened on, Status ("Open", "Closed"),
 Opening, Expected, Counted, Difference. Search box "Search session…" (by number), filters (status, number
-and the four amounts) and table or card view. Per row: "Detail" always and, in the open session,
+and the four amounts) and table or card view. The amounts "from / to" are typed as in any amount field of the
+Hub and as in the other lists (hub#1196: "1.000,50", "1,000.50", "2 500", "12,50 €"; only the difference takes
+a sign, "-5"); one that cannot be read does not filter and says so under its box in the words of the amount
+field ("This is not an amount…", "This amount cannot be negative." or, with "1.000" in euros, "This amount can
+be read in two ways…"). Per row: "Detail" always and, in the open session,
 "Movement", "Count" and "Close"; tapping the row opens the detail. Each action opens its window:
 
 - **Open cash session**: "Drawer" (optional; only if there are drawers), "Opening float", "Notes", "Open

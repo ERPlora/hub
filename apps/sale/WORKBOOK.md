@@ -1095,9 +1095,12 @@ Las ventas cobradas antes siguen como estaban: su línea cuenta para quien la ve
 bonos no cuentan para nadie, así que nada cuenta dos veces.
 Si falla: «Error cargando métricas» (las cifras salen como «—»); si no se pueden leer los últimos 7 días,
 «No se han podido leer los últimos 7 días.». Vacía: «Aún no hay ventas.». Quien
-no tiene permiso de informes ve la tabla, sin las cifras. Un total que no es un importe dice «Escribe
-un importe, como 12,50» bajo su campo, y una fecha final anterior a la inicial, «La fecha final no
-puede ser anterior a la inicial.»; ninguno de los dos filtra y manda el periodo. En el Inicio, un panel
+no tiene permiso de informes ve la tabla, sin las cifras. El total se lee como en cualquier campo de
+importe del Hub y como en las demás listas (hub#1196: «1.000,50», «1,000.50», «2 500» y «12,50 €» filtran);
+uno que no se puede leer lo dice bajo su campo con las palabras del campo de importe («Esto no es un
+importe. Escribe una cifra, por ejemplo 12,50.», «Este importe no puede ser negativo.» o, con «1.000» en
+euros, «Este importe se puede leer de dos maneras…»), y una fecha final anterior a la inicial, «La fecha
+final no puede ser anterior a la inicial.»; ninguno de los dos filtra y manda el periodo. En el Inicio, un panel
 de un día sin ventas dice 0, y uno que no se puede leer, «No disponible».
 Implicados: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, SALE-F27, SERVICE-F21, SERVICE-F24
 

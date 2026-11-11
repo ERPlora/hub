@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:87ac41d2e5acdb80944ccdffd29ee3c2cd592f7fa1977fba122a349ce2e4617a -->
+<!-- generated from WORKBOOK.md sha256:aa120051c023216ccfa5bfbe7b4663f2c1b8c17fdfbbe503adb3a26b0db29a82 -->
 
 ## What it is for and who it is for
 
@@ -55,13 +55,15 @@ sorting per column, a list or card view and 50 rows
 per page. It is sorted by creation date, the most recent on top. The total shows in the cart's currency
 (one created in euros stays in euros even if the business changes country); the Total filter is typed in
 the business's currency ("12" is zł 12.00 in a business in Poland and ¥12 in one in Japan, where there are
-no cents) and compares the amount as it is, without converting currencies. It can be pasted with its
-thousands separators ("1,250.50") or with that currency's symbol or code ("zł 12.50", "PLN 12.50"); an
-amount that cannot be read ("1,250", which may be one thousand two hundred and fifty or one and a quarter,
-or one with another currency's symbol) is warned under its box, "Type an amount, like 12.50" (with the
-decimals of the business's currency: "like 12" in yen), and does not filter. While the business has not
-answered, an amount is read with two decimals and, when it answers, the filter is read again in its
-currency from the first page.
+no cents) and compares the amount as it is, without converting currencies. It is read as in any amount
+field of the Hub and as in the other lists (hub#1196): it can be pasted with its thousands separators
+("1,250.50", "1.250,50", "2 500") or with that currency's symbol or code ("zł 12.50", "PLN 12.50"); one that
+cannot be read does not filter and says so under its box in the words of the amount field: "1,250", which
+may be one thousand two hundred and fifty or one and a quarter, "This amount can be read in two ways…"; one
+with another currency's symbol or with letters, "This is not an amount. Type a figure, for example 12.50.";
+a negative one, "This amount cannot be negative.". While the business has not answered, an amount is read
+with two decimals and nothing is warned; when it answers, the filter is read again in its currency from the
+first page.
 
 The **New cart** button opens the "New cart" form: **Session** (required; "Save" is not enabled
 without it), **Email** and **Name**. Each row offers **Abandon** (only an active cart) and
@@ -317,7 +319,7 @@ Steps:
 1. Open **Carts** or **Orders**.
 2. Search by session, email or name (carts) or by order number or email (orders) and sort. To filter
    per column, tap the funnel of the bar: it opens "Filters" with a box per column (the Total, as it is
-   typed or pasted: "12", "12.50", "1,250.50"); **Apply** filters and closes it, and the funnel counts
+   typed or pasted: "12", "12.50", "1,250.50", "2 500"); **Apply** filters and closes it, and the funnel counts
    the filters in use.
 3. The lines of a cart and the detail of an order (addresses, methods, dates, notes) are read with
    the assistant or the API: a cart by its session or by its customer's email or name, an order
@@ -326,7 +328,8 @@ In: the "view carts" permission (the employee has it).
 Out: lists of 50 rows (up to 100 per request). Quantities with their decimals, amounts in the minor
 unit of the row's currency (cents; the yen has none) with the currency and its decimals.
 If it fails: a loading error with "Retry"; without permission, "You do not have permission"; a Total amount that
-cannot be read, "Type an amount, like 12.50" under its box, without filtering.
+cannot be read, what the amount field would say ("This is not an amount. Type a figure, for example 12.50.", or
+the two readings of "1,250") under its box, without filtering.
 Involved: none
 
 ### CART_CHECKOUT-F13 Tell other apps what happens
