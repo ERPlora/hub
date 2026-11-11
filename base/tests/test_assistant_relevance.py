@@ -148,11 +148,12 @@ def test_the_hubs_own_words_bring_the_tool_they_mean_among_the_first_ten(owner, 
 
 #: «retira» and «anota» are the verbs they are (ERPlora/live#64), in phrases no tool says as its asks: «retira» takes
 #: something out (deletes, removes, retires or withdraws it, as the thing named says) and «anota» writes in what exists
-#: or adds to it.
+#: or adds to it. None is a probe of layer 2 of its tool with other names: each shares two stems at most with one
+#: (``live.assistant.stems``), so this test and the probes' do not fix the same sentence twice.
 RETIRA_AND_ANOTA = [
-    ("es", "retira el bono de diez sesiones del catálogo", "service.package.delete"),
+    ("es", "retira el bono de diez sesiones, que nadie más lo compre", "service.package.delete"),
     ("es", "retira el permiso de Marta para recibir publicidad", "customer.consent.withdraw"),
-    ("es", "anota en la cita de Ana de mañana que trae su propio tinte", "appointment.appointment.update"),
+    ("es", "anota en la cita de Rosa del viernes que trae su propio tinte", "appointment.appointment.update"),
     ("es", "anota en la reserva de Carmen que vienen con un perro", "reservation.reservation.update"),
 ]
 
@@ -161,7 +162,7 @@ RETIRA_AND_ANOTA = [
 @pytest.mark.parametrize(("language", "asked", "expected"), RETIRA_AND_ANOTA)
 def test_retira_and_anota_bring_the_tool_they_mean_among_the_first_ten(owner, language, asked, expected):
     """Before the Hub read live with «anota» and «retira» among its verbs, they asked for no action and the tool came
-    only by the thing named: these came 12th to 22nd. A pointer of ``packages/live`` back to before ERPlora/live#66
+    only by the thing named: these came 14th to 23rd. A pointer of ``packages/live`` back to before ERPlora/live#66
     fails here."""
     ctx = owner(language)
     assert expected in assistant.catalog(ctx)  # the owner holds it: only the selection can leave it out
