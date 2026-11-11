@@ -112,10 +112,11 @@ def test_the_reported_printing_requests_are_offered_their_tool_without_being_its
 
 
 #: A device that prints, retired in words that are no ask nor probe and that only its tool's asks bring among the first
-#: ten: «dispositivo» is the Hub's own word for it (Printing → Devices, «Dispositivo 1»). Since ERPlora/live#64, «retira»
-#: asks to retire, delete, remove and withdraw, and «el equipo» reads as the staff (``base.assistant.SYNONYMS``), so an
-#: ask that said «retira el equipo Barra 2» fell to the edge of the ten (10th) and this phrase with it (13th). With
-#: «el dispositivo» in the ask it is 8th for the owner, the admin and the manager, and 13th without its asks.
+#: ten: «dispositivo» is the Hub's own word for it (Printing → Devices, «Dispositivo 1»). Since ERPlora/live#64,
+#: «retira» asks to retire, delete, remove and withdraw, and «el equipo» reads as the staff
+#: (``live.assistant.SYNONYMS``), so an ask that said «retira el equipo Barra 2» fell to the edge of the ten (10th) and
+#: this phrase with it (13th). With «el dispositivo» in the ask it is 8th for the owner, the admin and the manager, and
+#: 13th without its asks.
 OWN_WORDS = [
     ("es", "printing.device.retire", "el dispositivo Terraza 1 ya no está, que no imprima más"),
 ]
