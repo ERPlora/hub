@@ -914,9 +914,9 @@ def test_the_yes_runs_the_write_with_its_attempt_keys_as_sent(monkeypatch):
     received = []
     write = keyed(lambda ctx, data: received.append(data.model_dump()) or data)
     monkeypatch.setitem(registry, write.name, write)
-    asked = turn(call(write.name, KEYED_ARGUMENTS))["confirm"]
-    assert ATTEMPT not in json.dumps(asked, ensure_ascii=False)
-    plan = turn(call(write.name, KEYED_ARGUMENTS), decision={"call_id": "c1", "accepted": True})
+    drawn = turn(call(write.name, KEYED_ARGUMENTS))
+    assert ATTEMPT not in json.dumps(drawn["confirm"], ensure_ascii=False)
+    plan = turn(*drawn["pending"], decision={"call_id": "c1", "accepted": True})
     assert plan["executed"][0]["outcome"] == "ok"
     assert received == [KEYED_ARGUMENTS]
 
@@ -929,10 +929,10 @@ def test_a_line_the_assistant_adds_twice_with_its_key_is_one_line():
 
     item = run("demo.item.create", name="Mesa 4")
     line = {"id": item["id"], "text": "Café", "qty": "1", "client_line_id": "0192f5a0-0000-7000-8000-000000000001"}
-    asked = turn(call("demo.item.add_line", line))["confirm"]
-    assert values(asked) == {"id": "Mesa 4", "text": "Café", "qty": "1"}
+    drawn = turn(call("demo.item.add_line", line))
+    assert values(drawn["confirm"]) == {"id": "Mesa 4", "text": "Café", "qty": "1"}
     for _ in range(2):
-        plan = turn(call("demo.item.add_line", line), decision={"call_id": "c1", "accepted": True})
+        plan = turn(*drawn["pending"], decision={"call_id": "c1", "accepted": True})
         assert plan["executed"][0]["outcome"] == "ok"
     lines = run("demo.item.detail", id=item["id"])["lines"]
     assert [(row["text"], row["client_line_id"]) for row in lines] == [("Café", line["client_line_id"])]

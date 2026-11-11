@@ -2619,8 +2619,13 @@ alguien con un rol que el negocio no tiene, STAFF-F01), no sale tarjeta y el asi
 Sale: si se acepta, la acción hecha en su app, con el mismo evento que si se hubiera pulsado su botón.
 Si falla: una acción que su app rechaza vuelve al asistente como error y él lo cuenta; el recibo dice «No se hizo,
 falló: …». Unos datos que la acción no acepta (un país o una moneda que no existe, un valor fuera de su lista) no
-llegan a la tarjeta: vuelven al asistente, que los corrige, y la persona confirma una sola vez. Si se recarga la
-página con la tarjeta abierta no se hace nada, y la respuesta acaba en «La respuesta se cortó.» con «Reintentar».
+llegan a la tarjeta: vuelven al asistente, que los corrige, y la persona confirma una sola vez. «Ejecutar» vale solo
+para lo que enseña la tarjeta: si antes de pulsarlo cambia —la acción encuentra por su nombre otro registro, porque
+alguien ha creado uno que encaja mejor con lo dicho («Mesa» cuando la tarjeta decía «Mesa 4»), el registro cambia de
+nombre o lo que dice «Lo que va a pasar» ya no es lo mismo—, no se hace nada y sale la tarjeta nueva, para
+confirmarla otra vez; si lo que encontró ya no está, no sale tarjeta y el asistente lo cuenta como su error.
+«Cancelar» y lo escrito que no coincide valen igual aunque haya cambiado. Si se recarga la página con la tarjeta
+abierta no se hace nada, y la respuesta acaba en «La respuesta se cortó.» con «Reintentar».
 Implicados: BASE-F98, BASE-F99, BASE-F101
 
 ### BASE-F98 Acciones peligrosas: escribir para confirmar, o no desde el chat
@@ -3682,7 +3687,13 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   Automatizaciones, Personal y Facturación); lo citado («…», `código`, nombres con punto) y lo negado no cuentan.
 - Operaciones del asistente, todas con `base.view_home` y `ai=` «Not an assistant tool»: `base.assistant.turn`
   (command: corre las lecturas pendientes, para en la tarjeta de una escritura hasta su `decision`, corta a las
-  `MAX_ROUNDS` = 6 rondas con `assistant.too_many_steps`; el «sí» a una escritura que la persona no puede hacer y un
+  `MAX_ROUNDS` = 6 rondas con `assistant.too_many_steps`; la llamada que espera su tarjeta vuelve con `shown`, la
+  huella de lo que enseñó (`assistant.fingerprint`: sus datos y «Lo que va a pasar» como los ve la persona, más el id
+  de cada registro que leyó, por sus datos marcados con `names(…)` —por id o por nombre— y por su `check`), y el
+  panel la devuelve tal cual con el «sí»; con él la tarjeta se vuelve a dibujar y, si la huella no coincide (o no
+  viene), no corre nada y sale la tarjeta nueva (hub#1208; lo comprueba `base/tests/test_assistant_yes_for_its_card.py`).
+  Una escritura que toma su registro por el nombre sin marcarlo ni comprobarlo no queda fijada: su tarjeta tiene que
+  leerlo (patrón de Demo, hub#1206); el «sí» a una escritura que la persona no puede hacer y un
   responsable puede aprobar responde `requires_elevation` para esa misma petición y, repetida con el pase, la corre
   con ese permiso más y gasta el pase en su transacción (`_assistant_approved` + `base.approval_spend`), y arma las
   instrucciones con las pantallas que puede enlazar
