@@ -15,10 +15,14 @@ import { fileURLToPath } from 'node:url';
 import { type Browser, type BrowserContext, type Cookie, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { turnOffRecorded, turnOnRecording } from './apps-turned-on';
+import { api } from './hub-api';
 import { hubDatabases, plan } from './hub-databases';
 import { mailDirFrom, readMailCode } from './mail';
 import { isConnectionRefused, withRetry } from './retry';
 import { STACK } from './stack';
+
+// The hub's API (setup and evidence), which every spec takes from here.
+export { api };
 
 export const A = STACK.hub('a');
 export const B = STACK.hub('b');
@@ -568,29 +572,6 @@ export async function menuApps(page: Page): Promise<string[]> {
   await sheet.locator('[data-testid="apps-launcher-close"]').click();
   await expect(sheet).toBeHidden();
   return names;
-}
-
-/** The demo's API with the context's session (setup and server-side evidence, never the check). */
-export async function api<T>(
-  context: BrowserContext,
-  origin: string,
-  method: 'GET' | 'POST',
-  path: string,
-  body?: unknown,
-): Promise<{ status: number; data: T }> {
-  // The context also holds the SaaS's cookies (host `localhost`), and Playwright hands them to
-  // `a.localhost` too: the token is the hub host's own.
-  const host = new URL(origin).hostname;
-  const cookies = await context.cookies(origin);
-  const csrf = cookies.find((c) => c.name === 'csrftoken' && c.domain === host)?.value ?? '';
-  const url = `${origin}/api${path}`;
-  const headers = { 'X-CSRFToken': csrf, Accept: 'application/json' };
-  const res =
-    method === 'GET'
-      ? await context.request.get(url, { headers })
-      : await context.request.post(url, { headers, data: body ?? {} });
-  const text = await res.text();
-  return { status: res.status(), data: (text ? JSON.parse(text) : null) as T };
 }
 
 export async function createItem(context: BrowserContext, origin: string, name: string): Promise<Item> {

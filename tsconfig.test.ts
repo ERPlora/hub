@@ -464,3 +464,32 @@ it('copies into the image every file pnpm build reads for the SPA, and keeps non
   expect(oneByOne).toBe(0);
 }, 60_000);
 
+/** The repo files Vite loads to read its config, before it builds anything: vite.config.ts and what it imports. */
+function viteConfigReads(): string[] {
+  const reads = new Set<string>();
+  const pending = ['vite.config.ts'];
+  for (let file = pending.pop(); file !== undefined; file = pending.pop()) {
+    if (reads.has(file)) continue;
+    reads.add(file);
+    const source = readFileSync(join(root, file), 'utf8');
+    const folder = dirname(join(root, file));
+    for (const pattern of SPECIFIERS) {
+      for (const [, specifier] of source.matchAll(pattern)) pending.push(relative(root, landing(resolve(folder, specifier))));
+    }
+  }
+  return [...reads];
+}
+
+it('copies into the image every file of the repo the Vite config imports: pnpm build loads it there first', () => {
+  // 2026-11-11: hub#765 made vite.config.ts import vitest.load.ts, and the `web` stage copied vite.config.ts alone:
+  // the image's `pnpm build` would have failed loading the config (Could not resolve "./vitest.load"). Only the
+  // deploy builds the image; the CI's `pnpm build` runs on the whole checkout.
+  const sources = webStageCopies();
+  const ignored = dockerIgnored();
+  const reads = viteConfigReads();
+
+  expect(reads).toEqual(expect.arrayContaining(['vite.config.ts', 'vitest.load.ts']));
+  expect(reads.filter((file) => !copiedBy(sources, file)).sort()).toEqual([]);
+  expect(reads.filter((file) => ignored(file)).sort()).toEqual([]);
+});
+

@@ -164,11 +164,13 @@ def card_for(name: str, arguments: dict, language: str, ctx=None) -> dict:
     return assistant.card(get(name), arguments, language, ctx=ctx or ctx_for(language=language))
 
 
-# RESERVATION-F06 «Tomar una reserva a mano», asked to the assistant: the card says for whom and at which table.
+# RESERVATION-F06 «Tomar una reserva a mano», asked to the assistant: the card says for whom and at which table, the
+# table with its zone («5 (Terraza)») as Tables names it, since its number repeats across zones (hub#550).
 @pytest.mark.django_db
 @pytest.mark.parametrize(("language", "customer", "table"), [("es", "Cliente", "Mesa"), ("en", "Customer", "Table")])
 def test_booking_a_table_names_the_customer_and_the_table_never_by_their_ids(language, customer, table):
     ana = make_customer("Ana García")
+    make_table("5", make_zone("Sala"))
     five = make_table("5", make_zone("Terraza"))
     arguments = {
         "customer_id": str(ana.id),
@@ -179,19 +181,25 @@ def test_booking_a_table_names_the_customer_and_the_table_never_by_their_ids(lan
     }
     card = card_for("reservation.reservation.create", arguments, language)
     named = [(label, value) for label, value in said(card) if label in (customer, table)]
-    assert named == [(customer, "Ana García"), (table, "5")]
+    assert named == [(customer, "Ana García"), (table, "5 (Terraza)")]
     assert not by_an_id(card)
 
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_changing_a_reservation_names_it_its_new_table_and_the_customer_it_is_changed_for(language):
+    """RESERVATION-F08: the new table with its zone, as Tables names it; table 7 of the room is another one (hub#550)."""
     ana = make_customer("Ana García")
     booked = make_reservation(customer_id=ana.id)
-    seven = make_table("7")
+    make_table("7", make_zone("Sala"))
+    seven = make_table("7", make_zone("Terraza"))
     arguments = {"id": str(booked.id), "table_id": str(seven.id), "on_behalf_of": str(ana.id)}
     card = card_for("reservation.reservation.update", arguments, language)
-    assert values(card) == {"id": f"Ana García · {WHEN[language]}", "table_id": "7", "on_behalf_of": "Ana García"}
+    assert values(card) == {
+        "id": f"Ana García · {WHEN[language]}",
+        "table_id": "7 (Terraza)",
+        "on_behalf_of": "Ana García",
+    }
     assert not by_an_id(card)
 
 
@@ -278,11 +286,11 @@ def test_a_record_the_person_may_not_read_is_left_out_never_by_its_id():
     """A host who books tables but may not read the customers' cards: the card names the table and leaves the customer
     out — as Customers would not show them that card."""
     ana = make_customer("Ana García")
-    five = make_table("5")
+    five = make_table("5", make_zone("Terraza"))
     host = ctx_for(language="es", permissions={"reservation.add_reservation", "table.view_table"})
     arguments = {"customer_id": str(ana.id), "date": TOMORROW.isoformat(), "time": "21:00", "party_size": 2}
     card = card_for("reservation.reservation.create", {**arguments, "table_id": str(five.id)}, "es", ctx=host)
-    assert "customer_id" not in values(card) and values(card)["table_id"] == "5"
+    assert "customer_id" not in values(card) and values(card)["table_id"] == "5 (Terraza)"
     assert not by_an_id(card)
 
 
