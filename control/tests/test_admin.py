@@ -708,6 +708,22 @@ class TestRestoreFromACopy:
         hub.refresh_from_db()
         assert hub.restoring_from_id is None
 
+    def test_anyone_who_is_not_staff_is_answered_403_and_nothing_is_asked(self, client):
+        client.force_login(get_user_model().objects.create_user(username="owner", password="pw"))
+        hub = self.a_hub("acme")
+        temporary = self.a_temporary_cluster()
+
+        response = client.post(
+            HUBS,
+            {"action": "restore_from_a_copy", "_selected_action": [str(hub.pk)], "apply": "yes",
+             "cluster": str(temporary.pk), "at": MOMENT},
+            HTTP_HOST=PLATFORM,
+        )
+
+        assert response.status_code == 403
+        hub.refresh_from_db()
+        assert hub.restoring_from_id is None and not events("control.hub.restore_requested")
+
     def test_past_the_admins_door_its_operation_still_refuses_support_with_403(self, client, support, monkeypatch):
         from live.errors import OperationError
 

@@ -15,9 +15,17 @@ asks each hub through its operation. «Move to cluster…» and «Restore from a
 {% endblock breadcrumbs %}
 {% block content %}
 <p>{% block intro %}{% endblock intro %}</p>
-<ul>
-  {% for hub in hubs %}<li>{{ hub.slug }}{% if hub.db_name %} ({{ hub.db_name }}){% endif %}</li>{% endfor %}
-</ul>
+{# Read-only rows of an aligned fieldset, as a hub's own page shows its fields: a long database name wraps there. #}
+<fieldset class="module aligned">
+  {% for hub in hubs %}
+  <div class="form-row">
+    <div class="flex-container">
+      <label>{{ hub.slug }}</label>
+      <div class="readonly">{{ hub.db_name }}</div>
+    </div>
+  </div>
+  {% endfor %}
+</fieldset>
 <form method="post">{% csrf_token %}
   {% for hub in hubs %}<input type="hidden" name="{{ action_checkbox_name }}" value="{{ hub.pk }}">{% endfor %}
   <input type="hidden" name="action" value="{{ action }}">
