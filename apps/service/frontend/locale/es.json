@@ -204,7 +204,7 @@
     },
     "grants": {
       "title": "Bonos vendidos",
-      "hint": "Todos los clientes que han comprado este bono, con las sesiones usadas y las que quedan. A un bono vivo se le pueden regalar sesiones o alargar la caducidad, o quitar sesiones para corregir su saldo; una venta de la que no se ha usado nada se puede anular.",
+      "hint": "Todos los clientes que han comprado este bono, con las sesiones usadas y las que quedan. En un bono vivo puedes gastar una sesión hecha fuera del cobro, regalar sesiones o alargar la caducidad, o quitar sesiones para corregir su saldo; una venta de la que no se ha usado nada se puede anular.",
       "empty": "Nadie ha comprado este bono todavía.",
       "error": "No se han podido cargar los bonos vendidos",
       "status": {
@@ -222,6 +222,7 @@
       "given": "Regalado después: +{uses} sesión(es), +{days} día(s)",
       "corrected": "Corregido después: −{uses} sesión(es)",
       "voidedBy": "Anulado por {who} el {when}",
+      "redeem": "Gastar una sesión",
       "adjust": "Ajustar",
       "void": "Anular"
     },
@@ -250,6 +251,27 @@
       "expiresOn": "caduca el {when}",
       "neverExpires": "no caduca",
       "confirm": "Ajustar"
+    },
+    "redeem": {
+      "title": "Gastar una sesión",
+      "message": "Da por entregada una sesión del bono «{package}» de {customer}, fuera del cobro.",
+      "service": "Servicio",
+      "servicePlaceholder": "Elige el servicio",
+      "member": "Profesional",
+      "memberHelp": "Quién la hizo: lo que vale la sesión cuenta en su producción en Ventas. Opcional.",
+      "note": "Nota",
+      "balance": "Queda {n} sesión · {after} después de esta | Quedan {n} sesiones · {after} después de esta",
+      "unlimited": "Sin límite de sesiones",
+      "checking": "Comprobando el bono…",
+      "refused": "No se puede gastar esta sesión",
+      "reason": {
+        "voided": "Este bono está anulado: ya no se puede usar.",
+        "expired": "Este bono ha caducado.",
+        "no_uses_left": "Este bono ya no tiene sesiones disponibles.",
+        "does_not_cover_service": "Este bono no cubre ese servicio."
+      },
+      "checkError": "No se ha podido comprobar el bono",
+      "confirm": "Gastar sesión"
     },
     "movements": {
       "title": "Movimientos del bono",
