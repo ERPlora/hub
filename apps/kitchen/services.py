@@ -677,7 +677,7 @@ def send(ctx: OperationContext, data: TicketSendIn) -> dict:
                 "open the last round sent from table 2",
             ),
             "es": (
-                "abre la ronda que acaba de mandar la mesa 4",
+                "la mesa 4 acaba de mandar otra ronda: recíbela",
                 "recibe la ronda de la mesa 2",
             ),
         },
