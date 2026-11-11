@@ -134,7 +134,7 @@ PAID = (
 #: half of its own. Language, tool, phrase.
 OWN_WORDS = [
     ("es", "invoice.invoice.list", "busca lo que le hemos emitido a Talleres Mercedes"),
-    ("en", "invoice.invoice.list", "look up everything we issued to Talleres Mercedes"),
+    ("en", "invoice.invoice.list", "anything still pending from Talleres Mercedes?"),
     ("es", "invoice.invoice.get", "quiero ver por dentro la FACT-2025-000412"),
     ("en", "invoice.invoice.get", "read me FACT-2025-000412 from top to bottom"),
     ("es", "invoice.invoice.document", "¿cómo se ve en hoja lo que le dimos a Talleres Mercedes?"),
@@ -156,7 +156,7 @@ OWN_WORDS = [
     ("es", "invoice.refund.get", "del reintegro de ayer a Mercedes, ¿qué número le salió?"),
     ("en", "invoice.refund.get", "Mercedes was reimbursed yesterday: which number did her rectifying one get?"),
     ("es", "invoice.issuer.get", "¿qué CIF y domicilio figuran como nuestros en lo que emitimos?"),
-    ("en", "invoice.issuer.get", "whose name heads everything we issue?"),
+    ("en", "invoice.issuer.get", "whose name and tax number head our documents?"),
     ("es", "invoice.numbering.allocations", "¿a qué se le dio el 000123 en el libro?"),
     ("en", "invoice.numbering.allocations", "who got 000123, according to the ledger?"),
     ("es", "invoice.numbering.gaps", "¿nos hemos saltado alguno al numerar?"),
