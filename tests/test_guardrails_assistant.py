@@ -63,7 +63,6 @@ def stops_in_the_chat(description: str) -> list[str]:
 #: fixes them once those merge and empties the list.
 PENDING = {
     "attendance.record.correct": "ERPlora/hub#1165 edits apps/attendance/services.py",
-    "cash_register.session.close": "ERPlora/hub#1158 edits apps/cash_register/services.py (and fixes it)",
     "flow.flow.delete": "ERPlora/hub#1164 edits apps/flow/services.py",
     "flow.flow.run": "ERPlora/hub#1164 edits apps/flow/services.py",
     "flow.question.answer": "ERPlora/hub#1164 edits apps/flow/services.py",
