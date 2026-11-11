@@ -10,7 +10,7 @@ import { defineComponent, h, ref } from 'vue';
 
 import { flush, mountBase } from '../__tests__/mount-base';
 import { unsavedChangesIn } from './system-back';
-import { useUnsavedChanges, useUnsavedForm, useUnsavedFormOnOpen } from './unsaved-changes';
+import { useSheetWaysOut, useUnsavedChanges, useUnsavedForm, useUnsavedFormOnOpen } from './unsaved-changes';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -270,5 +270,60 @@ describe('hub#1156 — useUnsavedForm and useUnsavedFormOnOpen give back the win
     await flush();
     button('¿Descartar los cambios?', 'submit')!.click();
     await expect(answer).resolves.toBe(true);
+  });
+});
+
+describe('hub#1233 — useSheetWaysOut: a window that is an ion-modal of its own asks on its close button, Escape and a tap outside', () => {
+  /** The question its guard gives back, answered by the test. */
+  function guard() {
+    let answer!: (yes: boolean) => void;
+    const ask = vi.fn(() => new Promise<boolean>((resolve) => (answer = resolve)));
+    return { ask, answer: (yes: boolean) => answer(yes) };
+  }
+
+  it('closing from the page (`open = false`, no role) never asks', async () => {
+    const { ask } = guard();
+    const { canDismiss } = useSheetWaysOut(ask, ref(true));
+    await expect(canDismiss(undefined, undefined)).resolves.toBe(true);
+    expect(ask).not.toHaveBeenCalled();
+  });
+
+  it('Ionic’s own ways out (Escape, a tap outside: role `backdrop`) ask, and close only on yes', async () => {
+    const g = guard();
+    const { canDismiss } = useSheetWaysOut(g.ask, ref(true));
+    const kept = canDismiss(undefined, 'backdrop');
+    g.answer(false);
+    await expect(kept).resolves.toBe(false);
+    const left = canDismiss(undefined, 'backdrop');
+    g.answer(true);
+    await expect(left).resolves.toBe(true);
+    expect(g.ask).toHaveBeenCalledTimes(2);
+  });
+
+  it('its close button asks: «Keep editing» leaves it open, a yes closes it', async () => {
+    const g = guard();
+    const open = ref(true);
+    const { close } = useSheetWaysOut(g.ask, open);
+    const kept = close();
+    g.answer(false);
+    await kept;
+    expect(open.value).toBe(true);
+    const left = close();
+    g.answer(true);
+    await left;
+    expect(open.value).toBe(false);
+  });
+
+  it('one question at a time: a second way out while it is up waits for the same answer', async () => {
+    const g = guard();
+    const open = ref(true);
+    const { canDismiss, close } = useSheetWaysOut(g.ask, open);
+    const byButton = close();
+    const byEscape = canDismiss(undefined, 'backdrop');
+    g.answer(true);
+    await byButton;
+    await expect(byEscape).resolves.toBe(true);
+    expect(g.ask).toHaveBeenCalledTimes(1);
+    expect(open.value).toBe(false);
   });
 });

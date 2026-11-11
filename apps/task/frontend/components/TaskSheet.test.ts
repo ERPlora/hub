@@ -232,14 +232,36 @@ describe('TaskSheet', () => {
 });
 
 
-describe('TaskSheet: Android Back with unsaved changes (hub#1046, BASE-F05)', () => {
-  it('as opened closes; a change asks; restored as opened closes again', async () => {
+describe('TaskSheet: unsaved changes ask before closing (hub#1046, hub#1233, BASE-F05)', () => {
+  it('a half-written comment: Back, «Close», Escape and a tap outside ask «Discard changes?»; «Keep editing» keeps it', async () => {
     const s = await setup();
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('task-sheet'),
       change: () => ionValue(s.el('task-sheet-new-comment'), 'Half done', 'ionInput'),
       restore: () => ionValue(s.el('task-sheet-new-comment'), '', 'ionInput'),
+    });
+  });
+
+  it('a half-written subtask asks on «Close» too', async () => {
+    const s = await setup();
+    const { answerUnsavedQuestion } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await ionValue(s.el('task-sheet-new-subtask'), 'Buy bleach', 'ionInput');
+    await click(s.el('task-sheet-close'));
+    await answerUnsavedQuestion('discard');
+    await settle();
+    expect(s.wrapper.props('open')).toBe(false);
+  });
+
+  it('as opened, «Close», Escape and a tap outside close it without asking', async () => {
+    const s = await setup();
+    const { expectUntouchedFormClosesAtOnce } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUntouchedFormClosesAtOnce({
+      overlay: () => s.inDoc('task-sheet'),
+      reopen: async () => {
+        await s.wrapper.setProps({ open: true });
+        await settle();
+      },
     });
   });
 
