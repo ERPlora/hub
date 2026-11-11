@@ -451,8 +451,10 @@ pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ve
   de la QA del asistente (hub#1090, dueño y empleado) que cada una trae su herramienta en la primera mitad de
   las que ofrece un turno (F01–F06, F08), que el empleado no recibe ninguna escritura, que listar o dar de alta
   un método va por delante de la forma de cobro del TPV con la misma acción y, al revés, que pedir una forma
-  de cobro del TPV nunca pone un método de Pagos por delante de ella; y una frase propia por herramienta y
-  otra por el grupo de sinónimos que sin ellos no llegan.
+  de cobro del TPV nunca pone un método de Pagos por delante de ella, que volver a activar un método va por
+  delante de encender una app (`base.app.enable`; live lee «activar» y «habilitar» también como la acción
+  `activate`, ERPlora/live#70); y una frase propia por herramienta y otra por el grupo de sinónimos que sin
+  ellos no llegan.
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#674): nombra el registro que una escritura
   señala por su id con las marcas `refers` de `schemas.py` (`A_METHOD`, `A_PAYMENT`), leídas como quien
   pregunta y con su permiso (`payment.view_payment`): el método (el `id` de `MethodRefIn`, en editar,
