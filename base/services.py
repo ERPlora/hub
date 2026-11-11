@@ -1915,6 +1915,21 @@ def reap_demo_tombstones(now: dt.datetime | None = None) -> int:
     return deleted.get(Hub._meta.label, 0)
 
 
+def gone_hubs(ids: list[UUID]) -> dict[UUID, Hub | None]:
+    """Of ``ids``, the hubs that are gone for good, each with its tombstone: ``purged``, or ``None`` with no row in the
+    registry at all (a demo's, forgotten after ``DEMO_TOMBSTONE_DAYS``). Any other status is not gone: on its way,
+    served, restorable or still being dropped (its own purge deletes its files, and retries).
+
+    A plain read of control (the caller opens ``use_control``), no operation: ``manage.py delete_leftover_hub_files``'s,
+    which deletes the files these left in the store before hub#781 (hub#785)."""
+    rows = {hub.pk: hub for hub in Hub.objects.filter(pk__in=ids).only("id", "slug", "status", "is_demo", "purged_at")}
+    return {
+        hub_id: rows.get(hub_id)
+        for hub_id in ids
+        if hub_id not in rows or rows[hub_id].status == Hub.Status.PURGED
+    }
+
+
 # ── Data: blueprints, imports and reset (APP-BASE-2) ──
 
 

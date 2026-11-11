@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ce41752ed7af37abee9f4ae2ecd3927006e516e673ba8d1614fb09ece9398862 -->
+<!-- generated from WORKBOOK.md sha256:880035592453ec243b3dd094afefa2f3a650ab28fdb4518ed3fa65728fc05358 -->
 
 ## What it is for and who it is for
 
@@ -1094,7 +1094,11 @@ They carry identifiers, never a number, a name or a text of the conversation.
   (`note.get`, `template.get`). Before changing anything it asks to confirm with its card (BASE-F97), which names each
   record as the screens name it, never by its id: the conversation as the inbox calls it ("Conversation: Ana López"),
   the card joined to it, the message retried and the note deleted by their text, and the template by its name and its
-  language ("Template: recordatorio (es)"). What the person asking cannot see is left out.
+  language ("Template: recordatorio (es)"). What the person asking cannot see is left out. Each tool knows how a
+  person asks for it, in English and in Spanish: "open Ana's last message", "retry the template that did not reach
+  Meta" or "which people can take this WhatsApp conversation?" reach their operation (before, opening one message, retrying a
+  message or a template, sending, changing a template and seeing who a conversation can be assigned to did not reach
+  it and it said it could not). For the assistant, a "template" and a "message" are this inbox's.
 
 ### Who can do what
 

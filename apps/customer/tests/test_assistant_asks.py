@@ -8,20 +8,20 @@ each.
 """
 
 import pytest
-from live.context import OperationContext, Scope
 from live.errors import Conflict
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
 from apps.customer.models import Customer
 from apps.customer.schemas import MergeIn
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import assert_its_asks_bring
+from base.tests.test_assistant_asks import (
+    assert_its_asks_bring,
+    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
+)
 
 from .conftest import ctx_for
 
-A = Scope("host", "a")
 #: Writes on cards and settings that only the owner and the admin hold, none of them a manager approves: an employee's
 #: assistant is never offered them (an approvable write is, as its button on the screen: running it asks a manager).
 NOT_THE_EMPLOYEES = {
@@ -30,20 +30,6 @@ NOT_THE_EMPLOYEES = {
     "customer.group.delete",
     "customer.tag.delete",
 }
-
-
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(
-            scope=A, actor=user.username, permissions=permissions_for(user, A), language=language
-        )
-        return assistant.catalog(ctx)
-
-    return of
 
 
 def test_customer_offers_at_least_30_tools():
