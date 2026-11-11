@@ -1103,7 +1103,7 @@ def numbering_status(ctx: OperationContext, params: NumberingStatusIn) -> dict:
             "en": (
                 "are there gaps in the invoice numbers?",
                 "is our invoice numbering correlative?",
-                "did we skip any invoice number?",
+                "is there a skipped number in our invoice numbering?",
             ),
             "es": (
                 "¿falta algún número entre las facturas?",

@@ -160,7 +160,7 @@ OWN_WORDS = [
     ("es", "invoice.numbering.allocations", "¿a qué se le dio el 000123 en el libro?"),
     ("en", "invoice.numbering.allocations", "who got 000123, according to the ledger?"),
     ("es", "invoice.numbering.gaps", "¿nos hemos saltado alguno al numerar?"),
-    ("en", "invoice.numbering.gaps", "did we skip any number somewhere along the way?"),
+    ("en", "invoice.numbering.gaps", "was any number skipped somewhere along the way?"),
     ("es", "invoice.numbering.status", "¿podemos empezar a emitir en 2027 o falta preparar algo?"),
     ("en", "invoice.numbering.status", "come January, are all our numbers ready to roll?"),
     ("es", "invoice.series.list", "¿con qué prefijos y letras numeramos este año cada cosa que emitimos?"),
