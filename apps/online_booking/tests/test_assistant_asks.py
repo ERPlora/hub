@@ -54,23 +54,24 @@ PROBES = [
 ]
 #: What a person says in words of their own, neither an ask nor a probe of layer 2, one per tool of Online booking: each
 #: reaches its tool among the first ten by its asks and not without them, so asks that stop reading as people speak fail
-#: here, tool by tool. None says «reserva» beside the verb of its tool: a booking named with its verb («anula la
-#: reserva») brings the tool by its name alone.
+#: here, tool by tool. None says «reserva» beside the verb of its tool (a booking named with its verb, «anula la
+#: reserva», brings the tool by its name alone), «ahora», «hoy» or «ya» (read by half the Hub's tools), nor more than two
+#: content words of any one of its asks: an ask said in another order is no phrase of a person's own (hub#1179).
 OWN_WORDS = [
-    ("online_booking.booking.list", "¿qué clientas han reservado ellas mismas desde internet?"),
-    ("online_booking.booking.get", "lo de Ainhoa de internet del miércoles, ¿qué es?"),
-    ("online_booking.settings.get", "¿cómo está montada la reserva por internet?"),
+    ("online_booking.booking.list", "¿alguna clienta ha cogido hora por internet esta semana?"),
+    ("online_booking.booking.get", "Ainhoa llama por lo suyo del miércoles, ¿qué es?"),
+    ("online_booking.settings.get", "¿qué tiene que dejar una clienta para reservar por internet?"),
     ("online_booking.settings.update", "que la web de reservas salude con un «Hola, guapa»"),
     ("online_booking.public.page", "¿qué color y qué logo lleva la web de reservas?"),
-    ("online_booking.public.services", "¿qué tratamientos se pueden coger por internet?"),
-    ("online_booking.public.slots", "¿qué horas libres tiene la web para cualquiera el jueves?"),
-    ("online_booking.public.booking", "con su enlace, ¿Leire puede ver lo que reservó?"),
+    ("online_booking.public.services", "¿qué tratamientos dejo coger por la web?"),
+    ("online_booking.public.slots", "el martes, ¿qué horas le quedan a cualquiera en la web?"),
+    ("online_booking.public.booking", "¿qué datos tiene Leire en su enlace?"),
     ("online_booking.public.book", "Maite quiere unas mechas el sábado por internet, con cualquiera"),
     ("online_booking.public.cancel", "deja libre lo de Leire usando su enlace"),
-    ("online_booking.booking.confirm", "acepta lo que ha llegado de Nerea por internet"),
-    ("online_booking.booking.complete", "lo de Nerea de internet ya está acabado"),
-    ("online_booking.booking.no_show", "Olga no apareció por lo de internet de ayer"),
-    ("online_booking.booking.cancel", "Olga no viene el sábado a lo de internet, dalo de baja"),
+    ("online_booking.booking.confirm", "dile que sí a Nerea con lo de internet"),
+    ("online_booking.booking.complete", "lo de la bandeja de Nerea, márcalo como acabado"),
+    ("online_booking.booking.no_show", "ni rastro de Olga ayer, faltó sin avisar"),
+    ("online_booking.booking.cancel", "a Olga le ha surgido algo, rechaza lo del jueves"),
     ("online_booking.booking.delete", "fuera de la bandeja lo repetido de Olga"),
 ]
 

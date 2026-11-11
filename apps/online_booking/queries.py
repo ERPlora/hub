@@ -721,7 +721,7 @@ def public_booking_out(appointment: Appointment) -> dict:
     ai={
         "asks": {
             "en": (
-                "what does Leire see when she opens the link of her booking?",
+                "what does Leire see on the link of her booking?",
                 "can Leire cancel it from her own link?",
             ),
             "es": (

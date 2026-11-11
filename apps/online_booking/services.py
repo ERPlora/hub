@@ -176,7 +176,7 @@ def confirm_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
                 "close off the booking APT-20261120-0004 from my link as finished",
             ),
             "es": (
-                "lo que Nerea reservó por internet ya está hecho",
+                "lo que reservó Nerea por internet, dalo por hecho",
                 "da por acabada la reserva de la bandeja APT-20261120-0004",
             ),
         },
@@ -202,8 +202,8 @@ def complete_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "Olga never turned up for what she booked by herself yesterday",
-                "Olga missed what she booked through my link",
+                "Olga never turned up for her self-booking yesterday",
+                "Olga missed her booking made through my link",
             ),
             "es": (
                 "Olga no se ha presentado a lo que reservó por internet ayer",
@@ -232,7 +232,7 @@ def no_show_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "cancel Olga's self-booking on Saturday, she can't make it",
+                "cancel Olga's self-booking on Saturday, something came up",
                 "decline the booking that came in through my link for Thursday",
             ),
             "es": (
@@ -516,7 +516,7 @@ def public_book(ctx: OperationContext, data: PublicBookIn) -> dict:
         "asks": {
             "en": (
                 "cancel through Leire's own link on her behalf",
-                "use the customer's link to call off what she booked",
+                "with the customer's link, call off her booking for her",
             ),
             "es": (
                 "anula lo que Leire reservó en la web, con su enlace y por ella",
