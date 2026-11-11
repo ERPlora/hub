@@ -12,6 +12,7 @@ app reach their tool without their own words (``own_asks=False``: how a person's
 (``AsksReach``), never failed.
 """
 
+import dataclasses
 import json
 import re
 import unicodedata
@@ -155,6 +156,60 @@ def probe_phrases() -> dict[str, str]:
         for path in sorted(PROBES.glob("*.json"))
         for probe in json.loads(path.read_text(encoding="utf-8"))["probes"]
     }
+
+
+# ── What an app's own test of its asks ranks with (``apps/<app>/tests/test_assistant_asks.py`` imports them) ────────
+
+
+@pytest.fixture
+def catalog_of(make_user):
+    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
+
+    def of(role: str, language: str) -> dict[str, Operation]:
+        user = make_user(f"asker-{role}", host=A.key, role=role)
+        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
+        return assistant.catalog(ctx)
+
+    return of
+
+
+def offered_place(tools: dict[str, Operation], name: str, phrase: str, language: str = "es") -> int | None:
+    """The place a turn offers ``name`` at for ``phrase`` (1 is first), ``None`` when it is not offered at all."""
+    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
+    return offered.index(name) + 1 if name in offered else None
+
+
+def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str) -> int | None:
+    """``offered_place`` of a tool the person holds for a ``phrase`` that is none of its asks in Spanish."""
+    assert name in tools  # positive control: the person holds the tool, so its place is known
+    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
+    return offered_place(tools, name, phrase)
+
+
+def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
+    """``tools`` with ``name`` saying no asks: how a turn ranks it by its name, its description and the groups alone."""
+    op = tools[name]
+    return {**tools, name: dataclasses.replace(op, ai={key: value for key, value in op.ai.items() if key != "asks"})}
+
+
+def assert_reported_are_owner_probes(reported: Iterable[tuple[str, str]]) -> None:
+    """Each ``(tool, phrase)`` an app's test reports is, word for word, the owner's Spanish probe of layer 2 of that
+    tool (``owner.es.<tool>``): the phrases are the QA's, never written to fit."""
+    phrases = probe_phrases()
+    assert [phrases.get(comparable(phrase)) for _, phrase in reported] == [f"owner.es.{name}" for name, _ in reported]
+
+
+def assert_reached_by_its_asks(tools: dict[str, Operation], name: str, phrase: str) -> None:
+    """A request in the person's own words (``OWN_WORDS`` of an app's test: neither an ask nor a probe) brings ``name``
+    among the first ``TOP`` by its asks, and without them it does not: asks that stop reading as people speak fail."""
+    assert comparable(phrase) not in probe_phrases()
+    assert comparable(phrase) not in {comparable(ask) for asks in shared.asks_of(tools[name]).values() for ask in asks}
+    place = place_of_no_ask(tools, name, phrase)
+    assert place is not None and place <= TOP, place
+    before = without_its_asks(tools, name)
+    assert not shared.asks_of(before[name])  # positive control: the tool is ranked without its asks
+    unasked = offered_place(before, name, phrase)
+    assert unasked is None or unasked > TOP, unasked
 
 
 def test_no_ask_copies_a_qa_probe_or_names_a_qa_record():

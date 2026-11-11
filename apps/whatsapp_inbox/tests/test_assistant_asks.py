@@ -7,20 +7,25 @@ Every ask of every tool of whatsapp_inbox bringing its tool among the first ten,
 ``live.E020`` over the asks and the guard that no ask copies a probe of layer 2.
 """
 
-import dataclasses
 import json
 
 import pytest
 from live import assistant as shared
-from live.context import OperationContext, Scope
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import PROBES, TOP, comparable, probe_phrases
-
-A = Scope("host", "a")
+from base.tests.test_assistant_asks import (
+    PROBES,
+    TOP,
+    assert_reached_by_its_asks,
+    assert_reported_are_owner_probes,
+    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
+    comparable,
+    offered_place,
+    place_of_no_ask,
+    probe_phrases,
+)
 
 #: The requests of hub#1108's QA (``owner.es.whatsapp_inbox.*`` of ``owner-es-whatsapp_inbox-2026-11-08.json``), as the
 #: owner said them: before the inbox said its asks, none of these tools was among the ones a turn offers
@@ -97,6 +102,8 @@ OWN_WORDS = [
 REWRITTEN = ("base.blueprint.list", "staff.member.bulk_create")
 #: The places an ask of another app keeps free below the first ten: the asks of the next app to say its own take them.
 ROOM = 2
+#: Who loads a business template and the whole staff (``base.administer_hub``, ``staff.add_member``): the roles both hold.
+RUN_THE_BUSINESS = (Membership.Role.OWNER, Membership.Role.ADMIN)
 
 
 def whatsapp_probes() -> list[tuple[str, str, str]]:
@@ -107,39 +114,6 @@ def whatsapp_probes() -> list[tuple[str, str, str]]:
         for path in sorted(PROBES.glob("*-es-whatsapp_inbox-*.json"))
         for probe in json.loads(path.read_text(encoding="utf-8"))["probes"]
     ]
-
-
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(
-            scope=A, actor=user.username, permissions=permissions_for(user, A), language=language
-        )
-        return assistant.catalog(ctx)
-
-    return of
-
-
-def offered_place(tools: dict[str, Operation], name: str, phrase: str, language: str = "es") -> int | None:
-    """The place a turn offers ``name`` at for ``phrase`` (1 is first), ``None`` when it is not offered at all."""
-    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
-    return offered.index(name) + 1 if name in offered else None
-
-
-def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str) -> int | None:
-    """``offered_place`` of a tool the person holds for a ``phrase`` that is none of its asks in Spanish."""
-    assert name in tools  # positive control: the person holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    return offered_place(tools, name, phrase)
-
-
-def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
-    """``tools`` with ``name`` saying no asks: how a turn ranks it by its name, its description and the groups alone."""
-    op = tools[name]
-    return {**tools, name: dataclasses.replace(op, ai={key: value for key, value in op.ai.items() if key != "asks"})}
 
 
 def test_the_inbox_offers_at_least_30_tools():
@@ -178,8 +152,7 @@ def test_a_request_in_spanish_brings_its_tool_among_the_first_ten_by_the_inboxs_
 
 
 def test_the_reported_requests_are_the_probes_of_layer_2():
-    phrases = probe_phrases()
-    assert [phrases.get(comparable(phrase)) for _, phrase in REPORTED] == [f"owner.es.{name}" for name, _ in REPORTED]
+    assert_reported_are_owner_probes(REPORTED)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -215,19 +188,12 @@ def test_every_tool_of_the_inbox_has_its_own_words():
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    assert comparable(phrase) not in probe_phrases()
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= TOP, place
-    before = without_its_asks(tools, name)
-    assert not shared.asks_of(before[name])  # positive control: the tool is ranked without its asks
-    unasked = offered_place(before, name, phrase)
-    assert unasked is None or unasked > TOP, unasked
+def test_the_owners_own_words_reach_each_tool_of_the_inbox_by_its_asks(catalog_of, name, phrase):
+    assert_reached_by_its_asks(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
-@pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.ADMIN])
+@pytest.mark.parametrize("role", RUN_THE_BUSINESS)
 @pytest.mark.parametrize("language", ["en", "es"])
 @pytest.mark.parametrize("name", REWRITTEN)
 def test_the_inboxs_templates_take_no_place_from_the_business_templates_nor_the_staff(catalog_of, name, language, role):
