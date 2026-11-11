@@ -312,6 +312,18 @@ def _status(rows: QuerySet, status: str) -> QuerySet:
     output=Page[PriceListOut],
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "who do I give special conditions to?",
+                "show me the special conditions for partners and distributors",
+                "how many special conditions are still in force?",
+            ),
+            "es": (
+                "¿para quién tengo condiciones especiales?",
+                "enséñame las condiciones de socios y distribuidores",
+                "¿cuántas condiciones especiales siguen en vigor?",
+            ),
+        },
         "description": "List the price lists (the active ones by default): code, name, currency, whether the "
         "prices carry the tax, customer group, dates, whether it is the general list and how many prices it has. "
         "Search by code or name; filter by currency, group, tax or status."
@@ -342,7 +354,21 @@ def list_price_lists(ctx: OperationContext, params: PriceListListIn) -> dict:
     input=PriceListRefIn,
     output=PriceListOut,
     expose_api=True,
-    ai={"description": "Get one price list by its id, its code or its name (e.g. «wholesale list»)."},
+    ai={
+        "asks": {
+            "en": (
+                "is the Hospitality one valid all year or does it end?",
+                "give me the details of Hospitality, HOST-24",
+                "until when is Hospitality valid?",
+            ),
+            "es": (
+                "¿lo de Hostelería vale todo el año o caduca?",
+                "dame el detalle de Hostelería, la HOST-24",
+                "¿qué fechas tiene la de Hostelería?",
+            ),
+        },
+        "description": "Get one price list by its id, its code or its name (e.g. «wholesale list»).",
+    },
 )
 def get_price_list(ctx: OperationContext, data: PriceListRefIn) -> dict:
     return list_row(find_list(data.id, data.price_list, rows=_lists()))
@@ -359,6 +385,18 @@ def get_price_list(ctx: OperationContext, data: PriceListRefIn) -> dict:
     output=Page[PriceItemOut],
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how much is the croissant in each one?",
+                "what does the croissant go for everywhere?",
+                "show me one by one what each thing costs in Hospitality",
+            ),
+            "es": (
+                "¿cuánto cuesta el croissant en cada una?",
+                "¿a cuánto va el croissant en todas?",
+                "enséñame uno por uno lo que cuesta cada cosa en la de Hostelería",
+            ),
+        },
         "description": "List the prices of a price list (named by its code or name), or the prices of one product "
         "or service across every list: the article, its catalog price, the from quantity and the price in cents. "
         "Search by product name or SKU or by service name."
@@ -394,6 +432,18 @@ def list_price_items(ctx: OperationContext, params: PriceItemListIn) -> dict:
     output=PriceItemDetailOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "from how many does the beer's amount in the partners' one apply?",
+                "give me the details of the croissant in the partners' one",
+                "what exactly does a beer go for with the partners?",
+            ),
+            "es": (
+                "¿a partir de cuántas vale lo de la caña de los socios?",
+                "dame el detalle de lo del croissant en la de socios",
+                "¿a cuánto va exactamente la caña para los socios?",
+            ),
+        },
         "description": "Get one price of a price list by its id (see pricing.price_item.list): the article, its list "
         "and the list's currency, the from quantity and the price in cents of that currency."
     },
@@ -417,6 +467,18 @@ def get_price_item(ctx: OperationContext, data: PriceItemIdIn) -> dict:
     output=Page[RuleOut],
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me the promotions running now",
+                "which promotions apply by themselves?",
+                "what gets cheaper by itself and for whom?",
+            ),
+            "es": (
+                "enséñame las promociones que hay ahora",
+                "¿qué promociones se aplican solas?",
+                "¿qué se rebaja solo y para quién?",
+            ),
+        },
         "description": "List the automatic discount rules (the active ones by default): type and value (a percent, "
         "an amount per unit, buy X get Y, tiers by quantity), what each applies to, its customer group, minimum "
         "quantity, dates and priority. Search by code or name."
@@ -446,7 +508,21 @@ def list_rules(ctx: OperationContext, params: RuleListIn) -> dict:
     input=RuleRefIn,
     output=RuleOut,
     expose_api=True,
-    ai={"description": "Get one discount rule, active or not, by its id, its code or its name (e.g. «summer rule»)."},
+    ai={
+        "asks": {
+            "en": (
+                "how big is the happy hour discount and how long does it last?",
+                "what does the happy hour consist of?",
+                "give me the details of the happy hour, PROMO-HH",
+            ),
+            "es": (
+                "¿de cuánto es el descuento de la happy hour y cuánto dura?",
+                "¿en qué consiste la happy hour?",
+                "dame el detalle de la happy hour, la PROMO-HH",
+            ),
+        },
+        "description": "Get one discount rule, active or not, by its id, its code or its name (e.g. «summer rule»).",
+    },
 )
 def get_rule(ctx: OperationContext, data: RuleRefIn) -> dict:
     return rule_row(find_rule(data.id, data.rule), platform.business_currency(ctx.scope))
@@ -463,6 +539,18 @@ def get_rule(ctx: OperationContext, data: RuleRefIn) -> dict:
     output=CatalogRecordOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what group is behind the partners' one?",
+                "what is the real name of the group behind that identifier?",
+                "name the identifier this one points at",
+            ),
+            "es": (
+                "¿qué grupo hay detrás de la de socios?",
+                "¿cómo se llama de verdad el grupo de ese identificador?",
+                "¿a qué apunta ese identificador y cómo se llama?",
+            ),
+        },
         "description": "Name by its id the service, the category or the customer group a price list, a price or a "
         "rule points at, as Services, Inventory or Customers name it (a service needs its permission in Services)."
     },
@@ -668,6 +756,18 @@ def resolve_line(ctx: OperationContext, data: ResolveIn) -> dict:
     output=ResolveOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "work out what three croissants cost Nuria",
+                "how much do three croissants come to for Nuria?",
+                "calculate a beer for the hotels' group, with its discount",
+            ),
+            "es": (
+                "calcula lo que cuestan tres croissants para Nuria",
+                "¿cuánto paga Nuria por tres croissants con su descuento?",
+                "calcula cuánto cuesta una caña para el grupo de hoteles",
+            ),
+        },
         "description": "The price of a line: give the product (by its name or SKU) or the service (by its name), "
         "and if you know them the customer (name, phone or email), the quantity and the moment. It answers the "
         "catalog price, the price that applies and the price list it comes from (the general list or the "

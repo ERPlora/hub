@@ -567,6 +567,7 @@ LIVE_ASSISTANT_ASKS_REQUIRED = (
     "inventory",
     "kitchen",
     "modifier",
+    "pricing",
     "printing",
     "reservation",
     "sale",
