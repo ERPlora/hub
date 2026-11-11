@@ -204,7 +204,7 @@
     },
     "grants": {
       "title": "Bonos vendidos",
-      "hint": "Todos los clientes que han comprado este bono, con las sesiones usadas y las que quedan. A un bono vivo se le pueden regalar sesiones o alargar la caducidad, o quitar sesiones para corregir su saldo; una venta de la que no se ha usado nada se puede anular.",
+      "hint": "Todos los clientes que han comprado este bono, con las sesiones usadas y las que quedan. En un bono vivo puedes gastar una sesión hecha fuera del cobro, regalar sesiones o alargar la caducidad, o quitar sesiones para corregir su saldo; una venta de la que no se ha usado nada se puede anular.",
       "empty": "Nadie ha comprado este bono todavía.",
       "error": "No se han podido cargar los bonos vendidos",
       "status": {

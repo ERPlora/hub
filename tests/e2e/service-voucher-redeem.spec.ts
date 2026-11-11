@@ -3,8 +3,8 @@
 // receptionist taps «Spend a session», the only service it covers comes chosen, she picks Ana from the team, sees
 // «5 sessions left · 4 after this one» and spends it: the row drops to «1 used · 4 left» by itself and Ana's
 // production in Sales rises by the session's worth (90.00 ÷ 5). A voucher with nothing left says why before
-// anything is spent. The dialog is captured in three viewports, without sideways scroll.
-import { expect, test } from '@playwright/test';
+// anything is spent. The dialog is captured at the fleet's three sizes, without sideways scroll.
+import { expect, type Locator, test } from '@playwright/test';
 
 import { A, api, shot } from './helpers';
 import { chargeByApi, cleanSales } from './sale-helpers';
@@ -26,6 +26,18 @@ test.afterAll(cleanAll);
 
 test('Sold vouchers: a session spent outside the till, choosing the service and the professional', async ({ browser }) => {
   const { context, page } = await ownerPage(browser, '/service/packages');
+  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+  // The fleet's three sizes (ui-clip-sweep.sh): desktop, tablet and a low phone; `reached` stays on screen at each.
+  const atEachSize = async (name: string, reached: Locator): Promise<void> => {
+    for (const [width, height] of [[1440, 900], [820, 1180], [375, 667]]) {
+      await page.setViewportSize({ width, height });
+      await settled(page);
+      await noHorizontalScroll(page, `${name} ${width}x${height}`);
+      await expect(reached).toBeInViewport();
+      await page.screenshot({ path: shot(`${name}-${width}x${height}`) });
+    }
+    await page.setViewportSize(VIEWPORTS.desktop);
+  };
   const productionOf = async (staffId: string): Promise<number> => {
     const res = await api<{ rows: StaffTotal[] }>(context, A, 'GET', '/sale/sales/by_staff');
     expect(res.status).toBe(200);
@@ -57,6 +69,7 @@ test('Sold vouchers: a session spent outside the till, choosing the service and 
   const sheet = page.locator('ion-modal[data-testid=service-grants]');
   const row = sheet.locator(`[data-testid=service-grants-row-${lucias.id}]`);
   await expect(row).toContainText('0 used · 5 left');
+  await atEachSize('service-grants-redeem', sheet.locator(`[data-testid=service-grants-redeem-${lucias.id}]`));
 
   // A voucher with nothing left: the check says why, and nothing can be spent.
   await sheet.locator(`[data-testid=service-grants-redeem-${martas.id}]`).click();
@@ -73,14 +86,7 @@ test('Sold vouchers: a session spent outside the till, choosing the service and 
   await expect(dialog.locator('[data-testid=service-grant-redeem-balance]')).toHaveText('5 sessions left · 4 after this one');
   await pick(page, 'service-grant-redeem-member', ana.full_name.split(' ')[0], ana.full_name);
   await dialog.locator('[data-testid=service-grant-redeem-note] textarea').fill('Came only for her session');
-  for (const [label, viewport] of Object.entries(VIEWPORTS)) {
-    await page.setViewportSize(viewport);
-    await settled(page);
-    await noHorizontalScroll(page, `spend a session ${label}`);
-    await expect(dialog.locator('[data-testid=service-grant-redeem-submit]')).toBeInViewport();
-    await page.screenshot({ path: shot(`service-grant-redeem-${label}`) });
-  }
-  await page.setViewportSize(VIEWPORTS.desktop);
+  await atEachSize('service-grant-redeem', dialog.locator('[data-testid=service-grant-redeem-submit]'));
   await dialog.locator('[data-testid=service-grant-redeem-submit]').click();
   await expect(dialog).toBeHidden();
 
