@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:53539be441e5a03188f7e65b8f37d89761d763e05794b1f7fa6a327f43af493b -->
+<!-- generated from WORKBOOK.md sha256:d879931bf2dafb84ed371c55ee8be2a2092d97b95f794ad532076656e8fe975b -->
 
 ## What it is for and who it is for
 
@@ -2941,6 +2941,7 @@ moment that has not come yet. Without a cluster or a moment, the page asks for t
 production VeriFactu records made, sent or changed after that moment, it is not restored and nothing changes, because it
 would use again numbers the AEAT already has: its page says so under "last error" ("restore_fiscal_records: …"); for that
 case, hub#1213. Any other failure undoes the restore by itself: the business keeps its usual database and its page says
-why. With records from the test environment only, the chain is recovered afterwards (VERIFACTU-F28). The support staff
-see the list, but not the action.
+why. With the platform frozen for a database upgrade, the restore waits, with the business under maintenance, until it
+is unfrozen. With records from the test environment only, the chain is recovered afterwards (VERIFACTU-F28). The
+support staff see the list, but not the action.
 Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move); hub#1198, hub#1213, aws#77

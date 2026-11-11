@@ -3072,8 +3072,9 @@ momento que aún no ha llegado. Sin clúster o sin momento, la página los vuelv
 VeriFactu de producción hechos, enviados o cambiados después de ese momento, no se restaura y no cambia nada, porque
 volvería a usar números que la AEAT ya tiene: su ficha lo dice en «último error» («restore_fiscal_records: …»); para ese
 caso, hub#1213. Cualquier otro fallo deshace la restauración sola: el negocio sigue con su base de siempre y su ficha dice
-por qué. Con registros solo del entorno de pruebas, después se recupera la cadena (VERIFACTU-F28). El personal de
-soporte ve la lista, pero no la acción.
+por qué. Con la plataforma congelada para una subida de la base de datos, la restauración espera, con el negocio en
+mantenimiento, hasta que se descongela. Con registros solo del entorno de pruebas, después se recupera la cadena
+(VERIFACTU-F28). El personal de soporte ve la lista, pero no la acción.
 Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado); hub#1198, hub#1213, aws#77
 
 ## Para quien lo mantiene
