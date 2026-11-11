@@ -27,6 +27,7 @@ The mechanics that do not depend on the gateway are ``live.assistant``'s, shared
 import contextlib
 import dataclasses
 import datetime as dt
+import hashlib
 import json
 import logging
 import time
@@ -354,7 +355,8 @@ class _Words:
     """The Hub's words of a card (``live.assistant.Words``): the person's language and the person (``ctx``: to read a
     record's name and its currency as them; ``None`` for an automation's card, which reads no record); ``currency``, the one its amounts are in when it is not the business's (the one a write names, the one of
     the record it names, or a preview's read answers, with the decimals it answers: ``answered``); ``priced`` false
-    when the write names one that is none, or a record whose currency cannot be read: its amounts go as sent."""
+    when the write names one that is none, or a record whose currency cannot be read: its amounts go as sent;
+    ``found``, the ids of the records it read to name them, one list for all its data (hub#1208: what a yes is for)."""
 
     op: Operation
     language: str
@@ -362,6 +364,7 @@ class _Words:
     currency: str | None = None
     priced: bool = True
     answered: dict | None = None
+    found: list = dataclasses.field(default_factory=list)
 
     @classmethod
     def of_answer(cls, read: Operation, ctx: OperationContext, answer: dict) -> "_Words":
@@ -434,6 +437,7 @@ def _reference(value: Any, prop: dict, words: _Words) -> Any:
     if failure is not None:
         return _LEFT_OUT
     said = answer.model_dump(mode="json")
+    words.found.append(said.get("id"))
     names = [said.get(field) for field in _names(declared)]
     return next((name for name in names if isinstance(name, str) and name.strip()), _LEFT_OUT)
 
@@ -444,17 +448,22 @@ def _names(declared: dict) -> list:
     return [name] if isinstance(name, str) else name if isinstance(name, list) else []
 
 
-def _card_details(op: Operation, arguments: dict, language: str, ctx: OperationContext | None = None) -> dict:
-    return shared.card(op, arguments, language, _Words(op, language, ctx))
+def _card_details(
+    op: Operation, arguments: dict, language: str, ctx: OperationContext | None = None, found: list | None = None
+) -> dict:
+    return shared.card(op, arguments, language, _Words(op, language, ctx, found=[] if found is None else found))
 
 
-def card(op: Operation, arguments: dict, language: str, ctx: OperationContext | None = None) -> dict:
+def card(
+    op: Operation, arguments: dict, language: str, ctx: OperationContext | None = None, *, found: list | None = None
+) -> dict:
     """What the person sees before ``op`` runs with ``arguments`` (``live.assistant.card``), in the Hub's words: a
     moment at the business's hour, a record by its name read as ``ctx``'s person, an amount in the currency the write
     names (``CURRENCY``) or the business's; its app by its name, a platform action by its screen (``app_name``).
     With ``ctx`` and a callable ``ai["summary"]``, its fields are exactly what that callable returns; it receives
-    ``(ctx, arguments, fields) -> list[dict]``, with the detailed fields already in ``language``, and runs in it too."""
-    shown = _card_details(op, arguments, language, ctx)
+    ``(ctx, arguments, fields) -> list[dict]``, with the detailed fields already in ``language``, and runs in it too.
+    ``found`` gathers the ids of the records it read to name them (``fingerprint``)."""
+    shown = _card_details(op, arguments, language, ctx, found)
     summary = op.ai.get("summary") if isinstance(op.ai, dict) else None
     if ctx is None or not callable(summary):
         return shown
@@ -556,13 +565,15 @@ def _answer_money(answer: dict) -> dict | None:
     return {"currency": currency, "decimals": decimals}
 
 
-def preview(ctx: OperationContext, op: Operation, arguments: dict) -> tuple[ToolOutcome | None, list[dict] | None]:
+def preview(
+    ctx: OperationContext, op: Operation, arguments: dict, *, found: list | None = None
+) -> tuple[ToolOutcome | None, list[dict] | None]:
     """What comes before the card of the write ``op`` with ``arguments``, run as ``ctx``'s person: first its check
-    (``checked``), whose refusal is the write's outcome; then what the dangerous write will do
-    (``live.assistant.preview``: the read its ``ai=`` names), in the Hub's words: its amounts in the currency the read
-    answers (``_answer_money``), else the business's; ``signed`` when its schema declares it so. ``base.E005`` and
-    ``base.E012`` check the declarations at start."""
-    refused = checked(ctx, op, arguments)
+    (``checked``, which adds the id of what it found to ``found``), whose refusal is the write's outcome; then what the
+    dangerous write will do (``live.assistant.preview``: the read its ``ai=`` names), in the Hub's words: its amounts
+    in the currency the read answers (``_answer_money``), else the business's; ``signed`` when its schema declares it
+    so. ``base.E005`` and ``base.E012`` check the declarations at start."""
+    refused = checked(ctx, op, arguments, found=found)
     if refused is not None:
         return refused, None
     return shared.preview(ctx, op, arguments, words_of_answer=_Words.of_answer)
@@ -574,17 +585,32 @@ def check_of(op: Operation) -> Any:
     return declared.get("check") if isinstance(declared, dict) else getattr(declared, "check", None)
 
 
-def checked(ctx: OperationContext, op: Operation, arguments: dict) -> ToolOutcome | None:
+def checked(
+    ctx: OperationContext, op: Operation, arguments: dict, *, found: list | None = None
+) -> ToolOutcome | None:
     """Why the read the write ``op`` names as its check (``check_of``) refuses ``arguments`` — run as ``ctx``'s person,
     with the data of the write its input takes —, or ``None`` when it takes them or the write names none (hub#538: a
     role the business does not have reached the card, and the write refused it only after the person's yes). Nothing
-    of its answer is shown: a normal write's card stays a single line."""
+    of its answer is shown: a normal write's card stays a single line; the id of what it found goes to ``found``
+    (``fingerprint``: a record the write takes by its name is the one the check found)."""
     name = check_of(op)
     if name is None:
         return None
     read = registry[name]
-    failure, _ = _run(ctx, read, {key: value for key, value in arguments.items() if key in read.input.model_fields})
+    failure, answer = _run(ctx, read, {key: value for key, value in arguments.items() if key in read.input.model_fields})
+    if failure is None and found is not None:
+        found.append(answer.model_dump(mode="json").get("id"))
     return failure
+
+
+def fingerprint(drawn: dict, found: list) -> str:
+    """The fingerprint of what a write's card showed the person (``drawn``: its data and what it will do, in their
+    words) and of the records it read to show them (``found``: their ids, by the data it names and its check) — what
+    their yes is for (hub#1208): with the yes the card is drawn again, and a different fingerprint runs nothing.
+    Only what the person saw and which records: never a read's whole answer (a signed link to a photo changes on each
+    read, and the yes would never come)."""
+    said = json.dumps({"card": drawn, "found": found}, sort_keys=True, ensure_ascii=False, default=str)
+    return hashlib.sha256(said.encode()).hexdigest()
 
 
 @checks.register("base")

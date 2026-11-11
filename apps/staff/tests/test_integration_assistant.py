@@ -174,6 +174,6 @@ def test_a_new_member_with_a_role_the_business_has_gets_its_card_and_the_yes_cre
     luis = call("staff.member.create", LUIS)
     plan = turn(luis)
     assert (plan["confirm"]["operation"], plan["executed"]) == ("staff.member.create", [])
-    done = turn(luis, decision={"call_id": "c1", "accepted": True, "typed": ""})
+    done = turn(*plan["pending"], decision={"call_id": "c1", "accepted": True, "typed": ""})
     assert [(row["outcome"], row["code"]) for row in done["executed"]] == [("ok", "")]
     assert list(Member.objects.values_list("first_name", "role_id")) == [("Luis", cashier.id)]

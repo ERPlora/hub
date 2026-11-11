@@ -85,8 +85,10 @@ def test_a_write_the_model_asked_for_comes_as_a_card_and_the_gateway_waits(clien
     got = frames(post(client, "/assistant/turn", {"messages": [ASK, asked], "pending": [call], "continuation": "tok"}))
     assert [frame["type"] for frame in got] == ["confirm", "done"]
     assert got[0]["card"]["operation"] == "demo.item.create"
-    assert got[0]["call"] == call
-    assert (got[1]["pending"], got[1]["continuation"]) == ([call], "tok")
+    # hub#1208: the call its card waits on comes with the fingerprint of what the card showed, in the card's frame and
+    # in the calls that wait: the panel gives these back with the yes.
+    assert got[0]["call"] == {**call, "shown": got[0]["call"]["shown"]} and len(got[0]["call"]["shown"]) == 64
+    assert (got[1]["pending"], got[1]["continuation"]) == ([got[0]["call"]], "tok")
     # A round that never reached the gateway brought no pages of the web (hub#870): without the word, the browser would
     # not know where the whole answer came from (ui#105), and its report would reach support without its text.
     assert got[1]["web"] is False
@@ -99,9 +101,9 @@ def test_the_yes_runs_it_and_the_turn_goes_on_with_its_result(client, make_user,
     asked = {"role": "assistant", "content": "", "tool_calls": [
         {"id": "c1", "type": "function", "function": {"name": "demo__item__create", "arguments": '{"name": "Mesa 4"}'}}
     ]}
+    body = _answering_its_card(client, {"messages": [ASK, asked], "pending": [call], "continuation": "tok"})
     gateway.turn({"type": "text_delta", "text": "Hecho."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
-    body = {"messages": [ASK, asked], "pending": [call], "continuation": "tok", "decision": {"call_id": "c1", "accepted": True}}
-    got = frames(post(client, "/assistant/turn", body))
+    got = frames(post(client, "/assistant/turn", {**body, "decision": {"call_id": "c1", "accepted": True}}))
     assert [frame["type"] for frame in got] == ["executed", "text", "done"]
     assert (got[0]["name"], got[0]["outcome"]) == ("demo.item.create", "ok")
     result, answer = got[-1]["append"]
@@ -283,6 +285,13 @@ def _create_turn() -> dict:
     return {"messages": [ASK, asked], "pending": [call], "continuation": "tok", "decision": {"call_id": "c1", "accepted": True}}
 
 
+def _answering_its_card(client, body: dict) -> dict:
+    """``body`` with the calls that wait as the turn that draws their card gives them back, the way the panel sends
+    its answer (hub#1208: a yes is for the card it answers)."""
+    drawn = frames(post(client, "/assistant/turn", {key: value for key, value in body.items() if key != "decision"}))
+    return {**body, "pending": drawn[-1]["pending"]}
+
+
 def _employee_and_manager(client, make_user):
     from base.tests.test_people import with_pin
 
@@ -299,7 +308,7 @@ def _items(name: str = "Mesa 4") -> int:
 
 def test_its_yes_asks_for_a_managers_approval_as_the_screen_does_and_runs_nothing(client, make_user, gateway, approvable_create):
     _employee_and_manager(client, make_user)
-    response = post(client, "/assistant/turn", _create_turn())
+    response = post(client, "/assistant/turn", _answering_its_card(client, _create_turn()))
     assert response.status_code == 403
     error = response.json()["error"]
     assert error["code"] == "requires_elevation"
@@ -313,7 +322,7 @@ def test_with_the_managers_pass_it_runs_once_as_the_person_and_the_pass_is_spent
     from base.models import Approval, Credential
 
     _employee_and_manager(client, make_user)
-    body = _create_turn()
+    body = _answering_its_card(client, _create_turn())
     asked = post(client, "/assistant/turn", body).json()["error"]["approval"]
     manager = str(Credential.objects.get(username="saas:4").pk)
     approval = {"operation": asked["operation"], "fingerprint": asked["fingerprint"], "person": manager, "pin": "1357"}
@@ -343,7 +352,7 @@ def test_its_question_says_the_figures_of_the_write_and_the_record_keeps_them(cl
 
     monkeypatch.setattr(apps.get_app_config("demo"), "approval_figures", {"demo.item.create": ["Create the item {name}"]}, raising=False)
     _employee_and_manager(client, make_user)
-    body = _create_turn()
+    body = _answering_its_card(client, _create_turn())
     asked = post(client, "/assistant/turn", body).json()["error"]["approval"]
     assert asked["label"] == "Create the item Mesa 4"
     manager = str(Credential.objects.get(username="saas:4").pk)
@@ -359,11 +368,12 @@ def test_a_pass_for_another_request_does_not_let_this_one_through(client, make_u
     from base.models import Credential
 
     _employee_and_manager(client, make_user)
-    asked = post(client, "/assistant/turn", _create_turn()).json()["error"]["approval"]
+    asked = post(client, "/assistant/turn", _answering_its_card(client, _create_turn())).json()["error"]["approval"]
     manager = str(Credential.objects.get(username="saas:4").pk)
     token = post(client, "/approvals", {**asked, "person": manager, "pin": "1357"}).json()["token"]
     other = _create_turn()
     other["pending"][0]["arguments"] = other["messages"][1]["tool_calls"][0]["function"]["arguments"] = '{"name": "Mesa 9"}'
+    other = _answering_its_card(client, other)
     gateway.turn({"type": "text_delta", "text": "No."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
     got = frames(post(client, "/assistant/turn", other, HTTP_X_ELEVATION_TOKEN=token))
     assert (got[0]["outcome"], got[0]["code"]) == ("error", "requires_elevation")
@@ -397,6 +407,7 @@ def test_a_pass_approved_for_another_command_on_this_very_request_does_not_let_i
     body = _create_turn()
     body["pending"][0]["name"] = body["messages"][1]["tool_calls"][0]["function"]["name"] = "demo__item__update"
     body["pending"][0]["arguments"] = body["messages"][1]["tool_calls"][0]["function"]["arguments"] = arguments
+    body = _answering_its_card(client, body)
     asked = post(client, "/assistant/turn", body).json()["error"]["approval"]
     assert asked["operation"] == "demo.item.update"
     manager = str(Credential.objects.get(username="saas:4").pk)

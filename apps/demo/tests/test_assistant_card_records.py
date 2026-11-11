@@ -258,11 +258,12 @@ def test_the_item_of_the_issue_said_by_its_own_name_alone_gets_its_card_and_goes
     assert [(field["name"], field["label"], field["value"]) for field in card["fields"]] == [
         ("called", SCREENS["es"]["detail"]["title"], "Ejemplo QA")
     ]
-    assert (plan["pending"], plan["executed"]) == ([write], [])
+    [waiting] = plan["pending"]
+    assert ({key: waiting[key] for key in write}, plan["executed"]) == (write, [])
     assert Item.objects.filter(pk=item.pk).exists()
 
     yes = {"call_id": "c1", "accepted": True, "typed": card["confirm_word"]}
-    done = turn_of(owner_in(), DELETE_BY_ITS_NAME, write, decision=yes)
+    done = turn_of(owner_in(), DELETE_BY_ITS_NAME, waiting, decision=yes)
 
     assert done["executed"][0]["outcome"] == "ok"
     assert not Item.objects.filter(pk=item.pk).exists()
