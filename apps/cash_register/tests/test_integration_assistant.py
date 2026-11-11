@@ -23,6 +23,7 @@ from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_services_assistant import answered, waiting
 
 pytestmark = pytest.mark.django_db
 
@@ -167,14 +168,14 @@ def test_the_close_waits_on_its_dangerous_card_naming_the_session_and_the_count(
         ("session", "Sesión", "text", session.number),
         ("closing_balance", "Efectivo contado", "money", 25000),
     ]
-    assert plan["pending"] == [close]
+    assert waiting(plan) == [close]
     assert Session.objects.get(pk=session.id).status == Session.Status.OPEN
 
 
 def test_typing_the_word_closes_the_session_as_the_person_with_the_three_figures():
     session = open_session(10000)
     close = call("cash_register.session.close", {"session": session.number, "closing_balance": 25000})
-    plan = turn(close, decision={"call_id": "c1", "accepted": True, "typed": " confirmar "})
+    plan = answered(close, decision={"call_id": "c1", "accepted": True, "typed": " confirmar "}, turn_of=turn)
     assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("ok", "")]
     closed = Session.objects.get(pk=session.id)
     assert (closed.status, closed.closing_balance, closed.expected_balance, closed.difference, closed.closed_by) == (
@@ -206,10 +207,12 @@ def test_without_the_word_the_session_stays_open(decision):
 def test_a_session_closed_meanwhile_on_another_device_is_not_closed_twice_nor_another_one_closed():
     session = open_session(10000)
     close = call("cash_register.session.close", {"session": session.number, "closing_balance": 25000})
+    drawn = turn(close)
     # Between the card and the yes, another device closes it and opens the next shift.
     run("cash_register.session.close", {"closing_balance": 9000})
     later = open_session(5000)
-    plan = turn(close, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
+    plan = turn(*drawn["pending"], decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
+    assert plan["confirm"] is None
     assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", "cash_register.session_not_open")]
     assert Session.objects.get(pk=session.id).closing_balance == 9000
     assert Session.objects.get(pk=later.id).status == Session.Status.OPEN
@@ -354,7 +357,7 @@ def test_the_employees_answer_that_tells_the_summary_and_calls_the_close_brings_
     card = plan["confirm"]
     assert (card["operation"], card["confirm_word"], card["blocked"]) == ("cash_register.session.close", "CONFIRMAR", False)
     assert previewed(card) == what_closing_the_bar_gives(session)
-    assert plan["pending"] == [close]
+    assert waiting(plan) == [close]
     assert Session.objects.get(pk=session.id).status == Session.Status.OPEN
 
 

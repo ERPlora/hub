@@ -66,6 +66,19 @@ def turn(*calls, decision=None, permissions=MANAGER, messages=None, **extra):
     )
 
 
+def answered(*calls, decision, turn_of=turn, **extra):
+    """The person's answer to the card drawn for the first of ``calls``: the turn that draws it, then the answer with
+    the calls that wait as that turn gave them back, as the panel does (hub#1208: a yes is for the card it answers).
+    ``turn_of`` is the turn of the test (an app's, with its own person and words); ``extra`` goes to both."""
+    drawn = turn_of(*calls, **extra)
+    return turn_of(*drawn["pending"], decision=decision, **extra)
+
+
+def waiting(plan) -> list[dict]:
+    """The calls that wait, as the model asked for them: without what their card showed (``shown``)."""
+    return [{key: value for key, value in call.items() if key != "shown"} for call in plan["pending"]]
+
+
 def items():
     return [row["name"] for row in run("demo.item.list", EMPLOYEE)["rows"]]
 
@@ -144,7 +157,7 @@ def test_a_write_waits_for_its_card_and_changes_nothing_meanwhile():
     plan = turn(write)
     assert plan["confirm"]["operation"] == "demo.item.create"
     assert plan["confirm"]["risk"] == "normal"
-    assert plan["pending"] == [write]
+    assert waiting(plan) == [write] and plan["pending"][0]["shown"]
     assert (plan["append"], plan["executed"]) == ([], [])
     assert "Mesa 4" not in items()
 
@@ -171,7 +184,7 @@ def test_the_card_carries_the_business_currency_for_its_amounts():
 
 def test_the_yes_runs_the_write_as_the_person():
     write = call("demo.item.create", {"name": "Mesa 4"})
-    plan = turn(write, decision={"call_id": "c1", "accepted": True})
+    plan = answered(write, decision={"call_id": "c1", "accepted": True})
     assert plan["executed"][0]["outcome"] == "ok"
     assert "Mesa 4" in items()
     assert json.loads(plan["append"][0]["content"])["name"] == "Mesa 4"
@@ -193,7 +206,7 @@ def test_a_dangerous_write_runs_only_with_the_word_typed():
     wrong = turn(delete, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMA"})
     assert wrong["executed"][0]["outcome"] == "cancelled"
     assert "Barra" in items()
-    right = turn(delete, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
+    right = answered(delete, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
     assert right["executed"][0]["outcome"] == "ok"
     assert "Barra" not in items()
 
@@ -210,7 +223,7 @@ def test_a_secret_reaches_the_browser_hidden_on_its_card_and_its_write_as_typed(
     asked_card = turn(write)["confirm"]
     assert asked_card["operation"] == secret_set.name
     assert "hunter2" not in json.dumps(asked_card, ensure_ascii=False)
-    plan = turn(write, decision={"call_id": "c1", "accepted": True})
+    plan = answered(write, decision={"call_id": "c1", "accepted": True})
     assert plan["executed"][0]["outcome"] == "ok"
     assert received == ["hunter2"]
 
@@ -359,10 +372,10 @@ def test_a_name_that_is_no_apps_shows_no_card(name):
 def test_each_write_of_a_chain_asks_its_own_yes():
     first = call("demo.item.create", {"name": "Uno"}, "c1")
     second = call("demo.item.create", {"name": "Dos"}, "c2")
-    plan = turn(first, second, decision={"call_id": "c1", "accepted": True})
+    plan = answered(first, second, decision={"call_id": "c1", "accepted": True})
     assert [row["outcome"] for row in plan["executed"]] == ["ok"]
     assert plan["confirm"]["fields"][0]["value"] == "Dos"
-    assert plan["pending"] == [second]
+    assert waiting(plan) == [second]
     assert "Uno" in items() and "Dos" not in items()
 
 
@@ -386,7 +399,7 @@ def test_the_receipt_names_where_it_happened_in_the_persons_language():
     pin = call("base.access.settings_update", {"pin_length": 6})
     plan = turn(pin, decision={"call_id": "c1", "accepted": False}, permissions={"base.view_home", "base.administer_hub"})
     assert (plan["executed"][0]["outcome"], plan["executed"][0]["app_name"]) == ("cancelled", "Ajustes")
-    written = turn(call("demo.item.create", {"name": "Mesa 4"}), decision={"call_id": "c1", "accepted": True})
+    written = answered(call("demo.item.create", {"name": "Mesa 4"}), decision={"call_id": "c1", "accepted": True})
     assert written["executed"][0]["app_name"] == "Demo"
 
 
@@ -398,7 +411,7 @@ def test_the_receipt_carries_the_platforms_screen_by_its_key_for_the_screen_to_n
     admin = {"base.view_home", "base.administer_hub"}
     pin = turn(call("base.access.settings_update", {"pin_length": 6}), decision={"call_id": "c1", "accepted": False}, permissions=admin)
     assert (pin["executed"][0]["app"], pin["executed"][0]["screen"]) == ("base", "settings")
-    written = turn(call("demo.item.create", {"name": "Mesa 4"}), decision={"call_id": "c1", "accepted": True})
+    written = answered(call("demo.item.create", {"name": "Mesa 4"}), decision={"call_id": "c1", "accepted": True})
     assert (written["executed"][0]["app"], written["executed"][0]["screen"]) == ("demo", "")
 
 
@@ -428,9 +441,11 @@ def test_a_write_the_assistant_runs_for_one_business_never_lands_in_another(hub_
     write = call("demo.item.create", {"name": "Solo en A"})
     op = get("base.assistant.turn")
     as_a = OperationContext(scope=Scope("host", hub_a.slug), actor="ana", permissions=MANAGER, language="es")
-    data = {"messages": [ASK, asked(write)], "pending": [write], "decision": {"call_id": "c1", "accepted": True}}
+    data = {"messages": [ASK, asked(write)], "pending": [write]}
     with context.use_hub(hub_a):
-        assert op(as_a, op.input.model_validate(data)).executed[0].outcome == "ok"
+        drawn = op(as_a, op.input.model_validate(data)).model_dump(mode="json")
+        yes = {**data, "pending": drawn["pending"], "decision": {"call_id": "c1", "accepted": True}}
+        assert op(as_a, op.input.model_validate(yes)).executed[0].outcome == "ok"
 
     def listed(hub):
         read = get("demo.item.list")
