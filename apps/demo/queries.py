@@ -24,7 +24,17 @@ ITEM_NOT_FOUND = _("This item no longer exists.")
     expose_api=True,
     ai={
         "description": "Lists the demo items, most recently changed first, with their status («open» or «done») "
-        "and how many lines each has; searches by a piece of the name and filters by status, a page at a time."
+        "and how many lines each has; searches by a piece of the name and filters by status, a page at a time.",
+        "asks": {
+            "en": (
+                "which demo items have «autumn» in their name?",
+                "show me the items of the Demo app that are done",
+            ),
+            "es": (
+                "busca en Demo los elementos cuyo nombre lleve «otoño»",
+                "enséñame los elementos de la demo que ya están hechos",
+            ),
+        },
     },
 )
 def list_items(ctx: OperationContext, params: ItemListIn) -> dict:
@@ -51,7 +61,17 @@ def list_items(ctx: OperationContext, params: ItemListIn) -> dict:
     output=ItemDetailOut,
     ai={
         "description": "Returns one demo item by its id: its name, status and note, and its lines (text and "
-        "quantity) in the order they were added."
+        "quantity) in the order they were added.",
+        "asks": {
+            "en": (
+                "what lines does the demo item Autumn trial have?",
+                "read me the note of the demo item Trial 2",
+            ),
+            "es": (
+                "¿qué líneas lleva el elemento «Ensayo de otoño» de Demo?",
+                "léeme la nota y el estado del elemento Ensayo 2 de la demo",
+            ),
+        },
     },
 )
 def item_detail(ctx: OperationContext, data: ByIdIn) -> Item:
@@ -67,7 +87,19 @@ def item_detail(ctx: OperationContext, data: ByIdIn) -> Item:
     permission="demo.manage",
     input=ItemStatsIn,
     output=ItemStatsOut,
-    ai={"description": "Counts the demo items: how many there are, how many are open and done, and their lines."},
+    ai={
+        "description": "Counts the demo items: how many there are, how many are open and done, and their lines.",
+        "asks": {
+            "en": (
+                "how many demo items and lines are there altogether?",
+                "sum up the Demo figures: open, done and lines",
+            ),
+            "es": (
+                "¿cuántos elementos y líneas hay en Demo en total?",
+                "resume las cifras de la demo: abiertos, hechos y líneas",
+            ),
+        },
+    },
 )
 def item_stats(ctx: OperationContext, data: ItemStatsIn) -> dict:
     counts = Item.objects.aggregate(
@@ -84,7 +116,19 @@ def item_stats(ctx: OperationContext, data: ItemStatsIn) -> dict:
     permission="demo.view",
     input=ItemStatsIn,
     output=ItemCountOut,
-    ai={"description": "Counts the demo items still open."},
+    ai={
+        "description": "Counts the demo items still open.",
+        "asks": {
+            "en": (
+                "how many demo items are still open?",
+                "count the open items of Demo",
+            ),
+            "es": (
+                "¿cuántos elementos abiertos hay en Demo?",
+                "dime el número de elementos de la demo sin acabar",
+            ),
+        },
+    },
 )
 def open_count(ctx: OperationContext, data: ItemStatsIn) -> dict:
     return {"count": Item.objects.filter(status=Item.Status.OPEN).count()}
