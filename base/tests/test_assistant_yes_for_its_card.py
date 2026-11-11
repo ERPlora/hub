@@ -21,12 +21,30 @@ from base.tests.test_services_assistant import ASK, MANAGER, asked, call, turn
 pytestmark = pytest.mark.django_db
 
 
-def yes_to(plan: dict, *, typed: str | None = None, **extra) -> dict:
+def yes_to(plan: dict, *, typed: str | None = None, turn_of=turn, **extra) -> dict:
     """The person's yes to ``plan``'s card (the word it asks, unless ``typed``), with the calls that wait as the turn
-    gave them back, as the panel does."""
+    gave them back, as the panel does; ``turn_of``, the turn of the test."""
     word = plan["confirm"]["confirm_word"] if typed is None else typed
     decision = {"call_id": plan["pending"][0]["call_id"], "accepted": True, "typed": word}
-    return turn(*plan["pending"], decision=decision, **extra)
+    return turn_of(*plan["pending"], decision=decision, **extra)
+
+
+def turn_as(person: OperationContext, *calls, decision: dict | None = None) -> dict:
+    """``base.assistant.turn`` as ``person`` (an app's own, with its roles), after the model asked for ``calls``."""
+    op = get("base.assistant.turn")
+    data = {"messages": [ASK, asked(*calls)], "pending": list(calls), "decision": decision}
+    return op(person, op.input.model_validate(data)).model_dump(mode="json")
+
+
+def yes_to_its_card(person: OperationContext, write: str, arguments: dict, meanwhile=lambda: None) -> dict:
+    """The case of hub#1208 for any app: ``person`` asks for ``write`` with ``arguments`` (its record by its name), its
+    card is drawn, ``meanwhile`` happens (somebody else creates a record the name fits better), and the person says
+    yes to that card as the panel sends it. → the yes's turn."""
+    plan = turn_as(person, call(write, arguments))
+    if plan["confirm"] is None or plan["confirm"]["operation"] != write:
+        raise LookupError(f"no card of {write}: {plan['executed']}")
+    meanwhile()
+    return yes_to(plan, turn_of=lambda *calls, decision: turn_as(person, *calls, decision=decision))
 
 
 def said(plan: dict) -> list[tuple[str, object]]:
@@ -296,15 +314,13 @@ def test_the_record_a_card_found_by_its_mark_or_by_its_check_is_held_alone(touch
 def test_a_card_drawn_in_one_business_is_no_yes_in_another(hub_a, hub_b):
     """Two businesses with a database each, as production: the same words name another record in B, and the card A
     drew is no yes there."""
-    op = get("base.assistant.turn")
 
     def turn_in(hub, *calls, decision=None) -> dict:
         as_hub = OperationContext(scope=Scope("host", hub.slug), actor="ana", permissions=MANAGER, language="es")
-        data = {"messages": [ASK, asked(*calls)], "pending": list(calls), "decision": decision}
         with context.use_hub(hub):
-            return op(as_hub, op.input.model_validate(data)).model_dump(mode="json")
+            return turn_as(as_hub, *calls, decision=decision)
 
-    def names(hub) -> set[str]:
+    def kept_in(hub) -> set[str]:
         with context.use_hub(hub):
             return set(Item.objects.values_list("name", flat=True))
 
@@ -317,6 +333,6 @@ def test_a_card_drawn_in_one_business_is_no_yes_in_another(hub_a, hub_b):
     in_b = turn_in(hub_b, *plan["pending"], decision=yes)
 
     assert (in_b["executed"], [(f["name"], f["value"]) for f in in_b["confirm"]["fields"]]) == ([], [("called", "Mesa 4")])
-    assert (names(hub_a), names(hub_b)) == ({"Mesa 4"}, {"Mesa 4"})
+    assert (kept_in(hub_a), kept_in(hub_b)) == ({"Mesa 4"}, {"Mesa 4"})
     assert [row["outcome"] for row in turn_in(hub_a, *plan["pending"], decision=yes)["executed"]] == ["ok"]
-    assert (names(hub_a), names(hub_b)) == (set(), {"Mesa 4"})
+    assert (kept_in(hub_a), kept_in(hub_b)) == (set(), {"Mesa 4"})
