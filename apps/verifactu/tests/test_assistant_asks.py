@@ -35,7 +35,8 @@ REPORTED = [
     ("verifactu.stats.events_recent", "¿cuáles son los cinco acontecimientos fiscales más recientes?"),
     (
         "verifactu.chain.validate",
-        "recalcula las huellas de toda la cadena del emisor en pruebas y comprueba que cada eslabón enlaza con el anterior",
+        "recalcula las huellas de toda la cadena del emisor en pruebas y comprueba que cada eslabón enlaza con el "
+        "anterior",
     ),
     (
         "verifactu.contingency.retry",
@@ -78,7 +79,10 @@ GO_LIVE = "qa20261108.owner.es.verifactu.config.go_live"
 #: presence), «sella» (a sale), «producción» (a product) or «comprueba» (a purchase), which live reads as other things
 #: (ERPlora/live#71).
 OWN_WORDS = [
-    ("verifactu.config.get", "la asesora pregunta por qué vía mandamos a la Agencia Tributaria y si seguimos en pruebas"),
+    (
+        "verifactu.config.get",
+        "la asesora pregunta por qué vía mandamos a la Agencia Tributaria y si seguimos en pruebas",
+    ),
     ("verifactu.record.list", "para la asesoría, saca los registros de septiembre que siguen sin subsanar"),
     ("verifactu.record.get", "la asesora quiere la huella y lo que respondió la Agencia Tributaria al 31"),
     ("verifactu.record.by_invoice", "necesito el QR de la factura F-2026-0031 para reimprimirla"),
