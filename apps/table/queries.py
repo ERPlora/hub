@@ -904,7 +904,7 @@ def get_line(ctx: OperationContext, params: LineRefIn) -> dict:
         "asks": {
             "en": (
                 "which waiters have opened table checks?",
-                "who has been serving tables?",
+                "which waiters have been serving tables today?",
             ),
             "es": (
                 "¿qué camareros han abierto cuentas de mesa?",
