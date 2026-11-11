@@ -208,13 +208,13 @@ async function save(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="service-package-form"
     :title="title"
     :submit-label="pkg ? $t('service.packages.form.save') : $t('service.packages.form.create')"
     :pending="pending"
     :error="error"
     :submit-disabled="!money || !form.name.trim() || (!pkg && completeLines.length === 0)"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

@@ -52,6 +52,7 @@ const canDismiss = useUnsavedFormOnOpen('tax-rule-end', validTo, open);
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="tax-rule-end"
     size="sm"
     :title="$t('tax.rules.end.title')"
@@ -60,7 +61,6 @@ const canDismiss = useUnsavedFormOnOpen('tax-rule-end', validTo, open);
     :pending="pending"
     :error="error"
     :submit-disabled="!validTo"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

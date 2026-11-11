@@ -86,13 +86,13 @@ const canDismiss = useUnsavedFormOnOpen(
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="schedule-override-form"
     :title="title"
     :submit-label="editing ? $t('schedule.save') : $t('schedule.overrides.form.submit')"
     :submit-disabled="!complete"
     :pending="pending"
     :error="error"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

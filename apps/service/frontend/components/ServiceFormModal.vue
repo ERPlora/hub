@@ -198,13 +198,13 @@ function retryPhoto(): void {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="service-form"
     :title="title"
     :submit-label="photo.uploading.value ? $t('base.imageField.uploading') : service ? $t('service.services.form.save') : $t('service.services.form.create')"
     :pending="pending"
     :error="error"
     :submit-disabled="!money || !form.name.trim() || !form.tax || (!service && noTaxes) || !!photo.failure.value"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

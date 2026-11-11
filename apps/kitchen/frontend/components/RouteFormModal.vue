@@ -76,13 +76,13 @@ async function save(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="kitchen-route-form"
     :title="t('kitchen.routing.form.title')"
     :submit-label="t('kitchen.routing.submit')"
     :pending="command.pending.value"
     :error="command.error.value"
     :submit-disabled="!stationId || !target"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <div class="kitchen-route-form">

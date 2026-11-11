@@ -116,6 +116,7 @@ async function save(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="kitchen-ticket-form"
     size="md"
     :title="t('kitchen.form.title')"
@@ -123,7 +124,6 @@ async function save(): Promise<void> {
     :pending="command.pending.value"
     :error="command.error.value"
     :submit-disabled="!ready"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

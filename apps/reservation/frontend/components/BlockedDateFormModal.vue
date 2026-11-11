@@ -62,6 +62,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="reservation-blocked-form"
     size="sm"
     :title="$t('reservation.availability.blockedForm.title')"
@@ -69,7 +70,6 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
     :pending="create.pending.value"
     :error="failure"
     :submit-disabled="!ready"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

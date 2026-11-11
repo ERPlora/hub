@@ -60,6 +60,7 @@ const canDismiss = useUnsavedFormOnOpen('invoice-substitute', recipient, open);
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="invoice-substitute"
     :title="$t('invoice.substitute.title', { number: ticket?.number ?? '' })"
     :submit-label="$t('invoice.substitute.submit')"
@@ -67,7 +68,6 @@ const canDismiss = useUnsavedFormOnOpen('invoice-substitute', recipient, open);
     :pending="command.pending.value"
     :error="error"
     :submit-disabled="!recipientComplete(recipient)"
-    :can-dismiss="canDismiss"
     @submit="issue"
   >
     <template #default="{ fieldErrors }">

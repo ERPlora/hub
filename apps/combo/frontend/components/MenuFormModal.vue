@@ -176,13 +176,13 @@ const canDismiss = useUnsavedFormOnOpen(
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="combo-menu-form"
     :title="title"
     :submit-label="photo.uploading.value ? $t('base.imageField.uploading') : $t('combo.save')"
     :pending="pending"
     :error="error"
     :submit-disabled="!money || !form.name.trim() || !!photo.failure.value"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

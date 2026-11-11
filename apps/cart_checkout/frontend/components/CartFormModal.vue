@@ -59,13 +59,13 @@ const canDismiss = useUnsavedFormOnOpen('cart-checkout-cart-form', form, open);
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="cart-checkout-cart-form"
     :title="$t('cart_checkout.carts.form.title')"
     :submit-label="$t('cart_checkout.carts.form.submit')"
     :pending="creation.pending.value"
     :error="creation.error.value"
     :submit-disabled="!form.session.trim()"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

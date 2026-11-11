@@ -68,6 +68,7 @@ const canDismiss = useUnsavedFormOnOpen('sale-void', () => reason.value, open);
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     size="sm"
     testid="sale-void"
     role="alertdialog"
@@ -77,7 +78,6 @@ const canDismiss = useUnsavedFormOnOpen('sale-void', () => reason.value, open);
     :cancel-label="$t('sale.void.cancel')"
     :pending="command.pending.value"
     :error="error"
-    :can-dismiss="canDismiss"
     @submit="confirm"
   >
     <p

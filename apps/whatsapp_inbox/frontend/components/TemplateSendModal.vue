@@ -132,13 +132,13 @@ const canDismiss = useUnsavedFormOnOpen(
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="whatsapp-inbox-template-form"
     :title="t('whatsapp_inbox.templates.sendTitle')"
     :submit-label="t('whatsapp_inbox.templates.send')"
     :pending="pending"
     :error="error"
     :submit-disabled="!complete"
-    :can-dismiss="canDismiss"
     @submit="send"
     @cancel="reset"
   >

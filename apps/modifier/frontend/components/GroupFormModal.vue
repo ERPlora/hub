@@ -113,13 +113,13 @@ const canDismiss = useUnsavedFormOnOpen('modifier-group-form', form, open);
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="modifier-group-form"
     :title="title"
     :submit-label="group ? $t('modifier.groups.form.save') : $t('modifier.groups.form.create')"
     :pending="pending"
     :error="error"
     :submit-disabled="!form.name.trim()"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

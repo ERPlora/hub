@@ -71,12 +71,12 @@ const canDismiss = useUnsavedFormOnOpen('customer-tag-form', () => ({ name: name
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="customer-tag-form"
     :title="title"
     :pending="pending"
     :error="failure"
     :submit-disabled="!name.trim()"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <div class="customer-config-form">

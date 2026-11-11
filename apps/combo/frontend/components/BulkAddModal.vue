@@ -141,12 +141,12 @@ const canDismiss = useUnsavedFormOnOpen('combo-bulk', picked, open);
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="combo-bulk"
     :title="$t('combo.bulk.title')"
     :submit-label="$t('combo.bulk.addCount', { n: picked.length })"
     :pending="add.pending.value"
     :error="add.error.value"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <div

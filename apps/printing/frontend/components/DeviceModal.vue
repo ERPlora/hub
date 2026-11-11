@@ -81,13 +81,13 @@ const canDismiss = useUnsavedFormOnOpen('printing-device', () => ({ name: name.v
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="printing-device"
     :title="device ? $t('printing.devices.modal.edit') : $t('printing.devices.modal.create')"
     :submit-label="$t('printing.devices.modal.save')"
     :cancel-label="$t('printing.devices.modal.cancel')"
     :pending="pending"
     :error="error"
-    :can-dismiss="canDismiss"
     @submit="confirm"
   >
     <div class="printing-device">

@@ -59,6 +59,7 @@ const canDismiss = useUnsavedFormOnOpen('cash-register-register', name, open);
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     size="sm"
     testid="cash-register-register"
     :title="register ? $t('cash_register.registers.modal.rename') : $t('cash_register.registers.modal.create')"
@@ -66,7 +67,6 @@ const canDismiss = useUnsavedFormOnOpen('cash-register-register', name, open);
     :cancel-label="$t('cash_register.registers.modal.cancel')"
     :pending="pending"
     :error="error"
-    :can-dismiss="canDismiss"
     @submit="confirm"
   >
     <ion-input

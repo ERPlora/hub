@@ -67,12 +67,12 @@ function pick(index: number, value: unknown): void {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     :title="$t('inventory.import.previewTitle')"
     testid="inventory-import-preview"
     :submit-label="$t('inventory.import.confirm', { n: ready })"
     :submit-disabled="!canImport"
     :pending="pending"
-    :can-dismiss="canDismiss"
     @submit="emit('confirm')"
     @cancel="emit('cancel')"
   >

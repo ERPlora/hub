@@ -64,13 +64,13 @@ const canDismiss = useUnsavedFormOnOpen('modifier-link-form', () => target.value
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="modifier-link-form"
     :title="t('modifier.links.form.title', { group: group.name })"
     :submit-label="$t('modifier.links.form.submit')"
     :pending="attach.pending.value"
     :error="attach.error.value"
     :submit-disabled="!target"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <div class="modifier-form">

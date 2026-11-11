@@ -53,6 +53,7 @@ async function confirm(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     size="sm"
     role="alertdialog"
     phone-layout="card"
@@ -63,7 +64,6 @@ async function confirm(): Promise<void> {
     :cancel-label="$t('printing.jobs.cancel.back')"
     :pending="cancel.pending.value"
     :error="error"
-    :can-dismiss="canDismiss"
     @submit="confirm"
   >
     <div class="printing-cancel">

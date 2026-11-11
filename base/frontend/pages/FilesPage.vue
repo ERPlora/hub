@@ -799,13 +799,13 @@ async function askDelete(entry: Entry): Promise<void> {
 
     <FormModal
       v-model:open="folderOpen"
+      :can-dismiss="canDismissNewFolder"
       testid="files-new-folder-dialog"
       :title="t('base.files.newFolderDialog.title')"
       :submit-label="t('base.files.newFolderDialog.create')"
       :pending="createFolder.pending.value"
       :error="folderError"
       :submit-disabled="!folderName.trim()"
-      :can-dismiss="canDismissNewFolder"
       @submit="makeFolder()"
       @cancel="folderOpen = false"
     >
@@ -825,13 +825,13 @@ async function askDelete(entry: Entry): Promise<void> {
 
     <FormModal
       v-model:open="renameOpen"
+      :can-dismiss="canDismissRename"
       testid="files-rename-dialog"
       :title="t(renaming?.folder ? 'base.files.renameDialog.titleFolder' : 'base.files.renameDialog.title')"
       :submit-label="t('base.files.renameDialog.save')"
       :pending="rename.pending.value"
       :error="renameError"
       :submit-disabled="!renameName.trim()"
-      :can-dismiss="canDismissRename"
       @submit="doRename()"
       @cancel="renameOpen = false"
     >

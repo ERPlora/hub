@@ -50,6 +50,7 @@ async function confirm(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="ob-cancel"
     size="sm"
     role="alertdialog"
@@ -59,7 +60,6 @@ async function confirm(): Promise<void> {
     submit-color="danger"
     :pending="cancel.pending.value"
     :error="cancel.error.value"
-    :can-dismiss="canDismiss"
     @submit="confirm"
   >
     <p>{{ message }}</p>

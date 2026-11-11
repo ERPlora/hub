@@ -77,13 +77,13 @@ const canDismiss = useUnsavedFormOnOpen('sale-quick-note-form', () => ({ text: t
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="sale-quick-note-form"
     :title="editing ? $t('sale.quickNotes.form.editTitle') : $t('sale.quickNotes.form.createTitle')"
     :submit-label="editing ? $t('sale.quickNotes.form.save') : $t('sale.quickNotes.form.add')"
     :pending="pending"
     :error="error"
     :submit-disabled="!complete"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

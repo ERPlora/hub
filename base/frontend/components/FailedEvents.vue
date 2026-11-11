@@ -213,13 +213,13 @@ async function confirmDiscard(): Promise<void> {
     </template>
     <ConfirmDialog
       v-model:open="discardOpen"
+      :can-dismiss="canDismiss"
       testid="failed-event-discard-dialog"
       tone="danger"
       :title="t('base.system.failed.discardConfirm.title')"
       :confirm-label="t('base.system.failed.discardConfirm.confirm')"
       :cancel-label="t('base.system.failed.discardConfirm.cancel')"
       :pending="discard.pending.value"
-      :can-dismiss="canDismiss"
       @confirm="confirmDiscard()"
       @cancel="discardOpen = false"
     >

@@ -53,6 +53,7 @@ async function confirm(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="service-grant-void"
     role="alertdialog"
     size="sm"
@@ -63,7 +64,6 @@ async function confirm(): Promise<void> {
     :pending="voiding.pending.value"
     :error="voiding.error.value"
     :submit-disabled="!reason.trim()"
-    :can-dismiss="canDismiss"
     @submit="confirm"
   >
     <template #default="{ fieldErrors }">

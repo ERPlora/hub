@@ -38,13 +38,13 @@ const canDismiss = useUnsavedFormOnOpen('task-project-form', form, open);
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="task-project-form"
     :title="$t('task.projects.form.titleNew')"
     :submit-label="$t('task.projects.form.create')"
     :pending="creation.pending.value"
     :error="creation.error.value"
     :submit-disabled="!form.code.trim() || !form.name.trim()"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

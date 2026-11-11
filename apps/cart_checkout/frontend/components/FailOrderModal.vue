@@ -50,6 +50,7 @@ const canDismiss = useUnsavedFormOnOpen('cart-checkout-fail', reason, open);
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="cart-checkout-fail"
     size="sm"
     role="alertdialog"
@@ -60,7 +61,6 @@ const canDismiss = useUnsavedFormOnOpen('cart-checkout-fail', reason, open);
     :pending="fail.pending.value"
     :error="fail.error.value"
     :submit-disabled="!reason.trim()"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

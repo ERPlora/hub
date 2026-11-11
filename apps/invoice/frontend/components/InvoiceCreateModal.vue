@@ -133,6 +133,7 @@ async function issue(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="invoice-create"
     :title="$t('invoice.create.title')"
     :submit-label="$t('invoice.create.submit')"
@@ -140,7 +141,6 @@ async function issue(): Promise<void> {
     :pending="command.pending.value"
     :error="error"
     :submit-disabled="!ready"
-    :can-dismiss="canDismiss"
     @submit="issue"
   >
     <template #default="{ fieldErrors }">

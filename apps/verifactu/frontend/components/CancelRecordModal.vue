@@ -58,6 +58,7 @@ async function cancel(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="verifactu-cancel"
     role="alertdialog"
     submit-color="danger"
@@ -66,7 +67,6 @@ async function cancel(): Promise<void> {
     :cancel-label="$t('verifactu.cancel')"
     :pending="command.pending.value"
     :error="error"
-    :can-dismiss="canDismiss"
     @submit="cancel"
   >
     <p

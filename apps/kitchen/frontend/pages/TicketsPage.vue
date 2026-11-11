@@ -282,6 +282,7 @@ async function confirmCancel(): Promise<void> {
     />
     <ConfirmDialog
       v-model:open="cancelOpen"
+      :can-dismiss="canDismiss"
       testid="kitchen-tickets-cancel"
       tone="danger"
       :title="t('kitchen.tickets.cancelDialog.title', { number: target?.number ?? '' })"
@@ -289,7 +290,6 @@ async function confirmCancel(): Promise<void> {
       :cancel-label="t('kitchen.close')"
       :pending="cancel.pending.value"
       :error="cancel.error.value"
-      :can-dismiss="canDismiss"
       @confirm="confirmCancel"
       @cancel="cancelOpen = false"
     >

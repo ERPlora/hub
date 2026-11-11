@@ -40,12 +40,12 @@ function setMode(item: UnresolvedText, event: CustomEvent<{ value?: unknown }>):
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     :title="$t('inventory.import.taxTitle')"
     testid="inventory-import-tax"
     :submit-label="$t('inventory.import.taxConfirm')"
     :submit-disabled="incomplete"
     :pending="pending"
-    :can-dismiss="canDismiss"
     @submit="emit('confirm')"
     @cancel="emit('cancel')"
   >

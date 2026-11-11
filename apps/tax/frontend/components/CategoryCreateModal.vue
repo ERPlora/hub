@@ -44,13 +44,13 @@ const canDismiss = useUnsavedFormOnOpen('tax-category-form', form, open);
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="tax-category-form"
     :title="$t('tax.categories.form.title')"
     :submit-label="$t('tax.add')"
     :pending="pending"
     :error="error"
     :submit-disabled="!complete"
-    :can-dismiss="canDismiss"
     @submit="save"
     @cancel="cancel"
   >

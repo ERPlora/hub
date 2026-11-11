@@ -263,13 +263,13 @@ const canDismiss = useUnsavedFormOnOpen(
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="pricing-rule-form"
     :title="title"
     :submit-label="rule ? $t('pricing.rules.form.save') : $t('pricing.rules.form.create')"
     :pending="pending"
     :error="error"
     :submit-disabled="!ready"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

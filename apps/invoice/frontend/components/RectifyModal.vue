@@ -95,6 +95,7 @@ const canDismiss = useUnsavedFormOnOpen('invoice-rectify', () => ({ reason: reas
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="invoice-rectify"
     role="alertdialog"
     submit-color="danger"
@@ -103,7 +104,6 @@ const canDismiss = useUnsavedFormOnOpen('invoice-rectify', () => ({ reason: reas
     :cancel-label="$t('invoice.cancel')"
     :pending="command.pending.value"
     :error="done || blocked ? null : error"
-    :can-dismiss="canDismiss"
     @submit="issue"
   >
     <InlineFeedback

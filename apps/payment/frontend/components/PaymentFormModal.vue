@@ -120,13 +120,13 @@ const canDismiss = useUnsavedFormOnOpen('payment-form', form, open);
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="payment-form"
     :title="$t('payment.payments.form.title')"
     :submit-label="$t('payment.payments.form.submit')"
     :pending="creation.pending.value"
     :error="creation.error.value"
     :submit-disabled="!complete"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

@@ -120,13 +120,13 @@ const canDismiss = useUnsavedFormOnOpen('inventory-stock-form', () => ({ qty: qt
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     :title="$t(texts.title, { name: product?.name ?? '' })"
     testid="inventory-stock-form"
     :submit-label="$t(texts.submit)"
     :pending="pending"
     :error="error"
     :submit-disabled="!ready || waitsForMoney"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <div class="stock-form">

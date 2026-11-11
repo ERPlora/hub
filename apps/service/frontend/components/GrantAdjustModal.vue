@@ -86,6 +86,7 @@ async function confirm(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="service-grant-adjust"
     :title="t('service.adjust.title')"
     :submit-label="t('service.adjust.confirm')"
@@ -93,7 +94,6 @@ async function confirm(): Promise<void> {
     :pending="adjusting.pending.value"
     :error="adjusting.error.value"
     :submit-disabled="!moves || !reason.trim()"
-    :can-dismiss="canDismiss"
     @submit="confirm"
   >
     <template #default="{ fieldErrors }">

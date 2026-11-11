@@ -204,12 +204,12 @@ async function save(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="staff-member-form"
     :title="title"
     :pending="pending"
     :error="error"
     :submit-disabled="!money || !complete || loading || !!loadError"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

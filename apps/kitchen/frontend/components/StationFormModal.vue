@@ -108,13 +108,13 @@ async function save(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="kitchen-station-form"
     :title="title"
     :submit-label="station ? t('kitchen.stations.form.save') : t('kitchen.stations.form.create')"
     :pending="pending"
     :error="error"
     :submit-disabled="!form.name.trim()"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

@@ -119,6 +119,7 @@ const canDismiss = useUnsavedFormOnOpen(
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="attendance-correct"
     :title="$t('attendance.correct.title')"
     :submit-label="$t('attendance.correct.save')"
@@ -126,7 +127,6 @@ const canDismiss = useUnsavedFormOnOpen(
     :pending="pending"
     :submit-disabled="!zone"
     :error="problem"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

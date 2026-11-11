@@ -92,6 +92,7 @@ const canDismiss = useUnsavedFormOnOpen('inventory-category-form', form, open);
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     :title="title"
     testid="inventory-category-form"
     :submit-label="editing ? $t('inventory.common.saveChanges') : $t('inventory.common.save')"
@@ -99,7 +100,6 @@ const canDismiss = useUnsavedFormOnOpen('inventory-category-form', form, open);
     :pending="pending"
     :error="error"
     :submit-disabled="!form.name.trim()"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <div class="category-form">

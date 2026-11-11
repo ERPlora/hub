@@ -109,12 +109,12 @@ const HOURS = [
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="staff-schedule-form"
     :title="title"
     :submit-label="schedule ? $t('staff.save') : $t('staff.schedules.form.create')"
     :pending="pending"
     :error="error"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

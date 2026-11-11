@@ -52,6 +52,7 @@ async function terminate(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="staff-member-terminate"
     size="sm"
     role="alertdialog"
@@ -61,7 +62,6 @@ async function terminate(): Promise<void> {
     :submit-label="$t('staff.members.terminate.confirm')"
     :pending="pending"
     :error="error"
-    :can-dismiss="canDismiss"
     @submit="terminate"
   >
     <template #default="{ fieldErrors }">

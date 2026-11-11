@@ -50,6 +50,7 @@ async function save(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="payment-cancel"
     size="sm"
     role="alertdialog"
@@ -60,7 +61,6 @@ async function save(): Promise<void> {
     :pending="cancel.pending.value"
     :error="cancel.error.value"
     :submit-disabled="!reason.trim()"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

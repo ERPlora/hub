@@ -62,11 +62,11 @@ async function addTable(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="table-add"
     :title="$t('table.add.title')"
     :pending="pending"
     :error="error"
-    :can-dismiss="canDismiss"
   >
     <div class="table-add">
       <ion-input

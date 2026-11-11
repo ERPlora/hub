@@ -270,6 +270,7 @@ async function confirmRevoke(): Promise<void> {
 
     <FormModal
       v-model:open="creating"
+      :can-dismiss="canDismiss"
       testid="api-key-form"
       size="md"
       :title="t('base.apiKeys.form.title')"
@@ -278,7 +279,6 @@ async function confirmRevoke(): Promise<void> {
       :pending="create.pending.value"
       :submit-disabled="!canCreate"
       :error="createError"
-      :can-dismiss="canDismiss"
       @submit="submitCreate()"
       @cancel="creating = false"
     >

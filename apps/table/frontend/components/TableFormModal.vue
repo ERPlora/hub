@@ -140,11 +140,11 @@ async function remove(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="table-form"
     :title="editing ? $t('table.form.titleEdit') : $t('table.form.titleNew')"
     :pending="pending"
     :error="error"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

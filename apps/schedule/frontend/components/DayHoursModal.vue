@@ -79,12 +79,12 @@ const canDismiss = useUnsavedFormOnOpen('schedule-day-form', () => ({ weekday: w
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="schedule-day-form"
     :title="title"
     :submit-label="$t('schedule.hours.form.submit')"
     :pending="saving.pending.value"
     :error="saving.error.value"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

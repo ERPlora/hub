@@ -29,10 +29,10 @@ function refunded(): void {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="sale-refund"
     role="alertdialog"
     :title="$t('sale.refund.title', { number: sale?.number ?? '' })"
-    :can-dismiss="canDismiss"
     @submit="form?.confirm()"
   >
     <RefundForm

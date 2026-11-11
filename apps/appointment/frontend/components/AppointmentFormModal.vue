@@ -315,13 +315,13 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="appointment-form"
     :title="title"
     :submit-label="editing ? $t('appointment.form.save') : $t('appointment.form.create')"
     :pending="pending"
     :error="shown"
     :submit-disabled="!ready || charged"
-    :can-dismiss="canDismiss"
     @submit="save()"
   >
     <template #default="{ fieldErrors }">

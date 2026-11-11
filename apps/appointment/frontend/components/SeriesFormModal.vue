@@ -196,13 +196,13 @@ const text = (value: unknown): string => (value === null || value === undefined 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="series-form"
     :title="editing ? $t('appointment.series.form.titleEdit') : $t('appointment.series.form.titleNew')"
     :submit-label="editing ? $t('appointment.series.form.save') : $t('appointment.series.form.create')"
     :pending="pending"
     :error="error"
     :submit-disabled="!ready"
-    :can-dismiss="canDismiss"
     @submit="save"
   >
     <template #default="{ fieldErrors }">
