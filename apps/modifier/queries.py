@@ -263,7 +263,7 @@ def _page(queryset, params, row) -> dict:
                 "what add-ons and extras do we offer with the dishes?",
             ),
             "es": (
-                "¿qué grupos de suplementos tengo montados?",
+                "¿qué grupos de suplementos usamos?",
                 "enséñame los extras que se pueden pedir con los platos",
             ),
         },

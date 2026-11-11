@@ -88,7 +88,7 @@ PROBES = [
 #: What a person says in words of their own, neither an ask nor a probe of layer 2 nor an ask of its tool but for a
 #: word, one per tool of Modifiers: here it is the tool's asks that bring it among the first ten, so asks that stop
 #: reading as people speak, or that another change empties, fail. None names its tool's thing by a word the Hub reads as
-#: one (an option's «opción» once Menus reads it so, hub#1091): that word alone would bring the tool.
+#: one (an option's «opción», or «opcional», once Menus reads them so, hub#1091): that word alone would bring the tool.
 OWN_WORDS = [
     ("modifier.group.list", "¿qué tengo montado para acompañar los platos?"),
     ("modifier.group.get", "¿cuál es el máximo de Punto de la carne?"),
@@ -100,8 +100,8 @@ OWN_WORDS = [
     ("modifier.group.for_target", "¿qué me pregunta el TPV si marco un bocadillo de lomo?"),
     ("modifier.selection.resolve", "si le pongo doble de queso a la pizza, ¿cuánto sube?"),
     ("modifier.group.create", "monta un grupo para el punto de la carne"),
-    ("modifier.group.update", "Salsas ya no es opcional, cámbialo"),
-    ("modifier.group.delete", "Punto de la carne sobra, bórralo con sus opciones"),
+    ("modifier.group.update", "Salsas es obligatorio desde ahora, cámbialo"),
+    ("modifier.group.delete", "Punto de la carne sobra, bórralo entero"),
     ("modifier.option.create", "en Extras falta el doble de bacon, añádelo a un euro"),
     ("modifier.option.update", "el extra de queso ahora cuesta un euro y medio, cámbialo"),
     ("modifier.option.delete", "el alioli ya no lo tenemos, quítalo de las salsas"),
