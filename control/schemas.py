@@ -108,6 +108,20 @@ class HubRestoreOut(Schema):
     restore_point: dt.datetime | None
 
 
+class RestoredCopyOut(Schema):
+    """The separate copy asked of a hub (hub#1213): its id, the hub, its database's name and where it will be (none:
+    the settings' own server), the temporary cluster it comes from, the moment and how it goes."""
+
+    id: UUID
+    hub: UUID
+    slug: str
+    db_name: str
+    cluster: UUID | None
+    source: UUID | None
+    restore_point: dt.datetime
+    status: str
+
+
 class HubIdIn(Schema):
     """Which hub (``control.hub.move_cancel``)."""
 

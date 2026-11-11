@@ -38,6 +38,21 @@ is there with its note), the kept copy renamed back and opened to the app again,
 to control, the hub ready with the reason in ``last_error`` (``restore_<step>: <why>``). An undo that cannot finish
 leaves the hub restoring, closed, and says why; the next pass undoes it again, never taking it forward. The kept copies
 are dropped after ``move.MOVED_COPY_DAYS`` by the moves' pass (``move.drop_old_copies``), with their rows.
+
+**Aside** (hub#1213, layer 1; BASE-F114): the same copy, made next to the business instead of in its place, for a
+business the fiscal guard would refuse (its production VeriFactu records after the moment are at the tax authority) or
+whose staff only wants back what it lost. The Hub admin asks (``control.hub.restore_aside``: a ``RestoredCopy`` row,
+``<control>_copy_<its hex>``); the worker makes it here (:func:`run_aside_due`, in the moves' thread), one a pass, under
+the row's own lease (``LEASE``, renewed while it copies), never the hub's: the business is never closed nor changed, its
+host answers and its own work goes on, so its fiscal records are not compared. The hub's copy is dumped from the
+temporary cluster; on the hub's cluster a database of the row's name is cloned from its vertical's template granted to
+nobody (``ops.clone_database(aside=True)``), emptied, filled with ``pg_restore`` in one transaction, its identity
+checked, closed to the app once more and noted made, the temporary cluster let go. Nothing in it reaches the tax
+authority, by construction: no hub's row names it (the worker serves the hubs of the registry only), none of the app's
+roles may connect to it, and its name is a copy left behind's (``names.is_left_behind``), which no process registers an
+alias for (``connections.register_hub_alias``). Its schema stays the moment's. A failure drops what it made and notes why
+on the row (``restore_aside_<step>: <why>``); a worker that lost the lease leaves it to whoever holds it now, who makes
+it anew. The copies are dropped after :data:`ASIDE_COPY_DAYS` with their rows (:func:`drop_old_aside_copies`).
 """
 
 import datetime as dt
@@ -62,6 +77,8 @@ logger = logging.getLogger(__name__)
 LEASE = move.LEASE
 #: What ``last_error`` says after the reason of a restore that could not be undone yet.
 UNDO_FAILED_MARK = " (restore_undo_failed: "
+#: How long a separate copy is kept once made (and a failed one's row): as a move's copies.
+ASIDE_COPY_DAYS = move.MOVED_COPY_DAYS
 
 
 def source_name(hub) -> str:
@@ -152,13 +169,14 @@ def restore_hub(
         move._close_this_processs(hub)
 
 
-def _reason(error: Exception) -> str:
-    """Why a restore failed, as ``last_error`` says it: ``restore_<step>: <why>``, a step of the move's own included."""
+def _reason(error: Exception, prefix: str = "restore_") -> str:
+    """Why a restore failed, as ``last_error`` says it: ``restore_<step>: <why>`` (``prefix``: ``restore_aside_`` for a
+    separate copy), a step of the move's own included."""
     if not isinstance(error, move.MoveFailed):
-        return f"restore_unexpected: {type(error).__name__}: {error}"
+        return f"{prefix}unexpected: {type(error).__name__}: {error}"
     code = error.code
     if code.startswith("move_"):
-        code = f"restore_{code.removeprefix('move_')}"
+        code = f"{prefix}{code.removeprefix('move_')}"
     return f"{code}: {str(error).split(': ', 1)[1]}"
 
 
@@ -175,6 +193,119 @@ def _back(hub, kept_name: str, roles, ours, *, reason: str) -> None:
         return
     control_services.move_undone(hub.id, hub.cluster_id, kept_name, reason)
     logger.info("base.tenancy.restore.undone hub=%s: %s", hub.slug, reason)
+
+
+# ── Aside: a separate copy, the business untouched (hub#1213) ───────────────────────────────────────────────────────
+
+
+def run_aside_due(
+    now: dt.datetime | None = None,
+    *,
+    roles: bootstrap.Names | None = None,
+    cancelled: Callable[[], bool] | None = None,
+    source: Callable[[object], str] | None = None,
+) -> int:
+    """The worker's pass for the separate copies: make the one asked longest ago whose lease nobody else holds (one a
+    pass), then drop the copies past their days; how many it worked on. ``roles``, ``cancelled`` and ``source`` as in
+    :func:`run_due` (``source`` by default :func:`source_name`)."""
+    now = now or timezone.now()
+    for copy_id in control_services.copies_to_make():
+        row = control_services.claim_copy(copy_id, timezone.now(), LEASE, services.LEASE_OWNER)
+        if row is None:
+            continue
+        try:
+            make_aside(row, now=now, roles=roles, cancelled=cancelled, source=source or source_name)
+        finally:
+            control_services.release_copy(copy_id, services.LEASE_OWNER)
+        drop_old_aside_copies(now)
+        return 1
+    drop_old_aside_copies(now)
+    return 0
+
+
+def make_aside(
+    row,
+    *,
+    now: dt.datetime,
+    roles: bootstrap.Names | None = None,
+    cancelled: Callable[[], bool] | None = None,
+    source: Callable[[object], str] = source_name,
+) -> None:
+    """Make the separate copy ``row`` (a ``RestoredCopy`` whose lease this worker holds; see the module); a failure is
+    dropped and noted on it, never raised."""
+    hub, name, cluster = row.hub, row.db_name, row.cluster
+    roles = ops.environment_roles(tenancy_connections.control_name()) if roles is None else roles
+
+    def ours() -> None:
+        control_services.renew_copy(row.pk, LEASE, services.LEASE_OWNER)
+        try:
+            control_services.still_making(row.pk, services.LEASE_OWNER)
+        except control_services.MoveTaken as taken:
+            raise move.MoveStopped(str(taken)) from taken
+
+    try:
+        if row.source is None:
+            raise move.MoveFailed("move_source_missing", "its temporary cluster is gone")
+        with tempfile.TemporaryDirectory(prefix="hub-restore-aside-") as folder:
+            path = Path(folder) / "aside.dump"
+            move._dump(source(hub), row.source, path, ours, cancelled)
+            ours()
+            move._clone_emptied(hub, cluster, roles, aside=name)
+            move._restore(path, name, cluster, ours, cancelled)
+        move._verify_identity(name, cluster, hub.id)
+        ours()
+        with ops.connect_ops(cluster=cluster) as conn:
+            move._close(conn, name, roles)
+        _made(row, now)
+    except (services.ProvisioningStopped, move.MoveStopped, dumps.DumpStopped) as stopped:
+        logger.info("base.tenancy.restore.aside_stopped copy=%s: %s; left to whoever holds it now.", name, stopped)
+        return
+    except Exception as error:
+        reason = _reason(error, "restore_aside_")
+        logger.warning("base.tenancy.restore.aside_failed hub=%s copy=%s: %s", hub.slug, name, reason)
+        _aside_failed(row, ours, reason)
+        return
+    logger.info("base.tenancy.restore.aside_made hub=%s copy=%s at=%s", hub.slug, name, row.restore_point.isoformat())
+
+
+def _made(row, now: dt.datetime) -> None:
+    try:
+        control_services.copy_made(row.pk, now, services.LEASE_OWNER)
+    except control_services.MoveTaken as taken:
+        raise move.MoveStopped(str(taken)) from taken
+
+
+def _aside_failed(row, ours, reason: str) -> None:
+    """Drop what was made of the copy ``row`` and note why, while it is still this worker's; a drop that fails leaves
+    the row failed all the same: its database, if any, goes with it after its days."""
+    try:
+        ours()
+        move._drop_copy(row.db_name, row.cluster)
+    except move.MoveStopped as stopped:
+        logger.info("base.tenancy.restore.aside_stopped copy=%s: %s; left to whoever holds it now.", row.db_name, stopped)
+        return
+    except Exception:
+        logger.exception("base.tenancy.restore.aside_kept copy=%s: it could not be dropped now.", row.db_name)
+    try:
+        control_services.copy_failed(row.pk, reason, services.LEASE_OWNER)
+    except control_services.MoveTaken as taken:
+        logger.info("base.tenancy.restore.aside_stopped copy=%s: %s; left to whoever holds it now.", row.db_name, taken)
+
+
+def drop_old_aside_copies(now: dt.datetime) -> int:
+    """Drop the separate copies past :data:`ASIDE_COPY_DAYS` by ``now`` (and what a failed one may have left), with
+    their rows; how many. One that cannot be dropped now stays, and the next pass tries again."""
+    dropped = 0
+    for row in control_services.aside_copies_due(now - dt.timedelta(days=ASIDE_COPY_DAYS)):
+        try:
+            move._drop_copy(row.db_name, row.cluster)
+            control_services.forget_aside_copy(row.pk)
+        except Exception:
+            logger.exception("base.tenancy.restore.aside_kept copy=%s: it could not be dropped; tried again.", row.db_name)
+            continue
+        dropped += 1
+        logger.info("base.tenancy.restore.aside_dropped copy=%s", row.db_name)
+    return dropped
 
 
 # ── The steps ────────────────────────────────────────────────────────────────────────────────────────────────────────

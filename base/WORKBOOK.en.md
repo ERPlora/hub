@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7e446edad986302c017881f162ffdf62d23540abfbcec4fd884217ccef8d3fbc -->
+<!-- generated from WORKBOOK.md sha256:9c8835cf70e62881dc346d27e4921ff8b95c5a450167587f6a8c5912e5380613 -->
 
 ## What it is for and who it is for
 
@@ -2918,10 +2918,12 @@ to ask.
 Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APPOINTMENT-F28, BASE-F61; hub#836
 
 ### BASE-F114 Put a business back as it was at a past moment from the Hub admin
-Status: done (the action and the restore; making and deleting the temporary cluster is the procedure "Devolver un negocio
-a un momento" of ERPlora/aws)
+Status: done (the action and the restore, in its place or to a separate copy; making and deleting the temporary cluster
+is the procedure "Devolver un negocio a un momento" of ERPlora/aws; getting back from the separate copy what was lost,
+hub#1257)
 Actor: the ERPlora staff who run the platform, when a business asks for it
-Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, action "Restore from a copy…"
+Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
+copy…"; and Separate copies
 Steps:
   1. A business asks to go back to how its data was at a moment of the last few days. The staff makes a temporary
      cluster restored to that moment and registers it in Clusters, closed to new hubs.
@@ -2936,17 +2938,32 @@ Steps:
   5. A few minutes later the system has copied the business's database from the temporary cluster, kept aside the one
      it had and put the copy in its place. The business opens again with its data of that moment and the arrow leaves
      the list.
+  To a separate copy (hub#1213), for a business that invoices with VeriFactu in production or when only what was lost
+  is wanted back without touching the rest:
+  6. In Hubs they choose the business and the action "Restore to a separate copy…". The same page asks for the
+     temporary cluster and the moment, and explains that the business stays open without anything changing and that the
+     copy is no business: nobody opens it and nothing in it is sent to the tax authority. They press **Make the
+     copies**.
+  7. "1 hub will get a separate copy as it was at 2026-11-09 14:30 UTC, made from <cluster>: the business stays open as
+     it is. Separate copies lists it, and says if it could not be made." appears. The business is not closed for a
+     second.
+  8. In Separate copies they see it "Being made" and, a few minutes later, "Made", with its moment, its database, its
+     cluster and until when it is kept (7 days). If it could not be made, it says "Failed" and why under "last error".
 In: the chosen businesses, the temporary cluster with their copy and the moment.
 Out: the business's database as it was at that moment; the one it had, kept 7 days on its server; the notice
-`control.hub.restore_requested` with who asked for it. The other businesses notice nothing.
+`control.hub.restore_requested` with who asked for it. The other businesses notice nothing. To a separate copy: the
+business as it was, untouched; a separate database on its cluster with the data of that moment, closed to the
+application and kept 7 days; the notice `control.hub.restore_aside_requested` with who asked for it.
 If it fails: what the restore does not accept is said in the notice, business by business, and that business is not
 touched: one that is not ready or has no database of its own, a demo, one being moved or restored, a cluster open to new
 hubs or with living businesses, the business's own cluster, a copy that is not on that cluster or is too large, and a
 moment that has not come yet. Without a cluster or a moment, the page asks for them again. If the business has
 production VeriFactu records made, sent or changed after that moment, it is not restored and nothing changes, because it
 would use again numbers the AEAT already has: its page says so under "last error" ("restore_fiscal_records: …"); for that
-case, hub#1213. Any other failure undoes the restore by itself: the business keeps its usual database and its page says
-why. With the platform frozen for a database upgrade, the restore waits, with the business under maintenance, until it
+case there is "Restore to a separate copy…", which does not compare them because it does not touch the business. Any
+other failure undoes the restore by itself: the business keeps its usual database and its page says why. A separate copy
+accepts the same as the restore and what it does not accept is said in the notice the same way; if making it fails,
+nothing of it is left and Separate copies says why ("restore_aside_<step>: …"); the business does not notice. With the platform frozen for a database upgrade, the restore waits, with the business under maintenance, until it
 is unfrozen. With records from the test environment only, the chain is recovered afterwards (VERIFACTU-F28). The
-support staff see the list, but not the action.
-Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move); hub#1198, hub#1213, aws#77
+support staff see the list and Separate copies, but not the actions.
+Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move); hub#1198, hub#1213, hub#1257, aws#77

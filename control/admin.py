@@ -18,6 +18,9 @@ hubs with their database (round 2026-10-30b of PLAN-DB, decision 1 of Ioan; tran
   cluster its copy is on and the moment it is of; the worker restores it (``base.tenancy.restore``), or refuses it for
   its fiscal records, and then the hub's page says why in its ``last_error``, as the worker noted it. While it is
   restored, the hub's cluster says where the copy comes from, as a move says where it goes.
+- **«Restore to a separate copy…»** (hub#1213, BASE-F114) asks ``control.hub.restore_aside`` the same way: the worker
+  makes the copy next to the business, which is never closed nor changed, and **Separate copies** lists each one (read
+  only, for support too) with its moment, how it went, its database and until when it is kept.
 
 - **Freeze** is the one switch that freezes the platform for a database upgrade (hub#930; PLAN-DB round 2026-11-04e,
   «Congelar»): ticked, the worker makes, drops and moves no database and ``migrate_hubs`` refuses to start, while the
@@ -49,7 +52,7 @@ from live.errors import OperationError
 from base import admin as base_admin
 from base.registry import REGISTRY_SCOPE, database_is_made
 from base.tenancy.move import MOVED_COPY_DAYS
-from control.models import Cluster, Freeze, Hub
+from control.models import Cluster, Freeze, Hub, RestoredCopy
 from control.queries import cluster_sizes, freeze_get
 from control.schemas import (
     ClusterIdIn,
@@ -72,6 +75,7 @@ from control.services import (
     hub_move,
     hub_move_cancel,
     hub_restore,
+    hub_restore_aside,
 )
 
 
@@ -89,6 +93,11 @@ def staff_context(request: HttpRequest) -> OperationContext:
 def is_platform_admin(request: HttpRequest) -> bool:
     """Staff and superuser (``platform_admin``): support only reads."""
     return request.user.is_staff and request.user.is_superuser
+
+
+def utc(moment: dt.datetime) -> str:
+    """A moment as the Hub admin says it, whatever its language: ``2026-11-09 14:30 UTC``."""
+    return f"{moment.astimezone(dt.UTC):%Y-%m-%d %H:%M} UTC"
 
 
 def no_limit() -> str:
@@ -320,9 +329,10 @@ class RestoreFromACopyForm(forms.Form):
     )
 
 
-#: The confirmation pages of «Move to cluster…» and «Restore from a copy…».
+#: The confirmation pages of «Move to cluster…», «Restore from a copy…» and «Restore to a separate copy…».
 MOVE_TEMPLATE = "admin/control/hub/move_to_cluster.html"
 RESTORE_TEMPLATE = "admin/control/hub/restore_from_a_copy.html"
+ASIDE_TEMPLATE = "admin/control/hub/restore_aside.html"
 
 
 class ClusterListFilter(admin.RelatedFieldListFilter):
@@ -356,7 +366,13 @@ class HubAdmin(base_admin.HubAdmin):
     )
     list_filter = ("status", ("cluster", ClusterListFilter), "schema_state", "is_demo")
     list_select_related = ("cluster", "moving_to", "restoring_from")
-    actions = [*base_admin.HubAdmin.actions, "move_to_cluster", "cancel_the_move", "restore_from_a_copy"]
+    actions = [
+        *base_admin.HubAdmin.actions,
+        "move_to_cluster",
+        "cancel_the_move",
+        "restore_from_a_copy",
+        "restore_aside",
+    ]
     # Never a form's field, even on the page of a hub on no cluster, where ``on_cluster`` takes its place.
     exclude = ("cluster",)
 
@@ -412,33 +428,58 @@ class HubAdmin(base_admin.HubAdmin):
         """Choose the temporary cluster the hubs' copy is on and the moment it is of on a confirmation page, then ask
         each chosen hub to be put back as it was (``control.hub.restore``): the worker restores it, its host answering
         503 «maintenance» meanwhile, or refuses it for its fiscal records, the reason in its ``last_error``."""
+        return self.from_a_copy(
+            request,
+            queryset,
+            "restore_from_a_copy",
+            gettext("Restore from a copy"),
+            RESTORE_TEMPLATE,
+            hub_restore,
+            lambda asked: ngettext(
+                "%(count)d hub will be restored from %(cluster)s as it was at %(moment)s: closed for a few minutes "
+                "while it is restored. If it is refused, its page says why under «last error».",
+                "%(count)d hubs will be restored from %(cluster)s as they were at %(moment)s: each closed for a few "
+                "minutes while it is restored. If one is refused, its page says why under «last error».",
+                asked,
+            ),
+        )
+
+    @admin.action(description=gettext_lazy("Restore to a separate copy…"), permissions=["restore"])
+    def restore_aside(self, request: HttpRequest, queryset):
+        """As «Restore from a copy…», but each chosen hub gets a separate copy of its database as it was, made next to
+        it (``control.hub.restore_aside``): the business is never closed nor changed, its fiscal records stop nothing,
+        and Separate copies lists the copy."""
+        return self.from_a_copy(
+            request,
+            queryset,
+            "restore_aside",
+            gettext("Restore to a separate copy"),
+            ASIDE_TEMPLATE,
+            hub_restore_aside,
+            lambda asked: ngettext(
+                "%(count)d hub will get a separate copy as it was at %(moment)s, made from %(cluster)s: the business "
+                "stays open as it is. Separate copies lists it, and says if it could not be made.",
+                "%(count)d hubs will get a separate copy each as they were at %(moment)s, made from %(cluster)s: the "
+                "businesses stay open as they are. Separate copies lists them, and says if one could not be made.",
+                asked,
+            ),
+        )
+
+    def from_a_copy(self, request: HttpRequest, hubs, action: str, title: str, template: str, operation, said):
+        """The temporary cluster and the moment asked on ``action``'s confirmation page, then ``operation`` asked of each
+        hub with them; ``said(count)``: what the staff is told of those asked."""
         form = RestoreFromACopyForm(request.POST if "apply" in request.POST else None)
         if not form.is_bound or not form.is_valid():
-            return self.confirmation(
-                request,
-                queryset,
-                form,
-                "restore_from_a_copy",
-                gettext("Restore from a copy"),
-                RESTORE_TEMPLATE,
-                kept_days=MOVED_COPY_DAYS,
-            )
+            return self.confirmation(request, hubs, form, action, title, template, kept_days=MOVED_COPY_DAYS)
         source, at = form.cleaned_data["cluster"], form.cleaned_data["at"]
         ctx = staff_context(request)
         asked = self.ask_each(
-            request, queryset, lambda hub: hub_restore(ctx, HubRestoreIn(hub=hub.pk, cluster=source.pk, at=at))
+            request, hubs, lambda hub: operation(ctx, HubRestoreIn(hub=hub.pk, cluster=source.pk, at=at))
         )
         if asked:
             self.message_user(
                 request,
-                ngettext(
-                    "%(count)d hub will be restored from %(cluster)s as it was at %(moment)s: closed for a few minutes "
-                    "while it is restored. If it is refused, its page says why under «last error».",
-                    "%(count)d hubs will be restored from %(cluster)s as they were at %(moment)s: each closed for a few "
-                    "minutes while it is restored. If one is refused, its page says why under «last error».",
-                    asked,
-                )
-                % {"count": asked, "cluster": source.name, "moment": f"{at.astimezone(dt.UTC):%Y-%m-%d %H:%M} UTC"},
+                said(asked) % {"count": asked, "cluster": source.name, "moment": utc(at)},
                 messages.SUCCESS,
             )
         return None
@@ -508,6 +549,64 @@ class HubAdmin(base_admin.HubAdmin):
     def database_size(self, hub: Hub) -> str:
         size = getattr(hub, "database_bytes", None)
         return filesizeformat(size) if size is not None else self.get_empty_value_display()
+
+
+@admin.register(RestoredCopy)
+class RestoredCopyAdmin(admin.ModelAdmin):
+    """The separate copies of hubs as they were at a moment (hub#1213, BASE-F114): asked from Hubs with «Restore to a
+    separate copy…», made and dropped by the worker; read only, for support too."""
+
+    list_display = (
+        "hub",
+        "moment",
+        "status",
+        "db_name",
+        "on_cluster",
+        "kept_until",
+        "asked_by",
+        "asked_at",
+        "last_error",
+    )
+    list_filter = ("status",)
+    list_select_related = ("hub", "cluster")
+    search_fields = ("hub__slug", "db_name")
+    fields = (
+        "hub",
+        "moment",
+        "status",
+        "db_name",
+        "on_cluster",
+        "source",
+        "kept_until",
+        "asked_by",
+        "asked_at",
+        "made_at",
+        "last_error",
+    )
+    readonly_fields = fields
+
+    @admin.display(description=pgettext_lazy("restore", "Moment"), ordering="restore_point")
+    def moment(self, copy: RestoredCopy) -> str:
+        return utc(copy.restore_point)
+
+    @admin.display(description=gettext_lazy("cluster"))
+    def on_cluster(self, copy: RestoredCopy) -> str:
+        return copy.cluster.name if copy.cluster_id else default_server()
+
+    @admin.display(description=pgettext_lazy("separate copy", "kept until"))
+    def kept_until(self, copy: RestoredCopy) -> str:
+        if copy.made_at is None:
+            return self.get_empty_value_display()
+        return utc(copy.made_at + dt.timedelta(days=MOVED_COPY_DAYS))
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj=None) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj=None) -> bool:
+        return False
 
 
 class FreezeForm(forms.ModelForm):

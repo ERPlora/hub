@@ -11,7 +11,10 @@ Every name derives from the control database's (``settings.DATABASES["default"][
   decision 3; ``base.tenancy.move``), as long as a demo's;
 - the database a restore replaced, kept aside: ``<control>_old_<hex>`` (hub#1198; ``base.tenancy.restore``), the hex of
   a UUIDv7 of its own: the moment it was kept is in it (a date suffix would not fit in 63 characters after the longest
-  control name), and two restores of a hub within the days keep both.
+  control name), and two restores of a hub within the days keep both;
+- a hub's database as it was at a moment, made aside while the business goes on: ``<control>_copy_<hex>`` (hub#1213;
+  ``base.tenancy.restore``, «restore aside»), the hex of its ``control.RestoredCopy`` row (a UUIDv7). It is a copy left
+  behind as the two above are: no process registers an alias of it, and it is only ever dropped.
 
 PostgreSQL silently truncates an identifier past 63 bytes, so a longer name is refused, never cut. A name reaches SQL
 only through :func:`identifier` (``psycopg.sql.Identifier``, after :func:`validate`): never an f-string.
@@ -27,6 +30,7 @@ MAX_IDENTIFIER = 63
 DEMO_INFIX = "demo"
 MOVED_INFIX = "move"
 KEPT_INFIX = "old"
+COPY_INFIX = "copy"
 #: Longest control database name its hubs' and demos' fit after: a demo's ``_demo_<hex>`` is the most a name adds.
 MAX_CONTROL = MAX_IDENTIFIER - len(f"_{DEMO_INFIX}_") - 32
 TEMPLATE_SUFFIX = "template"
@@ -45,13 +49,13 @@ class InvalidDatabaseName(ValueError):
 def _patterns(control: str) -> re.Pattern:
     escaped = re.escape(control)
     return re.compile(
-        rf"{escaped}(?:_{DEMO_INFIX}|_{MOVED_INFIX}|_{KEPT_INFIX})?_{_HEX}|{escaped}_{TEMPLATE_SUFFIX}(?:_{_VERTICAL})?"
+        rf"{escaped}(?:_{DEMO_INFIX}|_{MOVED_INFIX}|_{KEPT_INFIX}|_{COPY_INFIX})?_{_HEX}|{escaped}_{TEMPLATE_SUFFIX}(?:_{_VERTICAL})?"
     )
 
 
 def validate(name: str, *, control: str) -> str:
-    """``name`` if it is a hub's, a demo's, a template's, a moved copy's or a kept copy's database of ``control``;
-    ``InvalidDatabaseName`` if not."""
+    """``name`` if it is a hub's, a demo's, a template's, a moved copy's, a kept copy's or a copy aside's database of
+    ``control``; ``InvalidDatabaseName`` if not."""
     if not isinstance(name, str) or not _patterns(control).fullmatch(name):
         raise InvalidDatabaseName(f"{name!r} is no hub's, demo's or template's database of {control!r}.")
     if len(name.encode()) > MAX_IDENTIFIER:
@@ -92,10 +96,24 @@ def is_kept(name: str, *, control: str) -> bool:
     return bool(re.fullmatch(rf"{re.escape(control)}_{KEPT_INFIX}_{_HEX}", name))
 
 
+def is_copy_aside(name: str, *, control: str) -> bool:
+    """Whether ``name`` is a database of a hub of ``control`` as it was at a moment, made aside (hub#1213)."""
+    return bool(re.fullmatch(rf"{re.escape(control)}_{COPY_INFIX}_{_HEX}", name))
+
+
+def validate_copy_aside(name: str, *, control: str) -> str:
+    """``name`` if it is a separate copy of a hub (``<control>_copy_<hex>``, :func:`is_copy_aside`); else
+    ``InvalidDatabaseName``. What the worker clones a template to when it makes one (``base.tenancy.ops``)."""
+    validate(name, control=control)
+    if not is_copy_aside(name, control=control):
+        raise InvalidDatabaseName(f"{name!r} is no separate copy of a hub of {control!r}.")
+    return name
+
+
 def is_left_behind(name: str, *, control: str) -> bool:
-    """Whether ``name`` is a copy a hub of ``control`` left behind, moved or restored: closed to the app, only
-    dropped."""
-    return is_moved(name, control=control) or is_kept(name, control=control)
+    """Whether ``name`` is a copy a hub of ``control`` left behind, moved, restored or made aside: closed to the app,
+    only dropped."""
+    return is_moved(name, control=control) or is_kept(name, control=control) or is_copy_aside(name, control=control)
 
 
 def validate_left_behind(name: str, *, control: str) -> str:
@@ -126,6 +144,12 @@ def kept_db_name(control: str, kept_id: uuid.UUID) -> str:
     """The database a restore replaced, kept aside next to the control database ``control`` (``<control>_old_<hex>``,
     ``kept_id`` a UUIDv7 of its own)."""
     return validate(f"{control}_{KEPT_INFIX}_{kept_id.hex}", control=control)
+
+
+def copy_db_name(control: str, copy_id: uuid.UUID) -> str:
+    """A hub's database as it was at a moment, made aside next to the control database ``control``
+    (``<control>_copy_<hex>``, ``copy_id`` its ``control.RestoredCopy`` row's)."""
+    return validate(f"{control}_{COPY_INFIX}_{copy_id.hex}", control=control)
 
 
 def template_db_name(control: str, vertical: str | None = None) -> str:
