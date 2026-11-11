@@ -653,7 +653,7 @@ def update_settings(ctx: OperationContext, data: SettingsIn) -> dict:
                 "mark the working days left open too long",
             ),
             "es": (
-                "deja pendientes de revisión las jornadas que nadie cerró",
+                "deja pendientes las jornadas que nadie cerró a tiempo",
                 "comprueba si alguien se olvidó de fichar la salida",
                 "señala las jornadas abiertas desde hace demasiado",
             ),
