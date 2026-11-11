@@ -1,0 +1,14 @@
+{% extends "admin/control/hub/action_confirmation.html" %}
+{% load i18n %}
+{% comment %}
+«Restore from a copy…» of the Hub admin (control.admin.HubAdmin.restore_from_a_copy, hub#1198, BASE-F114): the chosen
+hubs, the temporary cluster their copy is on and the moment it is of. Confirmed, each is asked through
+control.hub.restore; the worker restores it or refuses it for its fiscal records (base.tenancy.restore).
+{% endcomment %}
+{% block intro %}{% blocktranslate trimmed with days=kept_days %}
+  Each hub chosen is put back as it was at the moment you give, from its copy on the temporary cluster you choose (a
+  point-in-time restore of its cluster, registered closed to new hubs). It closes for a few minutes while its database
+  is replaced, and the one it has now is kept for {{ days }} days. It is refused, nothing changed, if it has fiscal
+  records made, sent or changed after that moment: its page then says why under «last error».
+{% endblocktranslate %}{% endblock intro %}
+{% block submit %}{% translate 'Restore them' %}{% endblock submit %}

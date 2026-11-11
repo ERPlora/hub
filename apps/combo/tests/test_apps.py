@@ -56,6 +56,16 @@ CHECKED_BY_THE_MENU = {
     "combo.combo.update",
     "combo.group.reorder",
 }
+#: The writes of the assistant whose record is a course, or a choice, said by its id or by its name inside its menu:
+#: each one checks it with that record's own read (hub#1231) — the menu's would read a course's id as a menu's.
+CHECKED_BY_THE_COURSE = {"combo.group.delete", "combo.group.update"}
+CHECKED_BY_THE_CHOICE = {"combo.option.delete", "combo.option.update"}
+#: The read each write checks its record with before its card.
+CHECKS = {
+    **dict.fromkeys(CHECKED_BY_THE_MENU, "combo.combo.get"),
+    **dict.fromkeys(CHECKED_BY_THE_COURSE, "combo.group.get"),
+    **dict.fromkeys(CHECKED_BY_THE_CHOICE, "combo.option.get"),
+}
 
 
 def combo_app():
@@ -155,9 +165,9 @@ def test_every_operation_tells_the_assistant_what_it_does():
         # upload of the form's own photo and the reaction to Inventory's deletion declare ``ai`` and are no tool.
         if assistant.is_tool(op):
             expected.add("asks")
-        if name in CHECKED_BY_THE_MENU:
+        if name in CHECKS:
             expected.add("check")
-            assert op.ai["check"] == "combo.combo.get", name
+            assert op.ai["check"] == CHECKS[name], name
         assert set(op.ai) == expected, name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, name

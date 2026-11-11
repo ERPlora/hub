@@ -500,6 +500,8 @@ def create_group(ctx: OperationContext, data: GroupIn) -> dict:
         "description": "Change a course: its name, minimum and maximum picks, or whether a choice may repeat. "
         "Only the fields sent change; it keeps its place.",
         "risk": "normal",
+        # The course as the write will find it, before its card: the yes holds to it (hub#1231).
+        "check": "combo.group.get",
         "asks": {
             "en": (
                 "let them pick two starters instead of one",
@@ -552,6 +554,7 @@ def update_group(ctx: OperationContext, data: GroupPatchIn) -> dict:
     ai={
         "description": "Remove a course from its menu, with its choices.",
         "risk": "high",
+        "check": "combo.group.get",
         "asks": {
             "en": (
                 "remove the Desserts course from the vegan menu",
@@ -723,6 +726,8 @@ def bulk_create_options(ctx: OperationContext, data: OptionBulkIn) -> dict:
         "description": "Change a choice: its supplement, mark it sold out («no flan today in the menu of the "
         "day»: is_available false) or back on offer, or replace its product. It keeps its place.",
         "risk": "normal",
+        # The choice as the write will find it, before its card: the yes holds to it (hub#1231).
+        "check": "combo.option.get",
         "asks": {
             "en": (
                 "the custard is sold out in the kids' menu",
@@ -783,6 +788,7 @@ def update_option(ctx: OperationContext, data: OptionPatchIn) -> dict:
     ai={
         "description": "Remove a choice from its course.",
         "risk": "high",
+        "check": "combo.option.get",
         "asks": {
             "en": (
                 "take the gazpacho off the starters of the vegan menu",

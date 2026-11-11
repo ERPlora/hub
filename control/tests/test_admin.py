@@ -610,6 +610,190 @@ class TestCancelTheMove:
         assert Hub.objects.get(pk=moving.pk).move_undo_asked_at is None
 
 
+#: The moment a temporary cluster's copy is of, written as its point-in-time restore takes it (aws ``restore-hub.sh``).
+MOMENT = "2026-11-09T14:30:00Z"
+AT_MOMENT = dt.datetime(2026, 11, 9, 14, 30, tzinfo=dt.UTC)
+
+
+class TestRestoreFromACopy:
+    """«Restore from a copy…» (hub#1198, BASE-F114): the platform's admins choose hubs, then the temporary cluster their
+    copy is on (one closed to new hubs) and the moment it is of, on a confirmation page; each is asked through
+    ``control.hub.restore`` with that moment, and what the operation refuses is said hub by hub. Support never sees it,
+    and the operation itself refuses anyone but the platform's admins (403)."""
+
+    @pytest.fixture(autouse=True)
+    def small(self, monkeypatch):
+        from control import queries
+
+        monkeypatch.setattr(queries, "measure", lambda cluster, names: {name: 1024 for name in names})
+
+    a_hub = staticmethod(TestMoveToCluster.a_hub)
+
+    @staticmethod
+    def a_temporary_cluster() -> Cluster:
+        return a_cluster(name="restore-1", host="restore-1.example", is_open=False)
+
+    @staticmethod
+    def choose(client, *hubs, **more):
+        data = {"action": "restore_from_a_copy", "_selected_action": [str(hub.pk) for hub in hubs]} | more
+        return client.post(HUBS, data, HTTP_HOST=PLATFORM, follow=True)
+
+    def test_asks_for_a_temporary_cluster_and_the_moment_first_and_changes_nothing(self, client, root):
+        hub = self.a_hub("acme")
+        temporary = self.a_temporary_cluster()
+        a_cluster(name="cluster-open", host="writer-2.example")
+
+        html = self.choose(client, hub).content.decode()
+
+        assert "Restore from a copy" in html and "acme" in html
+        assert f'value="{temporary.pk}"' in html and "cluster-open" not in html
+        assert 'name="at"' in html and 'name="apply"' in html
+        hub.refresh_from_db()
+        assert hub.restoring_from_id is None
+
+    def test_confirmed_each_hub_is_asked_through_its_operation_with_the_moment(self, client, root):
+        first, second = self.a_hub("acme"), self.a_hub("bistro")
+        temporary = self.a_temporary_cluster()
+
+        html = self.choose(client, first, second, apply="yes", cluster=str(temporary.pk), at=MOMENT).content.decode()
+
+        assert "2 hubs will be restored from restore-1 as they were at 2026-11-09 14:30 UTC" in html
+        for hub in (first, second):
+            hub.refresh_from_db()
+            assert (hub.restoring_from_id, hub.restore_point) == (temporary.pk, AT_MOMENT)
+        assert [event["at"] for event in events("control.hub.restore_requested")] == [AT_MOMENT.isoformat()] * 2
+        assert "← restore-1" in cluster_cell(row_of(page(client, HUBS), ">acme<"))
+
+    def test_a_hub_the_operation_refuses_is_named_with_why_and_the_others_are_asked(self, client, root):
+        ready, demo = self.a_hub("acme"), self.a_hub("bistro", is_demo=True)
+        temporary = self.a_temporary_cluster()
+
+        html = self.choose(client, ready, demo, apply="yes", cluster=str(temporary.pk), at=MOMENT).content.decode()
+
+        # The admin writes each message with its first letter in capitals.
+        assert "Bistro: A demo is not restored: it ends on its own." in html
+        assert "1 hub will be restored from restore-1 as it was at 2026-11-09 14:30 UTC" in html
+        demo.refresh_from_db()
+        assert demo.restoring_from_id is None
+
+    def test_a_moment_still_to_come_is_the_operations_to_refuse(self, client, root):
+        hub = self.a_hub("acme")
+        temporary = self.a_temporary_cluster()
+        later = (timezone.now() + dt.timedelta(days=1)).isoformat()
+
+        html = self.choose(client, hub, apply="yes", cluster=str(temporary.pk), at=later).content.decode()
+
+        assert "Acme: That moment has not come yet." in html
+        hub.refresh_from_db()
+        assert hub.restoring_from_id is None
+
+    @pytest.mark.parametrize("given", ["cluster", "at"])
+    def test_without_the_cluster_or_the_moment_it_asks_again(self, client, root, given):
+        hub = self.a_hub("acme")
+        both = {"cluster": str(self.a_temporary_cluster().pk), "at": MOMENT}
+
+        html = self.choose(client, hub, apply="yes", **{given: both[given]}).content.decode()
+
+        assert 'name="apply"' in html and "errorlist" in html
+        hub.refresh_from_db()
+        assert hub.restoring_from_id is None
+
+    def test_support_neither_sees_it_nor_runs_it(self, client, support):
+        hub = self.a_hub("acme")
+        temporary = self.a_temporary_cluster()
+
+        assert "restore_from_a_copy" not in page(client, HUBS)
+        self.choose(client, hub, apply="yes", cluster=str(temporary.pk), at=MOMENT)
+
+        hub.refresh_from_db()
+        assert hub.restoring_from_id is None
+
+    def test_anyone_who_is_not_staff_is_answered_403_and_nothing_is_asked(self, client):
+        client.force_login(get_user_model().objects.create_user(username="owner", password="pw"))
+        hub = self.a_hub("acme")
+        temporary = self.a_temporary_cluster()
+
+        response = client.post(
+            HUBS,
+            {"action": "restore_from_a_copy", "_selected_action": [str(hub.pk)], "apply": "yes",
+             "cluster": str(temporary.pk), "at": MOMENT},
+            HTTP_HOST=PLATFORM,
+        )
+
+        assert response.status_code == 403
+        hub.refresh_from_db()
+        assert hub.restoring_from_id is None and not events("control.hub.restore_requested")
+
+    def test_past_the_admins_door_its_operation_still_refuses_support_with_403(self, client, support, monkeypatch):
+        from live.errors import OperationError
+
+        refused: list[int] = []
+        real = control_admin.hub_restore
+
+        def asked(ctx, data):
+            try:
+                return real(ctx, data)
+            except OperationError as error:
+                refused.append(error.status)
+                raise
+
+        monkeypatch.setattr(control_admin.HubAdmin, "has_restore_permission", lambda self, request: True)
+        monkeypatch.setattr(control_admin, "hub_restore", asked)
+        hub = self.a_hub("acme")
+        temporary = self.a_temporary_cluster()
+
+        html = self.choose(client, hub, apply="yes", cluster=str(temporary.pk), at=MOMENT).content.decode()
+
+        assert refused == [403] and "Acme: Only the platform may do this." in html
+        hub.refresh_from_db()
+        assert hub.restoring_from_id is None and not events("control.hub.restore_requested")
+
+
+def test_the_restore_speaks_spanish():
+    from django.utils import translation
+    from django.utils.translation import ngettext
+
+    with translation.override("es"):
+        assert str(control_admin.HubAdmin.restore_from_a_copy.short_description) == "Restaurar desde una copia…"
+        assert ngettext(
+            "%(count)d hub will be restored from %(cluster)s as it was at %(moment)s: closed for a few minutes while "
+            "it is restored. If it is refused, its page says why under «last error».",
+            "%(count)d hubs will be restored from %(cluster)s as they were at %(moment)s: each closed for a few "
+            "minutes while it is restored. If one is refused, its page says why under «last error».",
+            2,
+        ) % {"count": 2, "cluster": "r1", "moment": "2026-11-09 14:30 UTC"} == (
+            "2 hubs se restaurarán desde r1 tal como estaban el 2026-11-09 14:30 UTC: cada uno cerrado unos minutos "
+            "mientras se restaura. Si se rechaza alguno, su ficha dice por qué en «último error»."
+        )
+
+
+def test_its_restore_page_speaks_spanish(client, root):
+    hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")
+    a_cluster(name="restore-1", host="restore-1.example", is_open=False)
+
+    html = client.post(
+        HUBS,
+        {"action": "restore_from_a_copy", "_selected_action": [str(hub.pk)]},
+        HTTP_HOST=PLATFORM,
+        HTTP_ACCEPT_LANGUAGE="es",
+    ).content.decode()
+
+    assert "Cada hub elegido vuelve a como estaba en el momento" in html and 'value="Restaurarlos"' in html
+    assert "Clúster temporal" in html and "Momento" in html
+
+
+@pytest.mark.parametrize("action", ["move_to_cluster", "restore_from_a_copy"])
+def test_a_confirmation_page_wraps_a_long_database_name_as_a_hubs_own_page_does(client, root, action):
+    """The chosen hubs are read-only rows of an aligned fieldset: the admin's forms sheet is what wraps a database name
+    wider than a phone (375 px) instead of pushing the page sideways."""
+    hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")
+
+    html = client.post(HUBS, {"action": action, "_selected_action": [str(hub.pk)]}, HTTP_HOST=PLATFORM).content.decode()
+
+    assert 'class="module aligned"' in html and f'<div class="readonly">{hub.db_name}</div>' in html
+    assert "admin/css/forms.css" in html
+
+
 def test_the_move_speaks_spanish():
     from django.utils import translation
     from django.utils.translation import gettext, ngettext

@@ -653,3 +653,6 @@ msgstr "«%(name)s» es de %(app)s, que está apagada en este negocio: enciénde
 
 msgid "Cancelled: the customer's personal data were erased."
 msgstr "Cancelada: se borraron los datos personales del cliente."
+
+msgid "[erased with the customer's personal data]"
+msgstr "[borrado con los datos personales del cliente]"
