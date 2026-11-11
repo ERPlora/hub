@@ -118,7 +118,8 @@ APP_WORDS = shared.app_words
 #: deactivation itself (``staff.member.deactivate``, ``*.deactivate``), not only a switch off, and what one «pide» or
 #: «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``). A «bono» (a voucher, a pack) is
 #: Services' voucher, the one of the catalogue (``service.package``) or the one sold to a customer (``service.grant``),
-#: and an «asignación» (what one «asigna») is a professional's assignment to a service (``service.assignment``).
+#: and an «asignación» (what one «asigna») is a professional's assignment to a service (``service.assignment``). An
+#: «elemento», as Demo's screens name one, is an item (``demo.item``).
 SYNONYMS = (
     ("cuenta", "check", "tab", "order"),
     ("ticket", "tique", "recibo", "receipt", "sale"),
@@ -180,6 +181,8 @@ SYNONYMS = (
     ),
     ("borrador", "borradores", "draft", "drafts"),
     ("receta", "recetas", "prefabricada", "prefabricadas", "recipe", "recipes"),
+    # demo
+    ("elemento", "elementos", "item", "items"),
     # combo: an «opción» or an «elección» of a course is a choice (``combo.option``), as of a modifier group
     # (``modifier.option``). Until ERPlora/live#61, «ordena» and «orden» also name a device: «ordenador»'s stem.
     ("opcion", "opciones", "eleccion", "elecciones", "option", "options", "choice", "choices"),
