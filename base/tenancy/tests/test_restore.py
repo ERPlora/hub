@@ -566,16 +566,21 @@ class TestTwoWorkers:
     ):
         hub = restores.hub(source=restores.cluster())
         real = restore._refuse_fiscal_changes
+        checks: list[str] = []
 
         def checked_then_ended(*args, **kwargs):
             real(*args, **kwargs)
-            with use_control():
-                Hub.objects.filter(pk=hub.pk).update(restoring_from=None, restore_point=None)
+            checks.append(args[0])
+            # The second check, with the business closed: right before the rename, another worker ends it.
+            if len(checks) == 2:
+                with use_control():
+                    Hub.objects.filter(pk=hub.pk).update(restoring_from=None, restore_point=None)
 
         monkeypatch.setattr(restore, "_refuse_fiscal_changes", checked_then_ended)
 
         run(restores)
 
+        assert len(checks) == 2
         assert marker(hub.db_name) == [AS_THEN, SINCE]
         control = tenancy_connections.control_name()
         assert not [name for name in databases() if names.is_kept(name, control=control)]
