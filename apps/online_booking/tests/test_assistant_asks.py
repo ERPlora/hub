@@ -1,6 +1,6 @@
-"""What layer 1 of the assistant's QA says of Online booking (docs plan 2026-10-31, the assistant's knowledge and QA, §3):
-its fifteen tools, and that the owner's requests of the real-model QA (hub#1107), in the owner's own words, are offered
-their existing operation.
+"""What layer 1 of the assistant's QA says of Online booking (docs plan 2026-10-31, the assistant's knowledge and QA,
+§3): its fifteen tools, and that the owner's requests of the real-model QA (hub#1107), in the owner's own words, are
+offered their existing operation.
 
 Every ask of every tool of online_booking bringing its tool among the first ten, role by role, in English and in
 Spanish, out of the catalogue of a business with every app on and ranked as a turn ranks, is
@@ -34,7 +34,10 @@ REPORTED = [
         "cualquier profesional",
     ),
     ("online_booking.booking.delete", "elimina de la bandeja y de la agenda la reserva APT-20261109-0002"),
-    ("online_booking.public.services", "¿qué servicios puede reservar una clienta en la web, con precio y duración?"),
+    (
+        "online_booking.public.services",
+        "¿qué servicios puede reservar una clienta en la web, con precio y duración?",
+    ),
 ]
 #: How far down the tools a turn offers (``MAX_TOOLS``, 40) a probe of the QA may bring its tool: the first ten for the
 #: ones the issue reports, half of them for every other probe, so the tools of the apps that say their asks later may
