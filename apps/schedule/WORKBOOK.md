@@ -569,7 +569,15 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
   borrar un día especial o un cambio temporal, que no se deshace) y todo campo de entrada lleva
   `description`; las mismas descripciones salen en el OpenAPI. Las dos excepciones son `schedule.special_day.get` y
   `schedule.override.get`, lecturas internas (`ai=INTERNAL`, sin API): el modelo encuentra los días especiales y los
-  cambios temporales en sus listas.
+  cambios temporales en sus listas. Cada una de las 16 herramientas dice además sus `asks`, las frases en `en` y `es`
+  con que una persona la pide (`live.E020`: Horarios está en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1096), con palabras
+  propias de Horarios (festivo, fiesta local, vacaciones, obras, horario de verano, zona horaria) y sin las de cualquier
+  app («día», «hora», «semana» solo donde son la cosa pedida), para no quitar puesto a las herramientas de otras apps.
+  Así cerrar por obras, cargar festivos de una vez o corregir un cambio temporal o un día especial desde el chat
+  (SCHEDULE-F05, F07 y F13) llegan a su operación y no a los bloqueos de Citas: las frases reales de la QA del asistente
+  (`tests/e2e/qa/probes/owner-es-schedule-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno y por
+  delante de todo `appointment.blocked_time.*`, y una frase propia por herramienta solo llega entre las 10 primeras con
+  sus `asks` (`tests/test_assistant_asks.py`).
 - La tarjeta de confirmación del asistente (BASE-F97, hub#675) nombra el registro que una escritura señala por su id
   con las marcas `refers` de `schemas.py` (`A_SPECIAL_DAY`, `A_OVERRIDE`, en el `id` de `SpecialDayRefIn` y de
   `OverrideRefIn`), leídas como quien pregunta: el día especial por su `name` con `schedule.special_day.get` y el
