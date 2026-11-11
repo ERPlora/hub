@@ -5,9 +5,10 @@ from decimal import Decimal
 from typing import Annotated, Generic, Literal, TypeVar
 from uuid import UUID
 
+from django.utils.translation import gettext_lazy as _
 from django.utils.translation import gettext_noop
 from ninja import Field, Schema
-from pydantic import StringConstraints
+from pydantic import StringConstraints, ValidationInfo, field_validator
 
 from base.schemas import names
 
@@ -19,9 +20,12 @@ LineText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1,
 
 # What the assistant's card calls the item a write acts on (its Spanish in this app's catalog), as its screen calls one,
 # and the read it names that item by (base/assistant.py ``REFERS``), run as whoever asks, never by its id: by its name,
-# as the list and the «Delete» dialog say it.
+# as the list and the «Delete» dialog say it. Said by its name, the card reads it by that name too, so it shows the item
+# the write will find («Autumn trial» when the person said «autumn»), not only what was said.
 T_ITEM = gettext_noop("Item")
 AN_ITEM = names("demo.item.detail")
+AN_ITEM_BY_NAME = names("demo.item.detail", by="item")
+NO_ITEM = _("Say which item: its id or its name.")
 
 
 # Pages: every list is paginated, limit ≤ 100.
@@ -48,7 +52,26 @@ class ItemListIn(PageIn):
 
 
 class ItemRefIn(Schema):
-    id: UUID = Field(title=T_ITEM, json_schema_extra=AN_ITEM)
+    """An item by its ``id`` or, when the id is not known, by its name as a person says it (``item``; the same name in
+    any case before one that contains it: ``queries.find_item``). The id wins."""
+
+    id: UUID | None = Field(None, title=T_ITEM, json_schema_extra=AN_ITEM)
+    item: Name | None = Field(
+        None,
+        validate_default=True,
+        title=T_ITEM,
+        description="The item's name, when its id is not known.",
+        json_schema_extra=AN_ITEM_BY_NAME,
+    )
+
+    @field_validator("item")
+    @classmethod
+    def _said(cls, value: str | None, info: ValidationInfo) -> str | None:
+        """The name is required when the id is not given (and the id itself is valid: a malformed one is its own
+        error)."""
+        if value is None and "id" in info.data and info.data["id"] is None:
+            raise ValueError(str(NO_ITEM))
+        return value
 
 
 class ItemStatsIn(Schema):
@@ -61,19 +84,17 @@ class ItemIn(Schema):
     note: str = ""
 
 
-class ItemPatchIn(Schema):
-    """Only the fields sent are changed; ``null`` leaves a field as it is."""
+class ItemPatchIn(ItemRefIn):
+    """The item by its id or its name; only the fields sent are changed, ``null`` leaves a field as it is."""
 
-    id: UUID = Field(title=T_ITEM, json_schema_extra=AN_ITEM)
     name: Name | None = None
     status: Status | None = None
     note: str | None = None
 
 
-class LineIn(Schema):
-    """``id`` is the item's; ``client_line_id`` makes repeating the same line safe."""
+class LineIn(ItemRefIn):
+    """The item by its id or its name; ``client_line_id`` makes repeating the same line safe."""
 
-    id: UUID = Field(title=T_ITEM, json_schema_extra=AN_ITEM)
     text: LineText
     qty: Decimal = Field(gt=0, max_digits=10, decimal_places=3)
     client_line_id: UUID | None = Field(None, json_schema_extra={"attempt_key": True})
