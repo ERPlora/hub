@@ -480,7 +480,17 @@ cajero del producto actual es un empleado.
   tarjeta de confirmación del asistente, nunca por el título que pydantic inventa del campo
   (`tests/test_integration_assistant.py`). `kitchen_name` también lleva el suyo, «Kitchen ticket name» /
   «Nombre en la comanda», el de los formularios de grupo y opción: el modelo lo llama «kitchen name», que solo
-  queda para el admin de Django (hub#958). `expose_api` en las nueve consultas.
+  queda para el admin de Django (hub#958). `expose_api` en las nueve consultas. Cada herramienta dice además sus
+  `asks`, las frases en `en` y `es` con que una persona la pide (`live.E020`: Suplementos está en
+  `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1092), con platos y opciones de ejemplo que ninguna otra app usa (pizzas,
+  salsas, el punto de la carne; nunca «Café» ni «hamburguesa», que ya dicen las frases y sondas de Ventas), y los
+  `SYNONYMS` del Hub (`base/assistant.py`) leen «predeterminada» como el `default` de una opción (nunca «por defecto»,
+  que también es el de un turno o un umbral). Así consultar los grupos, las opciones y los enganches, engancharlos y
+  soltarlos, y cambiar o borrar grupos y opciones desde el chat (MODIFIER-F03 a F07) llegan a su operación: las frases
+  reales de la QA del asistente (`tests/e2e/qa/probes/*-es-modifier-2026-11-08.json`, del dueño y del empleado) quedan
+  entre las 20 primeras herramientas del turno, y una frase propia por herramienta solo llega con sus `asks`
+  (`tests/test_assistant_asks.py`). La sonda de borrar un grupo «sin cambiar los pedidos antiguos» sigue fuera: live
+  lee «sin cambiar» como una orden de cambiar (ERPlora/live#60; `xfail` estricto hasta su puntero).
 - **La tarjeta de confirmación del asistente** (BASE-F97) nombra cada registro que una escritura señala por su id con
   las marcas `refers` de `schemas.py` (`A_GROUP`, `AN_OPTION`, `A_LINK`, `A_PRODUCT`, `A_CATEGORY`), leídas como quien
   pregunta: el grupo, el producto y la categoría por su nombre, la opción por su nombre y su grupo, porque dos grupos
