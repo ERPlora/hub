@@ -15,7 +15,9 @@ The mechanics that do not depend on the gateway are ``live.assistant``'s, shared
   hour; a record by its name, as the read its schema marks answers it to them (``REFERS``), or not at all: never by
   its id; an amount in the currency the write names (``CURRENCY``) or the business's —; ``risk="high"`` asks to type
   a word in the person's language (``CONFIRM_WORD``) or, over records named by ``ids``, how many. Its preview
-  (``preview``) says the amounts of its read in the currency it answers. A platform action is named by the screen
+  (``preview``) says the amounts of its read in the currency it answers. The yes is for that card (``fingerprint``:
+  what it showed and the ids of the records it read, by its marked data and its check): drawn again with the yes, a
+  card that changed runs nothing and is shown anew (hub#1208). A platform action is named by the screen
   where the person would do it (``screen``, ``app_name``). An operation may replace the detailed fields with its own
   summary (``ai={"summary": …}``), computed as the person and in their language.
 - **The gateway**: every door is a signed POST (``base.signing``, the secret of every ``/internal`` call) naming this
