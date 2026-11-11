@@ -184,7 +184,7 @@ def _override_event(ctx: OperationContext, name: str, row: Override) -> None:
         "risk": "normal",
         "asks": {
             "en": (
-                "Saturdays will be 10:00 to 14:00 from now on",
+                "set the usual Saturday to 10:00 to 14:00",
                 "we stay closed on Mondays from now on",
             ),
             "es": (
@@ -224,7 +224,7 @@ def set_day(ctx: OperationContext, data: SetDayIn) -> dict:
         "risk": "normal",
         "asks": {
             "en": (
-                "the opening you proposed is fine, keep it as it is",
+                "the default opening is fine, confirm it as it is",
                 "confirm the default opening as it is, without changing a thing",
             ),
             "es": (
