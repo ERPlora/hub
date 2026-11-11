@@ -2,7 +2,7 @@ name: deploy
 
 # Push to main -> test (test.yml) and, side by side, build the hub image (tag = commit SHA) into
 # prod's ECR repository; once both pass, publish the release hub-vYYYY.MM.DD.N and deploy it to prod
-# (ecs-deploy.sh; aws-next README, "Contrato").
+# (ecs-deploy.sh; ERPlora/aws README, "Contrato").
 # Push to pre -> the same into pre's own ECR repository (erplora/hub-pre), deployed to pre, the team's
 # pre-production (hub-pre and worker-pre, hubs.pre.erplora.com), waking it up if its evening stop had
 # put it to sleep. No release: releases are prod's.
@@ -62,7 +62,7 @@ jobs:
       - name: Check the repository variables
         run: |
           if [ -z "$AWS_REGION" ]; then
-            echo "::error::empty repository variable: AWS_REGION (aws-next README, step 19)"
+            echo "::error::empty repository variable: AWS_REGION (ERPlora/aws README, step 19)"
             exit 1
           fi
 
@@ -201,7 +201,7 @@ jobs:
             fi
           done
           if [ -n "$missing" ]; then
-            echo "::error::empty repository variables:$missing (aws-next README, step 19)"
+            echo "::error::empty repository variables:$missing (ERPlora/aws README, step 19)"
             exit 1
           fi
 
@@ -280,7 +280,7 @@ jobs:
           gh release create "$tag" --target "$GITHUB_SHA" --title "hub ${tag#hub-v}" --notes-file "$RUNNER_TEMP/notes.md"
           echo "released $tag"
 
-      # ECR keeps the last 10 images (aws-next stacks/shared/ecr.tf): an old release may be gone.
+      # ECR keeps the last 10 images (ERPlora/aws stacks/shared/ecr.tf): an old release may be gone.
       - name: Check the image exists
         if: steps.order.outputs.deploy == 'true'
         env:

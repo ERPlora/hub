@@ -7,8 +7,9 @@ lo atascado. No compone documentos ni habla con la impresora: Ventas, Facturaci�
 mandan el documento ya compuesto, y la app de ERPlora del dispositivo lo imprime.
 
 - **Estado**: completa (2026-10-31): 19 de sus 21 flujos, `PRINTING-F01` … `F21`, están `hecho`;
-  `PRINTING-F02` está `descartado` con su issue (app#17, cerrada el 2026-11-03 por ERPlora/app#19; el WORKBOOK aún
-  lo da por descartado) y `PRINTING-F21` está `parcial` (hub#573).
+  `PRINTING-F02` está `parcial`, porque falta probar en un dispositivo la búsqueda en una red sin salida a internet
+  (la app la hace desde la 1.1.34: app#17, cerrada el 2026-11-03 por ERPlora/app#19), y `PRINTING-F21` también
+  (hub#573).
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta
   «Para quien lo mantiene»). Lo que se cambie de la app se cambia antes allí.
 - **Peticiones** a `@erplora/ui` y a la app nativa que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md).
@@ -75,6 +76,7 @@ pnpm e2e tests/e2e/printing-printers.spec.ts tests/e2e/printing-devices.spec.ts 
 
 - El ancho del papel en la app del dispositivo y el icono `ion:print-outline`: «Lo que queda fuera» del WORKBOOK y
   [`UI-REQUESTS.md`](UI-REQUESTS.md).
-- Ya no están fuera: `PRINTING-F02` en una red sin salida a internet (app#17, cerrada el 2026-11-03 por
-  ERPlora/app#19) y, de otras apps, el diálogo del dispositivo que usan Ventas, Caja y
-  Facturación sin impresora de tiques en la app Android (hub#455, cerrada el 2026-11-03).
+- La prueba en un dispositivo de `PRINTING-F02` en una red sin salida a internet: la app ya la barre desde la 1.1.34
+  (app#17, cerrada el 2026-11-03 por ERPlora/app#19); «Lo que queda fuera» del WORKBOOK.
+- Ya no está fuera, de otras apps, el diálogo del dispositivo que usan Ventas, Caja y Facturación sin impresora de
+  tiques en la app Android (hub#455, cerrada el 2026-11-03).

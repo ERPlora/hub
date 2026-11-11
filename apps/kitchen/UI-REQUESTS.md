@@ -4,9 +4,10 @@ Lo que las páginas de Cocina necesitan de `@erplora/ui` (y de otras apps) y tod
 usan lo más parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
 **Al cerrar la app (2026-10-21)**, contra `ERPlora/ui` `origin/main` `9962696`: no ha llegado nada de lo de abajo.
-Ninguno rompe un flujo (todos tienen su sustituto), así que pasan a «Fuera por ahora» (`## 6` de `MIGRATION.md`) con
-las claves `kitchen:ui-icons`, `kitchen:ui-live-server-table` y `kitchen:ui-color-picker`. Quien los suba a `ui` los
-borra de aquí y cambia el sustituto en la misma PR del puntero.
+Ninguno rompe un flujo (todos tienen su sustituto), así que pasan a «Fuera por ahora» (`## 6` de
+`archive/migration/MIGRATION.md` de `ERPlora/erplora-next`) con las claves `kitchen:ui-icons`,
+`kitchen:ui-live-server-table` y `kitchen:ui-color-picker`. Quien los suba a `ui` los borra de aquí y cambia el
+sustituto en la misma PR del puntero.
 
 ## Iconos (registrarlos en `packages/ui/src/shell/icons.ts`, `ION_ICONS`)
 
