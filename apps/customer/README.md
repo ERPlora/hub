@@ -35,7 +35,7 @@ las demás: Ventas, Citas, Reservas, la Bandeja de WhatsApp y otras cinco la req
 | `requires` | ninguna: se enciende sola |
 | La requieren | Ventas, Facturación, Citas, Servicios, Tarifas, Reservas, Mesas, Reservas online y la Bandeja de WhatsApp |
 | Pantallas | `/customer/customers` (lista y ficha, `/customer/customers/:id`), `/customer/groups`, `/customer/tags`, `/customer/fields`; `/customer/preview/customer-search` solo en el servidor de desarrollo |
-| Operaciones | 16 consultas (`queries.py`) y 28 acciones (`services.py`), todas con `ai=`; las cuatro `customer.health.*`, con `ai=INTERNAL` y sin `expose_api` (los datos de salud no llegan al asistente ni a las API keys); 41 rutas en `/api/customer/…` (sin ruta: las tres `customer.purchase.*`, que solo corre el sistema) |
+| Operaciones | 20 consultas (`queries.py`) y 28 acciones (`services.py`), todas con `ai=`; las cuatro `customer.health.*`, con `ai=INTERNAL` y sin `expose_api` (los datos de salud no llegan al asistente ni a las API keys); 41 rutas en `/api/customer/…` (sin ruta: las tres `customer.purchase.*`, que solo corre el sistema, y `customer.field.detail`, `customer.group.detail`, `customer.order.get` y `customer.tag.detail`) |
 | Aprobaciones | 8 órdenes que un responsable aprueba con su PIN al empleado (`approvals`, BASE-F84): unir fichas, crear y cambiar grupos y etiquetas, y crear, cambiar y eliminar campos |
 | Eventos | 28, `customer.<entidad>.<hecho>` (`events.py`), solo con identificadores; `REACTIONS` a `sale.sale.completed`, `.voided` y `.refunded` (`customer.purchase.record`, `.void`, `.refund`), por el relay del outbox |
 | Bloques de la ficha | `apps/<id>/frontend/customer-card/<Bloque>.vue` de cada app encendida (hoy, `appointment`) |
@@ -69,7 +69,7 @@ pnpm e2e tests/e2e/customer-flows.spec.ts tests/e2e/customer-pages.spec.ts tests
 
 ## Qué queda fuera
 
-- Los importes sin separador de millares (hub#512), la tarjeta del asistente que
-  no dice qué ficha toca (hub#513) y el país del negocio para un teléfono sin prefijo (hub#527, cruza las apps
-  que buscan fichas por teléfono): «Lo que queda fuera» del WORKBOOK.
+- Nada abierto: los importes sin separador de millares (hub#512), la tarjeta del asistente que no decía qué ficha
+  toca (hub#513) y el país del negocio para un teléfono sin prefijo (hub#527) se cerraron entre el 2026-11-04 y el
+  2026-11-07 («Lo que queda fuera» del WORKBOOK).
 - Las peticiones de [`UI-REQUESTS.md`](UI-REQUESTS.md).

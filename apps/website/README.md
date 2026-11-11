@@ -11,8 +11,8 @@ producto actual no tenía página por negocio.
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta
   «Para quien lo mantiene»). Lo que se cambie de la app se cambia antes allí.
 - **Peticiones a `@erplora/ui`**: ninguna abierta (sin `UI-REQUESTS.md`): `ColorInput` e `ImageUpload` llegaron con
-  ERPlora/ui#20. El hueco que falta entre la miniatura y el texto de `ImageUpload` es un arreglo en la cola
-  (`FIX-UI-IMAGEUPLOAD-THUMBNAIL-TOUCHES-TEXT`), no una petición.
+  ERPlora/ui#20, y el hueco entre la miniatura y el texto de `ImageUpload`
+  (`FIX-UI-IMAGEUPLOAD-THUMBNAIL-TOUCHES-TEXT`), con ERPlora/ui#44.
 
 ## Qué hace hoy
 
@@ -43,10 +43,10 @@ producto actual no tenía página por negocio.
 | Usa de otras apps | Inventario y Servicios por el nombre de sus consultas (`inventory.product.list_for_sale`, `inventory.category.list`, `inventory.product_category.list`, `service.service.list_for_sale`, `service.category.list`), solo con la app activa en el hub (`base.relay.active_apps`). De la plataforma: `base.operations.hub_id`, `base.operations.business_currency` (la moneda de los precios en la vista previa y el catálogo público), `base.business.currency_of` (la misma moneda en la página pública, de la fila del registro que el host ya cargó, sin una transacción por visita) y `base.business.currency_decimals` (sus decimales), `storages["hub_files"]`, `base.media` (`/p/media/…`), `base.throttle` y la zona horaria del hub (`control.Hub.timezone`, el «hoy» del horario; Madrid si está vacía) |
 | La usa | `base.public_home`: la entrada `/` del host del hub carga `apps/website/public_home.py` (`is_published`, `respond`) por `import_module`; ninguna app de negocio la lee |
 | Pantallas | `/website` (editor, vista previa y «Compartir y QR») y la página pública en `/` |
-| Operaciones | 7 consultas (`queries.py`) y 4 acciones (`services.py`), todas con su ruta en `/api/website/…` (11; las 3 `website.public.*` sin sesión) y `expose_api`; 5 con `ai=` (las que usa el asistente) |
+| Operaciones | 9 consultas (`queries.py`) y 4 acciones (`services.py`); 11 con su ruta en `/api/website/…` (las 3 `website.public.*` sin sesión) y `expose_api`, y `website.category.get` y `website.image.get` sin ruta; todas con `ai=`: 5 herramientas del asistente y las demás `INTERNAL` |
 | Eventos | 4, `website.<entidad>.<hecho>` (`events.py`); no reacciona a ninguno |
 | Tareas programadas | ninguna |
-| Migraciones | `0001_initial`, `0002_theme_palettes`, `0003_theme_overrides` (las dos, solo JSON del tema) y `0004_site_reviews_snapshot`; todas reversibles |
+| Migraciones | `0001_initial`, `0002_theme_palettes`, `0003_theme_overrides` (las dos, solo JSON del tema), `0004_site_reviews_snapshot` y `0005_image_filename`; todas reversibles |
 | Admin | Django admin en `hubs.erplora.com`, de solo lectura salvo `is_live` (desconectar una página por soporte) |
 | Fuera del Hub | Places API (New) de Google con `GOOGLE_PLACES_API_KEY` (Secrets Manager; ERPlora/aws#10) |
 | Paquete público | entrada `website` de Vite, en la raíz del Hub (`frontend/website.ts`: Bootstrap 5.3, su `collapse` y `apps/website/frontend/public/`) |
@@ -75,10 +75,9 @@ pnpm e2e tests/e2e/website-flows.spec.ts tests/e2e/website.spec.ts   # sin GOOGL
 
 ## Qué queda fuera
 
-- `ai=` en las seis operaciones que no son herramienta del asistente, a la espera de `INTERNAL` y `live.E017` (PLAN
-  §30) en `packages/live`.
-- El dominio propio para la web (HUBS-F17, `## 6` de `MIGRATION.md`; PLAN-SAAS §8).
-- `FIX-HUB-SPA-STATIC-PROBES-SET-CSRF-COOKIE` (`base/spa.py`) y `FIX-UI-IMAGEUPLOAD-THUMBNAIL-TOUCHES-TEXT`
-  (`packages/ui`), en la cola.
+- Ya no están fuera: `ai=INTERNAL` en las operaciones que no son herramienta del asistente (`INTERNAL` y
+  `live.E017` ya están en `packages/live`), el dominio propio para la web (HUBS-F17, hoy BASE-F110),
+  `FIX-HUB-SPA-STATIC-PROBES-SET-CSRF-COOKIE` (`base/spa.py`) y `FIX-UI-IMAGEUPLOAD-THUMBNAIL-TOUCHES-TEXT`
+  (ERPlora/ui#44).
 - Lo que la app no hace a propósito (más páginas, HTML del usuario, horario importado de Horarios, sitemap…): «Lo que
   NO hace, a propósito» del WORKBOOK.

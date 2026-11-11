@@ -6,9 +6,10 @@ documentación de la API, y por debajo lo que comparten todas las apps: el regis
 de datos por negocio), las operaciones, el outbox y su relevo, las tareas programadas y el contrato con erplora.com
 por `/internal`.
 
-- **Estado**: completa (2026-11-01): 101 de sus 108 flujos, `BASE-F01` … `F108`, están `hecho`; `BASE-F02`, `F11`,
-  `F41`, `F50`, `F74` y `F82` están `descartado`, cada uno con su issue (hub#573, hub#576–hub#579, saas#190), y `BASE-F40`
-  está `no hecho`, reabierto por hub#603.
+- **Estado**: completa (2026-11-01): 107 de sus 112 flujos, `BASE-F01` … `F112`, están `hecho`; `BASE-F02`, `F41` y
+  `F82` están `descartado`, cada uno con su issue (hub#573, hub#576 y hub#579), `BASE-F28` está `descartado` al unirse a
+  `BASE-F40` y `BASE-F109` está `parcial` (hub#738). Los que al cerrar la app quedaron descartados o reabiertos
+  llegaron después: `BASE-F11` (hub#716), `F40` (hub#603), `F50` (hub#577) y `F74` (hub#578).
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta «Para quien
   lo mantiene»). Lo que se cambie de la plataforma se cambia antes allí; lo que no entra, en su «Lo que queda fuera».
 - **Peticiones** a `@erplora/ui` que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md).
@@ -42,10 +43,14 @@ por `/internal`.
 - **La QA maestra del Hub y el reporte a soporte** (F107, F108).
 - **El borrado de un negocio eliminado** (F109): pasados sus 90 días, su copia final y su base de datos borrada; con
   documentos, la guarda hasta que exista el archivo fiscal (hub#738).
+- **La web por su dominio propio, el corte de la base de datos y las descargas en la app** (F110–F112): abrir la web
+  del negocio por su dominio, esperar a la base de datos cuando se corta un momento y guardar un archivo descargado
+  dentro de la app.
 
 ## Lo que queda fuera
 
-El detalle está en «Lo que queda fuera» del [`WORKBOOK.md`](WORKBOOK.md): las cifras de uso y el aviso de ampliar de
-Sistema › Recursos (hub#603), la fila de salud del Inicio (hub#573), el pase a
-erplora.com (saas#190), las notas de versión (hub#576), la vista previa de .xlsx y .docx (hub#578) y los roles que
-trae una app (hub#579).
+El detalle está en «Lo que queda fuera» del [`WORKBOOK.md`](WORKBOOK.md): el archivo fiscal antes de borrar un negocio
+con documentos (hub#738), la fila de salud del Inicio (hub#573), las notas de versión (hub#576), los roles que trae una
+app (hub#579) y la cola de PgBouncer de cada negocio en CloudWatch (hub#572). Ya no están fuera, cerradas después del
+cierre de la app: las cifras de uso y el aviso de ampliar (hub#603), el pase a erplora.com (saas#190) y la vista previa
+de .xlsx y .docx (hub#578).

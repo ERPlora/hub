@@ -32,7 +32,7 @@ Personal); Citas y Reservas lo leen para no reservar con el negocio cerrado.
 | Usa de otras apps | nada; de la plataforma, la zona horaria (`base.business.business_zone`) |
 | La usan | Citas y Reservas (las dos la requieren): importan `hours_for_range` y `day_label` de `queries.py` (Reservas, también `get_week`) y re-ejecutan sus consultas vivas con sus avisos; la agenda de Citas sigue en vivo `schedule.hours.for_range`; Reservas online, a través de Citas |
 | Pantallas | `/schedule/hours`, `/schedule/special-days` (dos tablas: días especiales y cambios temporales) y `/schedule/settings` |
-| Operaciones | 6 consultas (`queries.py`) y 10 acciones (`services.py`), todas con `ai=`; 16 rutas en `/api/schedule/…`; 5 consultas abiertas a las API keys |
+| Operaciones | 8 consultas (`queries.py`) y 10 acciones (`services.py`), todas con `ai=`; 16 rutas en `/api/schedule/…` (sin ruta: `schedule.override.get` y `schedule.special_day.get`); 5 consultas abiertas a las API keys |
 | Eventos | 8, `schedule.<entidad>.<hecho>` (`events.py`); no reacciona a ninguno |
 | Tareas programadas | ninguna |
 | Migraciones | `0001_initial` y `0002_default_week` (planta la semana por defecto; su vuelta atrás solo la quita si sigue sin confirmar) |

@@ -42,7 +42,7 @@ del dispositivo para los límites.
 | Operaciones | 7 consultas (`queries.py`) y 9 acciones (`services.py`), todas con `ai=`; no-show, cancelar, borrar y cancelar con el enlace, `risk = "high"`. Rutas en `/api/online_booking/…` para todas salvo `online_booking.customer.erase` (la reacción al RGPD, solo del sistema) |
 | Operaciones públicas | `online_booking.public.page`, `.services`, `.slots`, `.booking`, `.book`, `.cancel`, con el permiso `online_booking.public` (contrato en el WORKBOOK, «Contrato con la página pública») |
 | Consultas vivas | `online_booking.booking.list` y `.get` (avisos de Citas, fusión y borrado de Clientes, reserva nueva) y `online_booking.settings.get` (los ajustes de la app y las reglas de Citas) |
-| Eventos | 2: `online_booking.booking.created` y `online_booking.settings.updated`; solo los escucha Automatizaciones (`flow`, que se apunta a todos, FLOW-F21, todavía `parcial`). Reacciona a `customer.customer.erased` (`online_booking.customer.erase`), que entrega el relay del worker |
+| Eventos | 2: `online_booking.booking.created` y `online_booking.settings.updated`; solo los escucha Automatizaciones (`flow`, que se apunta a todos, FLOW-F21, `hecho`). Reacciona a `customer.customer.erased` (`online_booking.customer.erase`), que entrega el relay del worker |
 | Modelos | `Settings` (una fila; sin ella, los de fábrica) y `Booking` (una por cita reservada desde la página: la cita, el hash SHA-256 del enlace y la huella HMAC del visitante). UUIDv7, sin `hub_id` |
 | Tarea programada | ninguna |
 | Migraciones | `0001_initial` |
