@@ -7,7 +7,6 @@ Every ask of every tool of appointment bringing its tool among the first ten, ro
 over the asks and the guard that no ask copies a probe of layer 2.
 """
 
-import dataclasses
 import json
 from pathlib import Path
 
@@ -20,7 +19,7 @@ from live.operations import AI, Operation, registry
 from base import assistant
 from base.models import Membership
 from base.permissions import permissions_for
-from base.tests.test_assistant_asks import TOP, comparable, probe_phrases
+from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, comparable, probe_phrases
 
 A = Scope("host", "a")
 
@@ -140,12 +139,6 @@ def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str) -> int 
     return offered_place(tools, name, phrase)
 
 
-def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
-    """``tools`` with ``name`` saying no asks: how a turn ranked it by its name and description alone."""
-    op = tools[name]
-    return {**tools, name: dataclasses.replace(op, ai={key: value for key, value in op.ai.items() if key != "asks"})}
-
-
 def appointment_tools() -> dict[str, Operation]:
     return {name: op for name, op in registry.items() if op.app_label == "appointment" and assistant.is_tool(op)}
 
@@ -217,14 +210,7 @@ def test_a_request_in_spanish_brings_its_tool_among_the_first_ten_by_appointment
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
 def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    assert comparable(phrase) not in probe_phrases()
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= TOP, place
-    before = without_its_asks(tools, name)
-    assert not shared.asks_of(before[name])  # positive control: the tool is ranked without its asks
-    unasked = offered_place(before, name, phrase)
-    assert unasked is None or unasked > TOP, unasked
+    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
 
 
 def test_every_tool_is_caught_by_a_probe_or_by_words_of_its_own():
