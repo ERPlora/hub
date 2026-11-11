@@ -644,21 +644,23 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   `base/tests/test_assistant_asks.py` exige que cada frase traiga su herramienta entre las diez primeras, por
   rol. Sin ellos, volver a activar una tarifa o una regla (PRICING-F05, F12) quedaba fuera de las 40
   herramientas que se ofrecen en un turno, y añadir un precio (F07) y desactivar una regla, en los últimos
-  puestos: el Hub lee «activar» solo como encender (una app, un ajuste; ERPlora/live#50), «regla» no nombra
+  puestos: el Hub leía «activar» solo como encender (una app, un ajuste; hasta ERPlora/live#70), «regla» no nombra
   la regla y «descuento» es el de una cuenta del TPV. Los `asks` no dicen «tarifa», «precio» ni «price»: el
   nombre de las herramientas ya las trae con esas palabras, y en sus frases subían las 20 de Tarifas en
   toda pregunta de precios de Ventas y Carrito. Tampoco «lista»/«listas», «members» (es el personal),
   «importe» (se lee como Importar), «artículo», «euros», «impuesto»/«IVA», «automáticas» (Automatizaciones),
-  «desactiva» (sube las de Personal) ni nombres de las sondas de la QA («Mayorista», «Café», «Ana»): nombran
-  las tarifas por su nombre («la de Hostelería») y cada herramienta tiene el suyo. Medido sobre todos los
+  «desactiva» (sube las de Personal), «configurado» (live lee su raíz «confi» también como «confirma» y la
+  ponía detrás de los `*.confirm` de Citas y Reservas online; ERPlora/live#68) ni nombres de las sondas de
+  la QA («Mayorista», «Café», «Ana»): nombran las tarifas por su nombre («la de Hostelería») y cada
+  herramienta tiene el suyo. Medido sobre todos los
   `asks` del Hub y las 857 sondas de la capa 2: ningún ask de otra app pierde puesto.
   `tests/test_assistant_asks.py` mide con las frases reales de la QA
   (`tests/e2e/qa/probes/owner-es-pricing-2026-11-08.json`), nunca con los propios `asks`: cada una ofrece su
   herramienta en la primera mitad de las 40, la de reactivar una regla antes que `payment.method.activate`, y
   una frase propia por herramienta (ni `ask` ni sonda, con `assert_its_asks_bring` de la plataforma) la trae
-  entre las diez primeras solo con sus `asks`; el empleado no recibe ninguna escritura. Que reactivar una
-  tarifa o una regla salga antes que `base.app.enable` queda en `xfail` estricto hasta que live lea «activar»
-  como la acción (ERPlora/live#50): quien traiga ese puntero quita la marca.
+  entre las diez primeras solo con sus `asks`; el empleado no recibe ninguna escritura. Reactivar una
+  tarifa o una regla sale antes que `base.app.enable`: live lee «activar» también como la acción `activate`
+  (ERPlora/live#70).
 - La tarjeta de confirmación del asistente (BASE-F97) nombra cada registro que una escritura señala por su id
   con las marcas `refers` de `schemas.py` (`A_LIST`, `A_PRICE`, `A_RULE`, `A_PRODUCT`, `A_SERVICE`, `A_CATEGORY`,
   `A_GROUP`), leídas como quien pregunta: la tarifa y la regla por su nombre, el precio por su `label` («Champú ·
