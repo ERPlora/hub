@@ -201,6 +201,21 @@ def test_the_reported_cart_request_offers_its_tool_before_the_one_the_model_ran(
         assert offered.index(name) < offered.index(instead), offered
 
 
+#: What emptying a cart that stays active is not (hub#1100: the QA's model had no tool to empty it and said it could not
+#: remove its lines): deleting the cart, which the person asked to keep, nor removing its lines one by one.
+NOT_EMPTYING = ("cart_checkout.cart.delete", "cart_checkout.item.remove")
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize("instead", NOT_EMPTYING)
+def test_the_reported_request_to_empty_a_cart_offers_emptying_it_before_deleting_it_or_a_line(catalog_of, instead):
+    tools = catalog_of(Membership.Role.OWNER, "es")
+    offered = [op.name for op in assistant.relevant(tools, [dict(REPORTED)["cart_checkout.cart.clear"]], "es")]
+    assert "cart_checkout.cart.clear" in offered, offered
+    assert instead in offered, offered  # positive control: the rival is offered too, so their order is measured
+    assert offered.index("cart_checkout.cart.clear") < offered.index(instead), offered
+
+
 #: The cart's reads that give a line's id (``cart_checkout.item.update`` and ``.item.remove`` take it, never a product).
 LINE_READS = {"cart_checkout.cart.get", "cart_checkout.item.list"}
 
