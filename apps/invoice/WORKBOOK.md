@@ -689,13 +689,17 @@ Implicados: PRINTING-F08, VERIFACTU-F19
 ### INVOICE-F19 Marcar una factura como pagada
 <!-- origen: fi:modules/invoice#command-invoice-mark_paid old:invoice/workflow/consulta.md#invoice-f19 -->
 Estado: hecho
-Actor: empleado, responsable, administrador
+Actor: empleado, responsable, administrador, asistente
 Pantalla: Facturas, Ficha de factura
 Pasos:
-1. En **Facturas** (fila) o en la ficha, pulsa «Marcar pagada» en una factura «Emitida».
+1. En **Facturas** (fila) o en la ficha, pulsa «Marcar pagada» en una factura «Emitida»; o pídeselo al
+   asistente («marca como cobrada la FACT-2026-000001», «la factura de Construcciones Lema ya está pagada»)
+   y sigue en el paso 4.
 2. Confirma en «¿Marcar {número} como pagada?» («El cobro se registra con la fecha y la hora de
    ahora.») con «Marcar pagada», o vuelve con «Cancelar».
 3. La factura pasa a «Pagada» y la ficha enseña «Pagada el» con la fecha y la hora.
+4. Con el asistente sale «¿Ejecutar esta acción?» con la factura por su número; pulsa «Ejecutar» y pasa a
+   «Pagada» igual que desde la pantalla, o «Cancelar» y no cambia nada.
 Entra: la factura elegida.
 Sale: el estado «Pagada» y la fecha de pago (avisa `invoice.invoice.paid`). Ningún importe cambia y la
 caja no se toca.
@@ -1166,6 +1170,16 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   vista previa se cuenta en la misma respuesta que llama a rectificar, como el cierre de Caja: con «tell the person
   its preview, then rectify» el asistente enseñaba la vista previa y nunca la tarjeta (hub#1175, hub#1102; lo guarda
   `tests/test_guardrails_assistant.py` para todo el Hub).
+  Cada herramienta dice además sus `asks`, las frases en `en` y `es` con que una persona la pide (`live.E020`:
+  Facturación está en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1102), con clientes y números de ejemplo que ninguna
+  sonda usa (Construcciones Lema, Fontanería Ortega, `FACT-2026-000017`), y los `SYNONYMS` del Hub
+  (`base/assistant.py`) leen «pagada», «pagado» y «como cobrada» como una factura pagada (`paid`; «cobrar» y «cobro»
+  a secas siguen siendo el cobro de una venta). Así marcar cobrada, rectificar y el resto de las 25 herramientas
+  llegan a su operación desde el chat: las frases reales de la QA del asistente
+  (`tests/e2e/qa/probes/owner-es-invoice-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno,
+  «marca como cobrada la FACT-2026-000001» y «rectifícala con una R1» entre las 8 primeras, y una frase propia por
+  herramienta solo llega con sus `asks` (`tests/test_assistant_asks.py`). La sonda «…sin tocar caja ni cambiar
+  importes» aún sale 12.ª: live lee el «cambiar» detrás de «ni» como pedido (ERPlora/live#74).
 
 ### Decisiones (dudas abiertas del producto actual, resueltas con el mercado)
 
