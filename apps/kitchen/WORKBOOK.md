@@ -1016,6 +1016,19 @@ que no tiene ningún papel: solo el sistema (`*`).
 - **Estación eliminada**: no se encuentra ni por id ni por nombre (`kitchen.station_not_found`) y ya no
   sale entre los botones; la pantalla que la recordaba vuelve a «Todas» en vez de quedarse vacía para
   siempre (eliminarla exige que no tenga platos por hacer ni enrutado, F03).
+- **Frases del asistente** (hub#1088): cada una de las 29 herramientas declara sus `asks`, 2–3 frases en `en` y `es`
+  como las diría quien la usa (Cocina está en `LIVE_ASSISTANT_ASKS_REQUIRED`, `live.E020`), sin «cocina», «ticket»,
+  «mesa» ni «cuenta» salvo donde la herramienta es eso (las rondas de una cuenta: `send`, `receive`, `by_order`):
+  esas palabras ya nombran la app o su comanda, y repetidas en 29 herramientas las ponían por delante de Ventas en
+  cada frase que las dice. Para el Hub (`base.assistant.SYNONYMS`), «la comanda» (por sus frases: «la comanda», «qué
+  comandas», «las comandas de…»; la palabra sola sigue siendo la cuenta de Ventas para live) es la comanda de cocina
+  (`ticket`), una «estación» y «el puesto» la estación, «urgente» o «prisa» la urgencia (`set_rush`), el «enrutado»
+  el enrutado, un plato «como listo» o «como hecho» se marca listo (`item.bump`) y lo que vuelve «a pendientes» o «a
+  preparación» se recupera (`*.recall`). `tests/test_assistant_asks.py` comprueba con las frases reales de la QA del
+  asistente (hub#1088, dueño y empleado) que cada una trae su herramienta en la primera mitad de las que ofrece un
+  turno (F04, F09, F11, F12, F14, F18–F25), que el empleado no recibe lo que es solo de quien lleva la cocina, y una
+  frase por grupo de sinónimos que sin él no llega. Marcar platos «listos» (F11, F12) necesita además que live lea
+  «listo» y «listos» como terminado y no como la acción de listar (ERPlora/live#54, en `packages/live`).
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#671): nombra el registro que una escritura señala por su
   id con las marcas `refers` de `schemas.py`, leídas como quien pregunta: la comanda por su `number` con
   `kitchen.ticket.get` (`A_TICKET`: el `ticket_id` de `TicketRefIn`, en todas las escrituras de comandas y platos),

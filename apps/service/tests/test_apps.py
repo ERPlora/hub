@@ -124,18 +124,26 @@ def test_navigation_is_the_three_tabs_of_the_old_module_with_registered_icons():
     ]
 
 
+#: What only names a record on the assistant's card: no tool (``INTERNAL``).
+CARD_ONLY = {"service.record.get"}
+
+
 def test_every_operation_is_a_tool_of_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: the operation's
     # permission is its only door. A command says its risk; a read has none. A tool says what a
     # person types to ask for it, in both languages (live.E020: Services is listed in
     # LIVE_ASSISTANT_ASKS_REQUIRED, hub#1104).
-    from live.operations import AI, MIN_ASKS, registry
+    from live.operations import AI, INTERNAL, MIN_ASKS, registry
 
     operations = [op for name, op in registry.items() if name.startswith("service.")]
     # 45 + the service's image (SERVICE-F34, F35): set_image, upload_image, suggest_image
-    # + what the assistant's card names by its id (hub#676): assignment.get, grant.get, session.get.
-    assert len(operations) == 51
+    # + what the assistant's card names by its id (hub#676): assignment.get, grant.get, session.get
+    # + what it names of Sales and Appointments (hub#756): record.get, which is no tool.
+    assert len(operations) == 52
     for op in operations:
+        if op.name in CARD_ONLY:
+            assert op.ai is INTERNAL, op.name
+            continue
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
         if isinstance(op.ai_spec(), AI):
