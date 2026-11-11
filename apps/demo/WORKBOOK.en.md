@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:df05bfd8a7974914df380229c9d8f2b6147ba96377ac440047969ca114d7957c -->
+<!-- generated from WORKBOOK.md sha256:ed1b858cafd3a95d8138fb66090cdb68c7ebdc4125565cc4b4cb8a358c1d9dd5 -->
 
 ## What it is for and who it is for
 
@@ -196,6 +196,9 @@ Everything can be requested through the screens, the assistant and the API, with
 rules and the same permissions. Before changing or deleting an item or adding a line to it, the assistant asks for
 confirmation with its card (BASE-F97), which names the item as the screens name it, never by its id: by its name
 ("Item: Mesa 4"), and the status by its word ("Open", "Done"). What the person asking cannot see is left out.
+The assistant reaches each of them by what the person says ("¿cuántos elementos abiertos hay en Demo?", "borra el
+elemento Ensayo 2") and, when they name an item as "the item …", it also offers the list it finds it by its name
+with. An item said by its name alone ("borra Ensayo 2") it does not find yet (hub#1162).
 
 ### What it offers: queries (they read and change nothing; all of them can be followed live)
 
@@ -204,6 +207,7 @@ confirmation with its card (BASE-F97), which names the item as the screens name 
 | The items, with search by name, a status filter and pages (up to 100 per page) | view | F01–F05 | `demo.item.list` |
 | An item's page with its lines | view | F02–F05 | `demo.item.detail` |
 | The figures: total, open, done and lines | manage | F05 | `demo.item.stats` |
+| How many items are still open (the bell's counter) | view | F05 | `demo.item.open_count` |
 
 ### What it offers: actions (they change data)
 
