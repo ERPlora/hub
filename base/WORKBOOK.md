@@ -422,6 +422,7 @@ En la pantalla Archivos:
 | BASE-F109 | Borrar un negocio eliminado pasados sus 90 días | parcial — un negocio con documentos guarda su base de datos hasta que exista el archivo fiscal (hub#738) |
 | BASE-F110 | Abrir la web del negocio por su dominio propio | hecho |
 | BASE-F113 | Seguir avisando con la pantalla apagada (app de Android) | parcial — la app instalada aún no tiene la orden de quedarse a la escucha (hub#836) |
+| BASE-F114 | Devolver un negocio a un momento pasado desde el admin de Hubs | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -3042,6 +3043,39 @@ no sabe aún si hay algo que avisar, no pide nada a la app: recargar la página 
 Cerrar la sesión nunca espera a la app más de 2 segundos. En un navegador no hay app a la que pedírselo.
 Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APPOINTMENT-F28, BASE-F61; hub#836
 
+### BASE-F114 Devolver un negocio a un momento pasado desde el admin de Hubs
+<!-- origen: nuevo (aws#77; PLAN-DB §13 «Restaurar un hub»: los planes de pago prometen volver a cualquier momento de los últimos 14 días) gh:hub#1198 -->
+Estado: hecho (la acción y la restauración; crear y borrar el clúster temporal es el procedimiento «Devolver un negocio
+a un momento» de ERPlora/aws)
+Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
+Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acción «Restaurar desde una copia…»
+Pasos:
+  1. Un negocio pide volver a cómo estaban sus datos en un momento de los últimos días. El personal crea un clúster
+     temporal restaurado a ese momento y lo da de alta en Clústeres, cerrado a hubs nuevos.
+  2. En Hubs elige el negocio (o varios del mismo clúster) y la acción «Restaurar desde una copia…».
+  3. La página de confirmación explica lo que va a pasar y pide el clúster temporal (solo salen los cerrados a hubs
+     nuevos) y el momento con su zona horaria («2026-11-09T14:30:00Z es UTC»). Pulsa **Restaurarlos**.
+  4. Sale «1 hub se restaurará desde <clúster> tal como estaba el 2026-11-09 14:30 UTC: cerrado unos minutos mientras se
+     restaura. Si se rechaza, su ficha dice por qué en «último error».». Mientras dura, la lista dice en la columna del
+     clúster de dónde viene la copia («<su clúster> ← <clúster temporal>»), y quien abre el negocio ve que está en
+     mantenimiento unos minutos.
+  5. Unos minutos después el sistema ha copiado la base del negocio desde el clúster temporal, ha guardado aparte la
+     que tenía y ha puesto la copia en su sitio. El negocio vuelve a abrirse con sus datos de ese momento y la flecha desaparece de la
+     lista.
+Entra: los negocios elegidos, el clúster temporal con su copia y el momento.
+Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso
+`control.hub.restore_requested` con quién lo pidió. Los demás negocios no notan nada.
+Si falla: lo que la restauración no admite lo dice el aviso, negocio a negocio, y ese negocio no se toca: uno que no está
+listo o no tiene base propia, una demo, uno que se está trasladando o restaurando, un clúster abierto a hubs nuevos o con
+negocios vivos, el propio clúster del negocio, una copia que no está en ese clúster o que es demasiado grande, y un
+momento que aún no ha llegado. Sin clúster o sin momento, la página los vuelve a pedir. Si el negocio tiene registros
+VeriFactu de producción hechos, enviados o cambiados después de ese momento, no se restaura y no cambia nada, porque
+volvería a usar números que la AEAT ya tiene: su ficha lo dice en «último error» («restore_fiscal_records: …»); para ese
+caso, hub#1213. Cualquier otro fallo deshace la restauración sola: el negocio sigue con su base de siempre y su ficha dice
+por qué. Con registros solo del entorno de pruebas, después se recupera la cadena (VERIFACTU-F28). El personal de
+soporte ve la lista, pero no la acción.
+Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado); hub#1198, hub#1213, aws#77
+
 ## Para quien lo mantiene
 
 - **Dominio propio de un negocio** (BASE-F110, HUBS-F17, PLAN-SAAS §37 punto 2; `base/custom_domains.py`,
@@ -3933,6 +3967,14 @@ Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, A
   de sus hubs (y sus credenciales, si lleva secreto), y desde la primera ningún hub nuevo cae ya en el de los settings
   (`place_hub`). El admin de Hubs lo dice con palabras en la lista, su filtro y la ficha (`control/admin.py`), salvo en
   un hub sin BD hecha (`base.registry.database_is_made`): en preparación, cancelado antes de estar listo o ya borrado.
+
+- **«Restaurar desde una copia…»** (BASE-F114, hub#1198) es `control.admin.HubAdmin.restore_from_a_copy`: su página de
+  confirmación (`RestoreFromACopyForm`, la plantilla `action_confirmation.html` que comparte con «Mover a otro
+  clúster…») y, por cada hub, `control.hub.restore` con el actor del personal; el admin no comprueba nada que la
+  operación compruebe. Restaura el worker (`base.tenancy.restore`), y su negativa fiscal (`restore_fiscal_records`, con
+  el gancho `fiscal_record_states` de cada app que presenta a Hacienda) queda en `Hub.last_error`, que la ficha enseña
+  tal cual. Tests: `control/tests/test_admin.py::TestRestoreFromACopy` y, de punta a punta con el worker y dos BD
+  reales, `base/tenancy/tests/test_restore.py::TestAskedInTheHubAdmin`.
 
 ## Lo que queda fuera
 

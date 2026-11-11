@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8761195796ada8a5513c0a43369ee519be7ae38280dec0afe061a956e843e556 -->
+<!-- generated from WORKBOOK.md sha256:53539be441e5a03188f7e65b8f37d89761d763e05794b1f7fa6a327f43af493b -->
 
 ## What it is for and who it is for
 
@@ -414,6 +414,7 @@ On the Employees screens and the API documentation:
 | BASE-F109 | Delete a deleted business after its 90 days | partial — a business with documents keeps its database until the fiscal archive exists (hub#738) |
 | BASE-F110 | Open the business's website on its own domain | done |
 | BASE-F113 | Keep warning with the screen off (Android app) | partial — the installed app does not have the order to stay listening yet (hub#836) |
+| BASE-F114 | Put a business back as it was at a past moment from the Hub admin | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -2910,3 +2911,36 @@ Hub does not know yet whether there is something to warn about, it asks the app 
 stops it nor turns it on again. Signing out never waits for the app more than 2 seconds. In a browser there is no app
 to ask.
 Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APPOINTMENT-F28, BASE-F61; hub#836
+
+### BASE-F114 Put a business back as it was at a past moment from the Hub admin
+Status: done (the action and the restore; making and deleting the temporary cluster is the procedure "Devolver un negocio
+a un momento" of ERPlora/aws)
+Actor: the ERPlora staff who run the platform, when a business asks for it
+Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, action "Restore from a copy…"
+Steps:
+  1. A business asks to go back to how its data was at a moment of the last few days. The staff makes a temporary
+     cluster restored to that moment and registers it in Clusters, closed to new hubs.
+  2. In Hubs they choose the business (or several of the same cluster) and the action "Restore from a copy…".
+  3. The confirmation page explains what is going to happen and asks for the temporary cluster (only the ones closed to
+     new hubs are offered) and the moment with its time zone ("2026-11-09T14:30:00Z is UTC"). They press **Restore
+     them**.
+  4. "1 hub will be restored from <cluster> as it was at 2026-11-09 14:30 UTC: closed for a few minutes while it is
+     restored. If it is refused, its page says why under «last error»." appears. Meanwhile the list says in the cluster
+     column where the copy comes from ("<its cluster> ← <temporary cluster>"), and whoever opens the business sees it is
+     under maintenance for a few minutes.
+  5. A few minutes later the system has copied the business's database from the temporary cluster, kept aside the one
+     it had and put the copy in its place. The business opens again with its data of that moment and the arrow leaves
+     the list.
+In: the chosen businesses, the temporary cluster with their copy and the moment.
+Out: the business's database as it was at that moment; the one it had, kept 7 days on its server; the notice
+`control.hub.restore_requested` with who asked for it. The other businesses notice nothing.
+If it fails: what the restore does not accept is said in the notice, business by business, and that business is not
+touched: one that is not ready or has no database of its own, a demo, one being moved or restored, a cluster open to new
+hubs or with living businesses, the business's own cluster, a copy that is not on that cluster or is too large, and a
+moment that has not come yet. Without a cluster or a moment, the page asks for them again. If the business has
+production VeriFactu records made, sent or changed after that moment, it is not restored and nothing changes, because it
+would use again numbers the AEAT already has: its page says so under "last error" ("restore_fiscal_records: …"); for that
+case, hub#1213. Any other failure undoes the restore by itself: the business keeps its usual database and its page says
+why. With records from the test environment only, the chain is recovered afterwards (VERIFACTU-F28). The support staff
+see the list, but not the action.
+Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move); hub#1198, hub#1213, aws#77
