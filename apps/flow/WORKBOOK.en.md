@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:93e8e43fb073b77e56dcf4e5333d64a25ecb5abc6f9968d38d71dd8b11b22642 -->
+<!-- generated from WORKBOOK.md sha256:a27c4224e2e21c63da307160fe2da7b82480957124349a37ffde755eb0d2864a -->
 
 ## What it is for and who it is for
 
@@ -561,12 +561,12 @@ and the amounts of the notice that started it; one stopped by an error keeps it 
 resumed (FLOW-F24). If a customer's personal data are erased (CUSTOMER-F16), every run that names her card (what
 started it or what its steps read), also one that has already ended, forgets right then the free texts of its
 history that may carry her name: an answer's note, what the assistant or the app that did the action answered
-(and its technical text) and the title of the question in a "no" or a silence. Each one says "[erased with the
+(also about each field, and its technical text) and the title of the question in a "no" or a silence. Each one says "[erased with the
 customer's personal data]"; what happened stays (how it ended, who answered and what). The other customers' runs
 do not change.
 If it fails: if the history cannot be read, the message in red with **Retry**; with no runs, "It has not
 run yet.".
-Involved: FLOW-F13, FLOW-F15, FLOW-F21, FLOW-F22, FLOW-F23
+Involved: FLOW-F13, FLOW-F15, FLOW-F21, FLOW-F22, FLOW-F23, CUSTOMER-F16
 
 ### FLOW-F17 Ask the assistant for an automation
 Status: done

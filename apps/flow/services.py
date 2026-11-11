@@ -2112,14 +2112,17 @@ ERASED_TEXT = _("[erased with the customer's personal data]")
 
 def _forgotten_step(entry: dict, erased: str) -> dict:
     """A step of a run's History without its free texts: an answer's note, what the assistant answered and, of a step
-    that failed, what another app answered and its technical text (a failure of the engine's own is said again from
-    its reason, which names no person); what happened stays."""
+    that failed, what another app answered (also of each field) and its technical text (a failure of the engine's own
+    is said again from its reason, which names no person); what happened stays."""
     forgotten = {name: erased if name in ("note", "text") and value else value for name, value in entry.items()}
     error = entry.get("error")
     if isinstance(error, dict):
         error = {name: value for name, value in error.items() if name != "technical"}
         if not error.get("reason") and error.get("message"):
             error["message"] = erased
+        if isinstance(error.get("fields"), dict):
+            # Which field was refused stays; what was said of it may quote what the step sent (her name).
+            error["fields"] = {field: erased if said else said for field, said in error["fields"].items()}
         forgotten["error"] = error
     return forgotten
 

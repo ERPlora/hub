@@ -594,12 +594,12 @@ guarda al terminar: solo los ids y los importes del aviso que la arrancó; una p
 guarda 7 días, para poder reanudarla (FLOW-F24). Si se borran los datos personales de un cliente
 (CUSTOMER-F16), toda ejecución que nombra su ficha (lo que la arrancó o lo que leyeron sus pasos), también una
 ya terminada, olvida en ese momento los textos libres de su historial que pueden llevar su nombre: la nota de
-una respuesta, lo que contestó el asistente o la app que hizo la acción (y su texto técnico) y el título de la
-pregunta en un «no» o en un silencio. Cada uno dice «[borrado con los datos personales del cliente]»; lo que pasó
+una respuesta, lo que contestó el asistente o la app que hizo la acción (también de cada campo, y su texto
+técnico) y el título de la pregunta en un «no» o en un silencio. Cada uno dice «[borrado con los datos personales del cliente]»; lo que pasó
 se queda (cómo terminó, quién contestó y qué). Las de los demás clientes no cambian.
 Si falla: si no se puede leer el historial, el mensaje en rojo con **Reintentar**; sin ejecuciones,
 «Todavía no se ha ejecutado.».
-Implicados: FLOW-F13, FLOW-F15, FLOW-F21, FLOW-F22, FLOW-F23
+Implicados: FLOW-F13, FLOW-F15, FLOW-F21, FLOW-F22, FLOW-F23, CUSTOMER-F16
 
 ### FLOW-F17 Pedirle al asistente una automatización
 <!-- origen: old:flows/workflow/bandejas-y-asistente.md#flows-f26 -->
