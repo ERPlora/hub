@@ -8,7 +8,6 @@ of the catalogue of a business with every app on and ranked as a turn ranks, is 
 a probe of layer 2.
 """
 
-import dataclasses
 import json
 from pathlib import Path
 
@@ -21,7 +20,7 @@ from live.operations import AI, Operation, registry
 from base import assistant
 from base.models import Membership
 from base.permissions import permissions_for
-from base.tests.test_assistant_asks import TOP, comparable, probe_phrases
+from base.tests.test_assistant_asks import assert_its_asks_bring, comparable, probe_phrases
 
 A = Scope("host", "a")
 #: Every write of Price lists is ``pricing.manage``, which an employee lacks (they only read the prices,
@@ -90,29 +89,30 @@ PROBES = json.loads(
 
 #: What a person says in words of their own, neither an ask nor a probe of layer 2, one for each tool: it is their asks
 #: that bring the tool among the first ten (a «tarifa» or a «precio» named brings every tool of Price lists by its
-#: name, so none says it; nor «importe», which reads as Import's, «artículo», Inventory's product, or «sale», a sale),
-#: and asks that stop reading as people speak fail.
+#: name, so none says it; nor «importe», which reads as Import's, «artículo», Inventory's product, «sale», a sale, or
+#: «ahora», which the apps of people and of the till read too), and asks that stop reading as people speak fail. None is
+#: an ask of its tool with its words moved around: what it shares with them comes from more than one ask.
 OWN_WORDS = [
-    ("pricing.price_list.list", "¿qué condiciones especiales tienen los distribuidores y los socios?"),
+    ("pricing.price_list.list", "¿qué trato especial les doy a los distribuidores?"),
     ("pricing.price_list.get", "¿hasta qué día vale lo de Hostelería?"),
-    ("pricing.price_list.create", "prepara importes aparte para los socios del club"),
-    ("pricing.price_list.update", "alarga lo de verano hasta finales de octubre"),
-    ("pricing.price_list.set_default", "a partir de ahora lo de Distribuidores es lo normal para todos"),
+    ("pricing.price_list.create", "quiero dar de alta otra más para el club, que se llame Club Oro"),
+    ("pricing.price_list.update", "la de verano tiene que acabar más tarde, a finales de octubre"),
+    ("pricing.price_list.set_default", "Distribuidores pasa a ser la de todo el que no tenga otra"),
     ("pricing.price_list.deactivate", "congela lo de verano hasta el año que viene"),
-    ("pricing.price_list.activate", "recupera lo de invierno para los distribuidores"),
+    ("pricing.price_list.activate", "que vuelva a contar lo de invierno para los distribuidores"),
     ("pricing.price_item.list", "¿cómo tengo puesto el croissant en Hostelería y en las demás?"),
     ("pricing.price_item.get", "¿desde cuántas unidades vale lo del croissant en Socios?"),
-    ("pricing.price_item.add", "mete el croissant a 1,20 en lo de Socios"),
-    ("pricing.price_item.update", "el croissant de Hostelería ahora va a 1,30"),
+    ("pricing.price_item.add", "agrega la caña a los socios a 1,10"),
+    ("pricing.price_item.update", "la magdalena en Hostelería se queda en 1,60"),
     ("pricing.price_item.remove", "que el zumo de Distribuidores vuelva a costar lo de siempre"),
-    ("pricing.rule.list", "¿qué promociones tengo en marcha ahora mismo?"),
+    ("pricing.rule.list", "¿qué rebajas van solas en la tienda?"),
     ("pricing.rule.get", "¿qué hace exactamente la promo de verano y hasta cuándo dura?"),
-    ("pricing.rule.create", "monta un 3x2 en las tostadas para los socios"),
-    ("pricing.rule.update", "la promo de verano ahora que rebaje un 15 %"),
-    ("pricing.rule.deactivate", "para el 2x1 de zumos, pero guárdalo para el año que viene"),
+    ("pricing.rule.create", "monta una oferta de 3x2 para los socios"),
+    ("pricing.rule.update", "en verano, la rebaja tiene que ser del 25 %"),
+    ("pricing.rule.deactivate", "suspende lo de los zumos unos meses, pero guárdalo"),
     ("pricing.rule.activate", "recupera el 2x1 de zumos de otros veranos"),
     ("pricing.catalog.get", "¿a qué grupo corresponde ese identificador de lo de Socios?"),
-    ("pricing.price.resolve", "¿a cuánto le saldrían tres croissants a Nuria?"),
+    ("pricing.price.resolve", "Nuria quiere dos cañas, ¿cuánto le cuestan a ella?"),
 ]
 
 
@@ -146,12 +146,6 @@ def assert_offered_with_room(tools: dict[str, Operation], name: str, phrase: str
     """A request of the QA brings its tool into the first half of the ones a turn offers (``WITH_ROOM``)."""
     place = place_of(tools, name, phrase)
     assert place is not None and place <= WITH_ROOM, place
-
-
-def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
-    """``tools`` with ``name`` saying no asks (its description and name stay): how a turn ranked it before."""
-    op = tools[name]
-    return {**tools, name: dataclasses.replace(op, ai=dataclasses.replace(op.ai_spec(), asks={}))}
 
 
 def test_price_lists_is_listed_so_layer_1_sweeps_every_ask_of_it():
@@ -214,9 +208,4 @@ def test_every_probe_of_price_lists_offers_its_tool_without_being_one_of_its_ask
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
 def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    assert comparable(phrase) not in probe_phrases()
-    unasked = without_its_asks(tools, name)
-    assert not shared.asks_of(unasked[name])  # positive control: the tool is ranked without its asks
-    places = (place_of(tools, name, phrase), place_of(unasked, name, phrase))
-    assert places[0] is not None and places[0] <= TOP and (places[1] is None or places[1] > TOP), places
+    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
