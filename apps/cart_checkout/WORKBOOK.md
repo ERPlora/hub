@@ -503,7 +503,26 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
   mayor desbordaba el `bigint` de la base (un 500).
 - Asistente: toda operación declara `ai` con `description` y `risk` (`high` en marcar pagado, fallar,
   borrar y borrar los datos de un cliente) y todo campo de entrada su `description`. `expose_api=True` en
-  todas.
+  todas. Declaran también sus `asks`, lo que una persona escribe para pedir cada una, en `en` y `es`
+  (hub#1100): `cart_checkout` está en `LIVE_ASSISTANT_ASKS_REQUIRED` y `base/tests/test_assistant_asks.py`
+  exige que cada frase traiga su herramienta entre las diez primeras, por rol. Sin ellos, vaciar un
+  carrito (F04) y añadir una línea (F02) quedaban fuera de las 40 herramientas que se ofrecen en un turno,
+  y cambiar la cantidad de una línea (F03) salía por detrás de `inventory.product.update`, que fue lo que
+  el modelo cambió. `base.assistant.SYNONYMS` suma dos grupos: «cesta» y «carrito» son el carrito
+  (`cart_checkout.cart`), y «unidades» o «cantidad» la cantidad que toma una línea (`quantity`; «cantidad»
+  nunca es una unidad de medida de Inventario). «Línea» no lleva sinónimo hacia las líneas del carrito
+  (`item`): es la de las cuentas del TPV (`sale.order.*_line`) y les robaría el puesto. Los asks en inglés
+  de los pedidos no dicen «order», que el Hub lee como la cuenta del TPV («cuenta»), ni los de leer y
+  quitar líneas «total»: empujaban asks de Ventas y Mesas fuera de las diez primeras. Tampoco nombran a
+  las personas de las sondas de la QA («Ana», «Marta»): con ellas, cualquier frase de otra app sobre
+  «Ana QA» subía las herramientas del carrito y una de Citas salía de las 40. Y la lectura de un pedido no
+  dice «pedido» en español, que es también lo que «han pedido» en una mesa (`sale.order.get`). El Hub no
+  conoce el verbo «vaciar»: vaciar llega por sus `asks` y por «cesta».
+  `tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
+  (`tests/e2e/qa/probes/owner-es-cart_checkout-2026-11-08.json`), nunca con los propios `asks`: cada una
+  ofrece su herramienta, la de cambiar la cantidad antes que la ficha de producto, la de vaciar una cesta
+  que sigue activa antes que borrarla o quitarle una línea y, con las que cambian o quitan una línea, una
+  lectura del carrito que da su id; el empleado solo recibe las seis lecturas.
 - Datos personales (CART_CHECKOUT-F14): `cart_checkout.customer.erase` vacía email, nombre, notas y
   motivo de abandono de los carritos con ese email (también los borrados) y email, direcciones, notas y
   motivo de fallo de sus pedidos, en una transacción con las filas bloqueadas; su aviso lleva los números,
