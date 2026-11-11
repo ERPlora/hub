@@ -419,7 +419,7 @@ def update_flow(ctx: OperationContext, data: UpdateIn) -> dict:
             "es": (
                 "enciende la automatización que salta al cobrar una venta",
                 "pausa la automatización de cumpleaños",
-                "actívala ahora que ya tiene sus permisos",
+                "vuelve a encender la automatización de reseñas",
             ),
         },
         "description": "Turn an automation on or pause it, by its id or its name («activate the welcome "
@@ -512,7 +512,7 @@ def duplicate_flow(ctx: OperationContext, data: FlowRefIn) -> dict:
             ),
             "es": (
                 "borra la automatización de cumpleaños",
-                "elimina la automatización de bienvenida pero conserva su historial",
+                "quita la automatización de bienvenida, ya no la uso",
             ),
         },
         "description": "Delete an automation, by its id or its name: it stops at once, what was waiting is "
@@ -563,7 +563,7 @@ def delete_flow(ctx: OperationContext, data: FlowRefIn) -> dict:
             ),
             "es": (
                 "dale permiso a la automatización de bienvenida para crear tareas",
-                "deja que la automatización de cumpleaños mande WhatsApp y nada más",
+                "deja que la automatización de cumpleaños mande WhatsApp a los clientes",
                 "autoriza a la automatización de las ventas cobradas a leer los clientes",
             ),
         },
@@ -775,8 +775,8 @@ def restore_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
                 "fix the outdated cancellation recipe with its new conditions",
             ),
             "es": (
-                "repara la receta antigua del recordatorio",
-                "arregla la receta de cancelaciones con las condiciones nuevas",
+                "arregla la receta del recordatorio de citas que se quedó vieja",
+                "pon al día la receta de cancelaciones con lo que corrigió su app",
             ),
         },
         "description": "Repair a ready-made automation built from an older version that started in more cases than "
@@ -1739,8 +1739,8 @@ def _may_say_yes(ctx: OperationContext, run: FlowRun) -> None:
                 "say no to that question, the customer already paid",
             ),
             "es": (
-                "responde que sí a la pregunta de la automatización",
-                "contesta que no a esa pregunta, ya está pagado",
+                "dile que sí a la automatización que espera mi respuesta",
+                "di que no, el cliente ya ha pagado",
             ),
         },
         "description": "Answer yes or no, with an optional note, to a question an automation asked and is waiting "
@@ -2238,7 +2238,7 @@ def run_now(ctx: OperationContext, data: RunIn) -> dict:
                 "resume the run that stopped with an error",
             ),
             "es": (
-                "reintenta la ejecución que falló, ya está arreglado",
+                "vuelve a intentar la ejecución de anoche, ya he dado el permiso que faltaba",
                 "vuelve a lanzar desde el error la ejecución de ayer",
             ),
         },
