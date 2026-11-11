@@ -241,3 +241,43 @@ def test_the_card_says_the_option_it_finds(write):
     a_group("Salsas picantes")
     arguments = {**by_its_name("salsa")[write], "option": "ali"}
     assert fields_of(write, arguments, "es")["option"]["value"] == "Alioli (Salsas picantes)"
+
+
+# ── A link to something Inventory deleted, until MODIFIER-F09 lets it go ─────────────────────────────────────────────
+
+
+def test_a_link_to_a_product_deleted_meanwhile_draws_no_card_and_its_id_still_lets_it_go():
+    """Between the deletion of a product and the reaction that drops its links (MODIFIER-F09), the link is in no read
+    (``LIVE_LINK``), so the check of ``modifier.link.detach`` refuses it before any card, by its id or by its group
+    and product: the assistant cannot let go what it cannot see. The operation itself still takes it by its id."""
+    group = a_group("Extras")
+    link = ModifierLink.objects.get(group_id=group.id)
+    run("inventory.product.delete", {"id": str(link.product_id)})
+    assert ModifierLink.objects.filter(pk=link.pk).exists()
+
+    for arguments in ({"id": str(link.id)}, {"group": "extras", "product_id": str(link.product_id)}):
+        plan = turn_as(as_admin(), call("modifier.link.detach", arguments))
+        refused = [row["code"] for row in plan["executed"]]
+        assert (plan["confirm"], refused) == (None, ["not_found"]), arguments
+    assert ModifierLink.objects.filter(pk=link.pk).exists()
+
+    run("modifier.link.detach", {"id": str(link.id)})
+    assert not ModifierLink.objects.filter(pk=link.pk).exists()
+
+
+# ── Not yet: a record that comes by its id with the name of another group beside it (hub#1250) ──────────────────────
+# The write takes the record by its id and never looks at the name; the card reads that name all the same and says
+# both groups under one word. The yes is still held to what the card read. Strict: once the card leaves out a name
+# the write does not use, these pass and their mark goes.
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="hub#1250: the card reads a name the write does not use")
+@pytest.mark.parametrize("write", ["modifier.group.delete", "modifier.group.update", "modifier.link.detach"])
+def test_a_record_that_comes_by_its_id_names_no_other_group_said_beside_it(write):
+    extras = a_group("Extras")
+    a_group("Salsas picantes")
+    record = extras.id if write.startswith("modifier.group.") else ModifierLink.objects.get(group_id=extras.id).id
+    arguments = {**by_its_name("picantes")[write], "id": str(record)}
+    arguments.pop("product", None)
+    card = assistant.card(get(write), arguments, "es", as_admin())
+    assert "Salsas picantes" not in [field["value"] for field in card["fields"]]

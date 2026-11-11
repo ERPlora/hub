@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5554ab37e22dd3438cfc4b382bcbfcdd341bda69c14c7c685ebd6ee7ca0024a7 -->
+<!-- generated from WORKBOOK.md sha256:7b519c112224d83d4e7b32cc34972e81bc8144d8317cb95dbff47240c58a3e4a -->
 
 ## What it is for and who it is for
 
@@ -243,7 +243,8 @@ If it fails: a product or a category that does not exist or is deleted, "This pr
 this hub." or "This category no longer exists."; a link that already exists, "This group already
 applies there.". Through the assistant, unlinking a group said by its name that fits several or none brings up no
 card, and if before the "yes" another group fits better what was said, nothing is unlinked and the new card comes up
-(BASE-F97).
+(BASE-F97). A link to a product or a category already deleted brings up no card either ("This group does not apply
+there."): MODIFIER-F09 removes it.
 Involved: INVENTORY-F01, INVENTORY-F06
 
 ### MODIFIER-F06 Choose the options when selling an item

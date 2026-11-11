@@ -254,7 +254,8 @@ de **todas** sus categorías, cada grupo una sola vez.
 Si falla: un producto o una categoría que no existe o está borrado, «Este producto no existe en este
 hub.» o «Esta categoría ya no existe.»; un enganche que ya existe, «Este grupo ya se aplica ahí.». Por el
 asistente, al soltar un grupo dicho por su nombre que vale para varios o para ninguno no sale tarjeta, y si antes del
-«sí» otro grupo encaja mejor con lo dicho no se suelta nada y sale la tarjeta nueva (BASE-F97).
+«sí» otro grupo encaja mejor con lo dicho no se suelta nada y sale la tarjeta nueva (BASE-F97). Un enganche a un
+producto o una categoría ya borrados tampoco saca tarjeta («Este grupo no se aplica ahí.»): lo suelta MODIFIER-F09.
 Implicados: INVENTORY-F01, INVENTORY-F06
 
 ### MODIFIER-F06 Elegir las opciones al vender un artículo
@@ -522,7 +523,10 @@ cajero del producto actual es un empleado.
   (`modifier.option.create`, `modifier.link.attach`) no lleva marca: no hay lectura cuya entrada quepa en la suya
   (`base.E012`), y sin `check` un nombre que vale para varios grupos dejaría el grupo fuera de la tarjeta; ni la lleva
   el `option` dicho por su nombre, que necesita su grupo para encontrarse. Tres casos en `xfail(strict=True)` en ese
-  mismo fichero (hub#1245).
+  mismo fichero (hub#1245). Con ese `check`, `modifier.link.detach` por el asistente rechaza antes de la tarjeta un
+  enganche a algo borrado (`modifier.link.get` solo lee `LIVE_LINK`); la operación lo sigue soltando por su id. Y un
+  registro que llega por su id junto al nombre de otro grupo enseña los dos grupos en la tarjeta, porque la marca lee
+  un nombre que la escritura no usa: otro caso en `xfail(strict=True)` (hub#1250).
 - **Administrador de Django con CRUD completo** (ronda 12, PLAN §17), solo en `hubs.erplora.com` y para
   el staff: lo que guarda no pasa por las operaciones ni deja aviso, y no aplica sus reglas propias (las
   opciones por defecto dentro del máximo, las 100 opciones por grupo); la base de datos sí le rechaza
