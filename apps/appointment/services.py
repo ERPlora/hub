@@ -988,6 +988,7 @@ def complete(ctx: OperationContext, data: AppointmentRefIn) -> dict:
             "es": (
                 "Inés no vino a su cita",
                 "apunta que Carmen faltó a la cita de ayer",
+                "Beatriz no se ha presentado a su cita de las 12:00",
             ),
         },
         "description": "Record that the customer did not show up, once the appointment's time has passed (pending or "
