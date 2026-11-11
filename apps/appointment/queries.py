@@ -399,6 +399,16 @@ def _page(rows: QuerySet, limit: int, offset: int, out) -> dict:
     output=AppointmentPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what appointments do we have on Friday?",
+                "show me next week's appointments with Lucía",
+            ),
+            "es": (
+                "¿qué citas hay el viernes?",
+                "enséñame las citas de la semana que viene con Lucía",
+            ),
+        },
         "description": "List the appointments of one business day or a range of days (on the business's clock), "
         "with customer, services, professional, status and whether they are charged; filter by professional (name), "
         "status, customer or a search text. Contact details and notes are not included."
@@ -440,6 +450,16 @@ def list_appointments(ctx: OperationContext, params: AppointmentListIn) -> dict:
     output=AppointmentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me appointment APT-0042",
+                "what phone number is on appointment 17?",
+            ),
+            "es": (
+                "enséñame la cita APT-0042",
+                "¿qué teléfono tiene puesto la cita número 17?",
+            ),
+        },
         "description": "Get one appointment by its id or its number (APT-…), with contact, notes and charge."
     },
 )
@@ -455,6 +475,16 @@ def get_appointment(ctx: OperationContext, data: AppointmentRefIn) -> dict:
     output=HistoryPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "who moved Pilar's appointment and when?",
+                "show me the history of appointment APT-0042",
+            ),
+            "es": (
+                "¿quién movió la cita de Pilar y cuándo?",
+                "historial de cambios de la cita APT-0042",
+            ),
+        },
         "description": "The history of one appointment: every change, when, who did it (or that the customer asked), "
         "and what changed (time, professional, service, status, charge)."
     },
@@ -486,6 +516,16 @@ def appointment_history(ctx: OperationContext, data: HistoryIn) -> dict:
     output=VisitPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which appointments has Teresa had with us?",
+                "Teresa's past and upcoming appointments",
+            ),
+            "es": (
+                "¿qué citas ha tenido Teresa con nosotros?",
+                "todas las citas de Teresa, pasadas y futuras",
+            ),
+        },
         "description": "A customer's appointments, the newest first (named by her name, phone or email), with "
         "services, professional, status and the visit's notes (the internal one may hold a colour formula)."
     },
@@ -517,6 +557,16 @@ def list_for_customer(ctx: OperationContext, params: ForCustomerIn) -> dict:
     output=CountOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how many upcoming appointments still include the keratin treatment?",
+                "are there future appointments with highlights before I archive them?",
+            ),
+            "es": (
+                "¿cuántas citas futuras llevan todavía el alisado de keratina?",
+                "antes de archivar las mechas, ¿cuántas citas por delante las incluyen?",
+            ),
+        },
         "description": "How many upcoming live appointments (pending or confirmed) carry a service, and when the "
         "first one is: what to warn about before archiving the service."
     },
@@ -543,6 +593,16 @@ def count_active_for_service(ctx: OperationContext, data: CountForServiceIn) -> 
     output=CountOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how many appointments still need my confirmation?",
+                "are any appointments left unconfirmed?",
+            ),
+            "es": (
+                "¿cuántas citas me quedan por confirmar?",
+                "¿hay citas sin confirmar todavía?",
+            ),
+        },
         "description": "How many upcoming appointments are still pending: bookings to confirm."
     },
 )
@@ -569,6 +629,16 @@ NOTICES_WINDOW = dt.timedelta(hours=24)
     output=NoticesOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which appointments did customers book themselves this week?",
+                "any appointments the customers cancelled on their own lately?",
+            ),
+            "es": (
+                "¿qué citas han cogido las clientas ellas mismas esta semana?",
+                "¿qué citas han anulado los propios clientes últimamente?",
+            ),
+        },
         "description": "What customers did themselves lately (WhatsApp, the online booking): the appointments they "
         "booked and the ones they cancelled, the newest first, with who, which services, when and with whom."
     },
@@ -619,6 +689,16 @@ def takes_bookings(member: Member) -> bool:
     output=LanesOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show tomorrow's agenda split by stylist",
+                "Thursday's agenda in one column per hairdresser",
+            ),
+            "es": (
+                "la agenda del jueves por columnas de cada peluquera",
+                "enséñame la agenda de mañana repartida por persona",
+            ),
+        },
         "description": "The rows of the agenda by professional for some days: the bookable team, then whoever no "
         "longer takes bookings but still has appointments those days, and how many appointments have no professional."
     },
@@ -905,6 +985,16 @@ def _who_and_how_long(
     output=SlotsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what free times are there on Saturday for a manicure?",
+                "when could Inés fit a colour on Thursday?",
+            ),
+            "es": (
+                "¿qué horas libres hay el sábado para una manicura?",
+                "¿a qué horas puede coger Inés un tinte el jueves?",
+            ),
+        },
         "description": "The free times of a business day to book some services (or a length), for one professional "
         "(by name) or for anybody who does them: each time says which professionals are free. It crosses the "
         "opening hours (Schedules), each professional's shift and time off (Staff), blocked time and the appointments "
@@ -991,6 +1081,16 @@ def availability_slots(ctx: OperationContext, data: SlotsIn) -> dict:
     output=CheckOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "check if Sara can take an appointment on Friday at 6 pm",
+                "is 9:30 tomorrow bookable, and if not, why?",
+            ),
+            "es": (
+                "¿se puede dar cita a Sara el viernes a las 18:00?",
+                "¿mañana a las 9:30 se puede citar a alguien o por qué no?",
+            ),
+        },
         "description": "Whether a time can be booked (for a professional, by name, or the business alone) and why not: "
         "invalid_start, in_past, too_soon, too_far, outside_schedule (the business is shut), outside_staff_hours (the "
         "professional does not work then or is off), blocked or overlap (with the appointments it overlaps). The same "
@@ -1054,6 +1154,16 @@ def blocked_out(block: BlockedTime) -> dict:
     output=BlockedTimePage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which blocked periods are on the agenda this month?",
+                "is anything blocked off next week?",
+            ),
+            "es": (
+                "¿qué bloqueos tiene la agenda este mes?",
+                "¿hay algún rato bloqueado la semana que viene?",
+            ),
+        },
         "description": "The blocked periods (holidays, a professional's break) that touch some business days."
     },
 )
@@ -1178,6 +1288,16 @@ RECURRING_ORDER = {
     output=RecurringPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which repeating appointments do we have?",
+                "list the recurring appointments that are still running",
+            ),
+            "es": (
+                "¿qué citas fijas que se repiten tenemos?",
+                "las citas recurrentes que siguen en marcha",
+            ),
+        },
         "description": "List the repeating appointments (series) with customer, services, professional, rule and "
         "whether they are active; search by a name, filter by active, repetition or professional."
     },
@@ -1234,6 +1354,16 @@ def series_reach(series: Recurring, from_date: dt.date) -> tuple[int, int]:
     output=RecurringDetailOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "when is the next date of Paula's weekly appointment?",
+                "show me Paula's repeating appointment in detail",
+            ),
+            "es": (
+                "¿cuándo toca la próxima cita fija de Paula?",
+                "dame el detalle de la cita fija de Paula",
+            ),
+        },
         "description": "One repeating appointment with its next date and how many booked appointments an edit from a "
         "date would reach (and how many of those are charged, which an edit never touches)."
     },
@@ -1266,6 +1396,16 @@ def get_series(ctx: OperationContext, data: RecurringGetIn) -> dict:
     output=SettingsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what are our appointment booking rules?",
+                "what's the minimum notice for an appointment?",
+            ),
+            "es": (
+                "¿qué antelación mínima piden las citas?",
+                "¿cómo están puestas las reglas de las citas?",
+            ),
+        },
         "description": "The booking rules: default length, minimum notice and maximum advance, overlaps, the "
         "customer's cancellation policy, the calendar window, the slot interval and whether the customer's own "
         "bookings are born confirmed; and the business's time zone."
