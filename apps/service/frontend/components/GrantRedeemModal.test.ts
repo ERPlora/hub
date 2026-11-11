@@ -19,8 +19,6 @@ vi.mock('@ionic/vue', async (importOriginal) => {
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
 
-type Control = HTMLElement & { label?: string; disabled?: boolean; helperText?: string; value?: unknown };
-
 const CHECK = '/api/service/grants/redeem_check';
 const REDEEM = '/api/service/grants/redeem';
 const TWO_SERVICES = pkg({
@@ -31,6 +29,8 @@ const TWO_SERVICES = pkg({
   ],
 });
 const ok = (over: Partial<RedeemCheckOut> = {}): RedeemCheckOut => ({ id: 'g1', redeemable: true, reason: '', remaining: 3, ...over });
+/** An Ionic field or button as the tests read it: its label, value and whether it is off. */
+type Control = HTMLElement & { label?: string; disabled?: boolean; value?: unknown };
 
 interface Setup {
   grant?: Partial<GrantOut>;
