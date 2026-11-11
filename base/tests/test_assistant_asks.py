@@ -6,9 +6,10 @@ Every tool of an app listed in ``LIVE_ASSISTANT_ASKS_REQUIRED`` says what a pers
 ``ALWAYS`` first, the same ``APP_WORDS``, the Hub's own ``SYNONYMS`` and ``HOWTO``), brings its tool among the first ten
 offered, against the real catalogue of each role of the Hub (``base.assistant.catalog`` of a member of business ``a``,
 which has every module on: the largest catalogue a role can have). What a role may not run is not in its catalogue at
-all. An app joins the list in the same pull request that completes its asks; the ones still missing are reported per
-app (``AsksBacklog``), never failed. How many asks of each listed app reach their tool without their own words
-(``own_asks=False``: how a person's new phrase would) is reported too (``AsksReach``), never failed.
+all. An app joins the list in the same pull request that completes its asks, and stays in it while any of its tools
+says one; the ones still missing are reported per app (``AsksBacklog``), never failed. How many asks of each listed
+app reach their tool without their own words (``own_asks=False``: how a person's new phrase would) is reported too
+(``AsksReach``), never failed.
 """
 
 import json
@@ -36,11 +37,6 @@ LANGUAGES = ("en", "es")
 ROLES = tuple(Membership.Role)
 #: The apps whose tools all say their asks (``live.E020``): read from the settings, so each app that joins is tested.
 LISTED = tuple(settings.LIVE_ASSISTANT_ASKS_REQUIRED)
-#: The apps that completed their asks: once listed, an app stays listed.
-COMPLETED = {
-    "base", "cash_register", "customer", "inventory", "printing", "reservation", "sale", "staff", "table", "task",
-    "website",
-}
 #: How far down the tools a turn offers an ask may bring its own: ``ALWAYS`` takes the first places.
 TOP = 10
 
@@ -112,8 +108,28 @@ def test_each_ask_of_a_listed_app_brings_its_tool_among_the_first_ten(context_of
     assert [miss for miss in missed(tools, language) if of_app(miss.tool_name, label)] == []
 
 
-def test_the_apps_that_completed_their_asks_stay_listed():
-    assert COMPLETED <= set(LISTED), sorted(COMPLETED - set(LISTED))
+def completed() -> set[str]:
+    """The apps that completed their asks: every one of their tools says ``MIN_ASKS`` phrases or more in each
+    language. The asks are the record of it, so the apps are written once, in ``LIVE_ASSISTANT_ASKS_REQUIRED``."""
+    tools = [op for op in registry.values() if assistant.is_tool(op)]
+    short = {
+        op.app_label for op in tools for language in LANGUAGES if len(shared.asks_of(op).get(language, ())) < MIN_ASKS
+    }
+    return {op.app_label for op in tools} - short
+
+
+def started() -> set[str]:
+    """The apps with a tool that says any ask: asks are written in the pull request that lists their app, so an app
+    taken off the list while its other tools still say theirs is seen."""
+    return {op.app_label for op in registry.values() if assistant.is_tool(op) and any(shared.asks_of(op).values())}
+
+
+def test_the_listed_apps_are_the_ones_that_completed_their_asks():
+    """An app whose tools say asks is listed, and stays listed: one left out of ``LIVE_ASSISTANT_ASKS_REQUIRED``
+    (forgotten, or taken off it to quiet the sweep when a new tool came without its asks) escapes the sweep; one listed
+    without them all fails it (hub#1144)."""
+    assert sorted(started() - set(LISTED)) == []
+    assert sorted(set(LISTED) - completed()) == []
 
 
 def test_live_asks_nothing_more_of_the_listed_apps():
