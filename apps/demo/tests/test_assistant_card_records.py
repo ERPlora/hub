@@ -269,6 +269,28 @@ def test_the_item_of_the_issue_said_by_its_own_name_alone_gets_its_card_and_goes
 
 
 @pytest.mark.django_db
+def test_the_yes_deletes_only_the_item_its_card_showed_although_another_fits_the_name_better_meanwhile():
+    """hub#1208: «elimina mesa» shows «Mesa 4»; somebody creates «Mesa» before the yes. The yes, with the call as the
+    turn gave it back (the panel's way), deletes nothing: the card now says «Mesa», and only its yes deletes it."""
+    shown = Item.objects.create(name="Mesa 4")
+    plan = turn_of(owner_in(), "elimina mesa", call("demo.item.delete", {"called": "mesa"}))
+    assert [(field["name"], field["value"]) for field in plan["confirm"]["fields"]] == [("called", "Mesa 4")]
+    other = Item.objects.create(name="Mesa")
+    [waiting] = plan["pending"]
+    yes = {"call_id": "c1", "accepted": True, "typed": plan["confirm"]["confirm_word"]}
+
+    again = turn_of(owner_in(), "elimina mesa", waiting, decision=yes)
+
+    assert again["executed"] == []
+    assert [(field["name"], field["value"]) for field in again["confirm"]["fields"]] == [("called", "Mesa")]
+    assert Item.objects.filter(pk=shown.pk).exists() and Item.objects.filter(pk=other.pk).exists()
+    [waiting] = again["pending"]
+    done = turn_of(owner_in(), "elimina mesa", waiting, decision=yes)
+    assert [row["outcome"] for row in done["executed"]] == ["ok"]
+    assert list(Item.objects.values_list("pk", flat=True)) == [shown.pk]
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize(("write", "rest"), BY_ITS_NAME)
 def test_a_name_two_items_share_draws_no_card_and_the_model_hears_it(write, rest):
     """Two items called the same: no card that would act on either; the model hears ``demo.item_ambiguous`` and asks
