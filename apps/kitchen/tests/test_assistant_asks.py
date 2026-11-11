@@ -102,24 +102,10 @@ PROBES = [
     for probe in json.loads(path.read_text(encoding="utf-8"))["probes"]
 ]
 ROLES = {"owner": Membership.Role.OWNER, "employee": Membership.Role.EMPLOYEE}
-#: The dishes said «listos» (ready): live reads «listo» and «listos» with the stem of the action list, so every list of
-#: the Hub ranks before marking them ready or bringing them back (ERPlora/live#54). They are offered, below the half:
-#: «como listos» and «a pendientes» name them (``base.assistant.SYNONYMS``), and without those groups they are not.
-LISTO_READ_AS_LIST = {"kitchen.item.bump", "kitchen.item.recall"}
-
-
-def needs_live_54(*case, name: str):
-    """``case`` failing strictly while live reads «listos» as the action list, when it is of ``LISTO_READ_AS_LIST``."""
-    if name not in LISTO_READ_AS_LIST:
-        return pytest.param(*case)
-    return pytest.param(*case, marks=pytest.mark.xfail(strict=True, reason=(
-        "ERPlora/live#54: «listo» and «listos» have the stem of the action list"
-    )))
-
 
 #: The Hub's own words of the kitchen (``base.assistant.SYNONYMS``), in phrases nobody wrote as asks nor as probes, one
-#: per group: each brings its tool among the first ten, and none does without its group. The two said «listos» wait for
-#: live to read it (ERPlora/live#54); with it they come 4th and 5th, and 11th or not at all without their group.
+#: per group: each brings its tool among the first ten, and none does without its group. The dishes said «listos» need
+#: live to read «listo» and «listos» as done, never as the action list (ERPlora/live#54), and their group too.
 KITCHEN_WORDS = [
     ("¿cuántas comandas llevamos esta noche?", "kitchen.ticket.list"),
     ("lista los puestos con su impresora", "kitchen.station.list"),
@@ -172,11 +158,7 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(
-    ("role", "name", "phrase"),
-    [needs_live_54(*case, name=case[1]) for case in REPORTED],
-    ids=[f"{role}-{name}" for role, name, _ in REPORTED],
-)
+@pytest.mark.parametrize(("role", "name", "phrase"), REPORTED, ids=[f"{role}-{name}" for role, name, _ in REPORTED])
 def test_the_reported_kitchen_request_is_offered_its_tool_without_being_its_asks(catalog_of, role, name, phrase):
     tools = catalog_of(ROLES[role], "es")
     assert name in tools  # positive control: the person holds the tool, so the model can receive it
@@ -186,9 +168,7 @@ def test_the_reported_kitchen_request_is_offered_its_tool_without_being_its_asks
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(
-    "probe", [needs_live_54(probe, name=probe["tool"]) for probe in PROBES], ids=[probe["id"] for probe in PROBES]
-)
+@pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_kitchen_offers_its_tool_to_who_may_run_it(catalog_of, probe):
     """The owner's and the employee's phrases of layer 2, the ones the model answered right too: a tool of Kitchen that
     a new ask elsewhere pushes far down the ones a turn offers fails here before the real-model QA sees it; what the
@@ -207,24 +187,7 @@ def test_every_probe_of_kitchen_offers_its_tool_to_who_may_run_it(catalog_of, pr
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(
-    ("role", "name", "phrase"),
-    [case for case in REPORTED if case[1] in LISTO_READ_AS_LIST],
-    ids=[f"{role}-{name}" for role, name, _ in REPORTED if name in LISTO_READ_AS_LIST],
-)
-def test_until_live_reads_listo_the_dishes_said_listos_are_still_offered(catalog_of, role, name, phrase):
-    """While ERPlora/live#54 is open the dishes said «listos» rank below the half, but within what a turn offers: before
-    Kitchen said its asks and its words they were not offered at all."""
-    tools = catalog_of(ROLES[role], "es")
-    assert offered_place(tools, name, phrase, "es") is not None
-
-
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(
-    ("phrase", "name"),
-    [needs_live_54(*case, name=case[1]) for case in KITCHEN_WORDS],
-    ids=[name for _, name in KITCHEN_WORDS],
-)
+@pytest.mark.parametrize(("phrase", "name"), KITCHEN_WORDS, ids=[name for _, name in KITCHEN_WORDS])
 def test_the_kitchens_own_words_bring_the_tool_they_mean_among_the_first_ten(catalog_of, phrase, name):
     tools = catalog_of(ROLES["owner"], "es")
     assert name in tools  # positive control: the owner holds it, so only the selection can leave it out

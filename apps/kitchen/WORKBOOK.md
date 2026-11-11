@@ -1027,8 +1027,8 @@ que no tiene ningún papel: solo el sistema (`*`).
   preparación» se recupera (`*.recall`). `tests/test_assistant_asks.py` comprueba con las frases reales de la QA del
   asistente (hub#1088, dueño y empleado) que cada una trae su herramienta en la primera mitad de las que ofrece un
   turno (F04, F09, F11, F12, F14, F18–F25), que el empleado no recibe lo que es solo de quien lleva la cocina, y una
-  frase por grupo de sinónimos que sin él no llega. Marcar platos «listos» (F11, F12) se ofrece pero por debajo de la
-  mitad: live lee «listo» y «listos» como la acción de listar (ERPlora/live#54, en `xfail` estricto hasta que llegue).
+  frase por grupo de sinónimos que sin él no llega. Marcar platos «listos» (F11, F12) necesita además que live lea
+  «listo» y «listos» como terminado y no como la acción de listar (ERPlora/live#54, en `packages/live`).
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#671): nombra el registro que una escritura señala por su
   id con las marcas `refers` de `schemas.py`, leídas como quien pregunta: la comanda por su `number` con
   `kitchen.ticket.get` (`A_TICKET`: el `ticket_id` de `TicketRefIn`, en todas las escrituras de comandas y platos),
