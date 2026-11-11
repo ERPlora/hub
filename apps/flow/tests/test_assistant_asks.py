@@ -263,3 +263,23 @@ def test_each_group_brings_its_tool_among_the_first_ten(catalog_of, member, name
     without = tuple(other for other in assistant.SYNONYMS if other is not group[0])
     assert name in offered(tools, phrase)[:TOP]
     assert name not in offered(tools, phrase, without)[:TOP]
+
+
+#: The three that wait for ERPlora/live#53, asked naming «la automatización» and not only its own name: the thing they
+#: act on is named, so they come among the first ten today.
+NAMED = [
+    ("flow.flow.set_enabled", "activa la automatización de reseñas"),
+    ("flow.flow.update", "renombra la automatización de reseñas como Opiniones"),
+    ("flow.flow.grant", "permite a la automatización de reseñas mandar correos"),
+]
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("name", "phrase"), NAMED)
+def test_what_waits_for_live_is_offered_when_the_request_names_the_automation(catalog_of, name, phrase):
+    tools = catalog_of(Membership.Role.OWNER, "es")
+    asks = {comparable(ask) for op in tools.values() for ask in shared.asks_of(op).get("es", ())}
+    assert comparable(phrase) not in asks
+    assert comparable(phrase) not in probe_phrases()
+    assert {name for name, _ in NAMED} == AWAITS_LIVE  # positive control: the same three the probes wait for
+    assert name in offered(tools, phrase)[:TOP]
