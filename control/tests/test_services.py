@@ -369,29 +369,32 @@ def test_every_write_is_an_internal_command_of_control():
 # ── A hub's move to another cluster (round 2026-10-30b of PLAN-DB, decision 3; tranche S7) ──────────────────────────
 
 
+@pytest.fixture
+def small(monkeypatch):
+    """The hub's database (or its copy) measures 5 MB on the server asked (``control.queries.measure``)."""
+    from control import queries
+
+    measured: list[tuple[object, list[str]]] = []
+
+    def measure(cluster, names):
+        measured.append((cluster, names))
+        return {name: 5 * 1024 * 1024 for name in names}
+
+    monkeypatch.setattr(queries, "measure", measure)
+    return measured
+
+
+def a_ready_hub(**fields) -> Hub:
+    row = {"slug": "acme", "status": Hub.Status.READY, "db_name": f"hub_{uuid.uuid7().hex}"}
+    return Hub.objects.create(**(row | fields))
+
+
 class TestMove:
     """``control.hub.move`` asks the worker to move a ready hub's own database to another cluster (``base.tenancy.move``):
     its host answers 503 «maintenance» from now until the worker is done. Only an open cluster with room takes it, the
     way a new hub is placed; a database too large for a copy (``MOVE_MAX_BYTES``) waits for logical replication."""
 
-    @pytest.fixture
-    def small(self, monkeypatch):
-        """The hub's database measures 5 MB on its server (``control.queries.measure``)."""
-        from control import queries
-
-        measured: list[tuple[object, list[str]]] = []
-
-        def measure(cluster, names):
-            measured.append((cluster, names))
-            return {name: 5 * 1024 * 1024 for name in names}
-
-        monkeypatch.setattr(queries, "measure", measure)
-        return measured
-
-    @staticmethod
-    def a_hub(**fields) -> Hub:
-        row = {"slug": "acme", "status": Hub.Status.READY, "db_name": f"hub_{uuid.uuid7().hex}"}
-        return Hub.objects.create(**(row | fields))
+    a_hub = staticmethod(a_ready_hub)
 
     def test_asks_the_move_and_says_so(self, admin_ctx, small):
         from control.schemas import HubMoveIn
@@ -616,24 +619,7 @@ class TestRestore:
 
     MOMENT = dt.datetime(2026, 11, 9, 14, 30, tzinfo=dt.UTC)
 
-    @pytest.fixture
-    def checked(self, monkeypatch):
-        """The copy measures 5 MB on the temporary cluster."""
-        from control import queries
-
-        measured: list[tuple[object, list[str]]] = []
-
-        def measure(cluster, names):
-            measured.append((cluster, names))
-            return {name: 5 * 1024 * 1024 for name in names}
-
-        monkeypatch.setattr(queries, "measure", measure)
-        return measured
-
-    @staticmethod
-    def a_hub(**fields) -> Hub:
-        row = {"slug": "acme", "status": Hub.Status.READY, "db_name": f"hub_{uuid.uuid7().hex}"}
-        return Hub.objects.create(**(row | fields))
+    a_hub = staticmethod(a_ready_hub)
 
     @staticmethod
     def temporary(**fields) -> Cluster:
@@ -644,7 +630,7 @@ class TestRestore:
 
         return services.hub_restore(ctx, HubRestoreIn(hub=hub.pk, cluster=cluster.pk, at=at or self.MOMENT))
 
-    def test_asks_the_restore_and_says_so(self, admin_ctx, checked):
+    def test_asks_the_restore_and_says_so(self, admin_ctx, small):
         own, source = a_cluster(), self.temporary()
         hub = self.a_hub(cluster=own, last_error="move_cancelled: an old one")
 
@@ -665,7 +651,7 @@ class TestRestore:
             self.MOMENT,
         )
         # The copy is measured where it is, under the hub's own name.
-        assert checked == [(source, [hub.db_name])]
+        assert small == [(source, [hub.db_name])]
         assert events("control.hub.restore_requested") == [
             {"id": str(hub.pk), "slug": "acme", "from": str(source.pk), "at": self.MOMENT.isoformat()}
         ]
@@ -674,7 +660,7 @@ class TestRestore:
         "fields",
         [{"status": Hub.Status.REQUESTED}, {"status": Hub.Status.CANCELLED}, {"db_name": ""}],
     )
-    def test_only_a_ready_hub_with_its_own_database_is_restored(self, admin_ctx, checked, fields):
+    def test_only_a_ready_hub_with_its_own_database_is_restored(self, admin_ctx, small, fields):
         hub = self.a_hub(**fields)
 
         with pytest.raises(Conflict) as refused:
@@ -684,7 +670,7 @@ class TestRestore:
         hub.refresh_from_db()
         assert hub.restoring_from_id is None
 
-    def test_a_demo_moving_or_already_restored_hub_is_refused(self, admin_ctx, checked):
+    def test_a_demo_moving_or_already_restored_hub_is_refused(self, admin_ctx, small):
         source, other = self.temporary(), a_cluster(name="cluster-2", host="writer-2.example")
         demo = self.a_hub(slug="demo-0000beef", is_demo=True)
         moving = self.a_hub(slug="moving", moving_to=other)
@@ -698,9 +684,9 @@ class TestRestore:
             with pytest.raises(Conflict) as refused:
                 self.ask(admin_ctx, hub, source)
             assert refused.value.code == code
-        assert checked == []
+        assert small == []
 
-    def test_the_copy_comes_only_from_a_closed_temporary_cluster_never_its_own(self, admin_ctx, checked):
+    def test_the_copy_comes_only_from_a_closed_temporary_cluster_never_its_own(self, admin_ctx, small):
         own = self.temporary(name="own", host="writer-own.example")
         open_one = a_cluster(name="open", host="writer-open.example")
         lived_on = self.temporary(name="lived-on", host="writer-lived.example")
@@ -718,13 +704,13 @@ class TestRestore:
         hub.refresh_from_db()
         assert hub.restoring_from_id is None
 
-    def test_a_purged_demo_on_the_temporary_cluster_does_not_count_as_living_there(self, admin_ctx, checked):
+    def test_a_purged_demo_on_the_temporary_cluster_does_not_count_as_living_there(self, admin_ctx, small):
         source = self.temporary()
         self.a_hub(slug="demo-0000beef", is_demo=True, status=Hub.Status.PURGED, cluster=source)
 
         assert self.ask(admin_ctx, self.a_hub(), source).restoring_from == source.pk
 
-    def test_a_moment_still_to_come_is_refused(self, admin_ctx, checked):
+    def test_a_moment_still_to_come_is_refused(self, admin_ctx, small):
         hub = self.a_hub()
 
         with pytest.raises(InvalidPayload) as refused:
@@ -733,7 +719,7 @@ class TestRestore:
         assert refused.value.code == "control.restore_point_ahead"
         assert set(refused.value.fields) == {"at"}
 
-    def test_a_copy_missing_or_too_large_is_refused(self, admin_ctx, checked, monkeypatch):
+    def test_a_copy_missing_or_too_large_is_refused(self, admin_ctx, small, monkeypatch):
         from control import queries
 
         hub = self.a_hub()
@@ -746,7 +732,7 @@ class TestRestore:
         hub.refresh_from_db()
         assert hub.restoring_from_id is None
 
-    def test_a_move_is_refused_while_the_hub_is_restored(self, admin_ctx, checked):
+    def test_a_move_is_refused_while_the_hub_is_restored(self, admin_ctx, small):
         from control.schemas import HubMoveIn
 
         hub = self.a_hub(restoring_from=self.temporary(), restore_point=self.MOMENT)
@@ -766,7 +752,7 @@ class TestRestore:
 
         assert self.ask(admin_ctx, hub_a, source).restoring_from == source.pk
 
-    def test_support_may_not_and_unknown_ones_are_not_found(self, admin_ctx, checked):
+    def test_support_may_not_and_unknown_ones_are_not_found(self, admin_ctx, small):
         from control.schemas import HubRestoreIn
 
         source, hub = self.temporary(), self.a_hub()
