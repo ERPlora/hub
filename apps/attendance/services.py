@@ -268,7 +268,7 @@ def _end_break(ctx: OperationContext, record: Record, at: dt.datetime) -> bool:
             ),
             "es": (
                 "fíchame la entrada",
-                "ficha la entrada de Pedro",
+                "Pedro acaba de llegar, fíchalo",
                 "acabo de llegar, empieza mi jornada",
             ),
         },
@@ -341,7 +341,7 @@ def clock_in(ctx: OperationContext, data: ClockInIn) -> dict:
             ),
             "es": (
                 "fíchame la salida",
-                "ficha la salida de Pedro",
+                "Pedro ya se ha ido, fíchale la salida",
                 "me voy a casa, acaba mi jornada",
             ),
         },
@@ -393,7 +393,7 @@ def clock_out(ctx: OperationContext, data: ClockOutIn) -> dict:
             "es": (
                 "me voy a comer, empieza mi pausa",
                 "inicia una pausa para Luis",
-                "empiezo un descanso",
+                "me tomo cinco minutos de descanso",
             ),
         },
         "description": "Starts a break inside the open working day of the caller, or of the person named "
@@ -441,7 +441,7 @@ def start_break(ctx: OperationContext, data: BreakIn) -> dict:
                 "back to work after lunch",
             ),
             "es": (
-                "ya he vuelto de la pausa",
+                "se acabó mi pausa, vuelvo al trabajo",
                 "acaba el descanso de Luis",
                 "vuelvo de comer, sigo con mi jornada",
             ),

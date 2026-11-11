@@ -415,9 +415,9 @@ def business_date(instant: dt.datetime) -> dt.date:
                 "show me my working day so far",
             ),
             "es": (
-                "¿cuánto llevo trabajado hoy?",
+                "¿cuántas horas llevo hoy?",
                 "¿estoy fichado ahora?",
-                "¿cómo va mi jornada?",
+                "enséñame mi jornada de hoy",
             ),
         },
         "description": "Your working day today («my day», «am I clocked in?»): your staff record, whether "
@@ -488,7 +488,7 @@ def current(ctx: OperationContext, params: EmptyIn) -> dict:
                 "which days did Carmen clock in this month?",
             ),
             "es": (
-                "lista los fichajes de esta semana",
+                "¿qué fichajes hay de esta semana?",
                 "muéstrame las jornadas de Luis en octubre",
                 "¿qué días ha fichado Carmen este mes?",
             ),
@@ -716,7 +716,7 @@ def present_records() -> QuerySet:
             "es": (
                 "¿quién está fichado ahora mismo?",
                 "¿quién está en pausa en este momento?",
-                "dime quién sigue trabajando y desde qué hora",
+                "¿quién sigue dentro y desde qué hora entró?",
             ),
         },
         "description": "Who is clocked in right now («who is in?»): how many and who, since when and whether "
@@ -757,7 +757,7 @@ def list_presence(ctx: OperationContext, params: PresenceListIn) -> dict:
                 "count who is clocked in now",
             ),
             "es": (
-                "¿cuántos hay fichados ahora?",
+                "¿cuántos siguen sin fichar la salida?",
                 "¿cuánta gente está dentro en este momento?",
                 "número de fichados ahora mismo",
             ),
