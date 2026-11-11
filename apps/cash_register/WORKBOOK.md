@@ -899,5 +899,5 @@ cajero del producto actual es un empleado.
   abrirlo sin venta, con su permiso y su rastro en la sesión, queda fuera de esta versión.
 
 Las tres salidas de esta lista que el mercado sí ofrece (una sesión por cajón, el umbral del descuadre y
-el «no-sale») se decidieron al cerrar la app (2026-10-21) y van a «Fuera por ahora» (`## 6` de
-`MIGRATION.md`).
+el «no-sale») se decidieron al cerrar la app (2026-10-21) y están en «Fuera por ahora» (`## 6` de
+`archive/migration/MIGRATION.md` de `ERPlora/erplora-next`).

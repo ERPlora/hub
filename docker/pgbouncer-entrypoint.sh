@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PgBouncer sidecar of the hub and worker tasks (PLAN-DB §5; aws-next/README.md, «Imagen»): the
+# PgBouncer sidecar of the hub and worker tasks (PLAN-DB §5; ERPlora/aws README, «Imagen»): the
 # hub_<hex> aliases reach Aurora through it, in transaction mode, on loopback only. Renders the
 # config from the task environment under /tmp, the only writable path of the image, and replaces
 # itself with pgbouncer, so the container's signals reach it.

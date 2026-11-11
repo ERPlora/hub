@@ -205,6 +205,17 @@ describe('PaymentsPage', () => {
     expect(s.wrapper.text()).not.toContain('No payments.');
   });
 
+  it('that notice says its title once, then «Retry»: the page hands the same text as the reason (hub#1197)', async () => {
+    const s = await setup();
+    s.net.lastStream().push(errorFrame(s.subId(OP), 'internal_error'));
+    await flush();
+    const title = s.prop<{ loadError: string }>('labels').loadError;
+    const notice = s.wrapper.get('[data-role="load-error"]');
+    expect(notice.text().split(title).length - 1).toBe(1);
+    expect(notice.find('.data-table__error-reason').exists()).toBe(false);
+    expect(notice.find('[data-role="load-error-retry"]').exists()).toBe(true);
+  });
+
   it('paints each amount in its payment’s currency with the decimals the server says: the forint has two (Intl: none)', async () => {
     const s = await setup({ business: business(POLISH) });
     await s.show(page([payment('6', 'draft', { amount: 125050, currency: 'HUF', currency_decimals: 2 }), payment('7', 'draft', { amount: 1250, currency: 'PLN' })]));

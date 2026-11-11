@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests of the built hub image against the app ↔ infra contract (aws-next/README.md, «Imagen»).
+# Tests of the built hub image against the app ↔ infra contract (ERPlora/aws README, «Imagen»).
 #   docker buildx build --platform linux/arm64 --provenance=false -t erplora/hub:test --load \
 #     --build-arg APP_VERSION="$(git rev-parse HEAD)" --build-arg APP_RELEASED_AT="$(git show -s --format=%cI HEAD)" .
 #   bash docker/image.test.sh erplora/hub:test

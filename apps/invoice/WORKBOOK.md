@@ -648,7 +648,7 @@ Pasos:
    columna «Dto.» con el descuento sin IVA), el desglose y los totales.
 3. Con **VeriFactu**, lee debajo el «Justificante VeriFactu»: el estado del registro en la AEAT, su «CSV»
    cuando la AEAT ya contestó y el QR, que se puede escanear o abrir con «Validar en la Agencia Tributaria ↗» (en la
-   app instalada, en el navegador del dispositivo, en cuanto la app acepte esa dirección: ERPlora/app#20).
+   app instalada, en el navegador del dispositivo: VERIFACTU-F18).
 4. «Rectifica a», «Sustituye a», «Sustituida por» y las rectificativas abren el documento enlazado.
 5. «← Volver» regresa a la lista.
 Entra: la factura y sus líneas y, con VeriFactu, su registro.
