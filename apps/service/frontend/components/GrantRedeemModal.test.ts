@@ -105,7 +105,7 @@ describe('GrantRedeemModal', () => {
   });
 
   it.each([
-    ['voided', 'This voucher is voided: it can no longer be used.'],
+    ['voided', 'This voucher was voided: it can no longer be used.'],
     ['expired', 'This voucher has expired.'],
     ['no_uses_left', 'This voucher has no sessions left.'],
     ['does_not_cover_service', 'This voucher does not cover that service.'],
