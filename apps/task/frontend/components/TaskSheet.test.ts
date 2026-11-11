@@ -6,7 +6,7 @@
 import { Combo, ConfirmDialog, StatusPill } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, EMPLOYEE, errorFrame, ionValue, mountTask, OWNER, page, settle } from '../__tests__/mount-task';
+import { click, EMPLOYEE, errorFrame, expectSheetClosesUntouched, expectSheetDiscardsOnClose, ionValue, mountTask, OWNER, page, settle } from '../__tests__/mount-task';
 import { task } from '../__tests__/task';
 import TaskFormModal from './TaskFormModal.vue';
 import TaskSheet from './TaskSheet.vue';
@@ -243,26 +243,12 @@ describe('TaskSheet: unsaved changes ask before closing (hub#1046, hub#1233, BAS
     });
   });
 
-  it('a half-written subtask asks on «Close» too', async () => {
-    const s = await setup();
-    const { answerUnsavedQuestion } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await ionValue(s.el('task-sheet-new-subtask'), 'Buy bleach', 'ionInput');
-    await click(s.el('task-sheet-close'));
-    await answerUnsavedQuestion('discard');
-    await settle();
-    expect(s.wrapper.props('open')).toBe(false);
+  it('a half-written subtask asks on «Close» too; «Discard changes» closes it', async () => {
+    await expectSheetDiscardsOnClose(await setup(), 'task-sheet', 'task-sheet-new-subtask', 'Buy bleach');
   });
 
   it('as opened, «Close», Escape and a tap outside close it without asking', async () => {
-    const s = await setup();
-    const { expectUntouchedFormClosesAtOnce } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUntouchedFormClosesAtOnce({
-      overlay: () => s.inDoc('task-sheet'),
-      reopen: async () => {
-        await s.wrapper.setProps({ open: true });
-        await settle();
-      },
-    });
+    await expectSheetClosesUntouched(await setup(), 'task-sheet');
   });
 
   it('closing after discarding clears the half-written comment and subtask', async () => {

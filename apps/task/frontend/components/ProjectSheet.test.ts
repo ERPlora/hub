@@ -6,7 +6,7 @@
 import { ConfirmDialog } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, EMPLOYEE, errorFrame, ionValue, mountTask, OWNER, page, settle } from '../__tests__/mount-task';
+import { click, EMPLOYEE, errorFrame, expectSheetClosesUntouched, expectSheetDiscardsOnClose, ionValue, mountTask, OWNER, page, settle } from '../__tests__/mount-task';
 import { project } from '../__tests__/project';
 import { task } from '../__tests__/task';
 import ProjectSheet from './ProjectSheet.vue';
@@ -175,25 +175,11 @@ describe('ProjectSheet: unsaved changes ask before closing (hub#1046, hub#1233, 
   });
 
   it('a half-written new task asks on «Close» too; «Discard changes» closes it', async () => {
-    const s = await setup();
-    const { answerUnsavedQuestion } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await ionValue(s.el('task-project-sheet-new-task'), 'Hang the sign', 'ionInput');
-    await click(s.el('task-project-sheet-close'));
-    await answerUnsavedQuestion('discard');
-    await settle();
-    expect(s.wrapper.props('open')).toBe(false);
+    await expectSheetDiscardsOnClose(await setup(), 'task-project-sheet', 'task-project-sheet-new-task', 'Hang the sign');
   });
 
   it('as opened, «Close», Escape and a tap outside close it without asking', async () => {
-    const s = await setup();
-    const { expectUntouchedFormClosesAtOnce } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUntouchedFormClosesAtOnce({
-      overlay: () => s.inDoc('task-project-sheet'),
-      reopen: async () => {
-        await s.wrapper.setProps({ open: true });
-        await settle();
-      },
-    });
+    await expectSheetClosesUntouched(await setup(), 'task-project-sheet');
   });
 
   it('closing after discarding clears the edited fields and the half-written new task', async () => {
