@@ -8,6 +8,7 @@ Every ask of every tool of demo bringing its tool among the first ten, role by r
 asks and the guard that no ask copies a probe of layer 2.
 """
 
+import dataclasses
 import json
 from pathlib import Path
 
@@ -68,6 +69,8 @@ BY_ITS_NAME_ALONE = pytest.mark.xfail(
 #: How far down the tools a turn offers (``MAX_TOOLS``, 40) a probe of the QA may bring its tool: half of them, so
 #: twenty tools of the apps that say their asks later may climb past it before the model loses it.
 WITH_ROOM = 20
+#: How far down the tools a turn offers an ask brings its own tool in layer 1 (``base/tests/test_assistant_asks.py``).
+TOP = 10
 #: Every probe of layer 2 of Demo, both roles: the reported ones and the ones the model got right.
 PROBES = [
     probe
@@ -92,6 +95,24 @@ def catalog_of(make_user):
 
 def offered_to(tools: dict[str, Operation], phrase: str) -> list[str]:
     return [op.name for op in assistant.relevant(tools, [phrase], "es")]
+
+
+def place_in(tools: dict[str, Operation], name: str, phrase: str) -> int | None:
+    """The place a turn offers ``name`` at for ``phrase`` (1 is first), ``None`` when it is not offered at all."""
+    offered = offered_to(tools, phrase)
+    return offered.index(name) + 1 if name in offered else None
+
+
+def is_own_words(tools: dict[str, Operation], phrase: str) -> bool:
+    """Whether ``phrase`` is neither an ask in Spanish of any tool of ``tools`` nor a probe of layer 2."""
+    asks = {comparable(ask) for op in tools.values() for ask in shared.asks_of(op).get("es", ())}
+    return comparable(phrase) not in asks | set(probe_phrases())
+
+
+def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
+    """``tools`` with ``name`` saying no asks: how a turn ranks it by its name and description alone."""
+    op = tools[name]
+    return {**tools, name: dataclasses.replace(op, ai={key: value for key, value in op.ai.items() if key != "asks"})}
 
 
 def test_demo_offers_at_least_8_tools():
@@ -138,12 +159,34 @@ ELEMENTO = [
 @pytest.mark.parametrize(("name", "phrase"), ELEMENTO)
 def test_a_phrase_that_names_an_elemento_is_offered_its_tool_and_the_read_that_finds_it(catalog_of, name, phrase):
     tools = catalog_of(OWNER, "es")
-    asks = {comparable(ask) for op in tools.values() for ask in shared.asks_of(op).get("es", ())}
-    assert comparable(phrase) not in asks
-    assert comparable(phrase) not in probe_phrases()
+    assert is_own_words(tools, phrase)
     offered = offered_to(tools, phrase)
-    assert name in offered[:10], (offered.index(name) + 1 if name in offered else None, offered[:10])
-    assert BY_NAME in offered[:10], (offered.index(BY_NAME) + 1 if BY_NAME in offered else None, offered[:10])
+    assert name in offered[:TOP], (offered.index(name) + 1 if name in offered else None, offered[:TOP])
+    assert BY_NAME in offered[:TOP], (offered.index(BY_NAME) + 1 if BY_NAME in offered else None, offered[:TOP])
+
+
+#: What a person says in words of their own, neither an ask nor a probe of layer 2, for the five tools whose probes a
+#: turn offers by their verb and the «elemento» alone (the pattern of hub#1165): here it is their asks that bring the
+#: tool among the first ten, so asks that stop reading as people speak fail.
+OWN_WORDS = [
+    ("demo.item.list", "busca los que lleven «otoño» en el nombre"),
+    ("demo.item.create", "hazme «Ensayo de primavera» con la nota «llamar al técnico»"),
+    ("demo.item.update", "el Ensayo de otoño ya está hecho"),
+    ("demo.item.delete", "el Ensayo de otoño ya no sirve: que desaparezca para siempre"),
+    ("demo.item.add_line", "al Ensayo de otoño le faltan cables nuevos, cuatro"),
+]
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
+def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
+    tools = catalog_of(OWNER, "es")
+    assert name in tools  # positive control: the owner holds the tool, so its place is known
+    assert is_own_words(tools, phrase)
+    place = place_in(tools, name, phrase)
+    assert place is not None and place <= TOP, place
+    before = without_its_asks(tools, name)
+    assert not shared.asks_of(before[name])  # positive control: the tool is ranked without its asks
+    unasked = place_in(before, name, phrase)
+    assert unasked is None or unasked > TOP, unasked
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
