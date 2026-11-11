@@ -430,13 +430,18 @@ SEARCH_ASKED = {"role": "assistant", "content": "", "tool_calls": [
 ]}
 
 
-def test_a_how_to_question_gets_the_excerpts_of_the_documentation_as_its_tool_result(client, make_user, gateway):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+def _how_to_turn(client, make_user, gateway, role: str) -> list[dict]:
+    """The frames of a turn where ``role`` asked how to open the till and the model searched the documentation, which
+    erplora.com answers with ``EXCERPT``."""
+    client.force_login(make_user("ana", host="a", role=role))
     gateway.reply(DOCS, json={"results": [EXCERPT]})
     gateway.turn({"type": "text_delta", "text": "Desde Caja > Abrir."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
-
     body = {"messages": [HOW, SEARCH_ASKED], "pending": [SEARCH], "continuation": "tok"}
-    got = frames(post(client, "/assistant/turn", body, HTTP_ACCEPT_LANGUAGE="es"))
+    return frames(post(client, "/assistant/turn", body, HTTP_ACCEPT_LANGUAGE="es"))
+
+
+def test_a_how_to_question_gets_the_excerpts_of_the_documentation_as_its_tool_result(client, make_user, gateway):
+    got = _how_to_turn(client, make_user, gateway, "hub_employee")
 
     assert [frame["type"] for frame in got] == ["executed", "text", "done"]
     assert (got[0]["name"], got[0]["outcome"], got[0]["app_name"]) == ("base.docs.search", "ok", "Ayuda")
@@ -452,12 +457,7 @@ def test_the_model_answers_a_how_to_question_told_to_end_it_with_the_cite_of_its
     """hub#1079: «¿cómo se hace una factura a partir de un tique?» got the steps and no excerpt they came from. What
     the model reads next is the excerpt with the line its answer cites it by, in the person's language, and the
     instruction to end the answer with it; nothing of the business ran for it, only the search."""
-    client.force_login(make_user("ana", host="a", role="hub_owner"))
-    gateway.reply(DOCS, json={"results": [EXCERPT]})
-    gateway.turn({"type": "text_delta", "text": "Desde Caja > Abrir."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
-
-    body = {"messages": [HOW, SEARCH_ASKED], "pending": [SEARCH], "continuation": "tok"}
-    got = frames(post(client, "/assistant/turn", body, HTTP_ACCEPT_LANGUAGE="es"))
+    got = _how_to_turn(client, make_user, gateway, "hub_owner")
 
     assert [(frame["name"], frame["kind"]) for frame in got if frame["type"] == "executed"] == [("base.docs.search", "query")]
     [tool] = [message for message in gateway.sent("/internal/assistant/chat/stream")[0].body["messages"] if message["role"] == "tool"]
