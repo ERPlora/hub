@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:63de40657ccb2a6ee940f8fbbb1f5d0058ad518f5845fad3f32538c95457bd4b -->
+<!-- generated from WORKBOOK.md sha256:29a5786c973545af2a3e768df4142edf163a8dac4e27263016a07b1987c2e339 -->
 
 ## What it is for and who it is for
 
@@ -252,7 +252,10 @@ Out: the course (announces: course new, changed, reordered or withdrawn).
 If it fails: next to the field: "The course needs a name.", "The maximum ({max}) is below the
 minimum ({min}): nobody could ever satisfy this course." and "That menu already has a course “{name}”.".
 A minimum or a maximum above 50 is refused, and so are more than 20 courses in a menu ("A menu
-holds 20 courses at most."). If the server refuses, the form says so and does not lose what was written.
+holds 20 courses at most."). If the server refuses, the form says so and does not lose what was written. Through the
+assistant, when changing or withdrawing a course said by its name, a name that fits several courses or none brings up
+no card, and if before the "yes" another course or another menu fits better what was said, nothing is touched and the
+new card comes up (BASE-F97).
 Involved: none
 
 ### COMBO-F06 Choose the products of each course and their supplement
@@ -289,7 +292,10 @@ business's currency could not be read", with the reason), and offers "Retry", wh
 soon as it arrives, the button lights up (hub#946). "Add several" with nothing ticked: "Tick at least one
 product first."; a search or a category with no products: "No products match.". If the
 catalogue does not load, the search box says so with "Retry". A product that does not exist yet is
-created first in Inventory: the search box finds it as soon as it is saved.
+created first in Inventory: the search box finds it as soon as it is saved. Through the assistant, when changing or
+removing a choice said by its product, a name that fits several choices or none brings up no card, and if before the
+"yes" another choice or another menu fits better what was said, nothing is touched and the new card comes up
+(BASE-F97).
 Involved: INVENTORY-F27
 
 ### COMBO-F07 Choose a menu when selling
@@ -505,7 +511,13 @@ said fits several menus or none, no card comes up: the assistant hears "There ar
 menu, Gluten-free vegan menu. Say which one." and asks which one, or "That menu does not exist in this business.". The
 "yes" counts only for the menu the card showed: if, before confirming, someone creates one that fits better what was
 said ("Menu" when the card said "Vegan menu"), nothing is touched and the new card comes up. A course or a choice said
-by its name, and the menu they belong to, still come up as they were said (hub#1231).
+by its name when changing or withdrawing it is looked up the same way, inside its menu: if what was said fits several or
+none, or its menu fits several, no card comes up and the assistant asks which one; the card shows the menu they belong
+to with its full name, and the "yes" counts only for the course or the choice it found: if, before confirming, someone
+adds one that fits better what was said ("Desserts" when "Homemade desserts" was found) or a menu that fits better,
+nothing is touched and the new card comes up (hub#1231). The course and the choice still come up on the card as they
+were said, and so does their menu when adding or reordering courses and choices, without the "yes" being tied to it
+(hub#1245).
 
 ### What it offers: queries (they read, they change nothing)
 

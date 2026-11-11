@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:aaccd34ae6ac40b962d7235e33becc52f08fd437447561eec70748272757ed4b -->
+<!-- generated from WORKBOOK.md sha256:a152a328047a9985c589ed79c065a42ada5d2f8a2b8d791d48e43968b8bcb699 -->
 
 ## What it is for and who it is for
 
@@ -540,11 +540,13 @@ single audit entry (who, when, the reason and what was erased and what was kept)
 notice (`customer.customer.erased`) is listened to by WhatsApp, Services, Appointments, Reservations,
 Online booking and Tables to empty their copies, and by Automations, which cancels the runs that could still
 go on with her data (waiting, asking or resumable) and makes them forget what they read: none sends her
-anything any more. Sales & POS and Invoicing keep their tax copy (it is a tax document).
+anything any more; and every run that names her card, also one that has already ended, forgets the free
+texts of its history that may carry her name (FLOW-F16). Sales & POS and Invoicing keep their tax copy (it
+is a tax document).
 If it fails: "This customer is no longer available." if it does not exist. Repeating it does not change
 the data or duplicate the audit, but notifies again.
 Involved: RESERVATION-F22, SERVICE-F29, WHATSAPP_INBOX-F11, APPOINTMENT-F24, ONLINE_BOOKING-F12, TABLE-F31,
-FLOW-F23, FLOW-F24
+FLOW-F16, FLOW-F23, FLOW-F24
 
 ### CUSTOMER-F17 Assign a customer to the sale at the till
 Status: done — the search is `CustomerSearch` (see "Till customer search · API"); Sales & POS mounts it on its screen
