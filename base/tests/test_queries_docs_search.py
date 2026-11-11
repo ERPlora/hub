@@ -33,6 +33,8 @@ EXCERPT = {
     "score": 0.91,
     "lang": "es",
 }
+#: The excerpt as the model reads it: with the line its answer cites it by, in the person's language (hub#1079).
+CITED = {**EXCERPT, "cite": "Fuente: Caja > Abrir la caja"}
 
 
 def ctx(language="es", permissions=frozenset({"base.view_home"}), actor="ana"):
@@ -63,7 +65,7 @@ class TestTheOperation:
 
         found = search()
 
-        assert found == {"results": [EXCERPT]}
+        assert found == {"results": [CITED]}
         [seen] = gateway.sent(DOCS)
         assert seen.body == {"hub": "a", "query": "¿Cómo abro la caja?", "language": "es", "limit": 8}
         assert signed(seen)
@@ -95,6 +97,22 @@ class TestTheOperation:
         gateway.reply(DOCS, json={"results": []})
 
         assert search() == {"results": []}
+
+    @pytest.mark.parametrize(
+        ("language", "cite"), [("es", "Fuente: Caja > Abrir la caja"), ("en", "Source: Caja > Abrir la caja")]
+    )
+    def test_each_excerpt_brings_the_line_the_answer_cites_it_by_in_the_persons_language(self, gateway, language, cite):
+        """hub#1079: asked how to turn a ticket into an invoice, the answer gave the steps but named no excerpt they
+        came from. Each excerpt brings the line the answer ends with (``cite``): «Source» in the person's language and
+        the headings it sits under, for the model to write as it comes, never to compose nor to translate."""
+        gateway.reply(DOCS, json={"results": [EXCERPT]})
+
+        assert [excerpt["cite"] for excerpt in search(language)["results"]] == [cite]
+
+    def test_an_excerpt_without_headings_is_cited_by_its_path(self, gateway):
+        gateway.reply(DOCS, json={"results": [{**EXCERPT, "heading": ""}]})
+
+        assert search()["results"][0]["cite"] == "Fuente: app_doc:cash_register"
 
     @pytest.mark.parametrize(
         "reply",
@@ -145,7 +163,7 @@ class TestPreparedBeforeTheTurn:
         with assistant.prepared_docs(assistant.prepare_docs(ctx(), pending)):
             found = search()
 
-        assert found == {"results": [EXCERPT]}
+        assert found == {"results": [CITED]}
         assert len(gateway.sent(DOCS)) == 1
 
     def test_a_search_that_failed_while_prepared_is_refused_without_asking_again(self, gateway):

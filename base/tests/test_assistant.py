@@ -1181,12 +1181,14 @@ def test_arguments_that_do_not_fit_come_back_to_the_model_with_the_field():
 
 def test_the_instructions_answer_how_to_questions_only_from_the_documentation():
     """saas ASSISTANT-F28: how ERPlora works comes from its documentation, cited; what it does not cover is said, never
-    made up. Its records still come only from its tools."""
+    made up. Its records still come only from its tools. Cited by the ``cite`` line each excerpt brings (hub#1079: «citing
+    the section» alone let the answer give the steps and name no excerpt)."""
     text = " ".join(assistant.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={}).split())
     assert (
         "For questions about how ERPlora works (how to do something, what an option means, plans), search the "
-        "documentation with `base__docs__search` and answer only from what it returns, citing the section; if it "
-        "returns nothing, say the documentation does not cover it."
+        "documentation with `base__docs__search` and answer only from what it returns; end that answer with the `cite` "
+        "of each excerpt you used, at least one, as it comes and in a line of its own; if it returns nothing, say the "
+        "documentation does not cover it."
     ) in text
     assert "Never invent a record" in text
 
