@@ -994,7 +994,7 @@ def update_device(ctx: OperationContext, data: DeviceUpdateIn) -> dict:
                 "that station was lost, take it out of service",
             ),
             "es": (
-                "retira el equipo Barra 2, ya no está",
+                "retira el dispositivo Barra 2, ya no está",
                 "el equipo de la barra se ha perdido: retíralo",
             ),
         },

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f17398c6b28e4149182a20720096bccd01038115ee9ac48d2a9ab8a75ca98c4b -->
+<!-- generated from WORKBOOK.md sha256:a06f8953f29fae7d4b5b566d32abbc61c8d044e4e2668f898737581aa5d8f1c0 -->
 
 ## What it is for and who it is for
 
@@ -283,7 +283,8 @@ Steps:
 3. The reservation is born Pending (or Confirmed, if they confirm themselves: then it holds its table).
 4. By voice: "book for 4 tomorrow at 9 pm under the name Ana, at table 5". Before noting it down, the
    assistant's card says who it is for, by the name of their card, the day and the time ("Create in
-   Reservations: Ana García · 15 Oct 2026 · 21:00"), and carries the table by its number, never by a code.
+   Reservations: Ana García · 15 Oct 2026 · 21:00"), and carries the table with its zone, as Tables names it
+   ("5 (Terrace)": the number repeats across zones), never by a code.
 In: customer (or name and phone), date, time, guests, table, duration, booked through, notes. The phone is
 saved in international format, as in Customers (`+34` and the digits together, without spaces), also the
 one typed with the card already chosen; one written with another country's prefix keeps its own. It is
@@ -335,6 +336,9 @@ Steps:
    party and fills a full slot with "Book anyway". If it was confirmed, Tables moves its hold to the new
    table and time, or releases it if it is left without a table (TABLE-F26).
 3. A seated, completed, cancelled or no-show reservation only changes its notes.
+4. By voice: "move Ana's reservation to table 7 on the terrace". Before changing it, the assistant's card
+   says the reservation by its customer, its day and its time and the new table with its zone, as Tables
+   names it ("Change in Reservations: Ana García · 15 Oct 2026 · 21:00 · 7 (Terrace)"), never by a code.
 In: the changed fields. The new phone is saved in international format, as on a new reservation; the
 same number written another way (with spaces or without the prefix) is not a change.
 Out: the changed reservation (announces: `reservation.reservation.updated`).
@@ -633,7 +637,8 @@ record as the Reservations screens name it, never by its code: a reservation, by
 its time ("Ana García · 15 Oct 2026 · 21:00"; without a name, by its phone; with the customer's data
 erased, by the day and the time); a waitlist entry, the same; a slot, by its weekday and its hours
 ("Thursday · 20:00–23:30"); a blocked date, by its day and, if it is not the whole day, its hours; the
-customer, by the name of their card, and the table, by its number. For a dangerous action, the label says
+customer, by the name of their card, and the table, with its zone ("5 (Terrace)"), as Tables names it.
+For a dangerous action, the label says
 what it is: "Reservation", "Time slot", "Blocked date" or "Waitlist entry", never "Record". A record that
 whoever confirms cannot see (for example, the card of a customer, without permission to see customers)
 does not show on the card.
