@@ -264,11 +264,11 @@ def _save_issuer(ctx: OperationContext, data: IssuerIn, **extra) -> Issuer:
     ai={
         "asks": {
             "en": (
-                "change the company name on our invoices to Lema Construcción SL",
+                "change the company name on our invoices to Carpintería Lema SL",
                 "update the issuer's address to Calle Real 5",
             ),
             "es": (
-                "cambia la razón social de las facturas a Lema Construcción SL",
+                "cambia la razón social de las facturas a Carpintería Lema SL",
                 "pon la dirección del emisor en Calle Real 5",
                 "cambia en el emisor el domicilio a Calle Real 5",
             ),
@@ -663,11 +663,11 @@ def _rule_key(category_key: str, *, field: str, on: dt.date) -> fiscal.FiscalKey
     ai={
         "asks": {
             "en": (
-                "make an invoice for Construcciones Lema for two hours of work at 50 €",
+                "make an invoice for Carpintería Lema for two hours of work at 50 €",
                 "issue an invoice by hand to Fontanería Ortega",
             ),
             "es": (
-                "hazle una factura a Construcciones Lema por dos horas de trabajo a 50 €",
+                "hazle una factura a Carpintería Lema por dos horas de trabajo a 50 €",
                 "emite a mano una factura para Fontanería Ortega",
             ),
         },
@@ -985,11 +985,11 @@ def _tell_sales(ctx: OperationContext, invoice: Invoice, written: str) -> None:
     ai={
         "asks": {
             "en": (
-                "turn the ticket of sale 20261103-0012 into a full invoice for Construcciones Lema",
+                "turn the ticket of sale 20261103-0012 into a full invoice for Carpintería Lema",
                 "give the customer a full invoice with their details for their ticket",
             ),
             "es": (
-                "pasa el tique de la venta 20261103-0012 a factura completa a nombre de Construcciones Lema",
+                "pasa el tique de la venta 20261103-0012 a factura completa a nombre de Carpintería Lema",
                 "el cliente pide su tique en factura con sus datos",
             ),
         },
@@ -1123,12 +1123,12 @@ def _rectify(
     ai={
         "asks": {
             "en": (
-                "rectify invoice FACT-2026-000017, the amount was wrong",
-                "issue an R1 rectifying invoice for FACT-2026-000017",
+                "rectify FACT-2025-000317, the amount was wrong",
+                "issue an R1 rectification of FACT-2025-000317",
             ),
             "es": (
-                "rectifica la factura FACT-2026-000017 por un error en el importe",
-                "haz una rectificativa R1 de la FACT-2026-000017",
+                "rectifica la FACT-2025-000317 por un error en el importe",
+                "haz una rectificativa R1 de la FACT-2025-000317",
             ),
         },
         "description": "Rectify an invoice (by its number) with a mandatory reason: a rectifying invoice dated today in "
@@ -1224,11 +1224,11 @@ def _returned_by_key(refund: Refund) -> dict[fiscal.FiscalKey, tuple[int, str]] 
         "asks": {
             "en": (
                 "issue the rectifying invoice of what was given back in sale 20261103-0012",
-                "the refund of Construcciones Lema still has no rectifying invoice",
+                "the refund of Carpintería Lema still has no rectifying invoice",
             ),
             "es": (
                 "haz la factura en negativo de lo devuelto en la venta 20261103-0012",
-                "la devolución de Construcciones Lema aún no tiene su rectificativa",
+                "la devolución de Carpintería Lema aún no tiene su rectificativa",
             ),
         },
         "description": "Issue the rectifying invoice of a refund of the Sales app (by the refund's id): what the refund "
@@ -1340,12 +1340,12 @@ def rectify_from_void(ctx: OperationContext, data: FromVoidIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "mark invoice FACT-2026-000017 as paid",
-                "Construcciones Lema has paid their invoice",
+                "mark invoice FACT-2025-000317 as paid",
+                "Carpintería Lema has paid their invoice",
             ),
             "es": (
-                "la factura FACT-2026-000017 ya está pagada",
-                "Construcciones Lema ya ha pagado su factura",
+                "la factura FACT-2025-000317 ya está pagada",
+                "Carpintería Lema ya ha pagado su factura",
                 "deja como cobrada la factura de Fontanería Ortega",
                 "Fontanería Ortega ya nos ha abonado su factura",
             ),
@@ -1720,12 +1720,12 @@ def _qr_of(ctx: OperationContext, invoice: Invoice) -> dict | None:
     ai={
         "asks": {
             "en": (
-                "print invoice FACT-2026-000017",
-                "print a duplicate of invoice FACT-2026-000017",
+                "print FACT-2025-000317",
+                "print a duplicate of FACT-2025-000317",
             ),
             "es": (
-                "imprime la factura FACT-2026-000017",
-                "imprímeme un duplicado de la factura FACT-2026-000017",
+                "imprime la FACT-2025-000317",
+                "imprímeme un duplicado de la FACT-2025-000317",
             ),
         },
         "description": "Print an invoice's A4 page (by its id or number) on the system printer, in the reader's "

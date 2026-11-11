@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c0801faa9871ec7f1505ea3176b967bed6b95ecacfe58281952ed33924433153 -->
+<!-- generated from WORKBOOK.md sha256:1235770ac62e750cb0ec7c93d339e9669f8016c6cedf8f7b92f0a80c81fac16e -->
 
 ## What it is for and who it is for
 
@@ -664,7 +664,7 @@ Actor: employee, manager, administrator, assistant
 Screen: Invoices, Invoice detail
 Steps:
 1. In **Invoices** (row) or on the detail, tap "Mark as paid" on an "Issued" invoice; or ask the assistant
-   ("mark invoice FACT-2026-000001 as paid", "Construcciones Lema has paid their invoice") and go on at step 4.
+   ("mark invoice FACT-2026-000001 as paid", "Carpintería Lema has paid their invoice") and go on at step 4.
 2. Confirm in "Mark {number} as paid?" ("The payment is recorded with the current date and time.") with
    "Mark as paid", or go back with "Cancel".
 3. The invoice becomes "Paid" and the detail shows "Paid on" with the date and the time.

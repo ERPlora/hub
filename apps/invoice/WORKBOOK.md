@@ -693,7 +693,7 @@ Actor: empleado, responsable, administrador, asistente
 Pantalla: Facturas, Ficha de factura
 Pasos:
 1. En **Facturas** (fila) o en la ficha, pulsa «Marcar pagada» en una factura «Emitida»; o pídeselo al
-   asistente («marca como cobrada la FACT-2026-000001», «la factura de Construcciones Lema ya está pagada»)
+   asistente («marca como cobrada la FACT-2026-000001», «la factura de Carpintería Lema ya está pagada»)
    y sigue en el paso 4.
 2. Confirma en «¿Marcar {número} como pagada?» («El cobro se registra con la fecha y la hora de
    ahora.») con «Marcar pagada», o vuelve con «Cancelar».
@@ -1172,7 +1172,10 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   `tests/test_guardrails_assistant.py` para todo el Hub).
   Cada herramienta dice además sus `asks`, las frases en `en` y `es` con que una persona la pide (`live.E020`:
   Facturación está en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1102), con clientes y números de ejemplo que ninguna
-  sonda usa (Construcciones Lema, Fontanería Ortega, `FACT-2026-000017`), y los `SYNONYMS` del Hub
+  sonda usa (Carpintería Lema, Fontanería Ortega, `FACT-2025-000317`: «2026» sale en cientos de sondas y
+  «Construcciones» comparte raíz con «conste»), las que nombran la factura por su número sin decir «factura» (cada
+  palabra de las `asks` suma a toda frase que la diga, y con ella las 13 `invoice.invoice.*` empatan por delante de las
+  de VeriFactu), y los `SYNONYMS` del Hub
   (`base/assistant.py`) leen «pagada», «pagado» y «como cobrada» como una factura pagada (`paid`; «cobrar» y «cobro»
   a secas siguen siendo el cobro de una venta). Así marcar cobrada, rectificar y el resto de las 25 herramientas
   llegan a su operación desde el chat: las frases reales de la QA del asistente

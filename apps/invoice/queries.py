@@ -395,11 +395,11 @@ def _page(queryset, params, row) -> dict:
         "asks": {
             "en": (
                 "which invoices have we issued this month?",
-                "show me the invoices of Construcciones Lema that are still pending",
+                "show me the invoices of Carpintería Lema that are still pending",
             ),
             "es": (
                 "¿qué facturas hemos emitido este mes?",
-                "busca las facturas de Construcciones Lema que siguen pendientes",
+                "busca las facturas de Carpintería Lema que siguen pendientes",
             ),
         },
         "description": "List the invoices, the last issued first: search by number, customer's name or tax ID; filter "
@@ -446,12 +446,12 @@ def list_invoices(ctx: OperationContext, params: InvoiceListIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "open invoice FACT-2026-000017",
-                "who was invoice FACT-2026-000017 made out to, and for how much?",
+                "open FACT-2025-000317",
+                "who was FACT-2025-000317 made out to, and for how much?",
             ),
             "es": (
-                "abre la factura FACT-2026-000017",
-                "¿a quién se le hizo la factura FACT-2026-000017 y por cuánto?",
+                "abre la FACT-2025-000317",
+                "¿a quién se le hizo la FACT-2025-000317 y por cuánto?",
             ),
         },
         "description": "Read one invoice by its number (or id): its issuer, recipient, lines, tax breakdown, totals, "
@@ -609,12 +609,12 @@ def render_document(invoice: Invoice, *, duplicate: bool = False, qr: dict | Non
     ai={
         "asks": {
             "en": (
-                "show me invoice FACT-2026-000017 as an A4 page",
-                "let me see the sheet of invoice FACT-2026-000017 as it is handed over",
+                "show me FACT-2025-000317 as an A4 page",
+                "let me see the sheet of FACT-2025-000317 as it is handed over",
             ),
             "es": (
-                "enséñame la factura FACT-2026-000017 en A4",
-                "enséñame la hoja de la factura FACT-2026-000017 tal como se entrega",
+                "enséñame la FACT-2025-000317 en A4",
+                "enséñame la hoja de la FACT-2025-000317 tal como se entrega",
             ),
         },
         "description": "The printable A4 document of an invoice (by its number), a whole HTML page in the reader's "
@@ -986,12 +986,12 @@ def rectification_figures(
     ai={
         "asks": {
             "en": (
-                "before rectifying invoice FACT-2026-000017, show me what would be issued",
-                "preview the rectifying invoice of FACT-2026-000017 without issuing it",
+                "before rectifying FACT-2025-000317, show me what would be issued",
+                "preview the rectification of FACT-2025-000317 without issuing it",
             ),
             "es": (
-                "antes de rectificar la factura FACT-2026-000017, enséñame cómo quedaría",
-                "¿qué rectificativa saldría de la FACT-2026-000017 si la corrijo ahora?",
+                "antes de rectificar la FACT-2025-000317, enséñame cómo quedaría",
+                "¿qué rectificativa saldría de la FACT-2025-000317 si la corrijo ahora?",
             ),
         },
         "description": "The rectifying invoice that rectifying an invoice (by its number) with that reason and type "
@@ -1170,11 +1170,11 @@ def _allocation(invoice: Invoice) -> dict:
     ai={
         "asks": {
             "en": (
-                "which document got number FACT-2026-000017?",
+                "which document got number FACT-2025-000317?",
                 "which number went to which document this year?",
             ),
             "es": (
-                "¿qué documento lleva el número FACT-2026-000017?",
+                "¿qué documento lleva el número FACT-2025-000317?",
                 "enséñame el libro de números de este año",
             ),
         },

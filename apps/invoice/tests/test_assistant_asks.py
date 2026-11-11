@@ -134,7 +134,7 @@ PAID = (
 #: Language, tool, phrase.
 OWN_WORDS = [
     ("es", "invoice.invoice.list", "busca lo que le hemos emitido a Talleres Mercedes"),
-    ("es", "invoice.invoice.get", "quiero ver por dentro la FACT-2026-000004"),
+    ("es", "invoice.invoice.get", "quiero ver por dentro la FACT-2025-000412"),
     ("en", "invoice.invoice.document", "how does the sheet we handed to Talleres Mercedes look?"),
     ("es", "invoice.invoice.by_source", "lo que vendimos esta mañana en la 20261111-0007, ¿con qué papel quedó?"),
     ("es", "invoice.invoice.line_defaults", "si meto a mano una línea de unas gafas, ¿qué porcentaje le sale?"),
@@ -162,8 +162,8 @@ OWN_WORDS = [
         "la de esta mañana, la 20261111-0007, se quedó sin documento: genéralo ya",
     ),
     ("es", "invoice.invoice.substitute", "ese tique de ayer pásalo a nombre de Talleres Mercedes"),
-    ("es", "invoice.invoice.mark_paid", "Talleres Gómez ya nos ha abonado la FACT-2026-000004"),
-    ("es", "invoice.invoice.print", "saca en papel la FACT-2026-000004"),
+    ("es", "invoice.invoice.mark_paid", "Talleres Gómez ya nos ha abonado la FACT-2025-000412"),
+    ("es", "invoice.invoice.print", "saca en papel la FACT-2025-000412"),
     ("es", "invoice.invoice.rectify", "la de Talleres Mercedes tiene un error en el importe: hazle su negativo"),
     (
         "es",
