@@ -95,6 +95,20 @@ def fields_of(write: str, arguments: dict, language: str) -> dict:
     return {field["name"]: field for field in card["fields"]}
 
 
+def yes_after_salsa_comes(write: str) -> tuple[dict, tuple]:
+    """«salsa» said to ``write`` while only «Salsas picantes» fits; somebody creates «Salsa», with its own «Alioli» on
+    «Hamburguesa», before the yes. → the yes's turn, and every group, option and link as they were just before it."""
+    a_group("Salsas picantes")
+    before = {}
+
+    def meanwhile():
+        a_group("Salsa")
+        before["state"] = state()
+
+    done = yes_to_its_card(as_admin(), write, by_its_name("salsa")[write], meanwhile=meanwhile)
+    return done, before["state"]
+
+
 def state() -> tuple:
     """Every group, option and link, with what the writes above change."""
     return (
@@ -139,20 +153,12 @@ def test_a_write_on_a_group_said_by_its_name_says_the_group_it_finds(write):
 
 @pytest.mark.parametrize("write", WRITES)
 def test_the_yes_runs_nothing_when_another_group_fits_the_name_better_before_it(write):
-    """«salsa» shows «Salsas picantes»; somebody creates «Salsa», with its own «Alioli» on «Hamburguesa», before the
-    yes: the yes runs nothing on either, and the card it shows now says «Salsa»."""
-    a_group("Salsas picantes")
-    before = {}
-
-    def meanwhile():
-        a_group("Salsa")
-        before["state"] = state()
-
-    done = yes_to_its_card(as_admin(), write, by_its_name("salsa")[write], meanwhile=meanwhile)
-
+    """«salsa» shows «Salsas picantes»; somebody creates «Salsa» before the yes: the yes runs nothing on either, and
+    the card it shows now says «Salsa»."""
+    done, before = yes_after_salsa_comes(write)
     assert done["executed"] == []
     assert group_on(done) == [("group", "Salsa")]
-    assert state() == before["state"]
+    assert state() == before
 
 
 @pytest.mark.parametrize("write", WRITES)
@@ -224,17 +230,9 @@ def test_a_group_two_fit_stays_on_the_card_of_a_write_that_cannot_check_it(write
 @pytest.mark.parametrize("write", UNCHECKED)
 def test_the_yes_to_adding_or_applying_touches_only_the_group_its_card_showed(write):
     """«salsa» shows «salsa»; somebody creates «Salsa» before the yes: the yes adds or applies nothing."""
-    a_group("Salsas picantes")
-    before = {}
-
-    def meanwhile():
-        a_group("Salsa")
-        before["state"] = state()
-
-    done = yes_to_its_card(as_admin(), write, by_its_name("salsa")[write], meanwhile=meanwhile)
-
+    done, before = yes_after_salsa_comes(write)
     assert done["executed"] == []
-    assert state() == before["state"]
+    assert state() == before
 
 
 @pytest.mark.xfail(strict=True, raises=AssertionError, reason="hub#1245: an option said by its name needs its group")
