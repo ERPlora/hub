@@ -5,7 +5,7 @@
 // every field the person has not touched, «Save» sends only the fields touched and changed
 // (`online_booking.settings.update`: the page's and the diary's, all or nothing), and a refusal says itself as
 // a FormModal does. Below, the offered services with their «Online booking» switch, saved at once in Services.
-import { EmptyState, InlineFeedback, SettingsFormFooter, useSettingsForm } from '@erplora/ui/components';
+import { EmptyState, InlineFeedback, SettingsFormFooter, SettingsNumberField, useSettingsForm } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonInput, IonSpinner, IonTextarea, IonToggle } from '@ionic/vue';
@@ -159,22 +159,15 @@ async function toggleService(event: Event, id: string, online: boolean): Promise
           :class="invalid(fieldErrors[field])"
           @ion-input="set(field, text($event.detail.value))"
         />
-        <ion-input
+        <SettingsNumberField
           v-for="field in PAGE_NUMBERS"
           :key="field"
-          :data-testid="`ob-settings-${field}`"
-          type="number"
-          inputmode="numeric"
+          :settings="settingsForm"
+          :field="field"
+          :testid="`ob-settings-${field}`"
+          :label="t(`online_booking.settings.fields.${field}`)"
           min="1"
           max="50"
-          :value="form[field]"
-          :label="t(`online_booking.settings.fields.${field}`)"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
-          :error-text="fieldErrors[field]"
-          :class="invalid(fieldErrors[field])"
-          @ion-input="set(field, text($event.detail.value))"
         />
         <ion-toggle
           v-for="field in PAGE_SWITCHES.filter((name) => name !== 'is_enabled')"
@@ -194,22 +187,15 @@ async function toggleService(event: Event, id: string, online: boolean): Promise
         <p class="ob-settings__help">
           {{ $t('online_booking.settings.sections.rulesHelp') }}
         </p>
-        <ion-input
+        <SettingsNumberField
           v-for="field in RULE_NUMBERS"
           :key="field"
-          :data-testid="`ob-settings-${field}`"
-          type="number"
-          inputmode="numeric"
-          min="0"
-          :value="form[field]"
+          :settings="settingsForm"
+          :field="field"
+          :testid="`ob-settings-${field}`"
           :label="t(`online_booking.settings.fields.${field}`)"
           :helper-text="field === 'max_advance_booking' ? t('online_booking.settings.fields.max_advance_booking_help') : undefined"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
-          :error-text="fieldErrors[field]"
-          :class="invalid(fieldErrors[field])"
-          @ion-input="set(field, text($event.detail.value))"
+          min="0"
         />
         <ion-toggle
           v-for="field in RULE_SWITCHES"

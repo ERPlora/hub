@@ -5,10 +5,10 @@
 // elsewhere repaints every field the person has not touched, «Save» sends only the fields touched and changed
 // (`kitchen.settings.update`), so it never undoes someone else's change, and a refusal says itself as a
 // FormModal does, under its field. «Test sound» rings the tone and volume on screen.
-import { InlineFeedback, SettingsFormFooter, useSettingsForm } from '@erplora/ui/components';
+import { InlineFeedback, SettingsFormFooter, SettingsNumberField, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonButton, IonInput, IonSelect, IonSelectOption, IonSpinner, IonToggle } from '@ionic/vue';
+import { IonButton, IonSelect, IonSelectOption, IonSpinner, IonToggle } from '@ionic/vue';
 import { computed } from 'vue';
 
 import PageNotices from '../components/PageNotices.vue';
@@ -48,7 +48,7 @@ const settingsForm = useSettingsForm(
   useCommand('kitchen.settings.update'),
   { toForm, numbers: NUMBERS },
 );
-const { form, fieldErrors, set } = settingsForm;
+const { form, set } = settingsForm;
 const chime = new Chime();
 
 function toForm(settings: SettingsOut): Form {
@@ -65,9 +65,6 @@ function toForm(settings: SettingsOut): Form {
     default_order_type: settings.default_order_type,
   };
 }
-
-const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
-const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
 function testSound(): void {
   if (!form.value) return;
@@ -146,23 +143,16 @@ function testSound(): void {
             {{ t(LABELS[field][1] as string) }}
           </p>
         </div>
-        <ion-input
+        <SettingsNumberField
           v-for="field in NUMBERS"
           :key="field"
-          :data-testid="`kitchen-settings-${field}`"
-          type="number"
-          inputmode="numeric"
-          :min="field === 'sound_volume' ? 0 : 1"
-          :max="field === 'sound_volume' ? 100 : 120"
-          :value="form[field]"
+          :settings="settingsForm"
+          :field="field"
+          :testid="`kitchen-settings-${field}`"
           :label="t(LABELS[field][0])"
           :helper-text="LABELS[field][1] ? t(LABELS[field][1] as string) : undefined"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
-          :error-text="fieldErrors[field]"
-          :class="invalid(fieldErrors[field])"
-          @ion-input="set(field, text($event.detail.value))"
+          :min="field === 'sound_volume' ? 0 : 1"
+          :max="field === 'sound_volume' ? 100 : 120"
         />
         <div class="kitchen-settings__row">
           <ion-select

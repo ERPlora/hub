@@ -7,7 +7,7 @@
 // (`staff.settings.update`), so it never undoes someone else's change, and a refusal says itself as a
 // FormModal does. The server judges the ranges and the day: its 422 goes under each field. A read that fails
 // before any value came says so with «Retry» and shows no form: nothing unread is ever offered to save.
-import { InlineFeedback, SettingsFormFooter, useSettingsForm } from '@erplora/ui/components';
+import { InlineFeedback, SettingsFormFooter, SettingsNumberField, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSpinner } from '@ionic/vue';
@@ -134,23 +134,16 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
               :class="invalid(fieldErrors[key])"
               @ion-input="set(key, text($event.detail.value))"
             />
-            <ion-input
+            <SettingsNumberField
               v-for="key in NUMBERS"
               :key="key"
-              :data-testid="`staff-settings-${key}`"
-              type="number"
-              inputmode="numeric"
-              :min="RANGES[key][0]"
-              :max="RANGES[key][1]"
-              :value="form[key]"
+              :settings="settingsForm"
+              :field="key"
+              :testid="`staff-settings-${key}`"
               :label="$t(`staff.settings.fields.${key}`)"
               :helper-text="$t(`staff.settings.hints.${key}`)"
-              label-placement="floating"
-              fill="outline"
-              mode="md"
-              :error-text="fieldErrors[key]"
-              :class="invalid(fieldErrors[key])"
-              @ion-input="set(key, text($event.detail.value))"
+              :min="RANGES[key][0]"
+              :max="RANGES[key][1]"
             />
           </div>
         </section>

@@ -10,10 +10,10 @@
 // that field does, and the next refusal says them again (hub#871). A failed load says so with «Retry» and
 // shows no values (never the factory ones as the business's). If the person loses the permission with the
 // tab open (shift change) the fields lock, «Save» goes and the form says why.
-import { InlineFeedback, SettingsFormFooter, useSettingsForm } from '@erplora/ui/components';
+import { InlineFeedback, SettingsFormFooter, SettingsNumberField, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
-import { IonButton, IonInput, IonNote, IonSpinner, IonToggle } from '@ionic/vue';
+import { IonButton, IonNote, IonSpinner, IonToggle } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { useT } from '../composables/useT';
@@ -34,7 +34,7 @@ const settings = useSettingsForm(config, useCommand('inventory.config.update'), 
   toForm,
   numbers: ['low_stock_threshold'],
 });
-const { form, fieldErrors, set } = settings;
+const { form, set } = settings;
 
 function toForm(now: ConfigOut): Fields {
   return {
@@ -43,8 +43,6 @@ function toForm(now: ConfigOut): Fields {
     track_stock: now.track_stock,
   };
 }
-
-const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 </script>
 
 <template>
@@ -109,22 +107,15 @@ const text = (value: unknown): string => (value === null || value === undefined 
         </ion-note>
       </div>
 
-      <ion-input
-        data-testid="inventory-settings-threshold"
-        :model-value="form.low_stock_threshold"
-        type="number"
-        inputmode="numeric"
-        min="0"
-        step="1"
+      <SettingsNumberField
+        :settings="settings"
+        field="low_stock_threshold"
+        testid="inventory-settings-threshold"
         :label="$t('inventory.settings.threshold')"
         :helper-text="$t('inventory.settings.thresholdHelp')"
-        label-placement="floating"
-        fill="outline"
-        mode="md"
+        min="0"
+        step="1"
         :disabled="locked"
-        :error-text="fieldErrors.low_stock_threshold"
-        :class="{ 'ion-invalid': !!fieldErrors.low_stock_threshold, 'ion-touched': !!fieldErrors.low_stock_threshold }"
-        @update:model-value="set('low_stock_threshold', text($event))"
       />
 
       <div class="inventory-settings__field">
