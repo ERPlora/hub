@@ -558,7 +558,7 @@ def delete_flow(ctx: OperationContext, data: FlowRefIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "let the welcome automation create tasks",
+                "grant the welcome automation the permission to create tasks",
                 "give the birthday automation permission to send WhatsApp messages",
             ),
             "es": (

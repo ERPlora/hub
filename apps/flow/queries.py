@@ -702,7 +702,7 @@ def list_flows(ctx: OperationContext, data: FlowListIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "show me the welcome automation step by step",
+                "what does the welcome automation do, and when does it start?",
                 "what permissions is the birthday automation missing?",
             ),
             "es": (
