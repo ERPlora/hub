@@ -435,9 +435,10 @@ def create_department(ctx: OperationContext, data: DepartmentIn) -> dict:
     input=DepartmentUpdateIn,
     output=DepartmentOut,
     ai=AI(
-        description="Change the name, the tax category or the position of a department of the open price. Pass its "
-        "current name in department, or its id when already known; never ask the person for an internal id. What was "
-        "already sold keeps the name and the VAT it was charged with.",
+        description="Change the name, the tax category (the VAT its products charge: a cheaper reduced rate, the "
+        "standard one) or the position of a department of the open price. Pass its current name in department, or its "
+        "id when already known; never ask the person for an internal id. What was already sold keeps the name and the "
+        "VAT it was charged with.",
         risk="normal",
         asks={
             "en": (
