@@ -127,7 +127,9 @@ Reglas que el e2e hace cumplir:
   acabar la ejecución: desde S2a (ronda 2026-10-30 de PLAN-DB) un negocio o una demo que se dan de alta durante la
   ejecución quedan `requested` hasta que el worker hace su BD. Solo hace eso (y borra las demos que acaban): ni releva
   el outbox ni corre tareas, que las specs juegan ellas mismas (`manage.py shell --hub a`); un worker que releva a la vez
-  se les adelanta. Si el worker no dice «waiting for work» en 60 s, o sale antes, la ejecución para con lo que dijo.
+  se les adelanta. Si el worker sale antes de decir «waiting for work», o ni siquiera arranca, la ejecución para en el
+  acto con lo que dijo; si sigue vivo sin decirlo, para a los 5 minutos (con la máquina cargada, solo importar Django le
+  llevó unos 3, hub#759).
 - Las specs entran con las cuentas de demo del SaaS (`owner@example.com` y `employee@example.com`, con acceso a `a` y
   `b`), que crea `manage.py demo_seed` del SaaS (en la receta, por medio de `whatsapp_hub_seed.py`, abajo). `global-setup.ts`
   las busca en la BD del SaaS de la pila (`E2E_SAAS_DB`, por defecto `saas_e2e_<Hub+1>`; con un solo `select`, sin escribir

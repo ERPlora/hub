@@ -554,13 +554,15 @@ LIVE = {
 
 # The apps whose assistant tools all say what a person types to ask for them (AI.asks, live.E020; docs plan
 # 2026-10-31, the assistant's knowledge and QA): an app joins in the pull request that completes its asks, and layer 1
-# of the assistant's QA (base/tests/test_assistant_asks.py) checks each ask reaches its tool, role by role.
+# of the assistant's QA (base/tests/test_assistant_asks.py) checks each ask reaches its tool, role by role, and that
+# every app whose tools say asks is here. The list is written only here, one app per line (hub#1144).
 LIVE_ASSISTANT_ASKS_REQUIRED = (
     "base",
     "cash_register",
     "customer",
     "inventory",
     "printing",
+    "reservation",
     "sale",
     "staff",
     "table",

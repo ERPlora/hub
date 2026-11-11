@@ -225,7 +225,7 @@ Implicados: RESERVATION-F05, RESERVATION-F06
 ### RESERVATION-F02 Bloquear un día o unas horas
 <!-- origen: qa:modules/reservations/create-reservation wf:whatsapp-mesa#rec_wa_mesa-f04 fi:modules/reservations#command-reservations-blocked_dates-create-sql-transaccional fi:modules/reservations#command-reservations-blocked_dates-delete-sql-transaccional fi:modules/reservations#query-reservations-blocked_dates-list old:reservations/workflow/disponibilidad.md#reservations-f02 -->
 Estado: hecho
-Actor: responsable
+Actor: responsable, asistente
 Pantalla: Disponibilidad → Fechas bloqueadas
 Pasos:
 1. Pulsa «Añadir fecha bloqueada», escribe la fecha y el motivo (festivo, cierre, evento privado).
@@ -468,7 +468,7 @@ Implicados: RESERVATION-F16, CUSTOMER-F10
 ### RESERVATION-F15 Marcar contactado o quitar de la lista de espera
 <!-- origen: qa:modules/reservations/waitlist-and-walk-in fi:modules/reservations#command-reservations-waitlist-delete-sql-transaccional fi:modules/reservations#command-reservations-waitlist-update-handler-wasm-waitlist_update old:reservations/workflow/lista-de-espera.md#reservations-f15 -->
 Estado: hecho
-Actor: empleado, responsable
+Actor: empleado, responsable, asistente
 Pantalla: Lista de espera (fila → «Contactado», «Quitar»)
 Pasos:
 1. «Contactado» cuando se le llama: la fila dice «Sí».
@@ -576,7 +576,7 @@ Implicados: RESERVATION-F07, RESERVATION-F17, WHATSAPP_INBOX-F26
 ### RESERVATION-F20 Borrar una reserva
 <!-- origen: fi:modules/reservations#command-reservations-reservations-delete-sql-transaccional old:reservations/workflow/reservas.md#reservations-f20 -->
 Estado: hecho
-Actor: administrador, propietario
+Actor: administrador, propietario, asistente
 Pantalla: Reservas (fila → «Borrar»)
 Pasos:
 1. «Borrar» y confirma. Mejor cancelar: guarda el motivo.
@@ -644,8 +644,11 @@ Todo se puede pedir por las pantallas, por el asistente (por voz o por texto, co
 propia persona) y por la API, con las mismas reglas y los mismos permisos. Pensado para la voz: una
 reserva se nombra por su id o por el nombre o el teléfono del cliente con su fecha («la reserva de Ana
 de mañana»); una mesa por su id o por su número («mesa 5»), con la zona si el número se repite; un
-cliente por su id, su nombre o su teléfono. Si una referencia casa con varias, se rechaza diciendo
-cuáles (409 `*_ambiguous`). Cambiar y cancelar se pueden pedir además en nombre del propio cliente
+cliente por su id, su nombre o su teléfono; una entrada de la lista de espera, por el nombre o el teléfono
+de quien espera; una fecha bloqueada, por su fecha o por su motivo («el cierre por vacaciones»), que el
+asistente busca en la lista de bloqueos. A quien ya está en la lista de espera, el asistente le da la
+reserva convirtiendo su entrada (F16), nunca con otra reserva aparte. Si una referencia casa con varias,
+se rechaza diciendo cuáles (409 `*_ambiguous`). Cambiar y cancelar se pueden pedir además en nombre del propio cliente
 (`on_behalf_of`, su ficha; hoy, desde WhatsApp): solo su reserva, con sus reglas de cliente y sin tocar la
 mesa, las notas internas ni reservar igualmente (F18).
 
@@ -859,7 +862,12 @@ la que solo se le autorizó reservar.
   primera (aún en horario de verano) y una que no existe pasa a la de después del salto (02:30 → 03:30),
   como la retención de Mesas (TABLE-F25).
 - **Asistente**: cada operación declara `ai` (descripción; `risk: "high"` en cancelar, no presentado y
-  todo borrado) y cada campo de `schemas.py` su `description`. Cada id que nombra un registro en una
+  todo borrado; y `asks`, las frases en `en` y `es` con que una persona pide cada herramienta: Reservas está
+  en `LIVE_ASSISTANT_ASKS_REQUIRED` y `base/tests/test_assistant_asks.py` exige que cada una traiga su
+  herramienta entre las diez primeras, rol por rol) y cada campo de `schemas.py` su `description`. Ninguna
+  descripción le dice al modelo que pregunte antes: la tarjeta es la confirmación (BASE-F97), y un «Ask
+  first.» hacía que contestara en el chat sin sacarla (hub#1105; lo vigila
+  `tests/test_assistant_asks.py`). Cada id que nombra un registro en una
   escritura lleva su marca `refers` (`names` de `base/schemas.py`; `base.E009` la comprueba al arrancar):
   los de Reservas, la lectura por id de su registro (`reservation.reservation.get`, `.waitlist.get`,
   `.time_slot.get`, `.blocked_date.get`), que da su `label` en el idioma de quien la pide (`queries.py`,
