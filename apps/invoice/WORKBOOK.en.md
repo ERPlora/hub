@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:353f01d75b09f0a8b55caf77b3a723c707a861b026d1cf5f01d63e0bd554cab5 -->
+<!-- generated from WORKBOOK.md sha256:a9d7b2cc130600ee293cdf929b4d6468368c298398bc8295401a38bc753076a2 -->
 
 ## What it is for and who it is for
 
@@ -661,13 +661,16 @@ Involved: PRINTING-F08, VERIFACTU-F19
 
 ### INVOICE-F19 Mark an invoice as paid
 Status: done
-Actor: employee, manager, administrator
+Actor: employee, manager, administrator, assistant
 Screen: Invoices, Invoice detail
 Steps:
-1. In **Invoices** (row) or on the detail, tap "Mark as paid" on an "Issued" invoice.
+1. In **Invoices** (row) or on the detail, tap "Mark as paid" on an "Issued" invoice; or ask the assistant
+   ("mark invoice FACT-2026-000001 as paid", "Carpintería Lema has paid their invoice") and go on at step 4.
 2. Confirm in "Mark {number} as paid?" ("The payment is recorded with the current date and time.") with
    "Mark as paid", or go back with "Cancel".
 3. The invoice becomes "Paid" and the detail shows "Paid on" with the date and the time.
+4. With the assistant, "Run this action?" comes with the invoice by its number; tap "Run" and it becomes
+   "Paid" as from the screen, or "Cancel" and nothing changes.
 In: the chosen invoice.
 Out: the status "Paid" and the payment date (announces `invoice.invoice.paid`). No amount changes and the
 till is not touched.

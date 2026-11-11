@@ -309,7 +309,7 @@ def _locked_settings(ctx: OperationContext) -> Settings:
             "es": (
                 "que no se pueda cobrar sin cliente",
                 "pon el descuento máximo en un 15 %",
-                "quiero que salga factura por defecto",
+                "que cada venta salga con factura por defecto",
                 "cambia el texto del pie del ticket",
             ),
         },
@@ -3376,7 +3376,7 @@ def _print_sale(ctx: OperationContext, sale: Sale, detail: SaleOut, *, duplicate
             "en": (
                 "print the last ticket again",
                 "reprint the receipt of sale 7",
-                "she wants a copy of the invoice",
+                "print her a copy of the invoice of sale 7",
             ),
             "es": (
                 "imprime otra vez el último ticket",
