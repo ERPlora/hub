@@ -75,12 +75,13 @@ async function confirm(): Promise<void> {
 }
 
 // A Set has no JSON of its own: the ticked printers are compared as a sorted list.
-useUnsavedFormOnOpen('printing-device', () => ({ name: name.value, printers: [...chosen.value].sort() }), open);
+const canDismiss = useUnsavedFormOnOpen('printing-device', () => ({ name: name.value, printers: [...chosen.value].sort() }), open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="printing-device"
     :title="device ? $t('printing.devices.modal.edit') : $t('printing.devices.modal.create')"
     :submit-label="$t('printing.devices.modal.save')"

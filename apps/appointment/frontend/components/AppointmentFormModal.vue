@@ -53,7 +53,7 @@ const props = withDefaults(
 const emit = defineEmits<{ saved: [appointment: AppointmentOut]; outcome: [text: string] }>();
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('appointment-form', () => ({ customer: customer.value, services: services.value, staff: staff.value, day: day.value, time: time.value, minutes: minutesTouched.value ? minutes.value : openedMinutes.value, notes: notes.value, internalNotes: internalNotes.value }), open);
+const canDismiss = useUnsavedFormOnOpen('appointment-form', () => ({ customer: customer.value, services: services.value, staff: staff.value, day: day.value, time: time.value, minutes: minutesTouched.value ? minutes.value : openedMinutes.value, notes: notes.value, internalNotes: internalNotes.value }), open);
 
 const t = useT();
 const locale = useLocale();
@@ -315,6 +315,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="appointment-form"
     :title="title"
     :submit-label="editing ? $t('appointment.form.save') : $t('appointment.form.create')"

@@ -54,12 +54,13 @@ async function save(): Promise<void> {
   void toastSuccess(t('customer.create.created', { name: customer.name }));
 }
 
-useUnsavedFormOnOpen('customer-create', () => form.value, open);
+const canDismiss = useUnsavedFormOnOpen('customer-create', () => form.value, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="customer-create"
     :title="$t('customer.create.title')"
     :pending="pending"

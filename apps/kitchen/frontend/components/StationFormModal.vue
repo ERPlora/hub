@@ -20,7 +20,7 @@ const props = defineProps<{
 
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('kitchen-station-form', () => form.value, open);
+const canDismiss = useUnsavedFormOnOpen('kitchen-station-form', () => form.value, open);
 const emit = defineEmits<{ saved: [station: StationOut] }>();
 
 /** The palette of the old module's chips; the first is the factory colour. */
@@ -108,6 +108,7 @@ async function save(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="kitchen-station-form"
     :title="title"
     :submit-label="station ? t('kitchen.stations.form.save') : t('kitchen.stations.form.create')"

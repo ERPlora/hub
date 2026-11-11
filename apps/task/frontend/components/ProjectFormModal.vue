@@ -32,12 +32,13 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen('task-project-form', form, open);
+const canDismiss = useUnsavedFormOnOpen('task-project-form', form, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="task-project-form"
     :title="$t('task.projects.form.titleNew')"
     :submit-label="$t('task.projects.form.create')"
