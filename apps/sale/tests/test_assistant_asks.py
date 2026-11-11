@@ -17,6 +17,7 @@ from base import assistant
 from base.tests.test_assistant_asks import (
     assert_its_asks_bring,
     comparable,
+    offered_place,
     probe_phrases,
     probes_of_layer_2,
     without_its_asks,
@@ -155,16 +156,12 @@ def test_the_asks_of_the_payment_methods_of_the_till_take_no_place_from_the_paym
         tools = assistant.catalog(ctx_for(ROLE_OF[probe["role"]], language=probe["language"]))
         if probe["tool"] not in tools:
             continue
-
-        def place(catalog, probe=probe):
-            offered = [op.name for op in assistant.relevant(catalog, [probe["phrase"]], probe["language"])]
-            return offered.index(probe["tool"]) + 1 if probe["tool"] in offered else None
-
-        asked = place(tools)
+        said = probe["tool"], probe["phrase"], probe["language"]
+        asked = offered_place(tools, *said)
         if asked is None or asked > 10:
             continue
         kept += 1
-        unasked = place(without_its_asks(tools, "sale.payment_method.list"))
+        unasked = offered_place(without_its_asks(tools, "sale.payment_method.list"), *said)
         if asked != unasked:
             moved.append((probe["id"], unasked, asked))
     assert kept  # positive control: some probe of Payments brings its tool among the first ten
