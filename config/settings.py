@@ -563,6 +563,7 @@ LIVE_ASSISTANT_ASKS_REQUIRED = (
     "cash_register",
     "customer",
     "inventory",
+    "online_booking",
     "printing",
     "reservation",
     "sale",

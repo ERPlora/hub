@@ -140,6 +140,16 @@ def _diary(ctx: OperationContext, name: str, appointment: Appointment, **extra):
     output=BookingOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "accept Nerea's self-booking for Wednesday",
+                "approve the booking that came in from my link",
+            ),
+            "es": (
+                "acepta la reserva de internet de Nerea del miércoles",
+                "da el visto bueno a la reserva de Nerea que tengo en la bandeja",
+            ),
+        },
         "description": "Confirm a booking a customer made online that is waiting (pending), named by its number or "
         "as a person says it: the customer and the day (e.g. confirm Ana's booking of tomorrow).",
         "risk": "normal",
@@ -160,6 +170,16 @@ def confirm_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
     output=BookingOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "Nerea's self-booking from earlier today is done",
+                "close off the booking APT-20261120-0004 from my link as finished",
+            ),
+            "es": (
+                "lo que Nerea reservó por internet ya está hecho",
+                "da por acabada la reserva de la bandeja APT-20261120-0004",
+            ),
+        },
         "description": "Mark an online booking (confirmed or in progress) as completed, named by its number or by the "
         "customer and the day. It does not charge it: that is the till.",
         "risk": "normal",
@@ -180,6 +200,16 @@ def complete_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
     output=BookingOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "Olga never turned up for what she booked by herself yesterday",
+                "Olga missed what she booked through my link",
+            ),
+            "es": (
+                "Olga no se ha presentado a lo que reservó por internet ayer",
+                "Olga faltó a su reserva de la web: déjalo anotado",
+            ),
+        },
         "description": "Record that the customer of an online booking did not show up (only once its time has "
         "passed), named by its number or by the customer and the day. Ask the person before doing it.",
         "risk": "high",
@@ -200,6 +230,16 @@ def no_show_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
     output=BookingOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "cancel Olga's self-booking on Saturday, she can't make it",
+                "decline the booking that came in through my link for Thursday",
+            ),
+            "es": (
+                "anula la reserva de internet de Olga del sábado, no puede venir",
+                "rechaza la reserva de la bandeja que tengo para el jueves",
+            ),
+        },
         "description": "Cancel (or decline) an online booking, named by its number or by the customer and the day, "
         "with an optional reason; its time becomes free. Ask the person before doing it.",
         "risk": "high",
@@ -220,6 +260,16 @@ def cancel_booking(ctx: OperationContext, data: CancelIn) -> dict:
     output=DeletedOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "remove Olga's duplicate self-booking completely",
+                "get rid of the fake booking that came in through my link for good",
+            ),
+            "es": (
+                "borra la reserva de internet repetida de Olga",
+                "quita para siempre de la bandeja la reserva falsa",
+            ),
+        },
         "description": "Delete an online booking from the inbox and the diary (archived, not destroyed), named by "
         "its number or by the customer and the day. Cancelling keeps its history and is usually what is wanted; "
         "ask the person first.",
@@ -244,6 +294,16 @@ def delete_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
     output=SettingsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "ask for an email when customers book by themselves",
+                "change the welcome text customers see when they book",
+            ),
+            "es": (
+                "pide el email a quien reserve por internet",
+                "cambia el texto de bienvenida de la web de reservas",
+            ),
+        },
         "description": "Change the booking page's settings and the diary's booking rules it uses; only what is sent "
         "changes, all of it or nothing (e.g. switch the page on, ask for the email, or set the minimum notice).",
         "risk": "normal",
@@ -380,6 +440,16 @@ def _book(
     input=PublicBookIn,
     output=BookedOut,
     ai={
+        "asks": {
+            "en": (
+                "book Maite in by herself for a cut on Thursday at 5 pm, mobile 622 000 111",
+                "make a self-booking as the customer would, anyone free is fine",
+            ),
+            "es": (
+                "resérvale a Maite por internet un tinte el jueves a las 17:00, móvil 622 000 111",
+                "reserva por internet como lo haría la clienta, con cualquiera que esté libre",
+            ),
+        },
         "description": "Book from the public booking page as the customer: services, a professional or anyone, a "
         "free time, her name and mobile. Hands back the appointment number and her personal link token.",
         "risk": "normal",
@@ -442,6 +512,16 @@ def public_book(ctx: OperationContext, data: PublicBookIn) -> dict:
     input=PublicCancelIn,
     output=PublicBookingOut,
     ai={
+        "asks": {
+            "en": (
+                "cancel through Leire's own link on her behalf",
+                "use the customer's link to call off what she booked",
+            ),
+            "es": (
+                "anula lo que Leire reservó en la web, con su enlace y por ella",
+                "con el enlace de Leire, anúlale lo del jueves por ella",
+            ),
+        },
         "description": "Cancel the booking behind a customer's personal link, as the customer: the business's "
         "cancellation policy applies. Ask the person before doing it.",
         "risk": "high",
