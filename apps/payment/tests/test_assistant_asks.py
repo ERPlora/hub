@@ -1,7 +1,9 @@
 """What layer 1 of the assistant's QA does not say of Payments (docs plan 2026-10-31, the assistant's knowledge and QA,
 §3): how many tools it offers, what an employee is never offered, that the real-model QA's requests (hub#1090), in the
 owner's and the employee's own words, are offered their existing operation, and that a payment to a supplier is never
-taken for a charge of the till, nor the other way round.
+taken for a charge of the till, nor the other way round. And what the Hub's words of Payments are for (a «cuenta
+bancaria» or «del banco» is a Payments' method, ``base.assistant.SYNONYMS``), and that each tool's asks, not only its
+name, bring what a person says in words of their own.
 
 Every ask of every tool of payment bringing its tool among the first ten, role by role, in both languages, is
 ``base/tests/test_assistant_asks.py``'s (payment is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over
@@ -20,7 +22,7 @@ from live.operations import AI, Operation, registry
 from base import assistant
 from base.models import Membership
 from base.permissions import permissions_for
-from base.tests.test_assistant_asks import comparable, probe_phrases
+from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, comparable, probe_phrases
 
 A = Scope("host", "a")
 #: Every write of Payments: an employee only looks (``payment.view_payment``), and none of them is a write a manager
@@ -69,6 +71,10 @@ ROLES = {"owner": Membership.Role.OWNER, "employee": Membership.Role.EMPLOYEE}
 #: from (Payments' methods); «cobra» and «cobro» are a sale's.
 TILLS = ("sale.payment_method.",)
 OUTGOING = ("payment.method.",)
+#: The tender of the till a Payments' method tool can be taken for: the same action on how a customer pays (the model
+#: read the till's list for «¿desde qué cuentas pago a proveedores?»). The till lists and adds its tenders and nothing
+#: else, so Payments' get, update, activate and deactivate have none: their probes are only to be offered.
+TENDER_OF = {"payment.method.list": "sale.payment_method.list", "payment.method.create": "sale.payment_method.create"}
 #: The requests of the till's tenders of Sales' QA (``owner-es-sale-*.json``, ``sale-customer-base.json``), as the
 #: owner said them: Payments' methods, now that they say their asks, never go ahead of them.
 TENDERS = [
@@ -155,17 +161,18 @@ def test_every_probe_of_payments_offers_its_tool_or_is_refused_without_being_one
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(
     "probe",
-    [probe for probe in PROBES if probe["tool"].startswith(OUTGOING) and probe["expect"] != "refused"],
+    [probe for probe in PROBES if probe["tool"] in TENDER_OF and probe["expect"] != "refused"],
     ids=lambda probe: probe["id"],
 )
-def test_where_the_business_pays_a_supplier_from_goes_ahead_of_the_tills_tenders(catalog_of, probe):
+def test_where_the_business_pays_a_supplier_from_goes_ahead_of_the_tills_tender(catalog_of, probe):
     """«¿Desde qué cuentas pago a proveedores?» is Payments' method, never how a customer pays at the till: the model
-    read ``sale.payment_method.list`` because it came first. Each request of a Payments' method puts it ahead of every
-    tender of the till the turn offers."""
+    read ``sale.payment_method.list`` because it came first. Each request to list or add a Payments' method puts it
+    ahead of the till's tender of the same action."""
     offered = offered_to(catalog_of(ROLES[probe["role"]], "es"), probe["phrase"])
-    tills = [place(offered, name) for name in offered if name.startswith(TILLS)]
-    mine = place(offered, probe["tool"]) or len(offered) + 1  # not offered: behind every tender offered
-    assert all(mine < at for at in tills), (mine, tills)
+    tender = TENDER_OF[probe["tool"]]
+    assert tender in offered  # positive control: the tender competes in the ranking
+    mine = place(offered, probe["tool"]) or len(offered) + 1  # not offered: behind the tender
+    assert mine < place(offered, tender), (mine, place(offered, tender))
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -177,3 +184,72 @@ def test_a_tender_of_the_till_is_never_taken_for_where_the_business_pays_its_sup
     outgoing = [place(offered, name) for name in offered if name.startswith(OUTGOING)]
     tender = place(offered, probe["tool"]) or len(offered) + 1
     assert all(tender < at for at in outgoing), (tender, outgoing)
+
+
+#: Where the business pays from in the Hub's words (``base.assistant.SYNONYMS``): a «cuenta bancaria» or «cuenta del
+#: banco», never the table's check a «cuenta» alone is, and a «bank account», are a Payments' method, as «method» is.
+BANK_ACCOUNT = ("cuenta bancaria", "cuentas bancarias", "cuenta del banco", "cuentas del banco", "bank account")
+#: In phrases nobody wrote as asks nor as probes, each brings its tool among the first ten, and none does without them.
+PAYMENT_WORDS = [
+    ("payment.method.list", "¿qué cuentas bancarias tenemos?"),
+    ("payment.method.update", "cambia la referencia de la cuenta del banco"),
+]
+
+
+@pytest.mark.parametrize("words", BANK_ACCOUNT)
+def test_the_hub_reads_a_bank_account_as_where_the_business_pays_from(words):
+    phrase = f"la {words} del BBVA"
+    method = shared.asked(["the payment method"]).concepts
+    assert any("metho" in concept for concept in method)  # positive control: «method» names Payments' method
+    assert any("metho" in concept for concept in shared.asked([phrase], assistant.SYNONYMS).concepts), phrase
+    assert not any("metho" in concept for concept in shared.asked([phrase]).concepts), phrase
+
+
+def without_the_bank_account():
+    """The Hub's ``SYNONYMS`` without the group of where the business pays from."""
+    kept = tuple(group for group in assistant.SYNONYMS if not set(BANK_ACCOUNT) & set(group))
+    assert len(kept) == len(assistant.SYNONYMS) - 1  # positive control: the group is there, and only one
+    return kept
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("name", "phrase"), PAYMENT_WORDS)
+def test_a_bank_account_said_by_its_name_brings_the_payments_method(catalog_of, name, phrase):
+    tools = catalog_of(Membership.Role.OWNER, "es")
+    ranking = {**assistant.RANKING, "synonyms": without_the_bank_account()}
+    offered = offered_to(tools, phrase)
+    assert name in offered[:TOP], (place(offered, name), offered[:TOP])
+    unnamed = [op.name for op in shared.relevant(tools, [phrase], "es", **ranking)]
+    assert name not in unnamed[:TOP], place(unnamed, name)
+
+
+#: What a person says in words of their own, neither an ask nor a probe of layer 2 (nor an ask with a word changed), one
+#: per tool: it is their asks that bring each among the first ten (``assert_its_asks_bring``), so asks that stop
+#: reading as people speak fail. Language, tool, phrase.
+OWN_WORDS = [
+    ("en", "payment.payment.list", "which transfers to suppliers are still waiting?"),
+    ("en", "payment.payment.get", "I need the IBAN the Iberdrola money went to"),
+    ("es", "payment.method.list", "¿por dónde salen los pagos que hacemos a proveedores?"),
+    ("es", "payment.method.get", "necesito la referencia del Santander para dársela a un proveedor"),
+    ("es", "payment.method.create", "queremos pagar a proveedores desde el Santander, que aún no está"),
+    ("es", "payment.method.update", "el número de la cuenta bancaria del BBVA ha cambiado"),
+    ("en", "payment.method.deactivate", "stop the old BBVA account from being used"),
+    ("en", "payment.method.activate", "we can pay from the BBVA bank account again"),
+    ("en", "payment.payment.create", "write down what we owe Iberdrola, 300 €, without moving money"),
+    ("es", "payment.payment.approve", "da el visto bueno al borrador de Iberdrola"),
+    ("es", "payment.payment.mark_sent", "la transferencia de Iberdrola ya la mandé desde el banco"),
+    ("es", "payment.payment.mark_completed", "Iberdrola dice que ya tiene el dinero"),
+    ("es", "payment.payment.cancel", "lo de Iberdrola ya se pagó en efectivo, esa transferencia sobra"),
+]
+
+
+def test_each_tool_of_payments_has_its_own_words():
+    assert sorted(name for _, name, _ in OWN_WORDS) == sorted(
+        name for name, op in registry.items() if op.app_label == "payment" and assistant.is_tool(op)
+    )
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("language", "name", "phrase"), OWN_WORDS, ids=[name for _, name, _ in OWN_WORDS])
+def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, language, name, phrase):
+    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, language), name, phrase, language)

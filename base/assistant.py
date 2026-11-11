@@ -143,6 +143,12 @@ SYNONYMS = (
     # is the till's check line (``sale.order.*_line``) and a cart's line would take its place.
     ("unidades", "cantidad", "quantity"),
     ("cesta", "carrito", "cart", "basket"),
+    # payment: where the business pays its suppliers from is a payment method (``payment.method``), and so is its «cuenta
+    # bancaria» or «cuenta del banco», named by its phrases: a «cuenta» alone is a table's check.
+    (
+        "method", "methods", "cuenta bancaria", "cuentas bancarias", "cuenta del banco", "cuentas del banco",
+        "bank account", "bank accounts",
+    ),
 )
 #: The help a how-to question asks for (``live.assistant.HOWTO_POINTS``): it ranks by being one, not only by ``ALWAYS``.
 HOWTO = (DOCS_SEARCH,)
