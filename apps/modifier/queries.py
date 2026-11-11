@@ -256,7 +256,17 @@ def _page(queryset, params, row) -> dict:
     expose_api=True,
     ai={
         "description": "List the modifier groups (sauces, doneness, extras…) with their rule, how many options "
-        "they have and how many products and categories they apply to; a minimum of 1 or more means required."
+        "they have and how many products and categories they apply to; a minimum of 1 or more means required.",
+        "asks": {
+            "en": (
+                "which modifier groups have we set up?",
+                "what add-ons and extras do we offer with the dishes?",
+            ),
+            "es": (
+                "¿qué grupos de suplementos usamos?",
+                "enséñame los extras que se pueden pedir con los platos",
+            ),
+        },
     },
 )
 def list_groups(ctx: OperationContext, params: GroupListIn) -> dict:
@@ -286,7 +296,17 @@ def list_groups(ctx: OperationContext, params: GroupListIn) -> dict:
     output=GroupOut,
     expose_api=True,
     ai={
-        "description": "Get one modifier group, named by its id or its name (e.g. «group Sauces»), with its rule."
+        "description": "Get one modifier group, named by its id or its name (e.g. «group Sauces»), with its rule.",
+        "asks": {
+            "en": (
+                "how many sauces can be picked in the Sauces group?",
+                "what are the minimum and maximum of the Doneness group?",
+            ),
+            "es": (
+                "¿cuántas salsas se pueden elegir en el grupo Salsas?",
+                "dime el mínimo y el máximo del grupo Punto de la carne",
+            ),
+        },
     },
 )
 def get_group(ctx: OperationContext, data: GroupRefIn) -> dict:
@@ -302,7 +322,17 @@ def get_group(ctx: OperationContext, data: GroupRefIn) -> dict:
     expose_api=True,
     ai={
         "description": "Name by its id, or find by its name, the Inventory category a modifier group applies to, as "
-        "the list of what a group applies to names it."
+        "the list of what a group applies to names it.",
+        "asks": {
+            "en": (
+                "how is Pizzas named when it takes add-ons?",
+                "find Sandwiches to hang extras on it",
+            ),
+            "es": (
+                "¿cómo se identifica Bocadillos al colgarle suplementos?",
+                "busca Pizzas, la de los extras",
+            ),
+        },
     },
 )
 def get_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
@@ -322,7 +352,17 @@ def get_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
     expose_api=True,
     ai={
         "description": "List the options of a modifier group (or of every group) with their supplement in cents, "
-        "their own tax category if any and whether they come chosen by default."
+        "their own tax category if any and whether they come chosen by default.",
+        "asks": {
+            "en": (
+                "which sauces can people choose and what does each cost?",
+                "list the choices of Doneness and which one is preselected",
+            ),
+            "es": (
+                "¿qué salsas hay para elegir y cuánto cuesta cada una?",
+                "¿qué opciones trae Punto de la carne y cuál viene por defecto?",
+            ),
+        },
     },
 )
 def list_options(ctx: OperationContext, params: OptionListIn) -> dict:
@@ -350,7 +390,17 @@ def list_options(ctx: OperationContext, params: OptionListIn) -> dict:
     expose_api=True,
     ai={
         "description": "Get one option of a modifier group, named by its id or its name (and its group, when two "
-        "groups have one with that name), with its supplement in cents and the group it belongs to."
+        "groups have one with that name), with its supplement in cents and the group it belongs to.",
+        "asks": {
+            "en": (
+                "how much is the extra cheese option?",
+                "which group is the Gluten free option in?",
+            ),
+            "es": (
+                "¿qué suplemento lleva la opción Doble de queso?",
+                "¿de qué grupo es la opción Sin gluten?",
+            ),
+        },
     },
 )
 def get_option(ctx: OperationContext, data: OptionRefIn) -> dict:
@@ -370,7 +420,17 @@ def get_option(ctx: OperationContext, data: OptionRefIn) -> dict:
     expose_api=True,
     ai={
         "description": "List what modifier groups apply to: the products and categories of a group, or the groups "
-        "of a product or of a category."
+        "of a product or of a category.",
+        "asks": {
+            "en": (
+                "which dishes ask for the doneness?",
+                "what products is the Sauces group on?",
+            ),
+            "es": (
+                "¿a qué platos se les pregunta el punto de la carne?",
+                "¿qué productos llevan el grupo Salsas?",
+            ),
+        },
     },
 )
 def list_links(ctx: OperationContext, params: LinkListIn) -> dict:
@@ -421,7 +481,17 @@ def groups_for_product(product) -> list[ModifierGroup]:
     expose_api=True,
     ai={
         "description": "Get one link between a modifier group and what it applies to: by the link's id, or by the "
-        "group and the product (id, SKU or name) or category (id or name). One to something deleted is not there."
+        "group and the product (id, SKU or name) or category (id or name). One to something deleted is not there.",
+        "asks": {
+            "en": (
+                "does the Margherita pizza carry the Sauces group?",
+                "is Extras attached to the fries?",
+            ),
+            "es": (
+                "¿tiene la Pizza margarita enganchado el grupo Salsas?",
+                "¿qué asignación hay entre el grupo Extras y las patatas bravas?",
+            ),
+        },
     },
 )
 def get_link(ctx: OperationContext, data: LinkRefIn) -> dict:
@@ -460,7 +530,17 @@ def _target_option(option: ModifierOption) -> dict:
     expose_api=True,
     ai={
         "description": "The modifier groups and options of a product (named by its id, SKU or name), its own and "
-        "those of its categories: what the till asks before adding the line."
+        "those of its categories: what the till asks before adding the line.",
+        "asks": {
+            "en": (
+                "what does the till ask when selling a Margherita pizza?",
+                "which add-ons does the steak sandwich carry, its category's included?",
+            ),
+            "es": (
+                "¿qué hay que preguntar al vender una Pizza margarita?",
+                "¿qué extras lleva el Bocadillo de lomo, contando los de su familia?",
+            ),
+        },
     },
 )
 def for_target(ctx: OperationContext, data: TargetIn) -> dict:
@@ -500,7 +580,17 @@ def _refuse(code: str, message: str) -> Conflict:
     ai={
         "description": "Check and value the options chosen for a product: that each one is offered with it and "
         "every group's minimum, maximum and repeats hold; returns each one at its catalog price, what to add to "
-        "the line, what goes on a line of its own and the kitchen text."
+        "the line, what goes on a line of its own and the kitchen text.",
+        "asks": {
+            "en": (
+                "how much is a pizza with extra cheese and barbecue sauce?",
+                "what does the kitchen read for a rare steak?",
+            ),
+            "es": (
+                "con salsa barbacoa y doble de queso, ¿cuánto cuesta la pizza?",
+                "¿con qué nota llega a cocina un entrecot poco hecho?",
+            ),
+        },
     },
 )
 def resolve_selection(ctx: OperationContext, data: ResolveIn) -> dict:

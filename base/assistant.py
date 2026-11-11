@@ -218,6 +218,10 @@ SYNONYMS = (
     # combo: an «opción» or an «elección» of a course is a choice (``combo.option``), as of a modifier group
     # (``modifier.option``). Until ERPlora/live#61, «ordena» and «orden» also name a device: «ordenador»'s stem.
     ("opcion", "opciones", "eleccion", "elecciones", "option", "options", "choice", "choices"),
+    # modifier: the «predeterminada» option is the one a group brings chosen, its default (``is_default``), as the
+    # descriptions say it in English. Never «por defecto»: it is also the default of a shift, a working day or a
+    # threshold (Staff's and Inventory's settings), whose asks would then rank the options of a group.
+    ("predeterminada", "predeterminado", "predeterminadas", "predeterminados", "default"),
     # appointment: a «bloqueo» of the agenda is its blocked period (``appointment.blocked_time``), as «block» says in
     # English; a «cita fija», a «serie semanal» or a «cita que se repite» is a repeating appointment
     # (``appointment.recurring``), named by its phrases and never by «serie» alone, which is also an invoice's series;
