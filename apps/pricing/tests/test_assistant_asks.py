@@ -123,17 +123,19 @@ def offered(tools: dict[str, Operation], phrase: str) -> list[str]:
     return [op.name for op in assistant.relevant(tools, [phrase], "es")]
 
 
-def offered_place(tools: dict[str, Operation], name: str, phrase: str) -> int | None:
-    """The place a turn offers ``name`` at for ``phrase`` (1 is first), ``None`` when it is not offered at all."""
+def place_of(tools: dict[str, Operation], name: str, phrase: str) -> int | None:
+    """Where a turn offers ``name`` for ``phrase`` (1 is first, ``None`` out of the ``MAX_TOOLS``), a phrase that is
+    none of its asks: what it brings is the tool's name, description and other words, never the phrase itself."""
+    assert name in tools  # positive control: the owner holds the tool, so its place is known
+    assert comparable(phrase) not in {comparable(ask) for asks in shared.asks_of(tools[name]).values() for ask in asks}
     names = offered(tools, phrase)
     return names.index(name) + 1 if name in names else None
 
 
-def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str) -> int | None:
-    """``offered_place`` of a tool the person holds for a ``phrase`` that is none of its asks in Spanish."""
-    assert name in tools  # positive control: the owner holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    return offered_place(tools, name, phrase)
+def assert_offered_with_room(tools: dict[str, Operation], name: str, phrase: str) -> None:
+    """A request of the QA brings its tool into the first half of the ones a turn offers (``WITH_ROOM``)."""
+    place = place_of(tools, name, phrase)
+    assert place is not None and place <= WITH_ROOM, place
 
 
 def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
@@ -176,9 +178,7 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_pricing_request_offers_its_existing_operation(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= WITH_ROOM, place
+    assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -198,9 +198,7 @@ def test_every_probe_of_price_lists_offers_its_tool_without_being_one_of_its_ask
     """The owner's twenty phrases of layer 2, the ones the model answered right too: a tool of Price lists that a new
     ask elsewhere pushes out of the first half of the ones a turn offers fails here before the real-model QA sees it."""
     assert (probe["app"], probe["role"], probe["language"]) == ("pricing", "owner", "es")
-    tools = catalog_of(Membership.Role.OWNER, probe["language"])
-    place = place_of_no_ask(tools, probe["tool"], probe["phrase"])
-    assert place is not None and place <= WITH_ROOM, place
+    assert_offered_with_room(catalog_of(Membership.Role.OWNER, probe["language"]), probe["tool"], probe["phrase"])
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -208,9 +206,7 @@ def test_every_probe_of_price_lists_offers_its_tool_without_being_one_of_its_ask
 def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
     tools = catalog_of(Membership.Role.OWNER, "es")
     assert comparable(phrase) not in probe_phrases()
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= TOP, place
-    before = without_its_asks(tools, name)
-    assert not shared.asks_of(before[name])  # positive control: the tool is ranked without its asks
-    unasked = offered_place(before, name, phrase)
-    assert unasked is None or unasked > TOP, unasked
+    unasked = without_its_asks(tools, name)
+    assert not shared.asks_of(unasked[name])  # positive control: the tool is ranked without its asks
+    places = (place_of(tools, name, phrase), place_of(unasked, name, phrase))
+    assert places[0] is not None and places[0] <= TOP and (places[1] is None or places[1] > TOP), places
