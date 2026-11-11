@@ -211,7 +211,7 @@ def complete_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
             ),
         },
         "description": "Record that the customer of an online booking did not show up (only once its time has "
-        "passed), named by its number or by the customer and the day. Ask the person before doing it.",
+        "passed), named by its number or by the customer and the day.",
         "risk": "high",
     },
 )
@@ -241,7 +241,7 @@ def no_show_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
             ),
         },
         "description": "Cancel (or decline) an online booking, named by its number or by the customer and the day, "
-        "with an optional reason; its time becomes free. Ask the person before doing it.",
+        "with an optional reason; its time becomes free.",
         "risk": "high",
     },
 )
@@ -271,8 +271,7 @@ def cancel_booking(ctx: OperationContext, data: CancelIn) -> dict:
             ),
         },
         "description": "Delete an online booking from the inbox and the diary (archived, not destroyed), named by "
-        "its number or by the customer and the day. Cancelling keeps its history and is usually what is wanted; "
-        "ask the person first.",
+        "its number or by the customer and the day. Cancelling keeps its history and is usually what is wanted.",
         "risk": "high",
     },
 )
@@ -524,7 +523,7 @@ def public_book(ctx: OperationContext, data: PublicBookIn) -> dict:
             ),
         },
         "description": "Cancel the booking behind a customer's personal link, as the customer: the business's "
-        "cancellation policy applies. Ask the person before doing it.",
+        "cancellation policy applies.",
         "risk": "high",
     },
 )

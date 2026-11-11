@@ -312,7 +312,10 @@ Si falla: dentro de la ventana, encima de los botones: «Una factura completa ne
 la dirección del cliente.», «Ese NIF no es válido.» (bajo el campo), «Línea {n}: el precio no es un
 importe…», una línea con precio que sale a 0,00, una serie inactiva, que no emite facturas o de otro año
 («Esa serie numera otro año…»), un tique por encima del límite de Ventas («Por encima de 3.000,00 € no se
-puede emitir un tique…», RD 1619/2012 art. 4), o la falta de emisor. No se emite nada ni se gasta número,
+puede emitir un tique…», RD 1619/2012 art. 4), o la falta de emisor. Una línea con categoría fiscal (por la API o
+el asistente) sin regla vigente en el territorio del negocio se rechaza en el campo de esa línea, con la
+categoría por el nombre que le da Impuestos en el idioma de quien mira (p. ej. «Producto — general», nunca su clave `product.generic`) y
+«Crea su regla en Impuestos › Reglas.» (hub#1149). No se emite nada ni se gasta número,
 y lo escrito se conserva. El mensaje de un campo se va en cuanto se corrige ese campo (también si lo
 rellena la tarjeta de un cliente, y el del NIF si cambia el país o el tipo de documento), el aviso que
 solo señala campos en cuanto se cambia algo, y los dos vuelven si el siguiente intento también se

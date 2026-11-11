@@ -108,7 +108,13 @@ APP_WORDS = shared.app_words
 #: What a word means in the Hub and nowhere else (``live.assistant`` keeps what it means in any business): a «cuenta», a
 #: check or a tab is a table's open check, ``sale.order``, never the person's account (what it is in erplora.com's
 #: panel); a ticket or a receipt is a sale's, as the till's screens say («Tickets hoy», «Ticket medio», the «Tique» it
-#: prints), never the kitchen's, which is named by its app («la cocina»); a «placa» is a person's badge; the «unidades»
+#: prints), and the kitchen's is its «comanda» (``kitchen.ticket``, as its screens say): «la comanda», «qué comandas»,
+#: «las comandas de…», named by its phrases and never by the word, which live keeps for a table's order and a «comandas»
+#: said in passing («sin alterar las comandas ya enviadas») names no kitchen ticket; a kitchen's «estación», and its
+#: «puesto» named by its phrases («el puesto», never «tenemos puesto…»), is its station (``kitchen.station``), what goes
+#: «urgente» or in a hurry («prisa») a rush (``kitchen.ticket.set_rush``), the «enrutado» the routing
+#: (``kitchen.routing``), a dish marked «como listo» or «como hecho» bumped (``kitchen.item.bump``) and one sent back «a
+#: pendientes» or «a preparación» recalled (``kitchen.*.recall``); a «placa» is a person's badge; the «unidades»
 #: are Inventory's units of measure (``inventory.unit``), and a «albarán», the «mercancía» or what «entran» (never
 #: «entrada»: its stem is that of «entre») is the goods ``inventory.stock.receive`` records; a «tarea» and a «proyecto»
 #: are Tasks' task and project (``task.task``, ``task.project``), and what one «comenta» its comment (``task.comment``),
@@ -118,7 +124,8 @@ APP_WORDS = shared.app_words
 #: deactivation itself (``staff.member.deactivate``, ``*.deactivate``), not only a switch off, and what one «pide» or
 #: «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``). A «bono» (a voucher, a pack) is
 #: Services' voucher, the one of the catalogue (``service.package``) or the one sold to a customer (``service.grant``),
-#: and an «asignación» (what one «asigna») is a professional's assignment to a service (``service.assignment``).
+#: and an «asignación» (what one «asigna») is a professional's assignment to a service (``service.assignment``). An
+#: «elemento», as Demo's screens name one, is an item (``demo.item``).
 SYNONYMS = (
     ("cuenta", "check", "tab", "order"),
     ("ticket", "tique", "recibo", "receipt", "sale"),
@@ -180,6 +187,21 @@ SYNONYMS = (
     ),
     ("borrador", "borradores", "draft", "drafts"),
     ("receta", "recetas", "prefabricada", "prefabricadas", "recipe", "recipes"),
+    # demo
+    ("elemento", "elementos", "item", "items"),
+    # kitchen
+    (
+        "ticket", "la comanda", "una comanda", "unas comandas", "esta comanda", "esa comanda", "su comanda",
+        "sus comandas", "que comanda", "que comandas", "cuantas comandas", "otra comanda", "alguna comanda",
+        "cada comanda", "comanda manual", "comandas manuales", "las comandas de",
+    ),
+    ("estacion", "estaciones", "station", "stations", "el puesto", "al puesto", "del puesto", "un puesto",
+     "los puestos", "que puesto", "que puestos", "cada puesto", "por puesto"),
+    ("urgente", "urgentes", "urgencia", "prisa", "rush", "urgent"),
+    ("enrutado", "enrutados", "enrutar", "enruta", "enrutamiento", "routing", "route", "routes"),
+    ("bump", "como listo", "como listos", "como lista", "como listas", "como hecho", "como hechos", "como hecha",
+     "como hechas"),
+    ("recall", "a pendientes", "a pendiente", "a preparacion", "a preparar"),
 )
 #: The help a how-to question asks for (``live.assistant.HOWTO_POINTS``): it ranks by being one, not only by ``ALWAYS``.
 HOWTO = (DOCS_SEARCH,)
