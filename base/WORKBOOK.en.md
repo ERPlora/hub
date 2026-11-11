@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5219de989e4174982ac34511adbf5b735e59ba4b9bd21eb0f8b5d075c3e0c267 -->
+<!-- generated from WORKBOOK.md sha256:8761195796ada8a5513c0a43369ee519be7ae38280dec0afe061a956e843e556 -->
 
 ## What it is for and who it is for
 
@@ -413,6 +413,7 @@ On the Employees screens and the API documentation:
 | BASE-F108 | Report a problem to support | done |
 | BASE-F109 | Delete a deleted business after its 90 days | partial — a business with documents keeps its database until the fiscal archive exists (hub#738) |
 | BASE-F110 | Open the business's website on its own domain | done |
+| BASE-F113 | Keep warning with the screen off (Android app) | partial — the installed app does not have the order to stay listening yet (hub#836) |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -1728,7 +1729,7 @@ Steps:
 In: the session.
 Out: the session closed in the business; erplora.com's, only if the person confirms it.
 If it fails: if the business does not answer, the session expires by itself.
-Involved: none
+Involved: BASE-F113 (in the Android app, it stops listening before leaving)
 
 ### BASE-F62 Decide whether this device is shared or personal
 Status: done
@@ -2882,3 +2883,30 @@ those cases the screen does not say it was downloaded. The copies ERPlora keeps 
 through a signed link and do not go through here.
 Involved: HUB_APP-F30 (ERPlora/app), BASE-F35, BASE-F74, BASE-F85, BASE-F90, VERIFACTU-F05, ATTENDANCE-F10,
 INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
+
+### BASE-F113 Keep warning with the screen off (Android app)
+Status: partial — the Hub's part is done, but the installed app does not have the order to stay listening yet: version
+1.1.34 removed it (ERPlora/app#25) and it comes back with the second part of hub#836
+Actor: system
+Screen: none; on Android, the ongoing notification "ERPlora is listening"
+Steps:
+  1. In the ERPlora app, a person signs in to the business and hears some notice (a new kitchen ticket, an
+     appointment the customer booked, a customer waiting for an answer on WhatsApp), and Android has not refused the
+     notices.
+  2. After the question about notices, when it is due (HUB_APP-F07), the Hub asks the app to stay listening, with the
+     words of its ongoing notification in the person's language: "ERPlora is listening" and "You'll be warned when
+     something needs your attention, even with the screen off.", in the channel "Notices with the screen off".
+  3. With the screen off or the app in the background, the notices keep arriving at once (KITCHEN-F16,
+     APPOINTMENT-F28).
+  4. On signing out, also through inactivity (BASE-F61), or once nothing is left to warn about (the app that warned is
+     turned off), the Hub asks the app to stop listening; on signing out, before leaving the page.
+In: the notices the person hears and what Android says about the notices.
+Out: the order to the app to stay listening or to stop. Nothing is kept in the Hub.
+If it fails: with the notices refused ("Not now" to our question, or refused on Android), with nothing to warn about or
+without knowing what Android says, the app is not kept awake. An app without this order (1.1.34) refuses it: the Hub
+notes it in the console, does not ask again on that page and the person sees no error; the notices arrive with the app
+on screen, as before. If Android does not let it start, the same, and it is asked again at the next sign-in. While the
+Hub does not know yet whether there is something to warn about, it asks the app nothing: reloading the page neither
+stops it nor turns it on again. Signing out never waits for the app more than 2 seconds. In a browser there is no app
+to ask.
+Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APPOINTMENT-F28, BASE-F61; hub#836
