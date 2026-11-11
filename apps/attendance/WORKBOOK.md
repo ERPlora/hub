@@ -208,7 +208,7 @@ Implicados: ATTENDANCE-F04, ATTENDANCE-F12, BASE-F62
 ### ATTENDANCE-F04 Ajustar la ubicación del local y cuándo se revisa una jornada olvidada
 <!-- origen: old:attendance/WORKFLOW.md#attendance-f04 gh:attendance#4 gh:hub#2588 -->
 Estado: hecho (servidor y pantalla)
-Actor: propietario, administrador, responsable
+Actor: propietario, administrador, responsable, asistente
 Pantalla: Ajustes
 Pasos:
 1. Abre Control horario → «Ajustes».
@@ -550,8 +550,12 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   ficha no dada de baja) y los eventos (`events.WHO_IS_IN`, el `refresh_on` del panel y el `live()` de las dos).
   `tests/test_integration_home.py` lo pasa por `base.widget.list` real, con dos negocios, y la e2e
   `tests/e2e/fix-attendance-setup-hooks.spec.ts`, por el Inicio del dueño en 390, 834 y 1440.
-- Asistente: toda operación declara `ai={"description", "risk"}` (`risk` solo en las acciones; `high`
-  en corregir) y todo campo de entrada lleva `description`.
+- Asistente: toda operación declara `ai={"asks", "description", "risk"}` (`risk` solo en las acciones; `high`
+  en corregir) y todo campo de entrada lleva `description`. Las `asks` son tres frases en `en` y tres en `es`
+  de lo que dice una persona para pedirla: Control horario está en `LIVE_ASSISTANT_ASKS_REQUIRED`, así que
+  `base/tests/test_assistant_asks.py` comprueba que cada una trae su herramienta entre las diez primeras para
+  cada rol, y `tests/test_assistant_asks.py`, que las frases reales de la QA del dueño
+  (`tests/e2e/qa/probes/owner-es-attendance-*.json`) llegan a la suya sin ser una de sus `asks` (hub#1099).
 - **Admin de Django** (ronda 12, PLAN §17): ajustes con CRUD completo; jornadas, pausas y correcciones
   en **solo lectura** (salvo la nota interna de la jornada), sin alta ni borrado: una hora solo cambia
   con `attendance.record.correct`, que deja rastro. Contradice el «CRUD completo sobre todas sus
