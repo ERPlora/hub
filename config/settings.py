@@ -563,6 +563,7 @@ LIVE_ASSISTANT_ASKS_REQUIRED = (
     "printing",
     "reservation",
     "sale",
+    "staff",
     "table",
     "task",
     "website",
