@@ -132,8 +132,8 @@ describe('GroupFormModal: Editing group — {name}', () => {
 describe('GroupFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
   it('editing: as opened closes; a change asks; restored as opened closes again', async () => {
     const s = await setup(SAUCES);
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('modifier-group-form'),
       change: () => ionChecked(s.field('allow_repeat'), !SAUCES.allow_repeat),
       restore: () => ionChecked(s.field('allow_repeat'), SAUCES.allow_repeat),

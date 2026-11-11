@@ -27,7 +27,7 @@ const props = defineProps<{
 }>();
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedForm('service-package-form', () => open.value ? comparable(form.value) : original.value, () => original.value);
+const canDismiss = useUnsavedForm('service-package-form', () => open.value ? comparable(form.value) : original.value, () => original.value);
 
 interface Line {
   key: number;
@@ -208,6 +208,7 @@ async function save(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="service-package-form"
     :title="title"
     :submit-label="pkg ? $t('service.packages.form.save') : $t('service.packages.form.create')"
