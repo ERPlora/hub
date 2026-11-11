@@ -35,11 +35,11 @@ ITEM_DONE = _("This item is closed: open it to add lines.")
         "asks": {
             "en": (
                 "create a demo item called Autumn trial",
-                "add a new item to Demo named Trial 2 with the note «check the sync»",
+                "add a new item to Demo named Trial 2 with the note «call the technician»",
             ),
             "es": (
                 "crea el elemento «Ensayo de otoño» en la app Demo",
-                "nuevo elemento de demo: Ensayo 2, con la nota «revisar la sincronización»",
+                "nuevo elemento de demo: Ensayo 2, con la nota «llamar al técnico»",
             ),
         },
     },
@@ -64,11 +64,11 @@ def create_item(ctx: OperationContext, data: ItemIn) -> Item | None:
         "asks": {
             "en": (
                 "rename the demo item Trial 2 to «Winter trial»",
-                "mark the demo item Autumn trial as done",
+                "set the status of the demo item Autumn trial to done",
             ),
             "es": (
                 "cambia el nombre del elemento «Ensayo 2» de Demo a «Ensayo de invierno»",
-                "da por hecho el elemento Ensayo de otoño de la demo y pon en su nota «revisado»",
+                "da por hecho el elemento Ensayo de otoño de la demo y pon en su nota «visto»",
             ),
         },
     },
@@ -128,11 +128,11 @@ def delete_item(ctx: OperationContext, data: ByIdIn) -> dict:
         "asks": {
             "en": (
                 "add a line «screws» with quantity 3 to the demo item Trial 2",
-                "put a line «check the cables», 4 of them, on Autumn trial in Demo",
+                "put a line «new cables», 4 of them, on Autumn trial in Demo",
             ),
             "es": (
                 "añade una línea «tornillos» con cantidad 3 al elemento Ensayo 2 de Demo",
-                "pon una línea «revisar cables», cantidad 4, en el elemento Ensayo de otoño",
+                "mete en el elemento Ensayo de otoño una línea «cables nuevos» con cantidad 4",
             ),
         },
     },

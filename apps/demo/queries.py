@@ -125,7 +125,7 @@ def item_stats(ctx: OperationContext, data: ItemStatsIn) -> dict:
             ),
             "es": (
                 "¿cuántos elementos abiertos hay en Demo?",
-                "dime el número de elementos de la demo pendientes de terminar",
+                "dime el número de elementos de la demo sin acabar",
             ),
         },
     },
