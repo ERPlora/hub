@@ -395,12 +395,8 @@ REPORTED = [
         "base.device.remove",
         "he perdido el primer dispositivo de la lista; cierra su acceso y obliga a entrar de nuevo con una cuenta",
     ),
-    pytest.param(
-        "base.device.rename",
-        "pon al dispositivo que estoy usando ahora el nombre «Ordenador de oficina QA»",
-        # «pon al … el nombre» reads as any change (``set``/``update``), not as ``rename``: 43rd of 40 (ERPlora/live#47).
-        marks=pytest.mark.xfail(strict=True, reason="ERPlora/live#47: a split «pon … el nombre» is no rename"),
-    ),
+    # «pon al … el nombre» renames even with what it names in between (ERPlora/live#47): 43rd of 40 before, now 4th.
+    ("base.device.rename", "pon al dispositivo que estoy usando ahora el nombre «Ordenador de oficina QA»"),
     (
         "base.person.badge_remove",
         "la empleada de la demo ha perdido su tarjeta; desactiva esa placa sin quitarle el PIN ni la cuenta",
