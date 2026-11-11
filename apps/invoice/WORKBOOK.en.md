@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e513a072dd893cd4f7a8759de620af0e020bfe2fb529ee97ea2534df3080422a -->
+<!-- generated from WORKBOOK.md sha256:a53b70f754427d0e8ea1de91244e0e3955a4eccbbef1579a6109ebcdc4f5c733 -->
 
 ## What it is for and who it is for
 
@@ -296,7 +296,10 @@ If it fails: inside the window, above the buttons: "A full invoice needs the cus
 address.", "That tax ID is not valid." (under the field), "Line {n}: the price is not an amount…", a line
 with a price that comes to 0.00, a series that is inactive, does not issue invoices or belongs to another
 year ("That series numbers another year…"), a ticket above the Sales limit ("Above €3,000.00 a ticket
-cannot be issued…", RD 1619/2012 art. 4), or the missing issuer. Nothing is issued, no number is used,
+cannot be issued…", RD 1619/2012 art. 4), or the missing issuer. A line with a tax category (through the API
+or the assistant) that has no rule in force in the business's territory is refused on that line's field, naming the category as Taxes names
+it in the reader's language (e.g. "Product — generic", never its key `product.generic`) and with "Create its
+rule in Taxes › Rules." (hub#1149). Nothing is issued, no number is used,
 and what was typed is kept. A field's message goes as soon as that field is corrected (also when a
 customer's card fills it, and the tax ID's when the country or the document type changes), the notice
 that only points at fields as soon as anything is changed, and both come back if the next try is refused

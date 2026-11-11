@@ -486,7 +486,9 @@ Pantalla: asistente
 Pasos:
 1. Pide al asistente que conceda el bono a la clienta (por su nombre o su teléfono), con el importe
    cobrado y la venta que lo cobró. Si esa venta cobró varias líneas, también cuál de ellas.
-2. El bono sale en **Bonos vendidos** de ese bono (SERVICE-F16).
+2. La tarjeta de confirmación del asistente nombra el bono, la clienta, la venta por su número
+   («20261014-0007») y la línea por lo que cobra; confírmala.
+3. El bono sale en **Bonos vendidos** de ese bono (SERVICE-F16).
 Entra: el bono del catálogo, vivo y activo, y la clienta (Clientes).
 Sale: un bono vendido con la titular, la fecha, el importe y los «Usos» y la «Vigencia» del catálogo
 congelados; la caducidad cuenta desde ese momento (`service.grant.granted`). No sale ningún documento
@@ -614,7 +616,9 @@ Pasos:
 1. Si quieres, pregunta antes al asistente si se podría gastar una sesión de ese bono y por qué no.
 2. Pide al asistente que gaste una sesión de un bono comprado por la clienta, y si quieres que diga
    qué servicio se hizo, qué profesional lo hizo («la hizo Ana») y la enlace a la cita o a la venta.
-3. La tarjeta de confirmación del asistente nombra el bono, el servicio y la profesional; confírmala.
+3. La tarjeta de confirmación del asistente nombra el bono, el servicio y la profesional y, si la enlazas, la cita
+   como la dicen las de Citas («Lucía Pérez · martes, 3 de noviembre de 2026 · 10:00 · Ana López») y la venta por su
+   número; confírmala.
 Entra: la compra del bono; el servicio y la profesional del equipo de Personal que lo hizo; la cita y la
 venta, como referencia.
 Sale: una sesión **Entregada** al momento (`service.grant.redeemed`), que cuenta contra los «Usos» y se
@@ -950,7 +954,11 @@ nombran por su id o por su nombre; un profesional, por su nombre; una clienta, p
 teléfono. Si un nombre vale para varios, se dice cuáles y se pide que elija (409
 `service.service_ambiguous`, `service.category_ambiguous`, `service.package_ambiguous`,
 `staff.ambiguous_member`, `customer.customer_ambiguous`). Antes de cambiar nada, el asistente pide confirmar con su
-tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunca por su id.
+tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunca por su id; también lo que es de
+Ventas o de Citas: la venta por su número, su línea y la de la cuenta por lo que cobran, la cita como la dicen las
+tarjetas de Citas y la devolución o la anulación que devuelve sesiones por su venta («Devolución de la venta
+20261014-0007», «Anulación de la venta 20261014-0007»). Con Ventas o Citas apagadas, o si quien pregunta no puede
+verlo, ese dato no sale, nunca su id.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -970,6 +978,7 @@ tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunc
 | Una asignación por su id: el servicio, el profesional y sus minutos y precio propios, con la `label` con la que la nombra la tarjeta del asistente (BASE-F97) | ver servicios | F32 | `service.assignment.get` |
 | Un bono vendido por su id: el bono, la clienta, el día de la venta y su saldo, con su `label` | ver saldos de bonos | F17, F18, F21, F22 | `service.grant.get` |
 | Una sesión de un bono vendido por su id: el bono, la clienta, el servicio y su estado, con su `label` | ver saldos de bonos | F23, F24, F26, F27 | `service.session.get` |
+| El nombre de una venta, una línea de una venta o de la cuenta, una cita o la devolución o anulación que devuelve sesiones, por su id, leído en Ventas o en Citas como quien pregunta: solo para la tarjeta del asistente, no es herramienta; Ventas o Citas apagadas, 409 `service.sales_unavailable` o `service.appointments_unavailable` | ver saldos de bonos | F14, F21, F22, F24, F26, F27 | `service.record.get` |
 | Los bonos vendidos, de un bono o de una clienta, con su saldo | ver saldos de bonos | F15, F16 | `service.grant.list` |
 | Los bonos sin cliente | ver bonos sin cliente | F30 | `service.grant.list_orphans` |
 | Si un bono vendido se puede anular y por qué no | anular bonos | F17 | `service.grant.void_check` |
@@ -1082,6 +1091,10 @@ con la sesión de quien vende, como hace con Inventario.
   dos veces. Sin Ventas en el negocio no se llama.
   Servicios guarda la venta y la línea de la cuenta como identificadores opacos (`sale_id`,
   `order_line_id`): Ventas no es requisito de Servicios ni Servicios de Ventas.
+- **Lo que la tarjeta del asistente nombra de Ventas y de Citas**: `service.record.get` llama por su nombre, con la
+  sesión de quien pregunta, a `sale.sale.get` (el número de la venta), a `sale.record.get` (una línea de la venta con
+  `sale_line_id`, una de la cuenta con `line_id` y una devolución con `refund_id`, «Devolución de la venta …») y a
+  `appointment.appointment.get` (la `label` de la cita). Una `reference` que no es una devolución es la venta anulada.
 
 ### Quién puede qué
 
@@ -1226,6 +1239,13 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   Quien no puede ver clientas lee el bono y la sesión sin la clienta. El id lleva su título («Servicio», «Categoría»,
   «Paquete», «Profesional del servicio», «Bono vendido», «Sesión del bono», «Sesiones del bono»), nunca «Registro». Sin
   persona detrás, sin permiso o con un id de otro negocio, el registro queda fuera, nunca su id (hub#676).
+- Lo que es de Ventas o de Citas, que no son requisito de Servicios (`base.E009` no deja marcar sus lecturas), lo
+  nombra la lectura propia `service.record.get` (`ai=INTERNAL`) con las marcas `A_SALE`, `A_SALE_LINE`,
+  `AN_APPOINTMENT`, `A_CHECK_LINE` y `A_RETURN`: la pide a la app dueña por la puerta de la plataforma (BASE-F84),
+  como `customer.order.get` en Clientes. Sus títulos son los de los modelos («Venta», «Línea de venta», «Cita»,
+  «Línea de la cuenta») y el de la escritura («Devolución o anulación»). La lectura de Ventas o de Citas corre como
+  quien pregunta: sin «Ver ventas», o una cita que no es suya para quien solo ve las suyas, el dato queda fuera
+  (`tests/test_integration_assistant.py`, hub#756).
 - El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (ronda 12, PLAN §17);
   una escritura cruda del admin no pasa por las reglas ni deja aviso, salvo la del árbol de categorías.
 - Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD (desde el corte S5,
@@ -1279,8 +1299,6 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   la hizo** (F21, F19, hub#1058): hoy es del asistente y de la API.
 - **Importar servicios desde un fichero**: como en el producto actual, el alta de golpe es del
   asistente y la API.
-- **Decir en la tarjeta del asistente de qué venta, cita, línea de la cuenta o devolución se trata**: son datos de
-  Ventas y de Citas, que no son requisito de Servicios, así que la tarjeta los deja fuera (hub#756).
 
 ## Lo que NO hace, a propósito
 

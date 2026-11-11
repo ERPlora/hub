@@ -778,9 +778,12 @@ msgstr "No hay ninguna categoría fiscal «%(category)s»."
 
 #: services.py:142
 #, python-format
-msgid "No tax rule applies today to the tax category «%(category)s»."
+msgid ""
+"No tax rule applies today to the tax category «%(category)s». Create its "
+"rule in Taxes › Rules."
 msgstr ""
-"Ninguna regla fiscal se aplica hoy a la categoría fiscal «%(category)s»."
+"Ninguna regla fiscal se aplica hoy a la categoría fiscal «%(category)s». "
+"Crea su regla en Impuestos › Reglas."
 
 #: services.py:144
 #, python-format
