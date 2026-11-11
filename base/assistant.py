@@ -222,6 +222,19 @@ SYNONYMS = (
     # descriptions say it in English. Never «por defecto»: it is also the default of a shift, a working day or a
     # threshold (Staff's and Inventory's settings), whose asks would then rank the options of a group.
     ("predeterminada", "predeterminado", "predeterminadas", "predeterminados", "default"),
+    # appointment: a «bloqueo» of the agenda is its blocked period (``appointment.blocked_time``), as «block» says in
+    # English; a «cita fija», a «serie semanal» or a «cita que se repite» is a repeating appointment
+    # (``appointment.recurring``), named by its phrases and never by «serie» alone, which is also an invoice's series;
+    # whether someone «puede atender» or there is a «hueco libre» asks for the availability of the agenda
+    # (``appointment.availability``), named by its phrases: «puede» and «libre» alone ask for nothing.
+    ("bloqueo", "blocked"),
+    (
+        "recurring", "cita fija", "citas fijas", "cita periodica", "citas periodicas", "cita semanal", "citas semanales",
+        "cita mensual", "citas mensuales", "serie semanal", "series semanales", "serie mensual", "serie quincenal",
+        "serie de citas", "series de citas", "que se repite", "que se repiten", "que se repita", "que se repitan",
+        "repeating appointment", "repeating appointments", "weekly appointment", "monthly appointment",
+    ),
+    ("availability", "puede atender", "pueda atender", "puede coger", "pueda coger", "hueco libre", "huecos libres"),
 )
 #: The help a how-to question asks for (``live.assistant.HOWTO_POINTS``): it ranks by being one, not only by ``ALWAYS``.
 HOWTO = (DOCS_SEARCH,)
