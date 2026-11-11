@@ -4,8 +4,8 @@ offered their existing operation, that a record a tool takes by its id says whic
 Services' tools say to be asked for takes no place from the operations of Sales and Appointments a request is for.
 
 Every ask of every tool of service bringing its tool among the first ten, role by role, in both languages, is
-``base/tests/test_assistant_asks.py``'s (service is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over the
-asks and the guard that no ask copies a probe of layer 2.
+``base/tests/test_assistant_asks.py``'s (service is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over
+the asks and the guard that no ask copies a probe of layer 2.
 """
 
 import dataclasses
@@ -35,7 +35,10 @@ REPORTED = [
     ("service.grant.get", "abre el Bono QA vendido a Ana QA con fecha, saldo y sesiones usadas"),
     ("service.package.list", "¿qué bonos vendo, con precio cerrado, sesiones incluidas y días de validez?"),
     ("service.session.get", "abre la sesión de Bono QA que está retenida para una línea del TPV y dime su estado"),
-    ("service.assignment.assign", "asigna Corte QA a Camarera Ventas QA, con 30 minutos y 12 € como condiciones propias"),
+    (
+        "service.assignment.assign",
+        "asigna Corte QA a Camarera Ventas QA, con 30 minutos y 12 € como condiciones propias",
+    ),
     (
         "service.grant.redeem",
         "gasta una sesión del Bono extra QA de Ana QA en un Corte QA fuera del TPV, vinculada a su próxima cita",
@@ -63,6 +66,21 @@ WITH_ROOM = 20
 #: Every probe of layer 2 of Services, the owner's real phrases of the QA: the eleven above and the ones the model got
 #: right.
 PROBES = json.loads((PROBES_DIR / "owner-es-service-2026-11-08.json").read_text(encoding="utf-8"))["probes"]
+
+#: The tools whose probe of layer 2 comes 7th or better (measured on this branch): three places short of the first ten
+#: the asks themselves come within (``base/tests/test_assistant_asks.py``), so three tools of the apps that say their
+#: asks later may climb past each before it leaves the first ten; the rest only keep ``WITH_ROOM``.
+FIRST_TEN = frozenset({
+    "service.assignment.assign", "service.assignment.list", "service.assignment.update", "service.category.create",
+    "service.category.delete", "service.category.list", "service.category.update", "service.grant.adjust",
+    "service.grant.adjust_check", "service.grant.create", "service.grant.list", "service.grant.list_orphans",
+    "service.grant.redeem", "service.grant.redeem_check", "service.grant.tender_options", "service.grant.void",
+    "service.grant.void_check", "service.movement.list", "service.package.create", "service.package.delete",
+    "service.package.get", "service.package.update", "service.service.archive", "service.service.bulk_create",
+    "service.service.create", "service.service.list", "service.service.list_for_sale", "service.service.set_image",
+    "service.service.suggest_image", "service.service.update", "service.session.release", "service.session.settle",
+    "service.settings.get",
+})
 
 #: The tools that take a record by its id alone, and the read that finds that id by what a person names it with (the
 #: customer who owns a voucher, the service and the professional of an assignment, the line of a check a session pays):
@@ -160,6 +178,21 @@ def test_every_probe_of_services_offers_its_tool_without_being_one_of_its_asks(c
     offered_with_room(tools, name, phrase)
 
 
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(
+    "probe", [probe for probe in PROBES if probe["tool"] in FIRST_TEN], ids=lambda probe: probe["id"]
+)
+def test_the_probes_that_come_close_stay_among_the_first_ten(catalog_of, probe):
+    """What its own asks give each of these tools: without them, more than half of them would fall behind the tenth
+    (the session's release 17th, the voucher's redemption 17th, the service settings 19th)."""
+    found = place(catalog_of(Membership.Role.OWNER, "es"), probe["tool"], probe["phrase"])
+    assert found is not None and found <= 10, found
+
+
+def test_the_close_probes_are_probes_of_services():
+    assert FIRST_TEN <= {probe["tool"] for probe in PROBES}  # positive control: no name of the list is mistyped
+
+
 @pytest.mark.parametrize(("name", "read"), sorted(FOUND_BY.items()))
 def test_a_record_taken_by_its_id_says_which_read_finds_it(name, read):
     op = registry[name]
@@ -231,7 +264,8 @@ def ranked(tools: dict[str, Operation], phrase: str, synonyms: tuple | None = No
 
 
 def passed_by(offered: list[str], name: str) -> set[str] | None:
-    """Services' vouchers, sessions and assignments ahead of ``name`` in ``offered``; ``None`` when it is not offered."""
+    """Services' vouchers, sessions and assignments ahead of ``name`` in ``offered``; ``None`` when it is not
+    offered."""
     if name not in offered:
         return None
     return {other for other in offered[: offered.index(name)] if other.startswith(VOUCHERS_SESSIONS_ASSIGNMENTS)}
@@ -247,9 +281,9 @@ def lost_places(before: list[str], now: list[str], name: str) -> set[str] | None
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_services_asks_take_no_place_from_sales_nor_appointments(catalog_of):
-    """Each request of Appointments and of Sales' checks of layer 2 that a turn offers its tool for keeps it ahead of the
-    same vouchers, sessions and assignments of Services whether their tools say their asks or not: none climbs past it
-    by its asks (paying a line with a voucher is ``sale.order.apply_voucher``'s, not a session's)."""
+    """Each request of Appointments and of Sales' checks of layer 2 that a turn offers its tool for keeps it ahead of
+    the same vouchers, sessions and assignments of Services whether their tools say their asks or not: none climbs past
+    it by its asks (paying a line with a voucher is ``sale.order.apply_voucher``'s, not a session's)."""
     probes = neighbour_probes()
     assert len(probes) > 40  # positive control: the probes of Appointments and of Sales' checks are read
     tools = catalog_of(Membership.Role.OWNER, "es")
