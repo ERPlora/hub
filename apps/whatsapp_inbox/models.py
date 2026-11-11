@@ -12,7 +12,7 @@ import datetime as dt
 import re
 
 from django.db import models
-from django.db.models import Q
+from django.db.models import Q, Value
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
@@ -36,8 +36,8 @@ class Channel(UUIDModel):
     """The business's WhatsApp number as erplora.com reports it: one row per business, written only by what the SaaS
     says (its photo, and its answer when the Hub connects or disconnects the number).
 
-    Each business keeps one row in its own database: the database holds it to one by the unique business column phase 1
-    left (``migrations/0005``), empty in every row the code writes since ``0011`` and ``0012``.
+    Each business keeps one row in its own database, and the database holds it to one whatever business column phase 1
+    left on it (``migrations/0013``).
     """
 
     class Status(models.TextChoices):
@@ -65,6 +65,7 @@ class Channel(UUIDModel):
     class Meta:
         verbose_name = _("WhatsApp channel")
         verbose_name_plural = _("WhatsApp channels")
+        constraints = [models.UniqueConstraint(Value(True), name="whatsapp_inbox_channel_one_row")]
 
     def __str__(self) -> str:
         return self.phone_number or str(self.get_status_display())
@@ -510,12 +511,12 @@ class Template(UUIDModel):
         verbose_name_plural = _("templates")
         ordering = ["name", "language", "id"]
         constraints = [
-            # One live template per name and language: one deleted here frees them. In the database it still holds
-            # the business column phase 1 left (``migrations/0012``), where every row the code writes has it empty.
+            # One live template per name and language, whatever business column phase 1 left on it: one deleted here
+            # frees them.
             models.UniqueConstraint(
                 fields=["name", "language"],
                 condition=Q(deleted_at__isnull=True),
-                name="whatsapp_inbox_template_live_host_name_language_unique",
+                name="whatsapp_inbox_template_live_name_language_unique",
             ),
             models.UniqueConstraint(
                 fields=["submit_key"],

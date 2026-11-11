@@ -114,14 +114,14 @@ def test_a_client_message_id_is_used_once():
 
 def test_one_channel_row_per_database():
     Channel.objects.create()
-    assert violates("whatsapp_inbox_channel_one_per_host", Channel.objects.create)
+    assert violates("whatsapp_inbox_channel_one_row", Channel.objects.create)
 
 
 def test_one_template_per_name_and_language():
     Template.objects.create(name="recordatorio", language="es")
     Template.objects.create(name="recordatorio", language="en")
     assert violates(
-        "whatsapp_inbox_template_live_host_name_language_unique",
+        "whatsapp_inbox_template_live_name_language_unique",
         lambda: Template.objects.create(name="recordatorio", language="es"),
     )
 

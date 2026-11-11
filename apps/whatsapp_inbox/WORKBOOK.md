@@ -1191,9 +1191,9 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   plan no incluye ninguno, nunca sin límite, y antes de la primera foto, `synced_at` vacío, no se supone
   tope: `Channel.cap_reached`) y la
   `version` de la última foto de erplora.com **de ese negocio** (una igual o más vieja se ignora). Cada negocio
-  tiene su BD (desde el corte S5, hub#602) y una sola fila en ella: dos primeras fotos a la vez crean una y la otra
-  la encuentra. Solo la escribe lo que dice erplora.com: su foto y su respuesta al conectar o desconectar desde
-  Ajustes.
+  tiene su BD (desde el corte S5, hub#602) y una sola fila en ella, que la BD impone
+  (`whatsapp_inbox_channel_one_row`): dos primeras fotos a la vez crean una y la otra la encuentra. Solo la escribe lo
+  que dice erplora.com: su foto y su respuesta al conectar o desconectar desde Ajustes.
 - `Conversation`: número E.164 (`phone`, único entre las no borradas), nombre de WhatsApp y su forma
   para buscar (`contact_search`: sin mayúsculas, tildes, emojis ni espacios de más), ficha
   (`customer`, FK a `customer.Customer`; una ficha eliminada cuenta como ninguna), asignada
@@ -1215,7 +1215,8 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   `reaction` cuyo `reply_to` es el mensaje al que responde: no suma en «Sin leer» ni pasa a último
   mensaje.
 - `Note`: texto, autor y hora.
-- `Template` (de cada negocio, en su BD): nombre + idioma (únicos entre las no borradas), categoría, estado en Meta
+- `Template` (de cada negocio, en su BD): nombre + idioma (únicos entre las no borradas,
+  `whatsapp_inbox_template_live_name_language_unique`), categoría, estado en Meta
   (`DRAFT` mientras
   Meta nunca la tuvo, `APPROVED`, `PENDING`, `REJECTED`, `PAUSED`, `DISABLED`, `DELETED`), cabecera
   (`header_format`: vacío, `TEXT`, `IMAGE`, `VIDEO`, `DOCUMENT` o `LOCATION`; `header`; `header_sample`, el
@@ -1747,12 +1748,18 @@ el **Aprobar** se comprueba la cita de verdad) y en la e2e `tests/e2e/appointmen
   citas también la crea (F21, CUSTOMER-F26).
 - ~~Modo compartido de la tenencia (PLAN-DB, S1)~~ — **resuelta** por el corte S5 (hub#602): cada negocio tiene su
   BD y no comparte nada. Mientras lo hubo, cada fila llevaba su negocio en `host` (`erase_host` en un número por
-  olvidar). hub#1053 lo saca de los modelos (migraciones `0011` y `0012`): las columnas, sus datos y las dos guardas
-  únicas que las nombran (`whatsapp_inbox_channel_one_per_host` y
-  `whatsapp_inbox_template_live_host_name_language_unique`) se quedan en la BD para el código de antes, que sigue
-  corriendo mientras el despliegue migra; el código nuevo las deja vacías, así que siguen guardando una fila de canal
-  y una plantilla viva por nombre e idioma. Rehacer esas guardas sin `host` y borrar las columnas es de un
-  despliegue posterior (hub#1132).
+  olvidar). hub#1053 lo saca de los modelos (migraciones `0011` y `0012`) y hub#1132 lo saca de la BD en dos
+  despliegues (expand/contract, PLAN-DB §7):
+  1. **Hecho** (`0013`): las dos guardas únicas se rehacen sin `host` —`whatsapp_inbox_channel_one_row`, una sola
+     fila de canal por BD, y `whatsapp_inbox_template_live_name_language_unique`, una plantilla viva por nombre e
+     idioma— y las viejas que lo nombraban (`whatsapp_inbox_channel_one_per_host` y
+     `whatsapp_inbox_template_live_host_name_language_unique`) se van; las viejas vuelven al deshacerla. Una BD que
+     aún guarde dos filas de canal, o dos plantillas vivas del mismo nombre e idioma de dos negocios (filas que trajo
+     el `copy-all` del corte), no migra: se queda como estaba, con sus guardas viejas, y `migrate_hubs` la da por
+     atrasada.
+  2. **Por hacer**, en un despliegue posterior al del paso 1: borrar las cinco columnas (`host` de `Channel`,
+     `Template`, `TemplateSample` y `Message`, y `erase_host` de `Conversation`), que hasta entonces se quedan en la BD
+     con lo que guardaban de la fase 1 y vacías en todo lo que se escribe desde hub#1053.
 
 Resueltas en los planes, y fuera de esta lista:
 
@@ -1793,6 +1800,8 @@ Resueltas en los planes, y fuera de esta lista:
   ([`UI-REQUESTS.md`](UI-REQUESTS.md)).
 - **Relacionada, de otras apps**: el Inicio no dice de un vistazo si WhatsApp funciona (hub#573, BASE-F02): pide
   que la Bandeja declare el estado de su número a un punto de extensión nuevo de la plataforma.
+- **Borrar de la BD las columnas de negocio de la fase 1** (paso 2 de hub#1132, «Contradicciones escritas»): en un
+  despliegue posterior al de `0013`, que ya no las necesita para ninguna guarda.
 
 ## Lo que NO hace, a propósito
 
