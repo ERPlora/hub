@@ -233,7 +233,9 @@ Pasos:
    una Categoría o deja «Sin categoría».
 4. Elige la Categoría fiscal (son las de Impuestos, por su nombre y su tipo; viene la de los Ajustes
    si hay una). Sin ella **Crear servicio** no se puede pulsar; tampoco mientras el negocio no haya dicho
-   todavía su moneda, porque el precio se lee en ella (sin ella, «1500» yenes se guardaría como 150 000).
+   todavía su moneda, porque el precio se lee en ella (sin ella, «1500» yenes se guardaría como 150 000);
+   hasta entonces, salir del precio lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en
+   cuanto llega la moneda se leen en ella (hub#945).
    Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
    motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, **Crear servicio** se enciende (hub#938).
 5. Pulsa **Crear servicio**: el formulario se cierra y el servicio sale en la tabla como **Activo**.
@@ -451,7 +453,8 @@ canjear.»; un servicio repetido, archivado o que no existe; un importe ilegible
 su campo; un nombre que ya tiene otro bono vivo, «Ya hay un paquete con ese nombre. Elige otro
 nombre.». «Crear paquete» (y «Guardar cambios» al editarlo, SERVICE-F13) está en gris mientras el negocio
 no haya dicho todavía su moneda, porque el precio cerrado y el descuento se leen en ella (sin ella,
-«1500» yenes se guardaría como 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+«1500» yenes se guardaría como 150 000); hasta entonces, salir del precio cerrado o del descuento lo deja como se
+escribió, sin inventarle decimales ni juzgarlo: «¥9500» o «7,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, el botón se enciende (hub#938).
 Implicados: SERVICE-F14, SERVICE-F22
 
@@ -834,7 +837,7 @@ su servicio principal solo cambia si se dice.
 Si falla: dentro de la sección, «Ese miembro del personal no existe en este negocio.», un nombre que
 vale para varios (la lista para elegir) o el importe ilegible o negativo. **Asignar** está apagado
 mientras el negocio no haya dicho todavía su moneda: el precio propio se lee en ella, y sin ella «1500»
-yenes se guardaría como 150 000; si no se puede leer, «Editando servicio» lo dice arriba («No se ha podido
+yenes se guardaría como 150 000 (salir del precio propio lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945)); si no se puede leer, «Editando servicio» lo dice arriba («No se ha podido
 leer la moneda del negocio», con el motivo) y ofrece «Reintentar»; en cuanto llega, **Asignar** se
 enciende (hub#946). Mientras llega la lista sale
 «Cargando…»; si no se puede leer, «No se han podido cargar los profesionales.» con el motivo y

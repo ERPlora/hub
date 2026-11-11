@@ -10,7 +10,7 @@
 // loading; a list that cannot be read says so, with the reason and «Retry». «Assign» and a row's «Save» wait in grey
 // until the business answers its money, the one an own price is read in (hub#946); «Editing service» says it, with
 // «Retry», if that read fails.
-import { Combo, type ComboOption, InlineFeedback } from '@erplora/ui/components';
+import { Combo, type ComboOption, InlineFeedback, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonToggle } from '@ionic/vue';
@@ -18,10 +18,8 @@ import { computed, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
 import { formatMoney, type Money, useBusinessMoney } from '../lib/format';
-import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchMembers } from '../lib/pickers';
 import type { AssignmentOut } from '../operations';
-import MoneyInput from './MoneyInput.vue';
 
 const props = defineProps<{
   serviceId: string;
@@ -117,7 +115,7 @@ async function addPerson(): Promise<void> {
   const currency = money.value;
   const { member, minutes: typed, price } = newcomer.value;
   if (!currency || !member) return;
-  const custom = parseMoney(price, currency);
+  const custom = parseMoney(price, { money: currency });
   if (!custom.ok) return;
   const body = {
     service_id: props.serviceId,
@@ -132,7 +130,7 @@ async function saveOwn(row: AssignmentOut): Promise<void> {
   const currency = money.value;
   if (!currency) return;
   const draft = drafts.value[row.id];
-  const custom = parseMoney(draft.price, currency);
+  const custom = parseMoney(draft.price, { money: currency });
   if (!custom.ok) return;
   const own = ownOf(row, currency);
   const body = {
@@ -257,6 +255,7 @@ const setDraft = (id: string, part: Partial<Draft>) => {
           <MoneyInput
             :testid="`service-professionals-price-${row.id}`"
             :model-value="drafts[row.id]?.price ?? ''"
+            :money="money"
             :label="money ? t('service.professionals.priceIn', { currency: money.currency }) : t('service.professionals.price')"
             @update:model-value="setDraft(row.id, { price: $event })"
           />
@@ -316,6 +315,7 @@ const setDraft = (id: string, part: Partial<Draft>) => {
       <MoneyInput
         v-model="newcomer.price"
         testid="service-professionals-price"
+        :money="money"
         :label="money ? t('service.professionals.priceIn', { currency: money.currency }) : t('service.professionals.price')"
       />
       <ion-button

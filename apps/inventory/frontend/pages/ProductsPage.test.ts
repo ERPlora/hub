@@ -262,6 +262,21 @@ describe('ProductsPage: the list', () => {
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No products');
   });
 
+  // WORKBOOK «Productos», hub#924: the price ends are read like the price field, so a negative one says it cannot be negative.
+  it('a negative price end says it cannot be negative, in both languages, and does not filter', async () => {
+    const en = await setup();
+    await en.show(page([]));
+    await en.filter({ price_min: '-5' });
+    const es = await setup({ locale: 'es' });
+    await es.show(page([]));
+    await es.filter({ price_max: '-5' });
+    expect([en.prop('filterErrors'), es.prop('filterErrors'), en.params('inventory.product.list')]).toEqual([
+      { price_min: 'This amount cannot be negative.' },
+      { price_max: 'Este importe no puede ser negativo.' },
+      [{ sort: 'name', limit: 50, offset: 0 }],
+    ]);
+  });
+
   it('a filter the server refused (a 422 of the list) is said under it, and the rows stay', async () => {
     const s = await setup();
     await s.show(LIST);

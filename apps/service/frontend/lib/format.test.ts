@@ -4,7 +4,7 @@
 // default), a discount in basis points as the language writes a percentage, and a day.
 import { describe, expect, it } from 'vitest';
 
-import { formatDate, formatMoney, formatPercentBp, type Money, moneyDecimals, percentFieldText, readPercentBp } from './format';
+import { formatDate, formatMoney, formatPercentBp, type Money, percentFieldText, readPercentBp } from './format';
 
 const plain = (text: string) => text.replace(/[  ]/g, ' ');
 
@@ -45,12 +45,6 @@ describe('formatMoney', () => {
   it('is a dash until the business answers: never a euro by default', () => {
     expect(formatMoney(2250, 'es')).toBe('—');
     expect(formatMoney(2250, 'en')).toBe('—');
-  });
-});
-
-describe('moneyDecimals', () => {
-  it('is the business currency’s, two while it is unknown', () => {
-    expect([moneyDecimals(PLN), moneyDecimals(JPY), moneyDecimals(undefined)]).toEqual([2, 0, 2]);
   });
 });
 
