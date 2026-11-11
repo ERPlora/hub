@@ -4,6 +4,8 @@
 // the charge with its change, the ticket and the sale in «Sales» are in złoty, in 390, 834 and 1440 (captures
 // `FIX-HUB-SALE-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY-<width>`). Back in Spain the till is in euros and the sale charged in
 // Poland keeps its złoty (`…-es-1440`). What the run creates is deleted after it and `a`'s registration put back.
+// Like any business in Poland, `a` sells with a rule of its own country for the shirt's category: Spain alone has factory
+// rules (TAX-F16), and without one the till refuses to charge (PLAN-HUB §81, hub#1152); the run mounts it and deletes it.
 // flow: SALE-F01 (FIX-HUB-SALE-OWN-COPY-OF-BUSINESS-CURRENCY): the server charges the sale in the currency Sales asks
 // `base` for (`base.operations.business_currency`, BASE-F50), never a copy of its own: the ticket of the sale charged in
 // złoty (captures `FIX-HUB-SALE-OWN-COPY-OF-BUSINESS-CURRENCY-<width>`).
@@ -12,7 +14,8 @@ import { expect, type Page, test } from '@playwright/test';
 import { A, login, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
-import { cleanSales, drawerOff, newestSaleOf, openTillCart, restoreDrawer, stamp } from './sale-helpers';
+import { cleanSales, drawerOff, newestSaleOf, openTillCart, restoreDrawer, stamp, tillReady } from './sale-helpers';
+import { createRule, dropCountryRules } from './tax-helpers';
 
 const KEY = 'FIX-HUB-SALE-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';
 const BASE_KEY = 'FIX-HUB-SALE-OWN-COPY-OF-BUSINESS-CURRENCY';
@@ -39,11 +42,14 @@ test.beforeAll(async ({ browser }) => {
   original = registrationOf('a');
   // Card and cash charges issue tickets when the hub has an issuer: the cleanup gives their numbers back.
   snapshotSeries();
+  dropCountryRules('PL');
   const context = await browser.newContext({ baseURL: A });
   await login(await context.newPage(), A, '/sale/pos');
   // Cash without a cash session: the drawer's lock is sale-cash-gate.spec.ts's.
   await drawerOff(context);
   shirt = await createProduct(context, { name: `E2E Shirt ${RUN}`, sku: `E2E-CUR-S-${RUN}`, price: 1250, tax_category_key: 'product.generic' });
+  // Poland's standard VAT, the shirt's: the price already holds it, so the check is still 12,50.
+  await createRule(context, { country_code: 'PL', tax_category_key: 'product.generic', rate_pct: 23 });
   await context.close();
 });
 
@@ -52,12 +58,8 @@ test.afterAll(async () => {
   cleanSales();
   cleanInventory();
   restoreDrawer();
+  dropCountryRules('PL');
 });
-
-async function tillReady(page: Page): Promise<void> {
-  await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
-  await shown(page).locator('[data-testid^=pos-product-], [data-testid=pos-grid-empty]').first().waitFor({ state: 'visible' });
-}
 
 /** Adds the shirt the way a person finds it: the magnifier, its SKU, the result. */
 async function addShirt(page: Page): Promise<void> {

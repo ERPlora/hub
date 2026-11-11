@@ -1699,10 +1699,10 @@ def create_field(ctx: OperationContext, data: FieldIn) -> CustomField:
         "Updates a custom field, by its id or current name; its type cannot change once cards have values, and a "
         "select keeps at least one option.",
         asks={
-            "en": ("make the shoe size field required", "add an XL option to the size field"),
+            "en": ("make the shoe size field required", "let the size field also take XL"),
             "es": (
                 "haz obligatorio el campo talla",
-                "añade la opción XL al campo talla",
+                "pon XL entre los valores del campo talla",
                 "cambia el nombre del campo mascota",
             ),
         },

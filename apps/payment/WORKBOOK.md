@@ -441,6 +441,18 @@ pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ve
   que lo contiene; varios → 409 `payment.method_ambiguous` con sus nombres); un pago por su referencia.
 - Asistente: toda operación declara `ai` con `description` y `risk` (`high` en aprobar, enviar,
   completar y cancelar) y todo campo de entrada su `description`. `expose_api=True` en todas.
+- **Frases del asistente** (hub#1090): cada una de las 13 herramientas declara sus `asks`, 2–3 frases en `en`
+  y `es` como las diría quien paga a un proveedor (Pagos está en `LIVE_ASSISTANT_ASKS_REQUIRED`, `live.E020`),
+  con nombres que ninguna sonda dice (Makro, Sabadell, Santander, el electricista), sin «card» en inglés (live
+  la lee como «ficha») y sin «pago» en las de los pagos, a los que ya nombra su entidad: repetido en 13
+  herramientas, ponía Pagos por delante en cada frase que dice «pagar» (los bonos de Servicios). Para el Hub
+  (`base.assistant.SYNONYMS`), una «cuenta bancaria» o «cuenta del banco» es un método de Pagos (por sus
+  frases: una «cuenta» sola es la de una mesa). `tests/test_assistant_asks.py` comprueba con las frases reales
+  de la QA del asistente (hub#1090, dueño y empleado) que cada una trae su herramienta en la primera mitad de
+  las que ofrece un turno (F01–F06, F08), que el empleado no recibe ninguna escritura, que listar o dar de alta
+  un método va por delante de la forma de cobro del TPV con la misma acción y, al revés, que pedir una forma
+  de cobro del TPV nunca pone un método de Pagos por delante de ella; y una frase propia por herramienta y
+  otra por el grupo de sinónimos que sin ellos no llegan.
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#674): nombra el registro que una escritura
   señala por su id con las marcas `refers` de `schemas.py` (`A_METHOD`, `A_PAYMENT`), leídas como quien
   pregunta y con su permiso (`payment.view_payment`): el método (el `id` de `MethodRefIn`, en editar,
