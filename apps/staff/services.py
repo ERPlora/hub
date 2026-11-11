@@ -139,6 +139,18 @@ TRANSITIONS = {
     output=MemberDetailOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "add Lucía to the team as a stylist",
+                "register a new waiter, Pablo, at 12 € an hour",
+                "create a staff record for Ana with a 10 % commission",
+            ),
+            "es": (
+                "añade a Lucía al equipo como estilista",
+                "da de alta a un camarero nuevo, Pablo, a 12 € la hora",
+                "crea la ficha de Ana con un 10 % de comisión",
+            ),
+        },
         "description": "Adds a staff member (a person who works in the business). Their role is one of the "
         "business's active roles: read them with staff.role.list first, and if the role asked for is not there, "
         "ask the person before creating it.",
@@ -167,6 +179,18 @@ def create_member(ctx: OperationContext, data: MemberIn) -> Member | None:
     input=BulkCreateIn,
     output=BulkCreatedOut,
     ai={
+        "asks": {
+            "en": (
+                "add Lucía, Pablo and Ana to the team at once",
+                "register these three new waiters together",
+                "load the whole team in one go",
+            ),
+            "es": (
+                "añade de golpe a Lucía, Pablo y Ana al equipo",
+                "da de alta a estos tres camareros nuevos juntos",
+                "carga toda la plantilla de una vez",
+            ),
+        },
         "description": "Adds several staff members at once (up to 100); a row with a problem is skipped "
         "with its reason and the rest go in.",
         "risk": "normal",
@@ -223,6 +247,18 @@ def _bulk_row(row: Any) -> tuple[str | None, dict]:
     output=MemberDetailOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "raise Lucía to 14 € an hour",
+                "change Pablo's role to manager",
+                "update Ana's phone number",
+            ),
+            "es": (
+                "sube a Lucía a 14 € la hora",
+                "cambia el rol de Pablo a encargado",
+                "actualiza el teléfono de Ana",
+            ),
+        },
         "description": "Changes the details of a staff member, named by id or by name (only what is sent; "
         "it can change their pay, role and linked user).",
         "risk": "high",
@@ -265,6 +301,18 @@ def update_member(ctx: OperationContext, data: MemberPatchIn) -> Member | None:
     input=MemberRefIn,
     output=MemberDetailOut,
     ai={
+        "asks": {
+            "en": (
+                "deactivate Pablo while he is away",
+                "take Lucía off the agenda without deleting her record",
+                "deactivate Ana for a while, keeping everything",
+            ),
+            "es": (
+                "desactiva a Pablo mientras esté fuera",
+                "desactiva a Lucía en la agenda sin borrar nada",
+                "desactiva a Ana una temporada sin perder sus datos",
+            ),
+        },
         "description": "Deactivates a staff member (named by id or by name) without deleting anything: "
         "they stop being bookable.",
         "risk": "high",
@@ -290,6 +338,18 @@ def deactivate_member(ctx: OperationContext, data: MemberRefIn) -> Member | None
     input=TerminateIn,
     output=TerminatedOut,
     ai={
+        "asks": {
+            "en": (
+                "Pablo is leaving the business, terminate him today",
+                "Lucía no longer comes: end her contract and free her user",
+                "terminate Ana for good from Friday",
+            ),
+            "es": (
+                "Pablo se va del negocio, dalo de baja hoy",
+                "Lucía ya no viene: termina su contrato y libera su usuario",
+                "da de baja definitiva a Ana desde el viernes",
+            ),
+        },
         "description": "Terminates a staff member (named by id or by name) for good: stamps the last day "
         "(today by default) and the reason, frees their user and removes them from the team.",
         "risk": "high",
@@ -408,6 +468,18 @@ def lock_members(ids) -> list[UUID]:
     input=RoleIn,
     output=RoleOut,
     ai={
+        "asks": {
+            "en": (
+                "create a Receptionist role",
+                "add the role Senior stylist in blue",
+                "new staff role for the kitchen helpers",
+            ),
+            "es": (
+                "crea el rol Recepcionista",
+                "añade el rol Estilista sénior en azul",
+                "rol nuevo del personal para los ayudantes de cocina",
+            ),
+        },
         "description": "Creates a role of the business (a catalogue label such as stylist; it grants no "
         "permission).",
         "risk": "normal",
@@ -428,6 +500,18 @@ def create_role(ctx: OperationContext, data: RoleIn) -> Role | None:
     input=RolePatchIn,
     output=RoleOut,
     ai={
+        "asks": {
+            "en": (
+                "change the name of the Waiter role to Floor staff",
+                "edit the Stylist role so it goes first in the list",
+                "retire the Trainee role so it is no longer offered",
+            ),
+            "es": (
+                "cambia el nombre del rol Camarero a Sala",
+                "edita el rol de Estilista para que vaya el primero",
+                "retira el rol de Becario para que no se ofrezca más",
+            ),
+        },
         "description": "Changes a role (name, description, colour, order) or retires it (is_active false) "
         "so it is no longer offered.",
         "risk": "normal",
@@ -470,6 +554,18 @@ def _save_role(role: Role, **options: Any) -> None:
     input=ScheduleIn,
     output=ScheduleOut,
     ai={
+        "asks": {
+            "en": (
+                "create a schedule for Lucía from Monday to Friday, 10 to 18",
+                "give Pablo a weekend schedule",
+                "new summer schedule for Ana with a break at 14:00",
+            ),
+            "es": (
+                "crea un horario para Lucía de lunes a viernes de 10 a 18",
+                "crea a Pablo un horario de fin de semana",
+                "horario nuevo de verano para Ana con descanso a las 14:00",
+            ),
+        },
         "description": "Creates a weekly work schedule for a staff member (by id or by name), with the "
         "hours and break of each working day.",
         "risk": "normal",
@@ -504,6 +600,18 @@ def create_schedule(ctx: OperationContext, data: ScheduleIn) -> Schedule | None:
     input=ScheduleUpdateIn,
     output=ScheduleOut,
     ai={
+        "asks": {
+            "en": (
+                "change Lucía's schedule so she starts at 9 on Mondays",
+                "Pablo's schedule: Saturdays off from now on",
+                "edit Ana's schedule to end at 20:00",
+            ),
+            "es": (
+                "actualiza el horario de Lucía: los lunes empieza a las 9",
+                "en el horario de Pablo, los sábados libres a partir de ahora",
+                "edita el horario de Ana para que acabe a las 20:00",
+            ),
+        },
         "description": "Edits a work schedule (name, validity, default) and replaces its whole week of "
         "working hours.",
         "risk": "normal",
@@ -550,6 +658,18 @@ def update_schedule(ctx: OperationContext, data: ScheduleUpdateIn) -> Schedule |
     input=SetActiveIn,
     output=ScheduleOut,
     ai={
+        "asks": {
+            "en": (
+                "deactivate Lucía's summer schedule for now",
+                "turn Pablo's winter schedule back on",
+                "pause Ana's schedule without deleting it",
+            ),
+            "es": (
+                "desactiva de momento el horario de verano de Lucía",
+                "vuelve a activar el horario de invierno de Pablo",
+                "pausa el horario de Ana sin borrarlo",
+            ),
+        },
         "description": "Activates or deactivates a work schedule; an inactive schedule never governs "
         "availability.",
         "risk": "normal",
@@ -577,6 +697,18 @@ def set_schedule_active(ctx: OperationContext, data: SetActiveIn) -> Schedule | 
     input=ScheduleRefIn,
     output=DeletedOut,
     ai={
+        "asks": {
+            "en": (
+                "delete Lucía's summer schedule",
+                "remove Pablo's old schedule",
+                "get rid of Ana's weekend schedule",
+            ),
+            "es": (
+                "borra el horario de verano de Lucía",
+                "elimina el horario antiguo de Pablo",
+                "quita el horario de fin de semana de Ana",
+            ),
+        },
         "description": "Deletes a work schedule and its working hours; they stop counting for availability.",
         "risk": "high",
     },
@@ -639,6 +771,18 @@ def _write_week(schedule: Schedule, days: list) -> None:
     input=TimeOffIn,
     output=TimeOffDetailOut,
     ai={
+        "asks": {
+            "en": (
+                "register a vacation for Lucía from 1 to 7 August",
+                "Pablo is off sick tomorrow",
+                "add a training day off for Ana on Friday",
+            ),
+            "es": (
+                "registra unas vacaciones de Lucía del 1 al 7 de agosto",
+                "Pablo está de baja por enfermedad mañana",
+                "apunta una ausencia por formación de Ana el viernes",
+            ),
+        },
         "description": "Registers a time-off request (vacation, sick leave, personal, training or other) "
         "for a staff member, by id or by name; it starts pending.",
         "risk": "normal",
@@ -658,6 +802,18 @@ def create_time_off(ctx: OperationContext, data: TimeOffIn) -> TimeOff | None:
     input=TimeOffRequestIn,
     output=TimeOffDetailOut,
     ai={
+        "asks": {
+            "en": (
+                "I want to ask for a day off on Friday",
+                "request vacation for me from 1 to 15 August",
+                "I need the afternoon off tomorrow",
+            ),
+            "es": (
+                "quiero pedirme un día libre el viernes",
+                "solicito vacaciones del 1 al 15 de agosto",
+                "necesito librar mañana por la tarde",
+            ),
+        },
         "description": "Asks for time off for the current user (their own staff record); it starts pending.",
         "risk": "normal",
     },
@@ -711,6 +867,18 @@ def _register_time_off(
     input=TimeOffRefIn,
     output=TimeOffDetailOut,
     ai={
+        "asks": {
+            "en": (
+                "approve Lucía's vacation",
+                "accept Pablo's time-off request for Friday",
+                "say yes to Ana's day off",
+            ),
+            "es": (
+                "aprueba las vacaciones de Lucía",
+                "acepta la solicitud de ausencia de Pablo del viernes",
+                "dale el visto bueno al día libre de Ana",
+            ),
+        },
         "description": "Approves a pending time-off request: its hours leave the person's availability.",
         "risk": "normal",
     },
@@ -745,7 +913,22 @@ def approve_time_off(ctx: OperationContext, data: TimeOffRefIn) -> TimeOff | Non
     permission="staff.manage_time_off",
     input=TimeOffRefIn,
     output=TimeOffDetailOut,
-    ai={"description": "Rejects a pending time-off request.", "risk": "normal"},
+    ai={
+        "asks": {
+            "en": (
+                "reject Lucía's vacation request",
+                "say no to Pablo's day off on Friday",
+                "turn down Ana's pending time off",
+            ),
+            "es": (
+                "rechaza la solicitud de vacaciones de Lucía",
+                "dile que no al día libre de Pablo del viernes",
+                "deniega la ausencia pendiente de Ana",
+            ),
+        },
+        "description": "Rejects a pending time-off request.",
+        "risk": "normal",
+    },
 )
 def reject_time_off(ctx: OperationContext, data: TimeOffRefIn) -> TimeOff | None:
     """STAFF-F18."""
@@ -760,6 +943,18 @@ def reject_time_off(ctx: OperationContext, data: TimeOffRefIn) -> TimeOff | None
     input=TimeOffRefIn,
     output=TimeOffDetailOut,
     ai={
+        "asks": {
+            "en": (
+                "cancel Lucía's vacation",
+                "Pablo no longer needs Friday off, cancel it",
+                "withdraw my pending day off",
+            ),
+            "es": (
+                "cancela las vacaciones de Lucía",
+                "Pablo ya no necesita el viernes libre, anúlalo",
+                "retira mi solicitud de día libre pendiente",
+            ),
+        },
         "description": "Cancels a pending or approved time-off request (an employee may only withdraw their "
         "own pending one).",
         "risk": "normal",
@@ -832,6 +1027,18 @@ def _finish_move(
     input=SettingsIn,
     output=SettingsOut,
     ai={
+        "asks": {
+            "en": (
+                "change the default start and end of new schedules to 9 and 17",
+                "set the default break of new schedules to 45 minutes",
+                "change the default working day to 10 to 19",
+            ),
+            "es": (
+                "que los horarios nuevos empiecen a las 9 y acaben a las 17",
+                "cambia el descanso por defecto de los horarios nuevos a 45 minutos",
+                "cambia la jornada por defecto a de 10 a 19",
+            ),
+        },
         "description": "Changes the default working day that a new schedule proposes (start, end and "
         "break); only what is sent.",
         "risk": "normal",
