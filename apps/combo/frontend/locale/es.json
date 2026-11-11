@@ -68,11 +68,6 @@
       "noTaxCategory": "Un menú que se consume en el local necesita su propio tipo de IVA: sin él no se puede facturar.",
       "photoNotSaved": "El menú se ha guardado, pero la foto no: {reason}"
     },
-    "money": {
-      "notAmount": "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",
-      "negative": "El precio de un menú no puede ser negativo. Para abaratar una opción, ponle un suplemento negativo.",
-      "ambiguous": "Este importe se puede leer de dos maneras: «{typed}» tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda."
-    },
     "builder": {
       "back": "Todos los menús",
       "serviceWarning": "Este menú se factura como un único servicio: una sola línea a su tipo de IVA, tributen como tributen sus componentes.",

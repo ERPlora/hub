@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:64bd06a5b8e65258759c76235b9efe8c1c5877d48217d861bec5784ef66cf7f4 -->
+<!-- generated from WORKBOOK.md sha256:0b568bba92e38b07f510247b8ea1f8eb3e3e3ea892496a442ba1915ff1418f82 -->
 
 ## What it is for and who it is for
 
@@ -159,7 +159,8 @@ Steps:
    recorded only once.
 In: the form's data; the business's currency, its country's (a payment that does not say its currency is
 recorded in it, also through the assistant or the API). While the app does not know the business's
-currency yet, the field says "Amount" and "Record payment" waits. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+currency yet, the field says "Amount" and "Record payment" waits; leaving the amount keeps it as typed,
+without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, "Record payment" lights up (hub#938).
 Through the assistant or the API, the
 method is given by its id or by its name, the amount goes in the currency's minor unit (cents in euros)
