@@ -1,7 +1,7 @@
 // hub#1015 · INVENTORY-F01/F02, BASE-F05 — `useUnsavedChanges(inside, dirty)`: a window signs up with the system Back
 // (`system-back.ts`, `holdUnsavedChanges`) as holding what the person typed, for as long as it is mounted. While it
 // holds something, the overlay it is in answers `unsavedChangesIn` — what Back asks before it closes one (pinned with
-// Ionic's overlays in system-back.test.ts and on the real app in tests/e2e/inventory-unsaved-back.spec.ts) — and its
+// Ionic's overlays in system-back.test.ts and on the real app in tests/e2e/inventory-unsaved-changes.spec.ts) — and its
 // question is «Discard changes?» with «Keep editing» and «Discard changes» (ConfirmDialog through `useConfirm`, en + es).
 // The window's overlay is a plain element here: in this harness Ionic's own `ion-modal` is registered and parks itself
 // hidden, and the stub dialog of the question is not an Ionic overlay either.
@@ -31,14 +31,15 @@ function shownWindow() {
 async function setup(opts: { dirty?: boolean; locale?: 'en' | 'es' } = {}) {
   const shown = shownWindow();
   const dirty = ref(opts.dirty ?? true);
+  let canDismiss!: () => Promise<boolean>;
   const Window = defineComponent({
     setup() {
-      useUnsavedChanges(() => shown.fields, dirty);
+      canDismiss = useUnsavedChanges(() => shown.fields, dirty);
       return () => h('p');
     },
   });
   const m = await mountBase(Window, { locale: opts.locale });
-  return { ...m, ...shown, dirty };
+  return { ...m, ...shown, dirty, canDismiss };
 }
 
 /** The question on screen, by its title (ConfirmDialog names its dialog by it). */
@@ -108,6 +109,46 @@ describe('hub#1015 — useUnsavedChanges: a window with something typed holds th
     s.wrapper.unmount();
 
     expect(unsavedChangesIn(s.overlay)).toBeUndefined();
+  });
+});
+
+// hub#1023 · INVENTORY-F01/F02 — the same question on the window's own ways out: what `useUnsavedChanges` gives back is
+// the `canDismiss` of its FormModal (@erplora/ui), which asks it on Cancel, the close button, Escape and the backdrop.
+// Nothing typed, it lets the window close at once; something typed, it is the same «Discard changes?» Back asks.
+describe('hub#1023 — useUnsavedChanges: the window’s FormModal asks the same question on Cancel, × and Escape', () => {
+  it('with nothing typed it lets the window close at once, without asking', async () => {
+    const s = await setup({ dirty: false });
+
+    await expect(s.canDismiss()).resolves.toBe(true);
+    expect(question('Discard changes?')).toBeNull();
+  });
+
+  it('with something typed it asks «Discard changes?»: «Keep editing» keeps the window', async () => {
+    const s = await setup();
+
+    const answer = s.canDismiss();
+    await flush();
+    expect(button('Discard changes?', 'cancel')?.textContent?.trim()).toBe('Keep editing');
+    button('Discard changes?', 'cancel')!.click();
+    await expect(answer).resolves.toBe(false);
+  });
+
+  it('«Discard changes» lets it close; in Spanish, «¿Descartar los cambios?»', async () => {
+    const s = await setup({ locale: 'es' });
+
+    const answer = s.canDismiss();
+    await flush();
+    expect(button('¿Descartar los cambios?', 'submit')?.textContent?.trim()).toBe('Descartar cambios');
+    button('¿Descartar los cambios?', 'submit')!.click();
+    await expect(answer).resolves.toBe(true);
+  });
+
+  it('reads what is typed when it is asked, as Back does', async () => {
+    const s = await setup();
+    s.dirty.value = false;
+
+    await expect(s.canDismiss()).resolves.toBe(true);
+    expect(question('Discard changes?')).toBeNull();
   });
 });
 

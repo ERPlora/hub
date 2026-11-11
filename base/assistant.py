@@ -138,6 +138,11 @@ SYNONYMS = (
     # staff
     ("desactiva", "desactivar", "deactivate"),
     ("pido", "solicito", "solicitud", "request"),
+    # cart_checkout: a «cesta» or a «carrito» is a shopping cart (``cart_checkout.cart``), and «unidades» or «cantidad»,
+    # as «tres unidades», the quantity a line takes (never «cantidad» as Inventory's unit of measure). Never «línea»: it
+    # is the till's check line (``sale.order.*_line``) and a cart's line would take its place.
+    ("unidades", "cantidad", "quantity"),
+    ("cesta", "carrito", "cart", "basket"),
     # flow: an automation (``flow.flow``), its steps and the question it waits on (``flow.question``) are named by their
     # phrases and never by the word: «automatización» shares its stem with «automático» («la respuesta automática»),
     # «pasos» with «pasó» («¿qué pasó con…?», so no «qué paso» nor «de paso») and «pregunta» with its verb («se les
