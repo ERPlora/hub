@@ -290,6 +290,16 @@ def _decide_draft(
     input=CreateIn,
     output=FlowOut,
     ai={
+        "asks": {
+            "en": (
+                "create the automation from the assistant's draft",
+                "set up a new automation that runs every Monday at 9",
+            ),
+            "es": (
+                "crea la automatización a partir del borrador que me propusiste",
+                "monta una automatización nueva que arranque cada lunes a las 9",
+            ),
+        },
         "description": "Create an automation from scratch, from a gallery card or from the assistant's draft "
         "(`draft_id`, which is marked as used in the same step). It is born paused and with no permission "
         "(`flow.flow.set_enabled` turns it on); prefer `flow.draft.propose` when somebody asks you for one.",
@@ -329,6 +339,16 @@ def create_flow(ctx: OperationContext, data: CreateIn) -> dict:
     input=UpdateIn,
     output=FlowOut,
     ai={
+        "asks": {
+            "en": (
+                "change the name of the welcome automation to «New customers»",
+                "change the steps of the birthday automation",
+            ),
+            "es": (
+                "cambia el nombre de la automatización de bienvenida a «Clientes nuevos»",
+                "modifica los pasos de la automatización de cumpleaños",
+            ),
+        },
         "description": "Change an automation, by its id or its name: its name, what starts it or its steps (to turn "
         "it on or pause it, `flow.flow.set_enabled`). Only what is sent changes; its permissions stay. Changing the trigger or the steps "
         "raises its version, and what is already running goes on with the version it started with. What its app fixes "
@@ -391,6 +411,17 @@ def update_flow(ctx: OperationContext, data: UpdateIn) -> dict:
     input=EnabledIn,
     output=FlowOut,
     ai={
+        "asks": {
+            "en": (
+                "turn on the welcome automation",
+                "pause the birthday automation",
+            ),
+            "es": (
+                "enciende la automatización que salta al cobrar una venta",
+                "pausa la automatización de cumpleaños",
+                "vuelve a encender la automatización de reseñas",
+            ),
+        },
         "description": "Turn an automation on or pause it, by its id or its name («activate the welcome "
         "automation», «pause the cash close one»). A schedule turned on counts from now. Turning on one that "
         "lacks permissions leaves it doing nothing until they are granted: say so.",
@@ -422,6 +453,16 @@ def _switch(ctx: OperationContext, flow: Flow, enabled: bool) -> None:
     input=FlowRefIn,
     output=FlowOut,
     ai={
+        "asks": {
+            "en": (
+                "make a copy of the welcome automation",
+                "duplicate the birthday automation",
+            ),
+            "es": (
+                "haz una copia de la automatización de bienvenida",
+                "duplica la automatización de cumpleaños",
+            ),
+        },
         "description": "Copy an automation: «Copy of …», paused, with the same trigger and steps and none of its "
         "permissions or history.",
         "risk": "normal",
@@ -464,6 +505,16 @@ def duplicate_flow(ctx: OperationContext, data: FlowRefIn) -> dict:
     input=FlowRefIn,
     output=DeletedOut,
     ai={
+        "asks": {
+            "en": (
+                "delete the birthday automation",
+                "get rid of the welcome automation but keep its history",
+            ),
+            "es": (
+                "borra la automatización de cumpleaños",
+                "quita la automatización de bienvenida, ya no la uso",
+            ),
+        },
         "description": "Delete an automation, by its id or its name: it stops at once, what was waiting is "
         "cancelled and its history stays. Cannot be undone: confirm it first.",
         "risk": "high",
@@ -505,6 +556,17 @@ def delete_flow(ctx: OperationContext, data: FlowRefIn) -> dict:
     input=GrantIn,
     output=FlowOut,
     ai={
+        "asks": {
+            "en": (
+                "grant the welcome automation the permission to create tasks",
+                "give the birthday automation permission to send WhatsApp messages",
+            ),
+            "es": (
+                "dale permiso a la automatización de bienvenida para crear tareas",
+                "deja que la automatización de cumpleaños mande WhatsApp a los clientes",
+                "autoriza a la automatización de las ventas cobradas a leer los clientes",
+            ),
+        },
         "description": "Set the whole list of actions and reads an automation may run, by name: what is not in "
         "the list is withdrawn. A list that names something this business does not have is refused whole. "
         "An automation does nothing it was not allowed.",
@@ -587,6 +649,16 @@ def _apply_recipe(ctx: OperationContext, flow: Flow, recipe: recipes.Recipe, now
     input=RecipeRefIn,
     output=RecipeEnabledOut,
     ai={
+        "asks": {
+            "en": (
+                "turn on the recipe that fills a cancelled slot",
+                "activate the ready-made reminder automation",
+            ),
+            "es": (
+                "activa la receta de recordatorio de citas",
+                "enciende la receta que avisa cuando alguien cancela",
+            ),
+        },
         "description": "Turn on a ready-made automation an app brings (`flow.recipe.list`). The first time it is "
         "built and left on with exactly the permissions the recipe asks for; afterwards the one already built is "
         "switched on as the owner left it. Say what it will do and what it may do before turning it on.",
@@ -629,6 +701,16 @@ def enable_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
     input=RecipeRefIn,
     output=FlowOut,
     ai={
+        "asks": {
+            "en": (
+                "turn off the appointment reminder recipe",
+                "pause the ready-made cancellation recipe",
+            ),
+            "es": (
+                "apaga la receta del recordatorio de citas",
+                "desactiva la receta prefabricada de las cancelaciones",
+            ),
+        },
         "description": "Turn off a ready-made automation an app brings: it is paused, never deleted; its permissions "
         "and its history stay, and turning it on again leaves it as it was.",
         "risk": "high",
@@ -648,6 +730,16 @@ def disable_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
     input=RecipeRefIn,
     output=FlowOut,
     ai={
+        "asks": {
+            "en": (
+                "put the reminder recipe back as its app brings it",
+                "restore the original version of the cancellation recipe",
+            ),
+            "es": (
+                "deja la receta del recordatorio como la trae su app",
+                "vuelve a la versión original de la receta de cancelaciones",
+            ),
+        },
         "description": "Give a ready-made automation back the version its app brings today: its name, trigger, steps "
         "and exactly the recipe's permissions replace the owner's changes; it stays on or paused as it is and keeps "
         "its history. Confirm it: what the owner changed is lost.",
@@ -677,6 +769,16 @@ def restore_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
     input=RecipeRefIn,
     output=FlowOut,
     ai={
+        "asks": {
+            "en": (
+                "repair the old reminder recipe",
+                "fix the outdated cancellation recipe with its new conditions",
+            ),
+            "es": (
+                "arregla la receta del recordatorio de citas que se quedó vieja",
+                "pon al día la receta de cancelaciones con lo que corrigió su app",
+            ),
+        },
         "description": "Repair a ready-made automation built from an older version that started in more cases than "
         "its app meant: only the conditions of «Only when…» its app added since are added; its name, steps, "
         "permissions and switch stay. Nothing changes when there is nothing to repair.",
@@ -739,6 +841,16 @@ def set_secret(ctx: OperationContext, data: SecretSetIn) -> dict:
     input=SecretRefIn,
     output=DeletedOut,
     ai={
+        "asks": {
+            "en": (
+                "delete the secret called SHOP_TOKEN",
+                "remove the old API key secret",
+            ),
+            "es": (
+                "borra el secreto SHOP_TOKEN",
+                "elimina el secreto de la clave antigua",
+            ),
+        },
         "description": "Delete a secret by its name: the automations whose calls use it will fail with "
         "`flow.secret_not_found` until it is saved again. Confirm it first.",
         "risk": "high",
@@ -766,6 +878,16 @@ def delete_secret(ctx: OperationContext, data: SecretRefIn) -> dict:
     input=DraftProposeIn,
     output=DraftOut,
     ai={
+        "asks": {
+            "en": (
+                "create a flow that adds a task when a sale over 100 € is completed",
+                "automate a thank-you WhatsApp after each appointment",
+            ),
+            "es": (
+                "crea un flujo que deje una tarea cuando se cobre una venta de más de 100 €",
+                "automatiza un WhatsApp de agradecimiento después de cada cita",
+            ),
+        },
         "description": "Propose a DRAFT automation — «when X happens, do Y» — whenever somebody asks for something "
         "to happen on its own («create a flow that creates a task when a sale over 100 € is completed»). "
         "It does not run, holds no permissions and waits in Automations for a person to review it and turn "
@@ -794,6 +916,16 @@ def propose_draft(ctx: OperationContext, data: DraftProposeIn) -> dict:
     input=DraftRefIn,
     output=DraftOut,
     ai={
+        "asks": {
+            "en": (
+                "discard the assistant's draft",
+                "drop that draft, I don't want it",
+            ),
+            "es": (
+                "descarta el borrador del asistente",
+                "tira ese borrador, no lo quiero",
+            ),
+        },
         "description": "Discard a draft the assistant proposed; it stays as a record.",
         "risk": "normal",
     },
@@ -1601,6 +1733,16 @@ def _may_say_yes(ctx: OperationContext, run: FlowRun) -> None:
     input=AnswerIn,
     output=AnsweredOut,
     ai={
+        "asks": {
+            "en": (
+                "answer yes to the automation's question",
+                "say no to that question, the customer already paid",
+            ),
+            "es": (
+                "dile que sí a la automatización que espera mi respuesta",
+                "responde que no a la automatización de impagos, el cliente ya ha pagado",
+            ),
+        },
         "description": "Answer yes or no, with an optional note, to a question an automation asked and is waiting "
         "on (from `flow.question.list`): a yes carries it on, a no does what its step says. Only the role it was "
         "asked of, or whoever runs the business. It is the person's decision: confirm it with them first.",
@@ -2048,6 +2190,16 @@ def resume_due(ctx: OperationContext, data: DueIn) -> dict:
     input=RunIn,
     output=RunOut,
     ai={
+        "asks": {
+            "en": (
+                "run the weekly review automation now",
+                "launch the reminders automation right away",
+            ),
+            "es": (
+                "ejecuta ya la automatización de la revisión semanal",
+                "lanza ahora mismo la automatización de los recordatorios",
+            ),
+        },
         "description": "Run an automation now, for real, by its id or its name («run the weekly review now»), "
         "with `input` as what its steps read. Only when it is on; to see what it would do without effects, "
         "use `flow.flow.test`. Confirm it first.",
@@ -2080,6 +2232,16 @@ def run_now(ctx: OperationContext, data: RunIn) -> dict:
     input=RunRefIn,
     output=RunOut,
     ai={
+        "asks": {
+            "en": (
+                "retry the failed run now that the permission is granted",
+                "resume the run that stopped with an error",
+            ),
+            "es": (
+                "vuelve a intentar la ejecución de anoche, ya he dado el permiso que faltaba",
+                "vuelve a lanzar desde el error la ejecución de ayer",
+            ),
+        },
         "description": "Resume a run that stopped by an error at the step that failed, once its cause is fixed "
         "(a permission granted, an app turned on, the other system back): the steps before it are not "
         "repeated and it goes on with the steps it started with. Only within 7 days, with the automation on. "

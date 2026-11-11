@@ -1024,11 +1024,11 @@ def apply_voucher(ctx: OperationContext, data: OrderApplyVoucherIn) -> dict:
         asks={
             "en": (
                 "don't use the voucher for the haircut after all",
-                "take the voucher off that line",
+                "leave the voucher unused on this check",
             ),
             "es": (
                 "al final no uses el bono en el corte",
-                "quita el bono de esa línea",
+                "deja el bono sin usar en esta cuenta",
             ),
         },
     ),
