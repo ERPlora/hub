@@ -64,7 +64,7 @@ PROBES = [
 #: each reaches its tool among the first ten by its asks and not without them, so asks that stop reading as people speak
 #: fail here, tool by tool.
 OWN_WORDS = [
-    ("combo.combo.list", "¿qué tenemos montado ahora mismo?"),
+    ("combo.combo.list", "repásame los que tenemos montados y lo que cuesta cada uno"),
     ("combo.combo.get", "¿qué trae el infantil?"),
     ("combo.combo.for_sale", "¿qué se puede pedir ya de mostrador?"),
     ("combo.combo.suggest_image", "¿qué dibujos le pegan al de verano?"),
@@ -79,7 +79,7 @@ OWN_WORDS = [
     ("combo.group.reorder", "quiero que los postres salgan antes que los segundos"),
     ("combo.option.create", "añade merluza a los segundos"),
     ("combo.option.bulk_create", "mete de golpe tres postres en el infantil"),
-    ("combo.option.update", "las natillas se han acabado, márcalas"),
+    ("combo.option.update", "nos hemos quedado sin natillas en el infantil"),
     ("combo.option.delete", "ya no damos gazpacho de entrante"),
     ("combo.option.reorder", "que el helado salga el primero de los postres"),
 ]
