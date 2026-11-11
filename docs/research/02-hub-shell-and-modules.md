@@ -1,6 +1,6 @@
 # Hallazgos: Hub actual (/home/user/erplora/hub) — shell, PIN, módulos
 
-Documento de referencia del sistema anterior, recibido el 2026-10-12. Las rutas y afirmaciones describen la investigación original; no certifican el estado de estos repositorios.
+Documento de referencia del sistema anterior, recibido el 2026-10-12. Las rutas y afirmaciones describen la investigación original; no certifican el estado de estos repositorios. La columna «hub-next» es el destino que se preveía ese día para el Hub nuevo, hoy el repo `ERPlora/hub`: lo que hay se lee en su `README.md` y en los `WORKBOOK.md` de `base/` y de cada app.
 
 > **Informe recibido el 2026-10-12; donde contradiga PLAN §16 (ronda 11, 2026-10-13) manda el plan.**
 > Choques concretos: (1) «Anatomía de app en la ronda 9»: no hay `manifest.py`, `handbook.md`, `README.md`

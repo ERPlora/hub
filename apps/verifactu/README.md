@@ -6,8 +6,9 @@ contra los esquemas oficiales y enviado en orden por la pasarela de ERPlora (`fi
 la espera que pide la AEAT. Lo que no puede salir espera en la cola y sale solo; un rechazo se subsana con un
 registro nuevo. Solo para negocios de España (Canarias, Ceuta y Melilla incluidas); fuera, se porta como apagada.
 
-- **Estado**: completa (2026-10-27): 32 de los 35 flujos `VERIFACTU-F01` … `F35` están `hecho`; F07, F23 y F33,
-  `descartado` con su motivo (y las claves `G` del registro de migración, también `descartado`).
+- **Estado**: completa (2026-10-27): 31 de los 35 flujos `VERIFACTU-F01` … `F35` están `hecho`; F07, F23 y F33,
+  `descartado` con su motivo (y las claves `G` del registro de migración, también `descartado`), y F18, `parcial`
+  por ERPlora/app#20 (cerrada el 2026-11-04 por ERPlora/app#21; el WORKBOOK aún lo da por `parcial`).
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta
   «Para quien lo mantiene»). Lo que se cambie de la app se cambia antes allí.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md).
@@ -80,6 +81,7 @@ CI=1 pnpm e2e tests/e2e/verifactu-flows.spec.ts tests/e2e/verifactu-config.spec.
 
 - Lo que no hace a propósito (emitir facturas, calcular impuestos, guardar el sello de ERPlora, presentar por su
   cuenta, la modalidad NO VERI\*FACTU, el cese): «Lo que NO hace» del WORKBOOK.
-- Lo aplazado del bloque fiscal y lo que sigue en la cola fuera de su carril (el paso del Inicio y «Activar» fuera de
-  España, la autorización en pruebas, la contracción de `live_paid`): «Qué queda fuera» del WORKBOOK.
+- Lo aplazado del bloque fiscal y la contracción de `live_paid`: «Qué queda fuera» del WORKBOOK. Ya no están fuera,
+  cerradas después del cierre de la app: el paso del Inicio y «Activar» fuera de España (hub#682 y hub#694) y la
+  autorización en pruebas (saas#210).
 - Los iconos y las piezas compartidas de [`UI-REQUESTS.md`](UI-REQUESTS.md).

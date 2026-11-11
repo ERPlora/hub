@@ -49,7 +49,7 @@ caja ni de stock. Para cobrar está Ventas.
 | Consultas vivas | las 6 consultas, re-ejecutadas tras el COMMIT de sus eventos (`live.py`) |
 | Tarea programada | `expire_overdue_carts` → `cart_checkout.cart.cleanup_expired`, `*/15 * * * *`, `collapse` (la corre el worker, en cada negocio y con su ámbito) |
 | Permisos | `view_cart` (todos, también el empleado), `manage_cart` y `checkout` (responsable, administrador y propietario) |
-| Migraciones | `0001_initial`, `0002_order_email_erasable` |
+| Migraciones | `0001_initial`, `0002_order_email_erasable`, `0003_currency_without_default` |
 | Admin | Django admin con CRUD en `hubs.erplora.com` (PLAN §17–§18) y la acción «Borrar los datos personales de sus clientes», que es la operación `cart_checkout.customer.erase` |
 
 Las decisiones de diseño (libreta interna fuera de las plantillas, borrado lógico, caducidad leída,

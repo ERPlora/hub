@@ -38,11 +38,11 @@ sus ausencias (las pide el empleado y las aprueba un responsable) y lo que ha ga
 | Usa de otras apps | Ventas, opcional y por nombre (`sale.sale.by_staff` con `live.operations.get`, y sus avisos `sale.sale.completed`, `voided` y `refunded`); sin Ventas, Comisiones lo dice. De la plataforma, las cuentas con acceso (`base.Membership`) y la zona horaria (`timezone.localdate()`, en la fase 1 `settings.TIME_ZONE`) |
 | La usan | Citas, Servicios, Control horario, Tareas y Reservas online (la requieren: importan `Member`, `resolve_member` y, según la app, `member_availability`, `own_member` o los nombres de `events.py`); reaccionan a `staff.member.terminated` Citas (`appointment.staff.release`), Servicios (`service.assignment.release_member`), Control horario (`attendance.record.close_for_terminated`) y Tareas (`task.task.release_member`). Ventas lee el directorio en el TPV y Automatizaciones tiene una plantilla sobre `staff.member.created` |
 | Pantallas | `/staff/members`, `/staff/roles`, `/staff/time-off`, `/staff/schedules`, `/staff/commissions` (quien ve la compensación) y `/staff/settings` (quien guarda los ajustes) |
-| Operaciones | 17 consultas (`queries.py`, todas en vivo menos `staff.account.list`) y 17 acciones (`services.py`), todas con `ai=`; 34 rutas en `/api/staff/…`; 11 abiertas a las API keys (`expose_api`) |
+| Operaciones | 21 consultas (`queries.py`, en vivo todas menos `staff.account.list`, `staff.member.current`, `staff.role.detail`, `staff.role.resolve` y `staff.time_off.get`) y 17 acciones (`services.py`), todas con `ai=`; 35 rutas en `/api/staff/…`; 11 abiertas a las API keys (`expose_api`) |
 | Eventos | 14, `staff.<entidad>.<hecho>` (`events.py`), solo con identificadores; no reacciona a ninguno |
 | Permisos | 10 (`staff.view` … `staff.request_time_off`), repartidos entre propietario, administrador, responsable y empleado en `role_permissions` |
 | Tareas programadas | ninguna |
-| Migraciones | `0001_initial` |
+| Migraciones | `0001_initial`, `0002_work_hours_callable_defaults`, `0003_hourly_rate_verbose_name`, `0004_hub_users` |
 | Admin | Django admin con CRUD en `hubs.erplora.com` (PLAN §17–§18); el borrado de una ficha bloquea antes las fichas (`lock_members`, hub#66) |
 
 Las decisiones de diseño (una cuenta y una ficha viva, el único «Por defecto», los bloqueos por persona, el

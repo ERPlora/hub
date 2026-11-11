@@ -36,7 +36,7 @@ negocio. Ventas y Facturación calculan con ella cada línea; no fija precios ni
 | Usa de otras apps | nada; de la plataforma, la zona horaria (`timezone.localdate()`, en la fase 1 `settings.TIME_ZONE`) y `pycountry` para países y regiones |
 | La usan | Inventario, Servicios, Ventas, Facturación, Menús y combos y Suplementos (todas la requieren); todas menos Facturación enlazan `TaxCategory` (`PROTECT`) y eligen la categoría con `tax.category.list`; de `queries.py`, Ventas importa `calculate_tax`, `current_rates`, `business_jurisdiction`, `business_tax_kind`, `business_today` y `category_by_reference`, Facturación `resolve_tax`, `resolve_category_text`, `tax_kind_of`, `business_tax_kind`, `round_half_up` y `split_amount` (y lee por id la regla que congeló cada línea, `TaxRule.objects.in_bulk`), Suplementos `resolve_category_text` y Servicios `held_categories`; Ventas y Facturación re-ejecutan sus consultas vivas con `RULE_EVENTS`; las pantallas de Ventas y Facturación leen `tax.settings.get` con `useTaxKind()`/`useTaxName()`; Inventario, además, `tax.alias.resolve`, `tax.alias.create` y `tax.category.create` al importar |
 | Pantallas | `/tax/categories`, `/tax/rules`, `/tax/aliases` y `/tax/settings` |
-| Operaciones | 10 consultas (`queries.py`) y 8 acciones (`services.py`), todas con `ai=`; 18 rutas en `/api/tax/…`; 7 consultas y acciones abiertas a las API keys (`expose_api`) |
+| Operaciones | 11 consultas (`queries.py`) y 8 acciones (`services.py`), todas con `ai=`; 18 rutas en `/api/tax/…` (sin ruta: `tax.rule.get`); 7 consultas y acciones abiertas a las API keys (`expose_api`) |
 | Eventos | 7, `tax.<entidad>.<hecho>` (`events.py`); `RULE_EVENTS` (las cuatro de reglas y el cambio de territorio) recalculan la caja de Ventas y el tipo general de Facturación; no reacciona a ninguno |
 | Tareas programadas | ninguna |
 | Migraciones | `0001_initial` a `0006_tax_settings`: `0002` siembra el catálogo de fábrica (con vuelta atrás), `0005` añade `retail.alcohol` sin reescribir ningún tipo y `0006` crea el territorio fiscal |
@@ -72,7 +72,7 @@ pnpm e2e tests/e2e/tax-flows.spec.ts tests/e2e/tax-categories.spec.ts tests/e2e/
 
 ## Qué queda fuera
 
-- Que el aviso y el paso «Tus impuestos» miren el país y el territorio del negocio (hoy cuenta reglas de cualquiera), el
-  país del negocio llegado del SaaS (fase 2) y «hoy» en la zona del negocio: «Lo que queda fuera» del WORKBOOK.
+- Que el aviso y el paso «Tus impuestos» miren el territorio del negocio (desde hub#996 ya cuentan solo las reglas de
+  su país) y «hoy» en la zona del negocio: «Lo que queda fuera» del WORKBOOK.
 - `useServerTable`/`useLiveList` y los formateadores de porcentaje y fecha en `@erplora/ui`:
   [`UI-REQUESTS.md`](UI-REQUESTS.md).

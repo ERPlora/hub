@@ -50,12 +50,12 @@ cancela por WhatsApp o por la reserva online con las reglas del negocio.
 | Usa de otras apps | la ficha de Clientes (`find_customer`, `CustomerSearch` con el alta rápida), los servicios y quién los hace de Servicios (`find_service`), el profesional, su turno y sus ausencias de Personal (`resolve_member`, `staff.availability.for_member`), el horario de Horarios (`schedule.hours.for_range`) y, sin ser requisito, la cuenta de Venta (`sale.order.open`, `sale.order.get`) |
 | Quién la usa | Reservas online (la requiere y reserva por sus operaciones), Venta (comprueba el precio reservado contra `appointment.appointment.get`), Clientes (el bloque `frontend/customer-card/VisitHistory.vue`), la Bandeja de WhatsApp (la automatización de fábrica que avisa a la clienta cuando se confirma su cita), Automatizaciones, la campana y los avisos del dispositivo de la shell, y el asistente |
 | Pantallas | `/appointment/agenda` (Lista, Por profesional · Día y Semana, Periódicas) y `/appointment/settings` |
-| Operaciones | 14 consultas (`queries.py`) y 27 acciones (`services.py`), todas con `ai=`; 35 rutas en `/api/appointment/…` (las seis reacciones de la plataforma no tienen ruta) |
+| Operaciones | 15 consultas (`queries.py`) y 27 acciones (`services.py`), todas con `ai=`; 35 rutas en `/api/appointment/…` (sin ruta: las seis reacciones de la plataforma y `appointment.blocked_time.get`) |
 | Eventos | 21 (`events.py`): `appointment.appointment.{created,confirmed,started,completed,marked_no_show,cancelled,deleted,rescheduled,updated,charged,uncharged,check_opened,check_closed,unassigned,reassigned}`, `appointment.blocked_time.{created,deleted}`, `appointment.recurring.{created,updated,deleted}` y `appointment.settings.updated`; reacciona a `customer.customer.merged`, `customer.customer.erased`, `staff.member.terminated`, `sale.sale.created_from_appointment`, `sale.sale.voided` y `sale.order.voided` |
 | Permisos | 10 (`view_`, `add_` y `change_` de `appointment` y de `own_appointment`, `delete_appointment`, `view_schedule`, `manage_schedule` y `manage_settings`); el empleado, solo lo suyo |
 | Automatización de fábrica | «Cubrir el hueco cuando un cliente cancela» (`recipes.py`, FLOW-F33) |
 | Tareas programadas | ninguna (las series se reservan al crearlas, al editarlas y con «Reservar citas») |
-| Migraciones | `0001_initial` y `0002_appointment_order_id` |
+| Migraciones | `0001_initial`, `0002_appointment_order_id` y `0003_end_in_real_minutes` |
 | Admin | Django admin en `hubs.erplora.com`: citas, series, bloqueos, ajustes y contadores, para soporte; borrar una cita o una serie bloquea antes sus filas (`LockedDeletion`); lo que guarda no pasa por las operaciones ni deja aviso |
 
 Las decisiones de diseño (disponibilidad = Horarios ∩ Personal ∩ citas, solapes con bloqueo, numeración, reloj del
@@ -82,8 +82,8 @@ CI=1 pnpm e2e tests/e2e/appointment-charge.spec.ts
 
 ## Qué queda fuera
 
-- **hub#527** — En un negocio de otro país, un teléfono escrito sin prefijo se guarda y se busca como español.
-- **hub#632** — Los importes de cuatro cifras salen sin separador de millares.
+- Ya no están fuera: hub#527 (un teléfono sin prefijo de un negocio de otro país se guardaba como español) se cerró
+  el 2026-11-07 y hub#632 (importes de cuatro cifras sin separador de millares), el 2026-11-04.
 - Lo que no hace a propósito (recordatorios, pantalla de bloqueos, reserva pública, depósitos, lista de espera,
   calendario externo…): «Lo que queda fuera» y «Lo que NO hace, a propósito» del WORKBOOK.
 - Las peticiones de [`UI-REQUESTS.md`](UI-REQUESTS.md).

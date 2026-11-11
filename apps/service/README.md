@@ -5,7 +5,8 @@ con su tarifa, su precio, su duración, su categoría y su categoría fiscal, y 
 su duración y su precio propios. También guarda los bonos: paquetes de sesiones que una clienta paga una vez
 y gasta en varias visitas, con su saldo, su caducidad, sus ajustes y cada sesión gastada.
 
-- **Estado**: completa (2026-10-21): los 33 flujos, `SERVICE-F01` … `F33`, están `hecho`.
+- **Estado**: completa (2026-10-21; la foto del servicio, F34 y F35, el 2026-10-30): los 35 flujos, `SERVICE-F01` …
+  `F35`, están `hecho`.
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta
   «Para quien lo mantiene»). Lo que se cambie de la app se cambia antes allí.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md).
@@ -41,10 +42,10 @@ y gasta en varias visitas, con su saldo, su caducidad, sus ajustes y cada sesió
 | Usa de otras apps | Impuestos: `tax.TaxCategory` (claves ajenas, con la lectura retenida `FOR KEY SHARE`). Personal: `staff.Member` y `resolve_member`. Clientes: `customer.Customer`, `find_customer` y el bloqueo de la ficha. La venta y la cita de una sesión son identificadores opacos (`sale_id`, `appointment_id`): Ventas y Citas no son requisito |
 | Quién la lee | Citas (`service.service.list_for_sale`, `service.assignment.eligible` y los modelos; la requiere), Ventas (`list_for_sale`, `get`, `assignment.list`, `grant.tender_options` y `service.session.*`, por nombre y sin requerirla), Reservas online (los modelos, los ajustes y `service.service.list`/`.update`; la requiere) y Tarifas (`service.service.list` y `.get`, sin requerirla) |
 | Pantallas | `/service/services`, `/service/categories`, `/service/packages`, `/service/settings`; el hueco del bono en el cobro lo monta Ventas (SALE-F27) |
-| Operaciones | 18 consultas (`queries.py`) y 27 acciones (`services.py`), todas con `ai=`; 37 rutas en `/api/service/…` (sin ruta: las 4 de la plataforma, con `service.system`, y las 4 `service.session.*` que Ventas corre dentro de sus escrituras) |
+| Operaciones | 23 consultas (`queries.py`) y 29 acciones (`services.py`), todas con `ai=`; 43 rutas en `/api/service/…` (sin ruta: las 4 de la plataforma, con `service.system`, las 4 `service.session.*` que Ventas corre dentro de sus escrituras y `service.record.get`) |
 | Eventos | 25, `service.<entidad>.<hecho>` (`events.py`); `REACTIONS` a `staff.member.terminated` (`service.assignment.release_member`), `customer.customer.merged` (`service.grant.reassign`) y `customer.customer.erased` (`service.grant.forget_customer`), por el relay del outbox |
 | Tarea programada | `expire_session_holds` → `service.session.expire`, `0 * * * *`, `collapse` (la corre el worker) |
-| Migraciones | `0001_initial`, `0002_redemption_states` |
+| Migraciones | `0001_initial`, `0002_redemption_states`, `0003_service_image`, `0004_redemption_value`, `0005_grant_sale_line`, `0006_redemption_member` |
 | Admin | Django admin con CRUD en `hubs.erplora.com` (PLAN §17–§18) |
 
 Las decisiones de diseño (saldo calculado al leer, estados de una sesión, concurrencia, árbol de

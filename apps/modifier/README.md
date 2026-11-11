@@ -37,7 +37,7 @@ fuente del precio del suplemento; Ventas los pregunta en el TPV y los cobra, y C
 | `requires` | `["inventory", "tax"]`: un enganche es FK a `inventory.Product` o `inventory.Category` (`CASCADE`), y la categoría fiscal propia, a `tax.TaxCategory` (`PROTECT`). No se engancha a servicios de Servicios |
 | Quién la usa | Ventas la llama por nombre (`modifier.group.for_target` y `modifier.selection.resolve`) sin requerirla, solo con Suplementos encendida; Cocina no la llama: lee lo que Ventas congela en la línea |
 | Pantallas | `/modifier/groups` (la tabla) y la hoja del grupo en un `ion-modal`, sin URL propia; la hoja del TPV es de Ventas |
-| Operaciones | 6 consultas (`queries.py`) y 10 acciones (`services.py`), todas con `ai=`; 14 rutas en `/api/modifier/…` (`modifier.link.drop_product` y `drop_category`, las reacciones de sistema, no tienen ruta) |
+| Operaciones | 9 consultas (`queries.py`) y 10 acciones (`services.py`), todas con `ai=`; 17 rutas en `/api/modifier/…` (`modifier.link.drop_product` y `drop_category`, las reacciones de sistema, no tienen ruta) |
 | Eventos | 8, `modifier.<entidad>.<hecho>` (`events.py`); `REACTIONS` a `inventory.product.deleted` y `inventory.category.deleted`, por el relay del outbox |
 | Migraciones | `0001_initial` (depende de `inventory 0001` y `tax 0005`) |
 | Admin | Django admin con CRUD en `hubs.erplora.com` (PLAN §17–§18) |
