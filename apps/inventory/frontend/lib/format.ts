@@ -13,12 +13,7 @@ export type { Money };
 export { formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';
 export { formatQuantity };
 
-const NO_MONEY_DECIMALS = 2;
-
 const formats = new Map<string, Intl.NumberFormat>();
-
-/** The decimals of `money` (2 in EUR and HUF, 0 in JPY): its minor unit; two while unknown. */
-export const moneyDecimals = (money?: Money): number => money?.decimals ?? NO_MONEY_DECIMALS;
 
 function numberFormat(locale: string, kind: 'count' | 'percent'): Intl.NumberFormat {
   const key = `${locale}|${kind}`;

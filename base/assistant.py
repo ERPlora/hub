@@ -116,8 +116,10 @@ APP_WORDS = shared.app_words
 #: «arqueo», a «recuento» or a «conteo» of the drawer is a count of Cash register's (``cash_register.count``), and the
 #: «moneda» or «divisa» of the business is its currency (``cash_register.currency``). To «desactivar» names the
 #: deactivation itself (``staff.member.deactivate``, ``*.deactivate``), not only a switch off, and what one «pide» or
-#: «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``); an «elemento», as Demo's screens
-#: name one, is an item (``demo.item``).
+#: «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``). A «bono» (a voucher, a pack) is
+#: Services' voucher, the one of the catalogue (``service.package``) or the one sold to a customer (``service.grant``),
+#: and an «asignación» (what one «asigna») is a professional's assignment to a service (``service.assignment``). An
+#: «elemento», as Demo's screens name one, is an item (``demo.item``).
 SYNONYMS = (
     ("cuenta", "check", "tab", "order"),
     ("ticket", "tique", "recibo", "receipt", "sale"),
@@ -136,6 +138,9 @@ SYNONYMS = (
     ),
     ("arqueo", "recuento", "conteo", "count"),
     ("divisa", "moneda", "currency"),
+    # service
+    ("bono", "bonos", "voucher", "vouchers", "pack", "packs", "package", "packages", "grant", "grants"),
+    ("asignacion", "asignaciones", "assignment", "assignments"),
     # staff
     ("desactiva", "desactivar", "deactivate"),
     ("pido", "solicito", "solicitud", "request"),

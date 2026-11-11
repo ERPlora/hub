@@ -118,7 +118,6 @@ describe('combo catalogues (en source + es)', () => {
       ['combo.choices.add', 'Add choice', 'Añadir elección'],
       ['combo.bulk.open', 'Add several', 'Añadir varios'],
       ['combo.bulk.addCount', 'Add {n} selected | Add {n} selected', 'Añadir {n} seleccionado | Añadir {n} seleccionados'],
-      ['combo.money.notAmount', 'This is not an amount. Type a figure, for example 12.50.', 'Esto no es un importe. Escribe una cifra, por ejemplo 12,50.'],
       ['combo.live.reconnecting', 'Reconnecting…', 'Reconectando…'],
       ['combo.live.appInactive', 'This app is not active in this business', 'Esta app no está activa en este negocio'],
       ['combo.noPermission', 'You do not have permission', 'No tienes permiso'],
