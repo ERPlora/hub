@@ -384,7 +384,8 @@ def list_special_days(ctx: OperationContext, params: SpecialDayListIn) -> dict:
     output=OverridePage,
     expose_api=True,
     ai={
-        "description": "Lists the temporary changes of the opening hours (a range of dates closed or with other hours).",
+        "description": "Lists the temporary changes of the opening hours (a range of dates closed or with other "
+        "hours).",
         "asks": {
             "en": (
                 "which temporary changes of the opening are planned?",
@@ -452,7 +453,8 @@ def get_override(ctx: OperationContext, data: ByIdIn) -> dict:
     input=NoParamsIn,
     output=SettingsOut,
     ai={
-        "description": "Returns the settings of the opening hours (the day the week starts on) and the business's time zone.",
+        "description": "Returns the settings of the opening hours (the day the week starts on) and the business's "
+        "time zone.",
         "asks": {
             "en": (
                 "does our week start on Monday or on Sunday?",
