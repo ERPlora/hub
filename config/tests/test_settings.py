@@ -1044,7 +1044,8 @@ def test_in_aws_the_hubs_go_through_the_pgbouncer_sidecar_without_tls_to_it(load
 
 
 def test_what_pgbouncer_gives_each_database_is_prod_s_unless_the_environment_says(load_settings):
-    """No plan gets more at once than this (``base.tenancy.limits``): 6 in prod, 3 in pre (aws ``stacks/*/apps.tf``)."""
+    """No plan gets more at once than this (``base.tenancy.limits``): 48 in prod and in pre (ERPlora/aws
+    ``stacks/prod/apps.tf``); without the setting, 6."""
     assert load_settings(**PRODUCTION_ENV)["PGBOUNCER_MAX_DB_CONNECTIONS"] == 6
     assert load_settings(**PRODUCTION_ENV, PGBOUNCER_MAX_DB_CONNECTIONS="3")["PGBOUNCER_MAX_DB_CONNECTIONS"] == 3
 

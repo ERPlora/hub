@@ -3,9 +3,9 @@
 Lo que las páginas de Pagos necesitan de `@erplora/ui` y todavía no está. Mientras tanto usan lo más
 parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
-**Al cerrar la app** (CLOSE-PAYMENT, 2026-10-23): nada de esto ha llegado a `ERPlora/ui` (`origin/main`
-53db78c); todo tiene sustituto en uso y ningún flujo está roto. Queda propuesto para `## 6` de
-`MIGRATION.md` como `payment:ui-icons`, `payment:ui-live-server-table` y `payment:ui-money-reader`.
+**Al cerrar la app** (CLOSE-PAYMENT, 2026-10-23): nada de esto ha llegado a `ERPlora/ui` (`origin/main` 53db78c); todo
+tiene sustituto en uso y ningún flujo está roto. Queda propuesto para `## 6` de `archive/migration/MIGRATION.md` de
+`ERPlora/erplora-next` como `payment:ui-icons`, `payment:ui-live-server-table` y `payment:ui-money-reader`.
 
 ## Iconos (registrarlos en `packages/ui/src/shell/icons.ts`, `ION_ICONS`)
 

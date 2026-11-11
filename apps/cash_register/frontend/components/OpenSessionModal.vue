@@ -1,23 +1,23 @@
 <script setup lang="ts">
 // «Open cash session» (CASH_REGISTER-F03; the old dashboard's open panel): «Drawer» when the business has
 // drawers (the only one is chosen alone; with several it is optional), «Opening float» as it is read
-// (empty is 0), «Notes». An amount that cannot be read is said under its field and nothing is sent. The
+// (empty is 0), «Notes». The float is the platform's money field (`MoneyInput`), read with its `parseMoney` as every
+// amount of the Hub (hub#1160): one that cannot be read is said under it and nothing is sent. The
 // server numbers the session and keeps the rules (one open at a time, a float required): its refusal is
 // read inside the window, at its field. «Open session» waits in grey until the business has answered its money (the
 // float is read in it; hub#921), and says so with «Retry» if that read fails (hub#938). Success says «Session opened»
 // and closes; the table and the «Open session» button follow by themselves (live).
-import { FormModal, type FormModalError } from '@erplora/ui/components';
+import { FormModal, type FormModalError, MoneyInput, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
-import { computed, shallowRef, watch } from 'vue';
+import { computed, ref, shallowRef, watch } from 'vue';
 
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useLocale, useT } from '../composables/useT';
-import { moneyDecimals, formatMoney, moneyFieldText, moneyRefusal, readAmount, useBusinessMoney } from '../lib/money';
+import { formatMoney, useBusinessMoney } from '../lib/money';
 import { refusal } from '../lib/refusal';
-import MoneyField from './MoneyField.vue';
 
 const props = withDefaults(defineProps<{ unassignedCash?: number }>(), { unassignedCash: 0 });
 
@@ -33,8 +33,8 @@ const command = useCommand('cash_register.session.open');
 const registerId = shallowRef('');
 const balance = shallowRef('');
 const notes = shallowRef('');
-/** The field's own refusal (what was typed is no amount), before anything is sent. */
-const balanceRefusal = shallowRef<string | null>(null);
+/** «Open session» was pressed: the float says what is wrong with it even if it was never left. */
+const tried = ref(false);
 
 const drawers = computed(() => registers.data.value?.rows ?? []);
 
@@ -45,7 +45,7 @@ watch(
     registerId.value = drawers.value.length === 1 ? drawers.value[0].id : '';
     balance.value = '';
     notes.value = '';
-    balanceRefusal.value = null;
+    tried.value = false;
     command.error.value = null;
   },
   { immediate: true },
@@ -56,17 +56,17 @@ watch(drawers, (now) => {
 });
 
 const error = computed<FormModalError | null>(() => refusal(command.error.value, t('cash_register.open.failed')));
-const balanceError = computed(() => balanceRefusal.value ?? error.value?.fields?.opening_balance ?? null);
+const balanceError = computed(() => error.value?.fields?.opening_balance);
 const unassigned = computed(() => (props.unassignedCash > 0 ? formatMoney(props.unassignedCash, locale.value, business.value) : ''));
 
 async function confirm(): Promise<void> {
   // No float is read before the business answers its money: «1500» would be read with two decimals, whatever its
   // currency counts (in yen, 150000; hub#921).
+  tried.value = true;
   const money = business.value;
   if (!money) return;
-  const read = readAmount(balance.value, money);
-  balanceRefusal.value = moneyRefusal(read, t, locale.value, money);
-  if (!read.ok) return;
+  const read = parseMoney(balance.value, { money });
+  if (!read.ok) return; // The field says why.
   try {
     await command.run({
       ...(registerId.value ? { register_id: registerId.value } : {}),
@@ -136,12 +136,13 @@ useUnsavedFormOnOpen(
           {{ drawer.name }}
         </ion-select-option>
       </ion-select>
-      <MoneyField
+      <MoneyInput
         v-model="balance"
         testid="cash-register-open-balance"
         :label="$t('cash_register.open.balance')"
-        :placeholder="moneyFieldText(0, locale, moneyDecimals(business))"
-        :error="balanceError"
+        :money="business"
+        :error-text="balanceError"
+        :show-error="tried"
       />
       <ion-input
         data-testid="cash-register-open-notes"

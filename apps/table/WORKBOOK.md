@@ -1121,4 +1121,4 @@ Las dudas del producto actual quedan cerradas: la 1, la 6 y la 7, por mercado (�
 (Volver a sentar, elegir la cuenta de una mesa dividida y deshacer una división fusionando). La 2 («por
 limpiar»), la 3 (mesas unidas con el aforo sumado) y la 8 (elegir o cambiar el camarero), con los planos
 por turno (pm#121), se decidieron al cerrar la app (2026-10-21) como fuera de esta versión, igual que en
-el producto actual: van a «Fuera por ahora» (`## 6` de `MIGRATION.md`).
+el producto actual: están en «Fuera por ahora» (`## 6` de `archive/migration/MIGRATION.md` de `ERPlora/erplora-next`).

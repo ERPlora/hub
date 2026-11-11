@@ -13,9 +13,6 @@
       "noPermission": "No tienes permiso para ver esto."
     },
     "money": {
-      "notAnAmount": "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",
-      "negative": "Un importe de caja no puede ser negativo. Para sacar dinero del cajón, registra un movimiento de «Salida».",
-      "ambiguous": "Este importe se puede leer de dos maneras: «{typed}» tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda.",
       "zero": "Importe inválido"
     },
     "status": {

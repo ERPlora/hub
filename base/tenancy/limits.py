@@ -12,9 +12,10 @@ ERPlora's own hub (``Hub.is_platform``) is nobody's customer: the SaaS does not 
 and its row says what it gets, :data:`PLATFORM`, whatever a photo said. :func:`hub_limits` is that rule, the one the limiter
 and ``base.plan.usage`` both follow.
 
-No plan gets more at once than PgBouncer gives each database (``settings.PGBOUNCER_MAX_DB_CONNECTIONS``): 6 in prod, so
-a Pro's 12 are 6 here. Past that, a transaction would wait 10 s in PgBouncer and fail with no ``base.hub_busy``, which
-the meter would never count (PLAN-HUB §66, correction).
+No plan gets more at once than PgBouncer gives each database (``settings.PGBOUNCER_MAX_DB_CONNECTIONS``): 48 in prod and
+in pre, the highest plan's (Max; ERPlora/aws ``stacks/prod/apps.tf``), so every plan gets its own; without the setting
+it is 6, and a Pro's 12 are 6 there. Past that, a transaction would wait 10 s in PgBouncer and fail with no
+``base.hub_busy``, which the meter would never count (PLAN-HUB §66, correction).
 
 Who applies them: the hubs' database engine (:data:`ENGINE`, ``base.tenancy.backend``), which every hub's alias runs on
 (``base.tenancy.connections``). Its connection takes a place of its alias's :class:`Limiter` at the first statement of
@@ -67,7 +68,7 @@ class PlanLimits:
 FREE = PlanLimits(max_transactions=1, statement_timeout_seconds=5)
 #: ERPlora's own hub, with no plan: it issues every customer's invoice in one VeriFactu chain, and a send to the AEAT holds
 #: its transaction up to 45 s (``apps.verifactu.gateway``), so one place would close the hub meanwhile. As many at once as
-#: Standard, what PgBouncer gives each database in prod. Twice the paid plans' timeout, as its one chain only grows, but
+#: Standard. Twice the paid plans' timeout, as its one chain only grows, but
 #: never without one: a hung statement holds one of these few places.
 PLATFORM = PlanLimits(max_transactions=6, statement_timeout_seconds=30)
 

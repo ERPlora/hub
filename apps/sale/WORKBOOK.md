@@ -2027,9 +2027,6 @@ es una línea.
 - **Cobrar con propina** (SALE-G06): un flujo nuevo que cruza Ventas y Caja y que nunca entra en la base ni
   en el IVA del tique; el producto la aplazó tras el MVP (pm#100). Mientras, la propina en efectivo se anota
   en Caja como «Entrada» (CASH_REGISTER-F05). Issue hub#562.
-- **Fallos vistos que quedan como issue** (`migration-leftover`): hub#558 (dos pruebas del precio libre
-  del TPV fallan por tiempo con la máquina cargada). Y, en la cadena de arreglos de Ventas, hub#442: el
-  aviso de agotado se queda en el TPV tras volver a poner el artículo a la venta (F07).
 
 ### Dudas abiertas
 

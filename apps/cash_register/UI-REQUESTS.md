@@ -3,11 +3,12 @@
 Lo que las páginas de Caja necesitan de `@erplora/ui` y todavía no está. Mientras tanto usan lo más
 parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
-**Al cerrar la app (2026-10-21)**, contra `ERPlora/ui` `origin/main` `83aeacc`: no ha llegado ninguna de
-las cinco. Ninguna rompe un flujo (todas tienen su sustituto, dicho abajo), así que pasan a «Fuera por
-ahora» (`## 6` de `MIGRATION.md`) con las claves `cash_register:ui-icons`, `cash_register:ui-money-format`,
-`cash_register:ui-detail-list`, `cash_register:ui-bar-list` y `cash_register:ui-readonly-modal`. Quien
-entregue una en `ui` la borra de aquí y cambia su sustituto en la misma PR del puntero.
+**Al cerrar la app (2026-10-21)**, contra `ERPlora/ui` `origin/main` `83aeacc`: no ha llegado ninguna de las cinco.
+Ninguna rompe un flujo (todas tienen su sustituto, dicho abajo), así que pasan a «Fuera por ahora» (`## 6` de
+`archive/migration/MIGRATION.md` de `ERPlora/erplora-next`) con las claves `cash_register:ui-icons`,
+`cash_register:ui-money-format`, `cash_register:ui-detail-list`, `cash_register:ui-bar-list` y
+`cash_register:ui-readonly-modal`. Quien entregue una en `ui` la borra de aquí y cambia su sustituto en la misma PR
+del puntero.
 
 ## Iconos
 
@@ -22,13 +23,13 @@ Al registrarlos, cambiar `frontend/pages/SessionsPage.vue` (acciones), `frontend
 
 ## Dinero en `@erplora/ui/components/format`
 
-- **Qué**: el signo explícito de las diferencias en el formateador de dinero y un lector de importes tecleados
-  («150,50», «1.250,50», «1.250» ambiguo) con su motivo de rechazo, los dos en la moneda del negocio.
-- **Hoy**: el importe ya lo escribe `formatMoney` de `@erplora/ui/components` (hub#653); en
-  `frontend/lib/money.ts` queda lo propio (`formatMoney` con «—» para lo que no hay, `formatSignedMoney`,
-  `formatFace` —un billete o moneda entera sin decimales, «500 €»—, `moneyFieldText`, `readMoney`,
-  `moneyRefusal`). Ventas tiene el suyo en `apps/sale/frontend/lib/format.ts`: los dos se borran cuando llegue
-  el compartido.
+- **Qué**: el signo explícito de las diferencias en el formateador de dinero, en la moneda del negocio.
+- **Hoy**: el importe ya lo escribe `formatMoney` de `@erplora/ui/components` (hub#653), y lo tecleado en las
+  ventanas lo lee el campo común, `MoneyInput` con su `parseMoney` (ui#116; la Caja, desde hub#1160). En
+  `frontend/lib/money.ts` queda lo propio (`formatMoney` con «—» para lo que no hay, `formatSignedMoney` y
+  `formatFace` —un billete o moneda entera sin decimales, «500 €»—) y `readMoney`, que solo lee los filtros de
+  importe de la lista hasta hub#1196. Ventas tiene su formateador en `apps/sale/frontend/lib/format.ts`: los dos se
+  borran cuando llegue el compartido.
 
 ## Lista de detalle (`ok-detail-list`)
 

@@ -4,8 +4,9 @@ Lo que las páginas de Citas necesitan de `@erplora/ui` (y de otras apps) y toda
 usan lo más parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
 Cerrado al cerrar la app (2026-11-03, contra `@erplora/ui` en `667b7fb`). Ninguna petición rompe un flujo: todas
-tienen su sustituto en uso. Cada una lleva la clave con la que pasa a `## 6` de `MIGRATION.md`. La campana del shell
-y el aviso del sistema de una cita nueva o cancelada (APPOINTMENT-F03 y F28) ya están hechos y salen de esta lista.
+tienen su sustituto en uso. Cada una lleva la clave con la que pasa a `## 6` de `archive/migration/MIGRATION.md` de
+`ERPlora/erplora-next`. La campana del shell y el aviso del sistema de una cita nueva o cancelada (APPOINTMENT-F03 y
+F28) ya están hechos y salen de esta lista.
 
 ## Ya en `@erplora/ui`, sin usar todavía (`appointment:ui-use-landed`)
 

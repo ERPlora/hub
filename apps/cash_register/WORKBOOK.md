@@ -90,6 +90,12 @@ abre su ventana:
 - **Cerrar sesión · S-…**: la revisión del turno, «Esperado en el cajón» y «Diferencia» en vivo (si
   quien cierra puede verlos), «Efectivo contado», «Notas de cierre», «Cerrar sesión» y «Cancelar».
 
+Los importes («Fondo de apertura», «Importe», el «Total contado» escrito a mano y «Efectivo contado») se escriben
+en el mismo campo que un precio en el resto del Hub, y se leen igual (hub#1160): la etiqueta flota dentro del campo,
+al salir lo escrito se reescribe en el formato de la página («12,555» queda «12555,00»: 12.555,00 €) y, si no es un
+importe, lo dice debajo («0,515» o «abc»: «Esto no es un importe. Escribe una cifra, por ejemplo 12,50.»; «-5»: «Este
+importe no puede ser negativo.»; «1.250»: «Este importe se puede leer de dos maneras…»).
+
 El éxito sale como aviso verde («Sesión abierta», «Movimiento de entrada registrado (…)», «Arqueo
 registrado · total contado …», «Sesión S-… cerrada · esperado … · contado … · diferencia …»); un
 rechazo, dentro de la ventana, con las palabras del servidor y el campo marcado. Vacía: «Sin sesiones
@@ -236,7 +242,8 @@ sea el cajón; si dos dispositivos abren a la vez, solo uno abre y el otro recib
 fondo obligatorio y el fondo vacío o a cero, «Este negocio exige fondo de apertura: indica el efectivo
 con el que empieza la caja.» bajo el campo; un cajón desactivado o que no existe, «Ese cajón no está
 disponible.»; un importe ilegible («Esto no es un importe. Escribe una cifra, por ejemplo 12,50.»),
-negativo o ambiguo («1.250») se para antes de enviar. «Abrir sesión» está en gris mientras el negocio no
+negativo («Este importe no puede ser negativo.») o ambiguo («1.250») se dice debajo del campo al salir de él o al
+pulsar «Abrir sesión», y no se envía; «12,555» no es ambiguo: son 12.555,00 €, como en un precio (hub#1160). «Abrir sesión» está en gris mientras el negocio no
 haya dicho todavía su moneda, porque el fondo se lee en ella (sin ella, «1500» yenes se guardaría como
 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Abrir sesión» se enciende (hub#938).
@@ -280,7 +287,8 @@ pueden apuntar también tarjeta, transferencia u otro, que salen en la lista y e
 Sale: el movimiento, a nombre de quien lo apunta (avisa: `cash_register.movement.added`). El signo lo
 pone el sistema según el tipo.
 Si falla: «Esta salida dejaría la caja en negativo y el saldo negativo no está permitido.» si los
-ajustes no lo permiten; un importe cero, ilegible o negativo se para antes de enviar; la sesión
+ajustes no lo permiten; un importe cero («Importe inválido»), ilegible, negativo o ambiguo se dice debajo del campo
+y no se envía (se lee como en F03); la sesión
 cerrada en otro dispositivo: «Esa caja está cerrada: una caja cerrada no acepta movimientos nuevos.».
 «Registrar» está en gris mientras el negocio no haya dicho todavía su moneda, porque el importe se lee
 en ella (sin ella, «1500» yenes se guardaría como 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
@@ -310,7 +318,8 @@ los decimales de la moneda; un total escrito a mano (o enviado por la API) se gu
 prevalece sobre el desglose.
 Si falla: una sesión cerrada, «Esa caja está cerrada: una caja cerrada no acepta movimientos
 nuevos.»; un billete o moneda que no es de la moneda del negocio, bajo el desglose; sin desglose ni
-total, «Cuenta el cajón: indica los billetes y monedas o el total.».
+total, «Cuenta el cajón: indica los billetes y monedas o el total.»; un total escrito a mano que no es un importe lo
+dice debajo del campo al salir de él (se lee como en F03) y «Registrar arqueo» sigue en gris.
 Implicados: CASH_REGISTER-F09
 
 ### CASH_REGISTER-F07 Contar a ciegas: quién ve el efectivo esperado
@@ -397,8 +406,8 @@ diferencia (contado − esperado: positiva sobra, negativa falta), a nombre de q
 `cash_register.session.closed`). Las líneas de Ventas del turno quedan copiadas en la sesión: lo que
 pase después (una anulación de ayer) va al turno abierto, nunca a este.
 Si falla: «Escribe el efectivo contado para cerrar la sesión.» con el campo vacío (la pantalla siempre
-lo pide; el ajuste de recuento obligatorio lo hace cumplir también al asistente y a la API). «Cerrar
-sesión» está en gris mientras el negocio no haya dicho todavía su moneda, y el último arqueo de cierre
+lo pide; el ajuste de recuento obligatorio lo hace cumplir también al asistente y a la API); uno ilegible, negativo
+o ambiguo se dice debajo del campo y no cierra nada (se lee como en F03). «Cerrar sesión» está en gris mientras el negocio no haya dicho todavía su moneda, y el último arqueo de cierre
 no se escribe en el campo hasta entonces: el contado se escribe y se lee en ella (sin ella, «1500» yenes
 se guardaría como 150 000 y el arqueo de 1500 yenes saldría como «15.00»). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Cerrar sesión» se enciende (hub#938). Si otro
@@ -756,6 +765,11 @@ cajero del producto actual es un empleado.
   declara `apps.py` como tarea programada (`*/5 * * * *`, `collapse`), que corre el worker
   (`base/scheduler.py`, 2026-10-15), y
   `session.open` lo aplica antes de abrir.
+- **Importes escritos** (hub#1160): las cuatro ventanas que reciben un importe (abrir, movimiento, arqueo sin
+  desglose y cierre) usan el `MoneyInput` de `@erplora/ui/components` y leen con su `parseMoney`, en la moneda del
+  negocio (el arqueo, en la de `cash_register.currency.get`), como cada precio del Hub. `frontend/lib/money.ts`
+  conserva `readMoney` solo para los filtros de importe de la lista (`lib/sessionFilters.ts`), hasta que hub#1196 los
+  lleve al lector común; `frontend/money-fields.test.ts` impide que una ventana vuelva a leer con él.
 - **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
   `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#653). Un
   billete o moneda (`formatFace`) se escribe con la misma regla y sin decimales si es entero («5.000 Ft»).
@@ -885,5 +899,5 @@ cajero del producto actual es un empleado.
   abrirlo sin venta, con su permiso y su rastro en la sesión, queda fuera de esta versión.
 
 Las tres salidas de esta lista que el mercado sí ofrece (una sesión por cajón, el umbral del descuadre y
-el «no-sale») se decidieron al cerrar la app (2026-10-21) y van a «Fuera por ahora» (`## 6` de
-`MIGRATION.md`).
+el «no-sale») se decidieron al cerrar la app (2026-10-21) y están en «Fuera por ahora» (`## 6` de
+`archive/migration/MIGRATION.md` de `ERPlora/erplora-next`).

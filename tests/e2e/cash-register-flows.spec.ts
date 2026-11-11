@@ -7,7 +7,7 @@
 // the settings it changes go back as they were.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, psql, shot, shown } from './helpers';
+import { A, api, EMPLOYEE, login, psql, saveSessionForTheSweep, shot, shown } from './helpers';
 import { createProduct, dialog, fill, type Product } from './inventory-helpers';
 import { cleanDocumentsOf, stamp } from './sale-helpers';
 
@@ -218,6 +218,7 @@ test('CASH_REGISTER-F01, F02: the settings and the drawers, in three sizes', asy
 
 test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three sizes', async ({ page, context }) => {
   await login(page, A, '/cash_register/sessions');
+  await saveSessionForTheSweep(context);
   await closeLeftOpen(context);
   await sessionsReady(page);
 
@@ -227,7 +228,11 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three si
   await openButton.click();
   const open = dialog(page, 'cash-register-open');
   await expect(open).toBeVisible();
+  // hub#1160: the float is read as any price of the Hub: «0,515» is no amount in euros, said under it on leaving.
+  await fill(open, 'cash-register-open-balance', '0,515');
+  await expect(open.locator('[data-testid=cash-register-open-balance]')).toContainText(/This is not an amount\.|Esto no es un importe\./);
   await fill(open, 'cash-register-open-balance', '50,00');
+  await expect(open.locator('[data-testid=cash-register-open-balance] input')).toHaveValue(/^50[.,]00$/);
   await flowShots(page, 'CASH_REGISTER-F03', async () => {
     await expect(open.locator('[data-testid=cash-register-open-submit]')).toBeVisible();
   });
@@ -246,9 +251,14 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three si
   await shown(page).locator(`[data-testid=cash-register-sessions-row-${session.id}-movement]`).first().click();
   const movement = dialog(page, 'cash-register-movement');
   await expect(movement).toBeVisible();
+  // hub#1160: «12,555» is 12.555 €, as in a price: rewritten in the page format on leaving the field.
+  await fill(movement, 'cash-register-movement-amount', '12,555');
+  await expect(movement.locator('[data-testid=cash-register-movement-amount] input')).toHaveValue(/^12555[.,]00$/);
   await flowShots(page, 'CASH_REGISTER-F05', async () => {
     await expect(movement.locator('[data-testid=cash-register-movement-submit]')).toBeVisible();
   });
+  // As it opened, the window closes without asking (BASE-F05).
+  await fill(movement, 'cash-register-movement-amount', '');
   await movement.locator('[data-testid=cash-register-movement-cancel]').click();
   await expect(movement).toBeHidden();
 

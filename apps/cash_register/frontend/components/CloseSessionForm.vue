@@ -6,22 +6,22 @@
 // one) and, for the shift review, Sales' open checks, the kitchen tickets not served yet (Kitchen's
 // `kitchen.ticket.board`, KITCHEN-F31) and the prints that did not come out (Printing's queue). An app that
 // is off in this hub has nothing pending; a reading refused makes the review incomplete. The expected and
-// the difference follow what is typed. The counted cash is always asked for. With something pending the
+// the difference follow what is typed. The counted cash is always asked for, in the platform's money field
+// (`MoneyInput`), read with its `parseMoney` as every amount of the Hub (hub#1160). With something pending the
 // first press warns, the second closes («Close anyway»): it warns, it never prevents. «Close session» waits in grey
 // until the business has answered its money, in which the count is written and read (hub#921), and says so with
 // «Retry» if that read fails (hub#938). Success says the three figures and tells the window.
-import { InlineFeedback } from '@erplora/ui/components';
+import { InlineFeedback, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSpinner } from '@ionic/vue';
-import { computed, shallowRef, watch } from 'vue';
+import { computed, ref, shallowRef, watch } from 'vue';
 
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney, formatSignedMoney, moneyFieldText, moneyRefusal, readAmount, useBusinessMoney } from '../lib/money';
+import { formatMoney, formatSignedMoney, useBusinessMoney } from '../lib/money';
 import { refusal } from '../lib/refusal';
-import MoneyField from './MoneyField.vue';
 import ShiftReview from './ShiftReview.vue';
 
 const props = defineProps<{ session: { id: string; number: string } }>();
@@ -40,7 +40,10 @@ const command = useCommand('cash_register.session.close');
 const counted = shallowRef('');
 const notes = shallowRef('');
 const touched = shallowRef(false);
-const countedRefusal = shallowRef<string | null>(null);
+/** «Close session» was pressed: the counted cash says what is wrong with it even if it was never left. */
+const tried = ref(false);
+/** «Close session» was pressed with the counted cash empty: said under the field, nothing is sent. */
+const missing = ref(false);
 const acknowledged = shallowRef(false);
 
 // The last closing count seeds the field while the person has not typed anything, written in the business's money
@@ -49,7 +52,7 @@ const acknowledged = shallowRef(false);
 const seed = computed(() => {
   const last = counts.data.value?.rows?.find((count) => count.type === 'closing');
   const money = business.value;
-  return last && money ? moneyFieldText(last.total, locale.value, money.decimals) : null;
+  return last && money ? moneyFieldText(last.total, locale.value, money) : null;
 });
 watch(
   seed,
@@ -61,12 +64,13 @@ watch(
 
 function type(value: string): void {
   touched.value = true;
+  missing.value = false;
   counted.value = value;
 }
 
 const expected = computed(() => detail.data.value?.summary.expected_cash ?? null);
 /** What is typed, read in the business's money; nothing until it has answered. */
-const read = computed(() => (business.value ? readAmount(counted.value, business.value) : null));
+const read = computed(() => (business.value ? parseMoney(counted.value, { money: business.value }) : null));
 const difference = computed(() => (expected.value !== null && read.value?.ok && read.value.cents !== null ? read.value.cents - expected.value : null));
 
 /** A reading of the review: answered, refused (the review is incomplete), off in this hub (nothing pending)
@@ -98,16 +102,18 @@ const review = computed(() => {
 const pending = computed(() => review.value.openChecks + review.value.unserved + review.value.prints > 0);
 
 const error = computed(() => refusal(command.error.value, t('cash_register.close.failed')));
-const countedError = computed(() => countedRefusal.value ?? error.value?.fields?.closing_balance ?? null);
+const countedError = computed(() => error.value?.fields?.closing_balance ?? (missing.value ? t('cash_register.close.countedRequired') : undefined));
 
 async function confirm(): Promise<void> {
   // No count is read before the business answers its money: «1500» would be read with two decimals, whatever its
   // currency counts (in yen, 150000; hub#921).
+  tried.value = true;
   const money = business.value;
   if (!money) return;
-  const value = readAmount(counted.value, money);
-  countedRefusal.value = value.ok ? (value.cents === null ? t('cash_register.close.countedRequired') : null) : moneyRefusal(value, t, locale.value, money);
-  if (!value.ok || value.cents === null) return;
+  const value = parseMoney(counted.value, { money });
+  if (!value.ok) return; // The field says why.
+  missing.value = value.cents === null;
+  if (value.cents === null) return;
   if (pending.value && !acknowledged.value) {
     acknowledged.value = true;
     return;
@@ -155,11 +161,13 @@ useUnsavedForm('cash-register-close-notes', () => ({ counted: counted.value, not
         <dd>{{ formatSignedMoney(difference, locale, business) }}</dd>
       </div>
     </dl>
-    <MoneyField
+    <MoneyInput
       :model-value="counted"
       testid="cash-register-close-counted"
       :label="$t('cash_register.close.counted')"
-      :error="countedError"
+      :money="business"
+      :error-text="countedError"
+      :show-error="tried"
       @update:model-value="type"
     />
     <ion-input

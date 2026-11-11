@@ -960,7 +960,6 @@ la que solo se le autorizó reservar.
 
 ### Lo que queda fuera
 
-- **hub#550** — La tarjeta de confirmación del asistente dice la mesa solo por su número, sin su zona.
 - **Asignación automática de mesa y juntar mesas para un grupo grande**: una reserva tiene una mesa
   (la retención de Mesas es una por reserva); juntar mesas espera a que Mesas tenga mesas unidas
   (su duda 3).

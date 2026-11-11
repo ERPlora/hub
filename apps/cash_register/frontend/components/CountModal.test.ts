@@ -6,7 +6,8 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, ionValue, mountCash } from '../__tests__/mount-cash-register';
+import { click, ionValue, mountCash, settle } from '../__tests__/mount-cash-register';
+import { itReadsAmountsAsTheHub } from '../__tests__/money-field';
 import { plain } from '../lib/money';
 import CountModal from './CountModal.vue';
 
@@ -103,8 +104,12 @@ describe('CountModal', () => {
     await s.result(CURRENCY, { currency: 'ARS', decimals: 2, bills: [], coins: [] });
     expect(s.inDoc('cash-register-count-no-breakdown')?.textContent).toContain('There is no breakdown of notes and coins for ARS');
     expect(prop(s.inDoc('cash-register-count-submit'), 'disabled')).toBe(true);
+    // The platform's money field (hub#1160): «1.250» says its two readings once the person leaves it.
     await ionValue(s.inDoc('cash-register-count-total-input'), '1.250', 'ionInput');
-    expect(prop(s.inDoc('cash-register-count-total-input'), 'errorText')).toContain('can be read two ways');
+    s.inDoc('cash-register-count-total-input')?.dispatchEvent(new CustomEvent('ionBlur'));
+    await settle();
+    expect(prop(s.inDoc('cash-register-count-total-input'), 'errorText')).toContain('can be read in two ways');
+    expect(prop(s.inDoc('cash-register-count-submit'), 'disabled')).toBe(true);
     await ionValue(s.inDoc('cash-register-count-total-input'), '1250,40', 'ionInput');
     s.answer(201, { id: 'c1', type: 'closing', total: 125040 });
     await s.submit();
@@ -140,5 +145,18 @@ describe('CountModal: Android Back with unsaved changes (hub#1031, BASE-F05)', (
       change: () => ionValue(s.box('50'), '2', 'ionInput'),
       restore: () => ionValue(s.box('50'), '', 'ionInput'),
     });
+  });
+});
+
+describe('CountModal: the total typed by hand, read as every amount of the Hub', () => {
+  itReadsAmountsAsTheHub({
+    open: async () => {
+      const s = await setup();
+      await s.result(CURRENCY, { ...EUR, bills: [], coins: [] });
+      return s;
+    },
+    field: 'cash-register-count-total-input',
+    submit: 'cash-register-count-submit',
+    amount: (body) => body.total,
   });
 });

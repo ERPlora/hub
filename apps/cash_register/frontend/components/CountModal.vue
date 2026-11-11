@@ -3,8 +3,9 @@
 // end of the shift, or «Opening» to check the float), «Notes», one box per note («Bills») and coin
 // («Coins») of the business's currency, labelled as money, and «Total counted» adding up as it is typed —
 // the server adds them up again with the currency's decimals. Without a table for the currency, the total
-// is typed by hand. A count closes nothing: a closing one tells the page (`counted`), which opens the close.
-import { FormModal, type FormModalError } from '@erplora/ui/components';
+// is typed by hand, in the platform's money field (`MoneyInput`), read with its `parseMoney` as every amount of the Hub
+// (hub#1160). A count closes nothing: a closing one tells the page (`counted`), which opens the close.
+import { FormModal, type FormModalError, MoneyInput, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
@@ -14,10 +15,9 @@ import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-chan
 
 import { useLocale, useT } from '../composables/useT';
 import { countTotal, pieces } from '../lib/count';
-import { formatFace, formatMoney, moneyRefusal, readMoney } from '../lib/money';
+import { formatFace, formatMoney } from '../lib/money';
 import { refusal } from '../lib/refusal';
 import type { CountType } from '../operations';
-import MoneyField from './MoneyField.vue';
 
 const props = defineProps<{ session: { id: string; number: string } | null }>();
 
@@ -54,13 +54,13 @@ const decimals = computed(() => table.value?.decimals ?? 2);
 /** What each note or coin reads as: money of the business («50,00 €»). */
 const faceLabel = (face: string): string => formatFace(face, locale.value, table.value);
 
-const typedRead = computed(() => readMoney(typedTotal.value, decimals.value, table.value?.currency));
-const typedError = computed(() => moneyRefusal(typedRead.value, t, locale.value, table.value));
+/** The total typed by hand, read in the currency of the count; nothing until it has answered. */
+const typedRead = computed(() => (table.value ? parseMoney(typedTotal.value, { money: table.value }) : null));
 
 /** The total counted, in minor units; `null` while a typed total is not an amount yet. */
 const total = computed<number | null>(() => {
   if (hasTable.value) return countTotal(boxes.value, decimals.value);
-  return typedRead.value.ok ? typedRead.value.cents : null;
+  return typedRead.value?.ok ? typedRead.value.cents : null;
 });
 
 function counted(kind: 'bills' | 'coins'): Record<string, number> {
@@ -199,11 +199,11 @@ useUnsavedFormOnOpen(
         >
           {{ $t('cash_register.count.noBreakdown', { currency: table.currency }) }}
         </p>
-        <MoneyField
+        <MoneyInput
           v-model="typedTotal"
           testid="cash-register-count-total-input"
           :label="$t('cash_register.count.totalInput')"
-          :error="typedError"
+          :money="table"
         />
       </template>
     </div>

@@ -692,13 +692,14 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
 
 ## Lo que queda fuera
 
-- **Dos arreglos fuera de la app** (`TODO.md`, vistos en APP-WEBSITE):
+- **Ya no están fuera** los dos arreglos de fuera de la app vistos al cerrarla (APP-WEBSITE):
   - `FIX-HUB-SPA-STATIC-PROBES-SET-CSRF-COOKIE` (`base/spa.py`), hecho: en el host de un hub, `/favicon.ico`,
     `/robots.txt` o cualquier ruta que nombra un fichero y no tiene URL propia recibe un 404 sin la SPA ni cookie
     (antes, la SPA con 200 y `csrftoken`). Un buscador ya no lee HTML como `robots.txt`: el 404 es «sin reglas» y la
     web sigue indexable. Detalle en «Para quien lo mantiene» de `base/WORKBOOK.md`.
-  - `FIX-UI-IMAGEUPLOAD-THUMBNAIL-TOUCHES-TEXT` (`packages/ui`), en la cola: en `ImageUpload` la miniatura y su
-    texto se tocan, sin hueco, en los tres tamaños (logotipo, portada, Sobre nosotros y galería).
+  - `FIX-UI-IMAGEUPLOAD-THUMBNAIL-TOUCHES-TEXT` (`packages/ui`), hecho en ERPlora/ui#44 (2026-10-30): en
+    `ImageUpload` la miniatura deja su hueco hasta el texto en los tres tamaños (logotipo, portada, Sobre nosotros
+    y galería).
 - **La fuente del catálogo apagada no se ve en la e2e**: ese caso de WEBSITE-F05 lo cubren pytest (servidor) y
   Vitest (editor), no Playwright.
 

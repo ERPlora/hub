@@ -90,6 +90,5 @@ describe('cash register catalogues (en source + es)', () => {
     expect(ES.get('cash_register.detail.noMovements')).toBe('Sin movimientos en esta sesión.');
     expect(ES.get('cash_register.detail.noCounts')).toBe('Sin arqueos en esta sesión.');
     expect(ES.get('cash_register.settings.saved')).toBe('Ajustes guardados.');
-    expect(ES.get('cash_register.money.notAnAmount')).toBe('Esto no es un importe. Escribe una cifra, por ejemplo 12,50.');
   });
 });
