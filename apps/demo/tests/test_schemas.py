@@ -8,7 +8,7 @@ import pydantic
 import pytest
 
 from apps.demo.schemas import (
-    ByIdIn,
+    NO_ITEM,
     DeletedOut,
     ItemDetailOut,
     ItemIn,
@@ -16,6 +16,7 @@ from apps.demo.schemas import (
     ItemOut,
     ItemPage,
     ItemPatchIn,
+    ItemRefIn,
     ItemStatsIn,
     ItemStatsOut,
     LineIn,
@@ -27,10 +28,14 @@ from apps.demo.schemas import (
 ID = uuid.uuid7()
 
 
-def invalid_fields(schema, **data):
+def errors_of(schema, **data) -> list[dict]:
     with pytest.raises(pydantic.ValidationError) as excinfo:
         schema(**data)
-    return {".".join(str(part) for part in error["loc"]) for error in excinfo.value.errors()}
+    return excinfo.value.errors()
+
+
+def invalid_fields(schema, **data):
+    return {".".join(str(part) for part in error["loc"]) for error in errors_of(schema, **data)}
 
 
 # Pages
@@ -89,12 +94,49 @@ def test_patch_only_carries_what_was_sent():
     patch = ItemPatchIn(id=ID, note="")
     assert patch.model_dump(exclude_unset=True) == {"id": ID, "note": ""}
     assert invalid_fields(ItemPatchIn, id=ID, name="") == {"name"}
-    assert invalid_fields(ItemPatchIn) == {"id"}
+    assert invalid_fields(ItemPatchIn) == {"called"}
 
 
-def test_by_id_needs_a_uuid():
-    assert ByIdIn(id=str(ID)).id == ID
-    assert invalid_fields(ByIdIn, id="nope") == {"id"}
+def test_an_id_is_a_uuid():
+    assert ItemRefIn(id=str(ID)).id == ID
+    assert invalid_fields(ItemRefIn, id="nope") == {"id"}  # a malformed id is its own error, not a missing name
+
+
+# An item by its id or by its name (hub#1162): as the Hub's groups, tags, drawers, menus and tasks.
+
+#: Every input that names an item, with the rest of what it needs.
+NAMING_AN_ITEM = [
+    pytest.param(ItemRefIn, {}, id="detail-delete"),
+    pytest.param(ItemPatchIn, {"status": "done"}, id="update"),
+    pytest.param(LineIn, {"text": "Coffee", "qty": 1}, id="add_line"),
+]
+
+
+@pytest.mark.parametrize(("schema", "rest"), NAMING_AN_ITEM)
+def test_an_item_is_named_by_its_id_or_by_its_name(schema, rest):
+    assert (schema(id=ID, **rest).id, schema(id=ID, **rest).called) == (ID, None)
+    named = schema(called="  Autumn trial ", **rest)
+    assert (named.id, named.called) == (None, "Autumn trial")
+
+
+@pytest.mark.parametrize(("schema", "rest"), NAMING_AN_ITEM)
+def test_without_its_id_or_its_name_the_item_is_what_is_missing(schema, rest):
+    [error] = errors_of(schema, **rest)
+    assert (error["loc"], error["msg"]) == (("called",), f"Value error, {NO_ITEM}")
+
+
+@pytest.mark.parametrize("said", ["", "   ", "x" * 121])
+def test_an_items_name_is_said_as_an_item_is_named(said):
+    assert invalid_fields(ItemRefIn, called=said) == {"called"}
+
+
+def test_the_card_names_the_item_a_name_finds_by_reading_it():
+    """The assistant's card says the item the write will act on, read by the name the model sent (base/assistant.py
+    ``REFERS``): «Item: Autumn trial» even when the person said «autumn», never only what was said."""
+    properties = ItemRefIn.model_json_schema()["properties"]
+    assert properties["called"]["refers"] == {"read": "demo.item.detail", "by": "called", "name": ["name"]}
+    assert properties["id"]["refers"] == {"read": "demo.item.detail", "by": "id", "name": ["name"]}
+    assert properties["called"]["title"] == properties["id"]["title"] == "Item"
 
 
 def test_line_in():

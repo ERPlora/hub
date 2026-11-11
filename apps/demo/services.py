@@ -4,19 +4,17 @@ Every write locks the item's row first, so two writes on the same item never int
 lines added at once never share a position).
 """
 
-from uuid import UUID
-
 from django.db.models import Max
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import Conflict, NotFound
+from live.errors import Conflict
 from live.operations import operation
 from live.outbox import record_event
 
 from apps.demo import events
 from apps.demo.models import Item, ItemLine
-from apps.demo.queries import ITEM_NOT_FOUND, load_detail
-from apps.demo.schemas import ByIdIn, DeletedOut, ItemDetailOut, ItemIn, ItemPatchIn, LineIn
+from apps.demo.queries import find_item, load_detail
+from apps.demo.schemas import DeletedOut, ItemDetailOut, ItemIn, ItemPatchIn, ItemRefIn, LineIn
 
 ITEM_DONE = _("This item is closed: open it to add lines.")
 
@@ -58,9 +56,10 @@ def create_item(ctx: OperationContext, data: ItemIn) -> Item | None:
     input=ItemPatchIn,
     output=ItemDetailOut,
     ai={
-        "description": "Changes a demo item, by its id, only in what is sent: its name, its status («done» closes it "
-        "to new lines, «open» reopens it) or its note.",
+        "description": "Changes a demo item, by its id or its name, only in what is sent: its name, its status "
+        "(«done» closes it to new lines, «open» reopens it) or its note.",
         "risk": "normal",
+        "check": "demo.item.detail",
         "asks": {
             "en": (
                 "rename the demo item Trial 2 to «Winter trial»",
@@ -75,8 +74,8 @@ def create_item(ctx: OperationContext, data: ItemIn) -> Item | None:
 )
 def update_item(ctx: OperationContext, data: ItemPatchIn) -> Item | None:
     """Changes only the fields sent (``null`` leaves one as it is); no change, no event."""
-    item = _locked(data.id)
-    sent = data.model_dump(exclude_unset=True, exclude_none=True, exclude={"id"})
+    item = find_item(data, lock=True)
+    sent = data.model_dump(exclude_unset=True, exclude_none=True, exclude={"id", "called"})
     changes = {field: value for field, value in sent.items() if getattr(item, field) != value}
     if changes:
         for field, value in changes.items():
@@ -91,11 +90,12 @@ def update_item(ctx: OperationContext, data: ItemPatchIn) -> Item | None:
     kind="command",
     repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="demo.manage",
-    input=ByIdIn,
+    input=ItemRefIn,
     output=DeletedOut,
     ai={
-        "description": "Deletes a demo item, by its id, together with all its lines. It cannot be undone.",
+        "description": "Deletes a demo item, by its id or its name, together with all its lines. It cannot be undone.",
         "risk": "high",
+        "check": "demo.item.detail",
         "asks": {
             "en": (
                 "delete the demo item Trial 2 and its lines",
@@ -108,10 +108,12 @@ def update_item(ctx: OperationContext, data: ItemPatchIn) -> Item | None:
         },
     },
 )
-def delete_item(ctx: OperationContext, data: ByIdIn) -> dict:
-    _locked(data.id).delete()
-    record_event(ctx, events.ITEM_DELETED, {"id": str(data.id)})
-    return {"id": data.id}
+def delete_item(ctx: OperationContext, data: ItemRefIn) -> dict:
+    item = find_item(data, lock=True)
+    item_id = item.id  # ``delete()`` leaves the instance without its primary key
+    item.delete()
+    record_event(ctx, events.ITEM_DELETED, {"id": str(item_id)})
+    return {"id": item_id}
 
 
 @operation(
@@ -122,9 +124,10 @@ def delete_item(ctx: OperationContext, data: ByIdIn) -> dict:
     input=LineIn,
     output=ItemDetailOut,
     ai={
-        "description": "Adds a line (a text and a quantity above zero) at the end of an open demo item, by its id; "
-        "the same client_line_id sent again does not add it twice.",
+        "description": "Adds a line (a text and a quantity above zero) at the end of an open demo item, by its id or "
+        "its name; the same client_line_id sent again does not add it twice.",
         "risk": "normal",
+        "check": "demo.item.detail",
         "asks": {
             "en": (
                 "add a line «screws» with quantity 3 to the demo item Trial 2",
@@ -143,7 +146,7 @@ def add_line(ctx: OperationContext, data: LineIn) -> Item | None:
     The repeat is checked before the status: a retry of a line that already went in must not be
     rejected (the client would roll back a line the server has) because the item was closed since.
     """
-    item = _locked(data.id)
+    item = find_item(data, lock=True)
     if data.client_line_id is not None and item.lines.filter(client_line_id=data.client_line_id).exists():
         return load_detail(item.id)
     if item.status == Item.Status.DONE:
@@ -155,11 +158,3 @@ def add_line(ctx: OperationContext, data: LineIn) -> Item | None:
     item.save(update_fields=["updated_at"])  # the item moves up the list
     record_event(ctx, events.ITEM_LINE_ADDED, {"id": str(item.id), "line_id": str(line.id)})
     return load_detail(item.id)
-
-
-def _locked(item_id: UUID) -> Item:
-    """The item, its row locked until the end of the command's transaction."""
-    item = Item.objects.select_for_update().filter(pk=item_id).first()
-    if item is None:
-        raise NotFound(ITEM_NOT_FOUND)
-    return item

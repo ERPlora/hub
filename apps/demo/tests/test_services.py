@@ -12,6 +12,7 @@ from decimal import Decimal
 import psycopg
 import pytest
 from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from live.errors import Conflict, NotFound, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
@@ -19,7 +20,7 @@ from live.outbox import channel_for
 
 from apps.demo import events
 from apps.demo.models import Item, ItemLine
-from apps.demo.schemas import ByIdIn, DeletedOut, ItemDetailOut, ItemIn, ItemPatchIn, LineIn
+from apps.demo.schemas import DeletedOut, ItemDetailOut, ItemIn, ItemPatchIn, ItemRefIn, LineIn
 
 from .conftest import A, B, ctx_for
 
@@ -54,7 +55,7 @@ def outbox():
     [
         ("demo.item.create", ItemIn, ItemDetailOut),
         ("demo.item.update", ItemPatchIn, ItemDetailOut),
-        ("demo.item.delete", ByIdIn, DeletedOut),
+        ("demo.item.delete", ItemRefIn, DeletedOut),
         ("demo.item.add_line", LineIn, ItemDetailOut),
     ],
 )
@@ -134,7 +135,7 @@ def test_delete_removes_the_item_and_its_lines_and_records_deleted():
     add_line(item_id)
     OutboxEvent.objects.all().delete()
 
-    assert run("demo.item.delete", ByIdIn(id=item_id)) == DeletedOut(id=item_id)
+    assert run("demo.item.delete", ItemRefIn(id=item_id)) == DeletedOut(id=item_id)
 
     assert not Item.objects.exists() and not ItemLine.objects.exists()
     assert outbox() == [(events.ITEM_DELETED, "a", {"id": str(item_id)})]
@@ -143,8 +144,91 @@ def test_delete_removes_the_item_and_its_lines_and_records_deleted():
 @pytest.mark.django_db
 def test_delete_of_a_missing_item_is_not_found():
     with pytest.raises(NotFound):
-        run("demo.item.delete", ByIdIn(id=uuid.uuid7()))
+        run("demo.item.delete", ItemRefIn(id=uuid.uuid7()))
     assert outbox() == []
+
+
+# Each write on an item by its name (hub#1162), as the read finds it: ``tests/test_queries.py``.
+
+#: Each write on one item, its input and the rest of what it needs.
+ON_AN_ITEM = [
+    ("demo.item.update", ItemPatchIn, {"status": "done"}),
+    ("demo.item.delete", ItemRefIn, {}),
+    ("demo.item.add_line", LineIn, {"text": "Screws", "qty": "3"}),
+]
+
+
+@pytest.mark.django_db
+def test_update_by_its_name_changes_only_what_was_sent():
+    item = create("Autumn trial", note="keep")
+    create("Bar")
+    OutboxEvent.objects.all().delete()
+
+    detail = run("demo.item.update", ItemPatchIn(called="autumn trial", name="Winter trial", status="done"))
+
+    assert (detail.id, detail.name, detail.status, detail.note) == (item.id, "Winter trial", "done", "keep")
+    assert outbox() == [(events.ITEM_UPDATED, "a", {"id": str(item.id)})]
+
+
+@pytest.mark.django_db
+def test_delete_by_its_name_says_and_records_the_id_of_the_item_it_deleted():
+    item = create("Autumn trial")
+    add_line(item.id)
+    bar = create("Bar")
+    OutboxEvent.objects.all().delete()
+
+    assert run("demo.item.delete", ItemRefIn(called="Autumn trial")) == DeletedOut(id=item.id)
+
+    assert list(Item.objects.values_list("id", flat=True)) == [bar.id]
+    assert not ItemLine.objects.exists()
+    assert outbox() == [(events.ITEM_DELETED, "a", {"id": str(item.id)})]
+
+
+@pytest.mark.django_db
+def test_add_line_by_its_name():
+    item = create("Autumn trial")
+    create("Bar")
+
+    detail = run("demo.item.add_line", LineIn(called="Autumn trial", text="Screws", qty="3"))
+
+    assert (detail.id, [(line.text, line.qty) for line in detail.lines]) == (item.id, [("Screws", Decimal("3"))])
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("name", "schema", "rest"), ON_AN_ITEM)
+def test_a_name_two_items_share_changes_nothing_and_records_nothing(name, schema, rest):
+    first, second = create("Autumn trial"), create("Autumn trial")
+    OutboxEvent.objects.all().delete()
+
+    with pytest.raises(Conflict) as excinfo:
+        run(name, schema(called="Autumn trial", **rest))
+
+    assert excinfo.value.code == "demo.item_ambiguous"
+    assert sorted(Item.objects.values_list("id", "status")) == sorted([(first.id, "open"), (second.id, "open")])
+    assert not ItemLine.objects.exists()
+    assert outbox() == []
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("name", "schema", "rest"), ON_AN_ITEM)
+def test_each_write_locks_the_items_row_before_it_writes(name, schema, rest):
+    """The module's promise (two writes on the same item never interleave): the item found, by its id or its name, is
+    read again ``FOR UPDATE`` before anything is written."""
+    item = create("Autumn trial")
+    with CaptureQueriesContext(connection) as queries:
+        run(name, schema(called="Autumn trial", **rest))
+    statements = [query["sql"] for query in queries.captured_queries]
+    locked = next(at for at, sql in enumerate(statements) if "FOR UPDATE" in sql and str(item.id.hex) in sql.replace("-", ""))
+    written = next(at for at, sql in enumerate(statements) if sql.lstrip().startswith(("UPDATE", "DELETE", "INSERT")))
+    assert locked < written, statements
+
+
+@pytest.mark.django_db
+def test_a_write_on_a_name_no_item_has_is_not_found():
+    create("Bar")
+    with pytest.raises(NotFound):
+        run("demo.item.delete", ItemRefIn(called="Autumn trial"))
+    assert Item.objects.count() == 1
 
 
 # demo.item.add_line
@@ -282,7 +366,7 @@ def test_an_employee_cannot_write():
     attempts = [
         ("demo.item.create", ItemIn(name="x")),
         ("demo.item.update", ItemPatchIn(id=item_id, name="x")),
-        ("demo.item.delete", ByIdIn(id=item_id)),
+        ("demo.item.delete", ItemRefIn(id=item_id)),
         ("demo.item.add_line", LineIn(id=item_id, text="x", qty=1)),
     ]
     for name, data in attempts:
