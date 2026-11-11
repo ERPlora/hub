@@ -118,7 +118,8 @@ APP_WORDS = shared.app_words
 #: deactivation itself (``staff.member.deactivate``, ``*.deactivate``), not only a switch off, and what one «pide» or
 #: «solicita» for oneself, a «solicitud», is a request (``staff.time_off.request``). A «bono» (a voucher, a pack) is
 #: Services' voucher, the one of the catalogue (``service.package``) or the one sold to a customer (``service.grant``),
-#: and an «asignación» (what one «asigna») is a professional's assignment to a service (``service.assignment``).
+#: and an «asignación» (what one «asigna») is a professional's assignment to a service (``service.assignment``). An
+#: «elemento», as Demo's screens name one, is an item (``demo.item``).
 SYNONYMS = (
     ("cuenta", "check", "tab", "order"),
     ("ticket", "tique", "recibo", "receipt", "sale"),
@@ -180,6 +181,8 @@ SYNONYMS = (
     ),
     ("borrador", "borradores", "draft", "drafts"),
     ("receta", "recetas", "prefabricada", "prefabricadas", "recipe", "recipes"),
+    # demo
+    ("elemento", "elementos", "item", "items"),
 )
 #: The help a how-to question asks for (``live.assistant.HOWTO_POINTS``): it ranks by being one, not only by ``ALWAYS``.
 HOWTO = (DOCS_SEARCH,)
