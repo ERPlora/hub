@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:04657e215b140f295a0749265804386387796c6df66e557b6481cdb114c46971 -->
+<!-- generated from WORKBOOK.md sha256:2c5aea91e0d92aa12cbe359f7f643f9966d20e5ec172691bceb73801c56f8caa -->
 
 ## What it is for and who it is for
 
@@ -2350,8 +2350,9 @@ Steps:
      sent until this one ends.
   5. If they ask how something is done in ERPlora, what an option means or what a plan includes ("How do I open the
      cash register?"), the assistant searches ERPlora's documentation (the help, each app's and the plans) and answers
-     only with what it says, citing which section it comes from; if the documentation does not cover it, it says so
-     instead of making it up.
+     only with what it says, and ends the answer with a "Source: …" line naming the section it comes from (its
+     headings or, when it has none, its path), so the person can check it and read more; if the documentation does not
+     cover it, it says so instead of making it up.
   6. If the assistant ends without saying anything, the bubble reads "(no answer)".
   7. "Stop" cuts what was left: what was already written stays, with "Stopped." below.
   8. Under each finished answer, "Read aloud" reads it with the device's voice, if it has one, and "Stop reading"
