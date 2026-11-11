@@ -6,6 +6,7 @@ import datetime as dt
 from decimal import Decimal
 
 import pytest
+from django.apps import apps as django_apps
 from django.utils import timezone, translation
 from live.errors import Conflict
 
@@ -367,3 +368,64 @@ def test_a_figure_with_a_tax_of_no_territory_is_a_plain_taxes(product, families)
     (row,) = Sale.objects.get(pk=sale.id).tax_breakdown
     Sale.objects.filter(pk=sale.id).update(tax_breakdown=[{**row, "tax_type": family} for family in families])
     assert stats().tax_kind is None
+
+
+# ── A line without a rule: its tax category as Taxes names it, and where its rule is made (hub#1123) ──
+
+
+def where_rules_are_made() -> str:
+    """«Taxes › Rules» in the active language, as the Hub's menu names the app and its section."""
+    tax = django_apps.get_app_config("tax")
+    (rules,) = [entry for entry in tax.navigation if entry.id == "rules"]
+    return f"{tax.verbose_name} › {rules.label}"
+
+
+def refusals(product_sku: str) -> list[Conflict]:
+    """What the check's foot (the preview) and the checkout's sheet (the charge) are refused with."""
+    caught = []
+    for attempt in (
+        lambda: run("sale.checkout.preview", {"lines": [{"product": product_sku}]}),
+        lambda: charge("tax-key-1123", {"product": product_sku}),
+    ):
+        with pytest.raises(Conflict) as refusal:
+            attempt()
+        caught.append(refusal.value)
+    return caught
+
+
+@pytest.mark.parametrize("language", ["en", "es"])
+def test_a_line_without_a_rule_names_its_tax_category_as_taxes_does_and_where_its_rule_is_made(product, language):
+    # SALE-F01, SALE-F38: a factory category by its name in the reader's language, never by its key.
+    regional_rule("ES-CN", "7", "igic")
+    run("tax.settings.update", {"region_code": "ES-CN"})
+    product("Menu", "MNU", 1100, "restaurant.food")
+    shown = run("tax.category.get", {"key": "restaurant.food"}, ctx_for(language=language)).display_name
+    with translation.override(language):
+        caught = refusals("MNU")
+        where = where_rules_are_made()
+    assert [refusal.code for refusal in caught] == ["sale.no_tax_rule", "sale.no_tax_rule"]
+    for refusal in caught:
+        assert "«Menu»" in refusal.message
+        assert f"«{shown}»" in refusal.message
+        assert "restaurant.food" not in refusal.message
+        assert where in refusal.message
+    assert not Sale.objects.exists()
+
+
+def test_a_tax_category_of_the_business_without_a_rule_is_named_as_it_was_typed(product):
+    run("tax.category.create", {"key": "own.flowers", "name": "Fresh flowers"})
+    product("Roses", "ROS", 900, "own.flowers")
+    for refusal in refusals("ROS"):
+        assert refusal.code == "sale.no_tax_rule"
+        assert "«Fresh flowers»" in refusal.message
+        assert "own.flowers" not in refusal.message
+
+
+def test_the_name_of_a_tax_category_is_the_one_taxes_shows(db):
+    from apps.sale.queries import tax_category_name
+
+    with translation.override("es"):
+        shown = run("tax.category.get", {"key": "service.generic"}, ctx_for(language="es")).display_name
+        assert tax_category_name("service.generic") == shown != "service.generic"
+    # A key no category has any more (deleted in the Hub admin after the line was added) is all there is to name.
+    assert tax_category_name("ghost.category") == "ghost.category"

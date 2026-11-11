@@ -253,6 +253,18 @@ describe('BulkAddModal', () => {
     expect(namesGiven(bar)).toEqual(['Busca un producto…']);
   });
 
+  // hub#1124: one ticked product is singular, two are plural, in both languages.
+  it.each([
+    { locale: 'en' as const, ticked: ['p2'], label: 'Add 1 selected' },
+    { locale: 'en' as const, ticked: ['p2', 'p3'], label: 'Add 2 selected' },
+    { locale: 'es' as const, ticked: ['p2'], label: 'Añadir 1 seleccionado' },
+    { locale: 'es' as const, ticked: ['p2', 'p3'], label: 'Añadir 2 seleccionados' },
+  ])('«$label» with $ticked.length ticked ($locale, COMBO-F06)', async ({ locale, ticked, label }) => {
+    const s = await setup(locale);
+    for (const id of ticked) await ionChecked(s.box(id), true);
+    expect(s.submit().textContent?.trim()).toBe(label);
+  });
+
   it('speaks Spanish', async () => {
     const s = await setup('es');
     expect(s.inDoc('combo-bulk')?.getAttribute('aria-label')).toBe('Añadir productos a este plato');
