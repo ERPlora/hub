@@ -757,7 +757,7 @@ def list_presence(ctx: OperationContext, params: PresenceListIn) -> dict:
                 "count who is clocked in now",
             ),
             "es": (
-                "¿cuántos siguen sin fichar la salida?",
+                "¿cuántos no han fichado aún la salida?",
                 "¿cuánta gente está dentro en este momento?",
                 "número de fichados ahora mismo",
             ),
