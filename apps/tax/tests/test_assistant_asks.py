@@ -72,19 +72,20 @@ PROBES = [
     for probe in json.loads(path.read_text(encoding="utf-8"))["probes"]
 ]
 ROLES = {"owner": Membership.Role.OWNER, "employee": Membership.Role.EMPLOYEE}
-#: «activar» and «desactivar» read only as turning something on or off (an app, a setting), never as the actions
-#: ``activate`` and ``deactivate``: bringing a rule back or switching it off is offered, but after the app's switch the
-#: model reached for instead. Strict, so the pointer of live that reads the verbs turns these red and whoever brings it
-#: takes the mark off: the order is then held.
-UNTIL_LIVE_READS_THE_VERBS = pytest.mark.xfail(
+#: live reads «activar» and «desactivar» as the actions ``activate`` and ``deactivate`` (ERPlora/live#70), but it takes
+#: an app named in a «de» complement of the thing («la regla española de product.qa»: Products) for what the command
+#: switches: bringing a rule back or switching it off is offered, but after the app's switch the model reached for
+#: instead. Strict, so the pointer of live that reads the head of the object turns these red and whoever brings it takes
+#: the mark off: the order is then held.
+UNTIL_LIVE_READS_WHAT_IS_SWITCHED = pytest.mark.xfail(
     strict=True,
     raises=AssertionError,
-    reason="ERPlora/live#50: VERBS has no «activate» nor «deactivate»; «activar» is only enable, «desactivar» disable",
+    reason="ERPlora/live#73: «de product.qa» names the Products app, taken for what the command switches",
 )
 #: What a turn offers ahead of the reported requests to bring a rule back or to switch it off: an app's switch.
 CHOSEN_INSTEAD = [
-    pytest.param("tax.rule.activate", "base.app.enable", marks=UNTIL_LIVE_READS_THE_VERBS),
-    pytest.param("tax.rule.deactivate", "base.app.disable", marks=UNTIL_LIVE_READS_THE_VERBS),
+    pytest.param("tax.rule.activate", "base.app.enable", marks=UNTIL_LIVE_READS_WHAT_IS_SWITCHED),
+    pytest.param("tax.rule.deactivate", "base.app.disable", marks=UNTIL_LIVE_READS_WHAT_IS_SWITCHED),
 ]
 #: What a person says in words of their own, neither an ask nor a probe of layer 2, one for each tool: it is their asks
 #: that bring the tool among the first ten, and without them it is not there (hub#1135, hub#1165), so asks that stop
