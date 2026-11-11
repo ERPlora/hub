@@ -28,15 +28,13 @@ import datetime as dt
 import itertools
 import uuid
 
-import psycopg
 import pytest
 from django.apps import apps as django_apps
-from django.db import connections as django_connections
 from psycopg import sql
 from psycopg.types.json import Jsonb
 
 from base import services
-from base.tenancy import bootstrap, identity, move, names, restore
+from base.tenancy import identity, move, names, restore
 from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import use_control
 from base.tenancy.tests import hubs
@@ -59,21 +57,7 @@ def nothing_checked_yet(monkeypatch):
     monkeypatch.setattr(identity, "_verified", set())
 
 
-def databases() -> set[str]:
-    control = tenancy_connections.control_name()
-    with hubs._maintenance() as conn:
-        return {row[0] for row in conn.execute("SELECT datname FROM pg_database") if row[0].startswith(control)}
-
-
-def marker(name: str) -> list[str]:
-    """What the hub's own table says in the database ``name``."""
-    with hubs._maintenance(name) as conn:
-        return [row[0] for row in conn.execute("SELECT note FROM w8a_marker ORDER BY note")]
-
-
-def says_it_is(name: str) -> list[uuid.UUID]:
-    with hubs._maintenance(name) as conn:
-        return [row[0] for row in conn.execute("SELECT hub_id FROM base_hub_identity")]
+databases, marker, says_it_is = hubs.control_databases, hubs.marker, hubs.says_it_is
 
 
 def write(name: str, note: str) -> None:
@@ -143,22 +127,17 @@ def change_record(name: str, record_id: uuid.UUID, **fields) -> None:
         )
 
 
-class Restores:
-    """The rows and databases of one test (committed: no test case here), dropped and deleted after it."""
+class Restores(hubs.CopiedHubs):
+    """The rows and databases of one test, dropped and deleted after it."""
 
     def __init__(self, template: str):
-        self.template = template
-        self.hubs: list[Hub] = []
-        self.clusters: list[Cluster] = []
+        super().__init__(template)
         #: The copy of each hub on its temporary cluster (the session's server: a name of its own).
         self.copies: dict[uuid.UUID, str] = {}
 
     def cluster(self, name: str = "restore", **fields) -> Cluster:
         """A temporary cluster: closed to new hubs, on the session's server."""
-        default = django_connections.settings["default"]
-        values = {"host": default["HOST"], "port": default["PORT"], "pooler_host": "", "is_open": False}
-        self.clusters.append(row := Cluster.objects.create(name=f"{name}-{uuid.uuid4().hex[:8]}", **(values | fields)))
-        return row
+        return super().cluster(name, **({"is_open": False} | fields))
 
     def hub(self, *, source: Cluster | None, cluster: Cluster | None = None, **fields) -> Hub:
         """A ready hub on the settings' own server whose database is a clone of the template with its identity and a
@@ -166,18 +145,8 @@ class Restores:
         row since. Asked to be restored from ``source``."""
         hub_id = uuid.uuid7()
         control = tenancy_connections.control_name()
-        name = names.hub_db_name(control, hub_id)
+        name = self.database(hub_id, AS_THEN)
         copy = names.hub_db_name(control, uuid.uuid7())
-        with hubs._maintenance() as conn:
-            conn.execute(
-                sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(
-                    names.identifier(name, control=control), names.identifier(self.template, control=control)
-                )
-            )
-        with hubs._maintenance(name) as conn:
-            conn.execute("INSERT INTO base_hub_identity (hub_id) VALUES (%s)", [hub_id])
-            conn.execute("CREATE TABLE w8a_marker (note text)")
-            conn.execute("INSERT INTO w8a_marker VALUES (%s)", [AS_THEN])
         with hubs._maintenance() as conn:
             conn.execute(
                 sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(
@@ -186,18 +155,8 @@ class Restores:
             )
         write(name, SINCE)
         self.copies[hub_id] = copy
-        values = {
-            "id": hub_id,
-            "slug": f"acme-{hub_id.hex[-8:]}",
-            "status": Hub.Status.READY,
-            "db_name": name,
-            "vertical": hubs.TEMPLATE_VERTICAL,
-            "cluster": cluster,
-            "restoring_from": source,
-            "restore_point": THEN if source is not None else None,
-        }
-        self.hubs.append(row := Hub.objects.create(**(values | fields)))
-        return row
+        asked = {"cluster": cluster, "restoring_from": source, "restore_point": THEN if source is not None else None}
+        return self.ready_hub(hub_id, name, **(asked | fields))
 
     def source(self, hub) -> str:
         return self.copies[hub.id]
@@ -205,16 +164,10 @@ class Restores:
 
 @pytest.fixture
 def restores(django_db_blocker, hub_databases):
-    made = Restores(hub_databases.template)
     with django_db_blocker.unblock():
-        before = databases()
+        made = Restores(hub_databases.template)
         yield made
-        control = tenancy_connections.control_name()
-        with hubs._maintenance() as conn:
-            for name in sorted(databases() - before):
-                hubs._drop(conn, name, control)
-        Hub.objects.filter(pk__in=[row.pk for row in made.hubs]).delete()
-        Cluster.objects.filter(pk__in=[row.pk for row in made.clusters]).delete()
+        made.clean()
 
 
 def fresh(hub: Hub) -> Hub:
@@ -302,71 +255,43 @@ class TestClosedToTheApp:
 
     @pytest.fixture
     def app_role(self, restores):
-        role = f"w8a_app_{uuid.uuid4().hex[:8]}"
-        with hubs._maintenance() as conn:
-            conn.execute(sql.SQL("CREATE ROLE {} LOGIN PASSWORD 'app'").format(sql.Identifier(role)))
-        yield role
-        with hubs._maintenance() as conn:
-            for name in sorted(databases()):
-                revoke = sql.SQL("REVOKE ALL ON DATABASE {} FROM {}")
-                conn.execute(revoke.format(sql.Identifier(name), sql.Identifier(role)))
-            conn.execute(sql.SQL("DROP ROLE IF EXISTS {}").format(sql.Identifier(role)))
-
-    @staticmethod
-    def roles(role: str) -> bootstrap.Names:
-        return bootstrap.Names(hub_app=role, hub_admin="pg_monitor")
-
-    @staticmethod
-    def reaches(role: str, name: str) -> bool:
-        default = django_connections.settings["default"]
-        try:
-            with psycopg.connect(
-                dbname=name, user=role, password="app", host=default["HOST"], port=default["PORT"], connect_timeout=5
-            ):
-                return True
-        except psycopg.OperationalError:
-            return False
-
-    @staticmethod
-    def grant(role: str, name: str) -> None:
-        with hubs._maintenance() as conn:
-            grant = sql.SQL("GRANT CONNECT ON DATABASE {} TO {}")
-            conn.execute(grant.format(sql.Identifier(name), sql.Identifier(role)))
+        with hubs.an_app_role() as role:
+            yield role
 
     def test_while_it_is_restored_the_app_is_out_and_after_it_reaches_the_new_database_only(
         self, restores, app_role, monkeypatch
     ):
         hub = restores.hub(source=restores.cluster())
-        self.grant(app_role, hub.db_name)
+        hubs.grant_connect(app_role, hub.db_name)
         seen: list[tuple[bool, bool]] = []
         real = move._restore
 
         def restoring(path, name, cluster, heartbeat, cancelled=None):
             kept = control_services.pending_copy(hub.id).db_name
-            seen.append((self.reaches(app_role, name), self.reaches(app_role, kept)))
+            seen.append((hubs.reaches(app_role, name), hubs.reaches(app_role, kept)))
             return real(path, name, cluster, heartbeat, cancelled)
 
         monkeypatch.setattr(move, "_restore", restoring)
 
-        run(restores, roles=self.roles(app_role))
+        run(restores, roles=hubs.app_roles(app_role))
 
         assert seen == [(False, False)]
         kept = kept_copy(fresh(hub)).db_name
-        assert (self.reaches(app_role, hub.db_name), self.reaches(app_role, kept)) == (True, False)
+        assert (hubs.reaches(app_role, hub.db_name), hubs.reaches(app_role, kept)) == (True, False)
 
     def test_after_a_failure_the_app_reaches_its_own_database_again(self, restores, app_role, monkeypatch):
         hub = restores.hub(source=restores.cluster())
-        self.grant(app_role, hub.db_name)
+        hubs.grant_connect(app_role, hub.db_name)
 
         def broken(*args, **kwargs):
             raise move.MoveFailed("move_restore_failed", "the restore broke on purpose")
 
         monkeypatch.setattr(move, "_restore", broken)
 
-        run(restores, roles=self.roles(app_role))
+        run(restores, roles=hubs.app_roles(app_role))
 
         assert fresh(hub).restoring_from_id is None
-        assert self.reaches(app_role, hub.db_name)
+        assert hubs.reaches(app_role, hub.db_name)
         assert marker(hub.db_name) == [AS_THEN, SINCE]
 
 
