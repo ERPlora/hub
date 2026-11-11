@@ -165,11 +165,11 @@ def _cart_event(ctx: OperationContext, name: str, cart: Cart) -> None:
     ai={
         "asks": {
             "en": (
-                "start a shopping cart for Ana, ana@example.com",
+                "start a shopping cart for Carmen, carmen@example.com",
                 "create a new web basket for an anonymous visit",
             ),
             "es": (
-                "crea un carrito para Ana, ana@example.com",
+                "crea un carrito para Carmen, carmen@example.com",
                 "crea una cesta web nueva para una visita anónima",
             ),
         },
@@ -217,11 +217,11 @@ def create_cart(ctx: OperationContext, data: CartIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "mark Ana's cart as abandoned",
+                "mark Carmen's cart as abandoned",
                 "the customer left the web basket unfinished, set it as abandoned",
             ),
             "es": (
-                "marca como abandonado el carrito de Ana",
+                "marca como abandonado el carrito de Carmen",
                 "la clienta dejó la cesta web sin terminar: dala por abandonada",
             ),
         },
@@ -252,11 +252,11 @@ def mark_abandoned(ctx: OperationContext, data: AbandonIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "delete Ana's shopping cart",
+                "delete Carmen's shopping cart",
                 "remove the web basket of session sess_a1b2c3 but keep its orders",
             ),
             "es": (
-                "borra el carrito de Ana",
+                "borra el carrito de Carmen",
                 "elimina la cesta web de la sesión sess_a1b2c3 sin tocar sus pedidos",
             ),
         },
@@ -285,14 +285,14 @@ def delete_cart(ctx: OperationContext, data: CartRefIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "empty Ana's shopping cart",
+                "empty Carmen's shopping cart",
                 "clear every line of the web basket but keep it active",
                 "leave cart sess_a1b2c3 with no products",
             ),
             "es": (
-                "vacía la cesta web de Ana",
+                "vacía la cesta web de Carmen",
                 "vacía el carrito sess_a1b2c3 sin borrarlo",
-                "deja el carrito de Marta sin ningún producto, que siga abierto",
+                "deja el carrito de Nuria sin ningún producto, que siga abierto",
             ),
         },
         "description": "Empty an active shopping cart (named by its session code, its customer or its id): every "
@@ -373,11 +373,11 @@ def _line_and_cart(item_id) -> tuple[CartItem, Cart]:
     ai={
         "asks": {
             "en": (
-                "add two shampoos to Ana's cart",
+                "add two shampoos to Carmen's cart",
                 "put a bottle of wine at 12 euros each in the web basket",
             ),
             "es": (
-                "añade dos champús al carrito de Ana",
+                "añade dos champús al carrito de Carmen",
                 "mete un vino a 12 € cada uno en la cesta web",
             ),
         },
@@ -433,11 +433,11 @@ def add_item(ctx: OperationContext, data: ItemAddIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "change the shampoo in Ana's cart to two units",
+                "change the shampoo in Carmen's cart to two units",
                 "set the wine in the web basket to five units, same price",
             ),
             "es": (
-                "cambia el champú del carrito de Ana a dos unidades",
+                "cambia el champú del carrito de Carmen a dos unidades",
                 "pon cinco unidades del vino de la cesta web, al mismo precio",
             ),
         },
@@ -480,12 +480,12 @@ def update_item(ctx: OperationContext, data: ItemUpdateIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "take the shampoo out of Ana's cart",
-                "remove the wine line from Marta's web basket",
+                "take the shampoo out of Carmen's cart",
+                "remove the wine line from Nuria's web basket",
             ),
             "es": (
-                "quita el champú del carrito de Ana",
-                "elimina el vino de la cesta web de Marta",
+                "quita el champú del carrito de Carmen",
+                "elimina el vino de la cesta web de Nuria",
             ),
         },
         "description": "Remove a line from an active shopping cart (by the line's id); the cart's totals are "
@@ -524,12 +524,12 @@ def _number(day) -> int:
     ai={
         "asks": {
             "en": (
-                "turn Ana's cart into an order",
-                "place the order of Marta's web basket with home delivery",
+                "turn Carmen's cart into an order",
+                "place the order of Nuria's web basket with home delivery",
             ),
             "es": (
-                "convierte el carrito de Ana en un pedido",
-                "tramita el pedido de la cesta web de Marta con envío a casa",
+                "convierte el carrito de Carmen en un pedido",
+                "tramita el pedido de la cesta web de Nuria con envío a casa",
             ),
         },
         "description": "Start an order from an active shopping cart with lines (named by its session code, its "
@@ -652,11 +652,11 @@ def mark_paid(ctx: OperationContext, data: OrderRefIn) -> dict:
         "asks": {
             "en": (
                 "the payment of OS-20261014-0003 failed",
-                "the bank declined the payment of Ana's online purchase",
+                "the bank declined the payment of Carmen's online purchase",
             ),
             "es": (
                 "el pago del pedido OS-20261014-0003 ha fallado",
-                "el banco rechazó el pago del pedido web de Ana",
+                "el banco rechazó el pago del pedido web de Carmen",
             ),
         },
         "description": "Record that the payment of an initiated or paid order failed (named by its number or its "
@@ -690,11 +690,11 @@ def fail_order(ctx: OperationContext, data: FailIn) -> dict:
         "asks": {
             "en": (
                 "complete the paid order OS-20261014-0003",
-                "finish Ana's web order, it's already paid",
+                "finish Carmen's web order, it's already paid",
             ),
             "es": (
                 "completa el pedido pagado OS-20261014-0003",
-                "da por terminado el pedido web de Ana, que ya está pagado",
+                "da por terminado el pedido web de Carmen, que ya está pagado",
             ),
         },
         "description": "Complete a paid order (named by its number or its id): it becomes completed and its cart "
@@ -729,12 +729,12 @@ def complete_order(ctx: OperationContext, data: OrderRefIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "erase ana@example.com's personal data from the carts",
-                "wipe marta@example.com from the web orders",
+                "erase carmen@example.com's personal data from the carts",
+                "wipe nuria@example.com from the web orders",
             ),
             "es": (
-                "borra los datos personales de ana@example.com de los carritos",
-                "quita el email y las direcciones de marta@example.com de los pedidos web",
+                "aplica el derecho al olvido a carmen@example.com en los carritos",
+                "quita el email y las direcciones de nuria@example.com de los pedidos web",
             ),
         },
         "description": "Erase a customer's personal data (right to erasure), named by their exact email: every "

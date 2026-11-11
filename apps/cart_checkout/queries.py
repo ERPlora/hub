@@ -364,14 +364,14 @@ def list_carts(ctx: OperationContext, params: CartListIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "what's in Ana's shopping cart and how much is it?",
+                "what's in Carmen's shopping cart and how much is it?",
                 "show me the whole basket of session sess_a1b2c3",
-                "open the cart of marta@example.com, every line of it",
+                "open the cart of nuria@example.com, every line of it",
             ),
             "es": (
-                "¿qué lleva el carrito de Ana y cuánto suma?",
+                "¿qué lleva el carrito de Carmen y cuánto suma?",
                 "enséñame entera la cesta de la sesión sess_a1b2c3",
-                "dame el carrito de marta@example.com con todo lo que lleva",
+                "dame el carrito de nuria@example.com con todo lo que lleva",
             ),
         },
         "description": "Get one shopping cart with all its lines (product, quantity, unit price, line total), "
@@ -397,14 +397,14 @@ def get_cart(ctx: OperationContext, data: CartRefIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "which products are in Ana's web basket?",
+                "which products are in Carmen's web basket?",
                 "list the lines of cart sess_a1b2c3 with their prices",
-                "which products did Marta leave in her cart?",
+                "which products did Nuria leave in her cart?",
             ),
             "es": (
-                "¿qué productos hay en la cesta web de Ana?",
+                "¿qué productos hay en la cesta web de Carmen?",
                 "lista las líneas del carrito sess_a1b2c3 con sus precios",
-                "¿cuántas unidades de cada producto lleva el carrito de Marta?",
+                "¿cuántas unidades de cada producto lleva el carrito de Nuria?",
             ),
         },
         "description": "List the lines of one shopping cart (named by its session code or id): product reference "
@@ -447,11 +447,11 @@ def list_items(ctx: OperationContext, params: ItemListIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "at what price was the shampoo kept in Ana's cart?",
+                "at what price was the shampoo kept in Carmen's cart?",
                 "show me one line of the web basket with its quantity",
             ),
             "es": (
-                "¿a qué precio quedó guardado el champú en el carrito de Ana?",
+                "¿a qué precio quedó guardado el champú en el carrito de Carmen?",
                 "enséñame una línea de la cesta web con su cantidad",
             ),
         },
@@ -538,11 +538,11 @@ def list_orders(ctx: OperationContext, params: OrderListIn) -> dict:
         "asks": {
             "en": (
                 "what status is OS-20261014-0003 in?",
-                "give me the shipping address of what Ana bought online",
+                "give me the shipping address of what Carmen bought online",
             ),
             "es": (
-                "¿en qué estado está el pedido OS-20261014-0003?",
-                "dame la dirección de envío del pedido web de Ana",
+                "¿en qué estado está OS-20261014-0003?",
+                "dame la dirección de envío de la compra online de Carmen",
             ),
         },
         "description": "Get one order with everything it has (addresses, shipping and payment methods, dates, "
