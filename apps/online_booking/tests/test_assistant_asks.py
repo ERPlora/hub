@@ -14,15 +14,14 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 from live import assistant as shared
-from live.context import OperationContext, Scope
 from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, comparable, probe_phrases
+# ``context_of`` is base's fixture (a member of business ``a``, which has every app on, with a role and a language):
+# imported here, pytest hands it to the tests of this module as it does to base's.
+from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, comparable, context_of, probe_phrases
 
-A = Scope("host", "a")
 #: The requests of hub#1107's QA (``tests/e2e/qa/probes/owner-es-online_booking-2026-11-08.json``), as the owner said
 #: them, and nothing of the tools' ``asks``: before Online booking said its asks, booking from the public page as the
 #: customer came 12th, past the first ten the model weighs, and the services the page offers 13th (below the first ten
@@ -73,16 +72,9 @@ OWN_WORDS = [
 ]
 
 
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
+def owners_catalog(context_of, language: str = "es") -> dict[str, Operation]:
+    """The real catalogue of the assistant of the owner of business ``a``, which has every app on."""
+    return assistant.catalog(context_of(Membership.Role.OWNER, language))
 
 
 def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str, language: str = "es") -> int | None:
@@ -113,34 +105,30 @@ def test_online_booking_offers_its_fifteen_tools():
     assert "online_booking.customer.erase" not in tools
 
 
-def test_the_reported_requests_are_the_probes_of_layer_2():
-    phrases = probe_phrases()
-    assert [phrases.get(comparable(phrase)) for _, phrase in REPORTED] == [f"owner.es.{name}" for name, _ in REPORTED]
-
-
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
-def test_the_reported_request_offers_its_existing_operation_among_the_first_ten(catalog_of, name, phrase):
-    place = place_of_no_ask(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
+def test_the_reported_request_offers_its_existing_operation_among_the_first_ten(context_of, name, phrase):
+    assert probe_phrases().get(comparable(phrase)) == f"owner.es.{name}"  # the owner's own words, as the QA said them
+    place = place_of_no_ask(owners_catalog(context_of), name, phrase)
     assert place is not None and place <= TOP, place
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
-def test_every_probe_of_online_booking_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
+def test_every_probe_of_online_booking_offers_its_tool_without_being_one_of_its_asks(context_of, probe):
     """The owner's fifteen phrases of layer 2, the ones the model answered right too: a tool of Online booking that a
     new ask elsewhere pushes out of the first half of the ones a turn offers fails here before the real-model QA sees
     it."""
     assert (probe["role"], probe["language"]) == ("owner", "es")
-    tools = catalog_of(Membership.Role.OWNER, probe["language"])
+    tools = owners_catalog(context_of, probe["language"])
     place = place_of_no_ask(tools, probe["tool"], probe["phrase"], probe["language"])
     assert place is not None and place <= WITH_ROOM, place
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
+def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(context_of, name, phrase):
+    assert_its_asks_bring(owners_catalog(context_of), name, phrase, "es")
 
 
 def test_every_tool_of_online_booking_has_a_phrase_of_its_own():
