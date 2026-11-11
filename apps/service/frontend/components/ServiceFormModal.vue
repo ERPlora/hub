@@ -41,7 +41,7 @@ const props = withDefaults(
 
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedForm('service-form', () => ({ form: open.value ? form.value : original.value, image: image.value }), () => ({ form: original.value, image: draftOf(props.service) }));
+const canDismiss = useUnsavedForm('service-form', () => ({ form: open.value ? form.value : original.value, image: image.value }), () => ({ form: original.value, image: draftOf(props.service) }));
 
 interface Form {
   name: string;
@@ -198,6 +198,7 @@ function retryPhoto(): void {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="service-form"
     :title="title"
     :submit-label="photo.uploading.value ? $t('base.imageField.uploading') : service ? $t('service.services.form.save') : $t('service.services.form.create')"

@@ -336,8 +336,8 @@ describe('MenuFormModal: a business whose money cannot be read (hub#938)', () =>
 describe('MenuFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
   it('editing: as opened closes; a change asks; restored as opened closes again', async () => {
     const s = await setup(MENU);
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('combo-menu-form'),
       change: () => ionValue(s.field('name'), 'Kids menu', 'ionInput'),
       restore: () => ionValue(s.field('name'), MENU.name, 'ionInput'),

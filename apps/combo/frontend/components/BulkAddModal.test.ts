@@ -281,8 +281,8 @@ describe('BulkAddModal', () => {
 describe('BulkAddModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
   it('as opened closes; a product ticked asks; unticked again closes again', async () => {
     const s = await setup();
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('combo-bulk'),
       change: () => ionChecked(s.box('p3'), true),
       restore: () => ionChecked(s.box('p3'), false),

@@ -18,7 +18,7 @@ import type { GrantOut } from '../operations';
 const props = defineProps<{ grant: GrantOut | null }>();
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('service-grant-adjust', () => ({ direction: direction.value, uses: uses.value, days: days.value, reason: reason.value }), open);
+const canDismiss = useUnsavedFormOnOpen('service-grant-adjust', () => ({ direction: direction.value, uses: uses.value, days: days.value, reason: reason.value }), open);
 
 const t = useT();
 const locale = useLocale();
@@ -86,6 +86,7 @@ async function confirm(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="service-grant-adjust"
     :title="t('service.adjust.title')"
     :submit-label="t('service.adjust.confirm')"

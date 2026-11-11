@@ -73,12 +73,13 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen('schedule-day-form', () => ({ weekday: weekday.value, closed: closed.value, rows: rows.value }), open);
+const canDismiss = useUnsavedFormOnOpen('schedule-day-form', () => ({ weekday: weekday.value, closed: closed.value, rows: rows.value }), open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="schedule-day-form"
     :title="title"
     :submit-label="$t('schedule.hours.form.submit')"

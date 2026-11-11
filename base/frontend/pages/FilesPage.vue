@@ -266,8 +266,8 @@ async function download(item: FileItem): Promise<void> {
 const renaming = ref<Entry | null>(null);
 const renameOpen = ref(false);
 const renameName = ref('');
-useUnsavedFormOnOpen('files-new-folder-dialog', folderName, folderOpen);
-useUnsavedFormOnOpen('files-rename-dialog', renameName, renameOpen);
+const canDismissNewFolder = useUnsavedFormOnOpen('files-new-folder-dialog', folderName, folderOpen);
+const canDismissRename = useUnsavedFormOnOpen('files-rename-dialog', renameName, renameOpen);
 const renameError = computed(() =>
   rename.error.value ? { message: reasonOf(rename.error.value, renameName.value) } : null,
 );
@@ -799,6 +799,7 @@ async function askDelete(entry: Entry): Promise<void> {
 
     <FormModal
       v-model:open="folderOpen"
+      :can-dismiss="canDismissNewFolder"
       testid="files-new-folder-dialog"
       :title="t('base.files.newFolderDialog.title')"
       :submit-label="t('base.files.newFolderDialog.create')"
@@ -824,6 +825,7 @@ async function askDelete(entry: Entry): Promise<void> {
 
     <FormModal
       v-model:open="renameOpen"
+      :can-dismiss="canDismissRename"
       testid="files-rename-dialog"
       :title="t(renaming?.folder ? 'base.files.renameDialog.titleFolder' : 'base.files.renameDialog.title')"
       :submit-label="t('base.files.renameDialog.save')"

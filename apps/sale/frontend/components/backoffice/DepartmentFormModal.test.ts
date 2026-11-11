@@ -262,3 +262,17 @@ describe('DepartmentFormModal: Android Back with unsaved changes (hub#1020, SALE
     expect(holding(s)).toBeDefined();
   });
 });
+
+// hub#1156 (SALE-F35, BASE-F05): «Cancel», the «×», Escape and a tap outside ask «Discard changes?» too while a typed
+// change is there; «Keep editing» leaves «New section» open with it.
+describe('DepartmentFormModal: its own ways out ask with unsaved changes (hub#1156, SALE-F35, BASE-F05)', () => {
+  it('Cancel, ×, Escape and a tap outside ask while a name is typed; as opened nothing holds it', async () => {
+    const s = await setup();
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('sale-department-form'),
+      change: () => s.type('name', 'Fruit'),
+      restore: () => s.type('name', ''),
+    });
+  });
+});

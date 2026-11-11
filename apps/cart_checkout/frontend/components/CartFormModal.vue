@@ -53,12 +53,13 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen('cart-checkout-cart-form', form, open);
+const canDismiss = useUnsavedFormOnOpen('cart-checkout-cart-form', form, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="cart-checkout-cart-form"
     :title="$t('cart_checkout.carts.form.title')"
     :submit-label="$t('cart_checkout.carts.form.submit')"

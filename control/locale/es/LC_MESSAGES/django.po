@@ -549,3 +549,52 @@ msgstr[2] "Congelado: el worker aún trabaja en %(count)d hubs; espera a que sea
 
 msgid "Frozen: the worker is working on no hub: the database may be upgraded."
 msgstr "Congelado: el worker no trabaja en ningún hub: ya se puede subir la base de datos."
+
+#: admin.py and templates/admin/control/hub/restore_from_a_copy.html («Restore from a copy…», hub#1198)
+msgid "Restore from a copy…"
+msgstr "Restaurar desde una copia…"
+
+msgid "Restore from a copy"
+msgstr "Restaurar desde una copia"
+
+msgctxt "restore"
+msgid "Temporary cluster"
+msgstr "Clúster temporal"
+
+msgctxt "restore"
+msgid "Moment"
+msgstr "Momento"
+
+msgid "The moment the temporary cluster was restored to, with its time zone: 2026-11-09T14:30:00Z is UTC."
+msgstr "El momento al que se restauró el clúster temporal, con su zona horaria: 2026-11-09T14:30:00Z es UTC."
+
+msgid ""
+"%(count)d hub will be restored from %(cluster)s as it was at %(moment)s: closed for a few minutes while it is "
+"restored. If it is refused, its page says why under «last error»."
+msgid_plural ""
+"%(count)d hubs will be restored from %(cluster)s as they were at %(moment)s: each closed for a few minutes while "
+"it is restored. If one is refused, its page says why under «last error»."
+msgstr[0] ""
+"%(count)d hub se restaurará desde %(cluster)s tal como estaba el %(moment)s: cerrado unos minutos mientras se "
+"restaura. Si se rechaza, su ficha dice por qué en «último error»."
+msgstr[1] ""
+"%(count)d hubs se restaurarán desde %(cluster)s tal como estaban el %(moment)s: cada uno cerrado unos minutos "
+"mientras se restaura. Si se rechaza alguno, su ficha dice por qué en «último error»."
+msgstr[2] ""
+"%(count)d hubs se restaurarán desde %(cluster)s tal como estaban el %(moment)s: cada uno cerrado unos minutos "
+"mientras se restaura. Si se rechaza alguno, su ficha dice por qué en «último error»."
+
+msgid ""
+"Each hub chosen is put back as it was at the moment you give, from its copy on the temporary cluster you choose (a "
+"point-in-time restore of its cluster, registered closed to new hubs). It closes for a few minutes while its "
+"database is replaced, and the one it has now is kept for %(days)s days. It is refused, nothing changed, if it has "
+"fiscal records made, sent or changed after that moment: its page then says why under «last error»."
+msgstr ""
+"Cada hub elegido vuelve a como estaba en el momento que indiques, desde su copia en el clúster temporal que elijas "
+"(una restauración a un momento de su clúster, dada de alta cerrada a hubs nuevos). Se cierra unos minutos mientras "
+"se sustituye su base de datos, y la que tiene ahora se guarda %(days)s días. Se rechaza, sin cambiar nada, si tiene "
+"registros fiscales hechos, enviados o cambiados después de ese momento: su ficha dice entonces por qué en «último "
+"error»."
+
+msgid "Restore them"
+msgstr "Restaurarlos"

@@ -107,12 +107,13 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen('modifier-group-form', form, open);
+const canDismiss = useUnsavedFormOnOpen('modifier-group-form', form, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="modifier-group-form"
     :title="title"
     :submit-label="group ? $t('modifier.groups.form.save') : $t('modifier.groups.form.create')"

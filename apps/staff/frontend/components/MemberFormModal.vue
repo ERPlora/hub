@@ -35,7 +35,7 @@ const props = defineProps<{
 
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedForm('staff-member-form', () => open.value ? form.value : original.value, () => original.value);
+const canDismiss = useUnsavedForm('staff-member-form', () => open.value ? form.value : original.value, () => original.value);
 
 const t = useT();
 const locale = useLocale();
@@ -204,6 +204,7 @@ async function save(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="staff-member-form"
     :title="title"
     :pending="pending"
