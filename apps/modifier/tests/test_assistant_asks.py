@@ -90,7 +90,7 @@ PROBES = [
 #: reading as people speak, or that another change empties, fail. None names its tool's thing by a word the Hub reads as
 #: one (an option's «opción», or «opcional», once Menus reads them so, hub#1091): that word alone would bring the tool.
 OWN_WORDS = [
-    ("modifier.group.list", "¿qué tengo montado para acompañar los platos?"),
+    ("modifier.group.list", "¿con qué se pueden acompañar los platos?"),
     ("modifier.group.get", "¿cuál es el máximo de Punto de la carne?"),
     ("modifier.category.get", "localiza Bocadillos para colgarle extras"),
     ("modifier.option.list", "¿qué trae Salsas y cuánto vale cada cosa?"),
