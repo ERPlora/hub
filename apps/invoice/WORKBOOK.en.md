@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a53b70f754427d0e8ea1de91244e0e3955a4eccbbef1579a6109ebcdc4f5c733 -->
+<!-- generated from WORKBOOK.md sha256:fbc76c308952b20505efe9e230a34db986c57ef861eec3732139b2570df788a9 -->
 
 ## What it is for and who it is for
 
@@ -413,8 +413,8 @@ Steps:
    reason, the next number of the year's "RECT" series (it is not reserved: it takes it when issued),
    today's date, its lines and the base, the taxes and the total, negative; if the invoice already had
    rectifying invoices by differences, also what is left to rectify of it.
-5. Then "Run this action?" comes with the invoice's "Number" and the "Reason" and, in "What will happen",
-   the rectifying invoice about to be born: the "Type of rectifying invoice" by its name, never by its code alone
+5. In that same answer, without you having to ask again, "Run this action?" comes with the invoice's
+   "Number" and the "Reason" and, in "What will happen", the rectifying invoice about to be born: the "Type of rectifying invoice" by its name, never by its code alone
    ("Rectifying invoice: other causes (R4)"; also when the assistant asks for it when rectifying), the series' "Next number"
    (not reserved either) and the "Tax base", the "Tax" and the "Total", negative, in the business's
    currency. Type "CONFIRM" and tap "Run". That same rectifying invoice is issued, in your name, just as

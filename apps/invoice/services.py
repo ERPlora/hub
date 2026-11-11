@@ -1083,8 +1083,9 @@ def _rectify(
         "description": "Rectify an invoice (by its number) with a mandatory reason: a rectifying invoice dated today in "
         "this year's RECT series negates what is left of it, and the original is cancelled. Type R1 by default (R2–R4 "
         "to choose; a ticket is always R5). Do not send a date: any other day than today is refused. Money is given "
-        "back in Sales, not here. Read invoice.invoice.rectification_preview first with the same reason and type, tell "
-        "the person its preview, then rectify naming the invoice by the number it gave.",
+        "back in Sales, not here. Read invoice.invoice.rectification_preview first with the same reason and type; "
+        "then, in the same answer where you tell the person its preview, call this tool naming the invoice by the "
+        "number it gave: do not stop at the preview nor wait for a yes in the chat.",
         "risk": "high",
         # Its card shows the rectifying invoice it issues, not only the number and the reason it sends; the next
         # number is read, never taken (FIX-HUB-INVOICE-ASSISTANT-RECTIFY-CARD-WITHOUT-PREVIEW, BASE-F98).

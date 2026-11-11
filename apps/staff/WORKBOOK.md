@@ -217,7 +217,7 @@ acceso a este negocio.» o la cuenta ya vinculada a otra ficha (STAFF-F03). Quie
 compensación no puede enviarla: «Se necesita el permiso «{permiso}».». Dos fichas con el mismo
 nombre, email o nº de empleado se aceptan. Desde el asistente, un rol que el negocio no tiene (o que se
 ha retirado) se comprueba antes de la tarjeta de confirmación: no sale tarjeta, el asistente dice que
-ese rol no está disponible y no se crea nada. Guardar (también al editar, STAFF-F02) está en gris
+ese rol no está disponible y cuáles hay, y no se crea nada. Guardar (también al editar, STAFF-F02) está en gris
 mientras el negocio no haya dicho todavía su moneda, porque la tarifa por hora se lee en ella (sin ella,
 «1500» yenes se guardaría como 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, Guardar se enciende (hub#938).
@@ -792,6 +792,9 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   `es` en el catálogo: «Semana», «Miembros del personal») o, si no lo tiene, por el `verbose_name`
   de su campo en el modelo, el que da la ficha; un dato sin ninguno sale con el nombre técnico y lo
   para `tests/test_integration_assistant.py`.
+  La descripción de `staff.member.create` no manda preguntar antes: un rol que el negocio no tiene lo rechaza
+  su `check` antes de la tarjeta (hub#538) y el asistente dice cuáles hay; el «ask the person before creating
+  it» que llevaba hacía que preguntara en el chat (hub#1175; lo guarda `tests/test_guardrails_assistant.py`).
 - La tarjeta de confirmación del asistente (BASE-F97) nombra cada registro que una escritura señala por su id con las
   marcas `refers` de `schemas.py` (`A_MEMBER`, `A_ROLE`, `A_SCHEDULE`, `A_TIME_OFF`), leídas como quien pregunta.
   `staff.role.detail` y `staff.time_off.get` son lecturas internas (`ai=INTERNAL`, sin API), porque el modelo encuentra

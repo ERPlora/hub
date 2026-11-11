@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:27cec7d72e2dc9898c562b178b34416f3997f1728b2994d6c84463aaacab7cf4 -->
+<!-- generated from WORKBOOK.md sha256:ac0471785fe889a1a9a31313a928aca4194caba46ed663c0d69a0a2e34276ef3 -->
 
 ## What it is for and who it is for
 
@@ -202,7 +202,7 @@ access to this business." or the account already linked to another record (STAFF
 the pay cannot send it: "Permission “{permission}” is required.". Two records with the same name, email or
 employee ID are accepted. From the assistant, a role the business does not have (or that has been retired)
 is checked before the confirmation card: no card shows, the assistant says that role is not available and
-nothing is created. Save (also when editing, STAFF-F02) is grey while the business has not yet said its
+which ones there are, and nothing is created. Save (also when editing, STAFF-F02) is grey while the business has not yet said its
 currency, because the hourly rate is read in it (without it, "1500" yen would be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, Save lights up (hub#938).
 Involved: BASE-F97

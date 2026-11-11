@@ -1700,6 +1700,10 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   solo por su nombre propio, porque `live` no da el peso del verbo pedido: «activa X» a `flow.flow.set_enabled`,
   «renombra X» a `flow.flow.update` y «permite a X…» a `flow.flow.grant` (ERPlora/live#53; sus casos están marcados
   `xfail(strict=True)` y se desmarcan cuando entre el arreglo). Con «la automatización» en la frase sí se ofrecen.
+  Ninguna descripción manda confirmar antes: la tarjeta es la confirmación, y el «confirm it first» que llevaban
+  borrar, ejecutar, reanudar, restaurar una receta, contestar una pregunta y borrar un secreto hacía que el
+  asistente preguntara en el chat sin sacarla (hub#1175; lo guarda `tests/test_guardrails_assistant.py` para todo
+  el Hub). La respuesta a una pregunta es la que dio la persona, nunca la del asistente.
 - El admin de Django del Hub tiene **CRUD completo** sobre `Flow`, `FlowRun`, `Draft` y `Question`; de `Secret`, solo
   ver el nombre y borrar (un valor no se escribe ni se lee desde el admin). Una escritura cruda del admin no
   deja aviso.

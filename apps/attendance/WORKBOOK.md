@@ -556,6 +556,9 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   `base/tests/test_assistant_asks.py` comprueba que cada una trae su herramienta entre las diez primeras para
   cada rol, y `tests/test_assistant_asks.py`, que las frases reales de la QA del dueño
   (`tests/e2e/qa/probes/owner-es-attendance-*.json`) llegan a la suya sin ser una de sus `asks` (hub#1099).
+  Ninguna descripción manda confirmar antes: la tarjeta de `attendance.record.correct` es la confirmación, y el
+  «confirm the times and the reason first» que llevaba hacía que el asistente preguntara en el chat sin sacarla
+  (hub#1175; lo guarda `tests/test_guardrails_assistant.py` para todo el Hub).
 - **Admin de Django** (ronda 12, PLAN §17): ajustes con CRUD completo; jornadas, pausas y correcciones
   en **solo lectura** (salvo la nota interna de la jornada), sin alta ni borrado: una hora solo cambia
   con `attendance.record.correct`, que deja rastro. Contradice el «CRUD completo sobre todas sus
