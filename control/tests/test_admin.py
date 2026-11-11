@@ -764,6 +764,14 @@ class TestRestoreToASeparateCopy:
         data = {"action": "restore_aside", "_selected_action": [str(hub.pk) for hub in hubs]} | more
         return client.post(HUBS, data, HTTP_HOST=PLATFORM, follow=True)
 
+    @staticmethod
+    def a_copy(hub: Hub, **fields):
+        """A separate copy of ``hub`` of the moment, as ``control.hub.restore_aside`` asks it."""
+        from control.models import RestoredCopy
+
+        values = {"restore_point": AT_MOMENT, "db_name": f"hub_copy_{uuid.uuid7().hex}", "asked_by": "root"}
+        return RestoredCopy.objects.create(hub=hub, **(values | fields))
+
     def test_asks_for_a_temporary_cluster_and_the_moment_first_and_changes_nothing(self, client, root):
         from control.models import RestoredCopy
 
@@ -797,9 +805,7 @@ class TestRestoreToASeparateCopy:
 
         hub = self.a_hub("acme")
         temporary = self.a_temporary_cluster()
-        RestoredCopy.objects.create(
-            hub=hub, source=temporary, restore_point=AT_MOMENT, db_name=f"hub_copy_{uuid.uuid7().hex}", asked_by="root"
-        )
+        self.a_copy(hub, source=temporary)
 
         assert "restore_aside" not in page(client, HUBS)
         self.choose(client, hub, apply="yes", cluster=str(temporary.pk), at=MOMENT)
@@ -814,14 +820,7 @@ class TestRestoreToASeparateCopy:
 
         hub = self.a_hub("acme")
         made = AT_MOMENT + dt.timedelta(hours=1)
-        copy = RestoredCopy.objects.create(
-            hub=hub,
-            restore_point=AT_MOMENT,
-            db_name=f"hub_copy_{uuid.uuid7().hex}",
-            asked_by="root",
-            status=RestoredCopy.Status.MADE,
-            made_at=made,
-        )
+        copy = self.a_copy(hub, status=RestoredCopy.Status.MADE, made_at=made)
 
         listed = page(client, COPIES)
         assert copy.db_name in listed and "Made" in listed and "2026-11-16 15:30 UTC" in listed
@@ -835,15 +834,6 @@ def test_the_separate_copy_speaks_spanish(client, root):
     from django.utils import translation
     from django.utils.translation import ngettext
 
-    hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")
-    a_cluster(name="restore-1", host="restore-1.example", is_open=False)
-
-    html = client.post(
-        HUBS, {"action": "restore_aside", "_selected_action": [str(hub.pk)]}, HTTP_HOST=PLATFORM, HTTP_ACCEPT_LANGUAGE="es"
-    ).content.decode()
-
-    assert "Cada hub elegido tendrá una copia aparte de su base de datos" in html and "Hacienda" in html
-    assert 'value="Hacer las copias"' in html and "Restaurar en una copia aparte" in html
     with translation.override("es"):
         assert str(control_admin.HubAdmin.restore_aside.short_description) == "Restaurar en una copia aparte…"
         assert ngettext(
@@ -875,18 +865,25 @@ def test_the_restore_speaks_spanish():
         )
 
 
-def test_its_restore_page_speaks_spanish(client, root):
+@pytest.mark.parametrize(
+    "action, said, button",
+    [
+        ("restore_from_a_copy", "Cada hub elegido vuelve a como estaba en el momento", "Restaurarlos"),
+        ("restore_aside", "nada de ella se envía a Hacienda", "Hacer las copias"),
+    ],
+)
+def test_its_restore_page_speaks_spanish(client, root, action, said, button):
     hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")
     a_cluster(name="restore-1", host="restore-1.example", is_open=False)
 
     html = client.post(
         HUBS,
-        {"action": "restore_from_a_copy", "_selected_action": [str(hub.pk)]},
+        {"action": action, "_selected_action": [str(hub.pk)]},
         HTTP_HOST=PLATFORM,
         HTTP_ACCEPT_LANGUAGE="es",
     ).content.decode()
 
-    assert "Cada hub elegido vuelve a como estaba en el momento" in html and 'value="Restaurarlos"' in html
+    assert said in html and f'value="{button}"' in html
     assert "Clúster temporal" in html and "Momento" in html
 
 

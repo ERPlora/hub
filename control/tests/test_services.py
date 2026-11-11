@@ -610,12 +610,11 @@ class TestCancelAMove:
 # ── A hub's database put back as it was at a moment, from a copy on a temporary cluster (hub#1198) ──────────────────
 
 
-class TestRestore:
-    """``control.hub.restore`` asks the worker to put a ready hub's database back as it was at a moment, from the copy
-    of it on a temporary cluster (``base.tenancy.restore``): its host answers 503 «maintenance» from now until the
-    worker is done. The copy comes only from a cluster closed to new hubs with none on it, and never while the hub's
-    database has a production VeriFactu record the copy lacks or has otherwise: the worker refuses that one, nothing
-    changed (``base/tenancy/tests/test_restore.py``), for it reads both databases with the migrator."""
+class AskedFromATemporaryCluster:
+    """What a restore in place (``control.hub.restore``) and a separate copy (``control.hub.restore_aside``) both
+    refuse, nothing asked (``control.services._restorable``): a hub that is not ready or has no database of its own, a
+    demo, one moving or being restored, a copy from a cluster open to new hubs, with hubs on it or the hub's own, a
+    moment still to come, a copy missing or too large; support, and unknown hubs or clusters."""
 
     MOMENT = dt.datetime(2026, 11, 9, 14, 30, tzinfo=dt.UTC)
 
@@ -625,10 +624,107 @@ class TestRestore:
     def temporary(**fields) -> Cluster:
         return a_cluster(**({"name": "restore-1", "host": "writer-restore.example", "is_open": False} | fields))
 
+    # Each class names its ``operation`` and says what it would have written (``nothing_asked(hub)``).
+
     def ask(self, ctx, hub: Hub, cluster: Cluster, at: dt.datetime | None = None):
         from control.schemas import HubRestoreIn
 
-        return services.hub_restore(ctx, HubRestoreIn(hub=hub.pk, cluster=cluster.pk, at=at or self.MOMENT))
+        return self.operation(ctx, HubRestoreIn(hub=hub.pk, cluster=cluster.pk, at=at or self.MOMENT))
+
+    @pytest.mark.parametrize(
+        "fields",
+        [{"status": Hub.Status.REQUESTED}, {"status": Hub.Status.CANCELLED}, {"db_name": ""}],
+    )
+    def test_only_a_ready_hub_with_its_own_database_is_restored(self, admin_ctx, small, fields):
+        hub = self.a_hub(**fields)
+
+        with pytest.raises(Conflict) as refused:
+            self.ask(admin_ctx, hub, self.temporary())
+
+        assert refused.value.code == "control.hub_not_restorable"
+        assert self.nothing_asked(hub)
+
+    def test_a_demo_moving_or_already_restored_hub_is_refused(self, admin_ctx, small):
+        source, other = self.temporary(), a_cluster(name="cluster-2", host="writer-2.example")
+        demo = self.a_hub(slug="demo-0000beef", is_demo=True)
+        moving = self.a_hub(slug="moving", moving_to=other)
+        restoring = self.a_hub(slug="restoring", restoring_from=source, restore_point=self.MOMENT)
+
+        for hub, code in (
+            (demo, "control.hub_is_demo"),
+            (moving, "control.hub_moving"),
+            (restoring, "control.hub_restoring"),
+        ):
+            with pytest.raises(Conflict) as refused:
+                self.ask(admin_ctx, hub, source)
+            assert refused.value.code == code
+        assert small == [] and self.nothing_asked(demo) and self.nothing_asked(moving)
+
+    def test_the_copy_comes_only_from_a_closed_temporary_cluster_never_its_own(self, admin_ctx, small):
+        own = self.temporary(name="own", host="writer-own.example")
+        open_one = a_cluster(name="open", host="writer-open.example")
+        lived_on = self.temporary(name="lived-on", host="writer-lived.example")
+        self.a_hub(slug="living", cluster=lived_on)
+        hub = self.a_hub(cluster=own)
+
+        for cluster, code in (
+            (own, "control.restore_from_own_cluster"),
+            (open_one, "control.cluster_open"),
+            (lived_on, "control.cluster_holds_hubs"),
+        ):
+            with pytest.raises(Conflict) as refused:
+                self.ask(admin_ctx, hub, cluster)
+            assert refused.value.code == code
+        assert self.nothing_asked(hub)
+
+    def test_a_moment_still_to_come_is_refused(self, admin_ctx, small):
+        hub = self.a_hub()
+
+        with pytest.raises(InvalidPayload) as refused:
+            self.ask(admin_ctx, hub, self.temporary(), at=timezone.now() + dt.timedelta(minutes=5))
+
+        assert refused.value.code == "control.restore_point_ahead"
+        assert set(refused.value.fields) == {"at"}
+
+    def test_a_copy_missing_or_too_large_is_refused(self, admin_ctx, small, monkeypatch):
+        from control import queries
+
+        hub = self.a_hub()
+        for sizes, code in (({}, "control.restore_copy_missing"), (None, "control.hub_too_large")):
+            found = sizes if sizes is not None else {hub.db_name: services.MOVE_MAX_BYTES + 1}
+            monkeypatch.setattr(queries, "measure", lambda cluster, names, found=found: found)
+            with pytest.raises(Conflict) as refused:
+                self.ask(admin_ctx, hub, self.temporary(name=f"t-{code}", host=f"{code}.example"))
+            assert refused.value.code == code
+        assert self.nothing_asked(hub)
+
+    def test_support_may_not_and_unknown_ones_are_not_found(self, admin_ctx, small):
+        from control.schemas import HubRestoreIn
+
+        source, hub = self.temporary(), self.a_hub()
+        with pytest.raises(PermissionDenied):
+            self.ask(as_actor(person("support", is_staff=True)), hub, source)
+        for asked in (
+            HubRestoreIn(hub=uuid.uuid7(), cluster=source.pk, at=self.MOMENT),
+            HubRestoreIn(hub=hub.pk, cluster=uuid.uuid7(), at=self.MOMENT),
+        ):
+            with pytest.raises(NotFound):
+                self.operation(admin_ctx, asked)
+        assert self.nothing_asked(hub)
+
+
+class TestRestore(AskedFromATemporaryCluster):
+    """``control.hub.restore`` asks the worker to put a ready hub's database back as it was at a moment, from the copy
+    of it on a temporary cluster (``base.tenancy.restore``): its host answers 503 «maintenance» from now until the
+    worker is done. The copy comes only from a cluster closed to new hubs with none on it, and never while the hub's
+    database has a production VeriFactu record the copy lacks or has otherwise: the worker refuses that one, nothing
+    changed (``base/tenancy/tests/test_restore.py``), for it reads both databases with the migrator."""
+
+    operation = staticmethod(services.hub_restore)
+
+    def nothing_asked(self, hub: Hub) -> bool:
+        hub.refresh_from_db()
+        return hub.restoring_from_id is None
 
     def test_asks_the_restore_and_says_so(self, admin_ctx, small):
         own, source = a_cluster(), self.temporary()
@@ -656,81 +752,11 @@ class TestRestore:
             {"id": str(hub.pk), "slug": "acme", "from": str(source.pk), "at": self.MOMENT.isoformat()}
         ]
 
-    @pytest.mark.parametrize(
-        "fields",
-        [{"status": Hub.Status.REQUESTED}, {"status": Hub.Status.CANCELLED}, {"db_name": ""}],
-    )
-    def test_only_a_ready_hub_with_its_own_database_is_restored(self, admin_ctx, small, fields):
-        hub = self.a_hub(**fields)
-
-        with pytest.raises(Conflict) as refused:
-            self.ask(admin_ctx, hub, self.temporary())
-
-        assert refused.value.code == "control.hub_not_restorable"
-        hub.refresh_from_db()
-        assert hub.restoring_from_id is None
-
-    def test_a_demo_moving_or_already_restored_hub_is_refused(self, admin_ctx, small):
-        source, other = self.temporary(), a_cluster(name="cluster-2", host="writer-2.example")
-        demo = self.a_hub(slug="demo-0000beef", is_demo=True)
-        moving = self.a_hub(slug="moving", moving_to=other)
-        restoring = self.a_hub(slug="restoring", restoring_from=source, restore_point=self.MOMENT)
-
-        for hub, code in (
-            (demo, "control.hub_is_demo"),
-            (moving, "control.hub_moving"),
-            (restoring, "control.hub_restoring"),
-        ):
-            with pytest.raises(Conflict) as refused:
-                self.ask(admin_ctx, hub, source)
-            assert refused.value.code == code
-        assert small == []
-
-    def test_the_copy_comes_only_from_a_closed_temporary_cluster_never_its_own(self, admin_ctx, small):
-        own = self.temporary(name="own", host="writer-own.example")
-        open_one = a_cluster(name="open", host="writer-open.example")
-        lived_on = self.temporary(name="lived-on", host="writer-lived.example")
-        self.a_hub(slug="living", cluster=lived_on)
-        hub = self.a_hub(cluster=own)
-
-        for cluster, code in (
-            (own, "control.restore_from_own_cluster"),
-            (open_one, "control.cluster_open"),
-            (lived_on, "control.cluster_holds_hubs"),
-        ):
-            with pytest.raises(Conflict) as refused:
-                self.ask(admin_ctx, hub, cluster)
-            assert refused.value.code == code
-        hub.refresh_from_db()
-        assert hub.restoring_from_id is None
-
     def test_a_purged_demo_on_the_temporary_cluster_does_not_count_as_living_there(self, admin_ctx, small):
         source = self.temporary()
         self.a_hub(slug="demo-0000beef", is_demo=True, status=Hub.Status.PURGED, cluster=source)
 
         assert self.ask(admin_ctx, self.a_hub(), source).restoring_from == source.pk
-
-    def test_a_moment_still_to_come_is_refused(self, admin_ctx, small):
-        hub = self.a_hub()
-
-        with pytest.raises(InvalidPayload) as refused:
-            self.ask(admin_ctx, hub, self.temporary(), at=timezone.now() + dt.timedelta(minutes=5))
-
-        assert refused.value.code == "control.restore_point_ahead"
-        assert set(refused.value.fields) == {"at"}
-
-    def test_a_copy_missing_or_too_large_is_refused(self, admin_ctx, small, monkeypatch):
-        from control import queries
-
-        hub = self.a_hub()
-        for sizes, code in (({}, "control.restore_copy_missing"), (None, "control.hub_too_large")):
-            found = sizes if sizes is not None else {hub.db_name: services.MOVE_MAX_BYTES + 1}
-            monkeypatch.setattr(queries, "measure", lambda cluster, names, found=found: found)
-            with pytest.raises(Conflict) as refused:
-                self.ask(admin_ctx, hub, self.temporary(name=f"t-{code}", host=f"{code}.example"))
-            assert refused.value.code == code
-        hub.refresh_from_db()
-        assert hub.restoring_from_id is None
 
     def test_a_move_is_refused_while_the_hub_is_restored(self, admin_ctx, small):
         from control.schemas import HubMoveIn
@@ -752,20 +778,6 @@ class TestRestore:
 
         assert self.ask(admin_ctx, hub_a, source).restoring_from == source.pk
 
-    def test_support_may_not_and_unknown_ones_are_not_found(self, admin_ctx, small):
-        from control.schemas import HubRestoreIn
-
-        source, hub = self.temporary(), self.a_hub()
-        with pytest.raises(PermissionDenied):
-            self.ask(as_actor(person("support", is_staff=True)), hub, source)
-        for asked in (
-            HubRestoreIn(hub=uuid.uuid7(), cluster=source.pk, at=self.MOMENT),
-            HubRestoreIn(hub=hub.pk, cluster=uuid.uuid7(), at=self.MOMENT),
-        ):
-            with pytest.raises(NotFound):
-                services.hub_restore(admin_ctx, asked)
-        hub.refresh_from_db()
-        assert hub.restoring_from_id is None
 
     def test_a_cluster_a_hub_is_restored_from_is_never_deleted(self, admin_ctx):
         source = self.temporary()
@@ -790,22 +802,19 @@ class TestRestore:
         )
 
 
-class TestRestoreAside:
+class TestRestoreAside(AskedFromATemporaryCluster):
     """``control.hub.restore_aside`` asks the worker to make, on the hub's own cluster, a separate copy of its database
     as it was at a moment, from its copy on a temporary cluster (hub#1213, layer 1; ``base.tenancy.restore``): the
     business is never closed nor changed, so a hub with production VeriFactu records made after the moment gets its
     data back this way. The copy is a ``RestoredCopy`` row named ``<control>_copy_<its hex>``; it is asked under the
     same conditions as a restore in place (``control.hub.restore``)."""
 
-    MOMENT = dt.datetime(2026, 11, 9, 14, 30, tzinfo=dt.UTC)
+    operation = staticmethod(services.hub_restore_aside)
 
-    a_hub = staticmethod(a_ready_hub)
-    temporary = staticmethod(TestRestore.temporary)
+    def nothing_asked(self, hub: Hub) -> bool:
+        from control.models import RestoredCopy
 
-    def ask(self, ctx, hub: Hub, cluster: Cluster, at: dt.datetime | None = None):
-        from control.schemas import HubRestoreIn
-
-        return services.hub_restore_aside(ctx, HubRestoreIn(hub=hub.pk, cluster=cluster.pk, at=at or self.MOMENT))
+        return not RestoredCopy.objects.filter(hub=hub).exists()
 
     def test_asks_a_copy_aside_and_the_business_stays_open_as_it_was(self, admin_ctx, small):
         from base import registry
@@ -866,81 +875,6 @@ class TestRestoreAside:
         self.ask(admin_ctx, hub, source, at=self.MOMENT - dt.timedelta(hours=1))
 
         assert len(set(RestoredCopy.objects.values_list("db_name", flat=True))) == 2
-
-    @pytest.mark.parametrize(
-        "fields, code",
-        [
-            ({"status": Hub.Status.REQUESTED}, "control.hub_not_restorable"),
-            ({"db_name": ""}, "control.hub_not_restorable"),
-            ({"slug": "demo-0000beef", "is_demo": True}, "control.hub_is_demo"),
-        ],
-    )
-    def test_only_a_ready_hub_with_its_own_database_gets_a_copy(self, admin_ctx, small, fields, code):
-        from control.models import RestoredCopy
-
-        with pytest.raises(Conflict) as refused:
-            self.ask(admin_ctx, self.a_hub(**fields), self.temporary())
-
-        assert refused.value.code == code
-        assert not RestoredCopy.objects.exists()
-
-    def test_a_moving_or_restored_hub_is_refused(self, admin_ctx, small):
-        from control.models import RestoredCopy
-
-        source, other = self.temporary(), a_cluster(name="cluster-2", host="writer-2.example")
-        for hub, code in (
-            (self.a_hub(slug="moving", moving_to=other), "control.hub_moving"),
-            (self.a_hub(slug="restoring", restoring_from=source, restore_point=self.MOMENT), "control.hub_restoring"),
-        ):
-            with pytest.raises(Conflict) as refused:
-                self.ask(admin_ctx, hub, source)
-            assert refused.value.code == code
-        assert not RestoredCopy.objects.exists()
-
-    def test_the_copy_comes_only_from_a_closed_temporary_cluster_with_it_never_its_own(
-        self, admin_ctx, small, monkeypatch
-    ):
-        from control import queries
-        from control.models import RestoredCopy
-
-        own = self.temporary(name="own", host="writer-own.example")
-        open_one = a_cluster(name="open", host="writer-open.example")
-        lived_on = self.temporary(name="lived-on", host="writer-lived.example")
-        self.a_hub(slug="living", cluster=lived_on)
-        hub = self.a_hub(cluster=own)
-        for cluster, code in (
-            (own, "control.restore_from_own_cluster"),
-            (open_one, "control.cluster_open"),
-            (lived_on, "control.cluster_holds_hubs"),
-        ):
-            with pytest.raises(Conflict) as refused:
-                self.ask(admin_ctx, hub, cluster)
-            assert refused.value.code == code
-        with pytest.raises(InvalidPayload) as ahead:
-            self.ask(admin_ctx, hub, self.temporary(), at=timezone.now() + dt.timedelta(minutes=5))
-        assert (ahead.value.code, set(ahead.value.fields)) == ("control.restore_point_ahead", {"at"})
-        for sizes, code in (({}, "control.restore_copy_missing"), (None, "control.hub_too_large")):
-            found = sizes if sizes is not None else {hub.db_name: services.MOVE_MAX_BYTES + 1}
-            monkeypatch.setattr(queries, "measure", lambda cluster, names, found=found: found)
-            with pytest.raises(Conflict) as refused:
-                self.ask(admin_ctx, hub, self.temporary(name=f"t-{code}", host=f"{code}.example"))
-            assert refused.value.code == code
-        assert not RestoredCopy.objects.exists()
-
-    def test_support_may_not_and_unknown_ones_are_not_found(self, admin_ctx, small):
-        from control.models import RestoredCopy
-        from control.schemas import HubRestoreIn
-
-        source, hub = self.temporary(), self.a_hub()
-        with pytest.raises(PermissionDenied):
-            self.ask(as_actor(person("support", is_staff=True)), hub, source)
-        for asked in (
-            HubRestoreIn(hub=uuid.uuid7(), cluster=source.pk, at=self.MOMENT),
-            HubRestoreIn(hub=hub.pk, cluster=uuid.uuid7(), at=self.MOMENT),
-        ):
-            with pytest.raises(NotFound):
-                services.hub_restore_aside(admin_ctx, asked)
-        assert not RestoredCopy.objects.exists()
 
     def test_the_temporary_cluster_is_kept_while_its_copy_is_made_and_the_hubs_while_the_copy_is_on_it(
         self, admin_ctx, small

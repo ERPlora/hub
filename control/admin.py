@@ -552,7 +552,7 @@ class HubAdmin(base_admin.HubAdmin):
 
 
 @admin.register(RestoredCopy)
-class RestoredCopyAdmin(admin.ModelAdmin):
+class RestoredCopyAdmin(base_admin.ReadOnlyAdmin):
     """The separate copies of hubs as they were at a moment (hub#1213, BASE-F114): asked from Hubs with «Restore to a
     separate copy…», made and dropped by the worker; read only, for support too."""
 
@@ -598,15 +598,6 @@ class RestoredCopyAdmin(admin.ModelAdmin):
         if copy.made_at is None:
             return self.get_empty_value_display()
         return utc(copy.made_at + dt.timedelta(days=MOVED_COPY_DAYS))
-
-    def has_add_permission(self, request: HttpRequest) -> bool:
-        return False
-
-    def has_change_permission(self, request: HttpRequest, obj=None) -> bool:
-        return False
-
-    def has_delete_permission(self, request: HttpRequest, obj=None) -> bool:
-        return False
 
 
 class FreezeForm(forms.ModelForm):

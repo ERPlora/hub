@@ -24,6 +24,20 @@ from base.services import demo_expire
 ADMIN_HUB_SESSION_KEY = "admin_hub"
 
 
+class ReadOnlyAdmin(admin.ModelAdmin):
+    """A model's admin that only shows its rows: nothing is added, changed or deleted by hand there (what changes them is
+    an operation, or nothing)."""
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj=None) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj=None) -> bool:
+        return False
+
+
 @admin.register(Membership)
 class MembershipAdmin(admin.ModelAdmin):
     list_display = ("user", "host", "role")
@@ -33,7 +47,7 @@ class MembershipAdmin(admin.ModelAdmin):
 
 
 @admin.register(Hub)
-class HubAdmin(admin.ModelAdmin):
+class HubAdmin(ReadOnlyAdmin):
     """The registry of hubs (plan 2026-10-17, §1.1), read only: the SaaS writes it (``PUT /internal/hubs/{id}``)
     and the worker purges the demos; nothing here adds, changes or deletes a row by hand. «Expire now» ends the
     chosen demos at once through ``base.demo.expire``, for the platform's admins (superusers) only."""
@@ -88,15 +102,6 @@ class HubAdmin(admin.ModelAdmin):
     def get_readonly_fields(self, request: HttpRequest, obj=None):
         return [field.name for field in self.model._meta.fields]
 
-    def has_add_permission(self, request: HttpRequest) -> bool:
-        return False
-
-    def has_change_permission(self, request: HttpRequest, obj=None) -> bool:
-        return False
-
-    def has_delete_permission(self, request: HttpRequest, obj=None) -> bool:
-        return False
-
 
 @admin.register(TaskSchedule)
 class TaskScheduleAdmin(admin.ModelAdmin):
@@ -137,7 +142,7 @@ class LocationAdmin(admin.ModelAdmin):
 
 
 @admin.register(AppActivation)
-class AppActivationAdmin(admin.ModelAdmin):
+class AppActivationAdmin(ReadOnlyAdmin):
     """Which apps each business turned on or off, and which it chose (PLAN-HUB §9), as they are: read only. Turning
     one on or off is ``base.app.enable``/``base.app.disable`` (the apps it needs, the plan's limit, the event), never a
     row edited by hand; a business without rows has every app off (``base.activation``, round 2026-10-27)."""
@@ -145,15 +150,6 @@ class AppActivationAdmin(admin.ModelAdmin):
     list_display = ("host", "app", "state", "chosen", "changed_at")
     list_filter = ("state", "chosen")
     search_fields = ("host", "app")
-
-    def has_add_permission(self, request: HttpRequest) -> bool:
-        return False
-
-    def has_change_permission(self, request: HttpRequest, obj=None) -> bool:
-        return False
-
-    def has_delete_permission(self, request: HttpRequest, obj=None) -> bool:
-        return False
 
 
 def open_hub(request: HttpRequest, slug: str) -> HttpResponseRedirect:
