@@ -11,7 +11,6 @@ export type { Money };
 export { formatMoney };
 export { useBusinessMoney } from '../../../../base/frontend/lib/money';
 
-
 /** A supplement in `money` with its sign («+2,00 zł», «-zł 0.50»; «—» while it is unknown); `''` for none. */
 export function formatDelta(cents: number, locale: string, money?: Money): string {
   if (!cents) return '';

@@ -11,7 +11,6 @@ import type { Money } from '../../../../base/frontend/lib/home';
 export type { Money };
 export { filterCents, formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';
 
-
 const formats = new Map<string, Intl.NumberFormat>();
 const days = new Map<string, Intl.DateTimeFormat>();
 
