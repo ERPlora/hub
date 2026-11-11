@@ -97,8 +97,8 @@ def catalog_of(make_user):
     return of
 
 
-def offered_to(tools: dict[str, Operation], phrase: str) -> list[str]:
-    return [op.name for op in assistant.relevant(tools, [phrase], "es")]
+def offered_to(tools: dict[str, Operation], phrase: str, language: str = "es") -> list[str]:
+    return [op.name for op in assistant.relevant(tools, [phrase], language)]
 
 
 def place(offered: list[str], name: str) -> int | None:
@@ -203,15 +203,19 @@ def test_the_reported_request_to_bring_a_method_back_goes_ahead_of_turning_an_ap
     assert "base.app.enable" in offered  # positive control: turning an app on competes in the ranking
     assert place(offered, "payment.method.activate") < place(offered, "base.app.enable"), offered[:10]
 
+
 #: Where the business pays from in the Hub's words (``base.assistant.SYNONYMS``): a «cuenta bancaria» or «cuenta del
 #: banco», never the table's check a «cuenta» alone is, and a «bank account», are a Payments' method, as «method» is.
 BANK_ACCOUNT = (
     "cuenta bancaria", "cuentas bancarias", "cuenta del banco", "cuentas del banco", "bank account", "bank accounts",
 )
-#: In phrases nobody wrote as asks nor as probes, each brings its tool among the first ten, and none does without them.
+#: In phrases nobody wrote as asks nor as probes, each brings its tool among the first ten, and none does without them:
+#: in Spanish and in English, so the «bank account» of the group is held by what a turn offers and not only by how
+#: the words read. Language, tool, phrase.
 PAYMENT_WORDS = [
-    ("payment.method.list", "¿qué cuentas bancarias tenemos?"),
-    ("payment.method.update", "cambia la referencia de la cuenta del banco"),
+    ("es", "payment.method.list", "¿qué cuentas bancarias tenemos?"),
+    ("es", "payment.method.update", "cambia la referencia de la cuenta del banco"),
+    ("en", "payment.method.update", "the bank account of BBVA has a new number"),
 ]
 
 
@@ -232,13 +236,13 @@ def without_the_bank_account():
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), PAYMENT_WORDS)
-def test_a_bank_account_said_by_its_name_brings_the_payments_method(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
+@pytest.mark.parametrize(("language", "name", "phrase"), PAYMENT_WORDS)
+def test_a_bank_account_said_by_its_name_brings_the_payments_method(catalog_of, language, name, phrase):
+    tools = catalog_of(Membership.Role.OWNER, language)
     ranking = {**assistant.RANKING, "synonyms": without_the_bank_account()}
-    offered = offered_to(tools, phrase)
+    offered = offered_to(tools, phrase, language)
     assert name in offered[:TOP], (place(offered, name), offered[:TOP])
-    unnamed = [op.name for op in shared.relevant(tools, [phrase], "es", **ranking)]
+    unnamed = [op.name for op in shared.relevant(tools, [phrase], language, **ranking)]
     assert name not in unnamed[:TOP], place(unnamed, name)
 
 
