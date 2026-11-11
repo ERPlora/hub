@@ -8,8 +8,9 @@ of the catalogue of a business with every app on and ranked as a turn ranks, is 
 a «comanda» is Sales' order to live (``order``, a table's check), so without Kitchen's asks its tickets, dishes and
 routing were not among the tools a turn offers and the model answered with a check of Sales or with no tool at all. The
 Hub says what the kitchen's words name (``base.assistant.SYNONYMS``): «la comanda» is also a kitchen ticket, an
-«estación» or «el puesto» a station, «urgente» or «prisa» a rush, the «enrutado» the routing, a dish marked «como
-listo» or «como hecho» is bumped and one sent back «a pendientes» or «a preparación» recalled.
+«estación» or «el puesto» a station, «urgente» or «prisa» a rush, the «enrutado» and the «regla» that sends a dish to
+a station the routing, a dish marked «como listo» or «como hecho» is bumped and one sent back «a pendientes» or «a
+preparación» recalled.
 """
 
 import dataclasses
@@ -112,6 +113,7 @@ KITCHEN_WORDS = [
     ("lista los puestos con su impresora", "kitchen.station.list"),
     ("quita la urgencia a la mesa 3", "kitchen.ticket.set_rush"),
     ("¿qué enrutado tienen los productos de la carta?", "kitchen.routing.list"),
+    ("pon una regla para que las bebidas salgan por la Barra", "kitchen.routing.set"),
     ("da como listos los calamares de la 2", "kitchen.item.bump"),
     ("las bravas que di como listos vuelven a pendientes", "kitchen.item.recall"),
 ]
