@@ -599,3 +599,16 @@ msgstr "Sesión del bono"
 
 msgid "Voucher sessions"
 msgstr "Sesiones del bono"
+
+msgid "Say one record, by its id."
+msgstr "Di un registro, por su id."
+
+msgid "Sales is not active in this business."
+msgstr "Ventas no está activa en este negocio."
+
+msgid "Appointments is not active in this business."
+msgstr "Citas no está activa en este negocio."
+
+msgctxt "service"
+msgid "Void of sale %(number)s"
+msgstr "Anulación de la venta %(number)s"
