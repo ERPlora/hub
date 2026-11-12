@@ -479,6 +479,22 @@ def test_a_service_whose_category_came_back_goes_into_it():
     assert queries.services_in_business(services) == {services[0]["id"]: made.id}
 
 
+def test_a_category_the_business_renamed_since_is_the_same_one_whoever_took_its_old_name():
+    tax = make_tax("test.service", "Service — test")
+    hair = make_category("Hair")
+    copy = [a_category_of_the_copy(hair), a_category_of_the_copy(name="Kids", parent_id=hair.pk)]
+    services = [a_service_of_the_copy(name="Fringe trim", category_id=hair.pk, tax_category_id=tax.pk)]
+    # Renamed since, and its old name taken by one made after: the copy's is the renamed one, by its id before any name.
+    Category.objects.filter(pk=hair.pk).update(name="Styling")
+    make_category("Hair")
+
+    [kids] = queries.categories_not_in_business(copy)
+    [record] = queries.services_not_in_business(services)
+
+    assert kids["parent_id"] == hair.pk
+    assert record["category_id"] == hair.pk
+
+
 def test_the_app_declares_what_it_gives_back_its_categories_first():
     categories, services = apps.get_app_config("service").recoverable_from_copy()
 
