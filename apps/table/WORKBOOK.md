@@ -241,7 +241,8 @@ Pasos:
 Entra: el nombre, la descripción, el color y el orden.
 Sale: la zona (avisa: `table.zone.created`).
 Si falla: sin nombre, el botón no se activa. Un nombre que ya tiene otra zona: «Ya hay una zona con
-ese nombre.». Un empleado no ve el «+»; si lo pide por la API, se rechaza por permiso.
+ese nombre.». El motivo de un campo sale debajo de él y se quita en cuanto se corrige ese campo, aunque
+otro diga lo mismo (hub#888). Un empleado no ve el «+»; si lo pide por la API, se rechaza por permiso.
 Implicados: TABLE-F06, TABLE-F09
 
 ### TABLE-F02 Añadir mesas
@@ -268,7 +269,8 @@ Sale: la mesa (avisa: `table.table.created`). Con una mesa en uso, «Elegir mesa
 todas (TABLE-F04), el paso vuelve a pendiente solo. Una zona sin mesas no lo da por hecho.
 Si falla: número repetido en la zona (sin distinguir mayúsculas ni espacios), por cualquier puerta:
 «Ya hay una mesa con ese número en esta zona.». Zona borrada mientras tanto: «Esa zona no existe en
-este negocio.».
+este negocio.». En la ventana de **Mesas**, el motivo de un campo sale debajo de él y se quita en cuanto
+se corrige ese campo, aunque otro diga lo mismo (hub#888).
 Implicados: TABLE-F03, TABLE-F04, TABLE-F07, BASE-F01
 
 ### TABLE-F03 Colocar las mesas en el plano
@@ -303,7 +305,8 @@ Pasos:
 Entra: la mesa elegida.
 Sale: la mesa cambiada (avisa: `table.table.updated`) o borrada (avisa: `table.table.deleted`).
 Si falla: dentro de la ventana: «El número de mesa es obligatorio», «Ya hay una mesa con ese número
-en esta zona.», «Esa mesa no existe en este negocio.»; borrar una mesa con cuenta abierta: «Esa mesa
+en esta zona.», «Esa mesa no existe en este negocio.», cada motivo bajo su campo hasta que se corrige
+ese campo, aunque otro diga lo mismo (hub#888); borrar una mesa con cuenta abierta: «Esa mesa
 tiene una cuenta abierta. Ciérrala o trasládala antes de borrar la mesa.».
 Implicados: TABLE-F02, TABLE-F05, TABLE-F21
 
@@ -340,7 +343,8 @@ Pasos:
 Entra: la zona elegida.
 Sale: la zona cambiada (avisa: `table.zone.updated`) o borrada (avisa: `table.zone.deleted`).
 Si falla: «Esta zona todavía tiene mesas. Muévelas a otra zona o bórralas antes.» o «Esa zona no
-existe en este negocio.».
+existe en este negocio.». El motivo de un campo sale debajo de él hasta que se corrige ese campo, aunque
+otro diga lo mismo (hub#888).
 Implicados: TABLE-F01, TABLE-F04
 
 ### TABLE-F07 Crear muchas mesas de golpe

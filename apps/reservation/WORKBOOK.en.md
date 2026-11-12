@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a06f8953f29fae7d4b5b566d32abbc61c8d044e4e2668f898737581aa5d8f1c0 -->
+<!-- generated from WORKBOOK.md sha256:78eb7de51a144aefb010a888cb80880d6a815c7cc5a89b237f0fb241906c12ca -->
 
 ## What it is for and who it is for
 
@@ -207,7 +207,8 @@ Steps:
 In: day, from, to, maximum of reservations, maximum of guests (optional).
 Out: the slot (announces: `reservation.time_slot.created`, `reservation.time_slot.deleted`).
 If it fails: "To" before or equal to "From": "A slot has to end after it starts."; a slot that overlaps
-another one of the same day: "That slot overlaps another one of the same day (13:00–16:00).".
+another one of the same day: "That slot overlaps another one of the same day (13:00–16:00).". The reason
+of a field goes away as soon as that field is corrected, even if another one says the same (hub#888).
 Involved: RESERVATION-F05, RESERVATION-F06
 
 ### RESERVATION-F02 Block a day or some hours
@@ -222,7 +223,8 @@ Steps:
 In: date, reason, whole day or from–until.
 Out: the block (announces: `reservation.blocked_date.created`, `reservation.blocked_date.deleted`).
 If it fails: without hours when it is not the whole day, or "Until" before "From": the field says so;
-that day already blocked at that time: "That date is already blocked at that time.".
+that day already blocked at that time: "That date is already blocked at that time.". The reason of a
+field goes away as soon as that field is corrected, even if another one says the same (hub#888).
 Involved: RESERVATION-F05, RESERVATION-F06
 
 ### RESERVATION-F03 Adjust the booking rules
@@ -306,7 +308,9 @@ time slot covers it."; full slot: "That time slot is fully booked for that date.
 table out of service: "Table 5 cannot be booked: it is blocked or out of service."; table already
 reserved at that time: "Table 5 already has a reservation from 21:00 to 23:00.". Two reservations at once
 on the last place or on the same table and time: one goes in and the other gets its reason (in the full
-slot, the staff can then book anyway; on the table, never).
+slot, the staff can then book anyway; on the table, never). In the window, the reason of a field (the
+Table included) shows under it and goes away as soon as that field is corrected, even if another one says
+the same (hub#888).
 Involved: CUSTOMER-F10, CUSTOMER-F11, SCHEDULE-F02, RESERVATION-F23, TABLE-F25
 
 ### RESERVATION-F07 Confirm a reservation
@@ -447,7 +451,9 @@ international format, as in a reservation (RESERVATION-F06), also with the card 
 Out: the entry (announces: `reservation.waitlist.created`).
 If it fails: without a name nor a customer: the form says so; a phone that is not of its country:
 Customers' reason, "This is not a valid phone number of its country: check the digits or write it with
-its international prefix (+44…).", in the Phone field, and nobody is added nor is the card created.
+its international prefix (+44…).", in the Phone field, and nobody is added nor is the card created. The
+reason of a field goes away as soon as that field is corrected, even if another one says the same
+(hub#888).
 Involved: RESERVATION-F16, CUSTOMER-F10
 
 ### RESERVATION-F15 Mark as contacted or remove from the waitlist
