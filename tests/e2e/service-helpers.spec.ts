@@ -13,7 +13,8 @@ import { rowAction } from './service-helpers';
 /** A row of the table `book` (its hooks as `DataTable.vue` names them) inside a shown page: `buttons`, its «Edit» out;
  *  `folded`, inside «⋮», which opens an `ion-popover` with the entry; `folds`, out until the pointer first moves, when
  *  the row folds it into «⋮» as the table does after a resize; `drops`, out until it is pressed, when the row loses it
- *  and no click comes of the press. `window.ran` lists the actions run. */
+ *  and no click comes of the press. Like the table's actions cell (`@click.stop`), the row's actions keep their clicks
+ *  from bubbling: what says where a click landed has to hear it on its way down. `window.ran` lists the actions run. */
 const bookRow = (row: 'buttons' | 'folded' | 'folds' | 'drops') => `
   <div class="ion-page">
     <div data-testid="book-row" data-id="r1">
@@ -24,6 +25,7 @@ const bookRow = (row: 'buttons' | 'folded' | 'folds' | 'drops') => `
   <script>
     window.ran = [];
     const actions = document.querySelector('[data-role=actions]');
+    actions.addEventListener('click', (event) => event.stopPropagation());
     const control = (testid, label, run) => {
       const button = document.createElement('button');
       button.dataset.testid = testid;
