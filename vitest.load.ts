@@ -14,6 +14,13 @@ declare module 'vitest' {
   }
 }
 
+/** The budget of a test or hook whose work is synchronous — a guardrail that reads the whole tree, a process waited
+ *  for with `execFileSync` — when the default's is too short: none (hub#1200). Vitest looks at a synchronous test's
+ *  clock only once it has returned (vitest#2920), so a clock there never cuts one that hangs: it only turns red, after
+ *  the fact, a correct run the machine made slow. What it found is its verdict; a hang is cut, as before, by the end of
+ *  the run's job. vitest.load.test.ts holds every synchronous test of the run to it. */
+export const NO_CLOCK = 0;
+
 /** `vi.waitFor`'s own budget when a test names none. */
 const WAIT_FOR_TIMEOUT = 1_000;
 

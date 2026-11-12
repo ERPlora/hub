@@ -12,6 +12,7 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { bare, findingsByApp, hubFrontends, linesWhere } from './__tests__/frontend-sources';
+import { NO_CLOCK } from '../../vitest.load';
 
 const LEARN_IT_FROM_THE_PLATFORM =
   "take the typed decimal mark from decimalMark of @erplora/ui/components (the platform's one way to learn it)";
@@ -86,7 +87,6 @@ describe('guardrail: the Hub learns the typed decimal mark from the platform (ba
 
   it('no app, nor base, learns the typed decimal mark on its own', () => {
     expect(findingsByApp(hubFrontends({ ui: false }), ownDecimalMarks), LEARN_IT_FROM_THE_PLATFORM).toEqual({});
-    // It reads every frontend file of the Hub (some 1,600): the limit of the guardrails that read a whole tree (60 s,
-    // tsconfig.test.ts).
-  }, 60_000);
+    // It reads every frontend file of the Hub (some 1,600), synchronously: as long as the machine makes it (hub#1200).
+  }, NO_CLOCK);
 });
