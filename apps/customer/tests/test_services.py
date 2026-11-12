@@ -977,15 +977,16 @@ def test_recover_refuses_a_value_its_field_no_longer_takes_and_makes_nothing():
 @pytest.mark.django_db
 def test_recover_leaves_out_a_value_of_a_field_deactivated_and_never_asks_a_required_one():
     CustomField.objects.create(name="Pet", is_active=False)
+    nickname = CustomField.objects.create(name="Nickname")
     allergies = CustomField.objects.create(name="Allergies", is_required=True)
 
     made = system(
         "customer.customer.recover",
-        a_card_of_the_copy(field_values=[{"name": "Pet", "value": "Luna"}]),
+        a_card_of_the_copy(field_values=[{"name": "Pet", "value": "Luna"}, {"name": "Nickname", "value": "Lu"}]),
     )
 
     luis = Customer.objects.get(pk=made.id)
-    assert luis.field_values.count() == 0
+    assert list(luis.field_values.values_list("field_id", "value")) == [(nickname.id, "Lu")]
     assert CustomField.objects.filter(name="Pet").count() == 1
     assert not CustomFieldValue.objects.filter(field=allergies).exists()
 
