@@ -154,7 +154,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await rowAction(page, 'service-services', serviceId, 'archive');
       const archive = page.locator('ion-modal[data-testid=service-services-archive]');
       await expect(archive).toContainText(`${service} — it will no longer be offered or bookable.`);
-      await expect(archive).toContainText('1 upcoming appointment(s) still use this service.');
+      await expect(archive).toContainText('1 upcoming appointment still uses this service.');
       await expect(page.locator('[data-testid=service-services-archive-submit]')).toBeInViewport();
       await capture('SERVICE-F04');
       await page.locator('[data-testid=service-services-archive-submit]').click();
@@ -184,7 +184,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       const categoryId = psql(`select id from service_category where name = '${category}'`);
       await rowAction(page, 'service-categories', categoryId, 'delete');
       const deletion = page.locator('ion-modal[data-testid=service-categories-delete]');
-      await expect(deletion).toContainText('1 service(s) will be left without a category.');
+      await expect(deletion).toContainText('1 service will be left without a category.');
       await expect(page.locator('[data-testid=service-categories-delete-submit]')).toBeInViewport();
       await capture('SERVICE-F08');
       await page.locator('[data-testid=service-categories-delete-submit]').click();
@@ -261,11 +261,11 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await grants.locator(`[data-testid=service-grants-adjust-${sold.id}]`).click();
       await page.locator('[data-testid=service-grant-adjust-uses] input').fill('1');
       await page.locator('[data-testid=service-grant-adjust-reason] textarea').fill('Courtesy for the delay');
-      await expect(page.locator('[data-testid=service-grant-adjust-preview]')).toContainText('After the adjustment: 5 session(s) left');
+      await expect(page.locator('[data-testid=service-grant-adjust-preview]')).toContainText('After the adjustment: 5 sessions left');
       await expect(page.locator('[data-testid=service-grant-adjust-submit]')).toBeInViewport();
       await capture('SERVICE-F18');
       await page.locator('[data-testid=service-grant-adjust-submit]').click();
-      await expect(grants.locator(`[data-testid=service-grants-row-${sold.id}]`)).toContainText('Given afterwards: +1 session(s), +0 day(s)');
+      await expect(grants.locator(`[data-testid=service-grants-row-${sold.id}]`)).toContainText('Given afterwards: +1 session, +0 days');
 
       // SERVICE-F17: the purchase never used is voided, with its reason.
       await grants.locator(`[data-testid=service-grants-void-${untouched.id}]`).click();
@@ -292,14 +292,14 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await view.locator('[data-testid=service-packages-orphans-open]').click();
       const orphans = page.locator('ion-modal[data-testid=service-orphans]');
       await expect(orphans.locator(`[data-testid=service-orphans-row-${sold.id}]`)).toContainText(`Customer reference: ${lucia.id}`);
-      await expect(orphans.locator(`[data-testid=service-orphans-row-${sold.id}]`)).toContainText('5 session(s) left');
+      await expect(orphans.locator(`[data-testid=service-orphans-row-${sold.id}]`)).toContainText('5 sessions left');
       await capture('SERVICE-F30');
       await orphans.locator('[data-testid=service-orphans-close]').click();
       await expect(orphans).toBeHidden();
 
       // SERVICE-F13, deleting: it asks first, and the Deleted view still finds what was sold.
       await rowAction(page, 'service-packages', packageId, 'delete');
-      await expect(page.locator('ion-modal[data-testid=service-packages-delete]')).toContainText('the package and its 1 line(s) leave the catalogue');
+      await expect(page.locator('ion-modal[data-testid=service-packages-delete]')).toContainText('the package and its line leave the catalogue');
       await page.locator('[data-testid=service-packages-delete-submit]').click();
       await expect(page.locator('ion-modal[data-testid=service-packages-delete]')).toBeHidden();
       await expect(packageRow).toHaveCount(0);
