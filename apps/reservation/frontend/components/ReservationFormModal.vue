@@ -20,6 +20,7 @@ import { useT } from '../composables/useT';
 import { hhmm } from '../lib/clock';
 import { cancellationNote } from '../lib/states';
 import type { BookingSource, FreeTableOut, ReservationIn, ReservationOut, ReservationPatchIn } from '../operations';
+import PartyField from './PartyField.vue';
 
 const props = defineProps<{
   /** The reservation being edited; `null` = «New reservation». */
@@ -234,6 +235,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         <div class="reservation-form__pair">
           <ion-input
             data-testid="reservation-form-guest_name"
+            name="guest_name"
             :value="name"
             :label="$t('reservation.form.name')"
             label-placement="floating"
@@ -241,13 +243,13 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             mode="md"
             :maxlength="200"
             :disabled="notesOnly"
-            name="guest_name"
             :error-text="fieldErrors.guest_name"
             :class="invalid(fieldErrors.guest_name)"
             @ion-input="name = text($event.detail.value)"
           />
           <ion-input
             data-testid="reservation-form-guest_phone"
+            name="guest_phone"
             type="tel"
             :value="phone"
             :label="$t('reservation.form.phone')"
@@ -256,7 +258,6 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             mode="md"
             :maxlength="60"
             :disabled="notesOnly"
-            name="guest_phone"
             :error-text="fieldErrors.guest_phone"
             :class="invalid(fieldErrors.guest_phone)"
             @ion-input="phone = text($event.detail.value)"
@@ -264,6 +265,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         </div>
         <ion-input
           data-testid="reservation-form-guest_email"
+          name="guest_email"
           type="email"
           :value="email"
           :label="$t('reservation.form.email')"
@@ -272,7 +274,6 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           mode="md"
           :maxlength="254"
           :disabled="notesOnly"
-          name="guest_email"
           :error-text="fieldErrors.guest_email"
           :class="invalid(fieldErrors.guest_email)"
           @ion-input="email = text($event.detail.value)"
@@ -280,6 +281,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         <div class="reservation-form__when">
           <ion-input
             data-testid="reservation-form-date"
+            name="date"
             type="date"
             :value="date"
             :label="$t('reservation.form.date')"
@@ -287,13 +289,13 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             fill="outline"
             mode="md"
             :disabled="notesOnly"
-            name="date"
             :error-text="fieldErrors.date"
             :class="invalid(fieldErrors.date)"
             @ion-input="date = text($event.detail.value)"
           />
           <ion-input
             data-testid="reservation-form-time"
+            name="time"
             type="time"
             :value="time"
             :label="$t('reservation.form.time')"
@@ -301,29 +303,20 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             fill="outline"
             mode="md"
             :disabled="notesOnly"
-            name="time"
             :error-text="fieldErrors.time"
             :class="invalid(fieldErrors.time)"
             @ion-input="time = text($event.detail.value)"
           />
-          <ion-input
+          <PartyField
+            v-model="party"
             data-testid="reservation-form-party_size"
-            type="number"
-            inputmode="numeric"
-            min="1"
-            :value="party"
-            :label="$t('reservation.form.party')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
-            :disabled="notesOnly"
             name="party_size"
+            :disabled="notesOnly"
             :error-text="fieldErrors.party_size"
-            :class="invalid(fieldErrors.party_size)"
-            @ion-input="party = text($event.detail.value)"
           />
           <ion-input
             data-testid="reservation-form-duration_minutes"
+            name="duration_minutes"
             type="number"
             inputmode="numeric"
             min="1"
@@ -333,7 +326,6 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             fill="outline"
             mode="md"
             :disabled="notesOnly"
-            name="duration_minutes"
             :error-text="fieldErrors.duration_minutes"
             :class="invalid(fieldErrors.duration_minutes)"
             @ion-input="duration = text($event.detail.value)"
@@ -342,11 +334,11 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         <Combo
           v-model="table"
           testid="reservation-form-table"
+          name="table_id"
           :search="searchTables"
           :label="t('reservation.form.table')"
           :placeholder="t('reservation.form.pickTable')"
           :empty-label="date && time ? t('reservation.form.tablesNone') : t('reservation.form.pickFirst')"
-          name="table_id"
           :error-text="fieldErrors.table_id"
           :disabled="notesOnly"
           clearable
@@ -381,6 +373,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         </div>
         <ion-textarea
           data-testid="reservation-form-notes"
+          name="notes"
           :value="notes"
           :label="$t('reservation.form.notes')"
           label-placement="floating"
@@ -388,12 +381,12 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           mode="md"
           :auto-grow="true"
           :maxlength="2000"
-          name="notes"
           :error-text="fieldErrors.notes"
           @ion-input="notes = text($event.detail.value)"
         />
         <ion-textarea
           data-testid="reservation-form-internal_notes"
+          name="internal_notes"
           :value="internalNotes"
           :label="$t('reservation.form.internalNotes')"
           label-placement="floating"
@@ -401,7 +394,6 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           mode="md"
           :auto-grow="true"
           :maxlength="2000"
-          name="internal_notes"
           :error-text="fieldErrors.internal_notes"
           @ion-input="internalNotes = text($event.detail.value)"
         />

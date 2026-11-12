@@ -8,6 +8,7 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, capture, type Credentials, EMPLOYEE, login, psql, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
+import { expectMarked, expectUnmarked, refuseWithTheSameWords } from './same-words-helpers';
 import { stamp, VIEWPORTS } from './sale-helpers';
 
 const LAST = `E2E888${stamp()}`;
@@ -26,27 +27,12 @@ test.beforeAll(async ({ browser }) => {
   await employee.context.close();
 });
 
-/** Saving a new member (POST `/api/staff/members`) is refused for `fields`, every one with the same `words`. */
-async function refuseWithTheSameWords(page: Page, fields: readonly string[], words: string): Promise<void> {
-  await page.route('**/api/staff/members', (route) => {
-    if (route.request().method() !== 'POST') return route.fallback();
-    const body = { error: { code: 'invalid_payload', message: words, fields: Object.fromEntries(fields.map((key) => [key, words])) } };
-    return route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify(body) });
-  });
-}
-
 /** In Staff › Members › «+», the first name, the Role and the Hub user refused with the same `words` lose their marks
  *  one by one: a Hub user chosen in its picker, then the first name typed; the Role keeps its own. Screenshots
  *  `CLOSE-STAFF-hub888-<step>-<label>`. */
 async function correctOneByOne(page: Page, words: string, label: string): Promise<void> {
-  const marked = async (field: Locator): Promise<void> => {
-    await expect(field).toHaveClass(/ion-invalid/);
-    await expect(field).toContainText(words);
-  };
-  const unmarked = async (field: Locator): Promise<void> => {
-    await expect(field).not.toHaveClass(/ion-invalid/);
-    await expect(field).not.toContainText(words);
-  };
+  const marked = (field: Locator): Promise<void> => expectMarked(field, words);
+  const unmarked = (field: Locator): Promise<void> => expectUnmarked(field, words);
   await shown(page).locator('[data-testid=staff-members-add]').click();
   const form = page.locator('ion-modal[data-testid=staff-member-form]');
   await expect(form).toBeVisible();
@@ -56,7 +42,8 @@ async function correctOneByOne(page: Page, words: string, label: string): Promis
   await first.locator('input').fill('E2E Ana');
   await form.locator('[data-testid=staff-member-form-last_name] input').fill(LAST);
 
-  await refuseWithTheSameWords(page, ['first_name', 'role_id', 'user_id'], words);
+  // Saving a new member (POST `/api/staff/members`) is refused for the three, with the same words.
+  await refuseWithTheSameWords(page, '**/api/staff/members', ['first_name', 'role_id', 'user_id'], words);
   await form.locator('[data-testid=staff-member-form-submit]').click();
   for (const field of [first, role, user]) await marked(field);
   await capture(page, `CLOSE-STAFF-hub888-refused-${label}`);

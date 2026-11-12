@@ -154,6 +154,7 @@ async function remove(): Promise<void> {
         <div class="table-form__pair">
           <ion-input
             data-testid="table-form-number"
+            name="number"
             :value="form.number"
             :label="$t('table.form.number')"
             :placeholder="editing ? undefined : $t('table.add.numberPlaceholder')"
@@ -161,13 +162,13 @@ async function remove(): Promise<void> {
             fill="outline"
             mode="md"
             :maxlength="20"
-            name="number"
             :error-text="fieldErrors.number"
             :class="invalid(fieldErrors.number)"
             @ion-input="set('number', text($event.detail.value))"
           />
           <ion-input
             data-testid="table-form-capacity"
+            name="capacity"
             type="number"
             inputmode="numeric"
             min="1"
@@ -176,7 +177,6 @@ async function remove(): Promise<void> {
             label-placement="floating"
             fill="outline"
             mode="md"
-            name="capacity"
             :error-text="fieldErrors.capacity"
             :class="invalid(fieldErrors.capacity)"
             @ion-input="set('capacity', text($event.detail.value))"
@@ -192,13 +192,13 @@ async function remove(): Promise<void> {
         <ion-input
           v-if="editing"
           data-testid="table-form-name"
+          name="name"
           :value="form.name"
           :label="$t('table.form.name')"
           label-placement="floating"
           fill="outline"
           mode="md"
           :maxlength="100"
-          name="name"
           :error-text="fieldErrors.name"
           :class="invalid(fieldErrors.name)"
           @ion-input="set('name', text($event.detail.value))"

@@ -101,26 +101,26 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         <div class="reservation-slot-form__pair">
           <ion-input
             data-testid="reservation-slot-form-start_time"
+            name="start_time"
             type="time"
             :value="start"
             :label="$t('reservation.availability.slotForm.from')"
             label-placement="floating"
             fill="outline"
             mode="md"
-            name="start_time"
             :error-text="fieldErrors.start_time"
             :class="invalid(fieldErrors.start_time)"
             @ion-input="start = text($event.detail.value)"
           />
           <ion-input
             data-testid="reservation-slot-form-end_time"
+            name="end_time"
             type="time"
             :value="end"
             :label="$t('reservation.availability.slotForm.to')"
             label-placement="floating"
             fill="outline"
             mode="md"
-            name="end_time"
             :error-text="fieldErrors.end_time"
             :class="invalid(fieldErrors.end_time)"
             @ion-input="end = text($event.detail.value)"
@@ -129,6 +129,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         <div class="reservation-slot-form__pair">
           <ion-input
             data-testid="reservation-slot-form-max_reservations"
+            name="max_reservations"
             type="number"
             inputmode="numeric"
             min="1"
@@ -137,13 +138,13 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             label-placement="floating"
             fill="outline"
             mode="md"
-            name="max_reservations"
             :error-text="fieldErrors.max_reservations"
             :class="invalid(fieldErrors.max_reservations)"
             @ion-input="max = text($event.detail.value)"
           />
           <ion-input
             data-testid="reservation-slot-form-max_covers"
+            name="max_covers"
             type="number"
             inputmode="numeric"
             min="1"
@@ -152,7 +153,6 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             label-placement="floating"
             fill="outline"
             mode="md"
-            name="max_covers"
             :error-text="fieldErrors.max_covers"
             :class="invalid(fieldErrors.max_covers)"
             @ion-input="maxCovers = text($event.detail.value)"

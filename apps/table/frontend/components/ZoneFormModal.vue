@@ -134,6 +134,7 @@ async function save(): Promise<void> {
       >
         <ion-input
           data-testid="table-zone-form-name"
+          name="name"
           :value="form.name"
           :label="$t('table.zoneForm.name')"
           :placeholder="zone ? undefined : $t('table.add.zonePlaceholder')"
@@ -141,20 +142,19 @@ async function save(): Promise<void> {
           fill="outline"
           mode="md"
           :maxlength="100"
-          name="name"
           :error-text="fieldErrors.name"
           :class="invalid(fieldErrors.name)"
           @ion-input="set('name', text($event.detail.value))"
         />
         <ion-input
           data-testid="table-zone-form-description"
+          name="description"
           :value="form.description"
           :label="$t('table.zoneForm.description')"
           label-placement="floating"
           fill="outline"
           mode="md"
           :maxlength="500"
-          name="description"
           :error-text="fieldErrors.description"
           :class="invalid(fieldErrors.description)"
           @ion-input="set('description', text($event.detail.value))"
@@ -180,6 +180,7 @@ async function save(): Promise<void> {
           </ion-select>
           <ion-input
             data-testid="table-zone-form-sort_order"
+            name="sort_order"
             type="number"
             inputmode="numeric"
             min="0"
@@ -188,7 +189,6 @@ async function save(): Promise<void> {
             label-placement="floating"
             fill="outline"
             mode="md"
-            name="sort_order"
             :error-text="fieldErrors.sort_order"
             :class="invalid(fieldErrors.sort_order)"
             @ion-input="set('order', text($event.detail.value))"

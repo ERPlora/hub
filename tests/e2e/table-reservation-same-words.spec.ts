@@ -5,10 +5,12 @@
 // refused for three fields with the same words; typing in one takes the mark from it alone, then another, and the
 // third keeps its own. The refusal is answered in the browser (`page.route`), so nothing is created. Once more in
 // Spanish, whose session the fleet's visual sweep reads (`E2E_SAVE_STORAGE_STATE`).
-import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, login, psql, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
+import { capture, psql, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
+import { expectMarked, expectUnmarked, refuseWithTheSameWords } from './same-words-helpers';
 import { stamp, VIEWPORTS } from './sale-helpers';
+import { ownerPage } from './service-helpers';
 
 const TAG = `E2E888 ${stamp()}`;
 
@@ -58,40 +60,18 @@ const RESERVATION: Window = {
   created: `select count(*) from reservation_reservation where guest_name like '${TAG}%'`,
 };
 
-async function signedIn(browser: Browser, viewport: { width: number; height: number }, next: string): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext({ baseURL: A, viewport, locale: 'en-US' });
-  const page = await context.newPage();
-  await login(page, A, next);
-  return { context, page };
-}
-
-/** The window's save is refused for `keys`, every one with the same `words`. */
-async function refuseWithTheSameWords(page: Page, window: Window, words: string): Promise<void> {
-  await page.route(window.save, (route) => {
-    if (route.request().method() !== 'POST') return route.fallback();
-    const body = { error: { code: 'invalid_payload', message: words, fields: Object.fromEntries(window.keys.map((key) => [key, words])) } };
-    return route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify(body) });
-  });
-}
-
 /** In `window`, its three fields refused with the same `words` lose their marks one by one as each is typed again;
  *  the last keeps its own. Screenshots `CLOSE-<app>-hub888-<step>-<label>`. */
 async function correctOneByOne(page: Page, window: Window, words: string, label: string): Promise<void> {
-  const marked = async (field: Locator): Promise<void> => {
-    await expect(field).toHaveClass(/ion-invalid/);
-    await expect(field).toContainText(words);
-  };
-  const unmarked = async (field: Locator): Promise<void> => {
-    await expect(field).not.toHaveClass(/ion-invalid/);
-    await expect(field).not.toContainText(words);
-  };
+  const marked = (field: Locator): Promise<void> => expectMarked(field, words);
+  const unmarked = (field: Locator): Promise<void> => expectUnmarked(field, words);
   await shown(page).locator(`[data-testid=${window.add}]`).click();
   const form = page.locator(`ion-modal[data-testid=${window.testid}]`);
   await expect(form).toBeVisible();
   await window.fill(form);
   const [first, second, last] = window.keys.map((key) => form.locator(`[data-testid=${window.testid}-${key}]`));
 
-  await refuseWithTheSameWords(page, window, words);
+  await refuseWithTheSameWords(page, window.save, window.keys, words);
   await form.locator(`[data-testid=${window.testid}-submit]`).click();
   for (const field of [first, second, last]) await marked(field);
   await capture(page, `CLOSE-${window.app}-hub888-refused-${label}`);
@@ -121,7 +101,7 @@ async function correctOneByOne(page: Page, window: Window, words: string, label:
 for (const window of [ZONE, RESERVATION]) {
   for (const size of VIEWPORTS) {
     test(`hub#888 ${window.app} at ${size.label}: three fields refused with the same words lose their marks one by one`, async ({ browser }) => {
-      const { context, page } = await signedIn(browser, { width: size.width, height: size.height }, window.page);
+      const { context, page } = await ownerPage(browser, window.page, { width: size.width, height: size.height });
       try {
         await correctOneByOne(page, window, 'Check this field.', size.label);
       } finally {
