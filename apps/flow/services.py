@@ -14,7 +14,9 @@ before it stay. A step runs only if the automation was granted its operation, wi
 in the language of whoever saved the automation. One run per automation and trigger key (the outbox
 event's id): the row lock and the unique constraint make a repeated delivery start nothing. A run
 started by an event that a run of the same automation caused, or by a chain of more than
-``document.MAX_CHAIN`` automations, stops before doing anything (``flow.loop_stopped``).
+``document.MAX_CHAIN`` automations, stops before doing anything (``flow.loop_stopped``). An event that a recovery
+from a separate copy recorded (``base.recovery.brought_back``: its actor) starts none: what came back is nothing new to
+the business (BASE-F114, hub#1307).
 """
 
 import datetime as dt
@@ -118,6 +120,7 @@ from apps.flow.schemas import (
 from base import assistant as hub_assistant
 from base import outbound
 from base.business import business_zone
+from base.recovery import brought_back
 
 logger = logging.getLogger(__name__)
 
@@ -2055,6 +2058,10 @@ def react(ctx: OperationContext, data: ReactIn) -> dict:
         .values_list("pk", flat=True)
     )
     if waiting_ids and data.event.split(".", 1)[0] not in active_apps(ctx.scope):
+        return {"started": 0, "skipped": len(waiting_ids)}
+    if waiting_ids and brought_back(data.actor):
+        # What a recovery brought back from a separate copy is nothing new to the business (BASE-F114, hub#1307): no
+        # automation greets or announces it again.
         return {"started": 0, "skipped": len(waiting_ids)}
     for flow_id in waiting_ids:
         flow = (

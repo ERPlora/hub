@@ -291,8 +291,12 @@ Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Métodos
 Pasos:
-1. En **Pagos → Métodos** pulsa una fila (o su **Editar**): se abre «Editando método — {nombre}».
-2. Cambia el nombre, el tipo o la cuenta y pulsa **Guardar**.
+1. En **Pagos → Métodos** pulsa una fila (o su **Editar**): se abre «Editando método — {nombre}» con lo
+   que ya dice la fila; la **Cuenta** y **Guardar** esperan en gris mientras llega la ficha completa
+   (la lista enmascara la cuenta).
+2. Cambia el nombre, el tipo o la cuenta y pulsa **Guardar**. El nombre y el tipo se pueden cambiar
+   antes de que llegue la ficha: lo escrito se queda, y la ficha, al llegar, solo rellena lo que no se
+   ha tocado.
 3. Para dejar de usarlo, pulsa **Desactivar** en su fila: pasa a **Desactivado** y deja de salir en
    «Nuevo pago». **Activar** lo devuelve.
 Entra: el método (por el asistente, por su nombre) y lo que cambia.
