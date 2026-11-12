@@ -13,7 +13,8 @@ import { A, api, login, psql, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
 import { flowShots } from './printing-helpers';
-import { chargeByApi, cleanSales, drawerOff, newestSaleOf, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
+import { chargeByApi, cleanSales, drawerOff, newestSaleOf, restoreDrawer, stamp } from './sale-helpers';
+import { rowAction } from './service-helpers';
 
 const RUN = stamp();
 const TILL = `e2e Till ${RUN}`;
@@ -107,17 +108,6 @@ async function addCoffee(page: Page): Promise<void> {
   await expect(shown(page).locator('[data-testid=pos-total]')).toContainText(/1[.,]50/);
 }
 
-async function rowAction(page: Page, sale: SaleOut, action: string): Promise<void> {
-  const hook = `sales-table-row-${sale.id}-${action}`;
-  const inline = shown(page).locator(`[data-testid=${hook}]`);
-  if ((await inline.count()) > 0 && (await inline.first().isVisible())) {
-    await inline.first().click();
-    return;
-  }
-  await shown(page).locator(`[data-testid=sales-table-row-${sale.id}-menu]`).first().click();
-  await page.locator(`ion-popover [data-testid=${hook}]`).click();
-}
-
 test('PRINTING-F07, F13, F08: the charge queues its receipt (the drawer only with cash) and «Print» a copy', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/sale/pos');
@@ -169,7 +159,7 @@ test('PRINTING-F08: «Reprint» on a row of Sales queues a copy of its receipt',
   const before = (await jobsOf(context, till)).length;
   const row = shown(page).locator(`[data-testid=sales-table-row][data-id="${sale.id}"]`);
   await expect(row.first()).toBeVisible();
-  await rowAction(page, sale, 'reprint');
+  await rowAction(page, 'sales-table', sale.id, 'reprint');
   await expect(sentTo(page, TILL)).toBeVisible();
   const copy = await newest(context, till, before + 1);
   expect([copy.document_type, copy.reference, copy.source_app]).toEqual(['receipt', sale.invoice_number || sale.number, 'sale']);

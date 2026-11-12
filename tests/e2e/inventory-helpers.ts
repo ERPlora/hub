@@ -146,22 +146,6 @@ export async function shootFlow(page: Page, key: string, restore = { width: 1280
   return shoot(page, `APP-INVENTORY-${key}`, restore);
 }
 
-/** Runs a row action of the products list: its inline button, or the row's «⋮» menu when it folded there. */
-export async function rowAction(page: Page, id: string, action: string): Promise<void> {
-  const hook = `inventory-products-row-${id}-${action}`;
-  const inline = shown(page).locator(`[data-testid=${hook}]`).first();
-  const menu = shown(page).locator(`[data-testid=inventory-products-row-${id}-menu]`).first();
-  // Right after a search the row may not be painted yet: choosing then took the menu and waited there for an
-  // inline action until the test's time ran out. The row's buttons paint together, so wait for either.
-  await expect(inline.or(menu).first()).toBeVisible();
-  if (await inline.isVisible()) {
-    await inline.click();
-    return;
-  }
-  await menu.click();
-  await page.locator(`ion-popover [data-testid=${hook}]`).click();
-}
-
 /** How a «Not configured» chip sits in its box (`within`: the table cell, the card's value or the form's field):
  *  what is wrong with it (none = its icon in sight and its text on one line, whole or ending in «…»; `whole`: it
  *  has to be whole; `reads`: these words of its text end before what the chip cuts, its «…» included; `titled`: its

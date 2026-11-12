@@ -8,7 +8,8 @@
 import { expect, test } from '@playwright/test';
 
 import { A, api, capture, EMPLOYEE, shown, untilStill } from './helpers';
-import { cleanUp, named, post, recordOf, rowAction, rowOf, signedIn, TAG } from './task-helpers';
+import { rowAction } from './service-helpers';
+import { cleanUp, named, post, recordOf, rowOf, signedIn, TAG } from './task-helpers';
 
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);

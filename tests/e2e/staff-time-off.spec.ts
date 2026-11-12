@@ -7,6 +7,7 @@
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, type Credentials, EMPLOYEE, hubUserIdOf, login, psql, shot, shown } from './helpers';
+import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 const TAG = 'E2E';
@@ -40,17 +41,6 @@ async function signedIn(browser: Browser, next: string, credentials?: Credential
 }
 
 const rowOf = (page: Page, text: string) => shown(page).locator('[data-testid=staff-time-off-row]', { hasText: text });
-
-/** Clicks a row action, from its button or from the row's «⋮» menu when the box folded it. */
-async function rowAction(page: Page, id: string, action: string): Promise<void> {
-  const button = shown(page).locator(`[data-testid=staff-time-off-row-${id}-${action}]`);
-  if (await button.isVisible()) {
-    await button.click();
-    return;
-  }
-  await shown(page).locator(`[data-testid=staff-time-off-row-${id}-menu]`).click();
-  await page.locator(`ion-popover [data-testid=staff-time-off-row-${id}-${action}]`).click();
-}
 
 async function requestDays(page: Page, from: string, to: string, reason: string): Promise<void> {
   await shown(page).locator('[data-testid=staff-time-off-add]').click();
@@ -91,7 +81,7 @@ test('the employee asks, the owner approves live, an overlap is refused in the f
     await expect(rowOf(owner.page, name)).toContainText('Pending');
     const timeOffId = psql(`select id from staff_timeoff where member_id = '${memberId}'`);
     await owner.page.screenshot({ path: shot('staff-time-off-owner-pending') });
-    await rowAction(owner.page, timeOffId, 'approve');
+    await rowAction(owner.page, 'staff-time-off', timeOffId, 'approve');
     await expect(rowOf(owner.page, name)).toContainText('Approved');
 
     // …and the employee sees it Approved, still without reloading.

@@ -1,6 +1,6 @@
 // Shared by the schedule specs (apps/schedule/WORKBOOK.md): the default week of migration 0002 as the
 // database's own hand, the SQL that saves and puts back what hub `a` had, the cleanup of what a spec
-// creates (named «E2E …»), and the waits and row actions of the two screens.
+// creates (named «E2E …»), and the waits of the two screens. A row action is service-helpers.ts's `rowAction`.
 import { expect, type Page } from '@playwright/test';
 
 import { horizontalOverflow, psql, shown } from './helpers';
@@ -65,19 +65,6 @@ export async function listsReady(page: Page): Promise<void> {
   const view = shown(page);
   await view.locator('[data-testid=schedule-special-days-row], [data-testid=schedule-special-days-empty]').first().waitFor({ state: 'visible' });
   await view.locator('[data-testid=schedule-overrides-row], [data-testid=schedule-overrides-empty]').first().waitFor({ state: 'visible' });
-}
-
-/** A row action: its button, or the «⋮» menu when the row folded its actions (waits for either). */
-export async function rowAction(page: Page, table: string, id: string, action: string): Promise<void> {
-  const button = shown(page).locator(`[data-testid=${table}-row-${id}-${action}]`);
-  const menu = shown(page).locator(`[data-testid=${table}-row-${id}-menu]`);
-  await expect(button.or(menu).first()).toBeVisible();
-  if (await button.isVisible()) {
-    await button.click();
-    return;
-  }
-  await menu.click();
-  await page.locator(`ion-popover [data-testid=${table}-row-${id}-${action}]`).click();
 }
 
 export async function noHorizontalScroll(page: Page, label: string): Promise<void> {

@@ -6,7 +6,8 @@
 import { expect, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
-import { cleanupExceptions, listsReady, noHorizontalScroll, rowAction, TAG, VIEWPORTS } from './schedule-helpers';
+import { cleanupExceptions, listsReady, noHorizontalScroll, TAG, VIEWPORTS } from './schedule-helpers';
+import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 test.beforeAll(cleanupExceptions);

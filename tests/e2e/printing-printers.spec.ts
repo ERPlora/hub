@@ -11,6 +11,7 @@ import { A, api, EMPLOYEE, login, psql, shown } from './helpers';
 import { dialog, fill, pick } from './inventory-helpers';
 import { claim, fail, flowShots, forgetDevices } from './printing-helpers';
 import { shots, stamp } from './sale-helpers';
+import { rowAction } from './service-helpers';
 
 // One printer goes through every test, in order: a failure stops the rest instead of a new worker's names.
 test.describe.configure({ mode: 'serial' });
@@ -59,18 +60,6 @@ async function jobsReady(page: Page): Promise<void> {
   await shown(page).locator('[data-testid=printing-jobs-row], [data-testid=printing-jobs-empty]').first().waitFor({ state: 'visible' });
 }
 
-/** Runs a row action of the printers list: its inline button, or the row's «⋮» menu when it folded there. */
-async function rowAction(page: Page, id: string, action: string): Promise<void> {
-  const hook = `printing-printers-row-${id}-${action}`;
-  const inline = shown(page).locator(`[data-testid=${hook}]`);
-  if ((await inline.count()) > 0 && (await inline.first().isVisible())) {
-    await inline.first().click();
-    return;
-  }
-  await shown(page).locator(`[data-testid=printing-printers-row-${id}-menu]`).first().click();
-  await page.locator(`ion-popover [data-testid=${hook}]`).click();
-}
-
 async function byName(context: BrowserContext, name: string): Promise<Printer> {
   const listed = await api<{ rows: Printer[] }>(context, A, 'GET', `/printing/printers?search=${encodeURIComponent(name)}`);
   return listed.data.rows.find((p) => p.name === name)!;
@@ -104,7 +93,7 @@ test('PRINTING-F03, F05, F01: the owner adds a network printer and sends it a te
   const till = await byName(context, TILL);
   expect(till.target).toBe('network:192.168.1.50:9100');
 
-  await rowAction(page, till.id, 'test');
+  await rowAction(page, 'printing-printers', till.id, 'test');
   await expect.poll(async () => (await api<{ total: number }>(context, A, 'GET', `/printing/jobs?printer_id=${till.id}`)).data.total).toBe(1);
   // The summary is live: the receipt role now has a job waiting, and its card names the printer it prints
   // on (hub#1527) — the one the server says, the default or else the first active receipt printer.
@@ -151,7 +140,7 @@ test('PRINTING-F04: the owner gives the printer another role and deactivates it'
   await login(page, A, '/printing/printers');
   const till = await byName(context, TILL);
   await printersReady(page);
-  await rowAction(page, till.id, 'edit');
+  await rowAction(page, 'printing-printers', till.id, 'edit');
   const modal = dialog(page, 'printing-printer');
   await expect(modal).toBeVisible();
   await pick(page, modal.locator('[data-testid=printing-printer-usage]'), /Kitchen|Cocina/);
@@ -161,10 +150,10 @@ test('PRINTING-F04: the owner gives the printer another role and deactivates it'
   await modal.locator('[data-testid=printing-printer-submit]').click();
   await expect(modal).toBeHidden();
   await expect.poll(async () => (await byName(context, TILL)).usage).toBe('kitchen');
-  await rowAction(page, till.id, 'toggle');
+  await rowAction(page, 'printing-printers', till.id, 'toggle');
   await expect.poll(async () => (await byName(context, TILL)).is_active).toBe(false);
   await expect(shown(page).locator(`[data-testid=printing-printers-state-${till.id}]`).first()).toContainText(/Inactive|Inactiva/);
-  await rowAction(page, till.id, 'toggle');
+  await rowAction(page, 'printing-printers', till.id, 'toggle');
   await expect.poll(async () => (await byName(context, TILL)).is_active).toBe(true);
 });
 
