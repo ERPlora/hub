@@ -1,8 +1,8 @@
-"""``manage.py shell``, in a database context (phase 2, S1; plan docs/plans/2026-10-22-fase-2-tenencia.md).
+"""``manage.py shell``, in a database context.
 
 A hub's model without a context fails (``HubContextMissing``), so the shell runs on control (``use_control``: the
 registry, the platform's outbox) or, with ``--hub <slug>``, in that hub's database (``use_hub``: the e2e's ``shell -c``
-helpers relay a hub's outbox there). Since S5 there is no shared database: a business without its own is refused.
+helpers relay a hub's outbox there). There is no shared database: a business without its own is refused.
 """
 
 from django.core.management import CommandError

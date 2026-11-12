@@ -1,4 +1,4 @@
-"""FIX-SCHEDULED-TASK-LIVE-NOTICE-WRONG-CHANNEL: the live notice of what a scheduled task did goes on the channel of
+"""The live notice of what a scheduled task did goes on the channel of
 the hub it belongs to, never on the worker's fixed scope (``WORKER_SCOPE_SLUG``, the platform hub in production).
 
 In a hub with its own database the worker runs its tasks in that database and on its scope (``base.worker._hubs``,
