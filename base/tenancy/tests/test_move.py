@@ -24,6 +24,7 @@ import uuid
 import psycopg
 import pytest
 from django.db import connections as django_connections
+from django.utils import timezone
 from psycopg import sql
 
 from base import services
@@ -145,7 +146,10 @@ class TestAMove:
         target = moves.cluster()
         hub = moves.hub(to=target)
         with use_control():
-            HubDue.objects.create(hub=hub, due_at=AT, lease_until=AT + dt.timedelta(minutes=1), lease_owner="other:1")
+            # Held by the real clock: whether the pass claims with its ``now`` or with the clock, it is held (hub#1351).
+            HubDue.objects.create(
+                hub=hub, due_at=AT, lease_until=timezone.now() + dt.timedelta(minutes=1), lease_owner="other:1"
+            )
 
         assert run() == 0
 
