@@ -224,6 +224,41 @@ class TestCustomersComeBack:
         assert why["id"] == str(luis)
         assert why["reason"].startswith("customer.phone_invalid: ")
 
+    def test_the_reasons_are_said_in_the_language_of_the_staff_who_asked(self, recoveries, every_app_on):
+        hub, (ana,) = recoveries.business(every_app_on, ANA)
+        copy = recoveries.copy_of(hub)
+        run_in(hub, "customer.customer.delete", id=ana)
+        in_the_copy(copy, "UPDATE customer_customer SET phone = %s WHERE id = %s", ["12", ana])
+        asked = recoveries.ask(copy, language="es")
+
+        run()
+
+        [customers] = fresh(asked).results
+        [why] = customers["reasons"]
+        from django.utils import translation
+
+        from apps.customer.services import PHONE_INVALID
+
+        with translation.override("es"):
+            assert why["reason"] == f"customer.phone_invalid: {PHONE_INVALID}"
+        assert str(PHONE_INVALID) not in why["reason"]
+
+    def test_only_the_first_reasons_are_kept_and_every_card_not_created_is_counted(
+        self, recoveries, every_app_on, monkeypatch
+    ):
+        hub, ids = recoveries.business(every_app_on, ANA, LUIS)
+        copy = recoveries.copy_of(hub)
+        for card in ids:
+            run_in(hub, "customer.customer.delete", id=card)
+        in_the_copy(copy, "UPDATE customer_customer SET phone = '12'")
+        monkeypatch.setattr(CopyRecovery, "REASONS_KEPT", 1)
+        asked = recoveries.ask(copy)
+
+        run()
+
+        [customers] = fresh(asked).results
+        assert (customers["created"], customers["not_created"], len(customers["reasons"])) == (0, 2, 1)
+
     def test_an_app_the_business_turned_off_is_refused_with_why_and_nothing_is_made(self, recoveries, every_app_on):
         hub, (ana,) = recoveries.business(every_app_on, ANA)
         copy = recoveries.copy_of(hub)
@@ -376,6 +411,30 @@ class TestTheLease:
         assert len(live_cards(hub)) == 1
         taken = fresh(asked)
         assert (taken.status, taken.results, taken.lease_owner) == ("asked", [], "other:1")
+
+    def test_a_worker_that_lost_its_lease_after_its_last_record_does_not_note_it_done(
+        self, recoveries, every_app_on, monkeypatch
+    ):
+        hub, (ana,) = recoveries.business(every_app_on, ANA)
+        copy = recoveries.copy_of(hub)
+        run_in(hub, "customer.customer.delete", id=ana)
+        asked = recoveries.ask(copy)
+        op = get_operation("customer.customer.create")
+        real = op.fn
+
+        def then_taken(ctx, data):
+            made = real(ctx, data)
+            with use_control():
+                CopyRecovery.objects.filter(pk=asked.pk).update(lease_owner="other:1")
+            return made
+
+        monkeypatch.setattr(op, "fn", then_taken)
+
+        run()
+
+        assert len(live_cards(hub)) == 1
+        taken = fresh(asked)
+        assert (taken.status, taken.results, taken.done_at, taken.lease_owner) == ("asked", [], None, "other:1")
 
     def test_a_business_being_moved_waits_for_it_with_nothing_done(self, recoveries, every_app_on):
         hub, (ana,) = recoveries.business(every_app_on, ANA)
