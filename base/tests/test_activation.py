@@ -357,6 +357,15 @@ def test_a_business_is_born_with_the_apps_its_country_requires_that_the_platform
     assert activation.born_on(country, BORN) == born
 
 
+def test_every_module_a_business_is_born_with_brings_what_it_needs(monkeypatch):
+    """Its sign-up makes the tables of, and turns on, what the ones it is born with need too."""
+    configs = [Declared("sale", "Sales", "all", turns_on=True), Declared("tax", "Taxes"), Declared("customer", "Customers")]
+    for config, requires in zip(configs, [("tax", "customer"), (), ()]):
+        config.requires = requires
+    monkeypatch.setattr("base.activation.module_configs", lambda: configs)
+    assert activation.born_apps("PT") == {"sale", "tax", "customer"}
+
+
 def test_what_a_business_is_born_with_is_on_with_what_it_needs_and_none_of_it_chosen():
     born = activation.born({"sale"}, GRAPH)
     assert born == states(sale="on", tax="on", customer="on")
