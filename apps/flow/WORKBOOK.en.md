@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a27c4224e2e21c63da307160fe2da7b82480957124349a37ffde755eb0d2864a -->
+<!-- generated from WORKBOOK.md sha256:163dcd471514bdc7b22b1433b3b2ab1a4c023ccdfdd227a511c4c5e1083e5cae -->
 
 ## What it is for and who it is for
 
@@ -557,9 +557,10 @@ Steps:
 In: that automation's runs of the last 90 days, and all those still waiting.
 Out: nothing. The history keeps each finished run **90 days** and then forgets it; one that is waiting or
 under way is never deleted. What its steps read (a customer's card) is not kept when it ends: only the ids
-and the amounts of the notice that started it; one stopped by an error keeps it 7 days, so that it can be
-resumed (FLOW-F24). If a customer's personal data are erased (CUSTOMER-F16), every run that names her card (what
-started it or what its steps read), also one that has already ended, forgets right then the free texts of its
+and the amounts of the notice that started it and the ids of what they read, never their data; one stopped by an
+error keeps it 7 days, so that it can be resumed (FLOW-F24). If a customer's personal data are erased
+(CUSTOMER-F16), every run that names her card (what started it or what its steps read, also one started by hand or
+by a schedule or whose assistant read the card), also one that has already ended, forgets right then the free texts of its
 history that may carry her name: an answer's note, what the assistant or the app that did the action answered
 (also about each field, and its technical text) and the title of the question in a "no" or a silence. Each one says "[erased with the
 customer's personal data]"; what happened stays (how it ended, who answered and what). The other customers' runs
@@ -1301,8 +1302,9 @@ Notices carry ids, never names or contents.
   for that notice, and in the same delivery, it cancels the runs that wait, call, ask or can be resumed and whose
   kept data name that card (`flow.customer.erase`, FLOW-F23 and F24); what their steps read and their questions'
   texts are emptied. In the same pass, every run that names the card, also one that has already ended, forgets the
-  free texts of its history (FLOW-F16). It looks for them by the card's id, never by a name or a phone. Repeating
-  the notice changes nothing.
+  free texts of its history (FLOW-F16). It looks for them by the card's id (in what started them, in what their
+  steps read or among the ids of what they read and have forgotten), never by a name or a phone. Repeating the
+  notice changes nothing.
 - From the platform: the business's time zone (the schedules) and the outbox's notices (the last one of a
   kind, for Try it and the examples).
 
