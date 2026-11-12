@@ -113,6 +113,7 @@ async function toggleService(event: Event, id: string, online: boolean): Promise
         v-else-if="form"
         class="ob-settings"
         data-testid="ob-settings"
+        novalidate
         @submit.prevent="settingsForm.save()"
       >
         <h2 class="ob-settings__title">

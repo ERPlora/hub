@@ -84,6 +84,7 @@ function toForm(settings: SettingsOut): Form {
         v-else
         class="table-settings"
         data-testid="table-settings"
+        novalidate
         @submit.prevent="settingsForm.save()"
       >
         <h2 class="table-settings__title">

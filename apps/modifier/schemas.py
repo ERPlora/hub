@@ -52,10 +52,15 @@ KITCHEN_TICKET_NAME = gettext_noop("Kitchen ticket name")
 A_GROUP = names("modifier.group.get")
 # A group said by its name, when its id is not known: a group belongs to nothing, so the card reads it by that name
 # alone, as the write will find it, and shows the group the write acts on («Salsas picantes» when the person said
-# «salsa»), not only the words said. Only on the data of the writes that check their record before the card: read
-# without a check, a name two groups fit would leave the group off the card (hub#1218).
-A_GROUP_BY_NAME = names("modifier.group.get", by="group")
+# «salsa», hub#1218); words it cannot read (two groups fit, none does) it says as said, never off the card, so adding
+# an option or applying a group, which cannot check it, reads it too (hub#1245).
+A_GROUP_BY_NAME = names("modifier.group.get", by="group", as_said=True)
 AN_OPTION = names("modifier.option.get", name=("label",))
+# An option said by its name: two groups may have an option with one name, so the card reads it with its group when it
+# is told, as the write finds it, and says it as said when it cannot (hub#1245).
+AN_OPTION_BY_NAME = names(
+    "modifier.option.get", by="option", within=("group_id", "group"), name=("label",), as_said=True
+)
 A_LINK = names("modifier.link.get", name=("label",))
 A_PRODUCT = names("inventory.product.get")
 A_CATEGORY = names("modifier.category.get")
@@ -146,7 +151,7 @@ class _OwningGroup(_Input):
 
     group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=A_GROUP)
     group: Said | None = Field(
-        None, description="The group's name, when its id is not known (e.g. «Extras»)."
+        None, description="The group's name, when its id is not known (e.g. «Extras»).", json_schema_extra=A_GROUP_BY_NAME
     )
 
     @model_validator(mode="after")
@@ -261,6 +266,7 @@ class OptionRefIn(_Input):
         None,
         title=OPTION,
         description="The option's name, when its id is not known (e.g. «No onion»).",
+        json_schema_extra=AN_OPTION_BY_NAME,
     )
     group_id: UUID | None = Field(
         None,
@@ -361,7 +367,7 @@ class _Target(_Input):
 class LinkIn(_Target):
     group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=A_GROUP)
     group: Said | None = Field(
-        None, description="The group's name, when its id is not known (e.g. «Sauces»)."
+        None, description="The group's name, when its id is not known (e.g. «Sauces»).", json_schema_extra=A_GROUP_BY_NAME
     )
 
     @model_validator(mode="after")

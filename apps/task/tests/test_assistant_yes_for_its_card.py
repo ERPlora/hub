@@ -37,8 +37,8 @@ CHECKS = {
 }
 #: Each write that takes a task or a project by its name with no read whose input fits theirs to check it with
 #: (``base.E012``: the task's and the project's reads take an ``id`` that is the write's own record or none): their
-#: card says them as said (hub#1245). The data: a task commented on, a new task's project and parent task, and the
-#: project a task is moved to.
+#: card reads them by that name all the same, so the yes holds to what it found, and says them as said when two fit
+#: (hub#1245). The data: a task commented on, a new task's project and parent task, and the project a task is moved to.
 UNCHECKED = {
     "task.comment.add": ("task",),
     "task.task.create": ("parent", "project"),
@@ -196,7 +196,7 @@ def test_a_name_none_has_draws_no_card(write):
 
 def test_every_write_of_tasks_that_takes_a_task_or_a_project_by_its_name_is_here():
     """No assistant write that takes a task or a project by its name escapes these cases: it checks it, or it is one of
-    those that cannot yet (hub#1245)."""
+    those that cannot (hub#1245)."""
     taking: dict[str, set[str]] = {}
     for op in task_writes():
         for datum in ("task", "project", "parent"):
@@ -216,13 +216,14 @@ def test_only_the_writes_that_take_their_record_by_its_name_check_it():
     assert {name: read for name, read in declared.items() if read is not None} == CHECKS
 
 
-def test_a_write_reads_a_record_said_by_its_name_on_its_card_only_when_it_checks_it():
-    """Read by its name with no check before it, a name two fit would leave it off the card (the read fails and the
-    card names nobody it cannot read): only a write that checks its record reads it by its name."""
+def test_every_write_that_takes_a_task_or_a_project_by_its_name_reads_it_and_says_it_as_said_when_it_cannot():
+    """With or without a check before it, a task or a project said by its name is read on its card, and stays on it as
+    said when it cannot be read (two fit): never off it (``names(…, as_said=True)``, hub#1245)."""
     marks = {
-        "task": names("task.task.detail", by="task", name=("title",)),
-        "project": names("task.project.detail", by="project"),
-        "parent": names("task.task.detail", by="parent", name=("title",)),
+        "task": names("task.task.detail", by="task", name=("title",), as_said=True),
+        "project": names("task.project.detail", by="project", as_said=True),
+        # The parent task is a task: the task's read takes it as its ``task``.
+        "parent": names("task.task.detail", by="task", name=("title",), as_said=True),
     }
     reading = {
         (op.name, datum)
@@ -230,7 +231,11 @@ def test_a_write_reads_a_record_said_by_its_name_on_its_card_only_when_it_checks
         for datum, mark in marks.items()
         if datum in op.input.model_fields and op.input.model_fields[datum].json_schema_extra == mark
     }
-    assert reading == {(write, "task") for write in ON_A_TASK} | {(write, "project") for write in ON_A_PROJECT}
+    assert reading == (
+        {(write, "task") for write in ON_A_TASK}
+        | {(write, "project") for write in ON_A_PROJECT}
+        | {(write, datum) for write, data in UNCHECKED.items() for datum in data}
+    )
 
 
 def unchecked(write: str, datum: str, said_as: str) -> dict:
@@ -257,13 +262,20 @@ def test_a_name_two_fit_stays_on_the_card_of_a_write_that_cannot_check_it(write,
     assert fields_of(write, unchecked(write, datum, word))[datum]["value"] == word
 
 
-# ── Not yet: a task or a project said by its name with no read to check it with (hub#1245) ──────────────────────────
+# ── A task or a project said by its name with no read to check it with (hub#1245) ───────────────────────────────────
 # Commenting on a task, creating a task in a project or under a parent task, or moving a task to a project, said by
-# its name, has no read whose input fits to check it with, so the card says it as said and nothing holds the yes to
-# it. Strict: once the platform reads them and shows what was said when the read fails, these pass and their marks go.
+# its name, has no read whose input fits to check it with: its card reads it by that name all the same, so what it
+# found goes in its fingerprint and the yes holds to it.
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="hub#1245: a record said by its name, with no check")
+@pytest.mark.parametrize(("write", "datum"), UNCHECKED_CASES)
+def test_a_write_that_cannot_check_it_says_the_task_or_the_project_it_finds(write, datum):
+    make_task("Llamar al proveedor")
+    make_project("p-open", "Apertura del local")
+    word, found = ("apertura", "Apertura del local") if datum == "project" else ("llamar", "Llamar al proveedor")
+    assert fields_of(write, unchecked(write, datum, word))[datum]["value"] == found
+
+
 @pytest.mark.parametrize(("write", "datum"), UNCHECKED_CASES)
 def test_the_yes_to_a_write_that_cannot_check_it_touches_only_what_its_card_showed(write, datum):
     """«llamar» (or «apertura») shows the one that fits; somebody creates «Llamar» (or «Apertura») before the yes:

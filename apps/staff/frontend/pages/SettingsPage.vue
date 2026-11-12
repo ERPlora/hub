@@ -106,6 +106,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         v-else-if="form"
         class="staff-settings"
         data-testid="staff-settings-form"
+        novalidate
         @submit.prevent="settingsForm.save()"
       >
         <section class="staff-settings__section">
