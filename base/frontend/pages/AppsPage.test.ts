@@ -737,6 +737,9 @@ describe('AppsPage', () => {
         expect(counter(m)).toBe('2 apps activadas · 1 de 20 de tu plan');
         await m.result(m.call, 'base.app.list', { ...listOf(1, BORN, CHOSEN, OFF), max_apps: null }, 3);
         expect(counter(m)).toBe('2 apps activadas · Sin límite');
+        // A business just born without a limit: Taxes alone, in the singular.
+        await m.result(m.call, 'base.app.list', { ...listOf(0, BORN, OFF), max_apps: null }, 4);
+        expect(counter(m)).toBe('1 app activada · Sin límite');
       });
     });
   });
