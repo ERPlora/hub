@@ -1,14 +1,22 @@
+// @vitest-environment node
 // What the guardrails over the Hub's frontends read (money-grouping, quantity-format): the code of a `.ts` and of the
 // `<script>` blocks of a `.vue` at their own lines, the sources of a frontend without tests, their helpers, declarations
 // or builds, and what a guard finds in them, as `<path>:<line>` by app.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import ts from 'typescript';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { bare, findingsByApp, frontendSources, hubFrontends, linesWhere, scriptBlocks } from './frontend-sources';
+
+// Node's synchronous listing and reading, watched: the guards list and read the frontends without them (hub#1315).
+// In Node's environment, where a module's own `node:fs` is the watched one.
+vi.mock('node:fs', async (importOriginal) => {
+  const fs = await importOriginal<typeof import('node:fs')>();
+  return { ...fs, readdirSync: vi.fn(fs.readdirSync), readFileSync: vi.fn(fs.readFileSync) };
+});
 
 describe('scriptBlocks', () => {
   it('gives a .ts whole, from its first line', () => {
@@ -87,7 +95,7 @@ describe('frontendSources and findingsByApp', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('reads the .ts and .vue of a frontend, and no test, test helper, declaration, build or dependency', () => {
+  it('reads the .ts and .vue of a frontend, and no test, test helper, declaration, build or dependency', async () => {
     for (const path of [
       'apps/a/frontend/lib/format.ts',
       'apps/a/frontend/pages/ListPage.vue',
@@ -102,13 +110,13 @@ describe('frontendSources and findingsByApp', () => {
     ]) {
       put(path);
     }
-    expect(frontendSources(join(root, 'apps/a/frontend')).map((file) => file.slice(root.length + 1))).toEqual([
+    expect((await frontendSources(join(root, 'apps/a/frontend'))).map((file) => file.slice(root.length + 1))).toEqual([
       'apps/a/frontend/lib/format.ts',
       'apps/a/frontend/pages/ListPage.vue',
     ]);
   });
 
-  it('reports what a guard finds by app, as path:line from the hub, and skips an app without a frontend', () => {
+  it('reports what a guard finds by app, as path:line from the hub, and skips an app without a frontend', async () => {
     put('base/frontend/lib/home.ts', 'ok\nbad\n');
     put('apps/a/frontend/lib/format.ts', 'bad\nok\nbad\n');
     put('apps/b/frontend/lib/format.ts', 'ok\n');
@@ -119,10 +127,27 @@ describe('frontendSources and findingsByApp', () => {
       { app: 'c', dir: join(root, 'apps/c/frontend') },
     ];
     const bad = (text: string) => text.split('\n').flatMap((line, index) => (line === 'bad' ? [index + 1] : []));
-    expect(findingsByApp(frontends, bad, root)).toEqual({
+    expect(await findingsByApp(frontends, bad, root)).toEqual({
       base: ['base/frontend/lib/home.ts:2'],
       a: ['apps/a/frontend/lib/format.ts:1', 'apps/a/frontend/lib/format.ts:3'],
     });
+  });
+
+  it('lists and reads every frontend without holding the worker (hub#1315): what it was given meanwhile runs first', async () => {
+    for (let index = 0; index < 30; index += 1) put(`apps/a/frontend/lib/f${index}.ts`, 'bad\n');
+    vi.mocked(readdirSync).mockClear();
+    vi.mocked(readFileSync).mockClear();
+    let turned = false;
+    setImmediate(() => {
+      turned = true;
+    });
+    const found = await findingsByApp([{ app: 'a', dir: join(root, 'apps/a/frontend') }], () => [1], root);
+    expect(turned).toBe(true);
+    expect(found.a).toHaveLength(30);
+    expect([...vi.mocked(readdirSync).mock.calls, ...vi.mocked(readFileSync).mock.calls]).toEqual([]);
+    // And the watch sees them: `hubFrontends` lists the hub's apps that way.
+    hubFrontends({ ui: false });
+    expect(readdirSync).toHaveBeenCalled();
   });
 });
 

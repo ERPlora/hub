@@ -8,7 +8,8 @@
 import { expect, test } from '@playwright/test';
 
 import { api, A, capture, horizontalOverflow, shown, untilStill } from './helpers';
-import { cleanUp, named, pick, post, rowAction, rowOf, signedIn, TAG, VIEWPORTS } from './task-helpers';
+import { rowAction } from './service-helpers';
+import { cleanUp, named, pick, post, rowOf, signedIn, TAG, VIEWPORTS } from './task-helpers';
 
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);

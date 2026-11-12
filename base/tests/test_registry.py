@@ -1,4 +1,4 @@
-"""base.registry: what the host gate and the apps read of the registry of hubs (plan 2026-10-17, §1.2)."""
+"""base.registry: what the host gate and the apps read of the registry of hubs."""
 
 import datetime as dt
 import uuid
@@ -75,7 +75,7 @@ def test_a_hub_is_preparing_until_it_is_ready(status, preparing):
 @pytest.mark.parametrize(
     ("db_name", "status", "was_ready", "made"),
     [
-        ("", "ready", True, False),  # a business of phase 1 not yet cut (S5): its database is still to be made
+        ("", "ready", True, False),  # a business still on a shared database, not yet cut: its own is still to be made
         ("hub_x", "ready", False, True),
         ("hub_x", "cancelled", True, True),  # cancelled after it was ready: its database stays
         ("hub_x", "archiving", True, True),
@@ -95,8 +95,8 @@ def test_a_hub_database_is_made_once_it_was_ready_and_until_it_is_dropped(db_nam
 
 @pytest.mark.usefixtures("no_test_fallback")
 def test_a_ready_business_without_its_own_database_is_not_served_until_its_cut():
-    """S5: phase 1's shared database is gone; a business still on control's answers 503 until ``cut_shared_hubs``
-    gives it its own (``base.tenancy.cut``), the maintenance one, as one moving to another cluster (W8)."""
+    """No business shares a database any more: one still on control's answers 503 until ``cut_shared_hubs`` gives it
+    its own (``base.tenancy.cut``), the maintenance one, as one moving to another cluster."""
     hub = Hub(slug="acme", db_name="", status="ready", ready_at=timezone.now())
 
     refused = registry.refusal(hub)

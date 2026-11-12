@@ -7,12 +7,16 @@ message is the key and the Spanish its translation, so both languages are checke
 plural form, so it is read from the ``.po`` beside it; and since English has no catalogue, the screen says the forms
 the code hands the plural family, read from the code as ``base/tests/test_locale_modules.py`` reads its messages
 (hub#1294), and the two forms of each ``{% blocktranslate count %}`` of its templates, read with Django's own template
-parser. The server is the platform's (``control``, ``base``), each app's and ``live``'s, whose validation messages
-every form of the Hub shares (hub#1318). The readers are the ones of every catalogue test, ``base.tests.po``.
+parser. A text with no count is read there too, before ``makemessages`` takes it to the ``.po`` (hub#1333): the
+messages the code hands ``gettext``/``pgettext`` (``said_in_code``, as ``test_locale_modules.py`` reads them) and each
+``{% translate %}`` and ``{% blocktranslate %}`` with no count of the templates. The server is the platform's
+(``control``, ``base``), each app's and ``live``'s, whose validation messages every form of the Hub shares (hub#1318).
+The readers are the ones of every catalogue test, ``base.tests.po``.
 """
 
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from babel.messages.mofile import write_mo
@@ -20,10 +24,10 @@ from babel.messages.pofile import read_po
 from django.apps import AppConfig, apps
 from django.conf import settings
 from django.template import Engine
-from django.templatetags.i18n import BlockTranslateNode
+from django.templatetags.i18n import BlockTranslateNode, TranslateNode
 
 from base.tests.po import mo_entries, po_messages
-from base.tests.test_locale_modules import gettext_calls, own_code
+from base.tests.test_locale_modules import gettext_calls, own_code, said_in_code
 
 #: A plural ending glued to a word in parentheses: «record(s)», «opción(es)», «category(ies)» (as the SPA's guard).
 IN_PARENTHESES = re.compile(r"[^\W\d_]\((?:s|es|as|os|ies)\)")
@@ -82,6 +86,21 @@ def template_plurals_in(source: str) -> list[tuple[str, str]]:
     return [(node.render_token_list(node.singular)[0], node.render_token_list(node.plural)[0]) for node in counted]
 
 
+def template_messages_in(source: str) -> list[str]:
+    """The English text of each ``{% translate %}`` of the template ``source`` with a literal message and of each
+    ``{% blocktranslate %}`` with no count, in its order, as ``makemessages`` keeps them (a variable as
+    ``%(name)s``)."""
+    nodes = Engine.get_default().from_string(source).nodelist.get_nodes_by_type((TranslateNode, BlockTranslateNode))
+    said = []
+    for node in nodes:
+        if isinstance(node, BlockTranslateNode):
+            if not node.plural:  # one with a count is template_plurals_in's
+                said.append(node.render_token_list(node.singular)[0])
+        elif node.filter_expression.var.literal is not None:  # a message that is a variable is no text written here
+            said.append(node.filter_expression.var.literal)
+    return said
+
+
 def own_templates(config) -> list[Path]:
     """The templates of the module ``config``: the files of its ``templates/``, where Django loads them from."""
     return sorted(path for path in Path(config.path, "templates").rglob("*") if path.is_file())
@@ -105,6 +124,23 @@ def code_plurals() -> dict[str, list[tuple[str, str]]]:
         config.label: [
             *(pair for path in own_code(config) for pair in plurals_in(path.read_text(encoding="utf-8"))),
             *(pair for path in own_templates(config) for pair in template_plurals_in(path.read_text(encoding="utf-8"))),
+        ]
+        for config in server_modules()
+    }
+
+
+def code_messages() -> dict[str, list[str]]:
+    """The texts with no count the server of the Hub says, by module: the messages of its Python code (as
+    ``base/tests/test_locale_modules.py`` reads them; a contexted one without its context, which the screen does not
+    show) and those of its templates."""
+    return {
+        config.label: [
+            *sorted(message.rpartition("\x04")[2] for message in said_in_code(config)),
+            *(
+                text
+                for path in own_templates(config)
+                for text in template_messages_in(path.read_text(encoding="utf-8"))
+            ),
         ]
         for config in server_modules()
     }
@@ -237,12 +273,17 @@ TEMPLATE_SOURCE = """{% extends "base.html" %}{% load i18n %}
   {% endblocktranslate %}
   {% if carts %}
     {% blocktrans count counter=carts|length %}{{ counter }} cart{% plural %}{{ counter }} carts{% endblocktrans %}
+    {% trans "Clear the cart." context "cart" as cleared %}
   {% endif %}
   {% for till in tills %}
     {% blocktranslate context "cash" count n=till.count %}{{ n }} till{% plural %}{{ n }} tills{% endblocktranslate %}
+    {% blocktrans with name=till.name trimmed %}
+      Close {{ name }}
+    {% endblocktrans %}
   {% endfor %}
   {% blocktranslate %}Hello {{ name }}{% endblocktranslate %}
   {% translate "one record" %}
+  {% translate title %}
 {% endblock %}
 """
 
@@ -276,14 +317,88 @@ def test_every_plural_of_the_server_templates_is_read():
     assert all(pair in said[label] for label, pairs in read.items() for pair in pairs)
 
 
+def test_the_templates_texts_without_a_count_are_read_in_english():
+    """The English text of each ``{% translate %}`` of a template with a literal message and of each
+    ``{% blocktranslate %}`` with no count, in the template's order, as ``makemessages`` keeps them (a variable as
+    ``%(name)s``), under either tag name, with a context, kept ``as`` a variable or inside a block, an ``if`` or a
+    ``for``; a message that is a variable, or a text with a ``{% plural %}``, is not read here."""
+    said = template_messages_in(TEMPLATE_SOURCE)
+    assert said == ["Clear the cart.", "Close %(name)s", "Hello %(name)s", "one record"]
+
+
+#: A tag of a template that says a text with no count, as Django's lexer reads it: a ``{% translate %}`` of a literal
+#: message, or a ``{% blocktranslate %}`` with no ``count``.
+TEXT_TAG = re.compile(
+    r"\{%\s*(?:translate|trans)\s+[\"']|\{%\s*(?:blocktranslate|blocktrans)\b(?:(?!%\})(?!\bcount\b).)*%\}", re.DOTALL
+)
+
+
+def test_every_text_without_a_count_of_the_server_templates_is_read():
+    """Positive control: each ``{% translate %}`` and ``{% blocktranslate %}`` with no count of the templates of the
+    platform, ``live`` and the apps gives its text to the guard, ``base``'s «too many attempts» page among them
+    (hub#1333)."""
+    said = code_messages()
+    tags, read = {}, {}
+    for config in server_modules():
+        texts = [path.read_text(encoding="utf-8") for path in own_templates(config)]
+        tags[config.label] = sum(len(TEXT_TAG.findall(text)) for text in texts)
+        read[config.label] = [message for text in texts for message in template_messages_in(text)]
+    assert {label: len(messages) for label, messages in read.items()} == tags
+    assert {"control", "base", "website"} <= {label for label, count in tags.items() if count}
+    assert sum(tags.values()) > 50
+    assert "Too many sign-in attempts" in read["base"]
+    assert all(message in said[label] for label, messages in read.items() for message in messages)
+
+
+def test_the_server_codes_texts_without_a_count_are_read():
+    """Positive control: the messages ``control``, ``base``, ``live`` and the apps hand the gettext family in their code
+    are read with ``said_in_code``, a contexted one as the screen shows it, without its context (pricing's
+    ``pgettext_lazy("pricing", "active")``)."""
+    said = code_messages()
+    found = {label for label, messages in said.items() if messages}
+    assert {"control", "base", "live", "pricing", "verifactu"} <= found
+    assert sum(len(messages) for messages in said.values()) > 1000
+    assert "0 = no limit." in said["control"] and "Check the highlighted details." in said["live"]
+    assert {"Price list", "active"} <= set(said["pricing"])
+    assert not any("\x04" in message for messages in said.values() for message in messages)
+
+
+@pytest.mark.parametrize(
+    ("name", "content"),
+    [
+        ("probe.py", 'from django.utils.translation import gettext_lazy as _\n\nPROBE = _("Clear the field(s).")\n'),
+        ("templates/probe/form.html", '{% load i18n %}<p>{% translate "Clear the field(s)." %}</p>\n'),
+        (
+            "templates/probe/form.txt",
+            "{% load i18n %}{% blocktranslate with form=name %}Clear the field(s) of {{ form }}."
+            "{% endblocktranslate %}\n",
+        ),
+    ],
+    ids=["code", "translate", "blocktranslate"],
+)
+def test_the_check_catches_a_text_with_parentheses_the_catalogue_does_not_keep_yet(
+    name, content, tmp_path, monkeypatch
+):
+    """«Clear the field(s).» said with no count in a module's code or in one of its templates, before ``makemessages``
+    takes it to the ``.po``, turns the guard red (hub#1333)."""
+    path = tmp_path / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    modules = [*server_modules(), SimpleNamespace(label="probe", path=str(tmp_path))]
+    monkeypatch.setitem(globals(), "server_modules", lambda: modules)
+    with pytest.raises(AssertionError, match=re.escape("probe: Clear the field(s)")):
+        test_no_code_says_a_count_with_parentheses()
+
+
 def test_no_code_says_a_count_with_parentheses():
     """In English there is no catalogue: the screen says the forms the code hands ``ngettext`` and the templates'
-    ``{% blocktranslate count %}``, whatever the ``.po`` keeps (hub#1294, hub#1318)."""
+    ``{% blocktranslate count %}``, whatever the ``.po`` keeps (hub#1294, hub#1318), and the texts with no count they
+    say, before ``makemessages`` takes them to the ``.po`` (hub#1333)."""
+    plurals, messages = code_plurals(), code_messages()
     found = {
-        f"{label}: {form}"
-        for label, pairs in code_plurals().items()
-        for singular, plural in pairs
-        for form in (singular, plural)
-        if IN_PARENTHESES.search(form)
+        f"{label}: {text}"
+        for label in plurals.keys() | messages.keys()
+        for text in [*(form for pair in plurals.get(label, []) for form in pair), *messages.get(label, [])]
+        if IN_PARENTHESES.search(text)
     }
     assert found == set()

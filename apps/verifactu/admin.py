@@ -1,6 +1,5 @@
-"""Django admin of the verifactu app, for the platform's staff only (round 12, PLAN §17; hubs.erplora.com), at the
-service of support. Ioan's criterion (2026-10-15): a record not sent is not a record registered; support does not
-delete a sale, it fixes a sending problem.
+"""Django admin of the verifactu app, for the platform's staff only (hubs.erplora.com), at the service of support:
+a record not sent is not a record registered; support does not delete a sale, it fixes a sending problem.
 
 - What was sealed (records, chain heads, audit events, the AEAT's photo) is shown whole and never typed, added nor
   deleted: it is corrected with a new record (RD 1007/2023) and the records are kept. A record the AEAT registered
@@ -30,7 +29,7 @@ from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
 from django.utils import translation
 from django.utils.translation import gettext_lazy as _
-from django.utils.translation import ngettext_lazy
+from django.utils.translation import ngettext_lazy, npgettext_lazy
 from live.context import OperationContext, Scope
 from live.errors import OperationError
 from live.operations import get
@@ -54,11 +53,22 @@ STAFF_PERMISSIONS = frozenset(
 )
 
 RESEND = _("Resend to the AEAT")
-RESENT = _(
-    "Resend finished: %(accepted)s accepted, %(rejected)s rejected, %(waiting)s still waiting."
-)
+#: A notice that joins several counts says each one in its own singular or plural: «1 aceptado, 2 rechazados», never one
+#: plural for the whole sentence.
+RESENT = _("Resend finished: %(accepted)s, %(rejected)s, %(waiting)s.")
+RESENT_COUNTS = {
+    "accepted": npgettext_lazy(
+        "verifactu records", "%(count)s accepted", "%(count)s accepted", "count"
+    ),
+    "rejected": npgettext_lazy(
+        "verifactu records", "%(count)s rejected", "%(count)s rejected", "count"
+    ),
+    "waiting": npgettext_lazy(
+        "verifactu records", "%(count)s still waiting", "%(count)s still waiting", "count"
+    ),
+}
 RESCHEDULE = _("Reschedule: send with the next pass")
-#: A count says itself in the singular or the plural (hub#1275): «1 record goes out», never «record(s)».
+#: A count says itself in the singular or the plural: «1 record goes out», never «record(s)».
 RESCHEDULED = ngettext_lazy(
     "Rescheduled: %(count)s record goes out with the next pass.",
     "Rescheduled: %(count)s records go out with the next pass.",
@@ -72,9 +82,21 @@ CHAINS_RESCHEDULED = ngettext_lazy(
 )
 NOTHING_WAITING = _("nothing is waiting in its queue.")
 ASK_THE_AEAT = _("Ask the AEAT (out of the queue if it already has it)")
-ASKED = _(
-    "Asked the AEAT: %(held)s already registered (out of the queue), %(missing)s not in the AEAT (still in the queue)."
-)
+ASKED = _("Asked the AEAT: %(held)s, %(missing)s.")
+ASKED_COUNTS = {
+    "held": npgettext_lazy(
+        "verifactu records",
+        "%(count)s already registered (out of the queue)",
+        "%(count)s already registered (out of the queue)",
+        "count",
+    ),
+    "missing": npgettext_lazy(
+        "verifactu records",
+        "%(count)s not in the AEAT (still in the queue)",
+        "%(count)s not in the AEAT (still in the queue)",
+        "count",
+    ),
+}
 CORRECT_REJECTION = _("Correct a rejection with a new record")
 CORRECTED = ngettext_lazy(
     "Corrected: %(count)s new record in the queue.",
@@ -120,6 +142,12 @@ def _run(ctx: OperationContext, name: str, data: dict):
     """The operation ``name`` with ``data`` validated as its route would."""
     operation = get(name)
     return operation(ctx, operation.input.model_validate(data))
+
+
+def said_with_counts(sentence, counts: dict, tally: dict[str, int]) -> str:
+    """``sentence`` with each number of ``tally`` said by its own words in ``counts``, each in the singular or the
+    plural its number asks for."""
+    return str(sentence) % {key: counts[key] % {"count": number} for key, number in tally.items()}
 
 
 class ReadOnlyAdmin(admin.ModelAdmin):
@@ -198,7 +226,7 @@ class ConfigAdmin(admin.ModelAdmin):
         return tuple(
             field.name
             for field in Config._meta.concrete_fields
-            # ``live_paid`` is retired (PLAN §30): its column only waits to be dropped.
+            # ``live_paid`` is retired: its column only waits to be dropped.
             if field.name not in ("route", "live_paid")
         )
 
@@ -457,7 +485,7 @@ class RecordAdmin(SupportActions, ReadOnlyAdmin):
     def total(self, record: Record) -> str | None:
         if record.total_amount is None:
             return None
-        # Thousands always grouped with the screens' marks («1.234,56 €»; hub#1090): Django's Spanish format
+        # Thousands always grouped with the screens' marks («1.234,56 €»): Django's Spanish format
         # groups with a space.
         locale = translation.to_locale(translation.get_language() or "en")
         return f"{format_decimal(Decimal(record.total_amount) / 100, format='#,##0.00', locale=locale)} €"
@@ -504,7 +532,7 @@ class RecordAdmin(SupportActions, ReadOnlyAdmin):
             clean = totals["rejected"] == totals["waiting"] == 0
             self.message_user(
                 request,
-                str(RESENT) % totals,
+                said_with_counts(RESENT, RESENT_COUNTS, totals),
                 messages.SUCCESS if clean else messages.WARNING,
             )
 
@@ -549,7 +577,7 @@ class RecordAdmin(SupportActions, ReadOnlyAdmin):
         if tally["held"] or tally["missing"]:
             self.message_user(
                 request,
-                str(ASKED) % tally,
+                said_with_counts(ASKED, ASKED_COUNTS, tally),
                 messages.WARNING if tally["missing"] else messages.SUCCESS,
             )
 

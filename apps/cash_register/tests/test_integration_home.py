@@ -1,9 +1,8 @@
-"""Cash register on the Home (PLAN-HUB round 2026-10-21; FIX-CASH_REGISTER-SETUP-HOOKS): base's own queries bring
-«Your cash drawer» to whoever manages the drawer's settings (pending on the factory values, done once the business
-saved them, even as they came; CASH_REGISTER-F01) and the drawer's two panels (CASH_REGISTER-F12): the open session's
-expected cash, only to whoever may see it on a blind count (F07, gh:cash_register#24 and #84), and the differences of
-the last eight closed sessions, each answered by the drawer's own query as that person. A save in hub B re-runs B's
-checklist and panels and tells A nothing.
+"""Cash register on the Home: base's own queries bring «Your cash drawer» to whoever manages the drawer's settings
+(pending on the factory values, done once the business saved them, even as they came; CASH_REGISTER-F01) and the
+drawer's two panels (CASH_REGISTER-F12): the open session's expected cash, only to whoever may see it on a blind count
+(F07), and the differences of the last eight closed sessions, each answered by the drawer's own query as that person. A
+save in hub B re-runs B's checklist and panels and tells A nothing.
 
 base, sale and cash_register run for real: the step and the panels come from CashRegisterConfig through base's own
 queries, and the figures from sessions opened, charged and closed through their own operations.
@@ -120,15 +119,14 @@ def test_a_manager_is_offered_both_panels_followed_live():
         EXPECTED: ("cash_register.session.list", True, True, "kpi"),
         RECENT: ("cash_register.session.list", False, True, "bar-list"),
     }
-    # The picker groups them under the app's own name (gh:cash_register#123).
+    # The picker groups them under the app's own name.
     assert {panel["category"] for panel in offered.values()} == {"Cash register"}
 
 
 @pytest.mark.django_db
 def test_an_employee_never_gets_the_expected_cash_panel_but_reads_the_discrepancies():
-    """F07: the employee counts blind, so the Home never shows them what the drawer should hold
-    (gh:cash_register#24: the old dashboard's widget leaked it); the differences of closed sessions are theirs to see,
-    as in Cash register."""
+    """F07: the employee counts blind, so the Home never shows them what the drawer should hold; the differences of
+    closed sessions are theirs to see, as in Cash register."""
     employee = ctx_for("hub_employee")
     assert not employee.has("cash_register.view_expected_totals")
     assert list(panels(employee)) == [RECENT]
@@ -137,7 +135,7 @@ def test_an_employee_never_gets_the_expected_cash_panel_but_reads_the_discrepanc
 @pytest.mark.django_db
 def test_on_a_blind_count_the_expected_panels_query_tells_the_employee_nothing():
     """Hiding a panel is not the gate: the live stream runs the panel's own query as the person, so on a blind count
-    the query itself hides the open session's expected from whoever may not see it (gh:cash_register#84)."""
+    the query itself hides the open session's expected from whoever may not see it."""
     run("cash_register.settings.update", {"require_blind_count": True})
     open_session(10000)
     panel = panels(ctx_for("hub_manager"))[EXPECTED]

@@ -18,7 +18,7 @@ import { useSession } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonSelectOption, IonText, IonTextarea, IonToggle } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
-import { useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
+import { keepTouched, useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
 
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useLocale, useT } from '../composables/useT';
@@ -104,10 +104,15 @@ async function loadRecord(member: MemberOut, ticket: number): Promise<void> {
     if (ticket !== opening) return;
     loadedRate = pay?.rows[0]?.hourly_rate ?? null;
     const loaded = formFromRecord(record, pay?.rows[0] ?? null, locale.value, money.value);
+    // The fields took what was typed while the record was on its way: it stays, and the record fills only the
+    // fields the person has not touched. Save sends what differs from the record.
+    const shown = original.value;
+    const typed = form.value;
+    const touched = (field: keyof MemberForm) => typed[field] !== shown[field];
     original.value = loaded;
-    form.value = { ...loaded };
-    roleLabel.value = record.role_name ?? '';
-    if (loaded.user_id) void nameAccount(loaded.user_id, ticket);
+    form.value = keepTouched(loaded, shown, typed);
+    if (!touched('role_id')) roleLabel.value = record.role_name ?? '';
+    if (loaded.user_id && !touched('user_id')) void nameAccount(loaded.user_id, ticket);
   } catch (failure) {
     if (ticket === opening) loadError.value = failure instanceof ApiError ? failure.message : t('staff.members.form.loadError');
   } finally {

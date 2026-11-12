@@ -7,11 +7,11 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Worker } from 'node:worker_threads';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { NO_CLOCK } from './vitest.load';
+import { inThread } from './vitest.offload';
 
 const HUB_DIR = dirname(fileURLToPath(import.meta.url));
 const nodeRequire = createRequire(import.meta.url);
@@ -43,23 +43,14 @@ const eslint = new ESLint({ cwd: workerData.cwd });
 `;
 
 /**
- * Lints `lints` and asks about `paths` with the hub's ESLint (or `eslint`) in a thread of its own, as `pnpm lint` runs
- * it in a process of its own. Its first lint loads its parsers and plugins from the disk, and that load holds the
- * thread it runs in: a second at rest, and for as long as a loaded machine makes it (101 s measured), which no clock in
- * seconds tells from one that never ends, and Vitest fails a run whose worker it held past a minute (hub#1315). Waited
- * for without a clock (hub#1292): what could keep it from ever answering ends the thread, a lint left waiting on
- * nothing that could end it as much as an error, and that fails at once, saying so. A lint that never stops working,
- * only the end of the run's job cuts.
+ * Lints `lints` and asks about `paths` with the hub's ESLint (or `eslint`) in a thread of its own (`inThread`), as
+ * `pnpm lint` runs it in a process of its own. Its first lint loads its parsers and plugins from the disk, and that
+ * load holds the thread it runs in: a second at rest, and for as long as a loaded machine makes it (101 s measured),
+ * which no clock in seconds tells from one that never ends, and Vitest fails a run whose worker it held past a minute
+ * (hub#1315). A lint left waiting on nothing that could end it fails at once, saying so.
  */
 function lintInThread(lints: readonly Lint[], paths: readonly string[], eslint = nodeRequire.resolve('eslint')): Promise<Found> {
-  return new Promise((resolve, reject) => {
-    const thread = new Worker(LINTER, { eval: true, workerData: { eslint, cwd: HUB_DIR, lints, paths } });
-    thread.once('message', resolve);
-    thread.once('error', reject);
-    thread.once('exit', (code) => {
-      reject(new Error(`ESLint's thread ended (exit ${code}) without saying what it found: its lint was left waiting on nothing that could end it`));
-    });
-  });
+  return inThread<Found>(LINTER, { eslint, cwd: HUB_DIR, lints, paths });
 }
 
 const RESTRICTED = 'no-restricted-globals';

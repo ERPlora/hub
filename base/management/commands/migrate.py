@@ -1,6 +1,6 @@
-"""``manage.py migrate``, refused on any alias but control's (PLAN-DB §4 «Comandos» and §14.9; plan 2026-10-22, §2.7).
+"""``manage.py migrate``, refused on any alias but control's.
 
-``migrate`` migrates the control database (since S5 only control's tables and the outbox); the ``shared`` alias is the
+``migrate`` migrates the control database (only control's tables and the outbox); the ``shared`` alias is the
 SaaS's and migrates nothing (``base.routers.SharedRouter``). A hub's database, a demo's or a template's changes only
 through the migrator (``base.tenancy.migrator``), which creates just the apps that hub has: ``migrate`` on its alias
 would create them all, so it is refused before touching it.

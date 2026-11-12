@@ -1,4 +1,4 @@
-"""The schema migrator, phase 1: ``migrate_control`` (aws-next README, «Contrato app ↔ infra»).
+"""The schema migrator: ``migrate_control`` (``aws`` README, «Contrato app ↔ infra»), and a hub's own database.
 
 The control database migrates under a session advisory lock on its own connection, so two
 ``hub-migrate`` tasks of overlapping deploys never migrate at once: the second waits, then finds
@@ -155,7 +155,7 @@ def test_a_second_run_waits_until_the_first_one_ends(monkeypatch):
     assert lock_is_free()
 
 
-# ── Phase 2 (plan 2026-10-22, S1): a hub's database migrates only its own apps, through its __ddl alias ──────────
+# ── A hub's database migrates only its own apps, through its __ddl alias ─────────────────────────────────────────
 
 
 def test_migrate_apps_refuses_an_alias_that_is_no_migrators():
@@ -164,7 +164,7 @@ def test_migrate_apps_refuses_an_alias_that_is_no_migrators():
 
 
 def test_the_template_has_the_hub_tables_of_its_apps_and_nothing_of_controls(hub_databases):
-    """PLAN-DB §14.1: a hub's database has exactly the tables of base and of its created apps."""
+    """A hub's database has exactly the tables of base and of its created apps."""
     from base.tenancy.tests import hubs
 
     assert hubs.table_names(hub_databases.template) == hubs.hub_tables(hub_databases.apps) | {"django_migrations"}

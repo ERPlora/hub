@@ -1,7 +1,6 @@
-// The online booking app's UI texts: English source + Spanish (PLAN §5), kept by hand next to the pages until
-// Django's `djangojs` catalogues are exported to JSON (as the demo's). This test is their guardrail:
-// same keys and placeholders in both languages, nothing empty, every key a page, a component or a
-// helper of the app uses exists, and the texts the old screens showed are kept word for word.
+// The online booking app's UI texts: English source + Spanish, kept by hand next to the pages. This test
+// is their guardrail: same keys and placeholders in both languages, nothing empty, every key a page, a
+// component or a helper of the app uses exists, and the screens' established texts are kept word for word.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

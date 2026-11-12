@@ -14,7 +14,8 @@ import { type Browser, expect, type Locator, type Page, test } from '@playwright
 
 import { A, api, capture, login, psql, shot, shown } from './helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
-import { pick, rowAction } from './task-helpers';
+import { rowAction } from './service-helpers';
+import { pick } from './task-helpers';
 
 const TAG = 'E2E FlowF';
 /** Automations made from a card of the gallery: they carry the card's name, so they go by their ids. */

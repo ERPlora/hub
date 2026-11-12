@@ -1,8 +1,7 @@
-// gh:printing#50, gh:printing#54, gh:hub#1060 (PRINTING-F03, F04, F06): the shell starts in iOS mode, and
-// there an `ion-input`, `ion-select` or `ion-textarea` without `fill` paints no box — the old screen showed
-// the IP, the port, the paper width and the role as loose text. Every text control of the printing app's
-// pages and components is outlined and in «md» mode, the only one that paints the box (working-rules §2.4),
-// and this test keeps it so.
+// The shell starts in iOS mode, and there an `ion-input`, `ion-select` or `ion-textarea` without `fill`
+// paints no box: the IP, the port, the paper width and the role would show as loose text (PRINTING-F03, F04,
+// F06). Every text control of the printing app's pages and components is outlined and in «md» mode, the only
+// one that paints the box, and this test keeps it so.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

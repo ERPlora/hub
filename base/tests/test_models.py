@@ -1,4 +1,4 @@
-"""Membership: which role a user has on a host (phase 1 session, plan §4.4)."""
+"""Membership: which role a user has on a host."""
 
 import pytest
 from django.core.exceptions import ValidationError
@@ -62,7 +62,7 @@ def test_labels_are_translated_to_spanish():
         assert str(Membership._meta.get_field("host").verbose_name) == "host"
 
 
-# The registry of hubs (docs/plans/2026-10-17-demo-hubs-fase-1.md, §1.1): one row per hub the Hub serves.
+# The registry of hubs: one row per hub the Hub serves.
 
 
 class TestHub:
@@ -125,7 +125,7 @@ class TestHub:
         assert str(Hub(slug="acme")) == "acme"
 
 
-# The one-time codes into a demo (plan 2026-10-17, §1.1): kept by their sha256 only, several per demo.
+# The one-time codes into a demo: kept by their sha256 only, several per demo.
 
 
 class TestDemoCode:

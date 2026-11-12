@@ -1,5 +1,5 @@
 """The Hub admin of control (``hubs.erplora.com/admin``, staff only): the database clusters with their limit, and the
-hubs with their database (round 2026-10-30b of PLAN-DB, decision 1 of Ioan; tranche S7, part 1).
+hubs with their database.
 
 - **Clusters** lists each with its writer, its PgBouncer, whether it is open to new hubs, its limit, the hubs on it
   against that limit, its secret and the total size of its hubs' databases. Its writes are operations
@@ -14,23 +14,23 @@ hubs with their database (round 2026-10-30b of PLAN-DB, decision 1 of Ioan; tran
   ``control.cluster.sizes``, once per cluster on the page, kept ten minutes; a cluster that cannot be measured is said
   in a warning and its hubs show no size.
 
-- **«Restore from a copy…»** (hub#1198, BASE-F114) asks ``control.hub.restore`` for each chosen hub, with the temporary
+- **«Restore from a copy…»** (BASE-F114) asks ``control.hub.restore`` for each chosen hub, with the temporary
   cluster its copy is on and the moment it is of; the worker restores it (``base.tenancy.restore``), or refuses it for
   its fiscal records, and then the hub's page says why in its ``last_error``, as the worker noted it. While it is
   restored, the hub's cluster says where the copy comes from, as a move says where it goes.
-- **«Restore to a separate copy…»** (hub#1213, BASE-F114) asks ``control.hub.restore_aside`` the same way: the worker
+- **«Restore to a separate copy…»** (BASE-F114) asks ``control.hub.restore_aside`` the same way: the worker
   makes the copy next to the business, which is never closed nor changed, and **Separate copies** lists each one (read
   only, for support too) with its moment, how it went, its database and until when it is kept.
-- **«Recover into the business…»** on Separate copies (hub#1257, BASE-F114) asks ``control.copy.recover`` for each
+- **«Recover into the business…»** on Separate copies (BASE-F114) asks ``control.copy.recover`` for each
   chosen copy, with what to bring back (the apps that say what they give back from a copy,
   ``base.tenancy.recovery``); the worker creates in the business what it lacks, each record by its app's own
   operation, and **Recoveries** lists each one (read only, for support too) with what came back and why not.
 
-- **Freeze** is the one switch that freezes the platform for a database upgrade (hub#930; PLAN-DB round 2026-11-04e,
-  «Congelar»): ticked, the worker makes, drops and moves no database and ``migrate_hubs`` refuses to start, while the
-  relay, the tasks and VeriFactu go on. Its form saves through ``control.freeze.set`` (shows on its field what it
-  refuses); while frozen its pages say how many hubs the worker is still working on (``control.freeze.get``), the 0 the
-  staff waits for before the upgrade. It is never deleted, and added only if its row is missing.
+- **Freeze** is the one switch that freezes the platform for a database upgrade: ticked, the worker makes, drops and
+  moves no database and ``migrate_hubs`` refuses to start, while the relay, the tasks and VeriFactu go on. Its form
+  saves through ``control.freeze.set`` (shows on its field what it refuses); while frozen its pages say how many hubs
+  the worker is still working on (``control.freeze.get``), the 0 the staff waits for before the upgrade. It is never
+  deleted, and added only if its row is missing.
 
 Only the platform's admins (staff and superuser) add, change, close or delete; support reads (its ``view_*``
 permissions). Nothing here writes the ORM: every write is an operation, called with the staff member's context.
@@ -603,9 +603,9 @@ class HubAdmin(AsksFirst, base_admin.HubAdmin):
 
 @admin.register(RestoredCopy)
 class RestoredCopyAdmin(AsksFirst, base_admin.ReadOnlyAdmin):
-    """The separate copies of hubs as they were at a moment (hub#1213, BASE-F114): asked from Hubs with «Restore to a
+    """The separate copies of hubs as they were at a moment (BASE-F114): asked from Hubs with «Restore to a
     separate copy…», made and dropped by the worker; read only, for support too. «Recover into the business…»
-    (hub#1257) asks a made copy to give back what its business lacks, for the platform's admins only."""
+    asks a made copy to give back what its business lacks, for the platform's admins only."""
 
     actions = ["recover_into_the_business"]
 
@@ -686,7 +686,7 @@ class RestoredCopyAdmin(AsksFirst, base_admin.ReadOnlyAdmin):
 
 @admin.register(CopyRecovery)
 class CopyRecoveryAdmin(base_admin.ReadOnlyAdmin):
-    """What the staff asked to bring back into a business from one of its separate copies (hub#1257, BASE-F114): asked
+    """What the staff asked to bring back into a business from one of its separate copies (BASE-F114): asked
     from Separate copies with «Recover into the business…», done by the worker; read only, for support too. Its
     results say, app by app, how many came back and how many not; its page says why each did not (by its id in the
     copy: no personal data), and why an app gave nothing back."""
@@ -699,6 +699,10 @@ class CopyRecoveryAdmin(base_admin.ReadOnlyAdmin):
     search_fields = ("copy__hub__slug", "copy__db_name")
     fields = ("copy", "status", "what", "outcome", "why_not", "asked_by", "asked_on", "done_on", "last_error")
     readonly_fields = fields
+
+    class Media:
+        # A long result breaks inside its cell, never pushing the list sideways on a phone.
+        css = {"all": ["control/admin.css"]}
 
     @admin.display(description=gettext_lazy("separate copy"), ordering="copy__restore_point")
     def made_from(self, recovery: CopyRecovery) -> str:
@@ -737,7 +741,7 @@ class CopyRecoveryAdmin(base_admin.ReadOnlyAdmin):
     @staticmethod
     def result_said(result: dict) -> str:
         """What an app gave back, in words: «Customers: 1 restored, 2 created, 1 not created», or why it gave nothing.
-        A recovery noted before hub#1306 has no ``restored``."""
+        A recovery noted before that count existed has no ``restored``."""
         what, restored, created, missed, why = (
             recoverable_names([result["app"]]),
             result.get("restored", 0),

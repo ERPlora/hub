@@ -4,7 +4,7 @@
 // before, an erplora.com started without HTTPS_PROXY called the real graph.facebook.com with the e2e's made-up
 // credentials (8 calls in one pass of the inbox), and one started with it failed the specs whose Graph had gone.
 // flow: WHATSAPP_INBOX-F01
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { closeSync, existsSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { createServer, type Server } from 'node:net';
@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { connect as tlsConnect } from 'node:tls';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -243,25 +244,26 @@ describe('runCli', () => {
     }
   });
 
-  it('runs as a script through a symlinked path too (macOS reaches its tmp folder through one): it never prints nothing', () => {
+  it('runs as a script through a symlinked path too (macOS reaches its tmp folder through one): it never prints nothing', async () => {
     const linked = join(artifacts, 'linked-e2e');
     symlinkSync(HERE, linked);
-    runsAsScript(linked, 64980);
+    await runsAsScript(linked, 64980);
   }, NO_CLOCK);
 
-  it('runs as a script from erplora.com’s checkout, its authority in this checkout’s .artifacts', () => {
-    runsAsScript(HERE, 64990);
+  it('runs as a script from erplora.com’s checkout, its authority in this checkout’s .artifacts', async () => {
+    await runsAsScript(HERE, 64990);
   }, NO_CLOCK);
 });
 
 /** Runs whatsapp-graph.ts as a script from `dir` (this folder, or a path to it) for the Graph on `port`, and proves it
- *  names its authority, in this checkout's .artifacts, and makes it. */
-function runsAsScript(dir: string, port: number): void {
+ *  names its authority, in this checkout's .artifacts, and makes it. The script makes it with `uv` started cold, as
+ *  long as the machine makes it: its process is waited for without holding the worker (hub#1315). */
+async function runsAsScript(dir: string, port: number): Promise<void> {
   const folder = join(HERE, '.artifacts', `meta-graph-${port}`);
   rmSync(folder, { recursive: true, force: true });
   try {
     const args = [join(dir, 'whatsapp-graph.ts'), String(port), `http://localhost:${port + 1}`];
-    const out = execFileSync('node', args, { cwd: tmpdir(), encoding: 'utf8' });
+    const { stdout: out } = await promisify(execFile)('node', args, { cwd: tmpdir(), encoding: 'utf8' });
     expect(out.trim().split('\n')).toContain(`SSL_CERT_FILE=${join(folder, 'ca.pem')}`);
     expect(existsSync(join(folder, 'ca.pem'))).toBe(true);
   } finally {
@@ -384,6 +386,17 @@ function throughProxy(graph: Graph, host: string, method: string, path: string, 
   });
 }
 
+/** Runs `use` with a port of 127.0.0.1 that another server holds the whole time, and frees it afterwards. */
+async function withAHeldPort(use: (port: number) => Promise<void>): Promise<void> {
+  const holder: Server = createServer();
+  await new Promise<void>((resolve) => holder.listen(0, '127.0.0.1', () => resolve()));
+  try {
+    await use((holder.address() as { port: number }).port);
+  } finally {
+    await new Promise((resolve) => holder.close(resolve));
+  }
+}
+
 describe('startGraph', () => {
   const certs = mkdtempSync(join(tmpdir(), 'meta-graph-'));
   let graph: Graph;
@@ -433,16 +446,13 @@ describe('startGraph', () => {
     }
   }, NO_CLOCK);
 
+  // It waits first for the authority, a cold Python start that a loaded machine makes as slow as it likes, so it waits
+  // without a clock (hub#777). Once that start ends, a port still held after `busyFor` rejects at once.
   it('says which port is taken when another process holds it', async () => {
-    const holder: Server = createServer();
-    await new Promise<void>((resolve) => holder.listen(0, '127.0.0.1', () => resolve()));
-    const port = (holder.address() as { port: number }).port;
-    try {
+    await withAHeldPort(async (port) => {
       await expect(startGraph({ port, certs, hubDir: HUB_DIR, busyFor: 300 })).rejects.toThrow(`127.0.0.1:${port}`);
-    } finally {
-      await new Promise((resolve) => holder.close(resolve));
-    }
-  });
+    });
+  }, NO_CLOCK);
 });
 
 describe('startGraphThread', () => {
@@ -475,13 +485,8 @@ describe('startGraphThread', () => {
   }, NO_CLOCK);
 
   it('says why it could not start', async () => {
-    const holder: Server = createServer();
-    await new Promise<void>((resolve) => holder.listen(0, '127.0.0.1', () => resolve()));
-    const port = (holder.address() as { port: number }).port;
-    try {
+    await withAHeldPort(async (port) => {
       await expect(startGraphThread({ port, certs, hubDir: HUB_DIR, busyFor: 300 })).rejects.toThrow(`127.0.0.1:${port}`);
-    } finally {
-      await new Promise((resolve) => holder.close(resolve));
-    }
+    });
   }, NO_CLOCK);
 });

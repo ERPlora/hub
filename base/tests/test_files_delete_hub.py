@@ -1,7 +1,7 @@
 """``files.delete_hub_files``: a hub's whole prefix leaves the store and nothing of anyone else's does (hub#613).
 
 What purges a demo (``base.services.purge_demo_data``) and a business past its 90 days (``base.tenancy.offboarding``)
-calls it, once its database went (PLAN-DB §6 «Baja», step 4). On S3 (a real server, moto's, with the bucket versioned
+calls it, once its database went. On S3 (a real server, moto's, with the bucket versioned
 as prod's) and on disk (local development); what the store could not do is never taken for «nothing there».
 """
 

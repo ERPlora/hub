@@ -9,7 +9,8 @@
 import { type CDPSession, expect, type Page, test } from '@playwright/test';
 
 import { A, capture, exposeMovingInPage, shown, untilStill } from './helpers';
-import { cleanUp, FLOW_VIEWPORTS, named, post, rowAction, rowOf, signedIn, snap, VIEWPORTS } from './task-helpers';
+import { rowAction } from './service-helpers';
+import { cleanUp, FLOW_VIEWPORTS, named, post, rowOf, signedIn, snap, VIEWPORTS } from './task-helpers';
 
 const KEY = 'FIX-HUB-TASK-E2E-WAIT-COUNTS-ONLY-OVERLAYS';
 

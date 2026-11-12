@@ -13,7 +13,6 @@ import {
   listsReady,
   noHorizontalScroll,
   restoreWeek,
-  rowAction,
   rowTexts,
   settled,
   snapshotWeek,
@@ -21,6 +20,7 @@ import {
   VIEWPORTS,
   weekReady,
 } from './schedule-helpers';
+import { rowAction } from './service-helpers';
 
 let saved: string[] = [];
 

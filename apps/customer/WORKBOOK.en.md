@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a15630374a8fcac7285d2314f431488b83da61d4bd684a414bb1bfe16bce44bc -->
+<!-- generated from WORKBOOK.md sha256:3c4bcbca058dfc22585a0c2bf2c2086cd6bff45c8d7106b2fba8a3c7860ef93c -->
 
 ## What it is for and who it is for
 
@@ -216,7 +216,7 @@ valid email.". A phone that is not a number of its country: "This is not a valid
 country: check the digits or write it with its international prefix (+44…).". A country that does not
 exist: "Choose a country from the list.". A date that does not exist in "Birthday" or "Anniversary" (a
 31/02): "Enter a valid date.". Nothing is saved. Custom fields are not asked for when adding.
-Involved: WHATSAPP_INBOX-F04, BASE-F114 (the ERPlora staff bring back from a separate copy the cards that were lost, each by this same creation)
+Involved: WHATSAPP_INBOX-F04, BASE-F114 (the ERPlora staff bring back from a separate copy the cards that were lost, each by this same creation, with its groups and tags, CUSTOMER-F06, and its custom fields, CUSTOMER-F04)
 
 ### CUSTOMER-F02 Search and filter cards
 Status: done
@@ -899,9 +899,15 @@ If it fails: a card merged into another (CUSTOMER-F13) or with its personal data
 back: its history lives on in the other card, or its data no longer exists ("This customer is no longer
 available."). Nor does it come back if the business has already created the same person again (the same name, phone
 and email, CUSTOMER-F12): the one it made stays. A card the business no longer has at all is created again
-(CUSTOMER-F01). On a live card it does not fail: it answers fine and notifies again. What was charged in its name
+(CUSTOMER-F01), with its groups, tags and custom fields from the copy: the group, tag or field the business has with
+that name is that one, without making another, and one it no longer has is made again as it was (CUSTOMER-F06,
+CUSTOMER-F04, CUSTOMER-F29); a value of a field the business deactivated does not come back, and one its field no
+longer accepts leaves the whole card out with its reason. A deleted card that comes back does not get back the group,
+tag or field the business deleted afterwards (hub#1356). On a live card it does not fail: it answers fine and
+notifies again. What was charged in its name
 while it was deleted does not add up (CUSTOMER-F20).
-Involved: BASE-F114, CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16
+Involved: BASE-F114, CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06, CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16,
+CUSTOMER-F29
 
 ## What the verticals share
 
@@ -981,6 +987,7 @@ confirmation card is shown.
 | Replaces a card's tags | manage | F06 | `customer.customer.set_tags` |
 | Deletes a card (keeps its data) | delete | F07 | `customer.customer.delete` |
 | Puts a deleted card back in the list, as it was (the system only, when recovering from a separate copy) | system | F33 | `customer.customer.restore` |
+| Makes again a card the business no longer has, with its groups, tags and custom fields from the copy (the system only, when recovering from a separate copy) | system | F33 | `customer.customer.recover` |
 | Merges a duplicate card into another | merge | F13 | `customer.customer.merge` |
 | Erases a card's personal data | erase data | F16 | `customer.customer.erase` |
 | Adds a note | manage | F05 | `customer.note.add` |
@@ -1063,8 +1070,8 @@ personal data belong only to the owner and the administrator, and are never aske
 
 Recording and voiding purchases belongs to no role: the system does it when a sale is charged or voided
 (`customer.record_purchase`, which no app declares and therefore only the system has). Nor does putting a deleted
-card back: the system does it when ERPlora's staff recover from a separate copy (CUSTOMER-F33, `customer.restore`,
-which no app declares either).
+card back or making again the one the business no longer has: the system does it when ERPlora's staff recover from a
+separate copy (CUSTOMER-F33, `customer.restore`, which no app declares either).
 
 The server applies these permissions even if the screen shows the button, also through the API and the
 assistant. What the "Cashier" profile had in the current product, the employee has here.

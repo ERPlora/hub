@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0b568bba92e38b07f510247b8ea1f8eb3e3e3ea892496a442ba1915ff1418f82 -->
+<!-- generated from WORKBOOK.md sha256:dbc027cc0f36892b8f499ceb8251c107e4ae95972755527b5fc84f4e6e74b25f -->
 
 ## What it is for and who it is for
 
@@ -274,8 +274,12 @@ Status: done
 Actor: manager, administrator, owner, assistant
 Screen: Methods
 Steps:
-1. In **Payments → Methods** tap a row (or its **Edit**): "Editing method — {name}" opens.
-2. Change the name, the type or the account and tap **Save**.
+1. In **Payments → Methods** tap a row (or its **Edit**): "Editing method — {name}" opens with what the
+   row already says; **Account** and **Save** wait in grey while the whole method arrives (the list
+   masks the account).
+2. Change the name, the type or the account and tap **Save**. The name and the type can be changed
+   before the whole method arrives: what was typed stays, and the method, when it arrives, fills only
+   what has not been touched.
 3. To stop using it, tap **Deactivate** in its row: it moves to **Deactivated** and no longer shows in
    "New payment". **Activate** brings it back.
 In: the method (through the assistant, by its name) and what changes.

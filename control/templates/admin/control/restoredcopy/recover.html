@@ -4,7 +4,8 @@
 «Recover into the business…» of Separate copies (control.admin.RestoredCopyAdmin.recover_into_the_business, hub#1257,
 BASE-F114): the chosen copies and what to bring back. Confirmed, each is asked through control.copy.recover; the worker
 brings back in the business what it deleted and creates what it lacks, each record by its app's own operations
-(base.tenancy.recovery, hub#1306).
+(base.tenancy.recovery, hub#1306), as the recovery: what comes back starts none of the business's automations
+(base.recovery.brought_back, hub#1307).
 {% endcomment %}
 {% block intro %}{% blocktranslate trimmed %}
   Each separate copy chosen gives back into its business what the copy holds and the business lacks, of what you tick
@@ -12,5 +13,8 @@ brings back in the business what it deleted and creates what it lacks, each reco
   created again as its own screen creates it; nothing is ever copied. What the business has, or has made again since,
   is left as it is, and records for the tax authority are never brought back. The business stays open meanwhile.
   Recoveries says how it went, a few minutes later.
+{% endblocktranslate %} {% blocktranslate trimmed %}
+  What comes back is nothing new to the business: it starts none of its automations, so nobody is welcomed or told
+  again of a booking they already had.
 {% endblocktranslate %}{% endblock intro %}
 {% block submit %}{% translate 'Recover' %}{% endblock submit %}

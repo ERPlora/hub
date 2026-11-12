@@ -1,9 +1,9 @@
 """/healthz answers before the Host is validated (the ALB probes by IP) and never touches the DB.
 
-/readyz is the deploy pipeline's gate and Route 53's probe (PLAN-AWS §5): 200 with the control
+/readyz is the deploy pipeline's gate and Route 53's probe: 200 with the control
 database reachable and every migration applied, 503 otherwise. It answers on a hub's host, on the
 platform host (hubs.erplora.com) without a session and on the private name. Its answer is kept
-10 s in the process, as saas-next's.
+10 s in the process, as the SaaS's.
 """
 
 import logging

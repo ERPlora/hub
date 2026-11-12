@@ -1,6 +1,6 @@
-"""What layer 1 of the assistant's QA does not say of Demo (docs plan 2026-10-31, the assistant's knowledge and QA, §3):
-how many tools it offers, what an employee is never offered, and that the requests of the real-model QA (hub#1095), in
-the words each role said them, are offered their existing operation, which takes the item by its name too (hub#1162).
+"""What layer 1 of the assistant's QA does not say of Demo: how many tools it offers, what an employee is never
+offered, and that the requests of the real-model QA (hub#1095), in the words each role said them, are offered their
+existing operation, which takes the item by its name too (hub#1162).
 
 Every ask of every tool of demo bringing its tool among the first ten, role by role, in both languages, is
 ``base/tests/test_assistant_asks.py``'s (demo is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over the

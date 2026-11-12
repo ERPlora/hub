@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b0b79f16139d13f4a111f568fe1e7f33e81029ebba9eeda60664c12ecf66996a -->
+<!-- generated from WORKBOOK.md sha256:6aea977e3085b742d8f7562b45bc9a3f901942c1102bf5d9edfd6e880c092685 -->
 
 ## What it is for and who it is for
 
@@ -233,7 +233,8 @@ not exist or cannot be booked. From the front desk neither the minimum notice no
 refuses (the past time only warns before saving); an automation does not have those exceptions. An employee
 only books for themselves; an automation allowed to book, with any professional. Two people
 who book the same slot of the same professional at once: one gets in and the other gets the refusal.
-Involved: CUSTOMER-F11, CUSTOMER-F25, CUSTOMER-F30, SERVICE-F10, SERVICE-F33, STAFF-F16, SCHEDULE-F11
+Involved: CUSTOMER-F11, CUSTOMER-F25, CUSTOMER-F30, SERVICE-F10, SERVICE-F33, STAFF-F16, SCHEDULE-F11, BASE-F114
+(ERPlora's staff recovers from a separate copy the appointments that were lost, each by this same booking)
 
 ### APPOINTMENT-F02 See which times are still free
 Status: done
@@ -407,8 +408,13 @@ Steps:
 In: a pending, confirmed, cancelled or no-show appointment that is not charged.
 Out: the `appointment.appointment.deleted` event.
 If it fails: "This appointment cannot be deleted: it is in progress, completed or charged."; with its check
-open at the till, `appointment.check_open`.
-Involved: none
+open at the till, `appointment.check_open`. An appointment deleted by mistake that has not come yet is recovered by
+ERPlora's staff from a separate copy of the business (BASE-F114): it comes back booked as in APPOINTMENT-F01, with its
+customer, its services (one the business made again, with its name in its category, counts as the same), its
+professional, its time, its minutes and its notes, as a new appointment (another number and without its history,
+hub#1326); if its time is no longer free, or the customer or one of its services is no longer in the business, it does
+not come back and Recoveries says why.
+Involved: BASE-F114
 
 ### APPOINTMENT-F12 Create a repeating appointment
 Status: done

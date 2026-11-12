@@ -38,6 +38,7 @@ from django.utils.translation import pgettext_lazy
 from live.context import OperationContext, Scope
 from live.errors import Conflict, NotFound
 from live.operations import INTERNAL, operation
+from psycopg import sql
 
 from apps.customer.queries import find_customer
 from apps.service.models import (
@@ -96,6 +97,7 @@ from apps.service.schemas import (
 )
 from apps.staff.models import Member
 from apps.staff.queries import resolve_member
+from apps.tax.models import TaxCategory
 from base import images
 from base.business import babel_locale, business_zone
 from base.operations import call
@@ -1717,6 +1719,197 @@ def _adjustment_row(ctx: OperationContext, adjustment: GrantAdjustment) -> dict:
         "days_delta": adjustment.days_delta,
         "reason": adjustment.reason,
     }
+
+
+# --- What a separate copy of the business gives back (hub#1283, hub#1323; BASE-F114, SERVICE-F01, F07) ------------
+
+#: What ``service.category.create`` takes of a category of a separate copy, each a column since ``0001_initial``
+#: (``categories_in_copy``): all of it but its parent, which the business names its own way.
+CATEGORY_COPY_FIELDS = ("name", "description", "icon", "color", "sort_order")
+
+
+def categories_in_copy(conn) -> list[dict]:
+    """hub#1323: each live category of a separate copy of the business, with its ``id`` there, what
+    ``service.category.create`` takes and the id there of its parent (``parent_id``); nothing where the app's table is
+    not there. One the copy had deleted already is not the moment's and never comes back. ``conn`` is the copy's
+    direct, read-only connection (as ``services_in_copy``), so it is read by its own SQL over the model's names."""
+    table = Category._meta.db_table
+    if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
+        return []
+    read = ("id", *CATEGORY_COPY_FIELDS, "parent")
+    column = {field: sql.Identifier(Category._meta.get_field(field).column) for field in (*read, "is_deleted")}
+    query = sql.SQL("SELECT {} FROM {} WHERE NOT {} ORDER BY {}").format(
+        sql.SQL(", ").join(column[field] for field in read),
+        sql.Identifier(table),
+        column["is_deleted"],
+        column["id"],
+    )
+    named = ("id", *CATEGORY_COPY_FIELDS, "parent_id")
+    return [dict(zip(named, row, strict=True)) for row in conn.execute(query)]
+
+
+def categories_not_in_business(categories: list[dict]) -> list[dict]:
+    """hub#1323: the categories of a separate copy (``categories_in_copy``) the business lacks, parents first and then
+    in their order, each as ``service.category.create`` takes it here, with its ``id`` there. Not lacking: one the
+    business still has live, or one it made again (a live one with its name, the case and the spaces aside: a live name
+    is unique, SERVICE-F07), so none is ever made twice. Each goes into its parent: by its id when the business has it
+    (``_category_held``), by its name when it comes back too (created just before it, so with no id here yet), and at
+    the root when the copy did not have it live."""
+    here = _categories_here()
+    by_id = {one["id"]: one for one in categories}
+    lacking = [one for one in categories if _category_held(one["id"], one["name"], here) is None]
+    created = []
+    # Sorted is stable: within a depth, the copy's order.
+    for one in sorted(lacking, key=lambda category: _depth(category, by_id)):
+        record = {field: one[field] for field in ("id", *CATEGORY_COPY_FIELDS)}
+        if (parent := by_id.get(one["parent_id"])) is not None:
+            if (held := _category_held(parent["id"], parent["name"], here)) is not None:
+                record["parent_id"] = held
+            else:
+                record["parent"] = parent["name"]
+        created.append(record)
+    return created
+
+
+def _depth(category: dict, by_id: dict[UUID, dict]) -> int:
+    """How many of the copy's categories ``category`` hangs from; a loop a raw write left counts each once."""
+    seen, parent = {category["id"]}, by_id.get(category["parent_id"])
+    while parent is not None and parent["id"] not in seen:
+        seen.add(parent["id"])
+        parent = by_id.get(parent["parent_id"])
+    return len(seen) - 1
+
+
+def _categories_here() -> tuple[set[UUID], dict[str, UUID]]:
+    """The business's live categories: their ids, and each by its name as two that are the same compare."""
+    live = list(Category.objects.filter(is_deleted=False).values_list("pk", "name"))
+    return {pk for pk, _name in live}, {_same_name(name): pk for pk, name in live}
+
+
+def _category_held(category_id: UUID | None, name: str | None, here: tuple[set[UUID], dict[str, UUID]]) -> UUID | None:
+    """The business's live category that is the copy's ``category_id`` (named ``name`` there): the same while it is
+    live, else the live one with its name (brought back by an earlier part of the recovery, or made again by hand);
+    none otherwise."""
+    ids, by_name = here
+    if category_id in ids:
+        return category_id
+    return by_name.get(_same_name(name)) if name is not None else None
+
+
+#: What ``service.service.create`` takes of a service of a separate copy, each a column since ``0001_initial``
+#: (``services_in_copy``): all of it but its category and its tax category, which the business names its own way. Not
+#: its image (hub#1319) nor who performs it (SERVICE-F31, hub#1322).
+COPY_FIELDS = (
+    "name",
+    "pricing_type",
+    "price",
+    "min_price",
+    "max_price",
+    "cost",
+    "duration_minutes",
+    "buffer_before",
+    "buffer_after",
+    "max_capacity",
+    "description",
+    "short_description",
+    "is_bookable",
+    "requires_confirmation",
+    "allow_online_booking",
+    "sort_order",
+    "is_featured",
+    "sku",
+    "barcode",
+    "notes",
+)
+
+
+def services_in_copy(conn) -> list[dict]:
+    """hub#1283: each service of a separate copy of the business, on offer or archived (``is_active``), with its ``id``
+    there, what ``service.service.create`` takes and the ids there of its category (``category_id``) and its tax
+    category (``tax_category_id``), by id, and its category's name there (``category_name``, hub#1323: a category
+    brought back is a new one, found by its name); nothing where the app's table is not there. Only one on offer comes
+    back (``services_not_in_business``), but every one is read: a service of the copy is never another one's made again
+    (``services_in_business``). ``conn`` is the copy's direct, read-only connection (``recoverable_from_copy`` on this
+    app's config: the copy is no business and has no alias), so it is read by its own SQL over the model's names, never
+    the ORM."""
+    table = Service._meta.db_table
+    if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
+        return []
+    read = ("id", *COPY_FIELDS, "category", "tax_category", "is_active")
+    service, category = sql.Identifier("service"), sql.Identifier("category")
+
+    def of(alias, model, field):
+        return sql.SQL("{}.{}").format(alias, sql.Identifier(model._meta.get_field(field).column))
+
+    # Deleting a category takes its services out of it (SERVICE-F08): a service's category is a live one.
+    query = sql.SQL("SELECT {}, {} FROM {} AS {} LEFT JOIN {} AS {} ON {} = {} ORDER BY {}").format(
+        sql.SQL(", ").join(of(service, Service, field) for field in read),
+        of(category, Category, "name"),
+        sql.Identifier(table),
+        service,
+        sql.Identifier(Category._meta.db_table),
+        category,
+        of(category, Category, "id"),
+        of(service, Service, "category"),
+        of(service, Service, "id"),
+    )
+    named = ("id", *COPY_FIELDS, "category_id", "tax_category_id", "is_active", "category_name")
+    return [dict(zip(named, row, strict=True)) for row in conn.execute(query)]
+
+
+def services_in_business(services: list[dict]) -> dict[UUID, UUID]:
+    """hub#1283: ``{id in the copy: id in the business}`` of each service of a separate copy (all of
+    ``services_in_copy``, never a part) the business holds: the same one, on offer or archived (a service is never
+    deleted; SERVICE-F05 restores it), or, for one the copy had on offer, one made again, by hand or brought back
+    already: a service that is none of the copy's, with the same name, the case and the spaces aside, in the category it
+    would come back to (``_category_here``). Names are not unique, so each made again stands for one service of the copy:
+    the oldest made again for the copy's oldest. What a recovery of another app matches a service of the copy by."""
+    ids = [one["id"] for one in services]
+    by_id = set(Service.objects.filter(pk__in=ids).values_list("pk", flat=True))
+    here = _categories_here()
+    made_again: dict[tuple[str, UUID | None], list[UUID]] = {}
+    others = Service.objects.exclude(pk__in=ids).order_by("created_at", "id")
+    for pk, name, category in others.values_list("pk", "name", "category"):
+        made_again.setdefault((_same_name(name), category), []).append(pk)
+    held = {}
+    for one in sorted(services, key=lambda service: service["id"]):
+        if one["id"] in by_id:
+            held[one["id"]] = one["id"]
+        elif one["is_active"] and (twins := made_again.get((_same_name(one["name"]), _category_here(one, here)))):
+            held[one["id"]] = twins.pop(0)
+    return held
+
+
+def services_not_in_business(services: list[dict]) -> list[dict]:
+    """hub#1283: the services a separate copy (``services_in_copy``) had on offer and the business lacks (not in
+    ``services_in_business``), in their order, each as ``service.service.create`` takes it here, with its ``id`` there:
+    the key of its tax category (Taxes never deletes one; one turned off since is the create's to refuse, and without
+    one it takes the settings') and its category here (``_category_here``)."""
+    held = services_in_business(services)
+    lacking = [one for one in services if one["is_active"] and one["id"] not in held]
+    keys = dict(TaxCategory.objects.filter(pk__in={one["tax_category_id"] for one in lacking}).values_list("pk", "key"))
+    here = _categories_here()
+    created = []
+    for one in lacking:
+        record = {field: one[field] for field in ("id", *COPY_FIELDS)}
+        if (category := _category_here(one, here)) is not None:
+            record["category_id"] = category
+        if (key := keys.get(one["tax_category_id"])) is not None:
+            record["tax_category_key"] = key
+        created.append(record)
+    return created
+
+
+def _category_here(service: dict, here: tuple[set[UUID], dict[str, UUID]]) -> UUID | None:
+    """The category a service of the copy comes back to: its own while the business still has it, else the live one
+    with its name (brought back just before it by the categories' part, hub#1323, or made again by hand), none
+    otherwise (none in the copy, or deleted since and not back, SERVICE-F08)."""
+    return _category_held(service["category_id"], service["category_name"], here)
+
+
+def _same_name(name: str) -> str:
+    """A name as two that are the same compare: single spaces (as it is kept), the case aside."""
+    return " ".join(name.split()).casefold()
 
 
 # --- Helpers ----------------------------------------------------------------------------------------

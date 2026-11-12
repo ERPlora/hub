@@ -1,9 +1,10 @@
-"""``base.activation``: the rules of turning a business's modules on and off, without the database (PLAN-HUB §9).
+"""``base.activation``: the rules of turning a business's modules on and off, without the database.
 
 A module is ``on`` or ``off`` in a hub, and ``chosen`` when the business turned it on itself; what the closure by
 ``requires`` brought along is not chosen and does not count against the plan's ``max_apps``. A hub that never turned
-anything on or off has every module off (round 2026-10-27): a blueprint or the Apps screen turns on what it uses. The
-hubs of before it, and the developer's local hubs, have every module on, its roots chosen (:func:`every_on`).
+anything on or off has every module off: a blueprint or the Apps screen turns on what it uses. Hubs created before new
+hubs started with every module off, and the developer's local hubs, have every module on, its roots chosen
+(:func:`every_on`).
 """
 
 import pytest
@@ -55,9 +56,8 @@ def test_every_module_on_has_17_roots_of_27_on_main():
 
 @pytest.mark.parametrize(("vertical", "modules", "chosen"), [("restaurant", 20, 13), ("hair_salon", 18, 10)])
 def test_a_vertical_template_counts_only_its_roots_as_chosen(vertical, modules, chosen):
-    """PLAN §32 point 2: the restaurant's template has 20 modules and 13 roots; the hair salon's, 18 and 10 (one module
-    fewer each since VeriFactu is in no template, PLAN-HUB round 2026-11-07, hub#998: Invoicing is a root in its
-    place)."""
+    """The restaurant's template has 20 modules and 13 roots; the hair salon's, 18 and 10. VeriFactu is in no template
+    (hub#998), so Invoicing is a root in its place."""
     graph = activation.module_graph()
     apps = template_apps(vertical)
     template = activation.template(apps, graph)
@@ -69,15 +69,15 @@ def test_a_vertical_template_counts_only_its_roots_as_chosen(vertical, modules, 
 
 
 def test_the_baseline_has_every_module_off_and_none_chosen():
-    """Round 2026-10-27: a hub is born with every app off; nothing is on until the business turns it on."""
+    """A hub is born with it: nothing is on until the business turns it on."""
     assert activation.baseline(GRAPH) == {label: Activation(OFF, False) for label in GRAPH}
     graph = activation.module_graph()
     assert activation.baseline(graph) == {label: Activation(OFF, False) for label in graph}
 
 
 def test_every_on_has_every_module_on_and_its_roots_chosen():
-    """What the hubs of before round 2026-10-27 had without rows (the migration writes it down for them), and the
-    developer's local hubs ``a`` and ``b``: every module on, its roots chosen."""
+    """What hubs created before new hubs started with every module off had without rows (the migration writes it down
+    for them), and the developer's local hubs ``a`` and ``b``."""
     assert activation.every_on(GRAPH) == {
         "tax": Activation(ON, False),
         "customer": Activation(ON, False),
@@ -92,6 +92,20 @@ def test_the_graph_is_the_modules_and_their_requires():
     graph = activation.module_graph()
     assert graph == {config.label: tuple(config.requires) for config in module_configs()}
     assert "base" not in graph
+
+
+def test_apps_in_the_order_of_their_requires_each_after_those_of_them_it_needs_otherwise_as_given():
+    """hub#1284: what is brought back from a separate copy goes in this order, so a record finds what it points at."""
+    # verifactu needs sale and customer through invoice, which is not among them; task needs none.
+    assert activation.in_requires_order(["verifactu", "task", "customer", "sale"], GRAPH) == [
+        "customer",
+        "sale",
+        "verifactu",
+        "task",
+    ]
+    assert activation.in_requires_order(["task", "tax"], GRAPH) == ["task", "tax"]
+    # Each once; one the graph does not know (a platform app) needs none and keeps its place.
+    assert activation.in_requires_order(["platform", "sale", "tax", "sale"], GRAPH) == ["platform", "tax", "sale"]
 
 
 # ── What a hub has: its rows, or the baseline while it has none ──────────────────────────────────────────────────
@@ -194,7 +208,7 @@ def test_turning_off_one_another_app_on_needs_is_a_programming_error():
     [
         ({"plan": {"max_apps": 20}}, 20),
         ({"plan": {"max_apps": 0}}, None),  # 0 = no limit, as max_devices
-        ({"plan": {"slug": "free"}}, None),  # a photo from before saas#117
+        ({"plan": {"slug": "free"}}, None),  # a photo whose plan does not carry max_apps yet
         ({"plan": None}, None),
         ({}, None),
         (None, None),
@@ -250,7 +264,7 @@ def test_an_app_may_refuse_to_go_on_by_its_own_hook():
     assert activation.refusals(["task", "verifactu"], **asked) == {"verifactu": "only in Spain"}
 
 
-# ── What a business must have on in its country (hub#997, PLAN-HUB round 2026-11-07) ─────────────────────────────
+# ── What a business must have on in its country (hub#997) ────────────────────────────────────────────────────────
 # An app says where it is mandatory (``mandatory`` on its LiveAppConfig, ``base.home.mandatory_in``). Once on in a
 # business of one of those countries it never goes off there: base refuses it, with a reason of its own when the app
 # gives none, and turning off another app it came along with leaves it on.
@@ -335,7 +349,7 @@ def test_base_s_reason_is_only_to_go_off():
     assert activation.refusals(["tax"], **asked) == {}
 
 
-# ── What a business is born with (hub#997, PLAN-HUB round 2026-11-07) ────────────────────────────────────────────
+# ── What a business is born with (hub#997) ───────────────────────────────────────────────────────────────────────
 # At sign-up the platform turns on, by itself, the apps the business's country requires that say it may
 # (``platform_turns_on``: Taxes, in every country), with what they need, none chosen: they take nothing of the plan's
 # limit. Never one that binds the business to a tax authority (VeriFactu): its owner turns it on, asked by the Home.
@@ -374,7 +388,7 @@ def test_what_a_business_is_born_with_is_on_with_what_it_needs_and_none_of_it_ch
     assert activation.born(set(), GRAPH) == activation.baseline(GRAPH)
 
 
-# ── Its tables being made (S3; PLAN-DB §7): «creating» and «failed» ───────────────────────────────────────────────
+# ── Its tables being made: «creating» and «failed» ────────────────────────────────────────────────────────────────
 # In a hub with its own database an app's tables are made the first time it is turned on: meanwhile it is
 # ``creating``, and ``failed`` if making them failed (tried again). Both are wanted on: the closure by ``requires``, the
 # plan's limit and what goes off count them as on; only ``on`` is active (its operations, the relay, the menu).

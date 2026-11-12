@@ -207,7 +207,7 @@ class ComboRefIn(In):
         return self
 
 
-# The menu's image (COMBO-F14; round 2026-10-30, base.images): one of the shared library or a photo of its own.
+# The menu's image (COMBO-F14, base.images): one of the shared library or a photo of its own.
 
 #: An image a write sets: the assistant's card names it by its title in the library, never by its reference.
 AN_IMAGE = names("base.catalog_image.get", by="reference", name=("title",))

@@ -1,6 +1,5 @@
-"""What layer 1 of the assistant's QA says of Reservations (erplora-next docs/plans/2026-10-31-asistente-conocimiento-y-qa.md,
-§3): how many tools it offers, and that the owner's requests of the real-model QA (hub#1105), in the owner's own words,
-are offered their existing operation.
+"""What layer 1 of the assistant's QA says of Reservations: how many tools it offers, and that the owner's requests of
+the real-model QA (hub#1105), in the owner's own words, are offered their existing operation.
 
 Every ask of every tool of reservation bringing its tool among the first ten, role by role, in both languages, is
 ``base/tests/test_assistant_asks.py``'s (reservation is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020``

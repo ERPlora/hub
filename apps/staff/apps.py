@@ -27,7 +27,7 @@ class StaffConfig(LiveAppConfig):
     icon = "ion:id-card-outline"
     category = Category.PEOPLE
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The app store's texts, which register_apps writes to shared.app.
     summary = _(
         "Your team: records, roles, weekly schedules, time off with approval and commission rates."
     )
@@ -96,9 +96,9 @@ class StaffConfig(LiveAppConfig):
             path="/staff/schedules",
         ),
     ]
-    # The Home's panels (PLAN-HUB round 2026-10-21): the old module's five `widgets` (it had no `setup` nor `bell`),
-    # on the queries Staff's own figures read (STAFF-F20, STAFF-F23), in every business. A KPI says its name once, in
-    # its title (gh:hub#1105). Registered icons only: the old airplane and hourglass are asked for in UI-REQUESTS.md.
+    # The Home's panels, on the queries Staff's own figures read (STAFF-F20, STAFF-F23), in every business. A KPI says
+    # its name once, in its title. Registered icons only: the old airplane and hourglass are asked for in
+    # UI-REQUESTS.md.
     widgets = [
         Widget(
             key="headcount",

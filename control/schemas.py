@@ -1,5 +1,5 @@
-"""What control's operations take and give: the database clusters of the Hub admin (round 2026-10-30b of PLAN-DB,
-decision 1; tranche S7) and its freeze switch (hub#930). Their bounds are the model's (``control.models.Cluster``,
+"""What control's operations take and give: the database clusters of the Hub admin and its
+freeze switch. Their bounds are the model's (``control.models.Cluster``,
 ``control.models.Freeze``), so any caller, not only the admin's form, is held to them."""
 
 import datetime as dt
@@ -74,7 +74,7 @@ class ClusterSizesOut(Schema):
 
 
 class HubMoveIn(Schema):
-    """Which hub moves, and to which cluster (round 2026-10-30b of PLAN-DB, decision 3; tranche S7)."""
+    """Which hub moves, and to which cluster."""
 
     hub: UUID
     cluster: UUID
@@ -90,7 +90,7 @@ class HubMoveOut(Schema):
 
 
 class HubRestoreIn(Schema):
-    """Which hub is put back as it was at a moment, from the copy of it on which temporary cluster (hub#1198)."""
+    """Which hub is put back as it was at a moment, from the copy of it on which temporary cluster."""
 
     hub: UUID
     cluster: UUID
@@ -109,7 +109,7 @@ class HubRestoreOut(Schema):
 
 
 class RestoredCopyOut(Schema):
-    """The separate copy asked of a hub (hub#1213): its id, the hub, its database's name and where it will be (none:
+    """The separate copy asked of a hub: its id, the hub, its database's name and where it will be (none:
     the settings' own server), the temporary cluster it comes from, the moment and how it goes."""
 
     id: UUID
@@ -123,7 +123,7 @@ class RestoredCopyOut(Schema):
 
 
 class CopyRecoverIn(Schema):
-    """Which separate copy a business gets back what it lost from, and the apps whose records it gets back (hub#1257):
+    """Which separate copy a business gets back what it lost from, and the apps whose records it gets back:
     each an app that says what it gives back from a copy."""
 
     copy_id: UUID
@@ -131,7 +131,7 @@ class CopyRecoverIn(Schema):
 
 
 class CopyRecoveryOut(Schema):
-    """The recovery asked of a separate copy (hub#1257): its id, the copy, its business, the apps asked and how it
+    """The recovery asked of a separate copy: its id, the copy, its business, the apps asked and how it
     goes."""
 
     id: UUID
@@ -149,7 +149,7 @@ class HubIdIn(Schema):
 
 
 class FreezeIn(Schema):
-    """Freeze the platform (``frozen``) or lift its freeze, for a database upgrade (hub#930); ``reason``: why, for
+    """Freeze the platform (``frozen``) or lift its freeze, for a database upgrade; ``reason``: why, for
     whoever looks meanwhile. Asked while already so, nothing changes."""
 
     frozen: bool

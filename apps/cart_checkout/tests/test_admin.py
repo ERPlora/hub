@@ -1,9 +1,9 @@
 """Django admin of the cart_checkout app: carts with their lines, orders and the counter of the day, with
 full CRUD.
 
-Round 12 (PLAN §17; CLAUDE.md «Frontend y admin»): the Hub's admin lives only on hubs.erplora.com, for the
-platform's staff, and has full CRUD over every table. The database still refuses what no door may save:
-an unknown status, negative totals, a repeated live session code or order number.
+The Hub's admin lives only on hubs.erplora.com, for the platform's staff, and has full CRUD over every table. The
+database still refuses what no door may save: an unknown status, negative totals, a repeated live session code or order
+number.
 """
 
 import pytest
@@ -60,7 +60,7 @@ def test_the_pages_render(client, superuser):
     order = make_order(cart, order_number="OS-20261014-0007")
     counter = OrderCounter.objects.create(day="2026-10-14", last=7)
     client.force_login(superuser)
-    # The admin lives only on the platform host (PLAN §18.1.3).
+    # The admin lives only on the platform host.
     pages = {
         "/admin/cart_checkout/cart/": b"sess_admin",
         f"/admin/cart_checkout/cart/{cart.pk}/change/": b"Champ\xc3\xba de prueba",

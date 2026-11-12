@@ -331,6 +331,108 @@ describe('MemberFormModal: Edit · {name} (STAFF-F02, F03)', () => {
     expect(m.inDoc('staff-member-form-loading')).toBeNull();
   });
 
+  // hub#1347: the row is painted at once and the fields take what is typed; the record, when it arrives, fills only
+  // what the person has not touched (React Hook Form's keepDirtyValues, Salesforce's lightning-input-field), so what
+  // was typed is never lost and Save sends it.
+  describe('typed before the record arrives (hub#1347)', () => {
+    async function openHoldingTheRecord(routes: Record<string, [number, unknown]> = {}) {
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      const m = await mountStaff(MemberFormModal, { props: { open: false, member: ROW } });
+      const answers = { ...ROUTES, ...routes };
+      m.net.onApi(async ({ url }) => {
+        const path = new URL(url, 'http://a.localhost').pathname;
+        if (path === '/api/staff/members/detail') await held;
+        const [status, body] = answers[path] ?? [404, { error: { code: 'not_found', message: 'Not found' } }];
+        return Response.json(body, { status });
+      });
+      await m.live();
+      await m.result(BUSINESS, business());
+      await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
+      await m.wrapper.setProps({ open: true });
+      await settle();
+      expect(m.inDoc('staff-member-form-loading')).not.toBeNull();
+      const field = (name: string) => m.inDoc(`staff-member-form-${name}`) as Control;
+      const combo = (name: string) => m.wrapper.findAllComponents(Combo).find((c) => c.props('testid') === `staff-member-form-${name}`)!;
+      async function arrive() {
+        release();
+        await settle();
+        await settle();
+        expect(m.inDoc('staff-member-form-loading')).toBeNull();
+      }
+      const posts = () => m.sent().filter((c) => c.method === 'POST');
+      return { ...m, field, combo, arrive, posts };
+    }
+
+    it('a field typed meanwhile keeps what was typed; the untouched ones take the record; Save sends the typed one', async () => {
+      const s = await openHoldingTheRecord();
+      await ionValue(s.field('email'), 'ana.changed@example.com', 'ionInput');
+      await s.arrive();
+      expect([s.field('email').value, s.field('phone').value, s.field('bio').value, s.field('hourly_rate').value]).toEqual([
+        'ana.changed@example.com',
+        '600',
+        'Ten years.',
+        '12.50',
+      ]);
+      await click(s.inDoc('staff-member-form-submit'));
+      expect(s.posts()).toEqual([
+        { method: 'POST', path: '/api/staff/members/update', query: {}, body: { id: 'm1', email: 'ana.changed@example.com' } },
+      ]);
+    });
+
+    it('a role and a Hub user chosen meanwhile stay chosen, by their names, and are sent', async () => {
+      const s = await openHoldingTheRecord();
+      s.combo('role_id').vm.$emit('update:modelValue', { id: 'r1', label: 'Stylist' });
+      s.combo('user_id').vm.$emit('update:modelValue', { id: '9', label: 'Bea Ruiz' });
+      await settle();
+      await s.arrive();
+      expect([s.field('role_id').value, s.field('user_id').value]).toEqual(['Stylist', 'Bea Ruiz']);
+      await click(s.inDoc('staff-member-form-submit'));
+      expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1', role_id: 'r1', user_id: '9' }]);
+    });
+
+    // Each name follows its own field: choosing one of the two never decides the other's name.
+    it('a role chosen alone meanwhile keeps its name; the Hub user, untouched, is named from the record', async () => {
+      const s = await openHoldingTheRecord();
+      s.combo('role_id').vm.$emit('update:modelValue', { id: 'r1', label: 'Stylist' });
+      await settle();
+      await s.arrive();
+      expect([s.field('role_id').value, s.field('user_id').value]).toEqual(['Stylist', 'Ana López']);
+      await click(s.inDoc('staff-member-form-submit'));
+      expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1', role_id: 'r1' }]);
+    });
+
+    it('a Hub user chosen alone meanwhile keeps its name; the role, untouched, takes its name from the record', async () => {
+      const newer = { ...DETAIL, role_id: 'r2', role_name: 'Receptionist' };
+      const s = await openHoldingTheRecord({ '/api/staff/members/detail': [200, newer] });
+      s.combo('user_id').vm.$emit('update:modelValue', { id: '9', label: 'Bea Ruiz' });
+      await settle();
+      await s.arrive();
+      expect([s.field('role_id').value, s.field('user_id').value]).toEqual(['Receptionist', 'Bea Ruiz']);
+      await click(s.inDoc('staff-member-form-submit'));
+      expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1', user_id: '9' }]);
+    });
+
+    it('what was not touched takes the record even where the row was behind it (role by its name), and sends nothing', async () => {
+      const newer = { ...DETAIL, phone: '611', role_id: 'r1', role_name: 'Stylist' };
+      const s = await openHoldingTheRecord({ '/api/staff/members/detail': [200, newer] });
+      await ionValue(s.field('email'), 'ana.changed@example.com', 'ionInput');
+      await s.arrive();
+      expect([s.field('phone').value, s.field('role_id').value, s.field('user_id').value]).toEqual(['611', 'Stylist', 'Ana López']);
+      await click(s.inDoc('staff-member-form-submit'));
+      expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1', email: 'ana.changed@example.com' }]);
+    });
+
+    it('a rate typed meanwhile stays as typed and is sent', async () => {
+      const s = await openHoldingTheRecord();
+      await ionValue(s.field('hourly_rate'), '15', 'ionInput');
+      await s.arrive();
+      expect(s.field('hourly_rate').value).toBe('15');
+      await click(s.inDoc('staff-member-form-submit'));
+      expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1', hourly_rate: 1500 }]);
+    });
+  });
+
   it('a linked account that no longer has access to this business says so, instead of an id', async () => {
     const s = await setup(ROW, { routes: { '/api/staff/accounts': [200, page([])] } });
     expect(s.field('user_id').value).toBe('No access to this business');

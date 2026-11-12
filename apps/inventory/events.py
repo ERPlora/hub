@@ -3,10 +3,10 @@
 services.py records them in the outbox, in the command's transaction; live.py names the ones that
 re-run each live query. Each event carries only what the WORKBOOK's «Lo que avisa» lists.
 
-Reactions: a paid sale lowers the stock, a voided one restores it and a refund puts its returned units
-back, each through an operation of this app run as the system, in its own transaction. The worker's outbox
-relay (``base/relay.py``) hands each delivered event to ``react``; the operations are idempotent per sale
-(per refund for a refund), so a repeated delivery changes nothing. ``sale`` does not require ``inventory`` (PLAN §20.5): this is the only link.
+Reactions: a paid sale lowers the stock, a voided one restores it and a refund puts its returned units back, each
+through an operation of this app run as the system, in its own transaction. The worker's outbox relay
+(``base/relay.py``) hands each delivered event to ``react``; the operations are idempotent per sale (per refund for a
+refund), so a repeated delivery changes nothing. ``sale`` does not require ``inventory``: this is the only link.
 """
 
 from typing import Any
@@ -17,6 +17,8 @@ from live.operations import get
 PRODUCT_CREATED = "inventory.product.created"
 PRODUCT_UPDATED = "inventory.product.updated"
 PRODUCT_DELETED = "inventory.product.deleted"
+# INVENTORY-F34: a deleted product brought back the same, by the recovery from a separate copy (BASE-F114).
+PRODUCT_RESTORED = "inventory.product.restored"
 PRODUCT_CATEGORIZED = "inventory.product.categorized"
 PRODUCT_UNCATEGORIZED = "inventory.product.uncategorized"
 # Not in the WORKBOOK's list: they only re-run the category lists of the screens (live.py).
@@ -32,6 +34,7 @@ ALL = [
     PRODUCT_CREATED,
     PRODUCT_UPDATED,
     PRODUCT_DELETED,
+    PRODUCT_RESTORED,
     PRODUCT_CATEGORIZED,
     PRODUCT_UNCATEGORIZED,
     CATEGORY_CREATED,
@@ -42,8 +45,8 @@ ALL = [
     CONFIG_UPDATED,
 ]
 
-#: A product added, changed or deleted: what may change how many active products there are («Your catalog»).
-PRODUCT_EVENTS = [PRODUCT_CREATED, PRODUCT_UPDATED, PRODUCT_DELETED]
+#: A product added, changed, deleted or restored: what may change how many active products there are («Your catalog»).
+PRODUCT_EVENTS = [PRODUCT_CREATED, PRODUCT_UPDATED, PRODUCT_DELETED, PRODUCT_RESTORED]
 #: What re-runs the Panel's figures and its low-stock list, and with them the Home's panels: the settings decide which
 #: articles track stock.
 FIGURE_EVENTS = [*PRODUCT_EVENTS, STOCK_CHANGED, CONFIG_UPDATED]

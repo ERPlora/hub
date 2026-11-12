@@ -84,6 +84,24 @@ export async function tillReady(page: Page): Promise<void> {
 }
 
 /**
+ * Whether the till takes `button` — a tile of its grid or a row of its search, both Ionic buttons (SALE-F07,
+ * INVENTORY-F29): `data-aria-disabled` on the button, which greys it, and `aria-disabled` on its native button, which a
+ * screen reader announces. Never the host's own `aria-disabled`: Ionic moves it to the native button when it loads and
+ * leaves a later one on the host, where nothing reads it (hub#1337). A refused one still takes the tap, to say why.
+ */
+export async function expectTakes(button: Locator, takes: boolean): Promise<void> {
+  await expect(button).toHaveAttribute('data-aria-disabled', String(!takes));
+  const native = button.locator('button');
+  await expect(native).toHaveCount(1);
+  if (takes) await expect(native).not.toHaveAttribute('aria-disabled', 'true');
+  else await expect(native).toHaveAttribute('aria-disabled', 'true');
+}
+
+/** The lines of the check on screen that sell `product`. */
+export const linesOf = (page: Page, product: { name: string }): Locator =>
+  shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name });
+
+/**
  * Whether the till on screen is a phone's, once it has laid itself out for the window. It does so a frame after a
  * resize (its media query and its ResizeObserver): read straight after `setViewportSize`, the cart button is the
  * previous size's, and a spec tapped a phone's button on its way out until its 3 minutes ran out (rv-hub-292).

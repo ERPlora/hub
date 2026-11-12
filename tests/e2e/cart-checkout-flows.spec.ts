@@ -20,11 +20,11 @@ import {
   listShown,
   orderFrom,
   post,
-  rowAction,
   rowOf,
   signedIn,
   snap,
 } from './cart-checkout-helpers';
+import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 test.beforeAll(cleanUp);

@@ -33,6 +33,7 @@ from apps.inventory.schemas import (
     CategoryIn,
     CategoryOut,
     CategoryPatchIn,
+    CategoryRecoverIn,
     CategoryRefIn,
     ConfigOut,
     ConfigPatchIn,
@@ -612,6 +613,108 @@ def test_an_employee_cannot_delete():
     )
 
 
+# inventory.product.restore (INVENTORY-F34)
+
+
+def restore(product_id, ctx=None):
+    op = get("inventory.product.restore")
+    return op(ctx or system_context(A), op.input.model_validate({"id": str(product_id)}))
+
+
+def restored_payload(product_id, sku, name, **fields):
+    """What ``inventory.product.restored`` says: the product as it comes back."""
+    return {
+        "id": str(product_id),
+        "sku": sku,
+        "name": name,
+        "product_type": "physical",
+        "price": 100,
+        "cost": 0,
+        "unit": "ud",
+        "tax_category_key": TAX,
+        "is_active": True,
+        "is_sold_out": False,
+        "track_stock": None,
+        **fields,
+    }
+
+
+def test_restore_brings_a_deleted_product_back_the_same_with_its_movements_and_says_so():
+    created = create("Coffee", "CAF-1", ean13="8412345678905", initial_stock="5")
+    receive((created.id, "2"))
+    sold_out(created.id)
+    run("inventory.product.delete", ProductRefIn(id=created.id))
+    clear_outbox()
+
+    back = restore(created.id)
+
+    # The same product: its id, its codes, its stock and every movement hang from it again; back on sale, active and
+    # without the day's «sold out» it had when it was deleted.
+    assert (back.id, back.sku, back.ean13, back.stock) == (created.id, "CAF-1", "8412345678905", Decimal("7.000"))
+    product = Product.objects.get()
+    assert (product.is_deleted, product.deleted_at, product.is_active, product.is_sold_out) == (False, None, True, False)
+    # Who changed it last is whoever brought it back (the system), no longer who deleted it.
+    assert product.updated_by == "system"
+    assert [kind for kind, _, _ in movements(created.id)] == ["initial", "reception"]
+    assert outbox() == [(events.PRODUCT_RESTORED, restored_payload(created.id, "CAF-1", "Coffee"))]
+
+
+def test_restore_keeps_the_categories_it_still_has():
+    drinks = Category.objects.create(name="Drinks")
+    created = create("Coffee", "CAF-1", category_ids=[drinks.id])
+    run("inventory.product.delete", ProductRefIn(id=created.id))
+
+    restore(created.id)
+
+    assert list(ProductCategory.objects.values_list("product_id", "category_id")) == [(created.id, drinks.id)]
+
+
+def test_restoring_a_live_product_changes_nothing_and_says_so_again():
+    # A cut before the COMMIT runs it again (repeatable): the second time finds it live.
+    created = create("Coffee", "CAF-1")
+    run("inventory.product.delete", ProductRefIn(id=created.id))
+    restore(created.id)
+    clear_outbox()
+
+    assert restore(created.id).id == created.id
+
+    assert Product.objects.get().is_deleted is False
+    assert outbox() == [(events.PRODUCT_RESTORED, restored_payload(created.id, "CAF-1", "Coffee"))]
+
+
+@pytest.mark.parametrize(
+    "again, code",
+    [({"sku": "CAF-1"}, "inventory.sku_taken"), ({"sku": "CAF-2", "ean13": "8412345678905"}, "inventory.ean13_taken")],
+)
+def test_one_whose_sku_or_ean13_another_live_product_took_since_does_not_come_back(again, code):
+    first = create("Coffee", "CAF-1", ean13="8412345678905")
+    run("inventory.product.delete", ProductRefIn(id=first.id))
+    create("Coffee again", **again)
+    clear_outbox()
+
+    error = refused(Conflict, lambda: restore(first.id))
+
+    assert error.code == code
+    assert Product.objects.get(pk=first.id).is_deleted is True
+    assert outbox() == []
+
+
+def test_restoring_an_unknown_product_is_not_found():
+    refused(NotFound, lambda: restore(uuid.uuid7()))
+    assert outbox() == []
+
+
+def test_restore_is_the_platforms_without_a_route():
+    op = get("inventory.product.restore")
+    assert (op.kind, op.permission, op.expose_api, op.repeatable) == ("command", "inventory.system", False, True)
+    assert op.ai["risk"] == "normal" and op.ai["description"]
+    created = create()
+    run("inventory.product.delete", ProductRefIn(id=created.id))
+    # Not a permission of any role: the owner holds every permission inventory declares, not this one.
+    refused(PermissionDenied, lambda: restore(created.id, ctx_for("hub_owner")))
+    assert Product.objects.get().is_deleted is True
+
+
 # inventory.product.set_sold_out (INVENTORY-F29)
 
 
@@ -859,6 +962,70 @@ def test_an_employee_cannot_touch_categories():
             "inventory.category.create", CategoryIn(name="Drinks"), "hub_employee"
         ),
     )
+
+
+# inventory.category.recover (INVENTORY-F07, INVENTORY-F34)
+
+
+def recover_category(ctx=None, **data):
+    op = get("inventory.category.recover")
+    return op(ctx or system_context(A), op.input.model_validate(data))
+
+
+def test_recover_creates_the_category_as_its_screen_does_with_its_deleted_products_back_in_it():
+    cake = create("Cake", "CAK-1")
+    brownie = create("Brownie", "BRO-1")
+    run("inventory.product.delete", ProductRefIn(id=cake.id))
+    clear_outbox()
+
+    back = recover_category(
+        name="Desserts", color="#cc0066", tax_category_key=TAX, product_ids=[str(brownie.id), str(cake.id)]
+    )
+
+    assert (back.name, back.slug, back.color, back.tax_category_key) == ("Desserts", "desserts", "#cc0066", TAX)
+    made = Category.objects.get(pk=back.id)
+    assert (made.created_by, made.updated_by) == ("system", "system")
+    # Only the deleted one goes back in, so it comes back inside it when restored; the live one stays as it is.
+    assert list(ProductCategory.objects.filter(category=made).values_list("product_id", flat=True)) == [cake.id]
+    assert outbox() == [
+        (events.CATEGORY_CREATED, {"id": str(back.id), "name": "Desserts"}),
+        (events.PRODUCT_CATEGORIZED, {"product_id": str(cake.id), "category_id": str(back.id)}),
+    ]
+    restore(cake.id)
+    assert list(Product.objects.get(pk=cake.id).categories.values_list("name", flat=True)) == ["Desserts"]
+
+
+def test_recover_without_products_is_the_screens_create():
+    back = recover_category(name="Wines", product_ids=[str(uuid.uuid7())])
+
+    assert (back.name, back.slug, back.product_count) == ("Wines", "wines", 0)
+    assert not ProductCategory.objects.exists()
+    assert outbox() == [(events.CATEGORY_CREATED, {"id": str(back.id), "name": "Wines"})]
+
+
+def test_recover_with_a_tax_category_no_longer_active_is_refused():
+    TaxCategory.objects.filter(key=TAX).update(is_active=False)
+
+    error = refused(InvalidPayload, lambda: recover_category(name="Desserts", tax_category_key=TAX))
+
+    assert list(error.fields) == ["tax_category_key"]
+    assert not Category.objects.exists()
+
+
+def test_recover_is_the_platforms_without_a_route():
+    op = get("inventory.category.recover")
+    assert (op.kind, op.permission, op.input, op.output, op.expose_api, op.repeatable) == (
+        "command",
+        "inventory.system",
+        CategoryRecoverIn,
+        CategoryOut,
+        False,
+        True,
+    )
+    assert op.ai["risk"] == "normal" and op.ai["description"]
+    # Not a permission of any role: the owner holds every permission inventory declares, not this one.
+    refused(PermissionDenied, lambda: recover_category(ctx_for("hub_owner"), name="Desserts"))
+    assert not Category.objects.exists()
 
 
 # inventory.category.bulk_create (INVENTORY-F10)

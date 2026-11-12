@@ -1,8 +1,6 @@
-// The attendance app's UI texts: English source + Spanish (PLAN §5), kept by hand next to the pages until
-// Django's `djangojs` catalogues are exported to JSON. This test is their guardrail: same keys and
-// placeholders in both languages, nothing empty, every key a page, a component or a helper uses
-// exists, and the words the old screens showed (WORKBOOK «Pantallas», the old module's
-// `locales/*.json`) are kept word for word.
+// The attendance app's UI texts: English source + Spanish, kept by hand next to the pages. This test is
+// their guardrail: same keys and placeholders in both languages, nothing empty, every key a page, a
+// component or a helper uses exists, and the screens' words (WORKBOOK «Pantallas») are kept word for word.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -75,7 +73,7 @@ describe('attendance catalogues (en source + es)', () => {
     }
   });
 
-  it('name every status the server knows once, for Records and Clock in alike (attendance#18)', () => {
+  it('name every status the server knows once, for Records and Clock in alike', () => {
     for (const status of ['open', 'closed', 'needs_review']) {
       expect(EN.has(`attendance.status.${status}`), status).toBe(true);
       expect(EN.has(`attendance.clock.status.${status}`), status).toBe(false);

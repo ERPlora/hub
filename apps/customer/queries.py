@@ -6,6 +6,7 @@ its id or by its exact name, phone or email (``find_customer``); groups, tags an
 
 import csv
 import io
+import json
 from decimal import Decimal
 from uuid import UUID
 
@@ -53,7 +54,9 @@ from apps.customer.schemas import (
     FieldPage,
     FieldRefIn,
     FieldRow,
+    FieldValueOfCopyIn,
     GroupListIn,
+    GroupOfCopyIn,
     GroupPage,
     GroupRefIn,
     GroupRow,
@@ -69,6 +72,7 @@ from apps.customer.schemas import (
     PurchaseListIn,
     PurchasePage,
     TagListIn,
+    TagOfCopyIn,
     TagPage,
     TagRefIn,
     TagRow,
@@ -209,6 +213,12 @@ def _find_named(
             code=code.replace("_unavailable", "_ambiguous"),
         )
     return chosen[0]
+
+
+def named(model, name: str):
+    """The group, tag or custom field the business has under ``name``, the case aside: the active one first, as a
+    card's selection by name takes it (``set_groups``, ``set_tags``); ``None`` when it has none."""
+    return model.objects.filter(name__iexact=name.strip()).order_by("-is_active", "id").first()
 
 
 def find_group(
@@ -939,7 +949,34 @@ def has_live_twin(name: str, phone: str, email: str) -> bool:
 
     Only the three together: two people may share a phone or an email (CUSTOMER-F12).
     """
-    return Customer.objects.live().filter(name__iexact=name, phone=phone, email__iexact=email).exists()
+    return _live_twins(name, phone, email).exists()
+
+
+def _live_twins(name: str, phone: str, email: str) -> QuerySet[Customer]:
+    """The live cards ``has_live_twin`` finds, the oldest first."""
+    return Customer.objects.live().filter(name__iexact=name, phone=phone, email__iexact=email).order_by("created_at", "id")
+
+
+def card_in_business(card: dict) -> UUID | None:
+    """hub#1284: the business's live card that is ``card`` of a separate copy (its ``id``, ``name``, ``phone`` and
+    ``email`` there), what another app's recovery matches a record of the copy that points at it by, by the rule
+    ``cards_not_in_business`` tells a card is not lacking by: the same card while live, the one it was merged into since
+    (it lives on in that one, CUSTOMER-F13), or one made again (``has_live_twin``: by hand, or brought back already).
+    ``None`` when the business has none: deleted and not made again, gone, or erased (never another card, CUSTOMER-F16).
+    """
+    seen: set[UUID] = set()
+    current = card["id"]
+    while current is not None and current not in seen:
+        seen.add(current)
+        row = Customer.objects.filter(pk=current).values("deleted_at", "merged_into", "erased_at").first()
+        if row is None:
+            break
+        if row["erased_at"] is not None:
+            return None
+        if row["deleted_at"] is None:
+            return current
+        current = row["merged_into"]
+    return _live_twins(card["name"], card["phone"], card["email"]).values_list("pk", flat=True).first()
 
 
 #: What a card of a separate copy gives its create (``CustomerIn``), as the copy's columns hold it since
@@ -979,6 +1016,79 @@ def cards_in_copy(conn) -> list[dict]:
         sql.SQL(", ").join(column[field] for field in read), sql.Identifier(table), column["deleted_at"], column["id"]
     )
     return [dict(zip(read, row, strict=True)) for row in conn.execute(query)]
+
+
+def recoverable_cards_in_copy(conn) -> list[dict]:
+    """hub#1285: each card of ``cards_in_copy`` with what hung from it in the copy, as ``customer.customer.recover``
+    takes it (``CustomerRecoverIn``): its groups and its tags, active or not (a card keeps an inactive one), and its
+    values of the copy's active custom fields (an inactive field shows on no card and takes no value, CUSTOMER-F29),
+    each named as the copy named it, in the order its card shows them. The same connection and rule as
+    ``cards_in_copy``: its own SQL over the models' names, never the ORM."""
+    cards = cards_in_copy(conn)
+    if not cards:
+        return []
+    hanging = {card["id"]: {"groups": [], "tags": [], "field_values": []} for card in cards}
+    read = (
+        ("groups", _members_in_copy(conn, "groups", tuple(GroupOfCopyIn.model_fields))),
+        ("tags", _members_in_copy(conn, "tags", tuple(TagOfCopyIn.model_fields))),
+        ("field_values", _values_in_copy(conn)),
+    )
+    for key, rows in read:
+        for card_id, item in rows:
+            if card_id in hanging:
+                hanging[card_id][key].append(item)
+    return [card | hanging[card["id"]] for card in cards]
+
+
+def _members_in_copy(conn, relation: str, read: tuple[str, ...]) -> list[tuple[UUID, dict]]:
+    """Each group or tag (``relation`` of a card) of each card of the copy: the card's id and its ``read`` columns, by
+    name."""
+    field = Customer._meta.get_field(relation)
+    through, model = field.remote_field.through._meta, field.related_model._meta
+    columns = [sql.Identifier("m", field.m2m_column_name())]
+    columns += [sql.Identifier("x", model.get_field(name).column) for name in read]
+    query = sql.SQL("SELECT {} FROM {} m JOIN {} x ON x.{} = m.{} ORDER BY x.{}, x.{}").format(
+        sql.SQL(", ").join(columns),
+        sql.Identifier(through.db_table),
+        sql.Identifier(model.db_table),
+        sql.Identifier(model.pk.column),
+        sql.Identifier(field.m2m_reverse_name()),
+        sql.Identifier(model.get_field("name").column),
+        sql.Identifier(model.pk.column),
+    )
+    return [(row[0], dict(zip(read, row[1:], strict=True))) for row in conn.execute(query)]
+
+
+def _values_in_copy(conn) -> list[tuple[UUID, dict]]:
+    """Each value of an active custom field of each card of the copy: the card's id and the field as its create takes
+    it, with the value, in the order the card shows them. A select's options are read as their JSON text, whatever
+    the connection makes of a ``jsonb``."""
+    value, field = CustomFieldValue._meta, CustomField._meta
+    read = tuple(name for name in FieldValueOfCopyIn.model_fields if name != "value")
+    columns = [sql.Identifier("v", value.get_field("customer").column)]
+    columns += [
+        sql.SQL("{}::text").format(sql.Identifier("f", field.get_field(name).column))
+        if name == "options"
+        else sql.Identifier("f", field.get_field(name).column)
+        for name in read
+    ]
+    columns += [sql.Identifier("v", value.get_field("value").column)]
+    query = sql.SQL("SELECT {} FROM {} v JOIN {} f ON f.{} = v.{} WHERE f.{} ORDER BY f.{}, f.{}, f.{}").format(
+        sql.SQL(", ").join(columns),
+        sql.Identifier(value.db_table),
+        sql.Identifier(field.db_table),
+        sql.Identifier(field.pk.column),
+        sql.Identifier(value.get_field("field").column),
+        sql.Identifier(field.get_field("is_active").column),
+        sql.Identifier(field.get_field("sort_order").column),
+        sql.Identifier(field.get_field("name").column),
+        sql.Identifier(field.pk.column),
+    )
+    found = []
+    for row in conn.execute(query):
+        item = dict(zip((*read, "value"), row[1:], strict=True))
+        found.append((row[0], item | {"options": json.loads(item["options"])}))
+    return found
 
 
 def cards_not_in_business(cards: list[dict]) -> list[dict]:

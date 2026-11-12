@@ -1,4 +1,4 @@
-// The service app's UI texts: English source + Spanish (PLAN §5), kept by hand next to the pages until
+// The service app's UI texts: English source + Spanish, kept by hand next to the pages until
 // Django's `djangojs` catalogues are exported to JSON. This test is their guardrail: same keys and
 // placeholders in both languages, nothing empty, every key a page, a component or a helper uses
 // exists, and the words the old screens showed (the old module's `locales/*.json`) are kept.
@@ -110,7 +110,7 @@ describe('service catalogues (en source + es)', () => {
       ['service.categories.search', 'Search category…', 'Buscar categoría…'],
       ['service.categories.empty', 'No categories.', 'No hay categorías.'],
       ['service.categories.form.noParent', 'No parent (root)', 'Sin padre (raíz)'],
-      // hub#1147: the old screen said «service(s)»; one is said in the singular and several in the plural.
+      // Never «service(s)»: one is said in the singular and several in the plural.
       [
         'service.categories.delete.impact',
         '{count} service will be left without a category. | {count} services will be left without a category.',

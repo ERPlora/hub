@@ -3,7 +3,8 @@
 // real Sales and Taxes apps, no doubles:
 //   - «Mark sold out» in the row's menu: the «Sold out» mark beside the switch, which stays on, and the
 //     till open in another tab greys it out with «Sold out» without a reload (its grid and its search,
-//     SALE-F07), while the article next to it sells as always; «Put back on sale» brings it back the same way;
+//     SALE-F07), picking it in the search adds nothing and says why, while the article next to it sells as
+//     always; «Put back on sale» brings it back the same way;
 //   - the counts of the till's strip («All» and the category) count what its grid shows, the greyed tile
 //     included (FIX-INVENTORY-SOLD-OUT-GREYED-IN-POS), also on a till opened after the mark;
 //   - the product sheet marks and unmarks it too, and says so beside its status;
@@ -22,12 +23,12 @@ import {
   productBySku,
   productRow,
   productsReady,
-  rowAction,
   searchProducts,
   shootFlow,
   stamp,
 } from './inventory-helpers';
-import { drawerOff, restoreDrawer } from './sale-helpers';
+import { drawerOff, expectTakes, linesOf, restoreDrawer } from './sale-helpers';
+import { rowAction } from './service-helpers';
 
 const RUN = stamp();
 let croquettes: Product;
@@ -92,13 +93,9 @@ const stripCount = (page: Page, tab: string): Locator => shown(page).locator(`[d
 async function expectSoldOutTile(page: Page, product: Product, soldOut: boolean): Promise<void> {
   const shownTile = tile(page, product);
   await expect(shownTile).toHaveCount(1);
-  if (soldOut) {
-    await expect(shownTile).toHaveAttribute('aria-disabled', 'true');
-    await expect(shownTile).toContainText(/Sold out|Agotado/);
-  } else {
-    await expect(shownTile).not.toHaveAttribute('aria-disabled', 'true');
-    await expect(shownTile).not.toContainText(/Sold out|Agotado/);
-  }
+  await expectTakes(shownTile, !soldOut);
+  if (soldOut) await expect(shownTile).toContainText(/Sold out|Agotado/);
+  else await expect(shownTile).not.toContainText(/Sold out|Agotado/);
 }
 
 /** The till on «All»: the article that stays on sale is in its grid. */
@@ -189,7 +186,7 @@ test('INVENTORY-F29 / INVENTORY-F27: «Mark sold out» greys the article out in 
   await searchProducts(office, croquettes.sku);
   await expect(productRow(office, croquettes.sku)).toBeVisible();
   await expect(soldOutMark(office, croquettes)).toHaveCount(0);
-  await rowAction(office, croquettes.id, 'sold_out');
+  await rowAction(office, 'inventory-products', croquettes.id, 'sold_out');
   await expect(soldOutMark(office, croquettes)).toHaveText(/^(Sold out|Agotado)$/);
   // Sold out is not inactive: its switch stays on.
   await expect(office.locator(`[data-testid=inventory-products-active-${croquettes.id}]`).first()).toHaveJSProperty('checked', true);
@@ -209,10 +206,14 @@ test('INVENTORY-F29 / INVENTORY-F27: «Mark sold out» greys the article out in 
   await expectSoldOutTile(till, croquettes, true);
   await expectSoldOutTile(till, bread, false);
   const search = await searchTill(till);
-  await expect(search.locator(`[data-testid=pos-search-${croquettes.id}]`)).toHaveAttribute('aria-disabled', 'true');
-  await expect(search.locator(`[data-testid=pos-search-${croquettes.id}]`)).toContainText(/Sold out|Agotado/);
-  await search.locator('[data-testid=pos-search-close]').click();
+  const row = search.locator(`[data-testid=pos-search-${croquettes.id}]`);
+  await expectTakes(row, false);
+  await expect(row).toContainText(/Sold out|Agotado/);
+  // Picking it closes the search and adds nothing: the till says why.
+  await row.click({ force: true });
   await expect(search).toBeHidden();
+  await expect(shown(till).locator('[data-testid=pos-tap-notice]')).toHaveText(new RegExp(`^«${croquettes.name}» (is sold out|está agotado)\\.$`));
+  await expect(linesOf(till, croquettes)).toHaveCount(0);
   await till.screenshot({ path: shot('inventory-sold-out-till-1440') });
 
   // The strip counts what the grid shows, the greyed tile included, on a till opened now as well: the
@@ -225,14 +226,14 @@ test('INVENTORY-F29 / INVENTORY-F27: «Mark sold out» greys the article out in 
 
   // Back on sale: the mark goes and the till offers it again, live.
   await office.bringToFront();
-  await rowAction(office, croquettes.id, 'back_on_sale');
+  await rowAction(office, 'inventory-products', croquettes.id, 'back_on_sale');
   await expect(soldOutMark(office, croquettes)).toHaveCount(0);
   expect((await productBySku(context, croquettes.sku)).is_sold_out).toBe(false);
   await till.bringToFront();
   await expectSoldOutTile(till, croquettes, false);
   const again = await searchTill(till);
   await expect(again.locator(`[data-testid=pos-search-${croquettes.id}]`)).toBeVisible();
-  await expect(again.locator(`[data-testid=pos-search-${croquettes.id}]`)).not.toHaveAttribute('aria-disabled', 'true');
+  await expectTakes(again.locator(`[data-testid=pos-search-${croquettes.id}]`), true);
 });
 
 test('INVENTORY-F29: the product sheet marks it sold out, says so beside its status and puts it back on sale', async ({ page, context }) => {
@@ -241,7 +242,7 @@ test('INVENTORY-F29: the product sheet marks it sold out, says so beside its sta
   await productsReady(page);
   await searchProducts(page, bread.sku);
   await expect(productRow(page, bread.sku)).toBeVisible();
-  await rowAction(page, bread.id, 'detail');
+  await rowAction(page, 'inventory-products', bread.id, 'detail');
   const sheet = dialog(page, 'inventory-product-detail');
   await expect(sheet).toBeVisible();
   const status = sheet.locator('[data-testid=inventory-product-detail-status] ion-note');

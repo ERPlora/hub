@@ -1,6 +1,6 @@
-"""What layer 1 of the assistant's QA says of VeriFactu (docs plan 2026-10-31, the assistant's knowledge and QA, §3):
-its thirty-one tools, what an employee is never offered, and that the requests of the real-model QA (hub#1089), in the
-owner's and the employee's own words, are offered their existing operation on the record already there.
+"""What layer 1 of the assistant's QA says of VeriFactu: its thirty-one tools, what an employee is never offered, and
+that the requests of the real-model QA, in the owner's and the employee's own words, are offered their existing
+operation on the record already there.
 
 Every ask of every tool of verifactu bringing its tool among the first ten, role by role, in English and in Spanish, out
 of the catalogue of a business with every app on and ranked as a turn ranks, is ``base/tests/test_assistant_asks.py``'s
@@ -33,11 +33,11 @@ from base.tests.test_assistant_asks import (
     probe_phrases,
 )
 
-#: The requests of hub#1089's QA (``tests/e2e/qa/probes/owner-es-verifactu-2026-11-08.json``), as the owner said them,
-#: and nothing of the tools' ``asks``: before VeriFactu said its asks, none of these tools was among the ones a turn
-#: offers (``MAX_TOOLS``) but the queue's retry (24th), so the model answered it had no tool, sent the owner to the
-#: Recovery screen or created another test invoice instead of sealing the record of the one already issued. The last
-#: one the model answered right, but Taxes' asks (hub#1166: «fiscal», «registro») took it out of the ones a turn offers.
+#: The requests of the real-model QA (``tests/e2e/qa/probes/owner-es-verifactu-2026-11-08.json``), as the owner said
+#: them, and nothing of the tools' ``asks``: before VeriFactu said its asks, none of these tools was among the ones a
+#: turn offers (``MAX_TOOLS``) but the queue's retry (24th), so the model answered it had no tool, sent the owner to the
+#: Recovery screen or created another test invoice instead of sealing the record of the one already issued. The last one
+#: the model answered right, but Taxes' asks («fiscal», «registro») took it out of the ones a turn offers.
 REPORTED = [
     ("verifactu.stats.events_recent", "¿cuáles son los cinco acontecimientos fiscales más recientes?"),
     (
@@ -89,10 +89,10 @@ UNTIL_LIVE_TELLS_THE_ACCOUNT_FROM_A_CHECK = pytest.mark.xfail(
 #: What a person says in words of their own, neither an ask nor a probe of layer 2, one per tool of VeriFactu: each
 #: reaches its tool among the first ten by its asks and not without them, so asks that stop reading as people speak fail
 #: here, tool by tool. None says more than two content words of any one of its asks or of its probes, nor half of its
-#: own (hub#1179, hub#1199); none names the thing of its tool as the Hub reads it («contingencia», «diagnóstico»,
+#: own; none names the thing of its tool as the Hub reads it («contingencia», «diagnóstico»,
 #: «certificado», «modelo», «procesa»: they bring it by its name alone), nor «presenta» (the stem of attendance's
-#: presence), which live reads as another thing. Until ERPlora/live#71 live read «sella», «producción» and «comprueba»
-#: as a sale, a product and a purchase too; it reads them now as what they are.
+#: presence), which live reads as another thing. Live reads «sella», «producción» and «comprueba» as what they are,
+#: not as a sale, a product and a purchase.
 OWN_WORDS = [
     (
         "verifactu.config.get",
@@ -213,7 +213,7 @@ def test_the_owners_request_offers_its_existing_operation_among_the_first_eight(
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_sealing_the_record_of_an_issued_invoice_comes_before_creating_another_test_invoice(context_of):
-    """hub#1089: the owner asked to seal the record of the test invoice already issued, and the model created another
+    """The owner asked to seal the record of the test invoice already issued, and the model created another
     test invoice (``verifactu.test_invoice.create``): sealing the record of an issued invoice goes ahead of it."""
     tools = owners_catalog(context_of)
     ranked = [op.name for op in assistant.relevant(tools, [dict(REPORTED)["verifactu.record.create"]], "es")]

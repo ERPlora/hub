@@ -1,5 +1,4 @@
-"""The plan's limits on a hub's database, in each process (PLAN-DB §5 «Límite por plan»; plan 2026-10-22-fase-2-tenencia
-§3 S4 and §2, guardrail 12).
+"""The plan's limits on a hub's database, in each process.
 
 A hub with a database of its own gets, in each process, as many transactions at once on its alias as its plan says,
 and each of them carries its plan's ``statement_timeout``: Free 1 and 5 s, Starter 3 and 15 s, Standard 6 and 15 s
@@ -15,7 +14,7 @@ and ``base.plan.usage`` both follow.
 No plan gets more at once than PgBouncer gives each database (``settings.PGBOUNCER_MAX_DB_CONNECTIONS``): 48 in prod and
 in pre, the highest plan's (Max; ERPlora/aws ``stacks/prod/apps.tf``), so every plan gets its own; without the setting
 it is 6, and a Pro's 12 are 6 there. Past that, a transaction would wait 10 s in PgBouncer and fail with no
-``base.hub_busy``, which the meter would never count (PLAN-HUB §66, correction).
+``base.hub_busy``, which the meter would never count.
 
 Who applies them: the hubs' database engine (:data:`ENGINE`, ``base.tenancy.backend``), which every hub's alias runs on
 (``base.tenancy.connections``). Its connection takes a place of its alias's :class:`Limiter` at the first statement of
@@ -27,7 +26,7 @@ without a place: one that finds none waits :data:`SLOT_WAIT_SECONDS` and answers
 meter how many are in use (``base.meter``, never a statement of its own, and never holding the limiter's lock). The
 failure is counted only when it reaches a client (:meth:`HubBusy.reached_client`): the live executor tries a query again
 after it, and a try nobody saw must not tell an owner to upgrade (BASE-F40). A demo is not measured. Control's database
-and a hub of phase 1's shared database (``db_name=""``, ``default``) are not limited; the migrator's direct alias
+and a hub still in the old shared database (``db_name=""``, ``default``) are not limited; the migrator's direct alias
 (``__ddl``) neither: its passes have their own budget (``base.tenancy.migrator``).
 """
 

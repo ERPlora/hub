@@ -531,7 +531,7 @@ def restore_service(ctx: OperationContext, data: ServiceRefIn) -> dict:
     return load_service(service.id, ctx.scope)
 
 
-# ── The service's image (SERVICE-F34, F35; round 2026-10-30, base.images) ─────────────────────────────────────
+# ── The service's image (SERVICE-F34, F35; base.images) ───────────────────────────────────────────────────────
 
 #: Where a service's own photos are kept under its hub's prefix: the folder ``members_media`` serves (apps.py).
 PHOTOS = "service/services/"
@@ -1728,7 +1728,7 @@ def settle_sessions(ctx: OperationContext, data: SettleIn) -> dict:
 )
 def expire_holds(ctx: OperationContext, data: NoIn) -> dict:
     # Locked in id order, as every other step of a session takes them; one notice per session, saying which
-    # session of which voucher (hub#2681), and none when nothing lapsed.
+    # session of which voucher, and none when nothing lapsed.
     lapsed = list(
         Redemption.objects.select_for_update()
         .filter(status=HELD, hold_until__lte=timezone.now())

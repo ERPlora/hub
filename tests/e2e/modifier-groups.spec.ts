@@ -10,6 +10,7 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, EMPLOYEE, horizontalOverflow, hostPage, login, painted, psql, shown, untilStill } from './helpers';
+import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 const STAMP = Date.now().toString(36).toUpperCase();
@@ -91,18 +92,6 @@ async function pickCombo(page: Page, scope: Locator, testid: string, text: strin
   await input.click();
   await input.fill(text);
   await page.locator(`[data-testid="${testid}-option-${id}"]`).click();
-}
-
-/** Runs a row action of the groups table: its inline button, or the row's «⋮» menu when it folded there. */
-async function rowAction(page: Page, id: string, action: string): Promise<void> {
-  const hook = `modifier-groups-row-${id}-${action}`;
-  const inline = shown(page).locator(`[data-testid=${hook}]`);
-  if ((await inline.count()) > 0 && (await inline.first().isVisible())) {
-    await inline.first().click();
-    return;
-  }
-  await shown(page).locator(`[data-testid=modifier-groups-row-${id}-menu]`).first().click();
-  await page.locator(`ion-popover [data-testid=${hook}]`).click();
 }
 
 /** A group made through the API, with its options (setup, never the check). */
@@ -250,7 +239,7 @@ test('MODIFIER-F03: Edit changes only what is touched, a maximum below the defau
   await openGroups(page);
   await expect(groupRow(page, group.id)).toContainText('Optional · max. 3');
 
-  await rowAction(page, group.id, 'edit');
+  await rowAction(page, 'modifier-groups', group.id, 'edit');
   const form = dialog(page, 'modifier-group-form');
   await expect(form).toBeVisible();
   await expect(form.locator('[data-testid=modifier-group-form-name] input')).toHaveValue(named('Extras'));
@@ -268,7 +257,7 @@ test('MODIFIER-F03: Edit changes only what is touched, a maximum below the defau
   await expect(groupRow(page, group.id)).toContainText('EXTRA');
 
   // Deleting it, after a confirmation that says its options and where it applies go with it.
-  await rowAction(page, group.id, 'delete');
+  await rowAction(page, 'modifier-groups', group.id, 'delete');
   const confirm = dialog(page, 'modifier-groups-delete');
   await expect(confirm).toContainText('2 options will be deleted with it.');
   await expect(confirm).toContainText('It will stop applying to 1 product or category.');

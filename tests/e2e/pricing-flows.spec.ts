@@ -30,13 +30,13 @@ import {
   post,
   ready,
   row,
-  rowAction,
   search,
   shootConfirm,
   shootFlow,
   stamp,
   TAG,
 } from './pricing-helpers';
+import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 test.use({ viewport: DESKTOP, locale: 'en-US' });

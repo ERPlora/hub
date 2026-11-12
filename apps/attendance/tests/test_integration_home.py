@@ -1,8 +1,7 @@
-"""Time clock on the Home (PLAN-HUB round 2026-10-21; FIX-ATTENDANCE-SETUP-HOOKS): base's own query brings the old
-module's one panel, «Clocked in now» (ATTENDANCE-F11), answered by attendance's own count as that person, only to
-whoever sees the whole team, never to an employee. It counts what «Clocked in now» lists in Records: an open day (on a
-break too), never a closed one, a forgotten one, one waiting for review or a terminated person's. A clocking in hub B
-re-runs B's panel and tells A nothing.
+"""Time clock on the Home: base's own query brings its one panel, «Clocked in now» (ATTENDANCE-F11), answered by
+attendance's own count as that person, only to whoever sees the whole team, never to an employee. It counts what
+«Clocked in now» lists in Records: an open day (on a break too), never a closed one, a forgotten one, one waiting for
+review or a terminated person's. A clocking in hub B re-runs B's panel and tells A nothing.
 
 base, staff and attendance run for real: the panel comes from AttendanceConfig through base's own query, and the days
 are clocked through attendance's own operations.
@@ -55,7 +54,7 @@ def clock_in(member: Member, ctx=None):
 
 
 @pytest.mark.django_db
-def test_an_owner_is_offered_the_old_modules_one_panel_followed_live():
+def test_an_owner_is_offered_the_one_panel_followed_live():
     offered = panels(ctx_for("hub_owner"))
     assert list(offered) == [CLOCKED_IN_NOW]
     panel = offered[CLOCKED_IN_NOW]
@@ -69,7 +68,7 @@ def test_an_owner_is_offered_the_old_modules_one_panel_followed_live():
     assert (panel["title"], panel["icon"]) == ("Clocked in now", "ion:time-outline")
     # The picker groups it under the app's own name (never a literal category).
     assert panel["category"] == "Time clock"
-    # It follows the events attendance emits today, never the old module's (`attendance.clocked_in`…).
+    # It follows the events attendance emits, never the legacy names (`attendance.clocked_in`…).
     assert set(panel["refresh_on"]) == set(live_registry.subscribable["attendance.presence.count"])
     assert {"attendance.record.clocked_in", "attendance.record.clocked_out", "attendance.record.corrected"} <= set(
         panel["refresh_on"]

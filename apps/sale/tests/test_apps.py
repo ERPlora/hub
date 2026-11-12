@@ -44,8 +44,8 @@ def test_sale_is_an_installed_live_app():
 
 def test_it_requires_tax_and_customer_but_not_inventory():
     # Every line is priced with tax's rules and a sale keeps its customer's card (a foreign key).
-    # Inventory is optional (PLAN §20.5): the till sells services and open prices without it, a
-    # line keeps a copy of its product, and inventory moves the stock by reacting to the sale.
+    # Inventory is optional: the till sells services and open prices without it, a line keeps a copy of its product, and
+    # inventory moves the stock by reacting to the sale.
     assert sale().requires == ["tax", "customer"]
 
 
@@ -164,7 +164,7 @@ def test_the_money_and_fiscal_writes_are_high_risk():
     } <= high
 
 
-# ── The Home's hooks (PLAN-HUB round 2026-10-21) ────────────────────────────────────────────────────
+# ── The Home's hooks ────────────────────────────────────────────────────────────────────────────────
 
 FIGURES = ["sale.sale.completed", "sale.sale.voided", "sale.sale.refunded"]
 SALES = [*FIGURES, "sale.sale.reassigned", "sale.sale.invoiced"]

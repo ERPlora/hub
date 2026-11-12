@@ -415,11 +415,10 @@ WAYS_LOST = {
 def test_in_production_without_a_way_to_the_aeat_the_charge_is_refused(
     issuer, bar, settings, lost
 ):
-    # Working-rules §15 (the old Hub's enforce_fiscal_road, HUB-1935): a business that files for real never
-    # charges a sale whose ticket could never reach the AEAT, whether the route lost it (the authorisation, the
-    # own certificate) or the server (the key that opens the certificate, ERPlora's gateway, real filing). The
-    # refusal is not a document that waits: it reaches the cashier as it is and nothing is charged, numbered or
-    # sealed. The charge never stays «pending».
+    # A business that files for real never charges a sale whose ticket could never reach the AEAT, whether the route
+    # lost it (the authorisation, the own certificate) or the server (the key that opens the certificate, ERPlora's
+    # gateway, real filing). The refusal is not a document that waits: it reaches the cashier as it is and nothing is
+    # charged, numbered or sealed. The charge never stays «pending».
     settings.ERPLORA_ENVIRONMENT = "prod"
     settings.VERIFACTU_PRODUCTION_ENABLED = True
     settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
@@ -437,7 +436,7 @@ def test_in_production_without_a_way_to_the_aeat_the_charge_is_refused(
 
 
 def test_sales_refuses_as_without_a_way_exactly_the_codes_verifactu_raises_today():
-    # A code VeriFactu no longer raises (the paid live option's, retired with it: PLAN §30, round 2026-10-22b)
+    # A code VeriFactu no longer raises (the paid live option's, retired with it)
     # is dead code in Sales: each one Sales treats as «no way to the AEAT» is one the test above makes VeriFactu
     # raise for real, and each way lost it walks is one Sales refuses.
     from apps.sale.services import NO_WAY_TO_THE_AEAT
@@ -496,7 +495,7 @@ def test_the_seller_without_the_right_to_invoice_still_charges(issuer, bar):
     assert (sale.status, sale.invoice_status) == ("completed", "pending")
 
 
-# ── A document that waits has a way out in phase 1 (no relay): retry, «Issue now», the void ─────────
+# ── A document that waits has a way out: retry, «Issue now», the void ───────────────────────────────
 
 
 def test_retrying_a_charge_whose_document_waits_issues_it_now(bar, today):

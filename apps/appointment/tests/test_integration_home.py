@@ -1,7 +1,7 @@
-"""Citas on the Home's bell (PLAN-HUB round 2026-10-21; appointments#169, hub#1678): base's ``base.bell.counters``
-shows «Appointments to confirm» while the customers' own upcoming bookings wait for confirmation in the agenda the
-person sees, and leads to the agenda; at zero it is not shown. Every change of that number records an event the
-counter is refreshed on, and a booking in hub B re-runs the bell on B's channel only.
+"""Citas on the Home's bell: base's ``base.bell.counters`` shows «Appointments to confirm» while the customers' own
+upcoming bookings wait for confirmation in the agenda the person sees, and leads to the agenda; at zero it is not shown.
+Every change of that number records an event the counter is refreshed on, and a booking in hub B re-runs the bell on B's
+channel only.
 
 base and appointment run for real: the counter comes from AppointmentConfig through base's own query, never a
 stand-in module.

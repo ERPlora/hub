@@ -1,4 +1,4 @@
-"""A hub's database made at sign-up, a demo's dropped when it ends (round 2026-10-30 of PLAN-DB, S2a; PLAN-DB §6, §8).
+"""A hub's database made at sign-up, a demo's dropped when it ends.
 
 Every new hub and demo is born ``requested`` with its ``db_name`` (``base.services``: ``base.hub.register``,
 ``base.demo.create``) and due in ``hub_due``; the worker (``base.worker``, :func:`run_due`) or a command
@@ -13,11 +13,11 @@ of its own (``base.services``, «The provisioning's writes in control»):
    brought to the code's leaf (``base.tenancy.migrator.ensure_schema``: nothing to do when ``migrate_hubs`` kept the
    template current, so the sign-up is the clone; the lease renewed between apps) and noted in ``Hub.schema_apps``
    (``{app: its leaf migration}``) with ``schema_state`` current. Every template carries every portable app's tables
-   (``migrator.templates``, PLAN-DB round 2026-11-01), so the clone has them; an app it lacks (one ported after its
-   template was made) gets its tables the first time the business turns it on (S3: ``base.app.enable`` → ``creating``
-   → the worker's ``ensure_schema``, PLAN-DB §7);
+   (``migrator.templates``), so the clone has them; an app it lacks (one ported after its template was made) gets its
+   tables the first time the business turns it on (``base.app.enable`` → ``creating`` → the worker's
+   ``ensure_schema``);
 3. ``seeding``: inside ``use_hub``, its apps written down: every one off but those its country requires that the
-   platform turns on by itself (``base.services.turn_on_born_apps``: Taxes, hub#997), on and not chosen, whose tables
+   platform turns on by itself (``base.services.turn_on_born_apps``: Taxes), on and not chosen, whose tables
    the step before made; then the SaaS's photo kept on the row (its people, and the blocks of the apps it has on); a
    newer photo that arrives meanwhile is applied too before ``ready`` (:data:`SEED_ROUNDS`);
 4. ``ready``, and the SaaS of a business hears it after the COMMIT (``base.services.report_ready``).
@@ -99,9 +99,8 @@ def provision(
 
     ``apps``: more apps than its template's whose tables it gets now (the local hubs a and b, born with every app on:
     ``seed_local_hubs``); none by default, as the worker's pass (:func:`run_due`): a business and a demo are born with
-    their template's tables (every portable app's) and every app off (PLAN §33) but those their country requires that
-    the platform turns on (hub#997), whose tables they get too; an app their template lacked gets its tables when it is
-    turned on (S3).
+    their template's tables (every portable app's) and every app off but those their country requires that the
+    platform turns on, whose tables they get too; an app their template lacked gets its tables when it is turned on.
     ``seed``: what its seeding writes, inside its database (``use_hub``), before the apps it is born with (none when it
     wrote its apps itself) and the photo kept. A hub already ready is
     left as it is (``True``); one that is not being prepared (cancelled, gone) or whose lease someone else holds is not
@@ -223,7 +222,7 @@ def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = N
         with use_hub(hub):
             if seed is not None:
                 seed(hub)
-            # The apps it is born with on, those its country requires that the platform turns on (hub#997): after its
+            # The apps it is born with on, those its country requires that the platform turns on: after its
             # seeding, which may have written its apps already (the local hubs, every app on), and before the photo,
             # whose blocks belong to the apps it has on.
             services.turn_on_born_apps(hub)
