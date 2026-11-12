@@ -156,7 +156,7 @@ def an_appointment_of_the_copy(
 
 def test_the_business_lacks_what_it_does_not_hold_nor_booked_again(salon):
     lucia, now = salon.lucia, timezone.now()
-    # Held, whatever became of it since (cancelled here): it stays as it is.
+    # Held, whatever became of it since (cancelled here, and at another time than in the copy): it stays as it is.
     held = make_appointment(lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), status="cancelled")
     # Deleted from the agenda (APPOINTMENT-F11): lacking.
     deleted = make_appointment(lucia, salon.ana, [salon.cut], at(MONDAY, "11:00"), deleted_at=now)
@@ -165,7 +165,7 @@ def test_the_business_lacks_what_it_does_not_hold_nor_booked_again(salon):
     again = an_appointment_of_the_copy(card(lucia), salon, at(MONDAY, "12:00"))
     gone = an_appointment_of_the_copy(card(lucia), salon, at(MONDAY, "13:00"))
     records = [
-        an_appointment_of_the_copy(card(lucia), salon, held.start, held.pk),
+        an_appointment_of_the_copy(card(lucia), salon, at(MONDAY, "09:00"), held.pk),
         an_appointment_of_the_copy(card(lucia), salon, deleted.start, deleted.pk),
         again,
         gone,
@@ -279,6 +279,12 @@ def test_a_service_the_copy_had_too_is_never_taken_for_the_lost_one_of_the_same_
 
     assert comes_back_with(salon, copy) == [{"service_id": salon.cut.pk}]
     assert Service.objects.filter(pk=kept.pk).exists()
+
+
+def test_a_copy_with_no_appointment_to_come_lacks_none():
+    """The platform asks what is lacking even when the copy gave nothing (``base.tenancy.recovery._give_back``): with no
+    appointment there is no list of the copy's services to match, and none is lacking."""
+    assert queries.appointments_not_in_business([]) == []
 
 
 def test_the_app_declares_what_it_gives_back():
