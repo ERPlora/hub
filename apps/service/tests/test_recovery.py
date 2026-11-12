@@ -467,6 +467,8 @@ def test_the_main_service_comes_back_only_for_whom_the_business_set_none_since()
     # Sonia's main service in the business since the copy: hers stays.
     nails = make_service("Nails", tax=tax)
     Assignment.objects.create(service=nails, member=sonia, is_primary=True)
+    # Ana performs it too, and it is not her main one: she has none.
+    Assignment.objects.create(service=nails, member=ana)
     performed = [
         an_assignment_of_the_copy(ana, is_primary=True),
         an_assignment_of_the_copy(sonia, is_primary=True),
@@ -478,7 +480,7 @@ def test_the_main_service_comes_back_only_for_whom_the_business_set_none_since()
     create(record)
 
     assert performers("Keratin treatment") == [("Ana", None, None, True, True), ("Sonia", None, None, False, True)]
-    assert performers("Nails") == [("Sonia", None, None, True, True)]
+    assert performers("Nails") == [("Ana", None, None, False, True), ("Sonia", None, None, True, True)]
 
 
 def test_making_a_service_again_with_who_performed_it_is_only_the_systems():
