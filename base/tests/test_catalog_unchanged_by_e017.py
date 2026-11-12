@@ -1,5 +1,4 @@
-"""The assistant's catalogue did not move when ``ai=`` became typed and mandatory (``live.E017``; PLAN §30,
-docs/plans/2026-10-30-asistente-saas.md §2, T1).
+"""The assistant's catalogue did not move when ``ai=`` became typed and mandatory (``live.E017``).
 
 Before, the Hub decided a tool by the words of an ``ai=`` dictionary and by its permission: no description, «Not an
 assistant tool…»/«System only…», no permission or one no app declares (the platform's reactions and scheduled tasks),

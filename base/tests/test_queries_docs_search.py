@@ -199,7 +199,7 @@ class TestPreparedBeforeTheTurn:
 
 @pytest.mark.django_db(transaction=True)
 def test_waiting_for_the_documentation_holds_no_transaction(gateway, monkeypatch):
-    """Up to 15 s of waiting inside a transaction would hold the hub's connection (PLAN §14.2), as for every door of
+    """Up to 15 s of waiting inside a transaction would hold the hub's connection, as for every door of
     the gateway (``test_services_assistant.test_waiting_for_erplora_com_holds_no_transaction``)."""
     gateway.reply(DOCS, json={"results": []})
     seen = []

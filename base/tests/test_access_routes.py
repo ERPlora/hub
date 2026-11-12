@@ -1,6 +1,6 @@
-"""The SPA's op → route map (``frontend/generated/operations.json``, hand-written until V3) names every route of the way
-in (APP-BASE-3) as ``base/api.py`` binds it: the pages call them by operation, never by address. And each of its
-operations tells the assistant what it does, or that it is not the assistant's to run."""
+"""The SPA's op → route map (``frontend/generated/operations.json``) names every route of the way in as ``base/api.py``
+binds it: the pages call them by operation, never by address. And each of its operations tells the assistant what it
+does, or that it is not the assistant's to run."""
 
 import json
 
@@ -49,13 +49,12 @@ def test_the_spas_route_map_names_every_route_of_the_way_in(settings):
     assert named == ROUTES
 
 
-# ── What each operation of the way in tells the assistant (PLAN §30: every @operation declares ``ai=``) ─────
+# ── What each operation of the way in tells the assistant (every @operation declares ``ai=``) ───────────────
 
 WAY_IN_OPERATIONS = sorted({op for _, _, op in ROUTES} | {"base.access.faces"})
 
-# Not the assistant's to run (``ai=INTERNAL`` once ``live`` has it, FIX-LIVE-AI-DECLARATION-E017; until then declared
-# as whatsapp_inbox's «System only» ones are): a PIN is typed, never said; a photo is a file; the door is what a till's
-# browser shows by itself.
+# Not the assistant's to run, and each declaration says so in words: a PIN is typed, never said; a photo is a file; the
+# door is what a till's browser shows by itself.
 NOT_ASSISTANT_TOOLS = ["base.access.door", "base.access.faces", "base.pin.set", "base.profile.avatar_set"]
 
 

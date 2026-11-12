@@ -1,11 +1,11 @@
-"""/auth/login, /auth/callback and /auth/logout: the Hub's end of the login through the SaaS (PLAN-SAAS §3.1 steps 4–6).
+"""/auth/login, /auth/callback and /auth/logout: the Hub's end of the login through the SaaS.
 
 The jump to the SaaS carries a ``state`` that the cookie ``hub_login_state`` binds to the browser
 that started it; the callback refuses a code that comes back without it (login CSRF). The SaaS sends
 ``state`` back as it got it: ``callback`` plays its auto-submitted form.
 
 On the platform host (``hubs.localhost``) the same jump is the staff's to the Hub admin of a hub, with
-the ``hub-admin`` audience (round 13, PLAN §18.1): it starts on the Hub too
+the ``hub-admin`` audience: it starts on the Hub too
 (``/auth/login?hub=<slug>&next=/admin/hub/<slug>/``, the SaaS admin's button) and needs its state.
 """
 
@@ -112,8 +112,8 @@ class TestCallback:
     def test_the_language_of_my_profile_wins_over_the_account_s_and_without_one_the_account_s(
         self, client, fake_saas, settings, own, cookie
     ):
-        # BASE-G125: the language chosen in «My profile» is the one every entry speaks, the account's too; without one,
-        # the account's language on erplora.com, never the browser's (a PIN entry, without the account, takes the
+        # The language chosen in «My profile» is the one every entry speaks, the account's too; without one, the
+        # account's language on erplora.com, never the browser's (a PIN entry, without the account, takes the
         # business's: test_access_pin).
         from base.models import Profile
 
@@ -363,7 +363,7 @@ class TestAdminLoginStart:
         [{"next": "/admin/"}, {}, {"hub": "hubs"}, {"hub": "hub"}, {"hub": "A"}, {"next": "/admin/hub/../"}],
     )
     def test_without_a_hub_goes_to_the_saas_admin_hubs_page(self, client, saas, query):
-        # A hub-admin code is always for a hub (PLAN §18.1.3): the staff choose it there.
+        # A hub-admin code is always for a hub: the staff choose it there.
         response = client.get("/auth/login", query, HTTP_HOST=PLATFORM)
         assert (response.status_code, response["Location"]) == (302, SAAS_HUBS)
         assert STATE_COOKIE not in response.cookies
@@ -545,7 +545,7 @@ class TestLogout:
         assert client.get("/auth/logout", HTTP_HOST=HOST).status_code == 405
 
 
-# A demo hub (plan 2026-10-17, §1.6): no account behind it. Its jump goes to the SaaS's /demo/enter/ with the same
+# A demo hub: no account behind it. Its jump goes to the SaaS's /demo/enter/ with the same
 # state; the SaaS posts back a code the Hub made for the browser that owns the demo, redeemed here without the SaaS.
 
 DEMO_OWNER = hashlib.sha256(b"ana's browser").hexdigest()
@@ -557,8 +557,7 @@ def new_demo(session_key: str = DEMO_OWNER) -> str:
     """A demo of the browser ``session_key``, as ``POST /internal/demos`` leaves it, ready; its slug.
 
     Its own database is made by the worker (``base/tenancy/tests/test_provision.py``, on real databases): here, where
-    the door is tested, it stays on the tests' shared database (``db_name`` empty, as a demo of before S2a), which a
-    test case may reach."""
+    the door is tested, it stays on the tests' shared database (``db_name`` empty), which a test case may reach."""
     slug = demo_create(system_context(REGISTRY_SCOPE), DemoCreateIn(session_key=session_key, language="es")).slug
     Hub.objects.filter(slug=slug).update(status=Hub.Status.READY, db_name="")
     return slug

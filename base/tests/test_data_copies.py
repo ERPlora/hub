@@ -1,11 +1,11 @@
-"""The copies of a business's data, where they are read (round 2026-10-30 of PLAN-DB, proposals (k) and (l)).
+"""The copies of a business's data, where they are read.
 
 - ``GET /internal/hubs/{id}/dumps`` (signed, the SaaS's panel and mails; saas ``hubs/README.md``, «Contrato para el Hub»):
   ``{available, dumps: [{id: its S3 key, kind, created_at, bytes, url}]}``, newest first, each link signed for 15
   minutes; ``available`` false for a business without its own database (it never gets a copy); 200 for a business
   that left (the 410 is its host's door, never ``/internal``); 404 for one unknown or purged.
 - ``base.hub.dumps`` (Settings › Data, who runs the business): the copies without links, and how the last reset went;
-  in a business that still shares its database, nothing and ``available`` false.
+  in a business without its own database, nothing and ``available`` false.
 - ``base.hub.dump_link``: the link of one copy, asked on every click; never another business's copy.
 """
 
@@ -151,8 +151,8 @@ def test_without_a_bucket_the_copies_cannot_be_linked(no_dumps_bucket):
 
 
 def test_without_a_bucket_a_business_that_gets_copies_cannot_be_checked_even_without_any(no_dumps_bucket):
-    """PLAN-SAAS §24: anything but 200 or 404 is a failure for the SaaS («could not check»), never «no copy yet», which
-    would promise a copy this Hub can never make (review of round 3)."""
+    """Anything but 200 or 404 is a failure for the SaaS («could not check»), never «no copy yet», which would promise a
+    copy this Hub can never make."""
     business()
 
     answer = dumps_of(HUB_ID)

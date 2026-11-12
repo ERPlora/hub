@@ -1,6 +1,6 @@
-"""Turning a business's apps on and off, with the plan's limit (PLAN-HUB §9; BASE-F18, F19, F23–F25; FIX-BASE-APP-TURN-
-OFF-VETO): ``base.app.enable`` and ``base.app.disable``, their rows (``base.AppActivation``), what an app that is off
-stops being (its operations, the menu, the relay) and how the Apps screen follows them live.
+"""Turning a business's apps on and off, with the plan's limit (BASE-F18, F19, F23–F25): ``base.app.enable`` and
+``base.app.disable``, their rows (``base.AppActivation``), what an app that is off stops being (its operations, the
+menu, the relay) and how the Apps screen follows them live.
 
 The rules themselves, without the database, are ``base/tests/test_activation.py``.
 """
@@ -33,7 +33,7 @@ from base.tenancy.tests import hubs
 
 A = Scope("host", "a")
 B = Scope("host", "b")
-#: Businesses a test registers: born with every app off (round 2026-10-27), unlike the suite's ``a`` and ``b``.
+#: Businesses a test registers: born with every app off, unlike the suite's ``a`` and ``b``.
 C = Scope("host", "c")
 D = Scope("host", "d")
 ADMIN = "base.administer_hub"
@@ -127,7 +127,6 @@ def test_a_state_is_on_or_off():
 
 @pytest.mark.django_db
 def test_a_business_that_never_changed_anything_has_every_app_off_and_writes_nothing():
-    """Round 2026-10-27: a hub is born with every app off; reading its apps writes nothing."""
     Hub.objects.create(slug="c", status="ready")
     document = app_list(C)
     assert {app["id"]: (app["state"], app["chosen"]) for app in document["apps"]} == {
@@ -140,8 +139,8 @@ def test_a_business_that_never_changed_anything_has_every_app_off_and_writes_not
 
 @pytest.mark.django_db
 def test_a_hub_of_before_keeps_every_app_on_and_its_roots_chosen():
-    """What the migration base.0017 wrote for the hubs of before round 2026-10-27 (as the suite's ``a``): every app
-    on, the roots chosen (PLAN §32, point 2)."""
+    """What the migration base.0017 wrote for hubs created before new hubs started with every app off (as the suite's
+    ``a``): every app on, the roots chosen."""
     document = app_list()
     graph = activation.module_graph()
     roots = activation.roots(graph, graph)
@@ -164,7 +163,7 @@ def test_erploras_own_hub_has_every_app_on_and_the_worker_scope_is_not_the_platf
     assert activation.off_apps(Scope("host", "c")) == frozenset(graph)
 
 
-# ── How a hub is born (round 2026-10-27) ──────────────────────────────────────────────────────────────────────
+# ── How a hub is born ─────────────────────────────────────────────────────────────────────────────────────────
 
 
 def modules_on(scope):
@@ -184,7 +183,7 @@ def test_a_business_the_saas_registers_is_born_with_every_app_off():
                       timezone="Europe/Madrid", language="es", vertical="restaurant"),
     )
 
-    # Requested, with its own database to make (round 2026-10-30, S2a): its template carries no app turned on
+    # Requested, with its own database still to make: its template carries no app turned on
     # (base/tenancy/tests/test_provision.py), and nothing turns one on before it is ready.
     assert Hub.objects.get(slug="nuevo").status == "requested"
     assert modules_on(Scope("host", "nuevo")) == set()
@@ -405,7 +404,7 @@ def test_the_read_is_for_who_sees_the_home_and_told_to_the_assistant():
 
 @pytest.mark.django_db
 def test_the_assistants_card_names_the_app_by_its_name_never_by_its_id():
-    """B28c (hub#539): the card said «online_booking», and the person confirmed Reservas online asking for Reservas."""
+    """hub#539: the card said «online_booking», and the person confirmed Reservas online asking for Reservas."""
     from base import assistant
 
     set_rows()
@@ -436,7 +435,7 @@ def test_only_who_runs_the_business_turns_apps_on_or_off():
             run(name, "task", context=ctx(HOME))
 
 
-# ── The plan's limit (PLAN §32, points 2 and 3) ─────────────────────────────────────────────────────────────
+# ── The plan's limit ────────────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -595,7 +594,7 @@ def test_one_already_off_changes_nothing_and_records_nothing():
 
 @pytest.mark.django_db
 def test_an_app_may_veto_going_off_with_its_reason(monkeypatch):
-    """FIX-BASE-APP-TURN-OFF-VETO: the hook an app declares on its config (VeriFactu will, in its own lane)."""
+    """The hook an app declares on its config, told which business asks."""
     seen = []
 
     def veto(ctx):
@@ -617,7 +616,7 @@ def test_an_app_may_veto_going_off_with_its_reason(monkeypatch):
 
 @pytest.mark.django_db
 def test_a_veto_is_said_in_the_language_of_who_asks(monkeypatch):
-    """BASE-F25 (gh:hub#2595: a reason only in English): an app's reason comes in the asker's language, whatever the
+    """BASE-F25: an app's reason comes in the asker's language, whatever the
     language the process runs in (the assistant, an API key), even from a hook that only calls gettext."""
     from django.utils.translation import gettext
 
@@ -725,7 +724,7 @@ def test_one_that_refuses_itself_says_its_own_reason_before_that_of_an_app_that_
     assert (refused.value.envelope()["error"]["app"], refused.value.message) == ("staff", "Staff is busy.")
 
 
-# ── An app the business must have on in its country (hub#997, PLAN-HUB round 2026-11-07, BASE-F25) ──────────────
+# ── An app the business must have on in its country (hub#997, BASE-F25) ─────────────────────────────────────────
 # Taxes says it is mandatory everywhere (apps/tax/apps.py) and has no reason of its own to refuse: base's. The local
 # hub ``a`` has no country: it is in Spain.
 
