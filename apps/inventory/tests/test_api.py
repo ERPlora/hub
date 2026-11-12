@@ -99,6 +99,12 @@ def test_restoring_a_deleted_product_has_no_route():
     assert "inventory.product.restore" not in bound
 
 
+def test_recovering_a_deleted_category_has_no_route():
+    # Only the platform recovers a category, from a separate copy (BASE-F114, INVENTORY-F07).
+    bound = {operation for _, _, operation in ROUTES}
+    assert "inventory.category.recover" not in bound
+
+
 def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
 

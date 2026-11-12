@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e551e76d4a6b2262fd5291c762058a8003a64e4428afaaa9adfd4290f5846188 -->
+<!-- generated from WORKBOOK.md sha256:d008ff1b48d2833b4b92891cdd2272bce57150422112f77d59bca360fb800e93 -->
 
 ## What it is for and who it is for
 
@@ -2935,8 +2935,8 @@ Status: done (the action and the restore, in its place or to a separate copy, an
 the customers that were lost, the deleted ones as they were, the products, the services with their categories and the
 appointments; making and deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of
 ERPlora/aws; repeating appointments, hub#1327; the groups, tags and own fields of a customer brought back, hub#1285; the
-image and the categories of a product brought back, hub#1319 and hub#1320; the image of a service brought back,
-hub#1319; its professionals, hub#1322)
+image of a product brought back, hub#1319; the products the business keeps live in a product category that comes back,
+hub#1373; the image of a service brought back, hub#1319; its professionals, hub#1322)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -2973,10 +2973,11 @@ Steps:
      as it is; that records for the tax authority are never brought back and that the business stays open. And that
      what comes back is nothing new to the business: it starts none of its automations, so nobody is welcomed or told
      again of a booking they already had (hub#1307). Below, "What to bring back", with what can be brought ticked
-     (today, **Customers**, **Products**, **Service categories, Services** and **Appointments**). They press
-     **Recover**.
-  10. "1 separate copy will give back Customers, Products, Service categories, Services, Appointments into its business
-      within a few minutes: Recoveries says how it went." appears. In Recoveries they see it "Asked" with the copy, what
+     (today, **Customers**, **Product categories, Products**, **Service categories, Services** and **Appointments**).
+     They press **Recover**.
+  10. "1 separate copy will give back Customers, Product categories, Products, Service categories, Services,
+      Appointments into its business within a few minutes: Recoveries says how it went." appears. In Recoveries they
+      see it "Asked" with the copy, what
       was asked and when.
   11. A few minutes later it says "Done" and what came back: "Customers: 1 restored, 2 created" or "Customers: 2
       created, 1 not created". Its page also says which did not come back and why (by their identifier in the copy,
@@ -2986,13 +2987,21 @@ Steps:
       screen creates it, with their name, contact, tax ID, address, dates, source, stage, channel and notes; without their
       groups, tags or own fields (hub#1285). A card whose personal data was erased (GDPR) or one merged into another never
       comes back, and one the business has already made again (the same name, phone and email) is not repeated. With
-      Products, a product the business deleted and still holds comes back THE SAME and counts as restored, with its
-      stock, its categories that are still live and its whole history in Movements, active and on sale
+      Products, "Product categories, Products: 1 restored, 2 created" (the categories and the products that came back,
+      together): first each product category the business no longer has (it deleted or lost it) comes back as a new one,
+      created as the Categories screen creates it, with its name, slug, description, icon, colour, order and tax
+      category; the deleted one stays deleted (INVENTORY-F07). One the business keeps, even renamed, is the same one, and
+      one it has already made again (another live one with its name, case and spaces aside, that is not already one of
+      the copy's; the oldest if there are two) is not repeated: its own is used, as it is. Then a product the business
+      deleted and still holds comes back THE SAME and counts as restored, with its stock, its categories that are still
+      live, the one that just came back if it had it in the copy, and its whole history in Movements, active and on sale
       (INVENTORY-F34). One the business no longer has comes back as a new one, created as the Products screen creates it,
       with its name, SKU, EAN-13, description, type, price, cost, units, threshold, stock control and tax category, active
-      or inactive as it was and in the categories the business still has; with no stock, which is counted
-      (INVENTORY-F14), because the copy's is another day's; without its image (hub#1319) and without the categories the
-      business no longer has (hub#1320). One the business has already created again (another live one with its SKU or its
+      or inactive as it was and in its categories: the same one if the business still has it, and otherwise the one that
+      just came back or the one the business made again with its name; with no stock, which is counted (INVENTORY-F14),
+      because the copy's is another day's, and without its image (hub#1319). The products the business keeps live stay
+      as they are: those that were in a category that comes back stay without it (hub#1373). One the business has
+      already created again (another live one with its SKU or its
       EAN-13) neither comes back nor is repeated. With Services, "Service categories, Services: 3 created" (the categories
       and the services that came back, together): first each service category the business no longer has (it deleted or
       lost it) comes back as a new one, created as the Categories screen creates it, with its name, description, icon,
@@ -3025,7 +3034,9 @@ Out: the business's database as it was at that moment; the one it had, kept 7 da
 business as it was, untouched; a separate database on its cluster with the data of that moment, closed to the
 application and kept 7 days; the notice `control.hub.restore_aside_requested` with who asked for it. When recovering: in
 the business, each deleted card it still held, live again with its card-recovered notice (`customer.customer.restored`),
-a new card for each customer it no longer had, with its card-created notice (`customer.customer.created`), each deleted
+a new card for each customer it no longer had, with its card-created notice (`customer.customer.created`), a new
+product category for each one it lacked, with its category-created notice (`inventory.category.created`) and that of
+each deleted product that comes back in it (`inventory.product.categorized`), each deleted
 product it still held, live again with its product-recovered notice (`inventory.product.restored`), a new product for
 each product it no longer had, with its product-created notice (`inventory.product.created`), a new service category
 for each one it lacked, with its category-created notice (`service.category.created`), a new service for each one it
@@ -3060,7 +3071,7 @@ With the platform frozen for a database upgrade, the restore waits, with the bus
 is unfrozen. With records from the test environment only, the chain is recovered afterwards (VERIFACTU-F28). The
 support staff see the list, Separate copies and Recoveries, but not the actions.
 Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12,
-CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04, SERVICE-F01, SERVICE-F04, SERVICE-F05,
-SERVICE-F07, SERVICE-F08, APPOINTMENT-F01, APPOINTMENT-F11, FLOW-F21; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283,
-hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341,
-aws#77
+CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04, INVENTORY-F07, INVENTORY-F34, SERVICE-F01,
+SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08, APPOINTMENT-F01, APPOINTMENT-F11, FLOW-F21; hub#1198, hub#1213,
+hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323,
+hub#1326, hub#1327, hub#1341, hub#1373, aws#77

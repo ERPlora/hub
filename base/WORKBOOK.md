@@ -3064,9 +3064,9 @@ Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, A
 Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte, y recuperar desde la copia aparte los
 clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías y las citas;
 crear y borrar el clúster temporal es el procedimiento «Devolver un negocio a un momento» de ERPlora/aws; las citas
-periódicas, hub#1327; los grupos, etiquetas y campos propios de un cliente recuperado, hub#1285; la imagen y las
-categorías de un producto recuperado, hub#1319 y hub#1320; la imagen de un servicio recuperado, hub#1319; sus
-profesionales, hub#1322)
+periódicas, hub#1327; los grupos, etiquetas y campos propios de un cliente recuperado, hub#1285; la imagen de un
+producto recuperado, hub#1319; los productos que el negocio conserva vivos en una categoría de productos que vuelve,
+hub#1373; la imagen de un servicio recuperado, hub#1319; sus profesionales, hub#1322)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
 copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
@@ -3101,10 +3101,10 @@ Pasos:
      los registros para Hacienda no se recuperan nunca y que el negocio sigue abierto. Y que lo que vuelve no es nada
      nuevo para el negocio: no arranca ninguna de sus automatizaciones, así que a nadie se le da la bienvenida ni se le
      avisa otra vez de una cita que ya tenía (hub#1307).
-     Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes**, **Productos**, **Categorías de
-     servicios, Servicios** y **Citas**). Pulsa **Recuperar**.
-  10. Sale «1 copia aparte devolverá Clientes, Productos, Categorías de servicios, Servicios, Citas a su negocio en unos
-      minutos: Recuperaciones dice cómo fue.». En
+     Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes**, **Categorías de productos,
+     Productos**, **Categorías de servicios, Servicios** y **Citas**). Pulsa **Recuperar**.
+  10. Sale «1 copia aparte devolverá Clientes, Categorías de productos, Productos, Categorías de servicios, Servicios,
+      Citas a su negocio en unos minutos: Recuperaciones dice cómo fue.». En
       Recuperaciones la ve «Pedida» con la copia, qué se pidió y cuándo.
   11. Unos minutos después dice «Hecha» y qué volvió: «Clientes: se restauró 1, se crearon 2» o «Clientes: se crearon 2,
       1 sin crear». Su ficha dice además cuáles no volvieron y por qué (por su identificador en la copia, sin datos
@@ -3113,14 +3113,22 @@ Pasos:
       Uno que el negocio ya no tiene vuelve como ficha nueva, creada como la crea la pantalla de Clientes, con su nombre,
       contacto, NIF, dirección, fechas, origen, etapa, canal y notas; sin sus grupos, etiquetas ni campos propios
       (hub#1285). Nunca vuelve una ficha cuyos datos personales se borraron (RGPD) ni una que se unió a otra, ni se repite
-      una que el negocio ya volvió a crear (el mismo nombre, teléfono y email). Con Productos, un producto que el negocio
-      eliminó y aún guarda vuelve EL MISMO y cuenta como restaurado, con su stock, sus categorías que siguen vivas y en
-      Movimientos su historial entero, activo y a la venta (INVENTORY-F34). Uno que el negocio ya no tiene
-      vuelve como uno nuevo, creado como lo crea la pantalla de Productos, con su nombre, SKU, EAN-13,
-      descripción, tipo, precio, coste, unidades, umbral, control de stock y categoría fiscal, activo o desactivado como
-      estaba y en las categorías que el negocio sigue teniendo; sin stock, que se cuenta (INVENTORY-F14), porque el de la
-      copia es de otro día; sin su imagen (hub#1319) y sin las categorías que el negocio ya no tiene (hub#1320). No vuelve
-      ni se repite uno que el negocio ya volvió a dar de alta (otro vivo con su SKU o su EAN-13). Con Servicios,
+      una que el negocio ya volvió a crear (el mismo nombre, teléfono y email). Con Productos, «Categorías de productos,
+      Productos: se restauró 1, se crearon 2» (las categorías y los productos que volvieron, juntos): primero vuelve
+      cada categoría de productos que el negocio ya no tiene (la eliminó o la perdió), como una nueva, creada como la
+      crea la pantalla de Categorías, con su nombre, slug, descripción, icono, color, orden y categoría fiscal; la
+      eliminada sigue eliminada (INVENTORY-F07). Una que el negocio conserva, aunque la renombrara, es la misma, y una
+      que ya volvió a crear (otra viva con su nombre, sin distinguir mayúsculas ni espacios, que no sea ya una de la
+      copia; la más antigua si hay dos) no se repite: se usa la suya, tal como está. Después, un producto que el negocio
+      eliminó y aún guarda vuelve EL MISMO y cuenta como restaurado, con su stock, sus categorías que siguen vivas, la que
+      acaba de volver si la tenía en la copia, y en Movimientos su historial entero, activo y a la venta (INVENTORY-F34).
+      Uno que el negocio ya no tiene vuelve como uno nuevo, creado como lo crea la pantalla de Productos, con su nombre,
+      SKU, EAN-13, descripción, tipo, precio, coste, unidades, umbral, control de stock y categoría fiscal, activo o
+      desactivado como estaba y en sus categorías: la misma si el negocio aún la tiene, y si no, la que acaba de volver
+      o la que el negocio volvió a crear con su nombre; sin stock, que se cuenta (INVENTORY-F14), porque el de la copia es
+      de otro día, y sin su imagen (hub#1319). Los productos que el negocio conserva vivos se quedan como están: los que
+      estaban en una categoría que vuelve siguen sin ella (hub#1373). No vuelve ni se repite uno que el negocio ya volvió
+      a dar de alta (otro vivo con su SKU o su EAN-13). Con Servicios,
       «Categorías de servicios, Servicios: se crearon 3» (las categorías y los servicios que volvieron, juntos): primero
       vuelve cada categoría de servicios que el negocio ya no tiene (la eliminó o la perdió), como una nueva, creada como
       la crea la pantalla de Categorías, con su nombre, descripción, icono, color y orden, dentro de su categoría padre si
@@ -3153,7 +3161,9 @@ Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 
 tal como estaba, sin tocarlo; una base aparte en su clúster con los datos de ese momento, cerrada a la aplicación y
 guardada 7 días; el aviso `control.hub.restore_aside_requested` con quién lo pidió. Al recuperar: en el negocio, cada ficha
 eliminada que aún guardaba, viva otra vez con su aviso de ficha recuperada (`customer.customer.restored`), una ficha
-nueva por cada cliente que ya no tenía, con su aviso de ficha creada (`customer.customer.created`), cada producto
+nueva por cada cliente que ya no tenía, con su aviso de ficha creada (`customer.customer.created`), una categoría de
+productos nueva por cada una que le faltaba, con su aviso de categoría creada (`inventory.category.created`) y el de cada
+producto eliminado que vuelve en ella (`inventory.product.categorized`), cada producto
 eliminado que aún guardaba, vivo otra vez con su aviso de producto recuperado (`inventory.product.restored`), un
 producto nuevo por cada producto que ya no tenía, con su aviso de producto creado (`inventory.product.created`), una
 categoría de servicios nueva por cada una que le faltaba, con su aviso de categoría creada (`service.category.created`),
@@ -3187,10 +3197,10 @@ restaura, la recuperación espera sin hacer nada. Con la plataforma congelada pa
 mantenimiento, hasta que se descongela. Con registros solo del entorno de pruebas, después se recupera la cadena
 (VERIFACTU-F28). El personal de soporte ve la lista, Copias aparte y Recuperaciones, pero no las acciones.
 Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado), CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12,
-CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04, SERVICE-F01, SERVICE-F04, SERVICE-F05,
-SERVICE-F07, SERVICE-F08, APPOINTMENT-F01, APPOINTMENT-F11, FLOW-F21; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283,
-hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341,
-aws#77
+CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04, INVENTORY-F07, INVENTORY-F34, SERVICE-F01,
+SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08, APPOINTMENT-F01, APPOINTMENT-F11, FLOW-F21; hub#1198, hub#1213,
+hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323,
+hub#1326, hub#1327, hub#1341, hub#1373, aws#77
 
 ## Para quien lo mantiene
 
