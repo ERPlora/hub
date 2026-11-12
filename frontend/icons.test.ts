@@ -10,6 +10,8 @@ import { fileURLToPath } from 'node:url';
 import { isRegisteredIcon, scanIcons } from '@erplora/ui/testing';
 import { describe, expect, it } from 'vitest';
 
+import { NO_CLOCK } from '../vitest.load';
+
 /** The root of hub-next: the globs below are relative to it. */
 const HUB_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
 /** Where the hub names icons: base's Home, the apps' pages and components, the shell entry and each app's menu. */
@@ -28,10 +30,10 @@ const ICON_LITERAL = /"((?:ion|material-symbols|mdi|heroicons|tabler|lucide|fa):
 describe('guardrail: every icon the hub names is registered', () => {
   // `scanIcons` reads each of the ~700 sources once, from the disk, so its time is the machine's: with several
   // test runs on one machine (load 20–40) and every opened file scanned, it took up to 7.5 s (2026-10-21),
-  // against Vitest's 5 s. 60 s, as the other guardrails that read the whole tree (tsconfig.test.ts).
+  // against Vitest's 5 s. Its reads are synchronous: it runs as long as the machine makes it (hub#1200).
   it('every icon named in the apps, the entry and the menus is registered, and every glob reads something', () => {
     expect(scanIcons({ root: HUB_DIR, sources: SOURCES })).toEqual({ unregistered: [], emptyGlobs: [] });
-  }, 60_000);
+  }, NO_CLOCK);
 
   // base's Python names the icons of its platform steps and counters as plain strings (`"icon": "ion:…"` of a
   // counter, `DEFAULT_STEP_ICON`), which `scanIcons` does not read; HubIcon throws on an unknown one, so a typo

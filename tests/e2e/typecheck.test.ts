@@ -10,6 +10,8 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { expect, it } from 'vitest';
 
+import { NO_CLOCK } from '../../vitest.load';
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const e2eDir = join(root, 'tests', 'e2e');
 
@@ -81,4 +83,4 @@ it('reports a type error planted in a helper and in a spec', () => {
     ['tests/e2e/helpers.ts', 2322],
     ['tests/e2e/csp.spec.ts', 2322],
   ]);
-}, 60_000);
+}, NO_CLOCK);

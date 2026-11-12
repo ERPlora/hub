@@ -15,6 +15,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { NO_CLOCK } from '../../vitest.load';
+
 import {
   CODE,
   configProblem,
@@ -174,7 +176,7 @@ describe('runCli', () => {
     expect(runCli(['8240', 'http://localhost:8241'], deps)).toBe(0);
     expect(said.lines).toEqual(Object.entries(erploraEnv({ ...RUN, ca })).map(([name, value]) => `${name}=${value}`));
     expect(readFileSync(ca, 'utf8')).toMatch(/^-----BEGIN CERTIFICATE-----\n/);
-  }, 60_000);
+  }, NO_CLOCK);
 
   it('keeps the authority already there', () => {
     const before = readFileSync(ca, 'utf8');
@@ -206,7 +208,7 @@ describe('runCli', () => {
     expect(said.errors).toHaveLength(1);
     expect(said.errors[0]).toContain(`the authority ${join(blocked, 'meta-graph-8260', 'ca.pem')} could not be made: NotADirectoryError`);
     expect(said.errors[0]).not.toContain('\n');
-  }, 60_000);
+  }, NO_CLOCK);
 
   it('makes the authority the Graph trusts again in one step: a reader of the old one never finds it half written', async () => {
     const before = readFileSync(ca);
@@ -246,7 +248,7 @@ describe('runCli', () => {
     } finally {
       rmSync(folder, { recursive: true, force: true });
     }
-  }, 60_000);
+  }, NO_CLOCK);
 
   it('runs as a script from erplora.com’s checkout, its authority in this checkout’s .artifacts', () => {
     const folder = join(HERE, '.artifacts', 'meta-graph-64990');
@@ -258,7 +260,7 @@ describe('runCli', () => {
     } finally {
       rmSync(folder, { recursive: true, force: true });
     }
-  }, 60_000);
+  }, NO_CLOCK);
 });
 
 const config = (body: Record<string, unknown>, status = 200): DoorAnswer => ({ status, body });
