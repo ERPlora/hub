@@ -139,7 +139,7 @@ beforeAll(async () => {
   });
 }, NO_CLOCK);
 
-it('walks the repo ahead in a thread of its own, as TypeScript walks it: this worker walks none of it', async () => {
+it('finds ahead, in a thread of its own, the tsconfig an editor opens a file in and its files: this worker walks and looks up none of it', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'tsconfig-walk-'));
   try {
     mkdirSync(join(dir, 'src', 'deep'), { recursive: true });
@@ -148,9 +148,10 @@ it('walks the repo ahead in a thread of its own, as TypeScript walks it: this wo
     const config = join(dir, 'tsconfig.json');
     const walk = vi.spyOn(ts.sys, 'readDirectory');
     const lookup = vi.spyOn(ts.sys, 'fileExists');
+    let opened: string | undefined;
     let files: string[];
     try {
-      files = await walkAhead(() => editorProject(join(dir, 'src', 'deep', 'b.ts')) && editorConfig(config).fileNames);
+      [opened, files] = await walkAhead(() => [editorProject(join(dir, 'src', 'deep', 'b.ts')), editorConfig(config).fileNames] as const);
       expect(walk).not.toHaveBeenCalled();
       expect(lookup).not.toHaveBeenCalled();
     } finally {
@@ -158,6 +159,7 @@ it('walks the repo ahead in a thread of its own, as TypeScript walks it: this wo
       lookup.mockRestore();
     }
     const direct = ts.getParsedCommandLineOfConfigFile(config, {}, { ...configHost, ...ts.sys }, undefined, undefined, VUE);
+    expect(opened).toBe(config);
     expect(files.map((file) => relative(dir, file)).sort()).toEqual(['src/a.ts', 'src/deep/b.ts', 'src/deep/c.vue']);
     expect(files).toEqual(direct?.fileNames);
   } finally {

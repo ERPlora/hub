@@ -133,7 +133,7 @@ function walked<T>(walk: Walk, meanwhile: T): T {
 
 /** TypeScript's own `sys` for parsing a tsconfig, but its walks of the repo and lookups of files: those are made once
  *  per run, ahead in a thread of its own within `walkAhead`, else here, at once. */
-export const walkingHost: ts.ParseConfigHost & Pick<ts.System, 'readDirectory' | 'fileExists'> = {
+export const walkingHost: ts.System = {
   ...ts.sys,
   readDirectory: (...walk: Parameters<typeof ts.sys.readDirectory>) => walked<string[]>(['readDirectory', ...walk], []),
   fileExists: (file: string) => walked(['fileExists', file], false),
