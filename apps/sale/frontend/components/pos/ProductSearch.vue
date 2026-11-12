@@ -9,14 +9,14 @@
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonItem, IonList, IonSearchbar, IonSpinner } from '@ionic/vue';
-import { computed, onMounted, onUpdated, shallowRef, useTemplateRef } from 'vue';
+import { computed, onMounted, shallowRef, useTemplateRef } from 'vue';
 
 import type { ProductOut } from '../../../../inventory/frontend/operations';
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useSearchbarName } from '../../composables/useSearchbarName';
 import { useLocale, useT } from '../../composables/useT';
-import { syncAriaDisabled } from '../../lib/ariaDisabled';
+import { useNativeAriaDisabled } from '../../lib/ariaDisabled';
 import { formatMoney, useBusinessMoney } from '../../lib/format';
 import ServiceSearchResults from './ServiceSearchResults.vue';
 
@@ -39,9 +39,7 @@ const { data, status, error } = useLive('inventory.product.list', () => ({
 
 const rows = computed(() => data.value?.rows ?? []);
 const search = useTemplateRef<HTMLElement>('search');
-const syncDisabled = () => syncAriaDisabled(search.value);
-onMounted(syncDisabled);
-onUpdated(syncDisabled);
+useNativeAriaDisabled(() => search.value);
 
 /** Under the name: «Sold out», why it cannot be sold, or its SKU. */
 function note(item: ProductOut): string {
