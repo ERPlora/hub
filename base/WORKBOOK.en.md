@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7e446edad986302c017881f162ffdf62d23540abfbcec4fd884217ccef8d3fbc -->
+<!-- generated from WORKBOOK.md sha256:9942fd33cd56d3171367401da8570971b57e37f82076609e08c2e1cdc7fa5522 -->
 
 ## What it is for and who it is for
 
@@ -2480,7 +2480,10 @@ Steps:
      alone, "Nov 2, 2026"; a time alone, "9:30 PM"); a value of a closed list, with the name its app gives it ("Front
      desk", not the internal value), also that of a datum its app does not call like the field that names it
      ("Rectifying invoice: other causes (R4)", not "R4"); and a record, by its name when its app lets whoever asks read it ("Person: Eva
-     Gil"): otherwise the card leaves it out, never by its code. Nor does it put the key its app uses to avoid doing
+     Gil"): otherwise the card leaves it out, never by its code. A record said in words is looked up as the action will
+     look it up, also inside another (a course inside its menu), and the one it finds comes up ("Course: Homemade
+     desserts" when "desserts" was said); if those words fit several or none, they come up as they were said. Nor does
+     it put the key its app uses to avoid doing
      the same thing twice on a retry (charging, sending a WhatsApp, printing): nobody can judge it, and the action
      receives it all the same when it runs. Everything shows in the person's language, also the
      name of each datum when the card puts it on its own line (BASE-F98): the

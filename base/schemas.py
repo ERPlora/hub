@@ -19,10 +19,25 @@ from ninja import Schema
 from pydantic import AfterValidator, Field, field_validator
 
 
-def names(read: str, by: str = "id", name: tuple[str, ...] = ("name",)) -> dict:
+def names(
+    read: str,
+    by: str = "id",
+    name: tuple[str, ...] = ("name",),
+    *,
+    within: tuple[str, ...] = (),
+    as_said: bool = False,
+) -> dict:
     """The mark of a datum that names a record by its id (base/assistant.py ``REFERS``): the assistant's card names it
-    as ``read`` answers it (the first of ``name`` not empty), never by the id."""
-    return {"refers": {"read": read, "by": by, "name": list(name)}}
+    as ``read`` answers it (the first of ``name`` not empty), never by the id. ``within``: the data of its own object
+    ``read`` takes beside it, when the record is found inside another (a course by its name with its menu; hub#1245).
+    ``as_said``: a datum the person says in words, which the card says as said when it cannot be read (several fit,
+    none does, nobody is at hand) rather than leaving it out; never an id (``base.E009``)."""
+    refers: dict = {"read": read, "by": by, "name": list(name)}
+    if within:
+        refers["within"] = list(within)
+    if as_said:
+        refers["as_said"] = True
+    return {"refers": refers}
 
 
 def in_currency_of(read: str, by: str = "id", code: str = "currency") -> dict:

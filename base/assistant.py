@@ -368,7 +368,9 @@ class _Words:
     record's name and its currency as them; ``None`` for an automation's card, which reads no record); ``currency``, the one its amounts are in when it is not the business's (the one a write names, the one of
     the record it names, or a preview's read answers, with the decimals it answers: ``answered``); ``priced`` false
     when the write names one that is none, or a record whose currency cannot be read: its amounts go as sent;
-    ``found``, the ids of the records it read to name them, one list for all its data (hub#1208: what a yes is for)."""
+    ``found``, the ids of the records it read to name them, one list for all its data (hub#1208: what a yes is for);
+    ``data``, the object whose data these words say, which a record said by its name inside another is read with
+    (``within``, hub#1245)."""
 
     op: Operation
     language: str
@@ -377,6 +379,7 @@ class _Words:
     priced: bool = True
     answered: dict | None = None
     found: list = dataclasses.field(default_factory=list)
+    data: dict = dataclasses.field(default_factory=dict)
 
     @classmethod
     def of_answer(cls, read: Operation, ctx: OperationContext, answer: dict) -> "_Words":
@@ -385,11 +388,13 @@ class _Words:
         return cls(read, ctx.language, ctx, currency=money["currency"] if money else None, answered=money)
 
     def within(self, value: Any, props: dict, defs: dict) -> "_Words":
-        """The words of the data of the object ``value``: in the currency it names (``CURRENCY``), else in this one."""
+        """The words of the data of the object ``value``: in the currency it names (``CURRENCY``), else in this one;
+        beside its own data (``data``)."""
+        data = value if isinstance(value, dict) else {}
         priced, currency = _named_currency(value, props, defs, self)
         if priced and currency is None:
-            return self
-        return dataclasses.replace(self, currency=currency, priced=priced, answered=None)
+            return dataclasses.replace(self, data=data)
+        return dataclasses.replace(self, currency=currency, priced=priced, answered=None, data=data)
 
     def _currency_money(self) -> dict | None:
         return {"currency": self.currency, "decimals": currency_decimals(self.currency)} if self.currency else None
@@ -438,20 +443,24 @@ def _moment(value: str, kind: str, words: _Words) -> str | None:
 
 
 def _reference(value: Any, prop: dict, words: _Words) -> Any:
-    """The name of the record ``value`` names, as the read its schema marks (``REFERS``) answers it to the person; or
-    ``_LEFT_OUT`` — no mark, no person at hand, or a read that fails (not there, not theirs to read, its app off):
-    the card names nobody by an id, nor reads anything for somebody else."""
+    """The name of the record ``value`` names, as the read its schema marks (``REFERS``) answers it to the person —
+    read with the data of its own object the mark names beside it (``within``: a course by its name with its menu,
+    hub#1245) —; or ``_LEFT_OUT`` — no mark, no person at hand, or a read that fails (not there, not theirs to read,
+    its app off): the card names nobody by an id, nor reads anything for somebody else. Words a person says that it
+    cannot read (``as_said``: several fit, none does) are said as said instead."""
     declared = refers_of(prop)
     read = registry.get(declared.get("read")) if declared else None
+    as_said = value if declared and declared.get("as_said") is True and isinstance(value, str) else _LEFT_OUT
     if read is None or words.ctx is None or not isinstance(value, str):
-        return _LEFT_OUT
-    failure, answer = _run(words.ctx, read, {declared.get("by"): value})
+        return as_said
+    beside = {name: words.data[name] for name in declared.get("within", ()) if words.data.get(name) not in (None, "")}
+    failure, answer = _run(words.ctx, read, {**beside, declared.get("by"): value})
     if failure is not None:
-        return _LEFT_OUT
+        return as_said
     said = answer.model_dump(mode="json")
     words.found.append(said.get("id"))
     names = [said.get(field) for field in _names(declared)]
-    return next((name for name in names if isinstance(name, str) and name.strip()), _LEFT_OUT)
+    return next((name for name in names if isinstance(name, str) and name.strip()), as_said)
 
 
 def _names(declared: dict) -> list:
@@ -718,14 +727,21 @@ def _check_problems(op: Operation, declared: Any) -> list[str]:
 @checks.register("base")
 def check_references(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
     """``base.E009``: a datum marked ``REFERS`` names a read of the operation's own app, of ``base`` or of one it
-    requires, that takes the datum (``by``) and answers the record's name (``name``)."""
+    requires, that takes the datum (``by``) and the data of its own object it is read with (``within``), and answers
+    the record's name (``name``); only text a person says is said as said (``as_said``), never an id."""
     errors: list[checks.CheckMessage] = []
     for op in registry.values():
         schema = _schema(op)
+        defs = schema.get("$defs", {})
         problems = [
             f"{path} {problem}"
-            for path, declared in _marks(schema, schema.get("$defs", {}))
+            for path, declared in _marks(schema, defs)
             for problem in _reference_problems(op, declared)
+        ] + [
+            f"{path}.{name} {problem}" if path else f"{name} {problem}"
+            for path, props in _objects(schema, defs)
+            for name, prop in props.items()
+            for problem in _beside_problems(prop, props, defs)
         ]
         if problems:
             errors.append(
@@ -857,12 +873,39 @@ def _currency_problems(op: Operation, declared: Any) -> list[str]:
     return _reference_problems(op, {"read": declared["read"], "by": declared["by"], "name": declared["code"]})
 
 
+def _beside_problems(prop: dict, props: dict, defs: dict) -> list[str]:
+    """What is wrong with the datum ``prop`` of an object (``props``) a mark reads with the data beside it
+    (``within``) or says as said (``as_said``): data its own object does not have, or an id said as said."""
+    declared = prop.get(REFERS)
+    if not isinstance(declared, dict):
+        return []
+    within = declared.get("within", [])
+    problems = [
+        f"is read with {name}, which its own object does not have"
+        for name in (within if isinstance(within, list) else [])
+        if isinstance(name, str) and name not in props
+    ]
+    if declared.get("as_said") is True and _is_id(prop, defs):
+        problems.append("is said as said, but it is an id")
+    return problems
+
+
+def _is_id(prop: dict, defs: dict, depth: int = 0) -> bool:
+    """Whether the schema ``prop`` is an id (``format: uuid``), on its own or as a branch of its union."""
+    prop = _unreferred(prop, defs)
+    branches = [*prop.get("anyOf", []), *prop.get("oneOf", [])]
+    return prop.get("format") == "uuid" or (depth < 8 and any(_is_id(branch, defs, depth + 1) for branch in branches))
+
+
 def _reference_problems(op: Operation, declared: Any) -> list[str]:
     if (
         not isinstance(declared, dict)
         or not all(isinstance(declared.get(key), str) for key in ("read", "by"))
         or not _names(declared)
         or not all(isinstance(name, str) for name in _names(declared))
+        or not isinstance(declared.get("within", []), list)
+        or not all(isinstance(name, str) for name in declared.get("within", []))
+        or not isinstance(declared.get("as_said", False), bool)
     ):
         return ["is not a read, by and name"]
     read = registry.get(declared["read"])
@@ -874,8 +917,11 @@ def _reference_problems(op: Operation, declared: Any) -> list[str]:
     own = active_apps_label(op.app_label)
     if read.app_label not in {op.app_label, "base", *(own.requires if own else ())}:
         problems.append(f"names {read.name}, of {read.app_label}, which {op.app_label} does not require")
-    if declared["by"] not in read.input.model_fields:
-        problems.append(f"names {read.name}, which takes no {declared['by']}")
+    problems += [
+        f"names {read.name}, which takes no {name}"
+        for name in [declared["by"], *declared.get("within", [])]
+        if name not in read.input.model_fields
+    ]
     given = _output_schema(read).get("properties", {})
     problems += [f"names {read.name}, which gives no {name}" for name in _names(declared) if name not in given]
     return problems

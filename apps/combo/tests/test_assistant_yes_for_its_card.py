@@ -18,10 +18,11 @@ import pytest
 from live.operations import AI, registry
 
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
-from apps.combo.schemas import A_CHOICE, A_COURSE, A_MENU, A_MENU_BY_NAME
+from apps.combo.schemas import A_CHOICE, A_COURSE, A_MENU
 from apps.combo.tests.conftest import ctx_for, make_combo, make_group, make_option, make_product
-from apps.combo.tests.test_apps import CHECKED_BY_THE_MENU, CHECKS
+from apps.combo.tests.test_apps import CHECKED_BY_THE_MENU
 from apps.combo.tests.test_assistant_card_records import fields_of, words
+from base.schemas import names
 from base.tests.test_assistant_yes_for_its_card import turn_as, yes_to_its_card
 from base.tests.test_services_assistant import call
 
@@ -321,22 +322,56 @@ def test_every_assistant_write_of_menus_that_takes_a_course_or_a_choice_by_its_n
     assert {op.name for op in assistant_writes() if id_mark(op) in (A_COURSE, A_CHOICE)} == set(BY_NAME)
 
 
-# ── The mark and the check go together ───────────────────────────────────────────────────────────────────────────────
+# ── Every write reads what it takes by its name, and says it as said when it cannot (hub#1245) ────────────────────────
+# The card reads a course by its name with its menu, a choice by its product with its menu and its course, and the
+# menu and Inventory's product by their names, in every write, with or without a check before it: what it finds goes
+# in the card's fingerprint, so the yes holds to it; what it cannot read (two fit, none does) it says as said, never
+# leaving it off the card (base.schemas ``names(…, within=…, as_said=True)``).
 
 
-def test_a_write_reads_the_menu_said_by_its_name_on_its_card_only_when_it_checks_it():
-    """Read by its name with no check before it, a name two menus fit would leave the menu off the card (the read
-    fails and the card names nobody it cannot read): only a write that checks its record reads its menu by its name."""
-    reading = {
-        op.name
+def mark_of(op, name: str) -> dict | None:
+    """The mark that names the record of the datum ``name`` of ``op``'s input, or ``None``."""
+    field = op.input.model_fields.get(name)
+    return (field.json_schema_extra or {}).get("refers") if field is not None else None
+
+
+#: How the card reads each datum a write of Menus takes by its name.
+SAID_BY_NAME = {
+    "combo": names("combo.combo.get", by="combo", as_said=True),
+    "group": names("combo.group.get", by="group", within=("combo_id", "combo"), as_said=True),
+}
+
+
+@pytest.mark.parametrize("datum", sorted(SAID_BY_NAME))
+def test_every_write_that_takes_a_menu_or_a_course_by_its_name_reads_it_and_says_it_as_said_when_it_cannot(datum):
+    """With or without a check before it: a course with its menu, never alone (it would never be found)."""
+    taking = {op.name: mark_of(op, datum) for op in assistant_writes() if datum in op.input.model_fields}
+    assert taking
+    assert all(mark == SAID_BY_NAME[datum]["refers"] for mark in taking.values()), taking
+
+
+def test_a_choice_is_read_by_its_product_with_its_menu_and_its_course_and_a_product_of_inventory_by_its_name():
+    choice = names(
+        "combo.option.get", by="product", within=("combo_id", "combo", "group_id", "group"), name=("product_name",),
+        as_said=True,
+    )["refers"]
+    product = names("inventory.product.get", by="product", as_said=True)["refers"]
+    marks = {
+        (op.name, datum): mark_of(op, datum)
         for op in assistant_writes()
-        if any(field.json_schema_extra == A_MENU_BY_NAME for field in op.input.model_fields.values())
+        for datum in ("product", "new_product")
+        if datum in op.input.model_fields
     }
-    assert reading == set(CHECKS)
+    assert marks == {
+        ("combo.option.create", "product"): product,
+        ("combo.option.delete", "product"): choice,
+        ("combo.option.update", "product"): choice,
+        ("combo.option.update", "new_product"): product,
+    }
 
 
 #: The writes of Menus that take their menu, or their course, by its name and have no read whose input fits theirs to
-#: check it with (``base.E012``: adding or ordering courses and choices): their card says them as said.
+#: check it with (``base.E012``: adding or ordering courses and choices).
 UNCHECKED = {
     "combo.group.create": lambda combo: {"combo": "vegano", "name": "Bebidas"},
     "combo.option.create": lambda combo: {"combo": "vegano", "group": "postres", "product": "flan"},
@@ -348,6 +383,7 @@ UNCHECKED = {
         "option_ids": [str(option.id) for option in ChoiceOption.objects.filter(group__combo=combo)],
     },
 }
+UNCHECKED_COURSE = sorted(name for name in UNCHECKED if name != "combo.group.create")
 
 
 @pytest.mark.parametrize("write", sorted(UNCHECKED))
@@ -358,14 +394,23 @@ def test_a_menu_two_fit_stays_on_the_card_of_a_write_that_cannot_check_it(write)
     assert fields_of(write, UNCHECKED[write](combo), "es", as_admin())["combo"]["value"] == "vegano"
 
 
-# ── Not yet: what the card reads by a name needs its menu (hub#1245) ───────────────────────────────────────────────────
-# The platform reads a datum marked by its name with that datum alone (``base.assistant._reference``), and a course or a
-# choice said by its name needs its menu: marked, the read would always fail and the card would leave it out. So their
-# card says them as said, and adding or ordering courses and choices cannot read their menu by its name without losing
-# it when two menus fit (above). Strict: once the platform reads them with their menu, these pass and their marks go.
+@pytest.mark.parametrize("write", UNCHECKED_COURSE)
+def test_a_course_two_fit_stays_on_the_card_of_a_write_that_cannot_check_it(write):
+    """«postres» fits «Postres caseros» and «Postres de temporada»: the card still says «postres», as said."""
+    combo = vegan_desserts()
+    another("group", combo, ALSO["group"])
+    assert fields_of(write, UNCHECKED[write](combo), "es", as_admin())["group"]["value"] == "postres"
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="hub#1245: a course or a choice said by its name")
+@pytest.mark.parametrize("write", sorted(UNCHECKED))
+def test_a_write_that_cannot_check_it_says_the_menu_and_the_course_it_finds(write):
+    combo = vegan_desserts()
+    fields = fields_of(write, UNCHECKED[write](combo), "es", as_admin())
+    assert fields["combo"]["value"] == "Menú vegano"
+    if "group" in fields:
+        assert fields["group"]["value"] == FOUND["group"]
+
+
 @pytest.mark.parametrize("write", COURSE_OR_CHOICE_WRITES)
 def test_the_card_says_the_course_or_the_choice_it_finds(write):
     vegan_desserts()
@@ -373,12 +418,29 @@ def test_the_card_says_the_course_or_the_choice_it_finds(write):
     assert fields_of(write, course_or_choice(write, "Menú vegano"), "es", as_admin())[datum]["value"] == FOUND[datum]
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="hub#1245: the menu of a course added by its name")
-def test_the_yes_to_adding_a_course_touches_only_the_menu_its_card_showed_although_another_fits_the_name_better():
-    vegan_desserts()
-    done = yes_to_its_card(
-        as_admin(), "combo.group.create", {"combo": "menú", "name": "Bebidas"},
-        meanwhile=lambda: vegan_desserts("Menú"),
-    )
+@pytest.mark.parametrize("write", sorted(UNCHECKED))
+def test_the_yes_to_adding_or_ordering_touches_only_the_menu_its_card_showed_although_another_fits_the_name_better(
+    write,
+):
+    """«vegano» shows «Menú vegano»; somebody creates «Vegano», with the same course, before the yes: it adds or
+    orders nothing in either."""
+    combo = vegan_desserts()
+    meanwhile, seen = unchanged_after(lambda: vegan_desserts("Vegano"))
+    done = yes_to_its_card(as_admin(), write, UNCHECKED[write](combo), meanwhile=meanwhile)
     assert done["executed"] == []
-    assert not ChoiceGroup.objects.filter(name="Bebidas").exists()
+    assert everything() == seen["after"]
+
+
+@pytest.mark.parametrize(
+    ("write", "arguments", "datum"),
+    [
+        ("combo.option.create", {"combo": "Menú vegano", "group": "postres", "product": "natillas"}, "product"),
+        ("combo.option.update", {"combo": "Menú vegano", "product": "flan", "new_product": "natillas"}, "new_product"),
+    ],
+)
+def test_the_card_says_the_product_of_inventory_it_finds_or_as_said_when_two_fit(write, arguments, datum):
+    vegan_desserts()
+    make_product("Natillas caseras")
+    assert fields_of(write, arguments, "es", as_admin())[datum]["value"] == "Natillas caseras"
+    make_product("Natillas de chocolate")
+    assert fields_of(write, arguments, "es", as_admin())[datum]["value"] == "natillas"

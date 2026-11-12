@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:07056803432b7c857d02735e0dd5de688a9333dced805dce083371c6c6ac62f1 -->
+<!-- generated from WORKBOOK.md sha256:4a409bb1b80c9cd567dc7e982fa45c7011ac244c7be73d2b36b49e58fbd5ca2d -->
 
 ## What it is for and who it is for
 
@@ -398,8 +398,8 @@ was said). If what was said fits several or none, no card comes up: the assistan
 business.". The "yes" counts only
 for what the card showed: if, before confirming, someone creates a task that fits better what was said ("Call" when the
 card said "Call the supplier"), nothing is touched and the new card comes up. The task of a comment, the parent task
-and the project of a new task, and the project a task is moved to, said by their name, still come up as they were said
-(hub#1245).
+and the project of a new task, and the project a task is moved to, said by their name, also come up as the action finds
+them, and the "yes" counts only for them; if what was said fits several, the card says it as it was said (hub#1245).
 
 ### What it offers: queries (they read and change nothing; all of them can be followed live)
 
