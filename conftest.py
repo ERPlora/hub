@@ -21,6 +21,14 @@ pytest_runtest_teardown = testing.database_block_left_as_found
 
 
 @pytest.fixture(scope="session")
+def django_db_modify_db_settings(django_db_modify_db_settings):
+    """The settings of the session's test database as pytest-django leaves them, and no pool made before them: one made
+    on the developer's database would take every later connection there (hub#1332;
+    ``testing.close_pools_made_before_the_test_database``)."""
+    testing.close_pools_made_before_the_test_database()
+
+
+@pytest.fixture(scope="session")
 def django_db_createdb(django_db_createdb, django_db_keepdb, django_db_modify_db_settings):
     """``--reuse-db`` makes its database again if it lost its factory data, as ``--create-db`` would, and keeps it: a
     run finds what a new database holds, whatever the run before it left (``testing.lost_its_factory_data``). After

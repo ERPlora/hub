@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:343dc2fa08ae6f1e3b4eac021f48bd2cddb85b9a82a4311469fd90dc5dc1378b -->
+<!-- generated from WORKBOOK.md sha256:afb982b7546a3af1781785d4506fd390a43294659b0de26b78af75ff68a048e1 -->
 
 ## What it is for and who it is for
 
@@ -2983,13 +2983,14 @@ Steps:
       screen creates it, with their name, contact, tax ID, address, dates, source, stage, channel and notes; without their
       groups, tags or own fields (hub#1285). A card whose personal data was erased (GDPR) or one merged into another never
       comes back, and one the business has already made again (the same name, phone and email) is not repeated. With
-      Products, "Products: 3 created": each product comes back as a new one, created as the Products screen creates it,
+      Products, a product the business deleted and still holds comes back THE SAME and counts as restored, with its
+      stock, its categories that are still live and its whole history in Movements, active and on sale
+      (INVENTORY-F34). One the business no longer has comes back as a new one, created as the Products screen creates it,
       with its name, SKU, EAN-13, description, type, price, cost, units, threshold, stock control and tax category, active
       or inactive as it was and in the categories the business still has; with no stock, which is counted
       (INVENTORY-F14), because the copy's is another day's; without its image (hub#1319) and without the categories the
-      business no longer has (hub#1320). One that was deleted in the business also comes back as a new product; its
-      movements stay with the deleted one (hub#1321). One the business has already created again (another live one with
-      its SKU or its EAN-13) is not repeated. With Services, "Services: 2 created": each service the business no longer
+      business no longer has (hub#1320). One the business has already created again (another live one with its SKU or its
+      EAN-13) neither comes back nor is repeated. With Services, "Services: 2 created": each service the business no longer
       has comes back as a new one, on offer, created as the Services screen creates it, with its name, pricing, prices,
       cost, duration, buffers, capacity, descriptions, booking settings, order, featured flag, SKU, barcode and notes, its
       tax category and its category if the business still has it (if it was deleted, "No category", hub#1323); without
@@ -2997,14 +2998,17 @@ Steps:
       back (it is restored in Services), nor does one the copy had archived, and one the business has already made again
       (another with the same name in the same category, not itself one of the copy's; each counts for one only, so two
       services with the same name both come back) is not repeated. Asking again creates nothing twice.
-      Appointments always go after customers, whatever the order they are asked in, so each finds its customer. Each
-      appointment that has not come yet and was still booked (pending or confirmed, not charged) comes back, booked as the
-      agenda books it: for its customer's card in the business (the same one, the one it was merged into or the one made
-      again), with its services, its professional, its time, its minutes and its notes; as a new appointment, with another
-      number and without its history (hub#1326). It is never booked over another: one whose time is already taken, no
-      longer fits the business's or the professional's hours or is blocked, or whose customer, service or professional is
-      no longer there, does not come back and its reason says why ("appointment.slot_taken: …"). Those gone by do not
-      come back, nor one the business has (even if it cancelled it) or booked again (the same customer at the same time).
+      Appointments always go after customers and services, whatever the order they are asked in, so each finds its
+      customer and its services. Each appointment that has not come yet and was still booked (pending or confirmed, not
+      charged) comes back, booked as the agenda books it: for its customer's card in the business (the same one, the one
+      it was merged into or the one made again), with its services in the business as Services matches them (the same
+      one or, if it is gone, the one made again by hand or just brought back by Services: the same name in the same
+      category, the oldest if there are two), its professional, its time, its minutes and its notes; as a new
+      appointment, with another number and without its history (hub#1326). It is never booked over another: one whose
+      time is already taken, no longer fits the business's or the professional's hours or is blocked, or whose customer,
+      service or professional is no longer there, does not come back and its reason says why ("appointment.slot_taken:
+      …", "service.service_not_found: …"). Those gone by do not come back, nor one the business has (even if it
+      cancelled it) or booked again (the same customer at the same time).
 In: the chosen businesses, the temporary cluster with their copy and the moment; to recover, the made separate copy and
 what to bring back.
 Out: the business's database as it was at that moment; the one it had, kept 7 days on its server; the notice
@@ -3012,10 +3016,11 @@ Out: the business's database as it was at that moment; the one it had, kept 7 da
 business as it was, untouched; a separate database on its cluster with the data of that moment, closed to the
 application and kept 7 days; the notice `control.hub.restore_aside_requested` with who asked for it. When recovering: in
 the business, each deleted card it still held, live again with its card-recovered notice (`customer.customer.restored`),
-a new card for each customer it no longer had, with its card-created notice (`customer.customer.created`), and a new
-product for each product it lacked, with its product-created notice (`inventory.product.created`), a new service for
-each one it no longer had, with its service-created notice (`service.service.created`), and a new appointment for each
-one it lacked, with its appointment-created notice (`appointment.appointment.created`), and nothing else; the copy,
+a new card for each customer it no longer had, with its card-created notice (`customer.customer.created`), each deleted
+product it still held, live again with its product-recovered notice (`inventory.product.restored`), a new product for
+each product it no longer had, with its product-created notice (`inventory.product.created`), a new service for each one
+it no longer had, with its service-created notice (`service.service.created`), and a new appointment for each one it
+lacked, with its appointment-created notice (`appointment.appointment.created`), and nothing else; the copy,
 untouched; the notice `control.copy.recovery_requested` with who asked for it.
 If it fails: what the restore does not accept is said in the notice, business by business, and that business is not
 touched: one that is not ready or has no database of its own, a demo, one being moved or restored, a cluster open to new
@@ -3033,7 +3038,8 @@ its result and the rest goes on: the app is turned off in the business ("Custome
 copy did not have it, lacks the migration its read needs or has one this code does not know (`recover_not_in_copy`,
 `recover_copy_behind`, `recover_copy_ahead`). What the create operation does not accept today (a phone no longer valid, a
 product without a tax category or with one Taxes no longer has active, a service whose tax category was turned off
-(`service.tax_category_unknown`), a time taken, a customer no longer there) is counted "not created" with its reason,
+(`service.tax_category_unknown`), a time taken, a customer no longer there, a service the business no longer has
+nor made again) is counted "not created" with its reason,
 and the rest comes back; so is a deleted card that was merged into another or erased meanwhile
 ("customer.customer_unavailable: …"). If the copy is gone, the recovery says "Failed" and why
 ("recover_copy_unreadable: …"). While the business is being moved or restored, the recovery waits without doing anything.
@@ -3043,4 +3049,4 @@ support staff see the list, Separate copies and Recoveries, but not the actions.
 Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12,
 CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04, SERVICE-F01, SERVICE-F04, SERVICE-F05,
 SERVICE-F08, APPOINTMENT-F01, APPOINTMENT-F11; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285,
-hub#1306, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, aws#77
+hub#1306, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, aws#77

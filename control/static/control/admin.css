@@ -1,0 +1,35 @@
+/*
+ * The Hub admin's own sheet for control's lists (hubs.erplora.com/admin), loaded by a ModelAdmin's Media; never a
+ * style in a template.
+ *
+ * Recoveries › results (hub#1308, BASE-F114): a result can hold a word longer than a phone is wide (why a recovery
+ * failed names its copy's database, «hub_<hex>_copy_<hex>», in one piece). Inside Django's list box (`.results`,
+ * `overflow-x: auto`) that word widened the table and the list asked to be scrolled sideways at 375 and 768 px. It
+ * breaks inside its cell instead, as the admin's own long texts do (`word-break: break-word` of its history and docs
+ * tables, `overflow-wrap: break-word` of a read-only field); `anywhere` also lets the table give the column less than
+ * that word, which `break-word` does not, and words that fit stay whole.
+ */
+#result_list td.field-outcome {
+  overflow-wrap: anywhere;
+}
+
+/*
+ * Up to Django's tablet width, its nav sidebar (~300 px) and the filter beside the list (~230 px) leave the list some
+ * 160 px at 768 px: not even its column headers (`nowrap`) fit, and the results end up out of sight. The filter goes
+ * under the list there, as Django's own phone layout puts it (responsive.css, max-width: 767px).
+ */
+@media (max-width: 1024px) {
+  #changelist .changelist-form-container {
+    flex-direction: column;
+  }
+
+  #changelist .changelist-form-container:has(#changelist-filter) > div {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  #changelist-filter {
+    width: 100%;
+    margin: 30px 0 0;
+  }
+}

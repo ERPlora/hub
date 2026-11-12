@@ -3112,13 +3112,14 @@ Pasos:
       Uno que el negocio ya no tiene vuelve como ficha nueva, creada como la crea la pantalla de Clientes, con su nombre,
       contacto, NIF, dirección, fechas, origen, etapa, canal y notas; sin sus grupos, etiquetas ni campos propios
       (hub#1285). Nunca vuelve una ficha cuyos datos personales se borraron (RGPD) ni una que se unió a otra, ni se repite
-      una que el negocio ya volvió a crear (el mismo nombre, teléfono y email). Con Productos, «Productos: se crearon 3»: cada
-      producto vuelve como uno nuevo, creado como lo crea la pantalla de Productos, con su nombre, SKU, EAN-13,
+      una que el negocio ya volvió a crear (el mismo nombre, teléfono y email). Con Productos, un producto que el negocio
+      eliminó y aún guarda vuelve EL MISMO y cuenta como restaurado, con su stock, sus categorías que siguen vivas y en
+      Movimientos su historial entero, activo y a la venta (INVENTORY-F34). Uno que el negocio ya no tiene
+      vuelve como uno nuevo, creado como lo crea la pantalla de Productos, con su nombre, SKU, EAN-13,
       descripción, tipo, precio, coste, unidades, umbral, control de stock y categoría fiscal, activo o desactivado como
       estaba y en las categorías que el negocio sigue teniendo; sin stock, que se cuenta (INVENTORY-F14), porque el de la
-      copia es de otro día; sin su imagen (hub#1319) y sin las categorías que el negocio ya no tiene (hub#1320). Uno que se
-      eliminó en el negocio también vuelve como producto nuevo; sus movimientos siguen en el eliminado (hub#1321). No se
-      repite uno que el negocio ya volvió a dar de alta (otro vivo con su SKU o su EAN-13). Con Servicios, «Servicios: se
+      copia es de otro día; sin su imagen (hub#1319) y sin las categorías que el negocio ya no tiene (hub#1320). No vuelve
+      ni se repite uno que el negocio ya volvió a dar de alta (otro vivo con su SKU o su EAN-13). Con Servicios, «Servicios: se
       crearon 2»: cada servicio que el negocio ya no tiene vuelve como uno nuevo, en oferta, creado como lo crea la pantalla
       de Servicios, con su nombre, tarifa, precios, coste, duración, márgenes, capacidad, descripciones, reservas, orden,
       destacado, SKU, código de barras y notas, su categoría fiscal y su categoría si el negocio aún la tiene (si se
@@ -3127,14 +3128,17 @@ Pasos:
       que el negocio ya volvió a crear (otro con el mismo nombre en la misma categoría, que no sea ya uno de la copia; cada
       uno vale por uno solo, así que dos servicios con el mismo nombre vuelven los dos). Pedirlo otra vez no crea nada
       dos veces.
-      Las citas van siempre después de los clientes, se pidan en el orden que se pidan, para que cada una encuentre a su
-      clienta. Vuelve cada cita que aún no ha llegado y seguía reservada (pendiente o confirmada, sin cobrar), reservada
-      como la reserva la agenda: para la ficha de su clienta en el negocio (la misma, aquella en la que se unió o la que
-      se volvió a crear), con sus servicios, su profesional, su hora, sus minutos y sus notas; como cita nueva, con otro
-      número y sin su historial (hub#1326). Nunca se reserva encima de otra: una cuya hora ya está ocupada, ya no encaja
-      en el horario del negocio o del profesional o está bloqueada, o cuya clienta, servicio o profesional ya no están,
-      no vuelve y su motivo lo dice («appointment.slot_taken: …»). Las que ya pasaron no vuelven, y tampoco una que el
-      negocio tiene (aunque la cancelara) o que volvió a reservar (la misma clienta a la misma hora).
+      Las citas van siempre después de los clientes y los servicios, se pidan en el orden que se pidan, para que cada
+      una encuentre a su clienta y sus servicios. Vuelve cada cita que aún no ha llegado y seguía reservada (pendiente o
+      confirmada, sin cobrar), reservada como la reserva la agenda: para la ficha de su clienta en el negocio (la misma,
+      aquella en la que se unió o la que se volvió a crear), con sus servicios en el negocio como los empareja Servicios
+      (el mismo o, si ya no está, el que se volvió a crear a mano o acaba de volver con Servicios: el mismo nombre en la
+      misma categoría, el más antiguo si hay dos), su profesional, su hora, sus minutos y sus notas; como cita nueva, con
+      otro número y sin su historial (hub#1326). Nunca se reserva encima de otra: una cuya hora ya está ocupada, ya no
+      encaja en el horario del negocio o del profesional o está bloqueada, o cuya clienta, servicio o profesional ya no
+      están, no vuelve y su motivo lo dice («appointment.slot_taken: …», «service.service_not_found: …»). Las que ya
+      pasaron no vuelven, y tampoco una que el negocio tiene (aunque la cancelara) o que volvió a reservar (la misma
+      clienta a la misma hora).
 Entra: los negocios elegidos, el clúster temporal con su copia y el momento; para recuperar, la copia aparte hecha y qué
 recuperar.
 Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso
@@ -3142,11 +3146,12 @@ Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 
 tal como estaba, sin tocarlo; una base aparte en su clúster con los datos de ese momento, cerrada a la aplicación y
 guardada 7 días; el aviso `control.hub.restore_aside_requested` con quién lo pidió. Al recuperar: en el negocio, cada ficha
 eliminada que aún guardaba, viva otra vez con su aviso de ficha recuperada (`customer.customer.restored`), una ficha
-nueva por cada cliente que ya no tenía, con su aviso de ficha creada (`customer.customer.created`), un producto nuevo
-por cada producto que le faltaba, con su aviso de producto creado (`inventory.product.created`), un servicio nuevo por
-cada uno que ya no tenía, con su aviso de servicio creado (`service.service.created`), y una cita nueva por cada una
-que le faltaba, con su aviso de cita creada (`appointment.appointment.created`), y nada más; la copia, sin
-tocar; el aviso `control.copy.recovery_requested` con quién lo pidió.
+nueva por cada cliente que ya no tenía, con su aviso de ficha creada (`customer.customer.created`), cada producto
+eliminado que aún guardaba, vivo otra vez con su aviso de producto recuperado (`inventory.product.restored`), un
+producto nuevo por cada producto que ya no tenía, con su aviso de producto creado (`inventory.product.created`), un
+servicio nuevo por cada uno que ya no tenía, con su aviso de servicio creado (`service.service.created`), y una cita
+nueva por cada una que le faltaba, con su aviso de cita creada (`appointment.appointment.created`), y nada más; la
+copia, sin tocar; el aviso `control.copy.recovery_requested` con quién lo pidió.
 Si falla: lo que la restauración no admite lo dice el aviso, negocio a negocio, y ese negocio no se toca: uno que no está
 listo o no tiene base propia, una demo, uno que se está trasladando o restaurando, un clúster abierto a hubs nuevos o con
 negocios vivos, el propio clúster del negocio, una copia que no está en ese clúster o que es demasiado grande, y un
@@ -3163,7 +3168,8 @@ el negocio («Clientes: nada (app_inactive: …)»), o la copia no la tenía, le
 tiene una que este código no conoce (`recover_not_in_copy`, `recover_copy_behind`, `recover_copy_ahead`). Lo que la
 operación de crear no acepta hoy (un teléfono que ya no vale, un producto sin categoría fiscal o con una que Impuestos
 ya no tiene activa, un servicio cuya categoría fiscal se desactivó (`service.tax_category_unknown`), una hora ocupada,
-una clienta que ya no está) se cuenta «sin crear» con su motivo, y lo demás vuelve; también una ficha eliminada que
+una clienta que ya no está, un servicio que el negocio ya no tiene ni volvió a crear) se cuenta «sin crear» con su
+motivo, y lo demás vuelve; también una ficha eliminada que
 entretanto se unió a otra o se borró («customer.customer_unavailable: …»). Si la copia ya no está,
 la recuperación dice «No se pudo hacer» y por qué («recover_copy_unreadable: …»). Mientras el negocio se traslada o se
 restaura, la recuperación espera sin hacer nada. Con la plataforma congelada para una subida de la base de datos, la restauración espera, con el negocio en
@@ -3172,7 +3178,7 @@ mantenimiento, hasta que se descongela. Con registros solo del entorno de prueba
 Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado), CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12,
 CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04, SERVICE-F01, SERVICE-F04, SERVICE-F05,
 SERVICE-F08, APPOINTMENT-F01, APPOINTMENT-F11; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285,
-hub#1306, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, aws#77
+hub#1306, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, aws#77
 
 ## Para quien lo mantiene
 

@@ -421,8 +421,9 @@ Sale: el aviso `appointment.appointment.deleted`.
 Si falla: «Esta cita no se puede borrar: está en curso, completada o cobrada.»; con su cuenta abierta
 en el TPV, `appointment.check_open`. Una cita borrada por error que aún no ha llegado la recupera el personal de
 ERPlora desde una copia aparte del negocio (BASE-F114): vuelve reservada como en APPOINTMENT-F01, con su clienta, sus
-servicios, su profesional, su hora, sus minutos y sus notas, como cita nueva (otro número y sin su historial,
-hub#1326); si su hora ya no está libre o la clienta ya no está en el negocio, no vuelve y Recuperaciones dice por qué.
+servicios (uno que el negocio volvió a crear, con su nombre en su categoría, cuenta como el mismo), su profesional, su
+hora, sus minutos y sus notas, como cita nueva (otro número y sin su historial, hub#1326); si su hora ya no está libre,
+o la clienta o uno de sus servicios ya no están en el negocio, no vuelve y Recuperaciones dice por qué.
 Implicados: BASE-F114
 
 ### APPOINTMENT-F12 Crear una cita periódica
@@ -867,12 +868,17 @@ agenda tuya que enseñar.».
   (`queries.appointments_not_in_business`: ni la misma, haya pasado lo que haya pasado con ella, ni otra de la misma
   clienta a la misma hora), cada una creada por `appointment.appointment.create`. La clienta se casa por la regla de
   Clientes (`customer.queries.card_in_business`: la misma ficha, aquella en la que se unió o la que se volvió a crear;
-  la plataforma recupera las apps en el orden de sus `requires`, así que Clientes va antes); el servicio y el
-  profesional, por su id. Lo demás lo juzga la propia reserva con las reglas de una automatización: una hora pasada,
-  ocupada, fuera de horario o bloqueada, o una clienta que ya no está, no se crea y queda con su por qué. Lee desde
-  `0001_initial`; una migración que quite o renombre una de sus columnas cambia también `appointments_in_copy` y su
-  `reads_since`. Las series no se leen de la copia (hub#1327). Tests: `tests/test_recovery.py` y, de punta a punta,
-  `base/tenancy/tests/test_recovery.py`.
+  la plataforma recupera las apps en el orden de sus `requires`, así que Clientes va antes). Cada servicio, por la regla
+  de Servicios (hub#1341): `appointments_in_copy` lleva en cada cita la lista ENTERA de `service.queries.services_in_copy`
+  (leída una vez, la misma en todas) y `appointments_not_in_business` la pasa a `service.queries.services_in_business`,
+  nunca solo los servicios de las citas (los nombres no son únicos: un servicio que la copia también tenía nunca es el
+  perdido hecho otra vez); el mismo, o el que se volvió a crear, a mano o recuperado antes por Servicios (que va antes,
+  por los `requires`); sin pareja, el de la copia, que la reserva rechaza (`service.service_not_found`). El profesional,
+  por su id. Lo demás lo juzga la propia reserva con las reglas de una automatización: una hora pasada, ocupada, fuera
+  de horario o bloqueada, o una clienta que ya no está, no se crea y queda con su por qué. Lee desde `0001_initial`; una
+  migración que quite o renombre una de sus columnas cambia también `appointments_in_copy` y su `reads_since`. Las
+  series no se leen de la copia (hub#1327). Tests: `tests/test_recovery.py` (también de punta a punta, con la BD del
+  negocio y su copia) y `base/tenancy/tests/test_recovery.py`.
 - Anatomía completa (copia de `apps/tax` y `apps/service`): `apps.py`, `models.py`, `migrations/`,
   `schemas.py`, `engine.py` (reglas sin ORM: disponibilidad, horas libres y recurrencias), `queries.py`,
   `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un

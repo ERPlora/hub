@@ -1,6 +1,7 @@
 """What the fixtures of ``conftest.py`` check on the test databases: connections left with a session setting changed,
-connections left with their own ``ensure_connection`` (``database_block_left_as_found``) and a database kept by
-``--reuse-db`` that lost its factory data (``lost_its_factory_data``).
+connections left with their own ``ensure_connection`` (``database_block_left_as_found``), a database kept by
+``--reuse-db`` that lost its factory data (``lost_its_factory_data``) and a pool made before the session had its test
+database (``close_pools_made_before_the_test_database``).
 
 The control database's pool (``DATABASES["default"]["OPTIONS"]["pool"]``) hands a connection out again
 as its last user left it, so a session ``SET`` (a lock or statement timeout, a time zone, a role…) made
@@ -56,6 +57,27 @@ def _changed(conn, time_zone: str) -> list[tuple[int, str, str]]:
     return [(pid, name, value) for name, value in rows]
 
 
+def existing_pool(wrapper):
+    """The pool of ``wrapper``'s alias if one was made, else ``None``: never makes one.
+
+    Django makes it the first time ``wrapper.pool`` is read, on the database's name of that moment, and keeps it when
+    ``create_test_db`` renames the alias to the test database. Read after the first test of an xdist worker that had no
+    database, that name was the developer's, and the whole worker, its ``migrate`` included, read and wrote the
+    developer's database (hub#1332)."""
+    return type(wrapper)._connection_pools.get(wrapper.alias)
+
+
+def close_pools_made_before_the_test_database() -> None:
+    """Close every pool made before the session had its test database, with this thread's connection, as Django closes
+    them before it clones or drops a test database (``create_test_db`` does not): whatever read ``connection.pool``
+    before then made it on the developer's database, and the next connection would be taken from it."""
+    for alias in connections:
+        wrapper = connections[alias]
+        if existing_pool(wrapper) is not None:
+            wrapper.close()
+            wrapper.close_pool()
+
+
 def discard_changed_sessions() -> list[tuple[int, str, str]]:
     """The session settings left changed, as ``(backend pid, name, value)``, on this thread's connection
     and on the free connections of the control pool: what the next test to take one would inherit. Each
@@ -69,7 +91,7 @@ def discard_changed_sessions() -> list[tuple[int, str, str]]:
             found += changed
             own.close()
             wrapper.close()  # hands the closed connection back: the pool discards it
-    pool = wrapper.pool
+    pool = existing_pool(wrapper)
     if pool is not None and not pool.closed:
         # The pool hands out the oldest free connection and takes a returned one at the back: as many
         # turns as free connections see each of them once.

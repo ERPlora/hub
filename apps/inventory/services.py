@@ -74,6 +74,7 @@ from apps.inventory.schemas import (
     ProductImageUploadIn,
     ProductImportIn,
     ProductIn,
+    ProductIdIn,
     ProductOut,
     ProductPatchIn,
     ProductRefIn,
@@ -401,6 +402,34 @@ def delete_product(ctx: OperationContext, data: ProductRefIn) -> dict:
     images.let_go(ctx, photo)
     record_event(ctx, events.PRODUCT_DELETED, {"id": str(product.id), "sku": product.sku, "name": product.name})
     return {"id": product.id}
+
+
+@operation(
+    "inventory.product.restore",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=ProductIdIn,
+    output=ProductOut,
+    ai={
+        "description": "Bring a deleted product back to the catalog, the same product with its stock movements (run "
+        "by the platform when ERPlora's staff recovers the business from a separate copy).",
+        "risk": "normal",
+    },
+)
+def restore_product(ctx: OperationContext, data: ProductIdIn) -> dict:
+    """INVENTORY-F34: a deleted product back in every list and in the till, the same product (deleting keeps it,
+    INVENTORY-F04): its id, its codes, its categories and its stock, with every movement that hangs from it. Active and
+    on sale, as unarchiving does: the «sold out» it had was another day's. Not while another live product holds its
+    SKU or its EAN-13 (it was made again since). Repeating it on a product already back answers well and announces
+    again, as deleting does."""
+    product = find_product(data.id, None, lock=True, rows=Product.objects.all())
+    if product.is_deleted:
+        product.is_deleted, product.deleted_at, product.is_active, product.is_sold_out = False, None, True, False
+        product.updated_by = _actor(ctx)
+        _save(product, update_fields=["is_deleted", "deleted_at", "is_active", "is_sold_out", "updated_by", "updated_at"])
+    record_event(ctx, events.PRODUCT_RESTORED, _product_payload(product))
+    return load_product(product.id, ctx.scope)
 
 
 @operation(

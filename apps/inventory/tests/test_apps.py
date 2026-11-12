@@ -108,8 +108,8 @@ def test_every_operation_is_a_tool_of_the_assistant():
     # permission is its only door. A command says its risk; a read has none.
     operations = [op for name, op in registry.items() if name.startswith("inventory.")]
     # 31 + the product's image (INVENTORY-F30, F31): set_image, upload_image, suggest_image; + the category the
-    # assistant's card names (hub#526).
-    assert len(operations) == 35
+    # assistant's card names (hub#526); + the restore of a deleted product, the platform's alone (INVENTORY-F34).
+    assert len(operations) == 36
     for op in operations:
         if op.name in CARD_ONLY:
             assert op.ai is INTERNAL and op.expose_api is False, op.name
@@ -126,7 +126,7 @@ def test_every_operation_is_a_tool_of_the_assistant():
 # The Home's hooks (PLAN-HUB round 2026-10-21; FIX-INVENTORY-SETUP-HOOKS): the old module's module.json `setup` and
 # `widgets` (it had no `bell`), on the queries the Panel already reads (INVENTORY-F17, INVENTORY-F28).
 
-PRODUCT_EVENTS = [E.PRODUCT_CREATED, E.PRODUCT_UPDATED, E.PRODUCT_DELETED]
+PRODUCT_EVENTS = [E.PRODUCT_CREATED, E.PRODUCT_UPDATED, E.PRODUCT_DELETED, E.PRODUCT_RESTORED]
 
 
 def test_the_homes_step_is_your_catalog_done_with_one_active_product():
@@ -173,8 +173,9 @@ def test_the_step_speaks_the_language_of_whoever_reads_it():
     assert spanish == ("Tu catálogo", "Añade al menos un producto para que haya algo que vender.")
 
 
-def test_the_step_is_refreshed_when_a_product_is_added_changed_or_deleted():
-    # Turning a product off or deleting the last one sends the step back to pending (INVENTORY-F28, «Si falla»).
+def test_the_step_is_refreshed_when_a_product_is_added_changed_deleted_or_restored():
+    # Turning a product off or deleting the last one sends the step back to pending (INVENTORY-F28, «Si falla»); a
+    # deleted one brought back counts again (INVENTORY-F34).
     (step,) = inventory().setup
     assert list(step.refresh_on) == PRODUCT_EVENTS
     assert set(step.refresh_on) <= set(live_registry.subscribable[step.operation])
@@ -297,7 +298,7 @@ def test_the_panels_are_titled_in_english_and_in_spanish():
 
 
 def test_each_panel_is_refreshed_by_the_events_that_re_run_its_query():
-    """Any stock movement and any product added, changed or deleted, and the settings (which decide what tracks
+    """Any stock movement and any product added, changed, deleted or restored, and the settings (which decide what tracks
     stock): the same events that re-run the Panel."""
     panels = {panel.key: panel for panel in inventory().widgets}
     assert list(panels) == PANELS
