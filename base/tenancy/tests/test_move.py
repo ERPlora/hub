@@ -145,13 +145,13 @@ class TestAMove:
     def test_a_hub_whose_lease_another_worker_holds_is_left_to_it(self, moves):
         target = moves.cluster()
         hub = moves.hub(to=target)
+        # The pass runs at the clock's own ``now``: the lease is held whether the pass claims with its ``now`` or with
+        # the clock, and by one minute only, so a claim that takes a lease about to run out is seen (hub#1351).
+        now = timezone.now()
         with use_control():
-            # Held by the real clock: whether the pass claims with its ``now`` or with the clock, it is held (hub#1351).
-            HubDue.objects.create(
-                hub=hub, due_at=AT, lease_until=timezone.now() + dt.timedelta(minutes=1), lease_owner="other:1"
-            )
+            HubDue.objects.create(hub=hub, due_at=now, lease_until=now + dt.timedelta(minutes=1), lease_owner="other:1")
 
-        assert run() == 0
+        assert run(now) == 0
 
         assert fresh(hub).moving_to_id == target.pk
         assert marker(hub.db_name) == [MARKER]
