@@ -259,11 +259,11 @@ def test_an_app_may_refuse_to_go_on_by_its_own_hook():
 class Declared:
     """A module that says where a business must have it on, and maybe a reason of its own not to go off."""
 
-    def __init__(self, label, name, countries=None, veto=None):
+    def __init__(self, label, name, countries=None, veto=None, turns_on=False):
         self.label = label
         self.verbose_name = name
         if countries is not None:
-            self.mandatory = {"countries": countries, "platform_turns_on": False}
+            self.mandatory = {"countries": countries, "platform_turns_on": turns_on}
         if veto is not None:
             self.can_disable = veto
 
@@ -333,6 +333,36 @@ def test_the_app_s_own_reason_comes_before_base_s():
 def test_base_s_reason_is_only_to_go_off():
     asked = {"ctx": Asker(), "configs": DECLARED, "kept": {"tax"}, "country": "ES", "hook": activation.CAN_ENABLE}
     assert activation.refusals(["tax"], **asked) == {}
+
+
+# ── What a business is born with (hub#997, PLAN-HUB round 2026-11-07) ────────────────────────────────────────────
+# At sign-up the platform turns on, by itself, the apps the business's country requires that say it may
+# (``platform_turns_on``: Taxes, in every country), with what they need, none chosen: they take nothing of the plan's
+# limit. Never one that binds the business to a tax authority (VeriFactu): its owner turns it on, asked by the Home.
+
+BORN = [
+    Declared("tax", "Taxes", "all", turns_on=True),
+    Declared("verifactu", "VeriFactu", ["ES"]),
+    Declared("customer", "Customers", ["PT"], turns_on=True),
+    Declared("task", "Tasks"),
+]
+
+
+@pytest.mark.parametrize(
+    ("country", "born"),
+    [("ES", {"tax"}), ("", {"tax"}), ("PL", {"tax"}), ("PT", {"tax", "customer"}), ("pt", {"tax", "customer"})],
+)
+def test_a_business_is_born_with_the_apps_its_country_requires_that_the_platform_turns_on(country, born):
+    """Without a country (a demo) a business is in Spain; one mandatory there that the platform never turns on, never."""
+    assert activation.born_on(country, BORN) == born
+
+
+def test_what_a_business_is_born_with_is_on_with_what_it_needs_and_none_of_it_chosen():
+    born = activation.born({"sale"}, GRAPH)
+    assert born == states(sale="on", tax="on", customer="on")
+    assert activation.chosen_on(born) == 0
+    # Born with nothing on, it is the baseline: every module off.
+    assert activation.born(set(), GRAPH) == activation.baseline(GRAPH)
 
 
 # ── Its tables being made (S3; PLAN-DB §7): «creating» and «failed» ───────────────────────────────────────────────

@@ -9,10 +9,14 @@ The rules, without the database: ``base.services`` (``base.app.enable``, ``base.
   ``on`` is active (its operations, the relay, the menu). It is **chosen** when the business turned it on itself; what
   the closure by ``requires`` brought along with it is not, and goes off again with the last chosen module on that
   needs it (Odoo's «an app with its dependencies»).
-- **The baseline** (round 2026-10-27): a hub is born with every module off, a demo too. The business turns on what it
+- **The baseline** (round 2026-10-27): a hub without rows has every module off. The business turns on what it
   uses, one by one in Apps or all of a blueprint's at once (``base.blueprint.import`` turns them on, then loads); a
   module without its row is off (PLAN-DB: «``off`` o sin fila»). The first change writes every module down
-  (``base.services``), so two changes at once have rows to lock. A vertical's template turns on its modules with
+  (``base.services``), so two changes at once have rows to lock.
+- **What a business is born with** (hub#997, PLAN-HUB round 2026-11-07): its sign-up writes every module down, off but
+  the apps its country requires that say the platform may turn them on by itself (:func:`born_on`: Taxes, in every
+  country), on with what they need and none chosen (:func:`born`), a demo too. Never one that binds the business to a
+  tax authority (VeriFactu): its owner turns it on, asked by the Home. A vertical's template turns on its modules with
   their roots chosen (:func:`template`; 13 of 21 for the restaurant): the modules on that no other module on needs.
 - **Every module on** (:func:`every_on`): what a hub had without rows before that round, every module on and its roots
   chosen (today 17 of 27). The migration ``base.0017`` writes it down for every hub of before, so none loses an app,
@@ -157,6 +161,27 @@ def template(apps: Iterable[str], graph: Graph) -> dict[str, Activation]:
 def baseline(graph: Graph) -> dict[str, Activation]:
     """What a hub that never turned anything on or off has: every module off, none chosen (round 2026-10-27)."""
     return template((), graph)
+
+
+def born_on(country: str, configs: Iterable[Any] | None = None) -> frozenset[str]:
+    """The modules a business of ``country`` is born with on (hub#997): those it must have on there, as each says in its
+    ``mandatory`` (``base.home.mandatory_in``; without a country, Spain), that say the platform turns them on by itself
+    (``platform_turns_on``: Taxes), never one that binds the business to a tax authority (VeriFactu)."""
+    from base.home import MANDATORY_ATTRIBUTE, mandatory_in  # base.home reads the modules' declarations
+
+    return frozenset(
+        config.label
+        for config in (module_configs() if configs is None else configs)
+        if mandatory_in(config, country) and getattr(config, MANDATORY_ATTRIBUTE).get("platform_turns_on") is True
+    )
+
+
+def born(labels: Iterable[str], graph: Graph) -> dict[str, Activation]:
+    """Every module's state in a business born with ``labels`` on (:func:`born_on`): they and what they need on, none
+    chosen (the business chose none: they take nothing of the plan's limit); every other module off."""
+    on = set(labels)
+    on |= needs(on, graph)
+    return {label: Activation(ON, False) if label in on else OFF_ROW for label in graph}
 
 
 def every_on(graph: Graph) -> dict[str, Activation]:
