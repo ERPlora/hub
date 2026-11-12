@@ -881,6 +881,8 @@ class TestRecoverIntoTheBusiness:
         assert html.index('value="customer"') < html.index('value="appointment"')
         assert str(copy) in html and f'<div class="readonly">{copy.db_name}</div>' in html
         assert "admin/css/forms.css" in html
+        # hub#1307: before confirming, what will not happen: what comes back greets nobody.
+        assert "What comes back is nothing new to the business: it starts none of its automations" in html
         assert not CopyRecovery.objects.exists()
 
     def test_confirmed_each_copy_is_asked_and_recoveries_says_how_it_goes(self, client, root):
@@ -1061,6 +1063,8 @@ def test_the_recovery_speaks_spanish(client, root):
     assert 'value="Recuperar"' in html and "Clientes" in html and "nunca se copia" in html
     # hub#1306: what the business deleted and still holds comes back the same, with its history.
     assert "vuelve tal como era, con su historial" in html
+    # hub#1307: and it starts none of the business's automations.
+    assert "Lo que vuelve no es nada nuevo para el negocio: no arranca ninguna de sus automatizaciones" in html
     with translation.override("es"):
         said = control_admin.CopyRecoveryAdmin.result_said(
             {"app": "customer", "restored": 2, "created": 1, "not_created": 1, "reasons": [], "refused": ""}

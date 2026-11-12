@@ -3098,7 +3098,9 @@ Pasos:
   9. En Copias aparte elige la copia hecha y la acción «Recuperar en el negocio…». La página explica que lo que el
      negocio eliminó y aún guarda vuelve tal como era, con su historial, y que lo que ya no tiene se crea de nuevo como lo
      crea su propia pantalla, sin copiar nada; que lo que el negocio tiene, o ha vuelto a crear, se queda como está; que
-     los registros para Hacienda no se recuperan nunca y que el negocio sigue abierto.
+     los registros para Hacienda no se recuperan nunca y que el negocio sigue abierto. Y que lo que vuelve no es nada
+     nuevo para el negocio: no arranca ninguna de sus automatizaciones, así que a nadie se le da la bienvenida ni se le
+     avisa otra vez de una cita que ya tenía (hub#1307).
      Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes**, **Productos**, **Servicios** y
      **Citas**). Pulsa
      **Recuperar**.
@@ -3145,8 +3147,11 @@ eliminada que aún guardaba, viva otra vez con su aviso de ficha recuperada (`cu
 nueva por cada cliente que ya no tenía, con su aviso de ficha creada (`customer.customer.created`), un producto nuevo
 por cada producto que le faltaba, con su aviso de producto creado (`inventory.product.created`), un servicio nuevo por
 cada uno que ya no tenía, con su aviso de servicio creado (`service.service.created`), y una cita nueva por cada una
-que le faltaba, con su aviso de cita creada (`appointment.appointment.created`), y nada más; la copia, sin
-tocar; el aviso `control.copy.recovery_requested` con quién lo pidió.
+que le faltaba, con su aviso de cita creada (`appointment.appointment.created`), y nada más. Cada uno de esos avisos
+dice que lo hizo la recuperación (su autor es `copy_recovery:<id>`, el de la fila de Recuperaciones), así que ninguna
+automatización del negocio arranca con ellos (FLOW-F21), sea de algo creado o de algo recuperado; lo que solo pone al día
+lo del negocio con ellos sigue igual (la Bandeja de WhatsApp enlaza a la ficha su conversación). La copia, sin tocar; el
+aviso `control.copy.recovery_requested` con quién lo pidió.
 Si falla: lo que la restauración no admite lo dice el aviso, negocio a negocio, y ese negocio no se toca: uno que no está
 listo o no tiene base propia, una demo, uno que se está trasladando o restaurando, un clúster abierto a hubs nuevos o con
 negocios vivos, el propio clúster del negocio, una copia que no está en ese clúster o que es demasiado grande, y un
@@ -3171,8 +3176,8 @@ mantenimiento, hasta que se descongela. Con registros solo del entorno de prueba
 (VERIFACTU-F28). El personal de soporte ve la lista, Copias aparte y Recuperaciones, pero no las acciones.
 Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado), CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12,
 CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04, SERVICE-F01, SERVICE-F04, SERVICE-F05,
-SERVICE-F08, APPOINTMENT-F01, APPOINTMENT-F11; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285,
-hub#1306, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, aws#77
+SERVICE-F08, APPOINTMENT-F01, APPOINTMENT-F11, FLOW-F21; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284,
+hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, aws#77
 
 ## Para quien lo mantiene
 

@@ -736,7 +736,8 @@ class ReactIn(In):
         "",
         max_length=128,
         title=gettext_noop("Actor"),
-        description="Who caused it (`flow_run:<id>` when a run did).",
+        description="Who caused it (`flow_run:<id>` when a run did; `copy_recovery:<id>` when a recovery from a "
+        "separate copy did, which starts no automation).",
     )
 
 

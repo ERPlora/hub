@@ -805,5 +805,13 @@ msgstr ""
 "queda como está, y los registros para Hacienda no se recuperan nunca. El negocio sigue abierto mientras tanto. "
 "Recuperaciones dice cómo fue, unos minutos después."
 
+#: templates/admin/control/restoredcopy/recover.html
+msgid ""
+"What comes back is nothing new to the business: it starts none of its automations, so nobody is welcomed or told "
+"again of a booking they already had."
+msgstr ""
+"Lo que vuelve no es nada nuevo para el negocio: no arranca ninguna de sus automatizaciones, así que a nadie se le da "
+"la bienvenida ni se le avisa otra vez de una cita que ya tenía."
+
 msgid "Recover"
 msgstr "Recuperar"
