@@ -3131,14 +3131,17 @@ Pasos:
       que el negocio ya volvió a crear (otro con el mismo nombre en la misma categoría, que no sea ya uno de la copia; cada
       uno vale por uno solo, así que dos servicios con el mismo nombre vuelven los dos). Pedirlo otra vez no crea nada
       dos veces.
-      Las citas van siempre después de los clientes, se pidan en el orden que se pidan, para que cada una encuentre a su
-      clienta. Vuelve cada cita que aún no ha llegado y seguía reservada (pendiente o confirmada, sin cobrar), reservada
-      como la reserva la agenda: para la ficha de su clienta en el negocio (la misma, aquella en la que se unió o la que
-      se volvió a crear), con sus servicios, su profesional, su hora, sus minutos y sus notas; como cita nueva, con otro
-      número y sin su historial (hub#1326). Nunca se reserva encima de otra: una cuya hora ya está ocupada, ya no encaja
-      en el horario del negocio o del profesional o está bloqueada, o cuya clienta, servicio o profesional ya no están,
-      no vuelve y su motivo lo dice («appointment.slot_taken: …»). Las que ya pasaron no vuelven, y tampoco una que el
-      negocio tiene (aunque la cancelara) o que volvió a reservar (la misma clienta a la misma hora).
+      Las citas van siempre después de los clientes y los servicios, se pidan en el orden que se pidan, para que cada
+      una encuentre a su clienta y sus servicios. Vuelve cada cita que aún no ha llegado y seguía reservada (pendiente o
+      confirmada, sin cobrar), reservada como la reserva la agenda: para la ficha de su clienta en el negocio (la misma,
+      aquella en la que se unió o la que se volvió a crear), con sus servicios en el negocio como los empareja Servicios
+      (el mismo o, si ya no está, el que se volvió a crear a mano o acaba de volver con Servicios: el mismo nombre en la
+      misma categoría, el más antiguo si hay dos), su profesional, su hora, sus minutos y sus notas; como cita nueva, con
+      otro número y sin su historial (hub#1326). Nunca se reserva encima de otra: una cuya hora ya está ocupada, ya no
+      encaja en el horario del negocio o del profesional o está bloqueada, o cuya clienta, servicio o profesional ya no
+      están, no vuelve y su motivo lo dice («appointment.slot_taken: …», «service.service_not_found: …»). Las que ya
+      pasaron no vuelven, y tampoco una que el negocio tiene (aunque la cancelara) o que volvió a reservar (la misma
+      clienta a la misma hora).
 Entra: los negocios elegidos, el clúster temporal con su copia y el momento; para recuperar, la copia aparte hecha y qué
 recuperar.
 Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso
@@ -3171,7 +3174,8 @@ el negocio («Clientes: nada (app_inactive: …)»), o la copia no la tenía, le
 tiene una que este código no conoce (`recover_not_in_copy`, `recover_copy_behind`, `recover_copy_ahead`). Lo que la
 operación de crear no acepta hoy (un teléfono que ya no vale, un valor de un campo propio que su campo ya no admite, un producto sin categoría fiscal o con una que Impuestos
 ya no tiene activa, un servicio cuya categoría fiscal se desactivó (`service.tax_category_unknown`), una hora ocupada,
-una clienta que ya no está) se cuenta «sin crear» con su motivo, y lo demás vuelve; también una ficha eliminada que
+una clienta que ya no está, un servicio que el negocio ya no tiene ni volvió a crear) se cuenta «sin crear» con su
+motivo, y lo demás vuelve; también una ficha eliminada que
 entretanto se unió a otra o se borró («customer.customer_unavailable: …»). Si la copia ya no está,
 la recuperación dice «No se pudo hacer» y por qué («recover_copy_unreadable: …»). Mientras el negocio se traslada o se
 restaura, la recuperación espera sin hacer nada. Con la plataforma congelada para una subida de la base de datos, la restauración espera, con el negocio en
@@ -3180,7 +3184,7 @@ mantenimiento, hasta que se descongela. Con registros solo del entorno de prueba
 Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04, SERVICE-F01, SERVICE-F04, SERVICE-F05,
 SERVICE-F08, APPOINTMENT-F01, APPOINTMENT-F11; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285,
-hub#1306, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1356, aws#77
+hub#1306, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1356, aws#77
 
 ## Para quien lo mantiene
 
