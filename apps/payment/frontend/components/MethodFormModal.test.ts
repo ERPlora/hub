@@ -4,6 +4,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
+import { unsavedChangesIn } from '../../../../base/frontend/lib/system-back';
 import type { MethodOut } from '../operations';
 import { click, ionValue, mountPayment, settle } from '../__tests__/mount-payment';
 import MethodFormModal from './MethodFormModal.vue';
@@ -126,6 +127,92 @@ describe('MethodFormModal: Editing method — {name}', () => {
     expect(s.inDoc('payment-method-form')?.getAttribute('aria-label')).toBe('Editando método — BBVA account');
     expect([s.field('name').label, s.field('type').label, s.field('account').label]).toEqual(['Nombre', 'Tipo', 'Cuenta']);
     expect(s.save().textContent).toContain('Guardar');
+  });
+});
+
+// The row paints the form at once and Name and Type take what is typed while the whole method is on its way. When it
+// arrives it fills only the fields the person has not touched, so what was typed is never lost and Save sends it. Each
+// field is touched alone: a field that followed another field's change would keep or lose the wrong one.
+describe('MethodFormModal: typed before the whole method arrives', () => {
+  async function openHoldingTheMethod(whole: MethodOut = WHOLE) {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const m = await mountPayment(MethodFormModal, { props: { open: false, method: LISTED }, path: '/payment/methods' });
+    m.net.onApi(async ({ url, init }) => {
+      const path = new URL(url, 'http://a.localhost').pathname;
+      if (path === '/api/payment/methods/detail') {
+        await held;
+        return Response.json(whole, { status: 200 });
+      }
+      if (path === '/api/payment/methods/update') return Response.json({ ...whole, ...JSON.parse(String(init.body)) }, { status: 200 });
+      return Response.json({ error: { code: 'not_found', message: 'Not found' } }, { status: 404 });
+    });
+    await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
+    await m.wrapper.setProps({ open: true });
+    await settle();
+    const field = (name: string) => m.inDoc(`payment-method-form-${name}`) as Control;
+    const save = () => m.inDoc('payment-method-form-submit') as Control;
+    expect(field('account').disabled, 'the account waits for the whole method').toBe(true);
+    expect(save().disabled, 'Save waits for the whole method').toBe(true);
+    async function arrive() {
+      release();
+      await settle();
+      await settle();
+      expect(field('account').disabled).toBe(false);
+    }
+    const posts = () => m.sent().filter((c) => c.method === 'POST');
+    return { ...m, field, save, arrive, posts };
+  }
+
+  it('a name typed meanwhile stays; the type and the account take the whole method; Save sends only the name', async () => {
+    const s = await openHoldingTheMethod();
+    await ionValue(s.field('name'), 'BBVA main', 'ionInput');
+    await s.arrive();
+    expect([s.field('name').value, s.field('type').value, s.field('account').value]).toEqual([
+      'BBVA main',
+      'transfer',
+      'ES91 2100 0418 4502 0005 1332',
+    ]);
+    await click(s.save());
+    expect(s.posts()).toEqual([
+      { method: 'POST', path: '/api/payment/methods/update', query: {}, body: { id: 'm1', name: 'BBVA main' } },
+    ]);
+    expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
+  });
+
+  it('a type chosen meanwhile stays; the name, untouched, takes the whole method even where the row was behind it', async () => {
+    const s = await openHoldingTheMethod({ ...WHOLE, name: 'BBVA business' });
+    await ionValue(s.field('type'), 'sepa', 'ionChange');
+    await s.arrive();
+    expect([s.field('name').value, s.field('type').value, s.field('account').value]).toEqual([
+      'BBVA business',
+      'sepa',
+      'ES91 2100 0418 4502 0005 1332',
+    ]);
+    await click(s.save());
+    expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1', method_type: 'sepa' }]);
+  });
+
+  it('with nothing touched the whole method fills every field, and Save sends nothing but the id', async () => {
+    const s = await openHoldingTheMethod({ ...WHOLE, name: 'BBVA business', method_type: 'card' });
+    await s.arrive();
+    expect([s.field('name').value, s.field('type').value, s.field('account').value]).toEqual([
+      'BBVA business',
+      'card',
+      'ES91 2100 0418 4502 0005 1332',
+    ]);
+    await click(s.save());
+    expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1' }]);
+  });
+
+  it('what was typed meanwhile still counts as unsaved once the whole method is in: Back asks before closing', async () => {
+    const s = await openHoldingTheMethod();
+    await ionValue(s.field('name'), 'BBVA main', 'ionInput');
+    await s.arrive();
+    const overlay = s.inDoc('payment-method-form')!;
+    expect(unsavedChangesIn(overlay), 'the typed name is unsaved').toBeDefined();
+    await ionValue(s.field('name'), WHOLE.name, 'ionInput');
+    expect(unsavedChangesIn(overlay), 'back as the whole method says, nothing is unsaved').toBeUndefined();
   });
 });
 

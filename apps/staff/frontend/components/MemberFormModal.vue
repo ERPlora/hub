@@ -18,7 +18,7 @@ import { useSession } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonSelectOption, IonText, IonTextarea, IonToggle } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
-import { useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
+import { keepTouched, useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
 
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useLocale, useT } from '../composables/useT';
@@ -94,18 +94,6 @@ async function nameAccount(userId: string, ticket: number): Promise<void> {
   }
 }
 
-/** The record as loaded, with what the person changed since the form showed `shown` kept as typed. */
-function keepTouched(loaded: MemberForm, shown: MemberForm, typed: MemberForm): MemberForm {
-  const kept = { ...loaded };
-  const keep = <K extends keyof MemberForm>(field: K): void => {
-    kept[field] = typed[field];
-  };
-  for (const field of Object.keys(loaded) as (keyof MemberForm)[]) {
-    if (typed[field] !== shown[field]) keep(field);
-  }
-  return kept;
-}
-
 async function loadRecord(member: MemberOut, ticket: number): Promise<void> {
   loading.value = true;
   try {
@@ -117,7 +105,7 @@ async function loadRecord(member: MemberOut, ticket: number): Promise<void> {
     loadedRate = pay?.rows[0]?.hourly_rate ?? null;
     const loaded = formFromRecord(record, pay?.rows[0] ?? null, locale.value, money.value);
     // The fields took what was typed while the record was on its way: it stays, and the record fills only the
-    // fields the person has not touched (hub#1347). Save sends what differs from the record.
+    // fields the person has not touched. Save sends what differs from the record.
     const shown = original.value;
     const typed = form.value;
     const touched = (field: keyof MemberForm) => typed[field] !== shown[field];
