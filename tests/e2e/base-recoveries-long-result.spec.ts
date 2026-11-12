@@ -1,6 +1,6 @@
 // flow: BASE-F114 (step 11: Recoveries says how it went) — hub#1308: in the Hub admin, a recovery whose result is long
 // (an app's counts, then why it failed, naming its copy's database in one piece, as `base.tenancy.recovery` notes it)
-// breaks into several lines inside its cell of Recoveries at a phone's, a tablet's and a desktop's width, and neither
+// breaks into several lines inside its cell of Recoveries at a phone's, two tablets' and a desktop's width, and neither
 // the page nor the list's box asks to be scrolled sideways.
 // The recovery is control's row as the worker leaves a failed one; no copy's database is made: the list only reads it.
 import { expect, type Page, test } from '@playwright/test';
@@ -15,6 +15,8 @@ const RECOVERIES = `${PLATFORM}/admin/control/copyrecovery/`;
 const SIZES = [
   { label: '375', viewport: { width: 375, height: 667 } },
   { label: '768', viewport: { width: 768, height: 1024 } },
+  // The tablet the fleet looks at: the filter must still be under the list here (a cut at 800 px passes 768).
+  { label: '820', viewport: { width: 820, height: 1180 } },
   { label: '1280', viewport: { width: 1280, height: 860 } },
 ];
 const ROOT = 'e2e-recoveries-root';
