@@ -109,6 +109,30 @@ def test_the_business_lacks_what_it_has_not_live_merged_erased_nor_made_again():
     assert [card["id"] for card in lacking] == [deleted.pk, absent["id"], sharing["id"]]
 
 
+def test_a_card_of_the_copy_is_in_the_business_live_in_the_one_it_was_merged_into_or_made_again():
+    """hub#1284: what another app's recovery matches the card a record of the copy points at by (an appointment's
+    customer): the rule ``cards_not_in_business`` tells a card is not lacking by, naming the business's card."""
+    now = timezone.now()
+    live = Customer.objects.create(name="Marta Ruiz", phone="+34600555666", email="marta@example.com")
+    merged = Customer.objects.create(name="Luis Pérez", deleted_at=now, merged_into=live)
+    # Merged into one merged since: it lives on in the last, CUSTOMER-F13.
+    twice = Customer.objects.create(name="Luis P.", deleted_at=now, merged_into=merged)
+    deleted = Customer.objects.create(name="Ana López", phone="+34600111222", deleted_at=now, is_active=False)
+    erased = Customer.objects.create(name="Deleted customer", deleted_at=now, erased_at=now)
+    # Gone, and made again by hand (or brought back already): the same name, phone and email, the case aside.
+    again = a_card_of_the_copy(name="MARTA RUIZ", phone="+34600555666", email="Marta@Example.com")
+    absent = a_card_of_the_copy(name="Sara Gil", phone="+34600777888")
+
+    assert queries.card_in_business(a_card_of_the_copy(live)) == live.pk
+    assert queries.card_in_business(a_card_of_the_copy(merged)) == live.pk
+    assert queries.card_in_business(a_card_of_the_copy(twice)) == live.pk
+    assert queries.card_in_business(again) == live.pk
+    assert queries.card_in_business(a_card_of_the_copy(deleted)) is None
+    assert queries.card_in_business(absent) is None
+    # Erased (CUSTOMER-F16): never another card, not even one with the name, phone and email the copy still holds.
+    assert queries.card_in_business({"id": erased.pk, "name": live.name, "phone": live.phone, "email": live.email}) is None
+
+
 def test_the_app_declares_what_it_gives_back():
     [declared] = apps.get_app_config("customer").recoverable_from_copy()
 

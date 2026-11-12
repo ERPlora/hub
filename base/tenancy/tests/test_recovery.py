@@ -12,7 +12,7 @@ the worker does it (``base.tenancy.recovery.run_due``, in the moves' thread), on
    never copied. What the operation refuses is noted with why, and the rest go on.
 
 Real databases on the session's server, committed (``hubs.CopiedHubs``): the business's own and its copy, a clone of
-it. Customers is the app that answers today.
+it. Customers and Appointments are the apps that answer today, in the order of their ``requires``.
 """
 
 import datetime as dt
@@ -324,6 +324,184 @@ class TestCustomersComeBack:
         assert len(live_cards(hub)) == 1
 
 
+APPOINTMENTS = {"app": "appointment", "created": 0, "not_created": 0, "reasons": [], "refused": ""}
+
+
+def a_monday_at(hhmm: str) -> str:
+    """A Monday one to two weeks ahead at ``hhmm`` on the business's wall clock: open (09:00–18:00 by default), inside
+    the default advance and never in the past."""
+    from django.utils import timezone
+
+    today = timezone.localdate()
+    monday = today + dt.timedelta(days=(0 - today.weekday()) % 7 + 7)
+    return f"{monday.isoformat()}T{hhmm}"
+
+
+class Salon:
+    """A business with its cards (``Recoveries.business``), a professional who takes bookings and a cut."""
+
+    def __init__(self, recoveries, every_app_on, *cards: dict):
+        from apps.service.models import Service
+        from apps.staff.models import Member
+
+        self.hub, self.cards = recoveries.business(every_app_on, *cards)
+        with use_hub(self.hub):
+            self.ines = Member.objects.create(first_name="Inés", last_name="Mora").pk
+            self.cut = Service.objects.create(name="Haircut", price=2000, duration_minutes=30).pk
+
+    def book(self, card: uuid.UUID, hhmm: str, **fields):
+        """An appointment of ``card`` with Inés for a cut on Monday at ``hhmm``, booked by the agenda's create."""
+        return run_in(
+            self.hub,
+            "appointment.appointment.create",
+            customer_id=card,
+            staff_id=self.ines,
+            services=[{"service_id": self.cut}],
+            start=a_monday_at(hhmm),
+            **fields,
+        )
+
+    def live(self) -> list[tuple]:
+        """The business's live appointments: their customer's name, professional, start, minutes, services and notes."""
+        from apps.appointment.models import Appointment
+
+        with use_hub(self.hub):
+            return [
+                (
+                    one.customer.name,
+                    one.staff_id,
+                    one.start,
+                    one.duration_minutes,
+                    [line.service_id for line in one.lines.all()],
+                    one.notes,
+                )
+                for one in Appointment.objects.filter(deleted_at__isnull=True).order_by("start")
+            ]
+
+
+def booked_events(hub: Hub) -> int:
+    with use_hub(hub):
+        return OutboxEvent.objects.filter(name="appointment.appointment.created").count()
+
+
+class TestAppointmentsComeBack:
+    def test_the_appointments_the_business_lost_come_back_each_booked_by_its_operation(self, recoveries, every_app_on):
+        salon = Salon(recoveries, every_app_on, ANA, LUIS)
+        ana, luis = salon.cards
+        first = salon.book(ana, "10:00", notes="Bring the colour reference")
+        second = salon.book(luis, "11:00", duration_minutes=45)
+        then = salon.live()
+        copy = recoveries.copy_of(salon.hub)
+        run_in(salon.hub, "appointment.appointment.delete", id=first.id)
+        run_in(salon.hub, "appointment.appointment.delete", id=second.id)
+        asked = recoveries.ask(copy, "appointment")
+        before = booked_events(salon.hub)
+
+        assert run() == 1
+
+        assert salon.live() == then
+        # Through the agenda's create, never a copied row: new appointments, each with its number and its event.
+        from apps.appointment.models import Appointment
+
+        with use_hub(salon.hub):
+            back = Appointment.objects.filter(deleted_at__isnull=True)
+            assert not {one.pk for one in back} & {first.id, second.id}
+            assert not {one.number for one in back} & {first.number, second.number}
+        assert booked_events(salon.hub) == before + 2
+        done = fresh(asked)
+        assert (done.status, done.last_error) == ("done", "")
+        assert done.results == [APPOINTMENTS | {"created": 2}]
+
+    def test_asked_again_nothing_is_booked_twice(self, recoveries, every_app_on):
+        salon = Salon(recoveries, every_app_on, ANA)
+        booked = salon.book(salon.cards[0], "10:00")
+        copy = recoveries.copy_of(salon.hub)
+        run_in(salon.hub, "appointment.appointment.delete", id=booked.id)
+        recoveries.ask(copy, "appointment")
+        run()
+        again = recoveries.ask(copy, "appointment")
+
+        assert run() == 1
+
+        assert len(salon.live()) == 1
+        assert fresh(again).results == [APPOINTMENTS]
+
+    def test_one_gone_by_in_the_copy_does_not_come_back(self, recoveries, every_app_on):
+        salon = Salon(recoveries, every_app_on, ANA)
+        booked = salon.book(salon.cards[0], "10:00")
+        copy = recoveries.copy_of(salon.hub)
+        run_in(salon.hub, "appointment.appointment.delete", id=booked.id)
+        in_the_copy(
+            copy,
+            "UPDATE appointment_appointment SET start = now() - interval '1 day', \"end\" = now() - interval '23 hours'",
+        )
+        asked = recoveries.ask(copy, "appointment")
+
+        run()
+
+        assert salon.live() == []
+        assert fresh(asked).results == [APPOINTMENTS]
+
+    def test_its_customer_lost_too_comes_back_first_whatever_the_order_they_are_asked_in(self, recoveries, every_app_on):
+        salon = Salon(recoveries, every_app_on, ANA)
+        booked = salon.book(salon.cards[0], "10:00")
+        copy = recoveries.copy_of(salon.hub)
+        run_in(salon.hub, "appointment.appointment.delete", id=booked.id)
+        run_in(salon.hub, "customer.customer.delete", id=salon.cards[0])
+        # Asked appointments first: they need their customer, so Customers goes before (``requires``).
+        asked = recoveries.ask(copy, "appointment", "customer")
+
+        run()
+
+        [(name, *_rest)] = salon.live()
+        assert name == "Ana López"
+        assert [result["app"] for result in fresh(asked).results] == ["customer", "appointment"]
+        assert fresh(asked).results[1] == APPOINTMENTS | {"created": 1}
+
+    def test_one_whose_time_was_taken_since_is_never_booked_over_and_says_why_and_the_others_come_back(
+        self, recoveries, every_app_on
+    ):
+        salon = Salon(recoveries, every_app_on, ANA, LUIS, MARTA)
+        ana, luis, marta = salon.cards
+        taken = salon.book(ana, "10:00")
+        free = salon.book(luis, "11:00")
+        copy = recoveries.copy_of(salon.hub)
+        run_in(salon.hub, "appointment.appointment.delete", id=taken.id)
+        run_in(salon.hub, "appointment.appointment.delete", id=free.id)
+        # Its time given to another customer since, with the same professional.
+        salon.book(marta, "10:00")
+        asked = recoveries.ask(copy, "appointment")
+
+        run()
+
+        assert [one[0] for one in salon.live()] == ["Marta Ruiz", "Luis Pérez"]
+        [appointments] = fresh(asked).results
+        assert (appointments["created"], appointments["not_created"], appointments["refused"]) == (1, 1, "")
+        [why] = appointments["reasons"]
+        assert why["id"] == str(taken.id)
+        assert why["reason"].startswith("appointment.slot_taken: ")
+
+    def test_one_whose_customer_the_business_no_longer_has_is_not_made_up_and_says_why(self, recoveries, every_app_on):
+        salon = Salon(recoveries, every_app_on, ANA, LUIS)
+        ana, luis = salon.cards
+        lost = salon.book(ana, "10:00")
+        kept = salon.book(luis, "11:00")
+        copy = recoveries.copy_of(salon.hub)
+        run_in(salon.hub, "appointment.appointment.delete", id=lost.id)
+        run_in(salon.hub, "appointment.appointment.delete", id=kept.id)
+        run_in(salon.hub, "customer.customer.erase", id=ana, reason="Asked under GDPR")
+        asked = recoveries.ask(copy, "appointment")
+
+        run()
+
+        assert [one[0] for one in salon.live()] == ["Luis Pérez"]
+        [appointments] = fresh(asked).results
+        assert (appointments["created"], appointments["not_created"], appointments["refused"]) == (1, 1, "")
+        [why] = appointments["reasons"]
+        assert why["id"] == str(lost.id)
+        assert why["reason"].startswith("customer.customer_unavailable: ")
+
+
 class TestTheCopyIsOnlyRead:
     def test_no_alias_reaches_the_copy_and_nothing_in_it_changes(self, recoveries, every_app_on):
         hub, (ana,) = recoveries.business(every_app_on, ANA)
@@ -502,11 +680,11 @@ class TestTheLease:
         assert live_cards(hub) == []
 
 
-def test_only_customers_answer_and_no_app_whose_records_reach_the_tax_authority_ever_does():
+def test_only_customers_and_appointments_answer_and_no_app_whose_records_reach_the_tax_authority_ever_does():
     answering = {config.label for config in all_live_app_configs() if hasattr(config, recovery.HOOK)}
     fiscal = {config.label for config in all_live_app_configs() if hasattr(config, "fiscal_record_states")}
 
-    assert answering == {"customer"}
+    assert answering == {"customer", "appointment"}
     assert not answering & fiscal
     assert set(recovery.recoverable_apps()) == answering
 

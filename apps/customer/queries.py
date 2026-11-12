@@ -939,7 +939,34 @@ def has_live_twin(name: str, phone: str, email: str) -> bool:
 
     Only the three together: two people may share a phone or an email (CUSTOMER-F12).
     """
-    return Customer.objects.live().filter(name__iexact=name, phone=phone, email__iexact=email).exists()
+    return _live_twins(name, phone, email).exists()
+
+
+def _live_twins(name: str, phone: str, email: str) -> QuerySet[Customer]:
+    """The live cards ``has_live_twin`` finds, the oldest first."""
+    return Customer.objects.live().filter(name__iexact=name, phone=phone, email__iexact=email).order_by("created_at", "id")
+
+
+def card_in_business(card: dict) -> UUID | None:
+    """hub#1284: the business's live card that is ``card`` of a separate copy (its ``id``, ``name``, ``phone`` and
+    ``email`` there), what another app's recovery matches a record of the copy that points at it by, by the rule
+    ``cards_not_in_business`` tells a card is not lacking by: the same card while live, the one it was merged into since
+    (it lives on in that one, CUSTOMER-F13), or one made again (``has_live_twin``: by hand, or brought back already).
+    ``None`` when the business has none: deleted and not made again, gone, or erased (never another card, CUSTOMER-F16).
+    """
+    seen: set[UUID] = set()
+    current = card["id"]
+    while current is not None and current not in seen:
+        seen.add(current)
+        row = Customer.objects.filter(pk=current).values("deleted_at", "merged_into", "erased_at").first()
+        if row is None:
+            break
+        if row["erased_at"] is not None:
+            return None
+        if row["deleted_at"] is None:
+            return current
+        current = row["merged_into"]
+    return _live_twins(card["name"], card["phone"], card["email"]).values_list("pk", flat=True).first()
 
 
 #: What a card of a separate copy gives its create (``CustomerIn``), as the copy's columns hold it since

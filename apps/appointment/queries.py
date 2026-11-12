@@ -26,6 +26,7 @@ from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
 from live.operations import INTERNAL, operation
+from psycopg import sql
 
 from apps.appointment import engine
 from apps.appointment.models import (
@@ -67,7 +68,7 @@ from apps.appointment.schemas import (
     SlotsOut,
     VisitPage,
 )
-from apps.customer.queries import find_customer
+from apps.customer.queries import card_in_business, cards_in_copy, find_customer
 from apps.schedule.queries import day_label, hours_for_range
 from apps.schedule.schemas import HoursRangeIn
 from apps.service.models import Assignment, Service
@@ -1413,3 +1414,119 @@ def get_series(ctx: OperationContext, data: RecurringGetIn) -> dict:
 )
 def get_settings(ctx: OperationContext, data: NoIn) -> dict:
     return settings_out(current_settings())
+
+
+# ── What a separate copy of the business gives back (hub#1284; BASE-F114, APPOINTMENT-F01) ──────────────────────
+
+#: What an appointment of a separate copy is read with (``appointments_in_copy``): each a column since ``0001_initial``.
+COPY_FIELDS = ("id", "customer", "staff", "start", "duration_minutes", "notes", "internal_notes", "source")
+#: What the appointment kept of its customer when it was booked: who she is when the copy no longer has her card live.
+KEPT_OF_THE_CUSTOMER = ("customer_name", "customer_phone", "customer_email")
+#: Still booked: a cancelled one, a no-show or one done is not lacking from the agenda.
+BOOKED = [Appointment.Status.PENDING.value, Appointment.Status.CONFIRMED.value]
+
+
+def appointments_in_copy(conn) -> list[dict]:
+    """hub#1284: each appointment of a separate copy of the business still to come and still booked (pending or
+    confirmed, neither deleted nor charged: a charged one is the till's), by its start, with its ``id`` there, what
+    ``appointment.appointment.create`` takes (its services in their order, its professional, its start, its minutes,
+    its notes and how it was booked) and the card of its customer there (``customer_card``, ``_card_of``), which
+    ``appointments_not_in_business`` matches the business's by; nothing where the app's table is not there. One gone by
+    is not read: it was charged or not, and the agenda books none in the past. ``conn`` is the copy's direct, read-only
+    connection (``recoverable_from_copy`` on this app's config: the copy is no business and has no alias), so it is
+    read by its own SQL over the models' names, never the ORM."""
+    table = Appointment._meta.db_table
+    if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
+        return []
+    read = (*COPY_FIELDS, *KEPT_OF_THE_CUSTOMER)
+    names = (*read, "status", "deleted_at", "charged_at", "sale_id")
+    column = {field: sql.Identifier(Appointment._meta.get_field(field).column) for field in names}
+    query = sql.SQL(
+        "SELECT {} FROM {} WHERE {} IS NULL AND {} IS NULL AND {} IS NULL AND {} = ANY(%s) AND {} > %s ORDER BY {}, {}"
+    ).format(
+        sql.SQL(", ").join(column[field] for field in read),
+        sql.Identifier(table),
+        column["deleted_at"],
+        column["charged_at"],
+        column["sale_id"],
+        column["status"],
+        column["start"],
+        column["start"],
+        column["id"],
+    )
+    rows = [dict(zip(read, row, strict=True)) for row in conn.execute(query, [BOOKED, timezone.now()])]
+    services = _services_in_copy(conn, [row["id"] for row in rows])
+    cards = {card["id"]: card for card in cards_in_copy(conn)}
+    return [
+        {
+            "id": row["id"],
+            "customer_card": _card_of(cards.get(row["customer"]), row),
+            "staff_id": row["staff"],
+            "services": services.get(row["id"], []),
+            "start": row["start"],
+            "duration_minutes": row["duration_minutes"],
+            "notes": row["notes"],
+            "internal_notes": row["internal_notes"],
+            "source": row["source"],
+        }
+        for row in rows
+    ]
+
+
+def _services_in_copy(conn, ids: list[UUID]) -> dict[UUID, list[dict]]:
+    """``{id of an appointment of the copy: its services in their order}``, as its create takes them, of ``ids``."""
+    if not ids:
+        return {}
+    column = {
+        field: sql.Identifier(AppointmentService._meta.get_field(field).column)
+        for field in ("appointment", "service", "position")
+    }
+    query = sql.SQL("SELECT {}, {} FROM {} WHERE {} = ANY(%s) ORDER BY {}, {}").format(
+        column["appointment"],
+        column["service"],
+        sql.Identifier(AppointmentService._meta.db_table),
+        column["appointment"],
+        column["appointment"],
+        column["position"],
+    )
+    services: dict[UUID, list[dict]] = {}
+    for appointment, service in conn.execute(query, [ids]):
+        services.setdefault(appointment, []).append({"service_id": service})
+    return services
+
+
+def _card_of(card: dict | None, row: dict) -> dict:
+    """The customer of an appointment of the copy as Customers matches her (``card_in_business``): the copy's live card
+    (``cards_in_copy``), or, when the copy no longer has it live, what the appointment kept of her."""
+    if card is None:
+        card = {"id": row["customer"]} | {field.removeprefix("customer_"): row[field] for field in KEPT_OF_THE_CUSTOMER}
+    return {field: card[field] for field in ("id", "name", "phone", "email")}
+
+
+def appointments_not_in_business(appointments: list[dict]) -> list[dict]:
+    """hub#1284: the appointments of a separate copy (``appointments_in_copy``) the business lacks, in their order, each
+    as ``appointment.appointment.create`` takes it here, with its ``id`` there. Not lacking: one the business holds,
+    whatever became of it since (moved, cancelled, done: it stays as it is), and one booked again, by hand or brought
+    back already (a live appointment of the same customer at the same moment). Lacking: one deleted from the agenda
+    (APPOINTMENT-F11) or gone altogether.
+
+    Its customer is the business's card of hers by Customers' own rule (``card_in_business``: the same card, the one it
+    was merged into or the one made again); without one, the copy's, which the create refuses with why: an appointment
+    never comes back for a customer the business does not have. Its services and its professional, by their ids (a
+    service is archived, never deleted; a professional who leaves keeps hers): the create refuses one not bookable any
+    more, as it refuses a moment that does not fit the agenda now."""
+    held = set(
+        Appointment.objects.filter(pk__in=[one["id"] for one in appointments], deleted_at__isnull=True).values_list(
+            "pk", flat=True
+        )
+    )
+    lacking = []
+    for one in appointments:
+        if one["id"] in held:
+            continue
+        customer = card_in_business(one["customer_card"]) or one["customer_card"]["id"]
+        if Appointment.objects.filter(deleted_at__isnull=True, customer_id=customer, start=one["start"]).exists():
+            continue
+        create = {key: value for key, value in one.items() if key not in ("id", "customer_card")}
+        lacking.append({"id": one["id"], "customer_id": customer} | create)
+    return lacking
