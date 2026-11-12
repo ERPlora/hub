@@ -11,6 +11,7 @@ import ts from 'typescript';
 import { expect, it } from 'vitest';
 
 import { NO_CLOCK } from '../../vitest.load';
+import { readProgram, readText, walkAhead, walkingHost } from '../../vitest.offload';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const e2eDir = join(root, 'tests', 'e2e');
@@ -37,7 +38,7 @@ function typecheckProjects(): ts.ParsedCommandLine[] {
 
 function parse(project: string, options: ts.CompilerOptions): ts.ParsedCommandLine {
   const parsed = ts.getParsedCommandLineOfConfigFile(project, options, {
-    ...ts.sys,
+    ...walkingHost,
     onUnRecoverableConfigFileDiagnostic: (diagnostic) => {
       throw new Error(ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
     },
@@ -60,15 +61,18 @@ it('checks every .ts of tests/e2e', () => {
   expect(e2eFiles.filter((file) => !files.has(file)).map((file) => relative(root, file))).toEqual([]);
 });
 
-it('reports a type error planted in a helper and in a spec', () => {
+// The projects walked ahead and the program read ahead, without holding the worker (hub#1315): some 1,500 files, each
+// first open of which waits on its own on a loaded machine. What is left here is TypeScript's own work, the check.
+it('reports a type error planted in a helper and in a spec', async () => {
   const planted = ['helpers.ts', 'csp.spec.ts'].map((name) => join(e2eDir, name));
-  const project = typecheckProjects().find((candidate) => planted.every((file) => checked(candidate).has(file)));
+  const projects = await walkAhead(typecheckProjects);
+  const project = projects.find((candidate) => planted.every((file) => checked(candidate).has(file)));
   if (!project) throw new Error('no project of the typecheck script holds tests/e2e/');
 
+  await readProgram(project.fileNames, project.options);
   const host = ts.createCompilerHost(project.options);
-  const readFile = host.readFile.bind(host);
   host.readFile = (file) => {
-    const text = readFile(file);
+    const text = readText(file);
     return planted.includes(resolve(file)) ? `${text}\nexport const planted: number = 'not a number';\n` : text;
   };
   const program = ts.createProgram({ rootNames: project.fileNames, options: project.options, host });
