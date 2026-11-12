@@ -3062,9 +3062,10 @@ Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, A
 ### BASE-F114 Devolver un negocio a un momento pasado desde el admin de Hubs
 <!-- origen: nuevo (aws#77; PLAN-DB §13 «Restaurar un hub»: los planes de pago prometen volver a cualquier momento de los últimos 14 días) gh:hub#1198 -->
 Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte, y recuperar desde la copia aparte los
-clientes y los productos que se perdieron; crear y borrar el clúster temporal es el procedimiento «Devolver un negocio a
-un momento» de ERPlora/aws; recuperar servicios y citas, hub#1283 y hub#1284; los grupos, etiquetas y campos propios de un
-cliente recuperado, hub#1285; la imagen y las categorías de un producto recuperado, hub#1319 y hub#1320)
+clientes que se perdieron, los eliminados tal como eran, y los productos; crear y borrar el clúster temporal es el
+procedimiento «Devolver un negocio a un momento» de ERPlora/aws; recuperar servicios y citas, hub#1283 y hub#1284; los
+grupos, etiquetas y campos propios de un cliente recuperado, hub#1285; la imagen y las categorías de un producto
+recuperado, hub#1319 y hub#1320)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
 copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
@@ -3093,34 +3094,37 @@ Pasos:
      (7 días); su ficha dice además su base de datos, su clúster, quién la pidió y cuándo. Si no se pudo hacer, dice «No
      se pudo hacer» y por qué en «último error».
   Recuperar en el negocio lo que la copia aparte tiene y al negocio le falta (hub#1257):
-  9. En Copias aparte elige la copia hecha y la acción «Recuperar en el negocio…». La página explica que cada cosa vuelve
-     al negocio creada de nuevo como la crea su propia pantalla, sin copiar nada; que lo que el negocio tiene, o ha vuelto
-     a crear, se queda como está; que los registros para Hacienda no se recuperan nunca y que el negocio sigue abierto.
+  9. En Copias aparte elige la copia hecha y la acción «Recuperar en el negocio…». La página explica que lo que el
+     negocio eliminó y aún guarda vuelve tal como era, con su historial, y que lo que ya no tiene se crea de nuevo como lo
+     crea su propia pantalla, sin copiar nada; que lo que el negocio tiene, o ha vuelto a crear, se queda como está; que los registros para Hacienda no se recuperan nunca y que el negocio sigue abierto.
      Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes** y **Productos**). Pulsa
      **Recuperar**.
   10. Sale «1 copia aparte devolverá Clientes a su negocio en unos minutos: Recuperaciones dice cómo fue.». En
       Recuperaciones la ve «Pedida» con la copia, qué se pidió y cuándo.
-  11. Unos minutos después dice «Hecha» y qué volvió: «Clientes: 2 creados» o «Clientes: 2 creados, 1 sin crear». Su
-      ficha dice además cuáles no se crearon y por qué (por su identificador en la copia, sin datos personales). Cada
-      cliente vuelve como ficha nueva, creada como la crea la pantalla de Clientes, con su nombre, contacto, NIF,
-      dirección, fechas, origen, etapa, canal y notas; sin sus grupos, etiquetas ni campos propios (hub#1285). Uno que se
-      eliminó en el negocio vuelve como ficha nueva; sus compras siguen en la eliminada. Nunca vuelve una ficha cuyos
-      datos personales se borraron (RGPD) ni una que se unió a otra, ni se repite una que el negocio ya volvió a crear (el
-      mismo nombre, teléfono y email). Con Productos, «Productos: 3 creados»: cada producto vuelve como uno nuevo, creado
-      como lo crea la pantalla de Productos, con su nombre, SKU, EAN-13, descripción, tipo, precio, coste, unidades,
-      umbral, control de stock y categoría fiscal, activo o desactivado como estaba y en las categorías que el negocio
-      sigue teniendo; sin stock, que se cuenta (INVENTORY-F14), porque el de la copia es de otro día; sin su imagen
-      (hub#1319) y sin las categorías que el negocio ya no tiene (hub#1320). Uno que se eliminó en el negocio vuelve como
-      producto nuevo; sus movimientos siguen en el eliminado (hub#1321). No se repite uno que el negocio ya volvió a dar de
-      alta (otro vivo con su SKU o su EAN-13). Pedirlo otra vez no crea nada dos veces.
+  11. Unos minutos después dice «Hecha» y qué volvió: «Clientes: 1 restaurado, 2 creados» o «Clientes: 2 creados, 1 sin
+      crear». Su ficha dice además cuáles no volvieron y por qué (por su identificador en la copia, sin datos personales).
+      Un cliente que el negocio eliminó y aún guarda vuelve LA MISMA ficha, con sus compras y lo gastado, sus
+      consentimientos, notas y actividad, sus grupos, etiquetas y campos propios y sus pedidos enlazados (CUSTOMER-F33).
+      Uno que el negocio ya no tiene vuelve como ficha nueva, creada como la crea la pantalla de Clientes, con su nombre,
+      contacto, NIF, dirección, fechas, origen, etapa, canal y notas; sin sus grupos, etiquetas ni campos propios
+      (hub#1285). Nunca vuelve una ficha cuyos datos personales se borraron (RGPD) ni una que se unió a otra, ni se repite
+      una que el negocio ya volvió a crear (el mismo nombre, teléfono y email). Con Productos, «Productos: 3 creados»: cada
+      producto vuelve como uno nuevo, creado como lo crea la pantalla de Productos, con su nombre, SKU, EAN-13,
+      descripción, tipo, precio, coste, unidades, umbral, control de stock y categoría fiscal, activo o desactivado como
+      estaba y en las categorías que el negocio sigue teniendo; sin stock, que se cuenta (INVENTORY-F14), porque el de la
+      copia es de otro día; sin su imagen (hub#1319) y sin las categorías que el negocio ya no tiene (hub#1320). Uno que se
+      eliminó en el negocio también vuelve como producto nuevo; sus movimientos siguen en el eliminado (hub#1321). No se
+      repite uno que el negocio ya volvió a dar de alta (otro vivo con su SKU o su EAN-13). Pedirlo otra vez no crea nada
+      dos veces.
 Entra: los negocios elegidos, el clúster temporal con su copia y el momento; para recuperar, la copia aparte hecha y qué
 recuperar.
 Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso
 `control.hub.restore_requested` con quién lo pidió. Los demás negocios no notan nada. En una copia aparte: el negocio
 tal como estaba, sin tocarlo; una base aparte en su clúster con los datos de ese momento, cerrada a la aplicación y
-guardada 7 días; el aviso `control.hub.restore_aside_requested` con quién lo pidió. Al recuperar: en el negocio, una ficha
-nueva por cada cliente que le faltaba, cada una con su aviso de ficha creada (`customer.customer.created`), y un producto
-nuevo por cada producto que le faltaba, con su aviso de producto creado (`inventory.product.created`), y nada más; la
+guardada 7 días; el aviso `control.hub.restore_aside_requested` con quién lo pidió. Al recuperar: en el negocio, cada ficha
+eliminada que aún guardaba, viva otra vez con su aviso de ficha recuperada (`customer.customer.restored`), una ficha
+nueva por cada cliente que ya no tenía, con su aviso de ficha creada (`customer.customer.created`), y un producto nuevo
+por cada producto que le faltaba, con su aviso de producto creado (`inventory.product.created`), y nada más; la
 copia, sin tocar; el aviso `control.copy.recovery_requested` con quién lo pidió.
 Si falla: lo que la restauración no admite lo dice el aviso, negocio a negocio, y ese negocio no se toca: uno que no está
 listo o no tiene base propia, una demo, uno que se está trasladando o restaurando, un clúster abierto a hubs nuevos o con
@@ -3137,14 +3141,15 @@ página lo vuelve a pedir. Lo que no se puede traer de una app lo dice su result
 el negocio («Clientes: nada (app_inactive: …)»), o la copia no la tenía, le falta la migración que su lectura necesita o
 tiene una que este código no conoce (`recover_not_in_copy`, `recover_copy_behind`, `recover_copy_ahead`). Una ficha que la
 operación de crear no acepta hoy (un teléfono que ya no vale), o un producto sin categoría fiscal o con una que Impuestos
-ya no tiene activa, se cuenta «sin crear» con su motivo. Si la copia ya no está,
+ya no tiene activa, se cuenta «sin crear» con su motivo, y también una ficha eliminada que entretanto se unió a otra o se
+borró («customer.customer_unavailable: …»). Si la copia ya no está,
 la recuperación dice «No se pudo hacer» y por qué («recover_copy_unreadable: …»). Mientras el negocio se traslada o se
 restaura, la recuperación espera sin hacer nada. Con la plataforma congelada para una subida de la base de datos, la restauración espera, con el negocio en
 mantenimiento, hasta que se descongela. Con registros solo del entorno de pruebas, después se recupera la cadena
 (VERIFACTU-F28). El personal de soporte ve la lista, Copias aparte y Recuperaciones, pero no las acciones.
 Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado), CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12,
-CUSTOMER-F13, CUSTOMER-F16, INVENTORY-F01, INVENTORY-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284,
-hub#1285, hub#1319, hub#1320, hub#1321, aws#77
+CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283,
+hub#1284, hub#1285, hub#1306, hub#1319, hub#1320, hub#1321, aws#77
 
 ## Para quien lo mantiene
 
@@ -4080,11 +4085,15 @@ hub#1285, hub#1319, hub#1320, hub#1321, aws#77
   migrador y la copia está cerrada a los de la app. El worker la lee con la conexión directa del migrador
   (`ops.connect_ops`) con `default_transaction_read_only`, nunca con un alias de hub (`names.is_left_behind`): ni tareas ni
   cola de VeriFactu corren en ella. Antes de leer lo de cada app mira su `django_migrations` en la copia. Qué devuelve lo
-  dice cada app con el gancho `recoverable_from_copy` de su `LiveAppConfig` (una lista de `recovery.Recoverable`: `label`,
-  `reads_since`, `read(conn)` por SQL sobre los nombres del modelo en su `queries.py`, `missing(records)` en su
-  `queries.py` y `create`, la operación que crea cada uno); `base/` no nombra ninguna. Lo que falta se crea con la
-  operación de la app, en el contexto del sistema y en el idioma del personal, dentro de `use_hub`. Hoy solo responde
-  Clientes (`cards_in_copy`, `cards_not_in_business`, con `has_live_twin`, la regla de la importación). Ninguna app cuyos
+  dice cada app con el gancho `recoverable_from_copy` de su `LiveAppConfig` (una lista de `base.recovery.Recoverable`:
+  `label`, `reads_since`, `read(conn)` por SQL sobre los nombres del modelo en su `queries.py`, `missing(records)` en su
+  `queries.py` y `create`, la operación que crea cada uno; y, los dos o ninguno, `deleted(records)` en su `queries.py` y
+  `restore`, la operación que devuelve lo que el negocio guarda eliminado, por su `id`, hub#1306); `base/` no nombra
+  ninguna. Primero vuelve lo eliminado y después se crea lo que falta, con las operaciones de la app, en el contexto del
+  sistema y en el idioma del personal, dentro de `use_hub`; un `InvalidPayload` o un `NotFound` es de ese registro y los
+  demás siguen, cualquier otro rechazo para la app. Hoy solo responde Clientes (`cards_in_copy`,
+  `cards_deleted_in_business` con `customer.customer.restore`, `cards_not_in_business`, con `has_live_twin`, la regla de
+  la importación). Ninguna app cuyos
   registros llegan a Hacienda responde (contrato en `test_recovery.py`). Tests: `base/tenancy/tests/test_recovery.py`
   (dos BD reales: la copia y el negocio), `apps/customer/tests/test_recovery.py`, `control/tests/test_services.py::TestRecover`,
   `control/tests/test_admin.py::TestRecoverIntoTheBusiness` y `tests/e2e/base-recover-from-copy.spec.ts`.

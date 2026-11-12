@@ -524,12 +524,12 @@ class RestoredCopy(AskedOfTheWorker):
 class CopyRecovery(AskedOfTheWorker):
     """What the staff asked to bring back into a business from one of its separate copies (hub#1257, layer 2 of
     hub#1213; BASE-F114): asked in the Hub admin (``control.copy.recover``), done by the worker
-    (``base.tenancy.recovery``), which reads the copy and creates in the business, by each app's own operation, what
-    the business lacks. Dropped with its copy.
+    (``base.tenancy.recovery``), which reads the copy and, by each app's own operations, brings back in the business
+    what it deleted and still holds and creates what it lacks. Dropped with its copy.
 
     ``apps`` are the labels asked, each an app that answers ``recoverable_from_copy`` on its ``LiveAppConfig``;
     ``language`` is the staff's, which the apps' refusals are said in. ``results`` says, app by app, how many were
-    created and how many not, with why (``reasons``, the first :data:`REASONS_KEPT`, by the copy's id: no personal
+    restored (hub#1306; absent from one noted before), created and not, with why (``reasons``, the first :data:`REASONS_KEPT`, by the copy's id: no personal
     data), or why the app gave nothing back (``refused``). The worker holds the row's own lease (``lease_owner``,
     ``lease_until``) while it recovers, never the hub's: the business's own work does not wait for it."""
 
