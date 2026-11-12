@@ -6,6 +6,7 @@ from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_
 from live.operations import AI, MIN_ASKS, registry
 
 from apps.task import queries, services  # noqa: F401  (importing them registers the operations)
+from apps.task.tests.test_assistant_yes_for_its_card import CHECKS
 
 PERMISSIONS = [
     "task.view",
@@ -138,6 +139,8 @@ def test_every_operation_tells_the_assistant_what_it_does():
                 "en": True,
                 "es": True,
             }, name
+        if name in CHECKS:  # the writes that take their record by its name check it before its card (hub#1219)
+            expected |= {"check"}
         assert set(op.ai) == expected, name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, name
