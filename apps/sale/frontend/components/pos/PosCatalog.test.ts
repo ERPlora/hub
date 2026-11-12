@@ -28,11 +28,11 @@ afterEach(() => {
 });
 
 const PRODUCTS = 'inventory.product.list';
-/** The refused article, followed while its notice is up (hub#442). */
+/** The refused article, followed while its notice is up. */
 const GET = 'inventory.product.get';
 const CATEGORIES = 'inventory.category.list';
-// The grid shows what is sold out too, greyed (SALE-F07), and the count of «All» counts what the grid shows
-// (FIX-INVENTORY-SOLD-OUT-GREYED-IN-POS): «All · 2» over two tiles, one of them greyed.
+// The grid shows what is sold out too, greyed (SALE-F07), and the count of «All» counts what the grid shows:
+// «All · 2» over two tiles, one of them greyed.
 const GRID = { is_active: true, include_sold_out: true, sort: 'name' };
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
@@ -142,7 +142,7 @@ describe('PosCatalog: taps', () => {
     expect(s.find('pos-tap-notice').exists()).toBe(false);
   });
 
-  it('the sold-out notice goes the moment the product is back on sale, without another tap (hub#442)', async () => {
+  it('the sold-out notice goes the moment the product is back on sale, without another tap', async () => {
     const s = await setup({}, 'es');
     await s.result(PRODUCTS, page([product({ id: 'p1', name: 'Croquetas', is_sold_out: true })]), { sort: 'name' });
     await click(s.find('pos-product-p1').element);
@@ -157,7 +157,7 @@ describe('PosCatalog: taps', () => {
     expect(s.params(GET)).toEqual([]);
   });
 
-  it('the toast that said why goes with the notice, and only then (hub#442)', async () => {
+  it('the toast that said why goes with the notice, and only then', async () => {
     const s = await setup();
     await s.result(PRODUCTS, page([product({ id: 'p1', name: 'Croquettes', is_sold_out: true })]), { sort: 'name' });
     await click(s.find('pos-product-p1').element);
@@ -256,7 +256,7 @@ describe('PosCatalog: search', () => {
   });
 });
 
-describe('PosCatalog: the «Speak» key (PLAN §30 point 4)', () => {
+describe('PosCatalog: the «Speak» key', () => {
   it('sits in the strip, with products hidden too (who sees it: SpeakKey.test.ts)', async () => {
     for (const showProducts of [true, false]) {
       const s = await setup({ showProducts });
@@ -340,7 +340,7 @@ describe('PosCatalog: the services of Services (SALE-F38)', () => {
     expect(s.find('pos-tap-notice').text()).toBe('No se puede vender: sin categoría fiscal. Falta configurar el IVA.');
   });
 
-  describe('the notice of a service without VAT (hub#719)', () => {
+  describe('the notice of a service without VAT', () => {
     const SERVICE = 'service.service.get';
 
     /** The till on «Services» with `rows`, the service `sv2` without VAT among them, and that service tapped. */

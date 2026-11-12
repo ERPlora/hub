@@ -14,7 +14,7 @@ from live.operations import registry
 from apps.attendance import events as E
 from apps.attendance import queries, services  # noqa: F401  (importing them registers the operations)
 
-# The old module's four permissions (module.json), plus clocking someone else (ATTENDANCE-F12).
+# Clocking someone else in or out (ATTENDANCE-F12) is a permission of its own.
 PERMISSIONS = [
     "attendance.clock",
     "attendance.view_all",
@@ -66,8 +66,8 @@ def test_attendance_is_a_free_module_of_the_people_group():
     assert config in module_configs()
     assert config.category is Category.PEOPLE
     assert config.premium is False
-    # Its own icon, the fingerprint of the old module and of time clocks on the market (UI-REQUESTS.md),
-    # registered in the shell; `ion:time-outline` is the Schedules app's on the apps page.
+    # Its own icon, the fingerprint of time clocks on the market, registered in the shell;
+    # `ion:time-outline` is the Schedules app's on the apps page.
     assert config.icon == "ion:finger-print-outline"
     assert all(
         other.icon != config.icon for other in module_configs() if other is not config
@@ -97,8 +97,8 @@ def test_roles():
     assert permissions_for_role([config], "hub_employee") == {"attendance.clock"}
 
 
-def test_navigation_is_the_old_menu_with_iconify_icons():
-    # The old module's two menu entries («Clock in», «Records») with their old icons, registered ones.
+def test_navigation_is_two_entries_with_iconify_icons():
+    # Two menu entries, «Clock in» and «Records», with icons the shell registers.
     entries = attendance().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
     assert [
@@ -110,7 +110,7 @@ def test_navigation_is_the_old_menu_with_iconify_icons():
 
 
 def test_the_review_of_forgotten_days_is_a_scheduled_task():
-    # ATTENDANCE-F05: every 15 minutes (UTC), collapsing missed runs, as the old module.
+    # ATTENDANCE-F05: every 15 minutes (UTC), collapsing missed runs.
     assert attendance().scheduled_tasks == [
         {
             "name": "review_stale",
@@ -149,12 +149,11 @@ def test_every_input_field_is_described():
             assert (field.description or "").strip(), f"{name}.{field_name}"
 
 
-# The Home's panel (PLAN-HUB round 2026-10-21; FIX-ATTENDANCE-SETUP-HOOKS): the old module's module.json `widgets`, one
-# KPI (it had no `setup` nor `bell`), on the count of «Clocked in now» (ATTENDANCE-F11).
+# The Home's panel: one KPI, on the count of «Clocked in now» (ATTENDANCE-F11).
 
 
-def test_the_homes_panel_is_the_old_modules_one():
-    """«Clocked in now» on by default, to whoever sees the whole team, in every business (the old sectors were all)."""
+def test_the_homes_panel_is_clocked_in_now():
+    """«Clocked in now» on by default, to whoever sees the whole team, in every business."""
     panels = attendance().widgets
     assert all(isinstance(panel, Widget) for panel in panels)
     assert [
@@ -197,7 +196,7 @@ def test_the_panel_maps_a_field_its_query_gives_and_takes_its_params():
 
 
 def test_a_kpi_says_its_name_once():
-    # gh:hub#1105: the old KPIs painted their header twice (the title and options.label with its icon).
+    # hub#1105: a KPI with options.label and an icon painted its header twice.
     for panel in attendance().widgets:
         assert not {"label", "icon"} & set(panel.options), panel.key
 
@@ -210,7 +209,7 @@ def test_the_panel_is_titled_in_english_and_in_spanish():
 
 
 def test_the_panel_is_refreshed_by_the_events_that_re_run_its_query():
-    """The events attendance emits today (`attendance.record.clocked_in`…), never the old module's
+    """The events attendance emits (`attendance.record.clocked_in`…), never the legacy names
     (`attendance.clocked_in`, `attendance.clocked_out`), as «Clocked in now» in Records follows them."""
     (panel,) = attendance().widgets
     assert list(panel.refresh_on) == [*E.PRESENCE, E.MEMBER_UPDATED, E.MEMBER_TERMINATED]
@@ -228,6 +227,5 @@ def test_the_panels_icon_is_registered_in_the_shell():
 
 
 def test_attendance_has_no_setup_steps_nor_bell_counters():
-    # The old module declared none (its module.json has no `setup` nor `bell`).
     assert attendance().setup == []
     assert attendance().bell == []

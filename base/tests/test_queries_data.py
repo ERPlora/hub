@@ -1,13 +1,11 @@
-"""Settings › Data, the reads (PLAN-HUB round 2026-10-21, «Blueprints»): the catalogue, what a blueprint brings, the
-export, the loads and the apps' data.
+"""Settings › Data, the reads: the catalogue, what a blueprint brings, the export, the loads and the apps' data.
 
-``base.blueprint.list`` (BASE-G103, the Home's card BASE-G131) gives the seeds of the catalogue, the hub's country
-first and then the person's language, and whether the business has nothing a template brings yet;
-``base.blueprint.inspect`` (BASE-G104, BASE-G105) what a template or a file brings, writing nothing;
-``base.blueprint.export`` (BASE-G101, BASE-G102) the ``.blueprint.zip`` of the apps and datasets chosen, a template
-never with personal data; ``base.import.list`` (BASE-G107, BASE-G108) the loads, the last one that did not go in whole
-first; ``base.dataset.list`` (BASE-G102) every app on with what of it can travel and how many rows it has. Only who runs
-the hub reads them.
+``base.blueprint.list`` (also behind the Home's card) gives the seeds of the catalogue, the hub's country first and
+then the person's language, and whether the business has nothing a template brings yet; ``base.blueprint.inspect``
+what a template or a file brings, writing nothing; ``base.blueprint.export`` the ``.blueprint.zip`` of the apps and
+datasets chosen, a template never with personal data; ``base.import.list`` the loads, the last one that did not go in
+whole first; ``base.dataset.list`` every app on with what of it can travel and how many rows it has. Only who runs the
+hub reads them.
 """
 
 import base64
@@ -71,7 +69,7 @@ def a_file(purpose="backup", apps=("table", "customer"), data=None):
     return base64.b64encode(blueprint.write_zip(bundle)).decode()
 
 
-# ── The catalogue (BASE-G103, BASE-G131) ───────────────────────────────────────────────────────────────────────────
+# ── The catalogue ──────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def test_the_catalogue_puts_the_persons_language_first():
@@ -127,7 +125,7 @@ C = Scope("host", "c")
 
 @pytest.fixture
 def born():
-    """A business as it is born (round 2026-10-27): ready in the registry, every app off (no row), and its owner."""
+    """A business as it is born: ready in the registry, every app off (no row), and its owner."""
     Hub.objects.create(slug="c", status=Hub.Status.READY)
     user = get_user_model().objects.create_user(username="carla", password="pw")
     Membership.objects.create(user=user, host="c", role=Membership.Role.OWNER)
@@ -146,7 +144,7 @@ def test_who_does_not_run_the_hub_does_not_get_the_catalogue(manager):
         call(manager, "base.blueprint.list")
 
 
-# ── What a blueprint brings (BASE-G104, BASE-G105) ─────────────────────────────────────────────────────────────────
+# ── What a blueprint brings ────────────────────────────────────────────────────────────────────────────────────────
 
 
 def test_inspecting_a_template_says_its_apps_and_rows_and_writes_nothing(owner):
@@ -186,7 +184,7 @@ def test_the_review_does_not_promise_an_app_that_will_not_go_on_here(born, count
 
 
 def test_an_app_off_the_blueprint_lists_is_said_to_turn_on_and_one_it_does_not_list_stays_off(born):
-    """The load turns on the apps its manifest lists (round 2026-10-27); an app named only by its data is not."""
+    """The load turns on the apps its manifest lists; an app named only by its data is not."""
     summary = call(born, "base.blueprint.inspect", file_base64=a_file(apps=("table",)))
 
     assert {app.id: app.status for app in summary.apps} == {"table": "turns_on", "customer": "inactive"}
@@ -218,7 +216,7 @@ def test_inspecting_a_broken_file_says_why(owner):
         call(owner, "base.blueprint.inspect", template="bakery.es")
 
 
-# ── Export (BASE-G101, BASE-G102) ──────────────────────────────────────────────────────────────────────────────────
+# ── Export ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def opened(exported):
@@ -291,7 +289,7 @@ def test_who_does_not_run_the_hub_cannot_export(manager):
         call(manager, "base.blueprint.export", name="Copia", language="es", purpose="template", apps=[])
 
 
-# ── The loads (BASE-G107, BASE-G108) ───────────────────────────────────────────────────────────────────────────────
+# ── The loads ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def test_the_loads_come_newest_first_and_the_last_unfinished_one_is_offered_again(owner, monkeypatch):
@@ -339,7 +337,7 @@ def test_the_loads_are_for_who_runs_the_hub(manager):
         call(manager, "base.import.list")
 
 
-# ── The apps' data (BASE-G102) ─────────────────────────────────────────────────────────────────────────────────────
+# ── The apps' data ─────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def test_every_app_on_is_listed_with_what_of_it_travels_and_how_many_rows(owner):
@@ -362,5 +360,5 @@ def test_the_apps_data_is_for_who_runs_the_hub(manager):
         call(manager, "base.dataset.list")
 
 
-def test_a_load_kept_in_phase_1_has_no_hub_column():
+def test_a_kept_load_has_no_hub_column():
     assert "hub_id" not in {field.attname for field in ImportBatch._meta.get_fields() if hasattr(field, "attname")}

@@ -1,4 +1,4 @@
-"""The outbox relay, phase 1 (PLAN-HUB «Eventos entre módulos», round 2026-10-20; ``base.relay``).
+"""The outbox relay (``base.relay``).
 
 Every tick of the worker hands each new outbox event to the reactions of the apps that listen to it (their
 ``events.py``), each in its own transaction, exactly once, as the system and in the scope of the hub that
@@ -150,7 +150,7 @@ def deliveries(name: str) -> dict[str, tuple[str, int]]:
     return {row.app_label: (row.status, row.attempts) for row in rows}
 
 
-# ── The tick: money, fiscal and stock, exactly once (trap 2) ──────────────────────────────────
+# ── The tick: money, fiscal and stock, exactly once ───────────────────────────────────────────
 
 
 def test_a_paid_sale_lowers_the_stock_once_and_keeps_one_invoice_and_one_record(worker_loop, till):
@@ -255,7 +255,7 @@ def test_a_round_fired_at_the_till_reaches_the_kitchen_once(worker_loop, db):
     assert (Ticket.objects.count(), PrintJob.objects.count()) == (1, 1)
 
 
-# ── The backlog: what was recorded before the relay existed is never applied (trap 1) ─────────
+# ── The backlog: what was recorded before the relay existed is never applied ──────────────────
 
 
 class _SchemaEditor:
@@ -300,7 +300,7 @@ def test_reverting_the_migration_gives_back_only_the_events_it_held_back(worker_
     assert relayed.delivered_at is not None
 
 
-# ── Only the apps that are on (trap 4) ────────────────────────────────────────────────────────
+# ── Only the apps that are on ─────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db  # which apps are on is the business's: its rows (base.activation)
@@ -317,7 +317,7 @@ def test_listeners_of_an_event():
 
 @pytest.mark.django_db
 def test_an_event_of_the_platform_is_heard_by_no_app_of_a_hub():
-    """Verification of hub#471 in pre: ``base.demo.created`` (control's outbox, the registry's scope) reached Flows
+    """hub#471, seen in pre: ``base.demo.created`` (control's outbox, the registry's scope) reached Flows
     («*»), whose reaction ran on control and failed 8 times with ``HubContextMissing``. An event of no hub has no hub
     to enter: the apps of a hub never hear it."""
     for name in ("base.demo.created", "base.demo.code_created", "base.hub.registered"):
@@ -346,10 +346,10 @@ def test_the_worker_takes_a_platform_event_without_handing_it_to_any_app(worker_
 
 @pytest.mark.django_db
 @pytest.mark.usefixtures("no_test_fallback")
-def test_on_control_the_relay_takes_the_platform_s_events_and_leaves_what_phase_1_left_of_a_business_alone(
+def test_on_control_the_relay_takes_the_platform_s_events_and_leaves_a_business_s_old_events_alone(
     monkeypatch,
 ):
-    """S5: control's outbox keeps the events a business of phase 1 recorded there before its cut; reading the apps on
+    """Control's outbox keeps the events a business recorded there before it had its own database; reading the apps on
     of that business would need its database, so on control the relay never takes one, nor runs its deliveries
     (the cut copies a business's own into its database: ``base.tenancy.cut``)."""
     from base.registry import REGISTRY_SCOPE
@@ -444,7 +444,7 @@ def test_an_app_that_is_off_receives_nothing_nor_the_history_once_it_is_on(worke
     assert stock() == Decimal("9")
 
 
-# ── Depth: a reaction that records events does not loop (trap 5) ──────────────────────────────
+# ── Depth: a reaction that records events does not loop ───────────────────────────────────────
 
 
 def test_what_a_reaction_records_is_handed_over_in_its_own_transaction_one_level_deeper(worker_loop, till):
@@ -506,7 +506,7 @@ def test_past_the_deepest_level_an_event_is_not_delivered_and_says_why(worker_lo
     assert any("depth" in record.getMessage() for record in caplog.records)
 
 
-# ── A failing reaction: retried a few times, never in a loop, never blocking the others (trap 5)
+# ── A failing reaction: retried a few times, never in a loop, never blocking the others ────────
 
 
 def test_a_reaction_that_fails_is_retried_with_a_growing_wait_then_given_up_and_the_rest_flows(
@@ -656,7 +656,7 @@ def test_a_refusal_given_up_at_the_last_attempt_is_an_error_with_its_code(one_de
     )
 
 
-# ── Two hubs and two workers (traps 3 and 5), on committed data ───────────────────────────────
+# ── Two hubs and two workers, on committed data ───────────────────────────────────────────────
 
 
 @pytest.fixture
@@ -766,7 +766,7 @@ def test_two_workers_never_deliver_the_same_event_to_the_same_app(committed_till
 
 @pytest.mark.django_db
 def test_a_hubs_outbox_has_one_pending_index_and_it_is_base_outbox_pending(hub_databases):
-    """``base/0006`` owns the index that takes a tick straight to the events not taken yet (PLAN-HUB, round 2026-10-20).
+    """``base/0006`` owns the index that takes a tick straight to the events not taken yet.
     Without it a tick reads the whole outbox; a second one on the same condition costs every write and serves no query.
     """
     with hubs._maintenance(hub_databases.a) as conn:

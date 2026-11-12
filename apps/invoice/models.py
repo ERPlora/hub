@@ -11,7 +11,7 @@
 - ``InvoiceLine`` is one concept of a document, its money squared (base + tax = total).
 
 Money is in whole cents with a sign (a rectifying document is negative); quantities have three
-decimals, as the sale's. Phase 1 has no tenancy (like ``apps.sale``).
+decimals, as the sale's.
 """
 
 from django.core.serializers.json import DjangoJSONEncoder
@@ -336,7 +336,7 @@ class Invoice(UUIDModel):
         _("status"), max_length=10, choices=Status.choices, default=Status.ISSUED
     )
     paid_at = models.DateTimeField(_("paid at"), null=True, blank=True)
-    # ERPlora's own invoices (its platform hub, PLAN-SAAS §4): the SaaS's id of the invoice, which makes posting it
+    # ERPlora's own invoices (its platform hub): the SaaS's id of the invoice, which makes posting it
     # again harmless, and the language its document is printed in (its payer's). Empty for the business's own.
     platform_ref = models.UUIDField(_("ERPlora invoice"), null=True, blank=True, unique=True)
     language = models.CharField(_("document language"), max_length=8, blank=True)

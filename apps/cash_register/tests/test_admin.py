@@ -1,5 +1,5 @@
-"""Django admin of the cash register app: every table with full CRUD for the platform's staff (round 12,
-PLAN §17). Ids and dates are shown, never typed; the database still refuses what no door may save."""
+"""Django admin of the cash register app: every table with full CRUD for the platform's staff. Ids and dates
+are shown, never typed; the database still refuses what no door may save."""
 
 import pytest
 from django.contrib import admin

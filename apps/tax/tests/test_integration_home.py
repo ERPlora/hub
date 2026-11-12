@@ -1,8 +1,7 @@
-"""Taxes on the Home (PLAN-HUB round 2026-10-21; FIX-TAX-SETUP-HOOKS): base's own query brings the old module's item
-«Your taxes» (module.json `setup`, taxes#19), important, pending while no active root rule of the business's country applies
-today (TAX-F17, hub#996; the query the notice of the tax screens reads), to whoever manages taxes, leading to the rules. Every
-change of it records an event it is refreshed on, and a change in hub B re-runs B's Home only; with Taxes off the Home
-does not ask.
+"""Taxes on the Home: base's own query brings «Your taxes», important, pending while no active root rule of the
+business's country applies today (TAX-F17; the query the notice of the tax screens reads), to whoever manages taxes,
+leading to the rules. Every change of it records an event it is refreshed on, and a change in hub B re-runs B's Home
+only; with Taxes off the Home does not ask.
 
 base and tax run for real: the step comes from TaxConfig through base's own query, as the person.
 """
@@ -92,7 +91,7 @@ def test_a_hub_without_rules_has_your_taxes_pending_and_it_leads_to_the_rules(ge
 
 @pytest.mark.django_db
 def test_in_spanish_it_says_the_words_of_the_notice(generic):
-    # gh:hub#2356: the old checklist said a module's step in English to a Spanish reader.
+    # A Spanish reader never reads a module's step in English.
     item = step(person(language="es"))
     assert (item["title"], item["description"]) == (
         "Tus impuestos",
@@ -108,7 +107,7 @@ def test_the_factory_spanish_rules_tick_it():
 
 @pytest.mark.django_db
 def test_one_root_rule_of_the_business_s_country_in_force_today_ticks_it_whatever_its_class(generic):
-    # Only the business's country counts (hub#996): Spain here, with no country registered. A rule of another country
+    # Only the business's country counts: Spain here, with no country registered. A rule of another country
     # would never price its sales.
     rule(generic, country_code="PT", rate_pct=Decimal("23"))
     assert step()["state"] == "pending"
@@ -138,8 +137,8 @@ def test_whoever_manages_taxes_is_told_and_who_only_reads_them_is_not(generic):
 
 
 def never_turned_on() -> None:
-    """Hub A as a business that has turned no app on yet (born with every app off: round 2026-10-27). Once on, Taxes
-    never goes off (mandatory in every country, hub#997), so only such a business has it off."""
+    """Hub A as a business that has turned no app on yet (born with every app off). Once on, Taxes never goes off
+    (mandatory in every country), so only such a business has it off."""
     AppActivation.objects.filter(host=A.key).update(state=activation.OFF, chosen=False)
     activation.forget(A.key)
 

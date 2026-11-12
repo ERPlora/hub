@@ -1,4 +1,4 @@
-"""``/ws/print``, the print host's channel (PLAN-HUB §5; the old hub's ``print_ws.rs``, hub#343): ``base.ws_print``.
+"""``/ws/print``, the print host's channel (the old hub's ``print_ws.rs``): ``base.ws_print``.
 
 Driven through ``config.asgi.application`` the way Daphne drives it, on the real database and the real printing
 operations, without mocks: the handshake is answered (it was a 500), ``hello`` → ``ready``, ``claim`` hands the
@@ -6,8 +6,8 @@ oldest job of the device's printers, ``done``/``failed`` close it, a job queued 
 of its hub and not another hub's, and every refusal has its own code: a host that is no hub, a foreign origin,
 no session, a session that ended, printing off, a frame before ``hello``, a frame too large.
 
-Phase 1 has one database for every hub (PLAN §16): the hub is the Host's first label, the same scope the HTTP
-doors take, and the wake travels on that scope's channel only.
+The hub is the Host's first label, the same scope the HTTP doors take, and the wake travels on that scope's channel
+only.
 """
 
 import asyncio
@@ -407,7 +407,7 @@ async def test_hello_without_a_session_is_refused_and_the_socket_closed(sockets)
 
 
 async def test_a_session_opened_on_another_hub_is_no_session_here_even_for_a_member_of_both(sockets, django_user_model):
-    """Phase 2, S1: the session notes the host it was opened on (``base.middleware.SessionHostMiddleware``); the print
+    """The session notes the host it was opened on (``base.middleware.SessionHostMiddleware``); the print
     socket reads the session itself, so it applies the same rule: B's session on A's socket is 4401."""
 
     def opened_on_b() -> str:
@@ -702,7 +702,7 @@ async def test_printing_off_closes_the_socket_with_app_inactive(sockets, session
         for name in [name for name in registry if name.startswith("printing.")]:
             monkeypatch.delitem(registry, name)
     else:
-        # Phase 2: the operation refuses an app that is off (live's app check), whatever it is asked.
+        # The operation refuses an app that is off (live's app check), whatever it is asked.
         real = registry["printing.printer.get"]
 
         def off(ctx, data):
@@ -893,7 +893,7 @@ async def test_a_beat_counts_the_printers_the_device_still_reaches(sockets, sess
     assert (await socket.receive())["refreshed"] == 0
 
 
-# ── The device's presence (FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE) ──────────────────────────────
+# ── The device's presence ────────────────────────────────────────────────────────────────────────────────
 
 
 #: The print hosts' presence (``print_presence``): printing declares its own under this name, which a test stands in for

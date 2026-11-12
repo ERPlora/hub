@@ -1,14 +1,14 @@
-"""The website's palettes: the colours a page is painted with, light and dark (round 2026-10-22).
+"""The website's palettes: the colours a page is painted with, light and dark.
 
 ``palettes.json`` holds the eight curated palettes (the editor shows the same file as swatch cards): for each, the
 second colour (``accent``) and a light and a dark set of the main colour (``primary``: buttons, the bold hero), the
 page (``bg``), the bands and cards (``surface``), the text, the links and the borders, written so that every pair a
 visitor reads passes WCAG AA (4.5:1; ``tests/test_palettes.py`` checks each).
 
-The owner may change the chosen palette's two colours (the theme's ``custom``, W8 of the same round): the page, the
-bands and the text are then derived from those two, whatever the palette, and a colour is nudged toward black or white
-only as far as AA needs (a dark blue is kept as chosen; a yellow button gets a darker yellow or black text, whichever
-is closer). No pair is refused: an unreadable one is made readable.
+The owner may change the chosen palette's two colours (the theme's ``custom``): the page, the bands and the text are
+then derived from those two, whatever the palette, and a colour is nudged toward black or white only as far as AA needs
+(a dark blue is kept as chosen; a yellow button gets a darker yellow or black text, whichever is closer). No pair is
+refused: an unreadable one is made readable.
 
 :func:`resolve` gives both modes with the derived roles the page also needs (the text on the main and the second
 colour, the muted text, the links' hover, the main colour's subtle tint); ``render`` writes them as Bootstrap's CSS

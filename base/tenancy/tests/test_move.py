@@ -1,4 +1,4 @@
-"""A hub's database moved to another cluster (round 2026-10-30b of PLAN-DB, decision 3; tranche S7, part 1).
+"""A hub's database moved to another cluster.
 
 ``control.hub.move`` asks; the worker moves (``base.tenancy.move.run_due``), under the hub's lease, one hub at a time:
 
@@ -146,7 +146,7 @@ class TestAMove:
         target = moves.cluster()
         hub = moves.hub(to=target)
         # The pass runs at the clock's own ``now``: the lease is held whether the pass claims with its ``now`` or with
-        # the clock, and by one minute only, so a claim that takes a lease about to run out is seen (hub#1351).
+        # the clock, and by one minute only, so a claim that takes a lease about to run out is seen.
         now = timezone.now()
         with use_control():
             HubDue.objects.create(hub=hub, due_at=now, lease_until=now + dt.timedelta(minutes=1), lease_owner="other:1")
@@ -315,7 +315,7 @@ class TestResuming:
     def test_an_undo_that_failed_is_tried_again_as_an_undo_never_from_a_database_that_only_has_the_name(
         self, moves, monkeypatch
     ):
-        # Review of round 2: a move that could not be undone is not taken forward on the next pass; it goes back to its
+        # A move that could not be undone is not taken forward on the next pass; it goes back to its
         # origin. The destination is on the origin's server here: after the rename, the hub's name there is the
         # destination's, never the data, which stays in the copy until it is renamed back.
         target = moves.cluster()
@@ -432,7 +432,7 @@ def test_the_restore_leaves_out_the_extensions_and_the_public_schema_of_the_copy
 
 
 
-# ── Review of round 2: two workers, an unreachable destination, a missing origin, the schema record ──────────────────
+# ── Two workers, an unreachable destination, a missing origin, the schema record ─────────────────────────────────────
 
 
 class TestTwoWorkers:
@@ -693,7 +693,7 @@ class TestTheOriginFirst:
 
 
 
-# ── Review of round 3: a cancel never takes an older copy for the hub's data; the minor points ───────────────────────
+# ── A cancel never takes an older copy for the hub's data; the minor points ──────────────────────────────────────────
 
 
 def an_older_copy(moves, hub, *, note: str = "old copy, two days old") -> str:
@@ -766,7 +766,7 @@ class TestTheUndoRenamesBackOnlyWhatLeft:
     def test_with_its_note_and_copy_a_database_of_the_hubs_name_on_the_origin_is_never_reopened_as_its_own(
         self, moves
     ):
-        # Review of round 4: the worker's note and the copy on the origin say the data is in the copy (an older copy is
+        # The worker's note and the copy on the origin say the data is in the copy (an older copy is
         # dropped before the note is written). A database with the hub's name there is the destination's (one server)
         # or a leftover, never the hub's: it is not reopened, the copy is not dated; the undo fails and is tried again.
         target = moves.cluster("away", port=1)
@@ -792,7 +792,7 @@ class TestTheUndoRenamesBackOnlyWhatLeft:
     def test_on_one_server_a_destination_that_cannot_be_dropped_never_takes_the_place_of_the_real_data(
         self, moves, monkeypatch
     ):
-        # The reviewer's probe (round 4): the restore fails, then the undo's drop of the destination does too. The hub
+        # The restore fails, then the undo's drop of the destination does too. The hub
         # stays moving (503) with its data in the copy, never ready on the destination's half-made database.
         target = moves.cluster()  # the origin's own server
         hub = moves.hub(to=target)

@@ -1,4 +1,4 @@
-"""The Content Security Policy of a hub's public website and of the editor's preview (round 2026-10-21).
+"""The Content Security Policy of a hub's public website and of the editor's preview.
 
 The SPA runs on a nonce with ``'strict-dynamic'`` and Trusted Types (``live.csp.base_policy``). The public page
 cannot: its HTML is cached and shared between visitors (``public_home``), so it carries no nonce, and it loads one

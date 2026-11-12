@@ -1,6 +1,6 @@
-"""What layer 1 of the assistant's QA says of Schedules (docs plan 2026-10-31, the assistant's knowledge and QA, §3):
-which tools it offers, what an employee is never offered, and that the owner's requests of the real-model QA (hub#1096),
-in the owner's own words, are offered their existing operation before Appointments' blocks.
+"""What layer 1 of the assistant's QA says of Schedules: which tools it offers, what an employee is never offered, and
+that the owner's requests of the real-model QA (hub#1096), in the owner's own words, are offered their existing
+operation before Appointments' blocks.
 
 Every ask of every tool of schedule bringing its tool among the first ten, role by role, in English and in Spanish, out
 of the catalogue of a business with every app on and ranked as a turn ranks, is ``base/tests/test_assistant_asks.py``'s

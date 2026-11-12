@@ -1,4 +1,4 @@
-"""The shared image library (round 2026-10-30, «blueprints con imágenes»): ``base.image_catalog``.
+"""The shared image library: ``base.image_catalog``.
 
 ERPlora/blueprints publishes ``img/<folder>/<name>.webp`` and ``img/catalog.json`` once for every hub: in AWS under
 ``shared/catalog/`` of the hubs' bucket, locally in the checkout beside this repo (``CATALOG_DIR``). The manifest names
@@ -36,7 +36,7 @@ CATALOG_IMAGE_ROUTES = {
     ("GET", "/catalog/images/detail", "base.catalog_image.get"),
 }
 
-#: A small library as ERPlora/blueprints writes its manifest (the real one has 491 images).
+#: A small library as ERPlora/blueprints writes its manifest (the real one has hundreds of images).
 IMAGES = [
     {
         "name": "cafe_con_leche",

@@ -1,6 +1,5 @@
-// cash_register#98: the drawer's fields drew a border style the app ignored. Ionic paints `fill="outline"`
-// only in its `md` mode (in `ios` it draws nothing), so every outlined input, select and textarea of Cash
-// register carries `mode="md"` (working rules §2, «UI completa»).
+// Ionic paints `fill="outline"` only in its `md` mode (in `ios` it draws nothing), so every outlined input,
+// select and textarea of Cash register carries `mode="md"`.
 import { describe, expect, it } from 'vitest';
 
 const sources = import.meta.glob('./**/*.vue', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;

@@ -1,4 +1,4 @@
-"""base's live queries: the Home's three, each re-run after the events its hooks name (PLAN-HUB round 2026-10-21).
+"""base's live queries: the Home's three, each re-run after the events its hooks name.
 
 The modules declare in ``refresh_on`` what changes their steps, panels and counters; base follows the union of them
 per query, and the SaaS's photo (``base.hub.state_applied``: apps, country or vertical may change) re-runs all three.
@@ -23,13 +23,13 @@ from base.events import (
     IMPORT_UNDONE,
 )
 
-#: What Settings › Data does to the business (APP-BASE-2): the Home reads itself again after each (BASE-G131).
+#: What Settings › Data does to the business: the Home reads itself again after each.
 DATA = {BLUEPRINT_IMPORTED, IMPORT_UNDONE, HUB_DATA_RESET}
 FAILED_EVENTS = (FAILED_EVENT_CREATED, FAILED_EVENT_RETRIED, FAILED_EVENT_DISCARDED)
 
-#: The way in's live queries (APP-BASE-3) have their own test: base/tests/test_access_live.py.
+#: The way in's live queries have their own test: base/tests/test_access_live.py.
 WAY_IN = ("base.access.", "base.device.", "base.profile.")
-#: People and permissions' (APP-BASE-5) too: base/tests/test_people.py and base/tests/test_approvals.py.
+#: People and permissions' too: base/tests/test_people.py and base/tests/test_approvals.py.
 PEOPLE = ("base.person.", "base.role.", "base.api_key.", "base.approval.", "base.api_doc.")
 
 
@@ -48,24 +48,23 @@ def test_the_three_queries_and_their_events():
         if name.startswith("base.") and not name.startswith(WAY_IN + PEOPLE)
     }
     assert on == {
-        # An app turned on or off by the business (PLAN-HUB §9) brings its hooks to the Home or takes them away.
+        # An app turned on or off by the business brings its hooks to the Home or takes them away.
         "base.setup.status": sorted({*declared("setup"), HUB_STATE_APPLIED, *DATA, *APP_EVENTS}),
         "base.widget.list": sorted({*declared("widgets"), HUB_STATE_APPLIED, *DATA, *APP_EVENTS}),
-        # The failed events the relay gives up on, resent or discarded change the bell's row (APP-BASE-7).
+        # The failed events the relay gives up on, resent or discarded change the bell's row.
         "base.bell.counters": sorted({*declared("bell"), HUB_STATE_APPLIED, *DATA, *FAILED_EVENTS, *APP_EVENTS}),
         "base.notice.list": sorted({*declared("notices"), HUB_STATE_APPLIED, *APP_EVENTS}),
-        # Apps (APP-BASE-4): the photo gives or takes the right to a paid module; the business turns them on and off.
+        # Apps: the photo gives or takes the right to a paid module; the business turns them on and off.
         "base.app.list": sorted({HUB_STATE_APPLIED, *APP_EVENTS}),
         # The photo, and the night that measured the business's own database (BASE-F40, base.usage).
         "base.plan.usage": [HUB_STATE_APPLIED, HUB_USAGE_MEASURED],
         "base.blueprint.list": sorted({HUB_STATE_APPLIED, *DATA}),
         "base.import.list": sorted({*DATA, *APP_EVENTS}),
-        # The copies of the business's data and its last reset: each step the worker tells, and the reset done (S2b).
+        # The copies of the business's data and its last reset: each step the worker tells, and the reset done.
         "base.hub.dumps": sorted([HUB_RESET_PROGRESSED, HUB_DATA_RESET]),
-        # Business settings (APP-BASE-6): the SaaS registers the business again when it changes on erplora.com.
+        # Business settings: the SaaS registers the business again when it changes on erplora.com.
         "base.business.get": [HUB_REGISTERED],
-        # System (APP-BASE-7): the failed events, and the photo or the business (they turn the app they were for on or
-        # off).
+        # System: the failed events, and the photo or the business (they turn the app they were for on or off).
         "base.failed_event.list": sorted({HUB_STATE_APPLIED, *FAILED_EVENTS, *APP_EVENTS}),
         # The status re-runs on the photo and on every reconnection (a deploy's new release shows by itself); the log
         # also when a failed event appears, is resent or discarded (its level changes).
@@ -73,7 +72,7 @@ def test_the_three_queries_and_their_events():
         "base.event.list": sorted({HUB_STATE_APPLIED, *FAILED_EVENTS}),
         # The cards of «Usage and plan» (hub#683): an app turned on or off, by the business or by the photo.
         "base.system.cards": sorted({HUB_STATE_APPLIED, *APP_EVENTS}),
-        # Files (APP-BASE-8): every write of the business's files, and the photo (the plan's space).
+        # Files: every write of the business's files, and the photo (the plan's space).
         "base.file.list": sorted({HUB_STATE_APPLIED, *FILE_EVENTS}),
     }
 
@@ -100,7 +99,7 @@ def test_a_booking_re_runs_the_devices_notices():
 
 
 def test_loading_undoing_or_resetting_re_runs_the_home_and_the_loads():
-    """BASE-G131: the Home reads its list, its panels and its bell again after a load, without reloading the page."""
+    """The Home reads its list, its panels and its bell again after a load, without reloading the page."""
     for event in DATA:
         assert {"base.setup.status", "base.widget.list", "base.bell.counters", "base.import.list"} <= (
             live_registry.affected([event])

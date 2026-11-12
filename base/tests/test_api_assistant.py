@@ -1,4 +1,4 @@
-"""The assistant over HTTP (APP-BASE-9): its four routes, each bound to its operation; the turn answers as a stream
+"""The assistant over HTTP: its four routes, each bound to its operation; the turn answers as a stream
 of frames (``text/event-stream``) the panel reads with ``fetch``; the gateway is ``fake_gateway`` (a real server).
 """
 
@@ -13,8 +13,8 @@ from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
 pytestmark = pytest.mark.django_db
 
 HOST = {"HTTP_HOST": "a.localhost:8000"}
-#: A question that names the app it asks about: «elementos» is no tool's word (the demo items say no asks), and since
-#: live#22 a «¿cuántos…?» of nothing a tool knows brings no list at all.
+#: A question that names the app it asks about: «elementos» is no tool's word (the demo items say no asks), and a
+#: «¿cuántos…?» of nothing a tool knows brings no list at all.
 ASK = {"role": "user", "content": "¿cuántos elementos tengo en Demo?"}
 
 
@@ -51,7 +51,6 @@ def test_each_route_is_bound_to_its_operation(path, method, operation):
 
 
 def test_nobody_without_a_session_talks_to_the_assistant(client, gateway):
-    """gh:hub#1254: the old hub's assistant doors answered without a session."""
     assert post(client, "/assistant/turn", {"messages": [ASK]}).status_code == 401
     assert client.get("/api/assistant/usage", **HOST).status_code == 401
     assert gateway.requests == []
@@ -88,7 +87,7 @@ def test_a_write_the_model_asked_for_comes_as_a_card_and_the_gateway_waits(clien
     assert got[0]["call"] == {**call, "shown": got[0]["call"]["shown"]} and len(got[0]["call"]["shown"]) == 64
     assert (got[1]["pending"], got[1]["continuation"]) == ([got[0]["call"]], "tok")
     # A round that never reached the gateway brought no pages of the web (hub#870): without the word, the browser would
-    # not know where the whole answer came from (ui#105), and its report would reach support without its text.
+    # not know where the whole answer came from, and its report would reach support without its text.
     assert got[1]["web"] is False
     assert gateway.requests == []
 
@@ -156,7 +155,7 @@ def test_a_dictation_over_two_megabytes_is_refused_by_the_hub(client, make_user)
 
 
 def test_a_long_answer_can_be_reported_whole(client, make_user, gateway):
-    """An answer with a long table runs past 4,000 characters: the Hub takes what erplora.com's door takes (BASE-G123)."""
+    """An answer with a long table runs past 4,000 characters: the Hub takes what erplora.com's door takes."""
     client.force_login(make_user("ana", host="a", role="hub_employee"))
     gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
     answer = "| a | b |\n" * 2_000
@@ -165,7 +164,7 @@ def test_a_long_answer_can_be_reported_whole(client, make_user, gateway):
     assert gateway.sent("/internal/assistant/report")[0].body["answer"] == answer
 
 
-# ── Whether the answer came from the web, end to end (hub#870, saas#287, BASE-F105) ────────────────────────────────
+# ── Whether the answer came from the web, end to end (hub#870, BASE-F105) ──────────────────────────────────────────
 
 
 def test_a_turn_that_searched_the_web_tells_the_browser_and_its_report_tells_erplora(client, make_user, gateway):
@@ -213,7 +212,7 @@ def test_a_turn_the_gateway_refused_closes_saying_it_brought_no_pages(client, ma
     assert got[-1]["web"] is False
 
 
-# ── A write a manager may approve (BASE-G118, with APP-BASE-5's approvals): the chat asks as the screen does ────────
+# ── A write a manager may approve: the chat asks as the screen does ─────────────────────────────────────────────────
 
 APPROVED_CREATE = {"demo.item.create": "Create an item"}
 
@@ -338,8 +337,8 @@ def test_with_the_managers_pass_it_runs_once_as_the_person_and_the_pass_is_spent
 
 
 def test_its_question_says_the_figures_of_the_write_and_the_record_keeps_them(client, make_user, gateway, approvable_create, monkeypatch):
-    """FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE: the chat asks with the figures of the very write the
-    person said yes to, read from its arguments as the command validates them; the pass spent keeps them."""
+    """The chat asks with the figures of the very write the person said yes to, read from its arguments as the
+    command validates them; the pass spent keeps them."""
     from django.apps import apps
 
     from base.models import Approval, Credential
@@ -384,7 +383,7 @@ def test_a_write_nobody_may_approve_is_still_refused_flat(client, make_user, gat
 
 def test_a_pass_approved_for_another_command_on_this_very_request_does_not_let_it_through(client, make_user, gateway, monkeypatch):
     """What the manager read on the dialog is what runs: a pass granted as «Create an item» on the fingerprint of a
-    turn that renames one spends nothing on the rename (rv-hub-247)."""
+    turn that renames one spends nothing on the rename."""
     from django.apps import apps
     from django.core.cache import cache
 
@@ -415,7 +414,7 @@ def test_a_pass_approved_for_another_command_on_this_very_request_does_not_let_i
     cache.clear()
 
 
-# ── How-to questions answered from ERPlora's documentation (saas ASSISTANT-F28) ─────────────────────────────────────
+# ── How-to questions answered from ERPlora's documentation ──────────────────────────────────────────────────────────
 
 DOCS = "/internal/assistant/docs/search"
 HOW = {"role": "user", "content": "¿Cómo abro la caja?"}
@@ -492,8 +491,8 @@ def test_nobody_without_a_session_makes_erplora_com_search(client, gateway):
 
 @pytest.mark.django_db(transaction=True)
 def test_the_turn_asks_the_documentation_before_its_transaction_opens(client, make_user, gateway, monkeypatch):
-    """The search waits on erplora.com (up to 15 s): inside the turn's transaction it would hold the hub's connection
-    (PLAN §14.2), so the route asks it first (``assistant.prepare``) and the turn reads the answer."""
+    """The search waits on erplora.com (up to 15 s): inside the turn's transaction it would hold the hub's connection,
+    so the route asks it first (``assistant.prepare``) and the turn reads the answer."""
     from django.db import connections
 
     from base import assistant
