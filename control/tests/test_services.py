@@ -241,10 +241,18 @@ class TestUpdate:
         assert (cluster.host, cluster.port) == ("writer-1.example", 5432)
 
     @pytest.mark.parametrize(
-        "held_by", ["a hub on its way", "a hub restored from it", "a moved copy", "a leftover of an undone move"]
+        "held_by",
+        [
+            "a hub on its way",
+            "a hub restored from it",
+            "a moved copy",
+            "a leftover of an undone move",
+            "a separate copy on it",
+            "a separate copy to make from it",
+        ],
     )
     def test_its_writer_never_changes_under_what_is_coming_or_kept_there(self, admin_ctx, held_by):
-        from control.models import LeftoverDatabase, MovedCopy
+        from control.models import LeftoverDatabase, MovedCopy, RestoredCopy
 
         cluster = a_cluster()
         hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")
@@ -254,6 +262,11 @@ class TestUpdate:
             Hub.objects.filter(pk=hub.pk).update(restoring_from=cluster)
         elif held_by == "a moved copy":
             MovedCopy.objects.create(hub=hub, cluster=cluster, db_name=f"hub_move_{hub.id.hex}", moved_at="2026-10-31T10:00Z")
+        elif held_by.startswith("a separate copy"):
+            where = {"cluster": cluster} if held_by.endswith("on it") else {"source": cluster}
+            RestoredCopy.objects.create(
+                hub=hub, restore_point="2026-10-31T10:00Z", db_name=f"hub_copy_{uuid.uuid7().hex}", asked_by="root", **where
+            )
         else:
             LeftoverDatabase.objects.create(hub=hub, cluster=cluster, db_name=hub.db_name, noted_at="2026-10-31T10:00Z")
 
