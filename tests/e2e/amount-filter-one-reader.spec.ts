@@ -1,10 +1,11 @@
-// flow: SALE-F28, CUSTOMER-F02, INVOICE-F16, CART_CHECKOUT-F12 and the Cash register's sessions list — hub#1196: the
-// amount filter «from / to» of every list reads what is typed the way any amount field of the Hub reads it (the
-// platform's `parseMoney`, through `filterCents` and `amountFilterErrors` of base). Before, the same text was read with
-// five different rules: «1.000,50» filtered in Customers, Cash register and Carts and was «not an amount» in Sales and
-// Invoicing; «1.000» was 1.000 € in Customers and refused elsewhere. Now, in a business in euros, at 390, 834 and 1440,
-// in the five lists: «1.000» (a thousand euros or one) filters nothing and says both readings under its box, with the
-// money field's words, and «1.000,50» filters: the list's live subscription asks for 100050 cents, nothing is said.
+// flow: SALE-F28, CUSTOMER-F02, INVOICE-F16, CART_CHECKOUT-F12, the Cash register's sessions list and Inventory's
+// products — hub#1196: the amount filter «from / to» of every list reads what is typed the way any amount field of the
+// Hub reads it (the platform's `parseMoney`, through `filterCents` and `amountFilterErrors` of base). Before, the same
+// text was read with five different rules: «1.000,50» filtered in Customers, Cash register and Carts and was «not an
+// amount» in Sales and Invoicing; «1.000» was 1.000 € in Customers and refused elsewhere. Now, in a business in euros,
+// at 390, 834 and 1440, in every one of those lists: «1.000» (a thousand euros or one) filters nothing and says both
+// readings under its box, with the money field's words, and «1.000,50» filters: the list's live subscription asks for
+// 100050 cents, nothing is said.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, capture, login, saveSessionForTheSweep, shown, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
@@ -20,6 +21,7 @@ const LISTS = [
   { app: 'cart_checkout', path: '/cart_checkout/carts', table: 'cart-checkout-carts', from: 'total_amount_from', op: 'cart_checkout.cart.list', param: 'total_amount_min' },
   { app: 'cart_checkout', path: '/cart_checkout/orders', table: 'cart-checkout-orders', from: 'total_amount_from', op: 'cart_checkout.order.list', param: 'total_amount_min' },
   { app: 'cash_register', path: '/cash_register/sessions', table: 'cash-register-sessions', from: 'opening_min', op: 'cash_register.session.list', param: 'opening_min' },
+  { app: 'inventory', path: '/inventory/products', table: 'inventory-products', from: 'price_min', op: 'inventory.product.list', param: 'price_min' },
 ] as const;
 const SIZES = [
   { label: '390', viewport: VIEWPORTS.phone },

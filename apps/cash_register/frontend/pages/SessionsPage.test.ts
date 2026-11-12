@@ -243,6 +243,16 @@ describe('SessionsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-F
     expect(prop(es, 'filterErrors')).toEqual({ difference_max: 'Esto no es un importe. Escribe una cifra, por ejemplo 12,50.' });
   });
 
+  it('only the difference takes a minus: «-5» filters there and says nothing, and cannot be negative under any other amount (hub#1196)', async () => {
+    const s = await setup();
+    await s.ready();
+    s.table().vm.$emit('update:filters', { difference_min: '-5', counted_max: '-5' });
+    await flush();
+    await s.reopen();
+    expect(prop(s, 'filterErrors')).toEqual({ counted_max: 'This amount cannot be negative.' });
+    expect(s.tableParams()).toEqual([{ difference_min: -500, sort: 'opened_at', dir: 'desc', limit: 50, offset: 0 }]);
+  });
+
   it('a filter the server refuses (422) goes under its filter; the rows stay and no error replaces them', async () => {
     const s = await setup();
     await s.ready();

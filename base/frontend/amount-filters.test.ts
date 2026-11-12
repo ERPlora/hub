@@ -6,7 +6,7 @@
 // hunt for it: it makes every list with an amount filter (a table column or panel filter `{ type: 'range', amount:
 // true }`) run the table of texts of `__tests__/amount-filter.ts` in its own test, where a reader of its own fails.
 // The lists that do not yet are named here with the issue that takes them to it.
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
@@ -77,4 +77,32 @@ describe('guardrail: every amount filter of the Hub is read as the money field r
     const done = Object.keys(NOT_YET).filter((file) => runsTheTable(`${HUB}/${file}`) || !files.includes(file));
     expect({ missing, done }, RUN_THE_TABLE).toEqual({ missing: [], done: [] });
   }, 60_000);
+
+  it('no app keeps a copy of what an amount filter says: the words are the platform’s (base.money.filter.*)', () => {
+    const copies: string[] = [];
+    for (const locale of ['en', 'es'] as const) {
+      const words = new Set(Object.values(catalogue(`${HUB}/base/frontend/locale/${locale}.json`, 'base.money.filter.')));
+      expect(words.size, `base.money.filter.* in ${locale}`).toBe(3);
+      for (const app of readdirSync(`${HUB}/apps`).sort()) {
+        const file = `${HUB}/apps/${app}/frontend/locale/${locale}.json`;
+        if (!existsSync(file)) continue;
+        for (const [key, text] of Object.entries(catalogue(file))) if (words.has(text)) copies.push(`apps/${app}/frontend/locale/${locale}.json: ${key}`);
+      }
+    }
+    expect(copies, 'say it with amountFilterErrors of base/frontend/lib/money.ts and delete the app’s own text').toEqual([]);
+  });
 });
+
+/** The texts of a locale file by their dotted key, those under `prefix` alone when given. */
+function catalogue(file: string, prefix = ''): Record<string, string> {
+  const out: Record<string, string> = {};
+  const walk = (node: unknown, path: string): void => {
+    if (typeof node === 'string') {
+      if (path.startsWith(prefix)) out[path] = node;
+    } else if (node && typeof node === 'object') {
+      for (const [key, value] of Object.entries(node)) walk(value, path ? `${path}.${key}` : key);
+    }
+  };
+  walk(JSON.parse(readFileSync(file, 'utf8')), '');
+  return out;
+}

@@ -10,7 +10,7 @@ import { formatQuantity } from '@erplora/ui/components';
 import type { Money } from '../../../../base/frontend/lib/home';
 
 export type { Money };
-export { formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';
+export { amountFilterErrors, filterCents, formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';
 export { formatQuantity };
 
 const formats = new Map<string, Intl.NumberFormat>();
