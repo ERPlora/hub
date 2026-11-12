@@ -344,6 +344,7 @@ class Salon:
         from apps.service.models import Service
         from apps.staff.models import Member
 
+        self.recoveries = recoveries
         self.hub, self.cards = recoveries.business(every_app_on, *cards)
         with use_hub(self.hub):
             self.ines = Member.objects.create(first_name="Inés", last_name="Mora").pk
@@ -360,6 +361,13 @@ class Salon:
             start=a_monday_at(hhmm),
             **fields,
         )
+
+    def lost_since_a_copy(self, *booked) -> RestoredCopy:
+        """A separate copy of the business as it is now, then each of ``booked`` deleted from the agenda since."""
+        copy = self.recoveries.copy_of(self.hub)
+        for one in booked:
+            run_in(self.hub, "appointment.appointment.delete", id=one.id)
+        return copy
 
     def live(self) -> list[tuple]:
         """The business's live appointments: their customer's name, professional, start, minutes, services and notes."""
@@ -384,6 +392,14 @@ def booked_events(hub: Hub) -> int:
         return OutboxEvent.objects.filter(name="appointment.appointment.created").count()
 
 
+def the_one_not_booked(asked: CopyRecovery) -> dict:
+    """Why the only appointment of ``asked`` that did not come back did not, the others having come back."""
+    [appointments] = fresh(asked).results
+    assert (appointments["created"], appointments["not_created"], appointments["refused"]) == (1, 1, "")
+    [why] = appointments["reasons"]
+    return why
+
+
 class TestAppointmentsComeBack:
     def test_the_appointments_the_business_lost_come_back_each_booked_by_its_operation(self, recoveries, every_app_on):
         salon = Salon(recoveries, every_app_on, ANA, LUIS)
@@ -391,10 +407,7 @@ class TestAppointmentsComeBack:
         first = salon.book(ana, "10:00", notes="Bring the colour reference")
         second = salon.book(luis, "11:00", duration_minutes=45)
         then = salon.live()
-        copy = recoveries.copy_of(salon.hub)
-        run_in(salon.hub, "appointment.appointment.delete", id=first.id)
-        run_in(salon.hub, "appointment.appointment.delete", id=second.id)
-        asked = recoveries.ask(copy, "appointment")
+        asked = recoveries.ask(salon.lost_since_a_copy(first, second), "appointment")
         before = booked_events(salon.hub)
 
         assert run() == 1
@@ -414,9 +427,7 @@ class TestAppointmentsComeBack:
 
     def test_asked_again_nothing_is_booked_twice(self, recoveries, every_app_on):
         salon = Salon(recoveries, every_app_on, ANA)
-        booked = salon.book(salon.cards[0], "10:00")
-        copy = recoveries.copy_of(salon.hub)
-        run_in(salon.hub, "appointment.appointment.delete", id=booked.id)
+        copy = salon.lost_since_a_copy(salon.book(salon.cards[0], "10:00"))
         recoveries.ask(copy, "appointment")
         run()
         again = recoveries.ask(copy, "appointment")
@@ -428,9 +439,7 @@ class TestAppointmentsComeBack:
 
     def test_one_gone_by_in_the_copy_does_not_come_back(self, recoveries, every_app_on):
         salon = Salon(recoveries, every_app_on, ANA)
-        booked = salon.book(salon.cards[0], "10:00")
-        copy = recoveries.copy_of(salon.hub)
-        run_in(salon.hub, "appointment.appointment.delete", id=booked.id)
+        copy = salon.lost_since_a_copy(salon.book(salon.cards[0], "10:00"))
         in_the_copy(
             copy,
             "UPDATE appointment_appointment SET start = now() - interval '1 day', \"end\" = now() - interval '23 hours'",
@@ -444,9 +453,7 @@ class TestAppointmentsComeBack:
 
     def test_its_customer_lost_too_comes_back_first_whatever_the_order_they_are_asked_in(self, recoveries, every_app_on):
         salon = Salon(recoveries, every_app_on, ANA)
-        booked = salon.book(salon.cards[0], "10:00")
-        copy = recoveries.copy_of(salon.hub)
-        run_in(salon.hub, "appointment.appointment.delete", id=booked.id)
+        copy = salon.lost_since_a_copy(salon.book(salon.cards[0], "10:00"))
         run_in(salon.hub, "customer.customer.delete", id=salon.cards[0])
         # Asked appointments first: they need their customer, so Customers goes before (``requires``).
         asked = recoveries.ask(copy, "appointment", "customer")
@@ -464,10 +471,7 @@ class TestAppointmentsComeBack:
         salon = Salon(recoveries, every_app_on, ANA, LUIS, MARTA)
         ana, luis, marta = salon.cards
         taken = salon.book(ana, "10:00")
-        free = salon.book(luis, "11:00")
-        copy = recoveries.copy_of(salon.hub)
-        run_in(salon.hub, "appointment.appointment.delete", id=taken.id)
-        run_in(salon.hub, "appointment.appointment.delete", id=free.id)
+        copy = salon.lost_since_a_copy(taken, salon.book(luis, "11:00"))
         # Its time given to another customer since, with the same professional.
         salon.book(marta, "10:00")
         asked = recoveries.ask(copy, "appointment")
@@ -475,9 +479,7 @@ class TestAppointmentsComeBack:
         run()
 
         assert [one[0] for one in salon.live()] == ["Marta Ruiz", "Luis Pérez"]
-        [appointments] = fresh(asked).results
-        assert (appointments["created"], appointments["not_created"], appointments["refused"]) == (1, 1, "")
-        [why] = appointments["reasons"]
+        why = the_one_not_booked(asked)
         assert why["id"] == str(taken.id)
         assert why["reason"].startswith("appointment.slot_taken: ")
 
@@ -485,19 +487,14 @@ class TestAppointmentsComeBack:
         salon = Salon(recoveries, every_app_on, ANA, LUIS)
         ana, luis = salon.cards
         lost = salon.book(ana, "10:00")
-        kept = salon.book(luis, "11:00")
-        copy = recoveries.copy_of(salon.hub)
-        run_in(salon.hub, "appointment.appointment.delete", id=lost.id)
-        run_in(salon.hub, "appointment.appointment.delete", id=kept.id)
+        copy = salon.lost_since_a_copy(lost, salon.book(luis, "11:00"))
         run_in(salon.hub, "customer.customer.erase", id=ana, reason="Asked under GDPR")
         asked = recoveries.ask(copy, "appointment")
 
         run()
 
         assert [one[0] for one in salon.live()] == ["Luis Pérez"]
-        [appointments] = fresh(asked).results
-        assert (appointments["created"], appointments["not_created"], appointments["refused"]) == (1, 1, "")
-        [why] = appointments["reasons"]
+        why = the_one_not_booked(asked)
         assert why["id"] == str(lost.id)
         assert why["reason"].startswith("customer.customer_unavailable: ")
 
