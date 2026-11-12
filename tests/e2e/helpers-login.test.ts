@@ -33,7 +33,7 @@ const MAIL = vi.hoisted(() => {
   return dir;
 });
 
-import { login, OWNER, SAAS } from './helpers';
+import { login, OWNER, SAAS, SAAS_CODE, SAAS_SIGN_IN } from './helpers';
 
 const HUB = 'http://bar.localhost:8000';
 /** The config's time for a test (playwright.config.ts). */
@@ -79,11 +79,8 @@ interface Answer {
   mails?: string;
 }
 
-/** Where each form of the SaaS posts (allauth.headless). */
-const POSTS_TO: Record<SaasForm, string> = {
-  'sign-in': `${SAAS}/_allauth/browser/v1/auth/login`,
-  code: `${SAAS}/_allauth/browser/v1/auth/code/confirm`,
-};
+/** Where each form of the SaaS posts. */
+const POSTS_TO: Record<SaasForm, string> = { 'sign-in': SAAS_SIGN_IN, code: SAAS_CODE };
 
 /** The line Django's file backend ends every mail with. */
 const MAIL_END = '-'.repeat(79);
@@ -405,7 +402,7 @@ describe('login, when the hub’s shell takes longer than a sixth of the test’
 });
 
 describe('login, when the hub’s gate sends the page to the SaaS', () => {
-  it('counts the SaaS’s own steps from the moment its page has loaded, as before', async () => {
+  it('waits for the SaaS however long its page takes to load, and for its way back to the hub', async () => {
     inATestOf(TEST_TIME);
     const { page } = pageDoing([
       { stops: [{ url: hubLogin, loads: 40_000, for: 50_000 }, { url: target, for: 1_000 }, { url: target, shell: true }] },
@@ -551,7 +548,11 @@ describe('login, when the SaaS takes longer than a sixth of the test’s time at
   });
 
   it.each([
-    ['signed in there already, it sends the page back to the hub', [{ url: launch, for: LATE }, { url: target }, { url: target, shell: true }]],
+    ['signed in there already, it sends the page back to the hub', [{ url: handBack, for: LATE }, { url: target }, { url: target, shell: true }]],
+    [
+      'on its sign-in page, signed in there already, it sends the page back to the hub without its form',
+      [{ url: launch, for: LATE }, { url: target }, { url: target, shell: true }],
+    ],
     [
       'back from the SaaS, the hub’s page takes its time to load',
       [{ url: launch, for: 1_000 }, { url: target, loads: LATE, for: LATE }, { url: target, shell: true }],
@@ -643,13 +644,47 @@ describe('login, when the SaaS says one of its steps is not coming', () => {
     };
     const trip = (): Goto => ({ stops: [...signingIn({}, {}, 'code answer'), dropped] });
     const { page, went, clock, listening } = pageDoing([trip(), trip()]);
+    // When the first try fails, on the page's clock. Its wait for the answer stays on, as Playwright's does: on this
+    // page's clock it runs out before the second try starts, so the clock at the end says nothing of the first try.
+    const firstTryFailed: number[] = [];
+    vi.spyOn(console, 'warn').mockImplementation(() => void firstTryFailed.push(clock()));
 
     const failure = await outcomeOf(page);
 
-    expect(failure).toMatch(new RegExp(`^Error: login on ${HUB}: the SaaS did not answer the code \\(net::ERR_CONNECTION_RESET\\) \\(code ${MAILED} for `));
+    const unanswered = `^Error: login on ${HUB}: the SaaS did not answer the code \\(net::ERR_CONNECTION_RESET\\) \\(code ${MAILED} for `;
+    expect(failure).toMatch(new RegExp(unanswered));
     expect(failure).not.toContain('code rejected');
     expect(went, 'one more try, from next again').toEqual([target, target]);
-    expect(clock(), 'failed within a few seconds of the page').toBeLessThan(5_000);
+    expect(firstTryFailed).toHaveLength(1);
+    expect(firstTryFailed[0], 'the first try failed within a few seconds of the page').toBeLessThan(5_000);
+    expect(listening(), 'listeners left on the page').toBe(0);
+  });
+
+  it('a sign-in its request gets no answer to (the connection refused): it did not answer the sign-in; one more try', async () => {
+    inATestOf(TEST_TIME);
+    const refused: Stop = { url: launch, form: 'sign-in', answers: { to: 'sign-in', failure: 'net::ERR_CONNECTION_REFUSED' } };
+    const trip = (): Goto => ({ stops: [...signingIn({}, {}, 'sign-in answer'), refused] });
+    const { page, went, clock, listening } = pageDoing([trip(), trip()]);
+    const firstTryFailed: number[] = [];
+    vi.spyOn(console, 'warn').mockImplementation(() => void firstTryFailed.push(clock()));
+
+    const failure = await outcomeOf(page);
+
+    expect(failure).toBe(`Error: login on ${HUB}: the SaaS did not answer the sign-in (net::ERR_CONNECTION_REFUSED)`);
+    expect(went, 'one more try, from next again').toEqual([target, target]);
+    expect(firstTryFailed).toHaveLength(1);
+    expect(firstTryFailed[0], 'the first try failed within a few seconds of the page').toBeLessThan(5_000);
+    expect(listening(), 'listeners left on the page').toBe(0);
+  });
+
+  it('a script of the SaaS answered with an error (its dev server optimizing it again, which reloads the page) is no sign: it signs in', async () => {
+    inATestOf(TEST_TIME);
+    const { page, went, listening } = pageDoing([{ stops: [{ url: launch, script: { status: 504 }, for: 1_000 }, ...signingIn()] }]);
+
+    await login(page, HUB, '/demo/items', OWNER);
+
+    expect(page.url()).toBe(target);
+    expect(went).toEqual([target]);
     expect(listening(), 'listeners left on the page').toBe(0);
   });
 

@@ -49,18 +49,30 @@ distintas: salir del hub en uno la termina en todos (el siguiente login salta ot
 guardado en ella lo hereda la siguiente. Una spec con dos dispositivos de la misma cuenta, o la del cambio de
 empleado por PIN si no rota la clave de sesión, pide `fresh: true` para tener la suya.
 
-Cada paso del SaaS espera una sexta parte del tiempo del test (30 s con los 180 s de `playwright.config.ts`; más con
-`test.slow()` o `test.setTimeout`) y, si no llega, falla diciendo cuál y cuánto esperó. La shell del hub (la barra de
-arriba, `topbar-apps`), en cambio, se espera todo el tiempo del test, al entrar y al final: con la máquina cargada la
-SPA tardó más de 30 s en montarla sin nada roto (hub#1342). Lo que dice que no va a llegar cae en el acto y dice por
-qué: en el hub, la página lanza un error (el arranque murió), un script suyo no carga (falla o contesta un error; un
-fallo de red se reintenta una vez, como una conexión rechazada), su documento contesta un error que no se recarga solo
-(un 500, el 503 en texto de un hub ocupado) o la página se va a una dirección que no es este hub ni el SaaS. Las páginas
-503 del negocio que se prepara, en mantenimiento o con la BD cortada traen `Retry-After` y se recargan solas: no cortan,
-se sigue esperando la shell. Una shell que no llega sin nada de eso
-choca con el tope del propio test, y Playwright nombra esa espera (`locator.waitFor`, `topbar-apps`). «code rejected» solo
-sale cuando el SaaS dice que el código no vale; si aún no ha contestado, el error dice «the SaaS did not answer
-the code within … ms».
+Cada paso del login se espera **todo el tiempo del test**, nunca una parte: la shell del hub (la barra de arriba,
+`topbar-apps`), al entrar y al final, y cada paso del SaaS (su página de acceso o la vuelta, su respuesta al inicio de
+sesión, la pantalla del código, su respuesta al código y la vuelta al hub). Con la máquina cargada la SPA tardó más de
+30 s en montar la shell (hub#1342) y el SaaS lo mismo en contestar un paso (hub#1370), sin nada roto. Lo que dice que
+no va a llegar cae en el acto y dice por qué:
+
+- en el hub, la página lanza un error (el arranque murió), un script suyo no carga (falla o contesta un error) o su
+  documento contesta un error que no se recarga solo (un 500, el 503 en texto de un hub ocupado). Las páginas 503 del
+  negocio que se prepara, en mantenimiento o con la BD cortada traen `Retry-After` y se recargan solas: no cortan;
+- en el SaaS, su documento contesta un error o un script suyo falla en la red (un error que lanza su página no cuenta,
+  ni un script al que su Vite contesta un error mientras reoptimiza y recarga la página);
+- la página se va a una dirección que no es este hub ni el SaaS (la página de error de Chrome, por ejemplo);
+- la **respuesta del propio SaaS**: al inicio de sesión, un 401 pide el código y un 2xx entra; al código, un 2xx lo
+  acepta. Un 4xx es el SaaS rechazándolo y un 5xx el SaaS fallando, con lo que dijo (`errors` de allauth): «code
+  rejected, the SaaS answered 400 (…): «Incorrect code.»» solo sale cuando el SaaS contesta que el código no vale, nunca
+  por lo que pinte la página. Una petición sin respuesta (conexión cortada o rechazada) dice «the SaaS did not answer the
+  code (net::…)», aunque la página del SaaS diga «We could not sign you in»;
+- el SaaS pide el código y no hay correo con él: lo escribe **antes** de contestar el inicio de sesión, así que se lee
+  una vez, cuando la pantalla del código ya está.
+
+Un fallo de red (`net::…`) se reintenta una vez, como una conexión rechazada. Un paso que no llega sin nada de eso
+choca con el tope del propio test, y Playwright nombra esa espera: `locator.waitFor` de `topbar-apps` para la shell,
+`page.waitForResponse` desde `signInWithCode` (la línea del código o la del inicio de sesión) para una respuesta del
+SaaS que no llega.
 
 ## Contar los streams de una página
 

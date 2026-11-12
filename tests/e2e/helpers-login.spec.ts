@@ -13,13 +13,10 @@
 // would reuse the hub's session it keeps and never reach the SaaS (FIX-HUB-E2E-HUB-LOGIN-RATELIMIT-429).
 import { type Browser, type BrowserContext, expect, type Route, test } from '@playwright/test';
 
-import { A, hostPage, listReady, login, OWNER, SAAS, shot, topbarApps } from './helpers';
+import { A, hostPage, listReady, login, OWNER, SAAS, SAAS_CODE as CODE, SAAS_SIGN_IN as SIGN_IN, shot, topbarApps } from './helpers';
 
 /** What `login` is given here: the trip through the SaaS, even with a session of the hub kept. */
 const JUMP = { fresh: true };
-
-const SIGN_IN = `${SAAS}/_allauth/browser/v1/auth/login`;
-const CODE = `${SAAS}/_allauth/browser/v1/auth/code/confirm`;
 
 const VIEWPORTS = [
   { label: '1440', width: 1440, height: 900 },
