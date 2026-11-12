@@ -27,7 +27,7 @@ def age(job_id, minutes: int) -> None:
 
 
 def test_a_business_that_never_saved_has_the_factory_settings():
-    # printing#42: the read answers the defaults and never writes a row.
+    # The read answers the defaults and never writes a row.
     out = run("printing.settings.get")
     assert (out.print_receipt_on_sale, out.open_drawer_on_sale, out.receipt_copies, out.updated_at) == (True, False, 1, None)
     assert (out.receipt_printer_id, out.kitchen_printer_id, out.bar_printer_id, out.label_printer_id) == (None,) * 4
@@ -130,7 +130,7 @@ def test_the_queue_newest_first_with_its_printer_and_what_can_be_done():
 @pytest.mark.parametrize(("language", "title"), [("es", "Comanda de cocina M-12"), ("en", "Kitchen order M-12")])
 def test_a_job_by_its_id_or_its_number_titled_as_the_queue_titles_it(language, title):
     """«printing.job.get»: one job as the queue shows it, titled by its document and its number in the reader's
-    language — what the assistant's card names a job by (FIX-HUB-PRINTING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS)."""
+    language — what the assistant's card names a job by."""
     printer("Kitchen", usage="kitchen")
     queued = enqueue("kitchen_order", {"order_number": "M-12", "items": [ITEM]}).job
     by_id = run("printing.job.get", {"job_id": str(queued.id)}, ctx_for("hub_employee", language=language))
@@ -206,7 +206,7 @@ def test_the_summary_by_function():
 
 
 def test_the_summary_names_the_printer_each_function_prints_on():
-    # hub#1527: the card says WHERE a function prints, never only how many printers it has.
+    # The card says WHERE a function prints, never only how many printers it has.
     def prints_on() -> dict:
         return {row.usage: row.prints_on for row in run("printing.job.summary").usages}
 
@@ -251,8 +251,7 @@ def test_the_devices_by_name_with_the_printers_each_one_reaches():
 
 def test_a_device_by_its_registration_id_with_the_printers_it_reaches():
     """«printing.device.detail»: one device set up to print, as the devices screen shows it — what the assistant's card
-    names a device by (FIX-HUB-PRINTING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS). Never its own id; a retired one is no
-    device there."""
+    names a device by. Never its own id; a retired one is no device there."""
     from apps.printing.models import PrintDevice
 
     till = printer("Till")
@@ -278,9 +277,9 @@ def test_a_device_by_its_registration_id_with_the_printers_it_reaches():
 # ── Who prints each function: the Home's «Set up your printer» and the bell's «Nothing is printing» ───────────────
 # A device set up here (not retired) prints the active printers it reaches: the jobs of those printers, and the jobs of
 # a function no printer took yet on the paper of one of them (``printing.job.claim``). A job no such device can take
-# waits for ever: that is what the bell counts (old-hub:HUB_SHELL-F63, gh:hub#800) — once it has waited a minute, and
-# counting as such a device only one that gave news in the last 90 s (FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF,
-# below). The Home's step asks set up only: a device off right now is not a step undone.
+# waits for ever: that is what the bell counts — once it has waited a minute, and counting as such a device only one
+# that gave news in the last 90 s (below). The Home's step asks set up only: a device off right now is not a step
+# undone.
 
 
 def reaches(*printers, name: str = "Counter", retired: bool = False, seen: dt.timedelta | None = dt.timedelta(0)):
@@ -326,8 +325,8 @@ def test_a_device_set_up_with_the_receipt_printer_prints_the_receipts():
 
 
 def test_a_device_set_up_but_off_still_ticks_the_step_and_its_receipts_ring_the_bell():
-    # The old hub's «registered for the station, live or not» (hub#1948): a till off overnight is not a step undone. But
-    # nobody is printing its receipts: the bell says so (print_hosts::is_undrained, live_hosts == 0).
+    # A device set up counts for the step, live or not: a till off overnight is not a step undone. But nobody is
+    # printing its receipts: the bell says so.
     reaches(printer("Till"), seen=dt.timedelta(minutes=5))
     enqueue()
     assert coverage() == (True, 1)
@@ -405,7 +404,7 @@ def test_whoever_sees_the_printers_reads_it_and_nobody_else():
         run("printing.device.coverage", {"usage": "receipt"}, ctx=ctx_for("nobody"))
 
 
-# ── The bell by the clock (FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF): the old hub's ``print_hosts::is_undrained``.
+# ── The bell by the clock ──
 # A job waits for nobody once it has waited a minute (``UNDRAINED_ALERT_SECONDS``: not every till that restarts) and no
 # device set up to print it gave news in the last 90 s (``HOST_TTL_SECONDS``: three missed beats of 30 s). News is its
 # hello and its beats on base's /ws/print (``printing.device.seen``), asking for a job and being set up from it.
@@ -440,7 +439,7 @@ def test_a_device_that_never_gave_news_prints_nothing():
 
 
 def test_a_receipt_queued_less_than_a_minute_ago_does_not_ring_it_yet():
-    # Not a red badge on every screen each time a till restarts (the old hub's 60 s).
+    # Not a red badge on every screen each time a till restarts: the bell waits a minute.
     till = printer("Till")
     reaches(till, seen=None)
     queued_ago(50)
@@ -513,6 +512,6 @@ def test_a_job_waiting_without_a_printer_is_only_taken_by_a_device_of_its_own_fu
     ],
 )
 def test_ties_go_by_id_in_the_lists_own_direction(operation, column, tied):
-    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
+    """hub#768: a descending list is the ascending one read backwards, ties included, and its
     pages neither repeat nor lose rows."""
     assert_reads_backwards(listed_with(run, operation, column, by_dir=True), sorted(tied()))

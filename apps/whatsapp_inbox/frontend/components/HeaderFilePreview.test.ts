@@ -1,7 +1,7 @@
-// WHATSAPP_INBOX-F29, F30 and F33: the file of a template's photo, video or document header, as the template's sheet and
-// «Send a template» show it (FIX-HUB-WHATSAPP-INBOX-TEMPLATE-SHEET-SHOWS-NO-HEADER-THUMBNAIL) — as WhatsApp Manager, WATI
-// or respond.io do: the photo's thumbnail, the video's first frame with a play sign, a document's icon; its name and
-// size next to it. While the photo or the video loads, a spinner; if it cannot be shown, a notice, and the name stays.
+// WHATSAPP_INBOX-F29, F30 and F33: the file of a template's photo, video or document header, as the template's sheet
+// and «Send a template» show it — as WhatsApp Manager, WATI or respond.io do: the photo's thumbnail, the video's first
+// frame with a play sign, a document's icon; its name and size next to it. While the photo or the video loads, a
+// spinner; if it cannot be shown, a notice, and the name stays.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { mountInbox, settle } from '../__tests__/mount-inbox';

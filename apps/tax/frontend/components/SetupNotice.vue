@@ -6,7 +6,7 @@
 // can manage taxes: the step is for whoever can fix it.
 // The market warns where taxes are set up (WooCommerce, Shopify, Toast) as well as in a start checklist
 // (Square, Odoo, Lightspeed): the Home's «Finish setting up your business» carries the same step, with the
-// same query and words (apps.py `setup`, FIX-TAX-SETUP-HOOKS).
+// same query and words (apps.py `setup`).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { IonButton } from '@ionic/vue';

@@ -1,4 +1,4 @@
-"""VeriFactu never goes off once on, in Spain (VERIFACTU-F32, FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON).
+"""VeriFactu never goes off once on, in Spain (VERIFACTU-F32).
 
 The platform's ``base.app.disable`` asks the app's ``can_disable`` (``base.activation.veto``). A business in Spain that
 turned VeriFactu on has its invoices reach the AEAT from then on: VERI*FACTU binds it at least to the end of the

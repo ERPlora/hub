@@ -18,7 +18,7 @@
   when they are painted, never kept with the snapshot: it is in every key of what is cached, so a business whose
   country (hence its currency) changes on erplora.com is never shown the old one until an entry expires.
 
-Every read is of the request hub's own row (``hub_id``; phase 1: the tables are shared, models.py).
+Every read is of the request hub's own row (``hub_id``).
 """
 
 import base64
@@ -329,9 +329,8 @@ def _count_visitor(ctx: OperationContext) -> None:
 def _live(scope: Scope) -> QuerySet[Site]:
     """The live publication of ``scope``'s hub: the one guard of every public path, the API's reads and ``/``.
 
-    404 ``app_inactive`` while the module is off in the hub (phase 1: every installed app is on,
-    ``base.relay.active_apps``; phase 2: the hub's activation), 404 for a scope that is no hub; then only that hub's
-    row, and only while it is published and online."""
+    404 ``app_inactive`` while the module is off in the hub (``base.relay.active_apps``), 404 for a scope that is no
+    hub; then only that hub's row, and only while it is published and online."""
     if WEBSITE not in relay.active_apps(scope):
         raise AppInactive(str(MODULE_OFF))
     return Site.objects.filter(LIVE, hub_id=hub_id(scope))

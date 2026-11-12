@@ -1,10 +1,8 @@
 """The table app's writes that draw the room: zones, tables, the settings and the holds.
 
-Cases from the old module's tests: zones.postgres and write_gates.postgres (editing something that is not
-there is an error; a refused write leaves no event), gate_constraints.postgres (each refusal under its own
-code), settings.postgres (one row, upserted), reservation_handoff and the old canvas («Se numera sola»,
-the first free spot, the number taken in the zone). Every command is one transaction with its event in
-the outbox.
+Editing something that is not there is an error; a refused write leaves no event; each refusal has its own code; the
+settings are one row, upserted; reservations hand their tables over; a new table numbers itself («Se numera sola»),
+takes the first free spot and a number free in its zone. Every command is one transaction with its event in the outbox.
 """
 
 import datetime as dt
@@ -139,7 +137,7 @@ def test_a_table_without_a_number_takes_the_first_free_one_of_its_zone():
     make_table("1", zone=zone)
     make_table("3", zone=zone)
     make_table("2", zone=make_zone("Terrace"))
-    # Two tables, so 3 — which is taken: the next free one (the old canvas' rule, tables#83).
+    # Two tables, so 3 — which is taken: the next free one.
     assert run("table.table.create", {"zone_id": str(zone.id)}).number == "4"
 
 
@@ -270,7 +268,7 @@ def test_a_deleted_table_leaves_the_plan_frees_its_number_and_keeps_its_history(
     table = make_table("4", zone=zone)
     order = open_check("Table 4")
     session = make_session(table, order_id=order.id)
-    # Its check was charged in Sales (no relay in phase 1): the table is free, so it may go.
+    # Its check was charged in Sales, with nothing relayed yet: the table is free, so it may go.
     from apps.sale.models import Order
 
     Order.objects.filter(pk=order.id).update(
@@ -413,7 +411,7 @@ def test_the_sweep_expires_the_holds_whose_window_passed_and_says_so_only_then()
 
 
 def test_the_sweep_says_which_tables_it_freed_one_notice_per_hold():
-    # hub#2681: one notice for the whole sweep, with no table, left an automation not knowing which.
+    # One notice for the whole sweep, with no table, would leave an automation not knowing which.
     six, seven = make_table("6"), make_table("7")
     make_hold(six, starts_in=-180, lasts=60, ref="r-6", source="reservation")
     make_hold(seven, starts_in=-240, lasts=60, ref="r-7", source="reservation")

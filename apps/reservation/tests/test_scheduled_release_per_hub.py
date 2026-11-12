@@ -2,7 +2,7 @@
 (``base.worker._hubs``) runs the release in each hub's database and on that hub's scope, so the Reservations screen of
 the business whose pending reservation was released hears it at once (its live notice on its channel, the one its
 open list listens on) and the screen of another business hears nothing; nor does the worker's fixed scope
-(``WORKER_SCOPE_SLUG``, the platform hub in production), where phase 1 told it.
+(``WORKER_SCOPE_SLUG``, the platform hub in production).
 
 Two real databases (the session's ``hub_a`` and ``hub_b``), committed (``transaction=True``). The notices are heard as a
 live stream hears them: ``LISTEN`` on the scope's channel, in control.

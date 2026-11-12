@@ -200,7 +200,7 @@ describe('SettingsPage', () => {
     expect(s.find('verifactu-settings-pending-indicator').exists()).toBe(false);
   });
 
-  it('in the installed app, «Read the signed declaration» opens it in the system browser (gh:hub#518)', async () => {
+  it('in the installed app, «Read the signed declaration» opens it in the system browser', async () => {
     const invoke = vi.fn(() => Promise.resolve());
     (window as TauriWindow).__TAURI__ = { core: { invoke } };
     const s = await setup();
@@ -210,8 +210,8 @@ describe('SettingsPage', () => {
     expect(invoke).toHaveBeenCalledWith('open_external_url', { url: CONFIG.declaration_url });
   });
 
-  // FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN: VeriFactu is only for Spain; outside it nothing that would lead
-  // to the AEAT is offered, with that one reason in sight.
+  // VeriFactu is only for Spain; outside it nothing that would lead to the AEAT is offered, with that one reason in
+  // sight.
   const OUTSIDE_SPAIN = { code: 'outside_spain', message: 'this business is not in Spain: VeriFactu is only for businesses in Spain, so nothing is sent to the AEAT' };
   const disabled = (s: Awaited<ReturnType<typeof setup>>, hook: string) =>
     (s.find(`verifactu-settings-${hook}`).element as unknown as { disabled: boolean }).disabled;

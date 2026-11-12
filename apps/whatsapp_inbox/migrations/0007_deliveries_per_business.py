@@ -3,8 +3,8 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     """A message the Hub sends (``Message.host``) and a number it asks erplora.com to forget (``Conversation.erase_host``)
-    keep the business that made them, so that the worker's ``delivery.resume`` (phase 1: one fixed scope) hands each
-    over for that business. Expand only: the columns come empty; a row made before has no business recorded and is
+    keep the business that made them, so that the worker's ``delivery.resume`` (which ran under one fixed scope) hands
+    each over for that business. Expand only: the columns come empty; a row made before has no business recorded and is
     resumed as the worker's scope, as it was. Going back drops the two columns."""
 
     dependencies = [
