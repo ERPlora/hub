@@ -68,6 +68,12 @@ AN_OPTION_BY_NAME = names(
 A_LINK = names("modifier.link.get", name=("label",))
 A_PRODUCT = names("inventory.product.get")
 A_CATEGORY = names("modifier.category.get")
+# A product or a category said by its name, when a group is applied to it or let go from it: the card reads it by those
+# words, as the write will find it (a product by its SKU or its name, a category by its name), so it shows the one the
+# write acts on, and says it as said when it cannot read it (hub#1291). Beside the id the write takes its record by
+# instead (the product's or the category's or, letting a group go, the link's), it neither reads nor shows it.
+A_PRODUCT_BY_NAME = names("inventory.product.get", by="product", as_said=True)
+A_CATEGORY_BY_NAME = names("modifier.category.get", by="category", as_said=True)
 
 GroupSort = Literal[
     "name",
@@ -357,11 +363,15 @@ class LinkListIn(PageIn):
 class _Target(_Input):
     product_id: UUID | None = Field(None, description="The product's id.", json_schema_extra=A_PRODUCT)
     product: Said | None = Field(
-        None, description="The product's SKU or name, when its id is not known."
+        None,
+        description="The product's SKU or name, when its id is not known.",
+        json_schema_extra=unless_given(A_PRODUCT_BY_NAME, "product_id"),
     )
     category_id: UUID | None = Field(None, description="The category's id.", json_schema_extra=A_CATEGORY)
     category: Said | None = Field(
-        None, description="The category's name, when its id is not known."
+        None,
+        description="The category's name, when its id is not known.",
+        json_schema_extra=unless_given(A_CATEGORY_BY_NAME, "category_id"),
     )
 
     def _targets(self) -> int:
@@ -391,8 +401,18 @@ class LinkRefIn(_Target):
     product_id: UUID | None = Field(
         None, description="The product's id.", json_schema_extra=unless_given(A_PRODUCT, "id")
     )
+    product: Said | None = Field(
+        None,
+        description="The product's SKU or name, when its id is not known.",
+        json_schema_extra=unless_given(A_PRODUCT_BY_NAME, "id", "product_id"),
+    )
     category_id: UUID | None = Field(
         None, description="The category's id.", json_schema_extra=unless_given(A_CATEGORY, "id")
+    )
+    category: Said | None = Field(
+        None,
+        description="The category's name, when its id is not known.",
+        json_schema_extra=unless_given(A_CATEGORY_BY_NAME, "id", "category_id"),
     )
     id: UUID | None = Field(None, title=APPLIES_TO, description="The link's id.", json_schema_extra=A_LINK)
     group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=unless_given(A_GROUP, "id"))

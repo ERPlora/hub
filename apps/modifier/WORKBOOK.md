@@ -365,7 +365,13 @@ varias (hub#1245). Si el grupo, la opción o el enganche llegan por su identific
 la tarjeta no lee ni enseña ese nombre, que la acción no usa: dice el registro del identificador (hub#1250). Una
 opción por su identificador se busca dentro del grupo que se diga a su lado, así que ese grupo sí sale. Al soltar un
 grupo por el identificador del enganche, la tarjeta tampoco enseña el grupo, el producto ni la categoría cuyo
-identificador llegue a su lado, que la acción no mira (hub#1278).
+identificador llegue a su lado, que la acción no mira (hub#1278). Al aplicar o soltar un grupo, un producto dicho por
+su SKU o su nombre y una categoría dicha por su nombre se buscan como los buscará la acción, y la tarjeta enseña el que
+se va a tocar («Producto: Pizza» cuando se dijo «pizz»); al aplicarlo, si lo dicho vale para varios, la tarjeta lo
+enseña tal como se dijo y la acción pregunta cuál, y el «sí» vale solo para lo que enseñó: si antes de confirmar alguien
+crea uno que encaja mejor con lo dicho, no se aplica nada y sale la tarjeta nueva. Si el producto, la categoría o el
+enganche llegan por su identificador junto al nombre de otro producto o de otra categoría, la tarjeta no enseña ese
+nombre, que la acción no usa: dice el del identificador (hub#1291).
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -537,8 +543,12 @@ cajero del producto actual es un empleado.
   tarjeta deja sin leer el nombre (`base.schemas.unless_given`, hub#1250); el `group` de `OptionRefIn` solo junto a
   `group_id`, porque la opción por su id se busca en ese grupo (`UNLESS` de `tests/test_assistant_yes_for_its_card.py`).
   Junto al `id` del enganche, `modifier.link.detach` deja sin leer también `group_id`, `product_id` y `category_id`, que
-  `detach_link` no mira (hub#1278; `UNLESS_BY_ID`, que recorre todo dato leído por id). El nombre de un producto o una
-  categoría a su lado sale aún tal como llega, porque `_Target` no los marca: hub#1291.
+  `detach_link` no mira (hub#1278; `UNLESS_BY_ID`, que recorre todo dato leído por id). El `product` y la `category` de
+  `_Target` se leen por sus palabras como los busca `services._target`, con `as_said`: `A_PRODUCT_BY_NAME` con
+  `inventory.product.get`, que busca entre los mismos productos vivos que `find_product` (sus `rows` solo dan la fila
+  final por su id), y `A_CATEGORY_BY_NAME` con `modifier.category.get`, el mismo `find_category`. Se dejan sin leer
+  junto a `product_id` o `category_id` y, al soltar, también junto al `id` del enganche (hub#1291;
+  `UNLESS_OF_A_TARGET`, por la marca con `unless_marked`).
 - **Administrador de Django con CRUD completo** (ronda 12, PLAN §17), solo en `hubs.erplora.com` y para
   el staff: lo que guarda no pasa por las operaciones ni deja aviso, y no aplica sus reglas propias (las
   opciones por defecto dentro del máximo, las 100 opciones por grupo); la base de datos sí le rechaza

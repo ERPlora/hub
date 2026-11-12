@@ -9,20 +9,33 @@ a name two groups fit or none has draws no card, and a yes after another group f
 shows the new card, as Demo (hub#1206) and Menus (hub#1217) do (MODIFIER-F03, MODIFIER-F04, MODIFIER-F05,
 BASE-F97). Adding an option to a group or applying it, which cannot check it, reads it the same way and says it as said
 when two fit; an option said by its name is read with its group (hub#1245). A record that comes by its id names no other
-group said beside it (hub#1250), nor another group, product or category whose id comes beside a link's (hub#1278).
+group said beside it (hub#1250), nor another group, product or category whose id comes beside a link's (hub#1278). A
+product or a category said by its name, when a group is applied or let go, is read as the write finds it, and left
+unread beside the id the write takes its record by instead (hub#1291).
 """
 
 import json
 
 import pytest
+from live.context import Scope
 from live.operations import get, registry
 
 from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
-from apps.modifier.tests.conftest import ctx_for, make_category, make_product, run
+from apps.modifier.tests.conftest import GENERIC, ctx_for, make_category, make_product, run
 from apps.modifier.tests.test_integration_assistant import TITLES, modifier_writes
 from base import assistant
 from base.schemas import names
-from base.tests.test_assistant_yes_for_its_card import read_as, turn_as, unless_by_id, unless_of, yes_to_its_card
+from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
+from base.tests.test_assistant_yes_for_its_card import (
+    read_as,
+    said,
+    turn_as,
+    unless_by_id,
+    unless_marked,
+    unless_of,
+    yes_to_its_card,
+)
 from base.tests.test_services_assistant import call
 
 pytestmark = pytest.mark.django_db
@@ -417,3 +430,232 @@ def test_the_yes_to_a_link_that_comes_by_its_id_lets_only_it_go_whatever_id_come
     done = yes_to_its_card(as_admin(), "modifier.link.detach", arguments)
     assert [row["outcome"] for row in done["executed"]] == ["ok"]
     assert state()[2] == [("Salsas picantes", "Hamburguesa", None)]
+
+
+# ── A product or a category said by its name, when a group is applied or let go (hub#1291) ───────────────────────────
+# Applying a group or letting it go finds a product by its id, else by its SKU or its name, and a category by its id,
+# else by its name (``services._target``): the card reads them by what was said, as the write will find them, and
+# says them as said when it cannot. Beside the id the write takes its record by instead (the product's or the
+# category's or, letting a group go, the link's), the card neither reads nor shows the name, which the write does not
+# use.
+
+#: How the card reads a product and a category said by their names: as Inventory's detail and Modifiers' own read of a
+#: category find them, the same finders the write uses.
+A_PRODUCT_SAID = names("inventory.product.get", by="product", as_said=True)
+A_CATEGORY_SAID = names("modifier.category.get", by="category", as_said=True)
+#: Beside which data each write of Modifiers takes its product or its category by them and not by its name.
+UNLESS_OF_A_TARGET = {
+    ("modifier.link.attach", "product"): {"product_id"},
+    ("modifier.link.attach", "category"): {"category_id"},
+    ("modifier.link.detach", "product"): {"id", "product_id"},
+    ("modifier.link.detach", "category"): {"id", "category_id"},
+}
+
+
+def test_a_product_or_a_category_said_by_its_name_is_read_as_its_write_finds_it_and_unread_beside_its_id():
+    """Found by the mark, not by the datum's name (``unless_marked``): every write that takes a product or a category
+    by its name reads it as the write finds it, and leaves it unread beside each id it takes its record by instead."""
+    writes = modifier_writes()
+    marked = {**unless_marked(writes, A_PRODUCT_SAID), **unless_marked(writes, A_CATEGORY_SAID)}
+    assert marked == UNLESS_OF_A_TARGET
+    taking = {(op.name, datum) for op in writes for datum in ("product", "category") if datum in op.input.model_fields}
+    assert taking == set(UNLESS_OF_A_TARGET)
+
+
+def extras_everywhere() -> dict:
+    """«Extras» applied to «Hamburguesa», to «Pizza» and to the categories «Entrantes» and «Postres»; «Salsas», applied
+    to nothing. Made with each app's own operations."""
+    from apps.inventory.models import Category
+
+    extras = a_group("Extras")
+    entrantes = Category.objects.get(name="Entrantes")
+    run("modifier.link.attach", {"group_id": str(extras.id), "category_id": str(entrantes.id)})
+    run("modifier.link.attach", {"group_id": str(extras.id), "product_id": str(make_product("Pizza", "PIZ").id)})
+    run("modifier.link.attach", {"group_id": str(extras.id), "category_id": str(make_category("Postres").id)})
+    run("modifier.group.create", {"name": "Salsas"})
+    return {
+        "id": ModifierLink.objects.get(group_id=extras.id, product=burger()).id,
+        "product_id": burger().id,
+        "category_id": entrantes.id,
+    }
+
+
+#: The name of another product or category that comes beside the id: «Pizza» and «Postres», which «Extras» hangs from.
+ANOTHER = {"product": "Pizza", "category": "Postres"}
+#: Each write with, beside the name of another product or category, the id it takes its record by instead: letting
+#: «Extras» go by the link's id, or by «Extras» and the id of «Hamburguesa» or «Entrantes»; applying «Salsas» to the
+#: product or the category of the id. → what the card says: the record of the id, never the name beside it.
+SAID_BY_ITS_ID = {
+    ("modifier.link.detach", "id", "product"): {"id": "Extras · Hamburguesa"},
+    ("modifier.link.detach", "id", "category"): {"id": "Extras · Hamburguesa"},
+    ("modifier.link.detach", "product_id", "product"): {"group": "Extras", "product_id": "Hamburguesa"},
+    ("modifier.link.detach", "category_id", "category"): {"group": "Extras", "category_id": "Entrantes"},
+    ("modifier.link.attach", "product_id", "product"): {"group": "Salsas", "product_id": "Hamburguesa"},
+    ("modifier.link.attach", "category_id", "category"): {"group": "Salsas", "category_id": "Entrantes"},
+}
+#: The links of ``extras_everywhere``, and the one each yes of ``SAID_BY_ITS_ID`` lets go or makes: of the id's
+#: record, never of the name beside it.
+LINKS = [
+    ("Extras", None, "Entrantes"),
+    ("Extras", None, "Postres"),
+    ("Extras", "Hamburguesa", None),
+    ("Extras", "Pizza", None),
+]
+TOUCHED_BY_ITS_ID = {
+    ("modifier.link.detach", "id"): ("Extras", "Hamburguesa", None),
+    ("modifier.link.detach", "product_id"): ("Extras", "Hamburguesa", None),
+    ("modifier.link.detach", "category_id"): ("Extras", None, "Entrantes"),
+    ("modifier.link.attach", "product_id"): ("Salsas", "Hamburguesa", None),
+    ("modifier.link.attach", "category_id"): ("Salsas", None, "Entrantes"),
+}
+
+
+def beside_another_name(write: str, by: str, kind: str) -> dict:
+    """The data of a case of ``SAID_BY_ITS_ID``."""
+    ids = extras_everywhere()
+    group = {} if by == "id" else {"group": "extras" if write == "modifier.link.detach" else "salsas"}
+    return {**group, by: str(ids[by]), kind: ANOTHER[kind]}
+
+
+def by_name(rows) -> list[tuple]:
+    """``rows`` of (group, product, category) in order, a link to a category before one to a product."""
+    return sorted(rows, key=lambda row: tuple(value or "" for value in row))
+
+
+def links() -> list[tuple]:
+    return by_name(ModifierLink.objects.values_list("group__name", "product__name", "category__name"))
+
+
+@pytest.mark.parametrize("case", sorted(SAID_BY_ITS_ID))
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_a_product_or_a_category_named_beside_the_id_its_write_takes_is_not_on_the_card(case, language):
+    shown = fields_of(case[0], beside_another_name(*case), language)
+    assert {name: field["value"] for name, field in shown.items()} == SAID_BY_ITS_ID[case]
+
+
+@pytest.mark.parametrize("case", sorted(SAID_BY_ITS_ID))
+def test_the_yes_beside_the_name_of_another_product_or_category_touches_only_the_record_of_the_id(case):
+    """Control of the above: the write lets go the link of the id, or applies «Salsas» to the product or the category
+    of the id; nothing of «Pizza» or «Postres» changes."""
+    write, by, _ = case
+    done = yes_to_its_card(as_admin(), write, beside_another_name(*case))
+    assert [row["outcome"] for row in done["executed"]] == ["ok"]
+    touched = TOUCHED_BY_ITS_ID[(write, by)]
+    expected = [row for row in LINKS if row != touched] if write == "modifier.link.detach" else [*LINKS, touched]
+    assert links() == by_name(expected)
+
+
+#: A product or a category said in part, with no id: the card says the one the write finds.
+SAID_IN_PART = {
+    ("modifier.link.attach", "product"): ({"group": "salsas", "product": "pizz"}, "Pizza"),
+    ("modifier.link.attach", "category"): ({"group": "salsas", "category": "postr"}, "Postres"),
+    ("modifier.link.detach", "product"): ({"group": "extras", "product": "pizz"}, "Pizza"),
+    ("modifier.link.detach", "category"): ({"group": "extras", "category": "postr"}, "Postres"),
+}
+
+
+@pytest.mark.parametrize("case", sorted(SAID_IN_PART))
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_a_product_or_a_category_said_by_its_name_is_on_the_card_as_the_write_finds_it(case, language):
+    """«pizz» shows «Pizza» and «postr», «Postres», under the word the screens call one, never the words said."""
+    extras_everywhere()
+    arguments, found = SAID_IN_PART[case]
+    field = fields_of(case[0], arguments, language)[case[1]]
+    assert (field["value"], field["label"]) == (found, TITLES[language][case[1]])
+
+
+@pytest.mark.parametrize("kind", ["product", "category"])
+def test_a_product_or_a_category_two_fit_stays_on_the_card_of_applying_a_group_as_said(kind):
+    """«pizz» fits «Pizza» and «Pizza grande»; «postr», «Postres» and «Postres caseros»: applying a group, which cannot
+    check it, still says it as said, and the write asks which."""
+    extras_everywhere()
+    make_product("Pizza grande", "PIG")
+    make_category("Postres caseros")
+    arguments = SAID_IN_PART[("modifier.link.attach", kind)][0]
+    assert fields_of("modifier.link.attach", arguments, "es")[kind]["value"] == arguments[kind]
+
+
+#: What somebody creates before the yes that fits better what was said (the same name wins over one that holds it).
+FITS_BETTER = {
+    "product": ("Pizz", lambda: make_product("Pizz", "PZZ")),
+    "category": ("Postr", lambda: make_category("Postr")),
+}
+
+
+@pytest.mark.parametrize("kind", sorted(FITS_BETTER))
+def test_the_yes_to_applying_a_group_touches_only_the_product_or_the_category_its_card_showed(kind):
+    """«pizz» shows «Pizza»; somebody creates «Pizz» before the yes: the yes applies the group to neither, and the card
+    it shows now says «Pizz». The same with «postr», «Postres» and «Postr»."""
+    extras_everywhere()
+    arguments = SAID_IN_PART[("modifier.link.attach", kind)][0]
+    better, create = FITS_BETTER[kind]
+    before = {}
+
+    def meanwhile():
+        create()
+        before["links"] = links()
+
+    done = yes_to_its_card(as_admin(), "modifier.link.attach", arguments, meanwhile=meanwhile)
+    assert done["executed"] == []
+    assert [value for name, value in said(done) if name == kind] == [better]
+    assert links() == before["links"]
+
+
+
+#: Words and the product each one names: by its SKU before a name that holds it, by its same name before one that
+#: holds it, else the only one that holds it; a deleted product is nobody.
+PRODUCTS_SAID = [("piz", "Calzone"), ("pizza", "Pizza"), ("grande", "Pizza grande"), ("calz", "Calzone")]
+
+
+def products_to_find() -> None:
+    """«Calzone» (SKU «PIZ»), «Pizza», «Pizza grande» and a deleted «Pizza fría»; «Salsas», applied to nothing."""
+    make_product("Calzone", "PIZ")
+    make_product("Pizza", "PZA")
+    make_product("Pizza grande", "PZG")
+    run("inventory.product.delete", {"id": str(make_product("Pizza fría", "PZF").id)})
+    run("modifier.group.create", {"name": "Salsas"})
+
+
+@pytest.mark.parametrize(("said", "product"), PRODUCTS_SAID)
+def test_the_read_the_card_names_a_product_by_finds_the_one_the_write_applies_a_group_to(said, product):
+    """The trap of hub#1291: Inventory's detail finds a product with its rows ready (``_products``), the write with
+    ``find_product`` alone. Both look for it among the same live products, so they find the same one."""
+    products_to_find()
+    read = run("inventory.product.get", {"product": said})
+    applied = run("modifier.link.attach", {"group": "salsas", "product": said})
+    assert (read.name, applied.product_name) == (product, product)
+
+
+@pytest.mark.parametrize(("said", "product"), PRODUCTS_SAID)
+def test_the_card_says_the_product_the_yes_applies_the_group_to(said, product):
+    products_to_find()
+    arguments = {"group": "salsas", "product": said}
+    assert fields_of("modifier.link.attach", arguments, "es")["product"]["value"] == product
+    done = yes_to_its_card(as_admin(), "modifier.link.attach", arguments)
+    assert [row["outcome"] for row in done["executed"]] == ["ok"]
+    assert ModifierLink.objects.get().product.name == product
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_words_that_fit_a_product_or_a_category_of_another_business_are_said_as_said(hub_a, hub_b, no_fallback):
+    """Each business in its own database: «pizz» and «postr» name «Pizza» and «Postres» in A, nothing in B."""
+    in_a = ctx_for("hub_admin", scope=Scope("host", hub_a.slug), language="es")
+    in_b = ctx_for("hub_admin", scope=Scope("host", hub_b.slug), language="es")
+
+    def shown(ctx) -> dict:
+        return {
+            kind: {
+                field["name"]: field["value"]
+                for field in assistant.card(get(write), arguments, "es", ctx)["fields"]
+            }[kind]
+            for (write, kind), (arguments, _) in SAID_IN_PART.items()
+            if write == "modifier.link.attach"
+        }
+
+    with use_hub(hub_a):
+        product = {"name": "Pizza", "sku": "PIZ", "price": 800, "tax_category_key": GENERIC}
+        run("inventory.product.create", product, ctx=in_a)
+        run("inventory.category.create", {"name": "Postres"}, ctx=in_a)
+        assert shown(in_a) == {"product": "Pizza", "category": "Postres"}  # positive control
+    with use_hub(hub_b):
+        assert shown(in_b) == {"product": "pizz", "category": "postr"}
