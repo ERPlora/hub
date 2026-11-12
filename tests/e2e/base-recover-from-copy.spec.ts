@@ -1,19 +1,22 @@
 // flow: BASE-F114 (steps 6-11), CUSTOMER-F07, CUSTOMER-F33, CUSTOMER-F06, CUSTOMER-F04, INVENTORY-F01, INVENTORY-F04,
-// INVENTORY-F34, SERVICE-F01, SERVICE-F07 — hub#1257, hub#1306, hub#1285, hub#1282, hub#1283, hub#1321, hub#1323: in the
-// Hub admin, the ERPlora staff choose a separate copy of a business and bring back into it the customers, the products and
-// the services it lost since, by their apps' own operations (never a copied row): a card or a product the business deleted
-// and still holds comes back the same, with its history (the card with its group), by Customers' and Inventory's restore;
-// a card it no longer has at all comes back as a new one with its group (the business's own of that name), its tag (made
-// again: the business deleted it) and its custom field's value; and a service as a new one, made by Services' create, into
-// its category, brought back before it by Categories' create when the business deleted it. At each size: two cards in a
-// group, the second with a tag and a custom field's value, a product and a service in its own category of `a` are made; in
-// Hubs, «Restore to a separate copy…» asks a copy of `a` from a temporary cluster (the stack's own server) and the
-// worker's pass makes it; the first card, the product and the service's category are deleted in `a`, the second card, the
-// tag and the service are gone from it; then Separate copies › tick the copy › «Recover into the business…» › Customers,
-// Products and Services ticked (with whatever else answers) › «Recover»; the worker's pass brings them back; Recoveries
-// says «Customers: 1 restored, 1 created; Products: 1 restored» and «Services: 2 created» (the category and the service),
-// and `a` has the same card live again in its group, the second one again in that group with its tag and its value, the
-// same product live again, and the category and the service live again under new ids, the service in that category.
+// INVENTORY-F34, SERVICE-F01, SERVICE-F07, SERVICE-F31 — hub#1257, hub#1306, hub#1285, hub#1282, hub#1283, hub#1321,
+// hub#1322, hub#1323: in the Hub admin, the ERPlora staff choose a separate copy of a business and bring back into it
+// the customers, the products and the services it lost since, by their apps' own operations (never a copied row): a
+// card or a product the business deleted and still holds comes back the same, with its history (the card with its
+// group), by Customers' and Inventory's restore; a card it no longer has at all comes back as a new one with its group
+// (the business's own of that name), its tag (made again: the business deleted it) and its custom field's value; and a
+// service as a new one, made by Services' create, into its category, brought back before it by Categories' create when
+// the business deleted it, and assigned by Services' assign to the professional who performed it, with her own minutes
+// and price. At each size: two cards in a group, the second with a tag and a custom field's value, a product and a
+// service in its own category of `a`, performed by a professional of Staff, are made; in Hubs, «Restore to a separate
+// copy…» asks a copy of `a` from a temporary cluster (the stack's own server) and the worker's pass makes it; the first
+// card, the product and the service's category are deleted in `a`, the second card, the tag and the service are gone
+// from it; then Separate copies › tick the copy › «Recover into the business…» › Customers, Products and Services
+// ticked (with whatever else answers) › «Recover»; the worker's pass brings them back; Recoveries says «Customers: 1
+// restored, 1 created; Products: 1 restored» and «Services: 2 created» (the category and the service), and `a` has the
+// same card live again in its group, the second one again in that group with its tag and its value, the same product
+// live again, and the category and the service live again under new ids, the service in that category and performed by
+// that professional again.
 // The stack's worker serves databases only (no moves' thread), so the spec plays its passes, as the specs play the
 // relay.
 import { spawnSync } from 'node:child_process';
@@ -176,6 +179,8 @@ for (const { label, viewport } of SIZES) {
     const product = aProduct(name, sku);
     const category = inA('service.category.create', { name, color: '#cc0066' });
     const service = aService(name, category);
+    const professional = inA('staff.member.create', { first_name: 'Recovered', last_name: `${label} ${RUN}` });
+    inA('service.assignment.assign', { service_id: service, member_id: professional, custom_duration: 50, custom_price: 2800 });
     const hubId = psql("select id from base_hub where slug = 'a'");
 
     const context = await browser.newContext({ viewport });
@@ -207,7 +212,9 @@ for (const { label, viewport } of SIZES) {
     psql(`delete from customer_customer where id = '${goneCard}'`);
     inA('customer.tag.delete', { id: tag });
     expect(psql(`select count(*) from customer_customertag where name = '${tagName}'`)).toBe('0');
-    // And the service gone from the business altogether: no operation deletes one (it is archived), a lost database does.
+    // And the service gone from the business altogether, who performed it with it: no operation deletes one (it is
+    // archived), a lost database does.
+    psql(`delete from service_assignment where service_id = '${service}'`);
     psql(`delete from service_service where id = '${service}'`);
     expect(psql(`select count(*) from service_service where name = '${name}'`)).toBe('0');
 
@@ -273,6 +280,9 @@ for (const { label, viewport } of SIZES) {
     expect(psql(`select color from service_category where id = '${back}'`)).toBe('#cc0066');
     expect(psql(`select category_id from service_service where name = '${name}'`)).toBe(back);
     expect(psql(`select is_deleted from service_category where id = '${category}'`)).toBe('t');
+    // And performed again by the same professional, with her own minutes and price, by Services' assign.
+    const performer = `select member_id, custom_duration, custom_price, is_active from service_assignment where service_id = (select id from service_service where name = '${name}')`;
+    expect(psql(performer)).toBe(`${professional}|50|2800|t`);
     await context.close();
   });
 }

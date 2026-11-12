@@ -3066,7 +3066,7 @@ clientes que se perdieron, los eliminados tal como eran, los productos, los serv
 crear y borrar el clúster temporal es el procedimiento «Devolver un negocio a un momento» de ERPlora/aws; las citas
 periódicas, hub#1327; el grupo, la etiqueta o el campo propio que el negocio borró después de eliminar un cliente que
 vuelve, hub#1356; la imagen y las categorías de un producto recuperado, hub#1319 y hub#1320; la imagen de un servicio
-recuperado, hub#1319; sus profesionales, hub#1322)
+recuperado, hub#1319; que Recuperaciones nombre al profesional que no vuelve con su servicio, hub#1375)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
 copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
@@ -3132,8 +3132,11 @@ Pasos:
       Después, cada servicio que el negocio ya no tiene vuelve como uno nuevo, en oferta, creado como lo crea la pantalla
       de Servicios, con su nombre, tarifa, precios, coste, duración, márgenes, capacidad, descripciones, reservas, orden,
       destacado, SKU, código de barras y notas, su categoría fiscal y su categoría: la misma si el negocio aún la tiene,
-      y si no, la que acaba de volver o la que el negocio volvió a crear con su nombre; sin su imagen (hub#1319) ni sus
-      profesionales (hub#1322). Uno archivado sigue
+      y si no, la que acaba de volver o la que el negocio volvió a crear con su nombre; y con los profesionales que lo
+      hacían y el negocio sigue teniendo de alta, cada uno con sus minutos y su precio propios, asignados como los asigna
+      Servicios (SERVICE-F31): como su servicio principal si el negocio no le ha dado otro desde entonces, y apagado si lo
+      estaba. A quien Personal dio de baja, o el negocio ya no tiene, no se le asigna, porque ya no se le puede reservar
+      (Recuperaciones aún no lo nombra, hub#1375). Sin su imagen (hub#1319). Uno archivado sigue
       en el negocio y no vuelve (se restaura en Servicios), tampoco uno que la copia tenía archivado, y no se repite uno
       que el negocio ya volvió a crear (otro con el mismo nombre en la misma categoría, que no sea ya uno de la copia; cada
       uno vale por uno solo, así que dos servicios con el mismo nombre vuelven los dos). Pedirlo otra vez no crea nada
@@ -3163,7 +3166,8 @@ propio que le faltaba hecho otra vez, con su aviso (`customer.group.created`, `c
 eliminado que aún guardaba, vivo otra vez con su aviso de producto recuperado (`inventory.product.restored`), un
 producto nuevo por cada producto que ya no tenía, con su aviso de producto creado (`inventory.product.created`), una
 categoría de servicios nueva por cada una que le faltaba, con su aviso de categoría creada (`service.category.created`),
-un servicio nuevo por cada uno que ya no tenía, con su aviso de servicio creado (`service.service.created`), y una cita
+un servicio nuevo por cada uno que ya no tenía, con su aviso de servicio creado (`service.service.created`) y uno de
+profesional asignado (`service.assignment.assigned`) por cada profesional que vuelve con él, y una cita
 nueva por cada una que le faltaba, con su aviso de cita creada (`appointment.appointment.created`), y nada más. Cada uno
 de esos avisos dice que lo hizo la recuperación (su autor es `copy_recovery:<id>`, el de la fila de Recuperaciones), así
 que ninguna automatización del negocio arranca con ellos (FLOW-F21), sea de algo creado o de algo recuperado; lo que
@@ -3194,9 +3198,9 @@ mantenimiento, hasta que se descongela. Con registros solo del entorno de prueba
 (VERIFACTU-F28). El personal de soporte ve la lista, Copias aparte y Recuperaciones, pero no las acciones.
 Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
-SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08, APPOINTMENT-F01, APPOINTMENT-F11, FLOW-F21; hub#1198,
-hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322,
-hub#1323, hub#1326, hub#1327, hub#1341, hub#1356, aws#77
+SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08, SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F11,
+FLOW-F21; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320,
+hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1356, hub#1375, aws#77
 
 ## Para quien lo mantiene
 

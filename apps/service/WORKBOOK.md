@@ -881,7 +881,8 @@ leer la moneda del negocio», con el motivo) y ofrece «Reintentar»; en cuanto 
 enciende (hub#946). Mientras llega la lista sale
 «Cargando…»; si no se puede leer, «No se han podido cargar los profesionales.» con el motivo y
 «Reintentar», nunca «Nadie asignado todavía».
-Implicados: STAFF-F01, SALE-F38
+Implicados: STAFF-F01, SALE-F38, BASE-F114 (desde una copia aparte, un servicio recuperado vuelve asignado, por esta
+misma operación, a quien lo hacía y el negocio sigue teniendo de alta)
 
 ### SERVICE-F32 Cambiar o quitar un profesional de un servicio
 <!-- origen: old:staff/workflow/disponibilidad.md#staff-f11 -->
@@ -1199,7 +1200,7 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
 - **Nombres únicos** entre los vivos, sin distinguir mayúsculas: categorías
   (`service_category_live_name_unique`) y bonos (`service_package_live_name_unique`); el servicio lo
   comprueba antes para dar el 409 y traduce la violación (dos guardados a la vez) al mismo 409.
-- **Recuperar desde una copia aparte** (BASE-F114, hub#1283, hub#1323): `apps.py` responde a la plataforma
+- **Recuperar desde una copia aparte** (BASE-F114, hub#1283, hub#1322, hub#1323): `apps.py` responde a la plataforma
   (`recoverable_from_copy`, `base.tenancy.recovery`) con lo que devuelve una copia aparte del negocio, en dos
   declaraciones que se devuelven en su orden. Primero sus categorías vivas que el negocio no tiene
   (`queries.categories_not_in_business`: eliminadas o perdidas, y no hechas otra vez, es decir, sin otra viva con su
@@ -1207,11 +1208,17 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   `service.category.create`, padres primero: dentro de su padre por su id si el negocio lo tiene (el mismo o hecho otra
   vez), por su nombre si vuelve también (se acaba de crear y aquí aún no tiene id), y en la raíz si la copia no lo tenía
   vivo; `queries.categories_in_copy` las lee por SQL. Después sus servicios en oferta que el negocio no tiene
-  (`queries.services_not_in_business`), cada uno creado por `service.service.create` con la clave de su categoría fiscal
-  y su categoría aquí (`_category_held`): la misma si sigue viva, si no la viva con su nombre en la copia (la que acaba de
-  volver o una hecha a mano), si no ninguna. `queries.services_in_copy` lee por SQL sobre los nombres del modelo (la
-  copia no es un negocio y no tiene alias) todos los servicios de la copia, en oferta o archivados (`is_active`), con el
-  nombre de su categoría allí (`category_name`). Un servicio de la copia lo tiene el negocio (`queries.services_in_business`, `{id en la
+  (`queries.services_not_in_business`), cada uno hecho otra vez por `service.service.recover` (solo el sistema, sin
+  ruta ni herramienta del asistente), todo o nada: el servicio, por `service.service.create` con la clave de su
+  categoría fiscal y su categoría aquí (`_category_held`): la misma si sigue viva, si no la viva con su nombre en la
+  copia (la que acaba de volver o una hecha a mano), si no ninguna; y cada profesional que lo hacía en la copia y el
+  negocio sigue teniendo (no dado de baja, por su id: `staff.queries.live_members`), por `service.assignment.assign`
+  con sus minutos y su precio propios, principal solo si el negocio no le ha dado otro servicio principal desde
+  entonces, y apagado por `service.assignment.update` si lo estaba. Va en la misma operación, y no en una declaración
+  más, para que solo se asigne en los servicios que vuelven: en uno que el negocio conserva o rehízo a mano no se toca
+  nada. `queries.services_in_copy` lee por SQL sobre los nombres del modelo (la copia no es un negocio y no tiene
+  alias) todos los servicios de la copia, en oferta o archivados (`is_active`), con el nombre de su categoría allí
+  (`category_name`), y `queries.recoverable_services_in_copy` les añade quién los hacía allí (`assignments`). Un servicio de la copia lo tiene el negocio (`queries.services_in_business`, `{id en la
   copia: id en el negocio}`, con la lista entera de la copia) si es el mismo, en oferta o archivado, o, si la copia lo
   tenía en oferta, uno hecho otra vez: un servicio que no es ninguno de la copia, con el mismo nombre (sin distinguir
   mayúsculas ni espacios) en la categoría a la que volvería. Los nombres no son únicos: cada hecho otra vez responde por
@@ -1353,8 +1360,8 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   sus sesiones. Le pasa también a los vendidos antes de esa cifra.
 - **Importar servicios desde un fichero**: como en el producto actual, el alta de golpe es del
   asistente y la API.
-- **Lo que no vuelve con un servicio recuperado desde una copia aparte** (BASE-F114): su imagen (hub#1319) y sus
-  profesionales con su precio y su duración propios (hub#1322).
+- **Lo que no vuelve con un servicio recuperado desde una copia aparte** (BASE-F114): su imagen (hub#1319); y
+  Recuperaciones no nombra al profesional dado de baja que no vuelve con él (hub#1375).
 
 ## Lo que NO hace, a propósito
 

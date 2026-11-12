@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f199bf3d1f10ad6e9e0c14b811e5fce99e5f1fc86bacf4f3bec1d771c29859a2 -->
+<!-- generated from WORKBOOK.md sha256:b4f8602e2119c8d76974e2d310299c73d130aa6e8a37f1fea55bec6208ac5f78 -->
 
 ## What it is for and who it is for
 
@@ -2936,7 +2936,8 @@ the customers that were lost, the deleted ones as they were, the products, the s
 appointments; making and deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of
 ERPlora/aws; repeating appointments, hub#1327; the group, tag or own field the business deleted after deleting a
 customer who comes back, hub#1356; the image and the categories of a product brought back, hub#1319 and hub#1320; the
-image of a service brought back, hub#1319; its professionals, hub#1322)
+image of a service brought back, hub#1319; Recoveries naming the professional who does not come back with their service,
+hub#1375)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -3005,8 +3006,12 @@ Steps:
       comes back as a new one, on offer, created as the Services screen creates it, with its name, pricing, prices, cost,
       duration, buffers, capacity, descriptions, booking settings, order, featured flag, SKU, barcode and notes, its tax
       category and its category: the same one if the business still has it, and otherwise the one that has just come
-      back or the one the business created again with its name; without its image (hub#1319) or its professionals
-      (hub#1322). An archived one is still in the business and does not come
+      back or the one the business created again with its name; and with the professionals who performed it and the
+      business still has on its staff, each with their own minutes and price, assigned as Services assigns them
+      (SERVICE-F31): as their main service if the business has not given them another since, and switched off if it
+      was. Someone Staff terminated, or the business no longer has, is not assigned, because they can no longer be
+      booked (Recoveries does not name them yet, hub#1375). Without its image (hub#1319). An archived one is still in
+      the business and does not come
       back (it is restored in Services), nor does one the copy had archived, and one the business has already made again
       (another with the same name in the same category, not itself one of the copy's; each counts for one only, so two
       services with the same name both come back) is not repeated. Asking again creates nothing twice.
@@ -3035,7 +3040,8 @@ field it lacked made again, with its notice (`customer.group.created`, `customer
 product it still held, live again with its product-recovered notice (`inventory.product.restored`), a new product for
 each product it no longer had, with its product-created notice (`inventory.product.created`), a new service category
 for each one it lacked, with its category-created notice (`service.category.created`), a new service for each one it
-no longer had, with its service-created notice (`service.service.created`), and a new appointment for each one it
+no longer had, with its service-created notice (`service.service.created`) and a professional-assigned notice
+(`service.assignment.assigned`) for each professional who comes back with it, and a new appointment for each one it
 lacked, with its appointment-created notice (`appointment.appointment.created`), and nothing else. Each of those notices
 says the recovery did it (its actor is `copy_recovery:<id>`, that of the row in Recoveries), so no automation of the
 business starts on them (FLOW-F21), whether of something created or of something recovered; what only brings the
@@ -3068,6 +3074,6 @@ is unfrozen. With records from the test environment only, the chain is recovered
 support staff see the list, Separate copies and Recoveries, but not the actions.
 Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
-SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08, APPOINTMENT-F01, APPOINTMENT-F11, FLOW-F21; hub#1198,
-hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322,
-hub#1323, hub#1326, hub#1327, hub#1341, hub#1356, aws#77
+SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08, SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F11,
+FLOW-F21; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320,
+hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1356, hub#1375, aws#77
