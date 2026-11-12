@@ -30,6 +30,7 @@ from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
 from django.utils import translation
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext_lazy
 from live.context import OperationContext, Scope
 from live.errors import OperationError
 from live.operations import get
@@ -57,16 +58,29 @@ RESENT = _(
     "Resend finished: %(accepted)s accepted, %(rejected)s rejected, %(waiting)s still waiting."
 )
 RESCHEDULE = _("Reschedule: send with the next pass")
-RESCHEDULED = _("Rescheduled: %(count)s record(s) go out with the next pass.")
+#: A count says itself in the singular or the plural (hub#1275): «1 record goes out», never «record(s)».
+RESCHEDULED = ngettext_lazy(
+    "Rescheduled: %(count)s record goes out with the next pass.",
+    "Rescheduled: %(count)s records go out with the next pass.",
+    "count",
+)
 RESCHEDULE_CHAIN = _("Reschedule its queue: send with the next pass")
-CHAINS_RESCHEDULED = _("Rescheduled: %(count)s chain(s) go out with the next pass.")
+CHAINS_RESCHEDULED = ngettext_lazy(
+    "Rescheduled: %(count)s chain goes out with the next pass.",
+    "Rescheduled: %(count)s chains go out with the next pass.",
+    "count",
+)
 NOTHING_WAITING = _("nothing is waiting in its queue.")
 ASK_THE_AEAT = _("Ask the AEAT (out of the queue if it already has it)")
 ASKED = _(
     "Asked the AEAT: %(held)s already registered (out of the queue), %(missing)s not in the AEAT (still in the queue)."
 )
 CORRECT_REJECTION = _("Correct a rejection with a new record")
-CORRECTED = _("Corrected: %(count)s new record(s) in the queue.")
+CORRECTED = ngettext_lazy(
+    "Corrected: %(count)s new record in the queue.",
+    "Corrected: %(count)s new records in the queue.",
+    "count",
+)
 ONLY_REJECTED_REGISTERED = _(
     "only a record the AEAT rejected is corrected here; this one is registered."
 )
@@ -283,7 +297,7 @@ class SendControlAdmin(SupportActions, ReadOnlyAdmin):
             count += out is not None
         if count:
             self.message_user(
-                request, str(CHAINS_RESCHEDULED) % {"count": count}, messages.SUCCESS
+                request, CHAINS_RESCHEDULED % {"count": count}, messages.SUCCESS
             )
 
 
@@ -512,7 +526,7 @@ class RecordAdmin(SupportActions, ReadOnlyAdmin):
             count += out is not None
         if count:
             self.message_user(
-                request, str(RESCHEDULED) % {"count": count}, messages.SUCCESS
+                request, RESCHEDULED % {"count": count}, messages.SUCCESS
             )
 
     @admin.action(description=ASK_THE_AEAT)
@@ -568,7 +582,7 @@ class RecordAdmin(SupportActions, ReadOnlyAdmin):
             count += out is not None
         if count:
             self.message_user(
-                request, str(CORRECTED) % {"count": count}, messages.SUCCESS
+                request, CORRECTED % {"count": count}, messages.SUCCESS
             )
 
 
