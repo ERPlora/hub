@@ -673,20 +673,71 @@ describe('AppsPage', () => {
       expect(ids(m.wrapper)).toEqual(['sale', 'customer', 'task']);
     });
 
-    it('counts the chosen apps on against the plan’s limit, or says there is none', async () => {
-      const m = await open();
-      await m.result(m.call, 'base.app.list', APPS);
-      expect(m.wrapper.find('[data-testid="apps-counter"]').text()).toBe('2 of 20 apps turned on');
-      await m.result(m.call, 'base.app.list', { ...APPS, max_apps: null, enabled: 1 }, 2);
-      expect(m.wrapper.find('[data-testid="apps-counter"]').text()).toBe('1 app turned on · Unlimited');
-    });
+    describe('the counter: the apps on, as «My apps» lists them, and the plan’s chosen ones (hub#1286)', () => {
+      // Taxes is born on in every country (hub#997): on, never chosen, it takes nothing of the plan's limit.
+      const BORN = app('tax', { name: 'Taxes', chosen: false, mandatory: true });
+      const CHOSEN = app('task', { name: 'Tasks' });
+      const OFF = app('flow', { name: 'Flows', state: 'off', chosen: false, path: null });
+      const listOf = (enabled: number, ...apps: AppRow[]): AppList => ({
+        apps,
+        country_name: 'Spain',
+        store_url: STORE,
+        plan_url: PLANS,
+        max_apps: 20,
+        enabled,
+      });
+      const counter = (m: Awaited<ReturnType<typeof open>>) => m.wrapper.find('[data-testid="apps-counter"]').text();
 
-    it('the counter in Spanish', async () => {
-      const m = await open('/apps', { locale: 'es' });
-      await m.result(m.call, 'base.app.list', APPS);
-      expect(m.wrapper.find('[data-testid="apps-counter"]').text()).toBe('2 de 20 apps activadas');
-      await m.result(m.call, 'base.app.list', { ...APPS, max_apps: null, enabled: 3 }, 2);
-      expect(m.wrapper.find('[data-testid="apps-counter"]').text()).toBe('3 apps activadas · Sin límite');
+      it('an app born on is turned on, and none of the plan’s', async () => {
+        const m = await open();
+        await m.result(m.call, 'base.app.list', listOf(0, BORN, OFF));
+        expect(counter(m)).toBe('1 app turned on · 0 of 20 in your plan');
+      });
+
+      it('an app the business chose is turned on and one of the plan’s', async () => {
+        const m = await open();
+        await m.result(m.call, 'base.app.list', listOf(1, BORN, CHOSEN, OFF));
+        expect(counter(m)).toBe('2 apps turned on · 1 of 20 in your plan');
+      });
+
+      it('an app off, or paid without its right, is not turned on', async () => {
+        const m = await open();
+        await m.result(m.call, 'base.app.list', listOf(0, OFF, STOCK));
+        expect(counter(m)).toBe('0 apps turned on · 0 of 20 in your plan');
+      });
+
+      it('counts what came along with another app, the way «My apps» lists it', async () => {
+        const m = await open();
+        await m.result(m.call, 'base.app.list', APPS);
+        expect(counter(m)).toBe(`${ids(m.wrapper).length} apps turned on · 2 of 20 in your plan`);
+        expect(ids(m.wrapper)).toEqual(['sale', 'customer', 'task']);
+      });
+
+      it('an app still being set up, or that failed to be, is turned on', async () => {
+        const m = await open();
+        const creating = { ...OFF, state: 'creating' as const, chosen: true };
+        const failed = { ...CHOSEN, state: 'failed' as const };
+        await m.result(m.call, 'base.app.list', listOf(2, creating, failed));
+        expect(counter(m)).toBe('2 apps turned on · 2 of 20 in your plan');
+      });
+
+      it('without a limit, the apps turned on', async () => {
+        const m = await open();
+        await m.result(m.call, 'base.app.list', { ...listOf(0, BORN, OFF), max_apps: null });
+        expect(counter(m)).toBe('1 app turned on · Unlimited');
+        await m.result(m.call, 'base.app.list', { ...listOf(1, BORN, CHOSEN, OFF), max_apps: null }, 2);
+        expect(counter(m)).toBe('2 apps turned on · Unlimited');
+      });
+
+      it('in Spanish', async () => {
+        const m = await open('/apps', { locale: 'es' });
+        await m.result(m.call, 'base.app.list', listOf(0, BORN, OFF));
+        expect(counter(m)).toBe('1 app activada · 0 de 20 de tu plan');
+        await m.result(m.call, 'base.app.list', listOf(1, BORN, CHOSEN, OFF), 2);
+        expect(counter(m)).toBe('2 apps activadas · 1 de 20 de tu plan');
+        await m.result(m.call, 'base.app.list', { ...listOf(1, BORN, CHOSEN, OFF), max_apps: null }, 3);
+        expect(counter(m)).toBe('2 apps activadas · Sin límite');
+      });
     });
   });
 
