@@ -599,8 +599,11 @@ def beside_another_s_id() -> dict[str, dict]:
     return {
         "combo.group.delete": {"id": str(course.id), "combo_id": menu},
         "combo.group.update": {"id": str(course.id), "combo_id": menu, "max_choices": 2},
-        "combo.option.delete": {"id": str(choice.id), "combo_id": menu, "group_id": theirs},
-        "combo.option.update": {"id": str(choice.id), "combo_id": menu, "group_id": theirs, "is_available": False},
+        "combo.option.delete": {"id": str(choice.id), "combo_id": menu},
+        "combo.option.update": {"id": str(choice.id), "group_id": theirs, "is_available": False},
+        "combo.option.update with its menu and its course": {
+            "id": str(choice.id), "combo_id": menu, "group_id": theirs, "is_available": False,
+        },
         "combo.option.delete by its product": {"group_id": str(course.id), "combo_id": menu, "product": "flan"},
         "combo.option.create": {"group_id": str(course.id), "combo_id": menu, "product_id": str(natillas.id)},
         "combo.option.bulk_create": {"group_id": str(course.id), "combo_id": menu, "product_ids": [str(natillas.id)]},
@@ -614,6 +617,7 @@ SHOWN_BESIDE_ANOTHER_S_ID = {
     "combo.group.update": {"id": FOUND["group"], "max_choices": 2},
     "combo.option.delete": {"id": FOUND["product"]},
     "combo.option.update": {"id": FOUND["product"], "is_available": False},
+    "combo.option.update with its menu and its course": {"id": FOUND["product"], "is_available": False},
     "combo.option.delete by its product": {"group_id": FOUND["group"], "product": FOUND["product"]},
     "combo.option.create": {"group_id": FOUND["group"], "product_id": "Natillas"},
     "combo.option.bulk_create": {"group_id": FOUND["group"], "product_ids": ["Natillas"]},
