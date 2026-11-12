@@ -1,10 +1,10 @@
-"""What the SPA's HTML tells the shell about the way in of this session (``hub-home``'s ``access``; APP-BASE-3).
+"""What the SPA's HTML tells the shell about the way in of this session (``hub-home``'s ``access``).
 
-- «Switch user» (BASE-G60) only on a shared device of the hub of a business that asks, with somebody on its grid.
-- The lock after inactivity (BASE-G59) only there and when the business always asks: its minutes, served with the
-  session itself, so a till never has to read them on its own and fall back to anything (gh:hub#2537, hub#2677).
+- «Switch user» only on a shared device of the hub of a business that asks, with somebody on its grid.
+- The lock after inactivity only there and when the business always asks: its minutes, served with the
+  session itself, so a till never has to read them on its own and fall back to anything.
 - erplora.com's pages (account, plan, the bar's «erplora.com») only for a session opened with the account: a
-  session opened with a PIN or a badge on a shared till is not that browser's erplora.com account (gh:hub#2506).
+  session opened with a PIN or a badge on a shared till is not that browser's erplora.com account.
 """
 
 import json
@@ -72,7 +72,7 @@ def test_a_pin_session_on_a_till_switches_user_and_never_names_erplora_com(clien
 
 
 def test_the_owner_entering_with_her_pin_gets_no_way_to_erplora_com_in_the_bar(client, people):
-    # BASE-F11, gh:hub#2506: the owner may open erplora.com's panel, but a PIN on a shared till is a credential of the
+    # BASE-F11: the owner may open erplora.com's panel, but a PIN on a shared till is a credential of the
     # shift, not her account: the bar's «erplora.com» is empty, as every other erplora.com page.
     ana, _ = people
     a_device(client)
@@ -99,7 +99,7 @@ def test_a_personal_device_never_locks_nor_switches(client, people):
 
 
 def test_the_person_s_own_appearance_comes_with_the_html_on_any_device(client, people):
-    # BASE-G125: the mode, palette and interface scale chosen in «My profile» follow the person to every device they
+    # The mode, palette and interface scale chosen in «My profile» follow the person to every device they
     # enter; empty, the business's (and the browser's own toggle).
     ana, bea = people
     Profile.objects.create(username=ana.username, theme_mode="dark", palette="forest", ui_scale=120)

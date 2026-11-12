@@ -1,4 +1,4 @@
-"""A manager's PIN lets one refused command through (APP-BASE-5; BASE-G136, the old hub's HUB_SHELL-F51): without the ORM.
+"""A manager's PIN lets one refused command through: the rules, without the ORM.
 
 An app names the commands of its own a manager may approve on the spot, with what is approved in words:
 ``approvals = {"sale.sale.void": _("Void a sale")}`` in its ``LiveAppConfig`` (a module cannot name another's, a query

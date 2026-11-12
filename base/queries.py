@@ -977,7 +977,7 @@ IMPORTS_SHOWN = 50
     ),
 )
 def blueprint_list(ctx: OperationContext, data: BlueprintListIn) -> dict:
-    """The seeds by vertical (BASE-G103): the hub's country first, then the person's language, then the hub's vertical."""
+    """The seeds by vertical: the hub's country first, then the person's language, then the hub's vertical."""
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         country, vertical = (hub.country, hub.vertical) if hub else ("", "")
@@ -1014,7 +1014,7 @@ def blueprint_list(ctx: OperationContext, data: BlueprintListIn) -> dict:
     ),
 )
 def blueprint_export(ctx: OperationContext, data: BlueprintExportIn) -> dict:
-    """The file of the apps and datasets chosen (BASE-G101, BASE-G102), in base64 for the screen to save."""
+    """The file of the apps and datasets chosen, in base64 for the screen to save."""
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         on = blueprint.active_apps(ctx.scope)
@@ -1218,7 +1218,7 @@ def hub_dump_list(ctx: OperationContext, data: HubGetIn) -> dict:
     ),
 )
 def import_list(ctx: OperationContext, data: ImportListIn) -> dict:
-    """The loads, newest first; the last one, when it did not go in whole and stands, is shown first (BASE-G107)."""
+    """The loads, newest first; the last one, when it did not go in whole and stands, is shown first."""
     loads = list(ImportBatch.objects.order_by("-created_at", "-id")[:IMPORTS_SHOWN])
     latest = loads[0] if loads else None
     unfinished = latest if latest and latest.status != ImportBatch.Status.COMPLETE and latest.undone_at is None else None
@@ -1243,7 +1243,7 @@ def import_list(ctx: OperationContext, data: ImportListIn) -> dict:
     ),
 )
 def import_detail(ctx: OperationContext, data: ImportIdIn) -> dict:
-    """One load of Settings › Data (BASE-G107), as its row."""
+    """One load of Settings › Data, as its row."""
     load = ImportBatch.objects.filter(pk=data.id).first()
     if load is None:
         raise NotFound(gettext("This load is not there any more."))
@@ -1267,7 +1267,7 @@ def import_detail(ctx: OperationContext, data: ImportIdIn) -> dict:
     ),
 )
 def dataset_list(ctx: OperationContext, data: DatasetListIn) -> dict:
-    """Every app on (BASE-G102), with its datasets and their rows: what an export can take."""
+    """Every app on, with its datasets and their rows: what an export can take."""
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         on = blueprint.active_apps(ctx.scope)
@@ -1318,7 +1318,7 @@ def dataset_list(ctx: OperationContext, data: DatasetListIn) -> dict:
     ),
 )
 def business_get(ctx: OperationContext, data: BusinessIn) -> dict:
-    """Settings › Business (BASE-G97…G99) and what the old ``/api/hub/context`` gave (BASE-G43): the business as the
+    """Settings › Business and what the old ``/api/hub/context`` gave: the business as the
     SaaS registered it, from the registry of this scope, never another's. The currency is its country's
     (``base.business``); a demo has no business on erplora.com, hence no address to change it, and the deployment's
     zone and language until the SaaS says otherwise. ERPlora's own hub is ERPlora itself, the issuer of
@@ -1370,8 +1370,8 @@ def _business(
 
 
 # ── System ─────────────────────────────────────────────────────────────────────────────────────────────────────
-# The old hub's ``GET /api/system`` (its status and its log) and ``/api/hub/events/dead`` (the failed events), for who
-# runs the business only (hub#2519: an error may carry a customer's tax id and name). One hub never sees another's.
+# The hub's status, its log and the failed events, for who runs the business only (an error may carry a customer's
+# tax id and name). One hub never sees another's.
 
 #: How many of the last events between apps System › Logs shows: the old hub's.
 EVENT_LOG_SIZE = 50
@@ -1599,8 +1599,8 @@ def person_label(user) -> str:
 
 
 def face_name(user) -> str:
-    """How ``user`` shows on the grid of a till (BASE-G55, G60), seen by anyone at it: their name, never an email (the
-    SaaS names an account without a name by its address: then the part before the «@»; gh:hub#2536)."""
+    """How ``user`` shows on the grid of a till, seen by anyone at it: their name, never an email (the
+    SaaS names an account without a name by its address: then the part before the «@»)."""
     label = person_label(user)
     return label.split("@", 1)[0] if "@" in label else label
 
@@ -1669,10 +1669,10 @@ def pin_door_open(request: HttpRequest, slug: str) -> bool:
     },
 )
 def access_door(ctx: OperationContext, data: AccessDoorIn) -> dict[str, Any]:
-    """The way in of the browser that asks (BASE-G55): on a shared device of the hub of a business that asks, the
+    """The way in of the browser that asks: on a shared device of the hub of a business that asks, the
     people of this hub with a PIN, by name and initials (never their email nor account) and the PIN's length.
 
-    The grid reaches only whom the PIN would let in (the old Hub's HUB-F133): anyone else, and an address that tried
+    The grid reaches only whom the PIN would let in: anyone else, and an address that tried
     too many wrong PINs (with how long it still waits), hears the same answer with nobody in it."""
     return _door(ctx)
 
@@ -1689,7 +1689,7 @@ def access_door(ctx: OperationContext, data: AccessDoorIn) -> dict[str, Any]:
     },
 )
 def access_faces(ctx: OperationContext, data: AccessDoorIn) -> dict[str, Any]:
-    """The door's grid for a session: «Switch user» (BASE-G60), live, so a new PIN shows up and a person removed
+    """The door's grid for a session: «Switch user», live, so a new PIN shows up and a person removed
     leaves without reloading the till."""
     return _door(ctx)
 
@@ -1710,7 +1710,7 @@ def _door(ctx: OperationContext) -> dict[str, Any]:
         "pin_length": settings.pin_length,
         "people": faces,
         "wait": wait,
-        # BASE-G57's «Upgrade plan» to a browser nobody is signed in on: erplora.com's plans, never this hub's id.
+        # «Upgrade plan» to a browser nobody is signed in on: erplora.com's plans, never this hub's id.
         "plan_url": saas_url(f"{SAAS_PANEL_PATH}/store/plans"),
     }
 
@@ -1752,7 +1752,7 @@ def has_pin(user) -> bool:
     ),
 )
 def device_current(ctx: OperationContext, data: DeviceCurrentIn) -> dict[str, Any]:
-    """«This device» of Settings › General (BASE-G72): the mode of the browser that asks, and whether the hub knows it
+    """«This device» of Settings › General: the mode of the browser that asks, and whether the hub knows it
     (someone entered with an account from it). An unknown one reads as shared, the strict mode."""
     device = device_of(ctx.request)
     if device is None:
@@ -1807,7 +1807,7 @@ def device_list(ctx: OperationContext, data: DeviceListIn) -> dict[str, Any]:
     ),
 )
 def device_detail(ctx: OperationContext, data: DeviceByIdIn) -> dict[str, Any]:
-    """One device of «Devices» (BASE-G63), as its row: what the assistant's card names a device by."""
+    """One device of «Devices», as its row: what the assistant's card names a device by."""
     device = TrustedDevice.objects.filter(pk=data.id).first()
     if device is None:
         raise NotFound(gettext("That device is no longer registered here. Refresh the list."))
@@ -1847,7 +1847,7 @@ def _unused(device: TrustedDevice, here: TrustedDevice | None, now) -> bool:
 
 
 def unused_devices(here: TrustedDevice | None):
-    """The devices «Remove the unused» removes (BASE-G66): nobody entered on them in 30 days, never the one in hand."""
+    """The devices «Remove the unused» removes: nobody entered on them in 30 days, never the one in hand."""
     old = TrustedDevice.objects.filter(last_entry_at__lt=timezone.now() - access.UNUSED_AFTER)
     return old.exclude(pk=here.pk) if here is not None else old
 
@@ -1878,7 +1878,7 @@ def unused_devices(here: TrustedDevice | None):
     ),
 )
 def access_settings_get(ctx: OperationContext, data: AccessSettingsIn) -> dict[str, Any]:
-    """The «PIN pad» card of Settings › General (BASE-G62, G151): what the Hub confirmed, for everyone of the hub."""
+    """The «PIN pad» card of Settings › General: what the Hub confirmed, for everyone of the hub."""
     row = access_settings()
     return {
         "pin_policy": row.pin_policy,
@@ -1903,7 +1903,7 @@ def access_settings_get(ctx: OperationContext, data: AccessSettingsIn) -> dict[s
     ),
 )
 def profile_get(ctx: OperationContext, data: ProfileIn) -> dict[str, Any]:
-    """«My profile» (BASE-G125): always the profile of whoever asks; without a row, the account's name."""
+    """«My profile»: always the profile of whoever asks; without a row, the account's name."""
     user = signed_in(ctx)
     profile = Profile.objects.filter(username=user.get_username()).first()
     role = Membership.objects.filter(user=user, host=ctx.scope.key).values_list("role", flat=True).first() or ""
@@ -1934,7 +1934,7 @@ def avatar_url(ctx: OperationContext, name: str) -> str:
 
 
 def appearance_of(user) -> dict[str, str | int]:
-    """The appearance a person chose in «My profile» (BASE-G125), for the shell to paint on any device they enter;
+    """The appearance a person chose in «My profile», for the shell to paint on any device they enter;
     empty mode and palette, the business's."""
     chosen = Profile.objects.filter(username=user.get_username()).values("theme_mode", "palette", "ui_scale").first()
     if chosen:
@@ -1944,8 +1944,8 @@ def appearance_of(user) -> dict[str, str | int]:
 
 def shell_access(request: HttpRequest, slug: str) -> dict[str, Any]:
     """What the shell needs of this session's way in (``hub-home``'s ``access``, ``base.spa``): how it was opened,
-    whether «Switch user» is offered (BASE-G60: a shared device of the hub of a business that asks, with somebody on
-    its grid) and, when the business always asks on such a device, after how many idle minutes it locks (BASE-G59)."""
+    whether «Switch user» is offered (a shared device of the hub of a business that asks, with somebody on
+    its grid) and, when the business always asks on such a device, after how many idle minutes it locks."""
     credential = (
         SessionOwner.objects.filter(session_id=request.session.session_key).values_list("credential", flat=True).first()
         or SessionOwner.Credential.ACCOUNT
@@ -2097,7 +2097,7 @@ def signed_in_role(ctx: OperationContext) -> str:
 
 
 def person_detail_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str, Any]:
-    """A person's page (BASE-G10): what the hub keeps of their way in and what who asks may change of it."""
+    """A person's page: what the hub keeps of their way in and what who asks may change of it."""
     actor, actor_role = signed_in_username(ctx), signed_in_role(ctx)
     credential = person["credential"]
 
@@ -2133,7 +2133,7 @@ def person_detail_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str
     ),
 )
 def person_list(ctx: OperationContext, data: PersonListIn) -> dict:
-    """Employees › Personal (BASE-G11, G142, G138): every person once, owner first, with the plan's places."""
+    """Employees › Personal: every person once, owner first, with the plan's places."""
     found = people_of(ctx.scope.key)
     return {"people": [person_out(ctx, person) for person in found], "seats": seats_of(ctx.scope.key, len(found))}
 
@@ -2156,7 +2156,7 @@ def person_list(ctx: OperationContext, data: PersonListIn) -> dict:
     ),
 )
 def person_detail(ctx: OperationContext, data: PersonIn) -> dict:
-    """A person's page (BASE-G10), for who runs the business."""
+    """A person's page, for who runs the business."""
     return person_detail_out(ctx, person_of(ctx, data.person))
 
 
@@ -2178,7 +2178,7 @@ def person_detail(ctx: OperationContext, data: PersonIn) -> dict:
     ),
 )
 def role_list(ctx: OperationContext, data: RoleListIn) -> dict:
-    """Employees › Roles (BASE-G143): erplora.com's four, from the top, with their people and permissions."""
+    """Employees › Roles: erplora.com's four, from the top, with their people and permissions."""
     found = people_of(ctx.scope.key)
     configs = all_live_app_configs()
     everything = {permission for config in configs for permission in config.permissions}
@@ -2352,7 +2352,7 @@ def approval_action(operation: str, figures: dict | None = None, currency: str |
     ),
 )
 def approval_list(ctx: OperationContext, data: ApprovalListIn) -> dict:
-    """Employees › Approvals (BASE-G145): the record of approvals, read only."""
+    """Employees › Approvals: the record of approvals, read only."""
     rows = list(Approval.objects.order_by("-created_at", "-id")[:APPROVALS_SHOWN])
     currency = approval_rules.currency_of(ctx.scope) if any(row.figures for row in rows) else None
     return {
@@ -2476,7 +2476,7 @@ def approval_export(ctx: OperationContext, data: ApprovalExportIn) -> dict:
     },
 )
 def approval_approvers(ctx: OperationContext, data: ApproversIn) -> dict:
-    """«Who approves it?» (BASE-G136): the people of the business with a PIN who may do the action themselves, by name;
+    """«Who approves it?»: the people of the business with a PIN who may do the action themselves, by name;
     nobody for an action no app names."""
     found = approval_rules.approvable(data.operation)
     pin_length = access.pin_length_or_default(access_settings().pin_length)
@@ -2520,7 +2520,7 @@ def api_docs_enabled() -> bool:
     ),
 )
 def api_doc_settings(ctx: OperationContext, data: ApiDocSettingsIn) -> dict:
-    """«Show the API documentation» in Settings › General (BASE-G100); off without a row."""
+    """«Show the API documentation» in Settings › General; off without a row."""
     return {"docs_enabled": api_docs_enabled(), "can_change": ctx.has(ADMINISTER_HUB)}
 
 
@@ -2536,7 +2536,7 @@ def api_doc_settings(ctx: OperationContext, data: ApiDocSettingsIn) -> dict:
     },
 )
 def api_doc_get(ctx: OperationContext, data: ApiDocIn) -> dict:
-    """The API's documentation (BASE-G150, G48): what the apps this business has publish; not given while hidden."""
+    """The API's documentation: what the apps this business has publish; not given while hidden."""
     if not api_docs_enabled():
         raise Conflict(gettext("The API documentation is hidden in this business."), code="base.api_docs_hidden")
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
@@ -2549,8 +2549,8 @@ def api_doc_get(ctx: OperationContext, data: ApiDocIn) -> dict:
 
 
 # ── Files ──────────────────────────────────────────────────────────────────────────────────────────────────────
-# The old hub's Files (``GET /api/media``, ``/raw``; HUB_SHELL-F130, F132): the business's files in the hub file store
-# (``base.files``), on the hub of the request only. Everyone of the hub sees and opens them.
+# The business's files in the hub file store (``base.files``), on the hub of the request only. Everyone of the hub
+# sees and opens them.
 VIEW_FILES = "base.view_files"
 UPLOAD_FILES = "base.upload_files"
 DELETE_FILES = "base.delete_files"
@@ -2589,7 +2589,7 @@ def refuse_past_the_plans_space(ctx: OperationContext, store: Storage, size: int
     ),
 )
 def file_list(ctx: OperationContext, data: FileListIn) -> dict:
-    """BASE-G82: the tree, the folder's files, the space used and what this person may do with them."""
+    """The tree, the folder's files, the space used and what this person may do with them."""
     with translation.override(ctx.language):
         listing = files.listing(storages["hub_files"], hub_id(ctx.scope), data.folder)
     used = listing.pop("used_bytes")
@@ -2627,7 +2627,7 @@ def file_list(ctx: OperationContext, data: FileListIn) -> dict:
     ),
 )
 def file_read(ctx: OperationContext, data: FileReadIn) -> dict:
-    """BASE-G84: the file, described; ``base.api`` streams its bytes to the person who asked."""
+    """The file, described; ``base.api`` streams its bytes to the person who asked."""
     with translation.override(ctx.language):
         return files.describe(storages["hub_files"], hub_id(ctx.scope), data.path)
 
@@ -2653,7 +2653,7 @@ from base.schemas import AssistantUsageIn, AssistantUsageOut, DocsSearchIn, Docs
     database=False,
 )
 def assistant_usage(ctx: OperationContext, data: AssistantUsageIn) -> dict:
-    """This month's messages of the assistant as erplora.com counts them (BASE-G122): used, of how many, and when
+    """This month's messages of the assistant as erplora.com counts them: used, of how many, and when
     they come back. What cannot be read is an error, never a number made up."""
     try:
         usage = assistant.usage(ctx.scope)

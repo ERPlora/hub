@@ -134,7 +134,7 @@ def turned_off(label: str, language: str | None) -> str:
 
 
 def requires_of(label: str, configs: Iterable[Any] | None = None) -> frozenset[str]:
-    """What module ``label`` needs, transitively: what comes along with it (BASE-G73)."""
+    """What module ``label`` needs, transitively: what comes along with it."""
     by_label = {config.label: config for config in (module_configs() if configs is None else configs)}
     return frozenset(_requires_closure([label], by_label) - {label})
 

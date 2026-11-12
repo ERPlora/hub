@@ -1,4 +1,4 @@
-"""Files' operations and routes (APP-BASE-8, BASE-G82…G86): ``base.file.*``, on the hub of the request only.
+"""Files' operations and routes: ``base.file.*``, on the hub of the request only.
 
 Everyone of the hub sees and opens the files (``base.view_files``); who runs it (owner, admin) also uploads, makes
 folders and renames (``base.upload_files``) and deletes (``base.delete_files``; moving takes both, as the old hub).
@@ -113,7 +113,7 @@ def test_the_listing_follows_every_write_of_the_files_and_the_photo():
     assert [name for name in events.ALL if name.startswith("base.file.")] == FILE_EVENTS
 
 
-# ── See (BASE-G82) ───────────────────────────────────────────────────────────────────────────────────────────
+# ── See ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -149,7 +149,7 @@ def test_a_hub_lists_its_own_files_only(store):
     assert run("base.file.list", ctx(scope=B))["folders"][0]["name"] == "Secreto"
 
 
-# ── Upload and new folder (BASE-G83) ─────────────────────────────────────────────────────────────────────────
+# ── Upload and new folder ────────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -191,8 +191,8 @@ def test_an_upload_past_the_plan_s_space_is_refused(store):
 
 @pytest.mark.django_db
 def test_an_app_refuses_past_the_plan_s_space_of_the_hub_that_asks_in_its_language(store):
-    # FIX-HUB-BASE-PLAN-SPACE-CHECK-COPIED-IN-THREE-APPS: the website's images and WhatsApp's header samples take the
-    # plan's space as Files does; each read the plan and said the sentence on its own, now they ask base.
+    # The website's images and WhatsApp's header samples take the plan's space as Files does: they ask base, never
+    # read the plan and say the sentence on their own.
     full = hub("a")
     full.state = {"plan": {"max_storage_bytes": MB}}
     full.save(update_fields=["state"])
@@ -237,7 +237,7 @@ def test_who_does_not_run_the_business_neither_uploads_nor_makes_folders():
     assert recorded() == []
 
 
-# ── Read (BASE-G84) ──────────────────────────────────────────────────────────────────────────────────────────
+# ── Read ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -254,7 +254,7 @@ def test_reading_describes_the_file_of_this_hub(store):
         run("base.file.read", ctx(scope=B), path="Facturas/marzo.pdf")
 
 
-# ── Rename and move (BASE-G85) ───────────────────────────────────────────────────────────────────────────────
+# ── Rename and move ──────────────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -280,7 +280,7 @@ def test_moving_takes_both_deleting_where_it_was_and_uploading_where_it_goes(sto
     assert recorded() == []
 
 
-# ── Delete (BASE-G86) ────────────────────────────────────────────────────────────────────────────────────────
+# ── Delete ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db

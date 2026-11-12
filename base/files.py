@@ -297,7 +297,7 @@ def _refuse_program(name: str) -> None:
         raise InvalidPayload(message, code="base.file_type_refused", fields={"name": message})
 
 
-# ── Listing (BASE-G82) ───────────────────────────────────────────────────────────────────────────────────────
+# ── Listing ──────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def listing(store: Storage, hub: uuid.UUID, folder: str) -> dict:
@@ -475,7 +475,7 @@ def _tree(folders: set[str], parent: str) -> list[dict]:
     return [{"path": path, "name": posixpath.basename(path), "children": _tree(folders, path)} for path in children]
 
 
-# ── Upload and new folder (BASE-G83) ─────────────────────────────────────────────────────────────────────────
+# ── Upload and new folder ────────────────────────────────────────────────────────────────────────────────────
 
 
 def upload(
@@ -573,7 +573,7 @@ def create_folder(store: Storage, hub: uuid.UUID, parent: str, name: str) -> dic
     return {"path": path, "name": name}
 
 
-# ── Read (BASE-G84) ──────────────────────────────────────────────────────────────────────────────────────────
+# ── Read ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def describe(store: Storage, hub: uuid.UUID, path: str) -> dict:
@@ -609,7 +609,7 @@ def file_response(store: Storage, hub: uuid.UUID, described: dict, *, inline: bo
     return response
 
 
-# ── Rename and move (BASE-G85) ───────────────────────────────────────────────────────────────────────────────
+# ── Rename and move ──────────────────────────────────────────────────────────────────────────────────────────
 
 
 def rename(store: Storage, hub: uuid.UUID, path: str, name: str) -> dict:
@@ -702,7 +702,7 @@ def _prune(store: Storage, key: str) -> None:
     store.delete(key)
 
 
-# ── Delete (BASE-G86) ────────────────────────────────────────────────────────────────────────────────────────
+# ── Delete ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def delete(store: Storage, hub: uuid.UUID, path: str) -> dict:

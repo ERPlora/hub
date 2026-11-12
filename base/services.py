@@ -1976,7 +1976,7 @@ def _who(ctx: OperationContext) -> str:
     ),
 )
 def blueprint_inspect(ctx: OperationContext, data: BlueprintSourceIn) -> dict:
-    """What a template or an uploaded file brings and what of it would load here (BASE-G104, BASE-G105).
+    """What a template or an uploaded file brings and what of it would load here.
 
     It writes nothing: a command only because its input is a file, which no query string carries (a query is served
     by GET), like the rehearsal (``dry_run``) of the apps' imports.
@@ -2088,7 +2088,7 @@ def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
     ),
 )
 def import_undo(ctx: OperationContext, data: ImportUndoIn) -> dict:
-    """Remove exactly the rows one load created (BASE-G108), once."""
+    """Remove exactly the rows one load created, once."""
     with translation.override(ctx.language):
         load = ImportBatch.objects.select_for_update().filter(pk=data.id).first()
         if load is None:
@@ -2671,9 +2671,9 @@ def hub_purge(ctx: OperationContext, data: HubGetIn) -> dict:
 
 
 # ── System: the failed events ──────────────────────────────────────────────────────────────────────────────────────
-# The old hub's ``/api/hub/events/:id/retry``, ``retry-all`` and ``:id/discard`` (HUB-F55…F57), for who runs the
-# business. A failed event is a delivery the relay gave up on (``dead``): resending puts it back in the queue for the
-# app that had failed only; discarding closes it for good and keeps the row. One hub never touches another's.
+# Resend one, resend all and discard one, for who runs the business. A failed event is a delivery the relay gave up
+# on (``dead``): resending puts it back in the queue for the app that had failed only; discarding closes it for good
+# and keeps the row. One hub never touches another's.
 
 
 @operation(
@@ -2695,7 +2695,7 @@ def hub_purge(ctx: OperationContext, data: HubGetIn) -> dict:
     ),
 )
 def failed_event_retry(ctx: OperationContext, data: FailedEventIn) -> dict:
-    """HUB-F55: ``pending`` again, due now, attempts at zero; the relay takes it on its next tick."""
+    """``pending`` again, due now, attempts at zero; the relay takes it on its next tick."""
     from base import relay  # base.relay imports this module
 
     delivery = _failed_event(ctx, data.id)
@@ -2729,7 +2729,7 @@ def failed_event_retry(ctx: OperationContext, data: FailedEventIn) -> dict:
     ),
 )
 def failed_event_retry_all(ctx: OperationContext, data: FailedEventRetryAllIn) -> dict:
-    """HUB-F56: every ``dead`` delivery of the hub whose app is on; another worker's rows wait (``SKIP LOCKED``)."""
+    """Every ``dead`` delivery of the hub whose app is on; another worker's rows wait (``SKIP LOCKED``)."""
     from base import relay  # base.relay imports this module
 
     ids = list(
@@ -2770,7 +2770,7 @@ def failed_event_retry_all(ctx: OperationContext, data: FailedEventRetryAllIn) -
     ),
 )
 def failed_event_discard(ctx: OperationContext, data: FailedEventDiscardIn) -> dict:
-    """HUB-F57: closed as ``discarded`` with who, when and why; the row and its last error stay for the audit."""
+    """Closed as ``discarded`` with who, when and why; the row and its last error stay for the audit."""
     delivery = _failed_event(ctx, data.id)
     delivery.status = EventDelivery.Status.DISCARDED
     delivery.closed_at = timezone.now()
@@ -2809,7 +2809,7 @@ def _requeue(ids: list[UUID]) -> None:
 # ── The way in: devices, PIN, badge, the business's dial and the person's profile ────────────────────────────────
 
 def trust_device(request: HttpRequest, user) -> TrustedDevice:
-    """This browser's device of the hub, made a trusted one by an entry with the account (BASE-G52, G53).
+    """This browser's device of the hub, made a trusted one by an entry with the account.
 
     The device of the cookie ``hub_device`` if the hub knows it (its mode and name are kept), else a new one with a
     new token. Its last person in and entry are now's, and a notice of sessions it lost (``ended_reason``) is read.
@@ -2845,7 +2845,7 @@ def _label_of(user) -> str:
 
 def _end_other_devices(slug: str, device: TrustedDevice) -> None:
     """Keep within the devices the business's plan covers (``plan.max_devices`` of the SaaS's photo; 0 or none, no
-    cap; BASE-G57): an entry on ``device`` ends the live sessions on this host of every other device past the
+    cap): an entry on ``device`` ends the live sessions on this host of every other device past the
     ``max_devices - 1`` most recently entered, and marks those devices so their next way in says why. A session with
     no device (from before the rule) never counts as a kept one. Their tabs wake after the COMMIT and leave."""
     hub = Hub.objects.filter(slug=slug).first()
@@ -2870,7 +2870,7 @@ def _end_other_devices(slug: str, device: TrustedDevice) -> None:
 @transaction.atomic  # control's: the new session and the other devices' ones it ends
 @atomic  # the hub's: the device, locked, the person (base.HubUser) and the ones it ends
 def open_session_on_device(request: HttpRequest, user, device: TrustedDevice, credential: str) -> None:
-    """Log ``user`` in on the hub's ``device`` with its PIN or its badge (BASE-G55, G56, G60), for a shift (or what the
+    """Log ``user`` in on the hub's ``device`` with its PIN or its badge, for a shift (or what the
     device and the business allow). Over someone else's session («Switch user») ``login`` ends that one only now, once
     the new one is being opened in this transaction: a refused PIN never reaches here and changes nothing."""
     device = TrustedDevice.objects.select_for_update().get(pk=device.pk)
@@ -2898,7 +2898,7 @@ def saas_user_id_of(user) -> str:
     },
 )
 def pin_set(ctx: OperationContext, data: PinSetIn) -> dict:
-    """Choose or change one's own PIN (BASE-G54, G126): the business's length, digits only, not guessable, with the
+    """Choose or change one's own PIN: the business's length, digits only, not guessable, with the
     current one when there is one, and not the PIN of another active person of this hub. Every try counts against
     the person's budget (``access.PIN_CHANGE_LIMIT``), the accepted ones too: «already taken» tells something."""
     if ctx.actor is None or not hasattr(ctx.actor, "get_username"):
@@ -3018,7 +3018,7 @@ def _actor_label(ctx: OperationContext) -> str:
     ),
 )
 def device_mode_set(ctx: OperationContext, data: DeviceModeIn) -> dict:
-    """«This device» (BASE-G72): the mode of the browser that asks, never another's. The sessions opened from now on
+    """«This device»: the mode of the browser that asks, never another's. The sessions opened from now on
     follow it; the open one keeps its end, fixed when it opened."""
     device = queries.device_of(ctx.request, for_update=True)
     if device is None:
@@ -3063,7 +3063,7 @@ def _device(device_id) -> TrustedDevice:
     ),
 )
 def device_rename(ctx: OperationContext, data: DeviceRenameIn) -> dict:
-    """«Name it» (BASE-G64): the one thing of a device the business decides."""
+    """«Name it»: the one thing of a device the business decides."""
     name = data.name.strip()
     if len(name) > access.DEVICE_NAME_MAX_LENGTH:
         raise InvalidPayload(
@@ -3106,7 +3106,7 @@ def device_rename(ctx: OperationContext, data: DeviceRenameIn) -> dict:
     ),
 )
 def device_remove(ctx: OperationContext, data: DeviceByIdIn) -> dict:
-    """«Remove this device» (BASE-G65): the device is cut off, not its people; whoever has an account can enter on it
+    """«Remove this device»: the device is cut off, not its people; whoever has an account can enter on it
     again, and then it is a new device."""
     device = _device(data.id)
     here = queries.device_of(ctx.request)
@@ -3140,7 +3140,7 @@ def device_remove(ctx: OperationContext, data: DeviceByIdIn) -> dict:
     ),
 )
 def device_prune(ctx: OperationContext, data: DevicePruneIn) -> dict:
-    """«Remove the unused» (BASE-G66): those nobody entered on in 30 days, as BASE-G65 removes one."""
+    """«Remove the unused»: those nobody entered on in 30 days, as «Remove this device» removes one."""
     ids = list(queries.unused_devices(queries.device_of(ctx.request)).select_for_update().values_list("pk", flat=True))
     _remove_devices(ids)
     record_event(ctx, events.DEVICES_PRUNED, {"removed": len(ids)})
@@ -3185,7 +3185,7 @@ def _remove_devices(ids: list) -> None:
     ),
 )
 def access_settings_update(ctx: OperationContext, data: AccessSettingsUpdateIn) -> dict:
-    """The «PIN pad» card (BASE-G62, G151): only the fields sent change. The PINs of the other length keep working
+    """The «PIN pad» card: only the fields sent change. The PINs of the other length keep working
     until their owners change them; the sessions already open keep their end."""
     changes = data.dict(exclude_none=True)
     if not changes:
@@ -3228,7 +3228,7 @@ def _profile(user) -> Profile:
     ),
 )
 def profile_update(ctx: OperationContext, data: ProfileUpdateIn) -> dict:
-    """«Save my data» (BASE-G125): how the person appears in this hub. The contact email gives and takes no access."""
+    """«Save my data»: how the person appears in this hub. The contact email gives and takes no access."""
     user = queries.signed_in(ctx)
     email = data.contact_email.strip()
     if email:
@@ -3262,7 +3262,7 @@ def profile_update(ctx: OperationContext, data: ProfileUpdateIn) -> dict:
     ),
 )
 def preferences_set(ctx: OperationContext, data: PreferencesIn) -> dict:
-    """«Preferences» (BASE-G125): saved as chosen and applied at once; empty = the business's. They follow the person
+    """«Preferences»: saved as chosen and applied at once; empty = the business's. They follow the person
     on any device of the hub (the language from their next entry on another one)."""
     user = queries.signed_in(ctx)
     profile = _profile(user)
@@ -3292,7 +3292,7 @@ _AVATAR_FORMATS = {"image/jpeg": ("JPEG", "jpg"), "image/png": ("PNG", "png"), "
     },
 )
 def avatar_set(ctx: OperationContext, data: AvatarIn) -> dict:
-    """«Change photo» (BASE-G125): a JPG, PNG or WebP of 2 MB at most, kept in the hub's files under ``avatars/`` by
+    """«Change photo»: a JPG, PNG or WebP of 2 MB at most, kept in the hub's files under ``avatars/`` by
     its content's hash (served to the people of this hub only, ``base.media``)."""
     user = queries.signed_in(ctx)
     refused = gettext("The photo could not be saved. Use a JPG, PNG or WebP of up to 2 MB.")
@@ -3342,7 +3342,7 @@ def _is_image(raw: bytes, pillow_format: str) -> bool:
     ),
 )
 def avatar_remove(ctx: OperationContext, data: AvatarRemoveIn) -> dict:
-    """«Remove» (BASE-G125): the profile forgets its photo (the file, named by its content, may be someone else's)."""
+    """«Remove»: the profile forgets its photo (the file, named by its content, may be someone else's)."""
     user = queries.signed_in(ctx)
     profile = _profile(user)
     profile.avatar = ""
@@ -3396,7 +3396,7 @@ def _person_answer(ctx: OperationContext, person_id: str) -> dict:
     ),
 )
 def person_pin_remove(ctx: OperationContext, data: PersonIn) -> dict:
-    """«Remove the PIN» (BASE-G139): the PIN goes at once, the badge and the account stay."""
+    """«Remove the PIN»: the PIN goes at once, the badge and the account stay."""
     _changeable_person(ctx, data.person, badge=False)
     credential = Credential.objects.select_for_update().filter(username=data.person).exclude(pin_hash="").first()
     if credential is None:
@@ -3420,8 +3420,8 @@ def person_pin_remove(ctx: OperationContext, data: PersonIn) -> dict:
     },
 )
 def person_badge_set(ctx: OperationContext, data: BadgeSetIn) -> dict:
-    """«Badge» (BASE-G140): the card, kept as its digest; never one's own, never one somebody else carries. Every try
-    counts against who gives it (``people.BADGE_CHANGE_LIMIT``, gh:hub#2560): «already taken» tells something."""
+    """«Badge»: the card, kept as its digest; never one's own, never one somebody else carries. Every try
+    counts against who gives it (``people.BADGE_CHANGE_LIMIT``): «already taken» tells something."""
     _changeable_person(ctx, data.person, badge=True)
     editor = queries.signed_in_username(ctx)
     wait = people_rules.BADGE_CHANGE_LIMIT.wait(ctx.scope.key, editor)
@@ -3485,7 +3485,7 @@ def person_badge_set(ctx: OperationContext, data: BadgeSetIn) -> dict:
     ),
 )
 def person_badge_remove(ctx: OperationContext, data: PersonIn) -> dict:
-    """«Remove the badge» (BASE-G140): the card stops opening anything; a lost one never leaves anybody out."""
+    """«Remove the badge»: the card stops opening anything; a lost one never leaves anybody out."""
     _changeable_person(ctx, data.person, badge=False)
     credential = Credential.objects.select_for_update().filter(username=data.person).exclude(badge_digest="").first()
     if credential is None:
@@ -3545,7 +3545,7 @@ def _new_token_for(key: ApiKey) -> str:
     },
 )
 def api_key_create(ctx: OperationContext, data: ApiKeyCreateIn) -> dict:
-    """«New API key» (BASE-G146): its token once; the hub keeps its digest and its first characters."""
+    """«New API key»: its token once; the hub keeps its digest and its first characters."""
     _api_keys_available(ctx)
     name = " ".join(data.name.split())
     if not name:
@@ -3587,7 +3587,7 @@ def _live_key(key_id: UUID) -> ApiKey:
     },
 )
 def api_key_rotate(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
-    """«Rotate» (BASE-G147): a new token, shown once; the old one stops at once (its digest is gone)."""
+    """«Rotate»: a new token, shown once; the old one stops at once (its digest is gone)."""
     _api_keys_available(ctx)
     key = _live_key(data.id)
     token = _new_token_for(key)
@@ -3624,7 +3624,7 @@ def api_key_rotate(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
     ),
 )
 def api_key_revoke(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
-    """«Revoke» (BASE-G148): at once and for good; the key is kept, for the record."""
+    """«Revoke»: at once and for good; the key is kept, for the record."""
     _api_keys_available(ctx)
     key = _live_key(data.id)
     key.revoked_at, key.revoked_by = timezone.now(), _actor_label(ctx)
@@ -3741,7 +3741,7 @@ def _approver(ctx: OperationContext, data: ApprovalIn):
     },
 )
 def approval_approve(ctx: OperationContext, data: ApprovalIn) -> dict:
-    """«An approval is needed» (BASE-G136): somebody of the business who may do the action approves it with their PIN
+    """«An approval is needed»: somebody of the business who may do the action approves it with their PIN
     or badge; a pass of one use for two minutes, bound to who asked, that action and that very request."""
     found = approval_rules.approvable(data.operation)
     if found is None:
@@ -3841,7 +3841,7 @@ from base.schemas import ApiDocSettingsIn, ApiDocSettingsOut, ApiDocSettingsUpda
     ),
 )
 def api_doc_settings_update(ctx: OperationContext, data: ApiDocSettingsUpdateIn) -> dict:
-    """«Show the API documentation» (BASE-G100): saved at once."""
+    """«Show the API documentation»: saved at once."""
     row = ApiSettings.objects.select_for_update().first()
     if row is None:
         try:
@@ -3857,9 +3857,8 @@ def api_doc_settings_update(ctx: OperationContext, data: ApiDocSettingsUpdateIn)
 
 
 # ── Files ──────────────────────────────────────────────────────────────────────────────────────────────────────────
-# The old hub's Files (``POST /api/media/upload|folder|rename|move``, ``DELETE /api/media``; HUB_SHELL-F131, F133,
-# F134): the business's files in the hub file store (``base.files``), on the hub of the request only. Who runs the
-# business uploads, makes folders and renames (``base.upload_files``) and deletes (``base.delete_files``); moving takes
+# The business's files in the hub file store (``base.files``), on the hub of the request only. Who runs the business
+# uploads, makes folders and renames (``base.upload_files``) and deletes (``base.delete_files``); moving takes
 # both, as it deletes where the file was and uploads where it goes. Each write records its event in its transaction;
 # the store is written first, so a refusal of the store leaves no event (a lost event leaves the file: the listing
 # reads the store, never the events).
@@ -3899,7 +3898,7 @@ def _file_bytes(content_base64: str) -> bytes:
     ),
 )
 def file_upload(ctx: OperationContext, data: FileUploadIn) -> dict:
-    """BASE-G83: keep the file, numbered when its name is taken, within the plan's space."""
+    """Keep the file, numbered when its name is taken, within the plan's space."""
     with translation.override(ctx.language):
         content = _file_bytes(data.content_base64)
         saved = files.upload(
@@ -3933,7 +3932,7 @@ def file_upload(ctx: OperationContext, data: FileUploadIn) -> dict:
     ),
 )
 def file_create_folder(ctx: OperationContext, data: FileFolderCreateIn) -> dict:
-    """BASE-G83: a new folder, never over a file or folder of that name."""
+    """A new folder, never over a file or folder of that name."""
     with translation.override(ctx.language):
         made = files.create_folder(storages["hub_files"], hub_id(ctx.scope), data.parent, data.name)
     record_event(ctx, events.FILE_FOLDER_CREATED, {"path": made["path"]})
@@ -3959,7 +3958,7 @@ def file_create_folder(ctx: OperationContext, data: FileFolderCreateIn) -> dict:
     ),
 )
 def file_rename(ctx: OperationContext, data: FileRenameIn) -> dict:
-    """BASE-G85: a new name in the same folder; a folder takes everything in it along."""
+    """A new name in the same folder; a folder takes everything in it along."""
     with translation.override(ctx.language):
         renamed = files.rename(storages["hub_files"], hub_id(ctx.scope), data.path, data.name)
     if renamed["path"] != data.path:
@@ -3987,7 +3986,7 @@ def file_rename(ctx: OperationContext, data: FileRenameIn) -> dict:
     ),
 )
 def file_move(ctx: OperationContext, data: FileMoveIn) -> dict:
-    """BASE-G85: to another folder; deleting where it was and uploading where it goes."""
+    """To another folder; deleting where it was and uploading where it goes."""
     with translation.override(ctx.language):
         if not ctx.has(UPLOAD_FILES):
             raise PermissionDenied(gettext("Only who runs the business can change the files."))
@@ -4016,7 +4015,7 @@ def file_move(ctx: OperationContext, data: FileMoveIn) -> dict:
     ),
 )
 def file_delete(ctx: OperationContext, data: FileDeleteIn) -> dict:
-    """BASE-G86: the file, or the folder and everything in it; no bin."""
+    """The file, or the folder and everything in it; no bin."""
     with translation.override(ctx.language):
         deleted = files.delete(storages["hub_files"], hub_id(ctx.scope), data.path)
     record_event(ctx, events.FILE_DELETED, {"path": deleted["path"], "folder": deleted["folder"]})
@@ -4048,7 +4047,7 @@ NOT_FROM_THE_CHAT = "This cannot be done from the chat (it names no record): not
 
 
 def _assistant_screens(ctx: OperationContext) -> dict[str, str]:
-    """The screens the assistant may link (BASE-G114): the platform's and the menus of the apps on, by name."""
+    """The screens the assistant may link: the platform's and the menus of the apps on, by name."""
     with translation.override(ctx.language):
         screens = {
             "/": pgettext("base", "Home"),
@@ -4128,7 +4127,7 @@ def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):
 
 
 def _assistant_approved(ctx: OperationContext, op, arguments: str) -> OperationContext:
-    """Who runs a write the person said yes to (BASE-G118): the person. When they may not and a manager may approve it
+    """Who runs a write the person said yes to: the person. When they may not and a manager may approve it
    , the turn asks as the screen does — ``requires_elevation`` for this very request — and, repeated with
     the pass, runs it with that one permission more; the pass is spent in the write's own transaction
     (``base.approval_spend``), so a write that fails leaves it unspent and one that ran cannot run twice. The question
@@ -4156,7 +4155,7 @@ def _assistant_approved(ctx: OperationContext, op, arguments: str) -> OperationC
     ai={"description": "Not an assistant tool (the assistant's own turn: the person writes it in its panel)."},
 )
 def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
-    """A turn of the Hub's assistant made ready (BASE-G111, G115…G119, G121): the reads the model asked for run as the
+    """A turn of the Hub's assistant made ready: the reads the model asked for run as the
     person; a write shows its card and runs only with the person's yes (``decision``; «Cancel all» = ``stop``), and
     only on what that card showed (hub#1208: the call it waits on goes back with its ``shown``); a tool this person
     was not offered never runs. Then what goes to the gateway: the tools of what was asked, by relevance,
@@ -4181,7 +4180,7 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         if decision is not None and decision.call_id == call.call_id:
             stopped = decision.stop
             decision = None
-        # What ran, or was refused, by its name: a write this person was not offered is named too (BASE-G118).
+        # What ran, or was refused, by its name: a write this person was not offered is named too.
         op = assistant.operation_of(call.name, tools) or assistant.named(call.name)
         append.append({"role": "tool", "tool_call_id": call.call_id, "content": outcome.content})
         with translation.override(ctx.language):
@@ -4204,7 +4203,7 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
     asked = [str(m.get("content")) for m in data.messages if m.get("role") == "user" and isinstance(m.get("content"), str)]
     business = _assistant_read(ctx, "base.business.get") or {}
     if card is not None:
-        # gh:hub#1045: the card paints an amount (its schema's ``money`` mark) in the business's currency, with its decimals.
+        # The card paints an amount (its schema's ``money`` mark) in the business's currency, with its decimals.
         currency = business.get("currency") or "EUR"
         card["money"] = {"currency": currency, "decimals": business.get("currency_decimals", 2)}
     offered = assistant.relevant(tools, asked[-2:], ctx.language)
@@ -4260,7 +4259,7 @@ def _gateway_failure(code: str, message: str) -> OperationError:
     database=False,
 )
 def assistant_report(ctx: OperationContext, data: AssistantReportIn) -> dict:
-    """Send erplora.com's team an answer the person reports (BASE-G123), with the question that led to it."""
+    """Send erplora.com's team an answer the person reports, with the question that led to it."""
     try:
         return assistant.report(ctx.scope, **data.model_dump())
     except assistant.GatewayError:
@@ -4280,7 +4279,7 @@ def assistant_report(ctx: OperationContext, data: AssistantReportIn) -> dict:
     database=False,
 )
 def assistant_transcribe(ctx: OperationContext, data: AssistantTranscribeIn) -> dict:
-    """The text of the person's dictation (BASE-G112), by erplora.com: it goes to the box, never sent by itself."""
+    """The text of the person's dictation, by erplora.com: it goes to the box, never sent by itself."""
     try:
         return assistant.transcribe(ctx.scope, audio=data.audio, mime_type=data.mime_type, language=data.language or ctx.language)
     except assistant.GatewayError as exc:
@@ -4341,7 +4340,7 @@ REPORT_BROWSER_MAX = 300
 
 def _session_account(ctx: OperationContext) -> str | None:
     """The erplora.com account behind this session: only a session opened with it on this hub. A PIN or a badge on a
-    shared till (gh:hub#2506), a demo's visitor or a call without a session has none, and neither has a session that
+    shared till, a demo's visitor or a call without a session has none, and neither has a session that
     does not say how it was opened (``CREDENTIAL_SESSION_KEY``): never the account by default."""
     request, user = ctx.request, ctx.actor
     username = user.get_username() if hasattr(user, "get_username") else ""
@@ -4925,7 +4924,7 @@ def app_disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     """BASE-F23/F25: the app off, and what came along only with it but what the business's country requires on, which
     stays on (hub#997). 409 ``base.app_required`` while an app on needs it (naming the ones to turn off first); 409
     ``base.app_vetoed`` when it, one that would go off with it or one of those that need it refuses (``can_disable``, or
-    base's reason for one the country requires on: FIX-BASE-APP-TURN-OFF-VETO, hub#619, hub#997; nobody can turn off
+    base's reason for one the country requires on: hub#619, hub#997; nobody can turn off
     first one that refuses). Its tables are never dropped."""
     with activation.changing(ctx.scope.key):
         return _disable(ctx, data)
