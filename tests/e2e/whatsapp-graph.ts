@@ -16,7 +16,7 @@
 // latter with `PROBE_CODE`, which only this Graph receives) and name the variable it was started without: a run whose
 // erplora.com would call the real Meta stops there, in seconds (FIX-HUB-WHATSAPP-E2E-STACK-RECIPE-MISSING-META-ENV).
 // Each call is kept in `calls` and in `calls.jsonl` beside the certificates: what erplora.com asked Meta in the run.
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
@@ -248,14 +248,20 @@ put("key.pem", key.private_bytes(serialization.Encoding.PEM, serialization.Priva
 `;
 
 /** Makes a new authority of the run in `certs` (`ca.pem`, and the Graph's `cert.pem` and `key.pem` signed by it); when
- *  it cannot, it throws the one line that says why (Python's error), not the whole command. */
-function makeAuthority(certs: string, hubDir: string): void {
-  try {
-    execFileSync('uv', ['run', 'python', '-c', MAKE_CERTS, certs], { cwd: hubDir, encoding: 'utf8', stdio: ['ignore', 'ignore', 'pipe'] });
-  } catch (error) {
-    const why = String((error as { stderr?: unknown }).stderr ?? '').trim().split('\n').at(-1);
-    throw new Error(why || (error instanceof Error ? error.message : String(error)));
-  }
+ *  it cannot, it rejects with the one line that says why (Python's error), not the whole command. Without holding the
+ *  thread that waits for it: a cold Python start takes seconds, and longer on a loaded machine, while a spec's Graph
+ *  thread has calls to answer and a Vitest worker held past a minute fails its run (hub#1315). */
+function makeAuthority(certs: string, hubDir: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    execFile('uv', ['run', 'python', '-c', MAKE_CERTS, certs], { cwd: hubDir, encoding: 'utf8' }, (error, _out, stderr) => {
+      if (!error) {
+        resolve();
+        return;
+      }
+      const why = String(stderr ?? '').trim().split('\n').at(-1);
+      reject(new Error(why || error.message));
+    });
+  });
 }
 
 /** The command that starts the run's erplora.com: `node tests/e2e/whatsapp-graph.ts <hub port> <SAAS_URL>` makes the
@@ -263,11 +269,11 @@ function makeAuthority(certs: string, hubDir: string): void {
  *  `NAME=value` per line, for `env $(…)`. An erplora.com started with SSL_CERT_FILE naming a file that is not there
  *  fails every call it makes, even a plain http one: its assistant answered the Hub 502 until the first WhatsApp spec
  *  made one (FIX-HUB-E2E-SAAS-ASSISTANT-502-BEFORE-META-CA-EXISTS). The Graph makes a new one whenever it starts, and
- *  erplora.com reads it per call. Returns the exit status. */
-export function runCli(
+ *  erplora.com reads it per call. Resolves with the exit status. */
+export async function runCli(
   args: string[],
   deps: { artifacts: string; hubDir: string; print: (line: string) => void; fail: (line: string) => void },
-): number {
+): Promise<number> {
   const usage = 'usage: node tests/e2e/whatsapp-graph.ts <hub port> <SAAS_URL> (tests/e2e/README.md, «WhatsApp»)';
   const [port, saas = '', ...rest] = args;
   const hubPort = Number(port);
@@ -280,7 +286,7 @@ export function runCli(
   const certs = join(deps.artifacts, `meta-graph-${hubPort}`);
   const ca = join(certs, 'ca.pem');
   try {
-    if (!existsSync(ca)) makeAuthority(certs, deps.hubDir);
+    if (!existsSync(ca)) await makeAuthority(certs, deps.hubDir);
   } catch (error) {
     deps.fail(`whatsapp-graph.ts: the authority ${ca} could not be made: ${error instanceof Error ? error.message : String(error)}`);
     return 1;
@@ -332,7 +338,7 @@ export interface GraphOptions {
 
 /** Starts the run's Graph in this thread, with a new authority (the specs use `startGraphThread`). */
 export async function startGraph(options: GraphOptions): Promise<Graph> {
-  makeAuthority(options.certs, options.hubDir);
+  await makeAuthority(options.certs, options.hubDir);
   const ca = join(options.certs, 'ca.pem');
   const log = join(options.certs, 'calls.jsonl');
   writeFileSync(log, '');
@@ -483,11 +489,13 @@ export function startGraphThread(options: GraphOptions): Promise<GraphThread> {
 // comparing process.argv[1] with import.meta.url did not): the authority goes to this checkout's tests/e2e/.artifacts.
 if (isMainThread && import.meta.main) {
   const here = dirname(fileURLToPath(import.meta.url));
-  process.exitCode = runCli(process.argv.slice(2), {
+  void runCli(process.argv.slice(2), {
     artifacts: join(here, '.artifacts'),
     hubDir: join(here, '..', '..'),
     print: (line) => console.log(line),
     fail: (line) => console.error(line),
+  }).then((status) => {
+    process.exitCode = status;
   });
 }
 
