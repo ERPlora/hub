@@ -18,7 +18,8 @@ from apps.customer.models import Customer
 from apps.service.models import Service
 from apps.staff.models import Member
 
-from .conftest import A, MONDAY, at, make_appointment, make_series, make_settings, run, wall
+from .conftest import A, MONDAY, at, make_appointment, make_series, make_settings, run
+from .test_services import book
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("anytime")]
 
@@ -30,15 +31,14 @@ def restore(appointment_id, ctx=None):
     return op(ctx or system_context(A), op.input.model_validate({"id": str(appointment_id)}))
 
 
-def book(salon, start="10:00", **extra):
-    data = {
-        "customer_id": str(salon.lucia.id),
-        "services": [{"service_id": str(salon.cut.id)}],
-        "staff_id": str(salon.ana.id),
-        "start": wall(MONDAY, start),
-        **extra,
-    }
-    return run("appointment.appointment.create", data)
+def deleted_date_of_a_series(salon):
+    """Its series and the appointment it booked on its first Monday, deleted from the agenda."""
+    series = make_series(salon)
+    one = make_appointment(
+        salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), recurring=series, occurrence_date=MONDAY
+    )
+    run("appointment.appointment.delete", {"id": str(one.id)})
+    return series, one
 
 
 def deleted(salon, start="10:00", **extra):
@@ -98,11 +98,7 @@ def test_the_same_appointment_comes_back_with_its_number_and_its_history_and_say
 
 
 def test_one_of_a_series_comes_back_in_its_series_on_its_date(salon):
-    series = make_series(salon)
-    one = make_appointment(
-        salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), recurring=series, occurrence_date=MONDAY
-    )
-    run("appointment.appointment.delete", {"id": str(one.id)})
+    series, one = deleted_date_of_a_series(salon)
     # Its series' other dates are its own.
     later = MONDAY + dt.timedelta(weeks=1)
     make_appointment(salon.lucia, salon.ana, [salon.cut], at(later, "10:00"), recurring=series, occurrence_date=later)
@@ -182,11 +178,7 @@ def test_one_whose_service_is_no_longer_bookable_is_refused(salon):
 
 
 def test_one_whose_date_its_series_booked_again_is_refused(salon):
-    series = make_series(salon)
-    one = make_appointment(
-        salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), recurring=series, occurrence_date=MONDAY
-    )
-    run("appointment.appointment.delete", {"id": str(one.id)})
+    series, one = deleted_date_of_a_series(salon)
     make_appointment(
         salon.lucia, salon.bea, [salon.cut], at(MONDAY, "12:00"), recurring=series, occurrence_date=MONDAY
     )
