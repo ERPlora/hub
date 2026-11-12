@@ -1,7 +1,8 @@
 // @vitest-environment node
 // The time budgets of the hub's Vitest run follow the machine's load (hub#765): Vitest's own (5 s a test, 10 s a hook,
 // 1 s a `vi.waitFor`) stretched as the machine, with the run's own workers, slows down. A test or hook whose work is
-// synchronous names no clock of its own (hub#1200): the guardrail at the end holds every test file of the run to it.
+// synchronous names no clock of its own (hub#1200), and one that waits, or a suite, no fixed one (hub#1292): the
+// guardrail at the end holds every test file of the run to it.
 import { globSync, readFileSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -76,6 +77,8 @@ describe('scaleWaitFor', () => {
 
 /** The functions of Vitest that declare a test or a hook: the budget they name is one of their other arguments. */
 const DECLARES = new Set(['it', 'test', 'beforeAll', 'beforeEach', 'afterAll', 'afterEach']);
+/** The functions of Vitest that declare a suite: the budget it names is its tests' and hooks'. */
+const SUITES = new Set(['describe', 'suite']);
 
 /** The function `callee` is reached from: `it` for `it`, `it.skip`, `it.each([…])` or `test.concurrent.each(…)`. */
 function declaredBy(callee: ts.Expression): string | undefined {
@@ -110,20 +113,51 @@ function clockOf(argument: ts.Expression): ts.Node | undefined {
   return ts.isIdentifier(argument) && argument.text === 'NO_CLOCK' ? undefined : argument;
 }
 
-/** The lines of `text`, a test file, where a synchronous test or hook names a clock of its own. */
+/** The text each name of `source` is declared with (`const BUDGET = …`), by that name. */
+function declaredValues(source: ts.SourceFile): Map<string, string> {
+  const values = new Map<string, string>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+      values.set(node.name.text, node.initializer.getText());
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return values;
+}
+
+/** Whether `clock` stretches with the machine's load as Vitest's own budgets do (vite.config.ts): it reads `loadScale`,
+ *  itself or through a name `values` holds. */
+function stretches(clock: ts.Node, values: Map<string, string>): boolean {
+  const text = ts.isIdentifier(clock) ? (values.get(clock.text) ?? '') : clock.getText();
+  return /\bloadScale\b/.test(text);
+}
+
+/**
+ * The lines of `text`, a test file, where a test, hook or suite names a clock the load can outrun: any clock on a test
+ * or hook that has returned once its body has run (hub#1200), and a fixed one — not stretched by `loadScale` — on one
+ * that waits and on a suite, whose clock is its tests' and hooks' (hub#1292).
+ */
 function ownClocks(text: string): number[] {
   const source = ts.createSourceFile('test.ts', text, ts.ScriptTarget.Latest, true);
+  const values = declaredValues(source);
   const lines: number[] = [];
   const visit = (node: ts.Node): void => {
     const declares = ts.isCallExpression(node) ? declaredBy(node.expression) : undefined;
-    if (ts.isCallExpression(node) && declares && DECLARES.has(declares)) {
-      const fn = node.arguments.find((argument) => ts.isArrowFunction(argument) || ts.isFunctionExpression(argument));
-      if (fn && isSynchronous(fn as ts.ArrowFunction | ts.FunctionExpression)) {
-        // A test's first argument is its name; a hook has none.
-        const named = declares === 'it' || declares === 'test';
-        const others = node.arguments.filter((argument, index) => argument !== fn && (index > 0 || !named));
-        const clock = others.map(clockOf).find((found) => found !== undefined);
-        if (clock) lines.push(source.getLineAndCharacterOfPosition(clock.getStart()).line + 1);
+    if (ts.isCallExpression(node) && declares && (DECLARES.has(declares) || SUITES.has(declares))) {
+      // A test's and a suite's first argument is its name; a hook has none. Its function is the first other argument
+      // that is not its options: written there, passed by name or made by a call.
+      const named = !['beforeAll', 'beforeEach', 'afterAll', 'afterEach'].includes(declares);
+      const rest = node.arguments.slice(named ? 1 : 0);
+      const fn = rest.find((argument) => !ts.isObjectLiteralExpression(argument));
+      const clock = rest
+        .filter((argument) => argument !== fn)
+        .map(clockOf)
+        .find((found) => found !== undefined);
+      const synchronous =
+        DECLARES.has(declares) && fn !== undefined && (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) && isSynchronous(fn);
+      if (clock && (synchronous || !stretches(clock, values))) {
+        lines.push(source.getLineAndCharacterOfPosition(clock.getStart()).line + 1);
       }
     }
     ts.forEachChild(node, visit);
@@ -139,20 +173,21 @@ function testFilesOfTheRun(): string[] {
     .sort();
 }
 
-/** Every synchronous test or hook of `files` that names a clock, as `<path>:<line>`. */
+/** Every test, hook or suite of `files` that names a clock the load can outrun, as `<path>:<line>`. */
 function ownClocksOf(files: string[]): string[] {
   return files.flatMap((file) => ownClocks(readFileSync(join(HUB_DIR, file), 'utf8')).map((line) => `${file}:${line}`));
 }
 
 const NAME_NO_CLOCK =
-  'a synchronous test or hook that names a clock of its own: Vitest looks at that clock only once the test has ' +
-  'returned (vitest#2920), so it never cuts one that hangs and only turns red, after the fact, a correct run the ' +
-  'machine made slow. Give it NO_CLOCK (vitest.load.ts)';
+  'a test, hook or suite with a clock the load can outrun. On a synchronous one Vitest looks at it only once the ' +
+  'test has returned (vitest#2920), so it never cuts one that hangs and only turns red, after the fact, a correct ' +
+  'run the machine made slow: give it NO_CLOCK (vitest.load.ts). A fixed one on one that waits does not stretch ' +
+  'with the load (hub#765): what only the machine makes slow waits with NO_CLOCK, the rest takes Vitest\'s own budget';
 
-describe('guardrail: no synchronous test or hook of the Hub names a clock of its own (hub#1200)', () => {
-  it('counts the budget of a test or hook that has returned once its body has run, and none of one that waits', () => {
+describe('guardrail: no test, hook or suite of the Hub names a clock the load can outrun (hub#1200, hub#1292)', () => {
+  it('counts any clock of a test or hook that has returned once its body has run, and a fixed one of one that waits or of a suite', () => {
     const planted = [
-      // A number, a name and the options before or after it, through `each`: lines 3, 6, 7 and 12.
+      // Synchronous, any clock: a number, a name and the options before or after it, through `each`: lines 3, 6, 7 and 12.
       "it('walks the tree', () => {",
       '  expect(walk()).toEqual({});',
       '}, 60_000);',
@@ -165,7 +200,7 @@ describe('guardrail: no synchronous test or hook of the Hub names a clock of its
       "it.each(['a'])('reads %s', function (name) {",
       '  read(name);',
       '}, { timeout: 30_000, retry: 1 });',
-      // It waits, or may wait (what it returns), so the clock can cut it.
+      // It waits, or may wait (what it returns), on a fixed clock the load can outrun (hub#1292): lines 15, 18 and 19.
       "it('lints', async () => {",
       '  await lint();',
       '}, 60_000);',
@@ -187,10 +222,34 @@ describe('guardrail: no synchronous test or hook of the Hub names a clock of its
       "it('maps', () => {",
       '  expect([1].map((n) => { return n; })).toEqual([1]);',
       '}, 5_000);',
-      // A suite's options are its tests' (each judged by its own function).
+      // A suite's clock is its tests' and hooks': a fixed one, line 32.
       "describe('a suite', { timeout: 60_000 }, () => {});",
+      // Stretched with the load as Vitest's own budgets are (`loadScale`), itself or through a name, it is none of its
+      // own on one that waits or on a suite; on a synchronous test it still is: line 46.
+      "const SCALED = Math.round(60_000 * inject('loadScale'));",
+      "describe('a stretched suite', { timeout: SCALED }, () => {});",
+      'beforeAll(async () => {',
+      '  await warm();',
+      '}, SCALED);',
+      "it('spawns stretched', { timeout: Math.round(15_000 * inject('loadScale')) }, async () => {",
+      '  await spawn();',
+      '});',
+      "it('waits without a clock', async () => {",
+      '  await lint();',
+      '}, NO_CLOCK);',
+      "it('walks stretched', () => {",
+      '  walk();',
+      '}, SCALED);',
+      // A suite's budget last, and `suite`, Vitest's other name for it: lines 47 and 48.
+      "describe('a suite with its budget last', () => {}, 30_000);",
+      "suite('a suite by its other name', { timeout: 60_000 }, () => {});",
+      // A function passed by name, or made by a call, is the test's or hook's, not a clock.
+      "it('runs on fake timers', withFakeTimers(async () => {",
+      '  await tick();',
+      '}));',
+      'afterEach(forgetHubHome);',
     ].join('\n');
-    expect(ownClocks(planted)).toEqual([3, 6, 7, 12, 31]);
+    expect(ownClocks(planted)).toEqual([3, 6, 7, 12, 15, 18, 19, 31, 32, 46, 47, 48]);
   });
 
   // It reads every test file of the run (some 900): its work is synchronous, so it names no clock either.
