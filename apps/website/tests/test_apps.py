@@ -44,7 +44,7 @@ def test_permissions_and_roles():
     assert permissions_for_role([config], "hub_employee") == set()
 
 
-# The assistant's contract: every operation is one of its tools (CLAUDE.md «Un solo camino hacia el servidor»).
+# The assistant's contract: every operation is one of its tools.
 
 
 def website_operations():
@@ -92,8 +92,8 @@ def test_the_public_operations_need_no_permission_and_the_rest_do():
 
 #: What only the editor's screen calls, never the assistant: an HTML page (the preview), a file in base64 (an image's
 #: upload, the QR's PNG or SVG) and the anonymous reads of the visitors' page. The assistant reads and changes the site
-#: with the rest, as the person who asks (PLAN §14: every operation is a tool unless it cannot be one).
-#: What only the assistant's card reads, to name a record a save keeps (hub#679): an image by the name of its file, a
+#: with the rest, as the person who asks (every operation is a tool unless it cannot be one).
+#: What only the assistant's card reads, to name a record a save keeps: an image by the name of its file, a
 #: category of the catalog by its name. No tool, no route, nothing live.
 CARD_ONLY = {"website.image.get", "website.category.get"}
 SCREEN_ONLY = {
@@ -122,7 +122,7 @@ def test_the_assistant_gets_every_operation_but_the_screen_only_ones():
             continue
         assert isinstance(op.ai, dict), name
         assert len(str(op.ai.get("description", "")).strip()) > 20, name
-        # What a person types to ask for it (``asks``, hub#1093): website is listed in LIVE_ASSISTANT_ASKS_REQUIRED.
+        # What a person types to ask for it (``asks``): website is listed in LIVE_ASSISTANT_ASKS_REQUIRED.
         expected = {"description", "asks", "risk"} if op.kind == "command" else {"description", "asks"}
         if name == "website.site.save":
             expected.add("summary")

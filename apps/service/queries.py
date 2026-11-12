@@ -1721,7 +1721,7 @@ def _adjustment_row(ctx: OperationContext, adjustment: GrantAdjustment) -> dict:
     }
 
 
-# --- What a separate copy of the business gives back (hub#1283, hub#1322, hub#1323; BASE-F114, SERVICE-F01, F07, F31)
+# --- What a separate copy of the business gives back (BASE-F114, SERVICE-F01, F07, F31) ----------------------------
 
 #: What ``service.category.create`` takes of a category of a separate copy, each a column since ``0001_initial``
 #: (``categories_in_copy``): all of it but its parent, which the business names its own way.
@@ -1798,7 +1798,7 @@ def _category_held(category_id: UUID | None, name: str | None, here: tuple[set[U
 
 #: What ``service.service.create`` takes of a service of a separate copy, each a column since ``0001_initial``
 #: (``services_in_copy``): all of it but its category and its tax category, which the business names its own way, and
-#: who performs it, read apart (``recoverable_services_in_copy``). Not its image (hub#1319).
+#: who performs it, read apart (``recoverable_services_in_copy``). Not its image.
 COPY_FIELDS = (
     "name",
     "pricing_type",
@@ -1863,7 +1863,7 @@ ASSIGNMENT_COPY_FIELDS = ("custom_duration", "custom_price", "is_primary", "is_a
 
 
 def recoverable_services_in_copy(conn) -> list[dict]:
-    """hub#1322: each service of ``services_in_copy`` with who performed it in the copy (``assignments``), as
+    """Each service of ``services_in_copy`` with who performed it in the copy (``assignments``), as
     ``service.service.recover`` takes them: each professional by their id there, the same in the business, and their
     own minutes and price, whether it was their main service and whether it was switched on, in the order they were
     assigned. The same connection and rule as ``services_in_copy``: its own SQL over the model's names, never the ORM."""
@@ -1906,11 +1906,11 @@ def services_in_business(services: list[dict]) -> dict[UUID, UUID]:
 
 
 def services_not_in_business(services: list[dict]) -> list[dict]:
-    """hub#1283: the services a separate copy (``recoverable_services_in_copy``) had on offer and the business lacks (not
+    """The services a separate copy (``recoverable_services_in_copy``) had on offer and the business lacks (not
     in ``services_in_business``), in their order, each as ``service.service.recover`` takes it here, with its ``id``
     there: the key of its tax category (Taxes never deletes one; one turned off since is the create's to refuse, and
     without one it takes the settings'), its category here (``_category_here``) and who performed it there
-    (``assignments``, hub#1322)."""
+    (``assignments``)."""
     held = services_in_business(services)
     lacking = [one for one in services if one["is_active"] and one["id"] not in held]
     keys = dict(TaxCategory.objects.filter(pk__in={one["tax_category_id"] for one in lacking}).values_list("pk", "key"))

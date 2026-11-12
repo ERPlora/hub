@@ -127,7 +127,7 @@ describe('ProductsPage: the list', () => {
     ]);
     const chip = s.testid('inventory-products-unconfigured-p3');
     expect(chip.find('span').text()).toBe('Not configured · Missing tax category');
-    // FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED - Cut to «…» in a narrow column, its whole text stays on hand.
+    // Cut to «…» in a narrow column, its whole text stays on hand.
     expect(chip.attributes('title')).toBe('Not configured · Missing tax category');
     await chip.trigger('click');
     await flush();
@@ -135,7 +135,7 @@ describe('ProductsPage: the list', () => {
     expect([form.props('open'), (form.props('product') as { id: string }).id]).toEqual([true, 'p3']);
   });
 
-  it('hub#703: Status keeps the room to read «Not configured» only while a row carries it, and a refresh leaves the columns alone', async () => {
+  it('Status keeps the room to read «Not configured» only while a row carries it, and a refresh leaves the columns alone', async () => {
     const s = await setup();
     const columns = () => s.prop<Array<{ key: string; minWidth?: string }>>('columns');
     const floor = () => columns().find((c) => c.key === 'status')?.minWidth;
@@ -193,7 +193,6 @@ describe('ProductsPage: the list', () => {
     expect(s.params('inventory.product.list')).toEqual([{ name: 'caf', price_min: 220, sort: '-price', limit: 50, offset: 0 }]);
   });
 
-  // flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
   it('filters behind the table funnel, on their columns: name, SKU, price and stock (as typed) and status', async () => {
     const s = await setup();
     await s.show(LIST);
@@ -236,7 +235,7 @@ describe('ProductsPage: the list', () => {
     const panel = s.testid('inventory-products-filters-panel');
     const set = (name: string, event: string, value: string) =>
       panel.get(`[data-testid="inventory-products-filter-${name}"]`).element.dispatchEvent(new CustomEvent(event, { detail: { value } }));
-    // A closed list opens as a popover: no «CANCEL»/«OK» of an alert in English (hub#1736).
+    // A closed list opens as a popover: no «CANCEL»/«OK» of an alert in English.
     expect((panel.get('[data-testid="inventory-products-filter-status"]').element as HTMLElement & { interface?: string }).interface).toBe('popover');
     set('sku', 'ionInput', 'CAF');
     set('price_min', 'ionInput', '2,20');
@@ -263,7 +262,7 @@ describe('ProductsPage: the list', () => {
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No products');
   });
 
-  // WORKBOOK «Productos», hub#924: the price ends are read like the price field, so a negative one says it cannot be negative.
+  // WORKBOOK «Productos»: the price ends are read like the price field, so a negative one says it cannot be negative.
   it('a negative price end says it cannot be negative, in both languages, and does not filter', async () => {
     const en = await setup();
     await en.show(page([]));
@@ -335,7 +334,7 @@ describe('ProductsPage: actions', () => {
     const s = await setup();
     await s.show(LIST);
     const actions = s.prop<Array<{ id: string; label: string; hidden?: (row: unknown) => boolean; menuOnly?: boolean }>>('actions');
-    // hub#530: «Details» lives in «⋮», since tapping the row already opens the same sheet: its inline button took
+    // «Details» lives in «⋮», since tapping the row already opens the same sheet: its inline button took
     // the room the «Not configured» chip needs at 1280 once the list grew its «Photo» column.
     expect(actions.map((a) => [a.id, a.label, !!a.menuOnly])).toEqual([
       ['detail', 'Details', true],
@@ -533,7 +532,7 @@ describe('ProductsPage', () => {
   });
 });
 
-describe('ProductsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('ProductsPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
@@ -547,7 +546,7 @@ describe('ProductsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
   });
 });
 
-describe('ProductsPage: «Price» is read as every amount of the Hub (hub#1196)', () => {
+describe('ProductsPage: «Price» is read as every amount of the Hub', () => {
   itReadsAmountFiltersAsTheHub({
     ends: ['price_min', 'price_max'],
     params: ['price_min', 'price_max'],

@@ -107,7 +107,7 @@ def test_the_reactions_have_no_route():
 
 
 def test_making_a_service_again_from_a_copy_has_no_route():
-    # Only the recovery from a separate copy makes a service again with who performed it there (hub#1322).
+    # Only the recovery from a separate copy makes a service again with who performed it there.
     bound = {operation for _, _, operation in ROUTES}
     assert "service.service.recover" not in bound
 

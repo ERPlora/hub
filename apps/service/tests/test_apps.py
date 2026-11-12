@@ -125,7 +125,7 @@ def test_navigation_is_the_three_tabs_of_the_old_module_with_registered_icons():
 
 
 #: What only names a record on the assistant's card, and what only the recovery from a separate copy runs (a service
-#: made again with who performed it, hub#1322): no tool (``INTERNAL``).
+#: made again with who performed it): no tool (``INTERNAL``).
 NO_TOOL = {"service.record.get", "service.service.recover"}
 
 
@@ -133,14 +133,14 @@ def test_every_operation_is_a_tool_of_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: the operation's
     # permission is its only door. A command says its risk; a read has none. A tool says what a
     # person types to ask for it, in both languages (live.E020: Services is listed in
-    # LIVE_ASSISTANT_ASKS_REQUIRED, hub#1104).
+    # LIVE_ASSISTANT_ASKS_REQUIRED).
     from live.operations import AI, INTERNAL, MIN_ASKS, registry
 
     operations = [op for name, op in registry.items() if name.startswith("service.")]
     # 45 + the service's image (SERVICE-F34, F35): set_image, upload_image, suggest_image
-    # + what the assistant's card names by its id (hub#676): assignment.get, grant.get, session.get
-    # + what it names of Sales and Appointments (hub#756): record.get, which is no tool
-    # + a service made again from a separate copy with who performed it (hub#1322): service.recover, no tool either.
+    # + what the assistant's card names by its id: assignment.get, grant.get, session.get
+    # + what it names of Sales and Appointments: record.get, which is no tool
+    # + a service made again from a separate copy with who performed it: service.recover, no tool either.
     assert len(operations) == 53
     for op in operations:
         if op.name in NO_TOOL:
@@ -183,9 +183,8 @@ def test_the_holds_nobody_charged_expire_every_hour_as_the_system():
     assert get("service.session.expire").permission == "service.system"
 
 
-# The Home's hook (PLAN-HUB round 2026-10-21; FIX-SERVICE-SETUP-HOOKS): the old module's own item «Your service
-# catalogue» (module.json `setup`, services#26), which reads the catalog's status. The old module declared no panel and
-# no bell row.
+# The Home's step «Your service catalogue», which reads the catalog's status. The old module declared no panel and no
+# bell row.
 
 
 def test_the_homes_step_is_your_service_catalogue_done_once_one_service_can_be_charged():

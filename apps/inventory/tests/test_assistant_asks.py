@@ -1,6 +1,5 @@
-"""What layer 1 of the assistant's QA does not say of Inventory (docs plan 2026-10-31, the assistant's knowledge and
-QA, §3): how many tools it offers, and that the owner's requests of the real-model QA (hub#1080), in the owner's own
-words, are offered their existing operation.
+"""What layer 1 of the assistant's QA does not say of Inventory: how many tools it offers, and that the owner's requests
+of the real-model QA, in the owner's own words, are offered their existing operation.
 
 Every ask of every tool of inventory bringing its tool among the first ten, role by role, in both languages, is
 ``base/tests/test_assistant_asks.py``'s (inventory is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over
@@ -19,7 +18,7 @@ from base.tests.test_assistant_asks import comparable, probe_phrases
 
 A = Scope("host", "a")
 
-#: The requests of hub#1080's QA (``qa20261108.owner.es.inventory.*``), as the owner said them: each is offered its
+#: The requests of the real-model QA (``qa20261108.owner.es.inventory.*``), as the owner said them: each is offered its
 #: existing operation (among the ``MAX_TOOLS`` a turn offers, so the model can choose it), without being one of its
 #: asks.
 REPORTED = [

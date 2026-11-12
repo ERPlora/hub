@@ -15,7 +15,7 @@ class ServiceConfig(LiveAppConfig):
     icon = "ion:briefcase-outline"
     category = Category.CATALOG
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The app store's texts, which register_apps writes to shared.app.
     summary = _(
         "Your service menu: prices, durations, who performs each service and prepaid session vouchers."
     )
@@ -31,8 +31,7 @@ class ServiceConfig(LiveAppConfig):
     # The tax category of each service (tax.TaxCategory), the professionals who perform it
     # (staff.Member) and the owner of a voucher (customer.Customer).
     requires = ["tax", "staff", "customer"]
-    # The services' own photos (SERVICE-F35; round 2026-10-30, base.images): served by /p/media/ to the hub's sessions
-    # only.
+    # The services' own photos (SERVICE-F35; base.images): served by /p/media/ to the hub's sessions only.
     members_media = ["service/services/"]
     default_auto_field = "django.db.models.BigAutoField"
     permissions = [
@@ -90,10 +89,9 @@ class ServiceConfig(LiveAppConfig):
             "service.grant_package",
         ],
     }
-    # The Home's hook (PLAN-HUB round 2026-10-21): the old module's own item «Your service catalogue» (module.json
-    # `setup`, services#26), order 31 and important, done once one offered service can be charged (its tax category
-    # alive), for whoever adds services, leading to the list of services. Refreshed on what changes the services on
-    # offer. The old module declared no panel and no bell row.
+    # The Home's step «Your service catalogue», order 31 and important, done once one offered service can be charged
+    # (its tax category alive), for whoever adds services, leading to the list of services. Refreshed on what changes
+    # the services on offer. The old module declared no panel and no bell row.
     setup = [
         SetupStep(
             key="catalog",
@@ -133,14 +131,14 @@ class ServiceConfig(LiveAppConfig):
     ]
 
     def recoverable_from_copy(self) -> list:
-        """hub#1283, hub#1322, hub#1323: the platform asks (``base.tenancy.recovery``) what a separate copy of the
-        business gives back when the staff recovers from it (BASE-F114), in this order: first the categories the
-        business lacks (``queries.categories_in_copy``, ``queries.categories_not_in_business``), each created by
-        ``service.category.create``, the screen's own, parents first; then the services the copy offers and the
-        business lacks (``queries.recoverable_services_in_copy``, ``queries.services_not_in_business``), each made
-        again by ``service.service.recover``: created by ``service.service.create``, the screen's own, in its category
-        (the same one, or the one brought back just before with its name), and assigned to each professional who
-        performed it there and the business still has, by ``service.assignment.assign``, the screen's own too."""
+        """The platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when the staff
+        recovers from it (BASE-F114), in this order: first the categories the business lacks
+        (``queries.categories_in_copy``, ``queries.categories_not_in_business``), each created by
+        ``service.category.create``, the screen's own, parents first; then the services the copy offers and the business
+        lacks (``queries.recoverable_services_in_copy``, ``queries.services_not_in_business``), each made again by
+        ``service.service.recover``: created by ``service.service.create``, the screen's own, in its category (the same
+        one, or the one brought back just before with its name), and assigned to each professional who performed it
+        there and the business still has, by ``service.assignment.assign``, the screen's own too."""
         from apps.service import queries  # the models are not loaded yet when this module is
         from base.recovery import Recoverable
 

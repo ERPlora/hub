@@ -1,4 +1,4 @@
-"""Which database the code running now works on: ``use_hub``, ``use_control`` (PLAN-DB §4; plan 2026-10-22, step 3).
+"""Which database the code running now works on: ``use_hub``, ``use_control``.
 
 A ``ContextVar`` holds the active :class:`DatabaseContext`; the ``TenantRouter`` (``base.tenancy.router``) reads it
 for every model of a hub and ``@operation`` opens its transaction on its alias (:func:`operation_database`, wired as
@@ -7,9 +7,9 @@ inherits the context and a thread of its own starts without one (the live execut
 hub again in theirs).
 
 - :func:`use_hub` — one hub: its models go to its database's alias (registered on first use and its identity checked
-  once per process, ``base.tenancy.identity``). A business without a database of its own (``db_name=""``: phase 1's,
-  before its cut) is never entered (:class:`HubWithoutDatabase`): since S5 phase 1's shared database is gone, its
-  host answers 503 until ``cut_shared_hubs`` gives it one (``base.tenancy.cut``).
+  once per process, ``base.tenancy.identity``). A business without a database of its own (``db_name=""``) is never
+  entered (:class:`HubWithoutDatabase`): the old shared database is gone, so its host answers 503 until
+  ``cut_shared_hubs`` gives it one (``base.tenancy.cut``).
 - :func:`use_control` — the platform: the registry and the demos (``base.hub.*``, ``base.demo.*``); a hub's model
   here is ``HubContextMissing``, the outbox goes to control.
 - :func:`use_again` — the context :func:`current` gave elsewhere, entered again by a thread handed work
@@ -49,7 +49,7 @@ class HubContextMismatch(RuntimeError):
 
 
 class HubWithoutDatabase(RuntimeError):
-    """A business without a database of its own (phase 1's, not yet cut): it is never entered nor served (S5)."""
+    """A business without a database of its own (``db_name=""``): it is never entered nor served."""
 
 
 class AppNotCreated(AppInactive):
@@ -110,7 +110,7 @@ def use_control() -> Iterator[DatabaseContext]:
 def use_admin_without_a_business() -> AbstractContextManager[DatabaseContext]:
     """Where the admin works with no business chosen (``base.middleware``): control. Under the suite's fallback, the
     fallback itself: control's test database, with the rows of every business of the tests written before the
-    tenancy, as the admin showed them in phase 1."""
+    tenancy, as the admin showed them before every business had a database of its own."""
     return use_control() if _test_fallback is None else _entered(_test_fallback)
 
 

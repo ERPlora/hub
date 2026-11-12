@@ -1,4 +1,4 @@
-"""A hub's database copied to the dumps bucket (round 2026-10-30 of PLAN-DB: decision 2, proposals (f), (k), (l), (m)).
+"""A hub's database copied to the dumps bucket.
 
 :func:`dump_hub` copies one hub's own database with ``pg_dump -Fc --no-owner --no-acl`` (PostgreSQL's custom format,
 for ``pg_restore`` 18: the full copy that restores the business, not «Export as a copy»'s ``.blueprint.zip``) and
@@ -17,9 +17,9 @@ business leaves and again as its final copy after its 90 days, ``base.tenancy.of
   copy goes up (boto3's ``Callback``, in this same thread) and once more right after it;
 - to a temporary file first, uploaded only when ``pg_dump`` ended well, so a failed dump leaves nothing in the bucket.
 
-A hub without its own database is never dumped (:class:`HubWithoutDatabase`: a business of phase 1 not cut yet);
+A hub without its own database is never dumped (:class:`HubWithoutDatabase`: a business not cut yet);
 without a bucket there is nothing to dump to (:class:`DumpsUnavailable`). Every failure is a :class:`DumpFailed` with
-what went wrong in a line. :func:`dump_control` copies control's own database the same way, before the cut of S5
+what went wrong in a line. :func:`dump_control` copies control's own database the same way, before the cut
 (``manage.py cut_shared_hubs``), to ``<control>/<AAAAMMDDTHHMMSSZ>-cut.dump``, with no ``HubDump``.
 
 :func:`presigned_url` signs a link to one copy for 15 minutes (``X-Amz-Expires=900``, SigV4); the Hub's Settings › Data
@@ -54,7 +54,7 @@ from base.tenancy import connections as tenancy_connections
 
 logger = logging.getLogger(__name__)
 
-#: How long a copy is kept: the bucket's lifecycle rule deletes it then (aws ``s3_dumps.tf``, PLAN-DB proposal (m)).
+#: How long a copy is kept: the bucket's lifecycle rule deletes it then (aws ``s3_dumps.tf``).
 #: The Hub never lists nor links one older (``base.queries``), and the nightly pass forgets its row (``base.usage``).
 RETENTION = dt.timedelta(days=90)
 #: How long a dump may run before it is stopped.
@@ -82,7 +82,7 @@ class DumpError(RuntimeError):
 
 
 class HubWithoutDatabase(DumpError):
-    """The business has no database of its own yet (phase 1's, not cut): there is nothing of its own to copy."""
+    """The business has no database of its own yet (not cut): there is nothing of its own to copy."""
 
     code = "hub_without_database"
 
@@ -188,8 +188,8 @@ def dump_hub(
 def dump_control(*, kind: str = CUT, now: dt.datetime | None = None, timeout: float = DUMP_TIMEOUT_SECONDS) -> str:
     """Copy control's database to the bucket, at ``<control>/<AAAAMMDDTHHMMSSZ>-<kind>.dump``; return its key.
 
-    The copy taken before the cut of S5 moves the businesses of phase 1 out of it (``cut_shared_hubs``): every table,
-    the registry and what phase 1 kept of each business, restorable with ``pg_restore``. As a hub's, by the migrator on
+    The copy taken before the cut moves the businesses still in control out of it (``cut_shared_hubs``): every table,
+    the registry and what control kept of each business, restorable with ``pg_restore``. As a hub's, by the migrator on
     a direct connection to control's writer, its password only in the subprocess's environment; uploaded only when it
     ended well. No ``HubDump`` is noted: it is no business's copy, nor listed to anyone; the bucket keeps it its 90
     days. Without a bucket, :class:`DumpsUnavailable`."""

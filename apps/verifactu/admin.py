@@ -1,6 +1,5 @@
-"""Django admin of the verifactu app, for the platform's staff only (round 12, PLAN §17; hubs.erplora.com), at the
-service of support. Ioan's criterion (2026-10-15): a record not sent is not a record registered; support does not
-delete a sale, it fixes a sending problem.
+"""Django admin of the verifactu app, for the platform's staff only (hubs.erplora.com), at the service of support:
+a record not sent is not a record registered; support does not delete a sale, it fixes a sending problem.
 
 - What was sealed (records, chain heads, audit events, the AEAT's photo) is shown whole and never typed, added nor
   deleted: it is corrected with a new record (RD 1007/2023) and the records are kept. A record the AEAT registered
@@ -54,8 +53,8 @@ STAFF_PERMISSIONS = frozenset(
 )
 
 RESEND = _("Resend to the AEAT")
-#: A notice that joins several counts says each one in its own singular or plural (hub#1304): «1 aceptado,
-#: 2 rechazados», never one plural for the whole sentence.
+#: A notice that joins several counts says each one in its own singular or plural: «1 aceptado, 2 rechazados», never one
+#: plural for the whole sentence.
 RESENT = _("Resend finished: %(accepted)s, %(rejected)s, %(waiting)s.")
 RESENT_COUNTS = {
     "accepted": npgettext_lazy(
@@ -69,7 +68,7 @@ RESENT_COUNTS = {
     ),
 }
 RESCHEDULE = _("Reschedule: send with the next pass")
-#: A count says itself in the singular or the plural (hub#1275): «1 record goes out», never «record(s)».
+#: A count says itself in the singular or the plural: «1 record goes out», never «record(s)».
 RESCHEDULED = ngettext_lazy(
     "Rescheduled: %(count)s record goes out with the next pass.",
     "Rescheduled: %(count)s records go out with the next pass.",
@@ -227,7 +226,7 @@ class ConfigAdmin(admin.ModelAdmin):
         return tuple(
             field.name
             for field in Config._meta.concrete_fields
-            # ``live_paid`` is retired (PLAN §30): its column only waits to be dropped.
+            # ``live_paid`` is retired: its column only waits to be dropped.
             if field.name not in ("route", "live_paid")
         )
 
@@ -486,7 +485,7 @@ class RecordAdmin(SupportActions, ReadOnlyAdmin):
     def total(self, record: Record) -> str | None:
         if record.total_amount is None:
             return None
-        # Thousands always grouped with the screens' marks («1.234,56 €»; hub#1090): Django's Spanish format
+        # Thousands always grouped with the screens' marks («1.234,56 €»): Django's Spanish format
         # groups with a space.
         locale = translation.to_locale(translation.get_language() or "en")
         return f"{format_decimal(Decimal(record.total_amount) / 100, format='#,##0.00', locale=locale)} €"

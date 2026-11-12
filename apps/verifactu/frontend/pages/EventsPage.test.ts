@@ -65,8 +65,7 @@ describe('EventsPage', () => {
   });
 });
 
-describe('EventsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-FILTERS-2B)', () => {
-  // flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+describe('EventsPage: the filters behind the table funnel', () => {
   type Filter = { type: string; key?: string; keys?: string[]; options?: Array<{ value: string; label: string }> };
   const PAGE = { rows: [EVENT], total: 1, limit: 50, offset: 0 };
 
@@ -145,7 +144,7 @@ describe('EventsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-FIL
   });
 });
 
-describe('EventsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('EventsPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

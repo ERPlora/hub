@@ -470,7 +470,7 @@ def set_sold_out(ctx: OperationContext, data: ProductSoldOutIn) -> dict:
     return load_product(product.id, ctx.scope)
 
 
-# The product's image (round 2026-10-30, base.images)
+# The product's image (base.images)
 
 #: Where a product's own photos are kept under its hub's prefix: the folder ``members_media`` serves (apps.py).
 PHOTOS = "inventory/products/"

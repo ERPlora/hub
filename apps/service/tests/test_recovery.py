@@ -12,7 +12,7 @@ one it made again, the same name in the same category; the others it lacks (``qu
 as ``service.service.create`` takes it here: the key of its tax category and its category, the same one while the
 business still has it, else the live one with its name (brought back just before, or made again). Each is made again by
 ``service.service.recover``: created by that operation, the screen's own, and assigned to each professional who
-performed it in the copy and the business still has (``queries.recoverable_services_in_copy``, hub#1322) by
+performed it in the copy and the business still has (``queries.recoverable_services_in_copy``) by
 ``service.assignment.assign``, the screen's own too (SERVICE-F31).
 """
 
@@ -352,7 +352,7 @@ def test_a_tax_category_turned_off_since_is_the_creates_to_refuse():
     assert refused.value.code == "service.tax_category_unknown"
 
 
-# ── Who performs each one (hub#1322): each professional the business still has, assigned by the screen's operation ──
+# ── Who performs each one: each professional the business still has, assigned by the screen's operation ───────────
 
 
 def an_assignment_of_the_copy(member: Member, **fields) -> dict:

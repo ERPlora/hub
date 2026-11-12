@@ -1,4 +1,4 @@
-"""The roles a hub's database is reached with, per cluster (round 2026-10-30, S2a; PLAN-DB §5 and §10; aws#23).
+"""The roles a hub's database is reached with, per cluster.
 
 A hub on no cluster, or on one without a secret, uses the environment's roles: the default connection's for the app
 (``hub_app``) and ``DB_MIGRATOR_USER`` for the migrator, which a process without it does not have (never the app's). A cluster with ``secret_name`` has its own, in two Secrets
@@ -20,7 +20,7 @@ from django.db import connections as django_connections
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import credentials, names
 
-#: A cluster's ``secret_name``: the prefix of its two secrets (aws#23), ``…/app`` and ``…/migrator``.
+#: A cluster's ``secret_name``: the prefix of its two secrets, ``…/app`` and ``…/migrator``.
 SECRET = "erplora/prod/clusters/cluster-2"
 APP_SECRET, MIGRATOR_SECRET = f"{SECRET}/app", f"{SECRET}/migrator"
 # Where the cluster is comes from its row (``control.Cluster``), never from the secrets' host and ports.
@@ -112,7 +112,7 @@ def test_without_a_cluster_the_environments_roles_are_used(settings):
 
 
 def test_without_a_migrators_role_there_is_no_migrator_never_the_apps_role(settings):
-    """Fails closed (review of hub#469): a process without ``DB_MIGRATOR_*`` (the web) has no migrator, and the app's
+    """Fails closed: a process without ``DB_MIGRATOR_*`` (the web) has no migrator, and the app's
     role (``hub_app``, ``DB_USER``) never stands in for it."""
     settings.DB_MIGRATOR_USER, settings.DB_MIGRATOR_PASSWORD = "", ""
 
@@ -213,7 +213,7 @@ def test_a_hubs_alias_on_a_cluster_reaches_its_pooler_with_the_apps_role_never_t
 
     assert (registered["HOST"], registered["PORT"]) == ("pooler-2.example", 6433)
     assert (registered["USER"], registered["PASSWORD"]) == ("hub_app", "app-secret")
-    # The web may read only ``…/app`` (aws#23): a hub's alias never asks for the migrator's secret.
+    # The web may read only ``…/app``: a hub's alias never asks for the migrator's secret.
     assert secrets.reads == [APP_SECRET]
 
 
@@ -291,7 +291,7 @@ def tls_to_the_writer(monkeypatch):
 
 
 def test_a_hub_reached_on_its_clusters_writer_directly_keeps_the_writers_tls(secrets, tls_to_the_writer):
-    """Review of hub#471 (I5): without a PgBouncer of its own, the hub's alias goes straight to the cluster's writer,
+    """Without a PgBouncer of its own, the hub's alias goes straight to the cluster's writer,
     so it carries the default connection's ``sslmode``/``sslrootcert`` (never a plain connection to Aurora)."""
     alias = tenancy_connections.register_hub_alias(a_hub(on=cluster(pooler_host="")))
     options = django_connections.settings[alias]["OPTIONS"]
@@ -306,7 +306,7 @@ def test_a_hub_reached_through_a_pgbouncer_keeps_the_templates_options(secrets, 
     assert "sslmode" not in options and "sslrootcert" not in options
 
 
-# ── Rotation and a Secrets Manager that fails after a good read (review of hub#471, I4) ──────────────────────────────
+# ── Rotation and a Secrets Manager that fails after a good read ──────────────────────────────────────────────────────
 
 
 def test_a_secret_that_fails_on_its_refresh_keeps_the_last_good_one_and_says_so(secrets, clock, caplog):
@@ -379,7 +379,7 @@ def test_the_migrators_role_on_a_cluster_with_its_secret_is_that_secrets(secrets
 
 
 def test_a_rotated_migrators_password_reaches_a_ddl_alias_already_registered(secrets, clock):
-    """Re-review of hub#471 (b): a cluster's ``<db>__ddl`` takes the migrator's new password too, never the first one
+    """A cluster's ``<db>__ddl`` takes the migrator's new password too, never the first one
     for the life of the process."""
     on = cluster()
     db_name = a_hub(on=on).db_name
@@ -394,7 +394,7 @@ def test_a_rotated_migrators_password_reaches_a_ddl_alias_already_registered(sec
     assert django_connections[alias].settings_dict["PASSWORD"] == "rotated"
 
 
-# ── A hub moved to another cluster (round 2026-10-30b of PLAN-DB, decision 3; base.tenancy.move) ────────────────────
+# ── A hub moved to another cluster (base.tenancy.move) ───────────────────────────────────────────────────────────────
 
 
 def another_cluster() -> SimpleNamespace:

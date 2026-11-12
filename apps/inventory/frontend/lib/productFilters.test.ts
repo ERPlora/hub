@@ -1,6 +1,5 @@
 // The filters of Products as the table's funnel holds them (by name, as typed) and as
 // `inventory.product.list` takes them: price in cents (typed in euros), stock as an exact quantity.
-// flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
 import { describe, expect, it } from 'vitest';
 
 import { filterParams, filtersInUse, PRODUCT_STATUSES, unreadableQuantities } from './productFilters';
@@ -18,7 +17,7 @@ describe('productFilters', () => {
     });
   });
 
-  it('«from 12» is twelve euros, never twelve cents (inventory#115)', () => {
+  it('«from 12» is twelve euros, never twelve cents', () => {
     expect(filterParams({ price_min: '12' })).toEqual({ price_min: 1200 });
     expect(filterParams({ price_max: '1.250,50' })).toEqual({ price_max: 125050 });
   });
@@ -32,7 +31,7 @@ describe('productFilters', () => {
     expect(filterParams({ price_min: 'doce', price_max: '1.250', stock_min: 'x', name: '   ', status: 'gone' })).toEqual({});
   });
 
-  it('says which stock ends are no quantity; a price it cannot read is the page’s to say, as every amount filter (hub#1196)', () => {
+  it('says which stock ends are no quantity; a price it cannot read is the page’s to say, as every amount filter', () => {
     expect(unreadableQuantities({ price_min: 'doce', price_max: '1.250', stock_min: '2,5', stock_max: 'x' })).toEqual(['stock_max']);
     expect(unreadableQuantities({ stock_min: 'x', stock_max: '1,2345' })).toEqual(['stock_min', 'stock_max']);
     expect(unreadableQuantities({ price_min: '12', stock_min: '3' })).toEqual([]);
@@ -44,7 +43,7 @@ describe('productFilters', () => {
     expect(filtersInUse({ price_min: 'doce' })).toBe(0);
   });
 
-  // hub#924: the price ends are read in the business's money, like the price field: its złoty, never a euro.
+  // The price ends are read in the business's money, like the price field: its złoty, never a euro.
   it('reads the price ends in the business’s money: «12,50 zł» filters in Poland, «13,50 €» cannot be read there', () => {
     const PLN = { currency: 'PLN', decimals: 2 };
     const typed = { price_min: '13,50 €', price_max: '12,50 zł' };

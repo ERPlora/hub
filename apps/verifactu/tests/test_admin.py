@@ -1,6 +1,5 @@
-"""Django admin of the verifactu app, for the platform's staff (hubs.erplora.com, PLAN §17–§18), at the service of
-support (Ioan, 2026-10-15: «a record not sent is not a record registered»; support fixes a sending problem, it never
-deletes a sale).
+"""Django admin of the verifactu app, for the platform's staff (hubs.erplora.com), at the service of support: a
+record not sent is not a record registered; support fixes a sending problem, it never deletes a sale.
 
 Nothing fiscal is typed: what was sealed is shown whole and read-only, never added, changed nor deleted, and a record
 the AEAT registered stays as it is. What support changes, it changes through the module's operations, for the hub
@@ -155,7 +154,7 @@ def test_the_records_list_shows_what_the_records_screen_showed(client, staff, is
 
 
 def test_the_records_list_groups_the_thousands_of_a_total(client, staff, issuer):
-    # hub#1090: a total of four digits is «1,234.56 €» in English and «1.234,56 €» in Spanish, never «1234.56 €».
+    # A total of four digits is «1,234.56 €» in English and «1.234,56 €» in Spanish, never «1234.56 €».
     lines = [{"description": "Course", "quantity": "1", "unit_price": 102030, "tax_rate": "21"}]
     invoice = manual(lines, series_code="TICKET")
     run("verifactu.record.create", {"invoice_id": str(invoice.id)})
@@ -191,7 +190,7 @@ def test_a_record_opens_read_only_and_is_never_saved(client, staff, issuer):
 
 
 def test_a_record_page_in_spanish_says_the_aeats_words(client, staff, issuer):
-    """hub#591: the record's labels are VeriFactu's, the AEAT's, never those of an app installed before it that says
+    """The record's labels are VeriFactu's, the AEAT's, never those of an app installed before it that says
     the same English (invoice's «fecha de emisión» and «tipo de rectificación», sale's «desglose de impuestos» and
     «impuesto», attendance's «corrección»)."""
     sealed = record()
@@ -265,7 +264,7 @@ RESEND_ANSWERS = {
 def test_resend_says_each_count_in_the_singular_with_one_and_in_the_plural_with_several(
     issuer, gateway_answers, request_of, answer, count, language, notice
 ):
-    # hub#1304: «1 aceptados», «1 rechazados»: each count of the notice had only its plural.
+    # Never «1 aceptados», «1 rechazados»: each count of the notice has its own singular and plural.
     sealed = [record() for _ in range(count)]
     gateway_answers.set(RESEND_ANSWERS[answer])
     request = request_of()
@@ -333,7 +332,7 @@ def test_without_staff_the_records_are_forbidden(client, make_user):
     assert client.get(RECORDS, HTTP_HOST=PLATFORM).status_code == 403
 
 
-# Support's actions on what is not registered yet (Ioan, 2026-10-15)
+# Support's actions on what is not registered yet
 
 
 def failed_once(gateway_answers) -> Record:
@@ -431,7 +430,7 @@ def failed_together(gateway_answers, count: int) -> list[Record]:
 def test_rescheduling_several_records_says_them_in_the_plural(
     issuer, gateway_answers, request_of, language, notice
 ):
-    # hub#1275: «record(s)» showed the parentheses whatever the number.
+    # Never «record(s)» with the parentheses, whatever the number.
     sealed = failed_together(gateway_answers, 2)
     request = request_of()
     with translation.override(language):
@@ -461,7 +460,7 @@ def test_rescheduling_several_records_says_them_in_the_plural(
 def test_each_notice_of_a_count_says_one_in_the_singular_and_several_in_the_plural(
     notice, count, language, said_as
 ):
-    # hub#1275: the three notices of the actions said «record(s)», «chain(s)» and «new record(s)» whatever the number.
+    # The three notices of the actions never say «record(s)», «chain(s)» nor «new record(s)», whatever the number.
     with translation.override(language):
         assert notice % {"count": count} == said_as
 
@@ -533,7 +532,7 @@ def test_asking_the_aeat_takes_out_of_the_queue_only_what_it_holds(
 def test_asking_the_aeat_says_each_count_in_the_singular_with_one_and_in_the_plural_with_several(
     issuer, gateway_answers, request_of, held, missing, language, notice
 ):
-    # hub#1304: «1 ya registrados», «1 no están en la AEAT»: each count of the notice had only its plural.
+    # Never «1 ya registrados», «1 no están en la AEAT»: each count of the notice has its own singular and plural.
     sealed = left_without_answer(gateway_answers, held + missing)
     gateway_answers.set(aeat_holds(*sealed[:held]))
     request = request_of()
@@ -579,7 +578,7 @@ def test_a_rejection_is_corrected_with_a_new_record_and_the_rejected_one_stays(
 def test_correcting_several_rejections_says_them_in_the_plural(
     issuer, gateway_answers, request_of, language, notice
 ):
-    # hub#1275: «new record(s)» showed the parentheses whatever the number.
+    # Never «new record(s)» with the parentheses, whatever the number.
     rejected = rejected_together(gateway_answers, 2)
     request = request_of()
     with translation.override(language):
@@ -649,7 +648,7 @@ def test_a_chain_is_rescheduled_from_its_send_control(issuer, gateway_answers, r
 def test_rescheduling_several_chains_says_them_in_the_plural(
     issuer, gateway_answers, request_of, language, notice
 ):
-    # hub#1275: «chain(s)» showed the parentheses whatever the number; the number is the chains', not a fixed one.
+    # Never «chain(s)» with the parentheses, whatever the number; the number is the chains', not a fixed one.
     failed_once(gateway_answers)
     run("invoice.issuer.update", {**ISSUER, "tax_id": "A58818501"})  # another issuer: its own chain
     failed_once(gateway_answers)
@@ -775,7 +774,7 @@ def test_the_configuration_is_seen_whole_and_only_its_route_is_chosen(config, re
         "synced_version",
         "synced_at",
     } <= readonly
-    # The retired live option (PLAN §30, round 2026-10-22b) is not shown: its column only waits to be dropped.
+    # The retired live option is not shown: its column only waits to be dropped.
     assert "live_paid" not in instance.list_display
     assert "live_paid" not in instance.get_fields(request, config)
 
@@ -826,7 +825,7 @@ def test_without_a_chosen_hub_the_route_is_not_changed(client, staff, config):
 
 
 def test_only_erploras_own_hub_files_erploras_records_without_an_authorisation(client, staff, settings):
-    # saas#2524: the page of a record says why it waits for the hub chosen in the admin session. ERPlora's own hub
+    # The page of a record says why it waits for the hub chosen in the admin session. ERPlora's own hub
     # needs no authorisation for ERPlora's records; a business with ERPlora's tax ID typed in, the approved one.
     from live.context import Scope, system_context
 
@@ -863,7 +862,7 @@ def test_only_erploras_own_hub_files_erploras_records_without_an_authorisation(c
 
 
 def test_without_a_hub_drawn_erploras_tax_id_is_no_exemption_and_the_reason_is_said(settings):
-    # saas#2524: «Why it waits» drawn outside a hub's page (no hub chosen: no scope) never takes ERPlora's tax ID as
+    # «Why it waits» drawn outside a hub's page (no hub chosen: no scope) never takes ERPlora's tax ID as
     # ERPlora's own hub; it says the authorisation is missing instead of failing.
     from django.contrib.admin.sites import site
     from live.context import Scope, system_context
