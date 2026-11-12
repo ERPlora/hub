@@ -12,6 +12,7 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { bare, findingsByApp, HUB, hubFrontends, linesWhere } from './__tests__/frontend-sources';
+import { NO_CLOCK } from '../../vitest.load';
 
 /** The lists with an amount filter whose test does not run the table yet, and the issue that takes each to it. */
 const NOT_YET: Record<string, string> = {
@@ -76,7 +77,7 @@ describe('guardrail: every amount filter of the Hub is read as the money field r
     const missing = files.filter((file) => !(file in NOT_YET) && !runsTheTable(`${HUB}/${file}`));
     const done = Object.keys(NOT_YET).filter((file) => runsTheTable(`${HUB}/${file}`) || !files.includes(file));
     expect({ missing, done }, RUN_THE_TABLE).toEqual({ missing: [], done: [] });
-  }, 60_000);
+  }, NO_CLOCK);
 
   it('no app keeps a copy of what an amount filter says: the words are the platform’s (base.money.filter.*)', () => {
     const copies: string[] = [];

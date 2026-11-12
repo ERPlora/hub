@@ -1,9 +1,18 @@
 // @vitest-environment node
 // The time budgets of the hub's Vitest run follow the machine's load (hub#765): Vitest's own (5 s a test, 10 s a hook,
-// 1 s a `vi.waitFor`) stretched as the machine, with the run's own workers, slows down.
+// 1 s a `vi.waitFor`) stretched as the machine, with the run's own workers, slows down. A test or hook whose work is
+// synchronous names no clock of its own (hub#1200): the guardrail at the end holds every test file of the run to it.
+import { globSync, readFileSync } from 'node:fs';
+import { dirname, join, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-import { loadScale, scaleWaitFor } from './vitest.load';
+import config from './vite.config';
+import { loadScale, NO_CLOCK, scaleWaitFor } from './vitest.load';
+
+const HUB_DIR = dirname(fileURLToPath(import.meta.url));
 
 describe('loadScale', () => {
   it('counts the run\'s own workers in the load it will run under: Vitest\'s one per core but one', () => {
@@ -63,4 +72,134 @@ describe('scaleWaitFor', () => {
     expect(scaleWaitFor(undefined, 13.333_333)).toEqual({ timeout: 13_333 });
     expect(scaleWaitFor(1_000, 1.000_6)).toBe(1_001);
   });
+});
+
+/** The functions of Vitest that declare a test or a hook: the budget they name is one of their other arguments. */
+const DECLARES = new Set(['it', 'test', 'beforeAll', 'beforeEach', 'afterAll', 'afterEach']);
+
+/** The function `callee` is reached from: `it` for `it`, `it.skip`, `it.each([…])` or `test.concurrent.each(…)`. */
+function declaredBy(callee: ts.Expression): string | undefined {
+  let current = callee;
+  while (ts.isCallExpression(current) || ts.isPropertyAccessExpression(current)) current = current.expression;
+  return ts.isIdentifier(current) ? current.text : undefined;
+}
+
+/** Whether `fn` has returned once its body has run: it is not `async` and, a block, it returns no value — what it
+ *  starts it does not wait for. An arrow whose body is an expression may return a promise: it is not counted. */
+function isSynchronous(fn: ts.ArrowFunction | ts.FunctionExpression): boolean {
+  const isAsync = fn.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword);
+  if (isAsync || !ts.isBlock(fn.body)) return false;
+  let returns = false;
+  const visit = (node: ts.Node): void => {
+    // What a function inside it returns is not its own.
+    if (returns || ts.isFunctionLike(node)) return;
+    if (ts.isReturnStatement(node) && node.expression) returns = true;
+    else ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(fn.body, visit);
+  return !returns;
+}
+
+/** The clock `argument` names: a budget in milliseconds, or the `timeout` of an options object. `NO_CLOCK` is none. */
+function clockOf(argument: ts.Expression): ts.Node | undefined {
+  if (ts.isObjectLiteralExpression(argument)) {
+    const timeout = argument.properties.find((property) => property.name?.getText() === 'timeout');
+    if (!timeout || !ts.isPropertyAssignment(timeout)) return timeout;
+    return clockOf(timeout.initializer);
+  }
+  return ts.isIdentifier(argument) && argument.text === 'NO_CLOCK' ? undefined : argument;
+}
+
+/** The lines of `text`, a test file, where a synchronous test or hook names a clock of its own. */
+function ownClocks(text: string): number[] {
+  const source = ts.createSourceFile('test.ts', text, ts.ScriptTarget.Latest, true);
+  const lines: number[] = [];
+  const visit = (node: ts.Node): void => {
+    const declares = ts.isCallExpression(node) ? declaredBy(node.expression) : undefined;
+    if (ts.isCallExpression(node) && declares && DECLARES.has(declares)) {
+      const fn = node.arguments.find((argument) => ts.isArrowFunction(argument) || ts.isFunctionExpression(argument));
+      if (fn && isSynchronous(fn as ts.ArrowFunction | ts.FunctionExpression)) {
+        // A test's first argument is its name; a hook has none.
+        const named = declares === 'it' || declares === 'test';
+        const others = node.arguments.filter((argument, index) => argument !== fn && (index > 0 || !named));
+        const clock = others.map(clockOf).find((found) => found !== undefined);
+        if (clock) lines.push(source.getLineAndCharacterOfPosition(clock.getStart()).line + 1);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return lines;
+}
+
+/** The run's test files (the config's `include`), outside node_modules. */
+function testFilesOfTheRun(): string[] {
+  return globSync(config.test?.include ?? [], { cwd: HUB_DIR })
+    .filter((file) => !file.split(sep).includes('node_modules'))
+    .sort();
+}
+
+/** Every synchronous test or hook of `files` that names a clock, as `<path>:<line>`. */
+function ownClocksOf(files: string[]): string[] {
+  return files.flatMap((file) => ownClocks(readFileSync(join(HUB_DIR, file), 'utf8')).map((line) => `${file}:${line}`));
+}
+
+const NAME_NO_CLOCK =
+  'a synchronous test or hook that names a clock of its own: Vitest looks at that clock only once the test has ' +
+  'returned (vitest#2920), so it never cuts one that hangs and only turns red, after the fact, a correct run the ' +
+  'machine made slow. Give it NO_CLOCK (vitest.load.ts)';
+
+describe('guardrail: no synchronous test or hook of the Hub names a clock of its own (hub#1200)', () => {
+  it('counts the budget of a test or hook that has returned once its body has run, and none of one that waits', () => {
+    const planted = [
+      // A number, a name and the options before or after it, through `each`: lines 3, 6, 7 and 12.
+      "it('walks the tree', () => {",
+      '  expect(walk()).toEqual({});',
+      '}, 60_000);',
+      'beforeAll(() => {',
+      '  warm();',
+      '}, BUDGET);',
+      "it('reads', { timeout: 60_000 }, () => {",
+      '  read();',
+      '});',
+      "it.each(['a'])('reads %s', function (name) {",
+      '  read(name);',
+      '}, { timeout: 30_000, retry: 1 });',
+      // It waits, or may wait (what it returns), so the clock can cut it.
+      "it('lints', async () => {",
+      '  await lint();',
+      '}, 60_000);',
+      "it('spawns', () => {",
+      '  return spawn();',
+      '}, 60_000);',
+      "it('polls', () => poll(), 60_000);",
+      // No clock of its own: no budget, `NO_CLOCK`, or options without one.
+      "it('walks without a clock', () => {",
+      '  walk();',
+      '}, NO_CLOCK);',
+      "test('names none', () => {",
+      '  walk();',
+      '});',
+      "it('retries', { timeout: NO_CLOCK, retry: 2 }, () => {",
+      '  walk();',
+      '});',
+      // What a callback inside returns is not the test returning: line 31.
+      "it('maps', () => {",
+      '  expect([1].map((n) => { return n; })).toEqual([1]);',
+      '}, 5_000);',
+      // A suite's options are its tests' (each judged by its own function).
+      "describe('a suite', { timeout: 60_000 }, () => {});",
+    ].join('\n');
+    expect(ownClocks(planted)).toEqual([3, 6, 7, 12, 31]);
+  });
+
+  // It reads every test file of the run (some 900): its work is synchronous, so it names no clock either.
+  it('every test file of the run keeps to it', () => {
+    const files = testFilesOfTheRun();
+    // It reads the run's test files, this one and a guardrail that reads the whole tree among them: reading none (the
+    // run's `include` moved elsewhere) it would pass on anything.
+    const someOfThem = ['vitest.load.test.ts', join('base', 'frontend', 'money-grouping.test.ts')];
+    expect(files).toEqual(expect.arrayContaining(someOfThem));
+    expect(ownClocksOf(files), NAME_NO_CLOCK).toEqual([]);
+  }, NO_CLOCK);
 });

@@ -363,7 +363,9 @@ grupos, la tarjeta lo enseña tal como se dijo y la acción pregunta cuál. Una 
 encuentra, con su grupo («Opción: Alioli (Salsas picantes)» cuando se dijo «ali»), o tal como se dijo si vale para
 varias (hub#1245). Si el grupo, la opción o el enganche llegan por su identificador junto al nombre de otro grupo,
 la tarjeta no lee ni enseña ese nombre, que la acción no usa: dice el registro del identificador (hub#1250). Una
-opción por su identificador se busca dentro del grupo que se diga a su lado, así que ese grupo sí sale.
+opción por su identificador se busca dentro del grupo que se diga a su lado, así que ese grupo sí sale. Al soltar un
+grupo por el identificador del enganche, la tarjeta tampoco enseña el grupo, el producto ni la categoría cuyo
+identificador llegue a su lado, que la acción no mira (hub#1278).
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -534,6 +536,9 @@ cajero del producto actual es un empleado.
   al id con que la escritura toma su registro en su lugar (el del grupo, la opción o el enganche, o `group_id`), la
   tarjeta deja sin leer el nombre (`base.schemas.unless_given`, hub#1250); el `group` de `OptionRefIn` solo junto a
   `group_id`, porque la opción por su id se busca en ese grupo (`UNLESS` de `tests/test_assistant_yes_for_its_card.py`).
+  Junto al `id` del enganche, `modifier.link.detach` deja sin leer también `group_id`, `product_id` y `category_id`, que
+  `detach_link` no mira (hub#1278; `UNLESS_BY_ID`, que recorre todo dato leído por id). El nombre de un producto o una
+  categoría a su lado sale aún tal como llega, porque `_Target` no los marca: hub#1291.
 - **Administrador de Django con CRUD completo** (ronda 12, PLAN §17), solo en `hubs.erplora.com` y para
   el staff: lo que guarda no pasa por las operaciones ni deja aviso, y no aplica sus reglas propias (las
   opciones por defecto dentro del máximo, las 100 opciones por grupo); la base de datos sí le rechaza

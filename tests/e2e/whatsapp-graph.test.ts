@@ -15,6 +15,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { NO_CLOCK } from '../../vitest.load';
+
 import {
   CODE,
   configProblem,
@@ -174,7 +176,7 @@ describe('runCli', () => {
     expect(runCli(['8240', 'http://localhost:8241'], deps)).toBe(0);
     expect(said.lines).toEqual(Object.entries(erploraEnv({ ...RUN, ca })).map(([name, value]) => `${name}=${value}`));
     expect(readFileSync(ca, 'utf8')).toMatch(/^-----BEGIN CERTIFICATE-----\n/);
-  }, 60_000);
+  }, NO_CLOCK);
 
   it('keeps the authority already there', () => {
     const before = readFileSync(ca, 'utf8');
@@ -206,7 +208,7 @@ describe('runCli', () => {
     expect(said.errors).toHaveLength(1);
     expect(said.errors[0]).toContain(`the authority ${join(blocked, 'meta-graph-8260', 'ca.pem')} could not be made: NotADirectoryError`);
     expect(said.errors[0]).not.toContain('\n');
-  }, 60_000);
+  }, NO_CLOCK);
 
   it('makes the authority the Graph trusts again in one step: a reader of the old one never finds it half written', async () => {
     const before = readFileSync(ca);
@@ -235,31 +237,30 @@ describe('runCli', () => {
   });
 
   it('runs as a script through a symlinked path too (macOS reaches its tmp folder through one): it never prints nothing', () => {
-    const folder = join(HERE, '.artifacts', 'meta-graph-64980');
     const linked = join(artifacts, 'linked-e2e');
     symlinkSync(HERE, linked);
-    rmSync(folder, { recursive: true, force: true });
-    try {
-      const out = execFileSync('node', [join(linked, 'whatsapp-graph.ts'), '64980', 'http://localhost:64981'], { cwd: tmpdir(), encoding: 'utf8' });
-      expect(out.trim().split('\n')).toContain(`SSL_CERT_FILE=${join(folder, 'ca.pem')}`);
-      expect(existsSync(join(folder, 'ca.pem'))).toBe(true);
-    } finally {
-      rmSync(folder, { recursive: true, force: true });
-    }
-  }, 60_000);
+    runsAsScript(linked, 64980);
+  }, NO_CLOCK);
 
   it('runs as a script from erplora.com’s checkout, its authority in this checkout’s .artifacts', () => {
-    const folder = join(HERE, '.artifacts', 'meta-graph-64990');
-    rmSync(folder, { recursive: true, force: true });
-    try {
-      const out = execFileSync('node', [join(HERE, 'whatsapp-graph.ts'), '64990', 'http://localhost:64991'], { cwd: tmpdir(), encoding: 'utf8' });
-      expect(out.trim().split('\n')).toContain(`SSL_CERT_FILE=${join(folder, 'ca.pem')}`);
-      expect(existsSync(join(folder, 'ca.pem'))).toBe(true);
-    } finally {
-      rmSync(folder, { recursive: true, force: true });
-    }
-  }, 60_000);
+    runsAsScript(HERE, 64990);
+  }, NO_CLOCK);
 });
+
+/** Runs whatsapp-graph.ts as a script from `dir` (this folder, or a path to it) for the Graph on `port`, and proves it
+ *  names its authority, in this checkout's .artifacts, and makes it. */
+function runsAsScript(dir: string, port: number): void {
+  const folder = join(HERE, '.artifacts', `meta-graph-${port}`);
+  rmSync(folder, { recursive: true, force: true });
+  try {
+    const args = [join(dir, 'whatsapp-graph.ts'), String(port), `http://localhost:${port + 1}`];
+    const out = execFileSync('node', args, { cwd: tmpdir(), encoding: 'utf8' });
+    expect(out.trim().split('\n')).toContain(`SSL_CERT_FILE=${join(folder, 'ca.pem')}`);
+    expect(existsSync(join(folder, 'ca.pem'))).toBe(true);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+}
 
 const config = (body: Record<string, unknown>, status = 200): DoorAnswer => ({ status, body });
 const OPENS = { configured: true, app_id: META_APP.id, config_id: META_APP.configId, redirect_uri: `${RUN.saas}/whatsapp/return` };

@@ -16,6 +16,7 @@ import ts from 'typescript';
 import { beforeAll, expect, it, vi } from 'vitest';
 
 import viteConfig from './vite.config';
+import { NO_CLOCK } from './vitest.load';
 
 // The real `readFileSync`, watched: the files these tests read are read at once beforehand (see `readsOneByOne`).
 vi.mock('node:fs', async (importOriginal) => {
@@ -199,11 +200,11 @@ async function readsOneByOne<T>(run: () => T | Promise<T>): Promise<[T, number]>
 // lookup asked for them once per file of the repo. At rest that is 1.3 s and 160 garbage collections; under load what
 // counts is the opening of files and folders, whose time is the machine's (1,687 files read in 38–50 s with 15 busy
 // cores, 0.1–0.3 s at rest): a run opened 2,588 folders, 930 of them in one test, and a test of this file took 118 s
-// beside `pnpm test` at load ~30 (2026-10-29). Here, once per run (465 folders), with the limit of the guardrails that
-// read the whole tree; each test keeps its own work (the planted program, the build's reads) and its 60 s (2026-10-30).
+// beside `pnpm test` at load ~30 (2026-10-29). Here, once per run (465 folders): its reads are synchronous, so it runs
+// as long as the machine makes it (hub#1200); each test keeps its own work (the planted program, the build's reads).
 beforeAll(() => {
   for (const project of projectsRead()) checked(project);
-}, 60_000);
+}, NO_CLOCK);
 
 it('reads the projects the warm-up parsed: no test walks the repo for a project, nor lists its files, again', () => {
   const walk = vi.spyOn(ts.sys, 'readDirectory');
@@ -300,7 +301,7 @@ it('keeps in pnpm typecheck every file the single tsconfig.json checked: the SPA
   expect(single.filter((file) => file.endsWith('.vue')).length).toBeGreaterThan(0);
   expect(single.filter((file) => file.endsWith('.test.ts')).length).toBeGreaterThan(0);
   expect(single.filter((file) => !files.has(file)).map((file) => relative(root, file))).toEqual([]);
-}, 60_000);
+}, NO_CLOCK);
 
 it('opens every file pnpm typecheck checks, in an editor, in a project that checks it', () => {
   // Each file of this repo (the submodules are their own) with the tsconfigs of the runs that check it.
@@ -314,7 +315,7 @@ it('opens every file pnpm typecheck checks, in an editor, in a project that chec
   const lost = [...runs].filter(([file, configs]) => !configs.has(editorProject(file) ?? ''));
   expect(runs.size).toBeGreaterThan(0);
   expect(lost.map(([file]) => relative(root, file))).toEqual([]);
-}, 60_000);
+}, NO_CLOCK);
 
 /** What the image's `web` stage (Dockerfile) copies from the build context, as repo paths or globs. */
 function webStageCopies(): string[] {

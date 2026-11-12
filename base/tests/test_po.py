@@ -16,7 +16,7 @@ from babel.messages.mofile import write_mo
 from django.apps import apps as django_apps
 from babel.messages.pofile import PoFileError, read_po
 from django.utils import translation
-from django.utils.translation import gettext_lazy, pgettext_lazy
+from django.utils.translation import gettext_lazy, ngettext_lazy, npgettext_lazy, pgettext_lazy
 
 from base.tests.po import (
     catalogue_key,
@@ -155,6 +155,19 @@ def test_a_lazy_text_is_keyed_as_the_compiled_catalog_keys_it():
         assert catalogue_key(gettext_lazy("Open")) == "Open"
         assert catalogue_key(pgettext_lazy("sale", "Open")) == "sale\x04Open"
         assert catalogue_key("Open") == "Open"
+
+
+def test_a_lazy_plural_is_keyed_by_its_singular_and_first_form():
+    """A plural whose number comes from the formatting dict (``ngettext_lazy(…, "count")``, hub#1275) is read as the
+    compiled catalogue keys its first form, ``(msgid, 0)``: read with ``str()`` it is empty, and its entry would be
+    missing whatever the catalogue says."""
+    with translation.override("en"):
+        assert catalogue_key(ngettext_lazy("%(count)s cart", "%(count)s carts", "count")) == ("%(count)s cart", 0)
+        assert catalogue_key(npgettext_lazy("shop", "%(count)s cart", "%(count)s carts", "count")) == (
+            "shop\x04%(count)s cart",
+            0,
+        )
+        assert catalogue_key(ngettext_lazy("%(count)s cart", "%(count)s carts", 2)) == ("%(count)s cart", 0)
 
 
 def test_no_module_keys_a_lazy_text_by_itself():

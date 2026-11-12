@@ -17,22 +17,6 @@ from base.tests.po import mo_entries
 #: A plural ending glued to a word in parentheses: «record(s)», «opción(es)», «category(ies)» (as the SPA's guard).
 IN_PARENTHESES = re.compile(r"[^\W\d_]\((?:s|es|as|os|ies)\)")
 
-#: VeriFactu's messages of the server (fiscal zone), left out of hub#1147 with their own issue: hub#1275. Nothing else
-#: may join this list; each one leaves it when hub#1275 gives it its singular and plural.
-PENDING_FISCAL = {
-    "Rescheduled: %(count)s record(s) go out with the next pass.",
-    "Rescheduled: %(count)s chain(s) go out with the next pass.",
-    "Corrected: %(count)s new record(s) in the queue.",
-    "Not sent to the AEAT yet (%(count)s record(s)): %(why)s.",
-    "AEAT (%(environment)s): %(count)s record(s) accepted, CSV %(csv)s.",
-    "Fingerprint chain intact: %(total)s record(s) with their SHA-256 chaining verified (%(issuer_nif)s). Amounts "
-    "are not re-audited.",
-    "AEAT query: %(count)s record(s) retrieved for %(issuer_nif)s.",
-    "Chain recovered from the AEAT for %(issuer_nif)s: it continues after invoice %(invoice_number)s (%(found)s "
-    "record(s) found).",
-}
-
-
 def hub_catalogues() -> list[Path]:
     """Every compiled Spanish catalogue of the Hub: the platform's (``control``, ``base``) and each app's."""
     root = Path(settings.BASE_DIR)
@@ -62,13 +46,14 @@ def test_the_catalogues_read_are_the_platforms_and_every_apps():
     assert len(read) > 20
 
 
-def test_no_catalogue_says_a_count_with_parentheses_but_the_fiscal_ones_pending():
+def test_no_catalogue_says_a_count_with_parentheses():
+    # VeriFactu's messages of the server were the last ones, left out of hub#1147 as fiscal zone (hub#1275).
     found = {
         f"{path.relative_to(settings.BASE_DIR).parts[1]}: {message}"
         for path in hub_catalogues()
         for message in messages_with_parentheses(path)
     }
-    assert found == {f"verifactu: {message}" for message in PENDING_FISCAL}
+    assert found == set()
 
 
 def test_the_check_catches_a_plural_in_parentheses_in_either_language():

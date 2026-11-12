@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2005bfd5aeaf1c85aeb03eb8f29ddf06e988802aefa59ba302d5e64813773f68 -->
+<!-- generated from WORKBOOK.md sha256:908962cfe14046d87ff3af4261e7cb1573432cfc1a070c60c59e76dd4cde5996 -->
 
 ## What it is for and who it is for
 
@@ -525,7 +525,9 @@ product it found, and the "yes" counts only for them: if, before confirming, som
 was said, nothing is touched and the new card comes up; if what was said fits several, the card shows it as it was said
 and the action asks which one (hub#1245). If the menu, the course or the choice comes by its identifier beside a name
 the action does not use (another menu's, another course's or another product's), the card neither reads nor shows that
-name: it says the record of the identifier, as when it comes alone (hub#1250).
+name: it says the record of the identifier, as when it comes alone (hub#1250). The same with the identifier of another
+menu or another course that comes beside the course's or the choice's, or beside that of the course a choice is added
+to, reordered in or looked for in: the action does not use it and the card does not show it (hub#1278).
 
 ### What it offers: queries (they read, they change nothing)
 

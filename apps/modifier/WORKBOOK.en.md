@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c5d3e9618ca7a103b5c70240773b01bd296f645638175c89a90dd435f3017561 -->
+<!-- generated from WORKBOOK.md sha256:858e6ba895a9aaf3e442ef1eee6152dbff1910ee60abeed2291f6b221d1794e9 -->
 
 ## What it is for and who it is for
 
@@ -353,7 +353,9 @@ fits several groups, the card shows it as it was said and the action asks which 
 up as it is found, with its group ("Option: Aioli (Spicy sauces)" when "aio" was said), or as it was said if it fits
 several (hub#1245). If the group, the option or the link comes by its identifier beside another group's name, the
 card neither reads nor shows that name, which the action does not use: it says the record of the identifier (hub#1250).
-An option by its identifier is looked for inside the group said beside it, so that group does come up.
+An option by its identifier is looked for inside the group said beside it, so that group does come up. When letting
+a group go by the link's identifier, the card does not show either the group, the product or the category whose
+identifier comes beside it, which the action does not look at (hub#1278).
 
 ### What it offers: queries (they read, they change nothing)
 

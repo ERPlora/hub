@@ -820,8 +820,9 @@ Pasos:
 1. En **VeriFactu → Recuperación**, con el «NIF del emisor», pulsa «Validar cadena» («Trabajando…»).
 2. El sistema recalcula la huella de cada registro de la cadena del entorno actual y comprueba que cada uno
    lleva la del anterior.
-3. Sale «Operación completada.» y el veredicto: «Cadena de huellas íntegra: {total} registro(s) con su
-   encadenado SHA-256 verificado ({nif}).» o «Cadena de huellas ROTA en la secuencia {seq} ({nif}).».
+3. Sale «Operación completada.» y el veredicto: «Cadena de huellas íntegra: {total} registros con su
+   encadenado SHA-256 verificado ({nif}).» (con uno, «1 registro»; nunca «registro(s)») o «Cadena de huellas ROTA
+   en la secuencia {seq} ({nif}).».
 Entra: los registros de la cadena.
 Sale: el veredicto como evento (avisa `verifactu.chain.validated`). Solo lee: no repara nada ni re-audita los
 importes.
@@ -1428,13 +1429,14 @@ necesitan para el soporte». Por eso:
     rechazados, N aún en espera.».
   - **«Reprogramar: enviar en la próxima pasada»** → `verifactu.contingency.retry` (VERIFACTU-F22): el registro y
     los anteriores de su cadena salen en la pasada siguiente (la tarea de cada minuto), sin perder sus intentos.
-    «Reprogramado: N registro(s) salen en la próxima pasada.».
+    «Reprogramado: N registros salen en la próxima pasada.» (con uno, «1 registro sale»; cada aviso con un número
+    lo dice en singular o en plural, nunca con «(s)», hub#1275).
   - **«Consultar a la AEAT (sale de la cola si ya lo tiene)»** → `verifactu.record.reconcile` (VERIFACTU-F35): si
     la AEAT tiene ese mismo registro (misma huella), sale de la cola como registrado; si no, sigue en la cola.
     «Consulta a la AEAT: N ya registrados (fuera de la cola), N no están en la AEAT (siguen en la cola).».
   - **«Subsanar el rechazo con un registro nuevo»** → `verifactu.record.correct` (VERIFACTU-F24), solo sobre un
-    registro rechazado: el rechazado se queda tal cual y entra uno nuevo en la cola. «Subsanado: N registro(s)
-    nuevo(s) en la cola.».
+    registro rechazado: el rechazado se queda tal cual y entra uno nuevo en la cola. «Subsanado: N registros
+    nuevos en la cola.» (con uno, «1 registro nuevo»).
   - **Retirar de la cola**, como en el antiguo («Cancelar» solo si ya aceptado), es solo lo que la AEAT ya tiene,
     y se hace consultándola (la acción de arriba). Nada sale de la cola sin que la AEAT lo tenga (VERIFACTU-F23); un
     rechazo definitivo se resuelve con la subsanación, que deja el rechazado como estaba.
