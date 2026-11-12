@@ -11,7 +11,8 @@ import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { EMPLOYEE, errorFrame, flush, type MountOptions, mountCash, words } from '../__tests__/mount-cash-register';
+import { business, EMPLOYEE, errorFrame, flush, type MountOptions, mountCash, words } from '../__tests__/mount-cash-register';
+import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import CashFigures from '../components/CashFigures.vue';
 import CloseSessionModal from '../components/CloseSessionModal.vue';
 import CountModal from '../components/CountModal.vue';
@@ -228,7 +229,7 @@ describe('SessionsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-F
     s.table().vm.$emit('update:filters', { status: 'open', counted_min: 'abc' });
     await flush();
     await s.reopen();
-    expect(prop(s, 'filterErrors')).toEqual({ counted_min: 'This is not an amount.' });
+    expect(prop(s, 'filterErrors')).toEqual({ counted_min: 'This is not an amount. Type a figure, for example 12.50.' });
     expect(s.tableParams()).toEqual([{ status: 'open', sort: 'opened_at', dir: 'desc', limit: 50, offset: 0 }]);
     s.table().vm.$emit('update:filters', { counted_min: 'abc' });
     await flush();
@@ -239,7 +240,17 @@ describe('SessionsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-F
     await es.ready();
     es.table().vm.$emit('update:filters', { difference_max: 'x' });
     await flush();
-    expect(prop(es, 'filterErrors')).toEqual({ difference_max: 'Esto no es un importe.' });
+    expect(prop(es, 'filterErrors')).toEqual({ difference_max: 'Esto no es un importe. Escribe una cifra, por ejemplo 12,50.' });
+  });
+
+  it('only the difference takes a minus: «-5» filters there and says nothing, and cannot be negative under any other amount (hub#1196)', async () => {
+    const s = await setup();
+    await s.ready();
+    s.table().vm.$emit('update:filters', { difference_min: '-5', counted_max: '-5' });
+    await flush();
+    await s.reopen();
+    expect(prop(s, 'filterErrors')).toEqual({ counted_max: 'This amount cannot be negative.' });
+    expect(s.tableParams()).toEqual([{ difference_min: -500, sort: 'opened_at', dir: 'desc', limit: 50, offset: 0 }]);
   });
 
   it('a filter the server refuses (422) goes under its filter; the rows stay and no error replaces them', async () => {
@@ -342,5 +353,23 @@ describe('SessionsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+});
+
+describe('SessionsPage: the amounts are read as every amount of the Hub (hub#1196)', () => {
+  itReadsAmountFiltersAsTheHub({
+    ends: ['opening_min', 'opening_max'],
+    params: ['opening_min', 'opening_max'],
+    async open(money) {
+      const s = await setup({ business: business({ currency: money.currency, currency_decimals: money.decimals }) });
+      await s.ready();
+      const filter = async (values: Record<string, string>) => {
+        s.table().vm.$emit('update:filters', values);
+        await flush();
+        await s.reopen();
+      };
+      const says = () => (s.table().props() as Record<string, unknown>).filterErrors as Record<string, string>;
+      return { filter, query: () => s.tableParams().at(-1), says };
+    },
   });
 });

@@ -1,21 +1,18 @@
 // The filters of the Invoices list (INVOICE-F16: status, type, series, source, issue dates and total), as
 // the table's funnel holds them (by the list's parameter names, as typed; a filter not in use is absent)
-// and as `invoice.invoice.list` takes them (the total in cents, invoice#113). An amount that is not one,
-// or a «to» day before its «from», never reaches the server: the table says it under the field.
+// and as `invoice.invoice.list` takes them (the total in cents, invoice#113, read as every amount filter of the Hub:
+// `filterCents`, hub#1196). An amount that is not one, or a «to» day before its «from», never reaches the server: the
+// table says it under the field (the page, with `amountFilterErrors` on `TOTAL_ENDS`).
 import type { DataTableFilters } from '@erplora/ui/components';
 
 import type { InvoiceListIn, InvoiceSource, InvoiceStatus, InvoiceType } from '../operations';
-import { centsFromAmount, type Money } from './format';
+import { filterCents, type Money } from './format';
 import { SOURCE_CODES, STATUS_CODES, TYPE_CODES } from './invoice';
 
-const AMOUNTS = ['total_amount_from', 'total_amount_to'] as const;
+/** The two ends of «Total», in the business's money as typed. */
+export const TOTAL_ENDS = ['total_amount_from', 'total_amount_to'] as const;
 
 const typed = (values: DataTableFilters, key: string): string => (values[key] ?? '').trim();
-
-/** The amount filters typed that are not amounts of the business's `money`. */
-export function invalidAmounts(values: DataTableFilters, money?: Money): string[] {
-  return AMOUNTS.filter((key) => typed(values, key) !== '' && centsFromAmount(values[key], money) === undefined);
-}
 
 /** «Issued until» is a day before «Issued from»: neither is sent. */
 export function reversedDates(values: DataTableFilters): boolean {
@@ -38,8 +35,8 @@ export function filterQuery(values: DataTableFilters, money?: Money): Partial<In
     if (from) query.issue_date_from = from;
     if (to) query.issue_date_to = to;
   }
-  for (const key of AMOUNTS) {
-    const cents = centsFromAmount(values[key], money);
+  for (const key of TOTAL_ENDS) {
+    const cents = filterCents(values[key], money);
     if (cents !== undefined) query[key] = cents;
   }
   return query;

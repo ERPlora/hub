@@ -1,10 +1,11 @@
 // The filters of the sessions list (status, number and the four amounts; CASH_REGISTER Pantallas · Caja),
 // as the table's funnel holds them (what is typed, in the business's money) and as `cash_register.session.list` takes
-// them (cents). A difference may be negative (a short drawer); an amount that is not one never reaches
-// the server (cash_register#103, #107; hub#2271).
+// them (cents), read as every amount filter of the Hub (hub#1196). A difference may be negative (a short drawer); an
+// amount that is not one never reaches the server (cash_register#103, #107; hub#2271); the page says why under it
+// (`SessionsPage.test.ts`).
 import { describe, expect, it } from 'vitest';
 
-import { filterParams, filtersInUse, unreadableAmounts } from './sessionFilters';
+import { filterParams, filtersInUse } from './sessionFilters';
 
 describe('session filters', () => {
   it('turn what is typed into the query: euros into cents, a signed difference', () => {
@@ -21,8 +22,8 @@ describe('session filters', () => {
     expect(filterParams({ status: 'suspended' })).toEqual({});
   });
 
-  it('mark what is no amount and never send it; only the difference takes a minus', () => {
-    expect(unreadableAmounts({ opening_min: 'abc', counted_max: '-5', difference_min: '-5', expected_min: '7' })).toEqual(['opening_min', 'counted_max']);
+  it('never send what is no amount; only the difference takes a minus', () => {
+    expect(filterParams({ opening_min: 'abc', counted_max: '-5', difference_min: '-5', expected_min: '7' })).toEqual({ difference_min: -500, expected_min: 700 });
     expect(filterParams({ opening_min: 'abc', counted_max: '-5' })).toEqual({});
   });
 

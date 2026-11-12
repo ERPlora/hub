@@ -94,7 +94,6 @@
     "filters": {
       "series": "Series",
       "source": "Source",
-      "amountInvalid": "Type an amount, like 12.50",
       "dateOrder": "The end date cannot be before the start date."
     },
     "detail": {

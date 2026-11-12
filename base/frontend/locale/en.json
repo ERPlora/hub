@@ -1508,7 +1508,12 @@
     },
     "money": {
       "unreadable": "The business's currency could not be read",
-      "retry": "Retry"
+      "retry": "Retry",
+      "filter": {
+        "notAmount": "This is not an amount. Type a figure, for example 12.50.",
+        "negative": "This amount cannot be negative.",
+        "ambiguous": "This amount can be read in two ways: «{typed}» could be {grouped} or {decimal}. Write the decimals so there is no doubt."
+      }
     },
     "unsavedChanges": {
       "title": "Discard changes?",
