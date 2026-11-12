@@ -132,13 +132,16 @@ function ownClocks(text: string): number[] {
   return lines;
 }
 
-/** Every synchronous test or hook of the run's test files (the config's `include`) that names a clock, as
- *  `<path>:<line>`. */
-function ownClocksOfTheRun(): string[] {
+/** The run's test files (the config's `include`), outside node_modules. */
+function testFilesOfTheRun(): string[] {
   return globSync(config.test?.include ?? [], { cwd: HUB_DIR })
     .filter((file) => !file.split(sep).includes('node_modules'))
-    .sort()
-    .flatMap((file) => ownClocks(readFileSync(join(HUB_DIR, file), 'utf8')).map((line) => `${file}:${line}`));
+    .sort();
+}
+
+/** Every synchronous test or hook of `files` that names a clock, as `<path>:<line>`. */
+function ownClocksOf(files: string[]): string[] {
+  return files.flatMap((file) => ownClocks(readFileSync(join(HUB_DIR, file), 'utf8')).map((line) => `${file}:${line}`));
 }
 
 const NAME_NO_CLOCK =
@@ -192,6 +195,11 @@ describe('guardrail: no synchronous test or hook of the Hub names a clock of its
 
   // It reads every test file of the run (some 900): its work is synchronous, so it names no clock either.
   it('every test file of the run keeps to it', () => {
-    expect(ownClocksOfTheRun(), NAME_NO_CLOCK).toEqual([]);
+    const files = testFilesOfTheRun();
+    // It reads the run's test files, this one and a guardrail that reads the whole tree among them: reading none (the
+    // run's `include` moved elsewhere) it would pass on anything.
+    const someOfThem = ['vitest.load.test.ts', join('base', 'frontend', 'money-grouping.test.ts')];
+    expect(files).toEqual(expect.arrayContaining(someOfThem));
+    expect(ownClocksOf(files), NAME_NO_CLOCK).toEqual([]);
   }, NO_CLOCK);
 });
