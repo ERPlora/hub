@@ -887,6 +887,24 @@ def test_the_moves_pass_restores_the_hubs_asked_too_on_control(monkeypatch):
     assert seen == [(context.CONTROL, ten(0))]
 
 
+def test_the_moves_pass_brings_back_what_a_business_lost_from_its_copy_too_on_control(monkeypatch):
+    # hub#1257: a recovery from a separate copy, in the thread of the copies it reads, after they are made.
+    from base.tenancy import move, recovery, restore
+
+    monkeypatch.undo()
+    seen: list[tuple] = []
+    monkeypatch.setattr(move, "run_due", lambda now, *, cancelled: 0)
+    monkeypatch.setattr(restore, "run_due", lambda now, *, cancelled: 0)
+    monkeypatch.setattr(restore, "run_aside_due", lambda now, *, cancelled: seen.append("asides") or 0)
+    monkeypatch.setattr(
+        recovery, "run_due", lambda now, *, cancelled: seen.append((context.current().kind, now, cancelled())) or 1
+    )
+
+    worker._moves(ten(0), threading.Event())
+
+    assert seen == ["asides", (context.CONTROL, ten(0), False)]
+
+
 def test_a_moves_pass_that_fails_is_logged_and_the_next_tick_tries_again(monkeypatch, caplog):
     from base.tenancy import move
 

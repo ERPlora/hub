@@ -21,6 +21,10 @@ hubs with their database (round 2026-10-30b of PLAN-DB, decision 1 of Ioan; tran
 - **«Restore to a separate copy…»** (hub#1213, BASE-F114) asks ``control.hub.restore_aside`` the same way: the worker
   makes the copy next to the business, which is never closed nor changed, and **Separate copies** lists each one (read
   only, for support too) with its moment, how it went, its database and until when it is kept.
+- **«Recover into the business…»** on Separate copies (hub#1257, BASE-F114) asks ``control.copy.recover`` for each
+  chosen copy, with what to bring back (the apps that say what they give back from a copy,
+  ``base.tenancy.recovery``); the worker creates in the business what it lacks, each record by its app's own
+  operation, and **Recoveries** lists each one (read only, for support too) with what came back and why not.
 
 - **Freeze** is the one switch that freezes the platform for a database upgrade (hub#930; PLAN-DB round 2026-11-04e,
   «Congelar»): ticked, the worker makes, drops and moves no database and ``migrate_hubs`` refuses to start, while the
@@ -43,6 +47,7 @@ from django.db.models import Count, Q
 from django.http import HttpRequest, HttpResponseRedirect
 from django.contrib.admin import helpers
 from django.template.defaultfilters import filesizeformat
+from django.utils.html import format_html, format_html_join
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.translation import gettext, gettext_lazy, ngettext, pgettext, pgettext_lazy
@@ -52,13 +57,15 @@ from live.errors import OperationError
 from base import admin as base_admin
 from base.registry import REGISTRY_SCOPE, database_is_made
 from base.tenancy.move import MOVED_COPY_DAYS
-from control.models import Cluster, Freeze, Hub, RestoredCopy
+from base.tenancy.recovery import recoverable_apps
+from control.models import Cluster, CopyRecovery, Freeze, Hub, RestoredCopy
 from control.queries import cluster_sizes, freeze_get
 from control.schemas import (
     ClusterIdIn,
     ClusterIn,
     ClusterSizesIn,
     ClusterUpdateIn,
+    CopyRecoverIn,
     FreezeGetIn,
     FreezeIn,
     HubIdIn,
@@ -71,6 +78,7 @@ from control.services import (
     cluster_create,
     cluster_delete,
     cluster_update,
+    copy_recover,
     freeze_set,
     hub_move,
     hub_move_cancel,
@@ -329,10 +337,72 @@ class RestoreFromACopyForm(forms.Form):
     )
 
 
-#: The confirmation pages of «Move to cluster…», «Restore from a copy…» and «Restore to a separate copy…».
+def recoverable_names(labels) -> str:
+    """What the apps ``labels`` give back from a copy, as the staff reads it («Customers»); an app that no longer says
+    so, by its label."""
+    declared = recoverable_apps()
+    return ", ".join(
+        ", ".join(str(one.label) for one in declared[label]) if label in declared else label for label in labels
+    )
+
+
+class RecoverForm(forms.Form):
+    """What the chosen copies give back into their businesses: the apps that say what they give back from a copy
+    (``base.tenancy.recovery``), every one ticked; ``control.copy.recover`` checks the rest, copy by copy."""
+
+    apps = forms.MultipleChoiceField(
+        label=pgettext_lazy("recovery", "What to bring back"),
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        choices = [(label, recoverable_names([label])) for label in recoverable_apps()]
+        self.fields["apps"].choices = choices
+        self.fields["apps"].initial = [label for label, _name in choices]
+
+
+#: The confirmation pages of «Move to cluster…», «Restore from a copy…», «Restore to a separate copy…» and «Recover into
+#: the business…».
 MOVE_TEMPLATE = "admin/control/hub/move_to_cluster.html"
 RESTORE_TEMPLATE = "admin/control/hub/restore_from_a_copy.html"
 ASIDE_TEMPLATE = "admin/control/hub/restore_aside.html"
+RECOVER_TEMPLATE = "admin/control/restoredcopy/recover.html"
+
+
+class AsksFirst:
+    """The actions of an admin that ask for something on a confirmation page first, then ask its operation of each
+    chosen row (Hubs, Separate copies). The admin says ``confirmation_row(obj)``, each one's id, name and database on
+    that page, and ``chosen_name(obj)``, its name in what the staff is told."""
+
+    def confirmation(
+        self, request: HttpRequest, chosen, form: forms.Form, action: str, title: str, template: str, **more
+    ):
+        """The confirmation page of ``action`` for ``chosen``: what it does and its ``form``, asked again until
+        valid."""
+        context = {
+            **self.admin_site.each_context(request),
+            "title": title,
+            "opts": self.model._meta,
+            "rows": [self.confirmation_row(obj) for obj in chosen],
+            "form": form,
+            "action": action,
+            "action_checkbox_name": helpers.ACTION_CHECKBOX_NAME,
+            **more,
+        }
+        return TemplateResponse(request, template, context)
+
+    def ask_each(self, request: HttpRequest, chosen, ask: Callable[[object], object]) -> int:
+        """Ask ``ask`` (an operation) of each chosen row: what it refuses is said with its name; how many were asked."""
+        asked = 0
+        for obj in chosen:
+            try:
+                ask(obj)
+            except OperationError as refused:
+                self.message_user(request, f"{self.chosen_name(obj)}: {refused.message}", messages.ERROR)
+                continue
+            asked += 1
+        return asked
 
 
 class ClusterListFilter(admin.RelatedFieldListFilter):
@@ -348,7 +418,7 @@ admin.site.unregister(Hub)
 
 
 @admin.register(Hub)
-class HubAdmin(base_admin.HubAdmin):
+class HubAdmin(AsksFirst, base_admin.HubAdmin):
     """The registry of hubs with each one's database, cluster, schema and size (see the module)."""
 
     list_display = (
@@ -484,31 +554,11 @@ class HubAdmin(base_admin.HubAdmin):
             )
         return None
 
-    def confirmation(self, request: HttpRequest, hubs, form: forms.Form, action: str, title: str, template: str, **more):
-        """The confirmation page of ``action`` for ``hubs``: what it does and its ``form``, asked again until valid."""
-        context = {
-            **self.admin_site.each_context(request),
-            "title": title,
-            "opts": self.model._meta,
-            "hubs": hubs,
-            "form": form,
-            "action": action,
-            "action_checkbox_name": helpers.ACTION_CHECKBOX_NAME,
-            **more,
-        }
-        return TemplateResponse(request, template, context)
+    def confirmation_row(self, hub: Hub) -> tuple:
+        return hub.pk, hub.slug, hub.db_name
 
-    def ask_each(self, request: HttpRequest, hubs, ask: Callable[[Hub], object]) -> int:
-        """Ask ``ask`` (an operation) of each hub: what it refuses is said with the hub's slug; how many were asked."""
-        asked = 0
-        for hub in hubs:
-            try:
-                ask(hub)
-            except OperationError as refused:
-                self.message_user(request, f"{hub.slug}: {refused.message}", messages.ERROR)
-                continue
-            asked += 1
-        return asked
+    def chosen_name(self, hub: Hub) -> str:
+        return hub.slug
 
     def has_move_permission(self, request: HttpRequest) -> bool:
         return is_platform_admin(request)
@@ -552,9 +602,12 @@ class HubAdmin(base_admin.HubAdmin):
 
 
 @admin.register(RestoredCopy)
-class RestoredCopyAdmin(base_admin.ReadOnlyAdmin):
+class RestoredCopyAdmin(AsksFirst, base_admin.ReadOnlyAdmin):
     """The separate copies of hubs as they were at a moment (hub#1213, BASE-F114): asked from Hubs with «Restore to a
-    separate copy…», made and dropped by the worker; read only, for support too."""
+    separate copy…», made and dropped by the worker; read only, for support too. «Recover into the business…»
+    (hub#1257) asks a made copy to give back what its business lacks, for the platform's admins only."""
+
+    actions = ["recover_into_the_business"]
 
     # What the staff looks for at a glance; its database (searchable), who asked, when, from where and on which cluster
     # are on its page: a database's name is 40-odd characters in one piece, which pushes the rest out of sight.
@@ -590,6 +643,115 @@ class RestoredCopyAdmin(base_admin.ReadOnlyAdmin):
         if copy.made_at is None:
             return self.get_empty_value_display()
         return utc(copy.made_at + dt.timedelta(days=MOVED_COPY_DAYS))
+
+    @admin.action(description=gettext_lazy("Recover into the business…"), permissions=["recover"])
+    def recover_into_the_business(self, request: HttpRequest, queryset):
+        """Choose what to bring back on a confirmation page, then ask each chosen copy to give it back into its business
+        (``control.copy.recover``): the worker creates what the business lacks, each record by its app's own
+        operation, and Recoveries says how it went."""
+        form = RecoverForm(request.POST if "apply" in request.POST else None)
+        copies = queryset.select_related("hub")
+        if not form.is_bound or not form.is_valid():
+            title = gettext("Recover into the business")
+            return self.confirmation(request, copies, form, "recover_into_the_business", title, RECOVER_TEMPLATE)
+        apps = form.cleaned_data["apps"]
+        ctx = staff_context(request)
+        asked = self.ask_each(
+            request, copies, lambda copy: copy_recover(ctx, CopyRecoverIn(copy_id=copy.pk, apps=apps))
+        )
+        if asked:
+            self.message_user(
+                request,
+                ngettext(
+                    "%(count)d separate copy will give back %(what)s into its business within a few minutes: "
+                    "Recoveries says how it went.",
+                    "%(count)d separate copies will give back %(what)s into their businesses within a few minutes: "
+                    "Recoveries says how each went.",
+                    asked,
+                )
+                % {"count": asked, "what": recoverable_names(apps)},
+                messages.SUCCESS,
+            )
+        return None
+
+    def has_recover_permission(self, request: HttpRequest) -> bool:
+        return is_platform_admin(request)
+
+    def confirmation_row(self, copy: RestoredCopy) -> tuple:
+        return copy.pk, str(copy), copy.db_name
+
+    def chosen_name(self, copy: RestoredCopy) -> str:
+        return str(copy)
+
+
+@admin.register(CopyRecovery)
+class CopyRecoveryAdmin(base_admin.ReadOnlyAdmin):
+    """What the staff asked to bring back into a business from one of its separate copies (hub#1257, BASE-F114): asked
+    from Separate copies with «Recover into the business…», done by the worker; read only, for support too. Its
+    results say, app by app, how many came back and how many not; its page says why each did not (by its id in the
+    copy: no personal data), and why an app gave nothing back."""
+
+    # What the staff looks for at a glance, as Separate copies: three columns a phone shows whole (375 px). What was
+    # asked, who asked it, when, when it was done and why each record did not come back are on its page.
+    list_display = ("made_from", "status", "outcome")
+    list_filter = ("status",)
+    list_select_related = ("copy", "copy__hub")
+    search_fields = ("copy__hub__slug", "copy__db_name")
+    fields = ("copy", "status", "what", "outcome", "why_not", "asked_by", "asked_on", "done_on", "last_error")
+    readonly_fields = fields
+
+    @admin.display(description=gettext_lazy("separate copy"), ordering="copy__restore_point")
+    def made_from(self, recovery: CopyRecovery) -> str:
+        """Its copy's business and moment, on two lines: on a phone the results' column keeps the room."""
+        return format_html("{}<br>{}", recovery.copy.hub.slug, utc(recovery.copy.restore_point))
+
+    @admin.display(description=pgettext_lazy("recovery", "what"))
+    def what(self, recovery: CopyRecovery) -> str:
+        return recoverable_names(recovery.apps)
+
+    @admin.display(description=pgettext_lazy("recovery", "results"))
+    def outcome(self, recovery: CopyRecovery) -> str:
+        """How it went: while asked, what it brings back; done, what each app gave back; failed, that and why."""
+        if recovery.status == CopyRecovery.Status.ASKED:
+            return self.what(recovery)
+        said = [self.result_said(result) for result in recovery.results]
+        if recovery.status == CopyRecovery.Status.FAILED and recovery.last_error:
+            said.append(recovery.last_error)
+        return "; ".join(said) or self.get_empty_value_display()
+
+    @admin.display(description=pgettext_lazy("recovery", "not brought back"))
+    def why_not(self, recovery: CopyRecovery):
+        reasons = [(why["id"], why["reason"]) for result in recovery.results for why in result.get("reasons", [])]
+        if not reasons:
+            return self.get_empty_value_display()
+        return format_html("<ul>{}</ul>", format_html_join("", "<li>{}: {}</li>", reasons))
+
+    @admin.display(description=pgettext_lazy("separate copy", "asked at"), ordering="asked_at")
+    def asked_on(self, recovery: CopyRecovery) -> str:
+        return utc(recovery.asked_at)
+
+    @admin.display(description=pgettext_lazy("recovery", "done at"), ordering="done_at")
+    def done_on(self, recovery: CopyRecovery) -> str:
+        return utc(recovery.done_at) if recovery.done_at else self.get_empty_value_display()
+
+    @staticmethod
+    def result_said(result: dict) -> str:
+        """What an app gave back, in words: «Customers: 2 created, 1 not created», or why it gave nothing."""
+        what, created, missed, why = (
+            recoverable_names([result["app"]]),
+            result["created"],
+            result["not_created"],
+            result["refused"],
+        )
+        if why and not created and not missed:
+            return pgettext("recovery", "%(what)s: nothing (%(why)s)") % {"what": what, "why": why}
+        counts = [ngettext("%(count)d created", "%(count)d created", created) % {"count": created}]
+        if missed:
+            counts.append(ngettext("%(count)d not created", "%(count)d not created", missed) % {"count": missed})
+        said = pgettext("recovery", "%(what)s: %(counts)s") % {"what": what, "counts": ", ".join(counts)}
+        if why:
+            said = pgettext("recovery", "%(said)s, then stopped (%(why)s)") % {"said": said, "why": why}
+        return said
 
 
 class FreezeForm(forms.ModelForm):

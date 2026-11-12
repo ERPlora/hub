@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6a6df8418879911607be4a3317810d6a0a51465f0e740f1f13e88aa24abe0603 -->
+<!-- generated from WORKBOOK.md sha256:53cda92c24b85d9aef577fd1a919c41c7aa113f2f7736ec8b8115742ecdc44de -->
 
 ## What it is for and who it is for
 
@@ -215,7 +215,7 @@ valid email.". A phone that is not a number of its country: "This is not a valid
 country: check the digits or write it with its international prefix (+44…).". A country that does not
 exist: "Choose a country from the list.". A date that does not exist in "Birthday" or "Anniversary" (a
 31/02): "Enter a valid date.". Nothing is saved. Custom fields are not asked for when adding.
-Involved: WHATSAPP_INBOX-F04
+Involved: WHATSAPP_INBOX-F04, BASE-F114 (the ERPlora staff bring back from a separate copy the cards that were lost, each by this same creation)
 
 ### CUSTOMER-F02 Search and filter cards
 Status: done

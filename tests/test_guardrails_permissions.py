@@ -126,6 +126,11 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
         PLATFORM,
         "The Hub admin edits a database cluster, for the platform's admins (staff and superuser).",
     ),
+    "control.copy.recover": (
+        PLATFORM,
+        "The Hub admin's «Recover into the business…» on a separate copy, for the platform's admins (staff and "
+        "superuser); the worker creates what the business lacks by each app's own operation.",
+    ),
     "control.freeze.get": (
         PLATFORM,
         "The Hub admin's freeze switch, read by the platform's staff (support only reads): frozen, since when, by whom.",
