@@ -1786,7 +1786,7 @@ def _categories_here() -> tuple[set[UUID], dict[str, UUID]]:
     return {pk for pk, _name in live}, {_same_name(name): pk for pk, name in live}
 
 
-def _category_held(category_id: UUID, name: str | None, here: tuple[set[UUID], dict[str, UUID]]) -> UUID | None:
+def _category_held(category_id: UUID | None, name: str | None, here: tuple[set[UUID], dict[str, UUID]]) -> UUID | None:
     """The business's live category that is the copy's ``category_id`` (named ``name`` there): the same while it is
     live, else the live one with its name (brought back by an earlier part of the recovery, or made again by hand);
     none otherwise."""
@@ -1841,7 +1841,8 @@ def services_in_copy(conn) -> list[dict]:
     def of(alias, model, field):
         return sql.SQL("{}.{}").format(alias, sql.Identifier(model._meta.get_field(field).column))
 
-    query = sql.SQL("SELECT {}, {} FROM {} AS {} LEFT JOIN {} AS {} ON {} = {} AND NOT {} ORDER BY {}").format(
+    # Deleting a category takes its services out of it (SERVICE-F08): a service's category is a live one.
+    query = sql.SQL("SELECT {}, {} FROM {} AS {} LEFT JOIN {} AS {} ON {} = {} ORDER BY {}").format(
         sql.SQL(", ").join(of(service, Service, field) for field in read),
         of(category, Category, "name"),
         sql.Identifier(table),
@@ -1850,7 +1851,6 @@ def services_in_copy(conn) -> list[dict]:
         category,
         of(category, Category, "id"),
         of(service, Service, "category"),
-        of(category, Category, "is_deleted"),
         of(service, Service, "id"),
     )
     named = ("id", *COPY_FIELDS, "category_id", "tax_category_id", "is_active", "category_name")
@@ -1903,9 +1903,7 @@ def services_not_in_business(services: list[dict]) -> list[dict]:
 def _category_here(service: dict, here: tuple[set[UUID], dict[str, UUID]]) -> UUID | None:
     """The category a service of the copy comes back to: its own while the business still has it, else the live one
     with its name (brought back just before it by the categories' part, hub#1323, or made again by hand), none
-    otherwise (deleted since and not back, SERVICE-F08)."""
-    if service["category_id"] is None:
-        return None
+    otherwise (none in the copy, or deleted since and not back, SERVICE-F08)."""
     return _category_held(service["category_id"], service["category_name"], here)
 
 

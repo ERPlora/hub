@@ -14,6 +14,7 @@ business still has it, else the live one with its name (brought back just before
 that operation, the screen's own.
 """
 
+import threading
 import uuid
 
 import pytest
@@ -427,6 +428,25 @@ def test_a_category_the_business_made_again_is_never_made_twice_and_its_children
 
     assert queries.categories_not_in_business(copy) == [
         {key: value for key, value in toning.items() if key != "parent_id"} | {"parent_id": again.pk}
+    ]
+
+
+def test_a_loop_a_raw_write_left_in_the_copy_never_hangs_and_gives_each_category_once():
+    hair, cuts = a_category_of_the_copy(name="Hair"), a_category_of_the_copy(name="Cuts")
+    # No operation leaves one (SERVICE-F07 refuses it), a raw write may (``delete_category`` says so too).
+    hair["parent_id"], cuts["parent_id"] = cuts["id"], hair["id"]
+    by_id = {one["id"]: one for one in (hair, cuts)}
+    depths: list[int] = []
+    counting = threading.Thread(target=lambda: depths.extend(queries._depth(one, by_id) for one in (hair, cuts)))
+    counting.daemon = True  # a loop that never ends must not keep the run alive
+
+    counting.start()
+    counting.join(timeout=5)
+
+    assert depths == [1, 1]
+    assert [(one["name"], one.get("parent")) for one in queries.categories_not_in_business([hair, cuts])] == [
+        ("Hair", "Cuts"),
+        ("Cuts", "Hair"),
     ]
 
 
