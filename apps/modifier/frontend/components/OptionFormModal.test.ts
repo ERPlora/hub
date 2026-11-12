@@ -167,7 +167,8 @@ describe('OptionFormModal: in the business’s currency', () => {
 });
 
 describe('OptionFormModal: the business answers after the form opened', () => {
-  const NOT_AMOUNT = 'This is not an amount. Type a figure, for example 1.50, or -0.50 for a discount.';
+  /** What the money field says in yen, with its examples in yen (ui#140). */
+  const NOT_AMOUNT_IN_YEN = 'This is not an amount. Type a figure, for example 1, or -1 for a discount.';
 
   it('an untouched supplement is rewritten from the option with the yen’s decimals, and «Save» keeps its scale', async () => {
     const s = await setup({ ...SODA, price_delta: 150 }, 'en', null);
@@ -230,7 +231,7 @@ describe('OptionFormModal: the business answers after the form opened', () => {
     expect(s.field('price_delta').value).toBe('1,75');
     await click(s.save());
     expect(s.sent()).toEqual([]);
-    expect(s.field('price_delta').errorText).toBe(NOT_AMOUNT);
+    expect(s.field('price_delta').errorText).toBe(NOT_AMOUNT_IN_YEN);
   });
 
   // hub#945: a supplement typed with its sign cannot be read before the money is known; leaving the field while the

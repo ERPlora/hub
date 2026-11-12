@@ -481,7 +481,7 @@ describe('CustomerListPage: the business\'s currency (customer-business-currency
     await yen.show(PAGE);
     await yen.filter({ spent_from: '1250', spent_to: '12,5' });
     expect(yen.params(LIST)).toEqual([{ spent_min: 1250, sort: 'name', descending: false, limit: 50, offset: 0 }]);
-    expect(yen.prop('filterErrors')).toEqual({ spent_to: 'This is not an amount. Type a figure, for example 12.50.' });
+    expect(yen.prop('filterErrors')).toEqual({ spent_to: 'This is not an amount. Type a figure, for example 12.' });
     expect(spent(yen)).toEqual(['¥4,550', '¥4,550']);
   });
 
