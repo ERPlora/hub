@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f6a4efa3158083a98bcd7ae41757c0b87ee277c8905d8e7ec5699ffd5b42aeb4 -->
+<!-- generated from WORKBOOK.md sha256:8c41837e51b17ff3063a21a1918bc111f4135b988f2c0b0679767b0202c8006f -->
 
 ## What it is for and who it is for
 
@@ -795,12 +795,16 @@ Steps:
 3. If its personal data was erased (GDPR), Services empties the free texts of its vouchers: the note of
    the purchase, the reason of a void, the reason of each adjustment and the note and the return reason
    of each session.
-In: the deleted or anonymised card (Customers; when anonymising it announces `customer.customer.erased`).
+4. If ERPlora's staff recover a deleted card from the separate copy (CUSTOMER-F33), its vouchers leave
+   **Vouchers with no customer** and go back to her name at once, also on an open screen; sessions and balances do
+   not change. An anonymised card never comes back.
+In: the deleted or anonymised card (Customers; when anonymising it announces `customer.customer.erased`; when it is
+recovered, `customer.customer.restored`).
 Out: the voucher keeps the reference of the card, which is what matches it with the sale that paid for
 it; sessions, amounts and movements do not change. When anonymising, the free texts emptied
 (`service.grant.erased`). The voided ones do not show in the list.
 If it fails: repeating the notice changes nothing.
-Involved: CUSTOMER-F07, CUSTOMER-F16
+Involved: CUSTOMER-F07, CUSTOMER-F16, CUSTOMER-F33
 
 ### SERVICE-F30 Rescue the vouchers with no customer
 Status: done (the list; a voucher is not moved to another card)

@@ -826,12 +826,16 @@ Pasos:
 3. Si se borraron sus datos personales (RGPD), Servicios vacía los textos libres de sus bonos: la nota
    de la compra, el motivo de una anulación, el motivo de cada ajuste y la nota y el motivo de
    devolución de cada sesión.
-Entra: la ficha eliminada o anonimizada (Clientes; al anonimizar avisa `customer.customer.erased`).
+4. Si el personal de ERPlora recupera desde la copia aparte una ficha eliminada (CUSTOMER-F33), sus bonos salen
+   de **Bonos sin cliente** y vuelven a su nombre al momento, también en una pantalla abierta; sesiones y saldos
+   no cambian. Una ficha anonimizada no vuelve nunca.
+Entra: la ficha eliminada o anonimizada (Clientes; al anonimizar avisa `customer.customer.erased`; al recuperarla,
+`customer.customer.restored`).
 Sale: el bono conserva la referencia de la ficha, que es lo que lo casa con la venta que lo pagó;
 sesiones, importes y movimientos no cambian. Al anonimizar, los textos libres vacíos
 (`service.grant.erased`). Los anulados no salen en la lista.
 Si falla: repetir el aviso no cambia nada.
-Implicados: CUSTOMER-F07, CUSTOMER-F16
+Implicados: CUSTOMER-F07, CUSTOMER-F16, CUSTOMER-F33
 
 ### SERVICE-F30 Rescatar los bonos sin cliente
 <!-- origen: old:services/workflow/fichas-de-clienta.md#services-f30 -->

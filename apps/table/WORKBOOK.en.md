@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3cbf510e16b03d4bad23e8397e8353843c356ad620ff6eea17479206036b6dfb -->
+<!-- generated from WORKBOOK.md sha256:42801a00048351a6097b1701f754a9683ec369c123586f87a5858028bf53015e -->
 
 ## What it is for and who it is for
 
@@ -784,10 +784,12 @@ Steps:
 2. The check of the table stays with that card: Sales gets it back when charging. "Remove customer" lets
    it go.
 3. The assistant can also seat with a customer: "seat Ana García at table 4, there are 3 of us".
+4. If the card is deleted in Customers, the check stops saying her name; if ERPlora's staff recover it from the
+   separate copy (CUSTOMER-F33), it says it again at once, also on the floor plan and the room that are open.
 In: the card, from Customers.
 Out: the check ↔ customer link, which Customers keeps (announces: `customer.order.linked`).
 If it fails: the reason of Customers; the table is seated anyway.
-Involved: CUSTOMER-F17, CUSTOMER-F19, TABLE-F10
+Involved: CUSTOMER-F17, CUSTOMER-F19, CUSTOMER-F33, TABLE-F10
 
 ## Tables: what goes in and what comes out
 
