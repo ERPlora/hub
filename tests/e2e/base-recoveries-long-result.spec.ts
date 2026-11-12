@@ -3,11 +3,10 @@
 // breaks into several lines inside its cell of Recoveries at a phone's, a tablet's and a desktop's width, and neither
 // the page nor the list's box asks to be scrolled sideways.
 // The recovery is control's row as the worker leaves a failed one; no copy's database is made: the list only reads it.
-import { spawnSync } from 'node:child_process';
-
 import { expect, type Page, test } from '@playwright/test';
 
-import { capture, HUB_DIR, horizontalOverflow } from './helpers';
+import { managePy } from './global-setup';
+import { capture, horizontalOverflow } from './helpers';
 import { STACK } from './stack';
 
 const KEY = 'BASE-F114-RECOVERIES-LONG-RESULT';
@@ -24,45 +23,38 @@ const ROOT = 'e2e-recoveries-root';
  *  of `a` and its failed recovery once, and opens the staff member's session (its key); `clean` drops that copy, its
  *  recovery with it. */
 function control(step: 'setup' | 'clean'): string {
-  const out = spawnSync(
-    'uv',
+  const out = managePy(STACK.database)([
+    'shell',
+    '-c',
     [
-      'run',
-      'python',
-      'manage.py',
-      'shell',
-      '-c',
-      [
-        'import datetime as dt, uuid',
-        'from django.conf import settings',
-        'from django.contrib.auth import get_user_model',
-        'from django.utils import timezone',
-        'from control.models import CopyRecovery, Hub, RestoredCopy',
-        `step = "${step}"`,
-        'hub = Hub.objects.get(slug="a")',
-        `RestoredCopy.objects.filter(hub=hub, asked_by="${ROOT}").delete()`,
-        'if step == "setup":',
-        '    from django.test import Client',
-        '    User = get_user_model()',
-        `    root = User.objects.filter(username="${ROOT}").first()`,
-        `    root = root or User.objects.create_superuser("${ROOT}", "${ROOT}@example.com", None)`,
-        '    now = timezone.now()',
-        '    name = f"{settings.DATABASES[\'default\'][\'NAME\']}_copy_{uuid.uuid7().hex}"',
-        '    copy = RestoredCopy.objects.create(hub=hub, restore_point=now - dt.timedelta(hours=3), db_name=name, status="made", made_at=now, asked_by=root.username)',
-        '    lost = {"app": "customer", "restored": 1, "created": 12, "not_created": 3, "refused": "",',
-        '            "reasons": [{"id": str(uuid.uuid7()), "reason": "customer_email_taken"}]}',
-        '    error = f"recover_copy_unreadable: The migrator cannot connect to {name!r}: database \\"{name}\\" does not exist"',
-        '    CopyRecovery.objects.create(copy=copy, apps=["customer"], status="failed", results=[lost], last_error=error, done_at=now, asked_by=root.username)',
-        '    client = Client()',
-        '    client.force_login(root)',
-        '    print(client.cookies["sessionid"].value)',
-        'else:',
-        '    print("clean")',
-      ].join('\n'),
-    ],
-    { cwd: HUB_DIR, env: process.env, encoding: 'utf8' },
-  );
-  if (out.status !== 0) throw new Error(`The shell of manage.py exited with ${out.status}:\n${out.stdout}\n${out.stderr}`);
+      'import datetime as dt, uuid',
+      'from django.conf import settings',
+      'from django.contrib.auth import get_user_model',
+      'from django.utils import timezone',
+      'from control.models import CopyRecovery, Hub, RestoredCopy',
+      `step = "${step}"`,
+      'hub = Hub.objects.get(slug="a")',
+      `RestoredCopy.objects.filter(hub=hub, asked_by="${ROOT}").delete()`,
+      'if step == "setup":',
+      '    from django.test import Client',
+      '    User = get_user_model()',
+      `    root = User.objects.filter(username="${ROOT}").first()`,
+      `    root = root or User.objects.create_superuser("${ROOT}", "${ROOT}@example.com", None)`,
+      '    now = timezone.now()',
+      '    name = f"{settings.DATABASES[\'default\'][\'NAME\']}_copy_{uuid.uuid7().hex}"',
+      '    copy = RestoredCopy.objects.create(hub=hub, restore_point=now - dt.timedelta(hours=3), db_name=name, status="made", made_at=now, asked_by=root.username)',
+      '    lost = {"app": "customer", "restored": 1, "created": 12, "not_created": 3, "refused": "",',
+      '            "reasons": [{"id": str(uuid.uuid7()), "reason": "customer.phone_invalid: This phone is not valid."}]}',
+      '    error = f"recover_copy_unreadable: The migrator cannot connect to {name!r}: database \\"{name}\\" does not exist"',
+      '    CopyRecovery.objects.create(copy=copy, apps=["customer"], status="failed", results=[lost], last_error=error, done_at=now, asked_by=root.username)',
+      '    client = Client()',
+      '    client.force_login(root)',
+      '    print(client.cookies["sessionid"].value)',
+      'else:',
+      '    print("clean")',
+    ].join('\n'),
+  ]);
+  if (out.status !== 0) throw new Error(`control's shell exited with ${out.status}:\n${out.stdout}\n${out.stderr}`);
   return out.stdout.trim().split('\n').at(-1) ?? '';
 }
 
