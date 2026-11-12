@@ -3,7 +3,7 @@
 // `service.movement.list` live, the most recent first, 20 at a time: each session with its step (Held at
 // the till, Delivered, Released, Expired, Given back by a refund or a void: its service, or «No service on
 // the line»), each Courtesy and Correction (what moved, who and why), with the date, the customer (their
-// reference when the card is gone) and the sale.
+// reference when the card is gone), the professional who did a session when it was said (hub#1236) and the sale.
 import { InlineFeedback, StatusPill } from '@erplora/ui/components';
 
 import { useSheetList } from '../composables/useSheetList';
@@ -94,6 +94,9 @@ function who(movement: MovementOut): string {
         </div>
         <div class="service-sheet-list__line">
           {{ t('service.movements.customer', { name: movement.customer_name ?? movement.customer_id }) }}
+          <template v-if="movement.member_name">
+            · {{ t('service.movements.professional', { name: movement.member_name }) }}
+          </template>
           <template v-if="movement.sale_id">
             · {{ t('service.movements.sale', { id: movement.sale_id }) }}
           </template>

@@ -340,7 +340,8 @@ describe('ProductFormModal: editing', () => {
   });
 
   describe('the business answers after the form opened (flow INVENTORY-F02)', () => {
-    const NOT_AMOUNT = 'This is not an amount. Type a figure, for example 12.50.';
+    /** What the money field says in yen, with its example in yen (ui#140). */
+    const NOT_AMOUNT_IN_YEN = 'This is not an amount. Type a figure, for example 12.';
 
     it('a new product: the name and SKU typed before keep, and «Save» lights up once its tax category is chosen', async () => {
       const s = await setup({}, { business: null });
@@ -412,7 +413,7 @@ describe('ProductFormModal: editing', () => {
       expect(s.el('inventory-product-price')?.value).toBe('1,75');
       await s.submit();
       expect(s.calls('/api/inventory/products/update')).toHaveLength(0);
-      expect(s.el('inventory-product-price')?.errorText).toBe(NOT_AMOUNT);
+      expect(s.el('inventory-product-price')?.errorText).toBe(NOT_AMOUNT_IN_YEN);
     });
 
     // hub#945 (INVENTORY-F01): a price or a cost typed with its currency's sign and left before the business answers is

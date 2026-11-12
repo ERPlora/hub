@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 import { amountFilterErrors, filterCents, formatMoney } from '../lib/money';
-import { AMOUNT_FILTER_TEXTS, type AmountReading, EUR, itReadsAmountFiltersAsTheHub, JPY, moneyFieldSays } from './amount-filter';
+import { AMOUNT_FILTER_TEXTS, type AmountReading, EUR, itReadsAmountFiltersAsTheHub, JPY, KWD, moneyFieldSays } from './amount-filter';
 
 /** `parseMoney`'s reading of `typed` in `money`, as the table writes it (no text of the table is empty). */
 function platform(typed: string, money: Money): AmountReading {
@@ -18,8 +18,10 @@ function platform(typed: string, money: Money): AmountReading {
 }
 
 describe('the table of amount filter texts (hub#1196)', () => {
-  it('reads each text as the money field does, in euros and in yen', () => {
-    expect(AMOUNT_FILTER_TEXTS.map(({ typed }) => ({ typed, EUR: platform(typed, EUR), JPY: platform(typed, JPY) }))).toEqual(AMOUNT_FILTER_TEXTS);
+  it('reads each text as the money field does, in euros, in yen and in dinars', () => {
+    expect(
+      AMOUNT_FILTER_TEXTS.map(({ typed }) => ({ typed, EUR: platform(typed, EUR), JPY: platform(typed, JPY), KWD: platform(typed, KWD) })),
+    ).toEqual(AMOUNT_FILTER_TEXTS);
   });
 
   it('has the texts that split the lists: thousands, both conventions, spaces, a symbol, «1.000», a minus and letters', () => {
@@ -32,11 +34,15 @@ describe('the table of amount filter texts (hub#1196)', () => {
     expect([
       moneyFieldSays('1.000', { grouped: 100000, decimal: 100 }, EUR),
       moneyFieldSays('doce', 'not_amount', EUR),
+      moneyFieldSays('doce', 'not_amount', JPY),
+      moneyFieldSays('doce', 'not_amount', KWD),
       moneyFieldSays('-5', 'negative', JPY),
       moneyFieldSays('12', 1200, EUR),
     ]).toEqual([
       `This amount can be read in two ways: «1.000» could be ${formatMoney(100000, 'en', EUR)} or ${formatMoney(100, 'en', EUR)}. Write the decimals so there is no doubt.`,
       'This is not an amount. Type a figure, for example 12.50.',
+      'This is not an amount. Type a figure, for example 12.',
+      'This is not an amount. Type a figure, for example 12.500.',
       'This amount cannot be negative.',
       undefined,
     ]);

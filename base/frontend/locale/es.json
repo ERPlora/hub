@@ -1510,7 +1510,7 @@
       "unreadable": "No se ha podido leer la moneda del negocio",
       "retry": "Reintentar",
       "filter": {
-        "notAmount": "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",
+        "notAmount": "Esto no es un importe. Escribe una cifra, por ejemplo {amount}.",
         "negative": "Este importe no puede ser negativo.",
         "ambiguous": "Este importe se puede leer de dos maneras: «{typed}» tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda."
       }

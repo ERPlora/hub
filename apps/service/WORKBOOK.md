@@ -143,8 +143,9 @@ Hojas que se abren encima, todas con **Cerrar**, «Cargando…» mientras llegan
 
 - **Movimientos del bono**: cada sesión y cada ajuste de ese bono, de todas las clientas, el más
   reciente primero, con su etiqueta (**Reservada**, **Entregada**, **Liberada**, **Caducada**,
-  **Devuelta**, **Cortesía**, **Corrección**), el servicio, la fecha, «Cliente: <nombre>», quién y el
-  motivo. Vacía: «Este bono aún no se ha usado.».
+  **Devuelta**, **Cortesía**, **Corrección**), el servicio, la fecha, «Cliente: <nombre>», en una sesión
+  gastada diciendo quién la hizo «Profesional: <nombre>», quién y el motivo. Vacía: «Este bono aún no se ha
+  usado.».
 - **Bonos vendidos**: una fila por compra, con **Activo** o **Anulado**, la clienta, la fecha, el
   importe, «{used} usadas · quedan {remaining}» (o «· sin límite»), «Caduca el …» o «No caduca» y lo
   regalado o corregido después; en una anulada, «Anulado por {who} el {when}» y el motivo. Botones
@@ -595,7 +596,9 @@ Pasos:
 1. En la fila del bono pulsa **Movimientos**.
 2. Sale cada sesión entregada y cada ajuste, el más reciente primero (ver «Pantallas»); **Cargar
    más** trae los siguientes, cada movimiento una sola vez aunque varios lleven la misma hora.
-Entra: las sesiones y los ajustes de ese bono.
+3. Una sesión gastada diciendo quién la hizo (SERVICE-F21) la nombra junto a la clienta, «Profesional: Ana
+   López»; si cambia su nombre en Personal, la fila lo dice al momento.
+Entra: las sesiones y los ajustes de ese bono; el nombre de la profesional de cada sesión (Personal).
 Sale: nada; solo lectura.
 Si falla: vacía, «Este bono aún no se ha usado.»; si no se puede leer, «No se han podido cargar los
 movimientos» con el motivo.
@@ -1319,8 +1322,6 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   la sección de su IVA) y se concede con la concesión (asistente o API, F14) diciendo la venta.
 - **Enlazar a su venta un bono concedido sin decirla** (F14, hub#786): el bono sigue sin contar para quien hace
   sus sesiones. Le pasa también a los vendidos antes de esa cifra.
-- **Ver en Movimientos quién hizo cada sesión** (F19, hub#1236): la sesión guarda la profesional y suma en su
-  producción en Ventas, pero la fila de **Movimientos** no la nombra.
 - **Importar servicios desde un fichero**: como en el producto actual, el alta de golpe es del
   asistente y la API.
 

@@ -2,7 +2,7 @@
 // says it — the registry of this hub, never a call to erplora.com. Followed live (a change on erplora.com is pushed
 // and arrives), one subscription for the whole tab however many pieces ask (the SDK shares it), and unknown until the
 // business answers: an amount is then a dash, never in the euro by default nor with guessed decimals.
-import { type DataTableFilters, formatMoney as writeMoney, parseMoney } from '@erplora/ui/components';
+import { type DataTableFilters, formatMoney as writeMoney, moneyExamples, parseMoney } from '@erplora/ui/components';
 import { type ApiError, useLive } from '@erplora/ui/sdk';
 import { computed, type ComputedRef, type Ref } from 'vue';
 
@@ -37,9 +37,10 @@ export interface AmountFilterSay {
 }
 
 /** What the table says under each of `ends` typed in `values` that is no amount of the business's money: the money
- *  field's own words (`MoneyInput`) — not an amount, negative, or «1.000» that reads two ways, with both readings —
- *  so every list says it alike (hub#1196). An empty end or an amount says nothing, and nothing is judged while the
- *  money is unknown, as the money field does not (hub#945). */
+ *  field's own words (`MoneyInput`) — not an amount, with its example in that money («12,50», «12» in yen; ui#140),
+ *  negative, or «1.000» that reads two ways, with both readings — so every list says it alike (hub#1196). An empty
+ *  end or an amount says nothing, and nothing is judged while the money is unknown, as the money field does not
+ *  (hub#945). */
 export function amountFilterErrors(values: DataTableFilters, ends: readonly string[], say: AmountFilterSay): Record<string, string> {
   const errors: Record<string, string> = {};
   const { money, t, locale } = say;
@@ -48,7 +49,7 @@ export function amountFilterErrors(values: DataTableFilters, ends: readonly stri
     const typed = values[end] ?? '';
     const read = parseMoney(typed, { money, signed: say.signed?.includes(end) });
     if (read.ok) continue;
-    if (read.reason === 'not_amount') errors[end] = t('base.money.filter.notAmount');
+    if (read.reason === 'not_amount') errors[end] = t('base.money.filter.notAmount', { amount: moneyExamples(locale, money).amount });
     else if (read.reason === 'negative') errors[end] = t('base.money.filter.negative');
     else {
       const grouped = writeMoney(read.grouped, locale, money);

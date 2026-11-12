@@ -33,6 +33,7 @@ pytestmark = pytest.mark.django_db
 PLATFORM = "hubs.localhost:8000"
 CLUSTERS = "/admin/control/cluster/"
 HUBS = "/admin/control/hub/"
+COPIES = "/admin/control/restoredcopy/"
 FREEZE = "/admin/control/freeze/"
 SECRET = "erplora/prod/clusters/cluster-2"
 SIZE = re.compile(r"\d[\d.,]*\s(?:bytes|KB|MB|GB)")
@@ -749,6 +750,106 @@ class TestRestoreFromACopy:
         assert hub.restoring_from_id is None and not events("control.hub.restore_requested")
 
 
+class TestRestoreToASeparateCopy:
+    """«Restore to a separate copy…» (hub#1213, BASE-F114): the same confirmation page and form as «Restore from a
+    copy…», each hub asked through ``control.hub.restore_aside``; the hubs are not touched, and Separate copies lists
+    the copies, read only, for support too. Support never sees the action."""
+
+    small = TestRestoreFromACopy.small
+    a_hub = staticmethod(TestMoveToCluster.a_hub)
+    a_temporary_cluster = staticmethod(TestRestoreFromACopy.a_temporary_cluster)
+
+    @staticmethod
+    def choose(client, *hubs, **more):
+        data = {"action": "restore_aside", "_selected_action": [str(hub.pk) for hub in hubs]} | more
+        return client.post(HUBS, data, HTTP_HOST=PLATFORM, follow=True)
+
+    @staticmethod
+    def a_copy(hub: Hub, **fields):
+        """A separate copy of ``hub`` of the moment, as ``control.hub.restore_aside`` asks it."""
+        from control.models import RestoredCopy
+
+        values = {"restore_point": AT_MOMENT, "db_name": f"hub_copy_{uuid.uuid7().hex}", "asked_by": "root"}
+        return RestoredCopy.objects.create(hub=hub, **(values | fields))
+
+    def test_asks_for_a_temporary_cluster_and_the_moment_first_and_changes_nothing(self, client, root):
+        from control.models import RestoredCopy
+
+        hub = self.a_hub("acme")
+        temporary = self.a_temporary_cluster()
+
+        html = self.choose(client, hub).content.decode()
+
+        assert "Restore to a separate copy" in html and "acme" in html and 'value="Make the copies"' in html
+        assert f'value="{temporary.pk}"' in html and 'name="at"' in html
+        assert not RestoredCopy.objects.exists()
+
+    def test_confirmed_each_hub_gets_its_copy_asked_and_stays_as_it_is(self, client, root):
+        from control.models import RestoredCopy
+
+        first, second = self.a_hub("acme"), self.a_hub("bistro", is_demo=True)
+        temporary = self.a_temporary_cluster()
+
+        html = self.choose(client, first, second, apply="yes", cluster=str(temporary.pk), at=MOMENT).content.decode()
+
+        assert "Bistro: A demo is not restored: it ends on its own." in html
+        assert "1 hub will get a separate copy as it was at 2026-11-09 14:30 UTC, made from restore-1" in html
+        [copy] = RestoredCopy.objects.all()
+        assert (copy.hub_id, copy.source_id, copy.restore_point) == (first.pk, temporary.pk, AT_MOMENT)
+        first.refresh_from_db()
+        assert first.restoring_from_id is None
+        assert "←" not in cluster_cell(row_of(page(client, HUBS), ">acme<"))
+
+    def test_support_neither_sees_it_nor_runs_it_but_reads_the_copies(self, client, support):
+        from control.models import RestoredCopy
+
+        hub = self.a_hub("acme")
+        temporary = self.a_temporary_cluster()
+        self.a_copy(hub, source=temporary)
+
+        assert "restore_aside" not in page(client, HUBS)
+        self.choose(client, hub, apply="yes", cluster=str(temporary.pk), at=MOMENT)
+
+        assert RestoredCopy.objects.count() == 1
+        listed = page(client, COPIES)
+        assert "acme" in listed and "2026-11-09 14:30 UTC" in listed and "Being made" in listed
+        assert "addlink" not in listed
+
+    def test_the_copies_are_listed_read_only_with_until_when_they_are_kept(self, client, root):
+        from control.models import RestoredCopy
+
+        hub = self.a_hub("acme")
+        made = AT_MOMENT + dt.timedelta(hours=1)
+        copy = self.a_copy(hub, status=RestoredCopy.Status.MADE, made_at=made)
+
+        listed = page(client, COPIES)
+        assert "acme" in listed and "2026-11-09 14:30 UTC" in listed
+        assert "Made" in listed and "2026-11-16 15:30 UTC" in listed
+        assert copy.db_name in page(client, COPIES, q=copy.db_name)
+        its_page = client.get(f"{COPIES}{copy.pk}/change/", HTTP_HOST=PLATFORM).content.decode()
+        assert copy.db_name in its_page and "default server" in its_page
+        assert 'name="_save"' not in its_page and "deletelink" not in its_page
+        assert client.post(f"{COPIES}{copy.pk}/delete/", {"post": "yes"}, HTTP_HOST=PLATFORM).status_code == 403
+        assert RestoredCopy.objects.filter(pk=copy.pk).exists()
+
+
+def test_the_separate_copy_speaks_spanish(client, root):
+    from django.utils import translation
+    from django.utils.translation import ngettext
+
+    with translation.override("es"):
+        assert str(control_admin.HubAdmin.restore_aside.short_description) == "Restaurar en una copia aparte…"
+        assert ngettext(
+            "%(count)d hub will get a separate copy as it was at %(moment)s, made from %(cluster)s: the business stays "
+            "open as it is. Separate copies lists it, and says if it could not be made.",
+            "%(count)d hubs will get a separate copy each as they were at %(moment)s, made from %(cluster)s: the "
+            "businesses stay open as they are. Separate copies lists them, and says if one could not be made.",
+            1,
+        ).startswith("%(count)d hub tendrá una copia aparte")
+    listed = client.get(COPIES, HTTP_HOST=PLATFORM, HTTP_ACCEPT_LANGUAGE="es").content.decode()
+    assert "Copias aparte" in listed or "copias aparte" in listed
+
+
 def test_the_restore_speaks_spanish():
     from django.utils import translation
     from django.utils.translation import ngettext
@@ -767,22 +868,29 @@ def test_the_restore_speaks_spanish():
         )
 
 
-def test_its_restore_page_speaks_spanish(client, root):
+@pytest.mark.parametrize(
+    "action, said, button",
+    [
+        ("restore_from_a_copy", "Cada hub elegido vuelve a como estaba en el momento", "Restaurarlos"),
+        ("restore_aside", "nada de ella se envía a Hacienda", "Hacer las copias"),
+    ],
+)
+def test_its_restore_page_speaks_spanish(client, root, action, said, button):
     hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")
     a_cluster(name="restore-1", host="restore-1.example", is_open=False)
 
     html = client.post(
         HUBS,
-        {"action": "restore_from_a_copy", "_selected_action": [str(hub.pk)]},
+        {"action": action, "_selected_action": [str(hub.pk)]},
         HTTP_HOST=PLATFORM,
         HTTP_ACCEPT_LANGUAGE="es",
     ).content.decode()
 
-    assert "Cada hub elegido vuelve a como estaba en el momento" in html and 'value="Restaurarlos"' in html
+    assert said in html and f'value="{button}"' in html
     assert "Clúster temporal" in html and "Momento" in html
 
 
-@pytest.mark.parametrize("action", ["move_to_cluster", "restore_from_a_copy"])
+@pytest.mark.parametrize("action", ["move_to_cluster", "restore_from_a_copy", "restore_aside"])
 def test_a_confirmation_page_wraps_a_long_database_name_as_a_hubs_own_page_does(client, root, action):
     """The chosen hubs are read-only rows of an aligned fieldset: the admin's forms sheet is what wraps a database name
     wider than a phone (375 px) instead of pushing the page sideways."""

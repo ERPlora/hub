@@ -148,6 +148,11 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
         "The Hub admin puts a hub back as it was at a moment, for the platform's admins (staff and superuser); the "
         "worker restores it.",
     ),
+    "control.hub.restore_aside": (
+        PLATFORM,
+        "The Hub admin's «Restore to a separate copy…», for the platform's admins (staff and superuser); the worker "
+        "makes the copy next to the business, which is never closed nor changed.",
+    ),
     "staff.account.list": (
         CHECKED_INSIDE,
         "staff.add_member or staff.change_member (the «Hub user» selector of the record's form, STAFF-F03).",

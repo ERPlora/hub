@@ -188,3 +188,26 @@ def test_a_moved_copy_is_no_hubs_own_database_to_drop_with_it():
     # ``validate_hub`` (``ops.drop_database``) takes a hub's or a demo's database only: a copy is dropped by the move.
     with pytest.raises(names.InvalidDatabaseName):
         names.validate_hub(f"hub_move_{HEX}", control="hub")
+
+
+# ── A hub's database as it was at a moment, made aside (hub#1213; base.tenancy.restore, «restore aside») ─────────────
+
+
+def test_a_copy_aside_is_its_control_databases_copy_and_the_hex_of_its_own_uuid7():
+    made = uuid.uuid7()
+    assert names.copy_db_name("hub", made) == f"hub_copy_{made.hex}"
+    assert names.copy_db_name("pre_hub", made) == f"pre_hub_copy_{made.hex}"
+    # It fits after the longest control database, as a demo's does.
+    assert names.copy_db_name("c" * names.MAX_CONTROL, made)
+    assert names.is_copy_aside(f"hub_copy_{HEX}", control="hub")
+    for other in (f"hub_{HEX}", f"hub_old_{HEX}", f"pre_hub_copy_{HEX}", f"hub_copy_{HEX[:-1]}"):
+        assert not names.is_copy_aside(other, control="hub")
+
+
+def test_a_copy_aside_is_closed_to_the_app_and_only_dropped_as_a_left_behind_copy_never_a_hubs_database():
+    copy = f"hub_copy_{HEX}"
+    # Left behind: no process registers an alias of it (``connections.register_hub_alias``), the worker drops it.
+    assert names.is_left_behind(copy, control="hub")
+    assert names.validate_left_behind(copy, control="hub") == copy
+    with pytest.raises(names.InvalidDatabaseName):
+        names.validate_hub(copy, control="hub")

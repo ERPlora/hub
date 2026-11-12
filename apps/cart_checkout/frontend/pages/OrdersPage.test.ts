@@ -372,7 +372,7 @@ describe('OrdersPage: the business’s currency (cart-checkout-business-currency
     await yen.result(BUSINESS, business(JAPANESE));
     await filter(yen, { total_amount_from: '12', total_amount_to: '12,5' });
     expect(yen.list()).toEqual([{ total_amount_min: 12, sort: '-created_at', limit: 50, offset: 0 }]);
-    expect(yen.prop('filterErrors')).toEqual({ total_amount_to: 'This is not an amount. Type a figure, for example 12.50.' });
+    expect(yen.prop('filterErrors')).toEqual({ total_amount_to: 'This is not an amount. Type a figure, for example 12.' });
   });
 
   it('an amount typed before the business answers is read again in its currency when it does, from the first page', async () => {
