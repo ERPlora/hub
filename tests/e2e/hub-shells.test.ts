@@ -19,6 +19,10 @@ const WITHOUT_A_HUB: Record<string, { calls: number; on: string }> = {
     calls: 1,
     on: "control's registry: the separate copy, the staff member's session and the worker's recovery pass (its cards, products and services, with --hub a)",
   },
+  'base-recoveries-long-result.spec.ts': {
+    calls: 1,
+    on: "control's registry: a separate copy of a with its failed recovery, and the staff member's session",
+  },
   'fix-hub-csp-whatsapp-media-gate.spec.ts': { calls: 1, on: "control's registry of hubs" },
   'whatsapp-inbox-offered-options.spec.ts': { calls: 1, on: "the SaaS's WhatsApp number" },
   'whatsapp-inbox-plan-cap.spec.ts': { calls: 1, on: "the SaaS's plan of the business" },
@@ -34,9 +38,12 @@ function code(source: string): string {
     .join('\n');
 }
 
-/** The `manage.py shell` calls of `source` that name no business, as arguments (`'manage.py', 'shell'`) or as a command. */
+/** The `manage.py shell` calls of `source` that name no business, as arguments (`'manage.py', 'shell'`), as a command, or
+ *  as the arguments `managePy` of global-setup.ts runs `manage.py` with (`(['shell', '-c', code])`). */
 function shellsWithoutHub(source: string): number {
-  return code(source).match(/manage\.py(?:['"`]\s*,\s*['"`]|\s+)shell\b(?!['"`]\s*,\s*['"`]--hub\b|\s+--hub\b)/g)?.length ?? 0;
+  const asked =
+    /manage\.py(?:['"`]\s*,\s*['"`]|\s+)shell\b(?!['"`]\s*,\s*['"`]--hub\b|\s+--hub\b)|\[\s*['"`]shell['"`](?!\s*,\s*['"`]--hub\b)/g;
+  return code(source).match(asked)?.length ?? 0;
 }
 
 /** The specs and helpers of the e2e, its subfolders' too (`qa/`, whose specs Playwright runs as well), not Vitest's own
@@ -77,6 +84,13 @@ describe('a `manage.py shell` of the e2e names its business', () => {
     expect(shellsWithoutHub("execFile('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', RELAY]);")).toBe(0);
     expect(shellsWithoutHub('execSync(`uv run python manage.py shell --hub a -c "${code}"`);')).toBe(0);
     expect(shellsWithoutHub('// a one-shot `manage.py shell` of its own\n/** `manage.py shell -c` in the SaaS */\n/**\n * manage.py shell\n */')).toBe(0);
+  });
+
+  it('the count sees a shell asked through managePy (global-setup.ts), and not one that names its business', () => {
+    expect(shellsWithoutHub("managePy(STACK.database)(['shell', '-c', code]);")).toBe(1);
+    expect(shellsWithoutHub("const manage = managePy(db);\nmanage([\n  'shell',\n  '-c',\n  code,\n]);")).toBe(1);
+    expect(shellsWithoutHub("managePy(STACK.database)(['shell', '--hub', 'a', '-c', code]);")).toBe(0);
+    expect(shellsWithoutHub("managePy(STACK.database)(['migrate', '--check']);")).toBe(0);
   });
 
   it('a `/*` in a line comment or a string hides no call after it', () => {

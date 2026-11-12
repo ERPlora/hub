@@ -612,6 +612,108 @@ def test_an_employee_cannot_delete():
     )
 
 
+# inventory.product.restore (INVENTORY-F34)
+
+
+def restore(product_id, ctx=None):
+    op = get("inventory.product.restore")
+    return op(ctx or system_context(A), op.input.model_validate({"id": str(product_id)}))
+
+
+def restored_payload(product_id, sku, name, **fields):
+    """What ``inventory.product.restored`` says: the product as it comes back."""
+    return {
+        "id": str(product_id),
+        "sku": sku,
+        "name": name,
+        "product_type": "physical",
+        "price": 100,
+        "cost": 0,
+        "unit": "ud",
+        "tax_category_key": TAX,
+        "is_active": True,
+        "is_sold_out": False,
+        "track_stock": None,
+        **fields,
+    }
+
+
+def test_restore_brings_a_deleted_product_back_the_same_with_its_movements_and_says_so():
+    created = create("Coffee", "CAF-1", ean13="8412345678905", initial_stock="5")
+    receive((created.id, "2"))
+    sold_out(created.id)
+    run("inventory.product.delete", ProductRefIn(id=created.id))
+    clear_outbox()
+
+    back = restore(created.id)
+
+    # The same product: its id, its codes, its stock and every movement hang from it again; back on sale, active and
+    # without the day's «sold out» it had when it was deleted.
+    assert (back.id, back.sku, back.ean13, back.stock) == (created.id, "CAF-1", "8412345678905", Decimal("7.000"))
+    product = Product.objects.get()
+    assert (product.is_deleted, product.deleted_at, product.is_active, product.is_sold_out) == (False, None, True, False)
+    # Who changed it last is whoever brought it back (the system), no longer who deleted it.
+    assert product.updated_by == "system"
+    assert [kind for kind, _, _ in movements(created.id)] == ["initial", "reception"]
+    assert outbox() == [(events.PRODUCT_RESTORED, restored_payload(created.id, "CAF-1", "Coffee"))]
+
+
+def test_restore_keeps_the_categories_it_still_has():
+    drinks = Category.objects.create(name="Drinks")
+    created = create("Coffee", "CAF-1", category_ids=[drinks.id])
+    run("inventory.product.delete", ProductRefIn(id=created.id))
+
+    restore(created.id)
+
+    assert list(ProductCategory.objects.values_list("product_id", "category_id")) == [(created.id, drinks.id)]
+
+
+def test_restoring_a_live_product_changes_nothing_and_says_so_again():
+    # A cut before the COMMIT runs it again (repeatable): the second time finds it live.
+    created = create("Coffee", "CAF-1")
+    run("inventory.product.delete", ProductRefIn(id=created.id))
+    restore(created.id)
+    clear_outbox()
+
+    assert restore(created.id).id == created.id
+
+    assert Product.objects.get().is_deleted is False
+    assert outbox() == [(events.PRODUCT_RESTORED, restored_payload(created.id, "CAF-1", "Coffee"))]
+
+
+@pytest.mark.parametrize(
+    "again, code",
+    [({"sku": "CAF-1"}, "inventory.sku_taken"), ({"sku": "CAF-2", "ean13": "8412345678905"}, "inventory.ean13_taken")],
+)
+def test_one_whose_sku_or_ean13_another_live_product_took_since_does_not_come_back(again, code):
+    first = create("Coffee", "CAF-1", ean13="8412345678905")
+    run("inventory.product.delete", ProductRefIn(id=first.id))
+    create("Coffee again", **again)
+    clear_outbox()
+
+    error = refused(Conflict, lambda: restore(first.id))
+
+    assert error.code == code
+    assert Product.objects.get(pk=first.id).is_deleted is True
+    assert outbox() == []
+
+
+def test_restoring_an_unknown_product_is_not_found():
+    refused(NotFound, lambda: restore(uuid.uuid7()))
+    assert outbox() == []
+
+
+def test_restore_is_the_platforms_without_a_route():
+    op = get("inventory.product.restore")
+    assert (op.kind, op.permission, op.expose_api, op.repeatable) == ("command", "inventory.system", False, True)
+    assert op.ai["risk"] == "normal" and op.ai["description"]
+    created = create()
+    run("inventory.product.delete", ProductRefIn(id=created.id))
+    # Not a permission of any role: the owner holds every permission inventory declares, not this one.
+    refused(PermissionDenied, lambda: restore(created.id, ctx_for("hub_owner")))
+    assert Product.objects.get().is_deleted is True
+
+
 # inventory.product.set_sold_out (INVENTORY-F29)
 
 

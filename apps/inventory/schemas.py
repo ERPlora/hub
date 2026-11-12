@@ -200,6 +200,13 @@ class ProductImageSuggestIn(ProductRefIn):
     limit: int = Field(5, ge=1, le=20, description="How many images to propose (1 to 20).")
 
 
+class ProductIdIn(Schema):
+    """A product by its id alone: the one a deleted product keeps (INVENTORY-F34), the same in a separate copy of the
+    business and in the business."""
+
+    id: UUID = Field(title=T_PRODUCT, description="The product's id.")
+
+
 class CategoryRefIn(Schema):
     id: UUID | None = Field(None, title=T_CATEGORY, description="The category's id.", json_schema_extra=A_CATEGORY)
     category: Said | None = Field(

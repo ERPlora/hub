@@ -700,6 +700,10 @@ class CopyRecoveryAdmin(base_admin.ReadOnlyAdmin):
     fields = ("copy", "status", "what", "outcome", "why_not", "asked_by", "asked_on", "done_on", "last_error")
     readonly_fields = fields
 
+    class Media:
+        # A long result breaks inside its cell, never pushing the list sideways on a phone (hub#1308).
+        css = {"all": ["control/admin.css"]}
+
     @admin.display(description=gettext_lazy("separate copy"), ordering="copy__restore_point")
     def made_from(self, recovery: CopyRecovery) -> str:
         """Its copy's business and moment, on two lines: on a phone the results' column keeps the room."""
