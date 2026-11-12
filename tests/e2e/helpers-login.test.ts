@@ -367,6 +367,18 @@ const outcomeOf = (page: Page): Promise<string> =>
     (error: unknown) => String(error),
   );
 
+/** `login()` on `/demo/items` in a test of 180 s, through `gotos`: its first try fails on the network, the second ends on next. */
+async function endsOnNextAtTheSecondTry(gotos: Goto[]): Promise<void> {
+  inATestOf(TEST_TIME);
+  const { page, went, listening } = pageDoing(gotos);
+
+  await login(page, HUB, '/demo/items', OWNER);
+
+  expect(page.url()).toBe(target);
+  expect(went).toEqual([target, target]);
+  expect(listening(), 'listeners left on the page').toBe(0);
+}
+
 describe('login, when the hub’s shell takes longer than a sixth of the test’s time to mount', () => {
   it.each([
     ['in a test of 180 s, with the hub’s session kept', TEST_TIME, [{ url: target, for: LATE }, { url: target, shell: true }]],
@@ -453,17 +465,10 @@ describe('login, when the hub’s shell is not coming', () => {
   });
 
   it('a script that fails on the network (its dev server restarting) is a refused connection: one more try, which ends on next', async () => {
-    inATestOf(TEST_TIME);
-    const { page, went, listening } = pageDoing([
+    await endsOnNextAtTheSecondTry([
       { stops: [{ url: target, script: { failure: 'net::ERR_CONNECTION_REFUSED' } }] },
       { stops: [{ url: target, shell: true }] },
     ]);
-
-    await login(page, HUB, '/demo/items', OWNER);
-
-    expect(page.url()).toBe(target);
-    expect(went).toEqual([target, target]);
-    expect(listening(), 'listeners left on the page').toBe(0);
   });
 
   it('a script the jump aborts, an error thrown on the SaaS or an iframe gone elsewhere are not the hub’s: it waits for its shell', async () => {
@@ -633,17 +638,32 @@ describe('login, when the SaaS says one of its steps is not coming', () => {
     expect(listening(), 'listeners left on the page').toBe(0);
   });
 
-  it('a code its request gets no answer to (the connection reset): it did not answer the code, not «code rejected»; one more try', async () => {
+  it.each([
+    [
+      'a code its request gets no answer to (the connection reset): it did not answer the code, not «code rejected»',
+      // The SaaS's page says it could not sign in: an alert the SaaS did not answer, only its page wrote.
+      [
+        ...signingIn({}, {}, 'code answer'),
+        {
+          url: verifyEmail,
+          form: 'code',
+          alert: 'We could not sign you in. Please try again.',
+          answers: { to: 'code', failure: 'net::ERR_CONNECTION_RESET' },
+        } satisfies Stop,
+      ],
+      `^Error: login on ${HUB}: the SaaS did not answer the code \\(net::ERR_CONNECTION_RESET\\) \\(code ${MAILED} for ${OWNER.email}, at `,
+    ],
+    [
+      'a sign-in its request gets no answer to (the connection refused): it did not answer the sign-in',
+      [
+        ...signingIn({}, {}, 'sign-in answer'),
+        { url: launch, form: 'sign-in', answers: { to: 'sign-in', failure: 'net::ERR_CONNECTION_REFUSED' } } satisfies Stop,
+      ],
+      `^Error: login on ${HUB}: the SaaS did not answer the sign-in \\(net::ERR_CONNECTION_REFUSED\\)$`,
+    ],
+  ])('%s; one more try, which ends the same', async (_case, stops: Stop[], unanswered) => {
     inATestOf(TEST_TIME);
-    // The SaaS's page says it could not sign in: an alert the SaaS did not answer, only its page wrote.
-    const dropped: Stop = {
-      url: verifyEmail,
-      form: 'code',
-      alert: 'We could not sign you in. Please try again.',
-      answers: { to: 'code', failure: 'net::ERR_CONNECTION_RESET' },
-    };
-    const trip = (): Goto => ({ stops: [...signingIn({}, {}, 'code answer'), dropped] });
-    const { page, went, clock, listening } = pageDoing([trip(), trip()]);
+    const { page, went, clock, listening } = pageDoing([{ stops }, { stops }]);
     // When the first try fails, on the page's clock. Its wait for the answer stays on, as Playwright's does: on this
     // page's clock it runs out before the second try starts, so the clock at the end says nothing of the first try.
     const firstTryFailed: number[] = [];
@@ -651,26 +671,8 @@ describe('login, when the SaaS says one of its steps is not coming', () => {
 
     const failure = await outcomeOf(page);
 
-    const unanswered = `^Error: login on ${HUB}: the SaaS did not answer the code \\(net::ERR_CONNECTION_RESET\\) \\(code ${MAILED} for `;
     expect(failure).toMatch(new RegExp(unanswered));
     expect(failure).not.toContain('code rejected');
-    expect(went, 'one more try, from next again').toEqual([target, target]);
-    expect(firstTryFailed).toHaveLength(1);
-    expect(firstTryFailed[0], 'the first try failed within a few seconds of the page').toBeLessThan(5_000);
-    expect(listening(), 'listeners left on the page').toBe(0);
-  });
-
-  it('a sign-in its request gets no answer to (the connection refused): it did not answer the sign-in; one more try', async () => {
-    inATestOf(TEST_TIME);
-    const refused: Stop = { url: launch, form: 'sign-in', answers: { to: 'sign-in', failure: 'net::ERR_CONNECTION_REFUSED' } };
-    const trip = (): Goto => ({ stops: [...signingIn({}, {}, 'sign-in answer'), refused] });
-    const { page, went, clock, listening } = pageDoing([trip(), trip()]);
-    const firstTryFailed: number[] = [];
-    vi.spyOn(console, 'warn').mockImplementation(() => void firstTryFailed.push(clock()));
-
-    const failure = await outcomeOf(page);
-
-    expect(failure).toBe(`Error: login on ${HUB}: the SaaS did not answer the sign-in (net::ERR_CONNECTION_REFUSED)`);
     expect(went, 'one more try, from next again').toEqual([target, target]);
     expect(firstTryFailed).toHaveLength(1);
     expect(firstTryFailed[0], 'the first try failed within a few seconds of the page').toBeLessThan(5_000);
@@ -689,17 +691,7 @@ describe('login, when the SaaS says one of its steps is not coming', () => {
   });
 
   it('a script of the SaaS that fails on the network (its dev server restarting) is a refused connection: one more try, which signs in', async () => {
-    inATestOf(TEST_TIME);
-    const { page, went, listening } = pageDoing([
-      { stops: [{ url: launch, script: { failure: 'net::ERR_CONNECTION_REFUSED' } }] },
-      { stops: signingIn() },
-    ]);
-
-    await login(page, HUB, '/demo/items', OWNER);
-
-    expect(page.url()).toBe(target);
-    expect(went).toEqual([target, target]);
-    expect(listening(), 'listeners left on the page').toBe(0);
+    await endsOnNextAtTheSecondTry([{ stops: [{ url: launch, script: { failure: 'net::ERR_CONNECTION_REFUSED' } }] }, { stops: signingIn() }]);
   });
 });
 

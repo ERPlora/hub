@@ -69,6 +69,13 @@ async function signOutOfSaas(context: BrowserContext): Promise<void> {
   expect(res.status(), 'signed out of the SaaS (allauth answers 401: nobody signed in)').toBe(401);
 }
 
+/** What a login of the owner through the SaaS ends in, in `context`: «signed in», or the error it threw, as text. */
+const failureOf = async (context: BrowserContext): Promise<string> =>
+  login(await context.newPage(), A, '/demo/items', OWNER, JUMP).then(
+    () => 'signed in',
+    (error: unknown) => String(error),
+  );
+
 /** A login of the owner whose SaaS session then ends: the next login signs in with the SaaS's form and its code. */
 async function endSaasSession(browser: Browser): Promise<void> {
   const first = await hostPage(browser, A);
@@ -164,10 +171,7 @@ test('a code that gets no answer (its connection reset): the login says the SaaS
     await route.abort('connectionreset');
   });
   try {
-    const failure = await login(await context.newPage(), A, '/demo/items', OWNER, JUMP).then(
-      () => 'signed in',
-      (error: unknown) => String(error),
-    );
+    const failure = await failureOf(context);
     expect(dropped.length, 'codes sent').toBeGreaterThanOrEqual(1);
     expect(failure).toMatch(/: the SaaS did not answer the code \(net::ERR_CONNECTION_RESET\) \(code \d{6} for owner@example\.com, at .+\)/);
     expect(failure).not.toContain('code rejected');
@@ -190,10 +194,7 @@ test('a code the SaaS turns down: the login says «code rejected», what the Saa
     await route.fulfill({ response });
   });
   try {
-    const failure = await login(await context.newPage(), A, '/demo/items', OWNER, JUMP).then(
-      () => 'signed in',
-      (error: unknown) => String(error),
-    );
+    const failure = await failureOf(context);
     expect(answers, 'the SaaS answered the code').toEqual([400]);
     expect(failure).toMatch(/: code rejected, the SaaS answered 400 \(code \d{6} for owner@example\.com, at .+\): «.+»$/);
     expect(failure).not.toContain('did not answer');
