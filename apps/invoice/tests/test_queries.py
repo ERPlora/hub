@@ -1,8 +1,5 @@
 """Read operations of the invoice app (INVOICE-F14–F18, F20): the lists, the detail, the printable
 document, the series and their next number, the state of the numbering, its gaps and its book.
-
-Cases from the current product's tests: ``invoice_search_says_what_it_searches``, ``number_format``
-(the preview equals what the emission writes), ``setup_numbering`` and ``number_allocation``.
 """
 
 import datetime as dt
@@ -315,7 +312,7 @@ def test_the_next_number_previewed_is_the_one_the_emission_writes(issuer, today)
     assert InvoiceSeries.objects.get(pk=series.id).current_number == 1
 
 
-# What the assistant's card names a series and a refund by (FIX-HUB-INVOICE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS)
+# What the assistant's card names a series and a refund by
 
 
 def test_a_series_is_read_by_its_id_or_its_code_with_the_label_its_card_says(issuer, today):

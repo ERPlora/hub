@@ -1,11 +1,8 @@
-"""FIX-HUB-FLOW-PENDING-ANSWER-CARD-SHOWS-RAW-VALUES (FLOW-F29 step 1, FLOW-F38 step 4): the assistant's change that
-waits in «Waiting for your answer» painted each datum as the model sent it, in its details — «Services: [{}]», an
-amount in cents, «True», a day and a time as ISO 8601 writes them — and was written once, for nobody, when it was
-asked: it could neither name a record nor say the business's hour. Now each datum comes with the question as the
-assistant's confirmation card in the chat says it (BASE-F97 step 2, ``base.assistant.card``), read for whoever opens
-the inbox: a moment in their language at the business's hour, a value of a closed list by its label, an amount in
-cents marked as money, a yes or no as one, a list as a list, and a record by its name only when they may read it —
-never by its id. The details keep only what the assistant said.
+"""FLOW-F29 step 1, FLOW-F38 step 4: in the assistant's change that waits in «Waiting for your answer» each datum comes
+with the question as the assistant's confirmation card in the chat says it (BASE-F97 step 2, ``base.assistant.card``),
+read for whoever opens the inbox: a moment in their language at the business's hour, a value of a closed list by its
+label, an amount in cents marked as money, a yes or no as one, a list as a list, and a record by its name only when they
+may read it — never by its id. The details keep only what the assistant said.
 """
 
 import datetime as dt
@@ -245,11 +242,10 @@ def test_a_question_an_automation_step_asks_has_no_data_of_a_change(clock):
 
 
 
-# --- The action it waits on (FIX-HUB-FLOW-PENDING-ANSWER-CARD-DOES-NOT-SAY-THE-ACTION) ------------------------------
-# The card was always titled «The assistant wants to change something in «Reservations»», a cancellation too: whoever
-# approved read the record, the reason and on whose behalf, never the action. Now the card says the action first, as
-# the History names it (``queries.action_label``), and its title, in the language of whoever reads it — also for a
-# question that was already waiting, since both come from the change it waits on, never from what was kept.
+# --- The action it waits on -----------------------------------------------------------------------------------------
+# The card says the action first, as the History names it (``queries.action_label``), and its title, in the language
+# of whoever reads it, never a bare «The assistant wants to change something in «Reservations»» — also for a question
+# that was already waiting, since both come from the change it waits on, never from what was kept.
 
 RESERVATION = "0192f0b2-4444-7000-8000-000000000004"
 

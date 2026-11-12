@@ -1,12 +1,11 @@
 <script setup lang="ts">
-// Inventory → Products (WORKBOOK «Productos», INVENTORY-F01–F05, F08, F09, F11, F13–F15, F20, F29), the
-// old `erp-inventory-products`: the live `inventory.product.list` in a server-side DataTable — Name, SKU,
-// Price, Stock («—» without stock control) and Status (a switch, «Yes»/«No», or «Not configured ·
-// Missing tax category», which opens the form; «Sold out» beside it) —, search, sort, the filters behind
-// the table's funnel (name, SKU, price and stock ranges, status; the old table's), 50 a page. «+», import
-// and export CSV; per row the sheet, the stock dialogs (physical products), edit, «Mark sold out» / «Put
-// back on sale» and delete; each only for whoever may. Writes come back through the stream; nothing here refetches. A refused row action (the
-// switch, delete, export) is said above the table: no dialog is open then.
+// Inventory → Products (WORKBOOK «Productos», INVENTORY-F01–F05, F08, F09, F11, F13–F15, F20, F29): the live
+// `inventory.product.list` in a server-side DataTable — Name, SKU, Price, Stock («—» without stock control) and Status
+// (a switch, «Yes»/«No», or «Not configured · Missing tax category», which opens the form; «Sold out» beside it) —,
+// search, sort, the filters behind the table's funnel (name, SKU, price and stock ranges, status), 50 a page. «+»,
+// import and export CSV; per row the sheet, the stock dialogs (physical products), edit, «Mark sold out» / «Put back on
+// sale» and delete; each only for whoever may. Writes come back through the stream; nothing here refetches. A refused
+// row action (the switch, delete, export) is said above the table: no dialog is open then.
 import {
   type DataTableAction,
   type DataTableActionEvent,
@@ -408,8 +407,7 @@ async function exportFile(): Promise<void> {
         <span data-testid="inventory-product-stock">{{ row.tracks_stock ? formatQuantity(row.stock, locale) : '—' }}</span>
       </template>
       <template #status="{ row }">
-        <!-- The chip is the cell's own box, never inside one that clips: the table measures its whole width
-             (FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED). -->
+        <!-- The chip is the cell's own box, never inside one that clips: the table measures its whole width. -->
         <ion-chip
           v-if="row.needs_tax_setup"
           color="warning"

@@ -1,5 +1,5 @@
-"""A run parked on something outside the Hub goes out as its own business, whichever way the worker reaches it (FLOW-F27,
-F37, F38; FIX-HUB-FLOW-RESUME-DUE-SENDS-A-PARKED-RUN-AS-THE-PLATFORM-HUB).
+"""A run parked on something outside the Hub goes out as its own business, whichever way the worker reaches it
+(FLOW-F27, F37, F38).
 
 «Ask the assistant» and «Call another system» park their run with its wait already over (``resume_at`` = now): nobody
 holds it yet. Two ways reach it: the outbox relay (``flow.run.parked`` → ``flow.run.call``) and the minute's sweep

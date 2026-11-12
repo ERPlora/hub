@@ -277,7 +277,7 @@ def test_a_chain_of_real_events_is_stopped_when_it_would_start_itself_again():
     assert Task.objects.count() == 2
 
 
-# ── Booking a table by the guest's phone (FIX-HUB-FLOW-STEP-RESERVATION-BY-PHONE-DENIED) ─────────────
+# ── Booking a table by the guest's phone ───────────────────────────────────────────────────────────────────────
 
 
 #: «Book a table» with what a call or a message gives: the guest's name and phone, never her card.

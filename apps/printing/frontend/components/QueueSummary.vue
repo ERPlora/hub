@@ -1,16 +1,16 @@
 <script setup lang="ts">
-// «Print queue» (PRINTING-F01; the old screen's queue zone): one card per role that has an active printer
-// or jobs (a new business sees none), with its state — «Ready», «Waiting, no printer», «No device» (jobs no
-// device set up here can print: where the bell's «Nothing is printing “…”» leads, it says why), «Device off» (jobs
-// that waited a minute while the device set up for them gave no news for 90 s: the bell's too), «With errors» —,
-// «Waiting: N · the oldest has waited 3 min» or «Nothing waiting», the failed ones and the printer it prints
-// on now (the chosen one, else the first active one: named, never counted — hub#1527). A role with jobs waiting for over a minute and no active printer raises the orange alert
-// with its cause. Nothing waiting, sent unconfirmed or failed: «All clear». Live: every job that changes re-runs
-// it; the ages and the alert move on by themselves every 30 s (`useNow`). «Device off» moves with the clock on the server
-// (a job reaching its minute, a device quiet for 90 s) with no event: while something waits and the page is in sight, the
-// summary is read once again every 30 s, the bell's pace (HubBell.vue), without reopening the stream; a reading older than
-// a live result that came meanwhile is dropped, and one that fails keeps the last (FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF).
-// A failed read says so, with «Retry», and never «All clear».
+// «Print queue» (PRINTING-F01): one card per role that has an active printer or jobs (a new business sees none), with
+// its state — «Ready», «Waiting, no printer», «No device» (jobs no device set up here can print: where the bell's
+// «Nothing is printing “…”» leads, it says why), «Device off» (jobs that waited a minute while the device set up for
+// them gave no news for 90 s: the bell's too), «With errors» —, «Waiting: N · the oldest has waited 3 min» or «Nothing
+// waiting», the failed ones and the printer it prints on now (the chosen one, else the first active one: named, never
+// counted). A role with jobs waiting for over a minute and no active printer raises the orange alert with its cause.
+// Nothing waiting, sent unconfirmed or failed: «All clear». Live: every job that changes re-runs it; the ages and the
+// alert move on by themselves every 30 s (`useNow`). «Device off» moves with the clock on the server (a job reaching
+// its minute, a device quiet for 90 s) with no event: while something waits and the page is in sight, the summary is
+// read once again every 30 s, the bell's pace (HubBell.vue), without reopening the stream; a reading older than a live
+// result that came meanwhile is dropped, and one that fails keeps the last. A failed read says so, with «Retry», and
+// never «All clear».
 import { InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { useLive, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonSpinner } from '@ionic/vue';
@@ -21,7 +21,7 @@ import { useT } from '../composables/useT';
 import { waited } from '../lib/format';
 import type { JobSummaryOut, UsageSummary } from '../operations';
 
-/** A job waiting longer than this on a role nobody prints is worth an alert (the old screen's minute). */
+/** A job waiting longer than this on a role nobody prints is worth an alert. */
 const ALERT_AFTER_MS = 60_000;
 
 const t = useT();

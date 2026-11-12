@@ -76,8 +76,7 @@ def test_placeholders_survive_the_translation():
 def test_the_data_of_a_list_a_price_and_a_rule_are_said_as_pricing_says_them():
     """A list and a rule are «activa» (both feminine), in a «divisa» as the screens say it, «desde» and «hasta» a day as
     their forms, and «cambiado el» or «por» whom: pricing's own words, never the earlier app's that also says them
-    («activo», «moneda», «vigente desde», «actualizado el»), in the admin and on the assistant's card
-    (FIX-HUB-PRICING-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP)."""
+    («activo», «moneda», «vigente desde», «actualizado el»), in the admin and on the assistant's card."""
     fields = {
         PriceList: ("currency", "valid_from", "valid_until", "is_active", "updated_at", "updated_by"),
         PriceItem: ("updated_at", "updated_by"),

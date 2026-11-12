@@ -87,7 +87,7 @@ def test_an_error_message_follows_the_language_of_the_request(client, make_user)
 def test_a_printer_and_a_job_say_their_own_words_in_spanish():
     """A printer is «activa» and a job «Cancelado», «cancelado el»: printing's words, never the ones of an earlier
     app that says the same English (auth's «activo», appointment's «Cancelada» and «cancelada el»), as the admin
-    shows them (FIX-HUB-PRINTING-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP)."""
+    shows them."""
     with translation.override("es"):
         said = {
             "is_active": str(models.Printer._meta.get_field("is_active").verbose_name),
@@ -100,8 +100,7 @@ def test_a_printer_and_a_job_say_their_own_words_in_spanish():
 @pytest.mark.django_db
 def test_a_job_cancelled_meanwhile_is_refused_in_printing_s_words(client, make_user):
     """Cancelling or sending back a job someone already cancelled says it is «cancelado» (a job), not appointment's
-    «cancelada»: the queue's cancel window and its notice show the server's refusal as it came
-    (FIX-HUB-PRINTING-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP)."""
+    «cancelada»: the queue's cancel window and its notice show the server's refusal as it came."""
     client.force_login(make_user("boss", host="a", role="hub_admin"))
 
     def post(path: str, data: dict):

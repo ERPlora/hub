@@ -1,6 +1,4 @@
-"""Models of the pricing app: price lists, their prices, and the automatic discount rules of a line.
-
-- ``PriceList`` is a set of prices other than the catalog's: for a customer group (or for everybody,
+"""- ``PriceList`` is a set of prices other than the catalog's: for a customer group (or for everybody,
   the general one), between two dates. Its code is unique whatever its case; at most one is general.
 - ``PriceItem`` is the price of a product of Inventory or a service of Services in a list, from a
   minimum quantity on (quantity breaks: the same article again with another minimum).
@@ -13,8 +11,7 @@ opaque id too, read from Customers' model: Customers deletes a group for real, a
 make that deletion read these tables, which a hub without Pricing does not have (the reaction to
 ``customer.group.deleted`` tidies up, events.py). Products and categories are only ever deleted
 logically by Inventory: their foreign keys cascade only when the platform's staff deletes a row in the
-admin. Phase 1 has no tenancy: every scope shares these tables; phase 2 moves them to each hub's
-database.
+admin.
 """
 
 from django.db import models

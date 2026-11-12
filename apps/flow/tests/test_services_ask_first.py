@@ -1,5 +1,4 @@
-"""Cancelling a booking only with a person's yes first (FIX-HUB-FLOW-ASK-ME-FIRST-CANNOT-GRANT-A-CANCELLATION;
-WORKBOOK FLOW-F12, FLOW-F28, FLOW-F37, FLOW-F38).
+"""Cancelling a booking only with a person's yes first (WORKBOOK FLOW-F12, FLOW-F28, FLOW-F37, FLOW-F38).
 
 What needs a person in front (``ai.risk == "high"``) is never an automation's, with one exception the market makes:
 cancelling a reservation may be granted to an «Ask the assistant» step that asks first («Ask me first»), so a guest
@@ -147,8 +146,8 @@ def test_whoever_grants_a_cancellation_may_cancel_themselves():
     ],
 )
 def test_what_is_not_cancelling_a_booking_needs_a_person_in_front_even_asking_first(name):
-    # Seating is done at the door (FIX-HUB-FLOW-STEP-RESERVATION-BY-PHONE-DENIED); erasing, a no-show (it may charge
-    # the deposit) and money or fiscal records are never decided from an inbox.
+    # Seating is done at the door; erasing, a no-show (it may charge the deposit) and money or fiscal records are never
+    # decided from an inbox.
     with pytest.raises(InvalidPayload) as refused:
         run("flow.flow.create", document(assistant(tools=[name])))
     assert refused.value.code in ("flow.high_risk", "invalid_payload")
@@ -159,7 +158,7 @@ def test_what_is_not_cancelling_a_booking_needs_a_person_in_front_even_asking_fi
 
 
 def test_what_is_done_in_person_stays_out_even_were_it_listed_to_ask_first(monkeypatch):
-    # FIX-HUB-FLOW-STEP-RESERVATION-BY-PHONE-DENIED stays: the exception only reaches what is high risk, never seating.
+    # The exception only reaches what is high risk, never seating.
     monkeypatch.setattr(queries, "ASK_FIRST", queries.ASK_FIRST | {"reservation.reservation.seat"})
     with pytest.raises(InvalidPayload) as refused:
         run("flow.flow.create", document(assistant(tools=["reservation.reservation.seat"])))
