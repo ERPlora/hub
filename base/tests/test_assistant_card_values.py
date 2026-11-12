@@ -995,6 +995,7 @@ def test_a_mark_read_with_the_data_beside_it_is_sound(monkeypatch, dish_reads):
             "is left unread with dish_id, which its own object does not have",
         ),
         ({**A_DISH["refers"], "unless": "table"}, str, "is not a read, by and name"),
+        ({**A_DISH["refers"], "unless": [1]}, str, "is not a read, by and name"),
     ],
     ids=[
         "a datum its read does not take",
@@ -1004,6 +1005,7 @@ def test_a_mark_read_with_the_data_beside_it_is_sound(monkeypatch, dish_reads):
         "no yes",
         "left unread with a datum its object does not have",
         "unless no list",
+        "unless a list of no names",
     ],
 )
 def test_a_mark_read_with_the_data_beside_it_is_checked_at_start(monkeypatch, dish_reads, refers, kind, why):
