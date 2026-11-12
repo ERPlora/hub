@@ -884,6 +884,48 @@ def test_the_movements_of_a_package_are_its_sessions_and_adjustments_most_recent
     assert [row.id for row in second_page.rows] == [first.id]
 
 
+def test_a_session_of_the_movements_says_the_professional_who_did_it(tax):
+    # flow: SERVICE-F19, SERVICE-F21 (hub#1236): a session spent saying who did it shows her, like its customer; one
+    # said by nobody and a courtesy show nobody. Before, MovementOut had no professional at all.
+    cut = make_service("Cut", tax=tax)
+    package = make_package("Bono", [cut], max_uses=5)
+    grant = make_grant(package, make_customer("Lucía"), days_ago=3)
+    now = timezone.now()
+    ana = make_member("Ana", "López")
+    hers = make_redemption(grant, cut, member=ana, redeemed_at=now - dt.timedelta(days=2))
+    nobodys = make_redemption(grant, cut, redeemed_at=now - dt.timedelta(days=1))
+    courtesy = GrantAdjustment.objects.create(grant=grant, uses_delta=1, reason="gift", actor="boss", created_at=now)
+    rows = {row.id: row for row in run("service.movement.list", MovementListIn(package_id=package.id)).rows}
+    assert [(rows[key].member_id, rows[key].member_name) for key in (hers.id, nobodys.id, courtesy.id)] == [
+        (ana.id, "Ana López"),
+        (None, None),
+        (None, None),
+    ]
+
+
+def test_naming_the_professional_of_each_session_costs_no_query_per_row(tax):
+    # hub#1236: the professional is read with her session (select_related), so a voucher with many sessions done by
+    # many professionals reads in as many queries as one with a single session.
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    cut = make_service("Cut", tax=tax)
+    package = make_package("Bono", [cut], max_uses=10)
+    grant = make_grant(package, make_customer("Lucía"), days_ago=1)
+    make_redemption(grant, cut, member=make_member("Ana", "López"))
+
+    def reads() -> int:
+        with CaptureQueriesContext(connection) as queries:
+            run("service.movement.list", MovementListIn(package_id=package.id))
+        return len(queries)
+
+    reads()  # The first read also warms what the operation caches once.
+    one = reads()
+    for first_name in ("Bea", "Carla", "Dora"):
+        make_redemption(grant, cut, member=make_member(first_name, "Gil"))
+    assert reads() == one
+
+
 def test_the_vouchers_of_a_card_merged_into_it_show_before_the_relay_moves_them():
     # Customers flattens the chain of merged cards (one level): until the reaction to
     # customer.customer.merged moves the vouchers, they are read through the card that stays.

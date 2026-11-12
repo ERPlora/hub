@@ -1,7 +1,7 @@
 // SERVICE-F19 «Ver los movimientos de un bono»: the sheet «Voucher movements» of a package follows
 // `service.movement.list` live, the most recent first: each session Delivered (with its service, or «No
 // service on the line»), each Courtesy and Correction (with what moved, who and why), the date, the
-// customer and the sale.
+// customer, the professional who did a session (hub#1236) and the sale.
 import { StatusPill } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -25,6 +25,8 @@ const movement = (id: string, over: Partial<MovementOut> = {}): MovementOut => (
   customer_name: 'Lucía Pérez',
   service_id: 's1',
   service_name: 'Cut',
+  member_id: null,
+  member_name: null,
   sale_id: null,
   appointment_id: null,
   note: '',
@@ -46,7 +48,9 @@ async function setup(locale: 'en' | 'es' = 'en') {
   await settle();
   await m.live();
   const text = (id: string) => m.inDoc(`service-movements-row-${id}`)?.textContent ?? '';
-  return { ...m, text, show: (data: unknown) => m.result(OP, data) };
+  /** What a row reads on screen: the template's line breaks between its pieces collapse to one space. */
+  const line = (id: string) => text(id).replace(/\s+/g, ' ');
+  return { ...m, text, line, show: (data: unknown) => m.result(OP, data) };
 }
 
 describe('MovementsSheet', () => {
@@ -72,6 +76,21 @@ describe('MovementsSheet', () => {
     expect(s.text('m1')).toContain('Oct 10, 2026');
     expect(s.text('m0')).toContain('No service on the line');
     expect(s.text('m0')).toContain('Customer: cust-2');
+  });
+
+  // SERVICE-F19, SERVICE-F21 (hub#1236): a session spent saying who did it names her beside its customer; one said by
+  // nobody, and a courtesy, name nobody.
+  it('says the professional who did a session, beside its customer', async () => {
+    const s = await setup();
+    await s.show(
+      page([
+        movement('m2', { member_id: 'mem-1', member_name: 'Ana López', sale_id: 'sale-9' }),
+        movement('m1'),
+        movement('m0', { kind: 'adjusted', uses_delta: 1, service_id: null, service_name: null, actor: 'boss', reason: 'gift' }),
+      ]),
+    );
+    expect(s.line('m2')).toContain('Customer: Lucía Pérez · Professional: Ana López · Sale: sale-9');
+    expect([s.text('m1'), s.text('m0')].map((text) => text.includes('Professional'))).toEqual([false, false]);
   });
 
   it('paints every step of a session of the till: held, released, expired and given back with who and why', async () => {
@@ -116,5 +135,7 @@ describe('MovementsSheet', () => {
       'Entregada',
       'Entregada',
     ]);
+    await s.result(OP, page([movement('m9', { member_id: 'mem-1', member_name: 'Ana López' })]), {}, 2);
+    expect(s.line('m9')).toContain('Cliente: Lucía Pérez · Profesional: Ana López');
   });
 });
