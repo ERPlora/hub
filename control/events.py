@@ -1,8 +1,8 @@
 """Events of control (``<app>.<entity>.<fact>``): recorded by ``control.services`` in the transaction of their
-operation, in control's outbox. The database clusters of the Hub admin (round 2026-10-30b of PLAN-DB, decision 1):
+operation, in control's outbox. The database clusters of the Hub admin:
 no live query reacts to them yet; the outbox keeps them as the record of who registered, edited, closed or deleted a
-cluster, by its id and name (never its secret's values), who asked a hub to move or to be restored (hub#1198) or a
-separate copy of it (hub#1213), and who froze the platform for a database upgrade and lifted it (hub#930).
+cluster, by its id and name (never its secret's values), who asked a hub to move or to be restored or a
+separate copy of it, and who froze the platform for a database upgrade and lifted it.
 """
 
 CLUSTER_CREATED = "control.cluster.created"
@@ -18,20 +18,20 @@ HUB_MOVE_REQUESTED = "control.hub.move_requested"
 HUB_MOVE_CANCEL_REQUESTED = "control.hub.move_cancel_requested"
 
 #: A hub was asked to be put back as it was at a moment (``id``, ``slug``, ``from``: the temporary cluster its copy is
-#: on, ``at``: the moment; hub#1198); the worker restores it (``base.tenancy.restore``).
+#: on, ``at``: the moment); the worker restores it (``base.tenancy.restore``).
 HUB_RESTORE_REQUESTED = "control.hub.restore_requested"
 
 #: A hub was asked for a separate copy of its database as it was at a moment (``id``: the copy's, ``hub``, ``slug``,
-#: ``from``: the temporary cluster, ``at``, ``database``: the copy's name; hub#1213); the worker makes it
+#: ``from``: the temporary cluster, ``at``, ``database``: the copy's name); the worker makes it
 #: (``base.tenancy.restore``) and the business is never closed.
 HUB_RESTORE_ASIDE_REQUESTED = "control.hub.restore_aside_requested"
 
 #: The staff asked to bring back into a business what one of its separate copies holds and it lacks (``id``: the
-#: recovery, ``copy``, ``hub``, ``slug``, ``apps``: the labels asked; hub#1257); the worker does it
+#: recovery, ``copy``, ``hub``, ``slug``, ``apps``: the labels asked); the worker does it
 #: (``base.tenancy.recovery``), each record created by its app's own operation.
 COPY_RECOVERY_REQUESTED = "control.copy.recovery_requested"
 
-#: The platform was frozen for a database upgrade (``reason``; hub#930): the worker makes, drops and moves no database
+#: The platform was frozen for a database upgrade (``reason``): the worker makes, drops and moves no database
 #: and ``migrate_hubs`` refuses to start until it is lifted.
 FREEZE_STARTED = "control.freeze.started"
 #: Its freeze was lifted (``frozen_since``: when it started): what waited is done from the worker's next tick.

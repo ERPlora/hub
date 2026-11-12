@@ -1,4 +1,4 @@
-"""``manage.py create_platform_hub [--execute]``: bring up ERPlora's own hub, repeatably (PLAN-SAAS §4).
+"""``manage.py create_platform_hub [--execute]``: bring up ERPlora's own hub, repeatably.
 
 ERPlora's platform hub issues ERPlora's invoices to its customers, posted by the SaaS to
 ``/internal/platform/invoices`` (``base.internal``). Ported from the old SaaS's ``ensure_platform_hub``: idempotent and a
@@ -115,7 +115,7 @@ class Command(BaseCommand):
                 f"Set {', '.join(missing)}: the platform hub's issuer. Nothing was written."
             )
         # What ``verifactu.config.follow_deployment`` pins on a new hub (``queries.production_open``): production only
-        # on the prod deployment once ERPlora opens real filing there (working-rules §15).
+        # on the prod deployment once ERPlora opens real filing there.
         environment = (
             "production"
             if settings.ERPLORA_ENVIRONMENT == "prod"

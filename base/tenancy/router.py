@@ -1,4 +1,4 @@
-"""``TenantRouter``: control's models to ``default``, a hub's to its hub's alias (PLAN-DB §4; plan 2026-10-22, step 5).
+"""``TenantRouter``: control's models to ``default``, a hub's to its hub's alias.
 
 Second in ``DATABASE_ROUTERS``, after ``base.routers.SharedRouter`` (the SaaS's ``shared`` schema). It reads the
 database class of each model from ``base.tenancy.inventory`` and the active context from ``base.tenancy.context``:
@@ -13,16 +13,16 @@ own default does; a control object's hint (a reverse relation from a user) never
 does.
 
 A model of a module whose tables the hub's database does not have yet answers :class:`~base.tenancy.context.
-AppNotCreated`, the 404 ``app_inactive`` of a module that is off, before any SQL (PLAN-DB §4; spec 2026-10-11 «tablas al
-activar» §9): what no operation's gate covers, an ``events.py``, the admin, a task. The row the context holds says so
-for free on every query (``base.activation.has_tables``); the migrator's ``…__ddl`` alias, which makes those tables,
-is never asked. Not covered, as that spec says: raw SQL and the JOIN of a ``select_related`` to another app. A delete's
-walk of its relations asks with ``.using()`` and never comes here: :mod:`base.tenancy.deletion` passes those over.
+AppNotCreated`, the 404 ``app_inactive`` of a module that is off, before any SQL: what no operation's gate covers, an
+``events.py``, the admin, a task. The row the context holds says so for free on every query
+(``base.activation.has_tables``); the migrator's ``…__ddl`` alias, which makes those tables, is never asked. Not
+covered: raw SQL and the JOIN of a ``select_related`` to another app. A delete's walk of its relations asks with
+``.using()`` and never comes here: :mod:`base.tenancy.deletion` passes those over.
 
 ``allow_relation`` compares databases, not aliases (``hub_x`` and ``hub_x__ddl`` are one database). ``allow_migrate``:
 control's models (and the outbox's, contextual) on ``default``; a hub's only on a migrator's ``…__ddl`` alias, never on
-``default``: since S5 control holds control's tables alone (phase 1's businesses got their own databases,
-``base.tenancy.cut``; the tables they left in control are never migrated again, ``control/0007`` renames them).
+``default``: control holds control's tables alone (every business got its own database, ``base.tenancy.cut``; the
+tables they left in control are never migrated again, ``control/0007`` renames them).
 """
 
 from django.db import DEFAULT_DB_ALIAS, connections

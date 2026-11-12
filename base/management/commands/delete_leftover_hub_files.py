@@ -1,8 +1,8 @@
-"""``manage.py delete_leftover_hub_files``: the files the hubs gone before hub#781 left in the store, deleted once
-(hub#785; PLAN-DB §6 «Baja», step 4).
+"""``manage.py delete_leftover_hub_files``: the files left in the store by hubs purged before a purge deleted a hub's
+files, deleted once.
 
-Since hub#781 a purge deletes the hub's files after its database (``base.files.delete_hub_files``, BASE-F109 and
-PUBLIC-F34), but a row already ``purged`` never goes through the purge again, so what it kept stayed. This finds each
+A purge deletes the hub's files after its database (``base.files.delete_hub_files``, BASE-F109 and PUBLIC-F34), but a
+row already ``purged`` never goes through the purge again, so whatever it kept from before stayed. This finds each
 top folder of the hub file store named as a hub's prefix (``hub-<hex>``) whose hub is gone for good: ``purged``, or with
 no row in the registry any more (a demo's tombstone, forgotten after its days; ``base.services.gone_hubs``). Every other
 status keeps its files, anything at the top that is no hub's prefix (``shared/``, ``_inventory/``) is never looked
