@@ -160,7 +160,8 @@ test.beforeAll(async ({ browser }) => {
   business = await businessOf(owner);
   memberId = await joins(owner, employee, business);
   origin = STACK.hub(business.slug);
-  // A business is born with every app off (PLAN-HUB round 2026-10-27): its owner turns on Demo, where the employee works.
+  // A business is born with every app off but Taxes (PLAN-HUB rounds 2026-10-27 and 2026-11-07): its owner turns on Demo,
+  // where the employee works.
   await login(owner.page, origin, '/apps', owner.credentials);
   await turnOn(owner.context, origin, 'demo');
   tab = await employee.context.newPage();

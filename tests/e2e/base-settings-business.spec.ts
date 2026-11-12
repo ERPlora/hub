@@ -12,15 +12,27 @@
 //   - BASE-G98 on the Home: the amounts of «Sales, last 7 days» are in the business's currency — euros in the business
 //     in Spain, złoty in a second one in Poland (`APP-BASE-6-BASE-G98-HOME-<width>`) —, never a fixed euro.
 // Each flow leaves its capture `APP-BASE-6-<key>-<width>`.
-import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { api, type Credentials, horizontalOverflow, login, MAIL_DIR, psql, SAAS, shot, shown, turnOn, untilStill } from './helpers';
-import { readMailCode } from './mail';
+import {
+  api,
+  businessOnSaas,
+  horizontalOverflow,
+  login,
+  SAAS,
+  type SaasBusiness,
+  type SaasOwner,
+  saasPost,
+  shot,
+  shown,
+  signUpOnSaas,
+  turnOn,
+  untilStill,
+} from './helpers';
 import { STACK } from './stack';
 
 test.use({ actionTimeout: 30_000 });
 
-const PASSWORD = 'Masa-madre-y-centeno-26';
 const SIZES = [
   { name: '390', width: 390, height: 844 },
   { name: '834', width: 834, height: 1112 },
@@ -29,58 +41,12 @@ const SIZES = [
 /** What the SaaS's steps wait (its pushes to this Hub happen after its COMMIT). */
 const SAAS_STEP = 30_000;
 
-interface Owner {
-  context: BrowserContext;
-  page: Page;
-  credentials: Credentials;
-}
-
-interface Business {
-  id: string;
-  slug: string;
-}
-
-/** A fresh account signed up on the SaaS's «Create account», its address proven with the mailed code; signed in. */
-async function signUp(browser: Browser): Promise<Owner> {
-  const credentials = { email: `e2e-settings-${Date.now()}@example.com`, password: PASSWORD };
-  const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } });
-  const page = await context.newPage();
-  await page.goto(`${SAAS}/launch?tab=signup`);
-  const form = page.getByTestId('login-form');
-  await expect(page.getByTestId('login-submit')).toHaveText('Create account');
-  await form.getByTestId('login-email').locator('input').fill(credentials.email);
-  await form.getByTestId('login-password').locator('input').fill(credentials.password);
-  const since = Date.now() - 50;
-  await form.getByTestId('login-submit').click();
-  await expect(page).toHaveURL(/\/verify-email$/);
-  const code = await readMailCode({ dir: MAIL_DIR, to: credentials.email, since, timeout: SAAS_STEP });
-  await page.getByTestId('code').locator('input').fill(code);
-  await page.getByTestId('verify-email-submit').click();
-  await expect(page).toHaveURL(/\/launch$/);
-  return { context, page, credentials };
-}
-
-/** A POST to the SaaS's API as `context`'s account, with the SaaS's CSRF token. */
-async function saasPost(context: BrowserContext, path: string, data: unknown) {
-  const host = new URL(SAAS).hostname;
-  const csrf = (await context.cookies(SAAS)).find((c) => c.name === 'csrftoken' && c.domain === host)?.value;
-  if (!csrf) throw new Error(`POST ${path}: no csrftoken of the SaaS (sign in first)`);
-  return context.request.post(`${SAAS}/api${path}`, { headers: { 'X-CSRFToken': csrf }, data });
-}
-
-/** The owner's new business in `country`, once the SaaS registered it in this Hub and heard it is ready. */
-async function businessOf(owner: Owner, country = 'ES'): Promise<Business> {
-  const created = await saasPost(owner.context, '/hubs/businesses', { name: `Ajustes ${Date.now().toString(36)}`, country });
-  expect(created.status(), await created.text()).toBe(201);
-  const business = (await created.json()) as Business;
-  await expect
-    .poll(() => psql(`SELECT status FROM base_hub WHERE id = '${business.id}'`), { timeout: SAAS_STEP, message: 'registered here' })
-    .toBe('ready');
-  return business;
-}
+/** The owner's new business in `country`, created on erplora.com (`businessOnSaas`). */
+const businessOf = (owner: SaasOwner, country = 'ES'): Promise<SaasBusiness> =>
+  businessOnSaas(owner, { name: `Ajustes ${Date.now().toString(36)}`, country });
 
 /** The business's language, changed on erplora.com as its panel changes it (HUBS-F15). */
-async function changeLanguage(owner: Owner, business: Business, language: 'en' | 'es'): Promise<void> {
+async function changeLanguage(owner: SaasOwner, business: SaasBusiness, language: 'en' | 'es'): Promise<void> {
   const changed = await saasPost(owner.context, '/hubs/businesses/update', { id: business.id, language });
   expect(changed.status(), await changed.text()).toBe(200);
 }
@@ -115,13 +81,14 @@ test('BASE-G96 BASE-G97 BASE-G98 BASE-G99 — Settings › Business and Printing
   browser,
 }) => {
   test.setTimeout(240_000);
-  const owner = await signUp(browser);
+  const owner = await signUpOnSaas(browser, 'settings');
   const business = await businessOf(owner);
   const origin = STACK.hub(business.slug);
   await changeLanguage(owner, business, 'es');
   const page = await owner.context.newPage();
   await login(page, origin, '/', owner.credentials);
-  // A business is born with every app off (PLAN-HUB round 2026-10-27): the ones these screens open, and the Home's sales;
+  // A business is born with every app off but Taxes (PLAN-HUB rounds 2026-10-27 and 2026-11-07): the ones these screens
+  // open, and the Home's sales;
   // the page reads its session again, whose menu has them now.
   await turnOn(owner.context, origin, 'sale', 'invoice', 'printing');
   await page.reload();
@@ -208,13 +175,13 @@ test('BASE-G96 BASE-G97 BASE-G98 BASE-G99 — Settings › Business and Printing
 
 test('BASE-G98 — the Home of a business in Poland writes its amounts in złoty, never in euros', async ({ browser }) => {
   test.setTimeout(240_000);
-  const owner = await signUp(browser);
+  const owner = await signUpOnSaas(browser, 'settings');
   const business = await businessOf(owner, 'PL');
   const origin = STACK.hub(business.slug);
   await onlyTheWeek(owner.context);
   const page = await owner.context.newPage();
   await login(page, origin, '/', owner.credentials);
-  await turnOn(owner.context, origin, 'sale'); // born with every app off: the Home's week of sales
+  await turnOn(owner.context, origin, 'sale'); // born without Sales: the Home's week of sales
   if (process.env.E2E_SAVE_STORAGE_STATE) await owner.context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 
   // What Settings › Business says (its country's currency) and the server's seven days, in cents.
@@ -251,8 +218,11 @@ test('BASE-G98 — the Home of a business in Poland writes its amounts in złoty
   await atEverySize(page, ['BASE-G98-HOME'], async () => {
     await expect(amount).toHaveText(zloty[6]);
     await panel.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-    const overflow = await horizontalOverflow(page);
-    expect(overflow, `no sideways scroll at ${page.viewportSize()!.width}`).toBeLessThanOrEqual(0);
+    // Once the shell has laid itself out at the new size: right after the resize the bar's buttons of the wide layout
+    // are still there for a moment (hub#997's run caught it 3 times in 12); an overflow that stays still fails.
+    await expect
+      .poll(() => horizontalOverflow(page), { message: `no sideways scroll at ${page.viewportSize()!.width}` })
+      .toBeLessThanOrEqual(0);
   });
   await owner.context.close();
 });
