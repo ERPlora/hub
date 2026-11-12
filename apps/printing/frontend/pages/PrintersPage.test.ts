@@ -202,14 +202,14 @@ describe('PrintersPage by the clock', () => {
   });
 });
 
-describe('PrintersPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('PrintersPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });
 
-describe('the note says what is true where it is read (printing#37)', () => {
+describe('the note says what is true where it is read', () => {
   afterEach(() => applySurface('web'));
 
   it('a browser is told it cannot reach printers; inside the app nobody is told about a browser', async () => {
