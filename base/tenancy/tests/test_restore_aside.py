@@ -385,20 +385,66 @@ class TestTwoWorkers:
         # Its new holder's: never dropped here.
         assert marker(aside.db_name) == [AS_THEN]
 
+    def test_a_lease_lost_while_it_dumps_never_touches_what_its_new_holder_made(self, asides, monkeypatch):
+        hub, aside = a_hub_with_its_copy(asides)
+        real = move._dump
+
+        def taken(name, cluster, path, heartbeat, cancelled=None):
+            real(name, cluster, path, heartbeat, cancelled)
+            # Another worker took it meanwhile and already made its own database of the copy's name.
+            RestoredCopy.objects.filter(pk=aside.pk).update(lease_owner="other:1")
+            something_of_its_name(aside, hub)
+
+        monkeypatch.setattr(move, "_dump", taken)
+
+        run(asides)
+
+        left = fresh(aside)
+        assert (left.status, left.lease_owner, left.last_error) == ("copying", "other:1", "")
+        assert has_what_was_there(aside)
+
+    def test_a_failure_after_the_lease_was_lost_drops_nothing_and_notes_nothing(self, asides, monkeypatch):
+        aside = a_hub_with_its_copy(asides)[1]
+
+        def taken_then_broken(path, name, cluster, heartbeat, cancelled=None):
+            RestoredCopy.objects.filter(pk=aside.pk).update(lease_owner="other:1")
+            raise move.MoveFailed("move_restore_failed", "it broke on purpose")
+
+        monkeypatch.setattr(move, "_restore", taken_then_broken)
+
+        run(asides)
+
+        left = fresh(aside)
+        assert (left.status, left.lease_owner, left.last_error) == ("copying", "other:1", "")
+        # What has the copy's name is its new holder's to drop and make anew: still there.
+        assert aside.db_name in databases()
+
+    def test_a_lease_lost_while_a_failed_copy_is_dropped_leaves_the_row_to_its_new_holder(self, asides, monkeypatch):
+        aside = a_hub_with_its_copy(asides)[1]
+        failing: list[bool] = []
+        real = move._drop_copy
+
+        def broken(*args, **kwargs):
+            failing.append(True)
+            raise move.MoveFailed("move_restore_failed", "it broke on purpose")
+
+        def dropped_then_taken(name, cluster):
+            real(name, cluster)
+            if failing:
+                RestoredCopy.objects.filter(pk=aside.pk).update(lease_owner="other:1")
+
+        monkeypatch.setattr(move, "_restore", broken)
+        monkeypatch.setattr(move, "_drop_copy", dropped_then_taken)
+
+        run(asides)
+
+        left = fresh(aside)
+        assert (left.status, left.lease_owner, left.last_error) == ("copying", "other:1", "")
+
     def test_a_copy_cut_short_is_made_anew_on_the_next_pass(self, asides):
         hub, aside = a_hub_with_its_copy(asides)
         # A worker died after its clone: a database of the copy's name with something else in it, its lease run out.
-        with hubs._maintenance() as conn:
-            from psycopg import sql
-
-            control = tenancy_connections.control_name()
-            conn.execute(
-                sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(
-                    names.identifier(aside.db_name, control=control), names.identifier(hub.db_name, control=control)
-                )
-            )
-        with hubs._maintenance(aside.db_name) as conn:
-            conn.execute("CREATE SCHEMA left_over")
+        something_of_its_name(aside, hub)
         RestoredCopy.objects.filter(pk=aside.pk).update(
             lease_owner="gone:1", lease_until=timezone.now() - dt.timedelta(seconds=1)
         )
@@ -407,8 +453,29 @@ class TestTwoWorkers:
 
         assert fresh(aside).status == "made" and marker(aside.db_name) == [AS_THEN]
         # Made anew from the template: nothing of what was there is left, not only its tables.
-        with hubs._maintenance(aside.db_name) as conn:
-            assert not conn.execute("SELECT 1 FROM pg_namespace WHERE nspname = 'left_over'").fetchone()
+        assert not has_what_was_there(aside)
+
+
+def something_of_its_name(aside: RestoredCopy, hub: Hub) -> None:
+    """A database of the copy's name made by someone else, with something of its own in it."""
+    from psycopg import sql
+
+    control = tenancy_connections.control_name()
+    with hubs._maintenance() as conn:
+        conn.execute(
+            sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(
+                names.identifier(aside.db_name, control=control), names.identifier(hub.db_name, control=control)
+            )
+        )
+    with hubs._maintenance(aside.db_name) as conn:
+        conn.execute("CREATE SCHEMA someone_elses")
+
+
+def has_what_was_there(aside: RestoredCopy) -> bool:
+    if aside_absent(aside):
+        return False
+    with hubs._maintenance(aside.db_name) as conn:
+        return conn.execute("SELECT 1 FROM pg_namespace WHERE nspname = 'someone_elses'").fetchone() is not None
 
 
 class TestTheCopiesGoAfterTheirDays:
