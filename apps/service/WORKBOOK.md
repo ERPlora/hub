@@ -261,7 +261,8 @@ Si falla: dentro del formulario, cada motivo debajo de su campo: un importe que 
 ha eliminado.»); una categoría fiscal que no existe o está desactivada («Esa categoría fiscal no
 existe en Impuestos o está desactivada.»); sin ninguna categoría fiscal, el aviso de Impuestos. Lo
 tecleado se conserva.
-Implicados: TAX-F01, BASE-F01
+Implicados: TAX-F01, BASE-F01, BASE-F114 (el personal de ERPlora recupera desde una copia aparte los servicios que se
+perdieron, cada uno por esta misma alta)
 
 ### SERVICE-F02 Editar un servicio
 <!-- origen: fi:modules/services#command-services-services-update-sql-transaccional fi:modules/services#query-services-services-get old:services/workflow/catalogo.md#services-f02 -->
@@ -1192,6 +1193,16 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
 - **Nombres únicos** entre los vivos, sin distinguir mayúsculas: categorías
   (`service_category_live_name_unique`) y bonos (`service_package_live_name_unique`); el servicio lo
   comprueba antes para dar el 409 y traduce la violación (dos guardados a la vez) al mismo 409.
+- **Recuperar desde una copia aparte** (BASE-F114, hub#1283): `apps.py` responde a la plataforma
+  (`recoverable_from_copy`, `base.tenancy.recovery`) con lo que devuelve una copia aparte del negocio: sus servicios en
+  oferta (`queries.services_in_copy`, por SQL sobre los nombres del modelo: la copia no es un negocio y no tiene alias)
+  que el negocio no tiene (`queries.services_not_in_business`), cada uno creado por `service.service.create` con la clave
+  de su categoría fiscal y su categoría si el negocio aún la tiene. Un servicio de la copia lo tiene el negocio
+  (`queries.services_in_business`, `{id en la copia: id en el negocio}`) si es el mismo, en oferta o archivado, o uno
+  hecho otra vez: el mismo nombre (sin distinguir mayúsculas ni espacios) en la categoría a la que volvería. Es lo que
+  usa la recuperación de otra app (Citas, hub#1284) para emparejar un servicio de la copia con el del negocio. Lee desde
+  `0001_initial`; una migración que quite o renombre una de sus columnas cambia también `services_in_copy` y su
+  `reads_since`. Tests: `tests/test_recovery.py`, también de punta a punta con la base del negocio y su copia.
 - **Saldo de un bono vendido**: usos = los congelados + la suma de los ajustes; usadas = las sesiones
   entregadas más las reservadas cuyo plazo no ha vencido; quedan = usos − usadas (sin límite si los
   usos congelados son nulos); caduca = compra + vigencia congelada + días regalados. Se calcula al
@@ -1325,6 +1336,9 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   sus sesiones. Le pasa también a los vendidos antes de esa cifra.
 - **Importar servicios desde un fichero**: como en el producto actual, el alta de golpe es del
   asistente y la API.
+- **Lo que no vuelve con un servicio recuperado desde una copia aparte** (BASE-F114): su imagen (hub#1319), sus
+  profesionales con su precio y su duración propios (hub#1322) y la categoría que el negocio eliminó después (vuelve
+  «Sin categoría», hub#1323).
 
 ## Lo que NO hace, a propósito
 

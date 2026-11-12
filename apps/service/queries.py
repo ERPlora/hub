@@ -1725,7 +1725,7 @@ def _adjustment_row(ctx: OperationContext, adjustment: GrantAdjustment) -> dict:
 
 #: What ``service.service.create`` takes of a service of a separate copy, each a column since ``0001_initial``
 #: (``services_in_copy``): all of it but its category and its tax category, which the business names its own way. Not
-#: its photo (``service/services/…``, a file the copy does not hold) nor who performs it (SERVICE-F31, hub#1320).
+#: its image (hub#1319) nor who performs it (SERVICE-F31, hub#1322).
 COPY_FIELDS = (
     "name",
     "pricing_type",
@@ -1792,7 +1792,7 @@ def services_not_in_business(services: list[dict]) -> list[dict]:
     ``services_in_business``), in their order, each as ``service.service.create`` takes it here, with its ``id`` there:
     the key of its tax category (Taxes never deletes one; one turned off since is the create's to refuse, and without
     one it takes the settings') and its category while the business still has it (one deleted since leaves it with
-    none, SERVICE-F08)."""
+    none, SERVICE-F08; hub#1323)."""
     held = services_in_business(services)
     lacking = [one for one in services if one["id"] not in held]
     keys = dict(TaxCategory.objects.filter(pk__in={one["tax_category_id"] for one in lacking}).values_list("pk", "key"))
