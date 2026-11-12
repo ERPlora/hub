@@ -2,13 +2,14 @@
  * The Hub admin's own sheet for control's lists (hubs.erplora.com/admin), loaded by a ModelAdmin's Media; never a
  * style in a template.
  *
- * Recoveries › results (hub#1308, BASE-F114): a result can hold a word longer than a phone is wide (why a recovery
- * failed names its copy's database, «hub_<hex>_copy_<hex>», in one piece). Inside Django's list box (`.results`,
- * `overflow-x: auto`) that word widened the table and the list asked to be scrolled sideways at 375 and 768 px. It
- * breaks inside its cell instead, as the admin's own long texts do (`word-break: break-word` of its history and docs
- * tables, `overflow-wrap: break-word` of a read-only field); `anywhere` also lets the table give the column less than
- * that word, which `break-word` does not, and words that fit stay whole.
+ * Recoveries › results and Separate copies › last error: why a recovery or a copy failed names a copy's database,
+ * «hub_<hex>_copy_<hex>», in one piece, a word longer than a phone is wide. Inside Django's list box (`.results`,
+ * `overflow-x: auto`) that word widened the table and the list asked to be scrolled sideways. It breaks inside its cell
+ * instead, as the admin's own long texts do (`word-break: break-word` of its history and docs tables,
+ * `overflow-wrap: break-word` of a read-only field); `anywhere` also lets the table give the column less than that
+ * word, which `break-word` does not, and words that fit stay whole.
  */
+#result_list td.field-last_error,
 #result_list td.field-outcome {
   overflow-wrap: anywhere;
 }
@@ -31,5 +32,15 @@
   #changelist-filter {
     width: 100%;
     margin: 30px 0 0;
+  }
+}
+
+/*
+ * On a phone a header of more than one word may take two lines: a list's headers in one line each («se guarda hasta»,
+ * «último error») are wider than the phone. Wider, they keep their line.
+ */
+@media (max-width: 767px) {
+  #changelist table thead th {
+    white-space: normal;
   }
 }

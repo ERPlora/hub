@@ -108,6 +108,11 @@ def utc(moment: dt.datetime) -> str:
     return f"{moment.astimezone(dt.UTC):%Y-%m-%d %H:%M} UTC"
 
 
+def copy_said(copy: RestoredCopy) -> str:
+    """A separate copy in a list: its business and its moment on two lines, so a phone keeps room for the rest."""
+    return format_html("{}<br>{}", copy.hub.slug, utc(copy.restore_point))
+
+
 def no_limit() -> str:
     return pgettext("cluster limit", "no limit")
 
@@ -609,9 +614,9 @@ class RestoredCopyAdmin(AsksFirst, base_admin.ReadOnlyAdmin):
 
     actions = ["recover_into_the_business"]
 
-    # What the staff looks for at a glance; its database (searchable), who asked, when, from where and on which cluster
-    # are on its page: a database's name is 40-odd characters in one piece, which pushes the rest out of sight.
-    list_display = ("hub", "moment", "status", "kept_until", "last_error")
+    # What the staff looks for at a glance, in four columns a phone shows whole; its database (searchable), who asked,
+    # when, from where and on which cluster are on its page: a database's name is 40-odd characters in one piece.
+    list_display = ("made_from", "status", "kept_until", "last_error")
     list_filter = ("status",)
     list_select_related = ("hub", "cluster")
     search_fields = ("hub__slug", "db_name")
@@ -629,6 +634,14 @@ class RestoredCopyAdmin(AsksFirst, base_admin.ReadOnlyAdmin):
         "last_error",
     )
     readonly_fields = fields
+
+    class Media:
+        # A long last error breaks inside its cell and, up to a tablet's width, the filter goes under the list.
+        css = {"all": ["control/admin.css"]}
+
+    @admin.display(description=gettext_lazy("separate copy"), ordering="restore_point")
+    def made_from(self, copy: RestoredCopy) -> str:
+        return copy_said(copy)
 
     @admin.display(description=pgettext_lazy("restore", "Moment"), ordering="restore_point")
     def moment(self, copy: RestoredCopy) -> str:
@@ -706,8 +719,7 @@ class CopyRecoveryAdmin(base_admin.ReadOnlyAdmin):
 
     @admin.display(description=gettext_lazy("separate copy"), ordering="copy__restore_point")
     def made_from(self, recovery: CopyRecovery) -> str:
-        """Its copy's business and moment, on two lines: on a phone the results' column keeps the room."""
-        return format_html("{}<br>{}", recovery.copy.hub.slug, utc(recovery.copy.restore_point))
+        return copy_said(recovery.copy)
 
     @admin.display(description=pgettext_lazy("recovery", "what"))
     def what(self, recovery: CopyRecovery) -> str:

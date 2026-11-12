@@ -834,6 +834,49 @@ class TestRestoreToASeparateCopy:
         assert client.post(f"{COPIES}{copy.pk}/delete/", {"post": "yes"}, HTTP_HOST=PLATFORM).status_code == 403
         assert RestoredCopy.objects.filter(pk=copy.pk).exists()
 
+    def test_each_copy_says_its_business_and_moment_on_two_lines_as_recoveries_do(self, client, root):
+        """Five columns in one line each do not fit a phone (375 px), even with the last error broken: its business and
+        moment share the first cell, the one Recoveries shows for the same copy, and the last error keeps the room."""
+        from control.models import RestoredCopy
+
+        copy = self.a_copy(self.a_hub("acme"), status=RestoredCopy.Status.MADE, made_at=AT_MOMENT)
+
+        listed = page(client, COPIES)
+
+        assert re.findall(r'<th scope="col"[^>]*class="([^"]*)"', listed) == [
+            "action-checkbox-column",
+            "sortable column-made_from",
+            "sortable column-status",
+            "column-kept_until",
+            "sortable column-last_error",
+        ]
+        assert TestRecoverIntoTheBusiness.copy_cell(copy) in row_of(listed, ">acme<")
+
+    def test_a_long_last_error_breaks_inside_its_cell_by_the_sheet_copies_load(self, client, root):
+        """Why a copy could not be made names its database in one piece: Separate copies load control's admin sheet,
+        whose rule on the last error's cells breaks it into lines there instead of pushing the list sideways on a
+        phone or a tablet (hub#1345). The browser measures it at 375, 768, 820 and 1280 px
+        (tests/e2e/base-copies-aside-long-error.spec.ts); this keeps the sheet loaded and its rule on the cells the list
+        draws."""
+        from pathlib import Path
+
+        from django.contrib.staticfiles import finders
+        from django.templatetags.static import static
+
+        from control.models import RestoredCopy
+
+        copy = self.a_copy(self.a_hub("acme"), status=RestoredCopy.Status.FAILED)
+        copy.last_error = f"restore_aside_restore_failed: pg_restore into {copy.db_name} failed (exit 1)"
+        copy.save(update_fields=["last_error"])
+
+        listed = page(client, COPIES)
+
+        assert f'href="{static("control/admin.css")}"' in listed
+        assert 'class="field-last_error"' in row_of(listed, ">acme<")
+        sheet = Path(finders.find("control/admin.css")).read_text()
+        rule = re.search(r"([^{}]*)\{[^}]*overflow-wrap:\s*anywhere", sheet)
+        assert rule and "#result_list td.field-last_error" in rule.group(1)
+
 
 class TestRecoverIntoTheBusiness:
     """«Recover into the business…» on Separate copies (hub#1257, BASE-F114): a confirmation page with what the apps
