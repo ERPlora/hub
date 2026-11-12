@@ -31,6 +31,10 @@
       "variable": "Variable",
       "free": "Gratis"
     },
+    "counts": {
+      "sessions": "{count} sesión | {count} sesiones",
+      "days": "{count} día | {count} días"
+    },
     "tax": {
       "exempt": "exento"
     },
@@ -65,7 +69,7 @@
       "archive": {
         "title": "Archivar servicio",
         "message": "{name} — dejará de ofrecerse y de poder reservarse. Se conservan su histórico y las citas ya reservadas.",
-        "upcoming": "{count} cita(s) próxima(s) siguen usando este servicio. Conservan su reserva, precio y duración; solo dejan de admitirse reservas nuevas.",
+        "upcoming": "{count} cita próxima sigue usando este servicio. Conserva su reserva, precio y duración; solo dejan de admitirse reservas nuevas. | {count} citas próximas siguen usando este servicio. Conservan su reserva, precio y duración; solo dejan de admitirse reservas nuevas.",
         "confirm": "Archivar"
       },
       "restoreError": "No se pudo restaurar el servicio",
@@ -136,7 +140,7 @@
       "delete": {
         "title": "Eliminar categoría",
         "message": "{name} — la categoría desaparece; los servicios que contiene se conservan, sin categoría.",
-        "impact": "{count} servicio(s) se quedarán sin categoría.",
+        "impact": "{count} servicio se quedará sin categoría. | {count} servicios se quedarán sin categoría.",
         "confirm": "Eliminar"
       }
     },
@@ -198,7 +202,7 @@
       },
       "delete": {
         "title": "Eliminar paquete",
-        "message": "{name} — el paquete y sus {count} línea(s) salen del catálogo y ya no se pueden vender; los bonos ya vendidos se siguen pudiendo gastar y los encuentras filtrando Estado por Eliminado.",
+        "message": "{name} — el paquete y su línea salen del catálogo y ya no se pueden vender; los bonos ya vendidos se siguen pudiendo gastar y los encuentras filtrando Estado por Eliminado. | {name} — el paquete y sus {count} líneas salen del catálogo y ya no se pueden vender; los bonos ya vendidos se siguen pudiendo gastar y los encuentras filtrando Estado por Eliminado.",
         "confirm": "Eliminar"
       }
     },
@@ -219,8 +223,8 @@
       "expires": "Caduca el {when}",
       "noExpiry": "No caduca",
       "expired": "Caducado",
-      "given": "Regalado después: +{uses} sesión(es), +{days} día(s)",
-      "corrected": "Corregido después: −{uses} sesión(es)",
+      "given": "Regalado después: +{sessions}, +{days}",
+      "corrected": "Corregido después: −{sessions}",
       "voidedBy": "Anulado por {who} el {when}",
       "redeem": "Gastar una sesión",
       "adjust": "Ajustar",
@@ -246,7 +250,7 @@
       "daysHelp": "Ahora caduca el {when}. Hasta 366.",
       "reason": "Motivo",
       "reasonHelp": "Obligatorio. Queda en el registro del bono, p. ej. «cerramos en agosto».",
-      "preview": "Tras el ajuste: quedan {remaining} sesión(es) · {expiry}",
+      "preview": "Tras el ajuste: queda {count} sesión · {expiry} | Tras el ajuste: quedan {count} sesiones · {expiry}",
       "previewUnlimited": "Tras el ajuste: sin límite de sesiones · {expiry}",
       "expiresOn": "caduca el {when}",
       "neverExpires": "no caduca",
@@ -291,8 +295,8 @@
       "professional": "Profesional: {name}",
       "sale": "Venta: {id}",
       "noService": "Sin servicio en la línea",
-      "given": "+{uses} sesión(es) · +{days} día(s)",
-      "correctedDelta": "−{uses} sesión(es) · +{days} día(s)",
+      "given": "+{sessions} · +{days}",
+      "correctedDelta": "−{sessions} · +{days}",
       "givenBy": "Regalado por {who}",
       "correctedBy": "Corregido por {who}",
       "releasedBy": "Liberada por {who}",
@@ -303,7 +307,7 @@
       "hint": "Se borró o se anonimizó su ficha de cliente. El bono conserva todo lo que se vendió: para devolver el dinero, busca la venta en Ventas; para anularlo si no se usó, ábrelo desde Bonos vendidos.",
       "empty": "Ningún bono se ha quedado sin cliente.",
       "error": "No se han podido cargar los bonos sin cliente.",
-      "remaining": "Quedan {remaining} sesión(es)",
+      "remaining": "Queda {count} sesión | Quedan {count} sesiones",
       "unlimited": "Sin límite de sesiones",
       "noValue": "Agotado",
       "deletedAt": "Cliente borrado el {when}",

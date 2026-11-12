@@ -112,6 +112,21 @@ describe('PackagesPage', () => {
     expect([s.wrapper.findComponent(PackageFormModal).props('open'), s.wrapper.findComponent(PackageFormModal).props('pkg')]).toEqual([true, ROWS[1]]);
   });
 
+  // hub#1147: a package of one line says «its line», one of several «its 2 lines», never «line(s)».
+  it.each([
+    { locale: 'en' as const, count: 1, opening: 'Bono 5 cortes — the package and its line leave the catalogue' },
+    { locale: 'en' as const, count: 2, opening: 'Bono 5 cortes — the package and its 2 lines leave the catalogue' },
+    { locale: 'es' as const, count: 1, opening: 'Bono 5 cortes — el paquete y su línea salen del catálogo' },
+    { locale: 'es' as const, count: 2, opening: 'Bono 5 cortes — el paquete y sus 2 líneas salen del catálogo' },
+  ])('«Delete» of a package of $count line ($locale): «$opening…»', async ({ locale, count, opening }) => {
+    const s = await setup({ locale });
+    const row = pkg({ item_count: count });
+    await s.show(page([row]));
+    s.table().vm.$emit('action', { actionId: 'delete', row });
+    await flush();
+    expect(s.wrapper.findComponent(ConfirmDialog).props('message')).toMatch(new RegExp(`^${opening}`));
+  });
+
   it('deletes after its confirmation, saying what happens to the vouchers sold', async () => {
     const s = await setup();
     await s.show(page(ROWS));
@@ -120,7 +135,7 @@ describe('PackagesPage', () => {
     const dialog = s.wrapper.findComponent(ConfirmDialog);
     expect([dialog.props('title'), dialog.props('message')]).toEqual([
       'Delete package',
-      'Bono 5 cortes — the package and its 1 line(s) leave the catalogue and can no longer be sold; vouchers already sold can still be spent, and you find them filtering Status by Deleted.',
+      'Bono 5 cortes — the package and its line leave the catalogue and can no longer be sold; vouchers already sold can still be spent, and you find them filtering Status by Deleted.',
     ]);
     s.answer(200, { id: 'p1' });
     dialog.vm.$emit('confirm');

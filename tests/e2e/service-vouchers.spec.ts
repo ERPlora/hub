@@ -56,9 +56,9 @@ test('Vouchers: create, sold, adjusted, voided, movements, orphans and delete; s
     await sheet.locator(`[data-testid=service-grants-adjust-${sold.id}]`).click();
     await page.locator('[data-testid=service-grant-adjust-uses] input').fill('1');
     await page.locator('[data-testid=service-grant-adjust-reason] textarea').fill('Courtesy for the delay');
-    await expect(page.locator('[data-testid=service-grant-adjust-preview]')).toContainText('After the adjustment: 5 session(s) left');
+    await expect(page.locator('[data-testid=service-grant-adjust-preview]')).toContainText('After the adjustment: 5 sessions left');
     await page.locator('[data-testid=service-grant-adjust-submit]').click();
-    await expect(sheet.locator(`[data-testid=service-grants-row-${sold.id}]`)).toContainText('Given afterwards: +1 session(s), +0 day(s)');
+    await expect(sheet.locator(`[data-testid=service-grants-row-${sold.id}]`)).toContainText('Given afterwards: +1 session, +0 days');
     await sheet.locator(`[data-testid=service-grants-void-${untouched.id}]`).click();
     await expect(page.locator('ion-modal[data-testid=service-grant-void]')).toContainText(`The voucher of customer ${marta.name} (€90.00)`);
     await page.locator('[data-testid=service-grant-void-reason] textarea').fill('Sold to the wrong customer');
@@ -82,13 +82,13 @@ test('Vouchers: create, sold, adjusted, voided, movements, orphans and delete; s
     await view.locator('[data-testid=service-packages-orphans-open]').click();
     const orphans = page.locator('ion-modal[data-testid=service-orphans]');
     await expect(orphans.locator(`[data-testid=service-orphans-row-${sold.id}]`)).toContainText(`Customer reference: ${lucia.id}`);
-    await expect(orphans.locator(`[data-testid=service-orphans-row-${sold.id}]`)).toContainText('5 session(s) left');
+    await expect(orphans.locator(`[data-testid=service-orphans-row-${sold.id}]`)).toContainText('5 sessions left');
     await page.screenshot({ path: shot('service-orphans-desktop') });
     await orphans.locator('[data-testid=service-orphans-close]').click();
 
     // Delete asks first; the Deleted filter still finds what was sold.
     await rowAction(page, 'service-packages', packageId, 'delete');
-    await expect(page.locator('ion-modal[data-testid=service-packages-delete]')).toContainText('the package and its 1 line(s) leave the catalogue');
+    await expect(page.locator('ion-modal[data-testid=service-packages-delete]')).toContainText('the package and its line leave the catalogue');
     await page.locator('[data-testid=service-packages-delete-submit]').click();
     await expect(page.locator('ion-modal[data-testid=service-packages-delete]')).toBeHidden();
     await expect(row).toHaveCount(0);

@@ -267,8 +267,8 @@ test('MODIFIER-F03: Edit changes only what is touched, a maximum below the defau
   // Deleting it, after a confirmation that says its options and where it applies go with it.
   await rowAction(page, group.id, 'delete');
   const confirm = dialog(page, 'modifier-groups-delete');
-  await expect(confirm).toContainText('2 option(s) will be deleted with it.');
-  await expect(confirm).toContainText('It will stop applying to 1 product(s) or category(ies).');
+  await expect(confirm).toContainText('2 options will be deleted with it.');
+  await expect(confirm).toContainText('It will stop applying to 1 product or category.');
   await shoot(page, 'MODIFIER-F03-delete', () => expect(confirm).toBeVisible());
   await confirm.locator('[data-testid=modifier-groups-delete-submit]').click();
   await expect(confirm).toBeHidden();

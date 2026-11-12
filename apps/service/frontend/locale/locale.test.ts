@@ -110,7 +110,12 @@ describe('service catalogues (en source + es)', () => {
       ['service.categories.search', 'Search category…', 'Buscar categoría…'],
       ['service.categories.empty', 'No categories.', 'No hay categorías.'],
       ['service.categories.form.noParent', 'No parent (root)', 'Sin padre (raíz)'],
-      ['service.categories.delete.impact', '{count} service(s) will be left without a category.', '{count} servicio(s) se quedarán sin categoría.'],
+      // hub#1147: the old screen said «service(s)»; one is said in the singular and several in the plural.
+      [
+        'service.categories.delete.impact',
+        '{count} service will be left without a category. | {count} services will be left without a category.',
+        '{count} servicio se quedará sin categoría. | {count} servicios se quedarán sin categoría.',
+      ],
       ['service.packages.search', 'Search package…', 'Buscar paquete…'],
       ['service.packages.empty', 'No packages.', 'No hay paquetes.'],
       ['service.packages.form.noLines', 'Add at least one service: a package with no lines cannot be redeemed.', 'Añade al menos un servicio: un paquete sin líneas no se puede canjear.'],

@@ -103,8 +103,8 @@ botón **Crear servicio**. Tocar una fila (o su **Editar**) abre «Editando serv
 botón **Guardar cambios** y, debajo, **Profesionales que lo hacen** (SERVICE-F31, F32). Por fila:
 **Editar** y **Archivar**; en la vista de archivados, **Restaurar**. **Archivar** pide confirmar:
 «Archivar servicio» — «<nombre> — dejará de ofrecerse y de poder reservarse. Se conservan su
-histórico y las citas ya reservadas.» y, si Citas tiene citas próximas con él, «{count} cita(s)
-próxima(s) siguen usando este servicio. Conservan su reserva, precio y duración; solo dejan de
+histórico y las citas ya reservadas.» y, si Citas tiene citas próximas con él, «{count} citas
+próximas siguen usando este servicio. Conservan su reserva, precio y duración; solo dejan de
 admitirse reservas nuevas.».
 
 La foto del servicio (SERVICE-F34 y F35): para quien puede editar servicios, el formulario lleva «Foto»,
@@ -119,7 +119,7 @@ Tabla con buscador «Buscar categoría…» y columnas **Nombre, Categoría padr
 padre** («Sin padre (raíz)» u otra) y **Orden**, con **Crear categoría** / **Guardar cambios**. Por
 fila: **Editar** y **Eliminar**; **Eliminar** pide confirmar: «Eliminar categoría» — «<nombre> — la
 categoría desaparece; los servicios que contiene se conservan, sin categoría.» y, si tiene servicios,
-«{count} servicio(s) se quedarán sin categoría.».
+«{count} servicios se quedarán sin categoría.» (con uno, «1 servicio se quedará sin categoría.»).
 
 ### Bonos y paquetes
 Arriba, **Bonos sin cliente** (solo responsable, propietario y administrador). Tabla con buscador
@@ -134,7 +134,7 @@ caduca.»), **Usos** («Usos que concede el bono; vacío = ilimitados.») y **Se
 fila por servicio con **Servicio** y, debajo, **Sesiones** y «Quitar línea»; **Añadir servicio**; botón **Crear
 paquete**. Al editar, en lugar de las líneas sale «Los servicios incluidos no se cambian una vez
 creado: elimina este paquete y crea uno nuevo.». Por fila: **Editar, Movimientos, Bonos vendidos** y
-**Eliminar** (con «Eliminar paquete»: «<nombre> — el paquete y sus {count} línea(s) salen del catálogo
+**Eliminar** (con «Eliminar paquete»: «<nombre> — el paquete y sus {count} líneas (o «su línea») salen del catálogo
 y ya no se pueden vender; los bonos ya vendidos se siguen pudiendo gastar y los encuentras filtrando
 Estado por Eliminado.»).
 
@@ -158,8 +158,8 @@ Hojas que se abren encima, todas con **Cerrar**, «Cargando…» mientras llegan
     el bono; con uno solo, ya elegido), **Profesional** (el equipo de Personal; «Quién la hizo: lo que vale la
     sesión cuenta en su producción en Ventas. Opcional.»), **Nota** y los botones **Cancelar** y **Gastar
     sesión**. Mientras comprueba el bono, «Comprobando el bono…».
-- **Bonos sin cliente**: los bonos vivos cuya ficha se eliminó o se anonimizó, con «Quedan {remaining}
-  sesión(es)», «Sin límite de sesiones» o «Agotado», el bono, el importe, «Cliente borrado el {when}»,
+- **Bonos sin cliente**: los bonos vivos cuya ficha se eliminó o se anonimizó, con «Quedan {count}
+  sesiones» («Queda 1 sesión»), «Sin límite de sesiones» o «Agotado», el bono, el importe, «Cliente borrado el {when}»,
   «Caducado» si lo está y «Referencia del cliente: <identificador>». Vacía: «Ningún bono se ha quedado
   sin cliente.».
 
@@ -304,8 +304,9 @@ Pasos:
 1. En la fila del servicio pulsa **Archivar**.
 2. Lee «Archivar servicio»: «<nombre> — dejará de ofrecerse y de poder reservarse. Se conservan su
    histórico y las citas ya reservadas.» y, si Citas está activa y tiene citas próximas con ese
-   servicio, «{count} cita(s) próxima(s) siguen usando este servicio. Conservan su reserva, precio y
-   duración; solo dejan de admitirse reservas nuevas.».
+   servicio, «{count} citas próximas siguen usando este servicio. Conservan su reserva, precio y
+   duración; solo dejan de admitirse reservas nuevas.» (con una, «1 cita próxima sigue usando este servicio.
+   Conserva …»).
 3. Pulsa **Archivar** (o **Cancelar**). La fila desaparece de la lista.
 Entra: el servicio y, si Citas está activa y quien archiva ve citas, cuántas citas pendientes o
 confirmadas lo usan desde ahora.
@@ -575,7 +576,7 @@ Pasos:
 1. En **Bonos vendidos** pulsa **Ajustar** en una compra viva con límite de sesiones o caducidad.
 2. Elige **Añadir sesiones** o **Quitar sesiones** y cuántas (hasta 100; quitar, hasta las que le
    quedan), y/o «Días que se alarga» (hasta 366).
-3. Escribe el Motivo y revisa «Tras el ajuste: quedan {remaining} sesión(es) · caduca el {when}».
+3. Escribe el Motivo y revisa «Tras el ajuste: quedan {count} sesiones · caduca el {when}» («queda 1 sesión»).
 4. Pulsa **Ajustar**.
 Entra: la compra, las cantidades y el motivo.
 Sale: un movimiento aparte con quién, cuándo, cuánto y por qué (`service.grant.adjusted`), que sale en

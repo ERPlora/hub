@@ -4,7 +4,7 @@
 // default), a discount in basis points as the language writes a percentage, and a day.
 import { describe, expect, it } from 'vitest';
 
-import { formatDate, formatMoney, formatPercentBp, type Money, percentFieldText, readPercentBp } from './format';
+import { formatDate, formatMoney, formatPercentBp, type Money, percentFieldText, readPercentBp, sessionsAndDays } from './format';
 
 const plain = (text: string) => text.replace(/[  ]/g, ' ');
 
@@ -75,5 +75,21 @@ describe('formatDate', () => {
     expect(formatDate('2026-10-13T10:00:00Z', 'es', 'UTC')).toBe('13 oct 2026');
     expect(formatDate('2026-10-13T10:00:00Z', 'en', 'UTC')).toBe('Oct 13, 2026');
     expect(formatDate(null, 'en')).toBe('');
+  });
+});
+
+// hub#1147: what a courtesy or a correction moved, each count with vue-i18n's own singular or plural, never «(s)».
+describe('sessionsAndDays', () => {
+  const said: Record<string, string> = {
+    'service.counts.sessions|1': '1 session',
+    'service.counts.sessions|2': '2 sessions',
+    'service.counts.days|1': '1 day',
+    'service.counts.days|30': '30 days',
+  };
+  const t = (key: string, named?: Record<string, unknown>) => said[`${key}|${String(named?.count)}`] ?? `?${key}`;
+
+  it('asks the catalogue for each count by `count`, so each one picks its own form', () => {
+    expect(sessionsAndDays(t, 1, 30)).toEqual({ sessions: '1 session', days: '30 days' });
+    expect(sessionsAndDays(t, 2, 1)).toEqual({ sessions: '2 sessions', days: '1 day' });
   });
 });

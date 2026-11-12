@@ -131,7 +131,28 @@ def test_the_staff_erases_the_personal_data_of_the_selected_carts_customers(supe
     assert list(Cart.objects.filter(customer_email="ana@example.com")) == []
     assert Order.objects.get(pk=order.pk).notes == ""
     said = [str(message) for message in request._messages]
-    assert said == ["ana@example.com: personal data erased from 2 cart(s) and 1 order(s)."]
+    assert said == ["ana@example.com: personal data erased from 2 carts and 1 order."]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("language", "said"),
+    [
+        ("en", "ana@example.com: personal data erased from 1 cart and 2 orders."),
+        ("es", "ana@example.com: datos personales borrados de 1 carrito y 2 pedidos."),
+    ],
+)
+def test_the_erasure_says_each_count_in_the_singular_or_the_plural(superuser, language, said):
+    # hub#1147: «cart(s)» and «order(s)» showed the parentheses whatever the number.
+    from django.utils import translation
+
+    ana = make_cart("sess_ana", customer_email="ana@example.com", customer_name="Ana")
+    make_order(make_cart("sess_x"), customer_email="ana@example.com", order_number="OS-20261014-0001")
+    make_order(make_cart("sess_y"), customer_email="ana@example.com", order_number="OS-20261014-0002")
+    request = staff_request(superuser)
+    with translation.override(language):
+        CartAdmin(Cart, admin.site).erase_customer_data(request, Cart.objects.filter(pk=ana.pk))
+    assert [str(message) for message in request._messages] == [said]
 
 
 @pytest.mark.django_db

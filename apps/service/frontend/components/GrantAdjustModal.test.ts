@@ -45,7 +45,7 @@ describe('GrantAdjustModal', () => {
     await ionValue(s.el('service-grant-adjust-uses'), '2', 'ionInput');
     await ionValue(s.el('service-grant-adjust-days'), '30', 'ionInput');
     await ionValue(s.el('service-grant-adjust-reason'), 'closed in August', 'ionInput');
-    expect(s.el('service-grant-adjust-preview')?.textContent).toContain('After the adjustment: 5 session(s) left · expires Apr 29, 2027');
+    expect(s.el('service-grant-adjust-preview')?.textContent).toContain('After the adjustment: 5 sessions left · expires Apr 29, 2027');
     await click(s.el('service-grant-adjust-submit'));
     expect(s.sent()).toEqual([
       { method: 'POST', path: '/api/service/grants/adjust', query: {}, body: { id: 'g1', uses_delta: 2, days_delta: 30, reason: 'closed in August' } },
@@ -73,6 +73,18 @@ describe('GrantAdjustModal', () => {
     expect(unlimited.el('service-grant-adjust-days')).not.toBeNull();
     const forever = await setup({ expires_at: null });
     expect(forever.el('service-grant-adjust-days')).toBeNull();
+  });
+
+  // hub#1147: what is left after the adjustment says one session in the singular and several in the plural.
+  it.each([
+    { locale: 'en' as const, add: '0', said: 'After the adjustment: 1 session left' },
+    { locale: 'en' as const, add: '2', said: 'After the adjustment: 3 sessions left' },
+    { locale: 'es' as const, add: '0', said: 'Tras el ajuste: queda 1 sesión' },
+    { locale: 'es' as const, add: '2', said: 'Tras el ajuste: quedan 3 sesiones' },
+  ])('adding $add to a voucher with one left ($locale): «$said»', async ({ locale, add, said }) => {
+    const s = await setup({ remaining: 1 }, locale);
+    await ionValue(s.el('service-grant-adjust-uses'), add, 'ionInput');
+    expect(s.el('service-grant-adjust-preview')?.textContent).toContain(said);
   });
 
   it('a refusal stays in the dialog', async () => {

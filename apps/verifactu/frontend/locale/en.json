@@ -222,7 +222,7 @@
       "valid": "Fingerprint chain intact ✓",
       "broken": "Fingerprint chain BROKEN ✗ at sequence {seq}",
       "unknown": "Not validated yet",
-      "checked": "{total} record(s) checked on {date}.",
+      "checked": "{count} record checked on {date}. | {count} records checked on {date}.",
       "scope": "This recomputes the SHA-256 fingerprints and verifies the chaining. It does not re-audit the amounts: the base, the tax and the total are taken as the invoice declared them.",
       "validate": "Validate chain",
       "query": "Query AEAT",
