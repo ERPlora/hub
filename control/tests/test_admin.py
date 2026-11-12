@@ -876,6 +876,9 @@ class TestRecoverIntoTheBusiness:
         assert "Recover into the business" in html and 'value="Recover"' in html
         assert re.search(r'<input[^>]*name="apps"[^>]*value="customer"[^>]*checked', html)
         assert "Customers" in html
+        # hub#1284: and the appointments, after the customers they are booked for.
+        assert re.search(r'<input[^>]*name="apps"[^>]*value="appointment"[^>]*checked', html)
+        assert html.index('value="customer"') < html.index('value="appointment"')
         assert str(copy) in html and f'<div class="readonly">{copy.db_name}</div>' in html
         assert "admin/css/forms.css" in html
         assert not CopyRecovery.objects.exists()
@@ -1062,9 +1065,28 @@ def test_the_recovery_speaks_spanish(client, root):
         said = control_admin.CopyRecoveryAdmin.result_said(
             {"app": "customer", "restored": 2, "created": 1, "not_created": 1, "reasons": [], "refused": ""}
         )
-    assert said == "Clientes: 2 restaurados, 1 creado, 1 sin crear"
+    assert said == "Clientes: se restauraron 2, se creó 1, 1 sin crear"
     listed = client.get(RECOVERIES, HTTP_HOST=PLATFORM, HTTP_ACCEPT_LANGUAGE="es").content.decode()
     assert "Recuperaciones" in listed or "recuperaciones" in listed
+
+
+def test_what_came_back_is_said_in_spanish_in_words_that_fit_customers_and_appointments_alike():
+    """hub#1284: the counts follow the name of an app whose records are feminine in Spanish («Citas») as well as one
+    whose records are masculine («Clientes»): never «Citas: 2 creados»."""
+    from django.utils import translation
+
+    said = control_admin.CopyRecoveryAdmin.result_said
+    with translation.override("es"):
+        assert said({"app": "appointment", "created": 2, "not_created": 1, "reasons": [], "refused": ""}) == (
+            "Citas: se crearon 2, 1 sin crear"
+        )
+        assert said({"app": "customer", "created": 1, "not_created": 0, "reasons": [], "refused": ""}) == (
+            "Clientes: se creó 1"
+        )
+        # And what comes back the same (hub#1306), whatever app restores it next (hub#1326).
+        assert said({"app": "appointment", "restored": 1, "created": 0, "not_created": 0, "reasons": [], "refused": ""}) == (
+            "Citas: se restauró 1"
+        )
 
 
 def test_the_separate_copy_speaks_spanish(client, root):

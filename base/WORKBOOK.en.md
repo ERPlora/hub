@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:51abeb059ac137909903526012b3c0d3e4ba89a66d05915737205aa828c056e2 -->
+<!-- generated from WORKBOOK.md sha256:5bb470d5f39ad632a50fa123b81787b5db0aa5b77a37366f561485919abfabe1 -->
 
 ## What it is for and who it is for
 
@@ -2932,11 +2932,11 @@ Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APP
 
 ### BASE-F114 Put a business back as it was at a past moment from the Hub admin
 Status: done (the action and the restore, in its place or to a separate copy, and getting back from the separate copy
-the customers that were lost, the deleted ones as they were, the products and the services; making and deleting the
-temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws; getting back appointments,
-hub#1284; the groups, tags and own fields of a customer brought back, hub#1285; the image and the categories of a product
-brought back, hub#1319 and hub#1320; the image of a service brought back, hub#1319; its professionals, hub#1322; the
-deleted service categories, hub#1323)
+the customers that were lost, the deleted ones as they were, the products, the services and the appointments; making
+and deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws; repeating
+appointments, hub#1327; the groups, tags and own fields of a customer brought back, hub#1285; the image and the
+categories of a product brought back, hub#1319 and hub#1320; the image of a service brought back, hub#1319; its
+professionals, hub#1322; the deleted service categories, hub#1323)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -2970,9 +2970,9 @@ Steps:
   9. In Separate copies they choose the made copy and the action "Recover into the business…". The page explains that
      what the business deleted and still holds comes back as it was, with its history, and that what it no longer has is
      created again as its own screen creates it, nothing copied; that what the business has, or has made again, is left
-     as it is; that records for the tax authority are never brought back and
-     that the business stays open. Below, "What to bring back", with what can be brought ticked (today, **Customers**,
-     **Products** and **Services**). They press **Recover**.
+     as it is; that records for the tax authority are never brought back and that the business stays open. Below, "What
+     to bring back", with what can be brought ticked (today, **Customers**, **Products**, **Services** and
+     **Appointments**). They press **Recover**.
   10. "1 separate copy will give back Customers, Products, Services into its business within a few minutes: Recoveries
       says how it went." appears. In Recoveries they see it "Asked" with the copy, what was asked and when.
   11. A few minutes later it says "Done" and what came back: "Customers: 1 restored, 2 created" or "Customers: 2
@@ -2998,6 +2998,14 @@ Steps:
       back (it is restored in Services), nor does one the copy had archived, and one the business has already made again
       (another with the same name in the same category, not itself one of the copy's; each counts for one only, so two
       services with the same name both come back) is not repeated. Asking again creates nothing twice.
+      Appointments always go after customers, whatever the order they are asked in, so each finds its customer. Each
+      appointment that has not come yet and was still booked (pending or confirmed, not charged) comes back, booked as the
+      agenda books it: for its customer's card in the business (the same one, the one it was merged into or the one made
+      again), with its services, its professional, its time, its minutes and its notes; as a new appointment, with another
+      number and without its history (hub#1326). It is never booked over another: one whose time is already taken, no
+      longer fits the business's or the professional's hours or is blocked, or whose customer, service or professional is
+      no longer there, does not come back and its reason says why ("appointment.slot_taken: …"). Those gone by do not
+      come back, nor one the business has (even if it cancelled it) or booked again (the same customer at the same time).
 In: the chosen businesses, the temporary cluster with their copy and the moment; to recover, the made separate copy and
 what to bring back.
 Out: the business's database as it was at that moment; the one it had, kept 7 days on its server; the notice
@@ -3007,8 +3015,9 @@ application and kept 7 days; the notice `control.hub.restore_aside_requested` wi
 the business, each deleted card it still held, live again with its card-recovered notice (`customer.customer.restored`),
 a new card for each customer it no longer had, with its card-created notice (`customer.customer.created`), each deleted
 product it still held, live again with its product-recovered notice (`inventory.product.restored`), a new product for
-each product it no longer had, with its product-created notice (`inventory.product.created`), and a new service for each
-one it no longer had, with its service-created notice (`service.service.created`), and nothing else; the copy,
+each product it no longer had, with its product-created notice (`inventory.product.created`), a new service for each one
+it no longer had, with its service-created notice (`service.service.created`), and a new appointment for each one it
+lacked, with its appointment-created notice (`appointment.appointment.created`), and nothing else; the copy,
 untouched; the notice `control.copy.recovery_requested` with who asked for it.
 If it fails: what the restore does not accept is said in the notice, business by business, and that business is not
 touched: one that is not ready or has no database of its own, a demo, one being moved or restored, a cluster open to new
@@ -3024,16 +3033,16 @@ is only possible from a made copy and once at a time per copy; otherwise the not
 is made gives anything back."), and with nothing ticked the page asks again. What cannot be brought from an app is said in
 its result and the rest goes on: the app is turned off in the business ("Customers: nothing (app_inactive: …)"), or the
 copy did not have it, lacks the migration its read needs or has one this code does not know (`recover_not_in_copy`,
-`recover_copy_behind`, `recover_copy_ahead`). A card the create operation does not accept today (a phone no longer valid),
-or a product without a tax category or with one Taxes no longer has active, or a service whose tax category was turned
-off (`service.tax_category_unknown`), is counted "not created" with its reason, and so is a deleted card that was merged
-into another or erased meanwhile ("customer.customer_unavailable: …"). If the copy is gone, the recovery says "Failed"
-and why
+`recover_copy_behind`, `recover_copy_ahead`). What the create operation does not accept today (a phone no longer valid, a
+product without a tax category or with one Taxes no longer has active, a service whose tax category was turned off
+(`service.tax_category_unknown`), a time taken, a customer no longer there) is counted "not created" with its reason,
+and the rest comes back; so is a deleted card that was merged into another or erased meanwhile
+("customer.customer_unavailable: …"). If the copy is gone, the recovery says "Failed" and why
 ("recover_copy_unreadable: …"). While the business is being moved or restored, the recovery waits without doing anything.
 With the platform frozen for a database upgrade, the restore waits, with the business under maintenance, until it
 is unfrozen. With records from the test environment only, the chain is recovered afterwards (VERIFACTU-F28). The
 support staff see the list, Separate copies and Recoveries, but not the actions.
 Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12,
 CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04, SERVICE-F01, SERVICE-F04, SERVICE-F05,
-SERVICE-F08; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1319, hub#1320, hub#1321,
-hub#1322, hub#1323, aws#77
+SERVICE-F08, APPOINTMENT-F01, APPOINTMENT-F11; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285,
+hub#1306, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, aws#77

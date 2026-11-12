@@ -190,6 +190,8 @@ for (const { label, viewport } of SIZES) {
     await expect(page.locator('input[name="apps"][value="customer"]')).toBeChecked();
     await expect(page.locator('input[name="apps"][value="inventory"]')).toBeChecked();
     await expect(page.locator('input[name="apps"][value="service"]')).toBeChecked();
+    // Appointments comes ticked too (hub#1284): none was lost here, so this spec leaves it out.
+    await page.locator('input[name="apps"][value="appointment"]').uncheck();
     await expect(page.getByText('nothing is ever copied', { exact: false })).toBeVisible();
     await expect(page.getByText('comes back as it was, with its history', { exact: false })).toBeVisible();
     await capture(page, `${KEY}-${label}-2-confirm`, { fullPage: true });

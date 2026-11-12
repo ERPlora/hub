@@ -239,7 +239,8 @@ se pueden reservar. Desde el mostrador ni la antelación mínima ni una hora ya 
 hora pasada solo avisa antes de guardar); una automatización no tiene esas excepciones. Un empleado
 solo reserva para sí; una automatización a la que se permite reservar, con cualquier profesional. Dos personas
 que reservan a la vez el mismo hueco del mismo profesional: entra una y la otra recibe el rechazo.
-Implicados: CUSTOMER-F11, CUSTOMER-F25, CUSTOMER-F30, SERVICE-F10, SERVICE-F33, STAFF-F16, SCHEDULE-F11
+Implicados: CUSTOMER-F11, CUSTOMER-F25, CUSTOMER-F30, SERVICE-F10, SERVICE-F33, STAFF-F16, SCHEDULE-F11, BASE-F114
+(el personal de ERPlora recupera desde una copia aparte las citas que se perdieron, cada una por esta misma reserva)
 
 ### APPOINTMENT-F02 Ver qué horas quedan libres
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f06 fi:modules/appointments#query-appointments-availability-check fi:modules/appointments#query-appointments-availability-slots old:appointments/workflow/agenda.md#appointments-f02 old:schedules/WORKFLOW.md#schedules-f11 qa:modules/schedules/schedule-and-availability-per-professional qa:verticals/beauty/01-services-professionals-and-schedules wf:whatsapp-cita#rec_wa_cita-f04 wf:whatsapp-cita#rec_wa_cita-f08 -->
@@ -418,8 +419,11 @@ Pasos:
 Entra: una cita pendiente, confirmada, cancelada o no presentada que no esté cobrada.
 Sale: el aviso `appointment.appointment.deleted`.
 Si falla: «Esta cita no se puede borrar: está en curso, completada o cobrada.»; con su cuenta abierta
-en el TPV, `appointment.check_open`.
-Implicados: ninguno
+en el TPV, `appointment.check_open`. Una cita borrada por error que aún no ha llegado la recupera el personal de
+ERPlora desde una copia aparte del negocio (BASE-F114): vuelve reservada como en APPOINTMENT-F01, con su clienta, sus
+servicios, su profesional, su hora, sus minutos y sus notas, como cita nueva (otro número y sin su historial,
+hub#1326); si su hora ya no está libre o la clienta ya no está en el negocio, no vuelve y Recuperaciones dice por qué.
+Implicados: BASE-F114
 
 ### APPOINTMENT-F12 Crear una cita periódica
 <!-- origen: fi:modules/appointments#command-appointments-recurring-create fi:modules/appointments#query-appointments-recurring-list old:appointments/workflow/periodicas.md#appointments-f12 -->
@@ -856,6 +860,19 @@ agenda tuya que enseñar.».
 
 ## Para quien lo mantiene
 
+- **Recuperar desde una copia aparte** (BASE-F114, hub#1284): `apps.py` responde a la plataforma
+  (`recoverable_from_copy`, `base.tenancy.recovery`) con las citas de la copia que aún no han llegado y siguen
+  reservadas (pendientes o confirmadas, ni borradas ni cobradas; `queries.appointments_in_copy`, por SQL sobre los
+  nombres de los modelos: la copia no es un negocio y no tiene alias) que el negocio no tiene
+  (`queries.appointments_not_in_business`: ni la misma, haya pasado lo que haya pasado con ella, ni otra de la misma
+  clienta a la misma hora), cada una creada por `appointment.appointment.create`. La clienta se casa por la regla de
+  Clientes (`customer.queries.card_in_business`: la misma ficha, aquella en la que se unió o la que se volvió a crear;
+  la plataforma recupera las apps en el orden de sus `requires`, así que Clientes va antes); el servicio y el
+  profesional, por su id. Lo demás lo juzga la propia reserva con las reglas de una automatización: una hora pasada,
+  ocupada, fuera de horario o bloqueada, o una clienta que ya no está, no se crea y queda con su por qué. Lee desde
+  `0001_initial`; una migración que quite o renombre una de sus columnas cambia también `appointments_in_copy` y su
+  `reads_since`. Las series no se leen de la copia (hub#1327). Tests: `tests/test_recovery.py` y, de punta a punta,
+  `base/tenancy/tests/test_recovery.py`.
 - Anatomía completa (copia de `apps/tax` y `apps/service`): `apps.py`, `models.py`, `migrations/`,
   `schemas.py`, `engine.py` (reglas sin ORM: disponibilidad, horas libres y recurrencias), `queries.py`,
   `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
