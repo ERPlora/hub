@@ -9,11 +9,11 @@ BASE-F114).
    emptied, filled with the dump's ``pg_restore`` and its identity checked (it says it is this hub);
 3. control notes it made, and lets the temporary cluster go.
 
-The business is never closed nor changed: it is not restored, so its fiscal records are never compared and a production
-VeriFactu record made after the moment stops nothing. In the copy, nothing reaches the tax authority, by construction: it
-is no business (no row of ``base_hub`` names it, the worker never serves it), it is closed to the app's roles, and its
-name is one of a copy left behind, which no process registers an alias for. Any failure drops what it made and notes
-why on the row. The copies go after ``move.MOVED_COPY_DAYS``, with their rows, in the moves' pass.
+The business is never closed nor changed: it is not restored, so its fiscal records are never compared and a
+production VeriFactu record made after the moment stops nothing. In the copy, nothing reaches the tax authority, by
+construction: it is no business (no row of ``base_hub`` names it, the worker never serves it), it is closed to the
+app's roles, and its name is one of a copy left behind, which no process registers an alias for. Any failure drops what
+it made and notes why on the row. The copies go after ``move.MOVED_COPY_DAYS``, with their rows, in the moves' pass.
 
 Real databases on the session's server, as ``test_restore.py``: the temporary cluster's row points at it, so the hub's
 copy there has a name of its own (``run_aside_due(source=…)``).
@@ -226,7 +226,7 @@ class TestSendingToTheTaxAuthorityIsOffInTheCopy:
 
     def test_production_records_after_the_moment_stop_nothing_and_stay_as_they_are(self, asides, off_the_machine):
         hub = asides.hub(source=None)
-        # The business filed after the moment (what makes a restore in place refuse it); its copy holds one still to send.
+        # The business filed after the moment (what makes a restore in place refuse it); its copy holds one to send.
         made_after = a_record(hub.db_name, created_at=AFTER, updated_at=AFTER)
         to_send = a_record(asides.copies[hub.id], status="pending")
         aside = asides.aside(hub, asides.cluster())

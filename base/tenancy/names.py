@@ -49,7 +49,8 @@ class InvalidDatabaseName(ValueError):
 def _patterns(control: str) -> re.Pattern:
     escaped = re.escape(control)
     return re.compile(
-        rf"{escaped}(?:_{DEMO_INFIX}|_{MOVED_INFIX}|_{KEPT_INFIX}|_{COPY_INFIX})?_{_HEX}|{escaped}_{TEMPLATE_SUFFIX}(?:_{_VERTICAL})?"
+        rf"{escaped}(?:_{DEMO_INFIX}|_{MOVED_INFIX}|_{KEPT_INFIX}|_{COPY_INFIX})?_{_HEX}"
+        rf"|{escaped}_{TEMPLATE_SUFFIX}(?:_{_VERTICAL})?"
     )
 
 

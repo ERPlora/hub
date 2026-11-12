@@ -466,8 +466,8 @@ class HubAdmin(base_admin.HubAdmin):
         )
 
     def from_a_copy(self, request: HttpRequest, hubs, action: str, title: str, template: str, operation, said):
-        """The temporary cluster and the moment asked on ``action``'s confirmation page, then ``operation`` asked of each
-        hub with them; ``said(count)``: what the staff is told of those asked."""
+        """The temporary cluster and the moment asked on ``action``'s confirmation page, then ``operation`` asked of
+        each hub with them; ``said(count)``: what the staff is told of those asked."""
         form = RestoreFromACopyForm(request.POST if "apply" in request.POST else None)
         if not form.is_bound or not form.is_valid():
             return self.confirmation(request, hubs, form, action, title, template, kept_days=MOVED_COPY_DAYS)

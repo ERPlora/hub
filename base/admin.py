@@ -25,8 +25,8 @@ ADMIN_HUB_SESSION_KEY = "admin_hub"
 
 
 class ReadOnlyAdmin(admin.ModelAdmin):
-    """A model's admin that only shows its rows: nothing is added, changed or deleted by hand there (what changes them is
-    an operation, or nothing)."""
+    """A model's admin that only shows its rows: nothing is added, changed or deleted by hand there (what changes them
+    is an operation, or nothing)."""
 
     def has_add_permission(self, request: HttpRequest) -> bool:
         return False

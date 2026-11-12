@@ -1,8 +1,8 @@
 """Events of control (``<app>.<entity>.<fact>``): recorded by ``control.services`` in the transaction of their
 operation, in control's outbox. The database clusters of the Hub admin (round 2026-10-30b of PLAN-DB, decision 1):
 no live query reacts to them yet; the outbox keeps them as the record of who registered, edited, closed or deleted a
-cluster, by its id and name (never its secret's values), who asked a hub to move or to be restored (hub#1198) or a separate copy of it (hub#1213), and who
-froze the platform for a database upgrade and lifted it (hub#930).
+cluster, by its id and name (never its secret's values), who asked a hub to move or to be restored (hub#1198) or a
+separate copy of it (hub#1213), and who froze the platform for a database upgrade and lifted it (hub#930).
 """
 
 CLUSTER_CREATED = "control.cluster.created"

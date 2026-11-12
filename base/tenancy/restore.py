@@ -50,9 +50,9 @@ nobody (``ops.clone_database(aside=True)``), emptied, filled with ``pg_restore``
 checked, closed to the app once more and noted made, the temporary cluster let go. Nothing in it reaches the tax
 authority, by construction: no hub's row names it (the worker serves the hubs of the registry only), none of the app's
 roles may connect to it, and its name is a copy left behind's (``names.is_left_behind``), which no process registers an
-alias for (``connections.register_hub_alias``). Its schema stays the moment's. A failure drops what it made and notes why
-on the row (``restore_aside_<step>: <why>``); a worker that lost the lease leaves it to whoever holds it now, who makes
-it anew. The copies are dropped after :data:`ASIDE_COPY_DAYS` with their rows (:func:`drop_old_aside_copies`).
+alias for (``connections.register_hub_alias``). Its schema stays the moment's. A failure drops what it made and notes
+why on the row (``restore_aside_<step>: <why>``); a worker that lost the lease leaves it to whoever holds it now, who
+makes it anew. The copies are dropped after :data:`ASIDE_COPY_DAYS` with their rows (:func:`drop_old_aside_copies`).
 """
 
 import datetime as dt
@@ -282,7 +282,9 @@ def _aside_failed(row, ours, reason: str) -> None:
         ours()
         move._drop_copy(row.db_name, row.cluster)
     except move.MoveStopped as stopped:
-        logger.info("base.tenancy.restore.aside_stopped copy=%s: %s; left to whoever holds it now.", row.db_name, stopped)
+        logger.info(
+            "base.tenancy.restore.aside_stopped copy=%s: %s; left to whoever holds it now.", row.db_name, stopped
+        )
         return
     except Exception:
         logger.exception("base.tenancy.restore.aside_kept copy=%s: it could not be dropped now.", row.db_name)
@@ -301,7 +303,9 @@ def drop_old_aside_copies(now: dt.datetime) -> int:
             move._drop_copy(row.db_name, row.cluster)
             control_services.forget_aside_copy(row.pk)
         except Exception:
-            logger.exception("base.tenancy.restore.aside_kept copy=%s: it could not be dropped; tried again.", row.db_name)
+            logger.exception(
+                "base.tenancy.restore.aside_kept copy=%s: it could not be dropped; tried again.", row.db_name
+            )
             continue
         dropped += 1
         logger.info("base.tenancy.restore.aside_dropped copy=%s", row.db_name)

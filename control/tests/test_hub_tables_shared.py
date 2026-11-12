@@ -32,8 +32,8 @@ from control.models import Hub
 
 MIGRATION = "0007_hub_tables_renamed_shared"
 BEFORE = "0006_hub_activity"
-#: The tables control's migrations after ``MIGRATION`` make, which the deploy makes too (0010: the freeze switch, hub#930;
-#: 0012: the separate copies, hub#1213).
+#: The tables control's migrations after ``MIGRATION`` make, which the deploy makes too (0010: the freeze switch,
+#: hub#930; 0012: the separate copies, hub#1213).
 LATER_TABLES = {"control_freeze", "control_restoredcopy"}
 SUFFIX = "_shared_20261101"
 LEGACY_ROUTER = "base.tenancy.tests.legacy.LegacyTablesRouter"

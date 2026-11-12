@@ -264,9 +264,8 @@ class TestUpdate:
             MovedCopy.objects.create(hub=hub, cluster=cluster, db_name=f"hub_move_{hub.id.hex}", moved_at="2026-10-31T10:00Z")
         elif held_by.startswith("a separate copy"):
             where = {"cluster": cluster} if held_by.endswith("on it") else {"source": cluster}
-            RestoredCopy.objects.create(
-                hub=hub, restore_point="2026-10-31T10:00Z", db_name=f"hub_copy_{uuid.uuid7().hex}", asked_by="root", **where
-            )
+            copy = {"restore_point": "2026-10-31T10:00Z", "db_name": f"hub_copy_{uuid.uuid7().hex}", "asked_by": "root"}
+            RestoredCopy.objects.create(hub=hub, **copy, **where)
         else:
             LeftoverDatabase.objects.create(hub=hub, cluster=cluster, db_name=hub.db_name, noted_at="2026-10-31T10:00Z")
 

@@ -726,7 +726,8 @@ def claim_copy(copy_id: UUID, now: dt.datetime, lease: dt.timedelta, owner: str)
     with _control_transaction():
         row = (
             RestoredCopy.objects.select_for_update(skip_locked=True, of=("self",))
-            .filter(Q(lease_until__isnull=True) | Q(lease_until__lte=now), pk=copy_id, status=RestoredCopy.Status.COPYING)
+            .filter(Q(lease_until__isnull=True) | Q(lease_until__lte=now), pk=copy_id)
+            .filter(status=RestoredCopy.Status.COPYING)
             .first()
         )
         if row is None:
@@ -754,8 +755,8 @@ def still_making(copy_id: UUID, owner: str) -> None:
 
 
 def copy_made(copy_id: UUID, at: dt.datetime, owner: str) -> None:
-    """The separate copy ``copy_id`` is made: dated, its temporary cluster let go and its lease given back, on its locked
-    row, only if it is still ``owner``'s (``MoveTaken`` otherwise: nothing written)."""
+    """The separate copy ``copy_id`` is made: dated, its temporary cluster let go and its lease given back, on its
+    locked row, only if it is still ``owner``'s (``MoveTaken`` otherwise: nothing written)."""
     with _control_transaction():
         _making(copy_id, owner, lock=True)
         RestoredCopy.objects.filter(pk=copy_id).update(
