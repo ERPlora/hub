@@ -10,8 +10,9 @@
 // it brings others it needs, naming them; «Turn off» always asks, naming what goes with it, and one another app on
 // needs says which to turn off first. A refusal (another app needs it, the app's own reason, any other failure) is a
 // notice that stays until it is closed or the next change: its reason is often a long sentence of what to do first,
-// which a toast took away before it could be read (hub#2594). The counter says how many of the plan's apps are on
-// (`max_apps`; what came along does not count); at the limit, the notice with «Upgrade plan» (erplora.com's plans,
+// which a toast took away before it could be read (hub#2594). The counter says how many apps are on, as «My apps»
+// lists them, and how many of the plan's the business chose (`max_apps`; what came along or was born on does not
+// count, hub#1286); at the limit, the notice with «Upgrade plan» (erplora.com's plans,
 // only on the web). The menu of this screen is read again after each change; the other screens of the business
 // follow the live list (AppsFollower). «Upgrade plan» is the platform's PlanUpgradeLink, with the pass (BASE-F11), and the Store's link
 // by `openExternalLink` (gh:hub#439: the installed app opens nothing on a `_blank` link). In a business with its own database an app turned on
@@ -85,11 +86,14 @@ const limitHit = ref<number | null>(null);
 /** Why the last change was refused; on screen until it is closed or the next change (hub#2594). */
 const refusal = ref<string | null>(null);
 
+/** The apps turned on, as «My apps» lists them (those born on and those brought along included), and, against the
+ *  plan's limit, the ones the business chose (`enabled`: all the limit counts, hub#1286). */
 const counter = computed(() => {
   const answer = data.value;
   if (!answer) return '';
-  if (answer.max_apps === null) return t('base.appsPage.counter.unlimited', { enabled: answer.enabled, n: answer.enabled });
-  return t('base.appsPage.counter.limited', { enabled: answer.enabled, max: answer.max_apps });
+  const on = appsOfTab(apps.value, 'mine').length;
+  if (answer.max_apps === null) return t('base.appsPage.counter.unlimited', { on, n: on });
+  return t('base.appsPage.counter.limited', { on, n: on, chosen: answer.enabled, max: answer.max_apps });
 });
 
 /** Some app is sold apart (none is while every app comes with every plan, PLAN §32): only then «Paid» and «Price». */

@@ -130,8 +130,10 @@ el Inicio. Si desde ahí no hay ninguno que configurar, solo el aviso.
 
 ### Apps
 Desde «Apps» en el menú lateral. Tres pestañas abajo: «Mis apps» (las apps que el negocio tiene en marcha),
-«Añadir apps» (todas las apps de ERPlora) y «De pago» (las que se contratan aparte). Arriba, cuántas apps ha elegido
-el negocio frente al límite de su plan: «17 de 20 apps activadas» o, sin límite, «17 apps activadas · Sin límite».
+«Añadir apps» (todas las apps de ERPlora) y «De pago» (las que se contratan aparte). Arriba, cuántas apps tiene
+activadas el negocio (las de «Mis apps», también las que nacen activadas, como Impuestos, y las que llegaron con otra)
+y cuántas de las que deja su plan ha elegido: «27 apps activadas · 17 de 20 de tu plan» o, sin límite, «27 apps
+activadas · Sin límite». Un negocio recién dado de alta: «1 app activada · 0 de 20 de tu plan» (hub#1286).
 Cada pestaña, una tabla (o tarjetas) con su buscador, el embudo de filtros, el orden y «Columnas»: «App» (icono y
 nombre), «Categoría» y «Estado»; en «Añadir apps» y «De pago», además «Descripción», «Precio» y «Viene con».
 «Abrir» en la fila de una app que la persona puede abrir y, para quien administra, «Activar» o «Desactivar».
@@ -741,8 +743,9 @@ Pasos:
      el negocio tiene en marcha, con su icono y su nombre, su «Categoría» y su «Estado» («Activa»). Una app que el
      país del negocio exige lleva además, junto a su estado, «Obligatoria en España» (o el país del negocio): Impuestos
      en todos, VeriFactu en España (hub#997). Un negocio recién dado de alta ya tiene Impuestos aquí, «Activa»: nace
-     activada con los impuestos de su país y no cuenta para el tope de apps del plan. Las demás apps nacen
-     desactivadas, también VeriFactu, que activa el dueño.
+     activada con los impuestos de su país y no cuenta para el tope de apps del plan: el contador de arriba dice
+     «1 app activada · 0 de 20 de tu plan». Las demás apps nacen desactivadas, también VeriFactu, que activa el
+     dueño.
   3. Busca en «Buscar en tus apps…» (nombre, descripción o categoría), filtra por categoría con el embudo,
      ordena o elige columnas.
   4. Cuando el negocio contrata una app en erplora.com o deja de tenerla, la lista se pone al día sola, sin
@@ -817,8 +820,9 @@ Pasos:
   2. En «Añadir apps», quien administra busca una app que el negocio no usa, «Desactivada», y pulsa «Activar». Si
      necesita otras apps que están desactivadas, antes le pregunta nombrándolas (BASE-F19).
   3. La app pasa a «Instalada» al momento y sale en «Mis apps» y, sin recargar, en el menú de todos los
-     dispositivos del negocio. El contador de arriba suma una: de «16 de 20 apps activadas» a «17 de 20 apps
-     activadas».
+     dispositivos del negocio. El contador de arriba suma las apps que se activan y una de las del plan: al activar
+     Tareas, de «26 apps activadas · 16 de 20 de tu plan» a «27 apps activadas · 17 de 20 de tu plan»; las que
+     llegan con ella suman a las activadas, no a las del plan.
 Entra: la app elegida, las que necesita y lo que el negocio tiene contratado en erplora.com.
 Sale: la app en marcha en este negocio, elegida por él: cuenta para el límite de apps de su plan.
 Si falla: con el límite del plan alcanzado no se activa nada y sale «El límite de apps de tu plan»: «Has llegado al
@@ -926,7 +930,8 @@ Pasos:
      que el país del negocio exige: al desactivar Ventas, Impuestos se queda activa y no se nombra (hub#997).
   3. Confirma con «Desactivar»: «Reservas está desactivada. También se ha desactivado: Mesas.». Las dos salen de
      «Mis apps» y, sin recargar, del menú de todos los dispositivos del negocio; sus pantallas dicen que la app no
-     está disponible (BASE-F26) y el contador de arriba resta una.
+     está disponible (BASE-F26) y el contador de arriba resta las que se desactivan y, de las del plan, la que
+     eligió el negocio.
   4. En «Añadir apps» siguen, con su icono, su nombre y «Desactivada»: desde ahí se vuelven a activar (BASE-F24).
   5. Desde el asistente («Desactiva la app de reservas») la app se nombra como en BASE-F24, la tarjeta de riesgo alto
      la pone con su nombre entero y, si ya estaba desactivada, el asistente lo dice y no cambia nada.

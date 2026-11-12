@@ -1113,6 +1113,22 @@ def test_a_paid_app_without_its_right_is_blocked_on_or_off(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_an_app_born_on_is_listed_on_and_takes_nothing_of_the_plans_limit():
+    """hub#1286: Taxes, born on (hub#997), is on in «My apps» (the screen's counter counts it as turned on) but not
+    chosen, so the plan's part of the counter, ``enabled``, leaves it out; the app the business chose counts."""
+    with_limit("a", 20)
+    born = activation.born(activation.born_on("ES"), activation.module_graph())
+    set_rows(**{label: "on*" if row.chosen else "on" for label, row in born.items() if row.on}, task="on*")
+
+    document = app_list()
+    apps_ = by_id(document)
+
+    assert (apps_["tax"]["state"], apps_["tax"]["chosen"]) == ("on", False)
+    assert (apps_["task"]["state"], apps_["task"]["chosen"]) == ("on", True)
+    assert (document["max_apps"], document["enabled"]) == (20, 1)
+
+
+@pytest.mark.django_db
 def test_the_counter_counts_only_the_apps_this_business_shows(settings):
     """The reference app is no app of a customer's hub: it never counts against its limit."""
     settings.SHOW_UNLISTED_MODULES = False
