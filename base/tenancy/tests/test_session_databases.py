@@ -174,6 +174,31 @@ def test_a_lone_test_that_names_no_hub_s_alias_in_its_mark_gets_no_hub_database(
     assert _databases_of(session) == set()
 
 
+def test_a_session_whose_first_tests_have_no_database_runs_the_next_ones_on_its_own(session_name, tmp_path):
+    # hub#1332: the first test of an xdist worker had no database, the check after it read the pool of default, which
+    # Django made then, on the developer's database, and kept once the session renamed default to its own: the whole
+    # worker, its migrate included, read and wrote the developer's businesses. One of the tests here reads the pool
+    # itself, as any code may.
+    session, log, report = session_name(), tmp_path / "session.log", tmp_path / "report.json"
+    first = (f"{PROBE}::test_without_the_database_first", f"{PROBE}::test_without_the_database_that_reads_the_pool")
+
+    _assert_passed(
+        {
+            log: _start(
+                session,
+                "test_then_one_with_the_database_says_which_it_reaches",
+                log,
+                *first,
+                SESSION_PROBE_REPORT=str(report),
+            )
+        }
+    )
+
+    assert "3 passed" in log.read_text(), log.read_text()
+    assert json.loads(report.read_text()) == {"default": session, "reached": session}
+    assert _databases_of(session) == set()
+
+
 def test_the_hubs_databases_refuse_any_other_control_database_before_reaching_the_server(monkeypatch):
     monkeypatch.setitem(connections.settings[DEFAULT_DB_ALIAS], "NAME", "hub")
     monkeypatch.setattr(hubs, "_maintenance", lambda *args: pytest.fail("the server was reached"))
