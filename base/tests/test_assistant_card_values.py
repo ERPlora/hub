@@ -752,7 +752,10 @@ def test_a_mark_is_checked_at_start(monkeypatch, write, why):
 DISHES = {
     "Vegano": {"D-1": "Postres caseros", "D-2": "Primeros"},
     "Infantil": {"D-3": "Postres de fruta", "D-4": "Postres lácteos"},
+    "Degustación": {"D-5": "Sorpresa"},
 }
+#: A dish its read answers with no name.
+NAMELESS = {"D-5"}
 #: A dish said by its name, read with its menu beside it.
 A_DISH = {"refers": {"read": "demo.item.dish", "by": "dish", "name": ["name"], "within": ["menu"], "as_said": True}}
 
@@ -778,7 +781,7 @@ def dish_of(read: list) -> Operation:
         if not fits:
             raise NotFound("There is no such dish.")
         key, name = fits[0]
-        return {"id": key, "name": name}
+        return {"id": key, "name": "" if key in NAMELESS else name}
 
     return Operation(
         name="demo.item.dish",
@@ -861,6 +864,14 @@ def test_inside_an_object_the_data_beside_it_are_those_of_its_own_object(dish_re
 
 
 @pytest.mark.django_db
+def test_inside_an_object_a_datum_takes_nothing_from_the_object_around_it(dish_reads):
+    """A line that names no menu is read with none, though the write around it names one: it is said as said."""
+    shown = served({"menu": "Vegano", "line": {"dish": "postres"}})
+    assert shown["line"] == {"dish": "postres"}
+    assert dish_reads == [{"dish": "postres"}]
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     "arguments",
     [{"menu": "Infantil", "dish": "postres"}, {"menu": "Vegano", "dish": "helados"}, {"dish": "postres"}],
@@ -888,6 +899,13 @@ def test_the_record_found_by_its_name_goes_in_what_the_yes_is_for(dish_reads):
     found: list = []
     served({"menu": "Vegano", "dish": "postres"}, found=found)
     assert found == ["D-1"]
+
+
+@pytest.mark.django_db
+def test_a_record_found_that_has_no_name_is_said_as_said_and_goes_in_what_the_yes_is_for(dish_reads):
+    found: list = []
+    assert served({"menu": "Degustación", "dish": "sorpresa"}, found=found)["dish"] == "sorpresa"
+    assert found == ["D-5"]
 
 
 @pytest.mark.django_db
