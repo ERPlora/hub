@@ -19,6 +19,10 @@ const WITHOUT_A_HUB: Record<string, { calls: number; on: string }> = {
     calls: 1,
     on: "control's registry: the separate copy, the staff member's session and the worker's recovery pass (its cards, with --hub a)",
   },
+  'base-recoveries-long-result.spec.ts': {
+    calls: 1,
+    on: "control's registry: a separate copy of a with its failed recovery, and the staff member's session",
+  },
   'fix-hub-csp-whatsapp-media-gate.spec.ts': { calls: 1, on: "control's registry of hubs" },
   'whatsapp-inbox-offered-options.spec.ts': { calls: 1, on: "the SaaS's WhatsApp number" },
   'whatsapp-inbox-plan-cap.spec.ts': { calls: 1, on: "the SaaS's plan of the business" },
