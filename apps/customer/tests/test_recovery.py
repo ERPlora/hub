@@ -230,7 +230,14 @@ def test_the_copy_gives_each_card_with_its_groups_tags_and_custom_field_values_a
     ]
     assert ana_read["tags"] == [{"name": "Regular", "color": "success", "is_active": True}]
     assert ana_read["field_values"] == [
-        {"name": "Size", "field_type": "select", "options": ["S", "M"], "is_required": True, "sort_order": 1, "value": "M"},
+        {
+            "name": "Size",
+            "field_type": "select",
+            "options": ["S", "M"],
+            "is_required": True,
+            "sort_order": 1,
+            "value": "M",
+        },
         {"name": "Pet", "field_type": "text", "options": [], "is_required": False, "sort_order": 2, "value": "Luna"},
     ]
     assert (luis_read["groups"], luis_read["tags"], luis_read["field_values"]) == ([], [], [])
@@ -306,6 +313,14 @@ class TestWhatHangsFromACardComesBack:
         run_in(hub, "customer.group.update", id=made["old"], is_active=False)
         return hub, ana, luis, made
 
+    def luis_lost(self, recoveries, every_app_on):
+        """``a_business`` and a copy of it, and then Luis's row gone altogether and the tag Regular deleted."""
+        hub, _ana, luis, made = self.a_business(recoveries, every_app_on)
+        copy = recoveries.copy_of(hub)
+        gone(hub, luis)
+        run_in(hub, "customer.tag.delete", id=made["regular"])
+        return hub, luis, made, copy
+
     def test_a_card_the_business_no_longer_has_comes_back_with_its_groups_tags_and_custom_fields(
         self, recoveries, every_app_on
     ):
@@ -354,13 +369,11 @@ class TestWhatHangsFromACardComesBack:
         assert what_hangs(hub, ana) == before
         assert [group[1] for group in before["groups"]] == [made["old"], made["vip"]]
         assert named(hub, CustomerGroup) == [("Old", False), ("VIP", True)]
-        assert (named(hub, CustomerTag), named(hub, CustomField)) == ([("Regular", True)], [("Pet", True), ("Size", True)])
+        assert named(hub, CustomerTag) == [("Regular", True)]
+        assert named(hub, CustomField) == [("Pet", True), ("Size", True)]
 
     def test_asked_again_nothing_is_made_twice(self, recoveries, every_app_on):
-        hub, _ana, luis, made = self.a_business(recoveries, every_app_on)
-        copy = recoveries.copy_of(hub)
-        gone(hub, luis)
-        run_in(hub, "customer.tag.delete", id=made["regular"])
+        hub, _luis, _made, copy = self.luis_lost(recoveries, every_app_on)
         recoveries.ask(copy)
         run()
         again = recoveries.ask(copy)
@@ -375,10 +388,7 @@ class TestWhatHangsFromACardComesBack:
     def test_a_value_its_field_no_longer_takes_leaves_the_card_out_with_why_and_nothing_of_it_made(
         self, recoveries, every_app_on
     ):
-        hub, _ana, luis, made = self.a_business(recoveries, every_app_on)
-        copy = recoveries.copy_of(hub)
-        gone(hub, luis)
-        run_in(hub, "customer.tag.delete", id=made["regular"])
+        hub, luis, made, copy = self.luis_lost(recoveries, every_app_on)
         # Size no longer offers M: the card's screen would not save it either.
         run_in(hub, "customer.field.update", id=made["size"], options=["S", "L"])
         asked = recoveries.ask(copy)
@@ -397,9 +407,7 @@ class TestWhatHangsFromACardComesBack:
     def test_a_field_the_business_deactivated_or_made_required_since_does_not_keep_the_card_out(
         self, recoveries, every_app_on
     ):
-        hub, _ana, luis, made = self.a_business(recoveries, every_app_on)
-        copy = recoveries.copy_of(hub)
-        gone(hub, luis)
+        hub, _luis, made, copy = self.luis_lost(recoveries, every_app_on)
         # Pet deactivated: it shows on no card, so its value does not come back, and no second Pet is made.
         run_in(hub, "customer.field.update", id=made["pet"], is_active=False)
         # A field required since: a card is made without it, as the till makes one (CUSTOMER-F01).
