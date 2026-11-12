@@ -51,6 +51,7 @@ from apps.customer.schemas import (
     CustomerDetailOut,
     CustomerIn,
     CustomerPatchIn,
+    CustomerRecoverIn,
     DeletedOut,
     EraseIn,
     ErasedOut,
@@ -148,6 +149,7 @@ def invalid(error):
         ("customer.customer.merge", "customer.merge", MergeIn, CustomerDetailOut),
         ("customer.customer.erase", "customer.erase", EraseIn, ErasedOut),
         ("customer.customer.restore", "customer.restore", RefIn, CustomerDetailOut),
+        ("customer.customer.recover", "customer.restore", CustomerRecoverIn, CustomerDetailOut),
         ("customer.note.add", "customer.manage", NoteIn, ActivityRow),
         ("customer.activity.add", "customer.record_activity", ActivityIn, ActivityRow),
         ("customer.consent.grant", "customer.manage", ConsentGrantIn, ConsentRow),
@@ -869,6 +871,132 @@ def test_only_the_system_restores_a_card(role):
         run("customer.customer.restore", RefIn(id=ana.id), role)
 
     assert Customer.objects.get(pk=ana.pk).deleted_at == NOW
+
+
+# customer.customer.recover (BASE-F114, the recovery from a separate copy, hub#1285)
+
+
+def a_card_of_the_copy(**fields) -> CustomerRecoverIn:
+    """A card of a separate copy as its recovery takes it: what the create takes and what hung from it there."""
+    return CustomerRecoverIn.model_validate({"name": "Luis Pérez", "phone": "+34600333444"} | fields)
+
+
+@pytest.mark.django_db
+def test_recover_makes_the_card_with_its_groups_tags_and_values_by_the_screens_own_operations():
+    vip = CustomerGroup.objects.create(name="VIP")
+    vegan = CustomerTag.objects.create(name="Vegan")
+    size = CustomField.objects.create(name="Size", field_type="select", options=["S", "M"])
+    clear_outbox()
+
+    made = system(
+        "customer.customer.recover",
+        a_card_of_the_copy(
+            groups=[{"name": "vip"}, {"name": "Old", "color": "danger", "sort_order": 4, "is_active": False}],
+            tags=[{"name": "VEGAN"}, {"name": "Regular", "color": "success"}, {"name": "Winter", "is_active": False}],
+            field_values=[
+                {"name": "SIZE", "field_type": "select", "options": ["S", "M"], "value": "M"},
+                {"name": "Pet", "field_type": "text", "sort_order": 2, "value": "Luna"},
+            ],
+        ),
+    )
+
+    luis = Customer.objects.get(pk=made.id)
+    assert (luis.name, luis.phone) == ("Luis Pérez", "+34600333444")
+    # VIP and Size are the business's own, by name: never a second one.
+    old = CustomerGroup.objects.get(name="Old")
+    assert set(luis.groups.all()) == {vip, old}
+    assert (old.color, old.sort_order, old.is_active) == ("danger", 4, False)
+    assert sorted(luis.tags.values_list("name", "color", "is_active")) == [
+        ("Regular", "success", True),
+        ("Vegan", "primary", True),
+        ("Winter", "primary", False),
+    ]
+    assert vegan in luis.tags.all()
+    pet = CustomField.objects.get(name="Pet")
+    assert (pet.field_type, pet.sort_order, pet.is_active) == ("text", 2, True)
+    assert sorted(luis.field_values.values_list("field_id", "value")) == sorted([(size.id, "M"), (pet.id, "Luna")])
+    assert (CustomerGroup.objects.count(), CustomerTag.objects.count(), CustomField.objects.count()) == (2, 3, 2)
+    # Each by its own operation, with its own event: the card's create, the group, tag and field it made again, and
+    # the card's groups and tags set as its screen sets them.
+    names = [name for name, _ in outbox()]
+    assert names[0] == events.CUSTOMER_CREATED
+    assert sorted(names[1:]) == sorted(
+        [
+            events.GROUP_CREATED,
+            events.GROUP_UPDATED,
+            events.CUSTOMER_GROUPS_CHANGED,
+            events.TAG_CREATED,
+            events.TAG_CREATED,
+            events.TAG_UPDATED,
+            events.CUSTOMER_TAGS_CHANGED,
+            events.FIELD_CREATED,
+        ]
+    )
+
+
+@pytest.mark.django_db
+def test_recover_reuses_the_active_one_of_a_name_over_one_deactivated():
+    CustomerGroup.objects.create(name="VIP", is_active=False)
+    live = CustomerGroup.objects.create(name="vip")
+
+    made = system("customer.customer.recover", a_card_of_the_copy(groups=[{"name": "VIP"}]))
+
+    assert list(Customer.objects.get(pk=made.id).groups.all()) == [live]
+    assert CustomerGroup.objects.count() == 2
+
+
+@pytest.mark.django_db
+def test_recover_without_anything_hanging_makes_the_card_as_its_create_does():
+    clear_outbox()
+
+    made = system("customer.customer.recover", a_card_of_the_copy())
+
+    luis = Customer.objects.get(pk=made.id)
+    assert (luis.groups.count(), luis.tags.count(), luis.field_values.count()) == (0, 0, 0)
+    assert outbox() == [(events.CUSTOMER_CREATED, {"id": str(luis.id)})]
+
+
+@pytest.mark.django_db
+def test_recover_refuses_a_value_its_field_no_longer_takes_and_makes_nothing():
+    CustomField.objects.create(name="Size", field_type="select", options=["S", "L"])
+    clear_outbox()
+
+    with pytest.raises(InvalidPayload) as refused:
+        system(
+            "customer.customer.recover",
+            a_card_of_the_copy(
+                tags=[{"name": "Regular"}],
+                field_values=[{"name": "Size", "field_type": "select", "options": ["S", "M"], "value": "M"}],
+            ),
+        )
+
+    assert refused.value.code == "customer.field_invalid_option"
+    assert (Customer.objects.count(), CustomerTag.objects.count(), outbox()) == (0, 0, [])
+
+
+@pytest.mark.django_db
+def test_recover_leaves_out_a_value_of_a_field_deactivated_and_never_asks_a_required_one():
+    CustomField.objects.create(name="Pet", is_active=False)
+    allergies = CustomField.objects.create(name="Allergies", is_required=True)
+
+    made = system(
+        "customer.customer.recover",
+        a_card_of_the_copy(field_values=[{"name": "Pet", "value": "Luna"}]),
+    )
+
+    luis = Customer.objects.get(pk=made.id)
+    assert luis.field_values.count() == 0
+    assert CustomField.objects.filter(name="Pet").count() == 1
+    assert not CustomFieldValue.objects.filter(field=allergies).exists()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("role", ["hub_owner", "hub_admin", "hub_manager", "hub_employee"])
+def test_only_the_system_recovers_a_card_from_a_copy(role):
+    with pytest.raises(PermissionDenied):
+        run("customer.customer.recover", a_card_of_the_copy(), role)
+
+    assert Customer.objects.count() == 0
 
 
 # customer.customer.merge (CUSTOMER-F13; merge.pg)

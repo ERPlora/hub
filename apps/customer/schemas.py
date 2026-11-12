@@ -869,6 +869,41 @@ class FieldPatchIn(FieldRefIn):
         return list(dict.fromkeys(option.strip() for option in value if option.strip()))
 
 
+# ── A card of a separate copy, as its recovery takes it (BASE-F114, hub#1285) ───────────────────
+
+
+class GroupOfCopyIn(GroupIn):
+    """A group of a card of the copy, as the copy held it: what the Groups screen's create takes, and whether it was
+    offered on the cards."""
+
+    is_active: bool = Field(True, description="Whether the group was offered on the cards.")
+
+
+class TagOfCopyIn(TagIn):
+    """A tag of a card of the copy, as the copy held it: what the Tags screen's create takes, and whether it was offered
+    on the cards."""
+
+    is_active: bool = Field(True, description="Whether the tag was offered on the cards.")
+
+
+class FieldValueOfCopyIn(FieldIn):
+    """A card's value of an active custom field of the copy: the field as the Fields screen's create takes it, and the
+    value."""
+
+    value: _text(10000) = Field(description="The card's value, as text.")
+
+
+class CustomerRecoverIn(CustomerIn):
+    """A card of a separate copy the business no longer has: what ``customer.customer.create`` takes and what hung from
+    it there, each named as the copy named it (the business makes its own ids)."""
+
+    groups: list[GroupOfCopyIn] = Field([], max_length=200, description="The card's groups in the copy.")
+    tags: list[TagOfCopyIn] = Field([], max_length=200, description="The card's tags in the copy.")
+    field_values: list[FieldValueOfCopyIn] = Field(
+        [], max_length=200, description="The card's values of the copy's active custom fields."
+    )
+
+
 # ── Outputs ─────────────────────────────────────────────────────────────────────────────────────
 
 
