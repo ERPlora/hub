@@ -1,8 +1,8 @@
-"""The assistant's card names every datum a write of Automations sends (FIX-HUB-FLOW-ASSISTANT-CARD-FIELDS-IN-ENGLISH;
-base's half is hub#258): in Spanish, by the name the Automations screens give it, never by the title pydantic makes up
-from the field («Actor», «Draft Id», «Event Id»). The card is base's (``base.assistant.card``); the names are flow's: the
-titles of its schemas and the ``verbose_name`` of its models, with their Spanish in its catalog. Where the editor
-already has words for the datum (``flow.fields.<name>``, ``frontend/locale/{en,es}.json``), the card says the same.
+"""The assistant's card names every datum a write of Automations sends (base's half is hub#258): in Spanish, by the name
+the Automations screens give it, never by the title pydantic makes up from the field («Actor», «Draft Id», «Event Id»).
+The card is base's (``base.assistant.card``); the names are flow's: the titles of its schemas and the ``verbose_name``
+of its models, with their Spanish in its catalog. Where the editor already has words for the datum
+(``flow.fields.<name>``, ``frontend/locale/{en,es}.json``), the card says the same.
 
 And which writes are tools at all: what only the platform runs (the outbox relay, the worker, the scheduled tasks,
 under ``flow.system``) is «System only», and a secret's value is never asked for in a chat («Not an assistant tool»:
@@ -202,11 +202,11 @@ def test_flow_f17_the_assistant_may_leave_a_draft_automation_and_only_a_draft():
     assert "flow.draft.propose" not in assistant.catalog(ctx_for("hub_employee"))
 
 
-# ── Each record a write names by its id, as its screen names it (FIX-HUB-FLOW-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS) ──
-# Since hub#416 the card leaves out every id its schema does not mark with the read that names its record (before, the
-# UUID showed). Automations marks each one with a read by id of its own, run as the person who confirms: an automation by
-# its name, a draft by its name, a run by its automation and when it started, a question by what it asks. A record they
-# may not read, or of another business, is left out — never by its id.
+# ── Each record a write names by its id, as its screen names it ────────────────────────────────────────────────────
+# Since hub#416 the card leaves out every id its schema does not mark with the read that names its record. Automations
+# marks each one with a read by id of its own, run as the person who confirms: an automation by its name, a draft by its
+# name, a run by its automation and when it started, a question by what it asks. A record they may not read, or of
+# another business, is left out — never by its id.
 
 #: Thursday 15 October 2026 at 21:00 in Madrid, as each language writes a day and a time on the card (base's CLDR words).
 STARTED = dt.datetime(2026, 10, 15, 19, 0, tzinfo=dt.UTC)

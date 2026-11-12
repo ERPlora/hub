@@ -1,10 +1,5 @@
-"""Models of the flow app: the automation (``Flow``), each time it ran (``FlowRun``), what the assistant
-proposed (``Draft``), the secrets its calls to other systems use (``Secret``) and the questions its runs
-ask a person (``Question``).
-
-Phase 1 has no tenancy: every scope (``a``, ``b``) shares these tables; only the live notifications are
-per scope. Phase 2 moves them to each hub's database. An automation names other apps' operations and
-events by their names, never their rows: nothing here points at another app's table.
+"""An automation names other apps' operations and events by their names, never their rows: nothing here points at
+another app's table.
 """
 
 from django.db import models
@@ -14,7 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
 
-#: Longest name of an automation (the old module's draft schema).
+#: Longest name of an automation.
 NAME_MAX_LENGTH = 120
 #: An event name of the outbox (``live.models.OutboxEvent.name``).
 EVENT_MAX_LENGTH = 96
@@ -232,7 +227,7 @@ class Draft(UUIDModel):
         return self.name
 
 
-#: A secret's name: upper case, digits and ``_``, up to 64 characters (the old hub's rule).
+#: A secret's name: upper case, digits and ``_``, up to 64 characters.
 SECRET_NAME_RE = r"^[A-Z][A-Z0-9_]{0,63}$"
 
 

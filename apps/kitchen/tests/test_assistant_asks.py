@@ -1,6 +1,5 @@
-"""What layer 1 of the assistant's QA says of Kitchen (erplora-next
-docs/plans/2026-10-31-asistente-conocimiento-y-qa.md, the assistant's knowledge and QA): which tools it offers, to whom,
-and the requests the real-model QA found unreachable (hub#1088).
+"""What layer 1 of the assistant's QA says of Kitchen: which tools it offers, to whom, and the requests the real-model
+QA found unreachable (hub#1088).
 
 Every ask of every tool of kitchen bringing its tool among the first ten, role by role, in English and in Spanish, out
 of the catalogue of a business with every app on and ranked as a turn ranks, is ``base/tests/test_assistant_asks.py``'s
@@ -107,7 +106,7 @@ ROLES = {"owner": Membership.Role.OWNER, "employee": Membership.Role.EMPLOYEE}
 
 #: The Hub's own words of the kitchen (``base.assistant.SYNONYMS``), in phrases nobody wrote as asks nor as probes, one
 #: per group: each brings its tool among the first ten, and none does without its group. The dishes said «listos» need
-#: live to read «listo» and «listos» as done, never as the action list (ERPlora/live#54), and their group too.
+#: live to read «listo» and «listos» as done, never as the action list, and their group too.
 KITCHEN_WORDS = [
     ("¿cuántas comandas llevamos esta noche?", "kitchen.ticket.list"),
     ("lista los puestos con su impresora", "kitchen.station.list"),

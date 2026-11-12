@@ -1,7 +1,6 @@
-"""FIX-HUB-DEMO-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (hub#670): the card of a write of Demo says which item it acts on
-by its name, read as whoever asks, never by its id, and leaves it out when that person may not read it or it is not
-there. An item goes by its name, as its list and its «Delete» dialog say it; its status by its label in each language,
-as the list's «Open» / «Done».
+"""hub#670: the card of a write of Demo says which item it acts on by its name, read as whoever asks, never by its id,
+and leaves it out when that person may not read it or it is not there. An item goes by its name, as its list and its
+«Delete» dialog say it; its status by its label in each language, as the list's «Open» / «Done».
 """
 
 import dataclasses
@@ -297,7 +296,7 @@ def test_the_yes_deletes_only_the_item_its_card_showed_although_another_fits_the
 @pytest.mark.parametrize(("write", "rest"), BY_ITS_NAME)
 def test_a_name_two_items_share_draws_no_card_and_the_model_hears_it(write, rest):
     """Two items called the same: no card that would act on either; the model hears ``demo.item_ambiguous`` and asks
-    the person which one (BASE-G115: the data are checked before any card is drawn)."""
+    the person which one (the data are checked before any card is drawn)."""
     Item.objects.create(name="Ejemplo QA")
     Item.objects.create(name="Ejemplo QA", note="the other one")
     asked_for = call(write, {"called": "Ejemplo QA", **rest})
