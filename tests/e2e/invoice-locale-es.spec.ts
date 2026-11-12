@@ -1,10 +1,10 @@
-// flow: invoice-locale — FIX-HUB-INVOICE-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP: Django joins every app's Spanish
-// catalogue and the first that translates a message wins, so the assistant's card named the issuer's data with
-// customer's words, «NIF/CIF» and «Dirección». Changing the issuer is a dangerous write, whose card lists every datum by
-// its name: it names them as the Issuer screen does, «NIF» and «Domicilio». The owner, in Spanish, asks the assistant
-// (the e2e's provider, `E2E-ASK`: assistant-provider.ts; README «El asistente») to change the issuer's tax ID and
-// address; the card says them so at 390, 834 and 1440, and «Cancel» changes nothing. (A series' «Activa» rides a normal
-// card, a single line of values with no names: apps/invoice/tests/test_i18n.py checks the name the server gives it.)
+// flow: invoice-locale — Django joins every app's Spanish catalogue and the first that translates a message wins, so
+// the assistant's card could name the issuer's data with customer's words, «NIF/CIF» and «Dirección». Changing the
+// issuer is a dangerous write, whose card lists every datum by its name: it names them as the Issuer screen does, «NIF»
+// and «Domicilio». The owner, in Spanish, asks the assistant (the e2e's provider, `E2E-ASK`: assistant-provider.ts;
+// README «El asistente») to change the issuer's tax ID and address; the card says them so at 390, 834 and 1440, and
+// «Cancel» changes nothing. (A series' «Activa» rides a normal card, a single line of values with no names:
+// apps/invoice/tests/test_i18n.py checks the name the server gives it.)
 import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';

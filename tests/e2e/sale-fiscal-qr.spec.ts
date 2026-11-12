@@ -1,4 +1,4 @@
-// flow: SALE-F29 — the document of a charged sale carries VeriFactu's QR (VERIFACTU-F19, sales#411), against the real
+// flow: SALE-F29 — the document of a charged sale carries VeriFactu's QR (VERIFACTU-F19), against the real
 // Invoicing and VeriFactu, no mocks: the charge issues its ticket and VeriFactu seals its record in that emission (in
 // the AEAT's testing environment: nothing is sent); in Sales, «Document» shows the paper with «Tax QR:», the QR,
 // «VERI*FACTU» and how to check the receipt at the AEAT. In 390×844, 834×1194 and 1440×900. What a run creates — its

@@ -1,10 +1,9 @@
-// flow: sale-e2e-wait — FIX of the Sales specs' wait (FIX-HUB-SALE-E2E-WAIT-BLIND-TO-SHADOW-ROOTS)
+// flow: sale-e2e-wait — the Sales specs' wait
 // Before a capture or a measurement, the Sales specs (sale-*.spec.ts) and their helpers wait with the harness's one
-// wait, `untilStill(page)` (helpers.ts), which asks every open shadow root too. Their own wait asked the document alone
-// for its animations, blind to Ionic's overlays (`sale-settled.spec.ts` shows it let the till's «sold out» toast pass
-// for still), or slept a fixed time before the filters panel's capture. Swapping one of them back left every spec green:
-// this keeps them from coming back in the Sales files. The same rule for every spec of the e2e is
-// FIX-HUB-E2E-OWN-ANIMATION-WAIT-UNGUARDED's (hub:base).
+// wait, `untilStill(page)` (helpers.ts), which asks every open shadow root too. A wait of their own that asks the
+// document alone for its animations is blind to Ionic's overlays (`sale-settled.spec.ts` shows the till's «sold out»
+// toast passing for still), and so is a fixed sleep; swapping one back would leave every spec green: this keeps them
+// out of the Sales files. own-animation-waits.test.ts holds the same rule for every spec of the e2e.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

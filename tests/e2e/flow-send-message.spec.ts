@@ -6,20 +6,19 @@
 // - FLOW-F31, in each of the three sizes: in a new automation «Send a message» opens its own form; to the customer's
 //   exact number, the message, an approved template with a value for each blank; saved, allowed, on and run by
 //   hand, the WhatsApp is in the customer's conversation and went to erplora.com (door 5), whose Meta refuses the
-//   seed's made-up permission: the message says why. One screenshot per size (FIX-FLOW-SEND-MESSAGE-STEP-<width>).
+//   seed's made-up permission: the message says why. One screenshot per size.
 // - WHATSAPP_INBOX-F23: «Comes with WhatsApp inbox» turns on «Tell the customer by WhatsApp when their appointment is
 //   confirmed»; with «I review them first», Citas confirms a booking the customer made online; the worker's outbox
 //   relay pass hands it over and the notice reaches her conversation through erplora.com, once (a second pass sends
 //   nothing); a booking born confirmed tells its customer too. A customer whose number never wrote gets nothing,
 //   and the automation's history says where it stopped. Citas' setting is put back after.
 // - WHATSAPP_INBOX-F26 / RESERVATION-F19, as an owner who works in Spanish: the card «Avisar por WhatsApp al cliente
-//   cuando se confirma su reserva» opened and turned on (one screenshot per size, FIX-HUB-WHATSAPP-INBOX-RESERVATION-
-//   CONFIRMED-RECIPE-<width>); with «Confirmar solas las reservas nuevas» off, «Confirmar» in Reservas on a reservation
-//   whose number has a conversation; the relay pass hands it over and the notice, with its day, time and guests in
-//   Spanish, is in the conversation of the inbox once (a second pass, or cancelling it, sends nothing more; one
-//   screenshot per size, …-chat-<width>). Reservas' settings are put back after. The reservation is always on a
-//   Saturday, so the notice names «sábado», accent included, and it must name that very day, written as the Hub
-//   writes any weekday and month (checked against its `day_label`).
+//   cuando se confirma su reserva» opened and turned on (one screenshot per size); with «Confirmar solas las
+//   reservas nuevas» off, «Confirmar» in Reservas on a reservation whose number has a conversation; the relay pass
+//   hands it over and the notice, with its day, time and guests in Spanish, is in the conversation of the inbox once (a
+//   second pass, or cancelling it, sends nothing more; one screenshot per size). Reservas' settings are put back after.
+//   The reservation is always on a Saturday, so the notice names «sábado», accent included, and it must name that very
+//   day, written as the Hub writes any weekday and month (checked against its `day_label`).
 // What it creates is «E2E Fsm …», `e2e.`/`+3469900…` (whatsapp-helpers.ts), the recipes' automations, a slot (its
 // maximum is `SLOT_SENTINEL`) and a day open in Schedules («E2E Fsm …»), and goes.
 import { spawnSync } from 'node:child_process';
@@ -290,7 +289,7 @@ test('WHATSAPP_INBOX-F23: confirming a booking tells the customer by WhatsApp th
   }
 });
 
-/** The business's day `days` from today on its wall clock (Madrid in phase 1): `YYYY-MM-DD` and its weekday
+/** The business's day `days` from today on its wall clock (Madrid, hub `a`'s zone): `YYYY-MM-DD` and its weekday
  *  (0 = Monday), inside Reservas' 30 days ahead. */
 function madridDay(days: number): { date: string; weekday: number } {
   const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).format(

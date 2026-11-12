@@ -1,4 +1,4 @@
-// The translations the master QA of the Hub checks on screen (BASE-G152, base-qa-master.spec.ts): the hub's catalogues
+// The translations the master QA of the Hub checks on screen (BASE-F107, base-qa-master.spec.ts): the hub's catalogues
 // (`en` source, `es` translation; the SPA's JSON and Django's `.po`) and which visible texts are in the other language or
 // are a raw message key.
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';

@@ -1,9 +1,8 @@
 // Shared steps of the Invoicing browser specs (apps/invoice/WORKBOOK.md): the issuer set up through the
 // app's API (setup, never the check itself), the delivery of a Sales event to Invoicing as the outbox relay
-// will in phase 2 (the event's real payload, read from the outbox, posted to the operation the reaction
-// runs), and the cleanup every invoice spec runs in its `afterAll` BEFORE Sales' (a document keeps its sale).
-// What a run creates is found by its sales (`E2E-INV-…` products), its names (`e2e …`), its series
-// (`E2E…` codes) or the ids it recorded.
+// does it (the event's real payload, read from the outbox, posted to the operation the reaction runs), and the cleanup
+// every invoice spec runs in its `afterAll` BEFORE Sales' (a document keeps its sale). What a run creates is found by
+// its sales (`E2E-INV-…` products), its names (`e2e …`), its series (`E2E…` codes) or the ids it recorded.
 import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
 import { A, api, capture, psql } from './helpers';
@@ -139,7 +138,7 @@ const REACTION_ROUTES: Record<string, string> = {
   'sale.sale.voided': '/invoice/invoices/rectify_from_void',
 };
 
-/** Hands the newest `name` event of `saleId` to Invoicing, as the relay will: its real payload, read from
+/** Hands the newest `name` event of `saleId` to Invoicing, as the relay does: its real payload, read from
  *  the outbox, to the operation that reacts to it. Returns the document it issued. */
 export async function deliver(context: BrowserContext, name: keyof typeof REACTION_ROUTES & string, saleId: string): Promise<InvoiceOut> {
   const payload = psql(

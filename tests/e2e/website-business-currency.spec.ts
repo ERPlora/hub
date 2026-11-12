@@ -1,12 +1,11 @@
-// flow: website-business-currency (FIX-HUB-WEBSITE-PRICES-IN-EUR-WHATEVER-THE-COUNTRY; apps/website/WORKBOOK.md
-// WEBSITE-F05, F06 and F10)
+// flow: website-business-currency (apps/website/WORKBOOK.md WEBSITE-F05, F06 and F10)
 // The website prices its catalog in the business's currency: its country's, as erplora.com registered it
 // (`PUT /internal/hubs/{id}`, signed the way the SaaS sends it), never a fixed euro. Hub `a` publishes its site with
 // Services' catalog and moves to Poland: without publishing again, its public page (painted by the server, refreshed by
 // the bundle from the public catalog, which answers the same) and the editor's preview price a service of the run in
-// złoty, with no «€», at 390, 834 and 1440 (captures `FIX-HUB-WEBSITE-PRICES-IN-EUR-WHATEVER-THE-COUNTRY-<width>` and
-// `…-preview-<width>`). Back in Spain the same page is in euros again (`…-es-1440`). What the run creates is deleted
-// after it, the site saved as it was found and taken offline, and `a`'s registration put back, also when a test fails.
+// złoty, with no «€», at 390, 834 and 1440. Back in Spain the same page is in euros again. What the run creates is
+// deleted after it, the site saved as it was found and taken offline, and `a`'s registration put back, also when a test
+// fails.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, hostPage, psql, registerBusinessIn, registrationOf, type Registration } from './helpers';
@@ -125,7 +124,7 @@ test.afterAll(async () => {
   }
 });
 
-test(`${KEY}: website-business-currency a business in Poland sees its prices in złoty on its page and in the preview, in 390, 834 and 1440`, async ({
+test(`website-business-currency a business in Poland sees its prices in złoty on its page and in the preview, in 390, 834 and 1440`, async ({
   browser,
 }) => {
   if (!original || !owner) throw new Error('beforeAll did not run');
@@ -162,7 +161,7 @@ test(`${KEY}: website-business-currency a business in Poland sees its prices in 
   await context.close();
 });
 
-test(`${KEY}: website-business-currency back in Spain, the same page is in euros again`, async ({ browser }) => {
+test(`website-business-currency back in Spain, the same page is in euros again`, async ({ browser }) => {
   if (!original) throw new Error('beforeAll did not run');
   await registerBusinessIn(original, 'ES');
   const { context, page } = await visitor(browser, WIDE);

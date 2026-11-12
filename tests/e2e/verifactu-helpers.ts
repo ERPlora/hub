@@ -1,9 +1,8 @@
-// VeriFactu's state of hub `a` for the specs of its step on the Home (FIX-VERIFACTU-SETUP-HOOKS, the wall in production
-// and hub#682): the account's photo with the signed authorisation, sent the way the SaaS sends it (`PUT
-// /internal/hubs/{id}/state`, signed), and the configuration's columns a run moves, kept in scratch tables before it
-// and put back after it (or the configuration removed, if the run made it). A spec keeps them in its `beforeAll`
-// (`keepVerifactu`) and puts them back in its `afterAll` (`putVerifactuBack`); one spec at a time, as the e2e runs
-// (`workers: 1`, playwright.config.ts).
+// VeriFactu's state of hub `a` for the specs of its step on the Home (hub#682): the account's photo with the signed
+// authorisation, sent the way the SaaS sends it (`PUT /internal/hubs/{id}/state`, signed), and the configuration's
+// columns a run moves, kept in scratch tables before it and put back after it (or the configuration removed, if the run
+// made it). A spec keeps them in its `beforeAll` (`keepVerifactu`) and puts them back in its `afterAll`
+// (`putVerifactuBack`); one spec at a time, as the e2e runs (`workers: 1`, playwright.config.ts).
 import { expect } from '@playwright/test';
 
 import { internalPut, psql } from './helpers';

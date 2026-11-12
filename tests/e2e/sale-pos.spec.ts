@@ -6,7 +6,7 @@
 // sale-approval.spec.ts) but never reads the figures. A marked
 // line is charged on its own (SALE-F22) with its ticket, and the rest closes the check; on full screen
 // the checkout sheet still opens and charges on top of the till. In Spanish its search boxes are named by
-// their hint, never Ionic's English «search text» (flow: sale-pos, FIX-HUB-SALE-SEARCHBARS-NAMED-IN-ENGLISH).
+// their hint, never Ionic's English «search text» (flow: sale-pos).
 // Screenshots of the till in the three viewports. What this file creates is deleted after it.
 import { expect, type Page, test } from '@playwright/test';
 
@@ -37,7 +37,7 @@ test.afterAll(() => {
   cleanInventory();
   restoreDrawer();
   // What it charged reached the kitchen: Kitchen is free and on in every business (base.entitlement), and «Charge»
-  // sends what is pending first (sales#439). Not read from `/me`, which the till also reads: a Kitchen said «off» by
+  // sends what is pending first. Not read from `/me`, which the till also reads: a Kitchen said «off» by
   // mistake would stop both the rounds and this check. Without it the check below would be empty by mistake.
   if (charged > 0) expect(tickets, `the rounds of ${RUN} reached the kitchen`).not.toBe('null');
   if (tickets === 'null') return;
@@ -327,7 +327,7 @@ test('the employee charges at the till and sees «Void» and «Refund» on their
     await page.goto(`${A}/sale/sales`);
     await shown(page).locator('[data-testid=sales-table-row]').first().waitFor({ state: 'visible' });
     await expect(shown(page).locator('[data-testid=sales-kpis]')).toHaveCount(0);
-    // Since FIX-SALE-VOID-REFUND-ASKS-NO-APPROVAL (hub#250) the cashier sees «Void» and «Refund»: either asks a
+    // The cashier sees «Void» and «Refund» (hub#250): either asks a
     // manager's approval, which sale-approval.spec.ts walks end to end.
     const sold = await newestSaleOf(context, water.sku);
     await expect(shown(page).locator(`[data-testid=sales-table-row-${sold.id}-void]`).first()).toBeVisible();
