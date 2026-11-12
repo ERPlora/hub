@@ -139,6 +139,9 @@ ACCEPTED = {
     # Tenancy S3 (an app's tables made when it is turned on): the state's check is widened, dropped and added again in
     # one migration with ``creating`` and ``failed``; ``on`` and ``off``, all the code of before writes, still pass it.
     ("base", "0022_app_activation_creating", "AddConstraint", "appactivation.base_appactivation_state"),
+    # hub#1326: the actions a line of an appointment's history may say are widened, dropped and added again in one
+    # migration with ``restored``; every action the code of before writes still passes it.
+    ("appointment", "0004_history_restored", "AddConstraint", "history.appointment_history_action"),
     # Its contract, a later deploy's, once no code of before W10 runs (written here, not applied): the old columns to
     # control's users, which W10 took out of the state and nobody writes any more, leave the database through
     # SeparateDatabaseAndState(database_operations=[RunSQL("ALTER TABLE … DROP COLUMN …")]), with no state, and
