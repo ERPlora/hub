@@ -893,8 +893,9 @@ class TestRecoverIntoTheBusiness:
         assert "1 separate copy will give back Customers into its business within a few minutes" in html
         [asked] = CopyRecovery.objects.all()
         assert (asked.copy_id, asked.apps, asked.asked_by, asked.language) == (copy.pk, ["customer"], "root", "en")
-        listed = page(client, RECOVERIES)
-        assert self.copy_cell(copy) in listed and "Asked" in listed and "Customers" in listed
+        # Its row, never the admin's menu (which names Customers too): asked, and what it brings back.
+        row = row_of(page(client, RECOVERIES), self.copy_cell(copy))
+        assert "Asked" in row and "Customers" in row
 
     def test_with_nothing_ticked_it_asks_again(self, client, root):
         from control.models import CopyRecovery
