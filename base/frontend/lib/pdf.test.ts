@@ -1,6 +1,3 @@
-// The PDF of Files' preview (BASE-G84; the old hub drew it with pdf.js too): Mozilla's pdf.js, loaded only when a PDF
-// opens, runs in the page's own thread (its worker module handed over as `globalThis.pdfjsWorker`: no Worker, so the
-// strict CSP needs nothing new), reads the bytes it is given (it fetches nothing) and draws the first 30 pages.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const pdfjs = vi.hoisted(() => {

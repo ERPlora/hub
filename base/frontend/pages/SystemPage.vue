@@ -1,8 +1,7 @@
 <script setup lang="ts">
-// System (the old hub's SystemPage): its four tabs in the address hash (BASE-F39; `base/lib/system.ts`): «Usage and plan»
-// (BASE-F40, and below it, for anyone, the cards the apps on put there: hub#683), Updates (BASE-G89), Failed events (BASE-G91…G94) and Logs (BASE-G90). What only who runs the business may read
-// (hub#2519) is asked only for them: anyone else is told who may see it, has no Logs tab, and their session never asks the
-// Hub what it would refuse. The old `#backups` lands on Settings › Data.
+// Below «Usage and plan», anyone sees the cards the apps that are on put there. What only whoever runs the business
+// may read is asked only for them: anyone else is told who may see it, has no Logs tab, and their session never asks
+// the Hub what it would refuse. The old `#backups` lands on Settings › Data.
 import { InlineFeedback } from '@erplora/ui/components';
 import { AppPage, type ShellTab, useSession } from '@erplora/ui/shell';
 import { computed, watchEffect } from 'vue';
@@ -21,7 +20,7 @@ const route = useRoute();
 const router = useRouter();
 const session = useSession();
 
-/** Who runs the business: the status, Failed events and Logs are theirs (hub#2519). */
+/** Who runs the business: the status, Failed events and Logs are theirs. */
 const admin = computed(() => session.can('base.administer_hub'));
 
 const TAB_ICON: Record<SystemTab, string> = {

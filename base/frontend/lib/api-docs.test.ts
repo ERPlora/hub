@@ -1,6 +1,3 @@
-// The API's documentation as the page reads it (BASE-G150, G04): the OpenAPI document cut into one section per app, by
-// its name, each with its routes in path order — method, path, what it does, its parameters and the schema of its
-// body — and the file a person downloads to import it elsewhere (Postman).
 import { describe, expect, it } from 'vitest';
 
 import { apiDocFileName, apiDocSections } from './api-docs';

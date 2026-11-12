@@ -1,4 +1,4 @@
-// base's chrome mounts with the screen (FIX-HUB-BASE-HOME-ONE-STREAM-FLAKY): its pieces load on demand, but the hub
+// base's chrome mounts with the screen: its pieces load on demand, but the hub
 // mounts only once they are here. The bell (topbar) and the apps followed beside the pane (background) read live
 // queries: mounted after the screen, they came more than 150 ms after its queries on a slow device, and the one live
 // stream was cut and opened again with them (tests/e2e/base-home.spec.ts, «when base's chrome arrives late»). Its own
