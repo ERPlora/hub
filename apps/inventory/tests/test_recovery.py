@@ -443,6 +443,16 @@ def said(row) -> tuple[str, list[dict]]:
     return row.status, [{key: result[key] for key in keys} for result in row.results]
 
 
+def asked_again_gives_nothing(recoveries, copy) -> None:
+    """``copy`` asked again: nothing comes back twice."""
+    again = recoveries.ask(copy, "inventory")
+    assert run() == 1
+    assert said(again) == (
+        "done",
+        [{"app": "inventory", "restored": 0, "created": 0, "not_created": 0, "reasons": [], "refused": ""}],
+    )
+
+
 @pytest.mark.usefixtures("no_test_fallback")
 class TestProductsComeBack:
     def a_business(self, recoveries, every_app_on):
@@ -535,13 +545,7 @@ class TestProductsComeBack:
             ("Tea", "TEA-1", False, Decimal("0.000"), ["Drinks"]),
         ]
 
-        again = recoveries.ask(copy, "inventory")
-        assert run() == 1
-
-        assert said(again) == (
-            "done",
-            [{"app": "inventory", "restored": 0, "created": 0, "not_created": 0, "reasons": [], "refused": ""}],
-        )
+        asked_again_gives_nothing(recoveries, copy)
         with use_hub(hub):
             assert Category.objects.filter(name="Desserts", is_deleted=False).count() == 1
 
@@ -555,13 +559,7 @@ class TestProductsComeBack:
         assert run() == 1
         before = [events_named(hub, f"inventory.product.{fact}") for fact in ("restored", "created")]
 
-        again = recoveries.ask(copy, "inventory")
-        assert run() == 1
-
-        assert said(again) == (
-            "done",
-            [{"app": "inventory", "restored": 0, "created": 0, "not_created": 0, "reasons": [], "refused": ""}],
-        )
+        asked_again_gives_nothing(recoveries, copy)
         assert [events_named(hub, f"inventory.product.{fact}") for fact in ("restored", "created")] == before
         assert [one[0] for one in live_products(hub)] == ["Cake", "Coffee", "Tea"]
 
