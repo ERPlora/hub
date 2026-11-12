@@ -7,9 +7,9 @@
 // in `saasDatabase` (`E2E_SAAS_DB`, by default `saas` on :8000 and `saas_e2e_<port + 1>` beside it).
 //
 // A stack beside the shared one runs on its own e2e database (`hub_e2e_<port>`, `database.ts` creates
-// and migrates it): on 2026-10-16 two stacks (8030 and 8040) ran on the default `hub` and the cash sale
-// of one fell into the other's open shift. Phase 1 keeps every hub's business in that one database, so
-// `DB_NAME` is all a run needs to be on its own; without it, or with `hub`, the run is refused.
+// and migrates it), or the cash sale of one run could fall into another's open shift. Each hub's own
+// database is named after that one, so `DB_NAME` is all a run needs to be on its own; without it, or with
+// `hub`, the run is refused.
 
 type Env = Record<string, string | undefined>;
 

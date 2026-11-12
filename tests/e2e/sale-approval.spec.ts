@@ -1,21 +1,21 @@
 // flow: SALE-F30
 // flow: SALE-F31
-// FIX-SALE-VOID-REFUND-ASKS-NO-APPROVAL (apps/sale/WORKBOOK.md SALE-F30 and F31; base/WORKBOOK.md BASE-F84): the cashier
+// Approvals in Sales (apps/sale/WORKBOOK.md SALE-F30 and F31; base/WORKBOOK.md BASE-F84): the cashier
 // (employee@example.com, who may neither void nor refund) sees «Void» and «Refund» in Sales; confirming either opens
 // «An approval is needed» over the window, the owner approves it with their PIN on the cashier's own device and it is
 // done once, as the server then says; «Cancel» leaves the refusal inside the window, which stays open, and nothing is
 // voided. Screenshots of the dialog over Sales in the three viewports. The owner's PIN exists only while this file
 // runs, after the cashier has entered (a PIN in hub `a` turns every browser's way in into the PIN pad:
 // base-access.spec.ts), and the approvals it records go with it, as everything else this file creates (`afterAll`).
-// FIX-HUB-SALE-APPROVAL-E2E-REUSED-DB: the owner and the cashier are told by their session, not by their email (a hub
+// The owner and the cashier are told by their session, not by their email (a hub
 // database kept from a stack whose SaaS was created again holds an older account with each email), and the PIN and
 // the approvals of every account of those emails go before and after, so a run that failed leaves the next one clean.
-// FIX-HUB-SALE-OWN-COPY-OF-APPROVED-COMMAND-CONSEQUENCES (SALE-F30, F32; BASE-F84): what the approved void asks of other
+// SALE-F30, F32 and BASE-F84: what the approved void asks of other
 // apps goes with it by the platform's rule: a sale paid with Lucía's voucher and a shampoo by card, voided by the
 // cashier with the owner's PIN, gives its session back to the voucher and its rectifying invoice is issued in the void
 // (the cashier may do neither on their own). Screenshots of that approval in the three viewports.
 // flow: SALE-F14
-// FIX-HUB-SALE-APPROVAL-WITHOUT-FIGURE-DECLARATION (SALE-F14; BASE-F84, F85; sales#398, sales#403, hub#2180): with a
+// SALE-F14, BASE-F84 and F85: with a
 // maximum discount of 10 %, the cashier puts 50 % on a line at Sell and «An approval is needed» says that 50 %, then a
 // fixed amount on the check and it says that amount in the business's currency, as Square and Toast print what the
 // manager approves; the owner approves each with their PIN and the check keeps it. Screenshots of the dialog with the

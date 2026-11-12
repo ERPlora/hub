@@ -1,9 +1,7 @@
-// The hub's shell is the old hub's, side menu
-// included (docs/reference/old-hub/{dashboard,menu-toggle,verifactu-settings}-*.png). The menu is pinned
-// from 992 px and the topbar folds it to a rail of icons; below, a drawer the hamburger opens. In it, the
-// person, the platform's entries whose screen exists (today Home only) and no module; in its footer, the
-// QR «Open on your phone». The topbar: drawer button or rail toggle, the title centred, the ⠿ «My apps»;
-// no Back on the screens of a module nor on Home (only on a detail, as in the old hub).
+// The hub's shell, side menu included. The menu is pinned from 992 px and the topbar folds it to a rail of icons;
+// below, a drawer the hamburger opens. In it, the person, the platform's entries whose screen exists and no module;
+// in its footer, the QR «Open on your phone». The topbar: drawer button or rail toggle, the title centred, the ⠿ «My
+// apps»; no Back on the screens of a module nor on Home, only on a detail.
 // flow: none — the hub's shell.
 import { type Locator, type Page, expect, test } from '@playwright/test';
 
@@ -36,7 +34,7 @@ function topbar(page: Page) {
   };
 }
 
-/** The title's text, centred on its bar (the old hub's ios title), within 4 px. */
+/** The title's text, centred on its bar (Ionic's ios title), within 4 px. */
 async function expectTitleCentred(page: Page, label: string): Promise<{ title: Box; toolbar: Box }> {
   const bar = topbar(page);
   const text = await bar.title.evaluate((el) => {
@@ -67,9 +65,8 @@ test('1440: the menu pinned next to the content, the person on top and the QR be
   expect(pinned.width).toBeLessThanOrEqual(248);
   expect(content.x, 'the content starts where the menu ends, not under it').toBeGreaterThanOrEqual(pinned.x + pinned.width - 1);
 
-  // The person at the top; the platform entries with a screen today that the owner may open (Home, Apps and System:
-  // APP-BASE-4; Settings: APP-BASE-3; Employees: APP-BASE-5; Files: APP-BASE-8; «API» only with its docs shown); no
-  // module.
+  // The person at the top; the platform entries with a screen today that the owner may open (Home, Apps, System,
+  // Settings, Employees, Files, and «API» only with its docs shown); no module.
   await expect(menu(page).locator('[data-testid=user-menu-trigger] .sidebar-user-name')).toBeVisible();
   await expect(entries(page)).toHaveCount(PLATFORM_ENTRIES.length);
   expect(await entries(page).evaluateAll((items) => items.map((item) => item.getAttribute('data-testid')))).toEqual(PLATFORM_ENTRIES);
@@ -173,7 +170,7 @@ test('no Back on the screens of a module nor on Home, only on a detail; the ⠿ 
     await expect(shown(page).locator('[data-testid=home-my-app]').first()).toBeVisible();
     await expect(topbar(page).back, `${vp.label}: Home`).toHaveCount(0);
 
-    // A detail keeps its contextual Back (the old hub's `back-href`), and it returns to its list.
+    // A detail keeps its contextual Back (`back-href`), and it returns to its list.
     await page.goto(`/demo/items/${item.id}`);
     await expect(shown(page).locator('[data-testid=demo-detail-status]')).toBeVisible();
     await topbar(page).back.click();
@@ -220,10 +217,9 @@ async function measureUserMenu(page: Page) {
   });
 }
 
-// The user menu is the shared shell's (ERPlora/ui UserMenuPopover + App.vue), the SaaS's too: «Theme» went
-// one letter a line, the card's name and email ran under the chevron without «…», and from the name the
-// menu hung over the email line (ACCOUNTS-G93 in the SaaS, MIGRATION-TASK APP-ACCOUNTS-1).
-// The three sizes of the spec and the two others of the fleet's sweep (a short phone, a portrait tablet).
+// The user menu is the shared shell's (ERPlora/ui UserMenuPopover + App.vue), the SaaS's too: «Theme» on one line,
+// the card's name and email cut with «…» before the chevron, and the menu below the email line, never over it.
+// The three sizes of the spec and two more: a short phone and a portrait tablet.
 const MENU_VIEWPORTS = [
   VIEWPORTS.phone,
   VIEWPORTS.tablet,

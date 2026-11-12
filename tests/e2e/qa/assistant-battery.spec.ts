@@ -1,5 +1,4 @@
-// The QA battery of the Hub's assistant with the REAL model and the REAL documentation index
-// (docs/plans/2026-10-31-qa-asistente.md of erplora-next: block B, 21 to 34, and C35 to C37), one test per item.
+// The QA battery of the Hub's assistant with the REAL model and the REAL documentation index, one test per item.
 // Skipped unless QA_REAL_PROVIDER=1: it spends real tokens (about 20 turns) and never runs in CI. Needs the keys in
 // the environment (QA_QWEN_API_KEY, QA_OPENAI_API_KEY; never in the repo, the report or a screenshot) and the stack's
 // SaaS checkout (E2E_SAAS_DIR) running with ASSISTANT_SERVICE_PROVIDER=openai (README «La QA del asistente con el modelo
@@ -218,7 +217,7 @@ for (const item of ITEMS) {
     if (item.check === 'quota') {
       await expect.poll(async () => (await messages(context)).used, { timeout: 15_000 }).toBeGreaterThan(usedBefore);
       const { used, limit } = await messages(context);
-      // The foot only shows from 80 % of the month (BASE-G122): the month set to 5 left, the same question once more,
+      // The foot only shows from 80 % of the month: the month set to 5 left, the same question once more,
       // and the month put back to what was really spent.
       setMonth(limit - 5);
       let asked = false;

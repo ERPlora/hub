@@ -1,7 +1,7 @@
-// flow: SALE-F16 (atribuir a quien tiene la sesión con «Atiende yo») — the till's «Served by me» in Chrome,
+// flow: SALE-F16 (a sale left on «Me» belongs to whoever holds the session) — the till's «Served by me» in Chrome,
 // on the real stack (Sales, Inventory, Staff), no mocks. The owner's account first has no record in Staff:
 // «Who is serving this check» warns that a sale left on «Me» counts for nobody (seen at 390×844, 834×1112
-// and 1440×900, `.artifacts/FIX-SALE-SERVED-BY-ME-NOT-ATTRIBUTED-<width>.png`). Then the account gets its
+// and 1440×900). Then the account gets its
 // record: the warning is gone, a sale charged by card with the chip still on «Me» is the record's (the till
 // sends nobody: the server resolves «Me»), and Staff → Commissions counts it for that record. What the run
 // creates is named «E2E…» and removed after it; a record the account already had is unlinked for the run

@@ -18,7 +18,7 @@
 // without reloading; Meta's cancelled window and an expired code connect nothing and say why. F02: with «Needs
 // reconnecting», the inbox's notice leads to Settings, «Reconnect» opens the same window and connects the number
 // again, and the inbox's notice goes by itself (disconnecting: whatsapp-inbox-connect.spec.ts).
-// Captures, three sizes: FIX-HUB-WHATSAPP-INBOX-LOCAL-HTTP-RETURN-PAGE-REFUSED[-F01|-F02]-390|834|1440.
+// Captured in three sizes.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, capture, login, SAAS, shown } from './helpers';

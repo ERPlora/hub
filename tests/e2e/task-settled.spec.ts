@@ -1,7 +1,7 @@
-// flow: task-e2e-wait — FIX of the Tasks specs' wait (FIX-HUB-TASK-E2E-WAIT-COUNTS-ONLY-OVERLAYS)
+// flow: task-e2e-wait — the Tasks specs' wait
 // Every capture of a Tasks flow goes through `snap()` (task-helpers.ts), which waits for the screen to stop moving
-// first. Its own wait counted Ionic's modals and popovers while they slid in or out and nothing else: a toast entering
-// passed for still, and the capture caught it half in (TASK-F05: «Start» from a row says «Task started»). Here that
+// first. A wait that counts only Ionic's modals and popovers sliding in or out lets a toast entering pass for still,
+// and the capture catches it half in (TASK-F05: «Start» from a row says «Task started»). Here that
 // notice enters at a fifth of its speed (Chrome's own control) and, once `snap()` returns, nothing may move, asked
 // with the harness's own detector (`exposeMovingInPage`, helpers.ts), at 390, 834 and 1440. The answer to «Start» is
 // held until the click's own motion (the row's «⋮» menu leaving, where the row folds its actions) has ended at full
