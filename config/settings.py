@@ -383,8 +383,8 @@ FLOW_SECRETS_KEY = config("FLOW_SECRETS_KEY", default="")
 # place for its website (apps/website/reviews.py; Place Details and Text Search, from the server only). Secrets Manager
 # and the task definition in AWS. Empty: the reviews section asks nothing and shows only what was read before.
 GOOGLE_PLACES_API_KEY = config("GOOGLE_PLACES_API_KEY", default="")
-# Whether a business may go live with VeriFactu on this server (VERIFACTU-F08): ERPlora opens it under Ioan's
-# supervision, and only the prod deployment honours it (apps.verifactu.queries.production_open; pre files in testing).
+# Whether a business may go live with VeriFactu on this server (VERIFACTU-F08): ERPlora opens it by hand,
+# and only the prod deployment honours it (apps.verifactu.queries.production_open; pre files in testing).
 VERIFACTU_PRODUCTION_ENABLED = config("VERIFACTU_PRODUCTION_ENABLED", default=False, cast=bool)
 # ERPlora's own hub: it issues ERPlora's invoices to its customers, which the SaaS posts to
 # /internal/platform/invoices (base.internal). A reserved slug, so no business can ever take it; it files in the
@@ -506,7 +506,7 @@ LIVE = {
     "context_builder": "base.operations.HubContextBuilder",
     "control_alias": "default",
     # Every operation's transaction opens on the alias of its use_hub; the registry's, on control. An
-    # operation of an app the business has no right to answers 402 before (base.entitlement, BASE-G12).
+    # operation of an app the business has no right to answers 402 before (base.entitlement).
     "operation_database": "base.entitlement.operation_database",
     # Where live.operations.atomic() opens (a services.py's savepoint): the active use_hub's alias, inside an operation
     # its transaction's; without a context HubContextMissing, never control's by omission.

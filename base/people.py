@@ -1,4 +1,4 @@
-"""The people of a business and their roles, as Employees shows them (APP-BASE-5): rules without the ORM.
+"""The people of a business and their roles, as Employees shows them: rules without the ORM.
 
 Who is in the business and with which role is erplora.com's (HUBS-F24…F29 of the SaaS: invite, change the role,
 remove, the plan's places); the Hub keeps of each person how they get in at its tills (a PIN, a badge), and lets whoever
@@ -25,7 +25,7 @@ ROLE_ORDER = (
 SAAS_PREFIX = "saas:"
 
 #: Tries to give someone a badge: 30 an hour per editor, the accepted ones too («already taken» tells that a number
-#: is somebody's card: gh:hub#2560, the old Hub's brake on PINs tried through a person's page, gh:hub#2518).
+#: is somebody's card), the same brake as ``base.access.PIN_CHANGE_LIMIT`` puts on PINs.
 BADGE_CHANGE_LIMIT = AttemptLimit("badge-change", attempts=30, window=3600)
 
 #: Why a person's way in cannot be changed by who asks; the codes the operations answer with.

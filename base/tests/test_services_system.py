@@ -1,6 +1,5 @@
-"""System's commands on the events the relay gave up on (APP-BASE-7; the old hub's ``/api/hub/events/:id/retry``,
-``retry-all`` and ``:id/discard``, HUB-F55…F57): resend one, resend all, discard one. For who runs the business; one
-hub never touches another's; each records its event in its transaction and the live queries follow after the COMMIT.
+"""System's commands on the events the relay gave up on: resend one, resend all, discard one. For who runs the business;
+one hub never touches another's; each records its event in its transaction and the live queries follow after the COMMIT.
 A delivery the relay gives up on is told to its hub's live queries too (the bell rises at once, BASE-F10).
 """
 
@@ -64,7 +63,7 @@ def test_each_command_is_for_who_runs_the_business_and_told_to_the_assistant(nam
     assert description(op)
 
 
-# ── Resend one (BASE-G92) ────────────────────────────────────────────────────────────────────────────────────
+# ── Resend one ───────────────────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -157,7 +156,7 @@ def test_a_cashier_cannot_resend_nor_discard():
         run("base.failed_event.retry_all", cashier)
 
 
-# ── Resend all (BASE-G93) ────────────────────────────────────────────────────────────────────────────────────
+# ── Resend all ───────────────────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -185,7 +184,7 @@ def test_resending_all_with_nothing_to_resend_records_nothing():
     assert recorded(events.FAILED_EVENT_RETRIED) == []
 
 
-# ── Discard one (BASE-G94) ───────────────────────────────────────────────────────────────────────────────────
+# ── Discard one ──────────────────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db

@@ -1,4 +1,4 @@
-"""BASE-G136 and G145: a manager's PIN lets one refused action through, and Employees › Approvals keeps the record.
+"""A manager's PIN lets one refused action through, and Employees › Approvals keeps the record.
 
 An app names the commands of its own that a manager may approve on the spot (``LiveAppConfig.approvals``: operation →
 what is approved, in words). Whoever lacks the permission of one of them gets, instead of a flat refusal,
@@ -7,7 +7,7 @@ holds the permission approves it with their PIN (or their badge) and the hub han
 minutes, bound to that person, that command, that very request and this business. The command repeated with the pass
 goes through once; the record (who asked, who approved, what, when, whether it was used) stays in the hub and only who
 runs the business reads it. A query, a command no app names and a command the caller may run anyway never ask. The
-PIN is checked as the PIN pad checks it (APP-BASE-3): same hash, same brakes.
+PIN is checked as the PIN pad checks it: same hash, same brakes.
 """
 
 import csv
@@ -185,7 +185,7 @@ class TestApproving:
         assert braked.status_code == 429 and code(braked) == "base.too_many_attempts"
 
     def test_twenty_wrong_pins_from_one_address_brake_it_whatever_name_they_try(self, client, adam, eva):
-        """hub#2517 of the old hub: changing the person on every try does not dodge the address's brake."""
+        """Changing the person on every try does not dodge the address's brake."""
         from uuid import uuid4
 
         asked = refused(client)
@@ -413,7 +413,7 @@ APPROVAL_ROUTES = {
 
 
 class TestNotOfTheBusiness:
-    """rv-hub-244: whoever is not of the business gets the refusal of always, never the approval's question with what
+    """Whoever is not of the business gets the refusal of always, never the approval's question with what
     it would approve."""
 
     def test_a_session_of_another_business_is_refused_flat(self, client, adam, make_user):
@@ -461,13 +461,13 @@ class TestACommandThatTouchesNoDatabase:
         assert approvable(self.NO_DATABASE) is None
 
 
-# ── What is approved, with the figure of that very request (FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE) ─────
-# hub#2180, hub#2186, sales#398, sales#403: the manager sees how much they approve («a 50 % discount»), as Toast and
-# Square print it, not only what kind of action. Beside its words, an app declares in ``approval_figures`` how they are
-# said with the figures of the request: sentences tried in order, whose holes name fields of the command's input
-# (``{field}``, ``{field, percent}``, ``{field, money}``); the first one whose every hole fills is said. The figures are
-# read from the input as the command's own schema validates it, never from the raw body, and only the fields a sentence
-# names; a hole fills with no empty value and no zero; none fills, or no declaration: the words of always.
+# ── What is approved, with the figure of that very request ───────────────────────────────────────────────────────
+# The manager sees how much they approve («a 50 % discount»), as Toast and Square print it, not only what kind of
+# action. Beside its words, an app declares in ``approval_figures`` how they are said with the figures of the request:
+# sentences tried in order, whose holes name fields of the command's input (``{field}``, ``{field, percent}``,
+# ``{field, money}``); the first one whose every hole fills is said. The figures are read from the input as the
+# command's own schema validates it, never from the raw body, and only the fields a sentence names; a hole fills with
+# no empty value and no zero; none fills, or no declaration: the words of always.
 
 FIGURED = {APPROVABLE: ["Lock the till after {pin_inactivity_minutes} minutes with {pin_length} digits",
                         "Lock the till after {pin_inactivity_minutes} minutes"]}
@@ -566,7 +566,7 @@ class TestTheFigureOnTheRecord:
         assert [row[3] for row in lines(exported(client, "en", search="till"))[1:]] == ["Ana", "Eva"]
 
 class TestTheFigureOfEachHub:
-    """Two hubs with their own databases (phase 2): the figure approved in one is never on the other's record."""
+    """Two hubs with their own databases: the figure approved in one is never on the other's record."""
 
     pytestmark = pytest.mark.django_db(databases=HUB_DATABASES)
 
@@ -601,9 +601,8 @@ class TestTheFigureOfEachHub:
 
 
 class TestTheFiguresOfTheTill:
-    """The sentences Sales will declare (its FIX, ``espera: base``), on its real commands and their schemas: a percent
-    and an amount in the business's currency, and the check's discount that may carry either or both (hub#2186: never
-    «and 0.00 €»)."""
+    """The sentences Sales declares, on its real commands and their schemas: a percent and an amount in the business's
+    currency, and the check's discount that may carry either or both (never «and 0.00 €»)."""
 
     CHECK = "sale.order.set_discount_over_limit"
     LINE = "sale.order.set_line_discount_over_limit"
@@ -713,10 +712,9 @@ class TestTheFiguresAreCheckedAtStart:
 
 
 class TestTheFiguresTheReviewAdded:
-    """Three holes the review found (FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE): the record says an amount in
-    the business's currency (the list and the CSV ask it only when a row has figures); a currency written in letters
-    never touches its figure («PLN 1.00»); and ``base.E008`` refuses the sentences of another app's command even when
-    that app's ``approvals`` name it too."""
+    """Three holes a review found: the record says an amount in the business's currency (the list and the CSV ask it
+    only when a row has figures); a currency written in letters never touches its figure («PLN 1.00»); and ``base.E008``
+    refuses the sentences of another app's command even when that app's ``approvals`` name it too."""
 
     CHECK = "sale.order.set_discount_over_limit"
 
