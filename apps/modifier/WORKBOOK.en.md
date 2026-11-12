@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:858e6ba895a9aaf3e442ef1eee6152dbff1910ee60abeed2291f6b221d1794e9 -->
+<!-- generated from WORKBOOK.md sha256:d345511f8257816188ee6767a36a891f98f4f80596f2fac9f68e82abe0f3f385 -->
 
 ## What it is for and who it is for
 
@@ -355,7 +355,14 @@ several (hub#1245). If the group, the option or the link comes by its identifier
 card neither reads nor shows that name, which the action does not use: it says the record of the identifier (hub#1250).
 An option by its identifier is looked for inside the group said beside it, so that group does come up. When letting
 a group go by the link's identifier, the card does not show either the group, the product or the category whose
-identifier comes beside it, which the action does not look at (hub#1278).
+identifier comes beside it, which the action does not look at (hub#1278). When applying or letting go a group, a
+product said by its SKU or its name and a category said by its name are looked up as the action will look them up,
+and the card shows the one that will be touched ("Product: Pizza" when "pizz" was said); when applying it, if what was
+said fits several, the card shows it as it was said and the action asks which one, and the "yes" counts only for what
+it showed: if, before confirming, someone creates one that fits better what was said, nothing is applied and the new
+card comes up. If the product, the category or the link comes by its identifier beside the name of another product or
+another category, the card does not show that name, which the action does not use: it says the one of the identifier
+(hub#1291).
 
 ### What it offers: queries (they read, they change nothing)
 
