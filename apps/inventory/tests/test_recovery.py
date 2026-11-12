@@ -339,12 +339,21 @@ def test_a_category_the_business_renamed_since_is_the_same_one_whoever_took_its_
 def test_each_one_made_again_stands_for_one_category_of_the_copy_the_oldest_first():
     kept = category("Specials")
     lost, also_lost = category("Specials", is_deleted=True), category("Specials", is_deleted=True)
-    category("specials")
+    first_again = category("specials")
     copy = [a_category_of_the_copy(one) for one in (also_lost, kept, lost)]
 
     # The one the business kept is the copy's own, never another's made again; the one made again by hand stands for
     # the oldest lost, so the other comes back.
     assert [one["id"] for one in queries.categories_not_in_business(copy)] == [also_lost.pk]
+
+    # Brought back: each lost one is now its own, so a product of the copy goes into each by the same pairing.
+    second_again = category("SPECIALS")
+    cake = a_product_of_the_copy(
+        name="Cake", sku="CAK-1", category_ids=[also_lost.pk, kept.pk, lost.pk],
+        copy_categories={one["id"]: one["name"] for one in copy},
+    )
+    [lacking] = queries.products_not_in_business([cake])
+    assert lacking["category_ids"] == [second_again.pk, kept.pk, first_again.pk]
 
 
 @pytest.mark.django_db
