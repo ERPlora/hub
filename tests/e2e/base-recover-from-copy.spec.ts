@@ -1,14 +1,17 @@
-// flow: BASE-F114 (steps 6-11), CUSTOMER-F07, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04, SERVICE-F01 — hub#1257,
-// hub#1306, hub#1282, hub#1283: in the Hub admin, the ERPlora staff choose a separate copy of a business and bring back
+// flow: BASE-F114 (steps 6-11), CUSTOMER-F07, CUSTOMER-F33, CUSTOMER-F06, CUSTOMER-F04, INVENTORY-F01, INVENTORY-F04,
+// SERVICE-F01 — hub#1257, hub#1306, hub#1285, hub#1282, hub#1283: in the Hub admin, the ERPlora staff choose a separate copy of a business and bring back
 // into it the customers, the products and the services it lost since, by their apps' own operations (never a copied
-// row): a card the business deleted and still holds comes back the same card, with its history; a product comes back as
-// a new one, made by Inventory's create, and a service as a new one, made by Services' create. At each size: a card, a
-// product and a service of `a` are made; in Hubs, «Restore to a separate copy…» asks a copy of `a` from a temporary
-// cluster (the stack's own server) and the worker's pass makes it; the card and the product are deleted in `a` and the
-// service is gone from it; then Separate copies › tick the copy › «Recover into the business…» › Customers, Products and
+// row): a card the business deleted and still holds comes back the same card, with its history and its group; one it no
+// longer has at all comes back as a new card with its group (the business's own of that name), its tag (made again: the
+// business deleted it) and its custom field's value; a product comes back as a new one, made by Inventory's create, and a
+// service as a new one, made by Services' create. At each size: two cards in a group, the second with a tag and a custom
+// field's value, a product and a service of `a` are made; in Hubs, «Restore to a separate copy…» asks a copy of `a` from a temporary
+// cluster (the stack's own server) and the worker's pass makes it; the first card and the product are deleted in `a`,
+// the second card, the tag and the service are gone from it; then Separate copies › tick the copy › «Recover into the business…» › Customers, Products and
 // Services ticked (with whatever else answers) › «Recover»; the worker's pass brings them back; Recoveries says
-// «Customers: 1 restored; Products: 1 created» and «Services: 1 created», and `a` has the same card live again, and the
-// product and the service live again under new ids.
+// «Customers: 1 restored, 1 created; Products: 1 created» and «Services: 1 created», and `a` has the same card live again
+// in its group, the second one again in that group with its tag and its value, and the product and the service live again
+// under new ids.
 // The stack's worker serves databases only (no moves' thread), so the spec plays its passes, as the specs play the
 // relay.
 import { spawnSync } from 'node:child_process';
@@ -150,6 +153,17 @@ for (const { label, viewport } of SIZES) {
     const name = `Recovered ${label} ${RUN}`;
     const email = `recovered-${label}-${RUN}@example.com`;
     const card = aCard(name, email);
+    // What hangs from the cards: a group both are in, and a tag and a custom field's value of the second.
+    const group = inA('customer.group.create', { name: `VIP ${label} ${RUN}` });
+    const tagName = `Regular ${label} ${RUN}`;
+    const tag = inA('customer.tag.create', { name: tagName, color: 'success' });
+    const field = inA('customer.field.create', { name: `Size ${label} ${RUN}` });
+    const goneEmail = `gone-${label}-${RUN}@example.com`;
+    const goneCard = aCard(`Gone ${label} ${RUN}`, goneEmail);
+    inA('customer.customer.set_groups', { id: card, group_ids: [group] });
+    inA('customer.customer.set_groups', { id: goneCard, group_ids: [group] });
+    inA('customer.customer.set_tags', { id: goneCard, tag_ids: [tag] });
+    inA('customer.customer.update', { id: goneCard, field_values: [{ field_id: field, value: 'M' }] });
     const sku = `REC-${label}-${RUN}`;
     const product = aProduct(name, sku);
     const service = aService(name);
@@ -175,6 +189,14 @@ for (const { label, viewport } of SIZES) {
     inA('inventory.product.delete', { id: product });
     expect(psql(`select count(*) from customer_customer where email = '${email}' and deleted_at is null`)).toBe('0');
     expect(psql(`select count(*) from inventory_product where sku = '${sku}' and not is_deleted`)).toBe('0');
+    // The second card gone from the business altogether, with what hung from it (a lost database, or the Hub admin's
+    // «Delete»), and the tag deleted by Customers' own operation.
+    for (const table of ['customer_customer_groups', 'customer_customer_tags', 'customer_customfieldvalue']) {
+      psql(`delete from ${table} where customer_id = '${goneCard}'`);
+    }
+    psql(`delete from customer_customer where id = '${goneCard}'`);
+    inA('customer.tag.delete', { id: tag });
+    expect(psql(`select count(*) from customer_customertag where name = '${tagName}'`)).toBe('0');
     // And the service gone from the business altogether: no operation deletes one (it is archived), a lost database does.
     psql(`delete from service_service where id = '${service}'`);
     expect(psql(`select count(*) from service_service where name = '${name}'`)).toBe('0');
@@ -208,7 +230,7 @@ for (const { label, viewport } of SIZES) {
     await page.goto(RECOVERIES);
     const recovered = page.locator('#result_list tbody tr').first();
     await expect(recovered).toContainText('Done');
-    await expect(recovered).toContainText('Customers: 1 restored; Products: 1 created');
+    await expect(recovered).toContainText('Customers: 1 restored, 1 created; Products: 1 created');
     await expect(recovered).toContainText('Services: 1 created');
     await capture(page, `${KEY}-${label}-4-recoveries`, { fullPage: true });
     await recovered.locator('a').first().click();
@@ -218,6 +240,17 @@ for (const { label, viewport } of SIZES) {
     // In the business, the same card is live again, by Customers' restore, and no new one was made.
     expect(psql(`select id from customer_customer where email = '${email}' and deleted_at is null`)).toBe(card);
     expect(psql(`select count(*) from customer_customer where email = '${email}'`)).toBe('1');
+    // In its group still: deleting kept it.
+    expect(psql(`select count(*) from customer_customer_groups where customer_id = '${card}' and customergroup_id = '${group}'`)).toBe('1');
+    // The second card, a new one by Customers' own operations, in the same group (never a second one of that name), with
+    // its tag made again as it was and its value.
+    const again = psql(`select id from customer_customer where email = '${goneEmail}' and deleted_at is null`);
+    expect(again).not.toBe('');
+    expect(again).not.toBe(goneCard);
+    expect(psql(`select count(*) from customer_customer_groups where customer_id = '${again}' and customergroup_id = '${group}'`)).toBe('1');
+    expect(psql(`select count(*) from customer_customergroup where name = 'VIP ${label} ${RUN}'`)).toBe('1');
+    expect(psql(`select t.name || '|' || t.color from customer_customer_tags m join customer_customertag t on t.id = m.customertag_id where m.customer_id = '${again}'`)).toBe(`${tagName}|success`);
+    expect(psql(`select value from customer_customfieldvalue where customer_id = '${again}' and field_id = '${field}'`)).toBe('M');
     // And the product, a new one made by Inventory's create; the deleted one stays deleted.
     expect(psql(`select count(*) from inventory_product where sku = '${sku}' and not is_deleted`)).toBe('1');
     expect(psql(`select id from inventory_product where sku = '${sku}' and not is_deleted`)).not.toBe(product);

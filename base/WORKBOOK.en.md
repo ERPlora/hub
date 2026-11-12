@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:343dc2fa08ae6f1e3b4eac021f48bd2cddb85b9a82a4311469fd90dc5dc1378b -->
+<!-- generated from WORKBOOK.md sha256:d62e9f81f7b75a27838374b898e403ed574191fba7429c0a68de71d7e1bcf222 -->
 
 ## What it is for and who it is for
 
@@ -2934,8 +2934,8 @@ Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APP
 Status: done (the action and the restore, in its place or to a separate copy, and getting back from the separate copy
 the customers that were lost, the deleted ones as they were, the products, the services and the appointments; making
 and deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws; repeating
-appointments, hub#1327; the groups, tags and own fields of a customer brought back, hub#1285; the image and the
-categories of a product brought back, hub#1319 and hub#1320; the image of a service brought back, hub#1319; its
+appointments, hub#1327; the group, tag or own field the business deleted after deleting a customer who comes back,
+hub#1356; the image and the categories of a product brought back, hub#1319 and hub#1320; the image of a service brought back, hub#1319; its
 professionals, hub#1322; the deleted service categories, hub#1323)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
@@ -2980,8 +2980,11 @@ Steps:
       without personal data). A customer the business deleted and still holds comes back THE SAME card, with their
       purchases and what was spent, their consents, notes and activity, their groups, tags and own fields and their
       linked orders (CUSTOMER-F33). One the business no longer has comes back as a new card, created as the Customers
-      screen creates it, with their name, contact, tax ID, address, dates, source, stage, channel and notes; without their
-      groups, tags or own fields (hub#1285). A card whose personal data was erased (GDPR) or one merged into another never
+      screen creates it, with their name, contact, tax ID, address, dates, source, stage, channel and notes, and with their
+      groups, tags and own fields: the group, tag or field the business has with that name is that one, without making
+      another, and one it no longer has is made again as it was (hub#1285); a value of a field the business deactivated
+      does not come back. A deleted card that comes back does not get back the group, tag or field the business deleted
+      afterwards (hub#1356). A card whose personal data was erased (GDPR) or one merged into another never
       comes back, and one the business has already made again (the same name, phone and email) is not repeated. With
       Products, "Products: 3 created": each product comes back as a new one, created as the Products screen creates it,
       with its name, SKU, EAN-13, description, type, price, cost, units, threshold, stock control and tax category, active
@@ -3012,8 +3015,10 @@ Out: the business's database as it was at that moment; the one it had, kept 7 da
 business as it was, untouched; a separate database on its cluster with the data of that moment, closed to the
 application and kept 7 days; the notice `control.hub.restore_aside_requested` with who asked for it. When recovering: in
 the business, each deleted card it still held, live again with its card-recovered notice (`customer.customer.restored`),
-a new card for each customer it no longer had, with its card-created notice (`customer.customer.created`), and a new
-product for each product it lacked, with its product-created notice (`inventory.product.created`), a new service for
+a new card for each customer it no longer had, with its card-created notice (`customer.customer.created`) and those of
+its groups and tags set (`customer.customer.groups_changed`, `customer.customer.tags_changed`), each group, tag or own
+field it lacked made again, with its notice (`customer.group.created`, `customer.tag.created`,
+`customer.field.created`), and a new product for each product it lacked, with its product-created notice (`inventory.product.created`), a new service for
 each one it no longer had, with its service-created notice (`service.service.created`), and a new appointment for each
 one it lacked, with its appointment-created notice (`appointment.appointment.created`), and nothing else; the copy,
 untouched; the notice `control.copy.recovery_requested` with who asked for it.
@@ -3031,7 +3036,8 @@ is only possible from a made copy and once at a time per copy; otherwise the not
 is made gives anything back."), and with nothing ticked the page asks again. What cannot be brought from an app is said in
 its result and the rest goes on: the app is turned off in the business ("Customers: nothing (app_inactive: …)"), or the
 copy did not have it, lacks the migration its read needs or has one this code does not know (`recover_not_in_copy`,
-`recover_copy_behind`, `recover_copy_ahead`). What the create operation does not accept today (a phone no longer valid, a
+`recover_copy_behind`, `recover_copy_ahead`). What the create operation does not accept today (a phone no longer valid, a value of an own field its field no longer
+accepts, a
 product without a tax category or with one Taxes no longer has active, a service whose tax category was turned off
 (`service.tax_category_unknown`), a time taken, a customer no longer there) is counted "not created" with its reason,
 and the rest comes back; so is a deleted card that was merged into another or erased meanwhile
@@ -3040,7 +3046,7 @@ and the rest comes back; so is a deleted card that was merged into another or er
 With the platform frozen for a database upgrade, the restore waits, with the business under maintenance, until it
 is unfrozen. With records from the test environment only, the chain is recovered afterwards (VERIFACTU-F28). The
 support staff see the list, Separate copies and Recoveries, but not the actions.
-Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12,
-CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04, SERVICE-F01, SERVICE-F04, SERVICE-F05,
+Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
+CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04, SERVICE-F01, SERVICE-F04, SERVICE-F05,
 SERVICE-F08, APPOINTMENT-F01, APPOINTMENT-F11; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285,
-hub#1306, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, aws#77
+hub#1306, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1356, aws#77
