@@ -1,4 +1,4 @@
-"""The image of a row an app sells (round 2026-10-30): ``base.images``, what Inventory, Services and Combos share.
+"""The image of a row an app sells: ``base.images``, what Inventory, Services and Combos share.
 
 A product, a service or a set menu keeps one reference: ``catalog:<folder>/<name>`` (an image of the shared library,
 ``base.image_catalog``), ``file:<app>/<folder>/<uuid7 hex>.webp`` (a photo of its own, under its hub's prefix of the

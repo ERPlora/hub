@@ -1,4 +1,4 @@
-"""Which apps a business has the right to use (BASE-G12, PLAN §20.4–§20.5): the SaaS's photo decides, the Hub applies.
+"""Which apps a business has the right to use: the SaaS's photo decides, the Hub applies.
 
 A module with ``premium = False`` always has it; one with ``premium = True`` needs its id in ``modules[]`` of the last
 photo (``Hub.state``), straight or through the ``requires`` of one that is there, and a right whose ``valid_until``
@@ -83,7 +83,7 @@ def test_a_right_in_the_photo_says_where_it_comes_from():
 
 
 def test_the_right_on_an_app_gives_the_right_on_what_it_requires():
-    """PLAN §20.5: the SaaS knows no graph; a right on invoice is one on stock (and tax) too."""
+    """The SaaS knows no graph; a right on invoice is one on stock (and tax) too."""
     rights = entitlement.entitlements(photo("invoice"), now=NOW, configs=CONFIGS)
     assert rights == {"tax": "free", "stock": "required", "invoice": "purchase", "sale": "free"}
     assert entitlement.blocked(photo("invoice"), now=NOW, configs=CONFIGS) == frozenset()
@@ -100,7 +100,7 @@ def test_a_right_that_ended_is_no_right():
 
 
 def test_a_slug_the_hub_has_no_module_for_is_ignored_and_logged(caplog):
-    """PLAN §20.4.5: a typo in the SaaS's admin reads as «the hub never gets the right», and the log says why."""
+    """A typo in the SaaS's admin reads as «the hub never gets the right», and the log says why."""
     with caplog.at_level(logging.WARNING, logger="base.entitlement"):
         assert entitlement.blocked(photo("stok"), now=NOW, configs=CONFIGS) == frozenset({"stock", "invoice"})
     assert "stok" in caplog.text
@@ -161,7 +161,7 @@ def test_a_host_without_a_row_has_no_paid_app(modules):
 
 @pytest.mark.django_db
 def test_the_relay_and_the_home_leave_out_what_is_blocked(modules, monkeypatch):
-    """``active_apps``: what the relay delivers to and the Home asks; phase 1 has every installed app on but these."""
+    """``active_apps``: what the relay delivers to and the Home asks: every installed app but the blocked ones."""
     monkeypatch.setattr("base.relay.all_live_app_configs", lambda: [*CONFIGS, SimpleNamespace(label="base")])
     keep("a", photo("stock"))
 

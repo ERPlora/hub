@@ -1,5 +1,5 @@
-"""The SaaS's door to ERPlora's platform hub (contract point 4; PLAN-SAAS §4): ``/internal/platform/invoices``, signed
-as every ``/internal`` call (``base.internal``), as ``saas-next/hubs/hub_client.py`` calls it.
+"""The SaaS's door to ERPlora's platform hub: ``/internal/platform/invoices``, signed as every ``/internal`` call
+(``base.internal``), as the SaaS's ``hubs/hub_client.py`` calls it.
 
 - ``GET …/health``: 200 ``{"status": "ok"}`` only when the platform hub has its issuer and VeriFactu answers; else 503
   ``{"status": "unconfigured", "detail"}`` (the SaaS's gate before charging live).
@@ -42,7 +42,7 @@ def get(client, path, **more):
 @pytest.fixture
 def platform_row(db, settings):
     """The platform hub's row in the registry (``create_platform_hub`` makes it); the suite's fallback keeps its rows
-    on control's test database, as every business of the tests written before the tenancy."""
+    on control's test database, as for every business of the tests without its own database."""
     from control.models import Hub
 
     settings.PLATFORM_HUB_SLUG = PLATFORM.key
@@ -83,8 +83,8 @@ def test_without_the_platform_hub_in_the_registry_it_is_503_and_says_how_to_make
 
 
 @pytest.mark.usefixtures("no_test_fallback")
-def test_a_platform_hub_of_phase_1_without_its_own_database_is_503_and_says_how_to_make_it(client, platform_row):
-    """Its row is there but its data is still in control's (phase 1): never run there, nor on control (S5)."""
+def test_a_platform_hub_without_its_own_database_is_503_and_says_how_to_make_it(client, platform_row):
+    """Its row is there but its data is still in control's: never run there, nor on control."""
     issued = post(client, BODY)
     health = get(client, f"{ROOT}/health")
 
@@ -97,7 +97,7 @@ def test_a_platform_hub_of_phase_1_without_its_own_database_is_503_and_says_how_
 @pytest.mark.django_db(databases=HUB_DATABASES)
 @pytest.mark.usefixtures("no_test_fallback")
 def test_the_platform_hub_issues_in_its_own_database_and_nowhere_else(client, hub_a, settings):
-    """Since S5 the platform hub is a business with its own database (``is_platform``): its invoices go there."""
+    """The platform hub is a business with its own database (``is_platform``): its invoices go there."""
     from base.tenancy.context import use_hub
     from control.models import Hub
 

@@ -1,9 +1,9 @@
-"""translate_workbooks: each app's WORKBOOK.en.md (the modules' and base's), generated from its Spanish user part (spec §4.5).
+"""translate_workbooks: each app's WORKBOOK.en.md (the modules' and base's), generated from its Spanish user part.
 
 The hash is the user part's, not the file's: touching «Para quien lo mantiene» costs nothing. With
 the hash in the header unchanged, no call; otherwise one call and the header with the new hash.
 ``--check`` never reaches the network: it fails on a stale translation, telling to translate it by
-hand with the header ``HEADER_COMMAND`` prints (PLAN-MIGRATIONS §24-D: ERPlora uses no API key), and on
+hand with the header ``HEADER_COMMAND`` prints (ERPlora uses no API key), and on
 a Spanish date placeholder left in a current one. The API is always a double here: ``translate`` (one
 call to the Claude API) is replaced, and its own test fakes the SDK client. ``ANTHROPIC_API_KEY`` comes
 from the environment or the checkout's ``.env``, like every setting; here only from the test's own
@@ -26,7 +26,7 @@ from base.catalog import en_header, source_hash
 from base.management.commands import translate_workbooks
 from base.tests.test_catalog import USER_PART, WORKBOOK, module, translated
 
-#: The command of PLAN-MIGRATIONS §24-D that prints the first line of a hand-made WORKBOOK.en.md.
+#: The command that prints the first line of a hand-made WORKBOOK.en.md.
 HEADER_COMMAND = (
     'uv run python manage.py shell --no-imports -c "from django.apps import apps; from base import catalog; '
     "print(catalog.en_header(catalog.source_hash(catalog.workbook_translation(apps.get_app_config('{}')).source)))\""
@@ -207,7 +207,7 @@ def test_check_passes_when_every_translation_is_current_or_missing(tmp_path, ins
 
 
 def test_check_tells_to_translate_each_stale_one_by_hand_with_its_header_never_through_the_api(tmp_path, installed, translator):
-    """ERPlora uses no ANTHROPIC_API_KEY (PLAN-MIGRATIONS §24-D): whoever reads the error translates by hand."""
+    """ERPlora uses no ANTHROPIC_API_KEY: whoever reads the error translates by hand."""
     installed(
         module(tmp_path, "current", en=translated(USER_PART, ENGLISH)),
         module(tmp_path, "stale", en=translated("una versión anterior\n", ENGLISH)),
@@ -552,7 +552,7 @@ def test_translate_reports_an_api_failure(fake_client, key):
     ids=["env-file", "environment", "environment-wins"],
 )
 def test_the_key_reaches_the_client_from_the_environment_or_the_checkouts_env_file(fake_client, key, sources, expected):
-    """The SDK reads only the environment: a key only in .env never reached it (python-decouple exports nothing)."""
+    """The SDK reads only the environment: a key only in .env would never reach it (python-decouple exports nothing)."""
     key(**sources)
     fake = fake_client()
 

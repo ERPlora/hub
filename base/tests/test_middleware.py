@@ -1,10 +1,10 @@
 """SaasLoginRequiredMiddleware: a browser without a session on a SPA route goes to the SaaS's login.
 
-The Hub has no login of its own (Ioan, 2026-10-13; PLAN-SAAS §2.1). The API keeps answering 401,
-and every path with a URL of its own in Django (health, callback…) is left alone.
+The Hub has no login of its own. The API keeps answering 401, and every path with a URL of its own in
+Django (health, callback…) is left alone.
 
 PlatformHostMiddleware: the platform host (``hubs.localhost``, ``hubs.erplora.com``) is only the Hub
-admin for the staff (round 13, PLAN §18.1); on any other host, ``/admin/`` is not found (PLAN §18.1.3).
+admin for the staff; on any other host, ``/admin/`` is not found.
 """
 
 import json
@@ -76,7 +76,7 @@ def test_an_anonymous_browser_goes_to_the_saas_login_of_its_hub(client, path, ho
 
 def test_the_jump_page_carries_the_fragment_the_browser_never_sends(client):
     # «/settings#data» reaches the server as «/settings»: only the page's script knows the «#data» it adds to
-    # ``next``, so the person lands on the tab the link named after erplora.com (BASE-G52).
+    # ``next``, so the person lands on the tab the link named after erplora.com.
     page = browse(client, "/settings")
     html = page.content.decode()
     nonce = re.search(r"'nonce-([^']+)'", page["Content-Security-Policy"]).group(1)
@@ -98,7 +98,7 @@ def test_the_jump_page_leaves_the_state_to_the_login_it_sends_to(client):
 
 
 def test_the_jump_binds_its_state_to_this_browser_with_a_cookie(client):
-    # Only the callback reads it (PLAN-SAAS §3.1): /auth/callback refuses a code without this state.
+    # Only the callback reads it: /auth/callback refuses a code without this state.
     response = through_the_jump(client, browse(client, "/demo/items"))
     cookie = response.cookies["hub_login_state"]
     assert (cookie["httponly"], cookie["samesite"], cookie["secure"], cookie["max-age"], cookie["path"]) == (
@@ -181,11 +181,11 @@ def test_the_login_callback_of_a_host_that_is_no_hub_is_not_found(client):
 
 
 def test_health_still_answers_on_a_reserved_host(client):
-    # hub.localhost is reserved, not the platform host (hubs.localhost, PLAN §18.1).
+    # hub.localhost is reserved, not the platform host (hubs.localhost).
     assert browse(client, "/healthz", "hub.localhost:8000").status_code == 200
 
 
-# HUB_BASE_DOMAIN (plan 2026-10-14-entorno-pre, H-2): prod's Hub (erplora.com) never serves a host of
+# HUB_BASE_DOMAIN: prod's Hub (erplora.com) never serves a host of
 # pre (x.pre.erplora.com), which the ALB's wildcard *.erplora.com would also match; /readyz still
 # answers on every host Django accepts, the private name included.
 PROD_HOSTS = [".erplora.com", "hub.erplora.internal"]
@@ -252,7 +252,7 @@ def test_readyz_still_answers_on_the_private_name(client, host):
     health.forget_readiness()
 
 
-# The Hub admin lives only on the platform host (PLAN §18.1.3): on a hub host and on a host that is no
+# The Hub admin lives only on the platform host: on a hub host and on a host that is no
 # hub, every admin path is not found, never the admin's own login, also for a superuser.
 NOT_THE_PLATFORM_HOSTS = ["a.localhost:8000", *NO_HUB_HOSTS]
 ADMIN_PATHS = ["/admin/", "/admin/login/", "/admin/hub/a/", "/admin/base/membership/"]
@@ -348,7 +348,7 @@ class TestPlatformHost:
         assert browse(client, path, PLATFORM, method=method).status_code == status
 
     def test_a_module_s_documentation_image_is_served_without_a_session(self, client, settings):
-        # Round 16 (spec §4.4): the SaaS's store links /static/catalog/<id>/img/ on this host; WhiteNoise
+        # The SaaS's store links /static/catalog/<id>/img/ on this host; WhiteNoise
         # serves what AppImagesFinder publishes (from the finders here, from STATIC_ROOT once collected).
         settings.WHITENOISE_USE_FINDERS = True
         response = browse(client, "/static/catalog/demo/img/items-list.png", PLATFORM)
@@ -385,8 +385,8 @@ class TestPlatformHost:
         assert response["Location"] == f"{SAAS_LOGIN}?hub=a&next=/demo/items&state={state_of(response)}"
 
 
-# The registry decides (plan 2026-10-17, §1.2): a slug without a row is 404, a hub that is gone 410, one still being
-# prepared 503. `a` and `b` are in it (the autouse fixture `local_hubs`, as `seed_local_hubs` leaves them).
+# The registry decides: a slug without a row is 404, a hub that is gone 410, one still being prepared 503. `a` and
+# `b` are in it (the autouse fixture `local_hubs`, as `seed_local_hubs` leaves them).
 
 
 class TestTheRegistryGate:
@@ -442,8 +442,8 @@ class TestTheRegistryGate:
 
     @pytest.mark.parametrize("ended", ["by_time", "expired", "purged"])
     def test_the_login_of_a_demo_that_ended_still_jumps_to_the_saas_door(self, client, hub, ended):
-        # The SaaS's «Back to my demo» starts here: its /demo/enter/ asks for a code, hears 410 and says «expired»
-        # (plan 2026-10-17, §1.7); a 410 page here would leave the SaaS believing the demo is still on.
+        # The SaaS's «Back to my demo» starts here: its /demo/enter/ asks for a code, hears 410 and says «expired»;
+        # a 410 page here would leave the SaaS believing the demo is still on.
         import datetime as dt
 
         from django.utils import timezone
@@ -507,8 +507,8 @@ class TestTheRegistryGate:
         assert (page.status_code, api.status_code) == (status, status)
         assert not page.has_header("Retry-After") and not api.has_header("Retry-After")
 
-    # A hub moving to another cluster (round 2026-10-30b of PLAN-DB, decision 3; control.hub.move): closed for the few
-    # seconds its database is copied, then back on its new cluster.
+    # A hub moving to another cluster (control.hub.move): closed for the few seconds its database is copied, then back
+    # on its new cluster.
     def test_a_hub_moving_to_another_cluster_is_503_under_maintenance_and_asks_to_come_back(self, client, hub):
         from control.models import Cluster
 
@@ -551,8 +551,8 @@ class TestTheRegistryGate:
         assert (response.status_code, response["Retry-After"]) == (503, "30")
         assert response.json()["error"]["code"] == "base.hub_preparing"
 
-    # BILLING-F16 of the SaaS: a business suspended for an unpaid invoice (the SaaS's photo, ``status``) does not
-    # open, with a session or without, until it is paid; in its 7 days of grace (``past_due``) it works.
+    # A business suspended for an unpaid invoice (the SaaS's photo, ``status``) does not open, with a session or
+    # without, until it is paid; in its 7 days of grace (``past_due``) it works.
     def test_a_suspended_business_is_402_with_the_way_back_to_erplora(self, client, hub):
         hub("acme", state={"status": "suspended"})
         response = browse(client, "/", "acme.localhost:8000")

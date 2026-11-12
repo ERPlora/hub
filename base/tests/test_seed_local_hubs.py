@@ -1,4 +1,4 @@
-"""``manage.py seed_local_hubs``: the local hubs ``a`` and ``b``, ready in the registry (plan 2026-10-17, §1.3).
+"""``manage.py seed_local_hubs``: the local hubs ``a`` and ``b``, ready in the registry.
 
 The host gate answers 404 to a slug without a row, so a developer's database needs them once; local development
 only (``DEBUG``), idempotent, through its operation (``base.hub.seed_local``), never a data migration (it would put
@@ -41,9 +41,9 @@ def seed() -> str:
 
 @pytest.mark.usefixtures("fresh")
 def test_refuses_while_some_app_cannot_live_in_a_hub_s_own_database():
-    """Since S5 there is no shared database to leave a and b on: while some app cannot live in a hub's own database
-    (``migrator.portable_apps``; here ``staff``), it refuses and writes nothing. Every app can since W10 (hub#474):
-    the command then makes their databases (``base/tenancy/tests/test_provision.py``, on real ones)."""
+    """There is no shared database to leave a and b on: while some app cannot live in a hub's own database
+    (``migrator.portable_apps``; here ``staff``), it refuses and writes nothing. Every real app can (hub#474): the
+    command then makes their databases (``base/tenancy/tests/test_provision.py``, on real ones)."""
     with pytest.raises(CommandError, match="staff"):
         seed()
     assert not Hub.objects.filter(slug__in=["a", "b"]).exists()
@@ -56,7 +56,7 @@ def test_the_operation_names_each_local_hub_s_own_database_and_leaves_it_due():
     from base.tenancy import connections as tenancy_connections
     from base.tenancy import names
 
-    Hub.objects.create(slug="a", status="ready")  # a developer's a of phase 1, on control's database
+    Hub.objects.create(slug="a", status="ready")  # an older seed's a, which shared control's database
 
     answer = hub_seed_local(system_context(registry.REGISTRY_SCOPE), HubSeedLocalIn(slugs=["a", "b"]))
 

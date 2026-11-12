@@ -1,4 +1,4 @@
-"""The Hub's assistant without the ORM (``base/assistant.py``, APP-BASE-9; PLAN §30): which operations are its tools
+"""The Hub's assistant without the ORM (``base/assistant.py``): which operations are its tools
 for this person, the few it offers in a turn, how a write is shown before it runs, how a tool runs as the person, and
 the signed calls to erplora.com's gateway (``/internal/assistant/*``, ``/internal/speech/transcribe``).
 
@@ -35,7 +35,7 @@ def ctx(permissions=MANAGER, *, actor="ana", language="en", scope=A):
 
 
 
-# ── Tools: what the assistant may use for this person (BASE-G118; gh:hub#11) ─────────────────────────────────────
+# ── Tools: what the assistant may use for this person ────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -105,9 +105,9 @@ def owner(make_user) -> OperationContext:
 
 
 def test_no_operation_of_the_platform_is_a_tool_whatever_its_ai_says(owner):
-    """FIX-HUB-BASE-ASSISTANT-OFFERS-PLATFORM-WRITES-AS-TOOLS: the platform's reactions and scheduled tasks (erasing or
-    reassigning the customer of an appointment, expiring a hold, lowering the stock of a sale) were tools of whoever
-    holds «*», because their ``ai=`` does not start with «System only». Its permission says so, not its words."""
+    """The platform's reactions and scheduled tasks (erasing or reassigning the customer of an appointment, expiring a
+    hold, lowering the stock of a sale) must not be tools of whoever holds «*» just because their ``ai=`` does not start
+    with «System only». Its permission says so, not its words."""
     platform = platform_operations(owner)
     assert PLATFORM_WRITES <= set(platform)  # not an empty sweep
     assert [name for name in platform if assistant.is_tool(registry[name])] == []
@@ -126,7 +126,7 @@ def test_a_superusers_assistant_is_offered_no_operation_of_the_platform(owner, s
     assert sorted(set(tools) & set(platform_operations(owner))) == []
 
 
-# ── By relevance: a turn offers the tools of what was asked, never the whole catalogue (PLAN §30) ─────────────────
+# ── By relevance: a turn offers the tools of what was asked, never the whole catalogue ────────────────────────────
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -155,7 +155,7 @@ def test_what_the_person_asks_to_do_ranks_the_operation_that_does_it():
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_the_version_of_erplora_is_at_hand_for_who_runs_the_business():
-    """gh:hub#1044: asked «what version of ERPlora do I have?», the old assistant said there was none."""
+    """Asked «what version of ERPlora do I have?», the assistant has a tool that answers it."""
     tools = assistant.catalog(ctx({"base.view_home", "base.administer_hub"}))
     offered = [op.name for op in assistant.relevant(tools, ["¿Qué versión de ERPlora tengo?"], "es")]
     assert "base.system.status" in offered
@@ -171,8 +171,8 @@ def test_the_checklist_read_is_always_at_hand():
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("permissions", [EMPLOYEE, MANAGER, {"*"}])
 def test_the_documentation_search_is_always_at_hand_for_everybody(permissions):
-    """saas ASSISTANT-F28 (Ioan, 2026-10-31: «everything it is asked, it answers with our information, inventing
-    nothing»): a how-to question («¿cómo abro la caja?») shares no word with the tool, so it is in every turn."""
+    """Everything it is asked, it answers with our own information, inventing nothing: a how-to question («¿cómo abro
+    la caja?») shares no word with the tool, so it is in every turn."""
     assert "base.docs.search" in assistant.ALWAYS
     tools = assistant.catalog(ctx(permissions))
     assert "base.docs.search" in tools
@@ -194,7 +194,7 @@ def test_a_tool_is_offered_in_the_gateways_format():
     assert spec["parameters"]["properties"]["name"]["type"] == "string"
 
 
-# ── The card of a write (BASE-G115, G116; gh:hub#1045) ───────────────────────────────────────────────────────────
+# ── The card of a write ──────────────────────────────────────────────────────────────────────────────────────────
 
 
 def test_a_normal_write_asks_a_click_and_shows_what_it_will_send():
@@ -277,9 +277,8 @@ def labels(card: dict) -> list[str]:
 
 
 def test_every_datum_of_the_card_is_named_in_the_persons_language():
-    """gh:hub#1040, FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH: a datum the screen does not name itself
-    (``FIELDS`` of the shared assistant's ``card.ts``) went by its schema's English title, in Spanish too («Session»,
-    «Counted cash»)."""
+    """A datum the screen does not name itself (``FIELDS`` of the shared assistant's ``card.ts``) must not fall back to
+    its schema's English title in Spanish («Session», «Counted cash»)."""
     close = get("cash_register.session.close")
     arguments = {"session": "S-1", "closing_balance": 25000}
     assert labels(assistant.card(close, arguments, "es")) == ["Sesión", "Efectivo contado"]
@@ -347,7 +346,7 @@ def titled(fields: list[dict]) -> dict[str, bool]:
 
 
 def test_a_title_its_app_wrote_is_marked_so_for_the_card_to_name_the_datum_by_it():
-    """FIX-HUB-BASE-ASSISTANT-DANGER-CARD-CALLS-THE-RECORD-BY-ITS-FIELD-NAME: a dangerous write of Tables said «Registro:
+    """A dangerous write of Tables said «Registro:
     5 (Terraza)» where its schema titles the check «Cuenta»: the screen names a datum it knows by its own word
     (``FIELDS`` of the shared assistant's ``card.ts``: ``id`` is «Record») and could not tell the title its app wrote from one made up.
     The card says which: a title its app wrote, said in the person's language, is ``titled``; one no catalog
@@ -372,9 +371,9 @@ def test_a_title_the_read_of_a_preview_wrote_is_marked_so_too(settle):
     assert titled(fields) == {"asked_by": True, "name": True, "total_cents": False}
 
 
-# FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-SECRETSTR-IN-CLEAR: the card painted a secret (a certificate's password, an
-# automation's secret: ``SecretStr``) as typed, on the screen and in what the browser receives. Its schema says so
-# (``format: password``, ``writeOnly``): at any depth, the card shows it hidden; the write still receives it.
+# A card never paints a secret (a certificate's password, an automation's secret: ``SecretStr``) as typed, on the
+# screen or in what the browser receives. Its schema says so (``format: password``, ``writeOnly``): at any depth, the
+# card shows it hidden; the write still receives it.
 
 HIDDEN = "••••••••"
 
@@ -517,9 +516,9 @@ def test_no_datum_of_a_write_of_base_reaches_a_spanish_card_by_its_technical_nam
 
 
 def test_an_action_of_the_platform_is_named_by_its_screen_never_base():
-    """FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH: «Cambiar en Base» named the platform by its internal name.
-    An action of base goes by the screen where the person does it (Shopify's Sidekick, Business Central's Copilot:
-    the page, never the platform's name); one of an app, by the app."""
+    """«Cambiar en Base» would name the platform by its internal name. An action of base goes by the screen where the
+    person does it (Shopify's Sidekick, Business Central's Copilot: the page, never the platform's name); one of an
+    app, by the app."""
     pin = get("base.access.settings_update")
     assert assistant.card(pin, {"pin_length": 6}, "es")["app_name"] == "Ajustes"
     assert assistant.card(pin, {"pin_length": 6}, "en")["app_name"] == "Settings"
@@ -542,7 +541,7 @@ def test_every_action_of_base_names_its_screen():
 def test_each_screen_a_receipt_names_by_its_key_is_named_alike_by_the_screen(language):
     """A receipt names the platform's screen by its key (``screen``), in the language the screen is in
     (``base.assistant.screens.<key>`` of base's catalogue): the same name the card gives it in that language, for each
-    screen an action of base happens on (FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY)."""
+    screen an action of base happens on."""
     catalogue = json.loads((Path(settings.BASE_DIR) / f"base/frontend/locale/{language}.json").read_text())
     names = catalogue["base"]["assistant"]["screens"]
     with translation.override(language):
@@ -632,9 +631,9 @@ FROBNICATE = Operation(
 
 
 def test_every_write_the_assistant_may_call_names_its_action_in_english_and_spanish():
-    """FIX-HUB-BASE-ASSISTANT-CARD-RECTIFY-SAYS-DO-THIS-IN-INVOICING: a closed list of 24 verbs left 124 actions as
-    «Do this in Invoicing» (rectify, substitute, mark_paid, print, reschedule…). Every write of every app the
-    assistant may call has its own verb in both catalogues: an app with a new one fails here, saying which."""
+    """A closed list of 24 verbs left 124 actions as «Do this in Invoicing» (rectify, substitute, mark_paid, print,
+    reschedule…). Every write of every app the assistant may call has its own verb in both catalogues: an app with a
+    new one fails here, saying which."""
     assert unnamed(registry.values(), named_actions()) == []
 
 
@@ -645,7 +644,7 @@ def test_the_guardrail_catches_a_write_whose_verb_nobody_names():
 
 
 def test_a_write_whose_actions_verb_does_not_say_what_it_does_is_named_by_its_own():
-    """FIX-HUB-BASE-ASSISTANT-CARD-SAYS-REMOVE-FOR-EMPTYING-A-CART: emptying a cart (``cart_checkout.cart.clear``) said
+    """Emptying a cart (``cart_checkout.cart.clear``) said
     «Quitar», the verb of taking one of its lines out, which Kitchen's ``clear`` (taking a product's route away) does
     say; a cash count (``cash_register.count.add``) said «Añadir», as if it put money in. Their own verb goes first;
     their action's still names the rest."""
@@ -716,8 +715,8 @@ def test_the_typed_confirmation_is_compared_as_the_platforms_dialog_does():
 
 
 # ── What a dangerous write will do, before it is confirmed (BASE-F98) ────────────────────────────────────────────
-# FIX-HUB-BASE-ASSISTANT-HIGH-RISK-CARD-NO-OPERATION-PREVIEW: the card listed only what the write sends; the close of
-# the drawer could not show the expected cash, nor a rectification the invoice it issues. A dangerous write may name,
+# A card listing only what the write sends cannot show the expected cash of the drawer's close, nor the invoice a
+# rectification issues. A dangerous write may name,
 # in its ``ai=``, a read of its own app that tells what it will do (``preview``): run as the person who asks, with
 # the data of the write its input takes, before the card.
 
@@ -852,7 +851,7 @@ def count_preview(answer: dict, output: type[Schema] = CountPreviewOut) -> Opera
 @pytest.mark.django_db
 @pytest.mark.parametrize("difference", [13790, -490, 0], ids=["over", "short", "even"])
 def test_an_amount_its_read_declares_signed_is_marked_so_and_no_other_amount_is(monkeypatch, difference):
-    """FIX-HUB-BASE-ASSISTANT-CARD-POSITIVE-DIFFERENCE-WITHOUT-SIGN: a cash difference over came as a bare amount
+    """A cash difference over came as a bare amount
     («€137.90») where Cash register writes «+€137.90». An amount the read's schema declares signed (``"signed": true``)
     is marked so, whatever its value, for the card to write its sign; the expected cash beside it, and the amounts a
     write sends, stay as they were."""
@@ -903,7 +902,7 @@ def priced(monkeypatch, answer: dict) -> list[dict]:
     ids=["its currency and decimals", "decimals as it answers them", "decimals of its currency when it answers none"],
 )
 def test_an_amount_of_a_preview_carries_the_currency_its_read_answers(monkeypatch, answer, money):
-    """FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: an invoice issued in EUR, rectified once the
+    """An invoice issued in EUR, rectified once the
     business had moved to another currency, showed «-100,00» in the new one on the card. An amount of the preview
     carries the currency the read answers (``currency``) with its decimals (``currency_decimals``, else the
     currency's own: no yen with cents), the sign of a difference with it; a datum that is no amount, none; and the
@@ -983,7 +982,7 @@ def test_a_preview_marks_signed_only_an_amount(monkeypatch):
     """A sign means over or short: only an amount — a whole number its schema marks ``money`` — may be declared
     signed, said at start like the rest. A text is no amount, whether its name says cents or its schema marks it
     ``money`` (the mark alone is not enough: an amount is a whole number), nor a number whose description says cents
-    without the mark (FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS), nor one whose name does (hub#917:
+    without the mark, nor one whose name does (hub#917:
     a ``…_cents`` without the mark)."""
     read = count_preview({}, SignedNameOut)
     monkeypatch.setitem(registry, read.name, read)
@@ -1149,7 +1148,7 @@ def test_the_checks_of_today_are_declared_right(note):
     assert check_errors() == []
 
 
-# ── A tool runs as the person, by its own operation (BASE-G115, G118) ────────────────────────────────────────────
+# ── A tool runs as the person, by its own operation ──────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -1177,11 +1176,11 @@ def test_arguments_that_do_not_fit_come_back_to_the_model_with_the_field():
     assert (broken.outcome, broken.code) == ("error", "invalid_payload")
 
 
-# ── The instructions of a turn (gh:hub#1039, #1045, #1046) ───────────────────────────────────────────────────────
+# ── The instructions of a turn ───────────────────────────────────────────────────────────────────────────────────
 
 
 def test_the_instructions_answer_how_to_questions_only_from_the_documentation():
-    """saas ASSISTANT-F28: how ERPlora works comes from its documentation, cited; what it does not cover is said, never
+    """How ERPlora works comes from its documentation, cited; what it does not cover is said, never
     made up. Its records still come only from its tools. Cited by the ``cite`` line each excerpt brings (hub#1079: «citing
     the section» alone let the answer give the steps and name no excerpt)."""
     text = " ".join(assistant.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={}).split())
@@ -1207,10 +1206,10 @@ def test_the_instructions_keep_ids_out_of_the_answer():
 
 def test_the_instructions_set_the_language_the_money_and_the_screens():
     text = assistant.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={"/settings": "Ajustes"})
-    # gh:hub#1046: the old assistant answered anything (films, cinemas) on the business's allowance.
+    # Off-topic questions (films, cinemas) would spend the business's allowance.
     assert "Only help with this business and with using ERPlora" in text
     assert "Spanish" in text
-    # An amount by its mark, not by the words «in cents» (FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS).
+    # An amount by its mark, not by the words «in cents».
     assert "EUR" in text and '"money": true' in text and "minor unit" in text
     assert "[Ajustes](/settings)" in text
     assert "Bar Pepe" in text
@@ -1221,7 +1220,7 @@ def test_the_instructions_set_the_language_the_money_and_the_screens():
     [("EUR", 2, "17.00 EUR → 1700"), ("JPY", 0, "17 JPY → 17"), ("KWD", 3, "17.000 KWD → 17000")],
 )
 def test_the_instructions_say_an_amount_in_the_currency_its_result_gives(currency, decimals, example):
-    """FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: a tool's result gives its amounts with their
+    """A tool's result gives its amounts with their
     currency (``currency`` and ``currency_decimals``: an invoice keeps the one it was issued in) and the card paints them
     in it, but the model was told to say every amount in the business's, with two decimals: its text and the card
     disagreed. An amount goes in the minor unit of its currency (no cents in yen), said in the currency its result
@@ -1325,7 +1324,7 @@ def test_the_setup_block_carries_what_is_pending_and_who_does_it():
     assert "could not be read" in assistant.setup_block(None)
 
 
-# ── The gateway's doors, signed (BASE-G122, G123, G112, G124) ────────────────────────────────────────────────────
+# ── The gateway's doors, signed ──────────────────────────────────────────────────────────────────────────────────
 
 
 def test_the_allowance_is_asked_signed_and_for_this_business(gateway):
@@ -1365,7 +1364,7 @@ def test_a_dictation_is_transcribed_by_erplora(gateway):
     assert gateway.sent("/internal/speech/transcribe")[0].body == {"hub": "a", "audio": "UklGRg==", "mime_type": "audio/webm", "language": "es"}
 
 
-# ── The turn, streamed (BASE-G111, G119, G122, G124) ─────────────────────────────────────────────────────────────
+# ── The turn, streamed ───────────────────────────────────────────────────────────────────────────────────────────
 
 
 def frames_of(**kwargs):
@@ -1431,7 +1430,7 @@ def test_an_allowance_spent_is_not_a_breakdown(gateway):
     ],
 )
 def test_a_refusal_of_the_gateway_is_one_of_ours(gateway, status, code, expected):
-    """gh:hub#1738: the old hub said «Could not reach the assistant» for any refusal; each one is said as it is."""
+    """Each refusal is said as it is, never as a generic «Could not reach the assistant»."""
     gateway.reply("/internal/assistant/chat/stream", status=status, json={"error": {"code": code, "message": "x"}}, headers={"Retry-After": "40"})
     error = frames_of(**TURN)[-1]
     assert (error["type"], error["code"]) == ("error", expected)
@@ -1472,7 +1471,7 @@ def test_a_gateway_out_of_reach_is_said(settings):
     assert (error["type"], error["code"]) == ("error", "assistant.unreachable")
 
 
-# ── Whether a turn brought pages of the web, for the report of its answer (hub#870, saas#287, BASE-F105) ─────────────
+# ── Whether a turn brought pages of the web, for the report of its answer (hub#870, BASE-F105) ───────────────────────
 
 
 def test_a_turn_that_brought_pages_of_the_web_says_so_when_it_closes(gateway):
@@ -1498,7 +1497,7 @@ def test_a_turn_without_pages_of_the_web_says_it_brought_none(gateway):
 
 def test_the_tools_it_asks_for_after_searching_still_say_the_pages(gateway):
     """A search, then a tool of the Hub: the mark closes the round that waits for the tool (the browser keeps it across
-    the continuation, ui#105)."""
+    the continuation)."""
     call = {"type": "function_call", "name": "demo__item__list", "call_id": "c1", "arguments": "{}"}
     gateway.turn({"type": "web"}, call, {"type": "response", "output": [call], "usage": {}, "continuation": "tok"})
     done = frames_of(**TURN)[-1]
