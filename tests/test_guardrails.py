@@ -1539,54 +1539,64 @@ def _is_fixed(value: ast.AST, fixed: set[str]) -> bool:
     return False
 
 
-def _fixed_names(tree: ast.Module) -> set[str]:
-    """The names bound to a fixed moment in the body of the module or of one of its classes: ``AT = dt.datetime(…)``,
-    ``THEN = AT - dt.timedelta(days=2)``, a class's ``MOMENT``."""
-    fixed: set[str] = set()
-    for body in (tree.body, *(node.body for node in ast.walk(tree) if isinstance(node, ast.ClassDef))):
-        for statement in body:
-            if isinstance(statement, ast.Assign):
-                targets, value = statement.targets, statement.value
-            elif isinstance(statement, ast.AnnAssign) and statement.value is not None:
-                targets, value = [statement.target], statement.value
-            else:
-                continue
-            if _is_fixed(value, fixed):
-                fixed.update(target.id for target in targets if isinstance(target, ast.Name))
+def _bind_fixed(statements, fixed: set[str]) -> set[str]:
+    """``fixed`` and the names ``statements`` bind, in their order, to a fixed moment: ``AT = dt.datetime(…)``,
+    ``THEN = AT - dt.timedelta(days=2)``, ``until = AT + dt.timedelta(minutes=1)``."""
+    fixed = set(fixed)
+    for statement in statements:
+        if isinstance(statement, ast.Assign):
+            targets, value = statement.targets, statement.value
+        elif isinstance(statement, ast.AnnAssign) and statement.value is not None:
+            targets, value = [statement.target], statement.value
+        else:
+            continue
+        if _is_fixed(value, fixed):
+            fixed.update(target.id for target in targets if isinstance(target, ast.Name))
     return fixed
 
 
 def fixed_leases(source: str) -> list[tuple[int, str]]:
     """``(line, what)`` for every lease ``source`` writes until a fixed moment: ``lease_until=`` in a call (``create``,
     ``update``, a helper's), ``"lease_until": …`` in a dict or ``….lease_until = …``, built from a ``datetime(…)`` or
-    from a name bound to one in the body of the module or of a class.
+    from a name bound to one in the body of the module, of a class or of the function that writes it.
 
     The worker claims a row by the clock: ``timezone.now()`` on purpose in ``base/tenancy/recovery.py`` and
     ``restore.py`` (an earlier step of the tick may have outlasted the lease), its tick's ``now`` elsewhere. A lease
     another worker «holds» until a fixed moment is held only until the real clock passes it, and from then on the test
     falls in ``main`` and in every branch (hub#1351: ``AT``, 09:00 of the day it was written, plus 5 minutes). A lease
     written from the real clock (``timezone.now() ± …``, or a ``now`` the test read from it) holds for either clock.
-    Known limit: a fixed moment passed on through a function's local name is not seen.
+    Known limit, as (a)'s: it reads names, not values, so a fixed moment that comes in as an argument is not seen.
     """
     tree = ast.parse(source)
-    fixed = _fixed_names(tree)
+    classes = [node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)]
+    fixed = _bind_fixed([*tree.body, *(statement for node in classes for statement in node.body)], set())
     found: set[tuple[int, str]] = set()
 
-    def note(value: ast.AST) -> None:
-        if _is_fixed(value, fixed):
-            found.add((value.lineno, f"{LEASE_FIELD}={ast.unparse(value)}"))
+    def scan(scope: ast.AST, names: set[str]) -> None:
+        def note(value: ast.AST) -> None:
+            if _is_fixed(value, names):
+                found.add((value.lineno, f"{LEASE_FIELD}={ast.unparse(value)}"))
 
-    for node in ast.walk(tree):
-        if isinstance(node, ast.keyword) and node.arg == LEASE_FIELD:
-            note(node.value)
-        elif isinstance(node, ast.Dict):
-            for key, value in zip(node.keys, node.values, strict=True):
-                if isinstance(key, ast.Constant) and key.value == LEASE_FIELD:
-                    note(value)
-        elif isinstance(node, ast.Assign) and any(
-            isinstance(target, ast.Attribute) and target.attr == LEASE_FIELD for target in node.targets
-        ):
-            note(node.value)
+        for node in ast.walk(scope):
+            if isinstance(node, ast.keyword) and node.arg == LEASE_FIELD:
+                note(node.value)
+            elif isinstance(node, ast.Dict):
+                for key, value in zip(node.keys, node.values, strict=True):
+                    if isinstance(key, ast.Constant) and key.value == LEASE_FIELD:
+                        note(value)
+            elif isinstance(node, ast.Assign) and any(
+                isinstance(target, ast.Attribute) and target.attr == LEASE_FIELD for target in node.targets
+            ):
+                note(node.value)
+
+    scan(tree, fixed)
+    for function in ast.walk(tree):
+        if isinstance(function, ast.FunctionDef | ast.AsyncFunctionDef):
+            bound = sorted(
+                (node for node in ast.walk(function) if isinstance(node, ast.Assign | ast.AnnAssign)),
+                key=lambda node: (node.lineno, node.col_offset),
+            )
+            scan(function, _bind_fixed(bound, fixed))
     return sorted(found)
 
 
@@ -1605,6 +1615,9 @@ def test_d(row):
     row.lease_until = dt.datetime.fromisoformat("2026-11-12T09:05:00+00:00")
 def test_e(hub):
     held = {"lease_owner": "w1", "lease_until": dt.datetime(2026, 11, 12, 9, 5, tzinfo=dt.UTC)}
+def test_f(hub):
+    until = AT + dt.timedelta(minutes=1)
+    HubDue.objects.create(hub=hub, lease_until=until)
 """
 FIXED_LEASE_LOOKALIKES = """\
 \"\"\"lease_until=AT + 5 minutes is held only until the real clock passes it.\"\"\"
@@ -1623,6 +1636,12 @@ def test_d(row):
 def test_e(hub):
     for lease_until in (timezone.now() + dt.timedelta(seconds=60), None):
         RestoredCopy.objects.create(hub=hub, restore_point=AT, lease_until=lease_until)
+def test_f():
+    until = AT
+    assert until
+def test_g(hub):
+    until = timezone.now() + dt.timedelta(minutes=1)
+    HubDue.objects.create(hub=hub, lease_until=until)
 """
 
 
@@ -1633,6 +1652,7 @@ def test_the_lease_scanner_sees_a_lease_written_until_a_fixed_moment():
         (10, "lease_until=self.MOMENT"),
         (12, "lease_until=dt.datetime.fromisoformat('2026-11-12T09:05:00+00:00')"),
         (14, "lease_until=dt.datetime(2026, 11, 12, 9, 5, tzinfo=dt.UTC)"),
+        (17, "lease_until=until"),
     ]
 
 
