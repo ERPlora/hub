@@ -70,6 +70,52 @@ class TestWhatARecoveryBringsBack:
             assert Flow.objects.filter(enabled=True).count() == 2
         assert runs(hub) == []
 
+    def test_what_hangs_from_a_card_it_makes_again_starts_no_automation_of_its_own(self, recoveries, every_app_on):
+        """Luis, gone, comes back with a group, a tag and a custom field the business deleted since, made again by
+        their own operations: none of their events starts the automations that wait for them. The same event done by
+        the business afterwards still does."""
+        waited = (
+            "customer.group.created",
+            "customer.tag.created",
+            "customer.field.created",
+            "customer.customer.groups_changed",
+            "customer.customer.tags_changed",
+        )
+        hub, (_ana, luis) = recoveries.business(every_app_on, ANA, LUIS)
+        vip = run_in(hub, "customer.group.create", name="VIP").id
+        regular = run_in(hub, "customer.tag.create", name="Regular").id
+        pet = run_in(hub, "customer.field.create", name="Pet").id
+        run_in(hub, "customer.customer.set_groups", id=luis, group_ids=[vip])
+        run_in(hub, "customer.customer.set_tags", id=luis, tag_ids=[regular])
+        run_in(hub, "customer.customer.update", id=luis, field_values=[{"field_id": pet, "value": "Luna"}])
+        relayed(hub)
+        with use_hub(hub):
+            for event in waited:
+                make_flow(f"On {event}", trigger_event=event)
+        copy = recoveries.copy_of(hub)
+        gone(hub, luis)
+        for operation, deleted in (
+            ("customer.group.delete", vip),
+            ("customer.tag.delete", regular),
+            ("customer.field.delete", pet),
+        ):
+            run_in(hub, operation, id=deleted)
+        relayed(hub)
+        recoveries.ask(copy)
+
+        assert run() == 1
+        relayed(hub)
+
+        with use_hub(hub):
+            from apps.customer.models import Customer
+
+            again = Customer.objects.live().get(name=LUIS["name"])
+            assert (again.groups.count(), again.tags.count(), again.field_values.count()) == (1, 1, 1)
+        assert runs(hub) == []
+        run_in(hub, "customer.customer.set_groups", id=again.pk, group_ids=[])
+        relayed(hub)
+        assert runs(hub) == [("On customer.customer.groups_changed", "customer.customer.groups_changed")]
+
     def test_a_card_the_business_makes_afterwards_still_starts_them(self, recoveries, every_app_on):
         hub, copy = self.a_business_that_welcomes(recoveries, every_app_on)
         recoveries.ask(copy)

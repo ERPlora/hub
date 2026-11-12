@@ -52,6 +52,7 @@ from apps.customer.queries import (
     health_consent,
     load_detail,
     load_health,
+    named,
 )
 from apps.customer.schemas import (
     OPTIONS_MISSING,
@@ -63,6 +64,7 @@ from apps.customer.schemas import (
     CustomerDetailOut,
     CustomerIn,
     CustomerPatchIn,
+    CustomerRecoverIn,
     CustomerRefIn,
     DeletedOut,
     EraseIn,
@@ -243,12 +245,13 @@ def _kept(field: CustomField, value: str) -> str:
 
 
 def _validated_field_values(
-    customer: Customer, sent: list[FieldValueIn]
+    customer: Customer, sent: list[FieldValueIn], *, required: bool = True
 ) -> dict[UUID, str]:
     """The values to keep per field, or ``InvalidPayload`` with every problem under its field.
 
     Only active fields count: an unknown or inactive one is unavailable. Every required field must
-    end up with a value, the one sent or the one stored.
+    end up with a value, the one sent or the one stored, unless ``required`` is false: a card made
+    again from a separate copy is made as the till makes one, without them (``recover_customer``).
     """
     # The fields written are held until the COMMIT and read after: one deleted meanwhile is unavailable.
     lock_rows(CustomField, [item.field_id for item in sent])
@@ -271,7 +274,7 @@ def _validated_field_values(
             problems[key] = problem
             continue
         kept[field.id] = _kept(field, item.value)
-    for field in fields.values():
+    for field in fields.values() if required else ():
         if field.is_required and not kept.get(field.id, stored.get(field.id, "")):
             problems.setdefault(
                 f"field_values.{field.id}", ("customer.field_required", FIELD_REQUIRED)
@@ -541,15 +544,10 @@ def _named_ids(
     (or that was deleted meanwhile) saves nothing, and the refusal names the ids that are gone."""
     wanted = set(ids)
     for name in names:
-        match = (
-            model.objects.filter(name__iexact=name)
-            .order_by("-is_active", "id")
-            .values_list("id", flat=True)
-            .first()
-        )
+        match = named(model, name)
         if match is None:
             raise InvalidPayload(missing, code=code, fields={field: missing})
-        wanted.add(match)
+        wanted.add(match.id)
     gone = wanted - set(lock_rows(model, wanted))
     if gone:
         raise MembersUnavailable(
@@ -678,6 +676,54 @@ def restore_customer(ctx: OperationContext, data: CustomerRefIn) -> dict:
         customer.is_active = True
         customer.save(update_fields=["deleted_at", "is_active", "updated_at"])
     record_event(ctx, events.CUSTOMER_RESTORED, {"id": str(customer.id)})
+    return load_detail(customer)
+
+
+# Not an assistant tool, and declared by no app, as the restore: its one door is the recovery from a separate copy
+# (BASE-F114), for a card the business no longer has at all.
+@operation(
+    "customer.customer.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission="customer.restore",
+    input=CustomerRecoverIn,
+    output=CustomerDetailOut,
+    ai=INTERNAL,
+)
+def recover_customer(ctx: OperationContext, data: CustomerRecoverIn) -> dict:
+    """hub#1285: a card of a separate copy the business no longer has, made again with what hung from it there, each by
+    the operation its screen uses, all or nothing: the card by ``customer.customer.create``; its groups and tags by
+    ``set_groups`` and ``set_tags``, each the business's own of that name (``queries.named``) or, if it has none, made
+    again as the copy had it by the Groups or Tags screen's create (and deactivated if it was); its values of the custom
+    fields as the card's screen checks them (CUSTOMER-F04), each field the business's own of that name or one made again
+    by the Fields screen's create. A value of a field the business deactivated does not come back (it shows on no card);
+    one its field no longer takes keeps the whole card out, with why; a required field it has no value of does not,
+    as the till makes a card without one (CUSTOMER-F01)."""
+    made = create_customer(ctx, CustomerIn.model_validate(data.model_dump(include=set(CustomerIn.model_fields))))
+    for group in data.groups:
+        if named(CustomerGroup, group.name) is None:
+            again = create_group(ctx, GroupIn.model_validate(group.model_dump(exclude={"is_active"})))
+            if not group.is_active:
+                update_group(ctx, GroupPatchIn(id=again.id, is_active=False))
+    if data.groups:
+        set_groups(ctx, SetGroupsIn(id=made.id, groups=[group.name for group in data.groups]))
+    for tag in data.tags:
+        if named(CustomerTag, tag.name) is None:
+            again = create_tag(ctx, TagIn.model_validate(tag.model_dump(exclude={"is_active"})))
+            if not tag.is_active:
+                update_tag(ctx, TagPatchIn(id=again.id, is_active=False))
+    if data.tags:
+        set_tags(ctx, SetTagsIn(id=made.id, tags=[tag.name for tag in data.tags]))
+    customer = Customer.objects.get(pk=made.id)
+    values = []
+    for value in data.field_values:
+        field = named(CustomField, value.name) or create_field(
+            ctx, FieldIn.model_validate(value.model_dump(exclude={"value"}))
+        )
+        if field.is_active:
+            values.append(FieldValueIn(field_id=field.id, value=value.value))
+    if values:
+        _apply_field_values(customer, _validated_field_values(customer, values, required=False))
     return load_detail(customer)
 
 
