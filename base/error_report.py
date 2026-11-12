@@ -1,7 +1,6 @@
-"""``POST /api/error-report``: the errors the screen reports by itself (BASE-G95, G13, G50; the old hub's
-``frontend_error_report``, HUB_SHELL-F149).
+"""``POST /api/error-report``: the errors the screen reports by itself.
 
-PLAN-SAAS §1.1 (round 2026-10-15b; PLAN-HUB «Embudo de errores»): a report is one structured line in the log, at
+A report is one structured line in the log, at
 ``ERROR``, which CloudWatch counts and alarms on; no table, no issue and no forwarding to erplora.com (each project logs
 its own). The SPA sends it with ``navigator.sendBeacon`` (``base/frontend/lib/error-report.ts``), which cannot carry
 the CSRF header: the route is exempt because it only writes that line, never data. Only a session of the hub's host is

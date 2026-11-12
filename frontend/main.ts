@@ -34,11 +34,11 @@ import { allowedTo, useApiDocsShown } from '../base/frontend/lib/sidebar';
 import { OPERATION_ROUTES } from './generated/operation-routes';
 
 /**
- * The old hub's side menu (PLAN-MIGRATIONS §16): the platform's entries in its two groups — Home (the
+ * The old hub's side menu: the platform's entries in its two groups — Home (the
  * shell's, first), Employees, Files · My plan, Apps, System, API, Settings — and never a module (they open
  * from «My apps» and Home). The shell paints an entry only once its screen exists in the router, so
  * each appears by itself when `base` brings it; and only for whoever may open it (`visible`: the permission
- * its screen's operation asks, APP-BASE-5), «API» only while the business shows its API's documentation.
+ * its screen's operation asks), «API» only while the business shows its API's documentation.
  * My plan has no screen in the Hub yet: it asks nothing until it has one.
  */
 export const SIDEBAR: ShellSidebar = {
@@ -58,9 +58,9 @@ export const SIDEBAR: ShellSidebar = {
 };
 
 /**
- * base's pieces of the chrome (APP-BASE-1, the old hub's): the assistant's sparkles and the bell at the end of the
+ * base's pieces of the chrome, as in the old hub: the assistant's sparkles and the bell at the end of the
  * topbar, «Upgrade plan» and right below it «Manage on erplora.com» in the menu's footer, the blocking strip over every
- * screen and, beside the pane, the device's notices (APPOINTMENT-F28) and the assistant's panel (APP-BASE-9). Each in its
+ * screen and, beside the pane, the device's notices and the assistant's panel. Each in its
  * own chunk, which `boot` loads beside the first screen's: the hub mounts once they are here (`chromeLoaded`).
  */
 export const CHROME: NonNullable<CreateShellOptions['chrome']> = {
@@ -151,11 +151,11 @@ export function appMessages(catalogues: Record<string, AppCatalogue>): CreateShe
 }
 
 /**
- * The user menu: «Profile» (the person's page in this hub, BASE-G125) and, on a shared till of a business that asks,
- * «Switch user» (BASE-G60), both from `hub-home`'s `access` (APP-BASE-3); then the person's account, erplora.com's
- * page (PLAN-SAAS §1.1), opened from the address `base/spa.py` embeds only in a session opened with the account (a new
- * tab; the system browser in the installed app; gh:hub#2506), and with it «Report a problem», base's own dialog
- * (BASE-F108), since only that session has an account for support to answer to; then the Hub's sign out, a form POST
+ * The user menu: «Profile» (the person's page in this hub) and, on a shared till of a business that asks,
+ * «Switch user», both from `hub-home`'s `access`; then the person's account, erplora.com's
+ * page, opened from the address `base/spa.py` embeds only in a session opened with the account (a new
+ * tab; the system browser in the installed app), and with it «Report a problem», base's own dialog,
+ * since only that session has an account for support to answer to; then the Hub's sign out, a form POST
  * to `/auth/logout` once the assistant's conversation is forgotten (`signOut`). Without `hub-home` (no hub), only the sign out.
  */
 export function userMenu(doc: Document): ShellUserMenu {
@@ -211,9 +211,9 @@ export async function boot(
   doc: Document = document,
 ): Promise<void> {
   const config = readSpaConfig(doc);
-  // The shared assistant's panel (APP-BASE-9) as the Hub's: its routes, base's operations and words, who uses it.
+  // The shared assistant's panel as the Hub's: its routes, base's operations and words, who uses it.
   configureAssistant(hubAssistant(doc));
-  // A manager's approval (APP-BASE-5): the pass of the command being repeated travels in `X-Elevation-Token`.
+  // A manager's approval: the pass of the command being repeated travels in `X-Elevation-Token`.
   const client = createLiveClient(config, { routes: OPERATION_ROUTES, getElevationToken: approvalPass });
   const { reload, ...session } = loadSession(client, doc);
   const chrome = chromeLoaded();
@@ -226,7 +226,7 @@ export async function boot(
     // «Home» first in the menu, and the shell's grid of apps as the fallback of `/` (where the login lands
     // without `next`): base's Home (base/frontend/routes.ts) is registered before it and wins `/`.
     home: true,
-    // The old hub's shell (PLAN-MIGRATIONS §16): its side menu, pinned from 992 px and a drawer below,
+    // The old hub's shell: its side menu, pinned from 992 px and a drawer below,
     // with the QR in its footer and the rail toggle and «My apps» in the topbar.
     sidebar: SIDEBAR,
     userMenu: userMenu(doc),
@@ -251,7 +251,7 @@ export async function boot(
   if (blocked !== true) await router.replace(blocked);
   await chrome;
   app.mount('#app');
-  // base's way in (APP-BASE-3): the idle lock of a till, the person's appearance, «Now serving» after a switch.
+  // base's way in: the idle lock of a till, the person's appearance, «Now serving» after a switch.
   startWayIn(doc, {
     translate: (key, values) => (app.config.globalProperties as unknown as { $t: Translate }).$t(key, values),
     logout: () => void signOut(doc),

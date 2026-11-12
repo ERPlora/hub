@@ -1,9 +1,9 @@
-"""Database routers of hub-next.
+"""The Hub's database routers.
 
-``SharedRouter`` (round 16, PLAN §21; spec §3.3) goes first in ``DATABASE_ROUTERS``: the models of
+``SharedRouter`` goes first in ``DATABASE_ROUTERS``: the models of
 the ``shared`` app (the mirror of the SaaS's ``shared`` schema) read and write only on the
-``shared`` alias, and it answers ``None`` for every other model, so the next router (phase 2's
-``TenantRouter``) or ``default`` decides. The Hub never migrates anything on that alias nor the
+``shared`` alias, and it answers ``None`` for every other model, so the next router
+(``TenantRouter``) or ``default`` decides. The Hub never migrates anything on that alias nor the
 ``shared`` app anywhere: the SaaS owns those tables. A model of another app sent to the alias by
 hand (``.using("shared")`` skips the routers) is stopped by the ``hub_shared`` role, not here.
 """

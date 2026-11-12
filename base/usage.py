@@ -1,4 +1,4 @@
-"""The nightly use of each business (BASE-F40, HUBS-F21/F22; PLAN-DB §13 and round 2026-10-30, proposal (j)).
+"""The nightly use of each business.
 
 Once a UTC day ended, the worker measures it (:func:`measure`, through ``base.worker``: at :data:`MEASURE_AFTER` into the
 next day, 00:15, before the SaaS's ``collect_hub_usage`` asks at 01:15 and away from Aurora's backup window, 02:00–03:00)
@@ -12,8 +12,8 @@ for every hub with its own database it serves (ready, or a business that left an
   (``control.HubVisit``, noted at every login and by what they do after it, ``base.meter``: a session open for days counts
   on each of them; the visits older than the window are forgotten after).
 
-A business without its own database (phase 1's, not cut yet) is not measured (decision 3: it never gets control's
-size) and is logged once a night as ``base.usage_shared_database``. Each hub's figures replace that day's (one row per
+A business without its own database (one that shared a database, not cut yet) is not measured (it never gets
+control's size) and is logged once a night as ``base.usage_shared_database``. Each hub's figures replace that day's (one row per
 hub and day, ``control.HubUsageDaily``) and its live queries hear it; the night also forgets the rows of the copies of the hubs' data
 past their 90 days (``base.tenancy.dumps.RETENTION``), which the bucket no longer keeps (``base.hub.usage_measured``). The night itself is a
 ``control.UsageRun``: the first worker that claims it measures it, a run left unfinished for :data:`RUN_TAKEOVER` is taken

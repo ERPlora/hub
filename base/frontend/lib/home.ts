@@ -44,11 +44,11 @@ export interface HubHome {
   plan_url: string;
   /** The person's account on erplora.com (the user menu's «My account»). */
   account_url: string;
-  /** «Members» of this business on erplora.com, where people are invited, given a role and removed (APP-BASE-5). */
+  /** «Members» of this business on erplora.com, where people are invited, given a role and removed. */
   members_url?: string;
   /** This business on erplora.com's panel (the bar's «erplora.com», BASE-F11); empty for who may not open it. */
   manage_url?: string;
-  /** Whether erplora.com reads the assistant's answers aloud in its voices (`ASSISTANT_SERVER_VOICE`, round 2026-11-04a). */
+  /** Whether erplora.com reads the assistant's answers aloud in its voices (`ASSISTANT_SERVER_VOICE`). */
   server_voice?: boolean;
   /** erplora.com's door to the ERPlora app of each system it publishes (hub#683; `lib/app-downloads.ts`). */
   app_downloads?: Record<string, string>;

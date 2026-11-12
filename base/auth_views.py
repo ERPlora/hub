@@ -3,7 +3,7 @@
 Django views, not ninja routes: ``/auth/login`` is where the shell's auth gate sends, and it jumps to
 the SaaS's login with a fresh ``state`` (``base.auth.login_redirect``); the SaaS's page POSTs the
 one-time code and that ``state`` as a form, in a top-level navigation (``response_mode=form_post`` of
-OIDC, PLAN-SAAS §3.1 step 5), and all of them answer with a redirect. Like ``spa.py`` and
+OIDC), and all of them answer with a redirect. Like ``spa.py`` and
 ``health.py``, they hold no business logic: the session is opened by ``base.services``.
 
 The callback redeems a code only with the ``state`` of this browser's jump (its cookie): otherwise
@@ -11,13 +11,13 @@ The callback redeems a code only with the ``state`` of this browser's jump (its 
 for this browser's own login.
 
 On the platform host (``request.platform_host``, ``hubs.erplora.com``) the same pair is the staff's
-jump to the Hub admin (round 13, PLAN §18.1), which the SaaS admin's button starts here:
+jump to the Hub admin, which the SaaS admin's button starts here:
 ``/auth/login?hub=<slug>&next=/admin/hub/<slug>/`` jumps with the ``hub-admin`` audience and a
 ``state``; the callback wants ``next`` to be the deep link ``/admin/hub/<slug>/`` of a hub and that
 ``state``, redeems the code with the ``hub-admin`` audience for that slug, and a failure goes back to
 the SaaS admin's Hubs page.
 
-On a demo's host (``request.hub.is_demo``, plan 2026-10-17 §1.6) there is no account behind the session: the login
+On a demo's host (``request.hub.is_demo``) there is no account behind the session: the login
 jumps to the SaaS's ``/demo/enter/`` (``base.auth.demo_login_redirect``) with the same ``state``, the callback, with
 that ``state``, redeems a code the Hub made itself for the browser that owns the demo (``base.services``, never the
 SaaS) and opens the session of the demo's owner; a code that opens nothing goes back to the SaaS's demo door
@@ -102,7 +102,7 @@ def _admin_login(request: HttpRequest) -> HttpResponseRedirect:
     hub = request.GET.get("hub")
     slug = _hub_slug(hub) if hub else admin_hub_slug(request.GET.get("next"))
     if slug is None:
-        # A hub-admin code is always for a hub (PLAN §18.1.3): the staff choose it on the SaaS admin's Hubs page.
+        # A hub-admin code is always for a hub: the staff choose it on the SaaS admin's Hubs page.
         return HttpResponseRedirect(auth.admin_hubs_url())
     return auth.login_redirect(slug, f"/admin/hub/{slug}/", audience=auth.HUB_ADMIN_AUDIENCE)
 
@@ -274,7 +274,7 @@ def _supported_language(locale: str) -> str | None:
         return None
 
 
-# ── The way in on a device of the hub: the PIN and the badge (APP-BASE-3) ─────────────────────────────────────────
+# ── The way in on a device of the hub: the PIN and the badge ──────────────────────────────────────────────────────
 
 #: The hub's «Access» (``base/frontend/routes.ts``): the PIN pad, «Enter with your account» and what happened.
 ACCESS_PAGE = "/login"

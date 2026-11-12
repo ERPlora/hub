@@ -1,6 +1,6 @@
-// The rules of the Apps screen (BASE-G67…G74; the old hub's `AppsPage.vue` and `lib/apps-catalog.ts`) the browser
+// The rules of the Apps screen the browser
 // applies to `base.app.list`, which already says each app's right, state and first screen: the server decides, this
-// only chooses what each tab lists and how an app's company is named. Turning an app on or off (PLAN-HUB §9) is the
+// only chooses what each tab lists and how an app's company is named. Turning an app on or off is the
 // server's too (`base.app.enable`, `base.app.disable`): here only when each is offered and what the dialog names —
 // what comes along, what goes with it, and what has to go off first.
 import type { AppRow } from '../operations';
@@ -11,7 +11,7 @@ export type AppsTab = 'mine' | 'all' | 'paid';
 /** Each tab's address hash: the old hub's, kept for its links (`/apps#all`). */
 export const TAB_HASH: Readonly<Record<AppsTab, string>> = Object.freeze({ mine: '', all: '#all', paid: '#paid' });
 
-/** The tab an address hash opens; an unknown one is «My apps». Without `paid` (nothing is sold apart: PLAN §32)
+/** The tab an address hash opens; an unknown one is «My apps». Without `paid` (nothing is sold apart)
  *  there is no «Paid», and its old link opens «Add apps», where whatever was sold apart would be. */
 export function tabOf(hash: string, paid: boolean): AppsTab {
   if (hash === TAB_HASH.all) return 'all';
@@ -19,7 +19,7 @@ export function tabOf(hash: string, paid: boolean): AppsTab {
   return 'mine';
 }
 
-/** Whether the catalogue sells any app apart (`premium`): with every app in every plan (PLAN §32) none is, and
+/** Whether the catalogue sells any app apart (`premium`): with every app in every plan none is, and
  *  «Paid» and «Price» would say nothing but «Free». */
 export function sellsApart(apps: readonly AppRow[]): boolean {
   return apps.some((app) => app.premium);

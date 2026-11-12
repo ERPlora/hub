@@ -74,7 +74,7 @@ describe('AppBlockedPage', () => {
     expect(card.text()).toContain('Your data is safe');
     const buy = m.wrapper.find('[data-testid="app-blocked-buy"]');
     expect(buy.attributes()).toMatchObject({ href: STORE, target: '_blank' });
-    // PLAN §32, point 2: every app comes with a plan, so the way to it is a better plan.
+    // Every app comes with a plan, so the way to it is a better plan.
     expect(buy.text()).toBe('Upgrade plan');
     await m.wrapper.find('[data-testid="app-blocked-to-apps"]').trigger('click');
     await flush();

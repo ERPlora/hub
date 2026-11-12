@@ -5,13 +5,13 @@ Aurora failover must not drain every target. The ALB probes each task by its IP,
 ``ALLOWED_HOSTS`` rejects, so the answer comes from a middleware placed before anything that
 validates the Host (``CommonMiddleware``, ``CsrfViewMiddleware``…).
 
-``/readyz`` is the deploy pipeline's gate and Route 53's probe (PLAN-AWS §5): 200 with the control
+``/readyz`` is the deploy pipeline's gate and Route 53's probe: 200 with the control
 database reachable and every migration of this code applied, 503 otherwise. It is a route
 (``config/urls.py``) on the real hosts (a hub's, the platform host ``hubs.erplora.com`` and the private
 name), and the host gates of ``base.middleware`` leave it alone. Cheap: one connection from the pool
 and the read of ``django_migrations``; the reason of a 503 is logged, never sent. Route 53 probes it
 about 30 times a minute, so its answer, 200 or 503, is kept ``READYZ_KEEP_SECONDS`` in the process
-(``time.monotonic``), as saas-next's: never in Valkey, so a Valkey outage never takes ``/readyz`` down
+(``time.monotonic``), as the SaaS's: never in Valkey, so a Valkey outage never takes ``/readyz`` down
 with it. The Host is still validated on every request (the answer is kept in the view, after the
 middleware).
 """

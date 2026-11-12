@@ -1,11 +1,10 @@
-"""Models of base, the platform app of hub-next.
+"""Models of base, the Hub's platform app.
 
-Phase 1 has no tenancy: a user's role on a hub is a ``Membership`` keyed by the first label of the
-Host (``a`` for ``a.localhost``). Phase 2 replaces it with the hub's own staff in its database.
+A user's role on a hub is a ``Membership`` in control, keyed by the first label of the Host (``a`` for
+``a.localhost``); what a person does in a business hangs from its ``HubUser`` in the business's own database.
 
-The registry of hubs (``Hub``) and the demos' codes (``DemoCode``) moved to ``control`` in phase 2's S1 (plan
-2026-10-22), keeping their tables; they are still importable from here. ``HubIdentity`` is the row that says which hub
-a hub's database is.
+The registry of hubs (``Hub``) and the demos' codes (``DemoCode``) live in ``control``, keeping their tables; they are
+still importable from here. ``HubIdentity`` is the row that says which hub a hub's database is.
 """
 
 from django.conf import settings
@@ -77,7 +76,7 @@ class SessionOwner(UUIDModel):
     saas_user_id = models.CharField(_("SaaS account"), max_length=64)
     host = models.CharField(_("host"), max_length=63, help_text=_("The hub's slug, or the platform host's mark."))
     created_at = models.DateTimeField(pgettext_lazy("session owner", "created at"), auto_now_add=True)
-    # APP-BASE-3: the hub's device the session was opened on (a ``TrustedDevice``'s id: a hub's row, so no foreign key
+    # The hub's device the session was opened on (a ``TrustedDevice``'s id: a hub's row, so no foreign key
     # from control) and how its person proved who they are. A session with no device (the admin's, a demo's) has none.
     device_id = models.UUIDField(_("device"), null=True, blank=True)
     credential = models.CharField(
@@ -101,9 +100,8 @@ class SessionOwner(UUIDModel):
         return f"{self.saas_user_id} @ {self.host}"
 
 
-# ── The way in: devices, PIN, badge, the business's dial and the person's profile (APP-BASE-3) ───────────────────
-# Hub models (``base.tenancy.inventory``: base's), like any module's: phase 1 keeps them in the shared tables of every
-# scope, phase 2 in each hub's database. A person is named by the ``username`` of its local copy (``saas:<id>``,
+# ── The way in: devices, PIN, badge, the business's dial and the person's profile ────────────────────────────────
+# Hub models (``base.tenancy.inventory``: base's), like any module's: kept in each hub's own database. A person is named by the ``username`` of its local copy (``saas:<id>``,
 # ``base.services.username_for``), never by a foreign key: the users are control's and a hub's database has none.
 
 #: The longest «who did it» kept beside a row (``str(actor)``), as the apps keep it.
@@ -273,7 +271,7 @@ class Profile(UUIDModel):
 
 class HubUser(UUIDModel):
     """A person of this business in its own database: who a staff record hangs from, who signed a task, a clock-in or
-    a message (tenancy W10; PLAN-HUB §3, PLAN-DB §2).
+    a message.
 
     Control keeps the session's user (``auth.User``) and the role (``Membership``); a key between two databases does
     not exist, so the apps hang what a person did from this row instead. ``username`` is how the Hub knows them at its
@@ -308,8 +306,8 @@ class TaskSchedule(UUIDModel):
     """When a scheduled task of an app runs next (``base.scheduler``; the old Hub's ``_scheduled_tasks``).
 
     One row per task an app declares (``LiveAppConfig.scheduled_tasks``), written by the worker when it
-    starts: the operation and the cron come from the code, the clock is the row's. Phase 2 keeps it in
-    each hub's database, beside the rest of the hub's business.
+    starts: the operation and the cron come from the code, the clock is the row's. It lives in each hub's database,
+    beside the rest of the hub's business.
     """
 
     app_label = models.CharField(_("app"), max_length=100)
@@ -339,9 +337,9 @@ class EventDelivery(UUIDModel):
     ``delivered_at``); the reaction's writes and its row's ``delivered`` commit in one transaction, so an app
     never gets an event twice. A reaction that fails waits a little longer each time (``next_attempt_at``) and,
     after its last attempt or past the deepest level of events an event can start (``depth``), stays ``dead``
-    with what went wrong. Phase 2 keeps it in each hub's database, beside its outbox.
+    with what went wrong. It lives in each hub's database, beside its outbox.
 
-    Who runs the business sees the ones given up in System › Failed events (APP-BASE-7): resending one puts it back
+    Who runs the business sees the ones given up in System › Failed events: resending one puts it back
     ``pending``; discarding it closes it for good (``discarded``), with who, when and why, and keeps the row.
     """
 
@@ -386,11 +384,11 @@ class EventDelivery(UUIDModel):
 
 
 class HubIdentity(models.Model):
-    """The one row that says which hub a hub's database is (PLAN-DB §3; plan 2026-10-22, step 6).
+    """The one row that says which hub a hub's database is.
 
-    Written when the database is made (its clone, S2; the tests' ``conftest.py``) and read once per process and alias
+    Written when the database is made (its clone; the tests' ``conftest.py``) and read once per process and alias
     by ``use_hub`` (``base.tenancy.identity``): a database that says it is another hub is refused and nothing is served
-    from it. Control's database, phase 1's shared one, has the table and no row.
+    from it. Control's database has the table and no row.
     """
 
     hub_id = models.UUIDField(_("hub"), primary_key=True)
@@ -404,14 +402,14 @@ class HubIdentity(models.Model):
         return str(self.hub_id)
 
 
-# ── Data: blueprints, imports and reset (APP-BASE-2) ──
+# ── Data: blueprints, imports and reset ───────────────
 
 
 class ImportBatch(UUIDModel):
-    """One load of a blueprint (PLAN-HUB round 2026-10-21, «Blueprints»; BASE-G105–G108): what it was, its report
-    and the rows it created, by dataset, so that undoing it removes exactly those.
+    """One load of a blueprint: what it was, its report and the rows it created, by dataset, so that undoing it
+    removes exactly those.
 
-    A hub's model, like the business it loads (phase 1: the shared database; phase 2: each hub's own). ``apps`` are the
+    A hub's model, in the hub's own database like the business it loads. ``apps`` are the
     apps chosen to load (all the blueprint's when the person chose none); a retry names the load it retries.
     """
 
@@ -449,11 +447,11 @@ class ImportBatch(UUIDModel):
         return f"{self.name} ({self.get_status_display()})"
 
 
-# ── People and permissions: the business's API keys (APP-BASE-5) ──────────────────────────────────────────────────
+# ── People and permissions: the business's API keys ───────────────────────────────────────────────────────────────
 
 
 class ApiKey(UUIDModel):
-    """A key with which another system calls this business's API (``erpk_live_…``; PLAN-HUB §3, «API keys»).
+    """A key with which another system calls this business's API (``erpk_live_…``).
 
     Its token is shown once, when it is made or rotated: the hub keeps only its SHA-256 (a random token of 256 bits
     needs no slow hash) and its first characters, to tell it apart. What it may do: everything, read only, write only,
@@ -498,7 +496,7 @@ class ApiKey(UUIDModel):
         return f"{self.name} ({self.prefix}…)"
 
 
-# ── People and permissions: the API's documentation (APP-BASE-5) ───────────────────────────────────────────────────
+# ── People and permissions: the API's documentation ────────────────────────────────────────────────────────────────
 
 
 class ApiSettings(UUIDModel):
@@ -521,7 +519,7 @@ class ApiSettings(UUIDModel):
         return "API documentation shown" if self.docs_enabled else "API documentation hidden"
 
 
-# ── People and permissions: a manager's approval (APP-BASE-5) ──────────────────────────────────────────────────────
+# ── People and permissions: a manager's approval ───────────────────────────────────────────────────────────────────
 
 
 class Approval(UUIDModel):
@@ -562,7 +560,7 @@ class Approval(UUIDModel):
         return f"{self.operation} · {self.approved_by_name}"
 
 
-# ── Locations (round 2026-10-24b, multi-location) ──────────────────────────────────────────────────────────────────
+# ── Locations ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
 #: The name of the location every hub's database is born with (``base/migrations/0015_location``), kept in canonical
 #: English and read in the reader's language while it keeps that name.
@@ -572,7 +570,7 @@ LOCATION_NAME_MAX_LENGTH = 100
 
 
 class Location(UUIDModel):
-    """A place where the business works: a shop, a bar, a salon (round 2026-10-24b).
+    """A place where the business works: a shop, a bar, a salon.
 
     A hub is one business, with its tax id and one database: a business with several premises keeps them here, as
     Square, Shopify, Lightspeed and Odoo keep several shops in one company. Every hub's database is born with exactly
@@ -609,19 +607,19 @@ class Location(UUIDModel):
         return self.name
 
 
-# ── Apps turned on and off by the business (PLAN-HUB §9; PLAN-DB §7) ──────────────────────────────────────────────
+# ── Apps turned on and off by the business ────────────────────────────────────────────────────────────────────────
 
 
 class AppActivation(UUIDModel):
     """Whether a module is on in a business, and whether the business chose it (the rules: ``base.activation``).
 
     ``chosen`` is what the plan's ``max_apps`` counts: an app the business turned on itself, never one the closure by
-    ``requires`` brought along. A business without any row has every module off (the baseline, round 2026-10-27): its
-    first change writes them all down. The hubs of before have every module on, its roots chosen (migration 0017). ``host`` is the business's slug (the scope's key, as ``Membership`` and the
-    outbox keep it): phase 1's businesses share one database (plan 2026-10-22, decision 1), and the cut of S5 leaves
-    one hub per database, where it is always the same.
+    ``requires`` brought along. A business without any row has every module off (the baseline): its first change
+    writes them all down. The hubs made before that baseline have every module on, its roots chosen (migration 0017).
+    ``host`` is the business's slug (the scope's key, as ``Membership`` and the outbox keep it): the businesses used to
+    share one database, and their cut left one hub per database, where it is always the same.
 
-    In a hub with its own database an app's tables are made the first time it is turned on (S3; PLAN-DB §7): the row is
+    In a hub with its own database an app's tables are made the first time it is turned on: the row is
     ``creating`` until the worker made them (``on``), or ``failed`` with ``attempts``, ``last_error`` and
     ``next_attempt_at`` (tried again then, or by hand); ``target`` is the app's last migration in the code that asked,
     so a worker of an older code (a deploy rolling) leaves it to one of that code. The tables of an app off are never
@@ -690,6 +688,6 @@ class AppActivation(UUIDModel):
         return f"{self.app} @ {self.host} ({self.state})"
 
 
-# The registry moved to control in S1 (plan 2026-10-22): base/migrations/0004 and 0005 name the validator here, and
-# phase 1's code imports the models from here.
+# The registry lives in control: base/migrations/0004 and 0005 name the validator here, and older code imports the
+# models from here.
 from control.models import DemoCode, Hub, registry_slug_validator  # noqa: E402, F401

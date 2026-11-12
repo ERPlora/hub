@@ -1,7 +1,7 @@
 """``/p/media/<hub>/<name>``: the files of the hub file store (``storages["hub_files"]``, ``base.storage``).
 
 The bucket stays private and the Hub serves what it keeps, from each hub's own host: the images of its public
-website first (round 2026-10-21), the documents of other modules later (PLAN-HUB block 7). ``<hub>`` is the hub's id
+website and the files other modules declare. ``<hub>`` is the hub's id
 in hex, the one of its prefix (``hub-<hex>/``), and it must be the host's hub (``request.hub``, the host gate): one hub
 never serves another's files. ``<name>`` is the key under that prefix; one that could leave it (``..``, ``.``, an
 empty segment, a leading ``/``, a backslash) or is longer than :data:`MAX_NAME_LENGTH` is not found, and so is one
@@ -36,7 +36,7 @@ from base.storage import hub_prefix
 
 #: The longest key under a hub's prefix the Hub serves.
 MAX_NAME_LENGTH = 200
-#: The people's photos («My profile», APP-BASE-3): base's own folder, served only to a session of this hub.
+#: The people's photos («My profile»): base's own folder, served only to a session of this hub.
 AVATARS_FOLDER = "avatars/"
 #: What an app declares in its ``LiveAppConfig``: the folders of its own whose files anyone may see…
 PUBLIC_MEDIA = "public_media"
