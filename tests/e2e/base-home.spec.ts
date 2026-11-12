@@ -1,9 +1,4 @@
-// The Home of the Hub (APP-BASE-1; the old hub's dashboard, docs/reference/old-hub/dashboard-*.png,
-// dashboard-activity-*.png and apps-launcher-*.png) in the three viewports, as the owner of hub `a`: the
-// heading, «My apps», «Finish setting up your business» (the platform's steps and the demo's example, which a
-// development server shows), the board with the demo's panel — followed live: an item created elsewhere moves
-// it without a reload —, «Customize panel», the bell, «Upgrade plan» in the side menu and «Activity» at
-// `/#actividad`. Each flow leaves its capture `APP-BASE-1-<flow>-<width>` once nothing scrolls sideways.
+// «Finish setting up your business» carries the demo's example because a development server shows it.
 // flow: BASE-F02 BASE-F01 BASE-F03 BASE-F05 BASE-F06 BASE-F07 BASE-F08 BASE-F09 BASE-F10 BASE-F11
 import { expect, type Page, test } from '@playwright/test';
 
@@ -162,9 +157,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   });
 }
 
-// FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH: the board learnt its panels from its first live stream and
-// reopened it for their data on every load of the Home (`net::ERR_ABORTED`, and every query run twice). The shell
-// now carries the person's panels (`widget-list`): one stream carries the board and its panels' data.
+// The shell carries the person's panels (`widget-list`), so one stream carries the board and its panels' data: the
+// board never reopens it for them (`net::ERR_ABORTED`, every query run twice).
 for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   test(`BASE-F06 BASE-F08 — the Home opens one live stream, with its panels' data in it, at ${label}`, async ({ browser }) => {
     const { context, page } = await hostPage(browser, A, { viewport, next: '/' });
@@ -196,11 +190,10 @@ function liveOps(url: string): string[] {
 /** base's four pieces of the chrome (frontend/main.ts `CHROME`), by their module: the source in dev, the chunk in a build. */
 const CHROME_PIECE = /\/(TopbarChrome|SidebarFooter|BlockingStrip|BackgroundChrome)[.-]/;
 
-// FIX-HUB-BASE-HOME-ONE-STREAM-FLAKY (hub#473's review): base's chrome loaded on demand, after the screen had mounted. On
-// a slow device (the tab's CPU ×6: 7 of 9 runs) its modules came more than 150 ms after the screen's queries, so the
-// stream opened without the bell's `base.bell.counters` and the apps followed beside the pane (`base.app.list`), and was
-// cut and opened again with them. Here each piece arrives a second late, whatever the machine's load: the screen mounts
-// with its chrome, and one stream carries them all. The page that signed in is left first: its own stream is not counted.
+// On a slow device base's chrome can arrive well after the screen's queries; the stream must still open once, with the
+// bell's `base.bell.counters` and the apps beside the pane (`base.app.list`), never cut and opened again for them. Here
+// each piece arrives a second late, whatever the machine's load: the screen mounts with its chrome, and one stream
+// carries them all. The page that signed in is left first: its own stream is not counted.
 for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   test(`BASE-F06 BASE-F08 — the Home opens one live stream when base's chrome arrives late, at ${label}`, async ({ browser }) => {
     const { context, page } = await hostPage(browser, A, { viewport, next: '/' });
@@ -237,10 +230,10 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   });
 }
 
-// BASE-F06 — a panel's row without its value (FIX-HUB-BASE-HOME-PANEL-NULL-SHOWS-ZERO): with «Exigir recuento al cierre»
-// off in Cash register, a session closed without a count has no difference, and «Descuadres recientes» painted it as
-// «0,00 €», a discrepancy that never was. The owner of `a`, in Spanish, adds the panel from «Personalizar panel»: the
-// uncounted session says «—» with no bar, the one counted to the cent «0,00 €» on its track. Cash register's settings
+// BASE-F06 — a panel's row without its value: with «Exigir recuento al cierre» off in Cash register, a session closed
+// without a count has no difference, which «Descuadres recientes» must never paint as «0,00 €». The owner of `a`, in
+// Spanish, adds the panel from «Personalizar panel»: the uncounted session says «—» with no bar, the one counted to the
+// cent «0,00 €» on its track. Cash register's settings
 // row is parked for the block and put back after it; the sessions it opens are deleted, with their movements and counts.
 test.describe('BASE-F06 — a panel row without its value', () => {
   test.describe.configure({ mode: 'serial' });
@@ -359,11 +352,11 @@ test.describe('BASE-F06 — a panel row without its value', () => {
   }
 });
 
-// BASE-F06 — a bar-list with negatives (FIX-HUB-BASE-HOME-BAR-LIST-NEGATIVE-FULL-BAR-NO-SIGN-COLOUR): «Descuadres
-// recientes» painted a drawer 0,40 € short with a bar as long as one 5,50 € over (a negative width, which the browser
-// drops) and no sign. The owner of `a`, in Spanish, adds the panel from «Personalizar panel»: each bar is as long as the
-// size of its difference against the biggest of the list; only the shortfall is red, its amount with the sign, and the
-// surplus keeps the panel's colour (a surplus is a discrepancy too, never painted as «good»: rv-hub-264). Cash
+// BASE-F06 — a bar-list with negatives: a drawer 0,40 € short must not get a bar as long as one 5,50 € over (a negative
+// width, which the browser drops) nor lose its sign. The owner of `a`, in Spanish, adds the panel from «Personalizar
+// panel»: each bar is as long as the size of its difference against the biggest of the list; only the shortfall is red,
+// its amount with the sign, and the surplus keeps the panel's colour (a surplus is a discrepancy too, never painted as
+// «good»). Cash
 // register's settings row is parked for the block and put back after it; the sessions it opens are deleted, with their
 // movements and counts.
 test.describe('BASE-F06 — a bar-list with negatives', () => {
@@ -538,14 +531,12 @@ test.describe('BASE-F06 — a bar-list with negatives', () => {
   }
 });
 
-// BASE-F06 — a bar-list with the colour of its row (FIX-HUB-BASE-HOME-BAR-LIST-IGNORES-MAP-COLOR): Staff's «Empleados
-// por rol» painted every role in the panel's colour although each role has its own (the old hub's `renderBarList` gave
-// each bar `color: row[map.color]`). The owner of `a`, in Spanish, with that panel alone on the board and two roles of
-// colours of their own: each role's bar is in its row's colour when the panel maps one (`map.color`, as the server
-// declares it in `base.widget.list`) and in the panel's otherwise. Staff maps it (FIX-HUB-STAFF-ROLE-BARS-IGNORE-ROLE-
-// COLOR), so this run checks each row's colour; Vitest (`home.test.ts`, `WidgetPanel.test.ts`) pins the panel's colour
-// without `map.color`, the hex-only rule and the red of a negative. Everything this block creates is named
-// «E2E-ROWCOLOR …» and removed after it.
+// BASE-F06 — a bar-list with the colour of its row: in Staff's «Empleados por rol» each role has its own colour. The
+// owner of `a`, in Spanish, with that panel alone on the board and two roles of colours of their own: each role's bar
+// is in its row's colour when the panel maps one (`map.color`, as the server declares it in `base.widget.list`) and in
+// the panel's otherwise. Staff maps it, so this run checks each row's colour; Vitest (`home.test.ts`,
+// `WidgetPanel.test.ts`) pins the panel's colour without `map.color`, the hex-only rule and the red of a negative.
+// Everything this block creates is named «E2E-ROWCOLOR …» and removed after it.
 test.describe('BASE-F06 — a bar-list with the colour of its row', () => {
   test.describe.configure({ mode: 'serial' });
 

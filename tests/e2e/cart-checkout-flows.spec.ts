@@ -3,7 +3,7 @@
 // overdue one turn Expired, abandon one and delete another after confirming; in Orders, reached by the
 // tabbar, mark one paid and complete it (its cart becomes Converted) and fail another with its reason.
 // Lines and orders are started through the API, as the assistant does (the screens have no form for them,
-// WORKBOOK «Pantallas»). Each flow is a step and leaves its capture, `APP-CART_CHECKOUT-<flow>-<width>`,
+// WORKBOOK «Pantallas»). Each flow is a step and leaves its capture
 // after checking that nothing scrolls sideways. Everything carries the session prefix «e2e-cc» and is
 // removed before and after it.
 // flow: CART_CHECKOUT-F01 CART_CHECKOUT-F05 CART_CHECKOUT-F06 CART_CHECKOUT-F07 CART_CHECKOUT-F09 CART_CHECKOUT-F10 CART_CHECKOUT-F11 CART_CHECKOUT-F12
@@ -95,8 +95,8 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await search.fill('');
         await expect(row).toBeVisible();
 
-        // At every width the filters wait behind the funnel, as the old list (CART_CHECKOUT-F12,
-        // FIX-HUB-CART-CHECKOUT-ORDERS-FILTERS-BEHIND-FUNNEL): written in its panel (a sheet in the cards) and applied.
+        // At every width the filters wait behind the funnel (CART_CHECKOUT-F12): written in its panel (a sheet in the
+        // cards) and applied.
         const funnel = view.locator('[data-testid=cart-checkout-carts-filters-toggle]');
         const sheet = view.locator('[data-testid=cart-checkout-carts-filters-panel]');
         await expect(view.locator('[data-testid=cart-checkout-carts-filters]'), 'no open row of filters').toHaveCount(0);
@@ -106,7 +106,7 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
           await sheet.locator('[data-testid=cart-checkout-carts-filter-total_amount_from] input').fill(value);
           await view.locator('[data-testid=cart-checkout-carts-filters-apply]').click();
         }
-        // «Total from» reads an amount as it is pasted (pm#521): «1.236,06» leaves that cart only.
+        // «Total from» reads an amount as it is pasted: «1.236,06» leaves that cart only.
         await totalFrom('1.236,06');
         await expect(row).toBeVisible();
         await expect(rowOf(page, 'cart-checkout-carts', firstId)).toHaveCount(0);

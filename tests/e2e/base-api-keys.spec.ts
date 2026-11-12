@@ -1,5 +1,5 @@
 // The business's API keys from end to end (BASE-F86 create and copy the token, BASE-F89 see the keys and what each
-// may do, BASE-F87 rotate, BASE-F88 revoke; registry keys BASE-G03, G05, G25, G37), in the three viewports, as the
+// may do, BASE-F87 rotate, BASE-F88 revoke), in the three viewports, as the
 // owner of hub `a`, which has its own database: a business that still shares
 // control's database says «Not available yet» instead (ApiKeysPanel.test.ts, base/tests/test_api_keys.py).
 //

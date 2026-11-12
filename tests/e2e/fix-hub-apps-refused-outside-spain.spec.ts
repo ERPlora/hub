@@ -3,8 +3,7 @@
 // VeriFactu already on stays as it is and can go off, with what it needs; once off, «Add apps» says «No disponible» with
 // the reason and offers no «Activar», and the server refuses it when asked directly, changing nothing. Back in Spain it
 // is «Desactivada» with its «Activar» again, it goes on, and from then on Apps says it never goes off (hub#618). In
-// English too, at 1440. Captures `FIX-HUB-APPS-REFUSED-OUTSIDE-SPAIN-{pl-on,pl-off,es-off,es-on}-<width>` and
-// `…-pl-off-en-1440`. `a`'s rows and its registration are put back after each test.
+// English too, at 1440. Each step leaves a capture. `a`'s rows and its registration are put back after each test.
 // flow: VERIFACTU-F01 VERIFACTU-F32 BASE-F25
 import { expect, type Page, test } from '@playwright/test';
 

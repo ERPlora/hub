@@ -1,21 +1,13 @@
-// The master QA of the Hub (BASE-G152, the old `qa-hub` contract, base/WORKBOOK.md BASE-F107), the platform's half,
-// end to end with its real dependencies: this stack's SaaS (a fresh owner signs up on its screens and creates the
-// business through its API, as the panel does) and its assistant gateway with the e2e's provider (assistant-provider.ts),
-// no mock in between.
-//   - The precondition: a business of the restaurant vertical, created on erplora.com with its business type; the
-//     Hub registers it with its vertical, offers that vertical's template first and loads it (its catalogue and tables).
-//   - The platform from end to end, in 390, 834 and 1440 and in Spanish and English: Home (Summary and Activity, «My
-//     apps», the bell, «Add apps» → Apps: BASE-F05), Apps (its three tabs), Settings (General, Business, Ticket, Data and
-//     its sections), Employees (Staff, a person, Roles, API keys, Approvals), System (its five tabs), Files, My profile,
-//     the page of an address that does not exist and the assistant, which opens and answers. Each screen loads with no
-//     error (no console error, no uncaught one, no server error, no error state on view) and no text in the other
-//     language nor a message key left on view (translations.ts, against the hub's own catalogues); captures
-//     `APP-BASE-10-BASE-G152-<language>-<screen>-<width>`.
-// The other chains of the old contract (the restaurant's and the salon's day, fiscal, printing) are flows of their
-// apps with their own specs: base/WORKBOOK.md «Para quien lo mantiene», «La QA maestra del Hub».
+// The master QA of the Hub (base/WORKBOOK.md BASE-F107), the platform's half, end to end with its real dependencies:
+// this stack's SaaS (a fresh owner signs up on its screens and creates the business through its API, as the panel
+// does) and its assistant gateway with the e2e's provider (assistant-provider.ts), no mock in between. Every screen of
+// the platform, in both languages and at the three sizes, loads with no error and with no text in the other language
+// nor a message key left on view (translations.ts, against the hub's own catalogues).
+// The other chains (the restaurant's and the salon's day, fiscal, printing) are flows of their apps with their own
+// specs: base/WORKBOOK.md «Para quien lo mantiene», «La QA maestra del Hub».
 // The SaaS of the stack needs its taxonomy (`seed_taxonomy`, as every deploy runs it) and the assistant's provider
 // (README of this folder, «El asistente» and «La QA maestra»); the spec says which is missing.
-// flow: BASE-G152 BASE-F05
+// flow: BASE-F05
 import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
@@ -160,7 +152,7 @@ async function settled(page: Page, where: string): Promise<void> {
   expect(overflow, `${where}: no sideways scroll`).toBeLessThanOrEqual(0);
 }
 
-/** The screen checked in `language` and captured as `APP-BASE-10-BASE-G152-<language>-<screen>-<width>`. */
+/** The screen checked in `language` and captured at each width. */
 async function screen(page: Page, name: string, language: Language, size: Size): Promise<void> {
   const where = `${name} in ${language} at ${size.label}`;
   await settled(page, where);
@@ -217,7 +209,7 @@ test.afterAll(async () => {
   await owner?.context.close();
 });
 
-test('BASE-G152 — a restaurant created on erplora.com, its vertical in the Hub and its template loaded', async () => {
+test('a restaurant created on erplora.com, its vertical in the Hub and its template loaded', async () => {
   test.setTimeout(240_000);
   // The business, as the panel creates it: a name, the country and its business type, of the restaurant vertical.
   const businessType = await businessTypeOf(owner.context, VERTICAL);
@@ -264,7 +256,7 @@ test('BASE-G152 — a restaurant created on erplora.com, its vertical in the Hub
 
 for (const language of LANGUAGES) {
   for (const size of SIZES) {
-    test(`BASE-G152 BASE-F05 — the platform end to end in ${language} at ${size.label}`, async () => {
+    test(`BASE-F05 — the platform end to end in ${language} at ${size.label}`, async () => {
       test.setTimeout(300_000);
       expect(origin, 'the business of the precondition').not.toBe('');
       const { context, page } = owner;

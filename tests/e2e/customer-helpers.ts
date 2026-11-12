@@ -1,7 +1,7 @@
 // Shared steps of the customer e2e (customer-*.spec.ts): the app's API for setup and server-side
 // evidence (never the check itself), readiness of its lists, and the cleanup every spec runs in its
-// `afterAll`: what a run creates is named `e2e.…` and its ids are recorded, so it is deleted from the
-// hub's database (phase 1: hubs `a` and `b` share it) even after an erasure renamed the card.
+// `afterAll`: what a run creates is named `e2e.…` and its ids are recorded, so it is deleted from
+// hub `a`'s own database even after an erasure renamed the card.
 import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
 import { A, api, psql, shown } from './helpers';

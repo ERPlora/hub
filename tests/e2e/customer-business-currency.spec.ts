@@ -1,12 +1,12 @@
-// flow: customer-business-currency (FIX-HUB-CUSTOMER-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY; apps/customer/WORKBOOK.md
-// «Clientes», «Ficha de cliente», CUSTOMER-F02, F23 and F31)
+// flow: customer-business-currency (apps/customer/WORKBOOK.md «Clientes», «Ficha de cliente», CUSTOMER-F02, F23 and
+// F31)
 // Customers paints and reads money in the business's currency: its country's, as erplora.com registered it
 // (`PUT /internal/hubs/{id}`, signed the way the SaaS sends it), never a fixed euro. Hub `a` moves to Poland: the list's
 // «Spent» and «Revenue» read in złoty and no «€», and «Spent» from «45,50 zł» keeps the card while from «45,51» drops
-// it, in 390, 834 and 1440 (captures `FIX-HUB-CUSTOMER-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY-<width>`); the card's «Spent»
+// it, in 390, 834 and 1440; the card's «Spent»
 // is in złoty, and among its «Purchases» the one paid in złoty reads in złoty while the one paid in euros before the
-// move keeps its euros (a record is never rewritten; `…-card-<width>`). Back in Spain, the same card reads in euros
-// (`…-es-1440`). What the run creates is deleted after it and `a`'s registration put back, also when a test fails.
+// move keeps its euros (a record is never rewritten). Back in Spain, the same card reads in euros.
+// What the run creates is deleted after it and `a`'s registration put back, also when a test fails.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { cleanUp, createCard, customersReady, e2eName, rowNamed, searchList, spanishMobile, type Card } from './customer-helpers';
@@ -72,8 +72,8 @@ test.beforeAll(async ({ browser }) => {
   const owner = await hostPage(browser, A, { next: '/customer/customers' });
   card = await createCard(owner.context, { name: e2eName(`${STAMP} Ana`), phone: spanishMobile() });
   await owner.context.close();
-  // Sales reach a card through the sale app's notices (the relay, phase 2): its figures and purchases are set up here,
-  // one paid in złoty and one paid in euros before the business moved.
+  // Sales reach a card through the sale app's notices, which the e2e stack's worker does not relay, so its figures and
+  // purchases are written here: one paid in złoty and one paid in euros before the business moved.
   psql(`update customer_customer set total_purchases = 2, total_spent = 4550, last_purchase_at = now() where id = '${card.id}'`);
   psql(
     `insert into customer_purchase (id, customer_id, sale_id, refund_id, amount, currency, status, recorded_at, void_reason) values ` +

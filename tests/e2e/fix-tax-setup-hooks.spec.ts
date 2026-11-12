@@ -1,10 +1,9 @@
 // flow: TAX-F17
-// Taxes' hook of the Home (FIX-TAX-SETUP-HOOKS; the old module's own `setup` item «Tus impuestos», taxes#19; the old
-// hub's dashboard in docs/reference/old-hub/dashboard-*.png), as the owner of hub `a` reads it in Spanish (gh:hub#2356):
+// Taxes' hook of the Home (its `setup` item «Tus impuestos»), as the owner of hub `a` reads it in Spanish:
 // «Tus impuestos» pending and «Importante» in «Termina de configurar tu negocio» while no active root rule applies today,
 // its «Configurar» leading to Rules, where the first one is created with «+»; then «Hecho», back to pending without a
-// reload when that rule is deactivated and «Hecho» again when it is restored. In each of the three sizes, the capture
-// `FIX-TAX-SETUP-HOOKS-<width>` with the step pending in sight. The rules the hub already had in force are deactivated
+// reload when that rule is deactivated and «Hecho» again when it is restored. In each of the three sizes, a capture
+// with the step pending in sight. The rules the hub already had in force are deactivated
 // for the run and active again after it; the run's own hang from «e2e.» categories, deleted by `cleanUp()` before and
 // after.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';

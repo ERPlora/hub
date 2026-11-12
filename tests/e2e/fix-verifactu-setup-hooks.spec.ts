@@ -1,11 +1,10 @@
 // flow: HUB_HOME verifactu hooks
-// VeriFactu's hooks of the Home (FIX-VERIFACTU-SETUP-HOOKS; the old module's `setup` and `widgets`, the old hub's
-// dashboard in docs/reference/old-hub/dashboard-*.png), as the owner of hub `a` reads them in Spanish: «Configura
+// VeriFactu's hooks of the Home (its `setup` and `widgets`), as the owner of hub `a` reads them in Spanish: «Configura
 // VeriFactu» pending and «Importante» in «Termina de configurar tu negocio» while ERPlora still has no approved
 // authorisation (its «Configurar» leads to VeriFactu's Configuration), done without a reload once the account's photo
 // approves it; «Pendientes VeriFactu» on the board by default with the server's figure, and the other three panels
 // («Cola de contingencia», «Registros por estado», «Eventos AEAT recientes», whose types speak Spanish, never their
-// codes) on the board in each size, leaving the capture `FIX-VERIFACTU-SETUP-HOOKS-<width>`.
+// codes) on the board in each size, leaving a capture.
 // The photo is sent the way the SaaS sends it (`PUT /internal/hubs/{id}/state`, signed); what the run changes in
 // VeriFactu's configuration and in `a`'s photo is put back after it (or removed, if the run made it).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
@@ -62,7 +61,7 @@ const card = (page: Page): Locator => shown(page).locator('[data-testid="setup-c
 const row = (page: Page): Locator => card(page).locator(`[data-testid="setup-row"][data-key="${STEP}"]`);
 
 /** «Ver todo» when the fold keeps the step out of sight: on a phone it shows 2 rows, and a hub without its tax details
- *  has «Los datos de tu negocio» (⛔, before VeriFactu's) pending too (FIX-INVOICE-SETUP-HOOKS). */
+ *  has «Los datos de tu negocio» (⛔, before VeriFactu's) pending too. */
 async function unfolded(page: Page): Promise<void> {
   await expect(card(page)).toHaveAttribute('aria-busy', 'false');
   const toggle = card(page).locator('[data-testid="setup-toggle"]');
@@ -120,7 +119,7 @@ for (const size of SIZES) {
         await expect(panel(page, key).locator('[data-testid="widget-error"]')).toHaveCount(0);
         await expect(panel(page, key)).toHaveAttribute('aria-busy', 'false');
       }
-      // The photo just received is the newest event: its type in Spanish, never its code (gh:verifactu#139).
+      // The photo just received is the newest event: its type in Spanish, never its code.
       const events = panel(page, 'verifactu.events');
       await expect(events.locator('[data-testid="verifactu-events-panel-type"]').first()).toHaveText('Configuración cambiada');
       await expect(events).not.toContainText('config_changed');

@@ -1,8 +1,8 @@
 // «Activity» on the Home (BASE-F09) against the real Sales: a sale charged through its API shows up live in
 // the table at `/#actividad` with its number, amount in euros and status, and its date and time are read whole
-// in the three viewports (hub#2637: at about 820 px the old hub's «Date» column cut the time off). Whole for the
-// widest date the format can print, not only for this sale's: «Oct 22, 2026, 10:09 PM» was cut at 834 while
-// «9:30 PM» fit, so a check of the clock's own time passed or failed by the hour it ran (2026-10-22).
+// in the three viewports. Whole for the
+// widest date the format can print, not only for this sale's: «Oct 22, 2026, 10:09 PM» needs more room at 834 than
+// «9:30 PM», so a check of the clock's own time would pass or fail by the hour it ran.
 // flow: BASE-F09
 import { expect, type Locator, type Page, test } from '@playwright/test';
 

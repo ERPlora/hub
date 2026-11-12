@@ -38,7 +38,7 @@ function saasSql(sql: string): string {
   return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, { cwd: REPO_DIR, encoding: 'utf8' }).trim();
 }
 
-/** The business's day `days` from today (Madrid in phase 1) and its weekday, Monday 0. */
+/** The business's day `days` from today (hub `a` is in Madrid) and its weekday, Monday 0. */
 function madridDay(days: number): { date: string; weekday: number } {
   const date = new Date(Date.now() + days * 86_400_000).toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
   return { date, weekday: (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7 };

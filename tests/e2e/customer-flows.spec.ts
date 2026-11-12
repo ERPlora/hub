@@ -1,7 +1,7 @@
 // Every flow of Customers with a screen, one test each (its key in the title and in `// flow:`), done
 // end to end on the real stack and seen at 390×844, 834×1112 and 1440×900: `threeShots` resizes, brings
-// what the flow shows into sight, checks nothing scrolls sideways and saves
-// `.artifacts/APP-CUSTOMER-<key>-<width>.png`. The deeper cases of each flow live in the other
+// what the flow shows into sight, checks nothing scrolls sideways and saves a capture to
+// `.artifacts/`. The deeper cases of each flow live in the other
 // customer-*.spec.ts and in the app's pytest and Vitest suites; CUSTOMER-F25 is seen in
 // appointment-agenda.spec.ts (the agenda is the appointment app's screen).
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -58,7 +58,7 @@ async function createNamed(context: BrowserContext, kind: 'groups' | 'tags', nam
   return res.data.id;
 }
 
-// flow: CUSTOMER-F01 · gh:pm#478, gh:pm#513 — a refused save is told under its field and in sight, also on a phone
+// flow: CUSTOMER-F01 — a refused save is told under its field and in sight, also on a phone
 test('CUSTOMER-F01: «Add» creates a card from its name; a refused phone is told under its field at every width', async ({ page }) => {
   await login(page, A, '/customer/customers');
   await customersReady(page);
@@ -99,7 +99,7 @@ test('CUSTOMER-F01: a birthday that does not exist is told under «Birthday» an
   expect(found.data.rows).toEqual([]);
 });
 
-// flow: CUSTOMER-F02 · gh:customers#95 — on a phone the card names the row once
+// flow: CUSTOMER-F02 — on a phone the card names the row once
 test('CUSTOMER-F02: the search finds a card by its phone however it is typed; the phone card names it once', async ({ page, context }) => {
   await login(page, A, '/customer/customers');
   const phone = spanishMobile();
@@ -143,8 +143,8 @@ test('CUSTOMER-F04: «Edit» turns the data into the form; «Save» says «Custo
   expect(((await cardOf(context, card.id)).data as unknown as { city: string }).city).toBe('Sevilla');
 });
 
-// flow: CUSTOMER-F04 (textos «Si falla» de los campos personalizados) · FIX-HUB-CUSTOMER-ES-MSGIDS-SHADOWED-BY-LIVE —
-// the browser reads «tres» in a number input and 31/02 in a date one as "": saved, the stored values were emptied
+// flow: CUSTOMER-F04 (the custom fields' «Si falla» texts) — the browser reads «tres» in a number input and 31/02 in a
+// date one as "", so saving them would empty the stored values
 test('CUSTOMER-F04 in Spanish: «tres» in a number field and 31/02 in a date one are told under them, and nothing is saved', async ({ browser }) => {
   const context = await browser.newContext({ baseURL: A, locale: 'es-ES' });
   const page = await context.newPage();
@@ -258,7 +258,7 @@ test('CUSTOMER-F07: «Delete» asks in a dialog what it means; confirmed, the ca
   expect((await cardOf(context, card.id)).status).toBe(404);
 });
 
-// flow: CUSTOMER-F08 · gh:services#152, gh:customers#15 — importing the same file again does not duplicate
+// flow: CUSTOMER-F08 — importing the same file again does not duplicate
 test('CUSTOMER-F08: «Import CSV» reports what it created and skipped; the same file again creates nothing', async ({ page, context }) => {
   await login(page, A, '/customer/customers');
   await customersReady(page);
@@ -399,7 +399,8 @@ test('CUSTOMER-F17: the till\'s search assigns a card with its tax copy', async 
 test('CUSTOMER-F23: «Purchases» lists each sale, void and refund of the card', async ({ page, context }) => {
   await login(page, A, '/customer/customers');
   const card = await createCard(context, { name: e2eName('F23 Buyer') });
-  // Sales reach a card through the sale app's notices (the relay, phase 2): the rows are set up here.
+  // Sales reach a card through the sale app's notices, which the e2e stack's worker does not relay: the rows are
+  // written here.
   const sale = crypto.randomUUID();
   psql(
     `insert into customer_purchase (id, customer_id, sale_id, refund_id, amount, currency, status, recorded_at, void_reason) values ` +

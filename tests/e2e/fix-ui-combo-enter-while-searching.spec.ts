@@ -1,4 +1,4 @@
-// FIX-UI-COMBO-ENTER-WHILE-SEARCHING-SUBMITS — a Combo (ui:Combo) in Chrome, on Staff › Staff › a member's
+// A Combo (ui:Combo) in Chrome, on Staff › Staff › a member's
 // sheet, field «Role» (it searches the server): the owner types a role and presses Enter before the server
 // answers. Enter stays in the field: the sheet stays open, nothing is saved and the record keeps its role.
 // When the answer comes it is shown with its first role highlighted, but nothing is chosen behind the owner's

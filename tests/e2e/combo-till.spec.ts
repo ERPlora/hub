@@ -8,9 +8,9 @@
 // relays nothing — lowers each
 // dish's stock and never the menu's (F10). A menu sent from «Current order» reaches the kitchen dish by dish,
 // under the menu's kitchen name, and the kitchen display shows them under the menu's header (F11; the fire through
-// the relay is apps/combo/tests/test_relay.py). Each screen in 390×844, 834×1112 and 1440×900 (`APP-COMBO-COMBO-Fnn-<w>`).
+// the relay is apps/combo/tests/test_relay.py). Each screen in 390×844, 834×1112 and 1440×900.
 // SALE-F12: in a course of 1 to 4 whose dishes repeat, the rule says both and two dishes taken twice keep each name
-// on its line beside its counter and its minus, in the three sizes (`FIX-SALE-MENU-SHEET-REPEATABLE-CHOICE-NAME-BREAKS-<w>`).
+// on its line beside its counter and its minus, in the three sizes.
 // What a run makes — products `E2E-CMT-<run>-…`, its menus and service «e2e Combo …», checks, sales and kitchen
 // tickets — goes.
 import { spawnSync } from 'node:child_process';
@@ -332,8 +332,8 @@ test('COMBO-F11: a menu sent to the kitchen reaches it dish by dish, under its k
 });
 
 test('SALE-F12: two repeatable dishes taken twice keep each name on its line beside its counter and its minus', async ({ page, context }) => {
-  // FIX-SALE-MENU-SHEET-REPEATABLE-CHOICE-NAME-BREAKS: the counter and the minus shared a tile with the name, which
-  // was left a few pixels wide and broke letter by letter at 390 and 834 px.
+  // When the counter and the minus share a tile with the name, the name is left a few pixels wide and breaks letter
+  // by letter at 390 and 834 px.
   await till(page);
   products.DEC = await createProduct(context, { name: `E2E CmbTill Decaf with oat milk ${RUN}`, sku: `${SKU}-DEC`, price: 180, tax_category_key: FOOD, initial_stock: '10' });
   const coffees = (await post<{ id: string }>(context, '/combo/combos', { name: `e2e Combo Coffees ${RUN}`, price: 300, tax_category_key: FOOD })).id;

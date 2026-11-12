@@ -1,17 +1,7 @@
-// flow: BASE-G96 BASE-G97 BASE-G98 BASE-G99 (base/WORKBOOK.md) · HUBS-F15 of the SaaS (hubs/WORKBOOK.md)
-// Settings (APP-BASE-6; the old hub's settings-*.png) in the three viewports, against the real Hub and the real SaaS of
-// this run's stack (the SaaS's `HUB_INTERNAL_URL` points here): a fresh owner signs up on the SaaS's screens and creates
-// a business through its API as the panel does, so the SaaS registers it in this Hub with the same id.
-//   - BASE-G96: «Settings» from the side menu opens its first tab, «General» (APP-BASE-3, as in the old hub), and
-//     «Business» is the next; its four tabs fit the phone; a tab is in the address (replaced: Back leaves Settings);
-//     «Printing» opens the Printing app.
-//   - BASE-G97, G98: «Business» shows the country (Spain) and its currency (EUR · Euro), read-only, and where they change;
-//     «Fiscal data» opens Invoicing's issuer.
-//   - BASE-G99: the owner changes the business's language on erplora.com (HUBS-F15, the panel's own call); the open tab
-//     shows it without reloading. «Change on erplora.com» opens the business's settings there, in a new tab.
-//   - BASE-G98 on the Home: the amounts of «Sales, last 7 days» are in the business's currency — euros in the business
-//     in Spain, złoty in a second one in Poland (`APP-BASE-6-BASE-G98-HOME-<width>`) —, never a fixed euro.
-// Each flow leaves its capture `APP-BASE-6-<key>-<width>`.
+// flow: HUBS-F15 of the SaaS (hubs/WORKBOOK.md)
+// Against the real Hub and the real SaaS of this run's stack (the SaaS's `HUB_INTERNAL_URL` points here): a fresh
+// owner signs up on the SaaS's screens and creates a business through its API as the panel does, so the SaaS registers
+// it in this Hub with the same id.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { api, horizontalOverflow, login, SAAS, shot, shown, turnOn, untilStill } from './helpers';
@@ -53,7 +43,7 @@ const weekPanel = (page: Page): Locator =>
 const rowValue = (page: Page, row: string): Locator =>
   shown(page).locator(`[data-testid="business-${row}"] [data-testid="settings-row-value"]`);
 
-/** `ready` at each size and a capture `APP-BASE-6-<key>-<size>`; back at 1440 after. */
+/** `ready` at each size and a capture; back at 1440 after. */
 async function atEverySize(page: Page, keys: string[], ready: () => Promise<void>): Promise<void> {
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
@@ -64,7 +54,7 @@ async function atEverySize(page: Page, keys: string[], ready: () => Promise<void
   await page.setViewportSize({ width: 1440, height: 900 });
 }
 
-test('BASE-G96 BASE-G97 BASE-G98 BASE-G99 — Settings › Business and Printing, and a change made on erplora.com', async ({
+test('Settings › Business and Printing, and a change made on erplora.com', async ({
   browser,
 }) => {
   test.setTimeout(240_000);
@@ -80,7 +70,7 @@ test('BASE-G96 BASE-G97 BASE-G98 BASE-G99 — Settings › Business and Printing
   await turnOn(owner.context, origin, 'sale', 'invoice', 'printing');
   await page.reload();
 
-  // BASE-G96: «Settings» from the side menu opens its first tab, «General» (APP-BASE-3); «Business» is the next one.
+  // «Settings» from the side menu opens its first tab, «General»; «Business» is the next one.
   await page.locator('ion-item.nav-item', { hasText: 'Settings' }).first().click();
   await expect(page).toHaveURL(new RegExp(`^${origin}/settings`));
   await expect(shown(page).getByTestId('tab-general')).toHaveClass(/segment-button-checked/);
@@ -88,7 +78,7 @@ test('BASE-G96 BASE-G97 BASE-G98 BASE-G99 — Settings › Business and Printing
   await expect(page).toHaveURL(`${origin}/settings#business`);
   await expect(rowValue(page, 'name')).toHaveText(/^Ajustes /);
 
-  // BASE-G97, G98: the country and its currency, as erplora.com registered the business; nothing to type.
+  // The country and its currency, as erplora.com registered the business; nothing to type.
   await expect(rowValue(page, 'country')).toHaveText('Spain');
   await expect(rowValue(page, 'currency')).toHaveText('EUR · Euro');
   await expect(rowValue(page, 'timezone')).toHaveText(/^Europe\/Madrid · \d\d:\d\d$/);
@@ -99,7 +89,7 @@ test('BASE-G96 BASE-G97 BASE-G98 BASE-G99 — Settings › Business and Printing
   );
   await atEverySize(page, ['BASE-G97', 'BASE-G98'], async () => {
     await expect(rowValue(page, 'currency')).toBeVisible();
-    // gh:hub#2617 — the four tabs fit the phone: none under the edge, none cut.
+    // The four tabs fit the phone: none under the edge, none cut.
     for (const tab of ['general', 'business', 'tickets', 'data']) {
       const box = await shown(page).getByTestId(`tab-${tab}`).boundingBox();
       expect(box, tab).not.toBeNull();
@@ -108,7 +98,7 @@ test('BASE-G96 BASE-G97 BASE-G98 BASE-G99 — Settings › Business and Printing
     }
   });
 
-  // BASE-G99: the language changed on erplora.com shows in the open tab without reloading.
+  // The language changed on erplora.com shows in the open tab without reloading.
   let reloaded = false;
   page.on('framenavigated', (frame) => {
     if (frame === page.mainFrame()) reloaded = true;
@@ -134,7 +124,7 @@ test('BASE-G96 BASE-G97 BASE-G98 BASE-G99 — Settings › Business and Printing
   await page.goBack();
   await expect(page).toHaveURL(new RegExp(`^${origin}/settings`));
 
-  // BASE-G96: «Printing», in the address and replaced (Back leaves Settings); its row opens the Printing app.
+  // «Printing», in the address and replaced (Back leaves Settings); its row opens the Printing app.
   await shown(page).getByTestId('tab-tickets').click();
   await expect(page).toHaveURL(`${origin}/settings#tickets`);
   const printers = shown(page).getByTestId('tickets-printers');
@@ -153,14 +143,14 @@ test('BASE-G96 BASE-G97 BASE-G98 BASE-G99 — Settings › Business and Printing
   await page.goto(`${origin}/settings#tax`);
   await expect(rowValue(page, 'country')).toHaveText('Spain');
 
-  // BASE-G98 on the Home: the amounts of this business in Spain are in euros.
+  // On the Home, the amounts of this business in Spain are in euros.
   await onlyTheWeek(owner.context);
   await page.goto(`${origin}/`);
   await expect(weekPanel(page).locator('[data-testid="widget-chart-amount"]')).toHaveText(/^€[\d,]+\.\d\d$/);
   await owner.context.close();
 });
 
-test('BASE-G98 — the Home of a business in Poland writes its amounts in złoty, never in euros', async ({ browser }) => {
+test('the Home of a business in Poland writes its amounts in złoty, never in euros', async ({ browser }) => {
   test.setTimeout(240_000);
   const owner = await signUpOnSaas(browser, 'settings');
   const business = await businessOf(owner, 'PL');

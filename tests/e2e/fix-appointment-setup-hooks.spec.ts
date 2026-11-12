@@ -1,11 +1,9 @@
 // flow: APPOINTMENT-F28
-// flow: área: los ganchos del Inicio de Citas (`setup`, `widgets` y `bell` de `LiveAppConfig`; ronda PLAN-HUB 2026-10-21): el contador «Citas por confirmar» de la campana
-// Citas's counter of the bell (FIX-APPOINTMENT-SETUP-HOOKS; the old module's `bell`, appointments#169, hub#1678; the
-// old hub's dashboard, docs/reference/old-hub/dashboard-*.png): on the Home of hub `a`, as its owner reads it in
+// Citas's counter of the bell, «Citas por confirmar» (its `LiveAppConfig.bell`): on the Home of hub `a`, as its owner reads it in
 // Spanish, a booking the customer made herself with «confirm automatically» off waits for confirmation, and the bell's
 // badge counts it without a reload; opened, the row «Citas por confirmar (N)» leads to the agenda; confirming it
-// elsewhere takes the row away, live. In each of the three sizes, on a day of its own, leaving the capture
-// `FIX-APPOINTMENT-SETUP-HOOKS-<width>` with the bell open. What it creates is «E2E Bell …», removed before and after;
+// elsewhere takes the row away, live. In each of the three sizes, on a day of its own, leaving a capture with the bell
+// open. What it creates is «E2E Bell …», removed before and after;
 // Citas's settings are put back as they were.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 

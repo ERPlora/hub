@@ -1,5 +1,5 @@
-// Cancelling a reservation with «Ask the assistant» and «Ask me first» (FIX-HUB-FLOW-ASK-ME-FIRST-CANNOT-GRANT-A-CANCELLATION),
-// end to end with its real dependencies: the Hub of this stack, its SaaS's gateway and, behind it, the e2e's provider
+// Cancelling a reservation with «Ask the assistant» and «Ask me first», end to end with its real dependencies: the Hub
+// of this stack, its SaaS's gateway and, behind it, the e2e's provider
 // (assistant-provider.ts; the SaaS seeded with it, README «El asistente»). A real reservation is booked; in the editor
 // the step is given «Cancel a reservation», which only «Ask me first» offers, and the card says who may say yes to it;
 // saved, granted and run, the worker asks the assistant (`workerAsks`), which wants to cancel it: nothing is cancelled
@@ -31,7 +31,7 @@ function saasSql(sql: string): string {
   return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, { cwd: REPO_DIR, encoding: 'utf8' }).trim();
 }
 
-/** The business's day `days` from now (Madrid in phase 1) and its weekday, Monday 0. */
+/** The business's day `days` from now (hub `a` is in Madrid) and its weekday, Monday 0. */
 function madridDay(days: number): { date: string; weekday: number } {
   const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date(Date.now() + days * 86_400_000));
   return { date, weekday: (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7 };
@@ -160,7 +160,7 @@ for (const viewport of VIEWPORTS) {
       const card = shown(page).locator('[data-testid=flow-inbox] article').filter({ hasText: name });
       await expect(card).toBeVisible();
       await expect(card).toContainText('The assistant wants to change something in «Reservations»');
-      // It says the action, not only that something changes (FIX-HUB-FLOW-PENDING-ANSWER-CARD-DOES-NOT-SAY-THE-ACTION).
+      // It says the action, not only that something changes.
       await expect(card.locator('[data-testid^=flow-question-action-]')).toHaveText('Cancel a reservation');
       await card.locator('[data-testid^=flow-question-yes-]').click();
       await expect(page.locator('ion-toast').filter({ hasText: 'Approved: the automation carries on.' }).last()).toBeVisible();

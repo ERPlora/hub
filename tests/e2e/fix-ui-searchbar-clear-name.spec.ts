@@ -1,6 +1,6 @@
-// FIX-UI-SEARCHBAR-CLEAR-BUTTON-SAYS-RESET — Ionic 8 names the clear button of every `ion-searchbar` (the cross that
-// shows once something is typed) with a constant `aria-label="reset"`, in English whatever the person's language, so a
-// screen reader read «reset» on the tables' search (`DataTable`) and on the loose search boxes (Files, the till). The
+// Ionic 8 names the clear button of every `ion-searchbar` (the cross that shows once something is typed) with a
+// constant `aria-label="reset"`, in English whatever the person's language, so a screen reader would read «reset» on
+// the tables' search (`DataTable`) and on the loose search boxes (Files, the till). The
 // shared `syncSearchbarInputName` names it in the person's language — «Borrar búsqueda» / «Clear search» — and the field
 // keeps its hint. The demo list is a `DataTable`; Files names its own searchbar through the helper, as the till does.
 // flow: ui-datatable-search

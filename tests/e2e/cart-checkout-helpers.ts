@@ -1,7 +1,7 @@
 // Shared steps of the cart_checkout e2e (cart-checkout-*.spec.ts): a signed-in page in English, the app's
 // API for setup and server-side evidence (never the check itself), the flows' captures and the cleanup every
 // spec runs before and after it: what a run creates carries the session prefix «e2e-cc» and is deleted from
-// the hub's database (phase 1: `a` and `b` share it), with the day counter of the orders it numbered. A row
+// hub `a`'s own database, with the day counter of the orders it numbered. A row
 // action is service-helpers.ts's `rowAction`.
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
