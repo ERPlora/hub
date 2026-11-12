@@ -652,6 +652,8 @@ def test_restore_brings_a_deleted_product_back_the_same_with_its_movements_and_s
     assert (back.id, back.sku, back.ean13, back.stock) == (created.id, "CAF-1", "8412345678905", Decimal("7.000"))
     product = Product.objects.get()
     assert (product.is_deleted, product.deleted_at, product.is_active, product.is_sold_out) == (False, None, True, False)
+    # Who changed it last is whoever brought it back (the system), no longer who deleted it.
+    assert product.updated_by == "system"
     assert [kind for kind, _, _ in movements(created.id)] == ["initial", "reception"]
     assert outbox() == [(events.PRODUCT_RESTORED, restored_payload(created.id, "CAF-1", "Coffee"))]
 
