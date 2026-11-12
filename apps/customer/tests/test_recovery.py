@@ -5,7 +5,10 @@ business, so it has no alias and the ORM never reaches it. Customers answers it 
 config) with its own read, by SQL over its model's names (``queries.cards_in_copy``): each live card of the copy with
 what its create takes. Then, in the business, which of those it lacks (``queries.cards_not_in_business``): a card the
 business has live, merged into another or with its personal data erased is not lacking, and neither is one it made
-again (the same name, phone and email, the import's rule). Each lacking card is created by ``customer.customer.create``.
+again (the same name, phone and email, the import's rule). One it deleted is still there (deleting keeps the card,
+CUSTOMER-F07): it comes back the same, with all that hangs from it, by ``customer.customer.restore``
+(``queries.cards_deleted_in_business``, hub#1306); only one the business no longer has is created, by
+``customer.customer.create``.
 """
 
 import uuid
@@ -91,7 +94,7 @@ def a_card_of_the_copy(card: Customer | None = None, **fields) -> dict:
     return {"id": uuid.uuid7(), "name": "", "phone": "", "email": ""} | fields
 
 
-def test_the_business_lacks_what_it_has_not_live_merged_erased_nor_made_again():
+def test_the_business_lacks_only_what_it_no_longer_has_nor_made_again():
     now = timezone.now()
     live = Customer.objects.create(name="Marta Ruiz", phone="+34600555666", email="marta@example.com")
     deleted = Customer.objects.create(name="Ana López", deleted_at=now, is_active=False)
@@ -106,16 +109,37 @@ def test_the_business_lacks_what_it_has_not_live_merged_erased_nor_made_again():
 
     lacking = queries.cards_not_in_business(cards)
 
-    assert [card["id"] for card in lacking] == [deleted.pk, absent["id"], sharing["id"]]
+    assert [card["id"] for card in lacking] == [absent["id"], sharing["id"]]
+
+
+def test_the_business_holds_deleted_only_the_card_deleted_from_its_card_and_not_made_again():
+    now = timezone.now()
+    live = Customer.objects.create(name="Marta Ruiz", phone="+34600555666", email="marta@example.com")
+    deleted = Customer.objects.create(name="Ana López", phone="+34600111222", deleted_at=now, is_active=False)
+    merged = Customer.objects.create(name="Luis Pérez", deleted_at=now, is_active=False, merged_into=live)
+    erased = Customer.objects.create(name="Deleted customer", deleted_at=now, is_active=False, erased_at=now)
+    # Deleted, and made again by hand since: a live card with the same name, phone and email, the case aside.
+    twin = Customer.objects.create(name="Pablo Gil", phone="+34600777888", deleted_at=now, is_active=False)
+    Customer.objects.create(name="PABLO GIL", phone="+34600777888")
+    absent = a_card_of_the_copy(name="Sara Gil", phone="+34600999000")
+    copy = [a_card_of_the_copy(card) for card in (live, deleted, merged, erased)]
+    cards = [*copy, a_card_of_the_copy(twin), absent]
+
+    held = queries.cards_deleted_in_business(cards)
+
+    assert [card["id"] for card in held] == [deleted.pk]
+    assert held[0] is cards[1]
 
 
 def test_the_app_declares_what_it_gives_back():
     [declared] = apps.get_app_config("customer").recoverable_from_copy()
 
-    assert (declared.read, declared.missing, declared.create) == (
+    assert (declared.read, declared.missing, declared.create, declared.deleted, declared.restore) == (
         queries.cards_in_copy,
         queries.cards_not_in_business,
         "customer.customer.create",
+        queries.cards_deleted_in_business,
+        "customer.customer.restore",
     )
     assert str(declared.label) == "Customers"
     assert declared.reads_since == "0001_initial"

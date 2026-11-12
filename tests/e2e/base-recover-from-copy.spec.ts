@@ -1,11 +1,13 @@
-// flow: BASE-F114 (steps 6-11), CUSTOMER-F01, CUSTOMER-F07, SERVICE-F01 — hub#1257, hub#1283: in the Hub admin, the
-// ERPlora staff choose a separate copy of a business and bring back into it the customers and the services it lost
-// since, each created again by its app's own creation (never a copied row). At each size: a card and a service of `a`
-// are made; in Hubs, «Restore to a separate copy…» asks a copy of `a` from a temporary cluster (the stack's own server)
-// and the worker's pass makes it; the card is deleted in `a` and the service is gone from it; then Separate copies ›
-// tick the copy › «Recover into the business…» › Customers and Services ticked (with whatever else answers) ›
-// «Recover»; the worker's pass brings them back; Recoveries says «Customers: 1 created» and «Services: 1 created», and
-// `a` has the card live again and the service on offer again, each under a new id.
+// flow: BASE-F114 (steps 6-11), CUSTOMER-F07, CUSTOMER-F33, SERVICE-F01 — hub#1257, hub#1306, hub#1283: in the Hub
+// admin, the ERPlora staff choose a separate copy of a business and bring back into it the customers and the services it
+// lost since, by each app's own operations (never a copied row): a card the business deleted and still holds comes back
+// the same card, with its history; a service it no longer has is created again by Services' own creation. At each size:
+// a card and a service of `a` are made; in Hubs, «Restore to a separate copy…» asks a copy of `a` from a temporary
+// cluster (the stack's own server) and the worker's pass makes it; the card is deleted in `a` and the service is gone
+// from it; then Separate copies › tick the copy › «Recover into the business…» › Customers and Services ticked (with
+// whatever else answers) › «Recover»; the worker's pass brings them back; Recoveries says «Customers: 1 restored» and
+// «Services: 1 created», and `a` has the same card live again, and no other, and the service on offer again under a
+// new id.
 // The stack's worker serves databases only (no moves' thread), so the spec plays its passes, as the specs play the
 // relay.
 import { spawnSync } from 'node:child_process';
@@ -194,6 +196,7 @@ for (const { label, viewport } of SIZES) {
     await expect(page.locator('input[name="apps"][value="customer"]')).toBeChecked();
     await expect(page.locator('input[name="apps"][value="service"]')).toBeChecked();
     await expect(page.getByText('nothing is ever copied', { exact: false })).toBeVisible();
+    await expect(page.getByText('comes back as it was, with its history', { exact: false })).toBeVisible();
     await capture(page, `${KEY}-${label}-2-confirm`, { fullPage: true });
     await page.locator('input[type="submit"][value="Recover"]').click();
 
@@ -208,17 +211,16 @@ for (const { label, viewport } of SIZES) {
     await page.goto(RECOVERIES);
     const recovered = page.locator('#result_list tbody tr').first();
     await expect(recovered).toContainText('Done');
-    await expect(recovered).toContainText('Customers: 1 created');
+    await expect(recovered).toContainText('Customers: 1 restored');
     await expect(recovered).toContainText('Services: 1 created');
     await capture(page, `${KEY}-${label}-4-recoveries`, { fullPage: true });
     await recovered.locator('a').first().click();
     await expect(page.locator('.field-what .readonly')).toHaveText(/^Customers, (.+, )?Services(, .+)?$/);
     await capture(page, `${KEY}-${label}-5-recovery`, { fullPage: true });
 
-    // In the business, the card is live again, a new one made by Customers' create; the deleted one stays deleted.
-    expect(psql(`select count(*) from customer_customer where email = '${email}' and deleted_at is null`)).toBe('1');
-    expect(psql(`select id from customer_customer where email = '${email}' and deleted_at is null`)).not.toBe(card);
-    expect(psql(`select name from customer_customer where id = '${card}' and deleted_at is not null`)).toBe(name);
+    // In the business, the same card is live again, by Customers' restore, and no new one was made.
+    expect(psql(`select id from customer_customer where email = '${email}' and deleted_at is null`)).toBe(card);
+    expect(psql(`select count(*) from customer_customer where email = '${email}'`)).toBe('1');
     // And the service on offer again, a new one made by Services' create, with what it had.
     expect(psql(`select price, duration_minutes, is_active from service_service where name = '${name}'`)).toBe('2500|45|t');
     expect(psql(`select id from service_service where name = '${name}'`)).not.toBe(service);

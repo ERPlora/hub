@@ -101,9 +101,11 @@ class CustomerConfig(LiveAppConfig):
 
     def recoverable_from_copy(self) -> list:
         """hub#1257: the platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when
-        the staff recovers from it (BASE-F114): the copy's live cards the business lacks (``queries.cards_in_copy``,
-        ``queries.cards_not_in_business``), each created by ``customer.customer.create``, the till's and the card's
-        own. Never one whose personal data was erased."""
+        the staff recovers from it (BASE-F114): of the copy's live cards (``queries.cards_in_copy``), each the business
+        still holds deleted comes back the same, with all that hangs from it (``queries.cards_deleted_in_business``,
+        ``customer.customer.restore``, CUSTOMER-F33), and each it no longer has is created by
+        ``customer.customer.create``, the till's and the card's own (``queries.cards_not_in_business``). Never one
+        merged into another or whose personal data was erased."""
         from apps.customer import queries  # the models are not loaded yet when this module is
         from base.recovery import Recoverable
 
@@ -114,5 +116,7 @@ class CustomerConfig(LiveAppConfig):
                 read=queries.cards_in_copy,
                 missing=queries.cards_not_in_business,
                 create="customer.customer.create",
+                deleted=queries.cards_deleted_in_business,
+                restore="customer.customer.restore",
             )
         ]

@@ -655,6 +655,32 @@ def delete_customer(ctx: OperationContext, data: CustomerRefIn) -> dict:
     return {"id": customer.id}
 
 
+# Not an assistant tool, and declared by no app: only the system holds its permission, as the purchase commands. Its
+# one door is the recovery from a separate copy (BASE-F114): no screen of the business undoes a deletion.
+@operation(
+    "customer.customer.restore",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission="customer.restore",
+    input=CustomerRefIn,
+    output=CustomerDetailOut,
+    ai=INTERNAL,
+)
+def restore_customer(ctx: OperationContext, data: CustomerRefIn) -> dict:
+    """CUSTOMER-F33: a deleted card back in every list, the same card with all that hangs from it (deleting keeps it,
+    CUSTOMER-F07). Merged into another or erased it never comes back: its history lives on in the other card, or its
+    personal data is gone. Repeating it on a card already back answers well and announces again, as deleting does."""
+    customer = find_customer(ctx, data.id, data.customer, lock=True, live=False)
+    if customer.merged_into_id is not None or customer.erased_at is not None:
+        raise NotFound(CUSTOMER_UNAVAILABLE, code=CUSTOMER_UNAVAILABLE_CODE)
+    if customer.deleted_at is not None:
+        customer.deleted_at = None
+        customer.is_active = True
+        customer.save(update_fields=["deleted_at", "is_active", "updated_at"])
+    record_event(ctx, events.CUSTOMER_RESTORED, {"id": str(customer.id)})
+    return load_detail(customer)
+
+
 @operation(
     "customer.customer.merge",
     kind="command",

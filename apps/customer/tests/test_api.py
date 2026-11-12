@@ -99,6 +99,12 @@ def test_the_purchase_commands_have_no_route():
     assert {"customer.purchase.record", "customer.purchase.void", "customer.purchase.refund"}.isdisjoint(bound)
 
 
+def test_restoring_a_deleted_card_has_no_route():
+    # Only the system restores a card: its one door is the recovery from a separate copy (BASE-F114, CUSTOMER-F33).
+    bound = {operation for _, _, operation in ROUTES}
+    assert "customer.customer.restore" not in bound
+
+
 def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
 

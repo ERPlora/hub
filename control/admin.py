@@ -736,16 +736,22 @@ class CopyRecoveryAdmin(base_admin.ReadOnlyAdmin):
 
     @staticmethod
     def result_said(result: dict) -> str:
-        """What an app gave back, in words: «Customers: 2 created, 1 not created», or why it gave nothing."""
-        what, created, missed, why = (
+        """What an app gave back, in words: «Customers: 1 restored, 2 created, 1 not created», or why it gave nothing.
+        A recovery noted before hub#1306 has no ``restored``."""
+        what, restored, created, missed, why = (
             recoverable_names([result["app"]]),
+            result.get("restored", 0),
             result["created"],
             result["not_created"],
             result["refused"],
         )
-        if why and not created and not missed:
+        if why and not restored and not created and not missed:
             return pgettext("recovery", "%(what)s: nothing (%(why)s)") % {"what": what, "why": why}
-        counts = [ngettext("%(count)d created", "%(count)d created", created) % {"count": created}]
+        counts = []
+        if restored:
+            counts.append(ngettext("%(count)d restored", "%(count)d restored", restored) % {"count": restored})
+        if created or not restored:
+            counts.append(ngettext("%(count)d created", "%(count)d created", created) % {"count": created})
         if missed:
             counts.append(ngettext("%(count)d not created", "%(count)d not created", missed) % {"count": missed})
         said = pgettext("recovery", "%(what)s: %(counts)s") % {"what": what, "counts": ", ".join(counts)}

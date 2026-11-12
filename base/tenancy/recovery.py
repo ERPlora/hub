@@ -13,11 +13,13 @@ the business stays open and its own work goes on.
    (``recover_not_in_copy``), hold the migration its read needs (``reads_since``; ``recover_copy_behind`` otherwise)
    and none this code does not know (``recover_copy_ahead``). Then the app reads its records, and the connection is
    closed before anything is written.
-2. **Given back**: in the business (``use_hub``), the app says which of those records the business lacks, and each is
-   created by the app's own operation, the one its screen uses, as the platform runs an operation in a business (the
-   system's context, in the staff's language): rows are never copied. What the operation refuses for one record
-   (its input) is counted with why and the others go on; what it refuses for all (the app turned off, the business
-   busy) ends that app's part with why (``refused``), and the next app goes on.
+2. **Given back**: in the business (``use_hub``), the app says which of those records the business still holds deleted
+   and which it no longer has: each deleted one comes back first, the same record with all that hangs from it, by the
+   app's operation that undoes a deletion (``restore``, hub#1306), and each missing one is created by the app's own
+   operation, the one its screen uses, as the platform runs an operation in a business (the system's context, in the
+   staff's language): rows are never copied. What the operation refuses for one record (its input, or the record gone
+   since) is counted with why and the others go on; what it refuses for all (the app turned off, the business busy)
+   ends that app's part with why (``refused``), and the next app goes on.
 3. **Noted**: control notes the recovery done with what each app gave back, or failed with why
    (``recover_<step>: <why>``). A worker whose lease ran out leaves it to whoever holds it now, who reads the copy
    anew: what was created is not lacking any more, so nothing is made twice.
@@ -38,7 +40,7 @@ import psycopg
 import pydantic
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope
-from live.errors import InvalidPayload, OperationError
+from live.errors import InvalidPayload, NotFound, OperationError
 from live.meta import all_live_app_configs
 from live.operations import get as get_operation
 
@@ -189,9 +191,10 @@ def _refusal(label: str, declared: list[Recoverable] | None, applied: set[str], 
 def _give_back(
     hub: Hub, results: list[dict], label: str, declared, records, refused: str, ours: Callable[[], None]
 ) -> None:
-    """What ``label`` gives back to ``hub`` (in its ``use_hub``): each record it lacks created by its operation. Its
-    result is in ``results`` from the start, so a failure halfway is noted with what had come back until then."""
-    result = {"app": label, "created": 0, "not_created": 0, "reasons": [], "refused": refused}
+    """What ``label`` gives back to ``hub`` (in its ``use_hub``): each record it holds deleted brought back by its
+    restore, then each it no longer has created by its create. Its result is in ``results`` from the start, so a failure
+    halfway is noted with what had come back until then; ``not_created`` counts what either refused."""
+    result = {"app": label, "restored": 0, "created": 0, "not_created": 0, "reasons": [], "refused": refused}
     results.append(result)
     if refused:
         return
@@ -199,21 +202,41 @@ def _give_back(
         scope=Scope("host", hub.slug), actor="system", permissions=frozenset({"*"}), language=translation.get_language()
     )
     for one, found in zip(declared, records, strict=True):
-        op = get_operation(one.create)
-        for record in one.missing(found):
-            ours()
-            payload = {key: value for key, value in record.items() if key != "id"}
-            try:
-                op(ctx, op.input.model_validate(payload))
-            except pydantic.ValidationError as invalid:
-                _not_created(result, record, f"invalid_payload: {_first_error(invalid)}")
-            except InvalidPayload as invalid:
-                _not_created(result, record, f"{invalid.code}: {invalid.message}")
-            except OperationError as stopped:
-                result["refused"] = f"{stopped.code}: {stopped.message}"
+        steps = [(one.create, one.missing, "created", _create_input)]
+        if one.restore:
+            steps.insert(0, (one.restore, one.deleted, "restored", _restore_input))
+        for name, which, counted, payload in steps:
+            if not _each(ctx, get_operation(name), which(found), payload, counted, result, ours):
                 return
-            else:
-                result["created"] += 1
+
+
+def _each(ctx, op, records: list[dict], payload, counted: str, result: dict, ours: Callable[[], None]) -> bool:
+    """``op`` run on each of ``records``, its input ``payload(record)``, counted in ``result[counted]``; ``False`` once it
+    refuses them all (``refused``), and the app's part ends."""
+    for record in records:
+        ours()
+        try:
+            op(ctx, op.input.model_validate(payload(record)))
+        except pydantic.ValidationError as invalid:
+            _not_created(result, record, f"invalid_payload: {_first_error(invalid)}")
+        except (InvalidPayload, NotFound) as invalid:
+            _not_created(result, record, f"{invalid.code}: {invalid.message}")
+        except OperationError as stopped:
+            result["refused"] = f"{stopped.code}: {stopped.message}"
+            return False
+        else:
+            result[counted] += 1
+    return True
+
+
+def _create_input(record: dict) -> dict:
+    """What a create takes: the record as the copy holds it, but its id there."""
+    return {key: value for key, value in record.items() if key != "id"}
+
+
+def _restore_input(record: dict) -> dict:
+    """What a restore takes: the record's id, the same in the copy and in the business."""
+    return {"id": record["id"]}
 
 
 def _not_created(result: dict, record: dict, reason: str) -> None:
