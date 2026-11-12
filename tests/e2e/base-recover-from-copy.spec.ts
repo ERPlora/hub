@@ -2,7 +2,7 @@
 // separate copy of a business and bring back into it the customers it lost since, each created again by Customers'
 // own creation (never a copied row). At each size: a card of `a` is made; in Hubs, «Restore to a separate copy…» asks
 // a copy of `a` from a temporary cluster (the stack's own server) and the worker's pass makes it; the card is deleted
-// in `a`; then Separate copies › tick the copy › «Recover into the business…» › only Customers ticked › «Recover»; the
+// in `a`; then Separate copies › tick the copy › «Recover into the business…» › Customers ticked › «Recover»; the
 // worker's pass brings it back; Recoveries says «Customers: 1 created» and `a` has the card live again under a new id.
 // The stack's worker serves databases only (no moves' thread), so the spec plays its passes, as the specs play the
 // relay.
@@ -169,8 +169,8 @@ for (const { label, viewport } of SIZES) {
     // The confirmation page: what comes back, ticked, and the button.
     await expect(page.getByRole('heading', { name: 'Recover into the business' })).toBeVisible();
     await expect(page.locator('input[name="apps"][value="customer"]')).toBeChecked();
-    // Every app that gives something back comes ticked (Appointments too, hub#1284); this one follows the cards only.
-    for (const other of await page.locator('input[name="apps"]:not([value="customer"])').all()) await other.uncheck();
+    // Appointments comes ticked too (hub#1284): none was lost here, so this spec leaves it out.
+    await page.locator('input[name="apps"][value="appointment"]').uncheck();
     await expect(page.getByText('nothing is ever copied', { exact: false })).toBeVisible();
     await capture(page, `${KEY}-${label}-2-confirm`, { fullPage: true });
     await page.locator('input[type="submit"][value="Recover"]').click();

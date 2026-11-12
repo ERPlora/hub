@@ -677,7 +677,7 @@ class TestTheLease:
         assert live_cards(hub) == []
 
 
-def test_only_customers_and_appointments_answer_and_no_app_whose_records_reach_the_tax_authority_ever_does():
+def test_the_apps_that_answer_and_never_one_whose_records_reach_the_tax_authority():
     answering = {config.label for config in all_live_app_configs() if hasattr(config, recovery.HOOK)}
     fiscal = {config.label for config in all_live_app_configs() if hasattr(config, "fiscal_record_states")}
 
