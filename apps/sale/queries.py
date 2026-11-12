@@ -2,7 +2,7 @@
 
 The helpers that freeze a line (``freeze_product_line``, ``freeze_open_line``, ``freeze_service_line``)
 read Inventory's product and units, and Services' service, through those apps' own operations, with
-the caller's session: neither is a requirement of the sale app (PLAN §20.5), so their tables are never
+the caller's session: neither is a requirement of the sale app, so their tables are never
 read here. ``call_app`` is the one door to an app sale does not require (Inventory's catalog, Services' catalog and
 voucher sessions, Invoicing's documents, Cash register's drawer, Appointments' bookings), by the name of its operation:
 the platform's ``base.operations.call``, with this app's own 409 when that app is not in the business. ``valuate`` is the one
@@ -152,7 +152,7 @@ LINE_NOT_FOUND = _("That line does not exist.")
 TENDER_NOT_FOUND = _("That tender does not exist.")
 REFUND_NOT_FOUND = _("That refund does not exist.")
 #: How a refund is said where something names it (the card of Services' write that gives back the sessions a refund
-#: returns, hub#756): it has no number of its own, «Sales» lists it under its sale.
+#: returns): it has no number of its own, «Sales» lists it under its sale.
 REFUND_OF_SALE = _("Refund of sale %(number)s")
 BOOKED_PRICE_MISMATCH = _(
     "That is not the price the appointment booked for this service: it is cancelled, it is another "
@@ -355,7 +355,7 @@ def get_pos_settings(ctx: OperationContext, params: EmptyIn) -> dict:
     return settings_row(current_settings())
 
 
-# ── The business on paper (SALE-F21, SALE-F29; hub#458) ──────────────────────────────────────────────
+# ── The business on paper (SALE-F21, SALE-F29) ───────────────────────────────────────────────────────
 
 #: What the papers read of other apps, by name: Invoicing is no ``requires`` of Sales.
 ISSUER = "invoice.issuer.get"
@@ -807,7 +807,7 @@ def call_services(ctx: OperationContext, name: str, data: dict):
 
 def money_text(cents: int | None, currency: str = LIMITS_CURRENCY) -> str:
     """``cents`` (minor units of ``currency``, with its decimals: none in JPY) as the reader writes money in a sentence,
-    thousands always grouped as every screen paints them («1.234,56 €», «€1,234.56», «PLN 1,234.56»; hub#1090);
+    thousands always grouped as every screen paints them («1.234,56 €», «€1,234.56», «PLN 1,234.56»);
     nothing is «—». Without a currency it is one of Spain's legal limits, which the law writes in euros (Invoicing says
     its ticket limit so too); any other amount passes its own, the sale's or the business's."""
     return "—" if cents is None else business.money_text(cents, currency)

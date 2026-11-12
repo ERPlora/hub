@@ -1,7 +1,7 @@
-"""ERPlora's invoices issued by its platform hub (PLAN-SAAS §4; contract point 4): ``invoice.invoice.issue_platform``
-writes the invoice and its VeriFactu record in one transaction, idempotent by the SaaS's id (``platform_ref``);
-``invoice.invoice.platform_status`` answers how it stands, ``invoice.invoice.platform_document`` its A4 and
-``invoice.invoice.platform_health`` whether the platform hub can issue now. Real VeriFactu, no mocks.
+"""ERPlora's invoices issued by its platform hub: ``invoice.invoice.issue_platform`` writes the invoice and its
+VeriFactu record in one transaction, idempotent by the SaaS's id (``platform_ref``); ``invoice.invoice.platform_status``
+answers how it stands, ``invoice.invoice.platform_document`` its A4 and ``invoice.invoice.platform_health`` whether the
+platform hub can issue now. Real VeriFactu, no mocks.
 
 The case lists come from the old SaaS's own engine (billing/tests/test_hub_invoices.py, test_invoice_dedup.py,
 test_invoice_environment.py; hubs/main/tests/test_platform.py): one invoice per Stripe invoice whatever the
@@ -216,7 +216,7 @@ def test_in_prod_the_record_files_in_production_whatever_the_configuration_says(
 def test_in_prod_while_erplora_has_not_opened_real_filing_it_files_in_testing(
     platform_hub, settings
 ):
-    # Working-rules §15: ERPlora's own invoices skip no lock.
+    # ERPlora's own invoices skip no lock.
     settings.ERPLORA_ENVIRONMENT = "prod"
     settings.VERIFACTU_PRODUCTION_ENABLED = False
 

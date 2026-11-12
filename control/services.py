@@ -1,12 +1,11 @@
-"""Control's commands: the database clusters the hubs' databases are on (round 2026-10-30b of PLAN-DB, decision 1 of
-Ioan; tranche S7, part 1).
+"""Control's commands: the database clusters the hubs' databases are on.
 
 The Hub admin (``control.admin``) registers, edits, closes and deletes a cluster only through these operations, for
 the platform's admins (staff and superuser, ``platform_admin``) or the platform itself; support only reads. Each runs
 on control (the registry's scope) and records its event in control's outbox in the same transaction.
 
 - A cluster with a ``secret_name`` is saved only once its app's secret (``<secret_name>/app``) resolves through
-  ``base.tenancy.credentials.credentials_for``: the web, where the admin runs, may read only that one (aws#23), so the
+  ``base.tenancy.credentials.credentials_for``: the web, where the admin runs, may read only that one, so the
   migrator's is never asked from here (the worker and ``hub-migrate`` read it when they first reach the cluster).
 - «Close to new hubs» (``control.cluster.close``) takes it out of the placement of new hubs
   (``base.services.place_hub``); the hubs on it stay there.
@@ -18,22 +17,22 @@ on control (the registry's scope) and records its event in control's outbox in t
   only to an open one with room (as a new hub is placed, counting the hubs on their way there), and only a database
   small enough for a copy (:data:`MOVE_MAX_BYTES`, measured on its server: ``control.queries``); a larger one needs
   logical replication, which the Hub does not do yet. Its host answers 503 «maintenance» until the worker is done.
-- ``control.hub.restore`` asks the worker to put a ready hub's database back as it was at a moment (hub#1198,
-  ``base.tenancy.restore``): from the copy of it on a temporary cluster (a point-in-time restore of its own, registered
+- ``control.hub.restore`` asks the worker to put a ready hub's database back as it was at a moment
+  (``base.tenancy.restore``): from the copy of it on a temporary cluster (a point-in-time restore of its own, registered
   closed to new hubs, with no hub on it), small enough for a copy. Its host answers 503 «maintenance» until the worker
   is done. The worker refuses it, nothing changed, while the hub's database has a production VeriFactu record the copy
   lacks or has otherwise (it reads both with the migrator, which the web does not have; it only reads).
 - ``control.hub.restore_aside`` asks the worker for a separate copy of a ready hub's database as it was at a moment
-  (hub#1213, layer 1; ``base.tenancy.restore``), from the same copy and under the same conditions, made on the hub's
+  (``base.tenancy.restore``), from the same copy and under the same conditions, made on the hub's
   own cluster as ``<control>_copy_<hex>`` (a ``RestoredCopy`` row): the business is never closed nor changed, so its
   fiscal records stop nothing, and the copy is no business, closed to the app: nothing in it reaches the tax authority.
 
 Each locks the cluster's row first, as the placement does, so a hub placed at the same time is either counted or
 placed after.
 
-``control.freeze.set`` freezes the platform for a database upgrade with Blue/Green, or lifts its freeze (hub#930;
-PLAN-DB round 2026-11-04e, «Congelar»): while frozen the worker makes, drops and moves no database and makes no app's
-tables, and ``migrate_hubs`` refuses to start, while the relay, the tasks and the sends to the AEAT go on. It is
+``control.freeze.set`` freezes the platform for a database upgrade with Blue/Green, or lifts its freeze: while
+frozen the worker makes, drops and moves no database and makes no app's tables, and ``migrate_hubs`` refuses to start,
+while the relay, the tasks and the sends to the AEAT go on. It is
 idempotent: frozen again, the freeze in course is kept as it was (who, since when, why); lifted again, nothing changes.
 Only a real change records its event. Its one row is locked first, so two admins at once change it once.
 """
@@ -335,7 +334,7 @@ def hub_move(ctx: OperationContext, data: HubMoveIn) -> dict:
 def hub_move_cancel(ctx: OperationContext, data: HubIdIn) -> dict:
     """Ask the worker to undo the move of ``data.id``, started or not: the hub is marked (``move_undo_asked_at``) and the
     worker puts it back on its origin. No note of a copy is made nor taken here: an older copy of the same hub on its
-    server is never taken for its data (review of W8, round 3)."""
+    server is never taken for its data."""
     platform_admin_only(ctx)
     hub = Hub.objects.select_for_update().filter(pk=data.id).first()
     if hub is None:
@@ -493,7 +492,7 @@ def hub_restore_aside(ctx: OperationContext, data: HubRestoreIn) -> dict:
 )
 def copy_recover(ctx: OperationContext, data: CopyRecoverIn) -> dict:
     """Ask the worker to bring back into its business what the separate copy ``data.copy_id`` holds and the business
-    lacks, of the apps ``data.apps`` (hub#1257; ``base.tenancy.recovery``): each record created by its app's own
+    lacks, of the apps ``data.apps`` (``base.tenancy.recovery``): each record created by its app's own
     operation, in the staff member's language. Only from a made copy, of apps that say what they give back from one,
     and one recovery of a copy at a time; the business is not touched by the ask."""
     # Imported here: base.tenancy.recovery runs on control.services (its worker's side, below).
@@ -587,7 +586,7 @@ def hubs_moving() -> list[UUID]:
 
 
 def hubs_restoring() -> list[UUID]:
-    """The hubs asked to be restored (or whose restore is being undone), the longest asked first (hub#1198)."""
+    """The hubs asked to be restored (or whose restore is being undone), the longest asked first."""
     return list(
         Hub.objects.filter(restoring_from__isnull=False).order_by("updated_at", "pk").values_list("pk", flat=True)
     )
@@ -768,7 +767,7 @@ def forget_leftover(cluster_id: UUID, db_name: str) -> None:
         LeftoverDatabase.objects.filter(cluster_id=cluster_id, db_name=db_name).delete()
 
 
-# ── The worker's side of a separate copy (``base.tenancy.restore``, hub#1213): under the row's own lease ─────────────
+# ── The worker's side of a separate copy (``base.tenancy.restore``): under the row's own lease ───────────────────────
 
 
 def copies_to_make() -> list[UUID]:
@@ -871,7 +870,7 @@ def forget_aside_copy(copy_id: UUID) -> None:
         RestoredCopy.objects.filter(pk=copy_id).delete()
 
 
-# ── The worker's side of a recovery from a separate copy (``base.tenancy.recovery``, hub#1257): its own lease ────────
+# ── The worker's side of a recovery from a separate copy (``base.tenancy.recovery``): its own lease ──────────────────
 
 
 def recoveries_due() -> list[UUID]:

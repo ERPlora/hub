@@ -1,13 +1,13 @@
-"""Hot registration of the hubs' aliases (PLAN-DB §4 and §5; plan 2026-10-22-fase-2-tenencia, step 4).
+"""Hot registration of the hubs' aliases.
 
-A hub with a database of its own (``Hub.db_name``) gets its alias, ``hub_<hex of its id>`` (PLAN-DB §4), the first
+A hub with a database of its own (``Hub.db_name``) gets its alias, ``hub_<hex of its id>``, the first
 time a process uses it: a copy of the static ``hub_template`` alias (``config/settings.py``: the PgBouncer sidecar in
 transaction mode, no pool, ``CONN_MAX_AGE`` 0, no server-side cursors, no prepared statements) with the hub's database
 as ``NAME`` and, for a hub on a :class:`control.models.Cluster`, that cluster's PgBouncer. Its ``NAME`` is the row's
 ``db_name`` (pre's ``pre_hub_<hex>``, a demo's ``<control>_demo_<hex>``), never derived from the id; an alias already
 registered with another database is refused (``HubAliasConflict``): every thread keeps its connection to the first
 one, so a hub moved to another database needs the process restarted. A template's database (``<control>_template…``)
-never gets one: it is only cloned, and a connection to it would make its next clone fail (PLAN-DB §6).
+never gets one: it is only cloned, and a connection to it would make its next clone fail.
 
 Every hub's alias runs on the hubs' engine (``base.tenancy.backend``, ``base.tenancy.limits``): each transaction holds a
 place of its hub's limiter in this process and carries its plan's ``statement_timeout``; registering the alias (on every
@@ -16,15 +16,15 @@ own budget.
 
 ``connections.settings`` is never changed in place: ``close_old_connections`` walks it from other threads, so a new
 dict with the alias is swapped in, under a lock, after looking again. A business without a database of its own
-(``db_name=""``: phase 1's, not yet cut) has no alias (``HubWithoutDatabase``): since S5 it never runs on ``default``.
+(``db_name=""``) has no alias (``HubWithoutDatabase``) and never runs on ``default``.
 
-The migrator's alias, ``<db_name>__ddl`` (PLAN-DB §4 and §7), is the same database reached directly, without
+The migrator's alias, ``<db_name>__ddl``, is the same database reached directly, without
 PgBouncer and without the control database's pool, as the migrator's role: only the migrator, the provisioning
 (``base.tenancy.provision``) and the tests' template builder use it. :func:`migrator_conninfo` is the same connection
 in libpq's terms, for ``psycopg`` itself (``base.tenancy.ops``: ``CREATE``/``DROP DATABASE`` on the maintenance
 database ``postgres``).
 
-A hub on a :class:`control.models.Cluster` (round 2026-10-30, S2a) is reached on that cluster: its alias through the
+A hub on a :class:`control.models.Cluster` is reached on that cluster: its alias through the
 cluster's PgBouncer (its writer, directly, when the row names none) with the cluster's app role, its migrator's alias
 and connection on the cluster's writer with the cluster's migrator role (``base.tenancy.credentials.credentials_for``).
 A hub's alias never carries a migrator's role, nor asks for its secret: the web opens no other. Without a cluster, the

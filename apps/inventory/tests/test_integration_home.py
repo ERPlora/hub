@@ -1,8 +1,7 @@
-"""Inventory on the Home (PLAN-HUB round 2026-10-21; FIX-INVENTORY-SETUP-HOOKS): base's own queries bring «Your
-catalog» to whoever may add products (pending with no active product, done with one, physical or a service, and
-pending again when every product is turned off or deleted; INVENTORY-F28) and Inventory's four panels to whoever reads
-the products, each answered by the Panel's own queries as that person (INVENTORY-F17); a product added in hub B re-runs
-B's checklist and panels and tells A nothing.
+"""Inventory on the Home: base's own queries bring «Your catalog» to whoever may add products (pending with no active
+product, done with one, physical or a service, and pending again when every product is turned off or deleted;
+INVENTORY-F28) and Inventory's four panels to whoever reads the products, each answered by the Panel's own queries as
+that person (INVENTORY-F17); a product added in hub B re-runs B's checklist and panels and tells A nothing.
 
 base and inventory run for real: the step and the panels come from InventoryConfig through base's own queries.
 """
@@ -123,7 +122,7 @@ def test_a_manager_is_offered_the_four_panels_followed_live(general):
         "inventory.in_stock": ("inventory.stock.get_summary", False, True, "stat"),
         "inventory.low_stock_products": ("inventory.product.list_low_stock", True, True, "bar-list"),
     }
-    # The picker groups them under the app's own name (gh:inventory#126).
+    # The picker groups them under the app's own name.
     assert {panel["category"] for panel in offered.values()} == {"Inventory"}
 
 
@@ -186,7 +185,7 @@ def test_the_lowest_stock_panel_shows_five_the_one_with_less_first(general):
 
 @pytest.mark.django_db
 def test_a_spanish_request_reads_the_step_and_the_panels_in_spanish(general, client, make_user):
-    """gh:hub#868: the old checklist said «Your catalog» in English although the module carried its Spanish."""
+    """A Spanish request never reads «Your catalog» in English: the module carries its Spanish."""
     client.force_login(make_user("boss", host="a", role="hub_admin"))
     setup = client.get("/api/home/setup", HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE="es")
     assert setup.status_code == 200

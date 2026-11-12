@@ -1,19 +1,18 @@
-"""Names of the hubs' databases (PLAN-DB §3 and §14.12; plan 2026-10-22-fase-2-tenencia, step 1).
+"""Names of the hubs' databases.
 
 Every name derives from the control database's (``settings.DATABASES["default"]["NAME"]``: ``hub`` in prod,
 ``pre_hub`` in pre, the test database in the tests), so no pattern of one environment ever reaches another's:
 
 - a hub: ``<control>_<hex>``, the whole ``Hub.id.hex`` (never truncated: the first half of a UUIDv7 is its date);
-- a demo: ``<control>_demo_<hex>`` (prod ``hub_demo_<hex>``, pre ``pre_hub_demo_<hex>``: round 2026-10-30 of
-  PLAN-DB, proposal (e); before it a demo was ``demo_<hex>`` in every environment, and no such database was ever made);
+- a demo: ``<control>_demo_<hex>`` (prod ``hub_demo_<hex>``, pre ``pre_hub_demo_<hex>``);
 - a template: ``<control>_template`` or ``<control>_template_<vertical>``;
-- the copy a hub leaves behind on the server it moved from: ``<control>_move_<hex>`` (round 2026-10-30b of PLAN-DB,
-  decision 3; ``base.tenancy.move``), as long as a demo's;
-- the database a restore replaced, kept aside: ``<control>_old_<hex>`` (hub#1198; ``base.tenancy.restore``), the hex of
+- the copy a hub leaves behind on the server it moved from: ``<control>_move_<hex>``
+  (``base.tenancy.move``), as long as a demo's;
+- the database a restore replaced, kept aside: ``<control>_old_<hex>`` (``base.tenancy.restore``), the hex of
   a UUIDv7 of its own: the moment it was kept is in it (a date suffix would not fit in 63 characters after the longest
   control name), and two restores of a hub within the days keep both;
-- a hub's database as it was at a moment, made aside while the business goes on: ``<control>_copy_<hex>`` (hub#1213;
-  ``base.tenancy.restore``, «restore aside»), the hex of its ``control.RestoredCopy`` row (a UUIDv7). It is a copy left
+- a hub's database as it was at a moment, made aside while the business goes on: ``<control>_copy_<hex>``
+  (``base.tenancy.restore``, «restore aside»), the hex of its ``control.RestoredCopy`` row (a UUIDv7). It is a copy left
   behind as the two above are: no process registers an alias of it, and it is only ever dropped.
 
 PostgreSQL silently truncates an identifier past 63 bytes, so a longer name is refused, never cut. A name reaches SQL
@@ -34,7 +33,7 @@ COPY_INFIX = "copy"
 #: Longest control database name its hubs' and demos' fit after: a demo's ``_demo_<hex>`` is the most a name adds.
 MAX_CONTROL = MAX_IDENTIFIER - len(f"_{DEMO_INFIX}_") - 32
 TEMPLATE_SUFFIX = "template"
-#: The suffix of a hub's migrator alias (``<alias>__ddl``, PLAN-DB §4): the same database, reached directly.
+#: The suffix of a hub's migrator alias (``<alias>__ddl``): the same database, reached directly.
 DDL_SUFFIX = "__ddl"
 
 _HEX = r"[0-9a-f]{32}"
@@ -98,7 +97,7 @@ def is_kept(name: str, *, control: str) -> bool:
 
 
 def is_copy_aside(name: str, *, control: str) -> bool:
-    """Whether ``name`` is a database of a hub of ``control`` as it was at a moment, made aside (hub#1213)."""
+    """Whether ``name`` is a database of a hub of ``control`` as it was at a moment, made aside."""
     return bool(re.fullmatch(rf"{re.escape(control)}_{COPY_INFIX}_{_HEX}", name))
 
 

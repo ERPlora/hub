@@ -1,4 +1,4 @@
-"""The identity of a hub's database (PLAN-DB §3 and §14.4; plan 2026-10-22-fase-2-tenencia, step 6).
+"""The identity of a hub's database.
 
 Every hub's database holds one row in ``base_hub_identity`` (``base.models.HubIdentity``): its hub's id, written
 when the database is made (:func:`write`). ``use_hub`` checks it the first time a process uses an alias

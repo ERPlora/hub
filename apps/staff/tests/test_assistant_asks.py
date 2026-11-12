@@ -1,6 +1,5 @@
-"""What layer 1 of the assistant's QA does not say of Staff (docs plan 2026-10-31, the assistant's knowledge and QA,
-§3): how many tools it offers, and that the owner's requests of the real-model QA (hub#1103), in the owner's own
-words, are offered their existing operation.
+"""What layer 1 of the assistant's QA does not say of Staff: how many tools it offers, and that the owner's requests of
+the real-model QA, in the owner's own words, are offered their existing operation.
 
 Every ask of every tool of staff bringing its tool among the first ten, role by role, in both languages, is
 ``base/tests/test_assistant_asks.py``'s (staff is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over
@@ -21,10 +20,10 @@ from base.tests.test_assistant_asks import PROBES, TOP, comparable, probe_phrase
 
 A = Scope("host", "a")
 
-#: The requests of hub#1103's QA (``owner.es.staff.*`` of ``owner-es-staff-2026-11-08.json``), as the owner said them: before Staff said its
-#: asks, none of these tools was among the ones a turn offers (``MAX_TOOLS``), so the model read a list without the
-#: reason, picked ``customer.customer.delete``, asked what kind of record it was, or said it could not. Each is offered
-#: its existing operation now, without being one of its asks.
+#: The requests of the real-model QA (``owner.es.staff.*`` of ``owner-es-staff-2026-11-08.json``), as the owner said
+#: them: before Staff said its asks, none of these tools was among the ones a turn offers (``MAX_TOOLS``), so the model
+#: read a list without the reason, picked ``customer.customer.delete``, asked what kind of record it was, or said it
+#: could not. Each is offered its existing operation now, without being one of its asks.
 REPORTED = [
     (
         "staff.time_off.detail",

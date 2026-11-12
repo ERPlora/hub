@@ -148,7 +148,6 @@ describe('InvoicesPage: the live list', () => {
     expect(s.params()).toEqual([{ total_amount_from: 1250, sort: 'issued_at', dir: 'desc', limit: 50, offset: 0 }]);
   });
 
-  // flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
   it('filters behind the table funnel: total, status, date and type on their columns, then series and source', async () => {
     const s = await setup();
     await s.show(PAGE);
@@ -367,7 +366,7 @@ describe('InvoicesPage: the states of the screen', () => {
     expect(redNotices(s)).toBe(0);
   });
 
-  it('to whoever may not change the issuer, says once that an administrator has to, with no «Configurar» (gh:hub#435)', async () => {
+  it('to whoever may not change the issuer, says once that an administrator has to, with no «Configurar»', async () => {
     for (const session of [EMPLOYEE, MANAGER]) {
       const s = await setup({ platformNotice: true, locale: 'es', session });
       await answerIssuer(s, false, { locale: 'es', actionable: false });
@@ -432,14 +431,14 @@ describe('InvoicesPage: the rest', () => {
   });
 });
 
-describe('InvoicesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('InvoicesPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });
 
-describe('InvoicesPage: «Total» is read as every amount of the Hub (hub#1196)', () => {
+describe('InvoicesPage: «Total» is read as every amount of the Hub', () => {
   itReadsAmountFiltersAsTheHub({
     ends: ['total_amount_from', 'total_amount_to'],
     params: ['total_amount_from', 'total_amount_to'],

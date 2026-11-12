@@ -1346,7 +1346,7 @@ def fire(ctx: OperationContext, data: OrderFireIn) -> dict:
             "channel": data.channel,
             "priority": data.priority,
             "round_no": round_no,
-            # Who attends the check («Atiende» of the till), else who sends the round (kitchen#82).
+            # Who attends the check («Atiende» of the till), else who sends the round.
             "waiter": data.waiter or person_label(ctx),
             "items": [
                 {
@@ -2018,10 +2018,10 @@ def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> l
 
 # ── The fiscal document of a write: Invoicing, by name, in the same transaction ──────────────────
 
-#: VeriFactu's refusals (through Invoicing, unchanged) of a business that files for real and cannot reach the AEAT
-#: now (verifactu WORKBOOK, «Contrato con Facturación»): not a document that waits but the write's own refusal.
-#: Working-rules §15, as the old Hub's ``enforce_fiscal_road`` (HUB-1935): nothing is charged that could never be
-#: filed. The route's lacks and the server's (its own certificate it cannot open, no gateway, real filing closed).
+#: VeriFactu's refusals (through Invoicing, unchanged) of a business that files for real and cannot reach the AEAT now
+#: (verifactu WORKBOOK, «Contrato con Facturación»): not a document that waits but the write's own refusal. Nothing is
+#: charged that could never be filed. The route's lacks and the server's (its own certificate it cannot open, no
+#: gateway, real filing closed).
 NO_WAY_TO_THE_AEAT = frozenset(
     {
         "verifactu.representation_not_approved",
@@ -2050,9 +2050,9 @@ def _fiscal_document(
     typed_recipient: bool = False,
     strict: bool = False,
 ) -> dict:
-    """Invoicing's operation ``name`` (its ticket or invoice of a charge, its rectifying invoice of a refund
-    or a void), run by name with the seller's session INSIDE this write's transaction (CLAUDE.md
-    «Fiscal»): the document and its number commit with the sale, or neither does.
+    """Invoicing's operation ``name`` (its ticket or invoice of a charge, its rectifying invoice of a refund or a void),
+    run by name with the seller's session INSIDE this write's transaction: the document and its number commit with the
+    sale, or neither does.
 
     ``{status, id, number, type}``: «issued» with the document; «none» when there is nothing to declare
     (a refund of no money); «unavailable» when Invoicing is not in this business (the sale stays a ticket
@@ -2198,8 +2198,8 @@ def _replay(ctx: OperationContext, data: CompleteIn) -> dict | None:
         )
     if not same:
         raise Conflict(str(KEY_REUSED), code="sale.idempotency_key_reused")
-    # The same attempt again is the till's retry: a document that waited is asked for once more (phase 1
-    # has no relay to issue it on its own); still refused, it keeps waiting, in sight.
+    # The same attempt again is the till's retry: a document that waited is asked for once more (no relay issues it on
+    # its own); still refused, it keeps waiting, in sight.
     _issue_waiting_document(ctx, sale)
     with translation.override(ctx.language):
         return sale_detail(sale, already=True)
@@ -2543,8 +2543,8 @@ def voucher_unsold(ctx: OperationContext, data: VoucherUnsoldIn) -> dict:
 def record_voucher_session(ctx: OperationContext, data: VoucherSessionIn) -> dict:
     """Services' step when a session of a voucher is spent outside the till saying who did it (SERVICE-F21): no line
     carries it, so what it is worth counts in her production on today's business day (SALE-F28), the till's: the day a
-    sale charged at that moment would count on (hub#771). Whoever may sell may say who did a service, as on a line.
-    The same session told again counts once: the first telling stays."""
+    sale charged at that moment would count on. Whoever may sell may say who did a service, as on a line. The same
+    session told again counts once: the first telling stays."""
     session, created = VoucherSession.objects.get_or_create(
         session_id=data.session_id,
         defaults={"staff_id": data.staff_id, "business_day": business_today(), "value": data.value},
@@ -3283,11 +3283,11 @@ class _Unprintable(Exception):
 
 
 def _queue_paper(ctx: OperationContext, request: dict) -> dict:
-    """Asks Printing for one paper by its operation's name (no ``requires``; PLAN-HUB: the charge calls the queue
-    inside its own transaction, and nothing happens when Printing is not on), in a savepoint of its own. A job no
-    printer would take (it would wait in the queue for ever) is undone. Never raises for Printing: off, absent,
-    refusing, failing or without a printer, the answer is «not queued» and the device prints the screen's paper;
-    the write that asked goes on."""
+    """Asks Printing for one paper by its operation's name (no ``requires``: the charge calls the queue inside its own
+    transaction, and nothing happens when Printing is not on), in a savepoint of its own. A job no printer would take
+    (it would wait in the queue for ever) is undone. Never raises for Printing: off, absent, refusing, failing or
+    without a printer, the answer is «not queued» and the device prints the screen's paper; the write that asked goes
+    on."""
     try:
         op = get(PRINT_JOB)
     except UnknownOperation:

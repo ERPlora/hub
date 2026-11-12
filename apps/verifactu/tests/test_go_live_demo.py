@@ -1,4 +1,4 @@
-"""A demo hub never goes live with VeriFactu (PLAN-SAAS §3.5; plan 2026-10-17, §1.6 point 6).
+"""A demo hub never goes live with VeriFactu.
 
 The demo is a row of the registry (``base.Hub.is_demo``), which ``base.operations.is_demo_hub`` reads: here a real
 row, not a stand-in. On a demo's scope ``verifactu.config.go_live`` is 409 ``verifactu.go_live_forbidden`` even on a
@@ -35,7 +35,7 @@ def opened(settings):
 
 @pytest.fixture
 def ready_route(issuer):
-    """ERPlora's approved authorisation: the route to production is ready, on any plan (PLAN §30)."""
+    """ERPlora's approved authorisation: the route to production is ready, on any plan."""
     run(
         "verifactu.config.sync",
         {"version": 1, "representation": {"status": "approved"}},
@@ -45,7 +45,7 @@ def ready_route(issuer):
 
 @pytest.fixture
 def demo(every_app_on):
-    """A live demo that turned its apps on (a demo is born with every app off, round 2026-10-27)."""
+    """A live demo that turned its apps on (a demo is born with every app off)."""
     hub = Hub.objects.create(
         slug=DEMO.key, is_demo=True, status="ready", expires_at=timezone.now() + dt.timedelta(hours=1)
     )
@@ -70,9 +70,9 @@ def test_a_business_on_the_same_server_goes_live():
 
 @pytest.mark.usefixtures("opened", "ready_route", "demo")
 def test_a_demo_files_in_testing_even_where_the_configuration_says_production():
-    # VERIFACTU-G23 and G25 (SAAS_PUBLIC-F91, HUB-F315): nothing of a demo ever reaches the real AEAT. Phase 1
-    # shares the tables (round 2026-10-17), so the configuration a demo reads may be a business's that went live on
-    # this server: the demo's sale is still sealed in the test environment, never numbered in production.
+    # VERIFACTU-G23 and G25 (SAAS_PUBLIC-F91, HUB-F315): nothing of a demo ever reaches the real AEAT. The
+    # configuration a demo reads may say production (here, a business's that went live on this server, in the same
+    # test database): the demo's sale is still sealed in the test environment, never numbered in production.
     run("verifactu.config.go_live", ctx=ctx_for(scope=A))
     assert Config.objects.get().environment == "production"
 
