@@ -3,14 +3,16 @@
 The SPA's catalogues have the same guard in ``base/frontend/__tests__/catalogue-plurals.test.ts``. A message with a
 count goes through ``ngettext``/``npgettext`` with its ``msgid_plural`` (``control/admin.py``), never «cart(s)»: the
 parentheses show on screen whatever the number. Read from the compiled catalogues Django uses (``.mo``): the English
-message is the key and the Spanish its translation, so both languages are checked.
+message is the key and the Spanish its translation, so both languages are checked. The reader is the one of every
+catalogue test, ``base.tests.po.mo_entries``.
 """
 
-import gettext
 import re
 from pathlib import Path
 
 from django.conf import settings
+
+from base.tests.po import mo_entries
 
 #: A plural ending glued to a word in parentheses: «record(s)», «opción(es)», «category(ies)» (as the SPA's guard).
 IN_PARENTHESES = re.compile(r"[^\W\d_]\((?:s|es|as|os|ies)\)")
@@ -45,13 +47,11 @@ def hub_catalogues() -> list[Path]:
 
 def messages_with_parentheses(path: Path) -> set[str]:
     """The English messages of ``path`` that spell a plural in parentheses, in English or in their Spanish."""
-    with path.open("rb") as compiled:
-        entries = gettext.GNUTranslations(compiled)._catalog
     found = set()
-    for key, text in entries.items():
+    for key, text in mo_entries(path).items():
         message = key if isinstance(key, str) else key[0]  # A plural form is keyed (message, index).
         message = message.split("\x04", 1)[-1]  # A contexted one is keyed «context\x04message».
-        if message and (IN_PARENTHESES.search(message) or IN_PARENTHESES.search(text)):
+        if IN_PARENTHESES.search(message) or IN_PARENTHESES.search(text):
             found.add(message)
     return found
 
