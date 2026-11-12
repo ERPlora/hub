@@ -55,11 +55,12 @@ const e2eFiles = readdirSync(e2eDir, { recursive: true, encoding: 'utf8' })
   .filter((name) => !name.split(/[\\/]/).some((part) => part.startsWith('.') || part === 'node_modules'))
   .map((name) => join(e2eDir, name));
 
-// Synchronous: it reads the script's tsconfigs and walks their folders, a tenth of a second at rest and as slow as a
-// loaded machine makes each read, and Vitest looks at a synchronous test's clock only once it has returned. So it
-// names none (hub#777): what it found is its verdict, and a file of this folder left out is red at once.
-it('checks every .ts of tests/e2e', () => {
-  const files = new Set(typecheckProjects().flatMap((project) => [...checked(project)]));
+// It reads the script's tsconfigs and walks their folders, a tenth of a second at rest and as slow as a loaded machine
+// makes each read, which no clock in seconds tells from a walk that never ends. So it names none (hub#777), and the
+// walk is made ahead in a thread of its own, without holding the worker (hub#1315): what it found is its verdict, and
+// a file of this folder left out is red at once.
+it('checks every .ts of tests/e2e', async () => {
+  const files = new Set((await walkAhead(typecheckProjects)).flatMap((project) => [...checked(project)]));
   expect(e2eFiles.length).toBeGreaterThan(0);
   expect(e2eFiles.filter((file) => !files.has(file)).map((file) => relative(root, file))).toEqual([]);
 }, NO_CLOCK);
