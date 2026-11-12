@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c2fc5c630c91ce2d4ad5aba4e1e6bbcbd399c019e1b319e59172ffb2b62b9d8b -->
+<!-- generated from WORKBOOK.md sha256:c5d3e9618ca7a103b5c70240773b01bd296f645638175c89a90dd435f3017561 -->
 
 ## What it is for and who it is for
 
@@ -351,7 +351,9 @@ card said "Spicy sauces"), nothing is touched and the new card comes up. When ad
 it said by its name, the card shows the group it found all the same and the "yes" counts only for it; if what was said
 fits several groups, the card shows it as it was said and the action asks which one. An option said by its name comes
 up as it is found, with its group ("Option: Aioli (Spicy sauces)" when "aio" was said), or as it was said if it fits
-several (hub#1245).
+several (hub#1245). If the group, the option or the link comes by its identifier beside another group's name, the
+card neither reads nor shows that name, which the action does not use: it says the record of the identifier (hub#1250).
+An option by its identifier is looked for inside the group said beside it, so that group does come up.
 
 ### What it offers: queries (they read, they change nothing)
 

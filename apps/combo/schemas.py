@@ -28,7 +28,7 @@ from pydantic import (
 
 from apps.combo.models import MAX_PICKS, NAME_MAX_LENGTH
 from base.images import MAX_UPLOAD_BASE64
-from base.schemas import CatalogImageOut, names
+from base.schemas import CatalogImageOut, names, unless_given
 
 T = TypeVar("T")
 
@@ -61,7 +61,9 @@ A_MENU = names("combo.combo.get")
 # it, so it shows what the write acts on («Menú vegano» when the person said «vegano», hub#1217), and words it cannot
 # read (two fit, none does) as said, never off the card (hub#1245). A course is found inside its menu and a choice by
 # its product inside its menu and its course: each is read with them (``within``), never with the write's ``id``, which
-# is the record of the write (a course's, a choice's) and no menu's.
+# is the record of the write (a course's, a choice's) and no menu's. Beside the id the write takes its record by
+# instead (the datum's own, or the one of the record that holds it: a course's menu is the course's own), the card
+# neither reads nor shows the name, which the write does not use (``unless_given``, hub#1250).
 A_MENU_BY_NAME = names("combo.combo.get", by="combo", as_said=True)
 A_COURSE_BY_NAME = names("combo.group.get", by="group", within=("combo_id", "combo"), as_said=True)
 A_CHOICE_BY_NAME = names(
@@ -196,7 +198,7 @@ class Page(Schema, Generic[T]):
 
 class ComboRefIn(In):
     id: UUID | None = Field(None, title=T_MENU, description=D_COMBO_ID, json_schema_extra=A_MENU)
-    combo: Reference | None = Field(None, description=D_COMBO, json_schema_extra=A_MENU_BY_NAME)
+    combo: Reference | None = Field(None, description=D_COMBO, json_schema_extra=unless_given(A_MENU_BY_NAME, "id"))
 
     @model_validator(mode="after")
     def _combo_named(self):
@@ -234,14 +236,21 @@ class _ComboOfIn(In):
     """The menu something belongs to, by id or by name."""
 
     combo_id: UUID | None = Field(None, description=D_COMBO_ID, json_schema_extra=A_MENU)
-    combo: Reference | None = Field(None, description=D_COMBO, json_schema_extra=A_MENU_BY_NAME)
+    combo: Reference | None = Field(
+        None, description=D_COMBO, json_schema_extra=unless_given(A_MENU_BY_NAME, "combo_id")
+    )
 
 
 class _GroupOfIn(_ComboOfIn):
     """The course something belongs to: its id, or its name with its menu."""
 
+    combo: Reference | None = Field(
+        None, description=D_COMBO, json_schema_extra=unless_given(A_MENU_BY_NAME, "combo_id", "group_id")
+    )
     group_id: UUID | None = Field(None, description=D_GROUP_ID, json_schema_extra=A_COURSE)
-    group: Reference | None = Field(None, description=D_GROUP, json_schema_extra=A_COURSE_BY_NAME)
+    group: Reference | None = Field(
+        None, description=D_GROUP, json_schema_extra=unless_given(A_COURSE_BY_NAME, "group_id")
+    )
 
     def _group_named(self) -> None:
         if self.group_id is None and (
@@ -251,8 +260,11 @@ class _GroupOfIn(_ComboOfIn):
 
 
 class GroupRefIn(_ComboOfIn):
+    combo: Reference | None = Field(
+        None, description=D_COMBO, json_schema_extra=unless_given(A_MENU_BY_NAME, "id", "combo_id")
+    )
     id: UUID | None = Field(None, title=T_COURSE, description=D_GROUP_ID, json_schema_extra=A_COURSE)
-    group: Reference | None = Field(None, description=D_GROUP, json_schema_extra=A_COURSE_BY_NAME)
+    group: Reference | None = Field(None, description=D_GROUP, json_schema_extra=unless_given(A_COURSE_BY_NAME, "id"))
 
     @model_validator(mode="after")
     def _course_named(self):
@@ -264,6 +276,9 @@ class GroupRefIn(_ComboOfIn):
 
 
 class OptionRefIn(_ComboOfIn):
+    combo: Reference | None = Field(
+        None, description=D_COMBO, json_schema_extra=unless_given(A_MENU_BY_NAME, "id", "combo_id", "group_id")
+    )
     id: UUID | None = Field(
         None,
         title=T_CHOICE,
@@ -275,11 +290,13 @@ class OptionRefIn(_ComboOfIn):
         description="The course of the choice, when the product is in several.",
         json_schema_extra=A_COURSE,
     )
-    group: Reference | None = Field(None, description=D_GROUP, json_schema_extra=A_COURSE_BY_NAME)
+    group: Reference | None = Field(
+        None, description=D_GROUP, json_schema_extra=unless_given(A_COURSE_BY_NAME, "id", "group_id")
+    )
     product: Reference | None = Field(
         None,
         description="The SKU or name of the choice's product, when its id is not known.",
-        json_schema_extra=A_CHOICE_BY_NAME,
+        json_schema_extra=unless_given(A_CHOICE_BY_NAME, "id"),
     )
 
     @model_validator(mode="after")
@@ -404,7 +421,9 @@ class GroupReorderIn(ComboRefIn):
 
 class OptionIn(_GroupOfIn):
     product_id: UUID | None = Field(None, description=D_PRODUCT_ID, json_schema_extra=A_PRODUCT)
-    product: Reference | None = Field(None, description=D_PRODUCT, json_schema_extra=A_PRODUCT_BY_NAME)
+    product: Reference | None = Field(
+        None, description=D_PRODUCT, json_schema_extra=unless_given(A_PRODUCT_BY_NAME, "product_id")
+    )
     price_delta: Delta = Field(0, description=D_DELTA)
     is_available: bool = Field(
         True, description="false: sold out today, kept but not offered."
@@ -442,7 +461,7 @@ class OptionPatchIn(OptionRefIn):
         None,
         title=NEW_PRODUCT,
         description="SKU or name of the product that replaces the current one.",
-        json_schema_extra=A_PRODUCT_BY_NAME,
+        json_schema_extra=unless_given(A_PRODUCT_BY_NAME, "new_product_id"),
     )
     price_delta: Delta | None = Field(None, description=D_DELTA)
     is_available: bool | None = Field(
