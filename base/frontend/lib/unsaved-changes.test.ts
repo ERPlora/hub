@@ -332,8 +332,11 @@ describe('hub#1233 — useSheetWaysOut: a window that is an ion-modal of its own
 // between. When the record arrives, `keepTouched(loaded, shown, typed)` gives the form to show: the record, except the
 // fields the person changed since the window showed `shown`, which keep what was typed.
 describe('keepTouched: the record that arrives late fills only the fields the person has not touched', () => {
-  const shown = { name: 'BBVA account', type: 'transfer', account: '' };
-  const loaded = { name: 'BBVA business', type: 'card', account: 'ES91 1332' };
+  // Frozen because every test shares them: a keepTouched that wrote into the record it is given would otherwise pass,
+  // each expectation being built from the record it had just changed.
+  type Fields = Readonly<{ name: string; type: string; account: string }>;
+  const shown: Fields = Object.freeze({ name: 'BBVA account', type: 'transfer', account: '' });
+  const loaded: Fields = Object.freeze({ name: 'BBVA business', type: 'card', account: 'ES91 1332' });
 
   it('with nothing touched it is the record, every field', () => {
     expect(keepTouched(loaded, shown, { ...shown })).toEqual(loaded);
