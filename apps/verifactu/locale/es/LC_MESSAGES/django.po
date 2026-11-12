@@ -20,12 +20,32 @@ msgstr "Reenviar a la AEAT"
 
 #: admin.py:38
 #, python-format
-msgid ""
-"Resend finished: %(accepted)s accepted, %(rejected)s rejected, %(waiting)s "
-"still waiting."
-msgstr ""
-"Reenvío terminado: %(accepted)s aceptados, %(rejected)s rechazados, "
-"%(waiting)s aún en espera."
+msgid "Resend finished: %(accepted)s, %(rejected)s, %(waiting)s."
+msgstr "Reenvío terminado: %(accepted)s, %(rejected)s, %(waiting)s."
+
+#, python-format
+msgctxt "verifactu records"
+msgid "%(count)s accepted"
+msgid_plural "%(count)s accepted"
+msgstr[0] "%(count)s aceptado"
+msgstr[1] "%(count)s aceptados"
+msgstr[2] "%(count)s aceptados"
+
+#, python-format
+msgctxt "verifactu records"
+msgid "%(count)s rejected"
+msgid_plural "%(count)s rejected"
+msgstr[0] "%(count)s rechazado"
+msgstr[1] "%(count)s rechazados"
+msgstr[2] "%(count)s rechazados"
+
+#, python-format
+msgctxt "verifactu records"
+msgid "%(count)s still waiting"
+msgid_plural "%(count)s still waiting"
+msgstr[0] "%(count)s sigue esperando"
+msgstr[1] "%(count)s siguen esperando"
+msgstr[2] "%(count)s siguen esperando"
 
 msgid "Reschedule: send with the next pass"
 msgstr "Reprogramar: enviar en la próxima pasada"
@@ -54,8 +74,24 @@ msgid "Ask the AEAT (out of the queue if it already has it)"
 msgstr "Consultar a la AEAT (sale de la cola si ya lo tiene)"
 
 #, python-format
-msgid "Asked the AEAT: %(held)s already registered (out of the queue), %(missing)s not in the AEAT (still in the queue)."
-msgstr "Consulta a la AEAT: %(held)s ya registrados (fuera de la cola), %(missing)s no están en la AEAT (siguen en la cola)."
+msgid "Asked the AEAT: %(held)s, %(missing)s."
+msgstr "Consulta a la AEAT: %(held)s, %(missing)s."
+
+#, python-format
+msgctxt "verifactu records"
+msgid "%(count)s already registered (out of the queue)"
+msgid_plural "%(count)s already registered (out of the queue)"
+msgstr[0] "%(count)s ya registrado (fuera de la cola)"
+msgstr[1] "%(count)s ya registrados (fuera de la cola)"
+msgstr[2] "%(count)s ya registrados (fuera de la cola)"
+
+#, python-format
+msgctxt "verifactu records"
+msgid "%(count)s not in the AEAT (still in the queue)"
+msgid_plural "%(count)s not in the AEAT (still in the queue)"
+msgstr[0] "%(count)s no está en la AEAT (sigue en la cola)"
+msgstr[1] "%(count)s no están en la AEAT (siguen en la cola)"
+msgstr[2] "%(count)s no están en la AEAT (siguen en la cola)"
 
 msgid "Correct a rejection with a new record"
 msgstr "Subsanar el rechazo con un registro nuevo"
