@@ -1,10 +1,10 @@
-"""Production only seals what can reach the AEAT, and nothing leaves a server ERPlora has not opened (working-rules §15).
+"""Production only seals what can reach the AEAT, and nothing leaves a server ERPlora has not opened.
 
-From the review of the fiscal block (2026-10-15). The server's lock (``VERIFACTU_PRODUCTION_ENABLED``) holds every record
-of production before the gateway is called, and Settings says it where they say what else is missing. In production an
-own certificate this server cannot open (its key missing or rotated), a server without ERPlora's gateway and a closed
-server are no way to the AEAT: going live is refused, and so is every new sale or invoice, as a route without its
-authorisation or its certificate is. Testing refuses nothing.
+The server's lock (``VERIFACTU_PRODUCTION_ENABLED``) holds every record of production before the gateway is called, and
+Settings says it where they say what else is missing. In production an own certificate this server cannot open (its key
+missing or rotated), a server without ERPlora's gateway and a closed server are no way to the AEAT: going live is
+refused, and so is every new sale or invoice, as a route without its authorisation or its certificate is. Testing
+refuses nothing.
 """
 
 import pytest

@@ -1,8 +1,7 @@
 // The filters of the Invoices list (INVOICE-F16: status, type, series, source, issue dates and total), as
 // the table's funnel holds them (by the list's parameter names, as typed) and as `invoice.invoice.list`
-// takes them (the total in cents, read as every amount filter of the Hub: hub#1196). An amount that is not one, or a
+// takes them (the total in cents, read as every amount filter of the Hub). An amount that is not one, or a
 // «to» day before its «from», never reaches the server (the page says why under it: `InvoicesPage.test.ts`).
-// flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
 import { describe, expect, it } from 'vitest';
 
 import { filterQuery, filtersInUse, reversedDates } from './invoiceFilters';
@@ -32,7 +31,7 @@ describe('invoice filters', () => {
     });
   });
 
-  it('«from 12» is twelve euros, never twelve cents (invoice#113)', () => {
+  it('«from 12» is twelve euros, never twelve cents', () => {
     expect(filterQuery({ total_amount_from: '12' })).toEqual({ total_amount_from: 1200 });
   });
 
@@ -40,7 +39,7 @@ describe('invoice filters', () => {
     expect(filterQuery({ status: 'draft', invoice_type: 'X9', source_type: 'web', series_code: '  ' })).toEqual({});
   });
 
-  it('never send an amount that is not one, nor guess «1.000» in euros (a thousand or one, hub#1196)', () => {
+  it('never send an amount that is not one, nor guess «1.000» in euros (a thousand or one)', () => {
     const EUR = { currency: 'EUR', decimals: 2 };
     expect(filterQuery({ total_amount_from: 'abc', total_amount_to: '3' })).toEqual({ total_amount_to: 300 });
     expect(filterQuery({ total_amount_from: '1.000', total_amount_to: '1.000,50' }, EUR)).toEqual({ total_amount_to: 100050 });

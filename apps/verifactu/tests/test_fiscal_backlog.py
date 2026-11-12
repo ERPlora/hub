@@ -1,4 +1,4 @@
-"""Since when VeriFactu's oldest record waits to reach the AEAT (hub#488; VERIFACTU-F20; PLAN-AWS §8).
+"""Since when VeriFactu's oldest record waits to reach the AEAT (VERIFACTU-F20).
 
 The platform's metrics (``base.metrics``) ask every app's ``fiscal_pending_since`` in each database they read and
 publish the age of the oldest answer as ``ERPlora/Fiscal`` ``OldestPendingAgeSeconds``, which pages the team after

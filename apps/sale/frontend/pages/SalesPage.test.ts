@@ -310,7 +310,6 @@ describe('SalesPage: search, filters, sort and pages', () => {
     expect(s.list()[0]).toMatchObject({ status: 'voided', date_from: '2026-10-08', date_to: '2026-10-14' });
   });
 
-  // flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
   it('filters behind the table funnel, on their columns: date, payment (searched), status and total (as typed)', async () => {
     const s = await setup();
     await s.show(PAGE);
@@ -581,14 +580,14 @@ describe('SalesPage: the rest', () => {
   });
 });
 
-describe('SalesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('SalesPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });
 
-describe('SalesPage: «Total» is read as every amount of the Hub (hub#1196)', () => {
+describe('SalesPage: «Total» is read as every amount of the Hub', () => {
   itReadsAmountFiltersAsTheHub({
     ends: ['total_min', 'total_max'],
     params: ['total_min', 'total_max'],

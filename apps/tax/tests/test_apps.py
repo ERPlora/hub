@@ -86,8 +86,8 @@ def test_navigation_is_the_four_tabs_with_iconify_icons():
     ]
 
 
-#: The reads that are no assistant tool: what names a rule on the assistant's card (hub#678); the model reads the rules
-#: by their list.
+#: The reads that are no assistant tool: what names a rule on the assistant's card; the model reads the rules by their
+#: list.
 INTERNAL_READS = {"tax.rule.get"}
 
 
@@ -110,9 +110,8 @@ def test_every_operation_is_described_for_the_assistant():
             assert "risk" not in op.ai, name
 
 
-# The Home's hook (PLAN-HUB round 2026-10-21; FIX-TAX-SETUP-HOOKS): the old module's own item «Your taxes»
-# (module.json `setup`, taxes#19), which reads the same query as the notice of the tax screens (TAX-F17). The old
-# module declared no panel and no bell row.
+# The Home's step «Your taxes», which reads the same query as the notice of the tax screens (TAX-F17). The old module
+# declared no panel and no bell row.
 
 
 def test_the_homes_step_is_your_taxes_done_once_one_root_rule_applies_today():
@@ -149,7 +148,7 @@ def test_the_homes_step_is_your_taxes_done_once_one_root_rule_applies_today():
 
 
 def test_the_step_says_the_words_of_the_notice_in_the_language_of_whoever_reads_it():
-    # gh:hub#2356: the old checklist said a module's step in English to a Spanish reader.
+    # A Spanish reader never reads a module's step in English.
     (step,) = tax().setup
     with translation.override("en"):
         english = (str(step.title), str(step.description))
@@ -189,14 +188,14 @@ def test_taxes_brings_no_panels_and_no_bell_rows_to_the_home():
 
 
 def test_taxes_is_mandatory_in_every_country_and_the_platform_may_turn_it_on():
-    """hub#997 (PLAN-HUB round 2026-11-07): no sale is priced without it, in any country, and turning it on binds the
-    business to nobody, so the platform may turn it on by itself at sign-up."""
+    """No sale is priced without it, in any country, and turning it on binds the business to nobody, so the platform may
+    turn it on by itself at sign-up."""
     assert tax().mandatory == {"countries": "all", "platform_turns_on": True}
 
 
 @pytest.mark.parametrize("country", ["ES", "PT", "JP", ""])
 def test_every_business_is_born_with_taxes_on_and_none_with_verifactu(country):
-    """hub#997, part 3: what the platform turns on by itself at sign-up, read from every app's declaration, is Taxes,
+    """What the platform turns on by itself at sign-up, read from every app's declaration, is Taxes,
     in every country; never VeriFactu, which its owner turns on (it binds the business to the AEAT)."""
     assert "tax" in activation.born_on(country)
     assert "verifactu" not in activation.born_on(country)

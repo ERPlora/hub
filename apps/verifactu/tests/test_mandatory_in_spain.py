@@ -1,4 +1,4 @@
-"""VeriFactu is mandatory in Spain, and the platform never turns it on by itself (hub#997, PLAN-HUB round 2026-11-07).
+"""VeriFactu is mandatory in Spain, and the platform never turns it on by itself.
 
 It says so in its ``LiveAppConfig`` (``mandatory``), which base reads without naming it: while a business of Spain (or
 one without a country, a demo, in ERPlora's market) has it off, «Finish setting up your business» asks whoever runs it

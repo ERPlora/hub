@@ -1,6 +1,5 @@
-"""What layer 1 of the assistant's QA does not say of Taxes (docs plan 2026-10-31, the assistant's knowledge and QA,
-§3): how many tools it offers, what an employee is never offered, and that the requests of the real-model QA
-(hub#1094), in the person's own words, are offered their existing operation.
+"""What layer 1 of the assistant's QA does not say of Taxes: how many tools it offers, what an employee is never
+offered, and that the requests of the real-model QA, in the person's own words, are offered their existing operation.
 
 Every ask of every tool of tax bringing its tool among the first ten, role by role, in both languages, is
 ``base/tests/test_assistant_asks.py``'s (tax is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over the
@@ -51,7 +50,7 @@ TOOLS = {
 #: employee only reads and calculates (``TaxConfig.role_permissions``).
 THE_WRITES = {name for name in TOOLS if registry[name].kind == "command"}
 
-#: The requests of hub#1094's QA (``tests/e2e/qa/probes/owner-es-tax-2026-11-08.json``) as the owner said them, and
+#: The requests of the real-model QA (``tests/e2e/qa/probes/owner-es-tax-2026-11-08.json``) as the owner said them, and
 #: nothing of the tools' ``asks``: before Taxes said its asks, none of these tools was among the ones a turn offers
 #: (``MAX_TOOLS``), so the model sent the owner to the screen, looked for an automation or said it could not change a
 #: rule.
@@ -73,15 +72,15 @@ PROBES = [
 ]
 ROLES = {"owner": Membership.Role.OWNER, "employee": Membership.Role.EMPLOYEE}
 #: What the model reached for instead of the reported requests to bring a rule back or to switch it off: an app's
-#: switch, as «de product.qa» names Products. live reads «regla» as the rule a command switches (ERPlora/live#73), so
-#: the rule's tool is offered ahead of it.
+#: switch, as «de product.qa» names Products. live reads «regla» as the rule a command switches, so the rule's tool is
+#: offered ahead of it.
 CHOSEN_INSTEAD = [
     ("tax.rule.activate", "base.app.enable"),
     ("tax.rule.deactivate", "base.app.disable"),
 ]
 #: What a person says in words of their own, neither an ask nor a probe of layer 2, one for each tool: it is their asks
-#: that bring the tool among the first ten, and without them it is not there (hub#1135, hub#1165), so asks that stop
-#: reading as people speak fail. None shares more than two stems with any one ask of its tool.
+#: that bring the tool among the first ten, and without them it is not there, so asks that stop reading as people speak
+#: fail. None shares more than two stems with any one ask of its tool.
 OWN_WORDS = [
     ("tax.rate.calculate", "de 60 € en libros, ¿qué parte se va en IVA?"),
     ("tax.category.list", "¿qué tipos de IVA puedo dar a un producto?"),

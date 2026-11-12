@@ -1,7 +1,7 @@
-"""What layer 1 of the assistant's QA does not say of Services (docs plan 2026-10-31, the assistant's knowledge and QA,
-§3): how many tools it offers, that the owner's requests of the real-model QA (hub#1104), in the owner's own words, are
-offered their existing operation, that a record a tool takes by its id says which read finds it, and that what
-Services' tools say to be asked for takes no place from the operations of Sales and Appointments a request is for.
+"""What layer 1 of the assistant's QA does not say of Services: how many tools it offers, that the owner's requests of
+the real-model QA, in the owner's own words, are offered their existing operation, that a record a tool takes by its id
+says which read finds it, and that what Services' tools say to be asked for takes no place from the operations of Sales
+and Appointments a request is for.
 
 Every ask of every tool of service bringing its tool among the first ten, role by role, in both languages, is
 ``base/tests/test_assistant_asks.py``'s (service is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over
@@ -30,8 +30,8 @@ from base.tests.test_assistant_asks import (
 from base.tests.test_assistant_asks import offered_place as place
 PROBES_DIR = Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes"
 
-#: The requests of hub#1104's QA (``tests/e2e/qa/probes/owner-es-service-2026-11-08.json``) as the owner said them, and
-#: nothing of the tools' ``asks``: before Services said its asks, six of these tools were not among the ones a turn
+#: The requests of the real-model QA (``tests/e2e/qa/probes/owner-es-service-2026-11-08.json``) as the owner said them,
+#: and nothing of the tools' ``asks``: before Services said its asks, six of these tools were not among the ones a turn
 #: offers (``MAX_TOOLS``) and the rest came 7th to 16th, so the model answered it had no tool, asked for ids or chose a
 #: tool of another app (Online booking's settings to restore a service, a role to take a professional off a service).
 REPORTED = [
@@ -157,7 +157,7 @@ MOVED = [
 #: The tools that take a record by its id alone, and the read that finds that id by what a person names it with (the
 #: customer who owns a voucher, the service and the professional of an assignment, the line of a check a session pays):
 #: its description says that read, so the model looks the record up instead of asking the person for an id they never
-#: see (hub#1104: «pide el id del bono», «pide el id de la sesión»).
+#: see («pide el id del bono», «pide el id de la sesión»).
 FOUND_BY = {
     "service.grant.get": "service.grant.list",
     "service.grant.void": "service.grant.list",

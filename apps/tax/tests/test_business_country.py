@@ -1,5 +1,4 @@
-"""Taxes charges each business in the country erplora.com registered for it (hub#996, PLAN-HUB round 2026-11-07;
-TAX-F11, TAX-F17, TAX-F18, TAX-F19).
+"""Taxes charges each business in the country erplora.com registered for it (TAX-F11, TAX-F17, TAX-F18, TAX-F19).
 
 Taxes reads the country of the business at work as Customers and VeriFactu read it (``base.operations``: the registry's,
 ERPlora's market, Spain, without one). Only Spain comes with factory rules (TAX-F16): a business of another country has
