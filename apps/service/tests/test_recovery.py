@@ -154,6 +154,7 @@ def test_the_business_holds_the_same_service_offered_or_archived_and_one_made_ag
     made_again_archived = make_service("Beard trim", tax=tax, is_active=False, archived_at=timezone.now())
     services = [
         a_service_of_the_copy(offered),
+        # Archived and renamed since: still the same one, by its id.
         a_service_of_the_copy(archived),
         # Gone, and made again by hand since: the same name in the same category, the case and the spaces aside.
         again := a_service_of_the_copy(name="  BLOW-DRY ", category_id=hair.pk),
@@ -164,6 +165,8 @@ def test_the_business_holds_the_same_service_offered_or_archived_and_one_made_ag
         # Gone altogether.
         absent := a_service_of_the_copy(name="Manicure", category_id=nails.pk),
     ]
+
+    Service.objects.filter(pk=archived.pk).update(name="Perm (old)")
 
     held = queries.services_in_business(services)
 
