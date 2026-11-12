@@ -135,10 +135,15 @@ async function confirm(): Promise<void> {
   emit('closed');
 }
 
-defineExpose({ confirm });
+// The body only exists while the window is open: as it opened is the cash the last count left and no notes. Its
+// question goes to the window (`canDismiss`), which asks it on its ways out and on this «Cancel» (hub#1234).
+const canDismiss = useUnsavedForm(
+  'cash-register-close-notes',
+  () => ({ counted: counted.value, notes: notes.value }),
+  () => ({ counted: seed.value ?? '', notes: '' }),
+);
 
-// The body only exists while the window is open: as it opened is the cash the last count left and no notes.
-useUnsavedForm('cash-register-close-notes', () => ({ counted: counted.value, notes: notes.value }), () => ({ counted: seed.value ?? '', notes: '' }));
+defineExpose({ confirm, canDismiss });
 </script>
 
 <template>

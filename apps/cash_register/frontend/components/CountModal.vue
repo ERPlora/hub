@@ -95,7 +95,7 @@ async function confirm(): Promise<void> {
 }
 
 // A box emptied again counts nothing: it is as the window opened.
-useUnsavedFormOnOpen(
+const canDismiss = useUnsavedFormOnOpen(
   'cash-register-count',
   () => ({
     type: type.value,
@@ -110,6 +110,7 @@ useUnsavedFormOnOpen(
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="cash-register-count"
     :title="$t('cash_register.count.title', { number: session?.number ?? '' })"
     :submit-label="$t('cash_register.count.submit')"
