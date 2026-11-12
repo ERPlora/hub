@@ -25,10 +25,12 @@ const NOT_ATTACHED =
 
 /**
  * A reservation's reason in a list that paints `first`, and a locator for it that scrolls the way Playwright's does:
- * it takes the element painted when it is called, waits a turn for it to stand still, and throws `NOT_ATTACHED` if
- * the list painted it again meanwhile. `repaintsWhileScrolling` is how many of the scrolls, from the first, the list
- * paints itself again during (cards ↔ rows): what a resize that lands between the spec's check and its scroll does.
- * `fails` makes every scroll throw that error instead. Turns of microtasks, never a timer (vitest.setup.ts).
+ * it takes the element painted when it is called, waits a turn of the event loop for it to stand still (a round trip
+ * to the browser), and throws `NOT_ATTACHED` if the list painted it again meanwhile. `repaintsWhileScrolling` is how
+ * many of the scrolls, from the first, the list paints itself again during (cards ↔ rows): what a resize that lands
+ * between the spec's check and its scroll does. `fails` makes every scroll throw that error instead. Never a timer
+ * (vitest.setup.ts): `setImmediate` runs in the next turn, so a scroll that looks again forever still lets Vitest's
+ * clock cut the test instead of hanging the run.
  */
 function reasonIn(first: Painted['kind'], { repaintsWhileScrolling = 0, fails }: { repaintsWhileScrolling?: number; fails?: Error } = {}) {
   let painted: Painted = { kind: first, connected: true };
@@ -48,7 +50,7 @@ function reasonIn(first: Painted['kind'], { repaintsWhileScrolling = 0, fails }:
         repaints -= 1;
         queueMicrotask(repaint);
       }
-      await Promise.resolve();
+      await new Promise((resolve) => setImmediate(resolve));
       if (!taken.connected) throw new Error(NOT_ATTACHED);
       scrolled.push(taken.kind);
     },
