@@ -17,6 +17,7 @@ from apps.customer.models import Customer
 from apps.flow import events
 from apps.flow.models import Flow, FlowRun
 from apps.task.models import Task
+from base.recovery import actor_of
 
 from .conftest import A, TASK_STEP, due_daily_flow, make_flow, make_run, run
 
@@ -304,6 +305,19 @@ def test_an_event_of_an_app_that_is_off_starts_nothing():
 
     assert (result.started, result.skipped) == (0, 1)
     assert FlowRun.objects.count() == 0
+
+
+def test_an_event_a_recovery_from_a_separate_copy_recorded_starts_nothing_and_counts_as_skipped():
+    """hub#1307 (FLOW-F21): the reaction says what it left alone, as with an app that is off; the same event of the
+    business starts its automation."""
+    make_flow()
+    make_flow("Paused", enabled=False)
+
+    result = deliver(actor=actor_of(uuid.uuid7()))
+
+    assert (result.started, result.skipped) == (0, 1)
+    assert FlowRun.objects.count() == 0
+    assert (deliver().started, FlowRun.objects.count()) == (1, 1)
 
 
 def test_an_action_whose_app_is_gone_is_unavailable(django_capture_on_commit_callbacks):
