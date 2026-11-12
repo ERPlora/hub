@@ -14,7 +14,7 @@ import { A, EMPLOYEE, api, hostPage, login, psql, shot, shown } from './helpers'
 import { cleanUp as cleanCustomers, createCard, e2eName, spanishMobile } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
-import { cleanSales, drawerOff, newestSaleOf, openTillCart, restoreDrawer, shots, stamp } from './sale-helpers';
+import { cleanSales, drawerOff, expectTakes, newestSaleOf, openTillCart, restoreDrawer, shots, stamp } from './sale-helpers';
 
 const RUN = stamp();
 let water: Product;
@@ -245,8 +245,7 @@ test('SALE-F07: a product without tax category is marked and never enters the ch
   const result = search.locator(`[data-testid=pos-search-${untaxed.id}]`);
   await expect(result).toBeVisible();
   await expect(result).toContainText(/tax|IVA/);
-  // Ionic puts this state on the native button, which is the element exposed as a button.
-  await expect(result.locator('button')).toHaveAttribute('aria-disabled', 'true');
+  await expectTakes(result, false);
   // It still takes the tap (to say why), so the mouse clicks it as a finger would.
   await result.click({ force: true });
   await expect(lineOf(page, untaxed.name)).toHaveCount(0);

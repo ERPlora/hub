@@ -10,7 +10,7 @@ import { defineComponent, h, ref } from 'vue';
 
 import { flush, mountBase } from '../__tests__/mount-base';
 import { unsavedChangesIn } from './system-back';
-import { useSheetWaysOut, useUnsavedChanges, useUnsavedForm, useUnsavedFormOnOpen } from './unsaved-changes';
+import { keepTouched, useSheetWaysOut, useUnsavedChanges, useUnsavedForm, useUnsavedFormOnOpen } from './unsaved-changes';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -325,5 +325,43 @@ describe('hub#1233 — useSheetWaysOut: a window that is an ion-modal of its own
     await expect(byEscape).resolves.toBe(true);
     expect(g.ask).toHaveBeenCalledTimes(1);
     expect(open.value).toBe(false);
+  });
+});
+
+// An edit window paints what its row says at once and reads the whole record after; the fields take what is typed in
+// between. When the record arrives, `keepTouched(loaded, shown, typed)` gives the form to show: the record, except the
+// fields the person changed since the window showed `shown`, which keep what was typed.
+describe('keepTouched: the record that arrives late fills only the fields the person has not touched', () => {
+  // Frozen because every test shares them: a keepTouched that wrote into the record it is given would otherwise pass,
+  // each expectation being built from the record it had just changed.
+  type Fields = Readonly<{ name: string; type: string; account: string }>;
+  const shown: Fields = Object.freeze({ name: 'BBVA account', type: 'transfer', account: '' });
+  const loaded: Fields = Object.freeze({ name: 'BBVA business', type: 'card', account: 'ES91 1332' });
+
+  it('with nothing touched it is the record, every field', () => {
+    expect(keepTouched(loaded, shown, { ...shown })).toEqual(loaded);
+  });
+
+  it('the first field touched alone keeps what was typed; the others take the record', () => {
+    expect(keepTouched(loaded, shown, { ...shown, name: 'BBVA main' })).toEqual({ ...loaded, name: 'BBVA main' });
+  });
+
+  it('a later field touched alone keeps what was typed; the first one, untouched, takes the record', () => {
+    expect(keepTouched(loaded, shown, { ...shown, type: 'sepa' })).toEqual({ ...loaded, type: 'sepa' });
+  });
+
+  it('a field emptied by the person stays empty, even when the record has something there', () => {
+    expect(keepTouched(loaded, { ...shown, account: 'ES**' }, { ...shown, account: '' })).toEqual({ ...loaded, account: '' });
+  });
+
+  it('a field typed back to what was shown counts as untouched and takes the record', () => {
+    expect(keepTouched(loaded, shown, { ...shown, name: 'BBVA account' })).toEqual(loaded);
+  });
+
+  it('changes none of the three it is given', () => {
+    const typed = { ...shown, name: 'BBVA main' };
+    const copies = [structuredClone(loaded), structuredClone(shown), structuredClone(typed)];
+    keepTouched(loaded, shown, typed);
+    expect([loaded, shown, typed]).toEqual(copies);
   });
 });

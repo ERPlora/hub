@@ -6,7 +6,7 @@
 // app's pytest and Vitest suites. Everything created here is named «E2E Pay …» and removed before and after.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, horizontalOverflow, login, psql, shot, shown } from './helpers';
+import { A, api, capture, EMPLOYEE, horizontalOverflow, login, psql, shot, shown } from './helpers';
 import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
@@ -371,13 +371,29 @@ test('PAYMENT-F08: a row opens «Editing method — {name}» with the whole acco
     const paid = await payment(context, bank.id);
     await page.reload();
     await waitForList(page, 'payment-methods');
+    // What is typed before the whole method arrives stays and is saved: the method is held until the name is typed.
+    let arrive!: () => void;
+    const held = new Promise<void>((resolve) => (arrive = resolve));
+    const isDetail = (url: URL) => url.pathname === '/api/payment/methods/detail';
+    await page.route(isDetail, async (route) => {
+      await held;
+      await route.continue();
+    });
+    const name = page.locator('[data-testid=payment-method-form-name] input');
+    const account = page.locator('[data-testid=payment-method-form-account] input');
     await rowOf(page, 'payment-methods', bank.id).click();
     const form = page.locator('ion-modal[data-testid=payment-method-form]');
     await expect(form.locator('ion-title')).toHaveText(`Editing method — ${bank.name}`);
-    await expect(page.locator('[data-testid=payment-method-form-account] input')).toHaveValue('ES9121000418450200051332');
-    await threeShots(page, 'PAYMENT-F08', () => page.locator('[data-testid=payment-method-form-account]'));
+    await expect(account).toBeDisabled();
+    await expect(page.locator('[data-testid=payment-method-form-submit]')).toHaveAttribute('aria-disabled', 'true');
     const renamed = named('Renamed');
-    await page.locator('[data-testid=payment-method-form-name] input').fill(renamed);
+    await name.fill(renamed);
+    await capture(page, 'payment-methods-edit-before-whole');
+    arrive();
+    await expect(account).toHaveValue('ES9121000418450200051332');
+    await expect(name).toHaveValue(renamed);
+    await page.unroute(isDetail);
+    await threeShots(page, 'PAYMENT-F08', () => page.locator('[data-testid=payment-method-form-account]'));
     await page.locator('[data-testid=payment-method-form-submit]').click();
     await expect(form).toBeHidden();
     await expect(rowOf(page, 'payment-methods', bank.id)).toContainText(renamed);

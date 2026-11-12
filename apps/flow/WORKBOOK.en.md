@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:163dcd471514bdc7b22b1433b3b2ab1a4c023ccdfdd227a511c4c5e1083e5cae -->
+<!-- generated from WORKBOOK.md sha256:af81db378fc7ed591c39120857b74ed9285175dc9f086d80da1a12c4aa1d09ae -->
 
 ## What it is for and who it is for
 
@@ -645,14 +645,17 @@ Steps:
    longer be read…", visible in History, and the other automations of that notice carry on.
 In: the notice of another app, with its data (ids, amounts and states; never names or texts), which the
 platform hands to it a few seconds after it happens, outside the request that left it. A paused automation
-does not receive what happened while it was paused.
+does not receive what happened while it was paused. What ERPlora's staff recovers from a separate copy of the
+business (BASE-F114) starts none: its notices ("customer created", "customer recovered", "appointment created"…) say
+the recovery made them, and what comes back is nothing new to the business, so nobody is welcomed again or told of a
+booking they already had. What the business creates afterwards starts them as always.
 Out: a run (`flow.run.started`, `flow.run.finished` or `flow.run.parked` if it waits), in the business
 where the notice happened. The same notice delivered twice starts **a single** run per automation.
 If it fails: each step that fails stops the run with its reason, visible in History; the previous steps
 stay done. An automation that would set itself off in a chain is stopped (see "Para quien lo mantiene"). An
 "Only continue if…" that can no longer be read stops the run with "This "Only continue if…" can no longer be
 read…".
-Involved: FLOW-F10, FLOW-F11, FLOW-F15, FLOW-F16
+Involved: FLOW-F10, FLOW-F11, FLOW-F15, FLOW-F16, BASE-F114
 
 ### FLOW-F22 When the time comes, the automation starts
 Status: done
