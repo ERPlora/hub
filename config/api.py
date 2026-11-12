@@ -45,7 +45,7 @@ def build_api(*, urls_namespace: str = "api", docs: bool | None = None) -> Ninja
 api = build_api()
 # The api.py router of every app of ours: base (platform) and the modules of apps/.
 mount_app_routers(api)
-# The business's API keys (``erpk_live``, APP-BASE-5) open the routes of the operations the apps publish (``expose_api``).
+# The business's API keys (``erpk_live``) open the routes of the operations the apps publish (``expose_api``).
 api_keys.install(api)
-# A manager's PIN lets one refused command through (``base.approvals``, APP-BASE-5): its door, before the session's.
+# A manager's PIN lets one refused command through (``base.approvals``): its door, before the session's.
 approvals.install(api)
