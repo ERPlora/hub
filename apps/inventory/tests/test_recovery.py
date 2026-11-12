@@ -202,7 +202,8 @@ def live_products(hub) -> list[tuple]:
     """The business's live products: name, SKU, whether active, stock and its categories' names, by name."""
     with use_hub(hub):
         return [
-            (one.name, one.sku, one.is_active, one.stock, sorted(c.name for c in one.categories.filter(is_deleted=False)))
+            (one.name, one.sku, one.is_active, one.stock, sorted(one.categories.filter(is_deleted=False).values_list(
+                "name", flat=True)))
             for one in Product.objects.filter(is_deleted=False).order_by("name")
         ]
 

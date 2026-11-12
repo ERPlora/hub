@@ -1153,19 +1153,17 @@ def _live_links_in_copy() -> sql.Composed:
 
 def products_not_in_business(products: list[dict]) -> list[dict]:
     """hub#1282: the products of a separate copy (``products_in_copy``) the business lacks, in their order, each as
-    ``inventory.product.create`` takes it here. Not lacking: one it has live, and one with the SKU or the EAN-13 of a
-    live one (the code is the article's identity: made again by hand, or brought back already). Lacking: one deleted
-    (INVENTORY-F04) or gone altogether. Each takes the key of its tax category (Taxes never deletes one; one no longer
-    active is the create's to refuse, and one without any names none) and the categories the business still has live:
-    one deleted since is left out (INVENTORY-F07)."""
+    ``inventory.product.create`` takes it here. Not lacking: one with the SKU or the EAN-13 of a live one (the code is
+    the article's identity: the same product, live since, as a SKU is never edited; or one made again by hand, or
+    brought back already). Lacking: one deleted (INVENTORY-F04) or gone altogether. Each takes the key of its tax
+    category (Taxes never deletes one; one no longer active is the create's to refuse, and one without any names none)
+    and the categories the business still has live: one deleted since is left out (INVENTORY-F07)."""
     live = Product.objects.filter(is_deleted=False)
-    kept = set(live.filter(pk__in=[one["id"] for one in products]).values_list("pk", flat=True))
     skus = set(live.filter(sku__in=[one["sku"] for one in products]).values_list("sku", flat=True))
-    barcodes = set(live.filter(ean13__in=[one["ean13"] for one in products if one["ean13"]]).values_list("ean13", flat=True))
+    codes = [one["ean13"] for one in products if one["ean13"]]
+    barcodes = set(live.filter(ean13__in=codes).values_list("ean13", flat=True))
     lacking = [
-        one
-        for one in products
-        if one["id"] not in kept and one["sku"] not in skus and not (one["ean13"] and one["ean13"] in barcodes)
+        one for one in products if one["sku"] not in skus and not (one["ean13"] and one["ean13"] in barcodes)
     ]
     keys = dict(TaxCategory.objects.filter(pk__in={one["tax_category"] for one in lacking}).values_list("pk", "key"))
     wanted = {category for one in lacking for category in one["category_ids"]}

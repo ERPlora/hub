@@ -146,9 +146,9 @@ class InventoryConfig(LiveAppConfig):
 
     def recoverable_from_copy(self) -> list:
         """hub#1282: the platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when
-        the staff recovers from it (BASE-F114): the copy's live products the business lacks (``queries.products_in_copy``,
-        ``queries.products_not_in_business``), each created by ``inventory.product.create``, the screen's own, in the
-        categories the business still has and with no stock."""
+        the staff recovers from it (BASE-F114): the copy's live products the business lacks
+        (``queries.products_in_copy``, ``queries.products_not_in_business``), each created by
+        ``inventory.product.create``, the screen's own, in the categories the business still has and with no stock."""
         from apps.inventory import queries  # the models are not loaded yet when this module is
         from base.recovery import Recoverable
 
