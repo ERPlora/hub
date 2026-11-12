@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:53cda92c24b85d9aef577fd1a919c41c7aa113f2f7736ec8b8115742ecdc44de -->
+<!-- generated from WORKBOOK.md sha256:a15630374a8fcac7285d2314f431488b83da61d4bd684a414bb1bfe16bce44bc -->
 
 ## What it is for and who it is for
 
@@ -187,6 +187,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | CUSTOMER-F30 | Give a customer's card to other apps | done | common |
 | CUSTOMER-F31 | See the customers' figures | done | common |
 | CUSTOMER-F32 | Note allergies or the sensitivity test with their permission | done | hair salon |
+| CUSTOMER-F33 | Recover a deleted card | done | common |
 
 "Done": server and pages with their tests (of the pages and end to end in Chrome).
 "Discarded": it does not go into the app for now; the reason and its issue go in its "Status".
@@ -340,7 +341,7 @@ card no longer adds up (CUSTOMER-F20). It is not the erasure of personal data: t
 If it fails: a card that does not exist: "This customer is no longer available.", notifying nobody. On a
 card already deleted, merged into another or with its data erased it does NOT fail: it answers fine and
 notifies again.
-Involved: SERVICE-F29
+Involved: SERVICE-F29, CUSTOMER-F33 (the deleted card can come back as it was)
 
 ### CUSTOMER-F08 Import cards from a CSV
 Status: done
@@ -879,6 +880,29 @@ the next try is refused too; what is not of a field shows in the block and stays
 does not manage cards sees the block without buttons.
 Involved: CUSTOMER-F13, CUSTOMER-F16
 
+### CUSTOMER-F33 Recover a deleted card
+Status: done
+Actor: ERPlora's staff, when the business asks (in the business no screen undoes a deletion)
+Screen: none of the business; the Hubs admin › Separate copies › "Recover into the business…" (BASE-F114)
+Steps:
+1. The business deleted one or more cards by mistake (CUSTOMER-F07) and asks to recover them.
+2. ERPlora's staff make a separate copy of the business from an earlier moment and recover the customers from it
+   (BASE-F114, steps 6 to 11).
+3. Each card the business deleted and still holds comes back to the list, the till and the search by phone: THE SAME
+   card, with its purchases and what was spent, its consents, its notes and its activity, its health data, its
+   groups, tags and custom fields and its linked orders. Recoveries counts it as restored ("Customers: 1
+   restored").
+In: the deleted card, by its identifier.
+Out: the card live again, none of its details changed, and the card-recovered notice
+(`customer.customer.restored`).
+If it fails: a card merged into another (CUSTOMER-F13) or with its personal data erased (CUSTOMER-F16) never comes
+back: its history lives on in the other card, or its data no longer exists ("This customer is no longer
+available."). Nor does it come back if the business has already created the same person again (the same name, phone
+and email, CUSTOMER-F12): the one it made stays. A card the business no longer has at all is created again
+(CUSTOMER-F01). On a live card it does not fail: it answers fine and notifies again. What was charged in its name
+while it was deleted does not add up (CUSTOMER-F20).
+Involved: BASE-F114, CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16
+
 ## What the verticals share
 
 Touching a piece of this table affects the hair salon **and** the restaurant.
@@ -890,7 +914,7 @@ Touching a piece of this table affects the hair salon **and** the restaurant.
 | The list's text search (table, merge, till and Appointments' picker) | F02, F13, F17, F18, F25 |
 | The card-created or card-updated notice, which WhatsApp listens to | F01, F04, F08, F18, F26 |
 | The merge and its notice | F13 |
-| The data erasure and its notice, and the deletion | F07, F16 |
+| The data erasure and its notice, the deletion and recovering a deleted card | F07, F16, F33 |
 | The till's search, the tax copy and the purchase history | F17, F18, F19, F20, F21, F23 |
 | The consent per channel | F14, F15 |
 | Groups, tags and custom fields | F06, F27, F28, F29 |
@@ -956,6 +980,7 @@ confirmation card is shown.
 | Replaces a card's groups | manage | F06 | `customer.customer.set_groups` |
 | Replaces a card's tags | manage | F06 | `customer.customer.set_tags` |
 | Deletes a card (keeps its data) | delete | F07 | `customer.customer.delete` |
+| Puts a deleted card back in the list, as it was (the system only, when recovering from a separate copy) | system | F33 | `customer.customer.restore` |
 | Merges a duplicate card into another | merge | F13 | `customer.customer.merge` |
 | Erases a card's personal data | erase data | F16 | `customer.customer.erase` |
 | Adds a note | manage | F05 | `customer.note.add` |
@@ -985,6 +1010,7 @@ The notices carry only identifiers, never personal data: whoever needs the card 
 | Groups changed | Save groups with some change | `id` | `customer.customer.groups_changed` |
 | Tags changed | Save tags with some change | `id` | `customer.customer.tags_changed` |
 | Card deleted | Delete (also the repetition) | `id` | `customer.customer.deleted` |
+| Card recovered | Recover a deleted card (also the repetition) | `id` | `customer.customer.restored` |
 | Cards merged | Merge | `id` (the one that stays) and `absorbed_id` | `customer.customer.merged` |
 | Personal data erased | Erase data (also the repetition) | `id` | `customer.customer.erased` |
 | Note added | Add note | `id` (the note) and `customer_id` | `customer.note.added` |
@@ -1036,7 +1062,9 @@ their approval. Exporting is a read and is not approved; deleting cards, groups 
 personal data belong only to the owner and the administrator, and are never asked for.
 
 Recording and voiding purchases belongs to no role: the system does it when a sale is charged or voided
-(`customer.record_purchase`, which no app declares and therefore only the system has).
+(`customer.record_purchase`, which no app declares and therefore only the system has). Nor does putting a deleted
+card back: the system does it when ERPlora's staff recover from a separate copy (CUSTOMER-F33, `customer.restore`,
+which no app declares either).
 
 The server applies these permissions even if the screen shows the button, also through the API and the
 assistant. What the "Cashier" profile had in the current product, the employee has here.

@@ -147,6 +147,7 @@ def invalid(error):
         ("customer.customer.delete", "customer.delete", RefIn, DeletedOut),
         ("customer.customer.merge", "customer.merge", MergeIn, CustomerDetailOut),
         ("customer.customer.erase", "customer.erase", EraseIn, ErasedOut),
+        ("customer.customer.restore", "customer.restore", RefIn, CustomerDetailOut),
         ("customer.note.add", "customer.manage", NoteIn, ActivityRow),
         ("customer.activity.add", "customer.record_activity", ActivityIn, ActivityRow),
         ("customer.consent.grant", "customer.manage", ConsentGrantIn, ConsentRow),
@@ -798,6 +799,76 @@ def test_only_owner_and_admin_delete(role):
     with pytest.raises(PermissionDenied):
         run("customer.customer.delete", RefIn(id=ana.id), role)
     assert run("customer.customer.delete", RefIn(id=ana.id), "hub_owner").id == ana.id
+
+
+# customer.customer.restore (CUSTOMER-F33; BASE-F114, the recovery from a separate copy, hub#1306)
+
+
+@pytest.mark.django_db
+def test_restore_brings_the_same_card_back_with_all_that_hangs_from_it_and_announces_it():
+    ana = card("Ana", email="ana@example.com", phone="+34600111222", total_purchases=1, total_spent=500)
+    vip = CustomerGroup.objects.create(name="VIP")
+    ana.groups.add(vip)
+    Purchase.objects.create(customer=ana, sale_id=uuid.uuid7(), amount=500)
+    OrderLink.objects.create(order_id=uuid.uuid7(), customer=ana)
+    run("customer.note.add", NoteIn(customer_id=ana.id, content="Prefers mornings"))
+    run(
+        "customer.consent.grant",
+        ConsentGrantIn(customer_id=ana.id, channel="sms", notice_text="I want offers.", notice_version="v1"),
+    )
+    run("customer.customer.delete", RefIn(id=ana.id))
+    clear_outbox()
+
+    back = system("customer.customer.restore", RefIn(id=ana.id))
+
+    assert back.id == ana.id
+    ana.refresh_from_db()
+    assert (ana.deleted_at, ana.is_active) == (None, True)
+    assert Customer.objects.live().filter(pk=ana.pk).exists()
+    assert (ana.purchases.count(), ana.orders.count(), ana.consents.count(), list(ana.groups.all())) == (1, 1, 1, [vip])
+    assert ana.activity.filter(kind=Activity.Kind.NOTE_ADDED, text="Prefers mornings").exists()
+    assert (ana.total_purchases, ana.total_spent, ana.phone) == (1, 500, "+34600111222")
+    assert outbox() == [(events.CUSTOMER_RESTORED, {"id": str(ana.id)})]
+
+
+@pytest.mark.django_db
+def test_restoring_a_live_card_answers_well_changes_nothing_and_announces_again():
+    ana = card("Ana")
+    before = Customer.objects.get(pk=ana.pk).updated_at
+
+    assert system("customer.customer.restore", RefIn(id=ana.id)).id == ana.id
+
+    assert Customer.objects.get(pk=ana.pk).updated_at == before
+    assert outbox() == [(events.CUSTOMER_RESTORED, {"id": str(ana.id)})]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("gone", ["merged", "erased", "unknown"])
+def test_a_card_merged_into_another_erased_or_unknown_never_comes_back(gone):
+    survivor = card("Marta")
+    lost = {
+        "merged": lambda: card("Luis", deleted_at=NOW, is_active=False, merged_into=survivor).id,
+        "erased": lambda: card("Deleted customer", deleted_at=NOW, is_active=False, erased_at=NOW).id,
+        "unknown": uuid.uuid7,
+    }[gone]()
+
+    with pytest.raises(NotFound) as refused:
+        system("customer.customer.restore", RefIn(id=lost))
+
+    assert refused.value.code == "customer.customer_unavailable"
+    assert list(Customer.objects.live().values_list("name", flat=True)) == ["Marta"]
+    assert outbox() == []
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("role", ["hub_owner", "hub_admin", "hub_manager", "hub_employee"])
+def test_only_the_system_restores_a_card(role):
+    ana = card("Ana", deleted_at=NOW, is_active=False)
+
+    with pytest.raises(PermissionDenied):
+        run("customer.customer.restore", RefIn(id=ana.id), role)
+
+    assert Customer.objects.get(pk=ana.pk).deleted_at == NOW
 
 
 # customer.customer.merge (CUSTOMER-F13; merge.pg)

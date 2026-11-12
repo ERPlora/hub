@@ -1009,17 +1009,32 @@ def cards_in_copy(conn) -> list[dict]:
 
 
 def cards_not_in_business(cards: list[dict]) -> list[dict]:
-    """hub#1257: the cards of a separate copy (``cards_in_copy``) the business lacks, in their order. Not lacking: a
-    card it has live, one merged into another since (it lives on in that one, CUSTOMER-F13), one whose personal data was
-    erased (never brought back, CUSTOMER-F16), and one made again (``has_live_twin``: by hand, or brought back
-    already). Lacking: one deleted (CUSTOMER-F07) or gone altogether."""
-    kept = set(
-        Customer.objects.filter(pk__in=[card["id"] for card in cards])
-        .filter(Q(deleted_at__isnull=True) | Q(merged_into__isnull=False) | Q(erased_at__isnull=False))
-        .values_list("pk", flat=True)
+    """hub#1257: the cards of a separate copy (``cards_in_copy``) the business no longer has, in their order, for
+    ``customer.customer.create``. Not lacking: any card it still holds, live, deleted (it comes back the same,
+    ``cards_deleted_in_business``), merged into another (it lives on in that one, CUSTOMER-F13) or erased (never
+    brought back, CUSTOMER-F16), and one made again (``has_live_twin``: by hand, or brought back already)."""
+    held = set(Customer.objects.filter(pk__in=[card["id"] for card in cards]).values_list("pk", flat=True))
+    return [
+        card
+        for card in cards
+        if card["id"] not in held and not has_live_twin(card["name"], card["phone"], card["email"])
+    ]
+
+
+def cards_deleted_in_business(cards: list[dict]) -> list[dict]:
+    """hub#1306: the cards of a separate copy (``cards_in_copy``) the business still holds deleted (CUSTOMER-F07), in
+    their order, for ``customer.customer.restore``: the same card back with all that hangs from it. Never one merged
+    into another or erased, and never one made again since (``has_live_twin``)."""
+    deleted = set(
+        Customer.objects.filter(
+            pk__in=[card["id"] for card in cards],
+            deleted_at__isnull=False,
+            merged_into__isnull=True,
+            erased_at__isnull=True,
+        ).values_list("pk", flat=True)
     )
     return [
         card
         for card in cards
-        if card["id"] not in kept and not has_live_twin(card["name"], card["phone"], card["email"])
+        if card["id"] in deleted and not has_live_twin(card["name"], card["phone"], card["email"])
     ]

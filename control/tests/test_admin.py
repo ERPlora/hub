@@ -935,6 +935,28 @@ class TestRecoverIntoTheBusiness:
         assert client.post(f"{RECOVERIES}{done.pk}/delete/", {"post": "yes"}, HTTP_HOST=PLATFORM).status_code == 403
         assert f'href="{RECOVERIES}add/"' not in listed
 
+    def test_a_recovery_says_how_many_came_back_the_same_apart_from_those_created(self, client, root):
+        # hub#1306: a card the business deleted and still held comes back the same card (CUSTOMER-F33).
+        self.a_recovery(
+            self.made("acme"),
+            status="done",
+            results=[
+                {"app": "customer", "restored": 1, "created": 2, "not_created": 1, "reasons": [], "refused": ""}
+            ],
+        )
+        self.a_recovery(
+            self.made("bistro"),
+            status="done",
+            results=[
+                {"app": "customer", "restored": 2, "created": 0, "not_created": 0, "reasons": [], "refused": ""}
+            ],
+        )
+
+        listed = page(client, RECOVERIES)
+        assert "Customers: 1 restored, 2 created, 1 not created" in row_of(listed, ">acme<br>")
+        # Only what came back is said: no «0 created» beside what was restored.
+        assert "Customers: 2 restored<" in row_of(listed, ">bistro<br>")
+
     def test_an_app_that_gave_nothing_back_says_why_and_a_failed_one_its_error(self, client, root):
         refused = self.a_recovery(
             self.made("acme"),
@@ -974,9 +996,28 @@ class TestRecoverIntoTheBusiness:
             ],
         )
 
+        # hub#1306: what was restored before it stopped is said too, never «nothing».
+        self.a_recovery(
+            self.made("bistro"),
+            status="done",
+            results=[
+                {
+                    "app": "customer",
+                    "restored": 1,
+                    "created": 0,
+                    "not_created": 0,
+                    "reasons": [],
+                    "refused": "base.hub_busy: The business is busy.",
+                }
+            ],
+        )
+
         listed = page(client, RECOVERIES)
         assert "Customers: 2 created, then stopped (base.hub_busy: The business is busy.)" in row_of(
             listed, ">acme<br>"
+        )
+        assert "Customers: 1 restored, then stopped (base.hub_busy: The business is busy.)" in row_of(
+            listed, ">bistro<br>"
         )
 
     def test_support_neither_sees_it_nor_runs_it_but_reads_the_recoveries(self, client, support):
@@ -1018,6 +1059,13 @@ def test_the_recovery_speaks_spanish(client, root):
         HTTP_ACCEPT_LANGUAGE="es",
     ).content.decode()
     assert 'value="Recuperar"' in html and "Clientes" in html and "nunca se copia" in html
+    # hub#1306: what the business deleted and still holds comes back the same, with its history.
+    assert "vuelve tal como era, con su historial" in html
+    with translation.override("es"):
+        said = control_admin.CopyRecoveryAdmin.result_said(
+            {"app": "customer", "restored": 2, "created": 1, "not_created": 1, "reasons": [], "refused": ""}
+        )
+    assert said == "Clientes: se restauraron 2, se creó 1, 1 sin crear"
     listed = client.get(RECOVERIES, HTTP_HOST=PLATFORM, HTTP_ACCEPT_LANGUAGE="es").content.decode()
     assert "Recuperaciones" in listed or "recuperaciones" in listed
 
@@ -1034,6 +1082,10 @@ def test_what_came_back_is_said_in_spanish_in_words_that_fit_customers_and_appoi
         )
         assert said({"app": "customer", "created": 1, "not_created": 0, "reasons": [], "refused": ""}) == (
             "Clientes: se creó 1"
+        )
+        # And what comes back the same (hub#1306), whatever app restores it next (hub#1326).
+        assert said({"app": "appointment", "restored": 1, "created": 0, "not_created": 0, "reasons": [], "refused": ""}) == (
+            "Citas: se restauró 1"
         )
 
 
