@@ -1118,7 +1118,7 @@ def test_an_app_born_on_is_listed_on_and_takes_nothing_of_the_plans_limit():
     chosen, so the plan's part of the counter, ``enabled``, leaves it out; the app the business chose counts."""
     with_limit("a", 20)
     born = activation.born(activation.born_on("ES"), activation.module_graph())
-    set_rows(**{label: "on" for label, row in born.items() if row.on}, task="on*")
+    set_rows(**{label: "on*" if row.chosen else "on" for label, row in born.items() if row.on}, task="on*")
 
     document = app_list()
     apps_ = by_id(document)
