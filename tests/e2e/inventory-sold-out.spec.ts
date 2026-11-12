@@ -22,12 +22,12 @@ import {
   productBySku,
   productRow,
   productsReady,
-  rowAction,
   searchProducts,
   shootFlow,
   stamp,
 } from './inventory-helpers';
 import { drawerOff, restoreDrawer } from './sale-helpers';
+import { rowAction } from './service-helpers';
 
 const RUN = stamp();
 let croquettes: Product;
@@ -189,7 +189,7 @@ test('INVENTORY-F29 / INVENTORY-F27: «Mark sold out» greys the article out in 
   await searchProducts(office, croquettes.sku);
   await expect(productRow(office, croquettes.sku)).toBeVisible();
   await expect(soldOutMark(office, croquettes)).toHaveCount(0);
-  await rowAction(office, croquettes.id, 'sold_out');
+  await rowAction(office, 'inventory-products', croquettes.id, 'sold_out');
   await expect(soldOutMark(office, croquettes)).toHaveText(/^(Sold out|Agotado)$/);
   // Sold out is not inactive: its switch stays on.
   await expect(office.locator(`[data-testid=inventory-products-active-${croquettes.id}]`).first()).toHaveJSProperty('checked', true);
@@ -225,7 +225,7 @@ test('INVENTORY-F29 / INVENTORY-F27: «Mark sold out» greys the article out in 
 
   // Back on sale: the mark goes and the till offers it again, live.
   await office.bringToFront();
-  await rowAction(office, croquettes.id, 'back_on_sale');
+  await rowAction(office, 'inventory-products', croquettes.id, 'back_on_sale');
   await expect(soldOutMark(office, croquettes)).toHaveCount(0);
   expect((await productBySku(context, croquettes.sku)).is_sold_out).toBe(false);
   await till.bringToFront();
@@ -241,7 +241,7 @@ test('INVENTORY-F29: the product sheet marks it sold out, says so beside its sta
   await productsReady(page);
   await searchProducts(page, bread.sku);
   await expect(productRow(page, bread.sku)).toBeVisible();
-  await rowAction(page, bread.id, 'detail');
+  await rowAction(page, 'inventory-products', bread.id, 'detail');
   const sheet = dialog(page, 'inventory-product-detail');
   await expect(sheet).toBeVisible();
   const status = sheet.locator('[data-testid=inventory-product-detail-status] ion-note');

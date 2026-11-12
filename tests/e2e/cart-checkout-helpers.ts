@@ -1,8 +1,8 @@
 // Shared steps of the cart_checkout e2e (cart-checkout-*.spec.ts): a signed-in page in English, the app's
-// API for setup and server-side evidence (never the check itself), a row action (a button, or inside «⋮»
-// when the row folds them), the flows' captures and the cleanup every spec runs before and after it: what
-// a run creates carries the session prefix «e2e-cc» and is deleted from the hub's database (phase 1: `a`
-// and `b` share it), with the day counter of the orders it numbered.
+// API for setup and server-side evidence (never the check itself), the flows' captures and the cleanup every
+// spec runs before and after it: what a run creates carries the session prefix «e2e-cc» and is deleted from
+// the hub's database (phase 1: `a` and `b` share it), with the day counter of the orders it numbered. A row
+// action is service-helpers.ts's `rowAction`.
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
 import { A, api, capture, type Credentials, horizontalOverflow, login, psql, settled, shown } from './helpers';
@@ -62,19 +62,6 @@ export async function get<T>(context: BrowserContext, path: string): Promise<T> 
 /** Waits for a list of the app to have painted its first result: its rows or its empty state. */
 export async function listShown(page: Page, table: 'cart-checkout-carts' | 'cart-checkout-orders'): Promise<void> {
   await shown(page).locator(`[data-testid=${table}-empty], [data-testid=${table}-row]`).first().waitFor({ state: 'visible' });
-}
-
-/** Runs a row action: its button, or the same entry inside «⋮» when the row folds its actions. */
-export async function rowAction(page: Page, table: string, id: string, action: string): Promise<void> {
-  const button = shown(page).locator(`[data-testid=${table}-row-${id}-${action}]`);
-  const menu = shown(page).locator(`[data-testid=${table}-row-${id}-menu]`);
-  await button.or(menu).first().waitFor({ state: 'visible' });
-  if (await button.isVisible()) {
-    await button.click();
-    return;
-  }
-  await menu.click();
-  await page.locator(`ion-popover [data-testid=${table}-row-${id}-${action}]`).click();
 }
 
 /** How many pixels of `text` the row (or card) hides: its own box cuts it («…»), or a box around it

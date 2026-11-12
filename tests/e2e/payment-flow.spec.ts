@@ -7,6 +7,7 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, horizontalOverflow, login, psql, shot, shown } from './helpers';
+import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 const TAG = 'E2E Pay';
@@ -60,18 +61,6 @@ async function threeShots(page: Page, key: string, target: () => Locator): Promi
 /** A row (or, on a phone, a card) of a payment list by its id. */
 const rowOf = (page: Page, table: string, id: string): Locator =>
   shown(page).locator(`[data-testid=${table}-row][data-id="${id}"]`).first();
-
-/** Runs a row action: its button, or the same entry inside «⋮» when the row folds its actions. */
-async function rowAction(page: Page, table: string, id: string, action: string): Promise<void> {
-  await expect(rowOf(page, table, id)).toBeVisible();
-  const button = shown(page).locator(`[data-testid=${table}-row-${id}-${action}]`).first();
-  if (await button.isVisible()) {
-    await button.click();
-    return;
-  }
-  await shown(page).locator(`[data-testid=${table}-row-${id}-menu]`).first().click();
-  await page.locator(`ion-popover [data-testid=${table}-row-${id}-${action}]`).click();
-}
 
 /** Picks `text` in the ion-select `testid` (a popover). */
 async function choose(page: Page, testid: string, text: string): Promise<void> {

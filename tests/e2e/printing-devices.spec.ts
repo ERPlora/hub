@@ -13,6 +13,7 @@ import { A, api, EMPLOYEE, hostPage, login, psql, shot, shown } from './helpers'
 import { dialog, fill } from './inventory-helpers';
 import { FLOW_VIEWPORTS, flowShots, forgetDevices } from './printing-helpers';
 import { stamp } from './sale-helpers';
+import { rowAction } from './service-helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -49,17 +50,6 @@ async function browserDevice(page: Page): Promise<string> {
 
 async function claimAs(context: BrowserContext, printer: string, device: string) {
   return api<{ job: { id: string } | null; error?: { code: string } }>(context, A, 'POST', '/printing/jobs/claim', { printers: [printer], device });
-}
-
-async function rowAction(page: Page, id: string, action: string): Promise<void> {
-  const hook = `printing-devices-row-${id}-${action}`;
-  const inline = shown(page).locator(`[data-testid=${hook}]`);
-  if ((await inline.count()) > 0 && (await inline.first().isVisible())) {
-    await inline.first().click();
-    return;
-  }
-  await shown(page).locator(`[data-testid=printing-devices-row-${id}-menu]`).first().click();
-  await page.locator(`ion-popover [data-testid=${hook}]`).click();
 }
 
 test('PRINTING-F18: only the device the owner set up takes the queue, with anybody’s session', async ({ page, context, browser }) => {
@@ -137,7 +127,7 @@ test('PRINTING-F18: only the device the owner set up takes the queue, with anybo
   // Retired, it takes nothing more: not even with the owner's session.
   const listed = await api<{ rows: Device[] }>(context, A, 'GET', '/printing/devices');
   const set = listed.data.rows.find((device) => device.name === DEVICE_NAME)!;
-  await rowAction(page, set.id, 'retire');
+  await rowAction(page, 'printing-devices', set.id, 'retire');
   await page.locator('ion-modal').getByRole('button', { name: /Yes, retire|Sí, retirar/ }).click();
   await expect(row).toHaveCount(0);
   await expect(shown(page).locator('[data-testid=printing-devices-add]')).toBeVisible();

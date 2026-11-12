@@ -11,6 +11,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 import { api, listReady, login, psql, SAAS, shot, shown, turnOn } from './helpers';
 import { businessOnSaas, type SaasBusiness, type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
+import { rowAction } from './service-helpers';
 import { STACK } from './stack';
 
 const SIZES = [
@@ -60,11 +61,6 @@ async function team(owner: Person, business: Business): Promise<Page> {
   await panel.goto(`${SAAS}/dashboard/businesses/${business.id}/members`);
   await expect(panel.locator('ion-router-outlet > .ion-page:not(.ion-page-hidden)').last().getByTestId('members-row').first()).toBeVisible();
   return panel;
-}
-
-/** The panel's row action `action` of the member `memberId`. */
-function rowAction(panel: Page, memberId: string, action: string) {
-  return panel.locator('ion-router-outlet > .ion-page:not(.ion-page-hidden)').last().getByTestId(`members-row-${memberId}-${action}`);
 }
 
 /** The hub's session `person`'s browser holds for `origin` (its own `sessionid`, not the SaaS's). */
@@ -141,7 +137,7 @@ test("BASE-F13 (HUBS-F26): a new role ends the employee's session in the busines
   const before = await hubSession(employee, origin);
   const documents = documentsLoaded(tab);
   const panel = await team(owner, business);
-  await rowAction(panel, memberId, 'change_role').click();
+  await rowAction(panel, 'members', memberId, 'change_role');
   const modal = panel.getByTestId('role-modal');
   await expect(modal).toBeVisible();
   await panel.getByTestId('role-select').click();
@@ -177,7 +173,7 @@ test('BASE-F13 (HUBS-F27): a person removed from the business loses their sessio
 
   const before = await hubSession(employee, origin);
   const panel = await team(owner, business);
-  await rowAction(panel, memberId, 'remove').click();
+  await rowAction(panel, 'members', memberId, 'remove');
   const dialog = panel.getByTestId('remove-dialog');
   await expect(dialog).toBeVisible();
   await panel.getByTestId('remove-dialog-submit').click();

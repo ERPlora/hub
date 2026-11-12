@@ -7,6 +7,7 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
+import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 const TAG = 'E2E Price';
@@ -77,19 +78,6 @@ async function pick(page: Page, testid: string, query: string, text: string): Pr
     await page.locator(`[data-testid=${testid}-retry]`).click();
   }
   await option.click();
-}
-
-/** Runs a row action: its button, or the same entry inside «⋮» when the row folds its actions. */
-async function rowAction(page: Page, table: string, id: string, action: string): Promise<void> {
-  const button = shown(page).locator(`[data-testid=${table}-row-${id}-${action}]`);
-  const menu = shown(page).locator(`[data-testid=${table}-row-${id}-menu]`);
-  await button.or(menu).first().waitFor({ state: 'visible' });
-  if (await button.isVisible()) {
-    await button.click();
-    return;
-  }
-  await menu.click();
-  await page.locator(`ion-popover [data-testid=${table}-row-${id}-${action}]`).click();
 }
 
 const ready = (page: Page, table: string) =>

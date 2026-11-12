@@ -12,7 +12,8 @@ import { readFileSync } from 'node:fs';
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, type Credentials, EMPLOYEE, login, psql, shot, shown } from './helpers';
-import { noHorizontalScroll, rowAction, settled, VIEWPORTS } from './schedule-helpers';
+import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
+import { rowAction } from './service-helpers';
 
 type Rows<T> = { rows: T[]; total: number };
 type Day = { id: string; member_name: string; status: string; clock_in_at: string };

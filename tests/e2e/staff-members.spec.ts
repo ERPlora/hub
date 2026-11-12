@@ -8,6 +8,7 @@
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, hostPage, hubUserIdOf, login, psql, shot, shown } from './helpers';
+import { rowAction } from './service-helpers';
 
 const TAG = 'E2E';
 const PHONE = { width: 390, height: 844 };
@@ -55,17 +56,6 @@ const FILTER_VIEWPORTS = [
 
 /** A row of the Staff list by the person's name. */
 const rowOf = (page: Page, name: string) => shown(page).locator('[data-testid=staff-members-row]', { hasText: name });
-
-/** Clicks a row action, from its button or, when the box folded it, from the row's «⋮» menu. */
-async function rowAction(page: Page, id: string, action: string): Promise<void> {
-  const button = shown(page).locator(`[data-testid=staff-members-row-${id}-${action}]`);
-  if (await button.isVisible()) {
-    await button.click();
-    return;
-  }
-  await shown(page).locator(`[data-testid=staff-members-row-${id}-menu]`).click();
-  await page.locator(`ion-popover [data-testid=staff-members-row-${id}-${action}]`).click();
-}
 
 async function fillNew(page: Page, first: string, last: string): Promise<void> {
   await shown(page).locator('[data-testid=staff-members-add]').click();
@@ -136,14 +126,14 @@ test('the owner adds, links, edits, deactivates and terminates staff, live, with
 
     // STAFF-F05: «Deactivate» asks first; the row turns Inactive by itself.
     const aloneId = await memberId(context, aloneName);
-    await rowAction(page, aloneId, 'deactivate');
+    await rowAction(page, 'staff-members', aloneId, 'deactivate');
     await expect(page.locator('ion-modal[data-testid=staff-member-deactivate]')).toContainText(`Take ${aloneName} off the floor?`);
     await page.screenshot({ path: shot('staff-members-deactivate') });
     await page.locator('[data-testid=staff-member-deactivate-submit]').click();
     await expect(rowOf(page, aloneName)).toContainText('Inactive');
 
     // STAFF-F06: «Terminate» with a reason; the person leaves the list; the reason is kept.
-    await rowAction(page, aloneId, 'terminate');
+    await rowAction(page, 'staff-members', aloneId, 'terminate');
     await page.locator('[data-testid=staff-member-terminate-reason] textarea').fill('Moves abroad');
     await page.screenshot({ path: shot('staff-members-terminate') });
     await page.locator('[data-testid=staff-member-terminate-submit]').click();
