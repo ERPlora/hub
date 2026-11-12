@@ -258,6 +258,15 @@ def test_the_card_says_the_option_it_finds(write):
 
 
 @pytest.mark.parametrize("write", ["modifier.option.delete", "modifier.option.update"])
+def test_the_card_says_the_option_of_the_group_said_beside_it(write):
+    """«ali» of «dulces», though «Salsas picantes» has its «Alioli» too: the option is read with its group."""
+    a_group("Salsas picantes")
+    a_group("Salsas dulces")
+    arguments = {**by_its_name("dulces")[write], "option": "ali"}
+    assert fields_of(write, arguments, "es")["option"]["value"] == "Alioli (Salsas dulces)"
+
+
+@pytest.mark.parametrize("write", ["modifier.option.delete", "modifier.option.update"])
 def test_an_option_two_groups_have_stays_on_the_card_as_said(write):
     """«ali» with no group: «Alioli» of «Salsas picantes» and of «Salsas dulces» fit, and the card says «ali»."""
     a_group("Salsas picantes")
