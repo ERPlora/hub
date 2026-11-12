@@ -19,12 +19,12 @@ import pytest
 from live.operations import AI, registry
 
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
-from apps.combo.schemas import A_CHOICE, A_COURSE, A_MENU, A_PRODUCT
+from apps.combo.schemas import A_CHOICE, A_COURSE, A_MENU
 from apps.combo.tests.conftest import ctx_for, make_combo, make_group, make_option, make_product
 from apps.combo.tests.test_apps import CHECKED_BY_THE_MENU
 from apps.combo.tests.test_assistant_card_records import fields_of, words
 from base.schemas import names
-from base.tests.test_assistant_yes_for_its_card import read_as, turn_as, unless_marked, unless_of, yes_to_its_card
+from base.tests.test_assistant_yes_for_its_card import read_as, turn_as, unless_by_id, unless_of, yes_to_its_card
 from base.tests.test_services_assistant import call
 
 pytestmark = pytest.mark.django_db
@@ -550,8 +550,8 @@ def test_the_yes_to_a_record_that_comes_by_its_id_runs_on_it_whatever_name_is_sa
 # it (``unless``), as when the id comes alone. A menu's id is the record of the writes on the menu and of the course it
 # gets, and a course's of the choices it gets or orders: those are read.
 
-#: Beside which data each write of Menus takes its record by them and not by each id of a menu, a course, a choice or
-#: a product of Inventory: the record's own id, and the id of the course that holds a choice.
+#: Beside which data each write of Menus takes its record by them and not by each id it reads (a menu's, a course's, a
+#: choice's or a product's of Inventory): the record's own id, and the id of the course that holds a choice.
 UNLESS_BY_ID = {
     **{(name, "id"): set() for name in CHECKED_BY_THE_MENU},
     ("combo.group.create", "combo_id"): set(),
@@ -567,23 +567,8 @@ UNLESS_BY_ID = {
 }
 
 
-def by_its_id(writes) -> set[tuple[str, str]]:
-    """Each datum of ``writes`` the card reads by its id (``names(…, by="id")``), whatever record it names."""
-    return {
-        (op.name, datum)
-        for op in writes
-        for datum, field in op.input.model_fields.items()
-        if isinstance(field.json_schema_extra, dict)
-        and field.json_schema_extra.get("refers", {}).get("by") == "id"
-    }
-
-
 def test_an_id_is_left_unread_beside_each_datum_its_write_takes_its_record_by_instead():
-    writes = assistant_writes()
-    marks = (A_MENU, A_COURSE, A_CHOICE, A_PRODUCT)
-    marked = {key: unless for mark in marks for key, unless in unless_marked(writes, mark).items()}
-    assert set(marked) == by_its_id(writes)
-    assert marked == UNLESS_BY_ID
+    assert unless_by_id(assistant_writes()) == UNLESS_BY_ID
 
 
 def beside_another_s_id() -> dict[str, dict]:

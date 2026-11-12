@@ -19,11 +19,10 @@ from live.operations import get, registry
 
 from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
 from apps.modifier.tests.conftest import ctx_for, make_category, make_product, run
-from apps.modifier.schemas import A_CATEGORY, A_GROUP, A_LINK, A_PRODUCT, AN_OPTION
 from apps.modifier.tests.test_integration_assistant import TITLES, modifier_writes
 from base import assistant
 from base.schemas import names
-from base.tests.test_assistant_yes_for_its_card import read_as, turn_as, unless_marked, unless_of, yes_to_its_card
+from base.tests.test_assistant_yes_for_its_card import read_as, turn_as, unless_by_id, unless_of, yes_to_its_card
 from base.tests.test_services_assistant import call
 
 pytestmark = pytest.mark.django_db
@@ -386,23 +385,8 @@ UNLESS_BY_ID = {
 }
 
 
-def by_its_id(writes) -> set[tuple[str, str]]:
-    """Each datum of ``writes`` the card reads by its id (``names(…, by="id")``), whatever record it names."""
-    return {
-        (op.name, datum)
-        for op in writes
-        for datum, field in op.input.model_fields.items()
-        if isinstance(field.json_schema_extra, dict)
-        and field.json_schema_extra.get("refers", {}).get("by") == "id"
-    }
-
-
 def test_an_id_is_left_unread_beside_each_datum_its_write_takes_its_record_by_instead():
-    writes = modifier_writes()
-    marks = (A_GROUP, AN_OPTION, A_LINK, A_PRODUCT, A_CATEGORY)
-    marked = {key: unless for mark in marks for key, unless in unless_marked(writes, mark).items()}
-    assert set(marked) == by_its_id(writes)
-    assert marked == UNLESS_BY_ID
+    assert unless_by_id(modifier_writes()) == UNLESS_BY_ID
 
 
 def extras_link_beside(datum: str) -> dict:
