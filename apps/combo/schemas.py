@@ -63,7 +63,8 @@ A_MENU = names("combo.combo.get")
 # its product inside its menu and its course: each is read with them (``within``), never with the write's ``id``, which
 # is the record of the write (a course's, a choice's) and no menu's. Beside the id the write takes its record by
 # instead (the datum's own, or the one of the record that holds it: a course's menu is the course's own), the card
-# neither reads nor shows the name, which the write does not use (``unless_given``, hub#1250).
+# neither reads nor shows the name, which the write does not use (``unless_given``, hub#1250), nor the id of a menu or
+# a course beside the id of a course or a choice, or of the course a choice is said in (hub#1278).
 A_MENU_BY_NAME = names("combo.combo.get", by="combo", as_said=True)
 A_COURSE_BY_NAME = names("combo.group.get", by="group", within=("combo_id", "combo"), as_said=True)
 A_CHOICE_BY_NAME = names(
@@ -244,6 +245,7 @@ class _ComboOfIn(In):
 class _GroupOfIn(_ComboOfIn):
     """The course something belongs to: its id, or its name with its menu."""
 
+    combo_id: UUID | None = Field(None, description=D_COMBO_ID, json_schema_extra=unless_given(A_MENU, "group_id"))
     combo: Reference | None = Field(
         None, description=D_COMBO, json_schema_extra=unless_given(A_MENU_BY_NAME, "combo_id", "group_id")
     )
@@ -260,6 +262,7 @@ class _GroupOfIn(_ComboOfIn):
 
 
 class GroupRefIn(_ComboOfIn):
+    combo_id: UUID | None = Field(None, description=D_COMBO_ID, json_schema_extra=unless_given(A_MENU, "id"))
     combo: Reference | None = Field(
         None, description=D_COMBO, json_schema_extra=unless_given(A_MENU_BY_NAME, "id", "combo_id")
     )
@@ -276,6 +279,9 @@ class GroupRefIn(_ComboOfIn):
 
 
 class OptionRefIn(_ComboOfIn):
+    combo_id: UUID | None = Field(
+        None, description=D_COMBO_ID, json_schema_extra=unless_given(A_MENU, "id", "group_id")
+    )
     combo: Reference | None = Field(
         None, description=D_COMBO, json_schema_extra=unless_given(A_MENU_BY_NAME, "id", "combo_id", "group_id")
     )
@@ -288,7 +294,7 @@ class OptionRefIn(_ComboOfIn):
     group_id: UUID | None = Field(
         None,
         description="The course of the choice, when the product is in several.",
-        json_schema_extra=A_COURSE,
+        json_schema_extra=unless_given(A_COURSE, "id"),
     )
     group: Reference | None = Field(
         None, description=D_GROUP, json_schema_extra=unless_given(A_COURSE_BY_NAME, "id", "group_id")
