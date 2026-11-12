@@ -4,6 +4,7 @@
 // A zone with tables cannot be deleted: «Delete zone» is off and says why.
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionChecked, ionValue, mountTable, settle } from '../__tests__/mount-table';
 import { zoneRow } from '../__tests__/tables';
 import type { ZoneOut } from '../operations';
@@ -87,6 +88,15 @@ describe('ZoneFormModal', () => {
     const options = [...(f.field('color').querySelectorAll('ion-select-option') ?? [])].map((o) => o.textContent?.trim());
     expect(options).toEqual(['Azul', 'Cian', 'Morado', 'Verde', 'Ámbar', 'Rojo', 'Gris']);
   });
+});
+
+describe('ZoneFormModal: fields refused with the same words (hub#888)', () => {
+  // A new zone from Zones: Name, Description and Order paint a refusal, each under its own key.
+  itTellsTheCorrectedFieldApart(['name', 'description', 'sort_order'], async (locale, refusal) => {
+    const f = await form(null, {}, { '/api/table/zones': [422, refusal] }, locale);
+    await ionValue(f.field('name'), 'Terrace', 'ionInput');
+    return { field: f.field, send: () => click(f.field('submit')), settle };
+  }, 'sort_order');
 });
 
 describe('ZoneFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {

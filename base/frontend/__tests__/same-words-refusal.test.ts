@@ -4,7 +4,7 @@
 // field apart: correcting one leaves them all marked), a field named after another key (correcting it takes the
 // other's mark away), and a test that does not refuse the fields with the same words at all (it would prove nothing).
 import { FormModal, type FormModalError } from '@erplora/ui/components';
-import { IonInput, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
+import { IonButton, IonInput, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
 import { describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, nextTick, ref } from 'vue';
 
@@ -26,11 +26,13 @@ const KEYS = ['title', 'notes', 'kind'] as const;
 
 /** A window with a field per key — `title` an ion-input, `notes` an ion-textarea, `kind` an ion-select — whose «Save»
  *  is refused with `refusal`; each field carries the name `names` gives it (none when it gives none), and what each
- *  field hears is written down (`heard`: `<key>:<event>`). */
+ *  field hears is written down (`heard`: `<key>:<event>`). With `ownFooter`, the window paints its own footer, as one
+ *  with «Delete» beside Cancel and Save does: its Cancel (`thing-cancel`) is the window's button, not FormModal's. */
 async function windowNaming(
   names: Partial<Record<(typeof KEYS)[number], string>>,
   refusal: FormModalError = refusedWithTheSameWords(KEYS).error,
   locale: 'en' | 'es' = 'en',
+  ownFooter = false,
 ) {
   const error = ref<FormModalError | null>(null);
   const heard: string[] = [];
@@ -55,6 +57,14 @@ async function windowNaming(
               h(IonTextarea, { ...field('notes', fieldErrors.notes), label: 'Notes' }),
               h(IonSelect, { ...field('kind', fieldErrors.kind), label: 'Kind', value: 'a' }, () => [h(IonSelectOption, { value: 'a' }, () => 'A')]),
             ],
+            ...(ownFooter
+              ? {
+                  footer: ({ cancel, submit }: { cancel: () => void; submit: () => void }) => [
+                    h(IonButton, { 'data-testid': 'thing-cancel', fill: 'clear', onClick: cancel }, () => (locale === 'es' ? 'Cancelar' : 'Cancel')),
+                    h(IonButton, { 'data-testid': 'thing-submit', onClick: submit }, () => (locale === 'es' ? 'Guardar' : 'Save')),
+                  ],
+                }
+              : {}),
           },
         );
     },
@@ -140,6 +150,14 @@ describe('expectTheSameInSpanish (hub#888): the Spanish case is a window in Span
 
   it('fails a window that opens in English when asked for Spanish', async () => {
     await expect(expectTheSameInSpanish((_locale, refusal) => windowNaming(NAMED, refusal.error, 'en'), KEYS, 'title')).rejects.toThrow(/Cancel/);
+  });
+
+  it('passes a window with a footer of its own (Delete beside Cancel and Save) whose Cancel speaks Spanish', async () => {
+    await expect(expectTheSameInSpanish((locale, refusal) => windowNaming(NAMED, refusal.error, locale, true), KEYS, 'title')).resolves.toBeUndefined();
+  });
+
+  it('fails a window with a footer of its own that opens in English when asked for Spanish', async () => {
+    await expect(expectTheSameInSpanish((_locale, refusal) => windowNaming(NAMED, refusal.error, 'en', true), KEYS, 'title')).rejects.toThrow(/Cancel/);
   });
 
   it('fails a window in Spanish whose corrected field carries no name', async () => {

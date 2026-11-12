@@ -4,6 +4,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionValue, mountReservation, settle } from '../__tests__/mount-reservation';
 import { entryRow } from '../__tests__/rows';
 import WaitlistFormModal from './WaitlistFormModal.vue';
@@ -79,6 +80,18 @@ describe('WaitlistFormModal', () => {
     await click(s.submit());
     expect(s.field('guest_phone').errorText).toBe('Teléfono no válido');
   });
+});
+
+describe('WaitlistFormModal: fields refused with the same words (hub#888)', () => {
+  // The guest, the phone, the day, the time and the party paint a refusal, each under its own key.
+  itTellsTheCorrectedFieldApart(['guest_name', 'guest_phone', 'date', 'preferred_time', 'party_size'], async (locale, refusal) => {
+    const s = await setup(locale);
+    await ionValue(s.field('guest_name'), 'Luis', 'ionInput');
+    await ionValue(s.field('guest_phone'), '600123123', 'ionInput');
+    await ionValue(s.field('preferred_time'), '21:00', 'ionInput');
+    s.answer(422, refusal);
+    return { field: s.field, send: () => click(s.submit()), settle };
+  }, 'guest_phone');
 });
 
 describe('WaitlistFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {

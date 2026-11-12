@@ -78,6 +78,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
       >
         <ion-input
           data-testid="reservation-blocked-form-date"
+          name="date"
           type="date"
           :value="date"
           :label="$t('reservation.availability.blockedForm.date')"
@@ -113,6 +114,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         >
           <ion-input
             data-testid="reservation-blocked-form-blocked_from"
+            name="blocked_from"
             type="time"
             :value="from"
             :label="$t('reservation.availability.blockedForm.from')"
@@ -125,6 +127,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           />
           <ion-input
             data-testid="reservation-blocked-form-blocked_until"
+            name="blocked_until"
             type="time"
             :value="until"
             :label="$t('reservation.availability.blockedForm.to')"

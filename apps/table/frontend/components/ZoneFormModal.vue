@@ -134,6 +134,7 @@ async function save(): Promise<void> {
       >
         <ion-input
           data-testid="table-zone-form-name"
+          name="name"
           :value="form.name"
           :label="$t('table.zoneForm.name')"
           :placeholder="zone ? undefined : $t('table.add.zonePlaceholder')"
@@ -147,6 +148,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="table-zone-form-description"
+          name="description"
           :value="form.description"
           :label="$t('table.zoneForm.description')"
           label-placement="floating"
@@ -178,6 +180,7 @@ async function save(): Promise<void> {
           </ion-select>
           <ion-input
             data-testid="table-zone-form-sort_order"
+            name="sort_order"
             type="number"
             inputmode="numeric"
             min="0"
