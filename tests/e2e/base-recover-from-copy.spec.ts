@@ -17,7 +17,8 @@
 // category and the service) and «Appointments: 1 restored», and `a` has the same card live again in its group, the
 // second one again in that group with its tag and its value, the same product live again in its category back under a
 // new id, the same appointment (its number, its history ending in «restored») live again, and the service category and
-// the service live again under new ids, the service in that category.
+// the service live again under new ids, the service in that category; in its Agenda, the appointment's
+// «History» ends in «Restored» (APPOINTMENT-F10).
 // The stack's worker serves databases only (no moves' thread), so the spec plays its passes, as the specs play the
 // relay.
 import { spawnSync } from 'node:child_process';
@@ -25,6 +26,7 @@ import { spawnSync } from 'node:child_process';
 import { expect, type Page, test } from '@playwright/test';
 
 import { capture, HUB_DIR, psql } from './helpers';
+import { ownerPage, rowAction } from './service-helpers';
 import { STACK } from './stack';
 
 const KEY = 'BASE-F114-RECOVER';
@@ -323,5 +325,13 @@ for (const { label, viewport } of SIZES) {
     expect(psql(`select action from appointment_history where appointment_id = '${appointment}' order by at desc, id desc limit 1`)).toBe('restored');
     expect(psql(`select count(*) from appointment_appointment where customer_name = 'Booked ${label} ${RUN}'`)).toBe('1');
     await context.close();
+
+    // In the business's Agenda, its «History» keeps its lines and ends in «Restored» (APPOINTMENT-F10).
+    const agenda = await ownerPage(browser, `/appointment/agenda?date=${aMondayAt('10:00').slice(0, 10)}`, viewport);
+    await rowAction(agenda.page, 'appointment-list', appointment, 'history');
+    const history = agenda.page.locator('ion-modal[data-testid=appointment-history-modal]');
+    await expect(history.locator('[data-testid=appointment-history-entry]')).toHaveText([/^Booked/, /^Deleted/, /^Restored/]);
+    await capture(agenda.page, `${KEY}-${label}-6-history`);
+    await agenda.context.close();
   });
 }

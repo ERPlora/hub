@@ -103,6 +103,9 @@ def test_one_of_a_series_comes_back_in_its_series_on_its_date(salon):
         salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), recurring=series, occurrence_date=MONDAY
     )
     run("appointment.appointment.delete", {"id": str(one.id)})
+    # Its series' other dates are its own.
+    later = MONDAY + dt.timedelta(weeks=1)
+    make_appointment(salon.lucia, salon.ana, [salon.cut], at(later, "10:00"), recurring=series, occurrence_date=later)
 
     restore(one.id)
 
@@ -116,6 +119,17 @@ def test_one_still_waiting_for_the_business_comes_back_waiting(salon):
     assert gone.status == "pending"
 
     assert restore(gone.id).status == "pending"
+
+
+def test_one_the_customer_booked_and_the_business_confirmed_comes_back_confirmed(salon):
+    """Created again it would wait for the business once more (the business confirms online bookings by hand)."""
+    make_settings(auto_confirm_online=False)
+    out = book(salon, source="online")
+    run("appointment.appointment.confirm", {"id": str(out.id)})
+    run("appointment.appointment.delete", {"id": str(out.id)})
+
+    assert restore(out.id).status == "confirmed"
+    assert actions(out.id) == ["created", "confirmed", "deleted", "restored"]
 
 
 def test_one_whose_time_was_taken_since_is_refused_with_why_and_nothing_is_written(salon):

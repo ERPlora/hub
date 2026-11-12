@@ -198,6 +198,25 @@ def test_the_business_holds_deleted_what_it_deleted_and_did_not_book_again(salon
     assert queries.appointments_deleted_in_business([gone, *records]) == [records[-1]]
 
 
+def test_what_others_booked_since_never_holds_a_deleted_one_back(salon):
+    """Booked again means its own customer at its moment, or its own series on its date: another customer at its time,
+    another date of its series or another series on its date leave it to come back."""
+    lucia, now = salon.lucia, timezone.now()
+    marta = make_customer("Marta Ruiz", phone="+34600555666")
+    alone = make_appointment(lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), deleted_at=now)
+    make_appointment(marta, salon.bea, [salon.cut], at(MONDAY, "10:00"))
+    series, other = make_series(salon), make_series(salon, staff=salon.bea)
+    occurrence = make_appointment(
+        lucia, salon.ana, [salon.cut], at(MONDAY, "12:00"), recurring=series, occurrence_date=MONDAY, deleted_at=now
+    )
+    later = MONDAY + dt.timedelta(weeks=1)
+    make_appointment(lucia, salon.ana, [salon.cut], at(later, "12:00"), recurring=series, occurrence_date=later)
+    make_appointment(lucia, salon.bea, [salon.cut], at(MONDAY, "16:00"), recurring=other, occurrence_date=MONDAY)
+    records = [an_appointment_of_the_copy(card(lucia), salon, one.start, one.pk) for one in (alone, occurrence)]
+
+    assert queries.appointments_deleted_in_business(records) == records
+
+
 def test_a_deleted_one_is_the_same_by_its_id_whatever_the_copy_says_of_its_time(salon):
     """Moved since the copy and deleted after: it is the same appointment, and whether it was booked again is read on
     its own time in the business, never on the copy's."""
@@ -319,6 +338,7 @@ def test_a_copy_with_no_appointment_to_come_lacks_none():
     """The platform asks what is lacking even when the copy gave nothing (``base.tenancy.recovery._give_back``): with no
     appointment there is no list of the copy's services to match, and none is lacking."""
     assert queries.appointments_not_in_business([]) == []
+    assert queries.appointments_deleted_in_business([]) == []
 
 
 def test_the_app_declares_what_it_gives_back():
