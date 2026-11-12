@@ -1,7 +1,7 @@
-"""The device's presence through base's /ws/print, for real (FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF; the old hub's
-``print_hosts::heartbeat``): Printing declares ``printing.device.seen`` as ``print_presence``, and the socket runs it at
-the device's hello and at its beats as the device's user, with the permissions that user really has. Whoever is signed
-in at the till prints, an employee too: its till is seen, and the bell stops ringing for it.
+"""The device's presence through base's /ws/print, for real: Printing declares ``printing.device.seen`` as
+``print_presence``, and the socket runs it at the device's hello and at its beats as the device's user, with the
+permissions that user really has. Whoever is signed in at the till prints, an employee too: its till is seen, and the
+bell stops ringing for it.
 
 Driven through ``config.asgi.application`` with base's own socket client (``base/tests/test_ws_print.py``).
 """

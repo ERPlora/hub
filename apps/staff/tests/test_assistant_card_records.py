@@ -1,7 +1,7 @@
-"""FIX-HUB-STAFF-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (hub#495): the card of a write of Staff says which person, role,
-schedule or time-off request it acts on by its name, read as whoever asks, never by its id, and left out when that
-person may not read it. A schedule says whose it is and a time-off request says whose, of what kind and which days:
-every person has a «Regular schedule», and one person can ask for several absences.
+"""The card of a write of Staff (hub#495) says which person, role, schedule or time-off request it acts on by its name,
+read as whoever asks, never by its id, and left out when that person may not read it. A schedule says whose it is and a
+time-off request says whose, of what kind and which days: every person has a «Regular schedule», and one person can ask
+for several absences.
 """
 
 import pytest

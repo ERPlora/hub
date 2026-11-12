@@ -87,7 +87,7 @@ describe('InboxPage: the live list', () => {
     }
   });
 
-  it('while the list loads, the table says it is loading, never «0 conversations» (gh:pm#611)', async () => {
+  it('while the list loads, the table says it is loading, never «0 conversations»', async () => {
     const s = await setup();
     expect(s.prop('loading')).toBe(true);
     await s.result(LIST, PAGE);
@@ -245,8 +245,8 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
     expect((await setup()).find('whatsapp-inbox-cap-reached').exists()).toBe(false);
   });
 
-  // «Upgrade plan» sells, and everything that sells is web only (surface.ts): in the installed app the link opened
-  // nothing (gh:hub#439), so there the inbox says it without the link.
+  // «Upgrade plan» sells, and everything that sells is web only (surface.ts): in the installed app the link would open
+  // nothing, so there the inbox says it without the link.
   it('«Upgrade plan» sells: never on the app surfaces, where the inbox still says the month is spent', async () => {
     applySurface('mobile');
     try {
@@ -324,7 +324,7 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
     }
   });
 
-  it('a number reconnected (or a new month) takes its notice away by itself, without reloading (gh:hub#2064)', async () => {
+  it('a number reconnected (or a new month) takes its notice away by itself, without reloading', async () => {
     const s = await setup({}, { ...CONNECTED, status: 'reconnect_needed', cap_reached: true });
     expect(s.find('whatsapp-inbox-reconnect').exists()).toBe(true);
     expect(s.find('whatsapp-inbox-cap-reached').exists()).toBe(true);
@@ -349,7 +349,7 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
   });
 });
 
-describe('InboxPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('InboxPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

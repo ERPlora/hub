@@ -71,7 +71,7 @@ describe('ProjectsPage', () => {
     expect(s.params(OP)).toEqual([{ code: 'open', name: 'grand', is_active: false, search: 'op', sort: 'name', limit: 50, offset: 0 }]);
   });
 
-  it('keeps the filters behind the toolbar funnel, as the old table did, until it is pressed', async () => {
+  it('keeps the filters behind the toolbar funnel until it is pressed', async () => {
     const s = await setup();
     await s.show(page(ROWS));
     expect(s.prop('filterable')).toBe(true);
@@ -81,7 +81,7 @@ describe('ProjectsPage', () => {
     expect(s.wrapper.find('[data-testid="task-projects-filters-panel"] [data-testid="task-projects-filter-is_active"]').exists()).toBe(true);
   });
 
-  it("wears the old module's icons: «Open» opens, the folder on its cards and its empty list", async () => {
+  it('wears its icons: «Open» opens, the folder on its cards and its empty list', async () => {
     const s = await setup();
     await s.show(page(ROWS));
     expect(s.prop<Array<{ id: string; icon?: string }>>('actions').map((a) => [a.id, a.icon])).toEqual([['open', 'open-outline']]);
@@ -124,7 +124,7 @@ describe('ProjectsPage', () => {
   });
 });
 
-describe('ProjectsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('ProjectsPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

@@ -155,7 +155,7 @@ describe('RecordDetailPage', () => {
   );
 
   it('outside Spain it says why and never that it goes out by itself', async () => {
-    // FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN: VeriFactu is only for Spain, the record is never sent.
+    // VeriFactu is only for Spain, the record is never sent.
     const why = 'this business is not in Spain: VeriFactu is only for businesses in Spain, so nothing is sent to the AEAT';
     const s = await setup({ waiting: [{ code: 'outside_spain', message: why }], next_attempt_at: null, can_transmit: false });
     const notice = s.find('verifactu-record-waiting');
@@ -220,7 +220,7 @@ describe('RecordDetailPage', () => {
     expect(s.find('verifactu-record-digest').text()).toContain('Not stamped yet');
   });
 
-  it('in the installed app, «Verify at the AEAT» opens the AEAT’s page in the system browser (gh:hub#518)', async () => {
+  it('in the installed app, «Verify at the AEAT» opens the AEAT’s page in the system browser', async () => {
     const invoke = vi.fn(() => Promise.resolve());
     (window as TauriWindow).__TAURI__ = { core: { invoke } };
     const s = await setup();

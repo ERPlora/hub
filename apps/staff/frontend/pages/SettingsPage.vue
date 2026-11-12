@@ -1,12 +1,11 @@
 <script setup lang="ts">
-// Staff → Settings (WORKBOOK «Pantallas · Ajustes de Personal»; STAFF-F22): the default working day that
-// a new schedule proposes (STAFF-F13), only for whoever may save it; the old tab's other eight settings
-// changed nothing and are retired (FIX-STAFF-SETTINGS-ORPHANS). The values come live (`staff.settings.get`: the proposed ones until the
-// business saves). The form is every settings page's (`useSettingsForm`, hub#867): a change saved elsewhere
+// Staff → Settings (WORKBOOK «Pantallas · Ajustes de Personal»; STAFF-F22): the default working day that a new schedule
+// proposes (STAFF-F13), only for whoever may save it. The values come live (`staff.settings.get`: the proposed ones
+// until the business saves). The form is every settings page's (`useSettingsForm`, hub#867): a change saved elsewhere
 // repaints every field the person has not touched, «Save» sends only the fields touched and changed
-// (`staff.settings.update`), so it never undoes someone else's change, and a refusal says itself as a
-// FormModal does. The server judges the ranges and the day: its 422 goes under each field. A read that fails
-// before any value came says so with «Retry» and shows no form: nothing unread is ever offered to save.
+// (`staff.settings.update`), so it never undoes someone else's change, and a refusal says itself as a FormModal does.
+// The server judges the ranges and the day: its 422 goes under each field. A read that fails before any value came says
+// so with «Retry» and shows no form: nothing unread is ever offered to save.
 import { InlineFeedback, SettingsFormFooter, SettingsNumberField, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';

@@ -266,8 +266,8 @@ describe('ReservationsPage: why a reservation was cancelled (RESERVATION-F09, F1
   });
 });
 
-describe('ReservationsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
-  it('keeps its column filters behind the table’s funnel, as the old table: the list is not pushed down', async () => {
+describe('ReservationsPage: the list fills the page', () => {
+  it('keeps its column filters behind the table’s funnel: the list is not pushed down', async () => {
     const s = await setup();
     expect(s.prop('filterable')).toBe(true);
   });

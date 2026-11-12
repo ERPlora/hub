@@ -222,7 +222,7 @@ def test_only_who_manages_the_website_publishes_it():
     assert Site.objects.get().published_version == 0
 
 
-# One site per hub (phase 1: the tables are shared, the row names its hub)
+# One site per hub (the row names its hub)
 
 
 def hub_site(slug: str) -> Site:
@@ -507,8 +507,8 @@ def test_without_a_space_in_its_plan_an_image_is_kept_however_full_the_store(hub
 
 
 def test_the_plans_space_is_base_s_one_check_and_its_sentence_is_not_the_website_s(hub_files, monkeypatch):
-    # FIX-HUB-BASE-PLAN-SPACE-CHECK-COPIED-IN-THREE-APPS: the website copied Files' check and its sentence (hub#406), so
-    # a change of the limit or of what it says was to be made in every copy. Now the website asks base's own check.
+    # The website asks base's own check (hub#406), never a copy of Files' check and its sentence that a change of the
+    # limit or of what it says would miss.
     asked = []
     monkeypatch.setattr(
         files, "refuse_past_the_space", lambda store, hub, size, *, limit_bytes: asked.append((hub, size, limit_bytes))
@@ -570,7 +570,7 @@ def test_two_first_saves_at_once_leave_one_site_and_neither_fails(transactional_
     assert hub_site("a").template == "bold"
 
 
-# A hub with its own database (plan 2026-10-22-fase-2-tenencia, S2's first step)
+# A hub with its own database
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)

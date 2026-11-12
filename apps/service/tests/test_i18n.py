@@ -51,7 +51,7 @@ def visible_texts() -> set[str]:
     config = apps.get_app_config("service")
     lazies = [
         *config_texts(config),
-        # The Home's step (FIX-SERVICE-SETUP-HOOKS).
+        # The Home's step.
         *(text for step in config.setup for text in (step.title, step.description)),
     ]
     lazies += module_texts(queries, services, schemas, models)
