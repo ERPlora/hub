@@ -3113,14 +3113,16 @@ Pasos:
       contacto, NIF, dirección, fechas, origen, etapa, canal y notas, y con sus grupos, etiquetas y campos propios: el
       grupo, la etiqueta o el campo que el negocio tiene con ese nombre es ese, sin hacer otro, y el que ya no tiene se
       vuelve a crear como estaba (hub#1285); un valor de un campo que el negocio desactivó no vuelve. A una ficha
-      eliminada que vuelve no le vuelve el grupo, la etiqueta o el campo que el negocio borró después (hub#1356). Nunca vuelve una ficha cuyos datos personales se borraron (RGPD) ni una que se unió a otra, ni se repite
-      una que el negocio ya volvió a crear (el mismo nombre, teléfono y email). Con Productos, «Productos: se crearon 3»: cada
-      producto vuelve como uno nuevo, creado como lo crea la pantalla de Productos, con su nombre, SKU, EAN-13,
+      eliminada que vuelve no le vuelve el grupo, la etiqueta o el campo que el negocio borró después (hub#1356). Nunca
+      vuelve una ficha cuyos datos personales se borraron (RGPD) ni una que se unió a otra, ni se repite una que el
+      negocio ya volvió a crear (el mismo nombre, teléfono y email). Con Productos, un producto que el negocio
+      eliminó y aún guarda vuelve EL MISMO y cuenta como restaurado, con su stock, sus categorías que siguen vivas y en
+      Movimientos su historial entero, activo y a la venta (INVENTORY-F34). Uno que el negocio ya no tiene
+      vuelve como uno nuevo, creado como lo crea la pantalla de Productos, con su nombre, SKU, EAN-13,
       descripción, tipo, precio, coste, unidades, umbral, control de stock y categoría fiscal, activo o desactivado como
       estaba y en las categorías que el negocio sigue teniendo; sin stock, que se cuenta (INVENTORY-F14), porque el de la
-      copia es de otro día; sin su imagen (hub#1319) y sin las categorías que el negocio ya no tiene (hub#1320). Uno que se
-      eliminó en el negocio también vuelve como producto nuevo; sus movimientos siguen en el eliminado (hub#1321). No se
-      repite uno que el negocio ya volvió a dar de alta (otro vivo con su SKU o su EAN-13). Con Servicios, «Servicios: se
+      copia es de otro día; sin su imagen (hub#1319) y sin las categorías que el negocio ya no tiene (hub#1320). No vuelve
+      ni se repite uno que el negocio ya volvió a dar de alta (otro vivo con su SKU o su EAN-13). Con Servicios, «Servicios: se
       crearon 2»: cada servicio que el negocio ya no tiene vuelve como uno nuevo, en oferta, creado como lo crea la pantalla
       de Servicios, con su nombre, tarifa, precios, coste, duración, márgenes, capacidad, descripciones, reservas, orden,
       destacado, SKU, código de barras y notas, su categoría fiscal y su categoría si el negocio aún la tiene (si se
@@ -3147,11 +3149,12 @@ eliminada que aún guardaba, viva otra vez con su aviso de ficha recuperada (`cu
 nueva por cada cliente que ya no tenía, con su aviso de ficha creada (`customer.customer.created`) y los de sus grupos y
 etiquetas puestos (`customer.customer.groups_changed`, `customer.customer.tags_changed`), cada grupo, etiqueta o campo
 propio que le faltaba hecho otra vez, con su aviso (`customer.group.created`, `customer.tag.created`,
-`customer.field.created`), un producto nuevo
-por cada producto que le faltaba, con su aviso de producto creado (`inventory.product.created`), un servicio nuevo por
-cada uno que ya no tenía, con su aviso de servicio creado (`service.service.created`), y una cita nueva por cada una
-que le faltaba, con su aviso de cita creada (`appointment.appointment.created`), y nada más; la copia, sin
-tocar; el aviso `control.copy.recovery_requested` con quién lo pidió.
+`customer.field.created`), cada producto
+eliminado que aún guardaba, vivo otra vez con su aviso de producto recuperado (`inventory.product.restored`), un
+producto nuevo por cada producto que ya no tenía, con su aviso de producto creado (`inventory.product.created`), un
+servicio nuevo por cada uno que ya no tenía, con su aviso de servicio creado (`service.service.created`), y una cita
+nueva por cada una que le faltaba, con su aviso de cita creada (`appointment.appointment.created`), y nada más; la
+copia, sin tocar; el aviso `control.copy.recovery_requested` con quién lo pidió.
 Si falla: lo que la restauración no admite lo dice el aviso, negocio a negocio, y ese negocio no se toca: uno que no está
 listo o no tiene base propia, una demo, uno que se está trasladando o restaurando, un clúster abierto a hubs nuevos o con
 negocios vivos, el propio clúster del negocio, una copia que no está en ese clúster o que es demasiado grande, y un

@@ -252,6 +252,7 @@ Escape y tocar fuera del panel (hub#1023).
 | INVENTORY-F07 | Eliminar una categoría | hecho |
 | INVENTORY-F08 | Agrupar productos en categorías para el TPV | hecho |
 | INVENTORY-F29 | Marcar un artículo como agotado | hecho |
+| INVENTORY-F34 | Recuperar un producto eliminado | hecho |
 | | **Importar y exportar** | |
 | INVENTORY-F09 | Importar productos desde un CSV | hecho |
 | INVENTORY-F10 | Importar categorías desde un CSV | hecho |
@@ -331,7 +332,8 @@ otro producto vivo: «Ese SKU ya existe en el catálogo»; un EAN-13 repetido: �
 otro producto del catálogo». Una categoría fiscal que ya no está en Impuestos se rechaza, también si
 llega por el asistente o la API. Todo rechazo sale dentro del panel y no se guarda nada.
 Implicados: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F114 (el personal de ERPlora recupera desde una copia aparte
-los productos que se perdieron, cada uno por esta misma alta)
+los productos que el negocio ya no tiene en absoluto, cada uno por esta misma alta; uno eliminado vuelve el mismo,
+INVENTORY-F34)
 
 ### INVENTORY-F02 Editar un producto
 <!-- origen: fi:modules/inventory#command-inventory-products-update fi:modules/inventory#query-inventory-products-get old:inventory/workflow/catalogo.md#inventory-f02 -->
@@ -391,8 +393,8 @@ EAN-13 quedan libres para otro producto. Sus movimientos siguen en **Movimientos
 Inventario avisa de que el producto ya no está. No mira si tiene stock ni si está en una cuenta
 abierta: Ventas rechaza al cobrar la línea de un producto que ya no está en el catálogo.
 Si falla: «No se pudo eliminar el producto» (o el motivo) encima de la tabla.
-Implicados: SALE-F01, BASE-F114 (desde una copia aparte, el personal de ERPlora recupera el producto eliminado como
-uno nuevo, sin stock y sin sus movimientos, que siguen con el eliminado: hub#1321)
+Implicados: SALE-F01, BASE-F114, INVENTORY-F34 (desde una copia aparte, el personal de ERPlora devuelve el producto
+eliminado: el mismo, con su stock y sus movimientos)
 
 ### INVENTORY-F05 Revisar los productos que no se pueden vender por falta de IVA
 <!-- origen: wf:restaurante-dia#rec_restaurante-f03 qa:modules/inventory/create-product-with-vat old:inventory/workflow/catalogo.md#inventory-f05 -->
@@ -689,7 +691,8 @@ también quién lo hizo, aunque esta pantalla no lo enseña.
 Si falla: una venta cuyo número Inventario no llegó a apuntar deja vacía la celda Referencia. Un tique
 que Facturación numera más tarde (por ejemplo, sin los datos del negocio al cobrar) se lee y se busca
 por el número de la venta. Error de carga: el aviso de la tabla con «Reintentar».
-Implicados: INVOICE-F20, SALE-F28
+Implicados: INVOICE-F20, SALE-F28, INVENTORY-F34 (los movimientos de un producto eliminado que se recupera siguen
+siendo suyos: el historial no se parte en dos)
 
 ### INVENTORY-F17 Ver el panel y los productos con stock bajo
 <!-- origen: fi:modules/inventory#query-inventory-products-low_stock fi:modules/inventory#query-inventory-products-stats fi:modules/inventory#widget-inventory-low_stock_count-kpi-inventory-value-kpi-inventory-in_stock-stat-inventory-low_stock_products-bar-list old:inventory/workflow/stock.md#inventory-f17 -->
@@ -1122,6 +1125,33 @@ informe. El archivo pesa 20 MB como mucho, 100 MB descomprimido, con 1 000 entra
 se pueda leer («El fichero trae una foto que no es una imagen WebP de hasta 2 MB, así que no se puede leer.»).
 Implicados: BASE-F31, BASE-F34, BASE-F35, BASE-F36, BASE-F37, INVENTORY-F12
 
+### INVENTORY-F34 Recuperar un producto eliminado
+<!-- origen: nuevo (BASE-F114: recuperar desde una copia aparte lo que el negocio perdió) gh:hub#1321 -->
+Estado: hecho
+Actor: el personal de ERPlora, cuando el negocio lo pide (en el negocio ninguna pantalla deshace una eliminación)
+Pantalla: ninguna del negocio; el admin de Hubs › Copias aparte › «Recuperar en el negocio…» (BASE-F114)
+Pasos:
+1. El negocio eliminó por error uno o varios productos (INVENTORY-F04) y pide recuperarlos.
+2. El personal de ERPlora hace una copia aparte del negocio de un momento anterior y recupera desde ella los
+   productos (BASE-F114, pasos 6 a 11).
+3. Cada producto que el negocio eliminó y aún guarda vuelve a **Productos**, al TPV y al catálogo de venta: EL MISMO
+   producto, con su SKU, su EAN-13, sus categorías que siguen vivas, su categoría fiscal y su stock, y en
+   **Movimientos** su historial entero (inicial, recepciones, ventas, recuentos y bajas) sigue siendo suyo.
+   Vuelve activo y a la venta, como al desarchivar en Odoo o Square: si estaba desactivado o marcado como agotado
+   antes de eliminarse, se vuelve a hacer a mano (INVENTORY-F03, INVENTORY-F29). Recuperaciones lo cuenta entre los
+   restaurados de Productos.
+Entra: el producto eliminado, por su identificador.
+Sale: el producto vivo otra vez, activo y a la venta, sin cambiar ninguno de sus demás datos, y el aviso de producto
+recuperado (`inventory.product.restored`), con el producto tal como vuelve.
+Si falla: no vuelve si el negocio ya hizo otro producto con su SKU o su EAN-13 desde que lo eliminó: se queda el que
+hizo, y la recuperación no lo cuenta ni lo crea. Un producto que el negocio ya no tiene en absoluto se crea de nuevo
+(INVENTORY-F01), sin stock. Sobre un producto vivo no falla: responde bien y vuelve a avisar. Su foto no vuelve: la
+propia se borró al eliminarlo (INVENTORY-F31) y la de la librería se le quitó (hub#1319). Lo que las demás apps le
+colgaban (sus precios en las tarifas, sus grupos de suplementos, sus opciones en los menús) se borró al eliminarlo y
+todavía no vuelve con él (hub#1343).
+Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F16, INVENTORY-F29, PRICING-F14,
+MODIFIER-F09, COMBO-F13
+
 ## Qué comparten los verticales
 
 El restaurante usa Inventario para la carta y la peluquería para los productos de venta, con las
@@ -1183,6 +1213,7 @@ puede ver, o lo que ya no existe, no sale.
 | Da de alta muchos productos de una vez y dice qué fila entró, cuál se omitió y cuál falló | importar productos | un clic | F09 | `inventory.product.bulk_create` |
 | Cambia un producto: datos, activo o inactivo, control de stock y categorías | cambiar productos | un clic | F02, F03, F05, F08, F20 | `inventory.product.update` |
 | Elimina un producto | eliminar productos | escribir para confirmar | F04 | `inventory.product.delete` |
+| Devuelve al catálogo un producto eliminado, tal como era (solo el sistema, al recuperar desde una copia aparte) | sistema | no es del asistente: solo lo hace la plataforma | F34 | `inventory.product.restore` |
 | Marca un producto como agotado o lo vuelve a poner a la venta | cambiar productos | un clic | F29 | `inventory.product.set_sold_out` |
 | Pone la foto de un producto, de la librería, o se la quita | cambiar productos | un clic | F30 | `inventory.product.set_image` |
 | Sube la foto propia de un producto (JPG, PNG o WebP de hasta 2 MB; se guarda en WebP de 512 × 512) | cambiar productos | no es del asistente: el archivo se elige en la ficha | F31 | `inventory.product.upload_image` |
@@ -1206,6 +1237,7 @@ puede ver, o lo que ya no existe, no sale.
 | Producto nuevo | Alta por pantalla, importación, plantilla, asistente o API | El producto y sus categorías | Flujos; paneles del Inicio | `inventory.product.created` |
 | Producto cambiado | Cambio, activar o desactivar, marcar agotado o volver a la venta | El producto como queda, también si está agotado | Flujos; paneles del Inicio; el TPV, Cocina y Menús | `inventory.product.updated` |
 | Producto eliminado | Eliminar | Cuál era (SKU y nombre) | Flujos; paneles del Inicio | `inventory.product.deleted` |
+| Producto recuperado | Recuperar un producto eliminado (también la repetición) | El producto como vuelve | Flujos; paneles del Inicio | `inventory.product.restored` |
 | Producto añadido a una categoría | Alta, cambio o enlace suelto | Producto y categoría | Flujos | `inventory.product.categorized` |
 | Producto quitado de una categoría | Cambio, enlace suelto o categoría eliminada | Producto y categoría | Flujos | `inventory.product.uncategorized` |
 | Stock cambiado | Cualquier movimiento: inicial, recepción, recuento, baja, venta, anulación | Producto, cantidad, saldo y tipo de movimiento | Panel y paneles del Inicio | `inventory.stock.changed` |
@@ -1259,7 +1291,8 @@ factura se lo da Ventas, no Facturación.
 | Gestionar ajustes | sí | sí | no | no | `inventory.manage_settings` |
 
 Son los permisos de fábrica de cada perfil; el administrador los puede cambiar en Roles. El
-administrador lo puede todo. La app los comprueba en todas las puertas (pantalla, asistente y
+administrador lo puede todo. Ningún perfil devuelve al catálogo un producto eliminado: lo hace el sistema cuando el
+personal de ERPlora recupera desde una copia aparte (INVENTORY-F34, `inventory.system`, que tampoco tiene ningún rol). La app los comprueba en todas las puertas (pantalla, asistente y
 API), no solo en la pantalla.
 
 ## Para quien lo mantiene
@@ -1270,11 +1303,14 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   descendente es la ascendente leída al revés, empates incluidos, y los CSV salen en el mismo orden. Lo fijan
   `test_ties_go_by_id_in_the_lists_own_direction` y `test_an_export_settles_its_ties_the_way_the_list_does`, por lista.
 
-- **Recuperar desde una copia aparte** (BASE-F114, hub#1282): `apps.py` responde a la plataforma
-  (`recoverable_from_copy`, `base.recovery.Recoverable`) con lo que devuelve una copia aparte del negocio: sus productos
-  vivos (`queries.products_in_copy`, por SQL sobre los nombres de los modelos: la copia no es un negocio y no tiene alias)
-  que el negocio no tiene (`queries.products_not_in_business`: ni vivo, ni otro vivo con su SKU o su EAN-13), cada uno
-  creado por `inventory.product.create` con la clave de su categoría fiscal y las categorías que el negocio sigue
+- **Recuperar desde una copia aparte** (BASE-F114, hub#1282, hub#1321): `apps.py` responde a la plataforma
+  (`recoverable_from_copy`, `base.recovery.Recoverable`) con lo que devuelve una copia aparte del negocio: de sus
+  productos vivos (`queries.products_in_copy`, por SQL sobre los nombres de los modelos: la copia no es un negocio y no
+  tiene alias), los que el negocio aún guarda eliminados vuelven primero, los mismos, por `inventory.product.restore`
+  (`queries.products_deleted_in_business`: nunca uno cuyo SKU o EAN-13 tiene ya otro vivo; INVENTORY-F34, permiso
+  `inventory.system`, sin ruta, avisa `inventory.product.restored`, que está en `events.PRODUCT_EVENTS`); y los que ya
+  no tiene en absoluto (`queries.products_not_in_business`: ni guardado, vivo o eliminado, ni otro vivo con su SKU o su
+  EAN-13) se crean, cada uno por `inventory.product.create` con la clave de su categoría fiscal y las categorías que el negocio sigue
   teniendo vivas, activo o no como estaba (`ProductIn.is_active`), sin stock (el saldo de la copia es de otro día) y sin
   imagen (hub#1319). Las categorías perdidas no vuelven (hub#1320). Lee desde `0001_initial`; una migración que quite o
   renombre una columna que lee cambia también `products_in_copy` y su `reads_since`. Tests: `tests/test_recovery.py`,

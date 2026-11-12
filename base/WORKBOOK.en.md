@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d62e9f81f7b75a27838374b898e403ed574191fba7429c0a68de71d7e1bcf222 -->
+<!-- generated from WORKBOOK.md sha256:02514d7594e27ddae0d93b29326bc4626efd7a6fd22f5076be5066495f5ba3b5 -->
 
 ## What it is for and who it is for
 
@@ -2986,13 +2986,14 @@ Steps:
       does not come back. A deleted card that comes back does not get back the group, tag or field the business deleted
       afterwards (hub#1356). A card whose personal data was erased (GDPR) or one merged into another never
       comes back, and one the business has already made again (the same name, phone and email) is not repeated. With
-      Products, "Products: 3 created": each product comes back as a new one, created as the Products screen creates it,
+      Products, a product the business deleted and still holds comes back THE SAME and counts as restored, with its
+      stock, its categories that are still live and its whole history in Movements, active and on sale
+      (INVENTORY-F34). One the business no longer has comes back as a new one, created as the Products screen creates it,
       with its name, SKU, EAN-13, description, type, price, cost, units, threshold, stock control and tax category, active
       or inactive as it was and in the categories the business still has; with no stock, which is counted
       (INVENTORY-F14), because the copy's is another day's; without its image (hub#1319) and without the categories the
-      business no longer has (hub#1320). One that was deleted in the business also comes back as a new product; its
-      movements stay with the deleted one (hub#1321). One the business has already created again (another live one with
-      its SKU or its EAN-13) is not repeated. With Services, "Services: 2 created": each service the business no longer
+      business no longer has (hub#1320). One the business has already created again (another live one with its SKU or its
+      EAN-13) neither comes back nor is repeated. With Services, "Services: 2 created": each service the business no longer
       has comes back as a new one, on offer, created as the Services screen creates it, with its name, pricing, prices,
       cost, duration, buffers, capacity, descriptions, booking settings, order, featured flag, SKU, barcode and notes, its
       tax category and its category if the business still has it (if it was deleted, "No category", hub#1323); without
@@ -3018,9 +3019,11 @@ the business, each deleted card it still held, live again with its card-recovere
 a new card for each customer it no longer had, with its card-created notice (`customer.customer.created`) and those of
 its groups and tags set (`customer.customer.groups_changed`, `customer.customer.tags_changed`), each group, tag or own
 field it lacked made again, with its notice (`customer.group.created`, `customer.tag.created`,
-`customer.field.created`), and a new product for each product it lacked, with its product-created notice (`inventory.product.created`), a new service for
-each one it no longer had, with its service-created notice (`service.service.created`), and a new appointment for each
-one it lacked, with its appointment-created notice (`appointment.appointment.created`), and nothing else; the copy,
+`customer.field.created`), each deleted
+product it still held, live again with its product-recovered notice (`inventory.product.restored`), a new product for
+each product it no longer had, with its product-created notice (`inventory.product.created`), a new service for each one
+it no longer had, with its service-created notice (`service.service.created`), and a new appointment for each one it
+lacked, with its appointment-created notice (`appointment.appointment.created`), and nothing else; the copy,
 untouched; the notice `control.copy.recovery_requested` with who asked for it.
 If it fails: what the restore does not accept is said in the notice, business by business, and that business is not
 touched: one that is not ready or has no database of its own, a demo, one being moved or restored, a cluster open to new

@@ -33,6 +33,7 @@ def test_the_events_of_the_workbook_and_the_ones_that_refresh_the_screens():
         "PRODUCT_CREATED": "inventory.product.created",
         "PRODUCT_UPDATED": "inventory.product.updated",
         "PRODUCT_DELETED": "inventory.product.deleted",
+        "PRODUCT_RESTORED": "inventory.product.restored",
         "PRODUCT_CATEGORIZED": "inventory.product.categorized",
         "PRODUCT_UNCATEGORIZED": "inventory.product.uncategorized",
         "CATEGORY_CREATED": "inventory.category.created",
