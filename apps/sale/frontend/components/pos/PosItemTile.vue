@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
-import { computed, onMounted, onUpdated, useTemplateRef } from 'vue';
+import { computed, useTemplateRef } from 'vue';
 
 import ItemImage from '../../../../../base/frontend/components/ItemImage.vue';
-import { syncAriaDisabled } from '../../lib/ariaDisabled';
+import { useNativeAriaDisabled } from '../../lib/ariaDisabled';
 
 const props = withDefaults(
   defineProps<{
@@ -37,9 +37,7 @@ const fromCatalog = computed(() => props.imageReference?.startsWith('catalog:') 
 // A tile that sells out or goes back on sale with the till open tells its native button too (Ionic only reads the
 // host's aria-disabled when it loads).
 const tile = useTemplateRef<{ $el: HTMLElement }>('tile');
-const syncDisabled = () => syncAriaDisabled(tile.value?.$el);
-onMounted(syncDisabled);
-onUpdated(syncDisabled);
+useNativeAriaDisabled(() => tile.value?.$el);
 </script>
 
 <template>
