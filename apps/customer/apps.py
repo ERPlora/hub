@@ -103,9 +103,11 @@ class CustomerConfig(LiveAppConfig):
         """hub#1257: the platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when
         the staff recovers from it (BASE-F114): of the copy's live cards (``queries.cards_in_copy``), each the business
         still holds deleted comes back the same, with all that hangs from it (``queries.cards_deleted_in_business``,
-        ``customer.customer.restore``, CUSTOMER-F33), and each it no longer has is created by
-        ``customer.customer.create``, the till's and the card's own (``queries.cards_not_in_business``). Never one
-        merged into another or whose personal data was erased."""
+        ``customer.customer.restore``, CUSTOMER-F33), and each it no longer has is made again by
+        ``customer.customer.recover`` (``queries.cards_not_in_business``): as ``customer.customer.create``, the till's
+        and the card's own, makes it, with its groups, tags and custom field values there
+        (``queries.recoverable_cards_in_copy``, hub#1285), each by the screen's own operation. Never one merged into
+        another or whose personal data was erased."""
         from apps.customer import queries  # the models are not loaded yet when this module is
         from base.recovery import Recoverable
 
@@ -113,9 +115,9 @@ class CustomerConfig(LiveAppConfig):
             Recoverable(
                 label=self.verbose_name,
                 reads_since="0001_initial",
-                read=queries.cards_in_copy,
+                read=queries.recoverable_cards_in_copy,
                 missing=queries.cards_not_in_business,
-                create="customer.customer.create",
+                create="customer.customer.recover",
                 deleted=queries.cards_deleted_in_business,
                 restore="customer.customer.restore",
             )
