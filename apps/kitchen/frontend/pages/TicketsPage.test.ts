@@ -99,7 +99,7 @@ describe('TicketsPage', () => {
     expect(s.params(OP)).toEqual([{ search: 'table', sort: '-received_at', status: 'ready', priority: 'rush', limit: 50, offset: 0 }]);
   });
 
-  it('25 a page asks the server for 25 (kitchen#135)', async () => {
+  it('25 a page asks the server for 25', async () => {
     const s = await setup();
     await s.show([PENDING]);
     s.table().vm.$emit('pageSizeChange', 25);
@@ -108,7 +108,7 @@ describe('TicketsPage', () => {
     expect(s.params(OP)).toEqual([{ sort: '-received_at', limit: 25, offset: 0 }]);
   });
 
-  it('type, priority and status filter by a list of their words, never by typing (kitchen#39)', async () => {
+  it('type, priority and status filter by a list of their words, never by typing', async () => {
     const s = await setup();
     await s.show([PENDING]);
     const filters = s
@@ -122,7 +122,7 @@ describe('TicketsPage', () => {
     ]);
   });
 
-  it('a ticket made on page 2 is seen: the list goes back to the first page (kitchen#133)', async () => {
+  it('a ticket made on page 2 is seen: the list goes back to the first page', async () => {
     const s = await setup();
     await s.show([PENDING]);
     s.table().vm.$emit('pageChange', 1);
@@ -207,7 +207,7 @@ describe('TicketsPage', () => {
   });
 });
 
-describe('TicketsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('TicketsPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

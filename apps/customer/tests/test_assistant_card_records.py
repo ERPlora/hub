@@ -1,7 +1,7 @@
-"""FIX-HUB-CUSTOMER-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (hub#513): the card of a write of Customers says which
-customer, group, tag, custom field or open order it acts on by its name, read as whoever asks, never by its id, and
-leaves it out when that person may not read it or it is not there. The open order is Sales's: Customers needs no other
-app, so it names it by Sales's own read, and without Sales the card leaves it out.
+"""hub#513: the card of a write of Customers says which customer, group, tag, custom field or open order it acts on by
+its name, read as whoever asks, never by its id, and leaves it out when that person may not read it or it is not there.
+The open order is Sales's: Customers needs no other app, so it names it by Sales's own read, and without Sales the card
+leaves it out.
 """
 
 import dataclasses

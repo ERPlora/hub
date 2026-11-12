@@ -1,13 +1,13 @@
-"""The assistant's confirmation card names each datum of a write of Cart & checkout by a name of the app's own
-(FIX-HUB-CART_CHECKOUT-ASSISTANT-CARD-FIELDS-IN-ENGLISH; base's half is hub#258): in Spanish, never by the title
-pydantic makes up from the field («Item Id», «Order Id»), nor by a word another app's catalog happens to lend
-(«Customer» → «Cliente», from Tables'). The card is base's (``base.assistant.card``); the names are cart_checkout's:
-the titles of its schemas and the ``verbose_name`` of its models, with their Spanish in its catalog.
+"""The assistant's confirmation card names each datum of a write of Cart & checkout by a name of the app's own (base's
+half is hub#258): in Spanish, never by the title pydantic makes up from the field («Item Id», «Order Id»), nor by a word
+another app's catalog happens to lend («Customer» → «Cliente», from Tables'). The card is base's
+(``base.assistant.card``); the names are cart_checkout's: the titles of its schemas and the ``verbose_name`` of its
+models, with their Spanish in its catalog.
 
-The record a write names by its id (FIX-HUB-CART_CHECKOUT-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS; base's half is
-hub#416): the cart by its session code, as the Carts list and «Delete the cart …?» name it; the line by its product; the
-order by its number, as the Orders list. Read as whoever asks, in the hub they ask in — never by the id, and left out when
-nobody, or somebody who may not see carts, is behind the request."""
+The record a write names by its id (base's half is hub#416): the cart by its session code, as the Carts list and «Delete
+the cart …?» name it; the line by its product; the order by its number, as the Orders list. Read as whoever asks, in the
+hub they ask in — never by the id, and left out when nobody, or somebody who may not see carts, is behind the
+request."""
 
 import gettext
 import json

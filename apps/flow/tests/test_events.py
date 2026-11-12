@@ -1,7 +1,5 @@
-"""The flow app's events (``flow.<entity>.<fact>``) and its reaction to every other app's events.
-
-There is no outbox relay yet (phase 2 runs it in the worker); the reaction is tested by handing ``react``
-(or ``deliver``) a real event of the outbox, made by another app's real operation, as the relay will.
+"""The reaction is tested by handing ``react`` (or ``deliver``) a real event of the outbox, made by another app's real
+operation, as the worker's outbox relay does.
 """
 
 import re
