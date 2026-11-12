@@ -13,8 +13,8 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
-import { createProduct, dialog, post, ready, row, rowAction, search, stamp } from './pricing-helpers';
-import { settled } from './service-helpers';
+import { createProduct, dialog, post, ready, row, search, stamp } from './pricing-helpers';
+import { rowAction, settled } from './service-helpers';
 
 const KEY = 'FIX-HUB-PRICING-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';
 const RULE_KEY = 'FIX-HUB-PRICING-MONEY-FIELD-OPENED-BEFORE-THE-BUSINESS-ANSWERS';

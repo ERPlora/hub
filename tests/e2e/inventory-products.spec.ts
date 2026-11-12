@@ -26,13 +26,13 @@ import {
   productBySku,
   productRow,
   productsReady,
-  rowAction,
   searchProducts,
   settledChipFit,
   shoot,
   shootFlow,
   stamp,
 } from './inventory-helpers';
+import { rowAction } from './service-helpers';
 
 test.afterAll(() => {
   cleanInventory();
@@ -519,7 +519,7 @@ test('selectores de Inventario (Combo compartido): a product whose category and 
   await page.goto(`${A}/inventory/products`);
   await productsReady(page);
   await searchProducts(page, sku);
-  await rowAction(page, product.id, 'edit');
+  await rowAction(page, 'inventory-products', product.id, 'edit');
   const form = dialog(page, 'inventory-product-form');
   await expect(form.locator('[data-testid=inventory-product-tax] input')).toHaveValue(`ZZ E2E far tax ${tag}`);
   await expect(form.locator('[data-testid^="inventory-product-categories-chip-"]')).toHaveText([`E2E Zz far ${tag}`]);

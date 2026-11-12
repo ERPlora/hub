@@ -1,6 +1,6 @@
 // Shared steps of the service e2e (service-*.spec.ts): an owner's page in English, the apps' APIs for
 // setup and server-side evidence (never the check itself), a Combo pick, a row action (a button, or
-// inside «⋮» when the row folds them), a column filter through the table's «Filters» panel and the
+// inside «⋮» when the row folds them: the one every spec of the e2e takes, hub#1302), a column filter through the table's «Filters» panel and the
 // cleanup every spec runs before and after it: what a run creates is named «E2E Svc …» and deleted from
 // the hub's database (phase 1: hubs `a` and `b` share it), the appointments of its customers included.
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
@@ -65,7 +65,9 @@ export async function pick(page: Page, testid: string, query: string, text: stri
  * measuring its box, a frame or more after a resize or new rows (`DataTable`, W-19), so what the row showed a moment ago
  * is not what the click finds: the click goes to whichever of the two the row shows when it lands, and the entry is
  * looked for in «⋮» only when that is where it landed. Deciding first and clicking after waited for an «Edit» the table
- * had folded meanwhile until the test's time ran out (hub#1279; service-helpers.spec.ts).
+ * had folded meanwhile until the test's time ran out (hub#1279; service-helpers.spec.ts). It is the one every spec of the
+ * e2e takes, with its table's hook prefix (`inventory-products`, `tax-rules`, `members`…): nineteen copies of the old
+ * one hung the same way, and row-action.test.ts keeps a second one from coming back (hub#1302).
  */
 export async function rowAction(page: Page, table: string, id: string, action: string): Promise<void> {
   const hook = `${table}-row-${id}-${action}`;

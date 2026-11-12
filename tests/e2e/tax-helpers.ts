@@ -1,7 +1,7 @@
 // What the tax e2e specs share (apps/tax/WORKBOOK.md): the three sizes a flow is seen at, the
 // screenshot of each, the cleanup of what a run made (categories are never deleted by the app), the
-// API setup of a fresh category and its rules, and the pickers of the tax screens (a Combo, an
-// `ion-select` popover, a row action inline or behind the row's «⋮»).
+// API setup of a fresh category and its rules, and the pickers of the tax screens (a Combo and an
+// `ion-select` popover). A row action is service-helpers.ts's `rowAction`, on the table `tax-<section>`.
 import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
 import { countryRulesCleanup } from './country-rules';
@@ -112,16 +112,4 @@ export async function pickSelect(page: Page, select: Locator, text: string | Reg
   await popover.waitFor({ state: 'visible' });
   await popover.locator('ion-radio, ion-item').filter({ hasText: text }).first().click();
   await expect(popover).toBeHidden();
-}
-
-/** Runs a row action of a tax list: its inline button, or the row's «⋮» menu when it folded there. */
-export async function rowAction(page: Page, section: Section, id: string, action: string): Promise<void> {
-  const hook = `tax-${section}-row-${id}-${action}`;
-  const inline = shown(page).locator(`[data-testid=${hook}]`);
-  if ((await inline.count()) > 0 && (await inline.first().isVisible())) {
-    await inline.first().click();
-    return;
-  }
-  await shown(page).locator(`[data-testid=tax-${section}-row-${id}-menu]`).first().click();
-  await page.locator(`ion-popover [data-testid=${hook}]`).click();
 }

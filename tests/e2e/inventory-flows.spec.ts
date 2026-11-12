@@ -29,12 +29,12 @@ import {
   productBySku,
   productRow,
   productsReady,
-  rowAction,
   searchProducts,
   shootFlow,
   stamp,
 } from './inventory-helpers';
 import { chargeByApi, cleanSales } from './sale-helpers';
+import { rowAction } from './service-helpers';
 
 const printers: string[] = [];
 
@@ -81,7 +81,7 @@ test('INVENTORY-F02: «Edit» opens the product with its SKU locked and the row 
   await expect(productRow(page, sku).getByRole('button', { name: /^(Receive stock|Recibir stock)$/ })).toBeVisible();
   await expect(productRow(page, sku).getByRole('button', { name: /^(Count stock|Contar stock)$/ })).toBeVisible();
 
-  await rowAction(page, tea.id, 'edit');
+  await rowAction(page, 'inventory-products', tea.id, 'edit');
   const form = dialog(page, 'inventory-product-form');
   await expect(form).toContainText(/(Editing product|Editando producto) — E2E Green tea/);
   await expect(form.locator('[data-testid=inventory-product-sku] input')).toBeDisabled();
@@ -107,7 +107,7 @@ test('INVENTORY-F03 / INVENTORY-F20: the switch deactivates; an article set to �
   await expect.poll(async () => (await productBySku(context, sku)).is_active).toBe(false);
   await shootFlow(page, 'INVENTORY-F03');
 
-  await rowAction(page, salt.id, 'edit');
+  await rowAction(page, 'inventory-products', salt.id, 'edit');
   const form = dialog(page, 'inventory-product-form');
   const track = form.locator('[data-testid=inventory-product-track-stock]');
   await expect(form.locator('[data-testid=inventory-product-track-note]')).toHaveText(/(Following the hub setting|Sigue el ajuste del hub)/);
@@ -128,7 +128,7 @@ test('INVENTORY-F04: «Delete» says what goes and what stays; the product leave
   await searchProducts(page, sku);
   await expect(productRow(page, sku)).toBeVisible();
 
-  await rowAction(page, gone.id, 'delete');
+  await rowAction(page, 'inventory-products', gone.id, 'delete');
   const confirm = page.locator('ion-modal.ep-form-modal').filter({ hasText: /Delete product|Eliminar producto/ });
   await expect(confirm).toContainText(`E2E Old soap (${sku})`);
   await shootFlow(page, 'INVENTORY-F04');
@@ -152,7 +152,7 @@ test('INVENTORY-F08: a category picked in the form groups the product, and the c
   await productsReady(page);
   await searchProducts(page, sku);
 
-  await rowAction(page, mint.id, 'edit');
+  await rowAction(page, 'inventory-products', mint.id, 'edit');
   const form = dialog(page, 'inventory-product-form');
   await pickCombo(page, form.locator('[data-testid=inventory-product-categories]'), category, category);
   await expect(form.locator('[data-testid^=inventory-product-categories-chip-]')).toHaveText([category]);
@@ -280,7 +280,7 @@ test('INVENTORY-F25: the sheet shows the barcode and each press queues one label
     const wax = await createProduct(context, { name: 'E2E Hair wax', sku, price: 1210 });
     await productsReady(page);
     await searchProducts(page, sku);
-    await rowAction(page, wax.id, 'detail');
+    await rowAction(page, 'inventory-products', wax.id, 'detail');
     const sheet = dialog(page, 'inventory-product-detail');
     await expect(sheet.locator('[data-testid=inventory-barcode] svg')).toHaveAttribute('aria-label', new RegExp(sku));
     await expect(sheet.locator('[data-testid=inventory-barcode-text]')).toHaveText(sku);

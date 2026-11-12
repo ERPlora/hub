@@ -14,9 +14,10 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, login, psql, shot, shown } from './helpers';
-import { createProduct, dialog, fill, pick, productsReady, rowAction as productAction, searchProducts } from './inventory-helpers';
+import { createProduct, dialog, fill, pick, productsReady, searchProducts } from './inventory-helpers';
 import { claim, fail, FLOW_VIEWPORTS, flowShots, forgetDevices } from './printing-helpers';
 import { shots, stamp } from './sale-helpers';
+import { rowAction } from './service-helpers';
 
 const RUN = stamp();
 const KITCHEN = `e2e Kitchen ${RUN}`;
@@ -150,17 +151,6 @@ async function jobByRef(context: BrowserContext): Promise<Job> {
   return listed.data.rows[0];
 }
 
-async function rowAction(page: Page, id: string, action: string): Promise<void> {
-  const hook = `printing-jobs-row-${id}-${action}`;
-  const inline = shown(page).locator(`[data-testid=${hook}]`);
-  if ((await inline.count()) > 0 && (await inline.first().isVisible())) {
-    await inline.first().click();
-    return;
-  }
-  await shown(page).locator(`[data-testid=printing-jobs-row-${id}-menu]`).first().click();
-  await page.locator(`ion-popover [data-testid=${hook}]`).click();
-}
-
 test('PRINTING-F18, F14: a job that fails five times is sent back, then cancelled with its reason', async ({ page, context }) => {
   await login(page, A, '/printing/jobs');
   const kitchen = await kitchenPrinter(context);
@@ -190,11 +180,11 @@ test('PRINTING-F18, F14: a job that fails five times is sent back, then cancelle
     await expect(shown(p).locator('[data-testid=printing-jobs-row]').filter({ hasText: REF })).toBeVisible();
   });
 
-  await rowAction(page, queued.data.job.id, 'retry');
+  await rowAction(page, 'printing-jobs', queued.data.job.id, 'retry');
   await expect.poll(async () => (await jobByRef(context)).status).toBe('pending');
   await expect(row).toContainText(/Pending|Pendiente/);
 
-  await rowAction(page, queued.data.job.id, 'cancel');
+  await rowAction(page, 'printing-jobs', queued.data.job.id, 'cancel');
   const modal = dialog(page, 'printing-cancel-job');
   await expect(modal).toBeVisible();
   await fill(modal, 'printing-cancel-job-reason', 'e2e reason');
@@ -259,7 +249,7 @@ test('PRINTING-F12: the label asked from the product sheet waits in the «Label�
     // Inventory: «Print barcode» on the product sheet asks Printing for the label; no printer has the «Label» function.
     await productsReady(page);
     await searchProducts(page, LABEL_SKU);
-    await productAction(page, product.id, 'detail');
+    await rowAction(page, 'inventory-products', product.id, 'detail');
     const sheet = dialog(page, 'inventory-product-detail');
     await sheet.locator('[data-testid=inventory-product-detail-print-label]').click();
     await expect(sheet.locator('[data-testid=inventory-product-detail-label]')).toContainText(/(waiting in the print queue|espera en la cola)/);

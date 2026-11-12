@@ -8,6 +8,7 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, hubUserIdOf, login, psql, shot, shown } from './helpers';
+import { rowAction } from './service-helpers';
 
 const TAG = 'E2E';
 const VIEWPORTS = [
@@ -70,18 +71,6 @@ async function threeShots(page: Page, key: string, target: () => Locator, alsoAs
 
 /** A row (or, on a phone, a card) of a staff list by its id. */
 const rowOf = (page: Page, table: string, id: string): Locator => shown(page).locator(`[data-testid=${table}-row][data-id="${id}"]`);
-
-/** Clicks a row action, from its button or, when the box folded it, from the row's «⋮» menu. */
-async function rowAction(page: Page, table: string, id: string, action: string): Promise<void> {
-  await expect(rowOf(page, table, id)).toBeVisible();
-  const button = shown(page).locator(`[data-testid=${table}-row-${id}-${action}]`);
-  if (await button.isVisible()) {
-    await button.click();
-    return;
-  }
-  await shown(page).locator(`[data-testid=${table}-row-${id}-menu]`).click();
-  await page.locator(`ion-popover [data-testid=${table}-row-${id}-${action}]`).click();
-}
 
 async function search(page: Page, table: string, text: string): Promise<void> {
   await shown(page).locator(`[data-testid=${table}-search] input`).fill(text);

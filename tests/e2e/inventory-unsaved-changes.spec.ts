@@ -16,11 +16,11 @@ import {
   presentedDialog,
   productBySku,
   productsReady,
-  rowAction,
   searchProducts,
   stamp,
   VIEWPORTS,
 } from './inventory-helpers';
+import { rowAction } from './service-helpers';
 import { insideTheApp, leftTheApp, pressBack } from './system-back-helpers';
 import { noQuestion, question, QUESTION } from './unsaved-back-helpers';
 
@@ -133,13 +133,13 @@ test('INVENTORY-F02 390: Back on «Editing product» closes it as opened; with a
   const tea = await createProduct(context, { name: 'E2E Back tea', sku, price: 250 });
   await searchProducts(page, sku);
 
-  const form = await presented(page, () => rowAction(page, tea.id, 'edit'));
+  const form = await presented(page, () => rowAction(page, 'inventory-products', tea.id, 'edit'));
   await expect(form).toContainText(/(Editing product|Editando producto) — E2E Back tea/);
   await pressBack(page);
   await expect(form).toBeHidden();
   await noQuestion(page);
 
-  await presented(page, () => rowAction(page, tea.id, 'edit'));
+  await presented(page, () => rowAction(page, 'inventory-products', tea.id, 'edit'));
   await fill(form, 'inventory-product-name', 'E2E Back green tea');
   await pressBack(page);
   const asked = question(page);
@@ -207,14 +207,14 @@ test('INVENTORY-F02 390: «Cancel editing» on «Editing product» closes it as 
   await searchProducts(page, sku);
   const cancelEdit = (form: Locator) => form.locator('[data-testid=inventory-product-form-cancel]');
 
-  const form = await presented(page, () => rowAction(page, tea.id, 'edit'));
+  const form = await presented(page, () => rowAction(page, 'inventory-products', tea.id, 'edit'));
   await expect(form).toContainText(/(Editing product|Editando producto) — E2E Cancel tea/);
   await expect(cancelEdit(form)).toHaveText(/^\s*(Cancel editing|Cancelar edición)\s*$/);
   await cancelEdit(form).click();
   await expect(form).toBeHidden();
   await noQuestion(page);
 
-  await presented(page, () => rowAction(page, tea.id, 'edit'));
+  await presented(page, () => rowAction(page, 'inventory-products', tea.id, 'edit'));
   await fill(form, 'inventory-product-name', 'E2E Cancel green tea');
   await cancelEdit(form).click();
   const asked = question(page);

@@ -17,7 +17,7 @@ const WITHOUT_A_HUB: Record<string, { calls: number; on: string }> = {
   'assistant-probes.ts': { calls: 1, on: "the SaaS's accounts" },
   'base-recover-from-copy.spec.ts': {
     calls: 1,
-    on: "control's registry: the separate copy, the staff member's session and the worker's recovery pass (its cards, with --hub a)",
+    on: "control's registry: the separate copy, the staff member's session and the worker's recovery pass (its cards, products and services, with --hub a)",
   },
   'base-recoveries-long-result.spec.ts': {
     calls: 1,

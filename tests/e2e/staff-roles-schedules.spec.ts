@@ -5,9 +5,10 @@
 // STAFF-F22) and «Create schedule» lists it as the default one with its
 // hours; a day ending before it starts is refused under that day (422); editing drops Friday; «Delete»
 // asks first and empties the list. Everything this spec creates is named «E2E …» and removed after it.
-import { type Browser, expect, type Page, test } from '@playwright/test';
+import { type Browser, expect, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
+import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 const TAG = 'E2E';
@@ -33,16 +34,6 @@ async function ownerPage(browser: Browser, next: string) {
   const page = await context.newPage();
   await login(page, A, next);
   return { context, page };
-}
-
-async function rowAction(page: Page, table: string, id: string, action: string): Promise<void> {
-  const button = shown(page).locator(`[data-testid=${table}-row-${id}-${action}]`);
-  if (await button.isVisible()) {
-    await button.click();
-    return;
-  }
-  await shown(page).locator(`[data-testid=${table}-row-${id}-menu]`).click();
-  await page.locator(`ion-popover [data-testid=${table}-row-${id}-${action}]`).click();
 }
 
 test('Roles: create, a duplicate refused in the form, retire from Edit (still listed, marked)', async ({ browser }) => {

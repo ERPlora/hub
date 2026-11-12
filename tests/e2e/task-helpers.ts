@@ -1,7 +1,7 @@
 // Shared steps of the task e2e (task-*.spec.ts): a signed-in page in English, the apps' APIs for setup
-// and server-side evidence (never the check itself), a Combo pick, a row action (a button, or inside «⋮»
-// when the row folds them) and the cleanup every spec runs before and after it: what a run creates is
-// named «E2E Task …» (projects `e2e-…`) and deleted from the hub's database (phase 1: `a` and `b` share it).
+// and server-side evidence (never the check itself), a Combo pick and the cleanup every spec runs before and
+// after it: what a run creates is named «E2E Task …» (projects `e2e-…`) and deleted from the hub's database
+// (phase 1: `a` and `b` share it). A row action is service-helpers.ts's `rowAction`.
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
 import { A, api, capture, type Credentials, horizontalOverflow, hubUserIdOf, login, psql, shown, untilStill } from './helpers';
@@ -84,19 +84,6 @@ export async function pick(page: Page, testid: string, query: string, text: stri
   await page.locator(`[data-testid^=${testid}-option-]`, { hasText: text }).first().click();
   // Choosing closes the list: nothing of it is left over the next field.
   await expect(page.locator(`[data-testid^=${testid}-option-]`)).toHaveCount(0);
-}
-
-/** Runs a row action: its button, or the same entry inside «⋮» when the row folds its actions. */
-export async function rowAction(page: Page, table: string, id: string, action: string): Promise<void> {
-  const button = shown(page).locator(`[data-testid=${table}-row-${id}-${action}]`);
-  const menu = shown(page).locator(`[data-testid=${table}-row-${id}-menu]`);
-  await button.or(menu).first().waitFor({ state: 'visible' });
-  if (await button.isVisible()) {
-    await button.click();
-    return;
-  }
-  await menu.click();
-  await page.locator(`ion-popover [data-testid=${table}-row-${id}-${action}]`).click();
 }
 
 /** The row of a table that holds `text`. */

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a70f08d37e302d7f05db040ac02b4c79aa73dbb971945fc733e09f6bd330af48 -->
+<!-- generated from WORKBOOK.md sha256:8c41837e51b17ff3063a21a1918bc111f4135b988f2c0b0679767b0202c8006f -->
 
 ## What it is for and who it is for
 
@@ -247,7 +247,8 @@ business in Poland), one that reads two ways or a negative one; a deleted
 category ("That category is not available: it does not exist in this business or it has been
 deleted."); a tax category that does not exist or is deactivated ("That tax category does not exist in
 Taxes or is deactivated."); with no tax category at all, the notice of Taxes. What was typed is kept.
-Involved: TAX-F01, BASE-F01
+Involved: TAX-F01, BASE-F01, BASE-F114 (the ERPlora staff get back from a separate copy the services that were lost,
+each by this same creation)
 
 ### SERVICE-F02 Edit a service
 Status: done

@@ -24,12 +24,12 @@ import {
   productBySku,
   productRow,
   productsReady,
-  rowAction,
   searchProducts,
   stamp,
   VIEWPORTS,
 } from './inventory-helpers';
 import { drawerOff, restoreDrawer } from './sale-helpers';
+import { rowAction } from './service-helpers';
 
 const RUN = stamp();
 let coffee: Product;
@@ -68,7 +68,7 @@ async function editForm(page: Page, product: Product): Promise<Locator> {
   await productsReady(page);
   await searchProducts(page, product.sku);
   await expect(productRow(page, product.sku)).toBeVisible();
-  await rowAction(page, product.id, 'edit');
+  await rowAction(page, 'inventory-products', product.id, 'edit');
   const form = dialog(page, 'inventory-product-form');
   await expect(form).toBeVisible();
   return form;
