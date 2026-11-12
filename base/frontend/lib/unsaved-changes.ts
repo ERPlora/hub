@@ -7,8 +7,9 @@
 // question for the window's own ways out (hub#1023): the `canDismiss` of its FormModal, which asks it on Cancel, the
 // close button, Escape and the backdrop while `dirty`, and lets it close at once when nothing is typed. `useUnsavedForm`
 // and `useUnsavedFormOnOpen` give back the same question (hub#1156, BASE-F05), for every form window to hand its FormModal.
+// A window that is an `ion-modal` of its own (a sheet with its own close button) hands it to `useSheetWaysOut` (hub#1233).
 import { useConfirm } from '@erplora/ui/components';
-import { computed, getCurrentInstance, type MaybeRefOrGetter, onScopeDispose, ref, toValue, watch } from 'vue';
+import { computed, getCurrentInstance, type MaybeRefOrGetter, onScopeDispose, type Ref, ref, toValue, watch } from 'vue';
 
 import { useBaseI18n } from './i18n';
 import { holdUnsavedChanges } from './system-back';
@@ -76,4 +77,27 @@ export function useUnsavedFormOnOpen(
   );
   const dirty = computed(() => toValue(open) && original.value !== undefined && JSON.stringify(toValue(current)) !== original.value);
   return useUnsavedChanges(inside, dirty);
+}
+
+/** The ways out of a window that is an `ion-modal` of its own, not a FormModal (a sheet with its own close button,
+ *  hub#1233), asking the question its guard gives back (`useUnsavedForm`, `useUnsavedFormOnOpen`) as FormModal asks it:
+ *  `close`, for its close button, closes it only when it may; `canDismiss`, for its `ion-modal`, is asked on Ionic's own
+ *  dismissals (Escape, a tap outside), never on closing from the page (`open = false`, no role: a pick, a delete).
+ *  Ionic itself never asks who already asked, the system Back (role `handler`). One question at a time: a second way
+ *  out while it is up waits for the same answer. */
+export function useSheetWaysOut(
+  mayClose: () => Promise<boolean>,
+  open: Ref<boolean>,
+): { canDismiss: (data?: unknown, role?: string) => Promise<boolean>; close: () => Promise<void> } {
+  let asking: Promise<boolean> | null = null;
+  const ask = (): Promise<boolean> =>
+    (asking ??= mayClose().finally(() => {
+      asking = null;
+    }));
+  return {
+    canDismiss: (_data, role) => (role === undefined ? Promise.resolve(true) : ask()),
+    close: async () => {
+      if (await ask()) open.value = false;
+    },
+  };
 }

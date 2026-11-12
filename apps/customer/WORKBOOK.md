@@ -243,13 +243,19 @@ Pasos:
    el `00` ni el cero nacional, así que la ficha se encuentra se escriba como se escriba.
 2. Con los filtros: etapa, origen, activo y gastado por rango («Desde / Hasta», en la moneda del negocio,
    la de su país en Ajustes → Negocio, con sus decimales: el yen no tiene; con o sin su símbolo, «12,50 zł»).
+   El importe se escribe como en cualquier campo de importe del Hub y como en las demás listas (hub#1196): con
+   o sin puntos de miles («1.000,50», «1,000.50», «2 500»); «1.000» en euros puede ser mil euros o un euro, y
+   pide escribir los decimales.
 3. Ordena por nombre, email, teléfono, etapa, gastado, última compra o fecha de alta. De entrada, por
    nombre de la A a la Z, 50 por página (como mucho 100).
 4. Toca una fila para abrir su ficha (CUSTOMER-F03).
 Entra: el texto, los filtros y el orden.
 Sale: nada; solo lectura. Las fichas eliminadas, unidas a otra o con los datos borrados no salen;
 las marcadas como no activas, sí.
-Si falla: la tabla enseña el error con «Reintentar». Sin resultados: «Sin clientes.».
+Si falla: la tabla enseña el error con «Reintentar». Sin resultados: «Sin clientes.». Un gastado que no se
+puede leer no filtra y lo dice bajo su caja, con las palabras del campo de importe: «Esto no es un importe.
+Escribe una cifra, por ejemplo 12,50.», «Este importe no puede ser negativo.» o, con «1.000», «Este importe
+se puede leer de dos maneras…».
 Implicados: ninguno
 
 ### CUSTOMER-F03 Abrir la ficha de un cliente

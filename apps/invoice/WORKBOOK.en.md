@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8166a8cf8fd2536cbb6cc96f0649471db9615abaac74e7d8b4e07f9ac0753094 -->
+<!-- generated from WORKBOOK.md sha256:f62f4229a9d70bf19df10a45d1474a30470e6f98e9347594dcc682eca3b2ffe6 -->
 
 ## What it is for and who it is for
 
@@ -608,9 +608,12 @@ Steps:
 4. Tap "View", or the row, to open it (INVOICE-F17).
 In: the hub's invoices.
 Out: nothing; it only reads.
-If it fails: without results, "No results"; with an error, the message and "Retry". A total that is not an
-amount says "Type an amount, like 12.50" under its field, and an end date before the start date, "The end
-date cannot be before the start date."; neither of the two filters.
+If it fails: without results, "No results"; with an error, the message and "Retry". The total is read as in
+any amount field of the Hub and as in the other lists (hub#1196: "1.000,50", "1,000.50", "2 500" and
+"12,50 €" filter); one it cannot read says so under its field in the words of the amount field ("This is not
+an amount. Type a figure, for example 12.50.", "This amount cannot be negative." or, with "1.000" in euros,
+"This amount can be read in two ways…"), and an end date before the start date, "The end date cannot be
+before the start date."; neither of the two filters.
 Involved: none
 
 ### INVOICE-F17 View an invoice

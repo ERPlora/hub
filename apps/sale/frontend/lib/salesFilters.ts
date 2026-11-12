@@ -1,27 +1,24 @@
 // The filters of the Sales list (SALE-F28: status, payment, date, total), as the table's funnel holds them
 // (by the list's parameter names, as typed; a filter not in use is absent) and as `sale.sale.list` takes
-// them (the total in cents, sales#428). An amount that is not one, or a «to» day before its «from», never
-// reaches the server: the table says it under the field. A date range, when there is one, replaces the
+// them (the total in cents, sales#428, read as every amount filter of the Hub: `filterCents`, hub#1196). An amount
+// that is not one, or a «to» day before its «from», never reaches the server: the table says it under the field (the
+// page, with `amountFilterErrors` on `TOTAL_ENDS`). A date range, when there is one, replaces the
 // period. «Payment» searches the business's methods on the server (sales#260): each shown as the reader
 // reads it, sent by its stored name, the one a sale keeps (sales#181).
 import type { DataTableFilterOption, DataTableFilters } from '@erplora/ui/components';
 import type { LiveClient } from '@erplora/ui/sdk';
 
 import type { SaleListIn, SaleStatus } from '../operations';
-import { centsFromAmount, type Money } from './format';
+import { filterCents, type Money } from './format';
 
 export const SALE_STATUSES: readonly SaleStatus[] = ['completed', 'voided', 'refunded'];
 
-const AMOUNTS = ['total_min', 'total_max'] as const;
+/** The two ends of «Total», in the business's money as typed. */
+export const TOTAL_ENDS = ['total_min', 'total_max'] as const;
 /** A short page: a business has a handful of methods; the search finds the rest. */
 const METHODS_PAGE = 20;
 
 const typed = (values: DataTableFilters, key: string): string => (values[key] ?? '').trim();
-
-/** The amount filters typed that are not amounts of the business's `money`. */
-export function invalidAmounts(values: DataTableFilters, money?: Money): string[] {
-  return AMOUNTS.filter((key) => typed(values, key) !== '' && centsFromAmount(values[key], money) === undefined);
-}
 
 /** «Date to» is a day before «Date from»: neither is sent. */
 export function reversedDates(values: DataTableFilters): boolean {
@@ -47,8 +44,8 @@ export function filterQuery(values: DataTableFilters, money?: Money): Partial<Sa
     if (from) query.date_from = from;
     if (to) query.date_to = to;
   }
-  for (const key of AMOUNTS) {
-    const cents = centsFromAmount(values[key], money);
+  for (const key of TOTAL_ENDS) {
+    const cents = filterCents(values[key], money);
     if (cents !== undefined) query[key] = cents;
   }
   return query;

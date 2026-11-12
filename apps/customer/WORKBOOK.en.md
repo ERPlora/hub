@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a152a328047a9985c589ed79c065a42ada5d2f8a2b8d791d48e43968b8bcb699 -->
+<!-- generated from WORKBOOK.md sha256:eaabe31db51e27cfffd47e7f7d0d523abea497bfbc349a40f527ef270b367919 -->
 
 ## What it is for and who it is for
 
@@ -228,14 +228,19 @@ Steps:
    so the card is found however it is written.
 2. With the filters: stage, source, active and spent by range ("From / To", in the business's currency,
    the one of its country in Settings → Business, with its decimals: the yen has none; with or without its
-   symbol, "12,50 zł").
+   symbol, "12,50 zł"). The amount is typed as in any amount field of the Hub and as in the other lists
+   (hub#1196): with or without thousands separators ("1.000,50", "1,000.50", "2 500"); in euros "1.000"
+   could be a thousand euros or one euro, and it asks for the decimals.
 3. Sort by name, email, phone, stage, spent, last purchase or date added. To begin with, by name from A
    to Z, 50 per page (at most 100).
 4. Tap a row to open its card (CUSTOMER-F03).
 In: the text, the filters and the sort.
 Out: nothing; read only. Cards that are deleted, merged into another or with their data erased do not
 show; those marked as not active do.
-If it fails: the table shows the error with "Retry". No results: "No customers.".
+If it fails: the table shows the error with "Retry". No results: "No customers.". A spent amount it cannot
+read does not filter and says so under its box, in the words of the amount field: "This is not an amount.
+Type a figure, for example 12.50.", "This amount cannot be negative." or, with "1.000", "This amount can be
+read in two ways…".
 Involved: none
 
 ### CUSTOMER-F03 Open a customer's card

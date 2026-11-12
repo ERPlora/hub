@@ -152,6 +152,13 @@ T_PROJECT = gettext_noop("Project")
 # names them.
 A_TASK = names("task.task.detail", name=("title",))
 A_PROJECT = names("task.project.detail")
+# A task or a project said by its name, when its id is not known: a task is found by its number or its title alone and
+# a project by its code or its name alone, so the card reads it by what was said, as the write will find it, and shows
+# the one the write acts on («Llamar al proveedor» when the person said «llamar»), not only the words said. Only on the
+# data of the writes that check their record before the card: read without a check, a name two fit would leave it off
+# the card (hub#1219).
+A_TASK_BY_NAME = names("task.task.detail", by="task", name=("title",))
+A_PROJECT_BY_NAME = names("task.project.detail", by="project")
 A_MEMBER = names("staff.member.detail", name=("full_name",))
 
 
@@ -193,14 +200,16 @@ class Page(Schema, Generic[T]):
 
 class TaskRefIn(In):
     id: UUID | None = Field(None, title=T_TASK, description=D_TASK_ID, json_schema_extra=A_TASK)
-    task: Reference | None = Field(None, validate_default=True, description=D_TASK)
+    task: Reference | None = Field(None, validate_default=True, description=D_TASK, json_schema_extra=A_TASK_BY_NAME)
 
     _task_named = _said_by("task", "id", NO_TASK)
 
 
 class ProjectRefIn(In):
     id: UUID | None = Field(None, title=T_PROJECT, description=D_PROJECT_ID, json_schema_extra=A_PROJECT)
-    project: Reference | None = Field(None, validate_default=True, description=D_PROJECT)
+    project: Reference | None = Field(
+        None, validate_default=True, description=D_PROJECT, json_schema_extra=A_PROJECT_BY_NAME
+    )
 
     _project_named = _said_by("project", "id", NO_PROJECT)
 

@@ -3,8 +3,7 @@
 // grouped from four digits on, as every screen writes them); this is the one place the app adds to it what is its
 // own (nothing is «—», a note without decimals, a difference with its sign). What is typed in a window is read by the
 // platform's money field (`MoneyInput` and its `parseMoney`, `@erplora/ui/components`), as every amount of the Hub
-// (hub#1160); `readMoney` only reads the list's amount filters (empty, an amount, or why it is not one), until hub#1196
-// takes them to the platform's reader.
+// (hub#1160), and so is what is typed in the list's amount filters (`filterCents`, `amountFilterErrors`; hub#1196).
 // The money is the business's (`useBusinessMoney`: its country's currency and the decimals the server counts it
 // in): the screens pass it, and until it is known an amount is a figure with two decimals and no symbol, never the
 // euro by default. Its decimals come from the server, never from the browser's Intl (which gives none to the forint).
@@ -14,7 +13,7 @@ import { formatMoney as writeMoney } from '@erplora/ui/components';
 import type { Money } from '../../../../base/frontend/lib/home';
 
 export type { Money };
-export { useBusinessMoney } from '../../../../base/frontend/lib/money';
+export { amountFilterErrors, filterCents, useBusinessMoney } from '../../../../base/frontend/lib/money';
 
 const FALLBACK_LOCALE = 'en';
 const NO_MONEY_DECIMALS = 2;
@@ -71,71 +70,4 @@ export function formatSignedMoney(cents: number | null | undefined, locale: stri
 /** The text with Intl's no-break spaces as plain ones (what a test or a search compares). */
 export function plain(text: string): string {
   return text.replace(/[\u00a0\u202f]/g, ' ');
-}
-
-export type MoneyRead =
-  | { ok: true; cents: number | null }
-  | { ok: false; reason: 'notAnAmount' | 'negative' }
-  | { ok: false; reason: 'ambiguous'; typed: string; grouped: number; decimal: number };
-
-const WHOLE = /^\d+$/;
-const GROUPED = /^\d{1,3}(?:([.,])\d{3}){2,}$/;
-const GROUPED_DECIMAL = /^(\d{1,3}(?:([.,])\d{3})+)([.,])(\d+)$/;
-const ONE_GROUP = /^(\d{1,3})[.,](\d{3})$/;
-const DECIMAL = /^(\d+)[.,](\d+)$/;
-
-/** `whole` major units and `fraction` digits as minor units, the fraction rounded half up to `decimals`. */
-function minor(whole: string, fraction: string, decimals: number): number {
-  const kept = fraction.slice(0, decimals).padEnd(decimals, '0');
-  const up = fraction.length > decimals && Number(fraction[decimals]) >= 5 ? 1 : 0;
-  return Number(whole) * 10 ** decimals + Number(kept || '0') + up;
-}
-
-/** How `currency` may be written around an amount: its code, its symbol and its narrow symbol («PLN», «zł»). */
-function currencyMarks(currency: string): string[] {
-  const marks = (['code', 'symbol', 'narrowSymbol'] as const).map(
-    (display) =>
-      formatter(FALLBACK_LOCALE, `mark-${currency}-${display}`, { style: 'currency', currency, currencyDisplay: display })
-        .formatToParts(1)
-        .find((part) => part.type === 'currency')?.value ?? currency,
-  );
-  return [...new Set(marks)].sort((a, b) => b.length - a.length);
-}
-
-/** What a person typed in an amount filter of the sessions list, in minor units of a currency of `decimals` (2 in
- *  EUR). Empty is no amount; «1.250» in euros reads two ways and says so. The
- *  business's `currency` written before or after the figure («150,50 zł») is no part of it. */
-export function readMoney(raw: string | number | null | undefined, decimals = 2, currency?: string): MoneyRead {
-  const typed = String(raw ?? '').trim();
-  let text = typed.replace(/[\s\u00a0\u202f]/g, '');
-  for (const mark of currency ? currencyMarks(currency) : []) {
-    if (text.toUpperCase().endsWith(mark.toUpperCase())) text = text.slice(0, -mark.length);
-    else if (text.toUpperCase().startsWith(mark.toUpperCase())) text = text.slice(mark.length);
-  }
-  if (text === '') return { ok: true, cents: null };
-  if (/^[-\u2212]/.test(text)) return { ok: false, reason: 'negative' };
-  if (WHOLE.test(text)) return { ok: true, cents: minor(text, '', decimals) };
-  if (GROUPED.test(text) && new Set(text.replace(/\d/g, '')).size === 1) {
-    return { ok: true, cents: minor(text.replace(/[.,]/g, ''), '', decimals) };
-  }
-  let match = GROUPED_DECIMAL.exec(text);
-  if (match && match[2] !== match[3] && decimals > 0 && match[4].length <= decimals) {
-    return { ok: true, cents: minor(match[1].replace(/[.,]/g, ''), match[4], decimals) };
-  }
-  match = ONE_GROUP.exec(text);
-  if (match) {
-    // No decimals: a separator only groups. A leading zero never groups: «0,515» is a fraction.
-    if (decimals === 0) return { ok: true, cents: minor(`${match[1]}${match[2]}`, '', 0) };
-    if (Number(match[1]) === 0 && decimals >= 3) return { ok: true, cents: minor(match[1], match[2], decimals) };
-    return {
-      ok: false,
-      reason: 'ambiguous',
-      typed,
-      grouped: minor(`${match[1]}${match[2]}`, '', decimals),
-      decimal: minor(match[1], match[2], decimals),
-    };
-  }
-  match = DECIMAL.exec(text);
-  if (match && decimals > 0 && match[2].length <= decimals) return { ok: true, cents: minor(match[1], match[2], decimals) };
-  return { ok: false, reason: 'notAnAmount' };
 }

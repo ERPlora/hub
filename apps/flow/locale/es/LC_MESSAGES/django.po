@@ -162,6 +162,9 @@ msgstr "registro"
 msgid "outputs"
 msgstr "resultados"
 
+msgid "ids it read"
+msgstr "ids de lo que leyó"
+
 msgid "error code"
 msgstr "código de error"
 

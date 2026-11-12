@@ -2,7 +2,8 @@
 // every screen, form and confirmation is real. Nothing is saved: the dirty form asks, keeps what was typed on a second
 // Back, closes only on «Discard changes», opens blank again and closes cleanly when untouched, in three sizes.
 // `expectWaysOutAskOnDirtyForm` walks the window's own ways out the same way (hub#1156): «Cancel», the «×», Escape and
-// a tap outside, in the browser, with no installed app.
+// a tap outside, in the browser, with no installed app — also of a window that is an `ion-modal` of its own, with its
+// close button as `<form>-close` and no «Cancel» (hub#1233).
 import { expect, type Locator, type Page } from '@playwright/test';
 
 import { A, capture, login, shown } from './helpers';
@@ -22,6 +23,8 @@ export interface UnsavedFormCase {
   field: string;
   /** What is typed in it; a plain text unless the field asks for another. */
   value?: string;
+  /** What leads to the field once the window is open, when it is not there at once (the till's quick add). */
+  prepare?: (form: Locator) => Promise<void>;
 }
 
 const VIEWPORTS = [
@@ -83,23 +86,29 @@ export async function expectBackAsksOnDirtyForm(page: Page, item: UnsavedFormCas
 /** A way out of the window, as the person takes it. */
 type Way = [string, (form: Locator, page: Page) => Promise<void>];
 
-/** «Cancel» and the «×» of its FormModal (`<form>-cancel`, `<form>-close`), Escape and — when a tap outside closes it —
- *  a tap above the card on a wide screen, above the sheet on a phone. */
+/** «Cancel» (`<form>-cancel`: every FormModal has it, a window of its own only when it has one) and the «×»
+ *  (`<form>-close`), Escape and — when a tap outside closes it and there is an outside — a tap above the card on a wide
+ *  screen, above the sheet on a phone (a window that covers the whole phone has none). */
 async function waysOut(form: Locator, item: UnsavedFormCase): Promise<Way[]> {
-  const ways: Way[] = [
-    ['Cancel', (f) => f.locator(`[data-testid=${item.form}-cancel]`).click()],
-    ['×', (f) => f.locator(`[data-testid=${item.form}-close]`).click()],
-    ['Escape', (_f, page) => page.keyboard.press('Escape')],
-  ];
-  if (await form.evaluate((el) => (el as HTMLElement & { backdropDismiss?: boolean }).backdropDismiss !== false)) {
-    ways.push(['a tap outside', (_f, page) => page.mouse.click(8, 8)]);
+  const ways: Way[] = [];
+  const isFormModal = await form.evaluate((el) => el.classList.contains('ep-form-modal'));
+  if (isFormModal || (await form.locator(`[data-testid=${item.form}-cancel]`).count()) > 0) {
+    ways.push(['Cancel', (f) => f.locator(`[data-testid=${item.form}-cancel]`).click()]);
   }
+  ways.push(['×', (f) => f.locator(`[data-testid=${item.form}-close]`).click()]);
+  ways.push(['Escape', (_f, page) => page.keyboard.press('Escape')]);
+  const tapOutside = await form.evaluate((el) => {
+    const box = el.shadowRoot?.querySelector('.modal-wrapper')?.getBoundingClientRect();
+    if (!box) throw new Error('the window has no Ionic .modal-wrapper to tap outside of');
+    return (el as HTMLElement & { backdropDismiss?: boolean }).backdropDismiss !== false && (box.left > 8 || box.top > 8);
+  });
+  if (tapOutside) ways.push(['a tap outside', (_f, page) => page.mouse.click(8, 8)]);
   return ways;
 }
 
 /** With something typed every way out asks «Discard changes?» and «Keep editing» keeps it; «Discard changes» closes it;
- *  it opens blank again and, untouched, closes at once. `shots` names the captures of the question after «Cancel»
- *  (`<shots>-<app>-<size>`). */
+ *  it opens blank again and, untouched, closes at once. `shots` names the captures of the question after the first way
+ *  out, «Cancel» or the «×» (`<shots>-<app>-<size>`). */
 export async function expectWaysOutAskOnDirtyForm(page: Page, item: UnsavedFormCase, shots: string): Promise<void> {
   await login(page, A);
   await page.goto(item.route);
@@ -111,27 +120,30 @@ export async function expectWaysOutAskOnDirtyForm(page: Page, item: UnsavedFormC
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     const form = await open();
+    await item.prepare?.(form);
     const field = form.locator(`[data-testid=${item.field}] input`);
     await field.fill(value);
-    for (const [way, leave] of await waysOut(form, item)) {
+    const ways = await waysOut(form, item);
+    for (const [way, leave] of ways) {
       await leave(form, page);
       const asked = question(page);
       await expect(asked, way).toBeVisible();
       await expect(asked, way).toContainText(QUESTION);
       await expect(form, way).toBeVisible();
-      if (way === 'Cancel') await capture(page, `${shots}-${item.app}-${viewport.label}`);
+      if (way === ways[0][0]) await capture(page, `${shots}-${item.app}-${viewport.label}`);
       await asked.locator('.ep-form-modal__cancel').click();
       await expect(asked, way).toBeHidden();
       await expect(form, way).toBeVisible();
       await expect(field, way).toHaveValue(value);
     }
 
-    await form.locator(`[data-testid=${item.form}-cancel]`).click();
+    await ways[0][1](form, page);
     await question(page).locator('.ep-form-modal__submit').click();
     await expect(form).toBeHidden();
     await noQuestion(page);
 
     const again = await open();
+    await item.prepare?.(again);
     await expect(again.locator(`[data-testid=${item.field}] input`)).toHaveValue('');
     await again.locator(`[data-testid=${item.form}-close]`).click();
     await expect(again).toBeHidden();

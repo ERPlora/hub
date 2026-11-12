@@ -338,7 +338,9 @@ Pasos:
 2. Pulsa **Borrar** en el aviso: la tarea desaparece **con sus subtareas y sus comentarios**.
 Entra: la tarea.
 Sale: `task.task.deleted`.
-Si falla: «Esa tarea no existe en este negocio.».
+Si falla: «Esa tarea no existe en este negocio.». Por el asistente, un nombre que vale para varias tareas o para
+ninguna no saca tarjeta, y si antes del «sí» otra tarea encaja mejor con lo dicho no se borra nada y sale la tarjeta
+nueva (BASE-F97).
 Implicados: ninguno
 
 ### TASK-F12 Crear un proyecto
@@ -382,7 +384,9 @@ Pasos:
 2. Pulsa **Borrar** en el aviso: el proyecto desaparece; **sus tareas siguen**, sin proyecto.
 Entra: el proyecto.
 Sale: `task.project.deleted`.
-Si falla: «Ese proyecto no existe en este negocio.».
+Si falla: «Ese proyecto no existe en este negocio.». Por el asistente, un nombre que vale para varios proyectos o para
+ninguno no saca tarjeta, y si antes del «sí» otro proyecto encaja mejor con lo dicho no se borra nada y sale la tarjeta
+nueva (BASE-F97).
 Implicados: ninguno
 
 ### TASK-F15 Cuando alguien deja el equipo
@@ -411,7 +415,17 @@ nombre vale para varias, se dice cuáles y se pide que elija (`task.ambiguous_ta
 tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunca por su id: la tarea por su título
 («Tarea: Limpiar el almacén»), el proyecto por su nombre («Proyecto: Apertura del local») y la persona por su nombre
 completo («Asignada a: Ana López»). Lo que quien pregunta no puede ver no sale: el empleado no ve nombrada una tarea
-ajena, como no la ve en su lista.
+ajena, como no la ve en su lista. Una tarea dicha por su número o su título al cambiarla, cambiar su estado,
+completarla, asignarla o borrarla, y un proyecto dicho por su código o su nombre al cambiarlo o borrarlo, se buscan
+como los buscará la acción (el mismo título antes que uno que lo contenga, y una tarea abierta antes que una cerrada),
+y la tarjeta enseña lo que se va a tocar, con su título o su nombre entero («Tarea: Llamar al proveedor» cuando se dijo
+«llamar»). Si lo dicho vale para varias o para ninguna, no sale ninguna tarjeta: el asistente oye «Hay varias tareas
+que se llaman «llamar»: …», con el número y el título de cada una, y pregunta cuál, o «Esa tarea no existe en este
+negocio.». El «sí» vale solo para
+lo que enseñó la tarjeta: si antes de confirmar alguien crea una tarea que encaja mejor con lo dicho («Llamar» cuando la
+tarjeta decía «Llamar al proveedor»), no se toca nada y sale la tarjeta nueva. La tarea de un comentario, la tarea
+madre y el proyecto de una tarea nueva, y el proyecto al que se pasa una tarea, dichos por su nombre, todavía salen
+como se dijeron (hub#1245).
 
 ### Lo que ofrece: consultas (leen, no cambian nada; todas se pueden seguir en vivo)
 
@@ -531,8 +545,20 @@ cliente o a un compañero).
   con la palabra de su lista («Tarea», «Proyecto»), nunca «Registro». Sin persona detrás, sin `task.view` (o sin
   `staff.view` para una persona), una tarea que el empleado no ve, un id de otro negocio o algo que ya no está: el
   registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`); el trinquete `UNNAMED_REFERENCES` de
-  `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca. Tareas no tiene listas cerradas sin
-  etiqueta en sus escrituras: el estado y la prioridad salen con las de sus modelos.
+  `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca. Dicho por su nombre, el `task` de
+  `TaskRefIn` y el `project` de `ProjectRefIn` llevan la misma marca leída por ese nombre (`A_TASK_BY_NAME`,
+  `A_PROJECT_BY_NAME`: una tarea se busca sola por su número o su título y un proyecto solo por su código o su nombre),
+  y las siete escrituras cuya entrada es una de ellas declaran su `check` (`base.assistant.checked`):
+  `task.task.update`, `set_status`, `complete`, `assign` y `delete`, `task.task.detail`; `task.project.update` y
+  `delete`, `task.project.detail`. Antes de dibujar la tarjeta, el turno busca el registro como lo hará la escritura,
+  un nombre que encaja con varios o con ninguno vuelve al modelo, y la huella de la tarjeta lleva el id de lo
+  encontrado, así que el «sí» vale solo para ello (hub#1208, hub#1219; `tests/test_assistant_yes_for_its_card.py`,
+  con el trinquete de las escrituras que comprueban y las que leen por su nombre; `tests/test_apps.py` admite `check`
+  solo en ellas). El `task` de `CommentIn`, el `parent` y el `project` de `TaskIn` y el `project` de `TaskPatchIn` no
+  llevan marca: no hay lectura cuya entrada quepa en la suya (`base.E012`), y sin `check` un nombre que vale para
+  varios dejaría el dato fuera de la tarjeta. Cuatro casos en `xfail(strict=True)` en ese mismo fichero (hub#1245).
+  Tareas no tiene listas cerradas sin etiqueta en sus escrituras: el estado y la prioridad salen con las de sus
+  modelos.
 - El admin de Django del Hub tiene **CRUD completo** sobre los cuatro modelos (ronda 12, PLAN §17); una
   escritura cruda del admin no deja aviso. En español nombra la tarea en femenino, como la hoja: **Creada por**,
   **Creada el** y **Actualizada el** llevan el contexto `task` (`pgettext_lazy`), porque sin él saldrían el

@@ -20,6 +20,7 @@ started by an event that a run of the same automation caused, or by a chain of m
 import datetime as dt
 import json
 import logging
+import re
 import uuid
 from typing import Any
 
@@ -996,6 +997,23 @@ def _log(run: FlowRun, step: dict, outcome: str, now: dt.datetime, **more: Any) 
     run.log = [*run.log, {**entry, "outcome": outcome, **more, "at": now.isoformat()}]
 
 
+#: An id as the records of the Hub write it (UUIDv7, as text).
+ANY_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+
+
+def _remember_read(run: FlowRun) -> None:
+    """Keeps the ids in what ``run``'s steps left (a customer's card, a sale…), never their data, before that is
+    forgotten: erasing a customer finds by them a run whose texts may name her once it no longer keeps her card."""
+    found = ANY_ID.findall(json.dumps(run.outputs, default=str))
+    run.read_ids = sorted({*run.read_ids, *found})
+
+
+def _end_turn(run: FlowRun) -> None:
+    """The assistant's turn is over: what it was told (what its tools read) goes, its ids are kept."""
+    _remember_read(run)
+    run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
+
+
 def _start(
     ctx: OperationContext,
     flow: Flow,
@@ -1036,7 +1054,8 @@ def _finish(
     run.finished_at = now
     run.resume_at = None
     # What the steps read (a customer's card…) is only needed while the run may go on: none is kept,
-    # except by one that stopped by an error, which may be resumed for RESUME_DAYS (FLOW-F24).
+    # except by one that stopped by an error, which may be resumed for RESUME_DAYS (FLOW-F24); its ids are.
+    _remember_read(run)
     if status != FlowRun.Status.FAILED:
         run.outputs = {}
     run.error_code = failure.code if failure else ""
@@ -1305,7 +1324,7 @@ def _park_assistant(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict,
     """Parks the run on its «Ask the assistant» step and answers: the model is never asked from here (a web request
     would wait for it). Its ``flow.run.parked`` reaches the worker, which asks it (``flow.run.call``); a step resumed
     (FLOW-F24) starts its conversation again."""
-    run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
+    _end_turn(run)
     _back_to_assistant(ctx, run, flow, step, now)
 
 
@@ -1601,7 +1620,7 @@ def record_assistant(ctx: OperationContext, data: RecordAssistantIn) -> dict:
         return {"count": 0}
     flow = run.flow
     answered = (run.outputs.get(TURN) or {}).get("answered") or {}
-    run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
+    _end_turn(run)
     with translation.override(flow.language):
         if data.failure:
             code = _ASSISTANT_FAILURES.get(data.failure, "flow.assistant_refused")
@@ -1618,7 +1637,7 @@ def _out_of_rounds(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, 
     """Stops the step when the assistant spent its turns (``max_rounds``) and says so; ``True`` when it did."""
     if rounds < int(step.get("max_rounds", 6)):
         return False
-    run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
+    _end_turn(run)
     failure = _own("flow.assistant_too_many_rounds", n=rounds)
     _call_failed(ctx, run, flow, step, failure, now)
     return True
@@ -1635,7 +1654,7 @@ def _make_proposal(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, 
     name = str(proposal.get("operation") or "")
     op = _offered(ctx, flow, step).get(name)
     if op is None:
-        run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
+        _end_turn(run)
         if _fail(ctx, run, step, _own("flow.not_allowed", ASSISTANT_GONE_KEY, operation=name), now):
             _go_on(ctx, run, flow, now)
         return
@@ -2099,10 +2118,11 @@ GOING_ON = (FlowRun.Status.WAITING, FlowRun.Status.CALLING, FlowRun.Status.ASKIN
 
 def _naming(card: str):
     """The runs whose kept data name the card ``card``: its id in what started them (the notice of Customers or of
-    another app, ``customer_id``) or in what their steps read (the card itself, a sale, an appointment…)."""
+    another app, ``customer_id``), in what their steps read (the card itself, a sale, an appointment…) or among the
+    ids of what they read and have forgotten (``read_ids``: one that ended, started by hand or by a schedule)."""
     return FlowRun.objects.annotate(
         input_text=Cast("input", TextField()), outputs_text=Cast("outputs", TextField())
-    ).filter(Q(input_text__contains=card) | Q(outputs_text__contains=card))
+    ).filter(Q(input_text__contains=card) | Q(outputs_text__contains=card) | Q(read_ids__contains=[card]))
 
 
 #: What a free text of a run's History says once a customer it named is erased (CUSTOMER-F16), in the automation's
@@ -2409,11 +2429,15 @@ def prune_runs(ctx: OperationContext, data: DueIn) -> dict:
         .order_by("ended", "id")
         .values_list("pk", flat=True)[:PRUNE_BATCH]
     )
-    # A failure older than RESUME_DAYS can no longer be resumed: what its steps read goes (FLOW-F24).
-    FlowRun.objects.filter(
+    # A failure older than RESUME_DAYS can no longer be resumed: what its steps read goes (FLOW-F24), its ids stay.
+    expired = FlowRun.objects.filter(
         status=FlowRun.Status.FAILED,
         finished_at__lt=timezone.now() - dt.timedelta(days=RESUME_DAYS),
-    ).exclude(outputs={}).update(outputs={})
+    ).exclude(outputs={})
+    for failed in expired.select_for_update(skip_locked=True).order_by("id")[:PRUNE_BATCH]:
+        _remember_read(failed)
+        failed.outputs = {}
+        failed.save(update_fields=["outputs", "read_ids"])
     if doomed:
         FlowRun.objects.filter(pk__in=doomed).delete()
         # Counted: a silent prune cannot be told from lost data the day somebody looks for an old run.

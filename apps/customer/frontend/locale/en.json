@@ -97,9 +97,6 @@
         "many": "customers"
       }
     },
-    "filters": {
-      "amountInvalid": "Write an amount, like 1.000,50."
-    },
     "create": {
       "title": "New customer",
       "created": "Customer {name} created"
