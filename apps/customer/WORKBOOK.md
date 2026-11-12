@@ -937,7 +937,7 @@ Pasos:
 3. Cada ficha que el negocio eliminó y aún guarda vuelve a la lista, al TPV y a la búsqueda por teléfono: LA MISMA
    ficha, con sus compras y lo gastado, sus consentimientos, sus notas y su actividad, sus datos de salud, sus
    grupos, etiquetas y campos propios y sus pedidos enlazados. Recuperaciones la cuenta como restaurada
-   («Clientes: 1 restaurado»).
+   («Clientes: se restauró 1»).
 Entra: la ficha eliminada, por su identificador.
 Sale: la ficha viva otra vez, sin cambiar ninguno de sus datos, y el aviso de ficha recuperada
 (`customer.customer.restored`).

@@ -17,9 +17,12 @@ the business stays open and its own work goes on.
    and which it no longer has: each deleted one comes back first, the same record with all that hangs from it, by the
    app's operation that undoes a deletion (``restore``, hub#1306), and each missing one is created by the app's own
    operation, the one its screen uses, as the platform runs an operation in a business (the system's context, in the
-   staff's language): rows are never copied. What the operation refuses for one record (its input, or the record gone
-   since) is counted with why and the others go on; what it refuses for all (the app turned off, the business busy)
-   ends that app's part with why (``refused``), and the next app goes on.
+   staff's language): rows are never copied. The apps go in the order of their ``requires``
+   (``activation.in_requires_order``), whatever the order asked, so a record finds what it points at in another app
+   brought back first (hub#1284). What the operation refuses for one record (its input, the record or what it names
+   gone since, or the business as it is now: a time taken) is counted with why and the others go on; what it refuses
+   for all (the app turned off, the business busy) ends that app's part with why (``refused``), and the next app goes
+   on.
 3. **Noted**: control notes the recovery done with what each app gave back, or failed with why
    (``recover_<step>: <why>``). A worker whose lease ran out leaves it to whoever holds it now, who reads the copy
    anew: what was created is not lacking any more, so nothing is made twice.
@@ -40,11 +43,11 @@ import psycopg
 import pydantic
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope
-from live.errors import InvalidPayload, NotFound, OperationError
+from live.errors import Conflict, InvalidPayload, NotFound, OperationError
 from live.meta import all_live_app_configs
 from live.operations import get as get_operation
 
-from base import registry, services
+from base import activation, registry, services
 from base.recovery import HOOK, Recoverable
 from base.tenancy import migrator, move, ops
 from base.tenancy.context import use_hub
@@ -115,7 +118,7 @@ def recover(row: CopyRecovery, *, now: dt.datetime) -> bool:
     try:
         if hub.status != Hub.Status.READY or not hub.db_name:
             raise RecoveryFailed("recover_business_unavailable", f"the business {hub.slug} is {hub.status}")
-        read = _read(copy, row.apps)
+        read = _read(copy, activation.in_requires_order(row.apps, activation.module_graph()))
         with translation.override(row.language), use_hub(hub):
             for label, declared, records, refused in read:
                 _give_back(hub, results, label, declared, records, refused, ours)
@@ -219,8 +222,9 @@ def _each(ctx, op, records: list[dict], payload, counted: str, result: dict, our
             op(ctx, op.input.model_validate(payload(record)))
         except pydantic.ValidationError as invalid:
             _not_created(result, record, f"invalid_payload: {_first_error(invalid)}")
-        except (InvalidPayload, NotFound) as invalid:
-            _not_created(result, record, f"{invalid.code}: {invalid.message}")
+        except (InvalidPayload, NotFound, Conflict) as refused_one:
+            # The record's own: its input, it or what it names gone, the business as it is now (a time taken).
+            _not_created(result, record, f"{refused_one.code}: {refused_one.message}")
         except OperationError as stopped:
             result["refused"] = f"{stopped.code}: {stopped.message}"
             return False
