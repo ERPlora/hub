@@ -76,7 +76,11 @@ caja: «Sesión actual» y «Descuadres recientes» (CASH_REGISTER-F12; las mism
 los paneles del **Inicio**). Después, la tabla de
 sesiones, de la más reciente a la más antigua, 50 por página: Sesión, Abierta el, Estado («Abierta»,
 «Cerrada»), Apertura, Esperado, Contado, Diferencia. Buscador «Buscar sesión…» (por número), filtros
-(estado, número y los cuatro importes) y vista de tabla o tarjetas. Por fila: «Detalle» siempre y,
+(estado, número y los cuatro importes) y vista de tabla o tarjetas. Los importes «desde / hasta» se escriben
+como en cualquier campo de importe del Hub y como en las demás listas (hub#1196: «1.000,50», «1,000.50»,
+«2 500», «12,50 €»; solo la diferencia lleva signo, «-5»); uno que no se puede leer no filtra y lo dice bajo
+su caja con las palabras del campo de importe («Esto no es un importe…», «Este importe no puede ser
+negativo.» o, con «1.000» en euros, «Este importe se puede leer de dos maneras…»). Por fila: «Detalle» siempre y,
 en la sesión abierta, «Movimiento», «Arqueo» y «Cerrar»; tocar la fila abre el detalle. Cada acción
 abre su ventana:
 
@@ -767,9 +771,11 @@ cajero del producto actual es un empleado.
   `session.open` lo aplica antes de abrir.
 - **Importes escritos** (hub#1160): las cuatro ventanas que reciben un importe (abrir, movimiento, arqueo sin
   desglose y cierre) usan el `MoneyInput` de `@erplora/ui/components` y leen con su `parseMoney`, en la moneda del
-  negocio (el arqueo, en la de `cash_register.currency.get`), como cada precio del Hub. `frontend/lib/money.ts`
-  conserva `readMoney` solo para los filtros de importe de la lista (`lib/sessionFilters.ts`), hasta que hub#1196 los
-  lleve al lector común; `frontend/money-fields.test.ts` impide que una ventana vuelva a leer con él.
+  negocio (el arqueo, en la de `cash_register.currency.get`), como cada precio del Hub. Los filtros de importe de la
+  lista (`lib/sessionFilters.ts`) leen con el lector común de las listas (hub#1196: `filterCents` y
+  `amountFilterErrors` de `base/frontend/lib/money.ts`; solo la diferencia, `SIGNED`, admite el signo) y
+  `pages/SessionsPage.test.ts` corre la tabla de textos de `base/frontend/__tests__/amount-filter.ts`. El lector
+  propio de la Caja (`readMoney`) ya no existe: `frontend/money-fields.test.ts` impide que vuelva.
 - **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
   `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#653). Un
   billete o moneda (`formatFace`) se escribe con la misma regla y sin decimales si es entero («5.000 Ft»).

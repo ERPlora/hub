@@ -25,7 +25,7 @@ import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { amountExample, formatMoney, ORDER_TONE, recordMoney, TOTAL_BOUNDS, toMinor, unreadableTotals, useBusinessMoney } from '../lib/format';
+import { amountFilterErrors, filterCents, formatMoney, ORDER_TONE, recordMoney, TOTAL_BOUNDS, useBusinessMoney } from '../lib/format';
 import type { OrderListIn, OrderOut, OrderStatus } from '../operations';
 import { cartCheckoutTabs } from '../tabs';
 
@@ -53,18 +53,17 @@ const query = computed<Partial<OrderListIn>>(() => {
     ...(f.status ? { status: f.status as OrderStatus } : {}),
     ...(f.payment_method ? { payment_method: f.payment_method } : {}),
   };
-  const min = toMinor(f.total_amount_from, money.value);
-  const max = toMinor(f.total_amount_to, money.value);
+  const min = filterCents(f.total_amount_from, money.value);
+  const max = filterCents(f.total_amount_to, money.value);
   if (min !== undefined) out.total_amount_min = min;
   if (max !== undefined) out.total_amount_max = max;
   return out;
 });
 
-/** An end of «Total» it cannot read as an amount, said under its box (it filters nothing). */
+/** An end of «Total» it cannot read as an amount, said under its box as every amount filter of the Hub says it
+ *  (hub#1196); it filters nothing. */
 const filterErrors = computed<Record<string, string>>(() =>
-  Object.fromEntries(
-    unreadableTotals(filters.value, money.value).map((name) => [name, t('cart_checkout.amountInvalid', { example: amountExample(locale.value, money.value) })]),
-  ),
+  amountFilterErrors(filters.value, TOTAL_BOUNDS, { t, locale: locale.value, money: money.value }),
 );
 
 function onFilters(now: DataTableFilters): void {

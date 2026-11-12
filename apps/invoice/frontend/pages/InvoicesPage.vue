@@ -29,9 +29,9 @@ import RectifyModal from '../components/RectifyModal.vue';
 import { useMarkPaid } from '../composables/useMarkPaid';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { formatDate, formatMoney, moneyOf, useBusinessMoney } from '../lib/format';
+import { amountFilterErrors, formatDate, formatMoney, moneyOf, useBusinessMoney } from '../lib/format';
 import { SOURCE_CODES, STATUS_CODES, statusTone, TYPE_CODES } from '../lib/invoice';
-import { filterQuery, filtersInUse, invalidAmounts, reversedDates } from '../lib/invoiceFilters';
+import { filterQuery, filtersInUse, reversedDates, TOTAL_ENDS } from '../lib/invoiceFilters';
 import type { InvoiceListIn, InvoiceRowOut } from '../operations';
 import { invoiceTabs } from '../tabs';
 
@@ -62,10 +62,11 @@ const blocked = computed(() => blockingError(error.value));
 /** A filter the server refused (a 422 of the list): said under the filter, the rows stay. */
 const refusedFilters = computed(() => error.value?.fields ?? {});
 const tableError = computed(() => (status.value === 'error' && !Object.keys(refusedFilters.value).length ? error.value?.message : undefined));
-/** Under each filter: what it cannot read or a reversed range, else what the server refused. */
+/** Under each filter: what it cannot read (an amount, as every amount filter of the Hub says it: hub#1196) or a
+ *  reversed range, else what the server refused. */
 const filterErrors = computed<Record<string, string>>(() => ({
   ...refusedFilters.value,
-  ...Object.fromEntries(invalidAmounts(filters.value, money.value).map((key) => [key, t('invoice.filters.amountInvalid')])),
+  ...amountFilterErrors(filters.value, TOTAL_ENDS, { t, locale: locale.value, money: money.value }),
   ...(reversedDates(filters.value) ? { issue_date_to: t('invoice.filters.dateOrder') } : {}),
 }));
 

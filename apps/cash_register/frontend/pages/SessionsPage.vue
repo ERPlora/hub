@@ -33,8 +33,8 @@ import OpenSessionModal from '../components/OpenSessionModal.vue';
 import UnassignedModal from '../components/UnassignedModal.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney, formatSignedMoney, useBusinessMoney } from '../lib/money';
-import { AMOUNT_RANGES, filterParams, filtersInUse, SESSION_STATUSES, unreadableAmounts } from '../lib/sessionFilters';
+import { amountFilterErrors, formatMoney, formatSignedMoney, useBusinessMoney } from '../lib/money';
+import { AMOUNT_FILTERS, AMOUNT_RANGES, filterParams, filtersInUse, SESSION_STATUSES, SIGNED } from '../lib/sessionFilters';
 import type { CountType, SessionRow } from '../operations';
 import { cashRegisterTabs } from '../tabs';
 
@@ -64,10 +64,11 @@ const { data: result, status, error, refresh } = table;
 
 /** The failures that replace the list with a notice: the app is off here, or the person may not look. */
 const blocked = computed(() => (error.value?.code === 'app_inactive' || error.value?.code === 'permission_denied' ? error.value.code : null));
-/** What the server refused (a 422 of the list) and the amounts it cannot read, under each filter: the rows stay. */
+/** What the server refused (a 422 of the list) and the amounts it cannot read (said as every amount filter of the Hub
+ *  says it: hub#1196), under each filter: the rows stay. */
 const filterErrors = computed<Record<string, string>>(() => ({
   ...(error.value?.fields ?? {}),
-  ...Object.fromEntries(unreadableAmounts(filters.value, business.value).map((name) => [name, t('cash_register.filters.amountInvalid')])),
+  ...amountFilterErrors(filters.value, AMOUNT_FILTERS, { t, locale: locale.value, money: business.value, signed: SIGNED }),
 }));
 const tableError = computed(() =>
   status.value === 'error' && !Object.keys(error.value?.fields ?? {}).length ? (error.value?.message ?? t('cash_register.sessions.loadError')) : undefined,

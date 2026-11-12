@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { business, EMPLOYEE, errorFrame, flush, mountInventory, ok, page, POLISH, product, refusal, subId, UNITS, type ApiCall, type MountOptions } from '../__tests__/mount-inventory';
+import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import CsvButtons from '../components/CsvButtons.vue';
 import ImportPreviewModal from '../components/ImportPreviewModal.vue';
 import ProductDetailModal from '../components/ProductDetailModal.vue';
@@ -543,5 +544,17 @@ describe('ProductsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
     await s.show(LIST);
     expect(s.rows()[0].text()).toContain(formatMoney(220, 'en', { currency: 'PLN', decimals: 2 }));
     expect(s.rows()[0].text()).not.toContain('€');
+  });
+});
+
+describe('ProductsPage: «Price» is read as every amount of the Hub (hub#1196)', () => {
+  itReadsAmountFiltersAsTheHub({
+    ends: ['price_min', 'price_max'],
+    params: ['price_min', 'price_max'],
+    async open(money) {
+      const s = await setup({ business: business({ currency: money.currency, currency_decimals: money.decimals }) });
+      await s.show(page([]));
+      return { filter: s.filter, query: () => s.params('inventory.product.list').at(-1) as Record<string, unknown>, says: () => s.prop('filterErrors') };
+    },
   });
 });

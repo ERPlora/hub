@@ -4,7 +4,8 @@
 // {390,834,1440}.png), as Invoices and Sales already do here (hub#31). The new one painted the row open under the
 // toolbar (Order, Email, Status, Payment, Total from / to). Now, at 390, 834 and 1440, both lists open with no row;
 // the funnel opens the panel with the columns, «Apply» filters by Status and by Total, and a Total it cannot read
-// says «Type an amount, like 12.50» («Escribe un importe, como 12,50») under its box and filters nothing.
+// says under its box what the money field says (hub#1196: «This is not an amount. Type a figure, for example 12.50.»,
+// «Esto no es un importe. Escribe una cifra, por ejemplo 12,50.», or the two readings of «1.250») and filters nothing.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, record, shot, shown, untilStill } from './helpers';
@@ -105,10 +106,10 @@ for (const size of SIZES) {
         await expect(rowOf(page, ORDERS, big.id)).toBeVisible();
         await expect(hook(page, ORDERS, 'filters-toggle')).toHaveAttribute('data-invalid', 'true');
         const again = await openFunnel(page, ORDERS, ORDER_FILTERS);
-        await expect(again.getByText('Type an amount, like 12.50')).toBeVisible();
+        await expect(again.getByText('This amount can be read in two ways: «1.250» could be €1,250.00 or €1.25. Write the decimals so there is no doubt.')).toBeVisible();
         await page.screenshot({ path: shot(`${KEY}-${size.label}-error`) });
         await hook(page, ORDERS, 'filters-clear').click();
-        await expect(again.getByText('Type an amount, like 12.50')).toHaveCount(0);
+        await expect(again.getByText('This amount can be read in two ways: «1.250» could be €1,250.00 or €1.25. Write the decimals so there is no doubt.')).toHaveCount(0);
         await hook(page, ORDERS, 'filters-close').click();
         await expect(again).toBeHidden();
       });
@@ -139,10 +140,10 @@ for (const size of SIZES) {
         await expect(rowOf(page, CARTS, small.cart_id)).toBeVisible();
         await expect(hook(page, CARTS, 'filters-toggle')).toHaveAttribute('data-invalid', 'true');
         panel = await openFunnel(page, CARTS, CART_FILTERS);
-        await expect(panel.getByText('Type an amount, like 12.50')).toBeVisible();
+        await expect(panel.getByText('This is not an amount. Type a figure, for example 12.50.')).toBeVisible();
       });
 
-      await test.step('in Spanish the bad Total says «Escribe un importe, como 12,50» and filters nothing', async () => {
+      await test.step('in Spanish the bad Total says «Esto no es un importe…» and filters nothing', async () => {
         await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
         await page.goto('/cart_checkout/orders');
         await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
@@ -153,7 +154,7 @@ for (const size of SIZES) {
         await expect(rowOf(page, ORDERS, small.id)).toBeVisible();
         await expect(rowOf(page, ORDERS, big.id)).toBeVisible();
         const again = await openFunnel(page, ORDERS, ORDER_FILTERS);
-        await expect(again.getByText('Escribe un importe, como 12,50')).toBeVisible();
+        await expect(again.getByText('Esto no es un importe. Escribe una cifra, por ejemplo 12,50.')).toBeVisible();
         record(`${KEY}-${size.label}`, { orders: [small.order_number, big.order_number] });
       });
     } finally {

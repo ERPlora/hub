@@ -107,16 +107,17 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await totalFrom('1.236,06');
         await expect(row).toBeVisible();
         await expect(rowOf(page, 'cart-checkout-carts', firstId)).toHaveCount(0);
-        // «1.250» is 1.250 € or 1,25 €: it says so under its box (in the panel) and filters nothing.
+        // «1.250» is 1.250 € or 1,25 €: it says both under its box (in the panel), as every amount filter of the Hub
+        // (hub#1196), and filters nothing.
         await totalFrom('1.250');
         await funnel.click();
-        await expect(view.getByText('Type an amount, like 12.50')).toBeVisible();
+        await expect(view.getByText('This amount can be read in two ways: «1.250» could be €1,250.00 or €1.25. Write the decimals so there is no doubt.')).toBeVisible();
         await expect(rowOf(page, 'cart-checkout-carts', firstId)).toBeVisible();
         await totalFrom('');
         // «Apply» closed the panel: opened again, its box no longer warns (else the check below proves nothing).
         await funnel.click();
         await expect(sheet).toBeVisible();
-        await expect(view.getByText('Type an amount, like 12.50')).toHaveCount(0);
+        await expect(view.getByText('This amount can be read in two ways: «1.250» could be €1,250.00 or €1.25. Write the decimals so there is no doubt.')).toHaveCount(0);
         await view.locator('[data-testid=cart-checkout-carts-filters-close]').click();
         await expect(sheet).toBeHidden();
       });

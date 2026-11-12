@@ -1,11 +1,16 @@
 // BASE-G98: the Home writes its amounts in the business's currency, as `base.business.get` says it (its country's,
 // with its decimals): followed live, one subscription for the whole tab however many pieces ask, and unknown — never
 // the euro by default — until the business answers or when its read fails.
+import { createShellI18n } from '@erplora/ui/shell';
 import { afterEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { defineComponent, h } from 'vue';
 
+import moneyFieldEn from '../../../packages/ui/src/components/MoneyInput/locales/en.json';
+import moneyFieldEs from '../../../packages/ui/src/components/MoneyInput/locales/es.json';
 import { business, errorFrame, flush, mountBase, POLISH, subId } from '../__tests__/mount-base';
-import { filterCents, formatMoney, useBusinessMoney, useBusinessMoneyRead } from './money';
+import en from '../locale/en.json';
+import es from '../locale/es.json';
+import { amountFilterErrors, filterCents, formatMoney, useBusinessMoney, useBusinessMoneyRead } from './money';
 
 /** `pieces` pieces of one screen, each asking for the business's currency. */
 const Probe = defineComponent({
@@ -52,6 +57,47 @@ describe('filterCents', () => {
       undefined,
     ]);
     expect([filterCents('¥1500', JPY), filterCents('1500', undefined), filterCents('¥1500', undefined)]).toEqual([1500, 150000, undefined]);
+  });
+
+  it('reads a minus only on a signed end (a difference): «-5» is −5 € there and no bound elsewhere (hub#1196)', () => {
+    const EUR = { currency: 'EUR', decimals: 2 };
+    expect([filterCents('-5', EUR, { signed: true }), filterCents('−0,01', EUR, { signed: true }), filterCents('-5', EUR)]).toEqual([-500, -1, undefined]);
+  });
+});
+
+// hub#1196: every list says under an amount end it cannot read what the money field (`MoneyInput`) says for it, in its
+// words: not an amount, negative, or «1.000» that reads two ways; nothing while the business's money is unknown.
+describe('amountFilterErrors', () => {
+  const EUR = { currency: 'EUR', decimals: 2 };
+  const ENDS = ['total_from', 'total_to'] as const;
+  /** How a list in `locale` says an end, in a business in euros unless `money` says another (`undefined`: unknown). */
+  const say = (locale: 'en' | 'es', { money = EUR as typeof EUR | undefined, signed = undefined as readonly string[] | undefined } = {}) => {
+    const i18n = createShellI18n({ locale, messages: { en, es } });
+    const t = (key: string, named?: Record<string, unknown>) => (named ? i18n.global.t(key, named) : i18n.global.t(key));
+    return { t, locale, money, signed };
+  };
+  /** What the money field says for `typed`, from its own catalogue. */
+  const field = (messages: typeof moneyFieldEn, key: 'notAmount' | 'negative' | 'ambiguous', named: Record<string, string> = {}) =>
+    Object.entries(named).reduce((text, [name, value]) => text.replace(`{${name}}`, value), messages.moneyInput[key]);
+
+  it('says under each end what the money field says for it, in both languages; an empty end or an amount says nothing', () => {
+    expect(amountFilterErrors({ total_from: 'doce', total_to: '1.000', other: 'x' }, ENDS, say('en'))).toEqual({
+      total_from: field(moneyFieldEn, 'notAmount'),
+      total_to: field(moneyFieldEn, 'ambiguous', { typed: '1.000', grouped: formatMoney(100000, 'en', EUR), decimal: formatMoney(100, 'en', EUR) }),
+    });
+    expect(amountFilterErrors({ total_from: '-5', total_to: ' 1.000 ' }, ENDS, say('es'))).toEqual({
+      total_from: field(moneyFieldEs, 'negative'),
+      total_to: field(moneyFieldEs, 'ambiguous', { typed: '1.000', grouped: formatMoney(100000, 'es', EUR), decimal: formatMoney(100, 'es', EUR) }),
+    });
+    expect(amountFilterErrors({ total_from: '1.000,50', total_to: '' }, ENDS, say('en'))).toEqual({});
+  });
+
+  it('a signed end (a difference) reads its minus; the same minus on another end cannot be negative', () => {
+    expect(amountFilterErrors({ total_from: '-5', total_to: '-5' }, ENDS, say('en', { signed: ['total_from'] }))).toEqual({ total_to: field(moneyFieldEn, 'negative') });
+  });
+
+  it('judges nothing while the business’s money is unknown, as the money field does (hub#945)', () => {
+    expect(amountFilterErrors({ total_from: '12,50 zł', total_to: 'doce' }, ENDS, { ...say('en'), money: undefined })).toEqual({});
   });
 });
 
