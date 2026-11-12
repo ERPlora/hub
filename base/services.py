@@ -99,6 +99,7 @@ from base.models import (
 )
 from base.media import AVATARS_FOLDER
 from base.operations import hub_id
+from base.recovery import brought_back
 from base.storage import hub_prefix
 from base.permissions import ADMINISTER_HUB, OPEN_MANAGEMENT, VIEW_HOME
 from base import people as people_rules
@@ -461,7 +462,9 @@ def relay_deliver_next(
     one transaction; returns ``(delivery, delivered)``, or ``None`` when nothing is due.
 
     The claim is ``SKIP LOCKED``, as the scheduler's. ``deliver(app_label, event)`` runs in a savepoint, and the
-    events it records (and keeps) are handed over in it, one level deeper: a reaction that raises has its writes
+    events it records (and keeps) are handed over in it, one level deeper; those it records for an event a recovery
+    from a separate copy recorded keep that event's actor (``base.recovery.brought_back``), since what they say came
+    back with it and is nothing new to the business, however deep the chain goes. A reaction that raises has its writes
     undone and waits ``backoff(attempts)``; after ``max_attempts`` it is given up (``dead``). Either way it is
     logged with the event, and the other deliveries go on: a refusal of the business (an ``OperationError``) as a
     warning with its code; anything else, and the delivery given up, as an error with its traceback.
@@ -488,6 +491,8 @@ def relay_deliver_next(
                 kept = list(
                     OutboxEvent.objects.filter(pk__in=[event.pk for event in recorded]).order_by("created_at", "id")
                 )
+                if brought_back(delivery.event.actor):
+                    OutboxEvent.objects.filter(pk__in=[event.pk for event in kept]).update(actor=delivery.event.actor)
                 _hand_over(kept, now=now, depth=delivery.depth + 1, listeners=listeners, max_depth=max_depth)
         except Exception as error:
             delivered = False

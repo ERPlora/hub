@@ -12,7 +12,8 @@ it, the ``REACTIONS`` of their ``events.py`` (``"*"``: every event of the other 
 - **delivered**: each delivery runs its app's reaction as the system, in the scope of the hub that recorded the
   event (the reaction's own notice goes to that hub's channel after the COMMIT), and is marked in the same
   transaction, so an app never gets an event twice (``relay_deliver_next``); the events a reaction records are
-  taken in it, one level deeper, and past ``MAX_EVENT_DEPTH`` they are not delivered; what a reaction leaves for
+  taken in it, one level deeper, and past ``MAX_EVENT_DEPTH`` they are not delivered; those it records for what a
+  recovery from a separate copy brought back keep the recovery's actor (``base.recovery``); what a reaction leaves for
   after its COMMIT that waits on the network (a call to another system) goes through ``base.outbound``, in a thread
   of the worker's own, so it never holds the next delivery, of this hub or of another;
 - **failed**: a reaction that raises has its writes undone and waits ``backoff`` (2, 4, 8… s, an hour at most);
