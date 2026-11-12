@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c48eefa34cb44c163626b789435a9089d33ba62070f595db82f1385247c58d05 -->
+<!-- generated from WORKBOOK.md sha256:b9772ec114bbda339aeb6054278e86ab5bab5a7324f0cce38cd0b6558f40f8ed -->
 
 ## What it is for and who it is for
 
@@ -113,8 +113,10 @@ there, the warning alone.
 
 ### Apps
 From "Apps" in the side menu. Three tabs at the bottom: "My apps" (the apps the business has running), "Add
-apps" (every ERPlora app) and "Paid" (the ones subscribed to separately). At the top, how many apps the business
-has chosen against its plan's limit: "17 of 20 apps turned on" or, with no limit, "17 apps turned on · Unlimited".
+apps" (every ERPlora app) and "Paid" (the ones subscribed to separately). At the top, how many apps the business has
+turned on (those in "My apps", also the ones born on, like Taxes, and the ones that came along with another) and how
+many of the ones its plan allows it has chosen: "27 apps turned on · 17 of 20 in your plan" or, with no limit, "27
+apps turned on · Unlimited". A business just signed up: "1 app turned on · 0 of 20 in your plan" (hub#1286).
 Each tab, a table (or cards) with its search, the filters funnel, the order and "Columns": "App" (icon and name),
 "Category" and "Status"; in "Add apps" and "Paid", also "Description", "Price" and "Comes with". "Open" on the
 row of an app the person can open and, for whoever runs the business, "Turn on" or "Turn off". Above the table,
@@ -720,8 +722,9 @@ Steps:
      business has running, with its icon and its name, its "Category" and its "Status" ("Active"). An app the
      business's country requires also shows, next to its status, "Mandatory in Spain" (or the business's country):
      Taxes in every country, VeriFactu in Spain (hub#997). A business just signed up already has Taxes here,
-     "Active": it is born on with its country's taxes and does not count against the plan's app limit. The other
-     apps are born off, VeriFactu too, which the owner turns on.
+     "Active": it is born on with its country's taxes and does not count against the plan's app limit: the counter at
+     the top says "1 app turned on · 0 of 20 in your plan". The other apps are born off, VeriFactu too, which the
+     owner turns on.
   3. They search in "Search your apps…" (name, description or category), filter by category with the funnel,
      sort or choose columns.
   4. When the business subscribes to an app on erplora.com or stops having it, the list updates by itself,
@@ -793,8 +796,9 @@ Steps:
   2. In "Add apps", whoever runs the business looks for an app the business does not use, "Off", and presses "Turn
      on". If it needs other apps that are off, it asks first, naming them (BASE-F19).
   3. The app becomes "Installed" at once and shows in "My apps" and, without reloading, in the menu of every device
-     of the business. The counter at the top adds one: from "16 of 20 apps turned on" to "17 of 20 apps turned
-     on".
+     of the business. The counter at the top adds the apps turned on and one of the plan's: turning Tasks on, from
+     "26 apps turned on · 16 of 20 in your plan" to "27 apps turned on · 17 of 20 in your plan"; the ones that come
+     along with it add to the apps turned on, not to the plan's.
 In: the chosen app, the ones it needs and what the business has subscribed to on erplora.com.
 Out: the app running in this business, chosen by it: it counts towards its plan's limit of apps.
 If it fails: with the plan's limit reached nothing is turned on and "Your plan’s app limit" shows: "You have
@@ -897,7 +901,8 @@ Steps:
      requires never goes with it: on turning Sales off, Taxes stays on and is not named (hub#997).
   3. They confirm with "Turn off": "Reservations is off. Also turned off: Tables.". Both leave "My apps" and,
      without reloading, the menu of every device of the business; their screens say the app is not available
-     (BASE-F26) and the counter at the top takes one away.
+     (BASE-F26) and the counter at the top takes away the ones turned off and, of the plan's, the one the business
+     chose.
   4. In "Add apps" they stay, with their icon, their name and "Off": from there they are turned on again
      (BASE-F24).
   5. From the assistant ("Turn off the reservations app") the app is named as in BASE-F24, the high-risk card shows

@@ -91,6 +91,8 @@ test('BASE-F63 BASE-F14 BASE-F01 TAX-F16 — a business of Spain is born with Ta
     await expect(taxes.locator('[data-testid="apps-state"]')).toContainText('Active');
     await expect(taxes.locator('[data-testid="apps-mandatory"]')).toContainText('Mandatory in Spain');
     await expect(shown(page).locator('[data-testid="apps-row"]')).toHaveCount(1);
+    // hub#1286: the counter counts Taxes as turned on, and none of the plan's (it was born on, not chosen).
+    await expect(testid(page, 'apps-counter')).toHaveText('1 app turned on · 0 of 20 in your plan');
     await snap(page, 'ES-mine', size.label);
 
     // «Add apps»: VeriFactu, mandatory in Spain, is off with «Turn on»: its owner turns it on.

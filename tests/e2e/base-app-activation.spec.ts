@@ -184,8 +184,9 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       const tasksScreen = listed.data.apps.find((app) => app.id === 'task')?.path ?? '';
       expect(tasksScreen, 'Tasks has a screen for the owner').toBeTruthy();
 
-      // The baseline: every app on, the roots chosen (17 with the reference app of development) of Gratis's 20.
-      await expect(testid(page, 'apps-counter')).toHaveText('17 of 20 apps turned on');
+      // The baseline: every app on (27 with the reference app of development), the roots chosen (17) of Gratis's 20:
+      // the counter says both (hub#1286).
+      await expect(testid(page, 'apps-counter')).toHaveText('27 apps turned on · 17 of 20 in your plan');
       await search(page, 'Tasks');
       await expect(appRow(page, 'task')).toBeVisible();
       expect(await menuApps(page)).toContain('Tasks');
@@ -208,7 +209,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await page.screenshot({ path: shot(`APP-BASE-ACTIVATION-confirm-off-${width}`) });
       await confirm.getByRole('button', { name: 'Turn off' }).click();
       await expect(appRow(page, 'task')).toHaveCount(0);
-      await expect(testid(page, 'apps-counter')).toHaveText('16 of 20 apps turned on');
+      await expect(testid(page, 'apps-counter')).toHaveText('26 apps turned on · 16 of 20 in your plan');
       await expect.poll(() => menuApps(page), { message: 'the menu follows without a reload' }).not.toContain('Tasks');
       await snap(page, 'off', width);
 
@@ -240,7 +241,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(appRow(page, 'task').locator('[data-testid="apps-state"]')).toHaveText('Off');
       await testid(page, 'apps-row-task-toggle').click();
       await expect(appRow(page, 'task').locator('[data-testid="apps-state"]')).toHaveText('Installed');
-      await expect(testid(page, 'apps-counter')).toHaveText('17 of 20 apps turned on');
+      await expect(testid(page, 'apps-counter')).toHaveText('27 apps turned on · 17 of 20 in your plan');
       await expect.poll(() => menuApps(page), { message: 'the menu follows without a reload' }).toContain('Tasks');
       await snap(page, 'on-again', width);
       expect(psql("select state || ':' || chosen from base_appactivation where host = 'a' and app = 'task'")).toBe('on:true');
