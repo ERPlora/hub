@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ead069bb12f01ba5bd0250bb5edb09caa3c69e9f6031ef20f2430943a1f2f543 -->
+<!-- generated from WORKBOOK.md sha256:57b39908820422fec44930f4965b48a0b8b6b6d7b51e4adb7f8e4a6abf645f67 -->
 
 ## What it is for and who it is for
 
@@ -427,8 +427,14 @@ Steps:
 In: the chosen category.
 Out: the category is deleted and all its products, active or not, unlinked in the same step; the
 products stay. The till stops grouping them under it.
+A category deleted by mistake is recovered by the ERPlora staff from a separate copy (BASE-F114): it comes back as a
+new one, with its name, slug, description, icon, colour, order and tax category, before the products, and in it the
+products that come back with the recovery: those the business deleted and still holds (the same ones, INVENTORY-F34)
+and those it no longer has (created again). A category the business keeps, even renamed, is the same one and is not
+repeated; nor is one it made again with its name (case and spaces aside): its own is used, as it is. The products the
+business keeps live stay as they are, without it (hub#1373).
 If it fails: "The category could not be deleted" (or the reason) above the table.
-Involved: KITCHEN-F04, SALE-F01
+Involved: KITCHEN-F04, SALE-F01, BASE-F114, INVENTORY-F34
 
 ### INVENTORY-F08 Group products into categories for the till
 Status: done
@@ -1073,8 +1079,8 @@ Steps:
 2. The ERPlora staff make a separate copy of the business from an earlier moment and recover the products from it
    (BASE-F114, steps 6 to 11).
 3. Each product the business deleted and still holds comes back to **Products**, to the till and to the sale
-   catalog: THE SAME product, with its SKU, its EAN-13, its categories that are still live, its tax category and its
-   stock, and in **Movements** its whole history (initial, receptions, sales, counts and write-offs) is still its own.
+   catalog: THE SAME product, with its SKU, its EAN-13, its categories that are still live and the one that comes back
+   with the recovery if the business deleted it afterwards (INVENTORY-F07), its tax category and its stock, and in **Movements** its whole history (initial, receptions, sales, counts and write-offs) is still its own.
    It comes back active and on sale, as unarchiving does in Odoo or Square: if it was deactivated or marked as sold
    out before it was deleted, that is done again by hand (INVENTORY-F03, INVENTORY-F29). Recoveries counts it among
    the restored Products.
@@ -1087,8 +1093,8 @@ has at all is created again (INVENTORY-F01), with no stock. On a live product it
 announces again. Its photo does not come back: its own was erased when it was deleted (INVENTORY-F31) and the library
 one was taken off it (hub#1319). What the other apps hung from it (its prices in the price lists, its modifier groups,
 its options in the menus) was erased when it was deleted and does not come back with it yet (hub#1343).
-Involved: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F16, INVENTORY-F29, PRICING-F14,
-MODIFIER-F09, COMBO-F13
+Involved: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29,
+PRICING-F14, MODIFIER-F09, COMBO-F13
 
 ## What the verticals share
 
@@ -1161,6 +1167,7 @@ or what no longer exists, is left out.
 | Creates many categories at once, with a report per row | create categories | one tap | F10 | `inventory.category.bulk_create` |
 | Changes a category | change categories | one tap | F06 | `inventory.category.update` |
 | Deletes a category and unlinks its products | delete categories | type to confirm | F07 | `inventory.category.delete` |
+| Gives a deleted category back, as a new one, with the deleted products it had (the system only, when recovering from a separate copy) | system | not the assistant's: only the platform does it | F07, F34 | `inventory.category.recover` |
 | Exports products or categories to CSV | export products | one tap | F11 | `inventory.product.export`, `inventory.category.export` |
 | Records a goods receipt (one or several products, cost and delivery note) | move stock | one tap | F13 | `inventory.stock.receive` |
 | Applies a count: the balance becomes what was counted, with a reason | move stock | one tap | F14 | `inventory.stock.count` |
@@ -1229,6 +1236,7 @@ ticket or invoice is given by Sales, not by Invoicing.
 | Manage settings | yes | yes | no | no | `inventory.manage_settings` |
 
 These are each profile's factory permissions; the administrator can change them in Roles. The
-administrator can do everything. No profile gives a deleted product back to the catalog: the system does it when the
-ERPlora staff recover from a separate copy (INVENTORY-F34, `inventory.system`, which no role holds either). The app checks them at every door (screen, assistant and API), not only
+administrator can do everything. No profile gives a deleted product or category back: the system does it when the
+ERPlora staff recover from a separate copy (INVENTORY-F07, INVENTORY-F34, `inventory.system`, which no role holds
+either). The app checks them at every door (screen, assistant and API), not only
 on the screen.

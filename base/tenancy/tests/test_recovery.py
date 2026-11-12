@@ -251,13 +251,25 @@ class TestCustomersComeBack:
         run_in(hub, "customer.customer.set_tags", id=luis, tag_ids=[regular])
         run_in(hub, "customer.customer.update", id=luis, field_values=[{"field_id": pet, "value": "Luna"}])
         run_in(hub, "customer.group.update", id=old, is_active=False)
+        # And a product in its own category: both deleted after the copy, so the category comes back with it inside.
+        with use_hub(hub):
+            from apps.tax.models import TaxCategory
+
+            tax = TaxCategory.objects.filter(is_active=True).order_by("key").values_list("key", flat=True).first()
+        desserts = run_in(hub, "inventory.category.create", name="Desserts").id
+        cake = run_in(
+            hub, "inventory.product.create", name="Cake", sku="CAK-1", price=400, tax_category_key=tax,
+            category_ids=[desserts],
+        ).id
         copy = recoveries.copy_of(hub)
         run_in(hub, "customer.customer.delete", id=ana)
         gone(hub, luis)
         for operation, deleted in (("customer.group.delete", old), ("customer.tag.delete", regular)):
             run_in(hub, operation, id=deleted)
         run_in(hub, "customer.field.delete", id=pet)
-        asked = recoveries.ask(copy)
+        run_in(hub, "inventory.product.delete", id=cake)
+        run_in(hub, "inventory.category.delete", id=desserts)
+        asked = recoveries.ask(copy, "customer", "inventory")
         with use_hub(hub):
             before = list(OutboxEvent.objects.values_list("pk", flat=True))
 
@@ -277,9 +289,12 @@ class TestCustomersComeBack:
             ("customer.tag.created", mark),
             ("customer.customer.tags_changed", mark),
             ("customer.field.created", mark),
+            ("inventory.category.created", mark),
+            ("inventory.product.categorized", mark),
+            ("inventory.product.restored", mark),
             ("customer.customer.created", "system"),
         ]
-        assert [base_recovery.brought_back(actor) for _name, actor in said] == [True] * 8 + [False]
+        assert [base_recovery.brought_back(actor) for _name, actor in said] == [True] * 11 + [False]
 
     def test_asked_again_nothing_is_made_twice(self, recoveries, every_app_on):
         hub, (ana, _luis) = recoveries.business(every_app_on, ANA, LUIS)

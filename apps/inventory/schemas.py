@@ -571,6 +571,14 @@ class CategoryIn(Schema):
     )
 
 
+class CategoryRecoverIn(CategoryIn):
+    product_ids: list[UUID] = Field(
+        default_factory=list,
+        max_length=10_000,
+        description="Deleted products to put back in it, so that they come back inside it when restored.",
+    )
+
+
 class CategoryPatchIn(CategoryRefIn):
     """Only the fields sent are changed; ``tax_category_key: ""`` clears it. A category is not deactivated."""
 

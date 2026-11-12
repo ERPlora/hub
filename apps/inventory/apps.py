@@ -145,16 +145,21 @@ class InventoryConfig(LiveAppConfig):
     ]
 
     def recoverable_from_copy(self) -> list:
-        """hub#1282: the platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when
-        the staff recovers from it (BASE-F114): of the copy's live products (``queries.products_in_copy``), each the
-        business still holds deleted comes back the same, with its stock and its movements
-        (``queries.products_deleted_in_business``, ``inventory.product.restore``, INVENTORY-F34, hub#1321), and each it
-        no longer holds is created by ``inventory.product.create``, the screen's own, in the categories the business
-        still has and with no stock (``queries.products_not_in_business``)."""
+        """What a separate copy of the business gives back when ERPlora's staff recovers from it (BASE-F114), in this
+        order: first each category the business lacks, by ``inventory.category.recover``, with the deleted products it
+        had back in it; then each product it still holds deleted, the same, by ``inventory.product.restore``
+        (INVENTORY-F34), and each it no longer holds, by ``inventory.product.create``, in its categories here."""
         from apps.inventory import queries  # the models are not loaded yet when this module is
         from base.recovery import Recoverable
 
         return [
+            Recoverable(
+                label=_("Product categories"),
+                reads_since="0001_initial",
+                read=queries.categories_in_copy,
+                missing=queries.categories_not_in_business,
+                create="inventory.category.recover",
+            ),
             Recoverable(
                 label=_("Products"),
                 reads_since="0001_initial",
@@ -163,5 +168,5 @@ class InventoryConfig(LiveAppConfig):
                 create="inventory.product.create",
                 deleted=queries.products_deleted_in_business,
                 restore="inventory.product.restore",
-            )
+            ),
         ]
