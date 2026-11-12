@@ -3,7 +3,7 @@
 // inside «⋮» when the row folds them), a column filter through the table's «Filters» panel and the
 // cleanup every spec runs before and after it: what a run creates is named «E2E Svc …» and deleted from
 // the hub's database (phase 1: hubs `a` and `b` share it), the appointments of its customers included.
-import { type Browser, type BrowserContext, expect, type Page } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
 import { A, api, horizontalOverflow, login, psql, shown } from './helpers';
 
@@ -60,17 +60,36 @@ export async function pick(page: Page, testid: string, query: string, text: stri
   await expect(page.locator(`[data-testid^=${testid}-option-]`)).toHaveCount(0);
 }
 
-/** Runs a row action: its button, or the same entry inside «⋮» when the row folds its actions. */
+/**
+ * Runs a row action: its button, or the same entry inside «⋮» when the row folds its actions. The table folds them by
+ * measuring its box, a frame or more after a resize or new rows (`DataTable`, W-19), so what the row showed a moment ago
+ * is not what the click finds: the click goes to whichever of the two the row shows when it lands, and the entry is
+ * looked for in «⋮» only when that is where it landed. Deciding first and clicking after waited for an «Edit» the table
+ * had folded meanwhile until the test's time ran out (hub#1279; service-helpers.spec.ts).
+ */
 export async function rowAction(page: Page, table: string, id: string, action: string): Promise<void> {
-  const button = shown(page).locator(`[data-testid=${table}-row-${id}-${action}]`);
-  const menu = shown(page).locator(`[data-testid=${table}-row-${id}-menu]`);
-  await button.or(menu).first().waitFor({ state: 'visible' });
-  if (await button.isVisible()) {
-    await button.click();
-    return;
-  }
-  await menu.click();
-  await page.locator(`ion-popover [data-testid=${table}-row-${id}-${action}]`).click();
+  const hook = `${table}-row-${id}-${action}`;
+  const menuHook = `${table}-row-${id}-menu`;
+  const landed = await clickLanding(page, shown(page).locator(`[data-testid=${hook}]`).or(shown(page).locator(`[data-testid=${menuHook}]`)).first());
+  if (landed === hook) return;
+  if (landed !== menuHook) throw new Error(`rowAction ${hook}: the click landed on ${landed ?? 'nothing'}, neither the button nor «⋮»`);
+  await page.locator(`ion-popover [data-testid=${hook}]`).click();
+}
+
+/** Clicks `target` and says the `data-testid` of what the click landed on. A locator that matches either of two things
+ *  (`a.or(b)`) is resolved again on each try, so the answer is what was there when the click went through: a click
+ *  Playwright held back, because something else was under the pointer, never reaches the page's listeners. */
+async function clickLanding(page: Page, target: Locator): Promise<string | null> {
+  type Landing = Window & { e2eClickLanding?: string | null };
+  await page.evaluate(() => {
+    const record = (event: Event) => {
+      (window as Landing).e2eClickLanding = (event.target as Element | null)?.closest('[data-testid]')?.getAttribute('data-testid') ?? null;
+    };
+    (window as Landing).e2eClickLanding = undefined;
+    document.addEventListener('click', record, { capture: true, once: true });
+  });
+  await target.click();
+  return page.evaluate(() => (window as Landing).e2eClickLanding ?? null);
 }
 
 /** Picks `option` in the column filter `filter` of `table`, through its «Filters» panel, and applies it. */
