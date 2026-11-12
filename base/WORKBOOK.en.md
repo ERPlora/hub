@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c9adc243a2fed6bb5ab111831f0f95b7567aa921059e7256bda0691f984411f3 -->
+<!-- generated from WORKBOOK.md sha256:f199bf3d1f10ad6e9e0c14b811e5fce99e5f1fc86bacf4f3bec1d771c29859a2 -->
 
 ## What it is for and who it is for
 
@@ -2970,9 +2970,11 @@ Steps:
   9. In Separate copies they choose the made copy and the action "Recover into the business…". The page explains that
      what the business deleted and still holds comes back as it was, with its history, and that what it no longer has is
      created again as its own screen creates it, nothing copied; that what the business has, or has made again, is left
-     as it is; that records for the tax authority are never brought back and that the business stays open. Below, "What
-     to bring back", with what can be brought ticked (today, **Customers**, **Products**, **Service categories,
-     Services** and **Appointments**). They press **Recover**.
+     as it is; that records for the tax authority are never brought back and that the business stays open. And that
+     what comes back is nothing new to the business: it starts none of its automations, so nobody is welcomed or told
+     again of a booking they already had (hub#1307). Below, "What to bring back", with what can be brought ticked
+     (today, **Customers**, **Products**, **Service categories, Services** and **Appointments**). They press
+     **Recover**.
   10. "1 separate copy will give back Customers, Products, Service categories, Services, Appointments into its business
       within a few minutes: Recoveries says how it went." appears. In Recoveries they see it "Asked" with the copy, what
       was asked and when.
@@ -3029,13 +3031,16 @@ the business, each deleted card it still held, live again with its card-recovere
 a new card for each customer it no longer had, with its card-created notice (`customer.customer.created`) and those of
 its groups and tags set (`customer.customer.groups_changed`, `customer.customer.tags_changed`), each group, tag or own
 field it lacked made again, with its notice (`customer.group.created`, `customer.tag.created`,
-`customer.field.created`), each deleted
+`customer.field.created`, and `customer.group.updated` or `customer.tag.updated` if it was deactivated), each deleted
 product it still held, live again with its product-recovered notice (`inventory.product.restored`), a new product for
 each product it no longer had, with its product-created notice (`inventory.product.created`), a new service category
 for each one it lacked, with its category-created notice (`service.category.created`), a new service for each one it
 no longer had, with its service-created notice (`service.service.created`), and a new appointment for each one it
-lacked, with its appointment-created notice (`appointment.appointment.created`), and nothing else; the copy,
-untouched; the notice `control.copy.recovery_requested` with who asked for it.
+lacked, with its appointment-created notice (`appointment.appointment.created`), and nothing else. Each of those notices
+says the recovery did it (its actor is `copy_recovery:<id>`, that of the row in Recoveries), so no automation of the
+business starts on them (FLOW-F21), whether of something created or of something recovered; what only brings the
+business's own data up to date with them goes on the same (the WhatsApp Inbox links its conversation to the card). The
+copy, untouched; the notice `control.copy.recovery_requested` with who asked for it.
 If it fails: what the restore does not accept is said in the notice, business by business, and that business is not
 touched: one that is not ready or has no database of its own, a demo, one being moved or restored, a cluster open to new
 hubs or with living businesses, the business's own cluster, a copy that is not on that cluster or is too large, and a
@@ -3063,6 +3068,6 @@ is unfrozen. With records from the test environment only, the chain is recovered
 support staff see the list, Separate copies and Recoveries, but not the actions.
 Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
-SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08, APPOINTMENT-F01, APPOINTMENT-F11; hub#1198, hub#1213,
-hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326,
-hub#1327, hub#1341, hub#1356, aws#77
+SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08, APPOINTMENT-F01, APPOINTMENT-F11, FLOW-F21; hub#1198,
+hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322,
+hub#1323, hub#1326, hub#1327, hub#1341, hub#1356, aws#77

@@ -27,4 +27,24 @@ describe('PosItemTile', () => {
     expect(tile.find('.pos-tile__unit').text()).toBe('45 min');
     expect(tile.find('.pos-tile__badge').text()).toBe('Servicio');
   });
+
+  it('keeps its native button announcing the change when it sells out or goes back on sale with the till open', async () => {
+    const m = await mountSale(PosItemTile, { props: { testid: 'pos-item', name: 'Croquetas', price: '6,50 €' } });
+    const tile = m.find('pos-item');
+    // Ionic copies the host's aria-* to its native button only when it loads (INVENTORY-F29, SALE-F07; hub#1337).
+    tile.element.shadowRoot!.innerHTML = '<button type="button"></button>';
+    const native = () => tile.element.shadowRoot!.querySelector('button')!;
+    expect(tile.attributes('data-aria-disabled')).toBe('false');
+
+    await m.wrapper.setProps({ soldOut: true });
+    expect(tile.attributes('data-aria-disabled')).toBe('true');
+    expect(native().getAttribute('aria-disabled')).toBe('true');
+
+    await m.wrapper.setProps({ soldOut: false });
+    expect(tile.attributes('data-aria-disabled')).toBe('false');
+    expect(native().hasAttribute('aria-disabled')).toBe(false);
+
+    await m.wrapper.setProps({ blocked: true });
+    expect(native().getAttribute('aria-disabled')).toBe('true');
+  });
 });

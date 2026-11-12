@@ -384,6 +384,17 @@ function throughProxy(graph: Graph, host: string, method: string, path: string, 
   });
 }
 
+/** Runs `use` with a port of 127.0.0.1 that another server holds the whole time, and frees it afterwards. */
+async function withAHeldPort(use: (port: number) => Promise<void>): Promise<void> {
+  const holder: Server = createServer();
+  await new Promise<void>((resolve) => holder.listen(0, '127.0.0.1', () => resolve()));
+  try {
+    await use((holder.address() as { port: number }).port);
+  } finally {
+    await new Promise((resolve) => holder.close(resolve));
+  }
+}
+
 describe('startGraph', () => {
   const certs = mkdtempSync(join(tmpdir(), 'meta-graph-'));
   let graph: Graph;
@@ -433,16 +444,13 @@ describe('startGraph', () => {
     }
   }, NO_CLOCK);
 
+  // It waits first for the authority, a cold Python start that a loaded machine makes as slow as it likes, so it waits
+  // without a clock (hub#777). Once that start ends, a port still held after `busyFor` rejects at once.
   it('says which port is taken when another process holds it', async () => {
-    const holder: Server = createServer();
-    await new Promise<void>((resolve) => holder.listen(0, '127.0.0.1', () => resolve()));
-    const port = (holder.address() as { port: number }).port;
-    try {
+    await withAHeldPort(async (port) => {
       await expect(startGraph({ port, certs, hubDir: HUB_DIR, busyFor: 300 })).rejects.toThrow(`127.0.0.1:${port}`);
-    } finally {
-      await new Promise((resolve) => holder.close(resolve));
-    }
-  });
+    });
+  }, NO_CLOCK);
 });
 
 describe('startGraphThread', () => {
@@ -475,13 +483,8 @@ describe('startGraphThread', () => {
   }, NO_CLOCK);
 
   it('says why it could not start', async () => {
-    const holder: Server = createServer();
-    await new Promise<void>((resolve) => holder.listen(0, '127.0.0.1', () => resolve()));
-    const port = (holder.address() as { port: number }).port;
-    try {
+    await withAHeldPort(async (port) => {
       await expect(startGraphThread({ port, certs, hubDir: HUB_DIR, busyFor: 300 })).rejects.toThrow(`127.0.0.1:${port}`);
-    } finally {
-      await new Promise((resolve) => holder.close(resolve));
-    }
+    });
   }, NO_CLOCK);
 });
