@@ -144,7 +144,7 @@ test('TAX-F02: a malformed key is refused under Key; a good category closes the 
   expect(res.data.total).toBe(1);
 });
 
-// flow: none — the column filters sit behind the table's funnel, as in the old hub.
+// flow: none — the column filters sit behind the table's funnel.
 test('Categories filter by Key behind the funnel, with its count, the panel open at every width', async ({ page }) => {
   await login(page, A, '/tax/categories');
   for (const vp of FILTER_VIEWPORTS) {

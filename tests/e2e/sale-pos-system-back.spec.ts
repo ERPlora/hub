@@ -1,4 +1,4 @@
-// flow: SALE-F01 · FIX-HUB-SALE-POS-MORE-MENU-ANDROID-BACK-GOES-HOME — Android's Back on the till of the installed app.
+// flow: SALE-F01 — Android's Back on the till of the installed app.
 // The till's own layers (the ⋮ screen menu, «Open checks», the phone's check drawer) are sheets of the app, not Ionic
 // overlays: they answer base's `erplora:back` (base/frontend/lib/system-back.ts), so Back closes the topmost one and
 // the till stays; with nothing open, Back is the shell's (the root of an app goes Home). Tauri does not run in

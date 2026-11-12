@@ -4,7 +4,7 @@
 // created» that leaves a task, on and allowed; a real customer created through the Customers API; the worker's
 // outbox relay pass (`base.relay.run`, as every tick runs it, in `a`'s database: the e2e stack's worker relays nothing); its History says the
 // run finished well, step by step, and the task is in Tasks. A second pass starts nothing more. One screenshot
-// per size (`APP-FLOW-3-FLOW-F21-<width>`). What it creates is tagged `E2E FlowR` and goes.
+// per size. What it creates is tagged `E2E FlowR` and goes.
 import { spawnSync } from 'node:child_process';
 
 import { expect, test } from '@playwright/test';

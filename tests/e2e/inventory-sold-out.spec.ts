@@ -1,12 +1,11 @@
 // flow: INVENTORY-F29, INVENTORY-F27 — an article marked sold out («86») in Inventory stops being sold in
-// the till (apps/inventory/WORKBOOK.md; the old QA flow qa:modules/sales/sold-out-item-86), against the
-// real Sales and Taxes apps, no doubles:
+// the till (apps/inventory/WORKBOOK.md), against the real Sales and Taxes apps, no doubles:
 //   - «Mark sold out» in the row's menu: the «Sold out» mark beside the switch, which stays on, and the
 //     till open in another tab greys it out with «Sold out» without a reload (its grid and its search,
 //     SALE-F07), picking it in the search adds nothing and says why, while the article next to it sells as
 //     always; «Put back on sale» brings it back the same way;
 //   - the counts of the till's strip («All» and the category) count what its grid shows, the greyed tile
-//     included (FIX-INVENTORY-SOLD-OUT-GREYED-IN-POS), also on a till opened after the mark;
+//     included, also on a till opened after the mark;
 //   - the product sheet marks and unmarks it too, and says so beside its status;
 //   - a menu whose only dessert is sold out leaves the till (COMBO-F06), its editor says «Sold out in
 //     Inventory» on that choice, and the menu comes back with it;
@@ -119,7 +118,7 @@ const soldOutMark = (page: Page, product: Product): Locator =>
 /** What hides part of the switch or the «Sold out» mark beside it in the row's status (none = both whole): a part is
  *  in sight when it lies inside the cell (or the card's value) and inside every box between them that clips, shadow
  *  roots crossed — the switch's own track included. In a narrow column the mark goes under the switch, never over it
- *  (review of FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED: at 834 the switch was cut to its first half). */
+ *  (at 834 it could cut the switch to its first half). */
 async function statusProblems(page: Page, product: Product): Promise<string[]> {
   return soldOutMark(page, product).evaluate((mark) => {
     const px = (n: number) => Math.round(n * 10) / 10;

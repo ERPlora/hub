@@ -1,8 +1,8 @@
-// flow: kitchen-e2e-wait — FIX of the Kitchen specs' wait (FIX-HUB-KITCHEN-E2E-WAIT-BLIND-TO-SHADOW-ROOTS)
+// flow: kitchen-e2e-wait — the Kitchen specs' wait
 // Before a capture or a measurement, the Kitchen specs (kitchen-*.spec.ts) wait for the screen to stop moving with the
-// harness's one wait, `untilStill` (helpers.ts). Their own wait asked the document alone for its animations, which
-// leaves shadow roots out, and Ionic animates its overlays (`ion-modal`, `ion-toast`) in theirs: a capture could come
-// out with a sheet still sliding in and pass for good. Here the till's «Order tickets» sheet (KITCHEN-F19: «Tickets · 1»
+// harness's one wait, `untilStill` (helpers.ts). A wait that asks the document alone for its animations leaves shadow
+// roots out, and Ionic animates its overlays (`ion-modal`, `ion-toast`) in theirs: a capture could come out with a
+// sheet still sliding in and pass for good. Here the till's «Order tickets» sheet (KITCHEN-F19: «Tickets · 1»
 // beside what was sent opens it) enters at a fifth of its speed (Chrome's own control), and once the Kitchen specs'
 // wait returns nothing may move, asked with the harness's own detector (`exposeMovingInPage`, helpers.ts), at 390, 834
 // and 1440. What a run creates — the product `E2E-KST-<run>`, its check and its kitchen ticket — is deleted after it.

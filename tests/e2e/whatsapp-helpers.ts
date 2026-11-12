@@ -103,7 +103,7 @@ export function system<T = unknown>(op: string, payload: unknown): T {
 /** Python that goes first in a one-shot `manage.py shell` playing the worker's relay (in `a`'s database: the e2e stack's worker relays nothing).
  *  What a reaction hands erplora.com after its COMMIT goes to `base.outbound`'s threads, which in the worker outlive
  *  the tick but here would die with this process (daemon threads) before erplora.com is called: this process makes
- *  those calls at once, as the suite's `conftest.py` does (FIX-HUB-WHATSAPP-INBOX-SLOW-SEND-BLOCKS-RELAY). */
+ *  those calls at once, as the suite's `conftest.py` does. */
 export const OUTBOUND_AT_ONCE = `
 from base import outbound
 class _AtOnce:
@@ -223,7 +223,7 @@ export function seedErplora(seed: ErploraSeed = {}): { delivered: boolean; hub_e
 
 /** Puts back `a`'s photo as it was at the spec's first `keepPhoto` (or `seedErplora`), its version too, and the row
  *  of its WhatsApp channel (none, if it had none): a spec run after it on the same database finds `a` as it was, never
- *  on erplora.com's Free plan, whose one device ends another device's session (BASE-G57), nor with a channel whose
+ *  on erplora.com's Free plan, whose one device ends another device's session, nor with a channel whose
  *  version stops the photos of an erplora.com made afresh (`whatsapp_inbox.channel.sync` ignores an equal or older
  *  one). It goes last in the `afterAll` of every spec that keeps the photo, after anything else there that pushes a
  *  photo (a seed again, erplora.com's plan put back). With nothing kept since the last one, it changes nothing. */
