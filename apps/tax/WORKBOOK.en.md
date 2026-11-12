@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:64c404bbfa7b2386c84480db040e0e9f42799c31ad2ac89b242ef4dd5d23a206 -->
+<!-- generated from WORKBOOK.md sha256:082eed4f25f83c8ead65f08336f3980d217f719a342fe9f9893a471cc5eb3b29 -->
 
 ## What it is for and who it is for
 
@@ -47,15 +47,17 @@ country.
 
 ## Before you start
 
-- When Taxes is turned on, the business gets **11 categories**, **18 aliases** and **the rates of Spain**
-  from the factory (TAX-F16). With that a Spanish business can sell without touching anything.
-- Turning on Inventory, Services, Sales, Invoicing, Menus and combos or Modifiers turns on Taxes with them.
-  Once on, Taxes is not turned off: neither by itself ("Taxes is mandatory for businesses in Spain: it can't be
-  turned off.") nor when the app it came with is turned off (BASE-F25, hub#997).
+- **A business is born with Taxes on** (a demo too), without counting against the plan's app limit, and with its
+  factory catalogue: **11 categories**, **18 aliases** and **the rates of Spain** (TAX-F16). With that a Spanish
+  business can sell without touching anything (hub#997).
+- In a business of before that does not have it yet, turning on Inventory, Services, Sales, Invoicing, Menus and
+  combos or Modifiers turns on Taxes with them. Once on, Taxes is not turned off: neither by itself ("Taxes is
+  mandatory for businesses in Spain: it can't be turned off.") nor when the app it came with is turned off
+  (BASE-F25, hub#997).
 - **It is mandatory in every country**: without it nothing is charged, and **Apps** marks it "Mandatory in Spain"
-  (or in the business's country). While it is off, "Finish setting up your business" on the Home asks whoever runs
-  the business to "Turn on Taxes" ("Important"), with "Set up" leading to **Apps**; as soon as they turn it on,
-  that step goes and "Your taxes" comes (BASE-F01, hub#997).
+  (or in the business's country). While it is off (only in a business of before that never turned it on), "Finish
+  setting up your business" on the Home asks whoever runs the business to "Turn on Taxes" ("Important"), with "Set
+  up" leading to **Apps**; as soon as they turn it on, that step goes and "Your taxes" comes (BASE-F01, hub#997).
 - **The business's country and tax region**: the country is the one chosen when the business was signed up
   on erplora.com, and it is not changed here (a business without a country, such as a demo, is in Spain); the
   tax region —the whole country, or the Canary Islands, Ceuta or Melilla in Spain— is chosen in **Taxes →
@@ -442,8 +444,8 @@ Status: done
 Actor: system
 Screen: none
 Steps:
-1. The first time the business turns on Taxes (or when it is born with a vertical that brings it), the app
-   seeds the catalogue; nothing is done by hand.
+1. The business is born with Taxes on and the catalogue already there (hub#997); in a business of before, it
+   comes the first time it turns Taxes on. Nothing is done by hand.
 2. It is checked in Categories and Rules.
 In: nothing.
 Out: 11 system categories (`restaurant.food`, `restaurant.drink`, `restaurant.alcohol`,

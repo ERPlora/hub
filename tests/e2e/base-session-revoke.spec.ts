@@ -7,13 +7,12 @@
 // The real Hub and the real SaaS of this run's stack (the SaaS's `HUB_INTERNAL_URL` points here) and fresh accounts
 // signed up on the SaaS's screens; the business is created through the SaaS's API as the panel creates it, so the SaaS
 // registers it in this Hub with the same id. The SaaS's changes are made on its panel, as the owner makes them.
-import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
-import { api, type Credentials, listReady, login, MAIL_DIR, psql, SAAS, shot, shown, turnOn } from './helpers';
-import { readMailCode } from './mail';
+import { api, listReady, login, psql, SAAS, shot, shown, turnOn } from './helpers';
+import { businessOnSaas, type SaasBusiness, type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
 import { STACK } from './stack';
 
-const PASSWORD = 'Masa-madre-y-centeno-26';
 const SIZES = [
   { name: '390', width: 390, height: 844 },
   { name: '834', width: 834, height: 1112 },
@@ -22,53 +21,12 @@ const SIZES = [
 /** What the SaaS's steps wait (its pushes to this Hub happen after its COMMIT). */
 const SAAS_STEP = 30_000;
 
-interface Person {
-  context: BrowserContext;
-  page: Page;
-  credentials: Credentials;
-}
-
-interface Business {
-  id: string;
-  slug: string;
-}
-
-/** A fresh account signed up on the SaaS's «Create account», its address proven with the mailed code; signed in. */
-async function signUp(browser: Browser, who: string): Promise<Person> {
-  const credentials = { email: `e2e-revoke-${who}-${Date.now()}@example.com`, password: PASSWORD };
-  const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } });
-  const page = await context.newPage();
-  await page.goto(`${SAAS}/launch?tab=signup`);
-  const form = page.getByTestId('login-form');
-  await expect(page.getByTestId('login-submit')).toHaveText('Create account');
-  await form.getByTestId('login-email').locator('input').fill(credentials.email);
-  await form.getByTestId('login-password').locator('input').fill(credentials.password);
-  const since = Date.now() - 50;
-  await form.getByTestId('login-submit').click();
-  await expect(page).toHaveURL(/\/verify-email$/);
-  const code = await readMailCode({ dir: MAIL_DIR, to: credentials.email, since, timeout: SAAS_STEP });
-  await page.getByTestId('code').locator('input').fill(code);
-  await page.getByTestId('verify-email-submit').click();
-  await expect(page).toHaveURL(/\/launch$/);
-  return { context, page, credentials };
-}
-
-/** A POST to the SaaS's API as `context`'s account, with the SaaS's CSRF token. */
-async function saasPost(context: BrowserContext, path: string, data: unknown) {
-  const host = new URL(SAAS).hostname;
-  const csrf = (await context.cookies(SAAS)).find((c) => c.name === 'csrftoken' && c.domain === host)?.value;
-  if (!csrf) throw new Error(`POST ${path}: no csrftoken of the SaaS (sign in first)`);
-  return context.request.post(`${SAAS}/api${path}`, { headers: { 'X-CSRFToken': csrf }, data });
-}
+type Person = SaasOwner;
+type Business = SaasBusiness;
 
 /** `owner`'s new business, once the SaaS registered it in this Hub and heard it is ready. */
 async function businessOf(owner: Person): Promise<Business> {
-  const created = await saasPost(owner.context, '/hubs/businesses', { name: `Revoke ${Date.now().toString(36)}`, country: 'ES' });
-  expect(created.status(), await created.text()).toBe(201);
-  const business = (await created.json()) as Business;
-  await expect
-    .poll(() => psql(`SELECT status FROM base_hub WHERE id = '${business.id}'`), { timeout: SAAS_STEP, message: 'registered here' })
-    .toBe('ready');
+  const business = await businessOnSaas(owner, { name: `Revoke ${Date.now().toString(36)}`, country: 'ES' });
   await expect
     .poll(
       async () => {
@@ -155,12 +113,13 @@ let origin: string;
 let tab: Page;
 
 test.beforeAll(async ({ browser }) => {
-  owner = await signUp(browser, 'owner');
-  employee = await signUp(browser, 'employee');
+  owner = await signUpOnSaas(browser, 'revoke-owner');
+  employee = await signUpOnSaas(browser, 'revoke-employee');
   business = await businessOf(owner);
   memberId = await joins(owner, employee, business);
   origin = STACK.hub(business.slug);
-  // A business is born with every app off (PLAN-HUB round 2026-10-27): its owner turns on Demo, where the employee works.
+  // A business is born with every app off but Taxes (PLAN-HUB rounds 2026-10-27 and 2026-11-07): its owner turns on Demo,
+  // where the employee works.
   await login(owner.page, origin, '/apps', owner.credentials);
   await turnOn(owner.context, origin, 'demo');
   tab = await employee.context.newPage();

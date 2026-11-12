@@ -17,18 +17,26 @@ import datetime as dt
 import logging
 import threading
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from psycopg import sql
 from django.db import connections as django_connections
+from django.apps import apps as django_apps
 from django.db.migrations.loader import MigrationLoader
 from django.utils import timezone
 from live.models import OutboxEvent
 
-from base import services
+from live.context import OperationContext, Scope
+from live.operations import get as get_operation
+
+from base import activation, services
+from base.activation import Activation
 from base.models import AppActivation, Location
+from base.schemas import SetupStatusIn
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import identity, migrator, names, ops, provision
 from base.tenancy.context import use_control, use_hub
@@ -160,24 +168,33 @@ def test_a_failed_preparation_leaves_no_connection_open_either(registry, monkeyp
     hubs.assert_nobody_on(hub.db_name)
 
 
-def test_once_born_its_hub_reads_its_own_database_and_control_hears_none_of_its_business(registry, told):
-    hub = registry.hub()
-    provision.provision(hub)
+@contextmanager
+def control_hears() -> Iterator[list[str]]:
+    """The statements control's own connection runs meanwhile."""
     heard: list[str] = []
 
     def record(execute, sql, params, many, context):
         heard.append(sql)
         return execute(sql, params, many, context)
 
-    with django_connections["default"].execute_wrapper(record), use_hub(fresh(hub)) as active:
+    with django_connections["default"].execute_wrapper(record):
+        yield heard
+
+
+def test_once_born_its_hub_reads_its_own_database_and_control_hears_none_of_its_business(registry, told):
+    hub = registry.hub()
+    provision.provision(hub)
+
+    with control_hears() as heard, use_hub(fresh(hub)) as active:
         assert active.alias == tenancy_connections.hub_alias(hub)
         Location.objects.count()
         AppActivation.objects.count()
 
     assert not [sql for sql in heard if "base_location" in sql or "base_appactivation" in sql]
-    # Born with every app off (PLAN §33): its template carries no app turned on.
+    # Its template carries no app turned on: it is born with only what its country requires that the platform turns
+    # on by itself (Taxes, hub#997), every other app off (PLAN §33).
     with use_hub(fresh(hub)):
-        assert AppActivation.objects.count() == 0
+        assert set(AppActivation.objects.filter(state="on").values_list("app", flat=True)) == {"tax"}
 
 
 def test_a_hub_already_ready_is_left_as_it_is(registry, monkeypatch, told):
@@ -790,18 +807,20 @@ def test_a_hub_may_get_more_apps_than_its_template_and_a_seed_inside_its_databas
 
 
 def _only_its_templates_apps_are_there(hub: Hub) -> None:
-    """S3: a new hub has its template's tables and nothing more, every app off; an app's tables are made the first time
-    it is turned on (``base.app.enable`` → the worker's ``ensure_schema``)."""
+    """S3: a new hub has its template's tables and those of the apps it is born with on (Taxes, hub#997), nothing more,
+    every other app off; an app's tables are made the first time it is turned on (``base.app.enable`` → the worker's
+    ``ensure_schema``)."""
     hub = fresh(hub)
     assert hub.status == "ready"
-    assert set(hub.schema_apps) == {"base", "live"}
+    assert set(hub.schema_apps) == {"base", "live", "tax"}
     tables = hubs.table_names(hub.db_name)
-    assert not {table for table in tables if table.startswith(("sale_", "customer_", "tax_"))}
+    assert {table for table in tables if table.startswith("tax_")}
+    assert not {table for table in tables if table.startswith(("sale_", "customer_"))}
     with use_hub(hub):
-        assert not AppActivation.objects.filter(state="on").exists()
+        assert set(AppActivation.objects.filter(state="on").values_list("app", flat=True)) == {"tax"}
 
 
-def test_a_new_hub_gets_only_its_templates_tables_every_app_off(registry, small_template, told):
+def test_a_new_hub_gets_only_its_templates_tables_and_those_of_what_it_is_born_with(registry, small_template, told):
     hub = registry.hub(vertical="small")
     assert not {table for table in hubs.table_names(small_template) if table.startswith("sale_")}
 
@@ -819,37 +838,125 @@ def test_the_due_pass_gives_a_new_business_only_its_templates_tables(registry, s
     _only_its_templates_apps_are_there(hub)
 
 
-@pytest.fixture
-def full_template(django_db_blocker, hub_databases):
-    """``<control>_template_full``: built as ``migrate_hubs`` builds the platform's (``migrator.templates()[0].apps``)."""
-    control = hub_databases.control
-    name = names.template_db_name(control, "full")
-    with django_db_blocker.unblock():
-        with hubs._maintenance() as conn:
-            hubs._drop(conn, name, control)
-            conn.execute(sql.SQL("CREATE DATABASE {}").format(names.identifier(name, control=control)))
-        ddl = tenancy_connections.register_ddl_alias(name)
-        try:
-            migrator.migrate_apps(ddl, migrator.templates()[0].apps)
-        finally:
-            migrator._forget_alias(ddl)  # closed and out of the settings: Django's test case unwraps only its own
-    yield name
-    with hubs._maintenance() as conn:
-        hubs._drop(conn, name, control)
+# ── What a business is born with (hub#997, PLAN-HUB round 2026-11-07) ───────────────────────────────────────────
+# Its seeding turns on, by itself, the apps the business's country requires that say the platform may (Taxes, in every
+# country), none chosen: they take nothing of the plan's limit. Never VeriFactu, mandatory in Spain: it binds the
+# business to the AEAT, so the Home asks its owner to turn it on. Every other app is off, as since round 2026-10-27.
 
 
-def test_a_sign_up_from_a_template_up_to_date_is_the_clone_alone(registry, full_template, monkeypatch, told):
-    """Review of hub#471 in pre: ~63 s of migrations per sign-up on Fargate. The templates carry every portable app
-    (``migrator.templates``), so a hub made from one migrates nothing: its sign-up is the clone."""
-    hub = registry.hub(vertical="full")
-    applied = []
-    real = migrator.ensure_schema
-    monkeypatch.setattr(migrator, "ensure_schema", lambda row, **kwargs: applied.append(real(row, **kwargs)) or applied[-1])
+def admin(hub: Hub, language: str = "en") -> OperationContext:
+    return OperationContext(scope=Scope("host", hub.slug), actor="ana", permissions=frozenset({"*"}), language=language)
+
+
+def born_with(hub: Hub) -> tuple[dict[str, Activation], dict[str, dict]]:
+    """The apps of ``hub`` once born, and what «Finish setting up your business» asks its owner, read in its database."""
+    with use_hub(fresh(hub)):
+        states = activation.states_of(Scope("host", hub.slug))
+        document = get_operation("base.setup.status")(admin(hub), SetupStatusIn()).model_dump(mode="json")
+    return states, {item["key"]: item for item in document["items"]}
+
+
+@pytest.mark.parametrize(
+    ("country", "verifactu_asked", "rules"),
+    [("ES", True, "done"), ("", True, "done"), ("PT", False, "pending")],
+)
+def test_a_business_is_born_with_taxes_on_for_its_country_and_never_with_verifactu(
+    registry, told, country, verifactu_asked, rules
+):
+    """Taxes is on and not chosen from its sign-up, with its country's rules: Spain's (a business without a country, a
+    demo, is in Spain) price at once, one of Portugal is told it has none yet (TAX-F17). VeriFactu stays off: in Spain
+    the Home asks its owner to turn it on; elsewhere, nothing."""
+    hub = registry.hub(country=country)
 
     assert provision.provision(hub) is True
 
-    assert applied == [[]]
-    assert set(migrator.portable_apps()) <= set(fresh(hub).schema_apps)
+    states, asked = born_with(hub)
+    assert states["tax"] == Activation("on", False)
+    assert states["verifactu"] == Activation("off", False)
+    assert {label for label, row in states.items() if row.wanted} == {"tax"}
+    assert activation.chosen_on(states) == 0
+    assert "base.mandatory.tax" not in asked
+    # With only what it is born with on, its till has nothing to sell yet: «Your apps» still asks for one.
+    assert asked["base.apps"]["state"] == "pending"
+    assert asked["tax.rules"]["state"] == rules
+    assert ("base.mandatory.verifactu" in asked) is verifactu_asked
+    if verifactu_asked:
+        assert asked["base.mandatory.verifactu"]["state"] == "pending"
+
+
+def test_two_businesses_are_born_each_with_its_apps_in_its_own_database_and_none_in_control(registry, told):
+    """A business of Spain and one of Portugal, each with its rows in its own database; the second sign-up leaves the
+    first's as they were, and control hears none of their apps."""
+    spain, portugal = registry.hub(country="ES"), registry.hub(country="PT")
+
+    with control_hears() as heard:
+        assert provision.provision(spain) is True
+        with use_hub(fresh(spain)):
+            first = set(AppActivation.objects.values_list("host", "app", "state", "chosen", "changed_at"))
+        assert provision.provision(portugal) is True
+
+    assert not [sql for sql in heard if "base_appactivation" in sql]
+    with use_hub(fresh(spain)):
+        assert set(AppActivation.objects.values_list("host", "app", "state", "chosen", "changed_at")) == first
+    with use_hub(fresh(portugal)):
+        assert set(AppActivation.objects.values_list("host", flat=True)) == {portugal.slug}
+        assert set(AppActivation.objects.filter(state="on").values_list("app", flat=True)) == {"tax"}
+    assert {host for host, *_ in first} == {spain.slug}
+
+
+def test_a_demo_is_born_as_a_business_of_spain_with_taxes_on_and_verifactu_off(registry, told):
+    hub = registry.hub(demo=True)
+
+    assert provision.provision(hub) is True
+
+    states, asked = born_with(hub)
+    assert {label for label, row in states.items() if row.wanted} == {"tax"}
+    assert asked["base.mandatory.verifactu"]["state"] == "pending"
+
+
+def test_an_app_mandatory_in_one_country_that_the_platform_turns_on_is_on_only_in_a_business_of_it(
+    registry, small_template, told, monkeypatch
+):
+    """Base names no app: what it turns on at sign-up, with its tables, is what each app declares, for the business's own
+    country (a straw declaration on Tasks, mandatory in Portugal only; a template without its tables)."""
+    monkeypatch.setattr(
+        django_apps.get_app_config("task"), "mandatory", {"countries": ["PT"], "platform_turns_on": True}, raising=False
+    )
+    portugal, spain = registry.hub(country="PT", vertical="small"), registry.hub(country="ES", vertical="small")
+
+    assert provision.provision(portugal) is True
+    assert provision.provision(spain) is True
+
+    assert born_with(portugal)[0]["task"] == Activation("on", False)
+    assert born_with(spain)[0]["task"] == Activation("off", False)
+    assert "task" in fresh(portugal).schema_apps and "task" not in fresh(spain).schema_apps
+
+
+def test_what_its_seeding_read_of_its_apps_is_not_kept_once_it_is_born_with_them(registry, told):
+    """Read while it is seeded (its apps all off then), what is kept of them is forgotten once it is born with Taxes on:
+    Taxes answers from its first request, never refused for a minute as off."""
+    hub = registry.hub(country="ES")
+    read: list[frozenset[str]] = []
+
+    def seed(row):
+        read.append(activation.off_apps(Scope("host", row.slug)))
+
+    assert provision.provision(hub, seed=seed) is True
+
+    assert "tax" in read[0]
+    with use_hub(fresh(hub)):
+        assert "tax" not in activation.off_apps(Scope("host", hub.slug))
+
+
+def test_a_seeding_that_writes_its_apps_keeps_them_as_it_wrote_them(registry, told):
+    """The local hubs a and b are born with every app on (``seed_local_hubs``): their seeding writes their apps, and
+    what a business is born with adds nothing to them."""
+    hub = registry.hub()
+
+    assert provision.provision(hub, seed=services.turn_every_app_on) is True
+
+    states, _ = born_with(hub)
+    assert states == activation.every_on(activation.module_graph())
 
 
 @pytest.fixture

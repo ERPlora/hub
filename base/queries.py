@@ -278,12 +278,14 @@ def setup_status(ctx: OperationContext, data: SetupStatusIn) -> dict:
 
 
 def _platform_steps(ctx: OperationContext, on: frozenset[str], country: str, demo_hub: bool) -> list[dict]:
-    """«Your apps» (some business app on), «Turn on <app>» for each app mandatory in the business's ``country`` that is
-    off (hub#997) and «Your team» (more than one active person), for who runs the hub: who turns apps on and off."""
+    """«Your apps» (some business app on, but those its country's businesses are born with: with them alone the till has
+    nothing to sell, hub#997), «Turn on <app>» for each app mandatory in the business's ``country`` that is off (hub#997)
+    and «Your team» (more than one active person), for who runs the hub: who turns apps on and off."""
     if not ctx.has(ADMINISTER_HUB):
         return []
     business_apps = home.business_apps()
-    if any(label in on for label in business_apps):
+    born = activation.born_apps(country)
+    if any(label in on and label not in born for label in business_apps):
         apps_state = home.STATE_DONE
     else:
         apps_state = home.STATE_PENDING if business_apps else home.STATE_UNAVAILABLE

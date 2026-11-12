@@ -27,11 +27,12 @@ class TaxConfig(LiveAppConfig):
         "ready, lets you schedule a rate change ahead, never lets two rates apply on the same day, "
         "and is what the till and the invoices use to charge and declare each line."
     )
-    # Every hair salon and every restaurant turns it on at sign-up: no sale is priced without it.
+    # Both sectors' templates carry it (base.catalog.template_apps); every business is born with it on anyway (below).
     verticals = ["hair_salon", "restaurant"]
     # Mandatory wherever the business is: no sale is priced without it (hub#997, PLAN-HUB round 2026-11-07). The Home
-    # asks whoever runs a business to turn it on while it is off (base.home.mandatory_steps), and the platform may turn
-    # it on by itself at sign-up: it binds the business to no authority.
+    # asks whoever runs a business to turn it on while it is off (base.home.mandatory_steps), and the platform turns it
+    # on by itself at sign-up (base.activation.born_on, base.services.turn_on_born_apps): it binds the business to no
+    # authority.
     mandatory = {"countries": "all", "platform_turns_on": True}
     default_auto_field = "django.db.models.BigAutoField"
     permissions = ["tax.view", "tax.manage"]

@@ -1,4 +1,5 @@
-// A business is born with every app off (PLAN-HUB round 2026-10-27) and «Start with a business like yours» on the
+// A hub without rows of its apps has every app off (PLAN-HUB round 2026-10-27; a business signs up with Taxes on since
+// hub#997: base-sign-up-taxes-on.spec.ts) and «Start with a business like yours» on the
 // Home turns on the apps of the template it uses, then loads its catalogue (BASE-G131; `base.blueprint.import`), in the
 // three viewports, as the owner of hub `a` put back to how a business is born:
 //   - Apps says nothing is on: «My apps» is empty with its notice, and an app of the catalogue is «Off» in «Add apps»;

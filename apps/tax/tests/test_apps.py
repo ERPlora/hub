@@ -3,6 +3,7 @@ the Home."""
 
 from pathlib import Path
 
+import pytest
 from django.apps import apps
 from django.conf import settings
 from django.utils import translation
@@ -11,7 +12,7 @@ from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, modul
 from live.operations import INTERNAL, registry
 
 from apps.tax import events as E
-from base import home
+from base import activation, home
 
 
 def tax():
@@ -191,6 +192,14 @@ def test_taxes_is_mandatory_in_every_country_and_the_platform_may_turn_it_on():
     """hub#997 (PLAN-HUB round 2026-11-07): no sale is priced without it, in any country, and turning it on binds the
     business to nobody, so the platform may turn it on by itself at sign-up."""
     assert tax().mandatory == {"countries": "all", "platform_turns_on": True}
+
+
+@pytest.mark.parametrize("country", ["ES", "PT", "JP", ""])
+def test_every_business_is_born_with_taxes_on_and_none_with_verifactu(country):
+    """hub#997, part 3: what the platform turns on by itself at sign-up, read from every app's declaration, is Taxes,
+    in every country; never VeriFactu, which its owner turns on (it binds the business to the AEAT)."""
+    assert "tax" in activation.born_on(country)
+    assert "verifactu" not in activation.born_on(country)
 
 
 def test_while_taxes_is_off_whoever_runs_a_business_of_any_country_is_asked_to_turn_it_on():
