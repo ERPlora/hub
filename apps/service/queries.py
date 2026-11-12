@@ -1599,7 +1599,7 @@ def list_movements(ctx: OperationContext, params: MovementListIn) -> dict:
     now = timezone.now()
     sessions = (
         Redemption.objects.filter(grant__package=package)
-        .select_related("grant__customer", "service")
+        .select_related("grant__customer", "service", "member")
         .annotate(at=_session_moment(now))
     )
     adjustments = GrantAdjustment.objects.filter(grant__package=package).select_related(
@@ -1687,6 +1687,8 @@ def _session_row(ctx: OperationContext, session: Redemption, now: dt.datetime) -
         "at": session.at,
         "service_id": session.service_id,
         "service_name": session.service.name if session.service else None,
+        "member_id": session.member_id,
+        "member_name": session.member.full_name if session.member else None,
         "sale_id": session.sale_id,
         "appointment_id": session.appointment_id,
         "note": session.note,
@@ -1705,6 +1707,8 @@ def _adjustment_row(ctx: OperationContext, adjustment: GrantAdjustment) -> dict:
         "at": adjustment.created_at,
         "service_id": None,
         "service_name": None,
+        "member_id": None,
+        "member_name": None,
         "sale_id": None,
         "appointment_id": None,
         "note": "",

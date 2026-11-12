@@ -60,7 +60,8 @@ live(
     "service.grant.tender_options",
     on=[*GRANT_EVENTS, *SESSION_EVENTS, *PACKAGE_EVENTS, *CUSTOMER_NAMED],
 )
+# A session names its customer and the professional who did it (hub#1236).
 live(
     "service.movement.list",
-    on=[*GRANT_EVENTS, *SESSION_EVENTS, SERVICE_UPDATED, *CUSTOMER_NAMED],
+    on=[*GRANT_EVENTS, *SESSION_EVENTS, SERVICE_UPDATED, *CUSTOMER_NAMED, *STAFF_MEMBER_EVENTS],
 )
