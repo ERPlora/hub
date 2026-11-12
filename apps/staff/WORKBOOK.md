@@ -229,10 +229,12 @@ Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Personal
 Pasos:
-1. Pulsa la fila: se abre **Editar · {nombre}** (el asistente la nombra por su nombre).
-2. Cambia lo que haga falta. **Estado** ofrece Activo, Inactivo y De baja (la baja definitiva es
-   STAFF-F06). «Sin rol» quita el rol, «Sin acceso al Hub» desvincula la cuenta, y la Fecha de alta
-   se puede **borrar**.
+1. Pulsa la fila: se abre **Editar · {nombre}** (el asistente la nombra por su nombre) con lo que ya
+   dice la fila, y «Cargando…» mientras llega la ficha completa; Guardar espera en gris hasta entonces.
+2. Cambia lo que haga falta, también antes de que llegue la ficha: lo escrito o elegido se queda, y la
+   ficha, al llegar, solo rellena lo que no se ha tocado (hub#1347). **Estado** ofrece Activo, Inactivo y
+   De baja (la baja definitiva es STAFF-F06). «Sin rol» quita el rol, «Sin acceso al Hub» desvincula la
+   cuenta, y la Fecha de alta se puede **borrar**.
 3. Guarda: solo cambia lo enviado.
 Entra: la ficha (y, con permiso, su tarifa, comisión y notas).
 Sale: la ficha cambiada (`staff.member.updated`). Guardar sin cambiar nada no avisa. Poner Inactivo
