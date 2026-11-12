@@ -44,7 +44,7 @@ def create(record: dict) -> dict:
     return op(ctx_for(), op.input.model_validate({key: value for key, value in record.items() if key != "id"}))
 
 
-def test_the_copy_gives_each_offered_service_with_what_its_create_takes():
+def test_the_copy_gives_each_service_with_what_its_create_takes_and_whether_it_was_on_offer():
     tax = make_tax("test.service", "Service — test")
     hair = make_category("Hair")
     keratin = make_service(
@@ -72,10 +72,11 @@ def test_the_copy_gives_each_offered_service_with_what_its_create_takes():
         notes="Ask about allergies",
         image="service/services/keratin.webp",
     )
-    make_service("Old perm", tax=tax, is_active=False, archived_at=timezone.now())
+    old = make_service("Old perm", tax=tax, is_active=False, archived_at=timezone.now())
 
-    [read] = queries.services_in_copy(direct())
+    read, archived = sorted(queries.services_in_copy(direct()), key=lambda one: one["name"] != "Keratin treatment")
 
+    assert (archived["id"], archived["name"], archived["is_active"]) == (old.pk, "Old perm", False)
     assert read == {
         "id": keratin.pk,
         "name": "Keratin treatment",
@@ -100,6 +101,7 @@ def test_the_copy_gives_each_offered_service_with_what_its_create_takes():
         "notes": "Ask about allergies",
         "category_id": hair.pk,
         "tax_category_id": tax.pk,
+        "is_active": True,
     }
 
 
@@ -135,6 +137,7 @@ NEW = {
     "notes": "",
     "category_id": None,
     "tax_category_id": None,
+    "is_active": True,
 }
 
 
@@ -179,6 +182,69 @@ def test_the_business_holds_the_same_service_offered_or_archived_and_one_made_ag
     assert [one["id"] for one in queries.services_not_in_business(services)] == [other_category["id"], absent["id"]]
 
 
+def test_a_lost_service_named_as_one_the_business_kept_in_the_same_category_is_lacking():
+    tax = make_tax()
+    hair = make_category("Hair")
+    kept = make_service("Haircut", tax=tax, category=hair)
+    # Service names are not unique: the kept one is itself a service of the copy, never another's made again.
+    services = [a_service_of_the_copy(kept), lost := a_service_of_the_copy(name="Haircut", category_id=hair.pk)]
+
+    assert queries.services_in_business(services) == {kept.pk: kept.pk}
+    assert [one["id"] for one in queries.services_not_in_business(services)] == [lost["id"]]
+
+
+def test_a_lost_service_named_as_one_the_copy_had_archived_is_lacking():
+    tax = make_tax()
+    archived = make_service("Haircut", tax=tax, is_active=False, archived_at=timezone.now())
+    services = [
+        a_service_of_the_copy(archived),
+        lost := a_service_of_the_copy(name="Haircut"),
+    ]
+
+    assert queries.services_in_business(services) == {archived.pk: archived.pk}
+    assert [one["id"] for one in queries.services_not_in_business(services)] == [lost["id"]]
+
+
+def test_each_one_made_again_stands_for_one_service_of_the_copy_the_oldest_first():
+    tax = make_tax()
+    hair = make_category("Hair")
+    first, second = (a_service_of_the_copy(name="Haircut", category_id=hair.pk) for _ in range(2))
+    older = make_service("Haircut", tax=tax, category=hair)
+
+    # One made again: it stands for the first of the copy; the second is still lacking.
+    assert queries.services_in_business([first, second]) == {first["id"]: older.pk}
+    assert [one["id"] for one in queries.services_not_in_business([first, second])] == [second["id"]]
+
+    newer = make_service("haircut", tax=tax, category=hair)
+
+    assert queries.services_in_business([first, second]) == {first["id"]: older.pk, second["id"]: newer.pk}
+    assert queries.services_not_in_business([first, second]) == []
+
+
+def test_two_lost_with_the_same_name_both_come_back_and_asking_again_makes_neither_twice():
+    tax = make_tax("test.service", "Service — test")
+    hair = make_category("Hair")
+    copy = [
+        a_service_of_the_copy(name="Haircut", category_id=hair.pk, tax_category_id=tax.pk, price=2000),
+        a_service_of_the_copy(name="Haircut", category_id=hair.pk, tax_category_id=tax.pk, price=2500),
+    ]
+    first = create(queries.services_not_in_business(copy)[0])
+    # Cut after the first (the lease lost): the next pass still brings back the second.
+    [second] = [create(record) for record in queries.services_not_in_business(copy)]
+
+    assert (first.price, second.price) == (2000, 2500)
+    assert queries.services_not_in_business(copy) == []
+    assert queries.services_in_business(copy) == {copy[0]["id"]: first.id, copy[1]["id"]: second.id}
+
+
+def test_a_service_the_copy_had_archived_never_comes_back():
+    tax = make_tax("test.service", "Service — test")
+    archived = a_service_of_the_copy(name="Old perm", tax_category_id=tax.pk, is_active=False)
+
+    assert queries.services_in_business([archived]) == {}
+    assert queries.services_not_in_business([archived]) == []
+
+
 def test_one_whose_category_the_business_deleted_is_made_again_with_no_category():
     tax = make_tax()
     gone = make_category("Color", is_deleted=True, deleted_at=timezone.now())
@@ -210,10 +276,10 @@ def test_each_lacking_service_comes_as_its_create_takes_it_here():
     lacking = queries.services_not_in_business([in_hair, in_gone])
 
     assert lacking[0] == {
-        key: value for key, value in in_hair.items() if key not in {"category_id", "tax_category_id"}
+        key: value for key, value in in_hair.items() if key not in {"category_id", "tax_category_id", "is_active"}
     } | {"category_id": hair.pk, "tax_category_key": "test.service"}
     assert lacking[1] == {
-        key: value for key, value in in_gone.items() if key not in {"category_id", "tax_category_id"}
+        key: value for key, value in in_gone.items() if key not in {"category_id", "tax_category_id", "is_active"}
     } | {"tax_category_key": "test.service"}
     for record in lacking:
         ServiceIn.model_validate({key: value for key, value in record.items() if key != "id"})

@@ -1751,50 +1751,56 @@ COPY_FIELDS = (
 
 
 def services_in_copy(conn) -> list[dict]:
-    """hub#1283: each service a separate copy of the business offers (an archived one was not on offer then), with its
-    ``id`` there, what ``service.service.create`` takes and the ids there of its category (``category_id``) and its tax
-    category (``tax_category_id``), by id; nothing where the app's table is not there. ``conn`` is the copy's direct,
-    read-only connection (``recoverable_from_copy`` on this app's config: the copy is no business and has no alias),
-    so it is read by its own SQL over the model's names, never the ORM."""
+    """hub#1283: each service of a separate copy of the business, on offer or archived (``is_active``), with its ``id``
+    there, what ``service.service.create`` takes and the ids there of its category (``category_id``) and its tax
+    category (``tax_category_id``), by id; nothing where the app's table is not there. Only one on offer comes back
+    (``services_not_in_business``), but every one is read: a service of the copy is never another one's made again
+    (``services_in_business``). ``conn`` is the copy's direct, read-only connection (``recoverable_from_copy`` on this
+    app's config: the copy is no business and has no alias), so it is read by its own SQL over the model's names, never
+    the ORM."""
     table = Service._meta.db_table
     if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
         return []
-    read = ("id", *COPY_FIELDS, "category", "tax_category")
-    column = {field: sql.Identifier(Service._meta.get_field(field).column) for field in (*read, "is_active")}
-    query = sql.SQL("SELECT {} FROM {} WHERE {} ORDER BY {}").format(
-        sql.SQL(", ").join(column[field] for field in read), sql.Identifier(table), column["is_active"], column["id"]
+    read = ("id", *COPY_FIELDS, "category", "tax_category", "is_active")
+    column = {field: sql.Identifier(Service._meta.get_field(field).column) for field in read}
+    query = sql.SQL("SELECT {} FROM {} ORDER BY {}").format(
+        sql.SQL(", ").join(column[field] for field in read), sql.Identifier(table), column["id"]
     )
-    named = ("id", *COPY_FIELDS, "category_id", "tax_category_id")
+    named = ("id", *COPY_FIELDS, "category_id", "tax_category_id", "is_active")
     return [dict(zip(named, row, strict=True)) for row in conn.execute(query)]
 
 
 def services_in_business(services: list[dict]) -> dict[UUID, UUID]:
-    """hub#1283: ``{id in the copy: id in the business}`` of each service of a separate copy (``services_in_copy``) the
-    business holds: the same one, on offer or archived (a service is never deleted; SERVICE-F05 restores it), or one
-    made again, by hand or brought back already: the same name, the case and the spaces aside, in the category it would
-    come back to (``_category_here``). What a recovery of another app matches a service of the copy by."""
-    by_id = set(Service.objects.filter(pk__in=[one["id"] for one in services]).values_list("pk", flat=True))
+    """hub#1283: ``{id in the copy: id in the business}`` of each service of a separate copy (all of
+    ``services_in_copy``, never a part) the business holds: the same one, on offer or archived (a service is never
+    deleted; SERVICE-F05 restores it), or, for one the copy had on offer, one made again, by hand or brought back
+    already: a service that is none of the copy's, with the same name, the case and the spaces aside, in the category it
+    would come back to (``_category_here``). Names are not unique, so each made again stands for one service of the copy:
+    the oldest made again for the copy's oldest. What a recovery of another app matches a service of the copy by."""
+    ids = [one["id"] for one in services]
+    by_id = set(Service.objects.filter(pk__in=ids).values_list("pk", flat=True))
     live = _live_categories(services)
-    by_name = {}
-    for pk, name, category in Service.objects.order_by("created_at", "id").values_list("pk", "name", "category"):
-        by_name.setdefault((_same_name(name), category), pk)
+    made_again: dict[tuple[str, UUID | None], list[UUID]] = {}
+    others = Service.objects.exclude(pk__in=ids).order_by("created_at", "id")
+    for pk, name, category in others.values_list("pk", "name", "category"):
+        made_again.setdefault((_same_name(name), category), []).append(pk)
     held = {}
-    for one in services:
+    for one in sorted(services, key=lambda service: service["id"]):
         if one["id"] in by_id:
             held[one["id"]] = one["id"]
-        elif (twin := by_name.get((_same_name(one["name"]), _category_here(one, live)))) is not None:
-            held[one["id"]] = twin
+        elif one["is_active"] and (twins := made_again.get((_same_name(one["name"]), _category_here(one, live)))):
+            held[one["id"]] = twins.pop(0)
     return held
 
 
 def services_not_in_business(services: list[dict]) -> list[dict]:
-    """hub#1283: the services of a separate copy (``services_in_copy``) the business lacks (not in
+    """hub#1283: the services a separate copy (``services_in_copy``) had on offer and the business lacks (not in
     ``services_in_business``), in their order, each as ``service.service.create`` takes it here, with its ``id`` there:
     the key of its tax category (Taxes never deletes one; one turned off since is the create's to refuse, and without
     one it takes the settings') and its category while the business still has it (one deleted since leaves it with
     none, SERVICE-F08; hub#1323)."""
     held = services_in_business(services)
-    lacking = [one for one in services if one["id"] not in held]
+    lacking = [one for one in services if one["is_active"] and one["id"] not in held]
     keys = dict(TaxCategory.objects.filter(pk__in={one["tax_category_id"] for one in lacking}).values_list("pk", "key"))
     live = _live_categories(lacking)
     created = []
