@@ -781,7 +781,7 @@ class RepresentationIn(Schema):
 
 class ConfigSyncIn(Schema):
     """The ERPlora account's block of the hub's photo (WORKBOOK «Contrato con el SaaS»). Any other key is ignored,
-    never refused: the SaaS still sends the retired ``live_paid`` until it stops (PLAN §30, expand/contract)."""
+    never refused: the SaaS still sends the retired ``live_paid`` until it stops (expand/contract)."""
 
     model_config = ConfigDict(extra="ignore")
 

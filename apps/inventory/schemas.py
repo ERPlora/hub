@@ -174,7 +174,7 @@ class ProductSoldOutIn(ProductRefIn):
     )
 
 
-# The product's image (round 2026-10-30, base.images): one of the shared library or a photo of its own.
+# The product's image (base.images): one of the shared library or a photo of its own.
 
 #: An image a write sets: the assistant's card names it by its title in the library, never by its reference.
 AN_IMAGE = names("base.catalog_image.get", by="reference", name=("title",))

@@ -1,4 +1,4 @@
-// The sale app's UI texts: English source + Spanish (PLAN §5), kept by hand next to the pages until
+// The sale app's UI texts: English source + Spanish, kept by hand next to the pages until
 // Django's `djangojs` catalogues are exported to JSON (as the demo's). This test is their guardrail:
 // same keys and placeholders in both languages, nothing empty, every key a page, a component or a
 // helper of the app uses exists, and the texts the old screens showed are kept word for word.
@@ -80,7 +80,7 @@ describe('sale catalogues (en source + es)', () => {
     expect(ES.get('sale.tabs.pos')).toBe('Vender');
     expect(ES.get('sale.tabs.sales')).toBe('Ventas');
     expect(ES.get('sale.tabs.quickNotes')).toBe('Notas rápidas');
-    // FIX-SALE-TABBAR-LABEL: the old «Departamentos» did not fit a fifth of a phone's tabbar.
+    // «Departamentos» does not fit a fifth of a phone's tabbar.
     expect(ES.get('sale.tabs.departments')).toBe('Secciones');
     expect(ES.get('sale.tabs.settings')).toBe('Ajustes');
   });

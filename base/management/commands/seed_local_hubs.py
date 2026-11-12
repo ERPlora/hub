@@ -1,5 +1,5 @@
-"""``manage.py seed_local_hubs``: the local hubs ``a`` and ``b``, ready in the registry (plan 2026-10-17, §1.3), with
-every app on and its roots chosen, as every hub of before round 2026-10-27 (a business is born with every app off);
+"""``manage.py seed_local_hubs``: the local hubs ``a`` and ``b``, ready in the registry, with
+every app on and its roots chosen (a business is born with every app off);
 the apps of a local hub that already turned some on or off stay as they are.
 
 The host gate (``base.middleware``) answers 404 to a slug without a row in the registry (``base.Hub``), so a
@@ -8,9 +8,9 @@ Local development only (``DEBUG``): production's hubs are the SaaS's, registered
 Idempotent, through its operation (``base.hub.seed_local``). ``--check`` writes nothing and fails unless both are
 ready (``base.hub.by_slugs``): the e2e's global setup asks it before the first spec.
 
-Each has a database of its own (``<control>_<hex>``; S5: there is no shared database), made here at once from
+Each has a database of its own (``<control>_<hex>``; there is no shared database), made here at once from
 ``<control>_template`` with every app's tables and every app on, under its ``hub_due`` lease (``migrate_hubs`` makes the
-template first); a local hub of phase 1 left on control's database gets its own the same way. ``a`` and ``b`` turn every
+template first); a local hub still on control's database gets its own the same way. ``a`` and ``b`` turn every
 app on, so while some app cannot live in a hub's own database (``base.tenancy.migrator.portable_apps``: its tables
 refer to control's users) it refuses and writes nothing. A local hub that already has its own keeps it.
 """

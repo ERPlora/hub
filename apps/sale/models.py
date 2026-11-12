@@ -212,7 +212,7 @@ class Order(UUIDModel):
     """An open check: mutable, its amounts provisional; charging it creates one or more sales."""
 
     class Status(models.TextChoices):
-        # Own context: an open check («cuenta») is «Abierta», not Demo's «Abierto» of the same English (hub#560).
+        # Own context: an open check («cuenta») is «Abierta», not Demo's «Abierto» of the same English.
         OPEN = "open", pgettext_lazy("sale", "Open")
         COMPLETED = "completed", _("Completed")
         VOIDED = "voided", _("Voided")
@@ -357,7 +357,7 @@ class OrderLine(UUIDModel):
     # ordered: ``modifiers`` every pick in the order chosen (``unit_price`` already adds the ones taxed as the
     # dish), ``modifier_lines`` the ones of another tax category, charged on a child line of their own (their
     # ``quantity`` is per unit of the dish), ``kitchen_text`` what the kitchen reads under the dish. Own context, here
-    # and on the charged line: they are its «suplementos», not Clientes' «opciones» of the same English (hub#560).
+    # and on the charged line: they are its «suplementos», not Clientes' «opciones» of the same English.
     modifiers = models.JSONField(
         pgettext_lazy("sale", "options"),
         default=list,
@@ -544,7 +544,7 @@ class Sale(UUIDModel):
     payment_method_name = models.CharField(_("payment"), max_length=60, blank=True)
     idempotency_key = models.CharField(_("attempt key"), max_length=128, unique=True)
     notes = models.TextField(_("notes"), blank=True)
-    # Own context: a sale is «anulada el» as it is «anulada por», not Clientes' «anulado el» (hub#560).
+    # Own context: a sale is «anulada el» as it is «anulada por», not Clientes' «anulado el».
     voided_at = models.DateTimeField(
         pgettext_lazy("sale", "voided at"), null=True, blank=True
     )
@@ -553,7 +553,7 @@ class Sale(UUIDModel):
     )
     void_reason = models.CharField(_("void reason"), max_length=500, blank=True)
     # The fiscal document Invoicing issued for it (F2 ticket, F1 invoice) and for its void (R5, R1):
-    # ids of Invoicing without a foreign key (Invoicing is no requirement of Sales; PLAN §20.5).
+    # ids of Invoicing without a foreign key (Invoicing is no requirement of Sales).
     invoice_id = models.UUIDField(_("fiscal document"), null=True, blank=True)
     invoice_number = models.CharField(_("fiscal document number"), max_length=60, blank=True)
     invoice_type = models.CharField(_("fiscal document type"), max_length=2, blank=True)

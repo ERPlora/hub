@@ -16,7 +16,7 @@ class TaxConfig(LiveAppConfig):
     icon = "ion:calculator-outline"
     category = Category.SALES
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The app store's texts, which register_apps writes to shared.app.
     summary = _(
         "Tax categories and the VAT rate of each one, by country, region and date."
     )
@@ -29,14 +29,13 @@ class TaxConfig(LiveAppConfig):
     )
     # Both sectors' templates carry it (base.catalog.template_apps); every business is born with it on anyway (below).
     verticals = ["hair_salon", "restaurant"]
-    # Mandatory wherever the business is: no sale is priced without it (hub#997, PLAN-HUB round 2026-11-07). The Home
-    # asks whoever runs a business to turn it on while it is off (base.home.mandatory_steps), and the platform turns it
-    # on by itself at sign-up (base.activation.born_on, base.services.turn_on_born_apps): it binds the business to no
-    # authority.
+    # Mandatory wherever the business is: no sale is priced without it. The Home asks whoever runs a business to turn it
+    # on while it is off (base.home.mandatory_steps), and the platform turns it on by itself at sign-up
+    # (base.activation.born_on, base.services.turn_on_born_apps): it binds the business to no authority.
     mandatory = {"countries": "all", "platform_turns_on": True}
     default_auto_field = "django.db.models.BigAutoField"
     permissions = ["tax.view", "tax.manage"]
-    # The countries a rule is set for, by their names (hub#678): no field of the models labels them, so the
+    # The countries a rule is set for, by their names: no field of the models labels them, so the
     # assistant's card would say their ISO codes.
     choices = CHOICES
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). Viewing
@@ -57,10 +56,9 @@ class TaxConfig(LiveAppConfig):
         # The business's tax region (TAX-F11).
         Nav("settings", _("Settings"), "ion:settings-outline", "/tax/settings"),
     ]
-    # The Home's hook (PLAN-HUB round 2026-10-21): the old module's own item «Your taxes» (module.json `setup`,
-    # taxes#19), order 20 and important, done once one active root rule of any country applies today (TAX-F17: the
-    # query and the words of the notice of the tax screens), for whoever manages taxes, leading to the rules.
-    # Refreshed on what changes the rules in force. The old module declared no panel and no bell row.
+    # The Home's step «Your taxes», order 20 and important, done once one active root rule of any country applies today
+    # (TAX-F17: the query and the words of the notice of the tax screens), for whoever manages taxes, leading to the
+    # rules. Refreshed on what changes the rules in force. The old module declared no panel and no bell row.
     setup = [
         SetupStep(
             key="rules",

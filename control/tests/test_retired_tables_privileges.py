@@ -1,4 +1,4 @@
-"""``control/0008``: the app's role loses the tables ``control/0007`` retired (hub#621).
+"""``control/0008``: the app's role loses the tables ``control/0007`` retired.
 
 Run against real roles, as ``base/tests/test_bootstrap.py`` does: a bootstrapped cluster with a per-process prefix, so
 its control database is ``<prefix>hub`` and its app's role ``<prefix>hub_app``, the shape of pre's ``pre_hub`` and
@@ -214,7 +214,7 @@ def test_it_takes_whatever_the_app_held_not_only_what_the_default_privileges_gav
 
 
 def test_support_keeps_reading_them_and_only_reading(cluster, as_migrator):
-    # hub_admin's pg_dump of control (PLAN-DB §10) needs SELECT on every table it dumps; these keep rows nobody deleted.
+    # hub_admin's pg_dump of control needs SELECT on every table it dumps; these keep rows nobody deleted.
     make_tables(cluster, RETIRED)
 
     as_migrator(migration().forwards)

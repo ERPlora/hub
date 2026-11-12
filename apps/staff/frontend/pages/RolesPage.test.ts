@@ -79,7 +79,6 @@ describe('RolesPage', () => {
   });
 
   it('filters behind the table funnel: members from–to on its column, then status (a yes/no on the server) and colour', async () => {
-    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
     const s = await setup();
     await s.show(page(ROWS));
     expect(s.prop('filterable')).toBe(true);
@@ -135,7 +134,7 @@ describe('RolesPage', () => {
   });
 });
 
-describe('RolesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('RolesPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
