@@ -1,10 +1,6 @@
 <script setup lang="ts">
-// «Devices» (Settings › General, BASE-G63…G66; the old hub's DevicesCard): the devices someone entered this hub on, live
-// (`base.device.list`), the last entered first. Each row: the name the business gave it (or «Unnamed device» and what
-// it is: «Chrome · Android»), «The one you are using», how it asks, when it was used, until when its session stays open
-// and who entered last; never its identifier. «Name it» opens a field under the row; «Remove this device» asks first,
-// with its consequence (the one in hand ends this session, then the way in); «Remove the devices unused for 30 days»
-// too. Settings mounts it only for who runs the hub (the list is theirs). A list that cannot be read is never empty.
+// Settings › General: the devices someone entered this hub on, mounted only for whoever runs the hub. A device's
+// identifier is never shown. Removing the device in hand ends this session.
 import { formatDateTime, InlineFeedback } from '@erplora/ui/components';
 import { ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';

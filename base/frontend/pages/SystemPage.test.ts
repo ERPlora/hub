@@ -1,5 +1,4 @@
-// System's page (BASE-F39, BASE-G87): its four tabs, each in the address, what each opens for who runs the business and
-// what anyone else is told, with no useless «Retry». What «Usage and plan» says is SystemUsage.test.ts's.
+// What «Usage and plan» says is tested in SystemUsage.test.ts.
 import { AppPage, type ShellTab } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
@@ -11,7 +10,7 @@ import SystemAppCards from '../components/SystemAppCards.vue';
 import SystemUsage from '../components/SystemUsage.vue';
 import SystemPage from './SystemPage.vue';
 
-// ── The tabs (APP-BASE-7) ───────────────────────────────────────────────────────────────────────────────────
+// ── The tabs ────────────────────────────────────────────────────────────────────────────────────────────────
 
 async function at(path: string, options: Parameters<typeof mountBase>[1] = {}) {
   const m = await mountBase(SystemPage, { path, routes: ['/system', '/settings'], ...options });
@@ -25,7 +24,7 @@ async function at(path: string, options: Parameters<typeof mountBase>[1] = {}) {
 const tabIds = (m: Awaited<ReturnType<typeof at>>) =>
   (m.wrapper.getComponent(AppPage).props('tabs') as ShellTab[]).map((tab) => [`tab-${tab.id}`, tab.label]);
 
-describe('SystemPage › its tabs (BASE-G87)', () => {
+describe('SystemPage › its tabs', () => {
   it('who runs the business has four tabs, in their order', async () => {
     const m = await at('/system');
     expect(tabIds(m)).toEqual([

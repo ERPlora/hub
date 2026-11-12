@@ -1,9 +1,7 @@
-// System's tabs (BASE-F39, BASE-G87): «Usage and plan», Updates, Failed events and Logs, each in the address hash so Back
-// and a saved link open the same one; «Usage and plan» when the hash names none, and so also for the two tabs it took over
-// (`#resources` and `#plan`, BASE-F40), whose old links keep working. Logs is only for who runs the business (hub#2519):
-// for anyone else the tab does not exist and `#logs` opens «Usage and plan». The old `#backups` is no tab any more: its
-// copies live in Settings › Data. And the reasons of a failed resend or discard (BASE-G92…G94), named from the error's
-// code, never from the Hub's text.
+// System's tabs go in the address hash, so Back and a saved link open the same one; «Usage and plan» opens when the
+// hash names none, and also for the old `#resources` and `#plan`, whose links keep working. Logs is only for whoever
+// runs the business: for anyone else `#logs` opens «Usage and plan». The reasons of a failed resend or discard are
+// named from the error's code, never from the Hub's text.
 export type SystemTab = 'usage' | 'updates' | 'events' | 'logs';
 
 export const SYSTEM_TABS: readonly SystemTab[] = Object.freeze(['usage', 'updates', 'events', 'logs']);
@@ -15,7 +13,7 @@ export const TAB_HASH: Readonly<Record<SystemTab, string>> = Object.freeze({
   logs: '#logs',
 });
 
-/** Where the retired `#backups` goes: Settings › Data (APP-BASE-2). */
+/** The retired `#backups` tab: its copies now live in Settings › Data, where this hash leads. */
 export const BACKUPS_HASH = '#backups';
 export const BACKUPS_TARGET = Object.freeze({ path: '/settings', hash: '#data' });
 

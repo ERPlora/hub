@@ -1,10 +1,3 @@
-// Apps: «My apps», «Add apps» and «Paid» over the live `base.app.list`, in
-// the address (`/apps`, `#all`, `#paid`); «Paid» and «Price» only while some app is sold apart. «Open»
-// leads to the app's first screen; a paid app without its right says it needs a subscription and, for whoever runs
-// the business and only on the web, links to erplora.com's Store (buying is never inside the Hub). A failed read says so with «Retry» and keeps the rows; it is never «no apps».
-// Whoever runs the business turns an app on or off: the dialog names what comes along or goes with it,
-// a refusal says why (another app needs it, the app itself, or the plan's limit, with «Upgrade plan») in a notice that
-// stays until it is closed or the next change, and the counter says how many of the plan's apps are on.
 import { AppPage, applySurface, toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -106,7 +99,7 @@ describe('AppsPage', () => {
     ]);
   });
 
-  it('«Open» goes to the app’s first screen, and an app with no screen for this person has none (BASE-G68)', async () => {
+  it('«Open» goes to the app’s first screen, and an app with no screen for this person has none', async () => {
     const m = await open();
     await m.result(m.call, 'base.app.list', LIST);
     expect(m.wrapper.find('[data-testid="apps-row-reports-open"]').exists()).toBe(false);
@@ -125,7 +118,7 @@ describe('AppsPage', () => {
     expect(m.router.currentRoute.value.path).toBe('/apps');
   });
 
-  it('«Add apps» (#all) lists every app with what it does, its price and what comes with it (BASE-G69, G70, G73)', async () => {
+  it('«Add apps» (#all) lists every app with what it does, its price and what comes with it', async () => {
     const m = await open('/apps#all');
     await m.result(m.call, 'base.app.list', LIST);
     expect(ids(m.wrapper)).toEqual(['tax', 'invoice', 'reports', 'stock']);
@@ -137,7 +130,7 @@ describe('AppsPage', () => {
     expect(m.wrapper.find('[data-testid="apps-row"][data-id="stock"]').text()).toContain('Needs a subscription');
   });
 
-  it('«Paid» (#paid) lists only what is bought apart; never a free app (hub#2655)', async () => {
+  it('«Paid» (#paid) lists only what is bought apart; never a free app', async () => {
     const m = await open('/apps#paid');
     await m.result(m.call, 'base.app.list', LIST);
     expect(ids(m.wrapper)).toEqual(['stock']);
@@ -164,7 +157,7 @@ describe('AppsPage', () => {
     ]);
   });
 
-  it('a paid app without its right links to erplora.com’s Store for whoever runs the business (BASE-G74)', async () => {
+  it('a paid app without its right links to erplora.com’s Store for whoever runs the business', async () => {
     const m = await open('/apps#all');
     await m.result(m.call, 'base.app.list', LIST);
     const buy = m.wrapper.find('[data-testid="apps-row"][data-id="stock"] [data-testid="apps-buy"]');
@@ -326,8 +319,8 @@ describe('AppsPage', () => {
     const posted = (m: Awaited<ReturnType<typeof open>>) =>
       m.net.api.map((c) => [c.url, JSON.parse(String(c.init.body ?? '{}')) as Record<string, unknown>]);
     const refusal = (status: number, error: Record<string, unknown>) => () => Response.json({ error }, { status });
-    /** The refusal's notice: it stays on screen until it is closed or the next change (hub#2594: a toast went
-     *  before its long reason could be read). */
+    /** The refusal's notice: it stays on screen until it is closed or the next change, because a toast went before
+     *  its long reason could be read. */
     const refused = (m: Awaited<ReturnType<typeof open>>) => m.wrapper.find('[data-testid="apps-refused"]');
 
     it('«Turn off» asks with the app and what goes with it, turns it off and reads the menu again', async () => {
@@ -400,7 +393,7 @@ describe('AppsPage', () => {
       expect(toastError).not.toHaveBeenCalled();
     });
 
-    it('a refusal stays until it is closed, and the next change clears it (hub#2594)', async () => {
+    it('a refusal stays until it is closed, and the next change clears it', async () => {
       mocks.confirm.mockResolvedValue(true);
       let answer = refusal(409, { code: 'base.app_vetoed', message: 'Send the pending records first.', app: 'task' });
       const m = await open('/apps', { onApi: () => answer() });
@@ -744,7 +737,7 @@ describe('AppsPage', () => {
     });
   });
 
-  describe('an app whose tables the business’s database is still getting (S3)', () => {
+  describe('an app whose tables the business’s database is still getting', () => {
     const FLOW = app('flow', { name: 'Flows', state: 'off', chosen: false, path: null });
     const FLOW_CREATING = { ...FLOW, state: 'creating' as const, chosen: true };
     const FLOW_FAILED = { ...FLOW, state: 'failed' as const, chosen: true };

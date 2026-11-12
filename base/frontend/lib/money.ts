@@ -1,7 +1,6 @@
-// The business's currency for the Home's amounts (BASE-G98): its country's, with its decimals, as `base.business.get`
-// says it — the registry of this hub, never a call to erplora.com. Followed live (a change on erplora.com is pushed
-// and arrives), one subscription for the whole tab however many pieces ask (the SDK shares it), and unknown until the
-// business answers: an amount is then a dash, never in the euro by default nor with guessed decimals.
+// The business's currency for the Home's amounts, as this hub's `base.business.get` says it, never a call to
+// erplora.com. One subscription serves the whole tab however many pieces ask (the SDK shares it). Until the business
+// answers an amount is a dash, never euros by default nor guessed decimals.
 import { type DataTableFilters, formatMoney as writeMoney, moneyExamples, parseMoney } from '@erplora/ui/components';
 import { type ApiError, useLive } from '@erplora/ui/sdk';
 import { computed, type ComputedRef, type Ref } from 'vue';
@@ -37,7 +36,7 @@ export interface AmountFilterSay {
 }
 
 /** What the table says under each of `ends` typed in `values` that is no amount of the business's money: the money
- *  field's own words (`MoneyInput`) — not an amount, with its example in that money («12,50», «12» in yen; ui#140),
+ *  field's own words (`MoneyInput`) — not an amount, with its example in that money («12,50», «12» in yen),
  *  negative, or «1.000» that reads two ways, with both readings — so every list says it alike (hub#1196). An empty
  *  end or an amount says nothing, and nothing is judged while the money is unknown, as the money field does not
  *  (hub#945). */

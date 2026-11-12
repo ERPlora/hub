@@ -1,6 +1,3 @@
-// «Create your PIN» (`/pin/setup`, BASE-G54): after entering with the account on a till that works by PIN, the person
-// without one chooses it (the business's digits), repeats it and enters; «Not now» goes on without it. Someone who
-// already has one is never asked again.
 import { ApiError } from '@erplora/ui/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

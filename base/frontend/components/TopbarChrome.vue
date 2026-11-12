@@ -1,10 +1,8 @@
 <script setup lang="ts">
-// base's piece at the end of the topbar (`createShell({ chrome: { topbar } })`): the assistant's sparkles, then the
-// bell, as in the old hub (BASE-G110, BASE-G137). On a phone (under 768 px) they fold into one «More options» that
-// carries the bell's count, as the old hub's bar did: the shell keeps the title centred with two buttons a side, and a
-// third one would push it. Its rows open the assistant's panel, once the menu has closed (so what is written at once
-// goes to its box), and the bell's list; the apps' grid stays outside (the shell's). «Manage on erplora.com» (BASE-F11) is not here: it is at the side menu's foot, right below «Upgrade plan»
-// (ManageLink.vue).
+// base's piece at the end of the topbar (`createShell({ chrome: { topbar } })`). On a phone (under 768 px) the
+// assistant and the bell fold into one «More options» that carries the bell's count: the shell keeps the title centred
+// with two buttons a side, and a third one would push it. The assistant's panel opens only once the menu has closed,
+// so what is typed at once goes to its box.
 import { AssistantButton, useAssistant } from '@erplora/ui/components';
 import { HubIcon, useSession } from '@erplora/ui/shell';
 import { IonBadge, IonButton, IonItem, IonLabel, IonList, IonPopover } from '@ionic/vue';

@@ -12,7 +12,7 @@
 // - base's words: the verb of each write (`base.assistant.card.actions.<action>`, or of the whole operation when its
 //   action's verb does not say it, `base.assistant.card.operations.<app>.<entity>.<action>`; one per action of every
 //   write the assistant may run, guardrail: base/tests/test_assistant.py), the platform's screens
-//   (`base.assistant.screens.<key>`) and the setup's shortcuts of the empty conversation (BASE-G121).
+//   (`base.assistant.screens.<key>`) and the setup's shortcuts of the empty conversation.
 import type { AssistantApproval, AssistantConfig, AssistantSpeech } from '@erplora/ui/components';
 import { parseErrorEnvelope, readCookie, readSpaConfig } from '@erplora/ui/sdk';
 
@@ -26,8 +26,7 @@ import { useSaasPass } from './saas-pass';
 const ACTIONS: Readonly<Record<string, string>> = en.base.assistant.card.actions;
 
 /** The verb of a write whose action's verb does not say what it does: emptying a cart (`cart_checkout.cart.clear`) is
- *  not taking a route away, Kitchen's `clear`, nor a cash count adding anything
- *  (FIX-HUB-BASE-ASSISTANT-CARD-SAYS-REMOVE-FOR-EMPTYING-A-CART). */
+ *  not taking a route away, Kitchen's `clear`, nor a cash count adding anything. */
 const OPERATIONS: Readonly<Record<string, Readonly<Record<string, Readonly<Record<string, string>>>>>> =
   en.base.assistant.card.operations;
 

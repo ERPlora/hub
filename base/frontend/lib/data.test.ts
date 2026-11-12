@@ -1,5 +1,3 @@
-// The rules of Settings › Data that are not the server's (the old hub's `ExportPanel.vue`, `import-retry.ts`,
-// `data-table-labels.ts` and `blueprint-hero.ts`): pure, so each one is pinned here once.
 import { describe, expect, it, vi } from 'vitest';
 
 import en from '../locale/en.json';
@@ -84,18 +82,18 @@ function load(fields: Partial<ImportRow> = {}): ImportRow {
 }
 
 describe('the address of Settings', () => {
-  it('opens the tab the hash names, the old hub’s addresses included (APP-BASE-6)', () => {
+  it('opens the tab the hash names, older addresses included', () => {
     expect(settingsTab('#data')).toBe('data');
     expect(settingsTab('#general')).toBe('general');
     expect(settingsTab('#business')).toBe('business');
     expect(settingsTab('#tickets')).toBe('tickets');
     // Published versions of VeriFactu still link `#tax`: it was the business's own tab.
     expect(settingsTab('#tax')).toBe('business');
-    // The old hub's General was `#hub` (APP-BASE-3).
+    // General used to be `#hub`.
     expect(settingsTab('#hub')).toBe('general');
   });
 
-  it('opens the first tab, «General» as in the old hub, without a hash or with one it does not have (`#store`, `#permissions`)', () => {
+  it('opens the first tab, «General», without a hash or with one it does not have (`#store`, `#permissions`)', () => {
     for (const hash of ['', '#store', '#permissions', '#nonsense']) {
       expect(settingsTab(hash), hash).toBe('general');
     }
@@ -110,7 +108,7 @@ describe('the address of Settings', () => {
   });
 });
 
-describe('the export (BASE-G101, BASE-G102)', () => {
+describe('the export', () => {
   it('names the file as the server does: «{name}_{language}.blueprint.zip», safe for any disk', () => {
     expect(exportFileName('Bar Pepe', 'es')).toBe('bar-pepe_es.blueprint.zip');
     expect(exportFileName('  Peluquería  Ñandú! ', 'es')).toBe('peluqueria-nandu_es.blueprint.zip');
@@ -124,7 +122,7 @@ describe('the export (BASE-G101, BASE-G102)', () => {
     expect(defaultExportName(undefined, '')).toBe('');
   });
 
-  it('starts with every app registered and no data, as the old hub', () => {
+  it('starts with every app registered and no data', () => {
     const choice = freshExportChoice(APPS);
     expect(exportInput(choice, APPS, { name: 'Bar', language: 'es', purpose: 'backup' })).toEqual({
       name: 'Bar',
@@ -188,7 +186,7 @@ describe('the export (BASE-G101, BASE-G102)', () => {
   });
 });
 
-describe('the import (BASE-G103–G107)', () => {
+describe('the import', () => {
   it('reads a file in base64, in chunks, whatever its size', () => {
     const bytes = new Uint8Array(100_000).map((_, i) => i % 256);
     expect(bytesToBase64(bytes)).toBe(Buffer.from(bytes).toString('base64'));
@@ -255,7 +253,7 @@ describe('the import (BASE-G103–G107)', () => {
   });
 });
 
-describe('the templates card of the Home (BASE-G131, BASE-F02)', () => {
+describe('the templates card of the Home (BASE-F02)', () => {
   it('offers at most four, in the order the catalogue gives (the hub\'s country, then the language)', () => {
     const list = ['a.es', 'b.es', 'c.es', 'd.es', 'e.es'].map((key) => template(key));
     expect(cardTemplates(list).map((t) => t.key)).toEqual(['a.es', 'b.es', 'c.es', 'd.es']);

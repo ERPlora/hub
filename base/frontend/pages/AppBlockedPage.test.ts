@@ -1,8 +1,3 @@
-// «Why it does not open» (BASE-G132, G134; the old hub's ModuleView states): mounted by the app gate in the address
-// of a screen whose app the session gives `off`. It reads `base.app.list` to tell why: a paid app without its right
-// gets «Subscription needed» (data safe; bought on erplora.com: the Store's link for whoever runs the business, on the
-// web), an app the business does not have says so; both lead to Apps. Bought meanwhile (the SaaS's photo re-runs
-// the list), it offers to open the app, with a full load that brings the session up to date.
 import { applySurface } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { defineComponent } from 'vue';
@@ -65,7 +60,7 @@ describe('AppBlockedPage', () => {
     expect(m.wrapper.find('[data-testid="app-blocked-checking"]').exists()).toBe(true);
   });
 
-  it('a paid app without its right: «Subscription needed», data safe, the Store’s link and Apps (BASE-G134)', async () => {
+  it('a paid app without its right: «Subscription needed», data safe, the Store’s link and Apps', async () => {
     const m = await open();
     await m.result(m.call, 'base.app.list', LIST);
     const card = m.wrapper.find('[data-testid="app-blocked-subscription"]');
@@ -110,7 +105,7 @@ describe('AppBlockedPage', () => {
     expect(m.wrapper.find('[data-testid="app-blocked-buy"]').text()).toBe('Mejorar plan');
   });
 
-  it('an app the business does not have says so, in Spanish too, and leads to Apps (BASE-G132)', async () => {
+  it('an app the business does not have says so, in Spanish too, and leads to Apps', async () => {
     const m = await open('/ghost', { locale: 'es' });
     await m.result(m.call, 'base.app.list', LIST);
     expect(m.wrapper.find('[data-testid="app-blocked-missing"]').text()).toContain('Esta app no está disponible en este negocio');

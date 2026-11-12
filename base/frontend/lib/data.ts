@@ -1,6 +1,5 @@
-// The rules of Settings › Data that are not the server's (BASE-G101–G109, BASE-G131; the old hub's `ExportPanel.vue`,
-// `import-retry.ts`, `data-table-labels.ts` and `blueprint-hero.ts`): the address of the page, what an export takes,
-// how a report reads and what the Home's templates card offers. Pure: the components only paint them.
+// The rules of Settings › Data that are not the server's: the address of the page, what an export takes, how a report
+// reads and what the Home's templates card offers. Pure: the components only paint them.
 import type { StatusPillTone } from '@erplora/ui/components';
 
 import type {
@@ -16,14 +15,12 @@ import type {
 
 // ── The address ──────────────────────────────────────────────────────────────────────────────────────────────────
 
-// The old hub's tabs, in its order and with its addresses: «General» first (APP-BASE-3), Business and Printing
-// (APP-BASE-6), then «Data and backups» (APP-BASE-2).
 export type SettingsTab = 'general' | 'business' | 'tickets' | 'data';
 export const SETTINGS_TABS: readonly SettingsTab[] = ['general', 'business', 'tickets', 'data'];
 /** Old addresses still linked: `#hub` was General; published versions of VeriFactu open `#tax`, the business's tab. */
 const SETTINGS_TAB_ALIASES: Readonly<Record<string, SettingsTab>> = { hub: 'general', tax: 'business' };
 
-/** The tab a hash opens (`#data`); one it does not have — the old `#store`, `#permissions`… — opens the first, as the old hub. */
+/** The tab a hash opens (`#data`); one it does not have (an old `#store`, `#permissions`…) opens the first. */
 export function settingsTab(hash: string): SettingsTab {
   const wanted = hash.replace(/^#/, '');
   return SETTINGS_TABS.find((tab) => tab === wanted) ?? SETTINGS_TAB_ALIASES[wanted] ?? SETTINGS_TABS[0];
@@ -32,13 +29,13 @@ export function settingsTab(hash: string): SettingsTab {
 export type DataSection = 'import' | 'export' | 'reset';
 export const DATA_SECTIONS: readonly DataSection[] = ['import', 'export', 'reset'];
 
-/** The section `?data=` names; Import otherwise (the old hub's `?data=export`). */
+/** The section `?data=` names; Import otherwise. */
 export function dataSection(query: unknown): DataSection {
   const value = Array.isArray(query) ? query[0] : query;
   return DATA_SECTIONS.find((section) => section === value) ?? 'import';
 }
 
-// ── The export (BASE-G101, BASE-G102) ────────────────────────────────────────────────────────────────────────────
+// ── The export ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 /** Django's `slugify`, the one the server names the file with. */
 function slugify(value: string): string {
@@ -69,7 +66,7 @@ export interface ExportChoice {
   excluded: ReadonlySet<string>;
 }
 
-/** Every app registered and no data, as the old hub opens it. */
+/** Every app registered and no data. */
 export function freshExportChoice(apps: readonly AppDatasets[]): ExportChoice {
   return { apps: new Set(apps.map((app) => app.id)), data: new Set(), excluded: new Set() };
 }
@@ -151,7 +148,7 @@ export function downloadFrom(url: string): void {
   link.click();
 }
 
-// ── The import (BASE-G103–G108) ──────────────────────────────────────────────────────────────────────────────────
+// ── The import ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 /** The server takes 20 MB of zip at most (`base.blueprint`): 300 photos of its own fit (INVENTORY-F33). */
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
@@ -174,7 +171,7 @@ export function templateMatches(template: Template, search: string): boolean {
 
 type KnownStatus = AppLoadStatus;
 
-/** The words of each status of a report (the old hub's «Applied», «Skipped»… with the new ones). */
+/** The words of each status of a report. */
 export const STATUS_KEY: Record<KnownStatus, string> = {
   applied: 'base.data.status.applied',
   partial: 'base.data.status.partial',
@@ -249,7 +246,7 @@ export function stillLoading(report: LoadReport): boolean {
   return pendingApps(report).settingUp.length > 0;
 }
 
-// ── The Home's templates card (BASE-G131, BASE-F02) ──────────────────────────────────────────────────────────────
+// ── The Home's templates card ────────────────────────────────────────────────────────────────────────────────────
 
 /** The card offers at most four, one per kind of business, in the catalogue's order (the hub's country, then the
  * person's language): of a vertical in two languages, the first the catalogue gives, theirs when it has it. */

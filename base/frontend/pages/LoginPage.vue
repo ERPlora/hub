@@ -1,10 +1,8 @@
 <script setup lang="ts">
-// «Access» (`/login`; BASE-G52, G55, G56, G57, G58; the old hub's LoginPage): the door of a browser without a session,
-// where Django's `way_in` sends it. On a shared device of the hub of a business that asks: «PIN» (the faces, the pad
-// and the badge reader) and «Account»; anywhere else only «Enter with your account», erplora.com's sign-in for this hub
-// (the Hub has no password of its own). The door (`base.access.door`) is read again every minute, when the till comes
-// back to the screen and after a refused entry, so a PIN given or taken away shows without reloading (the old hub's
-// HUB_SHELL-F04 trap). On top, what happened: the session ended, or another device's entry ended it («Upgrade plan»).
+// Where Django's `way_in` sends a browser without a session. The Hub has no password of its own: outside a shared
+// device that asks for a PIN, the only way in is erplora.com's sign-in. The door (`base.access.door`) is read again
+// every minute, when the till comes back to the screen and after a refused entry, so a PIN given or taken away shows
+// without reloading.
 import { InlineFeedback } from '@erplora/ui/components';
 import { ApiError, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon, openExternalLink, toggleTheme, useSurface } from '@erplora/ui/shell';
@@ -22,7 +20,8 @@ const REREAD_MS = 60_000;
 const { t } = useBaseI18n();
 const route = useRoute();
 const client = useLiveClient();
-// «Upgrade plan» sells, so only on the web (surface.ts); its click goes the Hub's one way out (gh:hub#439).
+// «Upgrade plan» sells, so only on the web (surface.ts); its click goes out by `openExternalLink`, because the
+// installed app opens nothing on a `_blank` link.
 const { isWeb } = useSurface();
 
 const next = computed(() => nextWithHash(safeNext(route.query.next), route.hash));

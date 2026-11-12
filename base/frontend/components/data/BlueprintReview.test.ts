@@ -1,6 +1,3 @@
-// «Review what it brings» (BASE-G105): what a template or a file is (name, type, language and country by name, apps,
-// when it was made), one box per app with what it brings — an app off or this hub does not have, and personal data in
-// a template, say they stay out —, what this hub never loads, and «Import» with the apps ticked or «Choose another».
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { summary } from '../../__tests__/data-fixtures';

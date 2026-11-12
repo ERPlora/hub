@@ -1,5 +1,5 @@
-// The hub waits for base's chrome, but not for ever (FIX-HUB-BASE-HOME-ONE-STREAM-FLAKY, hub#473's review): a chunk the
-// network leaves hanging, never loaded and never failed, would keep the hub from mounting and the page blank. Past
+// The hub waits for base's chrome, but not for ever: a chunk the network leaves hanging, never loaded and never
+// failed, would keep the hub from mounting and the page blank. Past
 // `CHROME_WAIT_MS` it mounts with what is here; the piece comes when its chunk does. Its own file: the piece's module
 // hangs from the first import of main.ts, which boots on import (main.chrome.test.ts holds one that arrives).
 import { afterAll, describe, expect, it, vi } from 'vitest';

@@ -1,7 +1,3 @@
-// Settings › Data › Import (BASE-G103–G107), end to end over the fake API: only an administrator reads it; the last
-// import that did not go in whole opens first (its report, «Retry what is missing», «See the templates»); otherwise
-// the catalogue and «Upload from file» → review → import → report. A file or template that cannot be read says why
-// and stays on the choice; an import refused stays on the review with the reason.
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { load, summary, template, waitingLoad } from '../../__tests__/data-fixtures';

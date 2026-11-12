@@ -120,7 +120,7 @@ describe('main.ts', () => {
     ]);
   });
 
-  // BASE-G120: signing out forgets the assistant's conversation of the tab, from the menu and from the idle lock.
+  // From the menu and from the idle lock alike.
   it('signing out forgets the conversation with the assistant, then leaves', async () => {
     sessionStorage.setItem('erplora.assistant.history', JSON.stringify({ user: 'u1', bubbles: [], conversation: [] }));
     await main.signOut();
@@ -251,13 +251,10 @@ describe('main.ts', () => {
     expect(shellOptions().home).toBe(true);
   });
 
-  // The old hub's shell, side menu included. Its entries are the
-  // platform's, in the old hub's two groups and order, never a module (they open from «My apps» and
-  // Home); each shows once its screen exists (the shell checks the router), so today only Home does.
-  // Each entry only for whoever may open its screen — the
-  // permission its screen's operation asks —, and «API» (the old hub's, between System and Settings) only while the
-  // business shows its API's documentation.
-  it("paints the old hub's side menu: the platform's entries in its two groups, no module, each for who may open it", async () => {
+  // The side menu's entries are the platform's, never a module (modules open from «My apps» and Home); each shows once
+  // its screen exists (the shell checks the router) and only for whoever may open it, «API» only while the business
+  // shows its API's documentation.
+  it("paints the side menu: the platform's entries in its two groups, no module, each for who may open it", async () => {
     fakeShell();
     await main.boot({});
     expect(shellOptions().sidebar).toEqual({
@@ -503,7 +500,7 @@ describe('main.ts', () => {
     expect(router.replace).not.toHaveBeenCalled();
   });
 
-  it("hands the screen's uncaught errors to base's report before mounting (BASE-G95)", async () => {
+  it("hands the screen's uncaught errors to base's report before mounting", async () => {
     const { app } = fakeShell();
     await main.boot({});
     expect(app.config.errorHandler).toBeTypeOf('function');
