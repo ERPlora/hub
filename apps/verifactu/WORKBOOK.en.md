@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:473c2825c74927b8414993db32ab44fab7642b607b887e3cedd131a7c58e58db -->
+<!-- generated from WORKBOOK.md sha256:7f1f7cb11486cc19ab50b6b5d953283fe3fc0119beeda88de2720744dc92d6af -->
 
 ## What it is for and who it is for
 
@@ -790,8 +790,9 @@ Steps:
 1. In **VeriFactu → Recovery**, with the "Issuer tax ID", tap "Validate chain" ("Working…").
 2. The system recomputes the fingerprint of each record of the current environment's chain and checks that each one
    carries the previous one's.
-3. "Operation completed." and the verdict show: "Fingerprint chain intact: {total} record(s) with their SHA-256
-   chaining verified ({tax ID})." or "Fingerprint chain BROKEN at sequence {seq} ({tax ID}).".
+3. "Operation completed." and the verdict show: "Fingerprint chain intact: {total} records with their SHA-256
+   chaining verified ({tax ID})." (with one, "1 record with its"; never "record(s)") or "Fingerprint chain BROKEN
+   at sequence {seq} ({tax ID}).".
 In: the chain's records.
 Out: the verdict as an event (it announces `verifactu.chain.validated`). It only reads: it repairs nothing and does
 not re-audit the amounts.
