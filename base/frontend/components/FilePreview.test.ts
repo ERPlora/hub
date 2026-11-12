@@ -46,6 +46,25 @@ async function show(file: FileItem, locale: 'en' | 'es' = 'en') {
 
 const inDoc = (testid: string) => document.querySelector<HTMLElement>(`[data-testid="${testid}"]`);
 
+/** Resolves once the preview no longer says «Opening the file»: it shows the file, or says why it cannot. Watched in
+ *  the document, with no clock of its own (hub#1293): however long the machine takes to bring a library and read the
+ *  file, the test then checks what the preview shows. A read that never ends is cut by the test's budget, as any. */
+function settled(): Promise<void> {
+  return new Promise((resolve) => {
+    const done = (): boolean => !inDoc('file-preview-loading');
+    if (done()) {
+      resolve();
+      return;
+    }
+    const watcher = new MutationObserver(() => {
+      if (!done()) return;
+      watcher.disconnect();
+      resolve();
+    });
+    watcher.observe(document.body, { childList: true, subtree: true });
+  });
+}
+
 beforeEach(() => {
   vi.mocked(fetchFile).mockReset();
   mocks.renderPdf.mockReset();
@@ -156,8 +175,8 @@ describe('FilePreview', () => {
   it('shows a real .docx as its formatted text, and nothing of it runs', async () => {
     arrives(sample('sample.docx'), 'informe.docx');
     await show(item('informe.docx', '', DOCX));
-    await flush();
-    await vi.waitFor(() => expect(inDoc('file-preview-document')).not.toBeNull());
+    // Its library loads cold and reads the file in its own time: on a busy machine, longer than any clock (hub#1293).
+    await settled();
     expect(inDoc('file-preview-document')?.querySelector('h1')?.textContent).toBe('Informe de noviembre');
     expect(document.querySelector('[data-testid="file-preview"] script, [data-testid="file-preview"] [onerror]')).toBeNull();
     expect(inDoc('file-preview-document')?.textContent).toContain('<script>alert(1)</script>');
