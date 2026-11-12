@@ -977,8 +977,8 @@ def cards_in_copy(conn) -> list[dict]:
 
 
 def cards_not_in_business(cards: list[dict]) -> list[dict]:
-    """hub#1257: the cards of a separate copy (``cards_in_copy``) the business lacks, in their order. Not lacking: a card
-    it has live, one merged into another since (it lives on in that one, CUSTOMER-F13), one whose personal data was
+    """hub#1257: the cards of a separate copy (``cards_in_copy``) the business lacks, in their order. Not lacking: a
+    card it has live, one merged into another since (it lives on in that one, CUSTOMER-F13), one whose personal data was
     erased (never brought back, CUSTOMER-F16), and one made again (``has_live_twin``: by hand, or brought back
     already). Lacking: one deleted (CUSTOMER-F07) or gone altogether."""
     kept = set(

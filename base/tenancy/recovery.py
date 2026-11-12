@@ -143,7 +143,9 @@ def recover(row: CopyRecovery, *, now: dt.datetime) -> bool:
         logger.info("base.tenancy.recovery.stopped copy=%s: %s; left to whoever holds it now.", copy, stopped)
         return True
     except Exception as error:
-        reason = str(error) if isinstance(error, RecoveryFailed) else f"recover_unexpected: {type(error).__name__}: {error}"
+        reason = str(error)
+        if not isinstance(error, RecoveryFailed):
+            reason = f"recover_unexpected: {type(error).__name__}: {error}"
         logger.warning("base.tenancy.recovery.failed hub=%s copy=%s: %s", hub.slug, copy.db_name, reason)
         try:
             control_services.recovery_failed(row.pk, reason, results, now, owner)
@@ -172,8 +174,10 @@ def _read(copy, labels: list[str]) -> list[tuple[str, list[Recoverable], list[li
                 refused = _refusal(label, declared, applied.get(label, set()), code)
                 records = [] if refused else [one.read(conn) for one in declared]
                 read.append((label, declared or [], records, refused))
-    except (psycopg.Error, ops.DatabaseOpsError) as error:
-        raise RecoveryFailed("recover_copy_unreadable", ops.reason(error) if isinstance(error, psycopg.Error) else error)
+    except psycopg.Error as error:
+        raise RecoveryFailed("recover_copy_unreadable", ops.reason(error)) from error
+    except ops.DatabaseOpsError as error:
+        raise RecoveryFailed("recover_copy_unreadable", error) from error
     return read
 
 

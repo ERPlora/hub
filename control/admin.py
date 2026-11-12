@@ -375,8 +375,11 @@ class AsksFirst:
     chosen row (Hubs, Separate copies). The admin says ``confirmation_row(obj)``, each one's id, name and database on
     that page, and ``chosen_name(obj)``, its name in what the staff is told."""
 
-    def confirmation(self, request: HttpRequest, chosen, form: forms.Form, action: str, title: str, template: str, **more):
-        """The confirmation page of ``action`` for ``chosen``: what it does and its ``form``, asked again until valid."""
+    def confirmation(
+        self, request: HttpRequest, chosen, form: forms.Form, action: str, title: str, template: str, **more
+    ):
+        """The confirmation page of ``action`` for ``chosen``: what it does and its ``form``, asked again until
+        valid."""
         context = {
             **self.admin_site.each_context(request),
             "title": title,
@@ -653,7 +656,9 @@ class RestoredCopyAdmin(AsksFirst, base_admin.ReadOnlyAdmin):
             return self.confirmation(request, copies, form, "recover_into_the_business", title, RECOVER_TEMPLATE)
         apps = form.cleaned_data["apps"]
         ctx = staff_context(request)
-        asked = self.ask_each(request, copies, lambda copy: copy_recover(ctx, CopyRecoverIn(copy_id=copy.pk, apps=apps)))
+        asked = self.ask_each(
+            request, copies, lambda copy: copy_recover(ctx, CopyRecoverIn(copy_id=copy.pk, apps=apps))
+        )
         if asked:
             self.message_user(
                 request,
@@ -686,12 +691,19 @@ class CopyRecoveryAdmin(base_admin.ReadOnlyAdmin):
     results say, app by app, how many came back and how many not; its page says why each did not (by its id in the
     copy: no personal data), and why an app gave nothing back."""
 
-    list_display = ("copy", "status", "what", "outcome", "asked_on", "done_on", "last_error")
+    # What the staff looks for at a glance, as Separate copies: three columns a phone shows whole (375 px). What was
+    # asked, who asked it, when, when it was done and why each record did not come back are on its page.
+    list_display = ("made_from", "status", "outcome")
     list_filter = ("status",)
     list_select_related = ("copy", "copy__hub")
     search_fields = ("copy__hub__slug", "copy__db_name")
     fields = ("copy", "status", "what", "outcome", "why_not", "asked_by", "asked_on", "done_on", "last_error")
     readonly_fields = fields
+
+    @admin.display(description=gettext_lazy("separate copy"), ordering="copy__restore_point")
+    def made_from(self, recovery: CopyRecovery) -> str:
+        """Its copy's business and moment, on two lines: on a phone the results' column keeps the room."""
+        return format_html("{}<br>{}", recovery.copy.hub.slug, utc(recovery.copy.restore_point))
 
     @admin.display(description=pgettext_lazy("recovery", "what"))
     def what(self, recovery: CopyRecovery) -> str:
@@ -699,8 +711,13 @@ class CopyRecoveryAdmin(base_admin.ReadOnlyAdmin):
 
     @admin.display(description=pgettext_lazy("recovery", "results"))
     def outcome(self, recovery: CopyRecovery) -> str:
-        said = "; ".join(self.result_said(result) for result in recovery.results)
-        return said or self.get_empty_value_display()
+        """How it went: while asked, what it brings back; done, what each app gave back; failed, that and why."""
+        if recovery.status == CopyRecovery.Status.ASKED:
+            return self.what(recovery)
+        said = [self.result_said(result) for result in recovery.results]
+        if recovery.status == CopyRecovery.Status.FAILED and recovery.last_error:
+            said.append(recovery.last_error)
+        return "; ".join(said) or self.get_empty_value_display()
 
     @admin.display(description=pgettext_lazy("recovery", "not brought back"))
     def why_not(self, recovery: CopyRecovery):

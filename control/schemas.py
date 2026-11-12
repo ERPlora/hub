@@ -131,7 +131,8 @@ class CopyRecoverIn(Schema):
 
 
 class CopyRecoveryOut(Schema):
-    """The recovery asked of a separate copy (hub#1257): its id, the copy, its business, the apps asked and how it goes."""
+    """The recovery asked of a separate copy (hub#1257): its id, the copy, its business, the apps asked and how it
+    goes."""
 
     id: UUID
     copy_id: UUID

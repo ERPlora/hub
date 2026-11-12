@@ -306,9 +306,8 @@ class TestTheCopyIsOnlyRead:
             conn.execute("DELETE FROM customer_customer")
             return declared.read(conn)
 
-        monkeypatch.setattr(
-            type(customers), "recoverable_from_copy", lambda self: [type(declared)(**(vars(declared) | {"read": writes}))]
-        )
+        writing = type(declared)(**(vars(declared) | {"read": writes}))
+        monkeypatch.setattr(type(customers), "recoverable_from_copy", lambda self: [writing])
         asked = recoveries.ask(copy)
 
         run()
@@ -363,7 +362,8 @@ class TestTheCopysSchema:
     def test_a_copy_with_a_migration_this_code_does_not_know_is_refused(self, recoveries, every_app_on):
         hub, copy = self.lost_ana(recoveries, every_app_on)
         in_the_copy(
-            copy, "INSERT INTO django_migrations (app, name, applied) VALUES ('customer', '9999_from_the_future', now())"
+            copy,
+            "INSERT INTO django_migrations (app, name, applied) VALUES ('customer', '9999_from_the_future', now())",
         )
 
         assert self.refused(recoveries, copy).startswith("recover_copy_ahead: ")
@@ -375,6 +375,20 @@ class TestTheCopysSchema:
 
         assert self.refused(recoveries, copy).startswith("recover_not_in_copy: ")
         assert live_cards(hub) == []
+
+
+def taken_after_each_card(monkeypatch, asked: CopyRecovery) -> None:
+    """Another worker takes ``asked``'s lease each time Customers' create has made a card."""
+    op = get_operation("customer.customer.create")
+    real = op.fn
+
+    def then_taken(ctx, data):
+        made = real(ctx, data)
+        with use_control():
+            CopyRecovery.objects.filter(pk=asked.pk).update(lease_owner="other:1")
+        return made
+
+    monkeypatch.setattr(op, "fn", then_taken)
 
 
 class TestTheLease:
@@ -395,16 +409,7 @@ class TestTheLease:
         run_in(hub, "customer.customer.delete", id=ana)
         run_in(hub, "customer.customer.delete", id=luis)
         asked = recoveries.ask(copy)
-        op = get_operation("customer.customer.create")
-        real = op.fn
-
-        def then_taken(ctx, data):
-            made = real(ctx, data)
-            with use_control():
-                CopyRecovery.objects.filter(pk=asked.pk).update(lease_owner="other:1")
-            return made
-
-        monkeypatch.setattr(op, "fn", then_taken)
+        taken_after_each_card(monkeypatch, asked)
 
         run()
 
@@ -419,16 +424,7 @@ class TestTheLease:
         copy = recoveries.copy_of(hub)
         run_in(hub, "customer.customer.delete", id=ana)
         asked = recoveries.ask(copy)
-        op = get_operation("customer.customer.create")
-        real = op.fn
-
-        def then_taken(ctx, data):
-            made = real(ctx, data)
-            with use_control():
-                CopyRecovery.objects.filter(pk=asked.pk).update(lease_owner="other:1")
-            return made
-
-        monkeypatch.setattr(op, "fn", then_taken)
+        taken_after_each_card(monkeypatch, asked)
 
         run()
 

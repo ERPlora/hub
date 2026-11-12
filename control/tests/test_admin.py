@@ -855,6 +855,12 @@ class TestRecoverIntoTheBusiness:
         return client.post(COPIES, data, HTTP_HOST=PLATFORM, follow=True)
 
     @staticmethod
+    def copy_cell(copy) -> str:
+        """What Recoveries says of a copy: its business and its moment on two lines, the results' column room on a
+        phone (375 px)."""
+        return f">{copy.hub.slug}<br>2026-11-09 14:30 UTC</a>"
+
+    @staticmethod
     def a_recovery(copy, **fields):
         from control.models import CopyRecovery
 
@@ -888,7 +894,7 @@ class TestRecoverIntoTheBusiness:
         [asked] = CopyRecovery.objects.all()
         assert (asked.copy_id, asked.apps, asked.asked_by, asked.language) == (copy.pk, ["customer"], "root", "en")
         listed = page(client, RECOVERIES)
-        assert str(copy) in listed and "Asked" in listed and "Customers" in listed
+        assert self.copy_cell(copy) in listed and "Asked" in listed and "Customers" in listed
 
     def test_with_nothing_ticked_it_asks_again(self, client, root):
         from control.models import CopyRecovery
@@ -912,9 +918,15 @@ class TestRecoverIntoTheBusiness:
 
         listed = page(client, RECOVERIES)
         assert "Done" in listed and "Customers: 2 created, 1 not created" in listed
-        assert "2026-11-10 14:30 UTC" in listed
+        # Three columns, what a phone shows at a glance (375 px): when it was asked and done is on its page.
+        assert re.findall(r'<th scope="col"[^>]*class="([^"]*)"', listed) == [
+            "sortable column-made_from",
+            "sortable column-status",
+            "column-outcome",
+        ]
         its_page = client.get(f"{RECOVERIES}{done.pk}/change/", HTTP_HOST=PLATFORM).content.decode()
         assert why["id"] in its_page and "customer.phone_invalid: This phone is not valid." in its_page
+        assert "2026-11-10 14:30 UTC" in its_page and "Customers" in read_only_values(its_page, "what")
         assert 'name="_save"' not in its_page and "deletelink" not in its_page
         assert client.post(f"{RECOVERIES}{done.pk}/delete/", {"post": "yes"}, HTTP_HOST=PLATFORM).status_code == 403
         assert f'href="{RECOVERIES}add/"' not in listed
@@ -939,9 +951,9 @@ class TestRecoverIntoTheBusiness:
 
         listed = page(client, RECOVERIES)
         assert "Customers: nothing (app_inactive: Customers is turned off in this business.)" in row_of(
-            listed, str(refused.copy)
+            listed, ">acme<br>"
         )
-        assert "recover_copy_unreadable: it is gone" in row_of(listed, str(failed.copy))
+        assert "recover_copy_unreadable: it is gone" in row_of(listed, ">bistro<br>")
 
     def test_support_neither_sees_it_nor_runs_it_but_reads_the_recoveries(self, client, support):
         from control.models import CopyRecovery
@@ -953,7 +965,7 @@ class TestRecoverIntoTheBusiness:
 
         assert not CopyRecovery.objects.exists()
         self.a_recovery(copy)
-        assert str(copy) in page(client, RECOVERIES)
+        assert self.copy_cell(copy) in page(client, RECOVERIES)
 
 
 def test_the_recovery_speaks_spanish(client, root):

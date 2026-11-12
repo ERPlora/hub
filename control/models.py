@@ -449,7 +449,22 @@ class MovedCopy(UUIDModel):
         return self.db_name
 
 
-class RestoredCopy(UUIDModel):
+class AskedOfTheWorker(UUIDModel):
+    """What the staff asks of the worker in the Hub admin and the worker does under the row's own lease, never the
+    hub's (a separate copy, a recovery from one): who asked it and when, why it failed last, and the lease
+    (``lease_owner``, ``lease_until``) the worker holds while it works on it."""
+
+    last_error = models.TextField(_("last error"), blank=True, default="", db_default="")
+    asked_by = models.CharField(pgettext_lazy("separate copy", "asked by"), max_length=150)
+    asked_at = models.DateTimeField(pgettext_lazy("separate copy", "asked at"), auto_now_add=True)
+    lease_owner = models.CharField(_("leased by"), max_length=128, blank=True, default="", db_default="")
+    lease_until = models.DateTimeField(_("leased until"), null=True, blank=True)
+
+    class Meta:
+        abstract = True
+
+
+class RestoredCopy(AskedOfTheWorker):
     """A hub's database as it was at a moment, made aside on the hub's own cluster while the business goes on (hub#1213,
     layer 1; BASE-F114): asked in the Hub admin (``control.hub.restore_aside``), made by the worker from the hub's copy
     on a temporary cluster (``base.tenancy.restore``, «restore aside»), then dropped with its row after
@@ -489,12 +504,7 @@ class RestoredCopy(UUIDModel):
     status = models.CharField(
         _("status"), max_length=16, choices=Status.choices, default=Status.COPYING, db_default=Status.COPYING
     )
-    last_error = models.TextField(_("last error"), blank=True, default="", db_default="")
-    asked_by = models.CharField(pgettext_lazy("separate copy", "asked by"), max_length=150)
-    asked_at = models.DateTimeField(pgettext_lazy("separate copy", "asked at"), auto_now_add=True)
     made_at = models.DateTimeField(pgettext_lazy("separate copy", "made at"), null=True, blank=True)
-    lease_owner = models.CharField(_("leased by"), max_length=128, blank=True, default="", db_default="")
-    lease_until = models.DateTimeField(_("leased until"), null=True, blank=True)
 
     class Meta:
         verbose_name = _("separate copy")
@@ -511,7 +521,7 @@ class RestoredCopy(UUIDModel):
         return f"{self.hub.slug} · {self.restore_point.astimezone(dt.UTC):%Y-%m-%d %H:%M} UTC"
 
 
-class CopyRecovery(UUIDModel):
+class CopyRecovery(AskedOfTheWorker):
     """What the staff asked to bring back into a business from one of its separate copies (hub#1257, layer 2 of
     hub#1213; BASE-F114): asked in the Hub admin (``control.copy.recover``), done by the worker
     (``base.tenancy.recovery``), which reads the copy and creates in the business, by each app's own operation, what
@@ -540,12 +550,7 @@ class CopyRecovery(UUIDModel):
         _("status"), max_length=16, choices=Status.choices, default=Status.ASKED, db_default=Status.ASKED
     )
     results = models.JSONField(pgettext_lazy("recovery", "results"), default=list, blank=True)
-    last_error = models.TextField(_("last error"), blank=True, default="", db_default="")
-    asked_by = models.CharField(pgettext_lazy("separate copy", "asked by"), max_length=150)
-    asked_at = models.DateTimeField(pgettext_lazy("separate copy", "asked at"), auto_now_add=True)
     done_at = models.DateTimeField(pgettext_lazy("recovery", "done at"), null=True, blank=True)
-    lease_owner = models.CharField(_("leased by"), max_length=128, blank=True, default="", db_default="")
-    lease_until = models.DateTimeField(_("leased until"), null=True, blank=True)
 
     class Meta:
         verbose_name = _("recovery")
