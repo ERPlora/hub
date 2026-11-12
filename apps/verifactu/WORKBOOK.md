@@ -1426,14 +1426,16 @@ necesitan para el soporte». Por eso:
   terminar). Sin hub elegido, ninguna hace nada y lo dice.
   - **«Reenviar a la AEAT»** → `verifactu.record.transmit`: envía ya cada cadena una vez (el registro más reciente
     elegido arrastra los anteriores), respetando la espera de la AEAT. «Reenvío terminado: N aceptados, N
-    rechazados, N aún en espera.».
+    rechazados, N siguen esperando.» (cada recuento con el suyo: con uno, «1 aceptado», «1 rechazado», «1 sigue
+    esperando»; hub#1304).
   - **«Reprogramar: enviar en la próxima pasada»** → `verifactu.contingency.retry` (VERIFACTU-F22): el registro y
     los anteriores de su cadena salen en la pasada siguiente (la tarea de cada minuto), sin perder sus intentos.
     «Reprogramado: N registros salen en la próxima pasada.» (con uno, «1 registro sale»; cada aviso con un número
     lo dice en singular o en plural, nunca con «(s)», hub#1275).
   - **«Consultar a la AEAT (sale de la cola si ya lo tiene)»** → `verifactu.record.reconcile` (VERIFACTU-F35): si
     la AEAT tiene ese mismo registro (misma huella), sale de la cola como registrado; si no, sigue en la cola.
-    «Consulta a la AEAT: N ya registrados (fuera de la cola), N no están en la AEAT (siguen en la cola).».
+    «Consulta a la AEAT: N ya registrados (fuera de la cola), N no están en la AEAT (siguen en la cola).» (con
+    uno, «1 ya registrado», «1 no está en la AEAT (sigue en la cola)»).
   - **«Subsanar el rechazo con un registro nuevo»** → `verifactu.record.correct` (VERIFACTU-F24), solo sobre un
     registro rechazado: el rechazado se queda tal cual y entra uno nuevo en la cola. «Subsanado: N registros
     nuevos en la cola.» (con uno, «1 registro nuevo»).
