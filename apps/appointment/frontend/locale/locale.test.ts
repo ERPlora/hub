@@ -75,7 +75,7 @@ describe('appointment catalogues (en source + es)', () => {
       expect(EN.has(`appointment.status.${status}`), status).toBe(true);
     }
     const actions = ['created', 'confirmed', 'started', 'completed', 'cancelled', 'no_show', 'rescheduled'];
-    for (const action of [...actions, 'staff_changed', 'service_changed', 'unassigned', 'charged', 'uncharged', 'deleted']) {
+    for (const action of [...actions, 'staff_changed', 'service_changed', 'unassigned', 'charged', 'uncharged', 'deleted', 'restored']) {
       expect(EN.has(`appointment.history.action.${action}`), action).toBe(true);
     }
     for (const frequency of ['daily', 'weekly', 'biweekly', 'monthly']) expect(EN.has(`appointment.series.frequency.${frequency}`)).toBe(true);

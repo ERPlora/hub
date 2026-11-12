@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6aea977e3085b742d8f7562b45bc9a3f901942c1102bf5d9edfd6e880c092685 -->
+<!-- generated from WORKBOOK.md sha256:ff4bbe3a8718def67b34a0faace940fdae26dc101b96cf8edafa18801f373b7b -->
 
 ## What it is for and who it is for
 
@@ -234,7 +234,8 @@ refuses (the past time only warns before saving); an automation does not have th
 only books for themselves; an automation allowed to book, with any professional. Two people
 who book the same slot of the same professional at once: one gets in and the other gets the refusal.
 Involved: CUSTOMER-F11, CUSTOMER-F25, CUSTOMER-F30, SERVICE-F10, SERVICE-F33, STAFF-F16, SCHEDULE-F11, BASE-F114
-(ERPlora's staff recovers from a separate copy the appointments that were lost, each by this same booking)
+(ERPlora's staff recovers from a separate copy the appointments the business no longer has, each by this same
+booking; a deleted one comes back the same, APPOINTMENT-F11)
 
 ### APPOINTMENT-F02 See which times are still free
 Status: done
@@ -390,12 +391,14 @@ Screen: Agenda
 Steps:
 1. Tap **History** on the row (in any state) or open the appointment's card.
 2. Each change with its time on the business clock, who made it ("Requested by the customer" if it was
-   them) and what changed (from which professional or service to which, and the new time).
+   them) and what changed (from which professional or service to which, and the new time). A deleted appointment
+   that ERPlora's staff brought back from a separate copy keeps its lines and adds "Deleted" and "Restored"
+   (APPOINTMENT-F11).
 3. It is read-only: a single button, **Close**.
 In: an appointment in any state.
 Out: nothing (it only reads).
 If it fails: "The appointment history could not be loaded."
-Involved: none
+Involved: APPOINTMENT-F11, BASE-F114
 
 ### APPOINTMENT-F11 Delete an appointment
 Status: done
@@ -409,12 +412,17 @@ In: a pending, confirmed, cancelled or no-show appointment that is not charged.
 Out: the `appointment.appointment.deleted` event.
 If it fails: "This appointment cannot be deleted: it is in progress, completed or charged."; with its check
 open at the till, `appointment.check_open`. An appointment deleted by mistake that has not come yet is recovered by
-ERPlora's staff from a separate copy of the business (BASE-F114): it comes back booked as in APPOINTMENT-F01, with its
-customer, its services (one the business made again, with its name in its category, counts as the same), its
-professional, its time, its minutes and its notes, as a new appointment (another number and without its history,
-hub#1326); if its time is no longer free, or the customer or one of its services is no longer in the business, it does
-not come back and Recoveries says why.
-Involved: BASE-F114
+ERPlora's staff from a separate copy of the business (BASE-F114): THE SAME one comes back to the agenda, as it was when
+it was deleted, with its number, its customer, its services, its professional, its time, its notes, its series and its
+history, which adds the line "Restored", and with the `appointment.appointment.restored` event. It never comes back for
+a customer the business no longer has. If it was still booked, it only comes back if it fits as a booking of
+APPOINTMENT-F01: if its time is no longer free or no longer fits the opening hours, or one of its services or its
+professional can no longer be booked, it does not come back and Recoveries says why; a cancelled one comes back
+cancelled. One the business booked again (the same customer at the same time, or its series on that date) stays as it
+is. Only one the business no longer has comes back as a new appointment, booked as in APPOINTMENT-F01 (another number and
+without its history; one of its services the business made again, with its name in its category, counts as the same),
+under the same conditions.
+Involved: APPOINTMENT-F10, BASE-F114
 
 ### APPOINTMENT-F12 Create a repeating appointment
 Status: done
@@ -767,6 +775,7 @@ service and a professional, by their id or their name; a time, as the business's
 | Marks as no-show | change appointments | F09 | `appointment.appointment.mark_no_show` |
 | Cancels (also on behalf of the customer) | change appointments | F05, F06 | `appointment.appointment.cancel` |
 | Deletes an appointment / several | delete appointments | F11 | `appointment.appointment.delete`, `.bulk_delete` |
+| Brings a deleted appointment back to the agenda, the same one | the platform only (when recovering from a separate copy) | F11 | `appointment.appointment.restore` |
 | Opens the appointment's check at the till | change appointments + sell | F17 | `appointment.appointment.charge` |
 | Creates / removes a block | manage blocks | F16 | `appointment.blocked_time.create`, `.delete` |
 | Creates a series and books its window | book | F12, F13 | `appointment.recurring.create` |
@@ -784,6 +793,7 @@ confirmation before doing them.
 |---|---|---|
 | `appointment.appointment.created` | Booking (one per appointment of the batch and of the series) | The appointment, its number, the customer, the professional and its time |
 | `appointment.appointment.confirmed`, `.started`, `.completed`, `.marked_no_show`, `.cancelled`, `.deleted` | Each change of state | The appointment |
+| `appointment.appointment.restored` | A deleted appointment comes back to the agenda (recovering from a separate copy) | The appointment |
 | `appointment.appointment.rescheduled` | Moving (time, professional or services) | The appointment, the new time and the new professional |
 | `appointment.appointment.updated` | Changing notes or contact details | The appointment |
 | `appointment.appointment.charged` / `.uncharged` | Sale charged / voided | The appointment and the sale |

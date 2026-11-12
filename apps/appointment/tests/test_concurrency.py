@@ -439,6 +439,23 @@ def test_a_run_of_a_series_while_the_hub_admin_deletes_it_finds_it_gone(
     assert not Appointment.objects.exists()
 
 
+def test_a_deleted_date_of_a_series_restored_while_the_series_books_its_dates_is_booked_once(salon):
+    """The restore takes the series first, as every write does: a run of it waits, then finds the date booked."""
+    series = make_series(salon, max_occurrences=1)
+    run("appointment.recurring.materialize", {"id": str(series.id)})
+    [deleted] = Appointment.objects.filter(recurring=series)
+    run("appointment.appointment.delete", {"id": str(deleted.id)})
+    book = lambda: run("appointment.recurring.materialize", {"id": str(series.id)})  # noqa: E731
+    restore = get("appointment.appointment.restore")
+    with meanwhile(locks("appointment_recurring"), book) as outcomes:
+        restore(system_context(A), restore.input.model_validate({"id": str(deleted.id)}))
+    [outcome] = outcomes
+    assert not isinstance(outcome, Exception), outcome
+    assert (outcome.booked, outcome.already_booked) == (0, 1)
+    live = Appointment.objects.filter(recurring=series, deleted_at__isnull=True)
+    assert list(live.values_list("pk", flat=True)) == [deleted.pk]
+
+
 def test_the_agenda_and_the_hub_admin_deleting_the_same_appointments_never_wait_in_a_circle(
     salon, hub_staff
 ):

@@ -53,6 +53,15 @@ describe('AppointmentHistory', () => {
     ]);
   });
 
+  it('says when a deleted appointment came back from a copy of the business', async () => {
+    const s = await setup('es');
+    await s.result(OP, page([line({ action: 'deleted' }), line({ id: 'h2', action: 'restored', actor: '' })]));
+    expect(s.entries()).toEqual([
+      expect.stringMatching(/^Borrada.*Ana López$/),
+      expect.stringMatching(/^Recuperada.*Lo hizo la plataforma$/),
+    ]);
+  });
+
   it('in Spanish, empty, and failing with Retry', async () => {
     const s = await setup('es');
     await s.result(OP, page([]));

@@ -22,7 +22,7 @@ from django.utils import timezone
 from apps.appointment import queries
 from apps.appointment.models import Appointment
 from apps.appointment.schemas import AppointmentCreateIn
-from apps.appointment.tests.conftest import MONDAY, at, make_appointment, make_customer, make_service
+from apps.appointment.tests.conftest import MONDAY, at, make_appointment, make_customer, make_series, make_service
 from apps.service import queries as service_queries
 from apps.service.models import Service
 from apps.tax.models import TaxCategory
@@ -154,11 +154,11 @@ def an_appointment_of_the_copy(
     }
 
 
-def test_the_business_lacks_what_it_does_not_hold_nor_booked_again(salon):
+def test_the_business_lacks_what_it_does_not_hold_at_all_nor_booked_again(salon):
     lucia, now = salon.lucia, timezone.now()
     # Held, whatever became of it since (cancelled here, and at another time than in the copy): it stays as it is.
     held = make_appointment(lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), status="cancelled")
-    # Deleted from the agenda (APPOINTMENT-F11): lacking.
+    # Deleted from the agenda (APPOINTMENT-F11): still held, it comes back the same (``appointments_deleted_in_business``).
     deleted = make_appointment(lucia, salon.ana, [salon.cut], at(MONDAY, "11:00"), deleted_at=now)
     # Booked again by hand since (or brought back already): the same customer at the same moment.
     make_appointment(lucia, salon.bea, [salon.colour], at(MONDAY, "12:00"))
@@ -173,7 +173,41 @@ def test_the_business_lacks_what_it_does_not_hold_nor_booked_again(salon):
 
     lacking = queries.appointments_not_in_business(records)
 
-    assert [record["id"] for record in lacking] == [deleted.pk, gone["id"]]
+    assert [record["id"] for record in lacking] == [gone["id"]]
+
+
+def test_the_business_holds_deleted_what_it_deleted_and_did_not_book_again(salon):
+    lucia, now = salon.lucia, timezone.now()
+    live = make_appointment(lucia, salon.ana, [salon.cut], at(MONDAY, "09:00"))
+    deleted = make_appointment(lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), deleted_at=now)
+    # Deleted and booked again by hand since: the same customer at its moment. That one stays.
+    rebooked = make_appointment(lucia, salon.ana, [salon.cut], at(MONDAY, "11:00"), deleted_at=now)
+    make_appointment(lucia, salon.bea, [salon.colour], at(MONDAY, "11:00"))
+    # Deleted, and its series booked its date again since. That one stays.
+    series = make_series(salon)
+    occurrence = make_appointment(
+        lucia, salon.ana, [salon.cut], at(MONDAY, "12:00"), recurring=series, occurrence_date=MONDAY, deleted_at=now
+    )
+    make_appointment(lucia, salon.bea, [salon.cut], at(MONDAY, "15:00"), recurring=series, occurrence_date=MONDAY)
+    records = [
+        an_appointment_of_the_copy(card(lucia), salon, one.start, one.pk)
+        for one in (live, rebooked, occurrence, deleted)
+    ]
+    gone = an_appointment_of_the_copy(card(lucia), salon, at(MONDAY, "13:00"))
+
+    assert queries.appointments_deleted_in_business([gone, *records]) == [records[-1]]
+
+
+def test_a_deleted_one_is_the_same_by_its_id_whatever_the_copy_says_of_its_time(salon):
+    """Moved since the copy and deleted after: it is the same appointment, and whether it was booked again is read on
+    its own time in the business, never on the copy's."""
+    lucia, now = salon.lucia, timezone.now()
+    moved = make_appointment(lucia, salon.ana, [salon.cut], at(MONDAY, "11:00"), deleted_at=now)
+    make_appointment(lucia, salon.bea, [salon.colour], at(MONDAY, "09:00"))
+    record = an_appointment_of_the_copy(card(lucia), salon, at(MONDAY, "09:00"), moved.pk)
+
+    assert queries.appointments_deleted_in_business([record]) == [record]
+    assert queries.appointments_not_in_business([record]) == []
 
 
 def test_each_lacking_one_names_the_businesss_card_of_its_customer_and_is_what_its_create_takes(salon):
@@ -290,10 +324,12 @@ def test_a_copy_with_no_appointment_to_come_lacks_none():
 def test_the_app_declares_what_it_gives_back():
     [declared] = apps.get_app_config("appointment").recoverable_from_copy()
 
-    assert (declared.read, declared.missing, declared.create) == (
+    assert (declared.read, declared.missing, declared.create, declared.deleted, declared.restore) == (
         queries.appointments_in_copy,
         queries.appointments_not_in_business,
         "appointment.appointment.create",
+        queries.appointments_deleted_in_business,
+        "appointment.appointment.restore",
     )
     assert str(declared.label) == "Appointments"
     assert declared.reads_since == "0001_initial"

@@ -31,6 +31,8 @@ APPOINTMENT_CANCELLED = "appointment.appointment.cancelled"
 APPOINTMENT_RESCHEDULED = "appointment.appointment.rescheduled"
 APPOINTMENT_UPDATED = "appointment.appointment.updated"
 APPOINTMENT_DELETED = "appointment.appointment.deleted"
+# A deleted appointment back on the agenda, the same one (the recovery from a separate copy, BASE-F114).
+APPOINTMENT_RESTORED = "appointment.appointment.restored"
 APPOINTMENT_CHARGED = "appointment.appointment.charged"
 APPOINTMENT_UNCHARGED = "appointment.appointment.uncharged"
 APPOINTMENT_CHECK_OPENED = "appointment.appointment.check_opened"
@@ -55,6 +57,7 @@ APPOINTMENT_EVENTS = [
     APPOINTMENT_RESCHEDULED,
     APPOINTMENT_UPDATED,
     APPOINTMENT_DELETED,
+    APPOINTMENT_RESTORED,
     APPOINTMENT_CHARGED,
     APPOINTMENT_UNCHARGED,
     APPOINTMENT_CHECK_OPENED,
@@ -64,9 +67,10 @@ APPOINTMENT_EVENTS = [
 ]
 #: What changes how many upcoming bookings wait for confirmation in the agenda a person sees (the bell's «to
 #: confirm»): one is booked pending; it is confirmed, started, completed (a charge at the till completes it),
-#: cancelled or deleted; it moves (to a past hour or to another professional), or its professional leaves. Never a
-#: no-show (only once its start has passed, when it no longer counts), an edit of its notes or contact, a charge
-#: that leaves its state, an open or closed check, nor a card merged into another (same time, professional, state).
+#: cancelled, deleted or restored; it moves (to a past hour or to another professional), or its professional
+#: leaves. Never a no-show (only once its start has passed, when it no longer counts), an edit of its notes or
+#: contact, a charge that leaves its state, an open or closed check, nor a card merged into another (same time,
+#: professional, state).
 TO_CONFIRM_EVENTS = [
     APPOINTMENT_CREATED,
     APPOINTMENT_CONFIRMED,
@@ -76,6 +80,7 @@ TO_CONFIRM_EVENTS = [
     APPOINTMENT_RESCHEDULED,
     APPOINTMENT_UNASSIGNED,
     APPOINTMENT_DELETED,
+    APPOINTMENT_RESTORED,
 ]
 BLOCKED_TIME_EVENTS = [BLOCKED_TIME_CREATED, BLOCKED_TIME_DELETED]
 RECURRING_EVENTS = [RECURRING_CREATED, RECURRING_UPDATED, RECURRING_DELETED]

@@ -3148,15 +3148,18 @@ Pasos:
       dos veces.
       Las citas van siempre después de los clientes y los servicios, se pidan en el orden que se pidan, para que cada
       una encuentre a su clienta y sus servicios. Vuelve cada cita que aún no ha llegado y seguía reservada (pendiente o
-      confirmada, sin cobrar), reservada como la reserva la agenda: para la ficha de su clienta en el negocio (la misma,
-      aquella en la que se unió o la que se volvió a crear), con sus servicios en el negocio como los empareja Servicios
-      (el mismo o, si ya no está, el que se volvió a crear a mano o acaba de volver con Servicios: el mismo nombre en la
-      misma categoría, el más antiguo si hay dos), su profesional, su hora, sus minutos y sus notas; como cita nueva, con
-      otro número y sin su historial (hub#1326). Nunca se reserva encima de otra: una cuya hora ya está ocupada, ya no
-      encaja en el horario del negocio o del profesional o está bloqueada, o cuya clienta, servicio o profesional ya no
-      están, no vuelve y su motivo lo dice («appointment.slot_taken: …», «service.service_not_found: …»). Las que ya
-      pasaron no vuelven, y tampoco una que el negocio tiene (aunque la cancelara) o que volvió a reservar (la misma
-      clienta a la misma hora).
+      confirmada, sin cobrar). Una que el negocio borró y aún guarda vuelve LA MISMA y cuenta como restaurada, tal como
+      estaba al borrarla: con su número, su clienta, sus servicios, su profesional, su hora, sus notas, su serie y su
+      historial, que suma «Recuperada» (APPOINTMENT-F11). Una que el negocio ya no tiene vuelve reservada como la reserva
+      la agenda: para la ficha de su clienta en el negocio (la misma, aquella en la que se unió o la que se volvió a
+      crear), con sus servicios en el negocio como los empareja Servicios (el mismo o, si ya no está, el que se volvió a
+      crear a mano o acaba de volver con Servicios: el mismo nombre en la misma categoría, el más antiguo si hay dos), su
+      profesional, su hora, sus minutos y sus notas; como cita nueva, con otro número y sin su historial. Nunca se
+      reserva encima de otra: una cuya hora ya está ocupada, ya no encaja en el horario del negocio o del profesional o
+      está bloqueada, o cuya clienta, servicio o profesional ya no están, no vuelve y su motivo lo dice
+      («appointment.slot_taken: …», «service.service_not_found: …»); una borrada que no vuelve por eso no se crea de
+      nuevo. Las que ya pasaron no vuelven, y tampoco una que el negocio tiene (aunque la cancelara) o que volvió a
+      reservar (la misma clienta a la misma hora, o su serie en esa fecha).
 Entra: los negocios elegidos, el clúster temporal con su copia y el momento; para recuperar, la copia aparte hecha y qué
 recuperar.
 Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso
@@ -3173,8 +3176,9 @@ producto eliminado que vuelve en ella (`inventory.product.categorized`), cada pr
 eliminado que aún guardaba, vivo otra vez con su aviso de producto recuperado (`inventory.product.restored`), un
 producto nuevo por cada producto que ya no tenía, con su aviso de producto creado (`inventory.product.created`), una
 categoría de servicios nueva por cada una que le faltaba, con su aviso de categoría creada (`service.category.created`),
-un servicio nuevo por cada uno que ya no tenía, con su aviso de servicio creado (`service.service.created`), y una cita
-nueva por cada una que le faltaba, con su aviso de cita creada (`appointment.appointment.created`), y nada más. Cada uno
+un servicio nuevo por cada uno que ya no tenía, con su aviso de servicio creado (`service.service.created`), cada cita
+borrada que aún guardaba, viva otra vez con su aviso de cita recuperada (`appointment.appointment.restored`), y una cita
+nueva por cada una que ya no tenía, con su aviso de cita creada (`appointment.appointment.created`), y nada más. Cada uno
 de esos avisos dice que lo hizo la recuperación (su autor es `copy_recovery:<id>`, el de la fila de Recuperaciones), así
 que ninguna automatización del negocio arranca con ellos (FLOW-F21), sea de algo creado o de algo recuperado; lo que
 solo pone al día lo del negocio con ellos sigue igual (la Bandeja de WhatsApp enlaza a la ficha su conversación). La
@@ -3205,8 +3209,9 @@ mantenimiento, hasta que se descongela. Con registros solo del entorno de prueba
 Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
 INVENTORY-F07, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08, APPOINTMENT-F01,
-APPOINTMENT-F11, FLOW-F21; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1307,
-hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1356, hub#1373, aws#77
+APPOINTMENT-F10, APPOINTMENT-F11, FLOW-F21; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285,
+hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1356, hub#1373,
+aws#77
 
 ## Para quien lo mantiene
 

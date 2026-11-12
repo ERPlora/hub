@@ -240,7 +240,8 @@ hora pasada solo avisa antes de guardar); una automatización no tiene esas exce
 solo reserva para sí; una automatización a la que se permite reservar, con cualquier profesional. Dos personas
 que reservan a la vez el mismo hueco del mismo profesional: entra una y la otra recibe el rechazo.
 Implicados: CUSTOMER-F11, CUSTOMER-F25, CUSTOMER-F30, SERVICE-F10, SERVICE-F33, STAFF-F16, SCHEDULE-F11, BASE-F114
-(el personal de ERPlora recupera desde una copia aparte las citas que se perdieron, cada una por esta misma reserva)
+(el personal de ERPlora recupera desde una copia aparte las citas que el negocio ya no tiene, cada una por esta misma
+reserva; una borrada vuelve la misma, APPOINTMENT-F11)
 
 ### APPOINTMENT-F02 Ver qué horas quedan libres
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f06 fi:modules/appointments#query-appointments-availability-check fi:modules/appointments#query-appointments-availability-slots old:appointments/workflow/agenda.md#appointments-f02 old:schedules/WORKFLOW.md#schedules-f11 qa:modules/schedules/schedule-and-availability-per-professional qa:verticals/beauty/01-services-professionals-and-schedules wf:whatsapp-cita#rec_wa_cita-f04 wf:whatsapp-cita#rec_wa_cita-f08 -->
@@ -400,12 +401,13 @@ Pantalla: Agenda
 Pasos:
 1. Pulsa **Historial** en la fila (en cualquier estado) o abre la ficha de la cita.
 2. Cada cambio con su hora en el reloj del negocio, quién lo hizo («Lo pidió la clienta» si fue ella) y
-   qué cambió (de qué profesional o servicio a cuál, y la nueva hora).
+   qué cambió (de qué profesional o servicio a cuál, y la nueva hora). Una cita borrada que el personal de ERPlora
+   devolvió desde una copia aparte conserva sus líneas y suma «Borrada» y «Recuperada» (APPOINTMENT-F11).
 3. Es solo de lectura: un único botón, **Cerrar**.
 Entra: una cita en cualquier estado.
 Sale: nada (solo lee).
 Si falla: «No se pudo cargar el historial de la cita.»
-Implicados: ninguno
+Implicados: APPOINTMENT-F11, BASE-F114
 
 ### APPOINTMENT-F11 Borrar una cita
 <!-- origen: fi:modules/appointments#command-appointments-appointments-bulk_delete-handler-wasm fi:modules/appointments#command-appointments-appointments-delete old:appointments/workflow/agenda.md#appointments-f11 -->
@@ -420,11 +422,16 @@ Entra: una cita pendiente, confirmada, cancelada o no presentada que no esté co
 Sale: el aviso `appointment.appointment.deleted`.
 Si falla: «Esta cita no se puede borrar: está en curso, completada o cobrada.»; con su cuenta abierta
 en el TPV, `appointment.check_open`. Una cita borrada por error que aún no ha llegado la recupera el personal de
-ERPlora desde una copia aparte del negocio (BASE-F114): vuelve reservada como en APPOINTMENT-F01, con su clienta, sus
-servicios (uno que el negocio volvió a crear, con su nombre en su categoría, cuenta como el mismo), su profesional, su
-hora, sus minutos y sus notas, como cita nueva (otro número y sin su historial, hub#1326); si su hora ya no está libre,
-o la clienta o uno de sus servicios ya no están en el negocio, no vuelve y Recuperaciones dice por qué.
-Implicados: BASE-F114
+ERPlora desde una copia aparte del negocio (BASE-F114): vuelve LA MISMA a la agenda, tal como estaba al borrarla, con su
+número, su clienta, sus servicios, su profesional, su hora, sus notas, su serie y su historial, que suma la línea
+«Recuperada», y con el aviso `appointment.appointment.restored`. Nunca vuelve para una clienta que el negocio ya no
+tiene. Si seguía reservada, solo vuelve si encaja como una reserva de APPOINTMENT-F01: si su hora ya no está libre o ya
+no cabe en el horario, o si uno de sus servicios o su profesional ya no se reservan, no vuelve y Recuperaciones dice por
+qué; una cancelada vuelve cancelada. Una que el negocio volvió a reservar (la misma clienta a la misma hora, o su
+serie en esa fecha) se queda como está. Solo la que el negocio ya no tiene vuelve como cita nueva, reservada como en
+APPOINTMENT-F01 (otro número y sin su historial; uno de sus servicios que el negocio volvió a crear, con su nombre en su
+categoría, cuenta como el mismo), con las mismas condiciones.
+Implicados: APPOINTMENT-F10, BASE-F114
 
 ### APPOINTMENT-F12 Crear una cita periódica
 <!-- origen: fi:modules/appointments#command-appointments-recurring-create fi:modules/appointments#query-appointments-recurring-list old:appointments/workflow/periodicas.md#appointments-f12 -->
@@ -786,6 +793,7 @@ profesional, por su id o su nombre; una hora, como fecha y hora de pared del neg
 | Marca no presentada | cambiar citas | F09 | `appointment.appointment.mark_no_show` |
 | Cancela (también en nombre de la clienta) | cambiar citas | F05, F06 | `appointment.appointment.cancel` |
 | Borra una cita / varias | borrar citas | F11 | `appointment.appointment.delete`, `.bulk_delete` |
+| Devuelve a la agenda una cita borrada, la misma | solo la plataforma (al recuperar desde una copia aparte) | F11 | `appointment.appointment.restore` |
 | Abre la cuenta de la cita en el TPV | cambiar citas + vender | F17 | `appointment.appointment.charge` |
 | Crea / quita un bloqueo | gestionar bloqueos | F16 | `appointment.blocked_time.create`, `.delete` |
 | Crea una serie y reserva su ventana | reservar | F12, F13 | `appointment.recurring.create` |
@@ -803,6 +811,7 @@ confirmación antes de hacerlas.
 |---|---|---|
 | `appointment.appointment.created` | Reserva (una por cita del lote y de la serie) | La cita, su número, la clienta, el profesional y su hora |
 | `appointment.appointment.confirmed`, `.started`, `.completed`, `.marked_no_show`, `.cancelled`, `.deleted` | Cada cambio de estado | La cita |
+| `appointment.appointment.restored` | Una cita borrada vuelve a la agenda (recuperar desde una copia aparte) | La cita |
 | `appointment.appointment.rescheduled` | Mover (hora, profesional o servicios) | La cita, la hora y el profesional nuevos |
 | `appointment.appointment.updated` | Cambiar notas o contacto | La cita |
 | `appointment.appointment.charged` / `.uncharged` | Venta cobrada / anulada | La cita y la venta |
@@ -864,9 +873,14 @@ agenda tuya que enseñar.».
 - **Recuperar desde una copia aparte** (BASE-F114, hub#1284): `apps.py` responde a la plataforma
   (`recoverable_from_copy`, `base.tenancy.recovery`) con las citas de la copia que aún no han llegado y siguen
   reservadas (pendientes o confirmadas, ni borradas ni cobradas; `queries.appointments_in_copy`, por SQL sobre los
-  nombres de los modelos: la copia no es un negocio y no tiene alias) que el negocio no tiene
-  (`queries.appointments_not_in_business`: ni la misma, haya pasado lo que haya pasado con ella, ni otra de la misma
-  clienta a la misma hora), cada una creada por `appointment.appointment.create`. La clienta se casa por la regla de
+  nombres de los modelos: la copia no es un negocio y no tiene alias). La que el negocio aún guarda borrada vuelve la
+  misma por `appointment.appointment.restore` (`queries.appointments_deleted_in_business`, por su id, salvo que se
+  volviera a reservar: otra viva de su clienta a su hora, o de su serie en su fecha, según lo que el negocio guarda de
+  ella y no lo que dice la copia; hub#1326). La restauración bloquea primero su serie (como toda escritura: una pasada
+  de la serie no reserva esa fecha a la vez) y juzga, si sigue reservada, como una reserva: ficha viva, servicios y
+  profesional reservables y la hora libre, con las reglas de una automatización. La que el negocio no tiene
+  (`queries.appointments_not_in_business`: ni la misma, viva o borrada, ni otra de la misma clienta a la misma hora) se
+  crea por `appointment.appointment.create`. La clienta se casa por la regla de
   Clientes (`customer.queries.card_in_business`: la misma ficha, aquella en la que se unió o la que se volvió a crear;
   la plataforma recupera las apps en el orden de sus `requires`, así que Clientes va antes). Cada servicio, por la regla
   de Servicios (hub#1341): `appointments_in_copy` lleva en cada cita la lista ENTERA de `service.queries.services_in_copy`

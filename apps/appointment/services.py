@@ -81,6 +81,7 @@ from apps.appointment.queries import (
 from apps.appointment.schemas import (
     END_BEFORE_START,
     AppointmentCreateIn,
+    AppointmentIdIn,
     AppointmentOut,
     AppointmentRefIn,
     AppointmentsOut,
@@ -109,6 +110,7 @@ from apps.appointment.schemas import (
     OrderVoidedIn,
     SaleFromAppointmentIn,
     SaleVoidedIn,
+    ServiceRefIn,
     SettingsIn,
     SettingsOut,
     UpdateIn,
@@ -182,6 +184,7 @@ RECURRING_NO_STAFF = _(
     "This repeating appointment has no professional: edit it and choose who does it."
 )
 CALENDAR_UPSIDE_DOWN = _("The calendar has to end after it starts.")
+OCCURRENCE_BOOKED = _("Its repeating appointment has booked that date again since.")
 BATCH_AT = _("%(time)s: %(reason)s")
 
 
@@ -1155,6 +1158,58 @@ def bulk_delete(ctx: OperationContext, data: BulkDeleteIn) -> dict:
         _delete(ctx, appointment)
         deleted.append(appointment.id)
     return {"deleted": deleted}
+
+
+@operation(
+    "appointment.appointment.restore",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=AppointmentIdIn,
+    output=AppointmentOut,
+    ai={
+        "description": "Bring a deleted appointment back to the agenda, the same one with its number, its history and "
+        "its series (run by the platform when ERPlora's staff recovers the business from a separate copy).",
+        "risk": "normal",
+    },
+)
+def restore_appointment(ctx: OperationContext, data: AppointmentIdIn) -> dict:
+    """A deleted appointment back on the agenda as it was (deleting keeps it, APPOINTMENT-F11), with a line in its
+    history. One already on the agenda is answered as it is."""
+    # Its series first, as every write takes them: a run of the series cannot book its date meanwhile.
+    lock_series(Appointment.objects.filter(pk=data.id).values("recurring_id"))
+    appointment = Appointment.objects.select_for_update(of=("self",)).filter(pk=data.id).first()
+    if appointment is None:
+        raise NotFound(str(APPOINTMENT_NOT_FOUND), code="appointment.appointment_not_found")
+    if appointment.deleted_at is not None:
+        _refuse_unless_restorable(ctx, appointment)
+        appointment.deleted_at = None
+        appointment.updated_by = _actor(ctx)
+        appointment.save(update_fields=["deleted_at", "updated_by", "updated_at"])
+        _history(ctx, appointment, A.RESTORED)
+        _event(ctx, events.APPOINTMENT_RESTORED, appointment)
+    return load_detail(ctx, appointment.id)
+
+
+def _refuse_unless_restorable(ctx: OperationContext, appointment: Appointment) -> None:
+    """A deleted appointment comes back only as the agenda would book it now: for a live card, never on a date its
+    series booked again and, while it is still booked, with its services and its professional bookable at a time
+    that fits (judged by the customer's rules, as the platform always is)."""
+    find_customer(ctx, appointment.customer_id, None)
+    if (
+        appointment.recurring_id
+        and Appointment.objects.filter(
+            recurring_id=appointment.recurring_id,
+            occurrence_date=appointment.occurrence_date,
+            deleted_at__isnull=True,
+        ).exists()
+    ):
+        raise Conflict(str(OCCURRENCE_BOOKED), code="appointment.occurrence_booked")
+    if appointment.status not in MOVABLE:
+        return
+    services = resolve_services([ServiceRefIn(service_id=line.service_id) for line in appointment.lines.all()])
+    member = _member_for_booking(ctx, appointment.staff_id, None, services) if appointment.staff_id else None
+    _judge(ctx, member, appointment.start, appointment.end, customer=True, confirm_overlap=False)
 
 
 # ── Charging (F17) ───────────────────────────────────────────────────────────────────────────
