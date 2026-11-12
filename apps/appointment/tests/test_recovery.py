@@ -231,6 +231,15 @@ def lost(*services) -> None:
     Service.objects.filter(pk__in=[one.pk for one in services]).delete()
 
 
+def comes_back_with(salon, copy: list[dict]) -> list[dict]:
+    """The services a cut booked in the copy comes back with (``appointments_not_in_business``), ``copy`` being the
+    copy's services (``services_in_copy``)."""
+    [lacking] = queries.appointments_not_in_business(
+        [an_appointment_of_the_copy(card(salon.lucia), salon, at(MONDAY, "10:00"), services_in_copy=copy)]
+    )
+    return lacking["services"]
+
+
 def test_a_lacking_ones_service_made_again_since_is_the_one_it_is_booked_with(salon):
     """hub#1341: a service gone from the business and made again (the same name in the same category, by hand or
     brought back by Services first) is the one the appointment comes back with, as Services says
@@ -239,11 +248,7 @@ def test_a_lacking_ones_service_made_again_since_is_the_one_it_is_booked_with(sa
     lost(salon.cut)
     again = make_service("  haircut ", tax=salon.tax)
 
-    [lacking] = queries.appointments_not_in_business(
-        [an_appointment_of_the_copy(card(salon.lucia), salon, at(MONDAY, "10:00"), services_in_copy=copy)]
-    )
-
-    assert lacking["services"] == [{"service_id": again.pk}]
+    assert comes_back_with(salon, copy) == [{"service_id": again.pk}]
 
 
 def test_a_lacking_ones_service_the_business_no_longer_has_stays_the_copys_for_its_create_to_refuse(salon):
@@ -253,11 +258,7 @@ def test_a_lacking_ones_service_the_business_no_longer_has_stays_the_copys_for_i
     lost(salon.cut)
     make_service("Haircut and beard", tax=salon.tax)
 
-    [lacking] = queries.appointments_not_in_business(
-        [an_appointment_of_the_copy(card(salon.lucia), salon, at(MONDAY, "10:00"), services_in_copy=copy)]
-    )
-
-    assert lacking["services"] == [{"service_id": salon.cut.pk}]
+    assert comes_back_with(salon, copy) == [{"service_id": salon.cut.pk}]
 
 
 def test_with_two_made_again_the_oldest_is_the_one_it_is_booked_with(salon):
@@ -266,11 +267,7 @@ def test_with_two_made_again_the_oldest_is_the_one_it_is_booked_with(salon):
     older = make_service("Haircut", tax=salon.tax)
     make_service("Haircut", tax=salon.tax)
 
-    [lacking] = queries.appointments_not_in_business(
-        [an_appointment_of_the_copy(card(salon.lucia), salon, at(MONDAY, "10:00"), services_in_copy=copy)]
-    )
-
-    assert lacking["services"] == [{"service_id": older.pk}]
+    assert comes_back_with(salon, copy) == [{"service_id": older.pk}]
 
 
 def test_a_service_the_copy_had_too_is_never_taken_for_the_lost_one_of_the_same_name(salon):
@@ -280,11 +277,7 @@ def test_a_service_the_copy_had_too_is_never_taken_for_the_lost_one_of_the_same_
     copy = service_queries.services_in_copy(direct())
     lost(salon.cut)
 
-    [lacking] = queries.appointments_not_in_business(
-        [an_appointment_of_the_copy(card(salon.lucia), salon, at(MONDAY, "10:00"), services_in_copy=copy)]
-    )
-
-    assert lacking["services"] == [{"service_id": salon.cut.pk}]
+    assert comes_back_with(salon, copy) == [{"service_id": salon.cut.pk}]
     assert Service.objects.filter(pk=kept.pk).exists()
 
 
