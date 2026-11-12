@@ -226,7 +226,16 @@ Y, como toda spec, el SaaS arrancado como dice la receta, también con `DEMO_SPA
 por dirección subidos»): cada pasada abre dos demos desde `127.0.0.1` y, con el tope de 3 por hora del SaaS, la segunda
 pasada de la hora no encuentra su demo. Cuando la puerta contesta a «Try the demo» con `/demo/?state=<resultado>` en vez
 de abrir la demo (`throttled`, `full`, `unavailable`…), la spec cae al momento diciendo ese resultado
-(`demo-door.ts`) y, con `throttled`, esa variable, en vez de agotar los 15 s de espera de la demo.
+(`demo-door.ts`) y, con `throttled`, esa variable.
+
+La spec espera a que la demo esté lista **sin reloj propio** (hub#1061): con la máquina cargada muy por encima de sus
+núcleos una demo tardó 15,3 s sin nada roto y la espera de 15 s que tenía la tiraba. Si la puerta se cansa antes (sus
+30 s, `?state=not_ready`, PUBLIC-F29 del SaaS) y el Hub la sigue preparando, la spec pulsa «Try again» como haría el
+visitante y vuelve a esperar a la misma demo; si el Hub no pudo prepararla (`failed` en el registro), cae al momento con
+su `last_error`. Una demo que no se abre nunca la corta el tope del test (`playwright.config.ts`). Lo que aquella
+espera vigilaba se comprueba ahora como un hecho, tarde lo que tarde: la BD de cada demo es el **clon de su
+plantilla**, sin ninguna migración aplicada en el alta (cada fila de su `django_migrations` es de la plantilla, con la
+misma hora; `demo-born.ts`). Un alta que vuelva a crear las tablas en vez de clonar cae ahí, aunque sea rápida.
 
 ```bash
 CI=1 pnpm e2e tests/e2e/demo.spec.ts   # con las variables de la receta exportadas
