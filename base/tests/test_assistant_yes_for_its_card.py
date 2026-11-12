@@ -71,6 +71,19 @@ def unless_marked(writes, mark: dict) -> dict[tuple[str, str], set[str]]:
     }
 
 
+def unless_by_id(writes) -> dict[tuple[str, str], set[str]]:
+    """Beside which data the card leaves unread each datum of ``writes`` it reads by its id (``names(…, by="id")``),
+    whatever record it names: an app's ``unless`` table of its ids (hub#1278), every one of them, so that a new id the
+    write leaves aside for its record's comes in it."""
+    return {
+        (op.name, datum): unless_of(field.json_schema_extra)
+        for op in writes
+        for datum, field in op.input.model_fields.items()
+        if isinstance(field.json_schema_extra, dict)
+        and field.json_schema_extra.get("refers", {}).get("by") == "id"
+    }
+
+
 def said(plan: dict) -> list[tuple[str, object]]:
     return [(field["name"], field["value"]) for field in plan["confirm"]["fields"]]
 

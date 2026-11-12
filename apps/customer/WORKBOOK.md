@@ -955,7 +955,15 @@ su id: la ficha («Cliente: Ana García»), la ficha duplicada de una unión, lo
 el grupo, la etiqueta o el campo que se cambia o se elimina, por su nombre, y el pedido abierto como lo nombra Venta
 (su título o, sin él, su importe; con Venta apagada, no sale). Lo que quien pregunta no puede ver no sale. En una
 unión, si la ficha que se queda o la duplicada llegan por su id junto al nombre de otra ficha, la tarjeta no lee ni
-enseña ese nombre, que la unión no usa: dice solo las dos fichas que se juntan (hub#1272).
+enseña ese nombre, que la unión no usa: dice solo las dos fichas que se juntan (hub#1272). Igual en todo lo demás
+(cambiar, eliminar o borrar los datos de una ficha, ponerle grupos o etiquetas, añadirle una nota, una actividad o un
+consentimiento, retirarlo, ponerla en un pedido, y cambiar o eliminar un grupo, una etiqueta o un campo): si llega el
+id de la ficha, el grupo, la etiqueta o el campo junto al nombre de otro, la tarjeta dice solo el del id, que es el
+que se toca (hub#1280). Dicho solo por su nombre, su teléfono o su email, la tarjeta dice la ficha, el grupo, la
+etiqueta o el campo que va a tocar la acción («Cliente: Ana García» para «ana@ejemplo.com»); si no encaja con ninguno
+o encaja con varios, lo dice tal como se dijo y la acción responde que no lo encuentra o que hay varios. Si entre la
+tarjeta y el «sí» ese nombre pasa a ser de otro (otra ficha con ese email, un grupo activo con ese nombre), no se toca
+nada y sale la tarjeta nueva.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -977,9 +985,9 @@ enseña ese nombre, que la unión no usa: dice solo las dos fichas que se juntan
 | Qué cliente tiene un pedido | ver | F17, F19 | sí | `customer.order.customer` |
 | Los pedidos de una ficha (también para las API keys) | ver | F19 | sí | `customer.order.list` |
 | Los datos de salud de una ficha y su permiso (solo en pantalla) | ver | F32 | sí | `customer.health.detail` |
-| Un grupo por su id, también uno no activo: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97) | ver | F06, F27 | no | `customer.group.detail` |
-| Una etiqueta por su id, también una no activa: lo que lee la tarjeta del asistente (BASE-F97) | ver | F06, F28 | no | `customer.tag.detail` |
-| Un campo personalizado por su id: lo que lee la tarjeta del asistente (BASE-F97) | ver | F04, F29 | no | `customer.field.detail` |
+| Un grupo por su id o por su nombre, también uno no activo: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97) | ver | F06, F27 | no | `customer.group.detail` |
+| Una etiqueta por su id o por su nombre, también una no activa: lo que lee la tarjeta del asistente (BASE-F97) | ver | F06, F28 | no | `customer.tag.detail` |
+| Un campo personalizado por su id o por su nombre: lo que lee la tarjeta del asistente (BASE-F97) | ver | F04, F29 | no | `customer.field.detail` |
 | El nombre de un pedido abierto, como lo nombra Venta: lo que lee la tarjeta del asistente (BASE-F97) | ver (y ver las ventas, en Venta) | F19 | no | `customer.order.get` |
 
 ### Lo que ofrece: acciones (cambian datos)
@@ -1135,8 +1143,8 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   detrás, sin permiso, con un id de otro negocio o de algo que ya no está, el registro queda fuera, nunca su id:
   `tests/test_assistant_card_records.py`, y el trinquete `UNNAMED_REFERENCES` de
   `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca.
-- La fusión (F13) es la única escritura cuyas referencias escritas también llevan marca: `customer` y `absorbed` de
-  `MergeIn`, con `A_CUSTOMER_REFERENCE` (`customer.customer.detail` por `customer`). Así, «junta la ficha del
+- En la fusión (F13), las referencias escritas `customer` y `absorbed` de `MergeIn` llevan `A_CUSTOMER_REFERENCE`
+  (`customer.customer.detail` por `customer`), la única marca de una referencia escrita sin `as_said`. Así, «junta la ficha del
   611 222 444 dentro de la del 611 222 333» sale en la tarjeta como «Cliente: Ana QA» y «Ficha duplicada: Ana QA
   copia», no como los dos teléfonos: se ve quién se queda antes de algo que no se deshace. Si una referencia no encaja
   con una sola ficha viva, ese dato queda fuera de la tarjeta, como un id sin nombre, y la fusión responde con el mismo
@@ -1146,6 +1154,17 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   para `absorbed`), que `find_customer` usa sin mirar el nombre, la tarjeta deja ese nombre sin leer
   (`base.schemas.unless_given`, hub#1272; `UNLESS` de `tests/test_assistant_card_records.py`); junto al id de la otra
   ficha, lo lee.
+- En las demás escrituras, la ficha, el grupo, la etiqueta o el campo dichos con palabras (`customer` de
+  `CustomerRefIn`, `CustomerOfIn` y `OrderLinkIn`, `group` de `GroupRefIn`, `tag` de `TagRefIn` y `field` de
+  `FieldRefIn`) llevan `A_CUSTOMER_SAID`, `A_GROUP_SAID`, `A_TAG_SAID` y `A_FIELD_SAID`: se leen por esas palabras con
+  `customer.customer.detail`, `customer.group.detail`, `customer.tag.detail` y `customer.field.detail`, que buscan
+  con el mismo `find_customer`, `find_group`, `find_tag` y `find_field` que la escritura (el grupo, la etiqueta o el
+  campo activo antes que uno que ya no lo está), y lo encontrado va en la huella del «sí» (BASE-F97). Con `as_said`,
+  si las palabras no encajan con uno solo, o no hay persona detrás, la tarjeta las dice tal como llegan, como antes de
+  la marca. Junto al id de su propio registro (`id` o `customer_id`, el que la escritura usa sin mirar el nombre), la
+  tarjeta no las lee ni las enseña (`unless_given`, hub#1280; `UNLESS_SAID` de `tests/test_assistant_card_records.py`,
+  con el control del «sí» que toca solo el registro del id). Las listas `groups` y `tags` de `set_groups` y
+  `set_tags` no van con `unless`: la escritura usa los nombres junto a los ids.
 - Búsqueda: cada ficha guarda `search_text` (nombre, email, teléfono, NIF y empresa en minúsculas y
   sin acentos), recalculado en `Customer.save()`; así no hace falta la extensión `unaccent`.
 - Estados de una ficha: viva (`deleted_at` vacío), eliminada (`deleted_at`), unida (`merged_into`) y
@@ -1275,9 +1294,7 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
 ## Lo que queda fuera
 
 El país de un teléfono sin prefijo (hub#527) ya es el del negocio en Clientes y en todas las apps que buscan una
-ficha por su teléfono. Abierto: en las demás escrituras (cambiar, eliminar, borrar los datos, grupos y etiquetas,
-notas, actividad, consentimientos, pedido; y los grupos, etiquetas y campos), el nombre que llega junto al id de su
-ficha no lleva marca y la tarjeta del asistente lo enseña tal como llega (hub#1280).
+ficha por su teléfono.
 
 ## Lo que NO hace, a propósito
 

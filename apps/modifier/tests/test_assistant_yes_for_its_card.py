@@ -8,7 +8,8 @@ group said by its name finds them. The card says the group it found («Salsas pi
 a name two groups fit or none has draws no card, and a yes after another group fits the name better runs nothing and
 shows the new card, as Demo (hub#1206) and Menus (hub#1217) do (MODIFIER-F03, MODIFIER-F04, MODIFIER-F05,
 BASE-F97). Adding an option to a group or applying it, which cannot check it, reads it the same way and says it as said
-when two fit; an option said by its name is read with its group (hub#1245).
+when two fit; an option said by its name is read with its group (hub#1245). A record that comes by its id names no other
+group said beside it (hub#1250), nor another group, product or category whose id comes beside a link's (hub#1278).
 """
 
 import json
@@ -21,7 +22,7 @@ from apps.modifier.tests.conftest import ctx_for, make_category, make_product, r
 from apps.modifier.tests.test_integration_assistant import TITLES, modifier_writes
 from base import assistant
 from base.schemas import names
-from base.tests.test_assistant_yes_for_its_card import read_as, turn_as, unless_of, yes_to_its_card
+from base.tests.test_assistant_yes_for_its_card import read_as, turn_as, unless_by_id, unless_of, yes_to_its_card
 from base.tests.test_services_assistant import call
 
 pytestmark = pytest.mark.django_db
@@ -363,3 +364,56 @@ def test_an_option_that_comes_by_its_id_is_still_looked_for_in_the_group_said_be
     arguments = {**by_its_name("extras")[write], "id": str(option.id)}
     arguments.pop("option", None)
     assert fields_of(write, arguments, "es")["group"]["value"] == "Extras"
+
+
+# ── A link that comes by its id with the id of another group, product or category beside it (hub#1278) ───────────────
+# Letting a group go by the link's id never looks at the group, the product or the category whose id comes beside it:
+# the card neither reads nor shows them (``unless``), as when the id comes alone. Everywhere else an id of a group, a
+# product or a category is what the write takes (the group an option gets or a link hangs, what it applies to, the
+# group an option by its id is looked for in): it is read.
+
+#: Beside which data each write of Modifiers takes its record by them and not by each id it reads.
+UNLESS_BY_ID = {
+    **{(name, "id"): set() for name in ("modifier.group.delete", "modifier.group.update")},
+    **{(name, "id"): set() for name in ("modifier.option.delete", "modifier.option.update")},
+    **{
+        (name, "group_id"): set() for name in ("modifier.option.create", "modifier.option.delete", "modifier.option.update")
+    },
+    **{("modifier.link.attach", datum): set() for datum in ("group_id", "product_id", "category_id")},
+    ("modifier.link.detach", "id"): set(),
+    **{("modifier.link.detach", datum): {"id"} for datum in ("group_id", "product_id", "category_id")},
+}
+
+
+def test_an_id_is_left_unread_beside_each_datum_its_write_takes_its_record_by_instead():
+    assert unless_by_id(modifier_writes()) == UNLESS_BY_ID
+
+
+def extras_link_beside(datum: str) -> dict:
+    """The data to let «Extras» go from «Hamburguesa» by the link's id with, beside it, the id of «Salsas picantes»,
+    of «Pizza» or of «Entrantes», which the write does not use."""
+    from apps.inventory.models import Category
+
+    extras = a_group("Extras")
+    others = {
+        "group_id": a_group("Salsas picantes").id,
+        "product_id": make_product("Pizza", "PIZ").id,
+        "category_id": Category.objects.get(name="Entrantes").id,
+    }
+    return {"id": str(ModifierLink.objects.get(group_id=extras.id).id), datum: str(others[datum])}
+
+
+@pytest.mark.parametrize("datum", ["category_id", "group_id", "product_id"])
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_a_link_that_comes_by_its_id_names_no_group_product_or_category_whose_id_comes_beside_it(datum, language):
+    shown = fields_of("modifier.link.detach", extras_link_beside(datum), language)
+    assert {name: field["value"] for name, field in shown.items()} == {"id": "Extras · Hamburguesa"}
+
+
+@pytest.mark.parametrize("datum", ["category_id", "group_id", "product_id"])
+def test_the_yes_to_a_link_that_comes_by_its_id_lets_only_it_go_whatever_id_comes_beside_it(datum):
+    """Control of the above: the write lets «Extras» go from «Hamburguesa», and keeps every other link."""
+    arguments = extras_link_beside(datum)
+    done = yes_to_its_card(as_admin(), "modifier.link.detach", arguments)
+    assert [row["outcome"] for row in done["executed"]] == ["ok"]
+    assert state()[2] == [("Salsas picantes", "Hamburguesa", None)]

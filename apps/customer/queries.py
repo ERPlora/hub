@@ -32,7 +32,6 @@ from apps.customer.models import (
 from apps.customer.phones import candidates
 from apps.customer.schemas import (
     ActivityListIn,
-    ByIdIn,
     ActivityPage,
     ByPhoneIn,
     ConsentHistoryIn,
@@ -52,9 +51,11 @@ from apps.customer.schemas import (
     ExportOut,
     FieldListIn,
     FieldPage,
+    FieldRefIn,
     FieldRow,
     GroupListIn,
     GroupPage,
+    GroupRefIn,
     GroupRow,
     HealthDetailIn,
     HealthOut,
@@ -69,6 +70,7 @@ from apps.customer.schemas import (
     PurchasePage,
     TagListIn,
     TagPage,
+    TagRefIn,
     TagRow,
 )
 from apps.customer.search import normalize, search_term
@@ -615,40 +617,43 @@ def list_fields(ctx: OperationContext, params: FieldListIn) -> dict:
 
 # Not assistant tools: what names a group, a tag or a custom field on the card of a write (``schemas.A_GROUP``,
 # ``A_TAG``, ``A_FIELD``), also one no longer active, which a change brings back; the model finds them in their lists.
+# Said by its name (``schemas.A_GROUP_SAID``…), the one its write finds by it (``find_group``…, hub#1280).
 @operation(
     "customer.group.detail",
     kind="query",
     permission="customer.view",
-    input=ByIdIn,
+    input=GroupRefIn,
     output=GroupRow,
     ai=INTERNAL,
 )
-def group_detail(ctx: OperationContext, data: ByIdIn) -> CustomerGroup:
-    return _by_id(_groups(), data.id, missing=GROUP_UNAVAILABLE, code="customer.group_unavailable")
+def group_detail(ctx: OperationContext, data: GroupRefIn) -> CustomerGroup:
+    group_id = data.id if data.id is not None else find_group(None, data.group).id
+    return _by_id(_groups(), group_id, missing=GROUP_UNAVAILABLE, code="customer.group_unavailable")
 
 
 @operation(
     "customer.tag.detail",
     kind="query",
     permission="customer.view",
-    input=ByIdIn,
+    input=TagRefIn,
     output=TagRow,
     ai=INTERNAL,
 )
-def tag_detail(ctx: OperationContext, data: ByIdIn) -> CustomerTag:
-    return _by_id(_tags(), data.id, missing=TAG_UNAVAILABLE, code="customer.tag_unavailable")
+def tag_detail(ctx: OperationContext, data: TagRefIn) -> CustomerTag:
+    tag_id = data.id if data.id is not None else find_tag(None, data.tag).id
+    return _by_id(_tags(), tag_id, missing=TAG_UNAVAILABLE, code="customer.tag_unavailable")
 
 
 @operation(
     "customer.field.detail",
     kind="query",
     permission="customer.view",
-    input=ByIdIn,
+    input=FieldRefIn,
     output=FieldRow,
     ai=INTERNAL,
 )
-def field_detail(ctx: OperationContext, data: ByIdIn) -> CustomField:
-    return find_field(data.id, None)
+def field_detail(ctx: OperationContext, data: FieldRefIn) -> CustomField:
+    return find_field(data.id, data.field)
 
 
 # ── A card's timeline, purchases, consent and orders ────────────────────────────────────────────

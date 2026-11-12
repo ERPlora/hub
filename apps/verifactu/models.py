@@ -27,7 +27,7 @@ from django.db.models.functions import Length
 from django.db.models.lookups import Exact
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
-from django.utils.translation import pgettext_lazy
+from django.utils.translation import ngettext_lazy, pgettext_lazy
 from live.models import UUIDModel
 
 NIF_MAX_LENGTH = 32
@@ -610,9 +610,11 @@ class Event(UUIDModel):
                 params["reason"], params.get("detail", ""), params.get("at", "")
             )
         try:
-            return str(template) % params
+            # Formatted as it is, not through ``str()``: a sentence with a count picks its singular or its plural from
+            # the number in ``params`` (hub#1275), and read before that it is empty.
+            return str(template % params)
         except (KeyError, TypeError, ValueError):
-            return str(template)
+            return str(template) or self.message_key
 
     def compose_search_text(self) -> str:
         """The sentence in both languages, lower case."""
@@ -634,8 +636,17 @@ EVENT_MESSAGES = {
     "anulacion_sealed": _(
         "Cancellation record #%(sequence)s sealed for invoice %(invoice_number)s: %(reason_text)s"
     ),
-    "deferred": _("Not sent to the AEAT yet (%(count)s record(s)): %(why)s."),
-    "accepted": _("AEAT (%(environment)s): %(count)s record(s) accepted, CSV %(csv)s."),
+    # A count says itself in the singular or the plural (hub#1275): «1 record accepted», never «record(s)».
+    "deferred": ngettext_lazy(
+        "Not sent to the AEAT yet (%(count)s record): %(why)s.",
+        "Not sent to the AEAT yet (%(count)s records): %(why)s.",
+        "count",
+    ),
+    "accepted": ngettext_lazy(
+        "AEAT (%(environment)s): %(count)s record accepted, CSV %(csv)s.",
+        "AEAT (%(environment)s): %(count)s records accepted, CSV %(csv)s.",
+        "count",
+    ),
     "accepted_with_errors": _(
         "Invoice %(invoice_number)s accepted with errors by the AEAT (%(code)s): %(message)s"
     ),
@@ -649,17 +660,27 @@ EVENT_MESSAGES = {
     "record_reconciled": _(
         "Invoice %(invoice_number)s was already in the AEAT (%(status_label)s): out of the queue."
     ),
-    "chain_valid": _(
-        "Fingerprint chain intact: %(total)s record(s) with their SHA-256 chaining verified (%(issuer_nif)s). "
-        "Amounts are not re-audited."
+    "chain_valid": ngettext_lazy(
+        "Fingerprint chain intact: %(total)s record with its SHA-256 chaining verified (%(issuer_nif)s). "
+        "Amounts are not re-audited.",
+        "Fingerprint chain intact: %(total)s records with their SHA-256 chaining verified (%(issuer_nif)s). "
+        "Amounts are not re-audited.",
+        "total",
     ),
     "chain_broken": _(
         "Fingerprint chain BROKEN at sequence %(first_invalid_sequence)s (%(issuer_nif)s)."
     ),
-    "aeat_queried": _("AEAT query: %(count)s record(s) retrieved for %(issuer_nif)s."),
-    "chain_recovered_from_aeat": _(
+    "aeat_queried": ngettext_lazy(
+        "AEAT query: %(count)s record retrieved for %(issuer_nif)s.",
+        "AEAT query: %(count)s records retrieved for %(issuer_nif)s.",
+        "count",
+    ),
+    "chain_recovered_from_aeat": ngettext_lazy(
         "Chain recovered from the AEAT for %(issuer_nif)s: it continues after invoice %(invoice_number)s "
-        "(%(found)s record(s) found)."
+        "(%(found)s record found).",
+        "Chain recovered from the AEAT for %(issuer_nif)s: it continues after invoice %(invoice_number)s "
+        "(%(found)s records found).",
+        "found",
     ),
     "chain_continued_manually": _(
         "Chain continued manually for %(issuer_nif)s after invoice %(invoice_number)s."

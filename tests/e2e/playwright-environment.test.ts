@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import config from '../../vite.config';
+import { NO_CLOCK } from '../../vitest.load';
 
 // The real `readFileSync`, watched: the guardrail must read each module once (see `importsOf`).
 vi.mock('node:fs', async (importOriginal) => {
@@ -84,13 +85,13 @@ describe('the tests that load Playwright', () => {
 
   // Reads every module the tests load from the disk, so its time is the machine's: with several test runs on one
   // machine (load 20–40) and every opened file scanned, it took up to 9.4 s reading each module once (2026-10-21),
-  // against Vitest's 5 s. 60 s, as the other guardrails that read the whole tree (tsconfig.test.ts).
+  // against Vitest's 5 s. Its reads are synchronous: it runs as long as the machine makes it (hub#1200).
   it("give every test file that loads Playwright Node's environment", () => {
     const loading = testFiles().filter((file) => loadsPlaywright(join(HUB_DIR, file)));
     expect(loading).toEqual(expect.arrayContaining([join('tests', 'e2e', 'playwright.config.test.ts')]));
     const outsideNode = loading.filter((file) => environmentOf(readFileSync(join(HUB_DIR, file), 'utf8')) !== 'node');
     expect(outsideNode).toEqual([]);
-  }, 60_000);
+  }, NO_CLOCK);
 
   describe('loadsPlaywright', () => {
     let work: string;

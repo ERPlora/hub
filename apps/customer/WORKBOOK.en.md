@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:43347acbc76dada833c13da6f077a80ee47df7a5a5da90fb84eff78287dbc603 -->
+<!-- generated from WORKBOOK.md sha256:53cda92c24b85d9aef577fd1a919c41c7aa113f2f7736ec8b8115742ecdc44de -->
 
 ## What it is for and who it is for
 
@@ -910,7 +910,16 @@ its id: the card ("Customer: Ana García"), the duplicate card of a merge, the g
 tag or field being changed or deleted, by its name, and the open order as Sales names it (its title or, without one,
 its amount; with Sales off, it does not show). What the person asking cannot see does not show. In a merge, if the
 card that stays or the duplicate comes by its id beside another card's name, the confirmation card neither reads nor
-shows that name, which the merge does not use: it says only the two cards being merged (hub#1272).
+shows that name, which the merge does not use: it says only the two cards being merged (hub#1272). The same goes for
+everything else (changing, deleting or erasing the data of a card, giving it groups or tags, adding a note, an
+activity or a consent to it, withdrawing one, putting it on an order, and changing or deleting a group, a tag or a
+field): if the id of the card, group, tag or field comes beside another one's name, the confirmation card says only
+the one of the id, which is the one touched (hub#1280). Said only by its name, its phone or its email, the
+confirmation card says the card, group, tag or field the action is going to touch ("Customer: Ana García" for
+"ana@ejemplo.com"); if it fits none or fits several, it says it as it was said and the action answers that it cannot
+find it or that there are several. If between the confirmation card and the "yes" that name comes to belong to
+another one (another card with that email, an active group with that name), nothing is touched and the new
+confirmation card is shown.
 
 ### What it offers: queries (they read, they change nothing)
 
@@ -932,9 +941,9 @@ shows that name, which the merge does not use: it says only the two cards being 
 | Which customer an order has | view | F17, F19 | yes | `customer.order.customer` |
 | A card's orders (also for API keys) | view | F19 | yes | `customer.order.list` |
 | A card's health data and its permission (on screen only) | view | F32 | yes | `customer.health.detail` |
-| A group by its id, also an inactive one: what the assistant's card reads to name it (BASE-F97) | view | F06, F27 | no | `customer.group.detail` |
-| A tag by its id, also an inactive one: what the assistant's card reads (BASE-F97) | view | F06, F28 | no | `customer.tag.detail` |
-| A custom field by its id: what the assistant's card reads (BASE-F97) | view | F04, F29 | no | `customer.field.detail` |
+| A group by its id or by its name, also an inactive one: what the assistant's card reads to name it (BASE-F97) | view | F06, F27 | no | `customer.group.detail` |
+| A tag by its id or by its name, also an inactive one: what the assistant's card reads (BASE-F97) | view | F06, F28 | no | `customer.tag.detail` |
+| A custom field by its id or by its name: what the assistant's card reads (BASE-F97) | view | F04, F29 | no | `customer.field.detail` |
 | The name of an open order, as Sales names it: what the assistant's card reads (BASE-F97) | view (and view sales, in Sales) | F19 | no | `customer.order.get` |
 
 ### What it offers: actions (they change data)

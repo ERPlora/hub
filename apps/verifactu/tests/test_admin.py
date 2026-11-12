@@ -21,6 +21,9 @@ from django.utils import timezone, translation
 from django.utils.html import escape
 
 from apps.verifactu.admin import (
+    CHAINS_RESCHEDULED,
+    CORRECTED,
+    RESCHEDULED,
     AeatRecordAdmin,
     ChainAdmin,
     ConfigAdmin,
@@ -40,7 +43,7 @@ from apps.verifactu.models import (
 )
 from apps.verifactu import gateway
 from apps.verifactu.models import wait_reason_text
-from apps.verifactu.tests.conftest import aeat_holds, aeat_answer, answering, manual, records_of, run
+from apps.verifactu.tests.conftest import ISSUER, aeat_holds, aeat_answer, answering, manual, records_of, run
 from base.admin import ADMIN_HUB_SESSION_KEY
 
 pytestmark = pytest.mark.django_db
@@ -309,6 +312,12 @@ def left_without_answer(gateway_answers, count: int = 1) -> list[Record]:
 
 def rejected_by_the_aeat(gateway_answers) -> Record:
     """A ticket the AEAT rejected (its real answer, «Incorrecto» 1189)."""
+    [sealed] = rejected_together(gateway_answers, 1)
+    return sealed
+
+
+def rejected_together(gateway_answers, count: int) -> list[Record]:
+    """``count`` tickets sent together that the AEAT rejected (its real answer, «Incorrecto» 1189, for each)."""
 
     def reply(payload):
         body = aeat_answer("alta_2007_aceptado_con_errores_2026-08-02.xml", records_of(payload["envelope"]))
@@ -316,10 +325,11 @@ def rejected_by_the_aeat(gateway_answers) -> Record:
         return gateway.Reply(kind=gateway.ANSWERED, aeat_status=200, aeat_body=body)
 
     gateway_answers.set(reply)
-    sealed = record()
+    sealed = [record() for _ in range(count)]
     run("verifactu.contingency.process")
-    sealed.refresh_from_db()
-    assert sealed.status == "rejected"
+    for item in sealed:
+        item.refresh_from_db()
+        assert item.status == "rejected"
     return sealed
 
 
@@ -351,11 +361,67 @@ def test_reschedule_puts_the_record_out_with_the_next_pass_and_keeps_why_it_was_
     # Its reason stays: it is what declares it late (Incidencia S) when it goes; the next pass rewrites it.
     assert (sealed.status, sealed.wait_reason, sealed.attempts) == ("pending", "unreachable", 1)
     assert Event.objects.filter(message_key="queue_retried", record=sealed, actor="staff").exists()
-    assert said(request) == ["Rescheduled: 1 record(s) go out with the next pass."]
+    assert said(request) == ["Rescheduled: 1 record goes out with the next pass."]
     with translation.override("es"):
         request = request_of()
         model_admin(RecordAdmin, Record).reschedule(request, Record.objects.filter(pk=sealed.pk))
-        assert said(request) == ["Reprogramado: 1 registro(s) salen en la próxima pasada."]
+        assert said(request) == ["Reprogramado: 1 registro sale en la próxima pasada."]
+
+
+def failed_together(gateway_answers, count: int) -> list[Record]:
+    """``count`` tickets of one chain whose submission found the AEAT unreachable: pending, waiting for a timer."""
+    gateway_answers.set(gateway.Reply(kind=gateway.UNREACHABLE, message="connection refused"))
+    sealed = [record() for _ in range(count)]
+    run("verifactu.contingency.process")
+    for item in sealed:
+        item.refresh_from_db()
+        assert (item.status, item.wait_reason) == ("pending", "unreachable")
+    return sealed
+
+
+@pytest.mark.parametrize(
+    ("language", "notice"),
+    [
+        ("en", "Rescheduled: 2 records go out with the next pass."),
+        ("es", "Reprogramado: 2 registros salen en la próxima pasada."),
+    ],
+)
+def test_rescheduling_several_records_says_them_in_the_plural(
+    issuer, gateway_answers, request_of, language, notice
+):
+    # hub#1275: «record(s)» showed the parentheses whatever the number.
+    sealed = failed_together(gateway_answers, 2)
+    request = request_of()
+    with translation.override(language):
+        model_admin(RecordAdmin, Record).reschedule(
+            request, Record.objects.filter(pk__in=[item.pk for item in sealed])
+        )
+    assert said(request) == [notice]
+
+
+@pytest.mark.parametrize(
+    ("notice", "count", "language", "said_as"),
+    [
+        (RESCHEDULED, 1, "en", "Rescheduled: 1 record goes out with the next pass."),
+        (RESCHEDULED, 3, "en", "Rescheduled: 3 records go out with the next pass."),
+        (RESCHEDULED, 1, "es", "Reprogramado: 1 registro sale en la próxima pasada."),
+        (RESCHEDULED, 3, "es", "Reprogramado: 3 registros salen en la próxima pasada."),
+        (CHAINS_RESCHEDULED, 1, "en", "Rescheduled: 1 chain goes out with the next pass."),
+        (CHAINS_RESCHEDULED, 3, "en", "Rescheduled: 3 chains go out with the next pass."),
+        (CHAINS_RESCHEDULED, 1, "es", "Reprogramado: 1 cadena sale en la próxima pasada."),
+        (CHAINS_RESCHEDULED, 3, "es", "Reprogramado: 3 cadenas salen en la próxima pasada."),
+        (CORRECTED, 1, "en", "Corrected: 1 new record in the queue."),
+        (CORRECTED, 3, "en", "Corrected: 3 new records in the queue."),
+        (CORRECTED, 1, "es", "Subsanado: 1 registro nuevo en la cola."),
+        (CORRECTED, 3, "es", "Subsanado: 3 registros nuevos en la cola."),
+    ],
+)
+def test_each_notice_of_a_count_says_one_in_the_singular_and_several_in_the_plural(
+    notice, count, language, said_as
+):
+    # hub#1275: the three notices of the actions said «record(s)», «chain(s)» and «new record(s)» whatever the number.
+    with translation.override(language):
+        assert notice % {"count": count} == said_as
 
 
 def test_reschedule_leaves_a_registered_record_as_it_is(issuer, gateway_answers, request_of):
@@ -415,7 +481,27 @@ def test_a_rejection_is_corrected_with_a_new_record_and_the_rejected_one_stays(
     correction = Record.objects.exclude(pk=sealed.pk).get(invoice_id=sealed.invoice_id)
     assert (correction.status, correction.correction) == ("pending", True)
     assert correction.created_by == "staff"
-    assert said(request) == ["Corrected: 1 new record(s) in the queue."]
+    assert said(request) == ["Corrected: 1 new record in the queue."]
+
+
+@pytest.mark.parametrize(
+    ("language", "notice"),
+    [
+        ("en", "Corrected: 2 new records in the queue."),
+        ("es", "Subsanado: 2 registros nuevos en la cola."),
+    ],
+)
+def test_correcting_several_rejections_says_them_in_the_plural(
+    issuer, gateway_answers, request_of, language, notice
+):
+    # hub#1275: «new record(s)» showed the parentheses whatever the number.
+    rejected = rejected_together(gateway_answers, 2)
+    request = request_of()
+    with translation.override(language):
+        model_admin(RecordAdmin, Record).correct_rejection(
+            request, Record.objects.filter(pk__in=[item.pk for item in rejected])
+        )
+    assert said(request) == [notice]
 
 
 def test_a_registered_record_is_never_corrected_from_the_admin(
@@ -465,7 +551,28 @@ def test_a_chain_is_rescheduled_from_its_send_control(issuer, gateway_answers, r
     model_admin(SendControlAdmin, SendControl).reschedule_chain(request, SendControl.objects.all())
     sealed.refresh_from_db()
     assert sealed.next_attempt_at <= timezone.now()
-    assert said(request) == ["Rescheduled: 1 chain(s) go out with the next pass."]
+    assert said(request) == ["Rescheduled: 1 chain goes out with the next pass."]
+
+
+@pytest.mark.parametrize(
+    ("language", "notice"),
+    [
+        ("en", "Rescheduled: 2 chains go out with the next pass."),
+        ("es", "Reprogramado: 2 cadenas salen en la próxima pasada."),
+    ],
+)
+def test_rescheduling_several_chains_says_them_in_the_plural(
+    issuer, gateway_answers, request_of, language, notice
+):
+    # hub#1275: «chain(s)» showed the parentheses whatever the number; the number is the chains', not a fixed one.
+    failed_once(gateway_answers)
+    run("invoice.issuer.update", {**ISSUER, "tax_id": "A58818501"})  # another issuer: its own chain
+    failed_once(gateway_answers)
+    assert SendControl.objects.count() == 2
+    request = request_of()
+    with translation.override(language):
+        model_admin(SendControlAdmin, SendControl).reschedule_chain(request, SendControl.objects.all())
+    assert said(request) == [notice]
 
 
 def test_a_chain_with_nothing_waiting_says_so(issuer, gateway_answers, request_of):
@@ -553,7 +660,7 @@ def test_reschedule_of_a_record_the_gateway_refused_puts_it_back_in_the_queue(
     assert (refused.status, refused.wait_reason, refused.wait_detail) == ("pending", "", "")
     assert refused.next_attempt_at <= timezone.now()
     assert refused.attempts == 1
-    assert said(request) == ["Rescheduled: 1 record(s) go out with the next pass."]
+    assert said(request) == ["Rescheduled: 1 record goes out with the next pass."]
 
 
 # The configuration: only the route, through its operation

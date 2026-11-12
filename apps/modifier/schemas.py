@@ -55,7 +55,9 @@ A_GROUP = names("modifier.group.get")
 # «salsa», hub#1218); words it cannot read (two groups fit, none does) it says as said, never off the card, so adding
 # an option or applying a group, which cannot check it, reads it too (hub#1245). Beside the id the write takes its
 # record by instead (the group's, or the link's), the card neither reads nor shows the name, which the write does not
-# use (``unless_given``, hub#1250); an option by its id is looked for in the group said, so that one is read.
+# use (``unless_given``, hub#1250); an option by its id is looked for in the group said, so that one is read. Beside
+# a link's id the card neither reads nor shows the group, the product or the category whose id comes with it: letting
+# the link go takes it by its id alone (hub#1278).
 A_GROUP_BY_NAME = names("modifier.group.get", by="group", as_said=True)
 AN_OPTION = names("modifier.option.get", name=("label",))
 # An option said by its name: two groups may have an option with one name, so the card reads it with its group when it
@@ -386,8 +388,14 @@ class LinkIn(_Target):
 
 
 class LinkRefIn(_Target):
+    product_id: UUID | None = Field(
+        None, description="The product's id.", json_schema_extra=unless_given(A_PRODUCT, "id")
+    )
+    category_id: UUID | None = Field(
+        None, description="The category's id.", json_schema_extra=unless_given(A_CATEGORY, "id")
+    )
     id: UUID | None = Field(None, title=APPLIES_TO, description="The link's id.", json_schema_extra=A_LINK)
-    group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=A_GROUP)
+    group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=unless_given(A_GROUP, "id"))
     group: Said | None = Field(
         None,
         description="The group's name, when its id is not known.",

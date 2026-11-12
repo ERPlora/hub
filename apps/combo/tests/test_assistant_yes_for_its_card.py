@@ -8,7 +8,8 @@ name as the write will find it (``names("combo.combo.get", by="combo")``) and th
 said «vegano»), a name two menus fit or none has draws no card, and a yes after another menu fits the name better runs
 nothing and shows the new card (COMBO-F03, COMBO-F04, COMBO-F05, COMBO-F14, BASE-F97). A write whose record is a course
 or a choice checks it with its own read (``combo.group.get``, ``combo.option.get``) and reads its menu by its name the
-same way (hub#1231; COMBO-F05, COMBO-F06).
+same way (hub#1231; COMBO-F05, COMBO-F06). A record that comes by its id names no other menu, course or choice said
+beside it, by its name (hub#1250) or by its id (hub#1278).
 """
 
 import dataclasses
@@ -23,7 +24,7 @@ from apps.combo.tests.conftest import ctx_for, make_combo, make_group, make_opti
 from apps.combo.tests.test_apps import CHECKED_BY_THE_MENU
 from apps.combo.tests.test_assistant_card_records import fields_of, words
 from base.schemas import names
-from base.tests.test_assistant_yes_for_its_card import read_as, turn_as, unless_of, yes_to_its_card
+from base.tests.test_assistant_yes_for_its_card import read_as, turn_as, unless_by_id, unless_of, yes_to_its_card
 from base.tests.test_services_assistant import call
 
 pytestmark = pytest.mark.django_db
@@ -541,3 +542,101 @@ def test_the_yes_to_a_record_that_comes_by_its_id_runs_on_it_whatever_name_is_sa
     assert [row["outcome"] for row in done["executed"]] == ["ok"]
     assert (Combo.objects.values().get(pk=other.pk), list(ChoiceGroup.objects.filter(combo=other).values()),
             list(ChoiceOption.objects.filter(group__combo=other).values())) == before
+
+
+# ── A record that comes by its id with the id of another menu or course beside it (hub#1278) ─────────────────────────
+# The write takes the course or the choice by its id, and a choice by its product inside the course of the id, and never
+# looks at the id of a menu or a course beside it, which holds no record of the write: the card neither reads nor shows
+# it (``unless``), as when the id comes alone. A menu's id is the record of the writes on the menu and of the course it
+# gets, and a course's of the choices it gets or orders: those are read.
+
+#: Beside which data each write of Menus takes its record by them and not by each id it reads (a menu's, a course's, a
+#: choice's or a product's of Inventory): the record's own id, and the id of the course that holds a choice.
+UNLESS_BY_ID = {
+    **{(name, "id"): set() for name in CHECKED_BY_THE_MENU},
+    ("combo.group.create", "combo_id"): set(),
+    **{(name, "combo_id"): {"id"} for name in ("combo.group.delete", "combo.group.update")},
+    **{(name, "id"): set() for name in ("combo.group.delete", "combo.group.update")},
+    **{(name, "combo_id"): {"group_id"} for name in UNCHECKED_COURSE},
+    **{(name, "group_id"): set() for name in UNCHECKED_COURSE},
+    ("combo.option.create", "product_id"): set(),
+    **{(name, "combo_id"): {"id", "group_id"} for name in ("combo.option.delete", "combo.option.update")},
+    **{(name, "group_id"): {"id"} for name in ("combo.option.delete", "combo.option.update")},
+    **{(name, "id"): set() for name in ("combo.option.delete", "combo.option.update")},
+    ("combo.option.update", "new_product_id"): set(),
+}
+
+
+def test_an_id_is_left_unread_beside_each_datum_its_write_takes_its_record_by_instead():
+    assert unless_by_id(assistant_writes()) == UNLESS_BY_ID
+
+
+def beside_another_s_id() -> dict[str, dict]:
+    """The data of each write with its record by its id — a course's, a choice's, or the course of a choice said by its
+    product — and, beside it, the id of «Menú infantil» or of its «Postres infantiles», which the write does not use;
+    «Menú vegano» and its «Postres caseros» with «Flan de la casa» are the records of the ids."""
+    combo = vegan_desserts()
+    other = infantil()
+    course = combo.groups.get(name=FOUND["group"])
+    choice = course.options.get()
+    menu, theirs = str(other.id), str(other.groups.get().id)
+    natillas = make_product("Natillas")
+    return {
+        "combo.group.delete": {"id": str(course.id), "combo_id": menu},
+        "combo.group.update": {"id": str(course.id), "combo_id": menu, "max_choices": 2},
+        "combo.option.delete": {"id": str(choice.id), "combo_id": menu},
+        "combo.option.delete with its course": {"id": str(choice.id), "group_id": theirs},
+        "combo.option.update": {"id": str(choice.id), "group_id": theirs, "is_available": False},
+        "combo.option.update with its menu and its course": {
+            "id": str(choice.id), "combo_id": menu, "group_id": theirs, "is_available": False,
+        },
+        "combo.option.delete by its product": {"group_id": str(course.id), "combo_id": menu, "product": "flan"},
+        "combo.option.create": {"group_id": str(course.id), "combo_id": menu, "product_id": str(natillas.id)},
+        "combo.option.bulk_create": {"group_id": str(course.id), "combo_id": menu, "product_ids": [str(natillas.id)]},
+        "combo.option.reorder": {"group_id": str(course.id), "combo_id": menu, "option_ids": [str(choice.id)]},
+    }
+
+
+#: What each card above shows: the record of the id, and nothing of «Menú infantil».
+SHOWN_BESIDE_ANOTHER_S_ID = {
+    "combo.group.delete": {"id": FOUND["group"]},
+    "combo.group.update": {"id": FOUND["group"], "max_choices": 2},
+    "combo.option.delete": {"id": FOUND["product"]},
+    "combo.option.delete with its course": {"id": FOUND["product"]},
+    "combo.option.update": {"id": FOUND["product"], "is_available": False},
+    "combo.option.update with its menu and its course": {"id": FOUND["product"], "is_available": False},
+    "combo.option.delete by its product": {"group_id": FOUND["group"], "product": FOUND["product"]},
+    "combo.option.create": {"group_id": FOUND["group"], "product_id": "Natillas"},
+    "combo.option.bulk_create": {"group_id": FOUND["group"], "product_ids": ["Natillas"]},
+    "combo.option.reorder": {"group_id": FOUND["group"], "option_ids": [FOUND["product"]]},
+}
+
+
+def write_of(case: str) -> str:
+    return case.split(" ", 1)[0]
+
+
+@pytest.mark.parametrize("case", sorted(SHOWN_BESIDE_ANOTHER_S_ID))
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_a_record_that_comes_by_its_id_names_no_menu_or_course_whose_id_comes_beside_it(case, language):
+    shown = fields_of(write_of(case), beside_another_s_id()[case], language, as_admin(language))
+    assert {name: field["value"] for name, field in shown.items()} == SHOWN_BESIDE_ANOTHER_S_ID[case]
+
+
+@pytest.mark.parametrize("case", sorted(SHOWN_BESIDE_ANOTHER_S_ID))
+def test_the_yes_to_a_record_that_comes_by_its_id_touches_it_and_nothing_of_the_menu_whose_id_comes_beside_it(case):
+    """Control of the above: the write acts on the record of the id (or the choice of the course of the id), never on
+    «Menú infantil», its course or its choice."""
+    arguments = beside_another_s_id()[case]
+    other = Combo.objects.get(name="Menú infantil")
+
+    def of_the_other() -> tuple:
+        return (Combo.objects.values().get(pk=other.pk), list(ChoiceGroup.objects.filter(combo=other).values()),
+                list(ChoiceOption.objects.filter(group__combo=other).values()))
+
+    before, theirs = everything(), of_the_other()
+    done = yes_to_its_card(as_admin(), write_of(case), arguments)
+    assert [row["outcome"] for row in done["executed"]] == ["ok"]
+    assert of_the_other() == theirs
+    if write_of(case) != "combo.option.reorder":
+        assert everything() != before

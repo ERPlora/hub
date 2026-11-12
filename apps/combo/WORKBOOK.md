@@ -549,7 +549,9 @@ plato y el producto que encontró, y el «sí» vale solo para ellos: si antes d
 mejor con lo dicho, no se toca nada y sale la tarjeta nueva; si lo dicho vale para varios, la tarjeta lo enseña tal
 como se dijo y la acción pregunta cuál (hub#1245). Si el menú, el plato o la elección llegan por su identificador
 junto a un nombre que la acción no usa (el de otro menú, otro plato u otro producto), la tarjeta no lee ni enseña ese
-nombre: dice el registro del identificador, igual que cuando llega solo (hub#1250).
+nombre: dice el registro del identificador, igual que cuando llega solo (hub#1250). Lo mismo con el identificador de
+otro menú o de otro plato que llegue junto al del plato o la elección, o junto al del plato en que se añade, se ordena
+o se busca una elección: la acción no lo usa y la tarjeta no lo enseña (hub#1278).
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -755,7 +757,12 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   `test_a_choice_is_read_by_its_product_with_its_menu_and_its_course_and_a_product_of_inventory_by_its_name`). Cada
   dato dicho por su nombre se deja sin leer junto al id con que la escritura toma su registro en su lugar
   (`base.schemas.unless_given`, hub#1250): el suyo y el del registro que lo contiene (el menú de un plato es el del
-  plato). La lista exacta de cada escritura, en `UNLESS` de `tests/test_assistant_yes_for_its_card.py`. Las listas
+  plato). La lista exacta de cada escritura, en `UNLESS` de `tests/test_assistant_yes_for_its_card.py`. Igual con los
+  ids que la escritura no mira porque llega el de su registro (hub#1278): el `combo_id` de `GroupRefIn` junto al `id`
+  del plato, el de `_GroupOfIn` junto a `group_id`, y en `OptionRefIn` el `combo_id` junto a `id` o `group_id` y el
+  `group_id` junto a `id` (`find_group` y `find_option` no miran el menú ni el plato cuando llega el id del registro).
+  Su lista, en `UNLESS_BY_ID`, que recorre todo dato leído por id (`unless_marked` de
+  `base/tests/test_assistant_yes_for_its_card.py`). Las listas
   cerradas de sus escrituras (cómo se vende el menú) ya llevan su etiqueta en `en` + `es` por los `choices` del
   modelo.
 - El admin de Django del Hub tiene **CRUD completo** sobre los tres modelos (ronda 12, PLAN §17); una

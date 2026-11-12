@@ -128,7 +128,8 @@ function staleInTheRatchet(found: Record<string, number>): string[] {
 }
 
 describe('the e2e waits for «nothing moves» with the one detector of helpers.ts', () => {
-  // The e2e's folder, scanned once here with the limit of the guardrails that read a whole tree (60 s, tsconfig.test.ts);
+  // The e2e's folder, scanned once here with 60 s of its own: it waits for its reads, and that clock cuts one that
+  // never ends (hub#1292);
   // each test keeps Vitest's 5 s for its own work.
   beforeAll(async () => {
     await readsByFile();
