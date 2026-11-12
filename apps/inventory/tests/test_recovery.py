@@ -213,6 +213,13 @@ def created_events(hub) -> int:
         return OutboxEvent.objects.filter(name="inventory.product.created").count()
 
 
+def said(row) -> tuple[str, list[dict]]:
+    """``row``'s status and what each app gave back, by the keys these tests read."""
+    keys = ("app", "created", "not_created", "reasons", "refused")
+    row = fresh(row)
+    return row.status, [{key: result[key] for key in keys} for result in row.results]
+
+
 @pytest.mark.usefixtures("no_test_fallback")
 class TestProductsComeBack:
     def a_business(self, recoveries, every_app_on):
@@ -243,8 +250,7 @@ class TestProductsComeBack:
 
         assert run() == 1
 
-        row = fresh(row)
-        assert (row.status, row.results) == (
+        assert said(row) == (
             "done",
             [{"app": "inventory", "created": 3, "not_created": 0, "reasons": [], "refused": ""}],
         )
@@ -271,9 +277,10 @@ class TestProductsComeBack:
         again = recoveries.ask(copy, "inventory")
         assert run() == 1
 
-        assert fresh(again).results == [
-            {"app": "inventory", "created": 0, "not_created": 0, "reasons": [], "refused": ""}
-        ]
+        assert said(again) == (
+            "done",
+            [{"app": "inventory", "created": 0, "not_created": 0, "reasons": [], "refused": ""}],
+        )
         assert created_events(hub) == before
         assert [one[0] for one in live_products(hub)] == ["Cake", "Coffee", "Tea"]
 
@@ -289,7 +296,7 @@ class TestProductsComeBack:
 
         assert run() == 1
 
-        [result] = fresh(row).results
+        _, [result] = said(row)
         assert (result["created"], result["not_created"], result["refused"]) == (0, 2, "")
         assert {one["id"] for one in result["reasons"]} == {str(ids["coffee"]), str(ids["tea"])}
         assert all(one["reason"].startswith("invalid_field: ") for one in result["reasons"])
