@@ -1,14 +1,14 @@
-// flow: BASE-F114 (steps 6-11), CUSTOMER-F07, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04, SERVICE-F01 — hub#1257,
-// hub#1306, hub#1282, hub#1283: in the Hub admin, the ERPlora staff choose a separate copy of a business and bring back
-// into it the customers, the products and the services it lost since, by their apps' own operations (never a copied
-// row): a card the business deleted and still holds comes back the same card, with its history; a product comes back as
-// a new one, made by Inventory's create, and a service as a new one, made by Services' create. At each size: a card, a
-// product and a service of `a` are made; in Hubs, «Restore to a separate copy…» asks a copy of `a` from a temporary
-// cluster (the stack's own server) and the worker's pass makes it; the card and the product are deleted in `a` and the
-// service is gone from it; then Separate copies › tick the copy › «Recover into the business…» › Customers, Products and
-// Services ticked (with whatever else answers) › «Recover»; the worker's pass brings them back; Recoveries says
-// «Customers: 1 restored; Products: 1 created» and «Services: 1 created», and `a` has the same card live again, and the
-// product and the service live again under new ids.
+// flow: BASE-F114 (steps 6-11), CUSTOMER-F07, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04, INVENTORY-F34, SERVICE-F01 —
+// hub#1257, hub#1306, hub#1282, hub#1283, hub#1321: in the Hub admin, the ERPlora staff choose a separate copy of a
+// business and bring back into it the customers, the products and the services it lost since, by their apps' own
+// operations (never a copied row): a card or a product the business deleted and still holds comes back the same, with
+// its history, by Customers' and Inventory's restore, and a service as a new one, made by Services' create. At each
+// size: a card, a product and a service of `a` are made; in Hubs, «Restore to a separate copy…» asks a copy of `a` from
+// a temporary cluster (the stack's own server) and the worker's pass makes it; the card and the product are deleted in
+// `a` and the service is gone from it; then Separate copies › tick the copy › «Recover into the business…» › Customers,
+// Products and Services ticked (with whatever else answers) › «Recover»; the worker's pass brings them back; Recoveries
+// says «Customers: 1 restored; Products: 1 restored» and «Services: 1 created», and `a` has the same card and the same
+// product live again, and the service live again under a new id.
 // The stack's worker serves databases only (no moves' thread), so the spec plays its passes, as the specs play the
 // relay.
 import { spawnSync } from 'node:child_process';
@@ -206,7 +206,7 @@ for (const { label, viewport } of SIZES) {
     await page.goto(RECOVERIES);
     const recovered = page.locator('#result_list tbody tr').first();
     await expect(recovered).toContainText('Done');
-    await expect(recovered).toContainText('Customers: 1 restored; Products: 1 created');
+    await expect(recovered).toContainText('Customers: 1 restored; Products: 1 restored');
     await expect(recovered).toContainText('Services: 1 created');
     await capture(page, `${KEY}-${label}-4-recoveries`, { fullPage: true });
     await recovered.locator('a').first().click();
@@ -216,10 +216,9 @@ for (const { label, viewport } of SIZES) {
     // In the business, the same card is live again, by Customers' restore, and no new one was made.
     expect(psql(`select id from customer_customer where email = '${email}' and deleted_at is null`)).toBe(card);
     expect(psql(`select count(*) from customer_customer where email = '${email}'`)).toBe('1');
-    // And the product, a new one made by Inventory's create; the deleted one stays deleted.
-    expect(psql(`select count(*) from inventory_product where sku = '${sku}' and not is_deleted`)).toBe('1');
-    expect(psql(`select id from inventory_product where sku = '${sku}' and not is_deleted`)).not.toBe(product);
-    expect(psql(`select name from inventory_product where id = '${product}' and is_deleted`)).toBe(name);
+    // And the same product is live again, by Inventory's restore, and no new one was made.
+    expect(psql(`select id from inventory_product where sku = '${sku}' and not is_deleted`)).toBe(product);
+    expect(psql(`select count(*) from inventory_product where sku = '${sku}'`)).toBe('1');
     // And the service on offer again, a new one made by Services' create, with what it had.
     expect(psql(`select price, duration_minutes, is_active from service_service where name = '${name}'`)).toBe('2500|45|t');
     expect(psql(`select id from service_service where name = '${name}'`)).not.toBe(service);

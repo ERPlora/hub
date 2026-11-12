@@ -2983,13 +2983,14 @@ Steps:
       screen creates it, with their name, contact, tax ID, address, dates, source, stage, channel and notes; without their
       groups, tags or own fields (hub#1285). A card whose personal data was erased (GDPR) or one merged into another never
       comes back, and one the business has already made again (the same name, phone and email) is not repeated. With
-      Products, "Products: 3 created": each product comes back as a new one, created as the Products screen creates it,
+      Products, "Products: 1 restored, 2 created": a product the business deleted and still holds comes back THE SAME,
+      with its stock, its categories that are still live and its whole history in Movements, active and on sale
+      (INVENTORY-F34). One the business no longer has comes back as a new one, created as the Products screen creates it,
       with its name, SKU, EAN-13, description, type, price, cost, units, threshold, stock control and tax category, active
       or inactive as it was and in the categories the business still has; with no stock, which is counted
       (INVENTORY-F14), because the copy's is another day's; without its image (hub#1319) and without the categories the
-      business no longer has (hub#1320). One that was deleted in the business also comes back as a new product; its
-      movements stay with the deleted one (hub#1321). One the business has already created again (another live one with
-      its SKU or its EAN-13) is not repeated. With Services, "Services: 2 created": each service the business no longer
+      business no longer has (hub#1320). One the business has already created again (another live one with its SKU or its
+      EAN-13) neither comes back nor is repeated. With Services, "Services: 2 created": each service the business no longer
       has comes back as a new one, on offer, created as the Services screen creates it, with its name, pricing, prices,
       cost, duration, buffers, capacity, descriptions, booking settings, order, featured flag, SKU, barcode and notes, its
       tax category and its category if the business still has it (if it was deleted, "No category", hub#1323); without
@@ -3004,9 +3005,10 @@ Out: the business's database as it was at that moment; the one it had, kept 7 da
 business as it was, untouched; a separate database on its cluster with the data of that moment, closed to the
 application and kept 7 days; the notice `control.hub.restore_aside_requested` with who asked for it. When recovering: in
 the business, each deleted card it still held, live again with its card-recovered notice (`customer.customer.restored`),
-a new card for each customer it no longer had, with its card-created notice (`customer.customer.created`), and a new
-product for each product it lacked, with its product-created notice (`inventory.product.created`), and a new service
-for each one it no longer had, with its service-created notice (`service.service.created`), and nothing else; the copy,
+a new card for each customer it no longer had, with its card-created notice (`customer.customer.created`), each deleted
+product it still held, live again with its product-recovered notice (`inventory.product.restored`), a new product for
+each product it no longer had, with its product-created notice (`inventory.product.created`), and a new service for each
+one it no longer had, with its service-created notice (`service.service.created`), and nothing else; the copy,
 untouched; the notice `control.copy.recovery_requested` with who asked for it.
 If it fails: what the restore does not accept is said in the notice, business by business, and that business is not
 touched: one that is not ready or has no database of its own, a demo, one being moved or restored, a cluster open to new
