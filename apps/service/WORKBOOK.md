@@ -1195,12 +1195,16 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   comprueba antes para dar el 409 y traduce la violación (dos guardados a la vez) al mismo 409.
 - **Recuperar desde una copia aparte** (BASE-F114, hub#1283): `apps.py` responde a la plataforma
   (`recoverable_from_copy`, `base.tenancy.recovery`) con lo que devuelve una copia aparte del negocio: sus servicios en
-  oferta (`queries.services_in_copy`, por SQL sobre los nombres del modelo: la copia no es un negocio y no tiene alias)
-  que el negocio no tiene (`queries.services_not_in_business`), cada uno creado por `service.service.create` con la clave
-  de su categoría fiscal y su categoría si el negocio aún la tiene. Un servicio de la copia lo tiene el negocio
-  (`queries.services_in_business`, `{id en la copia: id en el negocio}`) si es el mismo, en oferta o archivado, o uno
-  hecho otra vez: el mismo nombre (sin distinguir mayúsculas ni espacios) en la categoría a la que volvería. Es lo que
-  usa la recuperación de otra app (Citas, hub#1284) para emparejar un servicio de la copia con el del negocio. Lee desde
+  oferta que el negocio no tiene (`queries.services_not_in_business`), cada uno creado por `service.service.create` con
+  la clave de su categoría fiscal y su categoría si el negocio aún la tiene. `queries.services_in_copy` lee por SQL sobre
+  los nombres del modelo (la copia no es un negocio y no tiene alias) todos los servicios de la copia, en oferta o
+  archivados (`is_active`). Un servicio de la copia lo tiene el negocio (`queries.services_in_business`, `{id en la
+  copia: id en el negocio}`, con la lista entera de la copia) si es el mismo, en oferta o archivado, o, si la copia lo
+  tenía en oferta, uno hecho otra vez: un servicio que no es ninguno de la copia, con el mismo nombre (sin distinguir
+  mayúsculas ni espacios) en la categoría a la que volvería. Los nombres no son únicos: cada hecho otra vez responde por
+  un solo servicio de la copia, el más antiguo por el más antiguo, y dos perdidos con el mismo nombre vuelven los dos.
+  Es lo que usa la recuperación de otra app (Citas, hub#1284) para emparejar un servicio de la copia con el del negocio;
+  uno que la copia tenía archivado solo se empareja por su id. Lee desde
   `0001_initial`; una migración que quite o renombre una de sus columnas cambia también `services_in_copy` y su
   `reads_since`. Tests: `tests/test_recovery.py`, también de punta a punta con la base del negocio y su copia.
 - **Saldo de un bono vendido**: usos = los congelados + la suma de los ajustes; usadas = las sesiones

@@ -3112,8 +3112,9 @@ Pasos:
       coste, duración, márgenes, capacidad, descripciones, reservas, orden, destacado, SKU, código de barras y notas, su
       categoría fiscal y su categoría si el negocio aún la tiene (si se eliminó, «Sin categoría», hub#1323); sin su imagen
       (hub#1319) ni sus profesionales (hub#1322). Uno archivado sigue en el negocio y no vuelve (se restaura en Servicios),
-      tampoco uno que la copia tenía archivado, y no se repite uno que el negocio ya volvió a crear (el mismo nombre en la
-      misma categoría). Pedirlo otra vez no crea nada dos veces.
+      tampoco uno que la copia tenía archivado, y no se repite uno que el negocio ya volvió a crear (otro con el mismo
+      nombre en la misma categoría, que no sea ya uno de la copia; cada uno vale por uno solo, así que dos servicios con
+      el mismo nombre vuelven los dos). Pedirlo otra vez no crea nada dos veces.
 Entra: los negocios elegidos, el clúster temporal con su copia y el momento; para recuperar, la copia aparte hecha y qué
 recuperar.
 Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso

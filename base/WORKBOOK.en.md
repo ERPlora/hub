@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a81024d1cbe949741ec3cd2692c67e5c5007c80873695d8ffdd622268f83c7e4 -->
+<!-- generated from WORKBOOK.md sha256:4aee6f4af32caa0ad972e866010565600cbfc9aa5a45479da548c7bb9a24cb22 -->
 
 ## What it is for and who it is for
 
@@ -2987,8 +2987,9 @@ Steps:
       featured flag, SKU, barcode and notes, its tax category and its category if the business still has it (if it was
       deleted, "No category", hub#1323); without its image (hub#1319) or its professionals (hub#1322). An archived one is
       still in the business and does not come back (it is restored in Services), nor does one the copy had archived, and
-      one the business has already made again (the same name in the same category) is not repeated. Asking again creates
-      nothing twice.
+      one the business has already made again (another with the same name in the same category, not itself one of the
+      copy's; each counts for one only, so two services with the same name both come back) is not repeated. Asking again
+      creates nothing twice.
 In: the chosen businesses, the temporary cluster with their copy and the moment; to recover, the made separate copy and
 what to bring back.
 Out: the business's database as it was at that moment; the one it had, kept 7 days on its server; the notice

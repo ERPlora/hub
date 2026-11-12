@@ -218,6 +218,8 @@ def test_each_one_made_again_stands_for_one_service_of_the_copy_the_oldest_first
     newer = make_service("haircut", tax=tax, category=hair)
 
     assert queries.services_in_business([first, second]) == {first["id"]: older.pk, second["id"]: newer.pk}
+    # In whatever order the copy's services come.
+    assert queries.services_in_business([second, first]) == {first["id"]: older.pk, second["id"]: newer.pk}
     assert queries.services_not_in_business([first, second]) == []
 
 
@@ -243,6 +245,17 @@ def test_a_service_the_copy_had_archived_never_comes_back():
 
     assert queries.services_in_business([archived]) == {}
     assert queries.services_not_in_business([archived]) == []
+
+
+def test_one_the_copy_had_archived_never_takes_the_one_made_again_for_one_it_had_on_offer():
+    tax = make_tax("test.service", "Service — test")
+    # Both gone: an older one archived and the one on offer, already brought back by an earlier pass.
+    archived = a_service_of_the_copy(name="Haircut", tax_category_id=tax.pk, is_active=False)
+    offered = a_service_of_the_copy(name="Haircut", tax_category_id=tax.pk)
+    brought_back = make_service("Haircut", tax=tax)
+
+    assert queries.services_in_business([archived, offered]) == {offered["id"]: brought_back.pk}
+    assert queries.services_not_in_business([archived, offered]) == []
 
 
 def test_one_whose_category_the_business_deleted_is_made_again_with_no_category():
