@@ -93,19 +93,14 @@ export interface IconPaint {
 /** An icon painted as it should be. */
 export const PAINTED: IconPaint = { registered: true, named: true, drawn: true };
 
-/** Where `paintOfShown` found the icon: read, or the action only inside a closed «⋮», or nowhere on screen. */
+/** What `paintIn` found: the icon's paint, the action only inside a closed «⋮», or nothing on the page. */
 export type IconShown = IconPaint | 'in «⋮»' | 'not shown';
 
-/** In the page, in one go: the paint of the icon `name` on the first of `found` on screen that is not «⋮» (`menu`),
- *  `found` being an `ion-icon` or what holds one; `'in «⋮»'` when «⋮» is all of them on screen. */
-function paintOfShown(found: Element[], { name, menu }: { name: string; menu: string | null }): IconShown {
-  const onScreen = (el: Element) => {
-    const box = el.getBoundingClientRect();
-    return box.width > 0 && box.height > 0 && el.checkVisibility({ visibilityProperty: true });
-  };
-  const there = found.filter(onScreen);
-  const holder = there.find((el) => menu === null || el.getAttribute('data-testid') !== menu);
-  if (!holder) return there.length > 0 ? 'in «⋮»' : 'not shown';
+/** In the page, in one go: the paint of the icon `name` on the first of `found` that is not «⋮» (`menu`), `found`
+ *  being `ion-icon`s or what holds one; `'in «⋮»'` when «⋮» is all there is. */
+function paintIn(found: Element[], { name, menu }: { name: string; menu: string | null }): IconShown {
+  const holder = found.find((el) => menu === null || el.getAttribute('data-testid') !== menu);
+  if (!holder) return found.length > 0 ? 'in «⋮»' : 'not shown';
   const ion = (holder.localName === 'ion-icon' ? holder : holder.querySelector('ion-icon')) as (HTMLElement & { name?: string; icon?: string }) | null;
   const src = (window as unknown as { Ionicons?: { map?: Map<string, string> } }).Ionicons?.map?.get(name);
   const svg = ion?.shadowRoot?.querySelector('.icon-inner svg');
@@ -116,9 +111,9 @@ function paintOfShown(found: Element[], { name, menu }: { name: string; menu: st
   };
 }
 
-/** The paint of the icon `name` on `icon` (an `ion-icon`, or what holds one), or `'not shown'` while it is off screen. */
+/** The paint of the icon `name` on `icon` (an `ion-icon`, or what holds one), or `'not shown'` while it is not there. */
 export function iconPaint(icon: Locator, name: string): Promise<IconShown> {
-  return icon.evaluateAll(paintOfShown, { name, menu: null });
+  return icon.evaluateAll(paintIn, { name, menu: null });
 }
 
 /**
@@ -131,7 +126,7 @@ export async function rowActionIcon(page: Page, table: string, id: string, actio
   const { hook, menuHook } = rowHooks(table, id, action);
   const menu = shown(page).locator(`[data-testid=${menuHook}]`);
   const where = shown(page).locator(`[data-testid=${hook}]`).or(page.locator(`ion-popover [data-testid=${hook}]`)).or(menu);
-  const seen = await where.evaluateAll(paintOfShown, { name, menu: menuHook });
+  const seen = await where.evaluateAll(paintIn, { name, menu: menuHook });
   if (seen === 'in «⋮»') await menu.click();
   return seen;
 }
