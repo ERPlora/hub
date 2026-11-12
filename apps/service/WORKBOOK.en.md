@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7f40168d9ff25396680a669bfa473b1c731b4f1f53eb0ff0c96c0e45eec3322d -->
+<!-- generated from WORKBOOK.md sha256:a802d757c09d519a75764968e059e068fcb7a7ca6a2fa0bf7117668b9b6df2ed -->
 
 ## What it is for and who it is for
 
@@ -130,8 +130,8 @@ and **Load more** with "Showing {shown} of {total}" when there are more:
 
 - **Voucher movements**: each session and each adjustment of that voucher, of every customer, the most
   recent first, with its label (**Held**, **Delivered**, **Released**, **Expired**, **Given back**,
-  **Courtesy**, **Correction**), the service, the date, "Customer: <name>", who and the reason. Empty:
-  "This voucher has not been used yet.".
+  **Courtesy**, **Correction**), the service, the date, "Customer: <name>", on a session spent saying who
+  did it "Professional: <name>", who and the reason. Empty: "This voucher has not been used yet.".
 - **Sold vouchers**: one row per purchase, with **Active** or **Voided**, the customer, the date, the
   amount, "{used} used · {remaining} left" (or "· no limit"), "Expires …" or "Never expires" and what
   was given or corrected afterwards; on a voided one, "Voided by {who} on {when}" and the reason.
@@ -569,7 +569,9 @@ Steps:
 1. In the voucher's row tap **Movements**.
 2. Each delivered session and each adjustment shows, the most recent first (see "Screens"); **Load
    more** brings the next ones, each movement only once even if several carry the same time.
-In: the sessions and the adjustments of that voucher.
+3. A session spent saying who did it (SERVICE-F21) names her beside the customer, "Professional: Ana
+   López"; if her name changes in Staff, the row says it at once.
+In: the sessions and the adjustments of that voucher; the name of each session's professional (Staff).
 Out: nothing; read only.
 If it fails: empty, "This voucher has not been used yet."; if it cannot be read, "Could not load the
 movements" with the reason.

@@ -3,7 +3,8 @@
 // receptionist taps «Spend a session», the only service it covers comes chosen, she picks Ana from the team, sees
 // «5 sessions left · 4 after this one» and spends it: the row drops to «1 used · 4 left» by itself and Ana's
 // production in Sales rises by the session's worth (90.00 ÷ 5). A voucher with nothing left offers no session to
-// spend: its row says «5 used · 0 left». The dialog is captured at the fleet's three sizes, without sideways scroll.
+// spend: its row says «5 used · 0 left». «Movements» then names Ana on that session, beside its customer (SERVICE-F19,
+// hub#1236). The dialog and that row are captured at the fleet's three sizes, without sideways scroll.
 import { expect, type Locator, test } from '@playwright/test';
 
 import { A, api, capture } from './helpers';
@@ -90,5 +91,14 @@ test('Sold vouchers: a session spent outside the till, choosing the service and 
   // The row follows the live list; the session counts in Ana's production in Sales.
   await expect(row).toContainText('1 used · 4 left');
   await expect.poll(() => productionOf(ana.id)).toBe(before + 1800);
+  await sheet.locator('[data-testid=service-grants-close]').click();
+
+  // «Movements»: the session names who did it, beside its customer.
+  await rowAction(page, 'service-packages', voucher.id, 'movements');
+  const movements = page.locator('ion-modal[data-testid=service-movements]');
+  const session = movements.locator('[data-testid^=service-movements-row-]', { hasText: 'Delivered' });
+  await expect(session).toContainText(`Customer: ${lucia.name} · Professional: ${ana.full_name}`);
+  await expect(movements.locator('[data-testid^=service-movements-row-]', { hasText: 'Correction' })).not.toContainText('Professional');
+  await atEachSize('service-movements-professional', session);
   await context.close();
 });

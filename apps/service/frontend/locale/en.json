@@ -288,6 +288,7 @@
         "corrected": "Correction"
       },
       "customer": "Customer: {name}",
+      "professional": "Professional: {name}",
       "sale": "Sale: {id}",
       "noService": "No service on the line",
       "given": "+{uses} session(s) · +{days} day(s)",

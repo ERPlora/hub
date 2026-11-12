@@ -4,9 +4,8 @@
 //     something is typed (hub#1015, hub#1020) and so do its own ways out (hub#1156): «Cancel», the «×», Escape and a tap
 //     outside ask «Discard changes?», and «Keep editing» leaves it open with what was typed. A FormModal, or a window that
 //     is an `ion-modal` of its own with its close button as `<testid>-close` (hub#1233, `useSheetWaysOut`).
-//   - `expectUntouchedFormClosesAtOnce` — the other half: as opened, each of those ways out closes it without asking.
-//   - `expectUnsavedFormOnAndroidBack` — only the Back, for the windows whose own ways out do not ask yet: those of
-//     Caja (hub#1234).
+//   - `expectUntouchedFormClosesAtOnce` — the other half: as opened, each of those ways out closes it without asking;
+//     `expectUntouchedWindowClosesAtOnce` does it for a window a test mounts with `open` as its prop.
 //   - `answerUnsavedQuestion` — answers the question on screen, for a test that follows one way out to its end.
 import { expect, type Mock } from 'vitest';
 
@@ -90,11 +89,6 @@ async function expectBackHolds(window: UnsavedFormWindow, between: (overlay: Ele
   expect(unsavedChangesIn(overlay!)).toBeUndefined();
 }
 
-/** Only Android's Back: as opened nothing holds it, a change does, and restored as opened it lets go. */
-export async function expectUnsavedFormOnAndroidBack(window: UnsavedFormWindow): Promise<void> {
-  await expectBackHolds(window, async () => {});
-}
-
 /** Back, and every way out of the window, ask «Discard changes?» while something is typed; «Keep editing» leaves the
  *  window open and still holding what was typed. */
 export async function expectUnsavedFormAsksBeforeClosing(window: UnsavedFormWindow): Promise<void> {
@@ -142,4 +136,21 @@ export async function expectUntouchedFormClosesAtOnce(window: {
     expect(presented(modal), `${way} as opened closes the window`).toBe(false);
     await window.reopen();
   }
+}
+
+/** A window a test mounts with `open` as its prop, by its `data-testid`: as opened, each way out closes it without
+ *  asking, and the test's prop opens it again (hub#1233, hub#1234). */
+export async function expectUntouchedWindowClosesAtOnce(
+  mounted: { wrapper: { setProps(props: { open: boolean }): Promise<void> }; inDoc(testid: string): HTMLElement | null },
+  testid: string,
+): Promise<void> {
+  await expectUntouchedFormClosesAtOnce({
+    overlay: () => mounted.inDoc(testid),
+    reopen: async () => {
+      await mounted.wrapper.setProps({ open: false });
+      await mounted.wrapper.setProps({ open: true });
+      await flush();
+      await flush();
+    },
+  });
 }
