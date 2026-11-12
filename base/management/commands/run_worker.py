@@ -1,4 +1,4 @@
-"""``manage.py run_worker``: the ``worker`` task, long-running (aws-next README, «Contrato app ↔ infra»).
+"""``manage.py run_worker``: the long-running ``worker`` task.
 
 Runs ``base.worker.run`` until SIGTERM (ECS stopping the task; its ``stopTimeout`` is 30 s) or SIGINT
 (Ctrl-C). The handlers only ask the loop to stop, so the current step ends cleanly and the process

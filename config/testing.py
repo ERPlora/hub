@@ -109,7 +109,7 @@ def discard_changed_sessions() -> list[tuple[int, str, str]]:
 def session_settings_left_as_found():
     """The autouse fixture of ``conftest.py``: fails the test that leaves a database connection with a
     session setting changed, which the pool would hand to the next test as it is (a 300 ms
-    ``lock_timeout`` left by flow failed inventory's lock waits, FIX-FLOW-DETAIL-RACE). The connection
+    ``lock_timeout`` left by a test of ``apps/flow`` fails inventory's lock waits). The connection
     is discarded, so the next test starts clean."""
     yield
     if left := discard_changed_sessions():

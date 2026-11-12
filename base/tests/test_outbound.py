@@ -1,7 +1,7 @@
-"""Slow I/O after the COMMIT, off the loop that committed (``base.outbound``; FIX-HUB-BASE-RELAY-BLOCKED-BY-SLOW-REACTION-CALLS).
+"""Slow I/O after the COMMIT, off the loop that committed (``base.outbound``).
 
 The worker relays the outbox of every hub in one loop, and Django runs what a transaction leaves for after its COMMIT
-right there: a reaction that called another system held every other delivery until it answered. ``after_commit``
+right there: a reaction that calls another system would hold every other delivery until it answered. ``after_commit``
 hands that I/O to a few threads of the worker's own, after the COMMIT and never after a rollback, in the database of
 the hub that asked; the loop goes on at once. These tests drive real threads on the real database: a job waits until
 the test lets it (``WAIT`` at most, so a broken pool fails instead of hanging), and the order says who waited for whom.
