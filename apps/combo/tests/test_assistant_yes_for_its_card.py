@@ -600,6 +600,7 @@ def beside_another_s_id() -> dict[str, dict]:
         "combo.group.delete": {"id": str(course.id), "combo_id": menu},
         "combo.group.update": {"id": str(course.id), "combo_id": menu, "max_choices": 2},
         "combo.option.delete": {"id": str(choice.id), "combo_id": menu},
+        "combo.option.delete with its course": {"id": str(choice.id), "group_id": theirs},
         "combo.option.update": {"id": str(choice.id), "group_id": theirs, "is_available": False},
         "combo.option.update with its menu and its course": {
             "id": str(choice.id), "combo_id": menu, "group_id": theirs, "is_available": False,
@@ -616,6 +617,7 @@ SHOWN_BESIDE_ANOTHER_S_ID = {
     "combo.group.delete": {"id": FOUND["group"]},
     "combo.group.update": {"id": FOUND["group"], "max_choices": 2},
     "combo.option.delete": {"id": FOUND["product"]},
+    "combo.option.delete with its course": {"id": FOUND["product"]},
     "combo.option.update": {"id": FOUND["product"], "is_available": False},
     "combo.option.update with its menu and its course": {"id": FOUND["product"], "is_available": False},
     "combo.option.delete by its product": {"group_id": FOUND["group"], "product": FOUND["product"]},
