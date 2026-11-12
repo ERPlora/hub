@@ -506,7 +506,7 @@ def _upper_code(value: Any) -> Any:
 
 
 def _series_code(value: str) -> str:
-    # Its own message, as the format's: pydantic's pattern would say only «Enter a valid value.» (hub#872).
+    # Its own message, as the format's: pydantic's pattern would say only «Enter a valid value.»
     if not re.fullmatch(SERIES_CODE_RE, value):
         raise ValueError(str(SERIES_CODE_INVALID))
     return value
@@ -1034,8 +1034,8 @@ GapPage = Page[GapOut]
 AllocationPage = Page[AllocationOut]
 
 
-# ── ERPlora's own invoices, posted by the SaaS to its platform hub (PLAN-SAAS §4) ───────────────────────────
-# The body of ``POST /internal/platform/invoices``: ``platform_payload()`` of saas-next/billing/services.py, field by
+# ── ERPlora's own invoices, posted by the SaaS to its platform hub ──────────────────────────────────────────
+# The body of ``POST /internal/platform/invoices``: ``platform_payload()`` of the SaaS's billing/services.py, field by
 # field. A key the SaaS adds later is ignored; one it drops is a 422.
 
 

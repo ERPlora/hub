@@ -190,7 +190,8 @@ class _Detail:
 
     @property
     def carries_amounts(self) -> bool:
-        # Exempt (§15.5) and N1/N2 (error 1237) carry neither rate nor quota; S2 carries explicit zeros.
+        # Exempt and N1/N2 carry neither rate nor quota (the AEAT's validations, section 15.5 and error 1237);
+        # S2 carries explicit zeros.
         return not self.exempt and self.qualification not in ("N1", "N2")
 
     @property
@@ -235,7 +236,8 @@ def _detail(entry: dict) -> _Detail:
         if qualification_name == "exempt":
             qualification = ""
             exempt = str(entry.get("exempt_reason") or "").strip().upper() or "E6"
-        # §15.6.6: a regime located in the Canaries, Ceuta or Melilla (08), or IGIC's 20, is always N2.
+        # The AEAT's validations, section 15.6.6: a regime located in the Canaries, Ceuta or Melilla (08), or IGIC's 20,
+        # is always N2.
         if qualification and (regime == "08" or (tax == "03" and regime == "20")):
             qualification = "N2"
         return _Detail(
@@ -289,7 +291,7 @@ def _id_otro(country: str, kind: str, number: str) -> str:
 
 
 def _recipient_identity(tax_id: str, country: str, id_type: str) -> str:
-    """``NIF`` for a Spanish recipient, ``IDOtro`` for anyone else (hub#1965, hub#1967)."""
+    """``NIF`` for a Spanish recipient, ``IDOtro`` for anyone else."""
     compact = _ALPHANUMERIC.sub("", tax_id).upper()
     country = country.strip().upper()
     declared = id_type.strip() if id_type.strip() in FOREIGN_ID_TYPES else ""
@@ -437,7 +439,8 @@ def registro_alta(
     correction = ""
     if data.correction:
         correction = _element("Subsanacion", "S")
-        # S: the AEAT holds the invoice and a later correction was rejected; X: it holds none (§9.1.3).
+        # S: the AEAT holds the invoice and a later correction was rejected; X: it holds none (the AEAT's web service
+        # description, section 9.1.3).
         if data.previous_rejection in ("S", "X"):
             correction += _element("RechazoPrevio", data.previous_rejection)
     operation_date = ""
@@ -557,7 +560,8 @@ def query(
 
     Through ERPlora (``represented``) the query raises ``IndicadorRepresentante``: unlike the alta, its header
     has no ``Representante`` block, only the flag (AEAT fault 4112 otherwise). ``after``: the next page, after
-    the record the previous answer named in its ``ClavePaginacion`` (§6.4.3).
+    the record the previous answer named in its ``ClavePaginacion`` (the AEAT's web service description,
+    section 6.4.3).
     """
     if not obligado_nif.strip():
         raise UndeclarableRecord("The query needs the obligado's NIF.")

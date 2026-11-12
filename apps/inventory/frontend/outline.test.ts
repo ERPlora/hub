@@ -1,7 +1,6 @@
-// gh:hub#1060, gh:inventory#59, gh:inventory#121 (INVENTORY-F01, F13): the shell starts in iOS mode, and there an
-// `ion-input`, `ion-select` or `ion-textarea` with `fill="outline"` paints no box: the old product form and the
-// Reception and Count dialogs showed their fields without a frame. Every outlined control of the app's pages and
-// components carries `mode="md"` (working-rules §2.4), and this test keeps it so.
+// INVENTORY-F01, F13: the shell starts in iOS mode, and there an `ion-input`, `ion-select` or `ion-textarea` with
+// `fill="outline"` paints no box: the old product form and the Reception and Count dialogs showed their fields without
+// a frame. Every outlined control of the app's pages and components carries `mode="md"`, and this test keeps it so.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

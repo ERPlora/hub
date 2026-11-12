@@ -15,8 +15,8 @@ with what preproduction taught it:
   the latest record is the one generated last, never the first or the last of the list.
 - A record of the queue is in the AEAT when its query returns it with the same fingerprint (``held_as``): the
   number alone could be an earlier record of the same invoice.
-- A query answers at most 10,000 records (§6.4.3): ``IndicadorPaginacion`` S says more follow, after the record
-  its ``ClavePaginacion`` names.
+- A query answers at most 10,000 records (the AEAT's web service description, section 6.4.3):
+  ``IndicadorPaginacion`` S says more follow, after the record its ``ClavePaginacion`` names.
 """
 
 import datetime as dt

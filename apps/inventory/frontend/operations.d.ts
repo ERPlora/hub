@@ -1,6 +1,6 @@
 // Types of the inventory app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`),
-// from apps/inventory/schemas.py. Written by hand, as `frontend/sdk-types.d.ts` is for the PoC,
-// until V3 generates them from `/api/openapi.json`. Keep it in step with schemas.py and with
+// from apps/inventory/schemas.py. Written by hand, as `frontend/sdk-types.d.ts` is, until they are
+// generated from `/api/openapi.json`. Keep it in step with schemas.py and with
 // `frontend/generated/operations.json`. One input per operation (ninja's parity): no path
 // parameters, a product or a category travels in the input. Money is whole cents; quantities and
 // other decimals are JSON strings on the way out («2.500») and a number or its string on the way in.
@@ -293,7 +293,7 @@ export interface ProductOut {
    *  optional only so that the products other apps' tests typed before it still compile. */
   is_sold_out?: boolean;
   category_ids: string[];
-  /** `catalog:<folder>/<name>`, `file:inventory/products/<uuid7 hex>.webp` or `''` (round 2026-10-30). The server
+  /** `catalog:<folder>/<name>`, `file:inventory/products/<uuid7 hex>.webp` or `''`. The server
    *  always sends both; optional only so that the products other apps' tests typed before them still compile. */
   image?: string;
   /** `/p/catalog/…` or `/p/media/<hub>/…`; `''`: none, show the initials (INVENTORY-F32). */
@@ -320,7 +320,7 @@ export interface SaleProductOut {
   price_quantity: string;
   pricing_unit: UnitCode;
   tracks_stock: boolean;
-  /** `catalog:<folder>/<name>`, `file:inventory/products/<uuid7 hex>.webp` or `''` (round 2026-10-30). The server
+  /** `catalog:<folder>/<name>`, `file:inventory/products/<uuid7 hex>.webp` or `''`. The server
    *  always sends both; optional only so that the products other apps' tests typed before them still compile. */
   image?: string;
   /** `/p/catalog/…` or `/p/media/<hub>/…`; `''`: none, show the initials (INVENTORY-F32). */

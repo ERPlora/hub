@@ -1,4 +1,4 @@
-"""Django admin of the invoice app, for the platform's staff only (round 12, PLAN §17; hubs.erplora.com).
+"""Django admin of the invoice app, for the platform's staff only (hubs.erplora.com).
 
 Series and issuer: full CRUD (what the admin saves does not go through the operations: no event; the
 database still refuses a code twice in a year, two default series in a year and a second issuer). A
