@@ -16,8 +16,8 @@ the business stays open and its own work goes on.
 2. **Given back**: in the business (``use_hub``), the app says which of those records the business lacks, and each is
    created by the app's own operation, the one its screen uses, as the platform runs an operation in a business (the
    system's context, in the staff's language): rows are never copied. The apps go in the order of their ``requires``
-   (``activation.in_requires_order``), whatever the order asked, so a record finds what it points at brought back
-   first (an appointment its customer, hub#1284). What the operation refuses for one record (its input, what it names
+   (``activation.in_requires_order``), whatever the order asked, so a record finds what it points at in another app
+   brought back first (hub#1284). What the operation refuses for one record (its input, what it names
    gone, or the business as it is now: a time taken) is counted with why and the others go on; what it refuses for all
    (the app turned off, the business busy) ends that app's part with why (``refused``), and the next app goes on.
 3. **Noted**: control notes the recovery done with what each app gave back, or failed with why
