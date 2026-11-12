@@ -130,20 +130,20 @@ function scrollRetries(source: string): string[] {
     .filter((body) => body.includes('scrollIntoViewIfNeeded'));
 }
 
-/** The specs and helpers that still retry their own scroll (a clock of 2 s in `toPass`), written before `scrolledTo`:
- *  hub#837 moves each to it and takes it off this list. A new copy fails the check; one that moved fails it too until
- *  it leaves the list, so the list only shrinks. */
-const OWN_RETRIES_LEFT = [
-  'cash-register-flows.spec.ts',
-  'customer-flows.spec.ts',
-  'fix-whatsapp-inbox-template-header-media.spec.ts',
-  'payment-flow.spec.ts',
-  'staff-commissions.spec.ts',
-  'staff-flows.spec.ts',
-  'tax-helpers.ts',
-  'verifactu-flows.spec.ts',
-  'website-flows.spec.ts',
-];
+/** The specs and helpers that still retry their own scroll (a clock of 2 s in `toPass`), written before `scrolledTo`,
+ *  and how many times each: hub#837 moves each to it and lowers its count or takes it off. A new copy fails the check,
+ *  also one more in a listed file; one that moved fails it too until its count goes down, so the list only shrinks. */
+const OWN_RETRIES_LEFT: Record<string, number> = {
+  'cash-register-flows.spec.ts': 1,
+  'customer-flows.spec.ts': 2,
+  'fix-whatsapp-inbox-template-header-media.spec.ts': 1,
+  'payment-flow.spec.ts': 1,
+  'staff-commissions.spec.ts': 2,
+  'staff-flows.spec.ts': 1,
+  'tax-helpers.ts': 1,
+  'verifactu-flows.spec.ts': 1,
+  'website-flows.spec.ts': 1,
+};
 
 describe('the e2e scrolls past a repaint one way, with scrolledTo of helpers.ts (hub#1303)', () => {
   it('there are helpers and specs to look at, the shared helper and the lists that scrolled their own way among them', () => {
@@ -154,8 +154,14 @@ describe('the e2e scrolls past a repaint one way, with scrolledTo of helpers.ts 
   });
 
   it('no helper or spec retries a scroll of its own but the ones still to move to scrolledTo (hub#837)', () => {
-    const own = helpersAndSpecs().filter((name) => scrollRetries(readFileSync(join(E2E_DIR, name), 'utf8')).length > 0);
-    expect(own.sort()).toEqual(OWN_RETRIES_LEFT);
+    const own = Object.fromEntries(
+      helpersAndSpecs()
+        .map((name) => [name, scrollRetries(readFileSync(join(E2E_DIR, name), 'utf8')).length] as const)
+        .filter(([, retries]) => retries > 0),
+    );
+    expect(own, 'a new scroll past a repaint is scrolledTo(target) of helpers.ts; a file that moved lowers its count').toEqual(
+      OWN_RETRIES_LEFT,
+    );
   });
 
   it('the check reads the shapes the copies had as a retry of a scroll, and scrolledTo or another retry as none', () => {
