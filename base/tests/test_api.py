@@ -39,7 +39,7 @@ def test_language_follows_the_request(client):
     assert body["language"] == "es"
 
 
-# The Home (PLAN-HUB round 2026-10-21): base.setup.status, base.widget.list and base.bell.counters
+# The Home: base.setup.status, base.widget.list and base.bell.counters
 
 
 @pytest.mark.parametrize(
@@ -67,8 +67,8 @@ def test_the_list_of_an_owner_over_http(client, make_user, settings):
 
     assert response.status_code == 200
     body = response.json()
-    # Base's own steps; the modules of the store bring theirs too (VeriFactu's, FIX-VERIFACTU-SETUP-HOOKS), and the
-    # one wall is Invoicing's while the hub has no issuer (FIX-INVOICE-SETUP-HOOKS).
+    # Base's own steps; the modules of the store bring theirs too (VeriFactu's), and the one wall is Invoicing's while
+    # the hub has no issuer.
     assert [item["key"] for item in body["items"] if item["app"] == "base"] == ["base.apps", "base.team"]
     walls = [item["key"] for item in body["items"] if item["level"] == "legal" and item["state"] == "pending"]
     assert (walls, body["blocking_pending"]) == (["invoice.business_identity"], 1)
@@ -81,7 +81,7 @@ def test_an_anonymous_visitor_gets_no_home(client):
 
 
 def test_the_spas_route_map_names_every_base_route(settings):
-    # frontend/generated/operations.json: the op → route map the SDK's client uses (hand-written until V3).
+    # frontend/generated/operations.json: the op → route map the SDK's client uses.
     import json
 
     from base.tests.test_access_routes import ROUTES as WAY_IN
@@ -103,25 +103,25 @@ def test_the_spas_route_map_names_every_base_route(settings):
         ("GET", "/api/apps", "base.app.list"),
         # Which app a name names (the assistant's card, hub#539).
         ("GET", "/api/apps/detail", "base.app.get"),
-        # Turning an app on or off (PLAN-HUB §9).
+        # Turning an app on or off.
         ("POST", "/api/apps/enable", "base.app.enable"),
         ("POST", "/api/apps/disable", "base.app.disable"),
-        # An app whose tables could not be made, tried again (S3).
+        # An app whose tables could not be made, tried again.
         ("POST", "/api/apps/retry", "base.app.retry"),
         ("GET", "/api/system/plan", "base.plan.usage"),
         # The cards the apps on put in System › «Usage and plan» (hub#683).
         ("GET", "/api/system/cards", "base.system.cards"),
         *DATA_ROUTES,
-        # Business settings (APP-BASE-6).
+        # Business settings.
         ("GET", "/api/business", "base.business.get"),
-        # System (APP-BASE-7)
+        # System.
         ("GET", "/api/system/status", "base.system.status"),
         ("GET", "/api/system/events", "base.event.list"),
         ("GET", "/api/system/failed-events", "base.failed_event.list"),
         ("POST", "/api/system/failed-events/retry", "base.failed_event.retry"),
         ("POST", "/api/system/failed-events/retry_all", "base.failed_event.retry_all"),
         ("POST", "/api/system/failed-events/discard", "base.failed_event.discard"),
-        # Files (APP-BASE-8): base/tests/test_files_api.py.
+        # Files: base/tests/test_files_api.py.
         ("GET", "/api/files", "base.file.list"),
         ("GET", "/api/files/raw", "base.file.read"),
         ("POST", "/api/files/upload", "base.file.upload"),
@@ -129,20 +129,20 @@ def test_the_spas_route_map_names_every_base_route(settings):
         ("POST", "/api/files/rename", "base.file.rename"),
         ("POST", "/api/files/move", "base.file.move"),
         ("POST", "/api/files/delete", "base.file.delete"),
-        # Assistant (APP-BASE-9)
+        # Assistant.
         ("POST", "/api/assistant/turn", "base.assistant.turn"),
         ("GET", "/api/assistant/usage", "base.assistant.usage"),
         ("POST", "/api/assistant/report", "base.assistant.report"),
         ("POST", "/api/assistant/transcribe", "base.assistant.transcribe"),
-        # «Read aloud» in the server's voice (round 2026-11-03n): the mp3 of an answer.
+        # «Read aloud» in the server's voice: the mp3 of an answer.
         ("POST", "/api/assistant/speak", "base.assistant.speak"),
         ("POST", "/api/support/report", "base.support.report"),
         ("POST", "/api/saas-pass", "base.saas_pass.create"),
     } | {(method, f"/api{path}", op) for method, path, op in WAY_IN | PEOPLE | KEYS | APPROVALS | API_DOCS | LOCATIONS | CATALOG_IMAGES}
 
 
-# Settings › Data (APP-BASE-2): the blueprints, the loads, the export and the reset. Reading what a file brings goes by
-# POST (a command that writes nothing: its body, the file, does not fit in a query string); the export by GET.
+# Settings › Data: the blueprints, the loads, the export and the reset. Reading what a file brings goes by POST (a
+# command that writes nothing: its body, the file, does not fit in a query string); the export by GET.
 DATA_ROUTES = {
     ("GET", "/api/settings/data/blueprints", "base.blueprint.list"),
     ("POST", "/api/settings/data/blueprints/inspect", "base.blueprint.inspect"),
@@ -152,7 +152,7 @@ DATA_ROUTES = {
     ("POST", "/api/settings/data/imports/undo", "base.import.undo"),
     ("GET", "/api/settings/data/datasets", "base.dataset.list"),
     ("POST", "/api/settings/data/reset", "base.hub.reset"),
-    # The copies of the business's data (round 2026-10-30 of PLAN-DB, S2b): base/tests/test_data_copies.py.
+    # The copies of the business's data: base/tests/test_data_copies.py.
     ("GET", "/api/settings/data/dumps", "base.hub.dumps"),
     ("GET", "/api/settings/data/dumps/link", "base.hub.dump_link"),
 }

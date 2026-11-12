@@ -7,8 +7,7 @@ at the menu's own tax category (art. 91.Uno.2.2 LIVA); ``goods`` = sold to take 
 component when they do not share a tax category (art. 79.Dos LIVA).
 
 A choice is a product of Inventory (``requires``) by foreign key; the tax category is Taxes' (never
-deleted). Deleting is physical and cascades: a sale keeps its own copy of the menu. Phase 1 has no
-tenancy: every scope shares these tables; phase 2 moves them to each hub's database.
+deleted). Deleting is physical and cascades: a sale keeps its own copy of the menu.
 """
 
 from django.db import models
@@ -17,7 +16,7 @@ from django.db.models.functions import Lower
 from django.utils.translation import gettext_lazy as _
 from live.models import UUIDModel
 
-#: The most choices a course asks for, at either end (the old module's schema).
+#: The most choices a course asks for, at either end.
 MAX_PICKS = 50
 NAME_MAX_LENGTH = 255
 ACTOR_MAX_LENGTH = 128
@@ -53,7 +52,7 @@ class Combo(UUIDModel):
     )
     sort_order = models.PositiveIntegerField(_("order"), default=0)
     is_active = models.BooleanField(_("on sale"), default=True)
-    # Its image (COMBO-F14; round 2026-10-30, base.images): one of the shared library («catalog:<folder>/<name>») or a
+    # Its image (COMBO-F14, base.images): one of the shared library («catalog:<folder>/<name>») or a
     # photo of its own («file:combo/combos/<uuid7 hex>.webp» under its hub's prefix); empty: none, the till shows its
     # initials. Never a URL. ``db_default``: a process still on the previous code inserts menus without it.
     image = models.CharField(_("image"), max_length=200, blank=True, default="", db_default="")

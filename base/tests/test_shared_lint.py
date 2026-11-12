@@ -1,4 +1,4 @@
-"""Only ``base/catalog.py`` reaches the SaaS's ``shared`` schema (round 16, PLAN §21; spec §3.3).
+"""Only ``base/catalog.py`` reaches the SaaS's ``shared`` schema.
 
 It is the single exception to «only ``services.py`` and ``queries.py`` touch the ORM», as
 ``base/tenancy/migrator.py`` is for the DDL: ``register_apps`` runs for no hub and no user, so it is
@@ -124,7 +124,7 @@ def test_only_base_catalog_reaches_the_shared_schema():
     ]
 
     assert offenders == [], (
-        "Only base/catalog.py reaches the SaaS's shared schema (spec §3.3): register_apps goes "
+        "Only base/catalog.py reaches the SaaS's shared schema: register_apps goes "
         f"through it, never an operation nor another module: {offenders}"
     )
 

@@ -1,7 +1,7 @@
 """The Home's three live queries: ``base.setup.status``, ``base.widget.list`` and ``base.bell.counters``; and the
-device's notices, ``base.notice.list`` (PLAN-HUB round 2026-10-23).
+device's notices, ``base.notice.list``.
 
-PLAN-HUB round 2026-10-21. Each module declares its steps, panels and counters in its ``LiveAppConfig`` and base runs
+Each module declares its steps, panels and counters in its ``LiveAppConfig`` and base runs
 their queries by name, as the person of the request, with the old hub's rules (``setup_status.rs``): only modules on
 in the scope, the hub's country, the person's permission (but a pending ⛔ stays, not actionable), a step whose query
 fails is left out. The stand-in modules here name real operations registered for the test.
@@ -147,7 +147,7 @@ def test_declarations(name, input, output):
 
 
 def test_the_assistant_reads_the_setup_status():
-    """BASE-G128: the assistant gets the same document as a tool; it never takes on a step «not available»."""
+    """The assistant gets the same document as a tool; it never takes on a step «not available»."""
     assert "not available" in description(get("base.setup.status"))
 
 
@@ -429,7 +429,7 @@ def test_the_level_is_bases_never_the_modules(modules, declare):
     assert (items["stock.catalog"]["level"], items["stock.photos"]["level"]) == ("functional", "recommended")
 
 
-# --- VeriFactu's way to the AEAT: a wall only where the hub files in production (PLAN-HUB round 2026-10-21) --------
+# --- VeriFactu's way to the AEAT: a wall only where the hub files in production ------------------------------------
 
 ROUTE = "verifactu.sending_route"
 
@@ -463,7 +463,7 @@ def test_in_production_a_way_to_the_aeat_not_ready_is_a_wall_for_everybody(modul
 
 
 def test_in_testing_the_way_stays_functional_and_the_till_sells(modules, declare):
-    """gh:hub#1726: a hub in testing sells without a way to the AEAT, so nothing tells it that it cannot invoice."""
+    """A hub in testing sells without a way to the AEAT, so nothing tells it that it cannot invoice."""
     sending_route(modules, declare, environment="testing", ready=False)
 
     owner = setup_status(ctx("verifactu.configure"))
@@ -482,7 +482,7 @@ def test_in_production_with_the_way_ready_the_step_is_done_and_off_the_strip(mod
 
 
 def test_whoever_may_not_read_the_way_still_has_its_wall_in_production(modules, declare, caplog):
-    """gh:hub#466: a wall whose query the person may not run is read as the system, never dropped. Outside it the
+    """A wall whose query the person may not run is read as the system, never dropped. Outside it the
     step is as any functional one: whoever may not read its query is not told, and the failure is logged."""
     sending_route(modules, declare, environment="production", ready=False, permission="verifactu.view_record")
 
@@ -500,8 +500,8 @@ def test_whoever_may_not_read_the_way_still_has_its_wall_in_production(modules, 
 
 
 def test_in_testing_whoever_may_neither_do_nor_read_the_way_is_skipped_without_a_warning(modules, declare, caplog):
-    """No wall in testing: the person at the till is not told about the step, as before, and that is no failure of
-    its query, so no Home of theirs logs one."""
+    """No wall in testing: the person at the till is not told about the step, and that is no failure of its query,
+    so no Home of theirs logs one."""
     sending_route(modules, declare, environment="testing", ready=False, permission="verifactu.view_record")
 
     with caplog.at_level(logging.WARNING, logger="base.home"):
@@ -648,9 +648,8 @@ def test_the_panels_the_person_may_see(modules):
 
 
 def test_the_texts_of_a_panels_options_are_in_the_persons_language(modules):
-    # FIX-HUB-HOME-WIDGET-OPTIONS-LAZY-TEXT: a panel's literal props may carry lazy translations (the text under the
-    # figure of a stat, or deeper in a list or a dict); the list gives them in the reader's language and every other
-    # prop as declared.
+    # A panel's literal props may carry lazy translations (the text under the figure of a stat, or deeper in a list or
+    # a dict); the list gives them in the reader's language and every other prop as declared.
     options = {
         "format": "number",
         "label": gettext_lazy("Contingency queue"),
@@ -691,7 +690,7 @@ def test_the_texts_of_a_panels_options_are_in_the_persons_language(modules):
 
 
 def test_a_panel_says_whether_its_operation_is_a_live_query(modules, monkeypatch):
-    # BASE-G168: the Home follows a live query and asks once for one that is not.
+    # The Home follows a live query and asks once for one that is not.
     from live.live_registry import live_registry
 
     modules(module("stock", widgets=[Widget(key="today", title="Today", kind="kpi", operation="stock.item.count"),
@@ -784,10 +783,9 @@ def refresh_every(context):
 
 
 def test_a_counter_that_changes_with_time_asks_the_bell_to_read_it_again(modules, declare):
-    """FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE: a counter whose figure moves as time passes (a job waiting for
-    a minute with no device alive) names how often the bell reads it again, besides its events. The bell is told the
-    shortest period among the counters the person may see of the apps on, also while they are at zero: it is the time
-    that raises them."""
+    """A counter whose figure moves as time passes (a job waiting for a minute with no device alive) names how often
+    the bell reads it again, besides its events. The bell is told the shortest period among the counters the person
+    may see of the apps on, also while they are at zero: it is the time that raises them."""
     declare("printing.device.coverage", {"count": 0})
     declare("stock.item.count", {"count": 2})
     stalled = counter("stalled", "printing.device.coverage", permission="printing.view_settings")
@@ -818,7 +816,7 @@ def dead_event(scope, status=EventDelivery.Status.DEAD):
 
 
 def test_the_failed_events_of_this_hub_for_an_administrator(modules):
-    """BASE-G137: the bell says how many events between apps the relay gave up on, in this hub only."""
+    """The bell says how many events between apps the relay gave up on, in this hub only."""
     modules(module("sale"))
     dead_event(A)
     dead_event(A)
@@ -878,7 +876,7 @@ def test_a_demo_item_written_in_b_notifies_b_only_and_re_runs_the_home_there(lis
     assert {"base.setup.status", "base.bell.counters"} <= live_registry.affected(["demo.item.created"])
 
 
-# --- base.notice.list (PLAN-HUB round 2026-10-23, APPOINTMENT-F28) ----------------------------------------------
+# --- base.notice.list (APPOINTMENT-F28) -------------------------------------------------------------------------
 
 
 def notice_list(context):
@@ -1080,7 +1078,7 @@ def test_the_notices_of_a_module_off_or_out_of_the_store(modules, declare, setti
 
 
 def test_it_says_which_notices_the_person_hears_even_with_nothing_to_tell(modules, declare):
-    """So the shell asks the device's permission only where there is something to be told (hub#2046, HUB_APP-F07)."""
+    """So the shell asks the device's permission only where there is something to be told."""
     declare("stock.item.changes", {"rows": []})
     modules(
         module("stock", permissions=["stock.view"], notices=[notice(), notice("secret", permission="stock.view")]),

@@ -1,6 +1,5 @@
-"""What layer 1 of the assistant's QA does not say of Tables (erplora-next docs plan 2026-10-31, the assistant's knowledge
-and QA): how many tools and phrases it offers, what an employee is never offered, and the requests of the real-model
-QA that came back without their tool (hub#1081).
+"""What layer 1 of the assistant's QA does not say of Tables: how many tools and phrases it offers, what an employee is
+never offered, and the requests of the real-model QA that came back without their tool (hub#1081).
 
 Every ask of every tool of table bringing its tool among the first ten, role by role, in English and in Spanish, out of
 the catalogue of a business with every app on and ranked as a turn ranks, is ``base/tests/test_assistant_asks.py``'s
@@ -114,7 +113,7 @@ def test_the_reported_tables_request_offers_its_existing_operation(role, languag
 
 
 #: The reported requests that come among the first ten, as layer 1 asks of an ask: «sienta» opens, «traslada»
-#: transfers and «comensales» are the guests (ERPlora/live#48). Not the Spanish split: «abre una segunda cuenta» asks to
+#: transfers and «comensales» are the guests. Not the Spanish split: «abre una segunda cuenta» asks to
 #: open a check, which ``sale.order.open`` does by its very verb, so it is only offered.
 WITHIN_TEN = [case for case in QA_PROBES if case[1:3] != ("es", "table.session.split")]
 
@@ -140,9 +139,9 @@ def table_probes() -> list[dict]:
 
 
 def test_no_qa_probe_is_an_ask_and_no_ask_names_a_qa_record():
-    """The probes measure that the selection generalises (erplora-next docs plan 2026-10-31 §1.5): a probe copied into
-    the asks of its tool ranks its own words, layer 2 skips it as a copy of an ask, and a record of the QA's data
-    («Comedor QA», «Cuenta QA») is no phrase a business says."""
+    """The probes measure that the selection generalises: a probe copied into the asks of its tool ranks its own words,
+    layer 2 skips it as a copy of an ask, and a record of the QA's data («Comedor QA», «Cuenta QA») is no phrase a
+    business says."""
     probes = table_probes() + [{"tool": name, "phrase": phrase} for _, _, name, phrase in QA_PROBES]
     assert len(probes) > 30  # positive control: the probes of layer 2 are read
     for probe in probes:

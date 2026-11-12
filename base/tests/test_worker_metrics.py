@@ -2,7 +2,7 @@
 
 Once its apps are registered, the worker builds its emitter (``metrics.emitter``, on its own
 stop request) and, every tick, starts a metrics pass when one is due (at once, then once a minute of its clock) in a
-thread of its own, ``Background("metrics")``, as its other slow passes (PLAN-DB round 2026-10-31b, C8): a pass that
+thread of its own, ``Background("metrics")``, as its other slow passes: a pass that
 takes long (a slow database, CloudWatch unreachable) never delays the relay, the tasks, VeriFactu or the hubs due, and
 on its way out it shares their grace. A worker that never registered its apps measures nothing. No database here: the
 passes of the tick are the fakes of ``test_worker.py``; the metrics' own tests are ``test_metrics.py``.
@@ -70,8 +70,8 @@ def test_a_pass_runs_at_once_then_once_a_minute_of_the_workers_clock(registered,
         if len(ticks) == 6:
             stop.set()
 
-    # Six ticks 30 s apart from 10:00:00 (since S5 no schedule is written before them: each hub's is written in its
-    # own database; the passes run inline here, test_worker.inline_passes): a pass on the first tick, then one a minute.
+    # Six ticks 30 s apart from 10:00:00 (no schedule is written before them: each hub's is written in its own
+    # database; the passes run inline here, test_worker.inline_passes): a pass on the first tick, then one a minute.
     assert worker.run(stop, wait=wait, clock=every(30)) == 0
 
     assert [call["MetricData"][0]["Timestamp"] for call in cloudwatch.calls] == [

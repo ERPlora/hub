@@ -1,6 +1,5 @@
-"""What layer 1 of the assistant's QA says of Online booking (docs plan 2026-10-31, the assistant's knowledge and QA,
-§3): its fifteen tools, and that the owner's requests of the real-model QA (hub#1107), in the owner's own words, are
-offered their existing operation.
+"""What layer 1 of the assistant's QA says of Online booking: its fifteen tools, and that the owner's requests of the
+real-model QA (hub#1107), in the owner's own words, are offered their existing operation.
 
 Every ask of every tool of online_booking bringing its tool among the first ten, role by role, in English and in
 Spanish, out of the catalogue of a business with every app on and ranked as a turn ranks, is

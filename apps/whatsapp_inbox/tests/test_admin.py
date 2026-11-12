@@ -1,4 +1,4 @@
-"""Django admin of the WhatsApp inbox (round 12, PLAN §17): the staff's CRUD on hubs.erplora.com/admin.
+"""Django admin of the WhatsApp inbox: the staff's CRUD on hubs.erplora.com/admin.
 
 Messages are read only, received and sent alike: they are what WhatsApp carried, and a message is
 corrected by erasing the conversation's data, never by editing it. Deleting stays for the staff.

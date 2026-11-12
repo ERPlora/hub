@@ -2,7 +2,7 @@
 reads, such as the country of a phone written without prefix (hub#527, CUSTOMER-F10, CUSTOMER-F11).
 
 It is ``base.business.get``'s country, read as the platform as ``business_currency`` reads the currency (no second
-source: PLAN-HUB §21), through base's one reading of a business without one (``base.business.country_or_market``,
+source), through base's one reading of a business without one (``base.business.country_or_market``,
 hub#682): ERPlora's market, Spain. ERPlora's own hub answers its issuer's country. A scope that is no hub's has no
 country: the same ``NotFound`` as the operation, never a silent Spain. Each hub answers its own, never another's.
 """
@@ -47,7 +47,7 @@ def test_a_business_without_a_country_is_in_erplora_s_market(hubs):
 
 
 def test_erplora_s_own_hub_is_in_its_issuer_s_country():
-    assert not Hub.objects.filter(slug="erplora").exists()  # phase 1: no registry row
+    assert not Hub.objects.filter(slug="erplora").exists()  # it answers even without a registry row
     assert business_country(ERPLORA) == "ES"
     with override_settings(PLATFORM_ISSUER_COUNTRY="GB"):
         assert business_country(ERPLORA) == "GB"

@@ -1,7 +1,6 @@
-"""What layer 1 of the assistant's QA does not say of Cash register (docs plan 2026-10-31, the assistant's knowledge and
-QA, §3): how many tools it offers, that the requests of the real-model QA (hub#1087), in the words the person said
-them, are offered their existing operation, and with it the read it needs first, and that no description makes the
-model stop in the chat before a write's card (hub#1138).
+"""What layer 1 of the assistant's QA does not say of Cash register: how many tools it offers, that the requests of
+the real-model QA (hub#1087), in the words the person said them, are offered their existing operation, and with it
+the read it needs first, and that no description makes the model stop in the chat before a write's card (hub#1138).
 
 Every ask of every tool of cash_register bringing its tool among the first ten, role by role, in both languages, is
 ``base/tests/test_assistant_asks.py``'s (cash_register is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020``

@@ -1,10 +1,9 @@
-"""A session is a session of the host it was opened on (phase 2, S1; PLAN-DB §2 and §14.2; plan 2026-10-22, §2.3).
+"""A session is a session of the host it was opened on.
 
-Sessions stay in control's database in this phase (plan, decision 3), so the session of hub B is a row hub A's host
-could read too. The login notes the host it was opened on (a hub's slug, or the platform host's mark), and on any
-other host that session is no session: anonymous, 401 on the API, the SaaS's login on a page. Nothing changes for a
-browser: its cookie is its host's only. A session from before this rule, with no host noted, stays valid where it is
-used until it expires.
+Sessions live in control's database, so the session of hub B is a row hub A's host could read too. The login notes
+the host it was opened on (a hub's slug, or the platform host's mark), and on any other host that session is no
+session: anonymous, 401 on the API, the SaaS's login on a page. Nothing changes for a browser: its cookie is its host's
+only. A session with no host noted stays valid where it is used until it expires.
 """
 
 import pytest

@@ -10,11 +10,11 @@ class ModifierConfig(LiveAppConfig):
     label = "modifier"
     kind = "app"
     verbose_name = _("Modifiers")
-    # The old `options-outline` is a pair of sliders: Lucide's, registered in the shell, is the same drawing.
+    # A pair of sliders, as `options-outline`; Lucide's is registered in the shell.
     icon = "lucide:sliders-horizontal"
     category = Category.CATALOG
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The public store's texts, which register_apps writes to shared.app.
     summary = _(
         "Supplements and choices of a dish: sauces, doneness, extras, each with its price."
     )
@@ -31,8 +31,8 @@ class ModifierConfig(LiveAppConfig):
     requires = ["inventory", "tax"]
     default_auto_field = "django.db.models.BigAutoField"
     permissions = ["modifier.view", "modifier.manage"]
-    # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The old cashier
-    # role is an employee: it reads the groups of a product and has its picks valued.
+    # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The cashier is an
+    # employee: it reads the groups of a product and has its picks valued.
     role_permissions = {
         "hub_owner": ["modifier.*"],
         "hub_admin": ["modifier.*"],

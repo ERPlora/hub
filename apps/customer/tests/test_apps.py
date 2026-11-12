@@ -86,7 +86,7 @@ HIGH_RISK = {
     "customer.tag.delete",
     "customer.field.delete",
 }
-#: Open to API keys, as in the product's module.json.
+#: Open to API keys.
 EXPOSED = {"customer.order.list", "customer.consent.state"}
 #: Health data (CUSTOMER-F32, GDPR art. 9): for the screen only, never a tool of the assistant.
 SCREEN_ONLY = {
@@ -142,7 +142,7 @@ def test_customer_is_a_free_module_of_the_people_group():
 
 
 def test_customer_is_listed_in_the_store_for_both_verticals():
-    # Round 16 (PLAN §21): one line for the store, one paragraph, and the verticals it ships with.
+    # One line for the store, one paragraph, and the verticals it ships with.
     config = customer()
     with translation.override("en"):
         assert 0 < len(str(config.summary)) <= 120
@@ -183,9 +183,8 @@ def test_the_manager_keeps_the_products_manager_rights():
     }
 
 
-def test_the_employee_works_the_counter_with_the_old_cashier_rights():
-    # The old «cashier» role (view, add, change, link_order, add_note) is the employee's now:
-    # search, attach, quick add, edit the sheet and record consent at the counter.
+def test_the_employee_works_the_counter():
+    # The employee searches, attaches, quick-adds, edits the sheet and records consent at the counter.
     assert permissions_for_role([customer()], "hub_employee") == {
         "customer.view",
         "customer.manage",

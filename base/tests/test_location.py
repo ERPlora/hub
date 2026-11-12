@@ -1,5 +1,5 @@
-"""Locations (round 2026-10-24b, multi-location): a hub is one business, with its tax id and one database, and the
-places it works in live inside it, as Square, Shopify, Lightspeed and Odoo keep several shops in one company.
+"""Locations: a hub is one business, with its tax id and one database, and the places it works in live inside it,
+as Square, Shopify, Lightspeed and Odoo keep several shops in one company.
 
 Every hub's database is born with exactly one default location, «Main» (``base/migrations/0015_location``; a new
 hub inherits it from the template it is cloned from), which the reader sees in their language («Principal» in
@@ -178,7 +178,7 @@ def test_every_step_of_the_migration_goes_back():
     assert all(step.reversible for step in steps if isinstance(step, RunPython))
 
 
-# ── A hub with a database of its own (phase 2) ─────────────────────────────────────────────────────────────────────
+# ── A hub with a database of its own ─────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture

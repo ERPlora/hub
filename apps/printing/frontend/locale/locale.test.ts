@@ -1,6 +1,6 @@
-// The printing app's UI texts: English source + Spanish (PLAN §5). This test is their guardrail: same
-// keys and placeholders in both languages, nothing empty, every key a page, a component or a helper of the
-// app uses exists, and the texts the old screens showed are kept word for word.
+// The printing app's UI texts: English source + Spanish. This test is their guardrail: same keys and
+// placeholders in both languages, nothing empty, every key a page, a component or a helper of the app uses
+// exists, and the screens' established texts are kept word for word.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

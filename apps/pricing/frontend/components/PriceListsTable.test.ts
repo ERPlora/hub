@@ -39,7 +39,7 @@ async function setup(options: MountOptions = {}, owner: Business | null = busine
 }
 
 describe('PriceListsTable', () => {
-  it("wears the old module's pricetag on its cards and its empty list, as its tab", async () => {
+  it('wears the pricetag on its cards and its empty list, as its tab', async () => {
     const s = await setup();
     await s.show(page([GENERAL, VIP]));
     expect(s.prop<() => string>('cardIcon')()).toBe('pricetag');
@@ -52,7 +52,7 @@ describe('PriceListsTable', () => {
     expect(s.params(OP)).toEqual([{ status: 'active', sort: 'name', dir: 'asc', limit: 50, offset: 0 }]);
     await s.show(page([GENERAL, VIP]));
     expect(s.table().props()).toMatchObject({ serverSide: true, searchable: true, testid: 'pricing-lists', total: 2 });
-    // The column filters wait behind the toolbar's funnel, as in the old table (PLAN-MIGRATIONS §13).
+    // The column filters wait behind the toolbar's funnel.
     expect(s.prop('filterable')).toBe(true);
     expect(s.prop('searchPlaceholder')).toBe('Search code or name…');
     expect(s.prop<{ add: string }>('labels').add).toBe('New price list');
@@ -95,7 +95,7 @@ describe('PriceListsTable', () => {
     ]);
   });
 
-  it('starts on the active ones, its Status filter says so, and its blank option is every list (pm#254)', async () => {
+  it('starts on the active ones, its Status filter says so, and its blank option is every list', async () => {
     const s = await setup();
     expect(s.prop('filters')).toEqual({ status: 'active' });
     const status = s.prop<Array<{ key: string; filter?: { options?: Array<{ value: string; label: string }> } }>>('columns').find(
@@ -124,7 +124,7 @@ describe('PriceListsTable', () => {
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No price lists.');
   });
 
-  it('says it is loading until the first answer, and a load that fails says so with «Retry» (pm#611, pm#533)', async () => {
+  it('says it is loading until the first answer, and a load that fails says so with «Retry»', async () => {
     const s = await setup();
     expect(s.prop('loading')).toBe(true);
     expect(s.prop('error')).toBeUndefined();

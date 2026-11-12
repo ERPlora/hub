@@ -1,11 +1,9 @@
-"""Every app fits a hub's own database: the people of the business are its own (tenancy W10; PLAN-DB §2).
+"""Every app fits a hub's own database: the people of the business are its own.
 
-Phase 1 hung a staff record, its time off, a clock-in, a task, its comments and the WhatsApp inbox's assignments and
-messages from control's ``auth.User``. A key between two databases does not exist, so those apps could not live in a
-hub's own database and the templates of the verticals left them out: a hair salon would have been born with no staff,
-no services and no appointments. They hang from ``base.HubUser`` now (``tests/test_guardrails.py``, «(h)»), so every
-app fits, every vertical's template holds its whole list, and the expand migrations that moved them fill the new links
-in phase 1's shared database and nothing in a hub's own.
+A staff record, its time off, a clock-in, a task, its comments and the WhatsApp inbox's assignments and messages hang
+from ``base.HubUser``, never from control's ``auth.User``: a key between two databases does not exist
+(``tests/test_guardrails.py``, «(h)»). So every app fits, every vertical's template holds its whole list, and the
+expand migrations that moved those links fill the new ones in the shared database and nothing in a hub's own.
 """
 
 import datetime as dt
@@ -215,7 +213,8 @@ class TestTheExpand:
         assert not HubUser.objects.exists()
 
     def test_it_drops_the_old_columns_keys_to_control_s_users(self, app, name, previous, links):
-        # A database migrated before W10 has them (phase 1's shared one); this history made the tests' without.
+        # A database migrated before these links moved to HubUser has those columns; the tests' one, made by this
+        # history, does not.
         historical = _before_the_new_links_take_their_names(app, name, previous)
         users = get_user_model()._meta.db_table
         for model, _old, _new, column in links:

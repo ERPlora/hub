@@ -1,6 +1,6 @@
-"""What layer 1 of the assistant's QA says of Price lists (docs plan 2026-10-31, the assistant's knowledge and QA, §3):
-which tools it offers, what an employee is never offered, and that the owner's requests of the real-model QA
-(hub#1101), in the owner's own words, are offered their existing operation.
+"""What layer 1 of the assistant's QA says of Price lists: which tools it offers, what an employee is never offered,
+and that the owner's requests of the real-model QA (hub#1101), in the owner's own words, are offered their existing
+operation.
 
 Every ask of every tool of pricing bringing its tool among the first ten, role by role, in English and in Spanish, out
 of the catalogue of a business with every app on and ranked as a turn ranks, is ``base/tests/test_assistant_asks.py``'s
@@ -64,7 +64,7 @@ REPORTED = [
 ]
 #: What the model ran instead of bringing a rule back, a payment method to switch on, and what it looked for instead of
 #: bringing a price list back, an app. live reads «activar» as the action ``activate`` too, not only as turning
-#: something on (ERPlora/live#70), so bringing a price list or a rule back goes ahead of ``base.app.enable``.
+#: something on, so bringing a price list or a rule back goes ahead of ``base.app.enable``.
 CHOSEN_INSTEAD = [
     ("pricing.rule.activate", "payment.method.activate"),
     ("pricing.price_list.activate", "base.app.enable"),
