@@ -1,8 +1,7 @@
-"""The cut of S5: every business phase 1 kept in control's database gets its own (plan 2026-10-22-fase-2-tenencia
-§3 «S5»; round 2026-11-01 of PLAN-DB).
+"""The cut: every business that still lives in control's database gets a database of its own.
 
-Phase 1 kept every business in control's database (``Hub.db_name`` empty), its apps' tables shared by all of them
-with no column saying whose a row is. Since S5 nothing serves a business there (its host answers 503, the worker
+At first every business lived in control's database (``Hub.db_name`` empty), its apps' tables shared by all of them
+with no column saying whose a row is. Nothing serves a business there any more (its host answers 503, the worker
 skips it): ``manage.py cut_shared_hubs`` gives each one, by name, its own database, in one of three modes:
 
 - :data:`RECREATE`: its database cloned from its vertical's template (as a sign-up's, ``base.tenancy.provision``),
@@ -278,7 +277,7 @@ class FiscalRows:
 
 
 def fiscal_rows() -> FiscalRows:
-    """The issuers and the VeriFactu records phase 1 left in control's tables (the platform's own among them, if
+    """The issuers and the VeriFactu records left in control's shared tables (the platform's own among them, if
     ``create_platform_hub`` ran then): the dry run warns that a copy of all of them takes them along."""
     issuer = _model_table("invoice", "Issuer")
     record = _model_table("verifactu", "Record")
@@ -391,8 +390,9 @@ def _keys_go_on(target: psycopg.Connection, tables: set[str]) -> None:
 
 
 def cut_hub(hub_id, mode: str, *, dump: str = "") -> Outcome:
-    """Give the business of phase 1 ``hub_id`` its own database in ``mode`` (:data:`RECREATE` or :data:`COPY_ALL`),
-    under its lease; :class:`CutError` with why, the business left as it was, when it could not be done."""
+    """Give the business ``hub_id``, still in control's database, its own database in ``mode`` (:data:`RECREATE` or
+    :data:`COPY_ALL`), under its lease; :class:`CutError` with why, the business left as it was, when it could not be
+    done."""
     if mode not in (RECREATE, COPY_ALL):
         raise CutError(f"{mode!r} makes no database.")
     started = time.monotonic()

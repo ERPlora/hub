@@ -1,4 +1,4 @@
-"""The tests' hubs with a database of their own (PLAN-DB §4 «Tests»; plan 2026-10-22-fase-2-tenencia §4, step 7).
+"""The tests' hubs with a database of their own.
 
 Per test session (and xdist worker), next to its control database ``<control>``:
 
@@ -88,8 +88,8 @@ def _maintenance(dbname: str = "postgres"):
 
 #: The sessions clients hold open on a database. Only client backends: the server's own processes are listed with a
 #: ``datname`` too, and they are nobody's to close. An autovacuum worker on ``pg_database`` (every ``CREATE DATABASE`` of
-#: the suite dirties it) works from whichever database it is sent to, a database just made included: it counted as a
-#: session in hub#819's CI.
+#: the suite dirties it) works from whichever database it is sent to, a database just made included: it was once counted
+#: as a session in CI.
 CLIENT_SESSIONS_COLUMNS = "(pid, application_name, state, last query)"
 CLIENT_SESSIONS = """
     SELECT pid, application_name, state, left(query, 100) FROM pg_stat_activity
@@ -97,7 +97,7 @@ CLIENT_SESSIONS = """
 """
 #: How long ``assert_nobody_on`` waits for the sessions on a database to end, and how often it looks: a client's
 #: ``close()`` returns before its server process has left ``pg_stat_activity``, so a connection just closed is still
-#: counted for a moment (hub#484's CI); one still there after the wait is a connection left open.
+#: counted for a moment; one still there after the wait is a connection left open.
 SESSIONS_END_WAIT = 5.0
 SESSIONS_END_POLL = 0.05
 
@@ -334,7 +334,7 @@ def watched() -> Iterator[dict[str, list[str]]]:
 
 
 #: Tables of a hub's (or contextual) model that a block watched by :func:`assert_only_alias` may still name in control's
-#: database, each with its reason. None: in control's, a hub's table is phase 1's shared data (``db_name=""``), nobody's
+#: database, each with its reason. None: in control's, a hub's table is the old shared data (``db_name=""``), nobody's
 #: own, and a hub with its own database never reads it.
 CONTROL_HUB_TABLES_ALLOWED: dict[str, str] = {}
 
@@ -351,16 +351,16 @@ def _hub_tables_named(statements: list[str]) -> list[str]:
 
 @contextmanager
 def assert_only_alias(alias: str) -> Iterator[dict[str, list[str]]]:
-    """The block reaches no hub's database but ``alias``'s (PLAN-DB §14.2): whatever any thread sends to another alias
+    """The block reaches no hub's database but ``alias``'s: whatever any thread sends to another alias
     than ``alias`` fails it, whichever hub that alias is, and so does a statement to control's (``default``: the
-    registry, the sessions) that names a hub's table, phase 1's shared data (``CONTROL_HUB_TABLES_ALLOWED`` aside).
+    registry, the sessions) that names a hub's table, the old shared data (``CONTROL_HUB_TABLES_ALLOWED`` aside).
     Yields the statements by alias (:func:`watched`)."""
     with watched() as sent:
         yield sent
     strays = {other: statements[:3] for other, statements in sent.items() if other not in (alias, DEFAULT_DB_ALIAS)}
     assert not strays, f"Only {alias} and control's database may be reached here, and these were too: {strays}"
     shared = _hub_tables_named(sent.get(DEFAULT_DB_ALIAS, []))
-    assert not shared, f"Control's database was asked for phase 1's shared data of a hub's tables: {shared}"
+    assert not shared, f"Control's database was asked for the old shared data of a hub's tables: {shared}"
 
 
 # ── For the migrator's tests (base/tenancy/tests/test_migrator.py, base/tests/test_migrate_hubs.py) ───────────────

@@ -1,4 +1,4 @@
-"""A business that left, once its 90 days are over (PLAN-DB §6 «Baja», proposal (a) of round 2026-10-30; hub#599).
+"""A business that left, once its 90 days are over.
 
 The worker's data pass (``base.worker._data``), under the row's lease, takes the business from ``cancelled`` through
 
@@ -8,7 +8,7 @@ The worker's data pass (``base.worker._data``), under the row's lease, takes the
    then its files, that business's prefix in the store and no other (``base.files.delete_hub_files``);
 3. ``purged``: ``base.hub.purge``, in one transaction of control, leaves the row as a tombstone.
 
-**A business with fiscal documents is not dropped.** PLAN-DB §6 archives its fiscal records and invoices for 6 years
+**A business with fiscal documents is not dropped.** Its fiscal records and invoices must be archived for 6 years
 (Código de Comercio, art. 30) before the drop, and that archive does not exist yet: every app that keeps such documents
 answers ``fiscal_documents_kept()`` on its ``LiveAppConfig``, and with any of them (asked before the copy and again after
 it: the worker still serves the business meanwhile) the business stays ``cancelled`` with its database, its row saying
