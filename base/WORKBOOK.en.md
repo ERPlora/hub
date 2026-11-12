@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9c8835cf70e62881dc346d27e4921ff8b95c5a450167587f6a8c5912e5380613 -->
+<!-- generated from WORKBOOK.md sha256:5dc4142d3e9f6541b85a845243d754b5ad288b170ac00d84628ede8699735f3b -->
 
 ## What it is for and who it is for
 
@@ -2947,8 +2947,9 @@ Steps:
   7. "1 hub will get a separate copy as it was at 2026-11-09 14:30 UTC, made from <cluster>: the business stays open as
      it is. Separate copies lists it, and says if it could not be made." appears. The business is not closed for a
      second.
-  8. In Separate copies they see it "Being made" and, a few minutes later, "Made", with its moment, its database, its
-     cluster and until when it is kept (7 days). If it could not be made, it says "Failed" and why under "last error".
+  8. In Separate copies they see it "Being made" and, a few minutes later, "Made", with its moment and until when it is
+     kept (7 days); its page also says its database, its cluster, who asked for it and when. If it could not be made, it
+     says "Failed" and why under "last error".
 In: the chosen businesses, the temporary cluster with their copy and the moment.
 Out: the business's database as it was at that moment; the one it had, kept 7 days on its server; the notice
 `control.hub.restore_requested` with who asked for it. The other businesses notice nothing. To a separate copy: the

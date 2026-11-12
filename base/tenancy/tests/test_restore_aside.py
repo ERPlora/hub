@@ -276,6 +276,37 @@ class TestSendingToTheTaxAuthorityIsOffInTheCopy:
                 )
 
 
+    def test_the_clone_is_granted_to_no_role_even_when_the_apps_are_given(self, asides, app_role):
+        # The first barrier on its own: ``ops.clone_database(aside=True)`` leaves the copy to its owner alone.
+        from base.tenancy import ops
+
+        name = names.copy_db_name(tenancy_connections.control_name(), uuid.uuid7())
+        ops.clone_database(name, template=asides.template, roles=hubs.app_roles(app_role), aside=True)
+
+        assert not hubs.reaches(app_role, name)
+        with pytest.raises(names.InvalidDatabaseName):
+            ops.clone_database(f"{tenancy_connections.control_name()}_old_{uuid.uuid7().hex}", template=asides.template,
+                               aside=True)
+
+    def test_a_copy_its_clone_left_open_is_closed_before_it_is_noted_made(self, asides, app_role, monkeypatch):
+        # The second barrier on its own: a server whose new databases came open to the app still ends with it closed.
+        from base.tenancy import ops
+
+        real = ops.clone_database
+
+        def left_open(name, **kwargs):
+            made = real(name, **kwargs)
+            hubs.grant_connect(app_role, name)
+            return made
+
+        monkeypatch.setattr(ops, "clone_database", left_open)
+        aside = a_hub_with_its_copy(asides)[1]
+
+        run(asides, roles=hubs.app_roles(app_role))
+
+        assert fresh(aside).status == "made" and not hubs.reaches(app_role, aside.db_name)
+
+
 def record_states(name: str) -> dict[uuid.UUID, str]:
     with hubs._maintenance(name) as conn:
         return {row[0]: row[1] for row in conn.execute("SELECT id, status FROM verifactu_record")}
@@ -366,6 +397,8 @@ class TestTwoWorkers:
                     names.identifier(aside.db_name, control=control), names.identifier(hub.db_name, control=control)
                 )
             )
+        with hubs._maintenance(aside.db_name) as conn:
+            conn.execute("CREATE SCHEMA left_over")
         RestoredCopy.objects.filter(pk=aside.pk).update(
             lease_owner="gone:1", lease_until=timezone.now() - dt.timedelta(seconds=1)
         )
@@ -373,6 +406,9 @@ class TestTwoWorkers:
         run(asides)
 
         assert fresh(aside).status == "made" and marker(aside.db_name) == [AS_THEN]
+        # Made anew from the template: nothing of what was there is left, not only its tables.
+        with hubs._maintenance(aside.db_name) as conn:
+            assert not conn.execute("SELECT 1 FROM pg_namespace WHERE nspname = 'left_over'").fetchone()
 
 
 class TestTheCopiesGoAfterTheirDays:

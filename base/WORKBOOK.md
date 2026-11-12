@@ -3076,9 +3076,9 @@ Pasos:
   7. Sale «1 hub tendrá una copia aparte tal como estaba el 2026-11-09 14:30 UTC, hecha desde <clúster>: el negocio
      sigue abierto tal como está. Copias aparte la lista y dice si no se pudo hacer.». El negocio no se cierra ni un
      segundo.
-  8. En Copias aparte la ve «Haciéndose» y, unos minutos después, «Hecha», con su momento, su base de datos, su
-     clúster y hasta cuándo se guarda (7 días). Si no se pudo hacer, dice «No se pudo hacer» y por qué en «último
-     error».
+  8. En Copias aparte la ve «Haciéndose» y, unos minutos después, «Hecha», con su momento y hasta cuándo se guarda
+     (7 días); su ficha dice además su base de datos, su clúster, quién la pidió y cuándo. Si no se pudo hacer, dice «No
+     se pudo hacer» y por qué en «último error».
 Entra: los negocios elegidos, el clúster temporal con su copia y el momento.
 Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso
 `control.hub.restore_requested` con quién lo pidió. Los demás negocios no notan nada. En una copia aparte: el negocio
