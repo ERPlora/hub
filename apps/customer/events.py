@@ -23,6 +23,7 @@ CUSTOMER_TAGS_CHANGED = "customer.customer.tags_changed"
 CUSTOMER_DELETED = "customer.customer.deleted"
 CUSTOMER_MERGED = "customer.customer.merged"
 CUSTOMER_ERASED = "customer.customer.erased"
+CUSTOMER_RESTORED = "customer.customer.restored"
 NOTE_ADDED = "customer.note.added"
 ACTIVITY_RECORDED = "customer.activity.recorded"
 CONSENT_GRANTED = "customer.consent.granted"
@@ -53,6 +54,7 @@ ALL = [
     CUSTOMER_DELETED,
     CUSTOMER_MERGED,
     CUSTOMER_ERASED,
+    CUSTOMER_RESTORED,
     NOTE_ADDED,
     ACTIVITY_RECORDED,
     CONSENT_GRANTED,

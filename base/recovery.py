@@ -23,8 +23,12 @@ class Recoverable:
     - ``reads_since``: the app's migration whose schema ``read`` reads (its tables and columns are there since);
     - ``read(conn)``: the records the copy holds, through ``conn``, the copy's direct read-only connection (its own SQL
       over its model's names, never the ORM): each a ``dict`` with its ``id`` in the copy and the input of ``create``;
-    - ``missing(records)``: those the business lacks, read in the business (its ``queries.py``);
-    - ``create``: the operation of the app that creates each, the one its screen uses.
+    - ``missing(records)``: those the business no longer has, read in the business (its ``queries.py``);
+    - ``create``: the operation of the app that creates each, the one its screen uses;
+    - ``deleted(records)`` and ``restore``, together or neither, for an app whose deletion keeps the record: those the
+      business still holds deleted, read in the business (its ``queries.py``), and the operation of the app that brings
+      each back, the same record with all that hangs from it, given its ``id`` (hub#1306). They come back before the
+      missing are created, so ``missing`` never counts them.
     """
 
     label: Any
@@ -32,3 +36,9 @@ class Recoverable:
     read: Callable[[psycopg.Connection], list[dict]]
     missing: Callable[[list[dict]], list[dict]]
     create: str
+    deleted: Callable[[list[dict]], list[dict]] | None = None
+    restore: str = ""
+
+    def __post_init__(self) -> None:
+        if (self.deleted is None) != (not self.restore):
+            raise ValueError("A Recoverable restores what it reads deleted: deleted and restore come together.")

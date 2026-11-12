@@ -200,6 +200,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | CUSTOMER-F30 | Dar la ficha de un cliente a otras apps | hecho | común |
 | CUSTOMER-F31 | Ver las cifras de los clientes | hecho | común |
 | CUSTOMER-F32 | Apuntar alergias o la prueba de sensibilidad con su permiso | hecho | peluquería |
+| CUSTOMER-F33 | Recuperar una ficha eliminada | hecho | común |
 
 «Hecho»: servidor y páginas con sus tests (de las páginas y de extremo a extremo en Chrome).
 «Descartado»: no entra en la app por ahora; el motivo y su issue van en su «Estado».
@@ -362,7 +363,7 @@ eso es CUSTOMER-F16.
 Si falla: una ficha que no existe: «Este cliente ya no está disponible.», sin avisar a nadie. Sobre
 una ficha ya eliminada, unida a otra o con los datos borrados NO falla: responde bien y vuelve a
 avisar.
-Implicados: SERVICE-F29
+Implicados: SERVICE-F29, CUSTOMER-F33 (la ficha eliminada puede volver tal como era)
 
 ### CUSTOMER-F08 Importar fichas desde un CSV
 <!-- origen: fi:modules/customers#command-customers-bulk_create-handler-wasm-bulk_create old:customers/workflow/fichas.md#customers-f08 -->
@@ -924,6 +925,30 @@ intento (hub#854). «Este cliente ya no está disponible.» si la ficha ya no es
 fichas ve el bloque sin botones.
 Implicados: CUSTOMER-F13, CUSTOMER-F16
 
+### CUSTOMER-F33 Recuperar una ficha eliminada
+<!-- origen: nuevo (BASE-F114: recuperar desde una copia aparte lo que el negocio perdió) gh:hub#1306 -->
+Estado: hecho
+Actor: el personal de ERPlora, cuando el negocio lo pide (en el negocio ninguna pantalla deshace una eliminación)
+Pantalla: ninguna del negocio; el admin de Hubs › Copias aparte › «Recuperar en el negocio…» (BASE-F114)
+Pasos:
+1. El negocio eliminó por error una o varias fichas (CUSTOMER-F07) y pide recuperarlas.
+2. El personal de ERPlora hace una copia aparte del negocio de un momento anterior y recupera desde ella los
+   clientes (BASE-F114, pasos 6 a 11).
+3. Cada ficha que el negocio eliminó y aún guarda vuelve a la lista, al TPV y a la búsqueda por teléfono: LA MISMA
+   ficha, con sus compras y lo gastado, sus consentimientos, sus notas y su actividad, sus datos de salud, sus
+   grupos, etiquetas y campos propios y sus pedidos enlazados. Recuperaciones la cuenta como restaurada
+   («Clientes: 1 restaurado»).
+Entra: la ficha eliminada, por su identificador.
+Sale: la ficha viva otra vez, sin cambiar ninguno de sus datos, y el aviso de ficha recuperada
+(`customer.customer.restored`).
+Si falla: una ficha unida a otra (CUSTOMER-F13) o con los datos personales borrados (CUSTOMER-F16) no vuelve nunca:
+su historia sigue en la otra ficha, o sus datos ya no existen («Este cliente ya no está disponible.»). Tampoco vuelve
+si el negocio ya creó otra vez a la misma persona (el mismo nombre, teléfono y email, CUSTOMER-F12): se queda la que
+hizo. Una ficha que el negocio ya no tiene en absoluto se crea de nuevo (CUSTOMER-F01). Sobre una ficha viva no
+falla: responde bien y vuelve a avisar. Lo que se cobró a su nombre mientras estuvo eliminada no se suma
+(CUSTOMER-F20).
+Implicados: BASE-F114, CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16
+
 ## Qué comparten los verticales
 
 Tocar una pieza de esta tabla afecta a la peluquería **y** al restaurante.
@@ -935,7 +960,7 @@ Tocar una pieza de esta tabla afecta a la peluquería **y** al restaurante.
 | La búsqueda de texto de la lista (tabla, fusión, TPV y selector de Citas) | F02, F13, F17, F18, F25 |
 | El aviso de ficha creada o actualizada, que escucha WhatsApp | F01, F04, F08, F18, F26 |
 | La fusión y su aviso | F13 |
-| El borrado de datos y su aviso, y la eliminación | F07, F16 |
+| El borrado de datos y su aviso, la eliminación y la recuperación de una ficha eliminada | F07, F16, F33 |
 | El buscador del TPV, la copia fiscal y el historial de compras | F17, F18, F19, F20, F21, F23 |
 | El consentimiento por canal | F14, F15 |
 | Grupos, etiquetas y campos personalizados | F06, F27, F28, F29 |
@@ -1000,6 +1025,7 @@ nada y sale la tarjeta nueva.
 | Sustituye los grupos de una ficha | gestionar | F06 | `customer.customer.set_groups` |
 | Sustituye las etiquetas de una ficha | gestionar | F06 | `customer.customer.set_tags` |
 | Elimina una ficha (conserva sus datos) | eliminar | F07 | `customer.customer.delete` |
+| Devuelve a la lista una ficha eliminada, tal como era (solo el sistema, al recuperar desde una copia aparte) | sistema | F33 | `customer.customer.restore` |
 | Une una ficha duplicada en otra | unir | F13 | `customer.customer.merge` |
 | Borra los datos personales de una ficha | borrar datos | F16 | `customer.customer.erase` |
 | Añade una nota | gestionar | F05 | `customer.note.add` |
@@ -1029,6 +1055,7 @@ Los avisos llevan solo identificadores, nunca datos personales: quien necesite l
 | Grupos cambiados | Guardar grupos con algún cambio | `id` | `customer.customer.groups_changed` |
 | Etiquetas cambiadas | Guardar etiquetas con algún cambio | `id` | `customer.customer.tags_changed` |
 | Ficha eliminada | Eliminar (también la repetición) | `id` | `customer.customer.deleted` |
+| Ficha recuperada | Recuperar una ficha eliminada (también la repetición) | `id` | `customer.customer.restored` |
 | Fichas unidas | Fusionar | `id` (la que se queda) y `absorbed_id` | `customer.customer.merged` |
 | Datos personales borrados | Borrar datos (también la repetición) | `id` | `customer.customer.erased` |
 | Nota añadida | Añadir nota | `id` (la nota) y `customer_id` | `customer.note.added` |
@@ -1080,7 +1107,9 @@ lo hace con su aprobación. Exportar es una lectura y no se aprueba; eliminar fi
 etiquetas y borrar datos personales son solo del propietario y del administrador, y nunca se piden.
 
 Apuntar y anular compras no es de ningún papel: lo hace el sistema al cobrarse o anularse una venta
-(`customer.record_purchase`, que ninguna app declara y por eso solo tiene el sistema).
+(`customer.record_purchase`, que ninguna app declara y por eso solo tiene el sistema). Tampoco devolver una ficha
+eliminada: lo hace el sistema cuando el personal de ERPlora recupera desde una copia aparte (CUSTOMER-F33,
+`customer.restore`, que tampoco declara ninguna app).
 
 El servidor aplica estos permisos aunque la pantalla enseñe el botón, también por la API y el
 asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aquí el empleado.
@@ -1111,13 +1140,17 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   ninguna pantalla la pide; exportar, eliminar y borrar datos nunca. La pantalla envuelve esas órdenes
   en `withApproval` (`base/frontend/lib/approval.ts`) y enseña sus botones también a quien solo tiene
   `customer.manage`; `tests/test_approvals.py` es el contrato.
-- **Recuperar desde una copia aparte** (BASE-F114, hub#1257): `apps.py` responde a la plataforma
-  (`recoverable_from_copy`, `base.tenancy.recovery`) con lo que devuelve una copia aparte del negocio: sus fichas vivas
-  (`queries.cards_in_copy`, por SQL sobre los nombres del modelo: la copia no es un negocio y no tiene alias) que el
-  negocio no tiene (`queries.cards_not_in_business`: ni viva, ni unida a otra, ni con los datos borrados, ni hecha otra
-  vez, con `has_live_twin`, la misma regla que la importación), cada una creada por `customer.customer.create`. Lee desde
+- **Recuperar desde una copia aparte** (BASE-F114, hub#1257, hub#1306): `apps.py` responde a la plataforma
+  (`recoverable_from_copy`, `base.recovery.Recoverable`) con lo que devuelve una copia aparte del negocio: de sus fichas
+  vivas (`queries.cards_in_copy`, por SQL sobre los nombres del modelo: la copia no es un negocio y no tiene alias), las
+  que el negocio aún guarda eliminadas vuelven las mismas por `customer.customer.restore` (`queries.cards_deleted_in_business`:
+  ni unidas a otra, ni con los datos borrados, ni hechas otra vez, con `has_live_twin`, la misma regla que la
+  importación; CUSTOMER-F33), y las que ya no tiene se crean por `customer.customer.create`
+  (`queries.cards_not_in_business`). `customer.customer.restore` no tiene ruta ni es herramienta del asistente
+  (`ai=INTERNAL`) y su permiso, `customer.restore`, no lo declara ninguna app: solo lo tiene el sistema. Lee desde
   `0001_initial`; una migración que quite o renombre una de sus columnas cambia también `cards_in_copy` y su
-  `reads_since`. Tests: `tests/test_recovery.py` y, de punta a punta, `base/tenancy/tests/test_recovery.py`.
+  `reads_since`. Tests: `tests/test_recovery.py`, `tests/test_services.py` (la operación) y, de punta a punta,
+  `base/tenancy/tests/test_recovery.py`.
 - Las reacciones a Venta (`events.REACTIONS`, `events.react`) las entrega el relay del outbox del
   worker en cada pasada (`base.relay`); `base/tests/test_relay.py` recorre el cobro, la anulación y la
   devolución hasta la ficha.

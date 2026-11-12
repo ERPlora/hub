@@ -33,6 +33,7 @@ def test_the_events():
         "CUSTOMER_DELETED": "customer.customer.deleted",
         "CUSTOMER_MERGED": "customer.customer.merged",
         "CUSTOMER_ERASED": "customer.customer.erased",
+        "CUSTOMER_RESTORED": "customer.customer.restored",
         "NOTE_ADDED": "customer.note.added",
         "ACTIVITY_RECORDED": "customer.activity.recorded",
         "CONSENT_GRANTED": "customer.consent.granted",

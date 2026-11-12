@@ -8,8 +8,9 @@ the worker does it (``base.tenancy.recovery.run_due``, in the moves' thread), on
    in the copy says first whether the app's read fits the copy's schema;
 2. each app says what it gives back (``recoverable_from_copy`` on its ``LiveAppConfig``): its read of the copy, which
    of those records the business lacks, and the operation that creates each;
-3. in the business (``use_hub``), each missing record is created by that operation, the one its screen uses: rows are
-   never copied. What the operation refuses is noted with why, and the rest go on.
+3. in the business (``use_hub``), each record it still holds deleted comes back the same, by the app's operation that
+   undoes a deletion (with all that hangs from it, hub#1306), and each missing record is created by its create, the one
+   its screen uses: rows are never copied. What the operation refuses is noted with why, and the rest go on.
 
 Real databases on the session's server, committed (``hubs.CopiedHubs``): the business's own and its copy, a clone of
 it. Customers is the app that answers today.
@@ -68,6 +69,19 @@ def created_events(hub: Hub) -> int:
         return OutboxEvent.objects.filter(name="customer.customer.created").count()
 
 
+def restored_events(hub: Hub) -> int:
+    with use_hub(hub):
+        return OutboxEvent.objects.filter(name="customer.customer.restored").count()
+
+
+def gone(hub: Hub, *cards: uuid.UUID) -> None:
+    """``cards``' rows gone altogether from ``hub`` (the Hub admin's «Delete»): what the business no longer has."""
+    from apps.customer.models import Customer
+
+    with use_hub(hub):
+        Customer.objects.filter(pk__in=cards).delete()
+
+
 class Recoveries(hubs.CopiedHubs):
     """The rows and databases of one test: a business with its cards, and separate copies of it."""
 
@@ -105,11 +119,10 @@ class Recoveries(hubs.CopiedHubs):
         )
 
     def all_lost(self, every_app_on, *cards: dict) -> tuple[Hub, CopyRecovery]:
-        """A business that deleted every one of ``cards`` since its copy, and the recovery asked of that copy."""
+        """A business that no longer has any of ``cards`` since its copy, and the recovery asked of that copy."""
         hub, ids = self.business(every_app_on, *cards)
         copy = self.copy_of(hub)
-        for card in ids:
-            run_in(hub, "customer.customer.delete", id=card)
+        gone(hub, *ids)
         return hub, self.ask(copy)
 
     def ask(self, copy: RestoredCopy, *apps: str, **fields) -> CopyRecovery:
@@ -141,21 +154,20 @@ def in_the_copy(copy: RestoredCopy, statement: str, params=()) -> list[tuple]:
         return cursor.fetchall() if cursor.description else []
 
 
-CUSTOMERS = {"app": "customer", "created": 0, "not_created": 0, "reasons": [], "refused": ""}
+CUSTOMERS = {"app": "customer", "restored": 0, "created": 0, "not_created": 0, "reasons": [], "refused": ""}
 
 
 class TestCustomersComeBack:
-    def test_the_cards_the_business_lost_come_back_each_created_by_its_operation(self, recoveries, every_app_on):
+    def test_the_cards_the_business_lost_come_back_the_deleted_the_same_and_the_gone_created_anew(
+        self, recoveries, every_app_on
+    ):
         hub, (ana, luis, _marta) = recoveries.business(every_app_on, ANA, LUIS, MARTA)
         copy = recoveries.copy_of(hub)
         # Lost since the copy: Ana deleted from her card, Luis's row gone altogether.
         run_in(hub, "customer.customer.delete", id=ana)
-        with use_hub(hub):
-            from apps.customer.models import Customer
-
-            Customer.objects.filter(pk=luis).delete()
+        gone(hub, luis)
         asked = recoveries.ask(copy)
-        before = created_events(hub)
+        before = (created_events(hub), restored_events(hub))
 
         assert run() == 1
 
@@ -164,17 +176,49 @@ class TestCustomersComeBack:
             ("Luis Pérez", "+34600333444", "luis@example.com", ""),
             ("Marta Ruiz", "+34600555666", "marta@example.com", ""),
         ]
-        # Through Customers' create, never a copied row: new cards, each with its event.
+        # Ana, still in the business, is the same card back by Customers' restore; Luis, gone, a new one by its create:
+        # never a copied row, each with its event.
         with use_hub(hub):
             from apps.customer.models import Customer
 
-            back = Customer.objects.live().filter(name__in=["Ana López", "Luis Pérez"])
-            assert not {card.pk for card in back} & {ana, luis}
-            assert Customer.objects.get(name="Luis Pérez", deleted_at__isnull=True).notes == "Prefers mornings"
-        assert created_events(hub) == before + 2
+            assert Customer.objects.live().get(name="Ana López").pk == ana
+            again = Customer.objects.live().get(name="Luis Pérez")
+            assert (again.pk != luis, again.notes) == (True, "Prefers mornings")
+            assert Customer.objects.count() == 3
+        assert (created_events(hub), restored_events(hub)) == (before[0] + 1, before[1] + 1)
         done = fresh(asked)
         assert (done.status, done.done_at, done.last_error, done.lease_owner) == ("done", AT, "", "")
-        assert done.results == [CUSTOMERS | {"created": 2}]
+        assert done.results == [CUSTOMERS | {"restored": 1, "created": 1}]
+
+    def test_a_card_the_business_deleted_comes_back_with_its_purchases_consents_notes_and_activity(
+        self, recoveries, every_app_on
+    ):
+        hub, (ana,) = recoveries.business(every_app_on, ANA)
+        run_in(hub, "customer.note.add", customer_id=ana, content="Prefers mornings")
+        run_in(
+            hub,
+            "customer.consent.grant",
+            customer_id=ana,
+            channel="email",
+            notice_text="I want offers.",
+            notice_version="v1",
+        )
+        run_in(hub, "customer.purchase.record", customer_id=ana, sale_id=uuid.uuid7(), total=2500, currency="EUR")
+        copy = recoveries.copy_of(hub)
+        run_in(hub, "customer.customer.delete", id=ana)
+        recoveries.ask(copy)
+
+        run()
+
+        detail = run_in(hub, "customer.customer.detail", id=ana)
+        assert (detail.id, detail.total_purchases, detail.total_spent) == (ana, 1, 2500)
+        with use_hub(hub):
+            from apps.customer.models import Customer
+
+            back = Customer.objects.live().get()
+            assert back.pk == ana
+            assert (back.purchases.count(), back.consents.count()) == (1, 1)
+            assert back.activity.filter(kind="note_added", text="Prefers mornings").exists()
 
     def test_asked_again_nothing_is_made_twice(self, recoveries, every_app_on):
         hub, (ana, _luis) = recoveries.business(every_app_on, ANA, LUIS)
@@ -196,11 +240,13 @@ class TestCustomersComeBack:
         copy = recoveries.copy_of(hub)
         run_in(hub, "customer.customer.erase", id=ana, reason="Asked under GDPR")
         run_in(hub, "customer.customer.merge", id=marta, absorbed_id=luis)
-        recoveries.ask(copy)
+        asked = recoveries.ask(copy)
 
         assert run() == 1
 
         assert [card[0] for card in live_cards(hub)] == ["Marta Ruiz"]
+        # Neither restored nor refused: not even asked of Customers.
+        assert (restored_events(hub), fresh(asked).results) == (0, [CUSTOMERS])
 
     def test_a_card_the_business_made_again_by_hand_is_not_made_once_more(self, recoveries, every_app_on):
         hub, (ana,) = recoveries.business(every_app_on, ANA)
@@ -217,8 +263,7 @@ class TestCustomersComeBack:
     def test_a_card_its_operation_refuses_is_counted_with_why_and_the_others_come_back(self, recoveries, every_app_on):
         hub, (ana, luis) = recoveries.business(every_app_on, ANA, LUIS)
         copy = recoveries.copy_of(hub)
-        run_in(hub, "customer.customer.delete", id=ana)
-        run_in(hub, "customer.customer.delete", id=luis)
+        gone(hub, ana, luis)
         # In the copy, a phone today's rules do not take.
         in_the_copy(copy, "UPDATE customer_customer SET phone = %s WHERE id = %s", ["12", luis])
         asked = recoveries.ask(copy)
@@ -232,10 +277,51 @@ class TestCustomersComeBack:
         assert why["id"] == str(luis)
         assert why["reason"].startswith("customer.phone_invalid: ")
 
+    def test_what_was_deleted_comes_back_before_anything_is_created_so_the_person_is_not_made_twice(
+        self, recoveries, every_app_on
+    ):
+        # The copy holds Ana twice (the same name, phone and email): the business deleted one and lost the other.
+        hub, (deleted, lost) = recoveries.business(every_app_on, ANA, ANA)
+        copy = recoveries.copy_of(hub)
+        run_in(hub, "customer.customer.delete", id=deleted)
+        gone(hub, lost)
+        asked = recoveries.ask(copy)
+
+        run()
+
+        with use_hub(hub):
+            from apps.customer.models import Customer
+
+            assert list(Customer.objects.live().values_list("pk", flat=True)) == [deleted]
+        assert fresh(asked).results == [CUSTOMERS | {"restored": 1}]
+
+    def test_a_card_its_restore_refuses_is_counted_with_why_and_the_others_come_back(
+        self, recoveries, every_app_on, monkeypatch
+    ):
+        hub, (ana, luis, marta) = recoveries.business(every_app_on, ANA, LUIS, MARTA)
+        copy = recoveries.copy_of(hub)
+        run_in(hub, "customer.customer.delete", id=ana)
+        run_in(hub, "customer.customer.merge", id=marta, absorbed_id=luis)
+        # Luis held deleted when the business was read, and merged into Marta before his turn came.
+        customers = django_apps.get_app_config("customer")
+        [declared] = customers.recoverable_from_copy()
+        held = type(declared)(**(vars(declared) | {"deleted": lambda cards: [c for c in cards if c["id"] in {ana, luis}]}))
+        monkeypatch.setattr(type(customers), "recoverable_from_copy", lambda self: [held])
+        asked = recoveries.ask(copy)
+
+        run()
+
+        assert [card[0] for card in live_cards(hub)] == ["Ana López", "Marta Ruiz"]
+        [customers_back] = fresh(asked).results
+        assert (customers_back["restored"], customers_back["not_created"], customers_back["refused"]) == (1, 1, "")
+        [why] = customers_back["reasons"]
+        assert why["id"] == str(luis)
+        assert why["reason"].startswith("customer.customer_unavailable: ")
+
     def test_the_reasons_are_said_in_the_language_of_the_staff_who_asked(self, recoveries, every_app_on):
         hub, (ana,) = recoveries.business(every_app_on, ANA)
         copy = recoveries.copy_of(hub)
-        run_in(hub, "customer.customer.delete", id=ana)
+        gone(hub, ana)
         in_the_copy(copy, "UPDATE customer_customer SET phone = %s WHERE id = %s", ["12", ana])
         asked = recoveries.ask(copy, language="es")
 
@@ -256,8 +342,7 @@ class TestCustomersComeBack:
     ):
         hub, ids = recoveries.business(every_app_on, ANA, LUIS)
         copy = recoveries.copy_of(hub)
-        for card in ids:
-            run_in(hub, "customer.customer.delete", id=card)
+        gone(hub, *ids)
         in_the_copy(copy, "UPDATE customer_customer SET phone = '12'")
         monkeypatch.setattr(CopyRecovery, "REASONS_KEPT", 1)
         asked = recoveries.ask(copy)
@@ -450,8 +535,7 @@ class TestTheLease:
     ):
         hub, (ana, luis) = recoveries.business(every_app_on, ANA, LUIS)
         copy = recoveries.copy_of(hub)
-        run_in(hub, "customer.customer.delete", id=ana)
-        run_in(hub, "customer.customer.delete", id=luis)
+        gone(hub, ana, luis)
         asked = recoveries.ask(copy)
         taken_after_each_card(monkeypatch, asked)
 
@@ -466,7 +550,7 @@ class TestTheLease:
     ):
         hub, (ana,) = recoveries.business(every_app_on, ANA)
         copy = recoveries.copy_of(hub)
-        run_in(hub, "customer.customer.delete", id=ana)
+        gone(hub, ana)
         asked = recoveries.ask(copy)
         taken_after_each_card(monkeypatch, asked)
 
@@ -518,8 +602,19 @@ def test_each_declaration_names_a_migration_of_its_app_and_an_operation_of_its_a
     for label, declared in recovery.recoverable_apps().items():
         for one in declared:
             assert (label, one.reads_since) in code.nodes
-            op = get_operation(one.create)
-            assert (op.app_label, op.kind) == (label, "command")
+            for name in filter(None, (one.create, one.restore)):
+                op = get_operation(name)
+                assert (op.app_label, op.kind) == (label, "command")
+
+
+@pytest.mark.parametrize("half", [{"restore": "customer.customer.restore"}, {"deleted": list}])
+def test_a_declaration_restores_only_what_it_reads_deleted_and_both_come_together(half):
+    from base.recovery import Recoverable
+
+    whole = {"label": "Customers", "reads_since": "0001_initial", "read": list, "missing": list, "create": "c"}
+    with pytest.raises(ValueError, match="deleted"):
+        Recoverable(**whole, **half)
+    assert Recoverable(**whole).restore == ""
 
 
 def test_the_lease_is_the_moves():
