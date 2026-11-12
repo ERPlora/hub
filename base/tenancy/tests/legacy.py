@@ -1,15 +1,15 @@
 """The suite's tests written before the tenancy: where they keep their businesses' rows without a context of their own.
 
-Production has no such place: since S5 every business has its own database, and a hub's model or operation without
-``use_hub`` fails (``HubContextMissing``); a business without one is never entered (``HubWithoutDatabase``). The tests
-of phase 1 call operations and the ORM directly, for the local hubs ``a`` and ``b`` and the businesses they make
-(``db_name=""``), so the session keeps a place for them: control's test database also holds the tables of the hubs'
-apps (:class:`LegacyTablesRouter`, in ``config/settings_pytest.py`` only), and :data:`LEGACY` is the fallback the root
+Production has no such place: every business has its own database, and a hub's model or operation without ``use_hub``
+fails (``HubContextMissing``); a business without one is never entered (``HubWithoutDatabase``). Those tests call
+operations and the ORM directly, for the local hubs ``a`` and ``b`` and the businesses they make (``db_name=""``), so
+the session keeps a place for them: control's test database also holds the tables of the hubs' apps
+(:class:`LegacyTablesRouter`, in ``config/settings_pytest.py`` only), and :data:`LEGACY` is the fallback the root
 ``conftest.py`` sets (``context._test_fallback``), under which such a business is entered there. The tests of the
 tenancy turn it off (``no_test_fallback``) and run as production does; the tests of the cut write with
-:func:`use_legacy` what phase 1 left in control's tables. The worker's loop serves only the hubs with their own
-database: for the tests that run it on the suite's businesses, :func:`worker_pass` stands in for its pass over
-control's outbox (``conftest.py``, ``legacy_worker``).
+:func:`use_legacy` what a business still on control's database left in its tables. The worker's loop serves only the
+hubs with their own database: for the tests that run it on the suite's businesses, :func:`worker_pass` stands in for its
+pass over control's outbox (``conftest.py``, ``legacy_worker``).
 """
 
 import logging
@@ -30,7 +30,7 @@ BUSINESS = Scope("host", "a")
 
 
 def use_legacy():
-    """Work on control's test database as phase 1 did, every business's rows in it, until the block ends."""
+    """Work on control's test database as before the tenancy, every business's rows in it, until the block ends."""
     return context._entered(LEGACY)
 
 

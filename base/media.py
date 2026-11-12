@@ -8,12 +8,12 @@ empty segment, a leading ``/``, a backslash) or is longer than :data:`MAX_NAME_L
 outside the folders served (:func:`served_folders`): the store also keeps the modules' private documents, which are
 never served here. A name that is a folder on disk (local development) is not found either.
 
-Each app says which folders of its own are served, in its ``LiveAppConfig`` (FIX-HUB-BASE-MEDIA-DOES-NOT-SERVE-
-WHATSAPP-INBOX-SAMPLES): ``public_media``, whose files anyone sees (the website's images), and ``members_media``, whose
-files only a session of this hub sees (a template's sample in the WhatsApp inbox); base's own are the people's photos
-(:data:`AVATARS_FOLDER`, for the hub's sessions). A folder starts with the app's label and a ``/`` and never climbs out
-of it, so no app opens another's files: what does not is never served and is said at start (``base.E010``). A visitor
-asking for a members' file gets the 404 of a missing one, and an app the business turned off serves none of its own.
+Each app says which folders of its own are served, in its ``LiveAppConfig``: ``public_media``, whose files anyone sees
+(the website's images), and ``members_media``, whose files only a session of this hub sees (a template's sample in the
+WhatsApp inbox); base's own are the people's photos (:data:`AVATARS_FOLDER`, for the hub's sessions). A folder starts
+with the app's label and a ``/`` and never climbs out of it, so no app opens another's files: what does not is never
+served and is said at start (``base.E010``). A visitor asking for a members' file gets the 404 of a missing one, and an
+app the business turned off serves none of its own.
 
 No permission: a visitor of the website sees its images, and the names are content hashes, written once and never
 changed, so the answer is cached for a year (``immutable``; a members' file only in that browser) and sets no cookie.

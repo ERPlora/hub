@@ -132,7 +132,7 @@ def auth_callback(request: HttpRequest) -> HttpResponse:
         logger.warning("Login on hub %r refused: the hub's user %r is deactivated.", slug, result.user.user_id)
         return auth.login_redirect(slug, next_path, error=USER_INACTIVE)
     landing = _choose_a_pin_first(request, next_path, slug)
-    # The language chosen in «My profile», else the account's on erplora.com (BASE-G125).
+    # The language chosen in «My profile», else the account's on erplora.com.
     language = queries.chosen_language(request.user) or result.user.locale
     return with_device(request, auth.forget_state(_with_language(HttpResponseRedirect(landing), language)))
 
@@ -240,7 +240,7 @@ def with_language_cookie(response: HttpResponse, language: str) -> None:
 @require_POST
 def auth_logout(request: HttpRequest) -> HttpResponseRedirect:
     """Close the Hub's session, then on to the SaaS's page that asks whether to close its own (``SAAS_LOGOUT_PATH``); a
-    demo's goes back to the demo door. On a device with the PIN pad (BASE-G61) it goes back to the hub's Access: the
+    demo's goes back to the demo door. On a device with the PIN pad it goes back to the hub's Access: the
     next person enters with their PIN, and erplora.com's session in this browser is whoever made it a device's, not the
     person signing out."""
     demo = _is_demo(request)
@@ -278,7 +278,7 @@ def _supported_language(locale: str) -> str | None:
 
 #: The hub's «Access» (``base/frontend/routes.ts``): the PIN pad, «Enter with your account» and what happened.
 ACCESS_PAGE = "/login"
-#: «Choose your PIN» after an entry with the account on a device that asks (BASE-G54).
+#: «Choose your PIN» after an entry with the account on a device that asks.
 PIN_SETUP_PAGE = "/pin/setup"
 #: What the Access page tells (``?notice=``): the session ended, or another device's entry ended it.
 NOTICE_ENDED = "ended"
@@ -286,7 +286,7 @@ NOTICE_DEVICE_LIMIT = "device_limit"
 
 
 def way_in(request: HttpRequest, next_path: str) -> HttpResponseRedirect:
-    """Where a browser without a session goes to enter this hub (BASE-G55, G57, G58): the hub's Access page
+    """Where a browser without a session goes to enter this hub: the hub's Access page
     (:func:`access_page_url`), else erplora.com's sign-in for this hub, as always, which brings the person straight
     back while its own session lives (a demo, its own door)."""
     access_page = access_page_url(request, next_path)
@@ -309,7 +309,7 @@ def access_page_url(request: HttpRequest, next_path: str) -> str | None:
 
 
 def jump_page(request: HttpRequest, next_path: str) -> HttpResponse:
-    """The page a page load without a session answers when it goes on to erplora.com or a demo's door (BASE-G52): its
+    """The page a page load without a session answers when it goes on to erplora.com or a demo's door: its
     script sends to :func:`auth_login` with the fragment of the link (``/settings#data``), which the browser never
     sends to the server and the way back through erplora.com would lose; ``/auth/login`` jumps on with a fresh state.
     Never cached (it carries the response's CSP nonce)."""
@@ -331,7 +331,7 @@ def _notice(request: HttpRequest) -> str:
 
 
 def _choose_a_pin_first(request: HttpRequest, next_path: str, slug: str) -> str:
-    """``next`` after an entry with the account, or «Choose your PIN» first (BASE-G54) when this device asks, the
+    """``next`` after an entry with the account, or «Choose your PIN» first when this device asks, the
     business already enters its tills by PIN (somebody else of it has one) and the person has none yet. The page lets
     them leave it for later. A business nobody of which has a PIN is never asked: its first PIN is chosen in «My
     profile» or given in Personal, as Square and Toast hand out their passcodes."""
@@ -354,9 +354,9 @@ def _hub_slug_of(request: HttpRequest) -> str | None:
 @require_POST
 @never_cache
 def auth_pin(request: HttpRequest) -> HttpResponse:
-    """``POST /auth/pin {person, pin, next}``: the session of the person of this hub whose PIN it is (BASE-G55, G60).
+    """``POST /auth/pin {person, pin, next}``: the session of the person of this hub whose PIN it is.
 
-    In this order (the old Hub's HUB-F133): the address is not braked, the browser is a shared device of the hub of a
+    In this order: the address is not braked, the browser is a shared device of the hub of a
     business that asks, the person is not braked and the PIN is the right one of an active person of this hub. A
     wrong one counts against the person and the address; a right one starts the person's count again."""
     door = _device_door(request)
@@ -423,7 +423,7 @@ def _pin_too_many(wait: int) -> JsonResponse:
 @require_POST
 @never_cache
 def auth_badge(request: HttpRequest) -> HttpResponse:
-    """``POST /auth/badge {badge, next}``: the session of the person of this hub whose card it is (BASE-G56). The same
+    """``POST /auth/badge {badge, next}``: the session of the person of this hub whose card it is. The same
     door and brakes as the PIN's, counted against the card (its digest) instead of a person."""
     door = _device_door(request)
     if isinstance(door, HttpResponse):

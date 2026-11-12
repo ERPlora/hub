@@ -288,7 +288,7 @@ def active_apps(scope: Scope) -> dict[str, LiveAppConfig]:
 def catalog(ctx: OperationContext, *, active_labels: Collection[str] | None = None) -> dict[str, Operation]:
     """The tools of ``ctx``'s person: by name, in name order, of the apps on in its business (``active_labels``, else
     ``active_apps``). A write a manager may approve is theirs too, as its button on the screen is: running
-    it asks for the approval (BASE-G118)."""
+    it asks for the approval."""
     tools = shared.catalog(
         ctx,
         active_labels=active_apps(ctx.scope) if active_labels is None else active_labels,
@@ -304,7 +304,7 @@ def relevant(tools: dict[str, Operation], texts: Iterable[str], language: str) -
     return shared.relevant(tools, texts, language, **RANKING)
 
 
-# ── The card of a write in the Hub's words (BASE-G115, G116) ─────────────────────────────────────────────────────
+# ── The card of a write in the Hub's words ───────────────────────────────────────────────────────────────────────
 
 #: The mark of the datum that names the currency of the amounts beside it, at any depth below it: a payment in dollars.
 #: ``True`` on a text, an ISO 4217 code; on a datum that names a record in a currency of its own (a cart, a price list),
@@ -1018,7 +1018,7 @@ def _who_asks(role: str | None, language: str, approvable: Collection[str]) -> s
 
 
 def setup_block(status: dict | None) -> str:
-    """The checklist «Finish setting up your business» as the model reads it (BASE-G121): what is pending, what
+    """The checklist «Finish setting up your business» as the model reads it: what is pending, what
     blocks invoicing, what is done, and what only an administrator can do. ``None``: it could not be read."""
     if status is None:
         return "The checklist of this business could not be read now: do not say the business is set up."
