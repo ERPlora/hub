@@ -141,6 +141,8 @@ export interface ProductIn {
   /** `null` follows the business's setting. */
   track_stock?: boolean | null;
   category_ids?: string[];
+  /** Absent: active. An inactive one stays out of the till until it is activated. */
+  is_active?: boolean;
 }
 
 /** Only the fields sent change; the SKU, the type and the stock are not editable. */

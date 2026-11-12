@@ -315,7 +315,9 @@ producto, de Inventario.
 Sale: el producto, activo y enlazado a las categorías marcadas, en un solo paso: o se guarda
 entero o no se guarda nada. Si se dio stock inicial, queda en **Movimientos** como «Inicial».
 Inventario avisa a las demás apps de que hay un producto nuevo: Ventas lo ofrece en la rejilla del
-TPV y el paso «Tu catálogo» de la puesta en marcha queda hecho (INVENTORY-F28).
+TPV y el paso «Tu catálogo» de la puesta en marcha queda hecho (INVENTORY-F28). Por el asistente o la API
+se puede dar de alta ya desactivado, fuera del TPV hasta que se active (INVENTORY-F03), como vuelve uno
+que estaba desactivado al recuperarse desde una copia aparte (BASE-F114).
 Si falla: «Guardar» está apagado mientras falten Nombre, SKU o categoría fiscal, y mientras el negocio no
 haya dicho todavía su moneda: el precio y el coste se leen en ella, y sin ella «1500» yenes se guardaría
 como 150 000; hasta entonces, salir del precio o del coste lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
@@ -328,7 +330,8 @@ la unidad: «La cantidad no respeta el incremento permitido para esta unidad». 
 otro producto vivo: «Ese SKU ya existe en el catálogo»; un EAN-13 repetido: «Ese EAN-13 ya lo tiene
 otro producto del catálogo». Una categoría fiscal que ya no está en Impuestos se rechaza, también si
 llega por el asistente o la API. Todo rechazo sale dentro del panel y no se guarda nada.
-Implicados: SALE-F01, TAX-F01, TAX-F19, BASE-F05
+Implicados: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F114 (el personal de ERPlora recupera desde una copia aparte
+los productos que se perdieron, cada uno por esta misma alta)
 
 ### INVENTORY-F02 Editar un producto
 <!-- origen: fi:modules/inventory#command-inventory-products-update fi:modules/inventory#query-inventory-products-get old:inventory/workflow/catalogo.md#inventory-f02 -->
@@ -388,7 +391,8 @@ EAN-13 quedan libres para otro producto. Sus movimientos siguen en **Movimientos
 Inventario avisa de que el producto ya no está. No mira si tiene stock ni si está en una cuenta
 abierta: Ventas rechaza al cobrar la línea de un producto que ya no está en el catálogo.
 Si falla: «No se pudo eliminar el producto» (o el motivo) encima de la tabla.
-Implicados: SALE-F01
+Implicados: SALE-F01, BASE-F114 (desde una copia aparte, el personal de ERPlora recupera el producto eliminado como
+uno nuevo, sin stock y sin sus movimientos, que siguen con el eliminado: hub#1321)
 
 ### INVENTORY-F05 Revisar los productos que no se pueden vender por falta de IVA
 <!-- origen: wf:restaurante-dia#rec_restaurante-f03 qa:modules/inventory/create-product-with-vat old:inventory/workflow/catalogo.md#inventory-f05 -->
@@ -1265,6 +1269,16 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   stock, categorías y movimientos van por la columna elegida y desempatan por `id`, todo en la dirección de la lista: la
   descendente es la ascendente leída al revés, empates incluidos, y los CSV salen en el mismo orden. Lo fijan
   `test_ties_go_by_id_in_the_lists_own_direction` y `test_an_export_settles_its_ties_the_way_the_list_does`, por lista.
+
+- **Recuperar desde una copia aparte** (BASE-F114, hub#1282): `apps.py` responde a la plataforma
+  (`recoverable_from_copy`, `base.recovery.Recoverable`) con lo que devuelve una copia aparte del negocio: sus productos
+  vivos (`queries.products_in_copy`, por SQL sobre los nombres de los modelos: la copia no es un negocio y no tiene alias)
+  que el negocio no tiene (`queries.products_not_in_business`: ni vivo, ni otro vivo con su SKU o su EAN-13), cada uno
+  creado por `inventory.product.create` con la clave de su categoría fiscal y las categorías que el negocio sigue
+  teniendo vivas, activo o no como estaba (`ProductIn.is_active`), sin stock (el saldo de la copia es de otro día) y sin
+  imagen (hub#1319). Las categorías perdidas no vuelven (hub#1320). Lee desde `0001_initial`; una migración que quite o
+  renombre una columna que lee cambia también `products_in_copy` y su `reads_since`. Tests: `tests/test_recovery.py`,
+  de punta a punta incluido, y el contrato de `base/tenancy/tests/test_recovery.py`.
 
 ## El servidor (fase de servidor, 2026-10-14)
 

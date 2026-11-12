@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4aee6f4af32caa0ad972e866010565600cbfc9aa5a45479da548c7bb9a24cb22 -->
+<!-- generated from WORKBOOK.md sha256:30d37b4ab3bd62f07c15b0db8f1deac29c8d140da9709d573f4b9d013b8df446 -->
 
 ## What it is for and who it is for
 
@@ -2932,10 +2932,11 @@ Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APP
 
 ### BASE-F114 Put a business back as it was at a past moment from the Hub admin
 Status: done (the action and the restore, in its place or to a separate copy, and getting back from the separate copy
-the customers that were lost, the deleted ones as they were, and the services that were lost; making and deleting the
-temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws; getting back products and
-appointments, hub#1282 and hub#1284; the groups, tags and own fields of a customer brought back, hub#1285; the image of a
-service brought back, hub#1319; its professionals, hub#1322; the deleted service categories, hub#1323)
+the customers that were lost, the deleted ones as they were, the products and the services; making and deleting the
+temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws; getting back appointments,
+hub#1284; the groups, tags and own fields of a customer brought back, hub#1285; the image and the categories of a product
+brought back, hub#1319 and hub#1320; the image of a service brought back, hub#1319; its professionals, hub#1322; the
+deleted service categories, hub#1323)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -2970,10 +2971,10 @@ Steps:
      what the business deleted and still holds comes back as it was, with its history, and that what it no longer has is
      created again as its own screen creates it, nothing copied; that what the business has, or has made again, is left
      as it is; that records for the tax authority are never brought back and
-     that the business stays open. Below, "What to bring back", with what can be brought ticked (today, **Customers** and
-     **Services**). They press **Recover**.
-  10. "1 separate copy will give back Customers, Services into its business within a few minutes: Recoveries says how it
-      went." appears. In Recoveries they see it "Asked" with the copy, what was asked and when.
+     that the business stays open. Below, "What to bring back", with what can be brought ticked (today, **Customers**,
+     **Products** and **Services**). They press **Recover**.
+  10. "1 separate copy will give back Customers, Products, Services into its business within a few minutes: Recoveries
+      says how it went." appears. In Recoveries they see it "Asked" with the copy, what was asked and when.
   11. A few minutes later it says "Done" and what came back: "Customers: 1 restored, 2 created" or "Customers: 2
       created, 1 not created". Its page also says which did not come back and why (by their identifier in the copy,
       without personal data). A customer the business deleted and still holds comes back THE SAME card, with their
@@ -2981,15 +2982,21 @@ Steps:
       linked orders (CUSTOMER-F33). One the business no longer has comes back as a new card, created as the Customers
       screen creates it, with their name, contact, tax ID, address, dates, source, stage, channel and notes; without their
       groups, tags or own fields (hub#1285). A card whose personal data was erased (GDPR) or one merged into another never
-      comes back, and one the business has already made again (the same name, phone and email) is not repeated. Each
-      service the business no longer has comes back as a new service, on offer, created as the Services screen creates
-      it, with its name, pricing, prices, cost, duration, buffers, capacity, descriptions, booking settings, order,
-      featured flag, SKU, barcode and notes, its tax category and its category if the business still has it (if it was
-      deleted, "No category", hub#1323); without its image (hub#1319) or its professionals (hub#1322). An archived one is
-      still in the business and does not come back (it is restored in Services), nor does one the copy had archived, and
-      one the business has already made again (another with the same name in the same category, not itself one of the
-      copy's; each counts for one only, so two services with the same name both come back) is not repeated. Asking again
-      creates nothing twice.
+      comes back, and one the business has already made again (the same name, phone and email) is not repeated. With
+      Products, "Products: 3 created": each product comes back as a new one, created as the Products screen creates it,
+      with its name, SKU, EAN-13, description, type, price, cost, units, threshold, stock control and tax category, active
+      or inactive as it was and in the categories the business still has; with no stock, which is counted
+      (INVENTORY-F14), because the copy's is another day's; without its image (hub#1319) and without the categories the
+      business no longer has (hub#1320). One that was deleted in the business also comes back as a new product; its
+      movements stay with the deleted one (hub#1321). One the business has already created again (another live one with
+      its SKU or its EAN-13) is not repeated. With Services, "Services: 2 created": each service the business no longer
+      has comes back as a new one, on offer, created as the Services screen creates it, with its name, pricing, prices,
+      cost, duration, buffers, capacity, descriptions, booking settings, order, featured flag, SKU, barcode and notes, its
+      tax category and its category if the business still has it (if it was deleted, "No category", hub#1323); without
+      its image (hub#1319) or its professionals (hub#1322). An archived one is still in the business and does not come
+      back (it is restored in Services), nor does one the copy had archived, and one the business has already made again
+      (another with the same name in the same category, not itself one of the copy's; each counts for one only, so two
+      services with the same name both come back) is not repeated. Asking again creates nothing twice.
 In: the chosen businesses, the temporary cluster with their copy and the moment; to recover, the made separate copy and
 what to bring back.
 Out: the business's database as it was at that moment; the one it had, kept 7 days on its server; the notice
@@ -2998,8 +3005,9 @@ business as it was, untouched; a separate database on its cluster with the data 
 application and kept 7 days; the notice `control.hub.restore_aside_requested` with who asked for it. When recovering: in
 the business, each deleted card it still held, live again with its card-recovered notice (`customer.customer.restored`),
 a new card for each customer it no longer had, with its card-created notice (`customer.customer.created`), and a new
-service for each one it no longer had, with its service-created notice (`service.service.created`), and nothing else;
-the copy, untouched; the notice `control.copy.recovery_requested` with who asked for it.
+product for each product it lacked, with its product-created notice (`inventory.product.created`), and a new service
+for each one it no longer had, with its service-created notice (`service.service.created`), and nothing else; the copy,
+untouched; the notice `control.copy.recovery_requested` with who asked for it.
 If it fails: what the restore does not accept is said in the notice, business by business, and that business is not
 touched: one that is not ready or has no database of its own, a demo, one being moved or restored, a cluster open to new
 hubs or with living businesses, the business's own cluster, a copy that is not on that cluster or is too large, and a
@@ -3014,14 +3022,16 @@ is only possible from a made copy and once at a time per copy; otherwise the not
 is made gives anything back."), and with nothing ticked the page asks again. What cannot be brought from an app is said in
 its result and the rest goes on: the app is turned off in the business ("Customers: nothing (app_inactive: …)"), or the
 copy did not have it, lacks the migration its read needs or has one this code does not know (`recover_not_in_copy`,
-`recover_copy_behind`, `recover_copy_ahead`). A card the create operation does not accept today (a phone no longer valid,
-or a service whose tax category was turned off: `service.tax_category_unknown`) is counted "not created" with its
-reason, and so is a deleted one that was merged into another or erased meanwhile ("customer.customer_unavailable: …").
-If the copy is gone, the recovery says "Failed" and why
+`recover_copy_behind`, `recover_copy_ahead`). A card the create operation does not accept today (a phone no longer valid),
+or a product without a tax category or with one Taxes no longer has active, or a service whose tax category was turned
+off (`service.tax_category_unknown`), is counted "not created" with its reason, and so is a deleted card that was merged
+into another or erased meanwhile ("customer.customer_unavailable: …"). If the copy is gone, the recovery says "Failed"
+and why
 ("recover_copy_unreadable: …"). While the business is being moved or restored, the recovery waits without doing anything.
 With the platform frozen for a database upgrade, the restore waits, with the business under maintenance, until it
 is unfrozen. With records from the test environment only, the chain is recovered afterwards (VERIFACTU-F28). The
 support staff see the list, Separate copies and Recoveries, but not the actions.
 Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12,
-CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F33, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F08; hub#1198, hub#1213,
-hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1319, hub#1322, hub#1323, aws#77
+CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04, SERVICE-F01, SERVICE-F04, SERVICE-F05,
+SERVICE-F08; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1319, hub#1320, hub#1321,
+hub#1322, hub#1323, aws#77
