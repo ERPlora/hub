@@ -49,7 +49,8 @@ Neither runs with ``databases_only``. On the way out the worker waits for them :
 a copy hears the stop, kills ``pg_dump`` and gives its lease back, and its work stays due. A third thread moves the hubs
 asked to move to another cluster and drops the copies they left behind after their days (``_moves``,
 ``base.tenancy.move``, round 2026-10-30b of PLAN-DB, decision 3), likewise, and puts the hubs asked to be restored back
-as they were at a moment, from their copy on a temporary cluster (``base.tenancy.restore``, hub#1198).
+as they were at a moment, from their copy on a temporary cluster (``base.tenancy.restore``, hub#1198), and makes the
+separate copies of a moment asked, next to the business and without closing it (hub#1213).
 
 The order of a tick (review of hub#471): control's own outbox first; then the hubs with their own database
 (``_hubs``, round 2026-10-30 of PLAN-DB): each one it serves (ready, or a business that left but keeps its database,
@@ -506,7 +507,8 @@ def _usage(now: dt.datetime) -> None:
 def _moves(now: dt.datetime, stop: threading.Event | None = None) -> None:
     """Move the hub asked longest ago to its new cluster and drop the copies past their days
     (``base.tenancy.move.run_due``, round 2026-10-30b of PLAN-DB, decision 3), then restore the hub asked longest ago
-    from its copy (``base.tenancy.restore.run_due``, hub#1198), on control, in the worker's move thread
+    from its copy (``base.tenancy.restore.run_due``, hub#1198) and make the separate copy asked longest ago
+    (``base.tenancy.restore.run_aside_due``, hub#1213), on control, in the worker's move thread
     (:class:`Background`); a failure is logged and the next tick tries again. ``stop`` set stops the copy in course and
     leaves it for the next worker to go on."""
     cancelled = stop.is_set if stop is not None else None
@@ -514,11 +516,12 @@ def _moves(now: dt.datetime, stop: threading.Event | None = None) -> None:
         with use_control():
             moved = move.run_due(now, cancelled=cancelled)
             moved += restore.run_due(now, cancelled=cancelled)
+            moved += restore.run_aside_due(now, cancelled=cancelled)
     except Exception:
         logger.exception("worker: the moves' pass failed; the next tick tries again.")
     else:
         if moved:
-            logger.info("worker: worked on the move or the restore of %d hub(s).", moved)
+            logger.info("worker: worked on the move, the restore or a separate copy of %d hub(s).", moved)
     finally:
         close_old_connections()
 

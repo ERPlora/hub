@@ -44,7 +44,7 @@ from base.registry import PREPARING_STATUSES, internal_only
 from base.tenancy.connections import NON_LIBPQ_OPTIONS
 from base.tenancy.credentials import APP, CredentialsUnavailable, credentials_for
 from base.tenancy.ops import MAINTENANCE_DATABASE
-from control.models import Cluster, Freeze, Hub, HubDue
+from control.models import Cluster, Freeze, Hub, HubDue, RestoredCopy
 from control.schemas import ClusterSizesIn, ClusterSizesOut, FreezeGetIn, FreezeOut
 
 logger = logging.getLogger(__name__)
@@ -217,8 +217,13 @@ def active_freeze() -> Freeze | None:
 
 
 def freeze_answer(row: Freeze | None) -> dict:
-    """The switch as its operations answer it (``FreezeOut``), with the hubs the worker is working on now."""
-    working = HubDue.objects.filter(lease_until__gt=timezone.now()).count()
+    """The switch as its operations answer it (``FreezeOut``), with the hubs the worker is working on now: under their
+    lease, or making a separate copy of one under the copy's own (hub#1213)."""
+    now = timezone.now()
+    working = (
+        HubDue.objects.filter(lease_until__gt=now).count()
+        + RestoredCopy.objects.filter(lease_until__gt=now).count()
+    )
     if row is None:
         return {"frozen": False, "reason": "", "since": None, "by": "", "working": working}
     return {"frozen": row.frozen, "reason": row.reason, "since": row.since, "by": row.by, "working": working}

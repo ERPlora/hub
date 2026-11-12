@@ -598,3 +598,95 @@ msgstr ""
 
 msgid "Restore them"
 msgstr "Restaurarlos"
+
+#: models.py (RestoredCopy, hub#1213)
+msgid "separate copy"
+msgstr "copia aparte"
+
+msgid "separate copies"
+msgstr "copias aparte"
+
+msgctxt "separate copy"
+msgid "Being made"
+msgstr "Haciéndose"
+
+msgctxt "separate copy"
+msgid "Made"
+msgstr "Hecha"
+
+msgctxt "separate copy"
+msgid "Failed"
+msgstr "No se pudo hacer"
+
+msgctxt "separate copy"
+msgid "asked by"
+msgstr "pedida por"
+
+msgctxt "separate copy"
+msgid "asked at"
+msgstr "pedida el"
+
+msgctxt "separate copy"
+msgid "made at"
+msgstr "hecha el"
+
+#: services.py (cluster_delete)
+msgid ""
+"%(count)d separate copy of a hub is on this cluster or still to be made from it: it is deleted once the copy is "
+"made or dropped."
+msgid_plural ""
+"%(count)d separate copies of hubs are on this cluster or still to be made from it: it is deleted once the copies "
+"are made or dropped."
+msgstr[0] ""
+"%(count)d copia aparte de un hub está en este clúster o aún se tiene que hacer desde él: se borra cuando la copia "
+"esté hecha o borrada."
+msgstr[1] ""
+"%(count)d copias aparte de hubs están en este clúster o aún se tienen que hacer desde él: se borra cuando las "
+"copias estén hechas o borradas."
+msgstr[2] ""
+"%(count)d copias aparte de hubs están en este clúster o aún se tienen que hacer desde él: se borra cuando las "
+"copias estén hechas o borradas."
+
+#: admin.py (HubAdmin.restore_aside, RestoredCopyAdmin)
+msgid "Restore to a separate copy…"
+msgstr "Restaurar en una copia aparte…"
+
+msgid "Restore to a separate copy"
+msgstr "Restaurar en una copia aparte"
+
+msgid ""
+"%(count)d hub will get a separate copy as it was at %(moment)s, made from %(cluster)s: the business stays open as "
+"it is. Separate copies lists it, and says if it could not be made."
+msgid_plural ""
+"%(count)d hubs will get a separate copy each as they were at %(moment)s, made from %(cluster)s: the businesses "
+"stay open as they are. Separate copies lists them, and says if one could not be made."
+msgstr[0] ""
+"%(count)d hub tendrá una copia aparte tal como estaba el %(moment)s, hecha desde %(cluster)s: el negocio sigue "
+"abierto tal como está. Copias aparte la lista y dice si no se pudo hacer."
+msgstr[1] ""
+"%(count)d hubs tendrán una copia aparte cada uno tal como estaban el %(moment)s, hecha desde %(cluster)s: los "
+"negocios siguen abiertos tal como están. Copias aparte las lista y dice si alguna no se pudo hacer."
+msgstr[2] ""
+"%(count)d hubs tendrán una copia aparte cada uno tal como estaban el %(moment)s, hecha desde %(cluster)s: los "
+"negocios siguen abiertos tal como están. Copias aparte las lista y dice si alguna no se pudo hacer."
+
+msgctxt "separate copy"
+msgid "kept until"
+msgstr "se guarda hasta"
+
+#: templates/admin/control/hub/restore_aside.html
+msgid ""
+"Each hub chosen gets a separate copy of its database as it was at the moment you give, made on its own cluster "
+"from its copy on the temporary cluster you choose (a point-in-time restore of its cluster, registered closed to new "
+"hubs). The business stays open and nothing of it changes, its fiscal records included. The copy is no business: "
+"nobody opens it and nothing in it is sent to the tax authority. Separate copies lists it, and it is kept for "
+"%(days)s days."
+msgstr ""
+"Cada hub elegido tendrá una copia aparte de su base de datos tal como estaba en el momento que indiques, hecha en "
+"su propio clúster desde su copia en el clúster temporal que elijas (una restauración a un momento de su clúster, "
+"dada de alta cerrada a hubs nuevos). El negocio sigue abierto y no cambia nada de él, tampoco sus registros "
+"fiscales. La copia no es un negocio: nadie la abre y nada de ella se envía a Hacienda. Copias aparte la lista, y se "
+"guarda %(days)s días."
+
+msgid "Make the copies"
+msgstr "Hacer las copias"

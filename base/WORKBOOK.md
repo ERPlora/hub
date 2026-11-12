@@ -3051,10 +3051,11 @@ Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, A
 
 ### BASE-F114 Devolver un negocio a un momento pasado desde el admin de Hubs
 <!-- origen: nuevo (aws#77; PLAN-DB §13 «Restaurar un hub»: los planes de pago prometen volver a cualquier momento de los últimos 14 días) gh:hub#1198 -->
-Estado: hecho (la acción y la restauración; crear y borrar el clúster temporal es el procedimiento «Devolver un negocio
-a un momento» de ERPlora/aws)
+Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte; crear y borrar el clúster temporal es el
+procedimiento «Devolver un negocio a un momento» de ERPlora/aws; recuperar desde la copia aparte lo que se perdió, hub#1257)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
-Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acción «Restaurar desde una copia…»
+Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
+copia aparte…»; y Copias aparte
 Pasos:
   1. Un negocio pide volver a cómo estaban sus datos en un momento de los últimos días. El personal crea un clúster
      temporal restaurado a ese momento y lo da de alta en Clústeres, cerrado a hubs nuevos.
@@ -3068,20 +3069,35 @@ Pasos:
   5. Unos minutos después el sistema ha copiado la base del negocio desde el clúster temporal, ha guardado aparte la
      que tenía y ha puesto la copia en su sitio. El negocio vuelve a abrirse con sus datos de ese momento y la flecha desaparece de la
      lista.
+  En una copia aparte (hub#1213), para un negocio que factura con VeriFactu en producción o cuando solo se quiere
+  recuperar lo perdido sin tocar lo demás:
+  6. En Hubs elige el negocio y la acción «Restaurar en una copia aparte…». La misma página pide el clúster temporal y
+     el momento, y explica que el negocio sigue abierto sin cambiar nada y que la copia no es un negocio: nadie la abre y
+     nada de ella se envía a Hacienda. Pulsa **Hacer las copias**.
+  7. Sale «1 hub tendrá una copia aparte tal como estaba el 2026-11-09 14:30 UTC, hecha desde <clúster>: el negocio
+     sigue abierto tal como está. Copias aparte la lista y dice si no se pudo hacer.». El negocio no se cierra ni un
+     segundo.
+  8. En Copias aparte la ve «Haciéndose» y, unos minutos después, «Hecha», con su momento y hasta cuándo se guarda
+     (7 días); su ficha dice además su base de datos, su clúster, quién la pidió y cuándo. Si no se pudo hacer, dice «No
+     se pudo hacer» y por qué en «último error».
 Entra: los negocios elegidos, el clúster temporal con su copia y el momento.
 Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso
-`control.hub.restore_requested` con quién lo pidió. Los demás negocios no notan nada.
+`control.hub.restore_requested` con quién lo pidió. Los demás negocios no notan nada. En una copia aparte: el negocio
+tal como estaba, sin tocarlo; una base aparte en su clúster con los datos de ese momento, cerrada a la aplicación y
+guardada 7 días; el aviso `control.hub.restore_aside_requested` con quién lo pidió.
 Si falla: lo que la restauración no admite lo dice el aviso, negocio a negocio, y ese negocio no se toca: uno que no está
 listo o no tiene base propia, una demo, uno que se está trasladando o restaurando, un clúster abierto a hubs nuevos o con
 negocios vivos, el propio clúster del negocio, una copia que no está en ese clúster o que es demasiado grande, y un
 momento que aún no ha llegado. Sin clúster o sin momento, la página los vuelve a pedir. Si el negocio tiene registros
 VeriFactu de producción hechos, enviados o cambiados después de ese momento, no se restaura y no cambia nada, porque
 volvería a usar números que la AEAT ya tiene: su ficha lo dice en «último error» («restore_fiscal_records: …»); para ese
-caso, hub#1213. Cualquier otro fallo deshace la restauración sola: el negocio sigue con su base de siempre y su ficha dice
-por qué. Con la plataforma congelada para una subida de la base de datos, la restauración espera, con el negocio en
+caso está «Restaurar en una copia aparte…», que no los compara porque no toca el negocio. Cualquier otro fallo deshace la
+restauración sola: el negocio sigue con su base de siempre y su ficha dice por qué. Una copia aparte admite lo mismo que
+la restauración y lo que no admite lo dice el aviso igual; si falla al hacerla, no queda nada de ella y Copias aparte dice
+por qué («restore_aside_<paso>: …»); el negocio no se entera. Con la plataforma congelada para una subida de la base de datos, la restauración espera, con el negocio en
 mantenimiento, hasta que se descongela. Con registros solo del entorno de pruebas, después se recupera la cadena
-(VERIFACTU-F28). El personal de soporte ve la lista, pero no la acción.
-Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado); hub#1198, hub#1213, aws#77
+(VERIFACTU-F28). El personal de soporte ve la lista y Copias aparte, pero no las acciones.
+Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado); hub#1198, hub#1213, hub#1257, aws#77
 
 ## Para quien lo mantiene
 
@@ -3983,6 +3999,19 @@ Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado
   el gancho `fiscal_record_states` de cada app que presenta a Hacienda) queda en `Hub.last_error`, que la ficha enseña
   tal cual. Tests: `control/tests/test_admin.py::TestRestoreFromACopy` y, de punta a punta con el worker y dos BD
   reales, `base/tenancy/tests/test_restore.py::TestAskedInTheHubAdmin`.
+- **«Restaurar en una copia aparte…»** (BASE-F114, hub#1213, capa 1) es `control.admin.HubAdmin.restore_aside`: el mismo
+  formulario y la misma página (`HubAdmin.from_a_copy`), con `control.hub.restore_aside`, que comprueba lo mismo que
+  `control.hub.restore` (`control.services._restorable`) y escribe una fila `control.RestoredCopy` con su nombre
+  `<control>_copy_<hex de la fila>` (`base.tenancy.names.copy_db_name`). El worker la hace en el hilo de los traslados
+  (`base.tenancy.restore.run_aside_due`), una por pasada y con el arriendo de la propia fila, nunca el del hub: clona sin
+  conceder nada (`ops.clone_database(aside=True)`), vacía, `pg_restore`, comprueba la identidad, la cierra otra vez y
+  suelta el clúster temporal. El envío a Hacienda está apagado por construcción: ninguna fila de `base_hub` la nombra
+  (el worker sirve solo las del registro), ningún rol de la app conecta y su nombre es de copia que queda atrás
+  (`names.is_left_behind`), así que `connections.register_hub_alias` se niega a darle alias. Se borra con su fila a los
+  `move.MOVED_COPY_DAYS` (`restore.drop_old_aside_copies`); mientras se hace cuenta en `control.freeze.get`. Su esquema
+  es el del momento. Tests: `base/tenancy/tests/test_restore_aside.py` (dos BD reales, la guarda de red y
+  `TestSendingToTheTaxAuthorityIsOffInTheCopy`, que nunca puede caer), `control/tests/test_services.py::TestRestoreAside`
+  y `control/tests/test_admin.py::TestRestoreToASeparateCopy`.
 
 ## Lo que queda fuera
 

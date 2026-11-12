@@ -449,6 +449,68 @@ class MovedCopy(UUIDModel):
         return self.db_name
 
 
+class RestoredCopy(UUIDModel):
+    """A hub's database as it was at a moment, made aside on the hub's own cluster while the business goes on (hub#1213,
+    layer 1; BASE-F114): asked in the Hub admin (``control.hub.restore_aside``), made by the worker from the hub's copy
+    on a temporary cluster (``base.tenancy.restore``, «restore aside»), then dropped with its row after
+    ``move.MOVED_COPY_DAYS``. Its database, ``<control>_copy_<its hex>`` (``base.tenancy.names``), is no business: no
+    hub's row names it, it is granted to none of the app's roles and no process registers an alias of it, so nothing in
+    it ever reaches the tax authority. The business itself is never closed nor changed by it.
+
+    ``source`` is the temporary cluster while the copy is to make (it cannot be deleted then), emptied once made or
+    failed. ``cluster`` is where the copy is (empty: the settings' own server), which cannot be deleted while it is
+    there. The worker holds the row's own lease (``lease_owner``, ``lease_until``) while it makes it, never the hub's:
+    the business's own work does not wait for its copy."""
+
+    class Status(models.TextChoices):
+        COPYING = "copying", pgettext_lazy("separate copy", "Being made")
+        MADE = "made", pgettext_lazy("separate copy", "Made")
+        FAILED = "failed", pgettext_lazy("separate copy", "Failed")
+
+    hub = models.ForeignKey(Hub, on_delete=models.CASCADE, related_name="restored_copies", verbose_name=_("hub"))
+    cluster = models.ForeignKey(
+        Cluster,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="restored_copies",
+        verbose_name=_("cluster"),
+    )
+    source = models.ForeignKey(
+        Cluster,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="copies_made_from",
+        verbose_name=pgettext_lazy("restore", "Temporary cluster"),
+    )
+    restore_point = models.DateTimeField(pgettext_lazy("restore", "Moment"))
+    db_name = models.CharField(_("database"), max_length=63)
+    status = models.CharField(
+        _("status"), max_length=16, choices=Status.choices, default=Status.COPYING, db_default=Status.COPYING
+    )
+    last_error = models.TextField(_("last error"), blank=True, default="", db_default="")
+    asked_by = models.CharField(pgettext_lazy("separate copy", "asked by"), max_length=150)
+    asked_at = models.DateTimeField(pgettext_lazy("separate copy", "asked at"), auto_now_add=True)
+    made_at = models.DateTimeField(pgettext_lazy("separate copy", "made at"), null=True, blank=True)
+    lease_owner = models.CharField(_("leased by"), max_length=128, blank=True, default="", db_default="")
+    lease_until = models.DateTimeField(_("leased until"), null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("separate copy")
+        verbose_name_plural = _("separate copies")
+        ordering = ["-asked_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["cluster", "db_name"], name="control_restoredcopy_one_per_server", nulls_distinct=False
+            )
+        ]
+
+    def __str__(self) -> str:
+        # Its hub and its moment, words a phone wraps; its database's name is one piece of 40-odd characters.
+        return f"{self.hub.slug} · {self.restore_point.astimezone(dt.UTC):%Y-%m-%d %H:%M} UTC"
+
+
 class LeftoverDatabase(UUIDModel):
     """A database a move may have left on its destination when it was undone without reaching it (round 2026-10-31 of
     the review of W8): the hub's name on that cluster, dropped by the worker on a later pass (``base.tenancy.move``)

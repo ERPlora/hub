@@ -5,6 +5,7 @@
 schema (``schema_state``, ``schema_apps``), its ``cluster`` and ``is_platform``. ``Cluster`` and ``HubDue`` are new.
 """
 
+import datetime
 import uuid
 
 import pytest
@@ -375,3 +376,19 @@ def test_a_moves_note_keeps_the_origins_schema_record_and_a_hub_says_when_its_mo
     assert hub.move_undo_asked_at is None
     with translation.override("es"):
         assert str(Hub._meta.get_field("move_undo_asked_at").verbose_name) == "deshacer el traslado pedido"
+
+
+def test_a_separate_copy_is_named_by_its_hub_and_its_moment_never_its_long_database_name():
+    """What its admin page heads with (and its breadcrumbs): words a phone can wrap, never the 40-odd characters of
+    ``<control>_copy_<hex>`` in one piece (hub#1213)."""
+    from control.models import RestoredCopy
+
+    hub = Hub.objects.create(slug="bistro-aurora", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")
+    copy = RestoredCopy.objects.create(
+        hub=hub,
+        restore_point=datetime.datetime(2026, 11, 9, 15, 30, tzinfo=datetime.timezone(datetime.timedelta(hours=1))),
+        db_name=f"hub_copy_{uuid.uuid7().hex}",
+        asked_by="root",
+    )
+
+    assert str(copy) == "bistro-aurora · 2026-11-09 14:30 UTC"
