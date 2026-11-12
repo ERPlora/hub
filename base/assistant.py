@@ -447,8 +447,9 @@ def _reference(value: Any, prop: dict, words: _Words) -> Any:
     read with the data of its own object the mark names beside it (``within``: a course by its name with its menu,
     hub#1245) —; or ``_LEFT_OUT`` — no mark, no person at hand, or a read that fails (not there, not theirs to read,
     its app off): the card names nobody by an id, nor reads anything for somebody else. Words a person says that it
-    cannot read (``as_said``: several fit, none does) are said as said instead. A datum the write does not use, because
-    a datum of its own object the mark names came (``unless``: the record's id), is neither read nor shown (hub#1250)."""
+    cannot read (``as_said``: several fit, none does) are said as said instead. A datum the write does not use,
+    because a datum of its own object the mark names came (``unless``: the record's id), is neither read nor shown
+    (hub#1250)."""
     declared = refers_of(prop)
     if declared and any(words.data.get(name) not in (None, "") for name in declared.get("unless", ())):
         return _LEFT_OUT

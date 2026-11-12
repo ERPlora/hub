@@ -989,7 +989,11 @@ def test_a_mark_read_with_the_data_beside_it_is_sound(monkeypatch, dish_reads):
         (A_DISH["refers"], UUID, "is said as said, but it is an id"),
         ({**A_DISH["refers"], "within": "menu"}, str, "is not a read, by and name"),
         ({**A_DISH["refers"], "as_said": "yes"}, str, "is not a read, by and name"),
-        ({**A_DISH["refers"], "unless": ["dish_id"]}, str, "is left unread with dish_id, which its own object does not have"),
+        (
+            {**A_DISH["refers"], "unless": ["dish_id"]},
+            str,
+            "is left unread with dish_id, which its own object does not have",
+        ),
         ({**A_DISH["refers"], "unless": "table"}, str, "is not a read, by and name"),
     ],
     ids=[

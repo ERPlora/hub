@@ -203,11 +203,16 @@ def test_only_the_writes_that_take_a_group_by_its_name_check_their_record():
     assert {name: read for name, read in declared.items() if read is not None} == CHECKS
 
 
+def read_as(mark: dict) -> dict:
+    """How the card reads a datum by its mark, but for the data beside which it leaves it unread (``unless``)."""
+    return {"refers": {key: value for key, value in mark["refers"].items() if key != "unless"}}
+
+
 def test_every_write_that_takes_a_group_or_an_option_by_its_name_reads_it_and_says_it_as_said_when_it_cannot():
     """With or without a check before it, a group said by its name is read on its card, and stays on it as said when it
     cannot be read (two fit): never off it. An option, with its group."""
     marks = {
-        (op.name, datum): op.input.model_fields[datum].json_schema_extra
+        (op.name, datum): read_as(op.input.model_fields[datum].json_schema_extra)
         for op in modifier_writes()
         for datum in ("group", "option")
         if datum in op.input.model_fields
@@ -297,19 +302,69 @@ def test_a_link_to_a_product_deleted_meanwhile_draws_no_card_and_its_id_still_le
     assert not ModifierLink.objects.filter(pk=link.pk).exists()
 
 
-# ── Not yet: a record that comes by its id with the name of another group beside it (hub#1250) ──────────────────────
-# The write takes the record by its id and never looks at the name; the card reads that name all the same and says
-# both groups under one word. The yes is still held to what the card read. Strict: once the card leaves out a name
-# the write does not use, these pass and their mark goes.
+# ── A record that comes by its id with the name of another group beside it (hub#1250) ────────────────────────────────
+# The write takes the record by its id and never looks at the name beside it: the card neither reads nor shows it
+# (``unless``). An option that comes by its id is the exception: the write looks for it in the group said beside it,
+# so that group is read.
+
+#: Beside which data each write of Modifiers takes its group by them and not by its name, and its option.
+UNLESS = {
+    **{(name, "group"): {"id"} for name in ("modifier.group.delete", "modifier.group.update")},
+    ("modifier.link.attach", "group"): {"group_id"},
+    ("modifier.link.detach", "group"): {"id", "group_id"},
+    ("modifier.option.create", "group"): {"group_id"},
+    **{(name, "group"): {"group_id"} for name in ("modifier.option.delete", "modifier.option.update")},
+    **{(name, "option"): {"id"} for name in ("modifier.option.delete", "modifier.option.update")},
+}
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="hub#1250: the card reads a name the write does not use")
-@pytest.mark.parametrize("write", ["modifier.group.delete", "modifier.group.update", "modifier.link.detach"])
-def test_a_record_that_comes_by_its_id_names_no_other_group_said_beside_it(write):
+def test_a_name_is_left_unread_beside_each_datum_its_write_takes_its_record_by_instead():
+    marked = {
+        (op.name, datum): set(op.input.model_fields[datum].json_schema_extra["refers"].get("unless", ()))
+        for op in modifier_writes()
+        for datum in ("group", "option")
+        if datum in op.input.model_fields
+    }
+    assert marked == UNLESS
+
+
+def by_its_id_beside_picantes(write: str) -> dict:
+    """The data of ``write`` with «Extras» (or its link) by its id and, beside it, «picantes», which only «Salsas
+    picantes» fits."""
     extras = a_group("Extras")
     a_group("Salsas picantes")
     record = extras.id if write.startswith("modifier.group.") else ModifierLink.objects.get(group_id=extras.id).id
     arguments = {**by_its_name("picantes")[write], "id": str(record)}
     arguments.pop("product", None)
-    card = assistant.card(get(write), arguments, "es", as_admin())
+    return arguments
+
+
+@pytest.mark.parametrize("write", ["modifier.group.delete", "modifier.group.update", "modifier.link.detach"])
+def test_a_record_that_comes_by_its_id_names_no_other_group_said_beside_it(write):
+    card = assistant.card(get(write), by_its_id_beside_picantes(write), "es", as_admin())
     assert "Salsas picantes" not in [field["value"] for field in card["fields"]]
+
+
+@pytest.mark.parametrize("write", ["modifier.group.delete", "modifier.link.detach"])
+def test_the_yes_to_a_record_that_comes_by_its_id_runs_on_it_whatever_group_is_said_beside_it(write):
+    """Control of the above: the write acts on «Extras» (or its link), never on «Salsas picantes»."""
+    arguments = by_its_id_beside_picantes(write)
+    picantes = ModifierGroup.objects.get(name="Salsas picantes")
+
+    def of_picantes() -> tuple[int, int]:
+        return ModifierGroup.objects.filter(pk=picantes.pk).count(), ModifierLink.objects.filter(group=picantes).count()
+
+    before = of_picantes()
+    done = yes_to_its_card(as_admin(), write, arguments)
+    assert [row["outcome"] for row in done["executed"]] == ["ok"]
+    assert of_picantes() == before
+
+
+@pytest.mark.parametrize("write", ["modifier.option.delete", "modifier.option.update"])
+def test_an_option_that_comes_by_its_id_is_still_looked_for_in_the_group_said_beside_it(write):
+    """The write looks for the option of the id in the group said: the card reads that group, as the write uses it."""
+    extras = a_group("Extras")
+    option = ModifierOption.objects.get(group_id=extras.id)
+    arguments = {**by_its_name("extras")[write], "id": str(option.id)}
+    arguments.pop("option", None)
+    assert fields_of(write, arguments, "es")["group"]["value"] == "Extras"

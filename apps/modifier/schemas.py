@@ -23,7 +23,7 @@ from pydantic import (
 )
 
 from apps.modifier.models import MAX_CHOICES, MAX_DELTA, NAME_MAX_LENGTH
-from base.schemas import names
+from base.schemas import names, unless_given
 
 T = TypeVar("T")
 
@@ -53,7 +53,9 @@ A_GROUP = names("modifier.group.get")
 # A group said by its name, when its id is not known: a group belongs to nothing, so the card reads it by that name
 # alone, as the write will find it, and shows the group the write acts on («Salsas picantes» when the person said
 # «salsa», hub#1218); words it cannot read (two groups fit, none does) it says as said, never off the card, so adding
-# an option or applying a group, which cannot check it, reads it too (hub#1245).
+# an option or applying a group, which cannot check it, reads it too (hub#1245). Beside the id the write takes its
+# record by instead (the group's, or the link's), the card neither reads nor shows the name, which the write does not
+# use (``unless_given``, hub#1250); an option by its id is looked for in the group said, so that one is read.
 A_GROUP_BY_NAME = names("modifier.group.get", by="group", as_said=True)
 AN_OPTION = names("modifier.option.get", name=("label",))
 # An option said by its name: two groups may have an option with one name, so the card reads it with its group when it
@@ -136,7 +138,7 @@ class GroupRefIn(_Input):
     group: Said | None = Field(
         None,
         description="The group's name, when its id is not known (e.g. «Sauces»).",
-        json_schema_extra=A_GROUP_BY_NAME,
+        json_schema_extra=unless_given(A_GROUP_BY_NAME, "id"),
     )
 
     @model_validator(mode="after")
@@ -151,7 +153,9 @@ class _OwningGroup(_Input):
 
     group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=A_GROUP)
     group: Said | None = Field(
-        None, description="The group's name, when its id is not known (e.g. «Extras»).", json_schema_extra=A_GROUP_BY_NAME
+        None,
+        description="The group's name, when its id is not known (e.g. «Extras»).",
+        json_schema_extra=unless_given(A_GROUP_BY_NAME, "group_id"),
     )
 
     @model_validator(mode="after")
@@ -266,7 +270,7 @@ class OptionRefIn(_Input):
         None,
         title=OPTION,
         description="The option's name, when its id is not known (e.g. «No onion»).",
-        json_schema_extra=AN_OPTION_BY_NAME,
+        json_schema_extra=unless_given(AN_OPTION_BY_NAME, "id"),
     )
     group_id: UUID | None = Field(
         None,
@@ -276,7 +280,7 @@ class OptionRefIn(_Input):
     group: Said | None = Field(
         None,
         description="Its group's name, when two groups have an option with that name.",
-        json_schema_extra=A_GROUP_BY_NAME,
+        json_schema_extra=unless_given(A_GROUP_BY_NAME, "group_id"),
     )
 
     @model_validator(mode="after")
@@ -367,7 +371,9 @@ class _Target(_Input):
 class LinkIn(_Target):
     group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=A_GROUP)
     group: Said | None = Field(
-        None, description="The group's name, when its id is not known (e.g. «Sauces»).", json_schema_extra=A_GROUP_BY_NAME
+        None,
+        description="The group's name, when its id is not known (e.g. «Sauces»).",
+        json_schema_extra=unless_given(A_GROUP_BY_NAME, "group_id"),
     )
 
     @model_validator(mode="after")
@@ -383,7 +389,9 @@ class LinkRefIn(_Target):
     id: UUID | None = Field(None, title=APPLIES_TO, description="The link's id.", json_schema_extra=A_LINK)
     group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=A_GROUP)
     group: Said | None = Field(
-        None, description="The group's name, when its id is not known.", json_schema_extra=A_GROUP_BY_NAME
+        None,
+        description="The group's name, when its id is not known.",
+        json_schema_extra=unless_given(A_GROUP_BY_NAME, "id", "group_id"),
     )
 
     @model_validator(mode="after")
