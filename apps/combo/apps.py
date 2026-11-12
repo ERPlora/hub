@@ -10,11 +10,11 @@ class ComboConfig(LiveAppConfig):
     label = "combo"
     kind = "app"
     verbose_name = _("Menus and combos")
-    # Registered in the shell (ION_ICONS); the old module's `restaurant-outline` waits in UI-REQUESTS.md.
+    # Registered in the shell (ION_ICONS); `restaurant-outline` waits in UI-REQUESTS.md.
     icon = "ion:layers-outline"
     category = Category.CATALOG
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The public store's texts, which register_apps writes to shared.app.
     summary = _(
         "Set menus and combos at a closed price, with courses, supplements and the right VAT."
     )
@@ -28,7 +28,7 @@ class ComboConfig(LiveAppConfig):
     verticals = ["restaurant"]
     # A choice is a product of Inventory; a menu eaten in has a tax category of Taxes.
     requires = ["inventory", "tax"]
-    # The menus' own photos (COMBO-F14; round 2026-10-30, base.images): served by /p/media/ to the hub's sessions only.
+    # The menus' own photos (COMBO-F14, base.images): served by /p/media/ to the hub's sessions only.
     members_media = ["combo/combos/"]
     default_auto_field = "django.db.models.BigAutoField"
     permissions = ["combo.view", "combo.manage"]
@@ -40,5 +40,5 @@ class ComboConfig(LiveAppConfig):
         "hub_employee": ["combo.view"],
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
-    # `icon =` as the module's own icon. One entry, as the old module (no tabbar).
+    # `icon =` as the module's own icon. One entry, no tabbar.
     navigation = [Nav("menus", _("Menus"), "ion:layers-outline", "/combo/menus")]

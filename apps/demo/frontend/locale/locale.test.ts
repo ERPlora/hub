@@ -1,6 +1,5 @@
-// The demo's UI texts: English source + Spanish (PLAN §5). They are kept by hand next to the pages
-// until V6 exports Django's `djangojs` catalogues to JSON (plan §4.7); this test is their guardrail:
-// same keys and placeholders in both languages, nothing empty, every key a page uses exists.
+// The demo's UI texts: English source + Spanish, kept by hand next to the pages. This test is their
+// guardrail: same keys and placeholders in both languages, nothing empty, every key a page uses exists.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

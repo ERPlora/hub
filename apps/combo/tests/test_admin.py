@@ -1,7 +1,7 @@
 """Django admin of the combo app: full CRUD on every model, for the platform's staff.
 
-Round 12 (PLAN §17, CLAUDE.md «Frontend y admin») gives the Hub admin full CRUD over all of a hub's
-tables. A raw admin write records no event and checks no business rule beyond the database's.
+The Hub admin has full CRUD over all of a hub's tables. A raw admin write records no event and checks no business rule
+beyond the database's.
 """
 
 import pytest

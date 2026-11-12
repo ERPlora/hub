@@ -1,10 +1,10 @@
-"""The business's files (APP-BASE-8, ``base.files``): what the Files screen keeps in the hub file store.
+"""The business's files (``base.files``): what the Files screen keeps in the hub file store.
 
 They live under the hub's prefix, in its own folder (``hub-<hex>/files/…``), apart from what the modules keep
 (``website/img/``, published by ``/p/media/``): a file of the business is never public. A name is one segment and a
 path a chain of them; nothing that could climb out of the folder (``..``, a backslash, a leading ``/``, a NUL)
-reaches the store, and one hub never lists, reads, moves nor deletes another's (BASE-G82…G86, saas#972). Writing
-never overwrites in silence: a second «a.pdf» is «a (1).pdf» (Google Drive, Dropbox).
+reaches the store, and one hub never lists, reads, moves nor deletes another's. Writing never overwrites in silence:
+a second «a.pdf» is «a (1).pdf» (Google Drive, Dropbox).
 """
 
 import datetime as dt
@@ -111,7 +111,7 @@ def test_a_path_has_a_ceiling():
     assert code_of(files.clean_path, deep) == "base.file_invalid_path"
 
 
-# ── Listing (BASE-G82) ───────────────────────────────────────────────────────────────────────────────────────
+# ── Listing ──────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def test_an_empty_business_has_no_folders_no_files_and_uses_nothing(store):
@@ -186,7 +186,7 @@ def test_the_preview_and_the_type_come_from_the_name_never_from_the_content():
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "",
     )
-    # Markup and scripts are their source, as text: a browser never runs them (saas#968).
+    # Markup and scripts are their source, as text: a browser never runs them.
     assert files.served("pagina.html") == ("text/plain", "text")
     assert files.served("script.js") == ("text/plain", "text")
     # An SVG may carry script: never shown, downloaded as plain bytes. So is what nobody knows.
@@ -240,7 +240,7 @@ def test_a_path_that_climbs_is_refused_before_the_store_sees_it(store, climb):
     assert store.exists(f"{hub_prefix(B)}/files/Secreto/nominas.pdf")
 
 
-# ── Upload and new folder (BASE-G83) ─────────────────────────────────────────────────────────────────────────
+# ── Upload and new folder ────────────────────────────────────────────────────────────────────────────────────
 
 
 def test_an_upload_keeps_the_bytes_in_the_open_folder(store):
@@ -290,8 +290,8 @@ def test_an_upload_past_the_plan_s_space_is_refused(store):
 
 
 def test_past_the_plan_s_space_one_refusal_says_the_same_for_every_app_that_keeps_files(store):
-    # FIX-HUB-BASE-PLAN-SPACE-CHECK-COPIED-IN-THREE-APPS: Files, the website's images and WhatsApp's header samples
-    # each copied this check, its code and its sentence; now they all refuse through this one.
+    # Files, the website's images and WhatsApp's header samples all refuse through this one check, with its code and
+    # its sentence.
     put(store, A, "a.pdf", b"x" * 60)
     assert files.refuse_past_the_space(store, A, 40, limit_bytes=100) is None  # up to the limit, it lets it in
     assert files.refuse_past_the_space(store, A, 10**12, limit_bytes=None) is None  # no limit in the plan: none
@@ -303,7 +303,6 @@ def test_past_the_plan_s_space_one_refusal_says_the_same_for_every_app_that_keep
             files.refuse_past_the_space(store, A, 1024**3 - 59, limit_bytes=1024**3)
         assert (refused.value.status, refused.value.code, refused.value.fields) == (409, "base.file_no_space", None)
         said[language] = refused.value.message
-    # What the person reads is what Files said before the check was shared.
     assert said == {
         "en": "There is no space left for that file: your plan includes 1 GB.",
         "es": "No queda espacio para ese archivo: tu plan incluye 1 GB.",
@@ -357,8 +356,7 @@ def bought_down(client, make_user, store):
 
 @pytest.mark.django_db
 def test_a_lower_plan_loses_no_file_and_only_refuses_one_more(client, make_user, bought_down):
-    # PLAN-SAAS §31, rule 5: what exceeds the new plan stays and is used; nothing more goes in until it is under the
-    # limit.
+    # What exceeds the new plan stays and is used; nothing more goes in until it is under the limit.
     frozen = [{**seen, "space": BOUGHT_DOWN_SPACE} for seen in bought_down]
     assert listed(client) == frozen
     for path, content in KEPT.items():
@@ -382,7 +380,7 @@ def test_a_lower_plan_loses_no_file_and_only_refuses_one_more(client, make_user,
 
 @pytest.mark.django_db
 def test_a_lower_plan_leaves_what_is_there_in_use(client, bought_down):
-    # PLAN-SAAS §31, rule 5, «and is used»: none of these adds a byte, and BASE-F73 and BASE-F75 give no refusal for
+    # What exceeds the plan is still used: none of these adds a byte, and BASE-F73 and BASE-F75 give no refusal for
     # the space.
     assert post_files(client, "folder", parent="", name="Contratos").status_code == 200
     assert post_files(client, "rename", path="a.pdf", name="renombrado.pdf").status_code == 200
@@ -421,7 +419,7 @@ def test_a_new_folder_inside_one_that_is_not_there_is_refused(store):
     assert code_of(files.create_folder, store, A, "Nadie", "x") == "base.file_folder_missing"
 
 
-# ── Read (BASE-G84) ──────────────────────────────────────────────────────────────────────────────────────────
+# ── Read ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def test_a_file_is_described_by_its_name_size_and_type(store):
@@ -447,7 +445,7 @@ def test_the_bytes_of_a_file_are_opened_from_its_hub_s_prefix(store):
         assert opened.read() == b"own"
 
 
-# ── Rename and move (BASE-G85) ───────────────────────────────────────────────────────────────────────────────
+# ── Rename and move ──────────────────────────────────────────────────────────────────────────────────────────
 
 
 def test_renaming_a_file_keeps_it_in_its_folder(store):
@@ -543,7 +541,7 @@ def test_moving_into_a_folder_that_is_not_there_is_refused(store):
     assert code_of(files.move, store, A, "a.pdf", "Nadie") == "base.file_folder_missing"
 
 
-# ── Delete (BASE-G86) ────────────────────────────────────────────────────────────────────────────────────────
+# ── Delete ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def test_deleting_a_file(store):
@@ -596,8 +594,8 @@ def walks(monkeypatch):
 
 
 def test_a_batch_of_uploads_and_the_listing_after_each_walk_the_business_files_at_most_once(store, monkeypatch):
-    # rv-hub-240: each upload walked the hub's whole prefix for the plan's space, and so did the live listing re-run
-    # after each one: a batch of N walked it 2N times.
+    # Each upload needs the plan's space and the live listing runs again after each one: without the kept index, a
+    # batch of N uploads would walk the hub's whole prefix 2N times.
     seen = walks(monkeypatch)
     for number in range(4):
         files.upload(store, A, "", f"factura-{number}.pdf", PDF, limit_bytes=1024**3)
@@ -669,8 +667,8 @@ def test_a_cache_that_does_not_answer_costs_a_walk_never_a_wrong_listing(store, 
 
 
 def test_each_hub_keeps_its_own_index_never_another_s(store):
-    # rv-hub-240 (round 2): the index is kept per hub in the cache; with one key for every hub, B would list A's
-    # folders and count A's bytes as its own space. Judged while A still has files and folders.
+    # The index is kept per hub in the cache: with one key for every hub, B would list A's folders and count A's
+    # bytes as its own space. Judged while A still has files and folders.
     files.create_folder(store, A, "", "Facturas")
     files.upload(store, A, "Facturas", "marzo.pdf", PDF)
     a = files.listing(store, A, "")
@@ -683,9 +681,9 @@ def test_each_hub_keeps_its_own_index_never_another_s(store):
 
 
 def test_a_write_that_comes_while_the_walk_is_being_kept_is_never_lost(store, monkeypatch):
-    # rv-hub-240 (round 2): the generation was read back BEFORE the walk was kept, so a write of Files landing between
-    # that read and the keeping (one cache round trip) left the kept index without it until it expired (10 minutes):
-    # a folder made on another device said «no longer exists» and an upload's bytes were missing from the space.
+    # A write of Files landing between reading the index's generation and keeping the walk (one cache round trip)
+    # must not leave the kept index without it until it expires (10 minutes): a folder made on another device would
+    # say «no longer exists» and an upload's bytes would be missing from the space.
     from django.core.cache import cache
 
     real_set_many = cache.set_many
@@ -711,8 +709,9 @@ def stale_free_name(monkeypatch, *names):
 
 
 def test_on_disk_two_uploads_of_one_name_at_once_never_write_over_each_other(disk, tmp_path, monkeypatch):
-    # rv-hub-240: the free name was checked, then written over (``file_overwrite``): the second upload took the first's
-    # name, and the first file was lost. The write itself refuses a name that is taken, and the upload takes the next.
+    # Checking the free name and then writing over it (``file_overwrite``) would let the second upload take the
+    # first's name and lose the first file: the write itself refuses a name that is taken, and the upload takes the
+    # next.
     put(disk, A, "a.pdf", b"first")
     stale_free_name(monkeypatch, "a.pdf")
     saved = files.upload(disk, A, "", "a.pdf", b"second")
@@ -758,9 +757,10 @@ def folder_page(*pairs, folders=()):
 
 
 def test_on_s3_a_listing_reads_the_open_folder_alone_and_walks_the_files_once_for_the_tree_and_the_space(s3):
-    # rv-hub-240: every listing walked the hub's whole prefix (a request per thousand keys) for the tree and the space.
-    # The tree of folders and what the business's files take are kept (``base.files`` index) and the open folder is
-    # read alone (``Delimiter``); what the apps keep is added at once, so the space stays exact for the plan's limit.
+    # Walking the hub's whole prefix on every listing would cost a request per thousand keys for the tree and the
+    # space. The tree of folders and what the business's files take are kept (``base.files`` index) and the open
+    # folder is read alone (``Delimiter``); what the apps keep is added at once, so the space stays exact for the
+    # plan's limit.
     storage, stubber = s3
     prefix, bucket = hub_prefix(A), "erplora-test-hubs"
     walk_files = {"Bucket": bucket, "Prefix": f"{prefix}/files/"}

@@ -1,12 +1,10 @@
-"""Printing on the Home (PLAN-HUB round 2026-10-21; FIX-PRINTING-SETUP-HOOKS) and in System (hub#683): base's own queries bring the old hub's
-core item «Set up your printer» (gh:hub#1948), recommended, pending until a device set up here reaches an active
-receipt printer, to whoever sets printers up; and the bell's «Nothing is printing “…”» (old-hub:HUB_SHELL-F63,
-gh:hub#800), one row per function with the jobs that have waited a minute and no device on can print (set up here and
-seen in the last 90 s, FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF), to everybody with Printing, leading to the
-printers' state by function (gh:hub#2016). Every change of either records an event they are refreshed on, the bell
-reads the clock every 30 s for what time moves, and a change in hub B re-runs B's Home only. And System › «Usage and
-plan» has its card «Your printer» (the old hub's of «Resources», HUB_SHELL-F137/F138) for everybody with Printing,
-while Printing is on in that business.
+"""Printing on the Home and in System (hub#683): base's own queries bring the step «Set up your printer»,
+recommended, pending until a device set up here reaches an active receipt printer, to whoever sets printers up; and
+the bell's «Nothing is printing “…”», one row per function with the jobs that have waited a minute and no device on
+can print (set up here and seen in the last 90 s), to everybody with Printing, leading to the printers' state by
+function. Every change of either records an event they are refreshed on, the bell reads the clock every 30 s for what
+time moves, and a change in hub B re-runs B's Home only. And System › «Usage and plan» has its card «Your printer»
+for everybody with Printing, while Printing is on in that business.
 
 base and printing run for real: the hooks come from PrintingConfig through base's own queries, as the person.
 """
@@ -166,7 +164,7 @@ def printing():
 
 @pytest.mark.django_db
 def test_receipts_waiting_for_a_printer_no_device_reaches_ring_the_bell_and_lead_to_the_printers():
-    # gh:hub#800: the owner is told that nobody is printing, and which function (gh:hub#2016: where it is fixed).
+    # The owner is told that nobody is printing, and which function (where it is fixed).
     printer("Till")
     enqueue()
     enqueue(job_key="sale:2")
@@ -201,8 +199,8 @@ def test_a_device_that_prints_them_quiets_the_bell_and_at_zero_nothing_shows():
 
 @pytest.mark.django_db
 def test_a_device_set_up_but_off_rings_the_bell_once_the_receipt_waited_a_minute():
-    # FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF: the till set up for the receipts went off (no news for 90 s, the old
-    # hub's HOST_TTL_SECONDS); a minute after a receipt is queued (UNDRAINED_ALERT_SECONDS), nobody is printing it.
+    # The till set up for the receipts went off (no news for 90 s); a minute after a receipt is queued, nobody is
+    # printing it.
     till = printer("Till")
     register(till)
     PrintDevice.objects.update(last_seen_at=timezone.now() - dt.timedelta(seconds=95))

@@ -1,4 +1,4 @@
-"""Django admin of the reservation app: full CRUD on every table for support (round 12, PLAN §17).
+"""Django admin of the reservation app: full CRUD on every table, for support.
 
 A second write path, for the staff only on hubs.erplora.com: it does not go through the operations' rules
 (the gate, the steps of a reservation, the holds of Tables) — the database's own constraints still refuse

@@ -1,7 +1,7 @@
 """erplora.com's WhatsApp doors into the Hub (``apps/whatsapp_inbox/WORKBOOK.md``, «Contrato con el SaaS», doors 1–4).
 
 Three doors under ``/internal/whatsapp/``, signed as the rest of ``/internal``, each the system operation of the inbox
-on the business the body names (``hub``: its slug in phase 1): ``POST …/inbound`` → ``whatsapp_inbox.message.receive``
+on the business the body names (``hub``: its slug): ``POST …/inbound`` → ``whatsapp_inbox.message.receive``
 (200 ``{id, conversation_id, created}``; the same WhatsApp id again is ``created: false``), ``POST …/status`` →
 ``whatsapp_inbox.message.update_status`` (200 ``{updated, status}``) and ``PUT …/channel`` →
 ``whatsapp_inbox.channel.sync`` (200 ``{applied, version}``). A business the registry does not know is 404, one that
@@ -50,7 +50,7 @@ def secret(settings):
 
 @pytest.fixture
 def acme(db, every_app_on):
-    """A business with WhatsApp on (a new one is born with every app off, round 2026-10-27)."""
+    """A business with WhatsApp on (a new one is born with every app off)."""
     hub = Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
     every_app_on("acme")
     return hub
@@ -355,8 +355,8 @@ def test_the_app_off_in_its_rows_is_404_app_inactive_with_the_cache_cold(hub_a, 
 
 @pytest.mark.parametrize("path", DOORS)
 def test_a_business_without_its_own_database_is_503_and_runs_nothing(acme, production, path):
-    """S5: a business still on control's database (phase 1's, not cut) is not served: erplora.com keeps the message and
-    tries again once its cut gives it its own."""
+    """A business still on control's database is not served: erplora.com keeps the message and tries again once it has
+    its own."""
     door = production()
 
     answer = post(door, path, door_body(path), host=PRIVATE_NAME)
@@ -370,7 +370,7 @@ def test_a_business_without_its_own_database_is_503_and_runs_nothing(acme, produ
 @pytest.mark.parametrize("host", [PRIVATE_NAME, "hubs.localhost"])
 def test_each_business_answers_from_its_own_database(hub_a, hub_b, production, monkeypatch, host):
     # WhatsApp on in tenant-a's database, off in tenant-b's: each door reads the business it names, never the other
-    # one nor phase 1's shared database (which the platform host opens: there tenant-a has no rows, every app off).
+    # one nor the shared database (which the platform host opens: there tenant-a has no rows, every app off).
     # The operation is probed where it starts: which business's database the door entered is what this test reads.
     with use_hub(hub_b):
         AppActivation.objects.filter(host=hub_b.slug, app="whatsapp_inbox").update(state="off", chosen=False)

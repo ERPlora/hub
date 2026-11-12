@@ -1,6 +1,6 @@
-"""What layer 1 of the assistant's QA says of Time clock (docs plan 2026-10-31, the assistant's knowledge and QA, §3):
-which tools it offers, what an employee is never offered, and that the owner's requests of the real-model QA
-(hub#1099), in the owner's own words, are offered their existing operation.
+"""What layer 1 of the assistant's QA says of Time clock: which tools it offers, what an employee is never offered,
+and that the owner's requests of the real-model QA (hub#1099), in the owner's own words, are offered their existing
+operation.
 
 Every ask of every tool of attendance bringing its tool among the first ten, role by role, in English and in Spanish,
 out of the catalogue of a business with every app on and ranked as a turn ranks, is

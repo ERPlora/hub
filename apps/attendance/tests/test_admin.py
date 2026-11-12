@@ -1,4 +1,4 @@
-"""Django admin of the attendance app, for the platform's staff only (round 12, PLAN §17).
+"""Django admin of the attendance app, for the platform's staff only.
 
 The settings have full CRUD. Working days, breaks and corrections are shown whole and read-only, never
 added nor deleted: the law keeps the working-day record four years and a time only changes with a

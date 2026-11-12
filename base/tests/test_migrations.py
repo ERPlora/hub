@@ -1,5 +1,6 @@
 """Data migrations of base: the customer roles of a Membership get the ``hub_`` prefix (reversible); the sessions
-alive before ``SessionOwner`` get their note; the hubs of before round 2026-10-27 keep every app on (reversible)."""
+alive before ``SessionOwner`` get their note; the hubs created before new hubs started with every app off keep every
+app on (reversible)."""
 
 from importlib import import_module
 
@@ -83,7 +84,7 @@ def test_the_sessions_alive_before_the_index_get_their_note_from_what_they_say()
     assert SessionOwner.objects.count() == 3
 
 
-# ── Round 2026-10-27: a hub is born with every app off; the hubs of before keep theirs (base.0017) ──────────────────
+# ── A hub is born with every app off; the hubs of before keep theirs (base.0017) ────────────────────────────────────
 
 
 def _apps_kept():

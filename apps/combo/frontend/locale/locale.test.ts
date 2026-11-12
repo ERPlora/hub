@@ -1,7 +1,6 @@
-// The combo app's UI texts: English source + Spanish (PLAN §5), kept by hand next to the pages until
-// Django's `djangojs` catalogues are exported to JSON. This test is their guardrail: same keys and
-// placeholders in both languages, nothing empty, every key a page, a component or a helper uses
-// exists, and the words the old screens showed (the old module's `locales/*.json`) are kept.
+// The combo app's UI texts: English source + Spanish, kept by hand next to the pages. This test is their
+// guardrail: same keys and placeholders in both languages, nothing empty, every key a page, a component or
+// a helper uses exists, and the screens' established words are kept.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -51,11 +50,11 @@ describe('combo catalogues (en source + es)', () => {
     expect([...ES.keys()].sort()).toEqual([...EN.keys()].sort());
   });
 
-  it('combos#14: in Spanish a course of a menu is a «plato», never a «curso»', () => {
+  it('in Spanish a course of a menu is a «plato», never a «curso»', () => {
     for (const [key, message] of ES) expect(message, key).not.toMatch(/\bcursos?\b/i);
   });
 
-  it('hub#1124: say a count in the singular or the plural, never «(s)»', () => {
+  it('say a count in the singular or the plural, never «(s)»', () => {
     expect(pluralsInParentheses(EN, ES)).toEqual([]);
   });
 
@@ -88,7 +87,7 @@ describe('combo catalogues (en source + es)', () => {
     for (const kind of ['service', 'goods']) expect(EN.has(`combo.supply.${kind}`), kind).toBe(true);
   });
 
-  it('keep the old screens’ words (the old module’s locales/*.json)', () => {
+  it('keep the old screens’ words', () => {
     const words: Array<[string, string, string]> = [
       ['combo.title', 'Menus', 'Menús'],
       ['combo.menus.search', 'Search a menu…', 'Buscar un menú…'],

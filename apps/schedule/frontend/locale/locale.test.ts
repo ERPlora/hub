@@ -1,7 +1,6 @@
-// The schedule app's UI texts: English source + Spanish (PLAN §5), kept by hand next to the pages until
-// Django's `djangojs` catalogues are exported to JSON. This test is their guardrail: same keys and
-// placeholders in both languages, nothing empty, every key a page, a component or a helper of the app
-// uses exists, and the texts the old screens showed are kept word for word.
+// The schedule app's UI texts: English source + Spanish, kept by hand next to the pages. This test is
+// their guardrail: same keys and placeholders in both languages, nothing empty, every key a page, a
+// component or a helper of the app uses exists, and the screens' established texts are kept word for word.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -95,7 +94,7 @@ describe('schedule catalogues (en source + es)', () => {
     ]);
   });
 
-  it('keep the old screens’ words (locales/es.json of the old module)', () => {
+  it('keep the old screens’ words', () => {
     expect(ES.get('schedule.tabs.hours')).toBe('Horario');
     expect(ES.get('schedule.tabs.special_days')).toBe('Días especiales');
     expect(ES.get('schedule.tabs.settings')).toBe('Ajustes');
@@ -124,8 +123,8 @@ describe('schedule catalogues (en source + es)', () => {
   });
 
   it('promise of the default week only what holds while it is unconfirmed: appointments are refused outside it', () => {
-    // The old words said «las reservas fuera de él se rechazan», but Reservations does not apply the week until it
-    // is saved or confirmed; Appointments (and Online booking through it) does (CLOSE-SCHEDULE, hub#172).
+    // Not «las reservas fuera de él se rechazan»: Reservations does not apply the week until it is saved or
+    // confirmed; Appointments (and Online booking through it) does (hub#172).
     expect(ES.get('schedule.hours.defaultWeek.message')).toBe(
       'Este es un horario por defecto que hemos puesto por ti. Comprueba que coincide con el de tu negocio: las citas fuera de él se rechazan.',
     );

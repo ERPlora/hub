@@ -1,4 +1,4 @@
-"""``manage.py migrate_hubs``: what the ``hub-migrate`` task runs on every deploy (aws-next README; PLAN-DB §7).
+"""``manage.py migrate_hubs``: what the ``hub-migrate`` task runs on every deploy (ERPlora/aws's README).
 
 Control (``base.tenancy.migrator.migrate_control``, its lock: ``test_migrator.py``), then the templates of every
 server the hubs live on (``clusters_to_migrate``, ``ensure_template``), then every hub behind, each through its own
@@ -114,7 +114,7 @@ def missing_database() -> str:
 
 
 def at_the_leaf() -> dict[str, str]:
-    """A hub with its own database at the code's leaf: the platform (S3: an app's tables are made when it is turned on,
+    """A hub with its own database at the code's leaf: the platform (an app's tables are made when it is turned on,
     never by ``migrate_hubs``)."""
     leaf = leaves()
     return {label: leaf[label] for label in PLATFORM}
@@ -191,7 +191,7 @@ def test_a_hub_that_fails_is_left_behind_and_the_others_still_migrate(small, new
 
 
 def test_hubs_at_the_leaf_are_not_opened(small, make_hub):
-    """A deploy without migrations opens no hub's database (PLAN-DB §7): this one does not even exist."""
+    """A deploy without migrations opens no hub's database: this one does not even exist."""
     make_hub(missing_database(), schema_apps=at_the_leaf())
 
     assert "migrate_hubs: hubs: 0 migrated, 0 left behind, 1 up to date." in migrate_hubs()
@@ -201,7 +201,7 @@ def test_only_the_hubs_with_a_complete_database_of_their_own_are_migrated(small,
     """Ready, cancelled or archiving (kept to come back) and expired (until its purge), once their database was made;
     never one on control's database, one being made (the worker's), a failed one or a purged one, nor one cancelled or
     expired before its database was ever made (a sign-up deleted while requested, or after failing): there is nothing to
-    migrate, and a deploy must not stop for it (review of round 5)."""
+    migrate, and a deploy must not stop for it."""
     made = timezone.now()
     alive = [make_hub(make_database(), status=Hub.Status.READY, ready_at=made)] + [
         make_hub(make_database(), status=status, ready_at=made)
@@ -314,7 +314,7 @@ def test_a_template_that_fails_stops_the_run_before_any_hub(small, make_hub, mon
 def test_every_server_gets_its_templates_and_each_hub_migrates_on_its_own(
     small, make_cluster, make_hub, new_database, opened_at, monkeypatch
 ):
-    """``CREATE DATABASE … TEMPLATE`` clones only within one server (round 2026-10-30b): two «clusters» on the tests'
+    """``CREATE DATABASE … TEMPLATE`` clones only within one server: two «clusters» on the tests'
     own Postgres, named apart (``control``) so their templates do not meet; a closed one without hubs is never
     reached (its writer does not even resolve)."""
     other_host = same_server_by_another_name()
@@ -416,8 +416,8 @@ def test_check_sees_a_new_migration_of_a_templates_app(small, db):
 
 
 def test_check_counts_a_template_without_the_portable_apps_as_behind(small, db, monkeypatch):
-    """Until S3 every template carries every portable app (``migrator.templates``): one built before, with the
-    platform alone, is behind, and a run gives it them."""
+    """Every template carries every portable app (``migrator.templates``): one built with the platform alone is
+    behind, and a run gives it them."""
     platform = small[0]  # the platform alone
     up_to_date = migrator.Template(db_name=platform.db_name, apps=REAL_TEMPLATES()[0].apps)
     monkeypatch.setattr(migrator, "templates", lambda control=None: [up_to_date])
@@ -479,7 +479,7 @@ def test_check_that_cannot_read_the_database_exits_non_zero_with_the_reason(monk
     assert raised.value.returncode != 0
 
 
-# ── The freeze (hub#930; PLAN-DB round 2026-11-04e, «Congelar») ──────────────────────────────────────────────────────
+# ── The freeze (hub#930) ─────────────────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture

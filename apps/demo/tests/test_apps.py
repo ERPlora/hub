@@ -29,8 +29,8 @@ def test_demo_is_a_free_module_of_the_organization_group():
 
 
 def test_demo_has_the_store_metadata_but_stays_out_of_the_store():
-    # Round 16 (PLAN §21): every module declares what the public store shows; demo is the technical
-    # reference and is not sold (its WORKBOOK), so listed = False and it belongs to no vertical.
+    # Every module declares what the public store shows; demo is the technical reference and is not
+    # sold (its WORKBOOK), so listed = False and it belongs to no vertical.
     config = demo()
     assert 0 < len(str(config.summary)) <= 120
     assert str(config.description)
@@ -58,11 +58,11 @@ def test_navigation_points_at_the_item_list_with_an_iconify_icon():
     [entry] = demo().navigation
     assert isinstance(entry, Nav)
     assert (entry.id, str(entry.label), entry.path) == ("demo", "Demo", "/demo/items")
-    # Iconify names carry their set prefix (HubIcon, working-rules §11).
+    # Iconify names carry their set prefix (HubIcon).
     assert entry.icon == "ion:flask-outline"
 
 
-# The assistant's contract: every operation is one of its tools (CLAUDE.md «Un solo camino hacia el servidor»).
+# The assistant's contract: every operation is one of its tools.
 
 
 def demo_operations():
@@ -118,8 +118,8 @@ def test_deleting_an_item_is_the_only_high_risk_command():
 
 
 def test_the_homes_hooks_are_the_example_every_app_copies():
-    """PLAN-HUB round 2026-10-21: one step, one panel and one counter, each on a query of its own queries.py. The
-    demo is out of the store, so base shows them only where SHOW_UNLISTED_MODULES is on (development, tests, e2e)."""
+    """One step, one panel and one counter, each on a query of its own queries.py. The demo is out of the store, so
+    base shows them only where SHOW_UNLISTED_MODULES is on (development, tests, e2e)."""
     config = apps.get_app_config("demo")
     [step] = config.setup
     [panel] = config.widgets
