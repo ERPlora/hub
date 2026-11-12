@@ -330,9 +330,17 @@ def test_every_assistant_write_of_menus_that_takes_a_course_or_a_choice_by_its_n
 
 
 def mark_of(op, name: str) -> dict | None:
-    """The mark that names the record of the datum ``name`` of ``op``'s input, or ``None``."""
+    """How the card reads the datum ``name`` of ``op``'s input — the mark that names its record, but for the data
+    beside which it is left unread (``unless``, below) —, or ``None``."""
     field = op.input.model_fields.get(name)
-    return (field.json_schema_extra or {}).get("refers") if field is not None else None
+    mark = (field.json_schema_extra or {}).get("refers") if field is not None else None
+    return {key: value for key, value in mark.items() if key != "unless"} if mark is not None else None
+
+
+def unless_of(op, name: str) -> set[str]:
+    """The data beside which the card leaves the datum ``name`` of ``op``'s input unread (``unless``)."""
+    field = op.input.model_fields[name]
+    return set(((field.json_schema_extra or {}).get("refers") or {}).get("unless", ()))
 
 
 #: How the card reads each datum a write of Menus takes by its name.
@@ -444,3 +452,98 @@ def test_the_card_says_the_product_of_inventory_it_finds_or_as_said_when_two_fit
     assert fields_of(write, arguments, "es", as_admin())[datum]["value"] == "Natillas caseras"
     make_product("Natillas de chocolate")
     assert fields_of(write, arguments, "es", as_admin())[datum]["value"] == "natillas"
+
+
+# ── A record that comes by its id with a name the write does not use beside it (hub#1250) ────────────────────────────
+# The write takes the menu, the course or the choice by its id (or its course's, or its menu's) and never looks at the
+# name beside it; the card neither reads nor shows that name (``unless``), as when the id comes alone: never another
+# menu, course, choice or product of Inventory.
+
+#: Beside which data each write of Menus takes its record by them and not by the name: the datum's own id, and the id
+#: of the record that holds it (a course's menu is the course's own).
+UNLESS = {
+    **{(name, "combo"): {"id"} for name in CHECKED_BY_THE_MENU},
+    ("combo.group.create", "combo"): {"combo_id"},
+    **{(name, "combo"): {"combo_id", "group_id"} for name in UNCHECKED_COURSE},
+    **{(name, "combo"): {"id", "combo_id"} for name in ("combo.group.delete", "combo.group.update")},
+    **{(name, "combo"): {"id", "combo_id", "group_id"} for name in ("combo.option.delete", "combo.option.update")},
+    **{(name, "group"): {"id"} for name in ("combo.group.delete", "combo.group.update")},
+    **{(name, "group"): {"group_id"} for name in UNCHECKED_COURSE},
+    **{(name, "group"): {"id", "group_id"} for name in ("combo.option.delete", "combo.option.update")},
+    ("combo.option.create", "product"): {"product_id"},
+    **{(name, "product"): {"id"} for name in ("combo.option.delete", "combo.option.update")},
+    ("combo.option.update", "new_product"): {"new_product_id"},
+}
+
+
+def test_a_name_is_left_unread_beside_each_datum_its_write_takes_its_record_by_instead():
+    marked = {
+        (op.name, datum): unless_of(op, datum)
+        for op in assistant_writes()
+        for datum in ("combo", "group", "product", "new_product")
+        if datum in op.input.model_fields
+    }
+    assert marked == UNLESS
+
+
+def infantil() -> Combo:
+    """«Menú infantil», whose course «Postres infantiles» offers «Flan infantil»: a name only it fits."""
+    combo = make_combo("Menú infantil")
+    make_option(make_group(combo, "Postres infantiles"), make_product("Flan infantil"))
+    return combo
+
+
+def beside_an_id() -> dict[str, dict]:
+    """The data of a write with its record by its id and, beside it, a name only «Menú infantil» or what it holds
+    fits; «Menú vegano» and its «Postres caseros» with «Flan de la casa» are the records of the ids."""
+    combo = vegan_desserts()
+    infantil()
+    course = combo.groups.get(name=FOUND["group"])
+    choice = course.options.get()
+    natillas = make_product("Natillas")
+    return {
+        "combo.combo.delete": {"id": str(combo.id), "combo": "infantil"},
+        "combo.group.update": {"id": str(course.id), "combo": "infantil", "group": "infantiles", "max_choices": 2},
+        "combo.group.create": {"combo_id": str(combo.id), "combo": "infantil", "name": "Bebidas"},
+        "combo.option.create": {
+            "group_id": str(course.id), "combo": "infantil", "group": "infantiles",
+            "product_id": str(natillas.id), "product": "flan infantil",
+        },
+        "combo.option.update": {
+            "id": str(choice.id), "combo": "infantil", "group": "infantiles", "product": "flan infantil",
+            "new_product_id": str(natillas.id), "new_product": "flan infantil",
+        },
+        "combo.option.delete": {"group_id": str(course.id), "combo": "infantil", "product": "flan"},
+    }
+
+
+OF_THE_OTHER = {"Menú infantil", "Postres infantiles", "Flan infantil"}
+
+
+@pytest.mark.parametrize(
+    "write",
+    ["combo.combo.delete", "combo.group.create", "combo.group.update", "combo.option.create",
+     "combo.option.delete", "combo.option.update"],
+)
+def test_a_record_that_comes_by_its_id_names_no_other_one_said_beside_it(write):
+    shown = fields_of(write, beside_an_id()[write], "es", as_admin())
+    assert OF_THE_OTHER.isdisjoint(field["value"] for field in shown.values()), shown
+
+
+def test_a_choice_that_comes_by_its_course_s_id_is_named_by_its_product_in_that_course():
+    """«flan» beside the course's id is how the write finds the choice: the card reads it there, never the menu."""
+    shown = fields_of("combo.option.delete", beside_an_id()["combo.option.delete"], "es", as_admin())
+    assert (shown["product"]["value"], "combo" in shown) == (FOUND["product"], False)
+
+
+@pytest.mark.parametrize("write", ["combo.combo.delete", "combo.group.update", "combo.option.update"])
+def test_the_yes_to_a_record_that_comes_by_its_id_runs_on_it_whatever_name_is_said_beside_it(write):
+    """Control: the write acts on the record of the id, never on what the name beside it fits."""
+    arguments = beside_an_id()[write]
+    other = Combo.objects.get(name="Menú infantil")
+    before = (Combo.objects.values().get(pk=other.pk), list(ChoiceGroup.objects.filter(combo=other).values()),
+              list(ChoiceOption.objects.filter(group__combo=other).values()))
+    done = yes_to_its_card(as_admin(), write, arguments)
+    assert [row["outcome"] for row in done["executed"]] == ["ok"]
+    assert (Combo.objects.values().get(pk=other.pk), list(ChoiceGroup.objects.filter(combo=other).values()),
+            list(ChoiceOption.objects.filter(group__combo=other).values())) == before
