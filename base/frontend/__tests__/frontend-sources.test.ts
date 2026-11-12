@@ -1,14 +1,22 @@
+// @vitest-environment node
 // What the guardrails over the Hub's frontends read (money-grouping, quantity-format): the code of a `.ts` and of the
 // `<script>` blocks of a `.vue` at their own lines, the sources of a frontend without tests, their helpers, declarations
 // or builds, and what a guard finds in them, as `<path>:<line>` by app.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import ts from 'typescript';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { bare, findingsByApp, frontendSources, hubFrontends, linesWhere, scriptBlocks } from './frontend-sources';
+
+// Node's synchronous listing and reading, watched: the guards list and read the frontends without them (hub#1315).
+// In Node's environment, where a module's own `node:fs` is the watched one.
+vi.mock('node:fs', async (importOriginal) => {
+  const fs = await importOriginal<typeof import('node:fs')>();
+  return { ...fs, readdirSync: vi.fn(fs.readdirSync), readFileSync: vi.fn(fs.readFileSync) };
+});
 
 describe('scriptBlocks', () => {
   it('gives a .ts whole, from its first line', () => {
@@ -127,6 +135,8 @@ describe('frontendSources and findingsByApp', () => {
 
   it('lists and reads every frontend without holding the worker (hub#1315): what it was given meanwhile runs first', async () => {
     for (let index = 0; index < 30; index += 1) put(`apps/a/frontend/lib/f${index}.ts`, 'bad\n');
+    vi.mocked(readdirSync).mockClear();
+    vi.mocked(readFileSync).mockClear();
     let turned = false;
     setImmediate(() => {
       turned = true;
@@ -134,6 +144,10 @@ describe('frontendSources and findingsByApp', () => {
     const found = await findingsByApp([{ app: 'a', dir: join(root, 'apps/a/frontend') }], () => [1], root);
     expect(turned).toBe(true);
     expect(found.a).toHaveLength(30);
+    expect([...vi.mocked(readdirSync).mock.calls, ...vi.mocked(readFileSync).mock.calls]).toEqual([]);
+    // And the watch sees them: `hubFrontends` lists the hub's apps that way.
+    hubFrontends({ ui: false });
+    expect(readdirSync).toHaveBeenCalled();
   });
 });
 
