@@ -284,3 +284,45 @@ def test_the_yes_to_a_write_that_cannot_check_it_touches_only_what_its_card_show
 
     assert done["executed"] == []
     assert state() == before["state"]
+
+
+# ── Not yet: a record that comes by its id with the name of another one beside it (hub#1250) ───────────────────────
+# The write takes the task or the project by its id and never looks at the name; the card reads that name all the
+# same and says both under one word («Tarea: Llamar al proveedor» and «Tarea: Pedir hielo»). The yes is still held to
+# what the card read, and the write acts on the one of the id. Strict: once the card leaves out a name the write does
+# not use, the first passes and its mark goes.
+
+OTHER = {"task": ("Pedir hielo", "hielo"), "project": ("Reforma del baño", "reforma")}
+
+
+def by_its_id_beside_another_name(write: str) -> dict:
+    """The data of ``write`` with the id of the record that fits «llamar» or «apertura» and, beside it, a name only
+    another one fits."""
+    datum, found, make = two(write)
+    record = make(found)
+    other, word = OTHER[datum]
+    make(other)
+    return {**by_its_name(word)[write], "id": str(record.id)}
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="hub#1250: the card reads a name the write does not use")
+@pytest.mark.parametrize("write", sorted(CHECKS))
+def test_a_record_that_comes_by_its_id_names_no_other_one_said_beside_it(write):
+    card = assistant.card(get(write), by_its_id_beside_another_name(write), "es", as_admin())
+    assert OTHER[two(write)[0]][0] not in [field["value"] for field in card["fields"]]
+
+
+@pytest.mark.parametrize("write", sorted(CHECKS))
+def test_the_yes_to_a_record_that_comes_by_its_id_runs_on_it_whatever_name_is_said_beside_it(write):
+    """Control of the above: the write acts on the record of the id, never on the one the name beside it fits."""
+    arguments = by_its_id_beside_another_name(write)
+    other = OTHER[two(write)[0]][0]
+
+    def of_the_other() -> list:
+        tasks, _, projects = state()
+        return [row for row in tasks + projects if row[0] == other]
+
+    before = of_the_other()
+    done = yes_to_its_card(as_admin(), write, arguments)
+    assert [row["outcome"] for row in done["executed"]] == ["ok"]
+    assert of_the_other() == before
