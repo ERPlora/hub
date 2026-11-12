@@ -511,6 +511,51 @@ class RestoredCopy(UUIDModel):
         return f"{self.hub.slug} · {self.restore_point.astimezone(dt.UTC):%Y-%m-%d %H:%M} UTC"
 
 
+class CopyRecovery(UUIDModel):
+    """What the staff asked to bring back into a business from one of its separate copies (hub#1257, layer 2 of
+    hub#1213; BASE-F114): asked in the Hub admin (``control.copy.recover``), done by the worker
+    (``base.tenancy.recovery``), which reads the copy and creates in the business, by each app's own operation, what
+    the business lacks. Dropped with its copy.
+
+    ``apps`` are the labels asked, each an app that answers ``recoverable_from_copy`` on its ``LiveAppConfig``;
+    ``language`` is the staff's, which the apps' refusals are said in. ``results`` says, app by app, how many were
+    created and how many not, with why (``reasons``, the first :data:`REASONS_KEPT`, by the copy's id: no personal
+    data), or why the app gave nothing back (``refused``). The worker holds the row's own lease (``lease_owner``,
+    ``lease_until``) while it recovers, never the hub's: the business's own work does not wait for it."""
+
+    #: How many records a recovery notes the reason of, app by app, when its operation refuses them.
+    REASONS_KEPT = 50
+
+    class Status(models.TextChoices):
+        ASKED = "asked", pgettext_lazy("recovery", "Asked")
+        DONE = "done", pgettext_lazy("recovery", "Done")
+        FAILED = "failed", pgettext_lazy("recovery", "Failed")
+
+    copy = models.ForeignKey(
+        RestoredCopy, on_delete=models.CASCADE, related_name="recoveries", verbose_name=_("separate copy")
+    )
+    apps = models.JSONField(pgettext_lazy("recovery", "what"), default=list)
+    language = models.CharField(_("language"), max_length=16, default="en", db_default="en")
+    status = models.CharField(
+        _("status"), max_length=16, choices=Status.choices, default=Status.ASKED, db_default=Status.ASKED
+    )
+    results = models.JSONField(pgettext_lazy("recovery", "results"), default=list, blank=True)
+    last_error = models.TextField(_("last error"), blank=True, default="", db_default="")
+    asked_by = models.CharField(pgettext_lazy("separate copy", "asked by"), max_length=150)
+    asked_at = models.DateTimeField(pgettext_lazy("separate copy", "asked at"), auto_now_add=True)
+    done_at = models.DateTimeField(pgettext_lazy("recovery", "done at"), null=True, blank=True)
+    lease_owner = models.CharField(_("leased by"), max_length=128, blank=True, default="", db_default="")
+    lease_until = models.DateTimeField(_("leased until"), null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("recovery")
+        verbose_name_plural = _("recoveries")
+        ordering = ["-asked_at"]
+
+    def __str__(self) -> str:
+        return str(self.copy)
+
+
 class LeftoverDatabase(UUIDModel):
     """A database a move may have left on its destination when it was undone without reaching it (round 2026-10-31 of
     the review of W8): the hub's name on that cluster, dropped by the worker on a later pass (``base.tenancy.move``)
