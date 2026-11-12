@@ -4,6 +4,14 @@
 // answers 410 «This demo has ended», whose link takes the visitor to the SaaS's /demo/?state=expired, which
 // forgets the demo the session still held as live. Zero CSP violations on the hub's pages.
 //
+// A demo is waited for with no clock of its own (hub#1061): on a machine loaded far beyond its cores one took 15.3 s
+// with nothing broken and failed the 15 s the spec gave it. That clock held two things, each a fact now, however long it
+// took: the worker's 5 s tick, which takes a demo due on its next pass (base/tests/test_worker.py, on the waits its loop
+// asks for), and a sign-up that is the clone of its template, with no migration applied (here, demo-born.ts). A demo
+// that never opens is cut by the test's timeout (playwright.config.ts); so is a shell that never comes up, and one
+// that is only slow is no longer caught here: this stack's shell is served by Vite in development, so its time is the
+// machine's, and the 15 s were never for it.
+//
 // It needs the SaaS with the demo door and its HUB_INTERNAL_URL on this stack's Hub (README of this folder,
 // «La demo»): the SaaS calls the Hub's /internal/demos itself, so a SaaS pointed at another Hub's port creates
 // the demo there and this run never finds it. And its limit of new demos per address raised, as the README's recipe
@@ -12,7 +20,8 @@ import { execFileSync } from 'node:child_process';
 
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { doorOutcome, noDemoBecause } from './demo-door';
+import { demoBeingPrepared, migrationsAppliedAtSignUp } from './demo-born';
+import { doorOutcome, whyNoDemo } from './demo-door';
 import { api, collectProblems, createViaPage, HUB_DIR, listReady, rowNames, SAAS, shot, shown, turnOn, uniqueName } from './helpers';
 import { STACK } from './stack';
 
@@ -41,21 +50,22 @@ function jumpInto(slug: string): RegExp {
   return new RegExp(`^http://${slug}\\.localhost:${STACK.hubPort}/auth/login\\?`);
 }
 
-/** How long a demo may take to be ready, door to shell: since S3 its sign-up is the clone of its template (every app off,
- *  an app's tables made when it is turned on), measured at 1.4–4.1 s from its request to `ready` with the worker's 5 s
- *  tick (2026-10-31; 13–32 s while every app's tables were made at sign-up). PLAN-DB §6 aims at 5 s: 15 s is the tick
- *  and that aim with room for a loaded machine, and a sign-up that makes tables again fails here. */
-const DEMO_READY_MS = 15_000;
-
 /** «Try the demo» on the door, then the jump through the demo's /auth/login and callback: its slug, once its shell
- *  is up. A door that answers with an outcome instead (`?state=throttled`…) fails the run at once saying which, not
- *  as a demo that never got ready (hub#1048). */
+ *  is up, however long the Hub takes to prepare it (no clock of its own: hub#1061). A door that answers with an outcome
+ *  instead (`?state=throttled`…) fails the run at once saying which, not as a demo that never got ready (hub#1048);
+ *  `not_ready`, the door's own 30 s run out on a demo the Hub is still preparing, is waited past with its «Try again»,
+ *  as the visitor does (PUBLIC-F29 of the SaaS), unless the Hub could not prepare it. */
 async function startDemo(page: Page): Promise<string> {
   await page.getByTestId('demo-start').click();
-  await page.waitForURL((url) => DEMO_HOST.test(url.href) || doorOutcome(url.href, DOOR) !== null, { timeout: DEMO_READY_MS });
-  const refused = doorOutcome(page.url(), DOOR);
-  if (refused) throw new Error(noDemoBecause(refused));
-  await shown(page).locator('[data-testid=topbar-apps]').waitFor({ state: 'attached', timeout: DEMO_READY_MS });
+  for (;;) {
+    await page.waitForURL((url) => DEMO_HOST.test(url.href) || doorOutcome(url.href, DOOR) !== null);
+    const outcome = doorOutcome(page.url(), DOOR);
+    if (outcome === null) break;
+    const why = whyNoDemo(outcome, demoBeingPrepared(STACK.database));
+    if (why) throw new Error(why);
+    await page.getByTestId('demo-retry').click();
+  }
+  await shown(page).locator('[data-testid=topbar-apps]').waitFor({ state: 'attached' });
   const slug = DEMO_HOST.exec(page.url())?.[1];
   if (!slug) throw new Error(`not on a demo host: ${page.url()}`);
   return slug;
@@ -80,16 +90,21 @@ test('a demo from the SaaS door: empty hub as «Demo», something made, ended no
   await doorSays(page, 'idle');
   const slug = await startDemo(page);
   const origin = STACK.hub(slug);
+  // Born as the clone of its template: a sign-up that makes its tables again fails here, fast or slow.
+  expect(migrationsAppliedAtSignUp(slug, STACK.database)).toEqual([]);
 
   const me = await api<Me>(context, origin, 'GET', '/me');
   expect(me.status).toBe(200);
   expect(me.data.user?.label).toBe('Demo');
   expect(Date.parse(me.data.demo?.expires_at ?? '')).toBeGreaterThan(Date.now());
 
-  // Born with every app off, as any business: the visitor turns on the app they try.
-  const apps = await api<{ apps: { id: string; state: string }[] }>(context, origin, 'GET', '/apps');
+  // Born with every app off but Taxes, which a business of Spain is born with on and never chose (hub#997), as any
+  // business: the visitor turns on the app they try.
+  const apps = await api<{ apps: { id: string; state: string; chosen: boolean }[] }>(context, origin, 'GET', '/apps');
   expect(apps.status).toBe(200);
-  expect(apps.data.apps.filter((app) => app.state !== 'off')).toEqual([]);
+  expect(apps.data.apps.filter((app) => app.state !== 'off').map(({ id, state, chosen }) => ({ id, state, chosen }))).toEqual([
+    { id: 'tax', state: 'on', chosen: false },
+  ]);
   await turnOn(context, origin, 'demo');
 
   await page.goto(`${origin}/demo/items`);
@@ -129,6 +144,7 @@ test('a demo from the SaaS door: empty hub as «Demo», something made, ended no
   // Another try is another demo.
   const another = await startDemo(page);
   expect(another).not.toBe(slug);
+  expect(migrationsAppliedAtSignUp(another, STACK.database)).toEqual([]);
   expect(expireNow(another)).toBe(`${another}: purged`);
 
   const found = await problems();
