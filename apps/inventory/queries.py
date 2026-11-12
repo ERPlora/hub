@@ -1151,19 +1151,37 @@ def _live_links_in_copy() -> sql.Composed:
     )
 
 
+def products_deleted_in_business(products: list[dict]) -> list[dict]:
+    """hub#1321: the products of a separate copy (``products_in_copy``) the business still holds deleted
+    (INVENTORY-F04), in their order, for ``inventory.product.restore``: the same product back with its movements. Never
+    one whose SKU or EAN-13 another live product holds now (made again by hand since: that one stays)."""
+    live = Product.objects.filter(is_deleted=False)
+    deleted = (
+        Product.objects.filter(pk__in=[one["id"] for one in products], is_deleted=True)
+        .exclude(sku__in=live.values("sku"))
+        .exclude(ean13__in=live.filter(ean13__isnull=False).values("ean13"))
+    )
+    held = set(deleted.values_list("pk", flat=True))
+    return [one for one in products if one["id"] in held]
+
+
 def products_not_in_business(products: list[dict]) -> list[dict]:
     """hub#1282: the products of a separate copy (``products_in_copy``) the business lacks, in their order, each as
-    ``inventory.product.create`` takes it here. Not lacking: one with the SKU or the EAN-13 of a live one (the code is
-    the article's identity: the same product, live since, as a SKU is never edited; or one made again by hand, or
-    brought back already). Lacking: one deleted (INVENTORY-F04) or gone altogether. Each takes the key of its tax
-    category (Taxes never deletes one; one no longer active is the create's to refuse, and one without any names none)
-    and the categories the business still has live: one deleted since is left out (INVENTORY-F07)."""
+    ``inventory.product.create`` takes it here. Not lacking: any product it still holds, live or deleted (it comes back
+    the same, ``products_deleted_in_business``, hub#1321), nor one with the SKU or the EAN-13 of a live one (the code
+    is the article's identity: one made again by hand, or brought back already). Lacking: one gone altogether. Each
+    takes the key of its tax category (Taxes never deletes one; one no longer active is the create's to refuse, and one
+    without any names none) and the categories the business still has live: one deleted since is left out
+    (INVENTORY-F07)."""
+    held = set(Product.objects.filter(pk__in=[one["id"] for one in products]).values_list("pk", flat=True))
     live = Product.objects.filter(is_deleted=False)
     skus = set(live.filter(sku__in=[one["sku"] for one in products]).values_list("sku", flat=True))
     codes = [one["ean13"] for one in products if one["ean13"]]
     barcodes = set(live.filter(ean13__in=codes).values_list("ean13", flat=True))
     lacking = [
-        one for one in products if one["sku"] not in skus and not (one["ean13"] and one["ean13"] in barcodes)
+        one
+        for one in products
+        if one["id"] not in held and one["sku"] not in skus and not (one["ean13"] and one["ean13"] in barcodes)
     ]
     keys = dict(TaxCategory.objects.filter(pk__in={one["tax_category"] for one in lacking}).values_list("pk", "key"))
     wanted = {category for one in lacking for category in one["category_ids"]}

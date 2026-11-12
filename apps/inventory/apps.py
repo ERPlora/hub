@@ -146,9 +146,11 @@ class InventoryConfig(LiveAppConfig):
 
     def recoverable_from_copy(self) -> list:
         """hub#1282: the platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when
-        the staff recovers from it (BASE-F114): the copy's live products the business lacks
-        (``queries.products_in_copy``, ``queries.products_not_in_business``), each created by
-        ``inventory.product.create``, the screen's own, in the categories the business still has and with no stock."""
+        the staff recovers from it (BASE-F114): of the copy's live products (``queries.products_in_copy``), each the
+        business still holds deleted comes back the same, with its stock and its movements
+        (``queries.products_deleted_in_business``, ``inventory.product.restore``, INVENTORY-F34, hub#1321), and each it
+        no longer holds is created by ``inventory.product.create``, the screen's own, in the categories the business
+        still has and with no stock (``queries.products_not_in_business``)."""
         from apps.inventory import queries  # the models are not loaded yet when this module is
         from base.recovery import Recoverable
 
@@ -159,5 +161,7 @@ class InventoryConfig(LiveAppConfig):
                 read=queries.products_in_copy,
                 missing=queries.products_not_in_business,
                 create="inventory.product.create",
+                deleted=queries.products_deleted_in_business,
+                restore="inventory.product.restore",
             )
         ]

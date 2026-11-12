@@ -1034,6 +1034,27 @@ class TestRecoverIntoTheBusiness:
         self.a_recovery(copy)
         assert self.copy_cell(copy) in page(client, RECOVERIES)
 
+    def test_a_long_result_breaks_inside_its_cell_by_the_sheet_recoveries_load(self, client, root):
+        """A result can be long and in one piece (why a recovery failed names its copy's database): Recoveries load
+        control's admin sheet, whose rule on the results' cells breaks it into lines there instead of pushing the list
+        sideways on a phone (hub#1308). The browser measures it at 375, 768 and 1280 px
+        (tests/e2e/base-recoveries-long-result.spec.ts); this keeps the sheet loaded and its rule on the cells the list
+        draws."""
+        from pathlib import Path
+
+        from django.contrib.staticfiles import finders
+        from django.templatetags.static import static
+
+        copy = self.made()
+        self.a_recovery(copy, status="failed", last_error=f"recover_copy_unreadable: {copy.db_name!r} is gone")
+
+        listed = page(client, RECOVERIES)
+
+        assert f'href="{static("control/admin.css")}"' in listed
+        assert 'class="field-outcome"' in row_of(listed, self.copy_cell(copy))
+        sheet = Path(finders.find("control/admin.css")).read_text()
+        assert re.search(r"#result_list td\.field-outcome\s*\{[^}]*overflow-wrap:\s*anywhere", sheet)
+
 
 def test_the_recovery_speaks_spanish(client, root):
     from django.utils import translation

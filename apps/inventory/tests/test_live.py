@@ -8,7 +8,7 @@ from live.operations import get
 from apps.inventory import events
 
 EVENTS_SOURCE = Path(events.__file__).read_text()
-PRODUCT = [events.PRODUCT_CREATED, events.PRODUCT_UPDATED, events.PRODUCT_DELETED]
+PRODUCT = [events.PRODUCT_CREATED, events.PRODUCT_UPDATED, events.PRODUCT_DELETED, events.PRODUCT_RESTORED]
 LINKS = [events.PRODUCT_CATEGORIZED, events.PRODUCT_UNCATEGORIZED]
 
 
@@ -23,12 +23,25 @@ def test_the_registry_is_valid():
 def test_each_live_query_and_its_events():
     assert inventory_queries() == {
         "inventory.product.list": [*PRODUCT, *LINKS, events.STOCK_CHANGED, events.CONFIG_UPDATED],
-        # A new product changes no existing detail.
-        "inventory.product.get": [events.PRODUCT_UPDATED, events.PRODUCT_DELETED, *LINKS, events.STOCK_CHANGED, events.CONFIG_UPDATED],
+        # A new product changes no existing detail; a deleted one brought back is its own again (INVENTORY-F34).
+        "inventory.product.get": [
+            events.PRODUCT_UPDATED,
+            events.PRODUCT_DELETED,
+            events.PRODUCT_RESTORED,
+            *LINKS,
+            events.STOCK_CHANGED,
+            events.CONFIG_UPDATED,
+        ],
         # The sale catalog carries no stock: a movement does not re-run it.
         "inventory.product.list_for_sale": [*PRODUCT, events.CONFIG_UPDATED],
         "inventory.product.list_low_stock": [*PRODUCT, events.STOCK_CHANGED, events.CONFIG_UPDATED],
-        "inventory.product_category.list": [*LINKS, events.PRODUCT_UPDATED, events.PRODUCT_DELETED, events.CATEGORY_DELETED],
+        "inventory.product_category.list": [
+            *LINKS,
+            events.PRODUCT_UPDATED,
+            events.PRODUCT_DELETED,
+            events.PRODUCT_RESTORED,
+            events.CATEGORY_DELETED,
+        ],
         "inventory.category.list": [
             events.CATEGORY_CREATED,
             events.CATEGORY_UPDATED,
@@ -36,7 +49,10 @@ def test_each_live_query_and_its_events():
             *LINKS,
             events.PRODUCT_UPDATED,
             events.PRODUCT_DELETED,
+            events.PRODUCT_RESTORED,
         ],
+        # Its movements keep their product's name and SKU while it is deleted (INVENTORY-F04): bringing it back
+        # changes none.
         "inventory.movement.list": [events.STOCK_CHANGED, events.PRODUCT_UPDATED],
         "inventory.stock.get_summary": [*PRODUCT, events.STOCK_CHANGED, events.CONFIG_UPDATED],
         "inventory.config.get": [events.CONFIG_UPDATED],
