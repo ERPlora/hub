@@ -19,6 +19,7 @@ from base.tests.po import (
     module_texts,
     operation_titles,
     po_entries,
+    po_messages,
     untranslated,
 )
 
@@ -65,9 +66,17 @@ def test_the_card_says_each_title_with_cart_checkouts_own_spanish():
         }
 
 
-def said_in_spanish(key: str) -> str:
-    """How the Hub says a catalogue entry in Spanish: every app's catalogue merged, the first one to have it winning."""
+#: A number that picks each form of Spanish's plural (``n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2``).
+FORM_NUMBER = {0: 1, 1: 1_000_000, 2: 2}
+
+
+def said_in_spanish(key: str | tuple[str, int], plurals: dict[str, str]) -> str:
+    """How the Hub says a catalogue entry in Spanish: every app's catalogue merged, the first one to have it winning.
+    A form of a plural entry, keyed ``(msgid, n)`` (hub#1147), is said by ``ngettext`` with a number that picks it."""
     with translation.override("es"):
+        if isinstance(key, tuple):
+            msgid, form = key
+            return translation.ngettext(msgid, plurals[msgid], FORM_NUMBER[form])
         if "\x04" in key:
             context, msgid = key.split("\x04", 1)
             return translation.pgettext(context, msgid)
@@ -80,7 +89,10 @@ def test_no_other_apps_catalogue_says_a_text_of_cart_checkout_its_own_way():
     other app's way — in the admin and on every card that names a datum by its model."""
     entries = po_entries(LOCALE / "django.po")
     assert len(entries) > 60  # positive control: the catalogue was read
-    shadowed = {key: said_in_spanish(key) for key, (msgstr, _) in entries.items() if said_in_spanish(key) != msgstr}
+    plurals = {message.id[0]: message.id[1] for message in po_messages(LOCALE / "django.po") if message.pluralizable}
+    assert {("%(count)d cart", 0), ("%(count)d order", 2)} <= entries.keys()  # its plural entries are checked too
+    said = {key: said_in_spanish(key, plurals) for key in entries}
+    shadowed = {key: said[key] for key, (msgstr, _) in entries.items() if said[key] != msgstr}
     assert shadowed == {}
 
 
