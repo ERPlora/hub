@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9dcb6391f2a8d1d5265416cf4cdea41780b8997801bc12ba2f1241e7fede3b4b -->
+<!-- generated from WORKBOOK.md sha256:ead069bb12f01ba5bd0250bb5edb09caa3c69e9f6031ef20f2430943a1f2f543 -->
 
 ## What it is for and who it is for
 
@@ -237,6 +237,7 @@ same, in the browser too (hub#1023).
 | INVENTORY-F07 | Delete a category | done |
 | INVENTORY-F08 | Group products into categories for the till | done |
 | INVENTORY-F29 | Mark an item as sold out | done |
+| INVENTORY-F34 | Recover a deleted product | done |
 | | **Import and export** | |
 | INVENTORY-F09 | Import products from a CSV | done |
 | INVENTORY-F10 | Import categories from a CSV | done |
@@ -313,7 +314,8 @@ exists in the catalog"; a repeated EAN-13: "Another product of the catalog alrea
 tax category that is no longer in Taxes is refused, also if it arrives through the assistant or the
 API. Every refusal shows inside the panel and nothing is saved.
 Involved: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F114 (the ERPlora staff bring back from a separate copy
-the products that were lost, each by this same creation)
+the products the business no longer has at all, each by this same creation; a deleted one comes back the same,
+INVENTORY-F34)
 
 ### INVENTORY-F02 Edit a product
 Status: done
@@ -371,8 +373,8 @@ are free for another product. Its movements stay in **Movements** with its name.
 the product is gone. It does not check whether it has stock or is on an open bill: Sales refuses, when
 charging, the line of a product that is no longer in the catalog.
 If it fails: "The product could not be deleted" (or the reason) above the table.
-Involved: SALE-F01, BASE-F114 (from a separate copy, the ERPlora staff bring the deleted product back as a new
-one, with no stock and without its movements, which stay with the deleted one: hub#1321)
+Involved: SALE-F01, BASE-F114, INVENTORY-F34 (from a separate copy, the ERPlora staff give the deleted product
+back: the same one, with its stock and its movements)
 
 ### INVENTORY-F05 Review the products that cannot be sold for lack of VAT
 Status: done
@@ -654,7 +656,8 @@ it, although this screen does not show it.
 If it fails: a sale whose number Inventory did not get to note down leaves the Reference cell empty. A
 ticket that Invoicing numbers later (for example, without the business's details when charging) is read
 and searched by the sale's number. Loading error: the table's notice with "Retry".
-Involved: INVOICE-F20, SALE-F28
+Involved: INVOICE-F20, SALE-F28, INVENTORY-F34 (the movements of a deleted product that is recovered are still
+its own: the history is not split in two)
 
 ### INVENTORY-F17 See the dashboard and the low-stock products
 Status: done
@@ -1060,6 +1063,33 @@ WebP of up to 2 MB makes the file unreadable ("The file holds a photo that is no
 2 MB, so it cannot be read.").
 Involved: BASE-F31, BASE-F34, BASE-F35, BASE-F36, BASE-F37, INVENTORY-F12
 
+### INVENTORY-F34 Recover a deleted product
+<!-- origen: nuevo (BASE-F114: recuperar desde una copia aparte lo que el negocio perdió) gh:hub#1321 -->
+Status: done
+Actor: the ERPlora staff, when the business asks (in the business no screen undoes a deletion)
+Screen: none of the business; the Hubs admin › Separate copies › "Recover into the business…" (BASE-F114)
+Steps:
+1. The business deleted one or several products by mistake (INVENTORY-F04) and asks to get them back.
+2. The ERPlora staff make a separate copy of the business from an earlier moment and recover the products from it
+   (BASE-F114, steps 6 to 11).
+3. Each product the business deleted and still holds comes back to **Products**, to the till and to the sale
+   catalog: THE SAME product, with its SKU, its EAN-13, its categories that are still live, its tax category and its
+   stock, and in **Movements** its whole history (initial, receptions, sales, counts and write-offs) is still its own.
+   It comes back active and on sale, as unarchiving does in Odoo or Square: if it was deactivated or marked as sold
+   out before it was deleted, that is done again by hand (INVENTORY-F03, INVENTORY-F29). Recoveries counts it among
+   the restored Products.
+In: the deleted product, by its identifier.
+Out: the product live again, active and on sale, with none of its other data changed, and the product-recovered
+notice (`inventory.product.restored`), with the product as it comes back.
+If it fails: it does not come back if the business has already made another product with its SKU or its EAN-13 since
+it deleted it: the one it made stays, and the recovery neither counts nor creates it. A product the business no longer
+has at all is created again (INVENTORY-F01), with no stock. On a live product it does not fail: it answers well and
+announces again. Its photo does not come back: its own was erased when it was deleted (INVENTORY-F31) and the library
+one was taken off it (hub#1319). What the other apps hung from it (its prices in the price lists, its modifier groups,
+its options in the menus) was erased when it was deleted and does not come back with it yet (hub#1343).
+Involved: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F16, INVENTORY-F29, PRICING-F14,
+MODIFIER-F09, COMBO-F13
+
 ## What the verticals share
 
 The restaurant uses Inventory for the menu and the hair salon for the products for sale, with the same
@@ -1121,6 +1151,7 @@ or what no longer exists, is left out.
 | Creates many products at once and says which row went in, which was skipped and which failed | import products | one tap | F09 | `inventory.product.bulk_create` |
 | Changes a product: data, active or inactive, stock control and categories | change products | one tap | F02, F03, F05, F08, F20 | `inventory.product.update` |
 | Deletes a product | delete products | type to confirm | F04 | `inventory.product.delete` |
+| Gives a deleted product back to the catalog, as it was (the system only, when recovering from a separate copy) | system | not the assistant's: only the platform does it | F34 | `inventory.product.restore` |
 | Marks a product as sold out or puts it back on sale | change products | one tap | F29 | `inventory.product.set_sold_out` |
 | Sets a product's photo, from the library, or removes it | change products | one tap | F30 | `inventory.product.set_image` |
 | Uploads a product's own photo (JPG, PNG or WebP of up to 2 MB; kept as a 512 × 512 WebP) | change products | not the assistant's: the file is chosen on the card | F31 | `inventory.product.upload_image` |
@@ -1144,6 +1175,7 @@ or what no longer exists, is left out.
 | New product | Created on screen, import, template, assistant or API | The product and its categories | Flows; Home's panels | `inventory.product.created` |
 | Product changed | Change, turn on or off, mark sold out or put back on sale | The product as it is left, also whether it is sold out | Flows; Home's panels; the till, Kitchen and Menus | `inventory.product.updated` |
 | Product deleted | Delete | Which one it was (SKU and name) | Flows; Home's panels | `inventory.product.deleted` |
+| Product recovered | Recover a deleted product (also its repetition) | The product as it comes back | Flows; Home's panels | `inventory.product.restored` |
 | Product added to a category | Creation, change or a single link | Product and category | Flows | `inventory.product.categorized` |
 | Product removed from a category | Change, a single link or a deleted category | Product and category | Flows | `inventory.product.uncategorized` |
 | Stock changed | Any movement: initial, goods receipt, count, write-off, sale, void | Product, quantity, balance and type of movement | Dashboard and Home's panels | `inventory.stock.changed` |
@@ -1197,5 +1229,6 @@ ticket or invoice is given by Sales, not by Invoicing.
 | Manage settings | yes | yes | no | no | `inventory.manage_settings` |
 
 These are each profile's factory permissions; the administrator can change them in Roles. The
-administrator can do everything. The app checks them at every door (screen, assistant and API), not only
+administrator can do everything. No profile gives a deleted product back to the catalog: the system does it when the
+ERPlora staff recover from a separate copy (INVENTORY-F34, `inventory.system`, which no role holds either). The app checks them at every door (screen, assistant and API), not only
 on the screen.

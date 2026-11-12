@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ac0471785fe889a1a9a31313a928aca4194caba46ed663c0d69a0a2e34276ef3 -->
+<!-- generated from WORKBOOK.md sha256:df540680227702cbaa10d19b34a2ba4410f7b7018917f5742444dec95e05d6fb -->
 
 ## What it is for and who it is for
 
@@ -212,10 +212,12 @@ Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Staff
 Steps:
-1. Tap the row: **Edit · {name}** opens (the assistant names it by its name).
-2. Change what is needed. **Status** offers Active, Inactive and On leave (the final termination is
-   STAFF-F06). "No role" removes the role, "No Hub access" unlinks the account, and the Hire date can be
-   **cleared**.
+1. Tap the row: **Edit · {name}** opens (the assistant names it by its name) with what the row already
+   says, and "Loading…" while the whole record arrives; Save waits in grey until then.
+2. Change what is needed, also before the record arrives: what was typed or chosen stays, and the record,
+   when it arrives, fills only what has not been touched (hub#1347). **Status** offers Active, Inactive and
+   On leave (the final termination is STAFF-F06). "No role" removes the role, "No Hub access" unlinks the
+   account, and the Hire date can be **cleared**.
 3. Save: only what was sent changes.
 In: the record (and, with the permission, its rate, commission and notes).
 Out: the changed record (`staff.member.updated`). Saving without changing anything does not announce.
