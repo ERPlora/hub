@@ -44,6 +44,8 @@ CODE_SUFFIXES = frozenset(
         ".yaml",
         ".sql",
         ".ini",
+        # The comments a patch adds end up in the installed dependency, read like any other code.
+        ".patch",
     }
 )
 
@@ -79,7 +81,8 @@ def internal_references(paths, root: Path = REPO) -> list[str]:
 
 def test_code_never_points_at_internal_plans():
     paths = code_files()
-    assert {"tests/test_no_internal_references.py", "Dockerfile"} <= set(paths), "git ls-files listed no code"
+    expected = {"tests/test_no_internal_references.py", "Dockerfile", "patches/@ionic__vue@8.8.9.patch"}
+    assert expected <= set(paths), "git ls-files listed no code"
     found = internal_references(paths)
     assert not found, "Code that points at internal plans, rounds or slices:\n" + "\n".join(found)
 
@@ -101,6 +104,7 @@ def test_code_never_points_at_internal_plans():
         ".github/workflows/deploy.yml",
         "base/templates/base/receipt.html",
         "pytest.ini",
+        "patches/@ionic__vue@8.8.9.patch",
     ],
 )
 def test_every_kind_of_code_file_is_scanned(path):
@@ -142,6 +146,15 @@ def test_the_scan_catches_each_kind_of_reference(text):
 )
 def test_the_scan_leaves_ordinary_text_alone(text):
     assert not INTERNAL_REFERENCE.search(text)
+
+
+def test_a_patch_comment_that_points_at_a_plan_is_caught(tmp_path):
+    patch = "patches/@scope__package@1.0.0.patch"
+    (tmp_path / "patches").mkdir()
+    comment = "+         * ERPlora patch: the queue of PLAN-HUB " + SECTION_SIGN + "84."
+    (tmp_path / patch).write_text("+        /**\n" + comment + "\n+         */\n", encoding="utf-8")
+    assert is_code(patch)
+    assert internal_references([patch], root=tmp_path) == [f"{patch}:2: {comment}"]
 
 
 def test_each_reference_is_named_by_file_and_line(tmp_path):
