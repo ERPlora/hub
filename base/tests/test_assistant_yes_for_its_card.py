@@ -58,6 +58,19 @@ def unless_of(mark: dict) -> set[str]:
     return set(mark["refers"].get("unless", ()))
 
 
+def unless_marked(writes, mark: dict) -> dict[tuple[str, str], set[str]]:
+    """Beside which data the card leaves unread each datum of ``writes`` it reads as ``mark`` (``read_as``): an app's
+    ``unless`` table (hub#1250), found by the mark and not by the datum's name."""
+    return {
+        (op.name, datum): unless_of(field.json_schema_extra)
+        for op in writes
+        for datum, field in op.input.model_fields.items()
+        if isinstance(field.json_schema_extra, dict)
+        and "refers" in field.json_schema_extra
+        and read_as(field.json_schema_extra) == read_as(mark)
+    }
+
+
 def said(plan: dict) -> list[tuple[str, object]]:
     return [(field["name"], field["value"]) for field in plan["confirm"]["fields"]]
 

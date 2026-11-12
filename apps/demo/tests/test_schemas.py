@@ -132,9 +132,15 @@ def test_an_items_name_is_said_as_an_item_is_named(said):
 
 def test_the_card_names_the_item_a_name_finds_by_reading_it():
     """The assistant's card says the item the write will act on, read by the name the model sent (base/assistant.py
-    ``REFERS``): «Item: Autumn trial» even when the person said «autumn», never only what was said."""
+    ``REFERS``): «Item: Autumn trial» even when the person said «autumn», never only what was said; beside the item's
+    id, which the write takes it by instead, it is left unread (``unless``, hub#1272)."""
     properties = ItemRefIn.model_json_schema()["properties"]
-    assert properties["called"]["refers"] == {"read": "demo.item.detail", "by": "called", "name": ["name"]}
+    assert properties["called"]["refers"] == {
+        "read": "demo.item.detail",
+        "by": "called",
+        "name": ["name"],
+        "unless": ["id"],
+    }
     assert properties["id"]["refers"] == {"read": "demo.item.detail", "by": "id", "name": ["name"]}
     assert properties["called"]["title"] == properties["id"]["title"] == "Item"
 

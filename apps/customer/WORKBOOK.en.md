@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:eaabe31db51e27cfffd47e7f7d0d523abea497bfbc349a40f527ef270b367919 -->
+<!-- generated from WORKBOOK.md sha256:17eac5185ea8a3c7ff5393e3a2fc04a18693627ab063418ad74770cab404ce57 -->
 
 ## What it is for and who it is for
 
@@ -908,7 +908,9 @@ its name; if two cards fit, the id, the phone or the email is asked for. Before 
 assistant asks for confirmation with its card (BASE-F97), which names each record as the screens name it, never by
 its id: the card ("Customer: Ana García"), the duplicate card of a merge, the groups and tags it is given, the group,
 tag or field being changed or deleted, by its name, and the open order as Sales names it (its title or, without one,
-its amount; with Sales off, it does not show). What the person asking cannot see does not show.
+its amount; with Sales off, it does not show). What the person asking cannot see does not show. In a merge, if the
+card that stays or the duplicate comes by its id beside another card's name, the confirmation card neither reads nor
+shows that name, which the merge does not use: it says only the two cards being merged (hub#1272).
 
 ### What it offers: queries (they read, they change nothing)
 
