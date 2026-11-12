@@ -504,6 +504,24 @@ def test_a_record_of_another_business_is_left_out(hub_a, hub_b):
             assert shown(write, {"id": str(record.id)}, ctx=in_b) == {}, write
 
 
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.usefixtures("no_test_fallback")
+def test_words_that_fit_a_record_of_another_business_are_said_as_said(hub_a, hub_b):
+    """Each business in its own database: the words that name a record of A name nothing in B (hub#1280)."""
+    in_a, in_b = ctx_for(scope=Scope("host", hub_a.slug)), ctx_for(scope=Scope("host", hub_b.slug))
+    writes = ["customer.customer.delete", "customer.group.delete", "customer.tag.delete", "customer.field.delete"]
+    said = []
+    with use_hub(hub_a):
+        for write in writes:
+            kind = write.split(".")[1]
+            own, _ = two(kind)
+            said.append((write, kind, words_for(kind, own)))
+            assert shown(write, {kind: said[-1][2]}, ctx=in_a) == {kind: own.name}, write  # positive control
+    with use_hub(hub_b):
+        for write, kind, words in said:
+            assert shown(write, {kind: words}, ctx=in_b) == {kind: words}, write
+
+
 # ── A closed list, by the word of its screen ──────────────────────────────────────────────────────────────────────────
 
 
@@ -560,6 +578,14 @@ def test_the_reads_find_a_group_a_tag_or_a_field_by_its_name_as_their_writes_do(
     assert read(f"customer.{kind}.detail", {kind: "Vip"}).id == active.id
     with pytest.raises(NotFound):
         read(f"customer.{kind}.detail", {kind: "Nobody"})
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("kind", ["group", "tag", "field"])
+def test_the_reads_take_a_group_a_tag_or_a_field_by_its_id_whatever_name_comes_beside_it(kind):
+    """The id wins, as in their writes (``_find_named``)."""
+    own, other = two(kind)
+    assert read(f"customer.{kind}.detail", {"id": str(own.id), kind: other.name}).id == own.id
 
 
 @pytest.mark.django_db
