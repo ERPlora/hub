@@ -43,7 +43,7 @@ from apps.verifactu.models import (
 )
 from apps.verifactu import gateway
 from apps.verifactu.models import wait_reason_text
-from apps.verifactu.tests.conftest import aeat_holds, aeat_answer, answering, manual, records_of, run
+from apps.verifactu.tests.conftest import ISSUER, aeat_holds, aeat_answer, answering, manual, records_of, run
 from base.admin import ADMIN_HUB_SESSION_KEY
 
 pytestmark = pytest.mark.django_db
@@ -552,6 +552,27 @@ def test_a_chain_is_rescheduled_from_its_send_control(issuer, gateway_answers, r
     sealed.refresh_from_db()
     assert sealed.next_attempt_at <= timezone.now()
     assert said(request) == ["Rescheduled: 1 chain goes out with the next pass."]
+
+
+@pytest.mark.parametrize(
+    ("language", "notice"),
+    [
+        ("en", "Rescheduled: 2 chains go out with the next pass."),
+        ("es", "Reprogramado: 2 cadenas salen en la próxima pasada."),
+    ],
+)
+def test_rescheduling_several_chains_says_them_in_the_plural(
+    issuer, gateway_answers, request_of, language, notice
+):
+    # hub#1275: «chain(s)» showed the parentheses whatever the number; the number is the chains', not a fixed one.
+    failed_once(gateway_answers)
+    run("invoice.issuer.update", {**ISSUER, "tax_id": "A58818501"})  # another issuer: its own chain
+    failed_once(gateway_answers)
+    assert SendControl.objects.count() == 2
+    request = request_of()
+    with translation.override(language):
+        model_admin(SendControlAdmin, SendControl).reschedule_chain(request, SendControl.objects.all())
+    assert said(request) == [notice]
 
 
 def test_a_chain_with_nothing_waiting_says_so(issuer, gateway_answers, request_of):
