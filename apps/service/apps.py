@@ -133,19 +133,29 @@ class ServiceConfig(LiveAppConfig):
     ]
 
     def recoverable_from_copy(self) -> list:
-        """hub#1283: the platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when
-        the staff recovers from it (BASE-F114): the services the copy offers and the business lacks
-        (``queries.services_in_copy``, ``queries.services_not_in_business``), each created by
-        ``service.service.create``, the screen's own, in the categories the business still has."""
+        """hub#1283, hub#1323: the platform asks (``base.tenancy.recovery``) what a separate copy of the business gives
+        back when the staff recovers from it (BASE-F114), in this order: first the categories the business lacks
+        (``queries.categories_in_copy``, ``queries.categories_not_in_business``), each created by
+        ``service.category.create``, the screen's own, parents first; then the services the copy offers and the
+        business lacks (``queries.services_in_copy``, ``queries.services_not_in_business``), each created by
+        ``service.service.create``, the screen's own, in its category: the same one, or the one brought back just
+        before with its name."""
         from apps.service import queries  # the models are not loaded yet when this module is
         from base.recovery import Recoverable
 
         return [
+            Recoverable(
+                label=_("Service categories"),
+                reads_since="0001_initial",
+                read=queries.categories_in_copy,
+                missing=queries.categories_not_in_business,
+                create="service.category.create",
+            ),
             Recoverable(
                 label=self.verbose_name,
                 reads_since="0001_initial",
                 read=queries.services_in_copy,
                 missing=queries.services_not_in_business,
                 create="service.service.create",
-            )
+            ),
         ]

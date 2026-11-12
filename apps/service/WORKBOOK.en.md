@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8c41837e51b17ff3063a21a1918bc111f4135b988f2c0b0679767b0202c8006f -->
+<!-- generated from WORKBOOK.md sha256:a91bed41109fde983412b3d2b13c851709a17b3a876a338d6c9839c33d1ad26f -->
 
 ## What it is for and who it is for
 
@@ -353,7 +353,8 @@ field: "There is already a category with that name. Pick another name.". A categ
 parent nor hang from one of its children: "A category cannot hang from itself or from one of its
 subcategories.". A deleted parent: "That parent category is not available: it does not exist in this
 business or it has been deleted.".
-Involved: SERVICE-F01, SERVICE-F08
+Involved: SERVICE-F01, SERVICE-F08, BASE-F114 (the ERPlora staff recover from a separate copy the categories the
+business no longer has, each by this same creation)
 
 ### SERVICE-F08 Delete a category
 Status: done
@@ -368,7 +369,8 @@ Out: the category deleted, not erased (`service.category.deleted`); its name bec
 are left **without a category** and its subcategories move to hang from its parent (or become roots).
 If it fails: in the confirmation, the reason (for example, "That category does not exist in this
 business.").
-Involved: SERVICE-F07, SERVICE-F02
+Involved: SERVICE-F07, SERVICE-F02, BASE-F114 (from a separate copy, the deleted category comes back as a new one,
+with the lost services inside it; those the business kept stay as they are)
 
 ### SERVICE-F09 Sell a service at the till
 Status: done (Sales does it, SALE-F38)
