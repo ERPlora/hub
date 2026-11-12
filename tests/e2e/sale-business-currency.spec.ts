@@ -1,12 +1,12 @@
-// flow: business-currency (FIX-HUB-SALE-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY; apps/sale/WORKBOOK.md «Antes de empezar»)
+// flow: business-currency (apps/sale/WORKBOOK.md «Antes de empezar»)
 // The till and the sales are in the business's currency: its country's, as erplora.com registered it
 // (`PUT /internal/hubs/{id}`, signed the way the SaaS sends it), never a fixed euro. Hub `a` moves to Poland: the check,
 // the charge with its change, the ticket and the sale in «Sales» are in złoty, in 390, 834 and 1440 (captures
 // `FIX-HUB-SALE-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY-<width>`). Back in Spain the till is in euros and the sale charged in
 // Poland keeps its złoty (`…-es-1440`). What the run creates is deleted after it and `a`'s registration put back.
 // Like any business in Poland, `a` sells with a rule of its own country for the shirt's category: Spain alone has factory
-// rules (TAX-F16), and without one the till refuses to charge (PLAN-HUB §81, hub#1152); the run mounts it and deletes it.
-// flow: SALE-F01 (FIX-HUB-SALE-OWN-COPY-OF-BUSINESS-CURRENCY): the server charges the sale in the currency Sales asks
+// rules (TAX-F16), and without one the till refuses to charge; the run mounts it and deletes it.
+// flow: SALE-F01: the server charges the sale in the currency Sales asks
 // `base` for (`base.operations.business_currency`, BASE-F50), never a copy of its own: the ticket of the sale charged in
 // złoty (captures `FIX-HUB-SALE-OWN-COPY-OF-BUSINESS-CURRENCY-<width>`).
 import { expect, type Page, test } from '@playwright/test';

@@ -1,8 +1,8 @@
 // The e2e's start: it refuses local databases with unapplied migrations before the first spec. On
 // 2026-10-16 the local `hub` lacked verifactu.0003–0005 and the specs failed with «not valid JSON» (the
 // `post` helper got Django's HTML error page), a red that never said its cause. It checks the control
-// database (`migrate --check`) and the hub databases (`migrate_hubs --check`; phase 1: the control
-// database again) of the run's `DB_NAME` (`stack.ts`), and never migrates: other sessions share them.
+// database (`migrate --check`) and the hub databases (`migrate_hubs --check`)
+// of the run's `DB_NAME` (`stack.ts`), and never migrates: other sessions share them.
 // A stack's own e2e database that does not exist yet is said as such, with `database.ts`, which creates
 // it (runserver cannot start without it, so the e2e cannot create it here). Then it checks that the local
 // hubs `a` and `b` are ready in the registry (`seed_local_hubs --check`; without them every host is a 404), and last
@@ -13,7 +13,7 @@
 // Before all that it refuses more than one worker: `--workers=N` overrides `workers: 1` of playwright.config.ts, and
 // specs running at once on the one stack delete each other's data (2026-10-23: the agenda spec timed out).
 // Once every check passes it starts this checkout's `manage.py run_worker --databases-only` on the run's databases
-// (round 2026-10-30 of PLAN-DB, S2a: a business or a demo registered during the run is `requested` until the worker
+// (a business or a demo registered during the run is `requested` until the worker
 // makes its database; the specs play the relay and the tasks themselves) and
 // hands Playwright its stop as the run's teardown; a worker that never waits for work stops the run with what it said.
 import { type ChildProcess, spawn as spawnProcess, spawnSync } from 'node:child_process';

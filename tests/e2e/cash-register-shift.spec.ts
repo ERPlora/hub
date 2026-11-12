@@ -244,8 +244,8 @@ async function closedSession(context: BrowserContext, float: number): Promise<st
   return opened.data.id;
 }
 
-// flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
-test('FIX-DATATABLE-HUB-FILTERS-2B: Sessions filter by Opening (euros) behind the funnel, with its count, the panel open at every width; a wrong amount is said under it', async ({
+// flow: none — the column filters sit behind the table's funnel, as in the old hub.
+test('Sessions filter by Opening (euros) behind the funnel, with its count, the panel open at every width; a wrong amount is said under it', async ({
   page,
   context,
 }) => {

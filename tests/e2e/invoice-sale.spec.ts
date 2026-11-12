@@ -6,8 +6,8 @@
 //     cancelled, and the R5 opens the ticket it rectifies;
 //   - the list filters behind the table's funnel (the total in euros), with its count, at every width; a
 //     «to» day before its «from» is said under it and does not filter.
-// Phase 1 has no outbox relay: the sale's real event, read from the outbox, is handed to the operation the
-// reaction runs (invoice-helpers.ts `deliver`), as the relay will. Screenshots in the three viewports.
+// The spec plays the outbox relay: the sale's real event, read from the outbox, is handed to the operation the
+// reaction runs (invoice-helpers.ts `deliver`), as the relay does. Screenshots in the three viewports.
 // What this file creates is deleted after it.
 import { expect, type Page, test } from '@playwright/test';
 
@@ -186,8 +186,8 @@ test('INVOICE-F01 and F09: a ticket refunded whole in Sales gets its rectifying 
   });
 });
 
-// flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
-test('FIX-DATATABLE-HUB-FILTERS-2A: Invoices filter by total in euros behind the funnel, with its count; a «to» day before its «from» is said under it', async ({ page, context }) => {
+// flow: none — the column filters sit behind the table's funnel, as in the old hub.
+test('Invoices filter by total in euros behind the funnel, with its count; a «to» day before its «from» is said under it', async ({ page, context }) => {
   await login(page, A, '/invoice/invoices');
   // Two tickets, 12,10 € and 6,05 €, each handed to Invoicing as the relay will.
   const dearSale = await chargeByApi(context, { lines: [{ product: shampoo.sku }], payments: [{ method: 'card' }] });

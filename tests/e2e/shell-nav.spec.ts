@@ -1,5 +1,4 @@
-// FIX-SHELL-NAV (PLAN-MIGRATIONS §13) → FIX-SHELL-SPLIT-PANE (§16, Ioan 2026-10-17): the hub's shell is the old
-// hub's, side menu included. Moving between apps: the ⠿ «My apps» sheet and Home (the first entry of the
+// The hub's shell is the old hub's, side menu included. Moving between apps: the ⠿ «My apps» sheet and Home (the first entry of the
 // side menu, pinned from 992 px and a drawer below); no Back on the screens of a module; the sections of
 // an app stay in its bottom tabbar. The menu, the rail and the drawer themselves: shell-split-pane.spec.ts.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -165,7 +164,7 @@ test('an app whose page does not load says so, with a Retry; never silent', asyn
   await expect(toast).toBeHidden();
 });
 
-// flow: BASE-F05 (Abrir una app desde «Mis apps»): a screen of an app has no Back (PLAN-MIGRATIONS §16), so the way out
+// flow: BASE-F05 (open an app from «My apps»): a screen of an app has no Back, so the way out
 // of an app is the ⠿ «My apps» sheet, and its first entry is «Home». Every app with screens (`apps/*/frontend/routes.ts`,
 // read here, not a list kept by hand) is opened from the sheet, the way a person does, at the three widths: its root is
 // one of its routes, it has the ⠿ apps and no Back, and every time the sheet opens «Home» comes first.

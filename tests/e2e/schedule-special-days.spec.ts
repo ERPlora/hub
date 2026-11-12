@@ -111,8 +111,8 @@ test('Special days in the three viewports: no horizontal scroll; cards on a phon
   }
 });
 
-// flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
-test('FIX-DATATABLE-HUB-FILTERS-1: Special days filter by Name behind their own funnel, with its count, the panel open at every width', async ({ page, context }) => {
+// flow: none — the column filters sit behind the table's funnel, as in the old hub.
+test('Special days filter by Name behind their own funnel, with its count, the panel open at every width', async ({ page, context }) => {
   const stamp = Date.now().toString(36);
   const kept = `${TAG} Fil${stamp} One`;
   const other = `${TAG} Fil${stamp} Two`;

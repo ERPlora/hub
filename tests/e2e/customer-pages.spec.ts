@@ -85,7 +85,7 @@ test('every page at 390 / 834 / 1440 without horizontal scroll; the phone shows 
       await page.goto('/customer/customers');
       await customersReady(page);
       await expect(shown(page).locator('.data-table__cards')).toBeVisible();
-      // The phone has the whole width: the side menu is a closed drawer (PLAN-MIGRATIONS §16).
+      // The phone has the whole width: the side menu is a closed drawer.
       await expect(page.locator('ion-split-pane')).not.toHaveClass(/split-pane-visible/);
       await expect(page.locator('ion-menu.dash-menu')).toBeHidden();
     }
@@ -93,8 +93,8 @@ test('every page at 390 / 834 / 1440 without horizontal scroll; the phone shows 
   record('customer-viewports', results);
 });
 
-// flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
-test('FIX-DATATABLE-HUB-FILTERS-1: Customers filter by Stage behind the funnel, with its count, the panel open at every width', async ({ page, context }) => {
+// flow: none — the column filters sit behind the table's funnel, as in the old hub.
+test('Customers filter by Stage behind the funnel, with its count, the panel open at every width', async ({ page, context }) => {
   await login(page, A, '/customer/customers');
   const stamp = `FIL${Date.now().toString(36)}`;
   const vip = await createCard(context, { name: e2eName(`${stamp} vip`), phone: spanishMobile(), lifecycle_stage: 'vip' });

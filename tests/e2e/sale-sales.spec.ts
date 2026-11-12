@@ -143,8 +143,8 @@ test('SALE-F31: the owner refunds a sale in full by its card', async ({ page, co
   await expect(row(page, card)).toContainText(/Refunded|Devuelta/);
 });
 
-// flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
-test('FIX-DATATABLE-HUB-FILTERS-2A: Sales filter by total in euros and by payment behind the funnel, with its count; a «to» day before its «from» is said under it', async ({ page, context }) => {
+// flow: none — the column filters sit behind the table's funnel, as in the old hub.
+test('Sales filter by total in euros and by payment behind the funnel, with its count; a «to» day before its «from» is said under it', async ({ page, context }) => {
   await login(page, A, '/sale/sales');
   const { toggle, panel, count } = funnel(page);
   for (const vp of FILTER_VIEWPORTS) {

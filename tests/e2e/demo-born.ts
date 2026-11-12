@@ -1,11 +1,11 @@
-// How a demo of the stack was born, as demo.spec.ts checks it (hub#1061): a fact in its databases instead of a clock.
+// How a demo of the stack was born, as demo.spec.ts checks it: a fact in its databases instead of a clock.
 // The spec waited 15 s for a demo, and on a machine loaded far beyond its cores a demo took 15.3 s with nothing broken
 // and failed it. Those 15 s held two things, each checked now as a fact, never against the wall clock:
-//   - «the worker's 5 s tick and PLAN-DB §6's 5 s aim»: the worker takes a demo due on its next pass, never more
+//   - «the worker's 5 s tick and the 5 s aim for a demo»: the worker takes a demo due on its next pass, never more
 //     than 5 s away (base/tests/test_worker.py,
 //     `test_with_its_own_tick_it_takes_a_new_demo_within_plan_dbs_five_seconds`, on the waits its loop asks for);
 //   - «a sign-up that makes tables again fails here»: this module, in the databases the sign-up left behind.
-// The second fact: a demo's database is the clone of its template (base/tenancy/provision.py, PLAN-DB §6), kept
+// The second fact: a demo's database is the clone of its template (base/tenancy/provision.py), kept
 // current by `migrate_hubs` (which global-setup.ts checks), so its sign-up applies no migration, and every row of its
 // `django_migrations` is its template's, applied at the same instant. A sign-up that makes its tables again (an empty
 // database migrated, the template skipped) leaves rows of its own, however fast or slow the machine is.
@@ -49,7 +49,7 @@ function migrationsOf(sql: SqlOn, database: string): string[] {
 }
 
 /** The migrations the sign-up of the demo `slug` applied to its database (registry of `control`): `[]` when it was born
- *  as the clone of its template, as every sign-up is (PLAN-DB §6). */
+ *  as the clone of its template, as every sign-up is. */
 export function migrationsAppliedAtSignUp(slug: string, control: string, sql: SqlOn = psqlOn): string[] {
   const [row = ''] = rows(
     sql,

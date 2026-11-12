@@ -2,7 +2,7 @@
 // end to end with its real dependencies: this stack's SaaS (a fresh owner signs up on its screens and creates the
 // business through its API, as the panel does) and its assistant gateway with the e2e's provider (assistant-provider.ts),
 // no mock in between.
-//   - §4, the precondition: a business of the restaurant vertical, created on erplora.com with its business type; the
+//   - The precondition: a business of the restaurant vertical, created on erplora.com with its business type; the
 //     Hub registers it with its vertical, offers that vertical's template first and loads it (its catalogue and tables).
 //   - The platform from end to end, in 390, 834 and 1440 and in Spanish and English: Home (Summary and Activity, «My
 //     apps», the bell, «Add apps» → Apps: BASE-F05), Apps (its three tabs), Settings (General, Business, Ticket, Data and
@@ -11,7 +11,7 @@
 //     error (no console error, no uncaught one, no server error, no error state on view) and no text in the other
 //     language nor a message key left on view (translations.ts, against the hub's own catalogues); captures
 //     `APP-BASE-10-BASE-G152-<language>-<screen>-<width>`.
-// The chains of the old contract's §5–§8 (the restaurant's and the salon's day, fiscal, printing) are flows of their
+// The other chains of the old contract (the restaurant's and the salon's day, fiscal, printing) are flows of their
 // apps with their own specs: base/WORKBOOK.md «Para quien lo mantiene», «La QA maestra del Hub».
 // The SaaS of the stack needs its taxonomy (`seed_taxonomy`, as every deploy runs it) and the assistant's provider
 // (README of this folder, «El asistente» and «La QA maestra»); the spec says which is missing.
@@ -54,7 +54,7 @@ const LANGUAGES: Language[] = ['es', 'en'];
 const SAAS_STEP = 30_000;
 /** The side menu is pinned from 992 px; below it is a drawer behind the bar's menu button. */
 const PINNED_MIN = 992;
-/** The vertical of the QA's restaurant chain (§5): the business is created as one. */
+/** The vertical of the QA's restaurant chain: the business is created as one. */
 const VERTICAL = 'restaurant';
 
 const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
@@ -217,7 +217,7 @@ test.afterAll(async () => {
   await owner?.context.close();
 });
 
-test('BASE-G152 §4 — a restaurant created on erplora.com, its vertical in the Hub and its template loaded', async () => {
+test('BASE-G152 — a restaurant created on erplora.com, its vertical in the Hub and its template loaded', async () => {
   test.setTimeout(240_000);
   // The business, as the panel creates it: a name, the country and its business type, of the restaurant vertical.
   const businessType = await businessTypeOf(owner.context, VERTICAL);
@@ -266,7 +266,7 @@ for (const language of LANGUAGES) {
   for (const size of SIZES) {
     test(`BASE-G152 BASE-F05 — the platform end to end in ${language} at ${size.label}`, async () => {
       test.setTimeout(300_000);
-      expect(origin, 'the business of §4').not.toBe('');
+      expect(origin, 'the business of the precondition').not.toBe('');
       const { context, page } = owner;
       await context.addCookies([{ name: 'django_language', value: language, domain: new URL(origin).hostname, path: '/' }]);
       await page.setViewportSize({ width: size.width, height: size.height });
@@ -297,7 +297,7 @@ for (const language of LANGUAGES) {
       await page.screenshot({ path: shot(`APP-BASE-10-BASE-F05-${language}-${size.label}`) });
       await tab(page, 'all');
       await check('apps-all');
-      // BASE-F14 (hub#270, PLAN §32): «Paid» is only there when some app is sold apart; in this seed none is, so Apps
+      // BASE-F14: «Paid» is only there when some app is sold apart; in this seed none is, so Apps
       // has «My apps» and «Add apps» and no «Paid».
       await expect(shown(page).locator('[data-testid="tab-mine"]')).toBeVisible();
       await expect(shown(page).locator('[data-testid="tab-paid"]')).toHaveCount(0);

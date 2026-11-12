@@ -144,8 +144,8 @@ test('TAX-F02: a malformed key is refused under Key; a good category closes the 
   expect(res.data.total).toBe(1);
 });
 
-// flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
-test('FIX-DATATABLE-HUB-FILTERS-1: Categories filter by Key behind the funnel, with its count, the panel open at every width', async ({ page }) => {
+// flow: none — the column filters sit behind the table's funnel, as in the old hub.
+test('Categories filter by Key behind the funnel, with its count, the panel open at every width', async ({ page }) => {
   await login(page, A, '/tax/categories');
   for (const vp of FILTER_VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
