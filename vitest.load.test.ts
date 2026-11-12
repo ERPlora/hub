@@ -75,8 +75,10 @@ describe('scaleWaitFor', () => {
   });
 });
 
+/** The functions of Vitest that declare a hook, which has no name. */
+const HOOKS = new Set(['beforeAll', 'beforeEach', 'afterAll', 'afterEach']);
 /** The functions of Vitest that declare a test or a hook: the budget they name is one of their other arguments. */
-const DECLARES = new Set(['it', 'test', 'beforeAll', 'beforeEach', 'afterAll', 'afterEach']);
+const DECLARES = new Set(['it', 'test', ...HOOKS]);
 /** The functions of Vitest that declare a suite: the budget it names is its tests' and hooks'. */
 const SUITES = new Set(['describe', 'suite']);
 
@@ -147,8 +149,7 @@ function ownClocks(text: string): number[] {
     if (ts.isCallExpression(node) && declares && (DECLARES.has(declares) || SUITES.has(declares))) {
       // A test's and a suite's first argument is its name; a hook has none. Its function is the first other argument
       // that is not its options: written there, passed by name or made by a call.
-      const named = !['beforeAll', 'beforeEach', 'afterAll', 'afterEach'].includes(declares);
-      const rest = node.arguments.slice(named ? 1 : 0);
+      const rest = node.arguments.slice(HOOKS.has(declares) ? 0 : 1);
       const fn = rest.find((argument) => !ts.isObjectLiteralExpression(argument));
       const clock = rest
         .filter((argument) => argument !== fn)
