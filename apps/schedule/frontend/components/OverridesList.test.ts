@@ -70,7 +70,6 @@ describe('OverridesList', () => {
   });
 
   it('filters behind the table funnel: from and to (each a range of days), reason and status on their columns', async () => {
-    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
     const s = await setup();
     await s.show(page(ROWS));
     expect(s.prop('filterable')).toBe(true);
@@ -107,7 +106,7 @@ describe('OverridesList', () => {
     expect(s.find('schedule-overrides-filters-count').text()).toBe('3');
   });
 
-  it('its funnel and view buttons say they are the overrides’ (the screen has two lists; schedules#58)', async () => {
+  it('its funnel and view buttons say they are the overrides’ (the screen has two lists)', async () => {
     const s = await setup();
     await s.show(page(ROWS));
     const name = (hook: string) => s.find(`schedule-overrides-${hook}`).attributes('aria-label');
@@ -160,7 +159,7 @@ describe('OverridesList', () => {
     expect([s.prop('addable'), s.prop('rowClickable'), s.prop('actions')]).toEqual([false, false, []]);
   });
 
-  it('a list that does not load names itself, then the cause, never the generic text (pm#610)', async () => {
+  it('a list that does not load names itself, then the cause, never the generic text', async () => {
     const s = await setup({ locale: 'es' });
     s.net.lastStream().push(errorFrame(s.subId(OP), 'boom'));
     await flush();

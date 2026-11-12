@@ -74,7 +74,7 @@ def pick(*options, quantity=1):
 @pytest.mark.parametrize(
     ("total", "weights", "shares"),
     [
-        # The old module's golden vector: 6,00 € over a 4,50 € sandwich and a 2,00 € beer.
+        # The reference case: 6,00 € over a 4,50 € sandwich and a 2,00 € beer.
         (600, [450, 200], [415, 185]),
         # Odoo's documented example: 120 over 100 and 50.
         (120, [100, 50], [80, 40]),
@@ -203,7 +203,7 @@ def test_a_menu_is_read_with_its_tree_in_as_many_queries_however_big(name):
             run(name, data)
         return len(read)
 
-    queries(1, 1)  # the business's first read also fills what base keeps per business (its apps off, PLAN-HUB §9)
+    queries(1, 1)  # the business's first read also fills what base keeps per business (its apps off)
     assert queries(3, 3) == queries(1, 1)
 
 
@@ -601,7 +601,7 @@ def test_a_menu_eaten_in_with_a_deactivated_tax_category_is_refused():
     assert refusal(combo, pick(option)).code == "combo.tax_category_missing"
 
 
-# Eaten in or to take away: the menu's setting, unless Ventas says how this line is sold (review 1)
+# Eaten in or to take away: the menu's setting, unless Sales says how this line is sold
 
 
 def sandwich_and_beer(supply_kind="goods", **fields):
@@ -743,8 +743,8 @@ def test_a_dish_now_sold_by_weight_is_not_offered_nor_charged():
 
 @pytest.mark.parametrize("column", ["price", "sort_order", "is_active", "supply_kind"])
 def test_ties_read_backwards_in_a_descending_list(column):
-    """hub#768 (the rule of hub#2355, as in Customers): a descending list is the ascending one read backwards, ties
-    included, and its pages neither repeat nor lose rows."""
+    """hub#768, as in Customers: a descending list is the ascending one read backwards, ties included, and its pages
+    neither repeat nor lose rows."""
     menus = [make_combo("Menu A"), make_combo("Menu A"), make_combo("Menu B"), make_combo("Menu B")]
     expected = sorted(menus, key=lambda menu: (menu.name, menu.id))
     assert_reads_backwards(listed_with(run, "combo.combo.list", column, by_dir=True), [menu.id for menu in expected])

@@ -1,7 +1,6 @@
-// The kitchen app's UI texts: English source + Spanish (PLAN §5), kept by hand next to the pages until
-// Django's `djangojs` catalogues are exported to JSON. This test is their guardrail: same keys and
-// placeholders in both languages, nothing empty, every key a page, a component or a helper uses exists,
-// and the words the old screens showed (the old module's `locales/*.json`) are kept.
+// The kitchen app's UI texts: English source + Spanish, kept by hand next to the pages. This test is their
+// guardrail: same keys and placeholders in both languages, nothing empty, every key a page, a component or
+// a helper uses exists, and the screens' established words are kept.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
