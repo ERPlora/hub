@@ -93,6 +93,12 @@ def test_the_reactions_to_sales_have_no_route():
     assert not bound & {"inventory.stock.apply_sale", "inventory.stock.restore_sale", "inventory.stock.restore_refund"}
 
 
+def test_restoring_a_deleted_product_has_no_route():
+    # Only the platform restores a product: its one door is the recovery from a separate copy (BASE-F114, INVENTORY-F34).
+    bound = {operation for _, _, operation in ROUTES}
+    assert "inventory.product.restore" not in bound
+
+
 def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
 
