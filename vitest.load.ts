@@ -14,15 +14,14 @@ declare module 'vitest' {
   }
 }
 
-/** No clock. The budget of a test or hook whose work is synchronous — a guardrail that reads the whole tree, a process
- *  waited for with `execFileSync` — when the default's is too short (hub#1200): Vitest looks at a synchronous test's
- *  clock only once it has returned (vitest#2920), so a clock there never cuts one that hangs, it only turns red, after
- *  the fact, a correct run the machine made slow. And of one that waits for what only the machine makes slow — the
- *  repo's files read cold, a process or a thread started cold (hub#1292) — which no clock in seconds tells from what
- *  never ends: what could keep it from ever ending fails at once where it can (a thread left with nothing to wait for
- *  ends). What it found is its verdict; a hang is cut, as before, by the end of the run's job. Work that holds the
- *  worker past a minute still fails the run, as Vitest's own call to it gives up (hub#1315): it goes to a thread or a
- *  process of its own. vitest.load.test.ts holds every test of the run to it. */
+/** No clock. The budget of a test or hook that waits for what only the machine makes slow — the repo's files read
+ *  cold, a process or a thread started cold (hub#1292) — which no clock in seconds tells from what never ends: what
+ *  could keep it from ever ending fails at once where it can (a thread left with nothing to wait for ends). What it
+ *  found is its verdict; a hang is cut, as before, by the end of the run's job. A synchronous test or hook never names
+ *  it: Vitest looks at its clock only once it has returned (vitest#2920, hub#1200), and work long enough to need none
+ *  holds the worker's thread as long, which past a minute fails the run with every test green, as Vitest's own call to
+ *  the worker gives up (hub#1315). That work goes off the worker's thread (vitest.offload.ts) and the test waits for
+ *  it. vitest.load.test.ts holds every test of the run to it. */
 export const NO_CLOCK = 0;
 
 /** `vi.waitFor`'s own budget when a test names none. */

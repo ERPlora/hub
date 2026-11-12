@@ -166,7 +166,7 @@ export function ungroupedFormats(text: string, name: string): number[] {
 
 /** Every currency format of the Hub's frontends (and of the shared `@erplora/ui`) that does not group always, as
  *  `<path>:<line>`, by app. */
-function ungroupedByApp(): Record<string, string[]> {
+function ungroupedByApp(): Promise<Record<string, string[]>> {
   return findingsByApp(hubFrontends({ ui: true }), ungroupedFormats);
 }
 
@@ -217,8 +217,8 @@ describe('guardrail: every amount of the Hub groups its thousands (base-money-th
     expect(ungroupedFormats(component.join('\n'), 'Total.vue')).toEqual([3]);
   });
 
-  it('no app, nor base or `ui`, has a currency format that does not group always', () => {
-    expect(ungroupedByApp(), GROUP_THE_AMOUNT).toEqual({});
-    // It reads every frontend file of the Hub (some 1,600), synchronously: as long as the machine makes it (hub#1200).
+  it('no app, nor base or `ui`, has a currency format that does not group always', async () => {
+    expect(await ungroupedByApp(), GROUP_THE_AMOUNT).toEqual({});
+    // It reads every frontend file of the Hub (some 2,000) without holding the worker, as long as the machine makes it (hub#1315).
   }, NO_CLOCK);
 });

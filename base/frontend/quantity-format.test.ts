@@ -71,8 +71,8 @@ describe('guardrail: every quantity of the Hub is written by the platform (base-
     expect(ownQuantityFormats(component.join('\n'), 'QtyStepper.vue')).toEqual([3]);
   });
 
-  it('no app, nor base, writes a quantity with a formatter of its own', () => {
-    expect(findingsByApp(hubFrontends({ ui: false }), ownQuantityFormats), WRITE_IT_WITH_THE_PLATFORM).toEqual({});
-    // It reads every frontend file of the Hub (some 1,600), synchronously: as long as the machine makes it (hub#1200).
+  it('no app, nor base, writes a quantity with a formatter of its own', async () => {
+    expect(await findingsByApp(hubFrontends({ ui: false }), ownQuantityFormats), WRITE_IT_WITH_THE_PLATFORM).toEqual({});
+    // It reads every frontend file of the Hub (some 2,000) without holding the worker, as long as the machine makes it (hub#1315).
   }, NO_CLOCK);
 });
