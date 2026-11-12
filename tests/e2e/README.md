@@ -232,10 +232,18 @@ La spec espera a que la demo esté lista **sin reloj propio** (hub#1061): con la
 núcleos una demo tardó 15,3 s sin nada roto y la espera de 15 s que tenía la tiraba. Si la puerta se cansa antes (sus
 30 s, `?state=not_ready`, PUBLIC-F29 del SaaS) y el Hub la sigue preparando, la spec pulsa «Try again» como haría el
 visitante y vuelve a esperar a la misma demo; si el Hub no pudo prepararla (`failed` en el registro), cae al momento con
-su `last_error`. Una demo que no se abre nunca la corta el tope del test (`playwright.config.ts`). Lo que aquella
-espera vigilaba se comprueba ahora como un hecho, tarde lo que tarde: la BD de cada demo es el **clon de su
-plantilla**, sin ninguna migración aplicada en el alta (cada fila de su `django_migrations` es de la plantilla, con la
-misma hora; `demo-born.ts`). Un alta que vuelva a crear las tablas en vez de clonar cae ahí, aunque sea rápida.
+su `last_error`. Una demo que no se abre nunca la corta el tope del test (`playwright.config.ts`); también una shell
+que no arranca. Una shell solo lenta ya no la caza esta spec: en esta pila la sirve Vite en desarrollo, así que su
+tiempo es el de la máquina, y los 15 s nunca fueron para ella. Aquella espera vigilaba dos cosas, y cada una se
+comprueba ahora como un hecho, tarde lo que tarde:
+
+- **El tick de 5 s del worker** (el objetivo de 5 s de PLAN-DB §6): el worker coge la demo en su siguiente pasada y
+  nunca espera más de 5 s entre dos. Lo comprueba `base/tests/test_worker.py`
+  (`test_with_its_own_tick_it_takes_a_new_demo_within_plan_dbs_five_seconds`), sobre las esperas que pide su bucle, sin
+  reloj de pared.
+- **El alta por clon**: la BD de cada demo es el **clon de su plantilla**, sin ninguna migración aplicada en el alta
+  (cada fila de su `django_migrations` es de la plantilla, con la misma hora; `demo-born.ts`). Un alta que vuelva a
+  crear las tablas en vez de clonar cae ahí, aunque sea rápida.
 
 ```bash
 CI=1 pnpm e2e tests/e2e/demo.spec.ts   # con las variables de la receta exportadas

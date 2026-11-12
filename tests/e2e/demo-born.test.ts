@@ -1,8 +1,9 @@
 // flow: ninguno — arnés e2e del Hub (hub#1061)
 // demo.spec.ts waited 15 s for a demo and failed on a loaded machine with nothing broken (the demo was ready 15.3 s
-// after it was asked for). Those 15 s stood for a fact: a demo's sign-up is the clone of its template (PLAN-DB §6), and
-// one that makes its tables again took 13–32 s. The spec now waits for the demo without a clock of its own and checks
-// that fact instead: every migration its database has came with its template's clone, none was applied at its sign-up.
+// after it was asked for). Those 15 s held the worker's 5 s tick (now base/tests/test_worker.py, on the waits its
+// loop asks for) and a fact: a demo's sign-up is the clone of its template (PLAN-DB §6), and one that makes its tables
+// again took 13–32 s. The spec now waits for the demo without a clock of its own and checks that fact instead: every
+// migration its database has came with its template's clone, none was applied at its sign-up.
 import { describe, expect, it } from 'vitest';
 
 import { demoBeingPrepared, migrationsAppliedAtSignUp, notFromItsTemplate, templateOf } from './demo-born';

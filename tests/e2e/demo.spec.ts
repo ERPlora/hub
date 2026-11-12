@@ -5,9 +5,12 @@
 // forgets the demo the session still held as live. Zero CSP violations on the hub's pages.
 //
 // A demo is waited for with no clock of its own (hub#1061): on a machine loaded far beyond its cores one took 15.3 s
-// with nothing broken and failed the 15 s the spec gave it. What that clock stood for is checked as a fact instead:
-// each demo's database is the clone of its template, with no migration applied at its sign-up (demo-born.ts), however
-// long it took. A demo that never opens is cut by the test's timeout (playwright.config.ts).
+// with nothing broken and failed the 15 s the spec gave it. That clock held two things, each a fact now, however long it
+// took: the worker's 5 s tick, which takes a demo due on its next pass (base/tests/test_worker.py, on the waits its loop
+// asks for), and a sign-up that is the clone of its template, with no migration applied (here, demo-born.ts). A demo
+// that never opens is cut by the test's timeout (playwright.config.ts); so is a shell that never comes up, and one
+// that is only slow is no longer caught here: this stack's shell is served by Vite in development, so its time is the
+// machine's, and the 15 s were never for it.
 //
 // It needs the SaaS with the demo door and its HUB_INTERNAL_URL on this stack's Hub (README of this folder,
 // «La demo»): the SaaS calls the Hub's /internal/demos itself, so a SaaS pointed at another Hub's port creates
