@@ -127,6 +127,27 @@ def fresh(hub: Hub) -> Hub:
     return Hub.objects.select_related("cluster").get(pk=hub.pk)
 
 
+def worked_on(monkeypatch) -> list:
+    """The hubs a pass over ``hub_due`` works on, as it counts them: each demo it dropped and each preparation that
+    ended. Compared with what ``provision.run_due`` returns, never a fixed total: the pass also works on whatever else
+    its process left due (hub#1332)."""
+    seen = []
+    drop, prepare = provision._drop, provision._prepare
+
+    def dropped(hub_id, now):
+        if result := drop(hub_id, now):
+            seen.append(hub_id)
+        return result
+
+    def prepared(hub_id, **kwargs):
+        prepare(hub_id, **kwargs)
+        seen.append(hub_id)
+
+    monkeypatch.setattr(provision, "_drop", dropped)
+    monkeypatch.setattr(provision, "_prepare", prepared)
+    return seen
+
+
 def test_a_business_is_born_with_its_own_database_its_identity_and_its_schema(registry, hub_databases, told):
     hub = registry.hub()
 
@@ -377,7 +398,7 @@ def test_a_demo_is_born_with_its_database_and_dropped_alone_when_it_ends(registr
     Hub.objects.filter(pk=demo.pk).update(expires_at=timezone.now() - dt.timedelta(minutes=1))
     before = databases()
 
-    assert services.reap_demos() == 1
+    services.reap_demos()
 
     demo = fresh(demo)
     assert (demo.status, demo.purged_at is not None) == ("purged", True)
@@ -397,7 +418,7 @@ def test_a_demos_database_is_dropped_outside_any_transaction_of_control_and_befo
 
     monkeypatch.setattr(ops, "drop_database", spied)
 
-    assert services.reap_demos() == 1
+    services.reap_demos()
 
     assert seen == [(demo.db_name, False, "dropping")]
     assert fresh(demo).status == "purged"
@@ -411,7 +432,7 @@ def test_a_demo_that_ends_goes_with_its_files_and_every_other_keeps_theirs(regis
     kept = keep_files(live_demo) | keep_files(business)
     Hub.objects.filter(pk=ended.pk).update(expires_at=timezone.now() - dt.timedelta(minutes=1))
 
-    assert services.reap_demos() == 1
+    services.reap_demos()
 
     assert (fresh(ended).status, fresh(live_demo).status, fresh(business).status) == ("purged", "ready", "ready")
     assert set(objects(moto_s3, hub_files_bucket)) == kept
@@ -425,7 +446,7 @@ def test_a_demos_files_go_right_after_its_database_outside_any_transaction_and_b
     Hub.objects.filter(pk=demo.pk).update(expires_at=timezone.now() - dt.timedelta(minutes=1))
     seen = spy_on_the_purge(monkeypatch, lambda: fresh(demo).status)
 
-    assert services.reap_demos() == 1
+    services.reap_demos()
 
     assert seen == ["drop", ("files", demo.pk, False, "dropping")]
     assert fresh(demo).status == "purged"
@@ -441,10 +462,10 @@ def test_a_store_that_fails_leaves_the_demo_dropping_noted_and_tried_again_never
     settings.STORAGES = {**settings.STORAGES, "hub_files": hub_files_entry(moto_s3, "erplora-test-no-such-bucket")}
     now = timezone.now()
 
-    assert services.reap_demos(now) == 0, "a purge that left files behind is not done"
+    services.reap_demos(now)
 
     failed = fresh(demo)
-    assert (failed.status, failed.purged_at) == ("dropping", None)
+    assert (failed.status, failed.purged_at) == ("dropping", None), "a purge that left files behind is not done"
     assert failed.last_error.startswith("drop_failed: HubFilesNotDeleted: ")
     assert failed.attempts == 1
     assert failed.next_attempt_at > now
@@ -453,7 +474,7 @@ def test_a_store_that_fails_leaves_the_demo_dropping_noted_and_tried_again_never
     assert "base.demo.purge_failed" in caplog.text
 
     settings.STORAGES = {**settings.STORAGES, "hub_files": hub_files_entry(moto_s3, hub_files_bucket)}
-    assert provision.run_due(failed.next_attempt_at + dt.timedelta(seconds=1)) == 1
+    provision.run_due(failed.next_attempt_at + dt.timedelta(seconds=1))
 
     purged = fresh(demo)
     assert purged.status == "purged"
@@ -471,20 +492,23 @@ def test_a_demos_database_that_is_not_dropped_keeps_its_files(registry, monkeypa
 
     monkeypatch.setattr(ops, "drop_database", refused)
 
-    assert services.reap_demos() == 0
+    services.reap_demos()
 
     assert fresh(demo).status == "dropping"
     assert set(objects(moto_s3, hub_files_bucket)) == kept
 
 
-def test_a_demo_that_ends_while_it_is_made_is_dropped_not_finished(registry, told):
+def test_a_demo_that_ends_while_it_is_made_is_dropped_not_finished(registry, monkeypatch, told):
     demo = registry.hub(demo=True, status=Hub.Status.CREATING, expires_at=timezone.now() - dt.timedelta(minutes=1))
     HubDue.mark_due(demo)
+    seen = worked_on(monkeypatch)
 
-    assert provision.run_due() == 1
+    worked = provision.run_due()
 
     assert fresh(demo).status == "purged" and demo.db_name not in databases()
     assert not HubDue.objects.filter(pk=demo.pk).exists()
+    # A drop is work it counts, as a preparation is.
+    assert demo.pk in seen and worked == len(seen)
 
 
 def test_the_due_pass_prepares_what_is_due_and_leaves_what_waits_for_its_retry(registry, told):
@@ -494,9 +518,10 @@ def test_the_due_pass_prepares_what_is_due_and_leaves_what_waits_for_its_retry(r
     HubDue.mark_due(due)
     HubDue.mark_due(waiting, later)
 
-    assert provision.run_due() == 1
+    provision.run_due()
 
-    assert fresh(due).status == "ready" and fresh(waiting).status == "failed"
+    assert fresh(due).status == "ready"
+    assert (fresh(waiting).status, fresh(waiting).attempts) == ("failed", 1)
     assert HubDue.objects.get(pk=waiting.pk).due_at == later
     assert not HubDue.objects.filter(pk=due.pk).exists()
 
@@ -700,7 +725,7 @@ def test_a_hub_held_by_another_worker_is_not_taken(registry, told):
     HubDue.mark_due(hub, now)
     HubDue.objects.filter(pk=hub.pk).update(lease_until=now + dt.timedelta(seconds=60))
 
-    assert provision.run_due(now) == 0
+    provision.run_due(now)
     assert provision.provision(hub, now=now) is False
 
     assert fresh(hub).status == "requested" and hub.db_name not in databases()
@@ -760,10 +785,14 @@ def test_the_due_pass_leases_one_hub_at_a_time_right_before_it_works_on_it(regis
 
     monkeypatch.setattr(provision, "_prepare", prepare)
 
-    assert provision.run_due(now) == 2
+    worked = provision.run_due(now)
 
+    # Theirs, in their turn, and how many it worked on: whatever else its process left due is worked on too (hub#1332).
+    ours = [entry for entry in seen if entry[0] in (first.pk, second.pk)]
+    assert [hub_id for hub_id, _ in ours] == [first.pk, second.pk]
+    assert worked == len(seen)
     # While the first is worked on, the second is nobody's yet: its lease starts when its turn comes.
-    assert seen[0] == (first.pk, "")
+    assert ours[0] == (first.pk, "")
 
 
 # ── More apps than the template's, and a/b's own databases once every app can have one (seed_local_hubs) ────────────
@@ -833,7 +862,7 @@ def test_the_due_pass_gives_a_new_business_only_its_templates_tables(registry, s
     hub = registry.hub(vertical="small")
     HubDue.mark_due(hub)
 
-    assert provision.run_due() == 1
+    provision.run_due()
 
     _only_its_templates_apps_are_there(hub)
 

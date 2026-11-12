@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:918be033a1215cf7c8292a82d7945ce787c70a254f3e953932fc6cdc415d5a3c -->
+<!-- generated from WORKBOOK.md sha256:1a2bc22273aa0a921ff61bb012fd58f191ac71245f11784c1abf0901b0d1e884 -->
 
 ## What it is for and who it is for
 
@@ -2999,14 +2999,17 @@ Steps:
       back (it is restored in Services), nor does one the copy had archived, and one the business has already made again
       (another with the same name in the same category, not itself one of the copy's; each counts for one only, so two
       services with the same name both come back) is not repeated. Asking again creates nothing twice.
-      Appointments always go after customers, whatever the order they are asked in, so each finds its customer. Each
-      appointment that has not come yet and was still booked (pending or confirmed, not charged) comes back, booked as the
-      agenda books it: for its customer's card in the business (the same one, the one it was merged into or the one made
-      again), with its services, its professional, its time, its minutes and its notes; as a new appointment, with another
-      number and without its history (hub#1326). It is never booked over another: one whose time is already taken, no
-      longer fits the business's or the professional's hours or is blocked, or whose customer, service or professional is
-      no longer there, does not come back and its reason says why ("appointment.slot_taken: …"). Those gone by do not
-      come back, nor one the business has (even if it cancelled it) or booked again (the same customer at the same time).
+      Appointments always go after customers and services, whatever the order they are asked in, so each finds its
+      customer and its services. Each appointment that has not come yet and was still booked (pending or confirmed, not
+      charged) comes back, booked as the agenda books it: for its customer's card in the business (the same one, the one
+      it was merged into or the one made again), with its services in the business as Services matches them (the same
+      one or, if it is gone, the one made again by hand or just brought back by Services: the same name in the same
+      category, the oldest if there are two), its professional, its time, its minutes and its notes; as a new
+      appointment, with another number and without its history (hub#1326). It is never booked over another: one whose
+      time is already taken, no longer fits the business's or the professional's hours or is blocked, or whose customer,
+      service or professional is no longer there, does not come back and its reason says why ("appointment.slot_taken:
+      …", "service.service_not_found: …"). Those gone by do not come back, nor one the business has (even if it
+      cancelled it) or booked again (the same customer at the same time).
 In: the chosen businesses, the temporary cluster with their copy and the moment; to recover, the made separate copy and
 what to bring back.
 Out: the business's database as it was at that moment; the one it had, kept 7 days on its server; the notice
@@ -3039,7 +3042,8 @@ its result and the rest goes on: the app is turned off in the business ("Custome
 copy did not have it, lacks the migration its read needs or has one this code does not know (`recover_not_in_copy`,
 `recover_copy_behind`, `recover_copy_ahead`). What the create operation does not accept today (a phone no longer valid, a
 product without a tax category or with one Taxes no longer has active, a service whose tax category was turned off
-(`service.tax_category_unknown`), a time taken, a customer no longer there) is counted "not created" with its reason,
+(`service.tax_category_unknown`), a time taken, a customer no longer there, a service the business no longer has
+nor made again) is counted "not created" with its reason,
 and the rest comes back; so is a deleted card that was merged into another or erased meanwhile
 ("customer.customer_unavailable: …"). If the copy is gone, the recovery says "Failed" and why
 ("recover_copy_unreadable: …"). While the business is being moved or restored, the recovery waits without doing anything.
@@ -3049,4 +3053,4 @@ support staff see the list, Separate copies and Recoveries, but not the actions.
 Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12,
 CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04, SERVICE-F01, SERVICE-F04, SERVICE-F05,
 SERVICE-F08, APPOINTMENT-F01, APPOINTMENT-F11, FLOW-F21; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284,
-hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, aws#77
+hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, aws#77
