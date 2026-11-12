@@ -94,6 +94,20 @@ def test_the_graph_is_the_modules_and_their_requires():
     assert "base" not in graph
 
 
+def test_apps_in_the_order_of_their_requires_each_after_those_of_them_it_needs_otherwise_as_given():
+    """hub#1284: what is brought back from a separate copy goes in this order, so a record finds what it points at."""
+    # verifactu needs sale and customer through invoice, which is not among them; task needs none.
+    assert activation.in_requires_order(["verifactu", "task", "customer", "sale"], GRAPH) == [
+        "customer",
+        "sale",
+        "verifactu",
+        "task",
+    ]
+    assert activation.in_requires_order(["task", "tax"], GRAPH) == ["task", "tax"]
+    # Each once; one the graph does not know (a platform app) needs none and keeps its place.
+    assert activation.in_requires_order(["platform", "sale", "tax", "sale"], GRAPH) == ["platform", "tax", "sale"]
+
+
 # ── What a hub has: its rows, or the baseline while it has none ──────────────────────────────────────────────────
 
 
