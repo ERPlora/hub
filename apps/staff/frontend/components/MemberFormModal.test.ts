@@ -391,6 +391,28 @@ describe('MemberFormModal: Edit · {name} (STAFF-F02, F03)', () => {
       expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1', role_id: 'r1', user_id: '9' }]);
     });
 
+    // Each name follows its own field: choosing one of the two never decides the other's name.
+    it('a role chosen alone meanwhile keeps its name; the Hub user, untouched, is named from the record', async () => {
+      const s = await openHoldingTheRecord();
+      s.combo('role_id').vm.$emit('update:modelValue', { id: 'r1', label: 'Stylist' });
+      await settle();
+      await s.arrive();
+      expect([s.field('role_id').value, s.field('user_id').value]).toEqual(['Stylist', 'Ana López']);
+      await click(s.inDoc('staff-member-form-submit'));
+      expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1', role_id: 'r1' }]);
+    });
+
+    it('a Hub user chosen alone meanwhile keeps its name; the role, untouched, takes its name from the record', async () => {
+      const newer = { ...DETAIL, role_id: 'r2', role_name: 'Receptionist' };
+      const s = await openHoldingTheRecord({ '/api/staff/members/detail': [200, newer] });
+      s.combo('user_id').vm.$emit('update:modelValue', { id: '9', label: 'Bea Ruiz' });
+      await settle();
+      await s.arrive();
+      expect([s.field('role_id').value, s.field('user_id').value]).toEqual(['Receptionist', 'Bea Ruiz']);
+      await click(s.inDoc('staff-member-form-submit'));
+      expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1', user_id: '9' }]);
+    });
+
     it('what was not touched takes the record even where the row was behind it (role by its name), and sends nothing', async () => {
       const newer = { ...DETAIL, phone: '611', role_id: 'r1', role_name: 'Stylist' };
       const s = await openHoldingTheRecord({ '/api/staff/members/detail': [200, newer] });

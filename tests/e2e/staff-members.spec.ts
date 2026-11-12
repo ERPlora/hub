@@ -7,7 +7,7 @@
 // removed after it (and before, if a run died half-way).
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, hostPage, hubUserIdOf, login, psql, shot, shown } from './helpers';
+import { A, api, capture, EMPLOYEE, hostPage, hubUserIdOf, login, psql, shot, shown } from './helpers';
 import { rowAction } from './service-helpers';
 
 const TAG = 'E2E';
@@ -131,7 +131,7 @@ test('the owner adds, links, edits, deactivates and terminates staff, live, with
     await expect(page.locator('[data-testid=staff-member-form-loading]')).toBeVisible();
     await expect(email).toHaveValue('ana.e2e@example.com');
     await email.fill('ana.changed@example.com');
-    await page.locator('ion-modal[data-testid=staff-member-form] .ep-form-modal__content').screenshot({ path: shot('staff-members-edit-before-record') });
+    await capture(page, 'staff-members-edit-before-record');
     arrive();
     await expect(page.locator('[data-testid=staff-member-form-loading]')).toHaveCount(0);
     await expect(email).toHaveValue('ana.changed@example.com');
