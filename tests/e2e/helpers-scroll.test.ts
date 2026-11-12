@@ -6,7 +6,13 @@
 // `locator.scrollIntoViewIfNeeded` takes that element once and keeps it, so it throws «Element is not attached to the
 // DOM» once the list paints it again (reservation-book.spec.ts, `saysWhy`, at 834). `scrolledTo` looks for it again
 // and scrolls to what the list paints now; any other error fails as before, and a list that never stops painting
-// itself again fails saying so.
+// itself again fails saying so. Nine specs and helpers had each written their own way past the same repaint before it (a
+// retry of the scroll on a clock of 2 s, in `toPass`); the last block keeps a new copy of that retry from appearing
+// anywhere in the e2e while those nine move to `scrolledTo` (hub#837), one by one.
+import { globSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import type { Locator } from '@playwright/test';
 import { describe, expect, it } from 'vitest';
 
@@ -107,5 +113,74 @@ describe('scrolledTo() when the list paints itself again for the new size (hub#1
       /scrolledTo: locator\('\[data-testid=reservation-list-reason\]'\) was painted again \d+ times while scrolling to it/,
     );
     expect(list.scrolled).toEqual([]);
+  });
+});
+
+const E2E_DIR = dirname(fileURLToPath(import.meta.url));
+
+/** The e2e's helpers and specs, in its subfolders too: not Vitest's own tests nor what a run leaves (dot folders). */
+const helpersAndSpecs = (): string[] =>
+  globSync('**/*.ts', { cwd: E2E_DIR, exclude: (name) => name === 'node_modules' || name.startsWith('.') || name.endsWith('.test.ts') });
+
+/** The bodies of the retries in `source` that scroll: an `expect(async () => { … }).toPass()` with a
+ *  `scrollIntoViewIfNeeded` in it, the way past a repaint `scrolledTo` is the one of. */
+function scrollRetries(source: string): string[] {
+  return [...source.matchAll(/expect\(\s*async\s*\(\)\s*=>\s*\{([\s\S]*?)\}\s*(?:,[^()]*?)?\)\s*\.toPass\(/g)]
+    .map((match) => match[1])
+    .filter((body) => body.includes('scrollIntoViewIfNeeded'));
+}
+
+/** The specs and helpers that still retry their own scroll (a clock of 2 s in `toPass`), written before `scrolledTo`:
+ *  hub#837 moves each to it and takes it off this list. A new copy fails the check; one that moved fails it too until
+ *  it leaves the list, so the list only shrinks. */
+const OWN_RETRIES_LEFT = [
+  'cash-register-flows.spec.ts',
+  'customer-flows.spec.ts',
+  'fix-whatsapp-inbox-template-header-media.spec.ts',
+  'payment-flow.spec.ts',
+  'staff-commissions.spec.ts',
+  'staff-flows.spec.ts',
+  'tax-helpers.ts',
+  'verifactu-flows.spec.ts',
+  'website-flows.spec.ts',
+];
+
+describe('the e2e scrolls past a repaint one way, with scrolledTo of helpers.ts (hub#1303)', () => {
+  it('there are helpers and specs to look at, the shared helper and the lists that scrolled their own way among them', () => {
+    expect(helpersAndSpecs()).toEqual(
+      expect.arrayContaining(['helpers.ts', 'reservation-book.spec.ts', 'tax-helpers.ts', 'website-flows.spec.ts', 'qa/assistant-battery.spec.ts']),
+    );
+    expect(helpersAndSpecs().filter((name) => name.endsWith('.test.ts'))).toEqual([]);
+  });
+
+  it('no helper or spec retries a scroll of its own but the ones still to move to scrolledTo (hub#837)', () => {
+    const own = helpersAndSpecs().filter((name) => scrollRetries(readFileSync(join(E2E_DIR, name), 'utf8')).length > 0);
+    expect(own.sort()).toEqual(OWN_RETRIES_LEFT);
+  });
+
+  it('the check reads the shapes the copies had as a retry of a scroll, and scrolledTo or another retry as none', () => {
+    const copies = [
+      [
+        '    await expect(async () => {',
+        '      await seen.scrollIntoViewIfNeeded({ timeout: 2000 });',
+        '      await expect(seen).toBeInViewport({ timeout: 1000 });',
+        '    }, `${key} at ${vp.label}`).toPass();',
+      ],
+      [
+        '    await expect(async () => {',
+        '      const seen = target();',
+        '      await seen.scrollIntoViewIfNeeded({ timeout: 2000 });',
+        '      await expect(seen).toBeInViewport({ timeout: 1000 });',
+        '    }, `${key} at ${vp.label}`).toPass();',
+      ],
+      ['await expect(async () => { await row.scrollIntoViewIfNeeded(); }).toPass({ timeout: 10_000 });'],
+    ].map((lines) => lines.join('\n'));
+    const others = [
+      '    await scrolledTo(target());',
+      '    await expect(async () => {\n      expect(await rowNames(page)).toContain(name);\n    }).toPass();',
+      '    await row.scrollIntoViewIfNeeded();',
+    ];
+    expect(copies.map((source) => scrollRetries(source).length)).toEqual(copies.map(() => 1));
+    expect(others.flatMap(scrollRetries)).toEqual([]);
   });
 });
