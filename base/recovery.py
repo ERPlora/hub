@@ -14,6 +14,23 @@ import psycopg
 #: The hook of a ``LiveAppConfig`` that says what the app gives back from a separate copy.
 HOOK = "recoverable_from_copy"
 
+#: The actor prefix of what a recovery does in the business (``copy_recovery:<id>``, the ``CopyRecovery``'s id): its
+#: operations run as it, so every event they record keeps it in the outbox, as a run of an automation keeps its own
+#: (hub#1307). What comes back is nothing new to the business: a reaction that greets or announces something new (an
+#: automation of «customer created») starts nothing for it, while one that keeps the business's data whole still runs.
+ACTOR = "copy_recovery:"
+
+
+def actor_of(recovery_id: object) -> str:
+    """The actor the recovery ``recovery_id`` runs the apps' operations as."""
+    return f"{ACTOR}{recovery_id}"
+
+
+def brought_back(actor: str) -> bool:
+    """Whether an event's ``actor``, as the outbox keeps it, is a recovery's: what it records came back from a separate
+    copy, and is nothing new to the business."""
+    return actor.startswith(ACTOR)
+
 
 @dataclass(frozen=True)
 class Recoverable:

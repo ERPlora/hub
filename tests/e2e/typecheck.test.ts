@@ -55,11 +55,14 @@ const e2eFiles = readdirSync(e2eDir, { recursive: true, encoding: 'utf8' })
   .filter((name) => !name.split(/[\\/]/).some((part) => part.startsWith('.') || part === 'node_modules'))
   .map((name) => join(e2eDir, name));
 
+// Synchronous: it reads the script's tsconfigs and walks their folders, a tenth of a second at rest and as slow as a
+// loaded machine makes each read, and Vitest looks at a synchronous test's clock only once it has returned. So it
+// names none (hub#777): what it found is its verdict, and a file of this folder left out is red at once.
 it('checks every .ts of tests/e2e', () => {
   const files = new Set(typecheckProjects().flatMap((project) => [...checked(project)]));
   expect(e2eFiles.length).toBeGreaterThan(0);
   expect(e2eFiles.filter((file) => !files.has(file)).map((file) => relative(root, file))).toEqual([]);
-});
+}, NO_CLOCK);
 
 // The projects walked ahead and the program read ahead, without holding the worker (hub#1315): some 1,500 files, each
 // first open of which waits on its own on a loaded machine. What is left here is TypeScript's own work, the check.
