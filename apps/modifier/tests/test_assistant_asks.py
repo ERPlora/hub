@@ -1,6 +1,6 @@
-"""What layer 1 of the assistant's QA does not say of Modifiers (docs plan 2026-10-31, the assistant's knowledge and
-QA, §3): how many tools it offers, what an employee is never offered, and that the requests of the real-model QA
-(hub#1092), in the person's own words, are offered their existing operation.
+"""What layer 1 of the assistant's QA does not say of Modifiers: how many tools it offers, what an employee is never
+offered, and that the requests of the real-model QA (hub#1092), in the person's own words, are offered their
+existing operation.
 
 Every ask of every tool of Modifiers bringing its tool among the first ten, role by role, in both languages, is
 ``base/tests/test_assistant_asks.py``'s (Modifiers is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020``

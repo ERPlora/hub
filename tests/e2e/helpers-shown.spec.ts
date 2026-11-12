@@ -1,8 +1,8 @@
-// flow: ninguno — FIX de la infraestructura e2e: con un diálogo abierto, `shown(page)` es el diálogo
+// flow: none — the e2e harness's `shown(page)` with a dialog open
 // `shown(page)` is the page on view, never a dialog presented over it: Ionic Vue wraps an inline
 // `ion-modal`'s content in an `.ion-page` and moves the presented modal to `ion-app`, after the pages, so a
-// helper that took the last visible `.ion-page` landed inside the dialog. There the list has no rows, and a
-// spec that counted 0 rows after confirming a dialog passed before anything was deleted. Nor is it `ion-app`,
+// helper that takes the last visible `.ion-page` lands inside the dialog. There the list has no rows, and a
+// spec that counts 0 rows after confirming a dialog would pass before anything was deleted. Nor is it `ion-app`,
 // which Ionic also marks `.ion-page` and which holds the route's page and the presented dialogs.
 import { expect, type Page, test } from '@playwright/test';
 

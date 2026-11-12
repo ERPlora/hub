@@ -1,5 +1,5 @@
-# A hub's database is made by steps (round 2026-10-30 of PLAN-DB, S2a; PLAN-DB §6): the statuses of its preparation
-# (creating, migrating, seeding) and of S2b's way out (archiving, dropping), and what a failed preparation keeps to be
+# A hub's database is made by steps: the statuses of its preparation
+# (creating, migrating, seeding) and of its way out (archiving, dropping), and what a failed preparation keeps to be
 # retried (attempts, last_error, next_attempt_at). A cluster gets its limit of hubs (max_hubs, 0 = none), the secret
 # of its own roles (secret_name, empty = the environment's) and may name no PgBouncer of its own (pooler_host blank:
 # its writer, directly). Every new column has its default in the database or is nullable, so the code of before

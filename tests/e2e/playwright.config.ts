@@ -1,4 +1,4 @@
-// Browser PoC of phase 1 (plan §8): Ioan's Chrome, hidden by default; `E2E_HEADED=1` shows it, slowed
+// The Hub's browser specs, in Chrome, hidden by default; `E2E_HEADED=1` shows it, slowed
 // down so it can be followed.
 // It drives the dev stack that `manage.py runserver` serves (Django on :8000 + Vite on :5173):
 // start it first. A branch beside another session's stack runs its own on other ports and its own e2e
@@ -8,7 +8,7 @@
 //
 // `globalSetup` (`global-setup.ts`) first stops the run if the local databases of that `DB_NAME` have
 // unapplied migrations: it runs `manage.py migrate --check --plan` (control) and `manage.py migrate_hubs
-// --check` (the hub databases; phase 1: control again), which apply nothing, and aborts naming what is
+// --check` (the hub databases), which apply nothing, and aborts naming what is
 // pending and the command that applies it, `uv run python manage.py migrate && uv run python manage.py
 // migrate_hubs` from this checkout. It never migrates them (sessions share them): without it, a database
 // behind the code failed the specs with «not valid JSON» (2026-10-16).
@@ -20,8 +20,7 @@
 // again in every worker process, which inherits the runner's environment and so the same id.
 // `E2E_OUTPUT_DIR` overrides the folder. The specs' own evidence keeps its fixed paths
 // (`.artifacts/*.png` and `.artifacts/metrics/*.json`, from `shot()` and `record()` in helpers.ts);
-// `.artifacts/results.json`, cited by the PoC report of 2026-10-13, is that run's and no longer
-// rewritten.
+// an old `.artifacts/results.json` is no longer rewritten.
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 

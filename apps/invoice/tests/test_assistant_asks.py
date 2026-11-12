@@ -1,7 +1,7 @@
-"""What layer 1 of the assistant's QA does not say of Invoicing (docs plan 2026-10-31, the assistant's knowledge and QA,
-§3): how many tools it offers, what an employee and a manager are never offered, that the owner's requests of the
-real-model QA (hub#1102), in the owner's own words, are offered their existing operation, that the Hub reads a «pagada»
-invoice as a paid one, and that each tool's asks, not only its name, bring what a person says in words of their own.
+"""What layer 1 of the assistant's QA does not say of Invoicing: how many tools it offers, what an employee and a
+manager are never offered, that the owner's requests of the real-model QA, in the owner's own words, are offered their
+existing operation, that the Hub reads a «pagada» invoice as a paid one, and that each tool's asks, not only its name,
+bring what a person says in words of their own.
 
 Every ask of every tool of invoice bringing its tool among the first ten, role by role, in both languages, is
 ``base/tests/test_assistant_asks.py``'s (invoice is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over
@@ -76,10 +76,10 @@ NOT_THE_EMPLOYEES = {
 #: The issuer is set by who runs the business and an administrator only (``invoice.manage_issuer``).
 NOT_THE_MANAGERS = {"invoice.issuer.update"}
 
-#: The owner's requests of hub#1102's QA (``tests/e2e/qa/probes/owner-es-invoice-2026-11-08.json``) as they were said,
-#: and nothing of the tools' ``asks``: before Invoicing said its asks, marking an invoice paid and replacing a ticket
-#: were not among the tools a turn offers (``MAX_TOOLS``), so the model found the invoice and said it could not mark
-#: it, and the rectification was offered fifth, behind its preview.
+#: The owner's requests of the real-model QA (``tests/e2e/qa/probes/owner-es-invoice-2026-11-08.json``) as they were
+#: said, and nothing of the tools' ``asks``: before Invoicing said its asks, marking an invoice paid and replacing a
+#: ticket were not among the tools a turn offers (``MAX_TOOLS``), so the model found the invoice and said it could not
+#: mark it, and the rectification was offered fifth, behind its preview.
 REPORTED = [
     (
         "invoice.invoice.mark_paid",
@@ -98,13 +98,13 @@ REPORTED = [
 #: How far down the tools a turn offers (``MAX_TOOLS``, 40) any request of the QA may bring its tool: half of them, so
 #: twenty tools of the apps that say their asks later may climb past it before the model loses it.
 WITH_ROOM = 20
-#: How far down the tools a turn offers the requests hub#1102 is about bring theirs: among the first eight, the three
+#: How far down the tools a turn offers the reported requests bring theirs: among the first eight, the three
 #: ``ALWAYS`` in front, so the model sees the write it was asked for near the top and calls it.
 NEAR_THE_TOP = 8
-#: The requests hub#1102 is about, each with its tool: the owner's words of the issue («marca como cobrada la
-#: FACT-2026-000001», «rectifícala con una R1») and the two probes of the QA it reports. In «sin tocar caja ni cambiar
-#: importes» live reads the «cambiar» after «ni» as not asked, as the infinitive right after «sin» (ERPlora/live#74), so
-#: marking the invoice paid is no longer behind the writes that change something (12th before, 5th since).
+#: The reported requests, each with its tool: the owner's words («marca como cobrada la FACT-2026-000001», «rectifícala
+#: con una R1») and the two QA probes that reported them. In «sin tocar caja ni cambiar importes» live reads the
+#: «cambiar» after «ni» as not asked, as the infinitive right after «sin», so marking the invoice paid is no longer
+#: behind the writes that change something (12th before, 5th since).
 THE_ISSUES = [
     pytest.param("invoice.invoice.mark_paid", "marca como cobrada la FACT-2026-000001", id="mark_paid-said"),
     pytest.param("invoice.invoice.rectify", "rectifícala con una R1", id="rectify-said"),
@@ -250,7 +250,7 @@ def test_the_reported_invoice_request_offers_its_existing_operation(context_of, 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), THE_ISSUES)
 def test_the_request_of_the_issue_offers_its_write_near_the_top(context_of, name, phrase):
-    """hub#1102: the owner asks to mark an invoice paid or to rectify it, and the write is among the first eight a turn
+    """The owner asks to mark an invoice paid or to rectify it, and the write is among the first eight a turn
     offers, so the model calls it and its card comes (INVOICE-F08, INVOICE-F19)."""
     assert_offered_within(assistant.catalog(context_of(Membership.Role.OWNER, "es")), name, phrase, NEAR_THE_TOP)
 
@@ -305,7 +305,7 @@ def test_an_invoice_said_paid_brings_marking_it_paid_by_the_hubs_words(context_o
 
 def test_each_tool_of_invoicing_has_its_own_words_in_each_language():
     """One phrase per tool and language: only the asks of the language a phrase is said in bring it, so a tool with
-    words of its own in one language only leaves its asks in the other unmeasured (hub#1216)."""
+    words of its own in one language only leaves its asks in the other unmeasured."""
     assert sorted((name, language) for language, name, _ in OWN_WORDS) == sorted(
         (name, language) for name in TOOLS for language in ("en", "es")
     )
@@ -332,7 +332,7 @@ def test_invoicings_asks_take_no_place_from_the_asks_of_sales_that_speak_of_an_i
     context_of, language, name, word
 ):
     """An ask of Sales that says «factura» or «invoice» brings its tool to the very place it has without the asks of
-    Invoicing: the words of the twenty-five tools here push no request of the till down (hub#1102)."""
+    Invoicing: the words of the twenty-five tools here push no request of the till down."""
     tools = assistant.catalog(context_of(Membership.Role.OWNER, language))
     unasked = tools
     for tool in TOOLS:

@@ -357,7 +357,7 @@ def delete_combo(ctx: OperationContext, data: ComboRefIn) -> dict:
     return {"id": combo_id}
 
 
-# --- The menu's image (COMBO-F14; round 2026-10-30, base.images) -------------------------------------
+# --- The menu's image (COMBO-F14, base.images) -------------------------------------------------------
 
 #: Where a menu's own photos are kept under its hub's prefix: the folder ``members_media`` serves (apps.py).
 PHOTOS = "combo/combos/"

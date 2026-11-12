@@ -1,4 +1,4 @@
-"""The business's API keys at the door of its API (APP-BASE-5; PLAN-HUB §3 «API keys», PLAN-SAAS §2.4): without the ORM.
+"""The business's API keys at the door of its API, without the ORM.
 
 A key's token is ``erpk_live_`` and 256 random bits, sent as ``Authorization: Bearer <token>``; the hub keeps its
 SHA-256 (``base.models.ApiKey``) and its first characters. :func:`install` puts the key's door in front of the session's

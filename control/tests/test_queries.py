@@ -1,4 +1,4 @@
-"""The size of the hubs' databases, as the Hub admin shows it (round 2026-10-30b of PLAN-DB, decision 1; tranche S7).
+"""The size of the hubs' databases, as the Hub admin shows it.
 
 ``control.cluster.sizes`` measures, with ``pg_database_size`` over the catalogue, the own databases of the hubs on one
 cluster, never opening any of them: on the settings' own server (no cluster) through control's own connection, on a

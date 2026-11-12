@@ -1,16 +1,14 @@
-// flow: ninguno — FIX base (ayudante `login` de los e2e del Hub; visto en hub#107 y hub#1370)
-// `login` on a loaded machine (hub#107: «next not reached», then «code rejected»). What fell was the SaaS's
-// answer to the mailed code (`POST …/auth/code/confirm`), 30 and 37 s on the server: allauth's user sessions walk
-// every open session of the account at each sign-in, and every login of the e2e signed in again and left one
-// more (1680 for owner@example.com in the shared `saas` database). So an account signs in to the SaaS once per
-// worker and later logins reuse that SaaS session, as a person signed in at erplora.com: the SaaS skips its
-// form and its code and only hands the hub its one-time code. A SaaS session that ended (a spec signed out
-// there) falls back to the real sign-in, whose session is reused next.
-// A SaaS slow at a step, however slow, is waited for (hub#1370: each step had a sixth of the test's time and fell
-// with nothing wrong): its answer here comes later than that on purpose, the test itself never waits. «code
-// rejected» is only what the SaaS answers, and a code that gets no answer says so, whatever the page shows.
-// Every login here is about the trip through the SaaS, so it asks for the jump (`fresh: true`): without it, `login`
-// would reuse the hub's session it keeps and never reach the SaaS (FIX-HUB-E2E-HUB-LOGIN-RATELIMIT-429).
+// flow: none — the `login` helper of the Hub's e2e (seen in hub#107 and hub#1370)
+// `login` on a loaded machine. The SaaS's answer to the mailed code (`POST …/auth/code/confirm`) slows down with every
+// open session of the account, which allauth's user sessions walk at each sign-in, and a login that signs in again
+// leaves one more. So an account signs in to the SaaS once per worker and later logins reuse that SaaS session, as
+// a person signed in at erplora.com: the SaaS skips its form and its code and only hands the hub its one-time code. A
+// SaaS session that ended (a spec signed out there) falls back to the real sign-in, whose session is reused next.
+// A SaaS slow at a step, however slow, is waited for: its answer here comes later than a step of the login used to
+// wait (a sixth of the test's time) on purpose, and the test itself never waits. «code rejected» is only what the SaaS
+// answers, and a code that gets no answer says so, whatever the page shows. Every login here is about the trip through
+// the SaaS, so it asks for the jump (`fresh: true`): without it, `login` would reuse the hub's session it keeps and
+// never reach the SaaS.
 import { type Browser, type BrowserContext, expect, type Route, test } from '@playwright/test';
 
 import { A, hostPage, listReady, login, OWNER, SAAS, SAAS_CODE as CODE, SAAS_SIGN_IN as SIGN_IN, shot, topbarApps } from './helpers';

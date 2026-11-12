@@ -1,4 +1,4 @@
-"""The roles a hub's database is reached with, per cluster (round 2026-10-30, S2a; PLAN-DB §5 and §10; aws#23).
+"""The roles a hub's database is reached with, per cluster.
 
 :func:`credentials_for` is the one place that says which user and password reach a hub's database, for one of two
 roles: :data:`APP` (``hub_app``: a hub's alias, in the web and the worker) or :data:`MIGRATOR` (``hub_migrator``: its
@@ -10,7 +10,7 @@ roles: :data:`APP` (``hub_app``: a hub's alias, in the web and the worker) or :d
   development only): without them, ``CredentialsUnavailable``, never the app's role.
 - A cluster with ``secret_name``: its own, from the Secrets Manager secret of that role under that prefix,
   ``<secret_name>/app`` (``app_user``, ``app_password``) or ``<secret_name>/migrator`` (``migrator_user``,
-  ``migrator_password``). The web's task role may read only ``…/app`` (aws#23), and only a migrator's connection asks
+  ``migrator_password``). The web's task role may read only ``…/app``, and only a migrator's connection asks
   for ``…/migrator``. Their ``host``, ``port``, ``pooler_host`` and ``pooler_port`` are not read: where the cluster is
   is its row's (``control.Cluster``), which the admin edits. Each secret is read once per :data:`SECRET_TTL_SECONDS`
   and kept in the process (a rotation reaches every task within that while: ``base.tenancy.connections`` puts the new

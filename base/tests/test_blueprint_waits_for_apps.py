@@ -256,7 +256,7 @@ def test_an_app_loaded_at_once_does_not_wait_and_is_not_loaded_again(business):
     assert done["rows"] == 1 + SALON_PRODUCTS + SALON_CATEGORIES + SALON_SERVICES
 
 
-# ── Two businesses: a load of one never reaches the other (PLAN-DB §14.2) ───────────────────────────────────────
+# ── Two businesses: a load of one never reaches the other ───────────────────────────────────────────────────────
 
 
 def test_a_load_that_waited_brings_its_data_to_its_own_business_and_never_opens_the_other(business):
@@ -563,7 +563,7 @@ def test_only_the_loads_of_the_apps_that_went_on_load(business):
 
 
 def test_what_the_person_left_unchecked_never_comes_in_later_though_its_app_is_on(business):
-    """Only what waited loads when the app is ready: an app on here but not chosen stays as it was (review of #841)."""
+    """Only what waited loads when the app is ready: an app on here but not chosen stays as it was."""
     hub = business("a")
     turn_on(hub, "inventory")
     run_pass()

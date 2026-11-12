@@ -109,7 +109,7 @@ describe('useCheckout', () => {
   });
 
   it('a business that files for real and cannot reach the AEAT is refused in the server’s words, in its language', async () => {
-    // Working-rules §15: VeriFactu refuses the charge itself (no ticket that could never be filed); the till
+    // VeriFactu refuses the charge itself (no ticket that could never be filed); the till
     // shows what the server says, already in the cashier's language, and charges nothing.
     const s = await setup();
     const message =

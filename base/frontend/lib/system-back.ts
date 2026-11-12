@@ -24,7 +24,7 @@
 //   3. the mounted app, through the `erplora:back` contract below;
 //   and with nothing open:
 //   4. on a detail view, the screen's own Back (the topbar's: history inside the app, else its `backHref`);
-//   5. on the root of an app, Home, with history behind or not: a screen of an app has no Back (PLAN-MIGRATIONS §16),
+//   5. on the root of an app, Home, with history behind or not: a screen of an app has no Back,
 //      and Home is where the menu's «Home» and the «My apps» sheet's lead;
 //   6. on Home, out of the app (`leave_app`), what the system Back does on a start screen.
 //

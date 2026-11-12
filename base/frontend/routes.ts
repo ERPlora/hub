@@ -1,6 +1,5 @@
-// Routes → pages of base, and nothing else: the Home at `/` (PLAN-HUB round 2026-10-21, the old hub's
-// dashboard), Apps and System (APP-BASE-4), the way in (APP-BASE-3) and Settings at `/settings` (its tab in the hash:
-// General, or `#data`; APP-BASE-3 and APP-BASE-2) and Employees at `/employees` (APP-BASE-5). The Home is registered before the shell's grid, so it wins `/`;
+// Routes → pages of base, and nothing else: the Home at `/`, Apps and System, the way in and Settings at `/settings`
+// (its tab in the hash: General, or `#data`) and Employees at `/employees`. The Home is registered before the shell's grid, so it wins `/`;
 // named apart from it (`home`), because a second route with the same name would replace the first. Types only:
 // `main.ts` globs this file eagerly.
 import type { RouteRecordRaw } from 'vue-router';
@@ -12,7 +11,7 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./pages/HomePage.vue'),
     meta: { auth: true },
   },
-  // ── Apps (APP-BASE-4) ──
+  // ── Apps ───────────────
   // The business's apps and the catalogue (BASE-G67…G74): «My apps», `#all` and `#paid`, the old hub's addresses.
   {
     path: '/apps',
@@ -27,7 +26,7 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./pages/SystemPage.vue'),
     meta: { auth: true },
   },
-  // ── The way in (APP-BASE-3) ──
+  // ── The way in ───────────────
   // «Access» (BASE-G55…G58): where Django's `way_in` sends a browser without a session; it paints its own frame.
   {
     path: '/login',
@@ -56,7 +55,7 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./pages/ProfilePage.vue'),
     meta: { auth: true },
   },
-  // ── Settings: General (APP-BASE-3) and Data (APP-BASE-2) ──
+  // ── Settings: General and Data ────────────────────────────
   // Its tab in the hash: General (this device, the PIN pad and the devices: BASE-G62…G66, G72, G151) or `#data`;
   // the old hub's `/import` and `/export` pages land on Settings › Data.
   {
@@ -65,7 +64,7 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./pages/SettingsPage.vue'),
     meta: { auth: true },
   },
-  // ── People and permissions (APP-BASE-5) ──
+  // ── People and permissions ───────────────
   // Employees: «Staff», «Roles», «API keys» and «Approvals», the tab in the hash (BASE-G11, G138…G149); a person's
   // page, for who runs the business (BASE-G10, G139, G140).
   {
@@ -89,7 +88,7 @@ const routes: RouteRecordRaw[] = [
   },
   { path: '/import', redirect: { path: '/settings', hash: '#data' } },
   { path: '/export', redirect: { path: '/settings', query: { data: 'export' }, hash: '#data' } },
-  // ── Files (APP-BASE-8) ──
+  // ── Files ───────────────
   // The business's files (BASE-G82…G86), the old hub's `/files` and the side menu's «Files»; the folder in `?folder=`.
   {
     path: '/files',

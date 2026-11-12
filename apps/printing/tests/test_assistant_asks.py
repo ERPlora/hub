@@ -1,5 +1,5 @@
-"""What layer 1 of the assistant's QA says of Printing (erplora-next docs/plans/2026-10-31-asistente-conocimiento-y-qa.md):
-how many tools it offers, and the two writes the real-model QA found unreachable (hub#1086).
+"""What layer 1 of the assistant's QA says of Printing: how many tools it offers, and the two writes the real-model QA
+found unreachable (hub#1086).
 
 Every ask of every tool of printing bringing its tool among the first ten, role by role, in English and in Spanish, out
 of the catalogue of a business with every app on and ranked as a turn ranks, is ``base/tests/test_assistant_asks.py``'s
@@ -112,12 +112,11 @@ def test_the_reported_printing_requests_are_offered_their_tool_without_being_its
 
 
 #: A device that prints, retired in words that are no ask nor probe and that only its tool's asks bring among the first
-#: ten: «dispositivo» is the Hub's own word for it (Printing → Devices, «Dispositivo 1»). Since ERPlora/live#64,
-#: «retira» asks to retire, delete, remove and withdraw, and «el equipo» reads as the staff
-#: (``live.assistant.SYNONYMS``), so an ask that said «retira el equipo Barra 2» fell to the edge of the ten (10th) and
-#: this phrase with it (13th). With «el dispositivo» in the ask it is 8th for the owner, the admin and the manager, and
-#: 13th without its asks; it shares one stem with an ask («dispositivo») and says no «retira», which brings the tool by
-#: its own name.
+#: ten: «dispositivo» is the Hub's own word for it (Printing → Devices, «Dispositivo 1»). In live, «retira» asks to
+#: retire, delete, remove and withdraw, and «el equipo» reads as the staff (``live.assistant.SYNONYMS``), so an ask that
+#: said «retira el equipo Barra 2» fell to the edge of the ten (10th) and this phrase with it (13th). With «el
+#: dispositivo» in the ask it is 8th for the owner, the admin and the manager, and 13th without its asks; it shares one
+#: stem with an ask («dispositivo») and says no «retira», which brings the tool by its own name.
 OWN_WORDS = [
     ("es", "printing.device.retire", "ese dispositivo de la entrada desapareció; que no imprima nunca más"),
 ]

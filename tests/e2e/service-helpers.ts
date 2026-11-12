@@ -1,8 +1,8 @@
 // Shared steps of the service e2e (service-*.spec.ts): an owner's page in English, the apps' APIs for
 // setup and server-side evidence (never the check itself), a Combo pick, a row action (a button, or
-// inside «⋮» when the row folds them: the one every spec of the e2e takes, hub#1302), a column filter through the table's «Filters» panel and the
-// cleanup every spec runs before and after it: what a run creates is named «E2E Svc …» and deleted from
-// the hub's database (phase 1: hubs `a` and `b` share it), the appointments of its customers included.
+// inside «⋮» when the row folds them: the one every spec of the e2e takes, hub#1302), a column filter through the
+// table's «Filters» panel and the cleanup every spec runs before and after it: what a run creates is named
+// «E2E Svc …» and deleted from the hub's database, the appointments of its customers included.
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
 import { A, api, horizontalOverflow, login, psql, shown } from './helpers';

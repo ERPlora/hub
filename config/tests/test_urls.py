@@ -111,7 +111,7 @@ def test_debug_shell_loads_from_the_vite_dev_server(client, settings):
 
 @pytest.mark.parametrize("path", ["/admin/", "/admin/login/", "/admin/hub/a/"])
 def test_the_admin_is_not_found_on_a_hub_host(client, admin_user, path):
-    # The Hub admin lives only on the platform host hubs.<domain> (PLAN §18.1.3), also for a superuser.
+    # The Hub admin lives only on the platform host hubs.<domain>, also for a superuser.
     for response in (client.get(path, HTTP_HOST=HOST), client.post(path, HTTP_HOST=HOST)):
         assert (response.status_code, response.has_header("Location"), is_shell(response)) == (404, False, False)
     client.force_login(admin_user)
@@ -120,7 +120,7 @@ def test_the_admin_is_not_found_on_a_hub_host(client, admin_user, path):
 
 
 def test_the_admin_deep_link_wins_over_the_admin_s_own_urls():
-    # Otherwise admin/<app_label>/ would take /admin/hub/ (round 13, PLAN §18.1).
+    # Otherwise admin/<app_label>/ would take /admin/hub/.
     assert resolve("/admin/hub/a/").url_name == "admin-hub"
 
 

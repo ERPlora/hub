@@ -1,10 +1,7 @@
-"""Models of the modifier app: groups of choices, their options and the links to what is sold.
-
-A group says how many options are chosen (``min_choices`` ≥ 1 IS «required»: there is no flag, Clover's
+"""A group says how many options are chosen (``min_choices`` ≥ 1 IS «required»: there is no flag, Clover's
 rule) and whether one can be repeated; an option carries its supplement in cents (negative = a
 discount) and, only when it taxes differently from the dish, a tax category of its own. A link hangs a
-group from exactly one product or one category of Inventory. Phase 1 has no tenancy: every scope shares
-these tables; phase 2 moves them to each hub's database.
+group from exactly one product or one category of Inventory.
 
 Deleting is deleting: a group takes its options and links with it (``CASCADE``); Sales keeps its own
 frozen copy of what was ordered. Every uniqueness and every rule of a group is held by Postgres too.

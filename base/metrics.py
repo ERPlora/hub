@@ -1,4 +1,4 @@
-"""The worker's CloudWatch metrics (hub#488; PLAN-AWS §8 «Observabilidad mínima»; PLAN-DB §6 and §8).
+"""The worker's CloudWatch metrics.
 
 Once a minute of its clock, in a thread of its own (the worker's ``Background("metrics")``, ``worker-metrics``: the tick
 never waits for it), the worker measures and publishes with ``PutMetricData``, every value with the ``Environment``
@@ -8,12 +8,12 @@ dimension (``ERPLORA_ENVIRONMENT``):
   the oldest hub still being prepared waits (requested, creating, migrating, seeding, or failed and retried);
   ``HubsFailed``, how many failed; ``DemosDropPending``, since when the oldest demo that ended waits to be dropped;
   and (:class:`StuckActivations`) ``AppsActivationStuck``, how many apps of every ready business are stuck turning on
-  (waiting for their tables for more than 10 minutes, or failed; hub#610), each business read in its own database;
+  (waiting for their tables for more than 10 minutes, or failed), each business read in its own database;
 - ``ERPlora/Fiscal`` (:class:`FiscalBacklog`): ``OldestPendingAgeSeconds``, since when the oldest production record
-  waits to reach the tax authority. The queue is the records themselves (PLAN-DB §8, «la cola son los propios
-  registros»), so every app that keeps one answers ``fiscal_pending_since()`` on its ``LiveAppConfig`` (VeriFactu),
-  in each hub with its own database where the app is on (since S5 there is no shared database: a business still
-  without its own, whose host answers 503 until ``manage.py cut_shared_hubs``, is never read).
+  waits to reach the tax authority. The queue is the records themselves, so every app that keeps one answers
+  ``fiscal_pending_since()`` on its ``LiveAppConfig`` (VeriFactu), in each hub with its own database where the app is
+  on (there is no shared database: a business still without its own, whose host answers 503 until
+  ``manage.py cut_shared_hubs``, is never read).
 
 What is measured is the list :func:`default_collectors` gives: one more measure is one more function there, taking the
 time and the stop request and giving its :class:`Metric` s (one read in each business, one more :class:`HubReadings`).
@@ -57,7 +57,7 @@ INTERVAL_SECONDS = 60.0
 #: How long one pass may read the hubs with their own database for one measure (the fiscal backlog, the apps stuck
 #: turning on); the next pass goes on after the last hub read, each hub's last reading kept meanwhile.
 HUBS_PASS_SECONDS = 20.0
-#: The region when the task does not say it (the platform's, PLAN-AWS).
+#: The region when the task does not say it: the platform's.
 DEFAULT_REGION = "eu-west-1"
 #: The ``Scope`` kind of a business's hub (``base.worker._serve_hub``).
 HUB_SCOPE_KIND = "host"
@@ -204,8 +204,8 @@ class FiscalBacklog(HubReadings):
 
 class StuckActivations(HubReadings):
     """``ERPlora/Hubs`` ``AppsActivationStuck``: how many apps of every ready business are stuck turning on
-    (``base.queries.activations_stuck``: waiting for their tables for more than 10 minutes, or failed; hub#610,
-    PLAN-DB §7), each business read in its own database; 0 when none is. Only the ready ones: a business that left
+    (``base.queries.activations_stuck``: waiting for their tables for more than 10 minutes, or failed), each
+    business read in its own database; 0 when none is. Only the ready ones: a business that left
     keeps its database for its fiscal records, and nobody waits there for an app. A business that cannot be read counts
     nothing until it is read: the fiscal backlog already pages for it."""
 

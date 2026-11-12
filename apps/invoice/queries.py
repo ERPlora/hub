@@ -1231,7 +1231,7 @@ def get_issuer(ctx: OperationContext, params: IssuerGetIn) -> dict:
     return issuer_row(Issuer.objects.first())
 
 
-# ── ERPlora's own invoices (its platform hub, PLAN-SAAS §4) ─────────────────────────────────────────────────────
+# ── ERPlora's own invoices (its platform hub) ───────────────────────────────────────────────────────────────────
 
 PLATFORM_UNKNOWN = _("This ERPlora invoice was never issued here.")
 PLATFORM_ISSUER_MISSING = _("The platform hub has no issuer: run create_platform_hub.")
@@ -1241,7 +1241,7 @@ VERIFACTU_RECORD = "verifactu.record.get"
 VERIFACTU_CONFIG = "verifactu.config.get"
 #: The record's statuses the SaaS reads as «issued»: sealed, on its way to the AEAT.
 ON_ITS_WAY = ("pending", "sent")
-#: What the AEAT registered: only then does the document print the QR (the old SaaS, saas#1054).
+#: What the AEAT registered: only then does the document print the QR, as the old SaaS did.
 IN_THE_AEAT = ("accepted", "accepted_with_errors")
 
 

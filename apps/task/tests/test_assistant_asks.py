@@ -1,6 +1,6 @@
-"""What layer 1 of the assistant's QA does not say of Tasks (docs plan 2026-10-31, the assistant's knowledge and QA,
-§3): how many tools it offers, what an employee is never offered, and that the owner's requests of the real-model QA
-(hub#1098), in the owner's own words, are offered their existing operation.
+"""What layer 1 of the assistant's QA does not say of Tasks: how many tools it offers, what an employee is never
+offered, and that the owner's requests of the real-model QA (hub#1098), in the owner's own words, are offered their
+existing operation.
 
 Every ask of every tool of task bringing its tool among the first ten, role by role, in both languages, is
 ``base/tests/test_assistant_asks.py``'s (task is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over the
@@ -103,9 +103,9 @@ def test_the_hub_reads_a_tarea_as_a_task_a_proyecto_as_a_project_and_a_comentari
 
 
 def test_the_guests_of_a_table_are_no_comment():
-    """«comentario» shares its stem «comen» with «comensales» (a table's guests) until ERPlora/live#48: the Hub names a
-    comment by the phrases a person says it with, never by that stem, so a question about the guests names no
-    comment and offers no tool of Tasks' comments ahead of Tables'."""
+    """«comentario» shares its stem «comen» with «comensales» (a table's guests): the Hub names a comment by the phrases
+    a person says it with, never by that stem, so a question about the guests names no comment and offers no tool of
+    Tasks' comments ahead of Tables'."""
     comment = shared.stem("comment")
     assert not any(
         comment in concept

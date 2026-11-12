@@ -1,5 +1,5 @@
-// The page's colour mode (round 2026-10-22): `data-ep-mode="auto"` follows the visitor's device. The server paints
-// it light (`data-bs-theme="light"`, the page without JS); the public bundle sets Bootstrap's `data-bs-theme` from
+// The page's colour mode: `data-ep-mode="auto"` follows the visitor's device. The server paints it light
+// (`data-bs-theme="light"`, the page without JS); the public bundle sets Bootstrap's `data-bs-theme` from
 // `prefers-color-scheme` and follows a change while the page is open. A light or a dark page is left as it is.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

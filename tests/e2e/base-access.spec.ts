@@ -38,7 +38,7 @@ const SIZES = [
 const SAAS_STEP = 30_000;
 const OWNER_PIN = '4826';
 const EMPLOYEE_PIN = '9071';
-/** A card's number, one per run: a badge opens one person's door only, and phase 1 keeps every hub's in one table. */
+/** A card's number, one per run: a badge opens one person's door only, so a run never reuses another run's. */
 const BADGE = `77${String(Date.now()).slice(-8)}`;
 /** Where the Sales app's till keeps the check it has on screen (`useCurrentCheck`). */
 const CURRENT_CHECK_KEY = 'erplora.sale.pos.currentCheck';
@@ -137,7 +137,7 @@ let till: Page;
 let problems: Awaited<ReturnType<typeof collectProblems>>;
 /** Every answer of 400 or more the till got: its method and path. */
 const refused: string[] = [];
-/** `sql` on the business this file signs up: its tables live in its own database (round 2026-10-30 of PLAN-DB, S2a),
+/** `sql` on the business this file signs up: its tables live in its own database,
  *  control's where they are (`psql`). */
 const own = (sql: string): string => psql(sql, business.slug);
 
@@ -152,7 +152,7 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(async () => {
   // The check of «Switch user» (its title is `e2e …`), with the Sales app's own cleanup.
   cleanSales();
-  // The business's dial back to the factory's, in its own database (phase 1 shared it with every hub).
+  // The business's dial back to the factory's, in its own database.
   if (business) own("UPDATE base_accesssettings SET pin_policy = 'per_shift', pin_inactivity_minutes = 5, pin_length = 4");
   await owner?.context.close();
   await employee?.context.close();
@@ -161,7 +161,7 @@ test.afterAll(async () => {
 test('BASE-G52 BASE-G125 BASE-G126: the owner enters with the account, names themselves and chooses their PIN', async () => {
   const page = owner.page;
   await login(page, origin, '/profile', owner.credentials);
-  // A business is born with every app off (PLAN-HUB round 2026-10-27): Sales, for the sale of BASE-G60 on the till.
+  // A business is born with every app off: Sales, for the sale of BASE-G60 on the till.
   await turnOn(owner.context, origin, 'sale');
   const profile = shown(page);
   await expect(profile.getByTestId('profile-summary')).toBeVisible();

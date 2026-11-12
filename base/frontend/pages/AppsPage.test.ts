@@ -1,10 +1,10 @@
-// Apps (BASE-G67…G74; the old hub's AppsPage): «My apps», «Add apps» and «Paid» over the live `base.app.list`, in
-// the address (`/apps`, `#all`, `#paid`); «Paid» and «Price» only while some app is sold apart (PLAN §32). «Open»
+// Apps: «My apps», «Add apps» and «Paid» over the live `base.app.list`, in
+// the address (`/apps`, `#all`, `#paid`); «Paid» and «Price» only while some app is sold apart. «Open»
 // leads to the app's first screen; a paid app without its right says it needs a subscription and, for whoever runs
 // the business and only on the web, links to erplora.com's Store (buying is never inside the Hub). A failed read says so with «Retry» and keeps the rows; it is never «no apps».
-// Whoever runs the business turns an app on or off (PLAN-HUB §9): the dialog names what comes along or goes with it,
+// Whoever runs the business turns an app on or off: the dialog names what comes along or goes with it,
 // a refusal says why (another app needs it, the app itself, or the plan's limit, with «Upgrade plan») in a notice that
-// stays until it is closed or the next change (hub#2594), and the counter says how many of the plan's apps are on.
+// stays until it is closed or the next change, and the counter says how many of the plan's apps are on.
 import { AppPage, applySurface, toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -225,9 +225,9 @@ describe('AppsPage', () => {
     ]);
   });
 
-  // Every app in every plan (PLAN §32): with nothing sold apart, «Paid» and «Price» would only say «Free» again
+  // Every app in every plan: with nothing sold apart, «Paid» and «Price» would only say «Free» again
   // and again, so they are not there; the day an app is sold apart they come back on their own.
-  describe('with no app sold apart (PLAN §32)', () => {
+  describe('with no app sold apart', () => {
     const FREE_LIST: AppList = { ...LIST, apps: [TAX, INVOICE, REPORTS] };
     const tabIds = (m: Awaited<ReturnType<typeof open>>) =>
       (m.wrapper.getComponent(AppPage).props('tabs') as { id: string }[]).map((tab) => tab.id);
@@ -307,7 +307,7 @@ describe('AppsPage', () => {
     });
   });
 
-  describe('turning an app on or off (PLAN-HUB §9)', () => {
+  describe('turning an app on or off', () => {
     // sale came with customer; task was chosen; flow is off and needs nothing; booking (off) needs schedule (off).
     const SALE = app('sale', { name: 'Sales', requires: ['customer'] });
     const CUSTOMER = app('customer', { name: 'Customers', chosen: false, required_by: ['sale'] });

@@ -1,7 +1,6 @@
-// PoC §8.1 (second half): a write in business `b` never reaches the open screens of `a`, and the
-// other way round. Since S2a (round 2026-10-30 of PLAN-DB) each business has its own database, so a
-// reload does not show them either: b's row is in b's database and nowhere in a's (phase 1 shared the
-// rows, and only the live notice was per business).
+// A write in business `b` never reaches the open screens of `a`, and the other way round. Each
+// business has its own database, so a reload does not show them either: b's row is in b's database
+// and nowhere in a's.
 import { type Page, expect, test } from '@playwright/test';
 
 import { A, B, createViaPage, hostPage, listReady, psql, record, row, rowNames, shot, uniqueName, watchForRow } from './helpers';

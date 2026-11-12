@@ -7,7 +7,7 @@ from live.meta import BellCounter, Category, LiveAppConfig, Nav, SetupCheck, Set
 
 from apps.printing.events import COVERAGE_EVENTS, UNATTENDED_EVENTS
 
-#: The bell's row of each function, named as Printing names it (the old row showed its internal key, HUB_SHELL-F63).
+#: The bell's row of each function, named as Printing names it, never by its internal key.
 NOTHING_PRINTING = {
     "receipt": _("Nothing is printing “Receipt”"),
     "kitchen": _("Nothing is printing “Kitchen”"),
@@ -25,7 +25,7 @@ class PrintingConfig(LiveAppConfig):
     icon = "lucide:receipt"
     category = Category.ORGANIZATION
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The public store's texts, which register_apps writes to shared.app.
     summary = _("Your receipt, kitchen and label printers, and the print queue that shows whether paper is coming out.")
     description = _(
         "Printing keeps the business's printers: their name, how they are connected (network, USB, Bluetooth "
@@ -45,20 +45,18 @@ class PrintingConfig(LiveAppConfig):
         "printing.print",
         "printing.manage_jobs",
     ]
-    # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The old module's
-    # retry and discard were the hub's administrator's: so are the queue's retry and cancel.
+    # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The queue's retry
+    # and cancel are the hub's administrator's.
     role_permissions = {
         "hub_owner": ["printing.*"],
         "hub_admin": ["printing.*"],
         "hub_manager": ["printing.view_settings", "printing.manage_settings", "printing.print"],
         "hub_employee": ["printing.view_settings", "printing.print"],
     }
-    # The Home's hooks (PLAN-HUB round 2026-10-21): the old hub's core item «Set up your printer» (setup_status.rs, order
-    # 70, recommended: without a printer the business still sells, hub#1731), done once a device set up here reaches
-    # an active receipt printer (the old «registered for the receipt station», live or not, hub#1948); and its bell row
-    # «Nothing is printing “…”» (HUB_SHELL-F63, hub#987), one per function, for everybody with Printing: whoever
-    # stands at the counter can switch the till back on. It counts what has waited a minute with no device on to print
-    # it (seen in the last 90 s), as the old print_hosts::is_undrained. The old module had none of its own, nor panels.
+    # The Home's step «Set up your printer» (order 70, recommended: without a printer the business still sells),
+    # done once a device set up here reaches an active receipt printer, live or not; and the bell row «Nothing is
+    # printing “…”», one per function, for everybody with Printing: whoever stands at the counter can switch the
+    # till back on. It counts what has waited a minute with no device on to print it (seen in the last 90 s).
     setup = [
         SetupStep(
             key="printer",
@@ -89,14 +87,14 @@ class PrintingConfig(LiveAppConfig):
         for usage, label in NOTHING_PRINTING.items()
     ]
     # A job starts counting once it has waited a minute and a device stops counting 90 s after its last news: the
-    # number moves with no event, so the bell reads it again every 30 s, the old bell's poll (print-alert.ts, POLL_MS).
+    # number moves with no event, so the bell reads it again every 30 s.
     bell_refresh_every = {f"stalled_{usage}": 30 for usage in NOTHING_PRINTING}
-    # System › «Usage and plan» (hub#683): the old hub's card «Your printer» of «Resources» (HUB_SHELL-F137/F138), for
-    # everybody with Printing, while Printing is on: who prints, «Set up printing» and, in a browser, where to get the
-    # ERPlora app. base mounts frontend/components/SystemPrinterCard.vue (base.E015 checks the name at start).
+    # System › «Usage and plan» (hub#683): the card «Your printer», for everybody with Printing, while Printing is
+    # on: who prints, «Set up printing» and, in a browser, where to get the ERPlora app. base mounts
+    # frontend/components/SystemPrinterCard.vue (base.E015 checks the name at start).
     system_cards = [{"key": "printer", "component": "SystemPrinterCard", "permission": "printing.view_settings"}]
-    # The news that a device is there (the old hub's print_hosts::heartbeat): base's /ws/print runs it at the hello
-    # and at every beat of a device that prints, as the device's user (base.E006).
+    # The news that a device is there: base's /ws/print runs it at the hello and at every beat of a device that prints,
+    # as the device's user (base.E006).
     print_presence = "printing.device.seen"
     # PRINTING-F20: the queue forgets the jobs that ended (printed, cancelled, failed) over 30 days ago,
     # once an hour, as the platform (cron in UTC).

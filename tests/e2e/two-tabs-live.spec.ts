@@ -1,4 +1,4 @@
-// PoC §8.1 (first half) and DEMO-F05: two tabs of `a`; an item created in tab 1 through «New item»
+// DEMO-F05: two tabs of `a`; an item created in tab 1 through «New item»
 // shows up in tab 2 within 1 s, without a reload and without moving tab 2's focus.
 import { expect, test } from '@playwright/test';
 

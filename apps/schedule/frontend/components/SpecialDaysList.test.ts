@@ -80,7 +80,6 @@ describe('SpecialDaysList', () => {
   });
 
   it('filters behind the table funnel: date (from–to), name, status and yearly on their columns', async () => {
-    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
     const s = await setup();
     await s.show(page(ROWS));
     expect(s.prop('filterable')).toBe(true);
@@ -117,7 +116,7 @@ describe('SpecialDaysList', () => {
     expect(s.find('schedule-special-days-filters-count').text()).toBe('3');
   });
 
-  it('its funnel and view buttons say they are the special days’ (the screen has two lists; schedules#58)', async () => {
+  it('its funnel and view buttons say they are the special days’ (the screen has two lists)', async () => {
     const s = await setup();
     await s.show(page(ROWS));
     const name = (hook: string) => s.find(`schedule-special-days-${hook}`).attributes('aria-label');
@@ -202,7 +201,7 @@ describe('SpecialDaysList', () => {
     expect(s.prop('error')).toBe('msg boom');
   });
 
-  it('a list that does not load names itself, then the cause, never the generic text (pm#610)', async () => {
+  it('a list that does not load names itself, then the cause, never the generic text', async () => {
     const s = await setup({ locale: 'es' });
     s.net.lastStream().push(errorFrame(s.subId(OP), 'boom'));
     await flush();

@@ -1,5 +1,4 @@
-"""``/ws/print``: the print host's channel, the Hub's only WebSocket (PLAN-HUB §5; the old hub's
-``crates/server/src/print_ws.rs``, hub#343).
+"""``/ws/print``: the print host's channel, the Hub's only WebSocket.
 
 The device next to a printer (the ERPlora app) opens ``wss://<hub>/ws/print`` and drains the print queue of the
 printers it reaches: it is told when a job arrives (``wake``), takes it (``claim`` → ``job``), prints it and says
@@ -8,8 +7,8 @@ name (``printing.device.get``, ``printing.printer.get``, ``printing.job.claim``,
 ``printing.job.fail``, ``printing.job.list``) with the context of the device's session, the same functions,
 permissions and scope as the HTTP doors (``/api/printing/jobs/claim``…), and touches no model itself.
 
-The wire is the old hub's, its messages and fields unchanged (the native app and its print host are published,
-working-rules §12)::
+The wire is the old hub's, its messages and fields unchanged, because the native app and its print host are published
+and still speak it::
 
     client                                                      hub
       {"type":"hello","session":…,"deviceId":…,"printers":[…]}  →
@@ -26,7 +25,7 @@ working-rules §12)::
 What the new Hub changed, and nothing else:
 
 - **The credential is the Hub's session cookie of the handshake**, the one every HTTP door takes (the Hub's
-  login is the SaaS's and its session an HttpOnly cookie, PLAN-SAAS §3.1): ``hello.session`` is accepted and not
+  login is the SaaS's and its session an HttpOnly cookie): ``hello.session`` is accepted and not
   read. It is checked at ``hello`` and again at every frame, so a session that ended (a logout) closes the socket
   at the device's next beat at the latest.
 - **Who prints is printing's** (``PrintDevice``, the old hub's ``_print_host``, PRINTING-F18): ``hello`` reads the
@@ -75,11 +74,11 @@ A ``done`` or ``failed`` the queue does not take (another device has the job, or
 ``confirmed: false`` / ``requeued: false``, as in the old hub: the device forgets it. A ``done`` re-sent after a
 reconnect is taken from the device that held the job, whatever hand-out it was.
 
-**Tenancy** (phase 1, PLAN §16): the hub is the Host's first label, checked against the registry by the gate the
+**Tenancy**: the hub is the Host's first label, checked against the registry by the gate the
 HTTP doors pass (``base.middleware.HubHostRequiredMiddleware``), and every operation runs in its scope with the
 session's user. The gate is heard again before every frame and every wake (the context's refresh,
-``base.operations.HostClosed``): a hub that stops serving while the socket is open closes it with the same code. From
-phase 2's S1 every synchronous step after the handshake runs in the hub's database (``use_hub``, ``_sync``) and its
+``base.operations.HostClosed``): a hub that stops serving while the socket is open closes it with the same code. Every
+synchronous step after the handshake runs in the hub's database (``use_hub``, ``_sync``) and its
 wake in the live executor, which enters the hub itself (``base.operations.HubContextBuilder.enter``). The ``Origin``
 must be the hub's own (cross-site WebSocket hijacking): anything else is refused at the handshake (Daphne answers
 it 403).
@@ -94,7 +93,7 @@ claim, a confirmation, a cancellation) does not, and neither does the job this d
 hand-outs). It runs as the device's user (its permissions re-read every time), on its hub's channel only, and never
 carries the document, which travels only in the answer to ``claim``.
 
-**The presence** (the old hub's heartbeat, ``print_hosts::heartbeat``; FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE):
+**The presence** (the old hub's heartbeat, ``print_hosts::heartbeat``):
 the ``hello`` and every ``beat`` of a device that prints for something are news that it is there. The app that keeps
 the print hosts says where that news goes with ``print_presence`` on its ``LiveAppConfig``: the name of a command of
 its own whose input takes ``device``, which the socket runs with the device's id and context, as every other
@@ -555,7 +554,7 @@ class PrintSocket:
         if not key:
             raise Refusal("unauthenticated", gettext("Sign in to this hub to print: this connection has no session."), status=401)
         self.request.session = import_module(settings.SESSION_ENGINE).SessionStore(key)
-        # A session opened on another host is no session here (phase 2, S1): the HTTP doors' rule.
+        # A session opened on another host is no session here: the HTTP doors' rule.
         user = AnonymousUser() if opened_elsewhere(self.request) else auth.get_user(self.request)
         held = self.device.ctx.actor if self.device is not None else None
         if not user.is_authenticated or (held is not None and user.pk != held.pk):
@@ -661,7 +660,7 @@ class PrintSocket:
 
     async def _sync(self, fn: Callable, *args: Any) -> Any:
         """Run the synchronous ``fn`` in a thread of its own, as Django runs a request's sync code, in the
-        socket's language and, once admitted, in its hub's database (``use_hub``; phase 2, S1); the database
+        socket's language and, once admitted, in its hub's database (``use_hub``); the database
         connection it used is released after it (there is no request_finished)."""
         hub = getattr(self.request, "hub", None)
 

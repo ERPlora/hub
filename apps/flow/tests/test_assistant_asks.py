@@ -1,6 +1,6 @@
-"""What layer 1 of the assistant's QA does not say of Automations (docs plan 2026-10-31, the assistant's knowledge and QA,
-§3): which tools it offers and to whom, the words of the Hub that name its records, and that the owner's requests of the
-real-model QA (hub#1106), in the owner's own words, are offered their existing operation.
+"""What layer 1 of the assistant's QA does not say of Automations: which tools it offers and to whom, the words of the
+Hub that name its records, and that the owner's requests of the real-model QA (hub#1106), in the owner's own words,
+are offered their existing operation.
 
 Every ask of every tool of flow bringing its tool among the first ten, role by role, in both languages, is
 ``base/tests/test_assistant_asks.py``'s (flow is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over the
@@ -316,8 +316,8 @@ def test_each_group_brings_its_tool_among_the_first_ten(catalog_of, member, name
     assert name not in offered(tools, phrase, without)[:TOP]
 
 
-#: The three that wait for ERPlora/live#53, asked naming «la automatización» and not only its own name: the thing they
-#: act on is named, so they come among the first ten today.
+#: Three asked naming «la automatización» and not only its own name: the thing they act on is named, so they come
+#: among the first ten.
 NAMED = [
     ("flow.flow.set_enabled", "activa la automatización de reseñas"),
     ("flow.flow.update", "renombra la automatización de reseñas como Opiniones"),

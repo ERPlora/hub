@@ -1,4 +1,4 @@
-"""FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES: one record of the platform by its id — an API key, a device, a failed
+"""One record of the platform by its id — an API key, a device, a failed
 event, a load —, read by who runs the business, as the screen that lists it names it. The assistant's card names by
 them what a write of base names by its id («Revoke in API keys» says which key), never by the id; the API reads them
 too. Each one is of the business that asks: another business's is not there.

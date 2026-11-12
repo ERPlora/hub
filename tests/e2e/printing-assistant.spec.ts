@@ -1,9 +1,8 @@
-// The assistant's card for a write of Printing (FIX-HUB-PRINTING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS; base's half is
-// hub#416, BASE-F97): since hub#416 the card left out every id its schema does not mark, so «cambia las impresoras de la
-// tablet del mostrador» or «reintenta el ticket» said no device, no printer and no job, and «imprime la comanda» said
-// its document as the model sent it («kitchen_order»). Now each record is named as the Printing screens show it — a
+// The assistant's card for a write of Printing (base's half is hub#416, BASE-F97): «cambia las impresoras de la tablet
+// del mostrador», «reintenta el ticket» or «imprime la comanda» name every record as the Printing screens show it — a
 // device and its printers by their names, a job as the queue titles it («Recibo …») —, read as the person, never by
-// its id, and a document by the queue's word for it («Comanda de cocina»). End to end with the stack's SaaS gateway and
+// its id, also the ids its schema does not mark, and a document by the queue's word for it («Comanda de cocina»),
+// never as the model sent it («kitchen_order»). End to end with the stack's SaaS gateway and
 // the e2e's provider (assistant-provider.ts, `E2E-ASK <tool> <JSON>`): the SaaS must be seeded with it (README of this
 // folder, «El asistente»). Cancelled, nothing changes. What this file creates carries its own prefix (E2E PAC) and goes
 // away; the app it turns on is turned off again.

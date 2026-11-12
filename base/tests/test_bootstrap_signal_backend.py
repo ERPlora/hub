@@ -1,10 +1,10 @@
-"""``hub_migrator`` may end the sessions of a database it drops (review of hub#471, I3; PLAN-DB §6, «Baja»).
+"""``hub_migrator`` may end the sessions of a database it drops (hub#471).
 
 ``DROP DATABASE … WITH (FORCE)`` (a demo that ended, ``base.tenancy.ops.drop_database``) terminates whoever is
 connected to it: a session of ``hub_app`` through PgBouncer, an open page's live stream. A role that is no superuser may
 only signal another role's backend as a member of ``pg_signal_backend``, so the bootstrap makes ``hub_migrator`` one
 (idempotent, as every step). The master here is RDS-like: no superuser, ``CREATEROLE`` and ``pg_signal_backend`` with
-its ADMIN option, as ``rds_superuser`` holds it (to be checked on Aurora in ``pre``, PLAN-DB cabecera (o)).
+its ADMIN option, as ``rds_superuser`` holds it.
 """
 
 import os

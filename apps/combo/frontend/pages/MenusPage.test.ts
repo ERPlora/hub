@@ -104,7 +104,7 @@ describe('MenusPage', () => {
     expect(s.list()).toEqual([{ name: 'day', supply_kind: 'goods', is_active: false, sort: 'sort_order', dir: 'asc', limit: 50, offset: 0 }]);
   });
 
-  it('pm#611: while the menus are on their way the table says it is loading, never «0 records» nor «No menus»', async () => {
+  it('while the menus are on their way the table says it is loading, never «0 records» nor «No menus»', async () => {
     const s = await setup();
     expect(s.prop('loading')).toBe(true);
     expect(s.wrapper.findComponent(EmptyState).exists()).toBe(false);
@@ -112,7 +112,7 @@ describe('MenusPage', () => {
     expect(s.prop('loading')).toBe(false);
   });
 
-  it('pm#533, hub#2328: a list that cannot be read says so with «Retry», never that there are no menus', async () => {
+  it('a list that cannot be read says so with «Retry», never that there are no menus', async () => {
     const s = await setup();
     s.net.lastStream().push(errorFrame(s.subId(OP), 'internal_error'));
     await flush();
@@ -181,7 +181,7 @@ describe('MenusPage', () => {
   });
 });
 
-describe('MenusPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('MenusPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

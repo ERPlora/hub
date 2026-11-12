@@ -1,5 +1,5 @@
-// base's UI texts (the Home and its pieces of the chrome): English source + Spanish (PLAN §5). They are kept by hand next to the pages
-// until V6 exports Django's `djangojs` catalogues to JSON (plan §4.7); this test is their guardrail:
+// base's UI texts (the Home and its pieces of the chrome): English source + Spanish. They are kept by hand next to the
+// pages, since Django's `djangojs` catalogues are not exported to JSON; this test is their guardrail:
 // same keys and placeholders in both languages, nothing empty, every key a page uses exists.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

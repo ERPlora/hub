@@ -1,4 +1,4 @@
-"""The person of a business in its own database: ``base.HubUser`` (tenancy W10; PLAN-HUB §3, PLAN-DB §2).
+"""The person of a business in its own database: ``base.HubUser``.
 
 Control keeps the session's user (``auth.User``, the copy ``saas:<id>`` of an erplora.com account) and the role
 (``Membership``); the hub's database keeps who signed what in it: a staff record, a task, a clock-in, a message. A key
@@ -342,7 +342,7 @@ class TestTheSession:
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 def test_a_demo_entry_that_fails_leaves_no_person_in_the_hub_s_database(hub_a, rf, monkeypatch):
     # The owner's person is the hub's row: written in the hub's transaction (live.operations.atomic), next to
-    # control's, so an entry that fails after it takes it back (tests/test_guardrails_atomic.py, W9).
+    # control's, so an entry that fails after it takes it back (tests/test_guardrails_atomic.py).
     def refused(*args, **kwargs):
         raise RuntimeError("the session could not be opened")
 

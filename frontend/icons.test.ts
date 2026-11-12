@@ -1,4 +1,4 @@
-// Icon guardrail of the hub (PLAN §16.4): an icon that is not registered in @erplora/ui's shell
+// Icon guardrail of the hub: an icon that is not registered in @erplora/ui's shell
 // paints NOTHING (no network for icons, by CSP), so a page, a component or an app's menu that names
 // one must fail a test, not a till. `scanIcons` is the reader @erplora/ui runs on itself; here it
 // reads the hub's own sources. It resolves icons through the baked `~icons/*` modules, so it needs

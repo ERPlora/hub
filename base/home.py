@@ -1,4 +1,4 @@
-"""The Home's rules (PLAN-HUB round 2026-10-21): what base does with the modules' steps, panels and counters.
+"""The Home's rules: what base does with the modules' steps, panels and counters.
 
 Every module declares in its ``LiveAppConfig`` its steps of «Finish setting up your business» (``setup``), its
 panels of the dashboard (``widgets``) and its counters of the bell (``bell``), each naming a query of its own
@@ -18,22 +18,22 @@ panels of the dashboard (``widgets``) and its counters of the bell (``bell``), e
 
 A counter whose figure moves as time passes, with no event (a job waiting a minute with no device alive to print
 it), names in ``bell_refresh_every`` of its module's ``LiveAppConfig`` (counter key → seconds) how often the bell reads
-it again besides its ``refresh_on`` (FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE): the bell is told the shortest
+it again besides its ``refresh_on``: the bell is told the shortest
 period among the counters the person may see (:func:`bell_refresh_every`), and ``base.E007`` checks the declarations
 at start (:func:`bell_refresh_errors`).
 
-The cards of System › «Usage and plan» (hub#683, the old hub's «Your printer» of «Resources») are a hook of base, not of
+The cards of System › «Usage and plan» are a hook of base, not of
 ``live.meta``: a module names in ``system_cards`` the Vue components of its own ``frontend/components/`` that paint them
 (:func:`system_cards`), base lists those of the modules on that the person may see (``base.system.cards``) and the SPA
 mounts each one, as a panel with a ``component`` of its own; ``base.E015`` checks the declarations at start
 (:func:`system_card_errors`). What a card says is its app's: base never learns what is in it.
 
-An app also says where a business must have it on (hub#997, PLAN-HUB round 2026-11-07): ``mandatory`` on its
+An app also says where a business must have it on: ``mandatory`` on its
 ``LiveAppConfig``, the countries (or ``"all"``) and whether the platform turns it on by itself. While it is off in a
 business of one of them, the list carries a step of the platform that asks to turn it on (:func:`mandatory_steps`);
 ``base.E016`` checks the declarations at start (:func:`mandatory_errors`). Base names no app: each says it.
 
-The device's notices (PLAN-HUB round 2026-10-23, ``notices``; ``base.notice.list``) run the same way: every row of
+The device's notices (``notices``; ``base.notice.list``) run the same way: every row of
 a notice's query that passes its ``when`` is told, with the texts filled in from the row in the person's language
 (:func:`device_notices`); the shell tells each one once on the device, with the installed app's system notice.
 
@@ -73,9 +73,9 @@ LEVEL_FUNCTIONAL = "functional"
 LEVEL_RECOMMENDED = "recommended"
 #: The ⛔ list base fixes: the steps whose absence stops the invoice (the old hub's ``BLOCKING_KEYS``).
 LEGAL_STEPS = frozenset({"invoice.business_identity"})
-#: The ⛔ steps only where the hub files in production, each with what the first row of its own query says there
-#: (PLAN-HUB round 2026-10-21): VeriFactu's way to the AEAT, without which every sale in production is refused; in
-#: testing the till sells without it (gh:hub#1726), so there it keeps the level its ``required`` gives.
+#: The ⛔ steps only where the hub files in production, each with what the first row of its own query says there:
+#: VeriFactu's way to the AEAT, without which every sale in production is refused; in testing the till sells without
+#: it, so there it keeps the level its ``required`` gives.
 LEGAL_IN_PRODUCTION = {
     "verifactu.sending_route": (SetupCheck(field="environment", equals="production"),),
 }
@@ -494,7 +494,7 @@ def check_bell_refresh(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
     return bell_refresh_errors(all_live_app_configs())
 
 
-# --- The device's notices (PLAN-HUB round 2026-10-23) ------------------------------------------------------------
+# --- The device's notices ----------------------------------------------------------------------------------------
 
 #: What joins the parts of a notice's body (the old shell's «service · day at hour · professional»).
 BODY_JOINER = " · "

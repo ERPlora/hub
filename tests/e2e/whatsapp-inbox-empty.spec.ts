@@ -3,7 +3,7 @@
 // a phone as on a desk, and with the «reconnect» notice above the list, the list under the search says
 // «No conversations.» where the owner can read it, and a search that matches nothing says «No results». Read by hit-testing the centre
 // of the empty state: a state that is rendered but clipped by the list's frame (or pushed under the tab
-// bar) is not where the point lands. Each size captured (FIX-HUB-WHATSAPP-INBOX-CONNECT-DOORS-10-12-empty-*).
+// bar) is not where the point lands. Each size captured.
 //
 // The hub can invoice during the run (hub#478): Invoicing's red strip «You cannot issue invoices yet» sits over
 // every screen, outside the scroller, while the hub has no issuer (base's WORKBOOK, «La franja…»; hub#374), and

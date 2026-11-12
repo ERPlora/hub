@@ -1,9 +1,9 @@
-"""The public website on a business's own domain (HUBS-F17, PLAN-SAAS §37 point 2), end to end through the middleware.
+"""The public website on a business's own domain (HUBS-F17), end to end through the middleware.
 
 The same page as on its own address, with what that domain changes: «Log in» goes to the business's own address, the
 page asks nothing of ``/api`` (which is not there), so its catalog is read when it is painted and it is kept a minute
 instead of an hour, and it never names a report's address that is not there. A session never turns it into the app. On
-both addresses the page tells search engines the domain is its main address (hub#818), with no redirect. The door
+both addresses the page tells search engines the domain is its main address, with no redirect. The door
 itself (the unknown host, what is closed, the probe, the images) is in ``base/tests/test_custom_domains.py``.
 """
 
@@ -211,7 +211,7 @@ def test_each_address_keeps_its_own_page(client, connected):
     assert cache.get(page_cache_key("a", 1, "en", today, "EUR", own_domain=True)) is not None
     assert cache.get(page_cache_key("a", 1, "en", today, "EUR")) is None
     visit(client, host=SLUG_HOST)
-    # Each kept with the main address it names (hub#818), which is the domain on both.
+    # Each kept with the main address it names, which is the domain on both.
     assert LOGIN_ON_ITS_ADDRESS in cache.get(page_cache_key("a", 1, "en", today, "EUR", own_domain=True))["html"]
     assert LOGIN_ON_ITS_ADDRESS not in cache.get(page_cache_key("a", 1, "en", today, "EUR"))["html"]
 
@@ -282,7 +282,7 @@ def test_a_hidden_catalog_is_not_even_read(db):
     assert queries.live_catalog(A, full_content(catalog={"source": "service", "hidden": True}))["groups"] == []
 
 
-# The main address: what the page tells search engines (hub#818)
+# The main address: what the page tells search engines
 
 MAIN_ON_THE_DOMAIN = f"https://{DOMAIN}/"
 MAIN_ON_ITS_ADDRESS = "https://a.localhost/"

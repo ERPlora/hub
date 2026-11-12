@@ -1,4 +1,4 @@
-"""The assistant's operations (APP-BASE-9): ``base.assistant.turn`` prepares a turn — it runs the reads the model
+"""The assistant's operations: ``base.assistant.turn`` prepares a turn — it runs the reads the model
 asked for, shows a write's card and runs it only with the person's yes, as the person —, and ``base.assistant.usage``,
 ``base.assistant.report`` and ``base.assistant.transcribe`` go to erplora.com's gateway (``fake_gateway``).
 """
@@ -97,8 +97,7 @@ def test_a_new_question_offers_the_tools_of_what_it_asks_and_the_instructions():
     assert "demo__item__create" in names
     assert "Spanish" in plan["instructions"]
     assert (plan["append"], plan["executed"], plan["confirm"], plan["pending"]) == ([], [], None, [])
-    # The business's currency with its decimals: an amount in its minor unit
-    # (FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY).
+    # The business's currency with its decimals: an amount in its minor unit.
     assert "17.00 EUR → 1700" in plan["instructions"] and "`currency_decimals`" in plan["instructions"]
 
 
@@ -116,7 +115,7 @@ def test_a_turn_names_the_role_of_the_persons_membership(make_user):
 
 
 def test_the_instructions_take_the_decimals_of_the_business_currency_not_two():
-    """FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: a yen business has no cents, so its turn
+    """A yen business has no cents, so its turn
     tells the model «17 JPY → 17» (``base.business.get``'s ``currency_decimals``), never a fixed «.00 → 1700»;
     the card's money carries the same decimals."""
     Hub.objects.filter(slug="a").update(country="JP")
@@ -125,7 +124,7 @@ def test_the_instructions_take_the_decimals_of_the_business_currency_not_two():
     assert plan["confirm"]["money"] == {"currency": "JPY", "decimals": 0}
 
 
-# ── Reads run by themselves (BASE-G115) ──────────────────────────────────────────────────────────────────────────
+# ── Reads run by themselves ──────────────────────────────────────────────────────────────────────────────────────
 
 
 def test_a_read_the_model_asked_for_runs_alone_and_its_result_goes_back():
@@ -149,7 +148,7 @@ def test_a_read_the_model_asked_for_runs_alone_and_its_result_goes_back():
     assert (plan["confirm"], plan["pending"]) == (None, [])
 
 
-# ── A write waits for the person (BASE-G115, G116, G119) ─────────────────────────────────────────────────────────
+# ── A write waits for the person ─────────────────────────────────────────────────────────────────────────────────
 
 
 def test_a_write_waits_for_its_card_and_changes_nothing_meanwhile():
@@ -163,7 +162,7 @@ def test_a_write_waits_for_its_card_and_changes_nothing_meanwhile():
 
 
 def test_a_write_its_operation_would_refuse_shows_no_card_and_the_model_hears_what_to_correct():
-    """live#17 (QA 2026-10-31, A2.12): a card said what its write would refuse, the person typed the word, the write
+    """A card said what its write would refuse, the person typed the word, the write
     failed and the model asked again: two cards for one change. The data are checked before any card is drawn; the
     model hears which do not fit, field by field, and asks again with them corrected."""
     plan = turn(call("demo.item.create", {"name": "Mesa 4", "status": "abierto"}))
@@ -177,7 +176,7 @@ def test_a_write_its_operation_would_refuse_shows_no_card_and_the_model_hears_wh
 
 
 def test_the_card_carries_the_business_currency_for_its_amounts():
-    """gh:hub#1045: an amount in cents is painted in the business's currency, with its decimals."""
+    """An amount in cents is painted in the business's currency, with its decimals."""
     plan = turn(call("demo.item.create", {"name": "Mesa 4"}))
     assert plan["confirm"]["money"] == {"currency": "EUR", "decimals": 2}
 
@@ -212,7 +211,7 @@ def test_a_dangerous_write_runs_only_with_the_word_typed():
 
 
 def test_a_secret_reaches_the_browser_hidden_on_its_card_and_its_write_as_typed(monkeypatch):
-    """FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-SECRETSTR-IN-CLEAR: the card the browser receives (and keeps while it waits)
+    """The card the browser receives (and keeps while it waits)
     never carries a secret as typed; the yes runs the write with it."""
     received = []
     secret_set = dataclasses.replace(
@@ -232,7 +231,7 @@ def test_a_secret_reaches_the_browser_hidden_on_its_card_and_its_write_as_typed(
 
 
 def test_a_dangerous_card_carries_what_its_app_says_it_will_do_read_as_the_person(settle):
-    """FIX-HUB-BASE-ASSISTANT-HIGH-RISK-CARD-NO-OPERATION-PREVIEW: the expected cash of a close, the invoice a
+    """The expected cash of a close, the invoice a
     rectification issues… inside the card, before the word is typed; what the read hides is not there."""
     plan = turn(call("demo.item.settle", {"id": "7", "reason": "cierre"}))
     card = plan["confirm"]
@@ -246,7 +245,7 @@ def test_a_dangerous_card_carries_what_its_app_says_it_will_do_read_as_the_perso
 
 
 def test_an_amount_its_preview_declares_signed_reaches_the_card_marked_so_and_no_other_does(monkeypatch):
-    """FIX-HUB-BASE-ASSISTANT-CARD-POSITIVE-DIFFERENCE-WITHOUT-SIGN: the turn's card dropped the mark on its way out
+    """The turn's card dropped the mark on its way out
     (its schema had no place for it), so a difference over still came without its «+»."""
     read = count_preview({"expected_balance": 11210, "difference": 13790})
     monkeypatch.setitem(registry, read.name, read)
@@ -260,7 +259,7 @@ def test_an_amount_its_preview_declares_signed_reaches_the_card_marked_so_and_no
 
 
 def test_an_amount_of_a_preview_reaches_the_card_in_the_currency_its_read_answers(monkeypatch):
-    """FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: the turn's card keeps the currency of each
+    """The turn's card keeps the currency of each
     amount of the preview (the read's, here złoty) beside the business's (euros) for what the write sends."""
     read = count_preview(
         {"note": "R1", "total_cents": -12100, "difference": 4200, "currency": "PLN", "currency_decimals": 2},
@@ -297,7 +296,7 @@ LISTED = Operation(
 
 
 def test_a_list_said_item_by_item_reaches_the_card_marked_named_and_one_of_codes_does_not(monkeypatch):
-    """FIX-HUB-PRINTING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS: the turn's card dropped the mark on its way out (its
+    """The turn's card dropped the mark on its way out (its
     schema had no place for it), so the printers of a device, named on the server, reached the screen as «2 items»; a
     list of codes nobody names keeps saying how many."""
     monkeypatch.setitem(registry, LISTED.name, LISTED)
@@ -340,7 +339,7 @@ def test_taking_a_pin_away_names_whose_it_is(make_user):
 
 @pytest.mark.parametrize("name", ["base.app.enable", "base.app.disable", "base.app.retry"])
 def test_turning_an_app_on_or_off_names_it_on_its_card(name):
-    """B28c (hub#539): «Activa la app de reservas» showed «online_booking», and Reservas online was the one confirmed."""
+    """hub#539: «Activa la app de reservas» showed «online_booking», and Reservas online was the one confirmed."""
     admin = {"base.view_home", "base.administer_hub"}
     plan = turn(call(name, {"app": "online_booking"}), permissions=admin)
     assert [(field["name"], field["value"]) for field in plan["confirm"]["fields"]] == [("app", "Reservas online")]
@@ -390,12 +389,12 @@ def test_stop_cancels_this_write_and_the_rest_of_the_chain():
     assert items() == []
 
 
-# ── What the person may not do is not done (BASE-G118; gh:hub#11) ────────────────────────────────────────────────
+# ── What the person may not do is not done ───────────────────────────────────────────────────────────────────────
 
 
 def test_the_receipt_names_where_it_happened_in_the_persons_language():
     """The receipt under the answer says it as the card does: an app by its name, the platform by its screen («No se
-    hizo, cancelado: Cambiar en Ajustes»), never «Base» (FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH)."""
+    hizo, cancelado: Cambiar en Ajustes»), never «Base»."""
     pin = call("base.access.settings_update", {"pin_length": 6})
     plan = turn(pin, decision={"call_id": "c1", "accepted": False}, permissions={"base.view_home", "base.administer_hub"})
     assert (plan["executed"][0]["outcome"], plan["executed"][0]["app_name"]) == ("cancelled", "Ajustes")
@@ -404,10 +403,9 @@ def test_the_receipt_names_where_it_happened_in_the_persons_language():
 
 
 def test_the_receipt_carries_the_platforms_screen_by_its_key_for_the_screen_to_name_it_in_its_own_language():
-    """FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY (seen on its e2e): a receipt kept from a turn
-    in English, read once the person had switched to Spanish, said «No se hizo, cancelado: Rectificar en Invoicing» —
-    its name came written in the turn's language. The platform's screen goes by its key too (``screen``), the one the
-    screen names in its own language; an app's, none (its menu names it)."""
+    """A receipt kept from a turn in English, read once the person had switched to Spanish, said «No se hizo,
+    cancelado: Rectificar en Invoicing» — its name came written in the turn's language. The platform's screen goes by
+    its key too (``screen``), the one the screen names in its own language; an app's, none (its menu names it)."""
     admin = {"base.view_home", "base.administer_hub"}
     pin = turn(call("base.access.settings_update", {"pin_length": 6}), decision={"call_id": "c1", "accepted": False}, permissions=admin)
     assert (pin["executed"][0]["app"], pin["executed"][0]["screen"]) == ("base", "settings")
@@ -457,7 +455,7 @@ def test_a_write_the_assistant_runs_for_one_business_never_lands_in_another(hub_
     assert listed(hub_b) == []
 
 
-# ── A loop is cut (BASE-G119) ────────────────────────────────────────────────────────────────────────────────────
+# ── A loop is cut ────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def test_after_too_many_rounds_the_turn_stops_and_says_why():
@@ -471,7 +469,7 @@ def test_after_too_many_rounds_the_turn_stops_and_says_why():
     assert plan["executed"][0]["outcome"] == "ok"
 
 
-# ── The setup (BASE-G121) ────────────────────────────────────────────────────────────────────────────────────────
+# ── The setup ────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def test_in_setup_the_turn_reads_the_checklist_again_for_the_model():
@@ -480,7 +478,7 @@ def test_in_setup_the_turn_reads_the_checklist_again_for_the_model():
     assert "Finish setting up" not in run("base.assistant.turn", messages=[ASK])["instructions"]
 
 
-# ── The gateway's doors (BASE-G122, G123, G112) ──────────────────────────────────────────────────────────────────
+# ── The gateway's doors ──────────────────────────────────────────────────────────────────────────────────────────
 
 
 def test_the_allowance_of_the_month(gateway):
@@ -502,7 +500,7 @@ def test_a_report_of_a_bad_answer(gateway):
 
 
 def test_a_report_says_whether_its_answer_came_from_the_web(gateway):
-    """hub#870 (saas#287): erplora.com does not mail an answer that may quote pages of the web; the browser says it."""
+    """hub#870: erplora.com does not mail an answer that may quote pages of the web; the browser says it."""
     gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
     run("base.assistant.report", EMPLOYEE, message_id="m1", reason="incorrect", question="q", answer="a", web=True)
     assert gateway.sent("/internal/assistant/report")[0].body["web"] is True
@@ -529,7 +527,7 @@ def test_a_dictation_too_long_is_said(gateway):
     assert (caught.value.status, caught.value.code) == (413, "base.assistant_audio_too_long")
 
 
-# ── A dangerous write that names no record never runs, whatever the browser answers (BASE-G116) ──────────────────
+# ── A dangerous write that names no record never runs, whatever the browser answers ──────────────────────────────
 
 
 def test_a_blocked_write_does_not_run_even_with_a_yes_and_the_word_typed():
@@ -544,7 +542,7 @@ def test_a_blocked_write_does_not_run_even_with_a_yes_and_the_word_typed():
     assert plan["confirm"] is None
 
 
-# ── The screens the assistant may link are the person's (BASE-G114, G118) ────────────────────────────────────────
+# ── The screens the assistant may link are the person's ──────────────────────────────────────────────────────────
 
 
 def test_the_system_screen_is_linked_only_to_who_administers():
@@ -553,7 +551,7 @@ def test_the_system_screen_is_linked_only_to_who_administers():
 
 
 def test_the_files_screen_is_linked_to_who_sees_the_files():
-    """BASE-F72 (APP-BASE-8): «Files» is a screen of the platform; the old panel could name it but never link it."""
+    """BASE-F72: «Files» is a screen of the platform; the old panel could name it but never link it."""
     text = run("base.assistant.turn", {"base.view_home", "base.view_files"}, messages=[ASK])["instructions"]
     assert "[Archivos](/files)" in text
     assert "/files" not in run("base.assistant.turn", EMPLOYEE, messages=[ASK])["instructions"]
@@ -561,10 +559,10 @@ def test_the_files_screen_is_linked_to_who_sees_the_files():
 
 
 def test_the_employees_screen_is_linked_as_the_menu_shows_it():
-    """APP-BASE-5 (BASE-F77…F91): «Employees» is in everybody's menu, so the assistant may link it to everybody."""
+    """BASE-F77…F91: «Employees» is in everybody's menu, so the assistant may link it to everybody."""
     assert "[Empleados](/employees)" in run("base.assistant.turn", EMPLOYEE, messages=[ASK])["instructions"]
 
-# ── What waits on erplora.com holds no transaction meanwhile (BASE-G122, G123, G112; rv-hub-247) ──────────────────
+# ── What waits on erplora.com holds no transaction meanwhile ──────────────────────────────────────────────────────
 
 GATEWAY_CALLS = [
     ("base.assistant.usage", "/internal/assistant/usage", {"used": 1, "limit": 30, "resets_at": None, "demo": False}, {}),
@@ -587,7 +585,7 @@ GATEWAY_CALLS = [
 @pytest.mark.parametrize(("operation_name", "path", "answer", "data"), GATEWAY_CALLS)
 def test_waiting_for_erplora_com_holds_no_transaction(gateway, monkeypatch, operation_name, path, answer, data):
     """Up to 15 s of waiting inside a transaction would hold the hub's connection (and, on the Free plan, its one
-    transaction at a time: PLAN §14.2), so the till would wait too: while the gateway answers, none is open."""
+    transaction at a time), so the till would wait too: while the gateway answers, none is open."""
     gateway.reply(path, json=answer)
     seen = []
     post = assistant._post

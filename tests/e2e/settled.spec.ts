@@ -1,10 +1,10 @@
-// flow: hub-e2e-capture — FIX of the e2e harness (FIX-HUB-E2E-SHOT-BEFORE-RESIZE-UNCHECKED): `settled()` ignored Ionic
+// flow: hub-e2e-capture — the harness's `settled()` and Ionic's animations
 // The harness's `settled()` (helpers.ts; service-helpers.ts and schedule-helpers.ts hand out the same one), the wait the
 // captures and measurements of the specs take: once it returns, nothing on the screen moves any more. Ionic animates
 // its overlays (`ion-toast`, `ion-modal`, `ion-popover`) with Web Animations on elements of their shadow roots, which
-// `document.getAnimations()` leaves out: right after the old `settled()`, a toast still entering counted 0 animations in
-// the document and 1 in its own shadow root. The checks here read the page on their own, never through `settled()`'s
-// code. The same fix as erplora.com's e2e (FIX-SAAS-E2E-SETTLED-IGNORES-IONIC-ANIMATIONS).
+// `document.getAnimations()` leaves out: a toast still entering counts 0 animations in the document and 1 in its own
+// shadow root. The checks here read the page on their own, never through `settled()`'s code. erplora.com's e2e waits
+// the same way.
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, createItem, login, repeatedTop, settled as baseSettled, shown, uniqueName } from './helpers';

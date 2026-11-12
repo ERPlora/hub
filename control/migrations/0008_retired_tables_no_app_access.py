@@ -1,6 +1,6 @@
 # The tables control/0007 retired keep their rows, and until now they kept the app's role too: ``ALTER TABLE … RENAME``
 # moves the grants with the table, so ``hub_app`` could still read and write ``<table>_shared_20261101``. Nothing does,
-# but nothing stopped a future bug from doing it either (hub#621).
+# but nothing stopped a future bug from doing it either.
 #
 # - A migration and not a step of ``bootstrap_databases``: this one reaches prod and pre with their next deploy, as
 #   ``hub_migrator``, who owns the tables and made the grants, so it needs no master. ``db-bootstrap`` is a task run by
@@ -10,7 +10,7 @@
 #   database. A server without that role (local development, the suite) has nobody to close them to: said, not failed.
 #   It is the second exception, after control/0007, to «a migration never imports app code»: the roles' names are said
 #   in one place, so it holds as long as ``base.tenancy.ops`` does.
-# - ``hub_admin`` keeps its ``SELECT``: support's ``pg_dump`` of control (PLAN-DB §10) stops at the first table it
+# - ``hub_admin`` keeps its ``SELECT``: support's ``pg_dump`` of control stops at the first table it
 #   cannot read, these tables keep rows nobody deleted, and that role is never the application's.
 # - The list goes by the name alone, not by the inventory: a retired table whose model is gone later is still one.
 # - The sequences of the few that have one (the identity of a join table) stay as they are: they hold no business data

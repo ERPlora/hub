@@ -1,4 +1,4 @@
-"""The Hub's schema migrator (CLAUDE.md «Tenencia del Hub»; PLAN-DB §7; aws-next README, «Contrato»).
+"""The Hub's schema migrator.
 
 ``manage.py migrate_hubs`` (the ``hub-migrate`` task of every deploy) runs it, in this order:
 
@@ -7,13 +7,13 @@
 2. the templates, as canaries, on every server the hubs live on (``clusters_to_migrate``: ``CREATE DATABASE …
    TEMPLATE`` clones only within one): ``<control>_template``, the platform alone, and one
    ``<control>_template_<vertical>`` per vertical of ``base.catalog``, cloned from it, with the tables of that
-   vertical's apps and every app off (PLAN-DB round 2026-10-30, proposal (h)) (``templates``, ``ensure_template``).
+   vertical's apps and every app off (``templates``, ``ensure_template``).
    One missing is created; one whose list changed is brought up to date, never rebuilt;
 3. every hub with a database of its own that is behind the code (``is_behind``, from ``Hub.schema_apps``: a deploy
    without migrations opens none), each on its own server, ERPlora's own first, then at most ``HUB_WORKERS`` at once:
    ``migrate_hubs_behind``.
 
-``ensure_schema(hub, add=())`` is the only function that changes a hub's schema (PLAN-DB §7): through the hub's direct
+``ensure_schema(hub, add=())`` is the only function that changes a hub's schema: through the hub's direct
 ``<db_name>__ddl`` alias, under the schema lock of that database (``pg_try_advisory_lock(hashtext('erplora.schema'))``:
 the key lives in each database, so it is per hub), it brings the platform (``base``, ``live``), the apps the hub's
 database already has and ``add`` (closed by ``requires``) to the code's leaf with ``migrate_apps``, then writes down in
@@ -69,18 +69,18 @@ LOCK_KEY = int.from_bytes(
     hashlib.blake2b(LOCK_NAME.encode(), digest_size=8).digest(), "big", signed=True
 )
 
-#: How long a run waits for another to release a database's schema lock, in seconds (PLAN-DB §7: 120 s).
+#: How long a run waits for another to release a database's schema lock, in seconds.
 SCHEMA_LOCK_WAIT = 120.0
 SCHEMA_LOCK_POLL = 0.5
-#: PLAN-DB §7, «Conexión»: the migrator's session on a hub's or a template's database.
+#: The limits of the migrator's session on a hub's or a template's database.
 SESSION_LIMITS = {
     "lock_timeout": "5s",
     "statement_timeout": "5min",
     "idle_in_transaction_session_timeout": "5min",
 }
-#: Hubs migrated at once: as many ``__ddl`` connections (PLAN-DB §5, the budget; plan 2026-10-22, decision 5).
+#: Hubs migrated at once: as many ``__ddl`` connections, within the cluster's connection budget.
 HUB_WORKERS = 4
-#: A hub's run cut by ``lock_timeout`` (a table held by its traffic) is tried this many times (PLAN-DB §7).
+#: A hub's run cut by ``lock_timeout`` (a table held by its traffic) is tried this many times.
 LOCK_TIMEOUT_ATTEMPTS = 3
 #: The hubs whose database is complete: ready, or kept after leaving (a cancelled business, or one whose final copy
 #: is being made, which the worker still serves; an expired demo until its purge). One being created is the worker's,
@@ -89,7 +89,7 @@ MIGRATED_STATUSES = (Hub.Status.READY, Hub.Status.CANCELLED, Hub.Status.ARCHIVIN
 #: Where ``CREATE DATABASE`` runs: every database's own catalog is reached from any, and this one always exists.
 OPS_DATABASE = "postgres"
 #: Cloning a template fails while anyone is connected to its source (55006, after PostgreSQL's own 5 s wait): it is
-#: tried this many times, this many seconds apart (PLAN-DB §6).
+#: tried this many times, this many seconds apart.
 CLONE_ATTEMPTS = 5
 CLONE_RETRY_DELAY = 2.0
 #: The privileges of a database (``aclexplode``'s ``privilege_type``): the only words that reach a GRANT.
@@ -351,8 +351,7 @@ def templates(control: str | None = None) -> list[Template]:
     named after ``control`` (default: this control database).
 
     Each carries every portable app's tables (:func:`portable_apps`): a hub made from one gets them with the clone, and
-    its sign-up migrates nothing. That stays so in S3: turning an app on makes tables only for an app its hub's template
-    had not (ruling of hub#471's review, 2026-10-31).
+    its sign-up migrates nothing. Turning an app on makes tables only for an app its hub's template had not.
 
     :func:`ensure_template` never rebuilds a template, it migrates it where it is: the first deployment that adds the
     portable apps to an existing template migrates each one live (about a minute on Fargate). A sign-up meanwhile finds
@@ -379,9 +378,9 @@ def templates(control: str | None = None) -> list[Template]:
 
 def apps_every_hub_gets() -> tuple[str, ...]:
     """The apps whose tables every template carries (:func:`templates`): every portable one, so a hub made from one has
-    them with the clone and its sign-up migrates nothing. It stays so in S3 (PLAN-DB round 2026-11-01): turning an app
-    on makes tables only for an app its hub's template had not (one ported later), through the worker's
-    :func:`ensure_schema`; ``migrate_hubs`` never adds an app to a hub already made."""
+    them with the clone and its sign-up migrates nothing. Turning an app on makes tables only for an app its hub's
+    template had not (one ported later), through the worker's :func:`ensure_schema`; ``migrate_hubs`` never adds an app
+    to a hub already made."""
     return portable_apps()
 
 

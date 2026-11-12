@@ -1,5 +1,4 @@
-"""The worker makes the tables of the apps a hub with its own database turned on (S3; PLAN-DB §7 and §8, spec
-2026-10-11 «tablas al activar» §4–§8 and §14).
+"""The worker makes the tables of the apps a hub with its own database turned on.
 
 ``base.app.enable`` leaves the app ``creating`` and rings the hub's ``hub_due``; each tick the worker takes the hubs
 rung (and, every ``ACTIVATION_SWEEP_SECONDS``, every ready hub with its own database, so a ring lost is found again),
@@ -82,7 +81,7 @@ def no_visit_outlives_its_test(django_db_setup, django_db_blocker):
 @pytest.fixture(scope="module")
 def platform_template(django_db_setup, django_db_blocker):
     """A template with the platform's tables alone: what a hub's template is for an app ported after it was made. The
-    real ones carry every portable app (``migrator.templates``, PLAN-DB round 2026-11-01), so turning on an app they have
+    real ones carry every portable app (``migrator.templates``), so turning on an app they have
     is on at once; this one makes every app one whose tables its hubs lack."""
     with django_db_blocker.unblock():
         name = names.template_db_name(tenancy_connections.control_name(), VERTICAL)
@@ -211,7 +210,7 @@ def _what_is_due():
     assert activations_due("d", now) == {}
 
 
-# ── Spec §14, 1: turned on in A, its tables are made in A and nowhere else ──────────────────────────────────────
+# ── Turned on in A, its tables are made in A and nowhere else ───────────────────────────────────────────────────
 
 
 def test_turned_on_in_a_its_tables_are_made_there_only_and_bs_database_is_never_opened(business):
@@ -258,7 +257,7 @@ def test_the_pass_leaves_no_connection_to_the_hubs_database_open(business):
     hubs.assert_nobody_on(a.db_name)
 
 
-# ── Spec §14, 4: a failure leaves it failed with why, never on; the next try finishes it ────────────────────────
+# ── A failure leaves it failed with why, never on; the next try finishes it ─────────────────────────────────────
 
 
 def test_making_its_tables_failing_leaves_it_failed_with_why_and_a_try_a_minute_later_finishes_it(business, monkeypatch):
@@ -303,7 +302,7 @@ def test_each_failure_waits_longer_up_to_an_hour(business, monkeypatch, attempts
     assert abs((failed.next_attempt_at - now).total_seconds() - wait) < 5
 
 
-# ── Spec §14, 3: two at once in one hub, one waits or is put off; no 42P07 ──────────────────────────────────────
+# ── Two at once in one hub, one waits or is put off; no 42P07 ───────────────────────────────────────────────────
 
 
 def test_a_schema_held_by_another_run_puts_it_off_30_seconds(business):
@@ -422,7 +421,7 @@ def test_the_pass_takes_only_the_hubs_rung(business):
     assert not [alias for alias in sent if a.id.hex in alias]
 
 
-# ── Its retries go by hub_due, which the pass over the hubs due leaves to it (PLAN-DB §8) ─────────────────────────
+# ── Its retries go by hub_due, which the pass over the hubs due leaves to it ──────────────────────────────────────
 
 
 def due_at(hub: Hub):
@@ -474,7 +473,7 @@ def test_a_ring_with_other_work_of_the_hub_is_left_to_it(business):
     assert due_at(a) is not None  # the reset still to do keeps it due
 
 
-# ── A ring lost is found by the sweep of the hubs served: every 10 min the active ones, daily all (PLAN-DB §8) ─────
+# ── A ring lost is found by the sweep of the hubs served: every 10 min the active ones, daily all ──────────────────
 
 
 def activation_reads(sent: dict[str, list[str]], hub: Hub) -> int:
@@ -530,7 +529,7 @@ def test_the_sweep_looks_into_a_hub_only_at_its_pace(business, active, again):
         assert activation_reads(sent, a) > 0
 
 
-# ── PLAN-DB §7, rollback: a database ahead of this code holds back only what it is about ────────────────────────
+# ── Rollback: a database ahead of this code holds back only what it is about ────────────────────────────────────
 
 
 def test_the_platform_ahead_of_this_code_does_not_hold_back_another_apps_tables(business):
@@ -612,7 +611,7 @@ def test_a_hub_that_fails_is_logged_and_the_others_are_served(business, monkeypa
     assert "went away" in caplog.text
 
 
-# ── Spec §14, 2: migrate_hubs with a new migration of X touches A, never B (B's database is not even opened) ────
+# ── migrate_hubs with a new migration of X touches A, never B (B's database is not even opened) ─────────────────
 
 
 def test_migrate_hubs_brings_xs_new_migration_to_a_and_never_opens_b(business, opened_at):
@@ -642,7 +641,7 @@ def test_migrate_hubs_brings_xs_new_migration_to_a_and_never_opens_b(business, o
     assert APP not in recorded(b)
 
 
-# ── Spec §14, 5 and 6: an app not on is never reached in a hub, whatever a process kept ─────────────────────────
+# ── An app not on is never reached in a hub, whatever a process kept ────────────────────────────────────────────
 
 
 def read_printing(hub: Hub):
@@ -694,7 +693,7 @@ def test_an_app_b_never_turned_on_says_app_inactive_in_b_never_a_database_error(
         read_printing(b)
 
 
-# ── Spec §14, 8: turning X on changes nothing of the process ────────────────────────────────────────────────────
+# ── Turning X on changes nothing of the process ─────────────────────────────────────────────────────────────────
 
 
 def test_turning_an_app_on_changes_neither_the_installed_apps_nor_the_urls_nor_the_api_routes(business):
@@ -721,7 +720,7 @@ def test_turning_an_app_on_changes_neither_the_installed_apps_nor_the_urls_nor_t
     assert snapshot() == before
 
 
-# ── Spec §14, 11: each app is made alone from nothing on the platform's template ────────────────────────────────
+# ── Each app is made alone from nothing on the platform's template ──────────────────────────────────────────────
 
 
 @pytest.mark.parametrize("label", sorted(activation.module_graph()))
@@ -740,7 +739,7 @@ def test_each_app_is_made_alone_with_what_it_requires_on_the_platforms_template(
 
 @pytest.mark.parametrize("copying", ["moving_to", "restoring_from"])
 def test_a_hub_whose_database_is_copied_is_not_entered_until_its_copy_ends(business, copying):
-    """Its database is being copied (S7, ``base.tenancy.move``; hub#1198, ``base.tenancy.restore``): tables made
+    """Its database is being copied (``base.tenancy.move``, or ``base.tenancy.restore``, hub#1198): tables made
     meanwhile would stay behind in the database it leaves. Its ring waits; once the copy ends, the app is set up."""
     from control.models import Cluster
 

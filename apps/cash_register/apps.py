@@ -16,7 +16,7 @@ class CashRegisterConfig(LiveAppConfig):
     icon = "ion:cash-outline"
     category = Category.SALES
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The public store's texts, which register_apps writes to shared.app.
     summary = _(
         "Open and close the drawer by shifts, record cash in and out, count it and see the difference."
     )
@@ -42,8 +42,8 @@ class CashRegisterConfig(LiveAppConfig):
         "cash_register.view_expected_totals",
         "cash_register.manage_settings",
     ]
-    # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The old cashier is
-    # the employee: opens, records, counts and closes. The manager also sees a blind count's expected.
+    # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The employee is the
+    # cashier: opens, records, counts and closes. The manager also sees a blind count's expected.
     role_permissions = {
         "hub_owner": ["cash_register.*"],
         "hub_admin": ["cash_register.*"],
@@ -80,9 +80,9 @@ class CashRegisterConfig(LiveAppConfig):
             "settings", _("Settings"), "ion:settings-outline", "/cash_register/settings"
         ),
     ]
-    # The Home's hooks (PLAN-HUB round 2026-10-21): the old module's `setup` and `widgets` (it had no `bell`), on the
-    # queries the drawer's own screens read. The factory values apply from the start, so «Your cash drawer» waits for
-    # the business's own save (CASH_REGISTER-F01), even of the values as they came.
+    # The Home's step and panels, on the queries the drawer's own screens read. The factory values apply from the
+    # start, so «Your cash drawer» waits for the business's own save (CASH_REGISTER-F01), even of the values as they
+    # came.
     setup = [
         SetupStep(
             key="drawer",
@@ -102,9 +102,9 @@ class CashRegisterConfig(LiveAppConfig):
         )
     ]
     # CASH_REGISTER-F12: the open session's expected cash, to whoever may see it on a blind count (F07), and the
-    # differences of the last eight closed sessions (the old «view reports» is gone: whoever reads the sessions).
+    # differences of the last eight closed sessions, to whoever reads the sessions.
     widgets = [
-        # A KPI says its name once, in its title (gh:hub#1105); money in the hub's currency (gh:cash_register#121).
+        # A KPI says its name once, in its title (hub#1105); money is in the hub's currency.
         Widget(
             key="current_session",
             title=_("Cash register (current session)"),
@@ -133,7 +133,7 @@ class CashRegisterConfig(LiveAppConfig):
             options={"valueFormat": "currency"},
         ),
     ]
-    # The daily auto-close (CASH_REGISTER-F10): the phase-2 worker runs it on every hub as the system
+    # The daily auto-close (CASH_REGISTER-F10): the worker runs it on every hub as the system
     # (cron in UTC; the operation reads the business's own cut-off hour). Opening a session applies it
     # too, so a forgotten shift never blocks the next one meanwhile.
     scheduled_tasks = [
@@ -146,8 +146,8 @@ class CashRegisterConfig(LiveAppConfig):
     ]
 
     def fiscal_documents_kept(self) -> bool:
-        """hub#599: the platform asks (``base.tenancy.offboarding``) before it drops the database of a business that
-        left: Its cash movements here are documents nothing archives yet (PLAN-DB §6), so the database stays."""
+        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left:
+        its cash movements are documents nothing archives yet, so the database stays."""
         from apps.cash_register import queries  # the models are not loaded yet when this module is
 
         return queries.keeps_fiscal_documents()

@@ -16,7 +16,7 @@ import { NO_CLOCK } from '../../vitest.load';
 
 /** The lists with an amount filter whose test does not run the table yet, and the issue that takes each to it. */
 const NOT_YET: Record<string, string> = {
-  // Fiscal app, worked with Ioan supervising (working-rules §15).
+  // The fiscal app: its changes are supervised by hand.
   'apps/verifactu/frontend/pages/RecordsPage.vue': 'hub#1247',
 };
 

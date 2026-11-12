@@ -1,12 +1,10 @@
 // Cart & Checkout → Orders (WORKBOOK «Pantallas · Pedidos»; CART_CHECKOUT-F09 to F12): the live
-// `cart_checkout.order.list` with the old table's Order, Email, Status, Payment and Total, «Search order or
-// email…», filters per column (the total from / to in the unit the column shows, cart_checkout#26),
-// newest first, 50 a page, list or cards. Each row offers the step it can take — «Mark paid» (Initiated),
-// «Complete» (Paid), «Fail» (Initiated or Paid, with its reason in a form) —, only to whoever may; a
-// failed order shows its reason. No «add»: orders are born from a cart (CART_CHECKOUT-F08). The total
-// paints in the order's own currency (the old screen used the business's), in minor units (the old #9), with the
-// decimals the server counts; the Total filter is typed in the business's currency, its country's (flow
-// cart-checkout-business-currency), never in euros by default.
+// `cart_checkout.order.list` with Order, Email, Status, Payment and Total, «Search order or email…», filters per column
+// (the total from / to in the unit the column shows), newest first, 50 a page, list or cards. Each row offers the step
+// it can take — «Mark paid» (Initiated), «Complete» (Paid), «Fail» (Initiated or Paid, with its reason in a form) —,
+// only to whoever may; a failed order shows its reason. No «add»: orders are born from a cart (CART_CHECKOUT-F08). The
+// total paints in the order's own currency, in minor units, with the decimals the server counts; the Total filter is
+// typed in the business's currency, its country's (flow cart-checkout-business-currency), never in euros by default.
 import { DataTable, type DataTableAction, EmptyState, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
@@ -85,7 +83,7 @@ async function setup(options: MountOptions = {}) {
 }
 
 describe('OrdersPage', () => {
-  it('while the first page loads, the table paints the loading state and counts nothing (pm#611)', async () => {
+  it('while the first page loads, the table paints the loading state and counts nothing', async () => {
     const s = await setup();
     expect(s.prop('loading')).toBe(true);
     expect(s.find('cart-checkout-orders-loading').exists()).toBe(true);
@@ -95,11 +93,11 @@ describe('OrdersPage', () => {
     expect(s.find('cart-checkout-orders-loading').exists()).toBe(false);
   });
 
-  it('follows the orders newest first, with the old table’s columns and no add', async () => {
+  it('follows the orders newest first, with its columns and no add', async () => {
     const s = await setup();
     expect(s.list()).toEqual([{ sort: '-created_at', limit: 50, offset: 0 }]);
     await s.show(page(ROWS));
-    // The topbar names the app, as the old hub's did; the tabbar says which section.
+    // The topbar names the app; the tabbar says which section.
     expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Cart & Checkout');
     expect(s.prop('searchPlaceholder')).toBe('Search order or email…');
     expect(s.prop('addable')).toBe(false);
@@ -113,9 +111,9 @@ describe('OrdersPage', () => {
     expect(s.cells(0).slice(0, 5)).toEqual(['OS-20261014-0001', 'ana@example.com', 'Initiated', 'Card', '€31.50']);
     // The number's column holds a whole «OS-AAAAMMDD-NNNN»: it tells one order from the next.
     expect(s.prop<Array<{ key: string; width?: string }>>('columns')[0].width).toBe(NUMBER_WIDTH);
-    // No payment method: a dash, as the old table.
+    // No payment method: a dash.
     expect(s.cells(1)[3]).toBe('—');
-    // The total in the order's own currency (the old screen used the business's).
+    // The total in the order's own currency, never the business's.
     expect(s.cells(3)[4]).toBe('¥1,999');
   });
 
@@ -167,7 +165,7 @@ describe('OrdersPage', () => {
     ]);
   });
 
-  it('the total is typed as an amount, read as it is pasted, and one it cannot read says so under its box (pm#521)', async () => {
+  it('the total is typed as an amount, read as it is pasted, and one it cannot read says so under its box', async () => {
     const s = await setup();
     await s.result('base.business.get', business());
     await s.show(page(ROWS));
@@ -266,7 +264,7 @@ describe('OrdersPage', () => {
   });
 });
 
-describe('OrdersPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('OrdersPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
@@ -275,7 +273,7 @@ describe('OrdersPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
 
 // flow: CART_CHECKOUT-F12 — the old Orders kept its column filters behind the toolbar's funnel, with no
 // open row (docs/reference/old-hub/cart_checkout-orders-{390,834,1440}.png), as Invoices and Sales (hub#31).
-describe('OrdersPage: the column filters wait behind the funnel, as the old table (CART_CHECKOUT-F12)', () => {
+describe('OrdersPage: the column filters wait behind the funnel (CART_CHECKOUT-F12)', () => {
   const ID = 'cart-checkout-orders';
   type Setup = Awaited<ReturnType<typeof setup>>;
   type Field = HTMLElement & { errorText?: string };

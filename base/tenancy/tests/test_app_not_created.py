@@ -1,6 +1,6 @@
-"""A model of an app a business has not created yet, touched where no operation's gate is (hub#608; PLAN-DB §4, spec
-2026-10-11 «tablas al activar» §9): an ``events.py``, the admin, a task. The ``TenantRouter`` answers the 404
-``app_inactive`` an app that is off answers, before any SQL, never a ``relation … does not exist``.
+"""A model of an app a business has not created yet, touched where no operation's gate is: an ``events.py``, the admin,
+a task. The ``TenantRouter`` answers the 404 ``app_inactive`` an app that is off answers, before any SQL, never a
+``relation … does not exist``.
 
 Real databases, committed (no test case: the migrator registers its own aliases): two businesses cloned from a template
 with the platform alone, both confirmed by the migrator as every ready hub is, A with Printing's tables and B without.
@@ -125,7 +125,7 @@ def test_no_sql_reaches_the_database_so_the_transaction_goes_on(two_businesses):
 
 
 def test_an_operation_whose_row_says_on_without_its_tables_answers_the_same_404(two_businesses):
-    """A row or a cache behind what the database has (PLAN-DB §9, «caché atrasada sin tablas») never reaches the SQL."""
+    """A row or a cache behind what the database has (a stale cache without the tables) never reaches the SQL."""
     _, without_it = two_businesses
     op = get("printing.job.list")
     ctx = OperationContext(scope=Scope("host", without_it.slug), actor="ana", permissions=frozenset({"*"}), language="en")

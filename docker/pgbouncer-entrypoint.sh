@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PgBouncer sidecar of the hub and worker tasks (PLAN-DB §5; ERPlora/aws README, «Imagen»): the
+# PgBouncer sidecar of the hub and worker tasks (ERPlora/aws README, «Imagen»): the
 # hub_<hex> aliases reach Aurora through it, in transaction mode, on loopback only. Renders the
 # config from the task environment under /tmp, the only writable path of the image, and replaces
 # itself with pgbouncer, so the container's signals reach it.
@@ -7,7 +7,7 @@
 #   PGBOUNCER_SERVER_HOST           Aurora writer (required)
 #   PGBOUNCER_AUTH_USER/_PASSWORD   hub_app, the only role in the auth file (required, secrets)
 #   PGBOUNCER_MAX_USER_CONNECTIONS  server connections per task, all hub databases together
-#                                   (required; the task definition's budget, PLAN-DB «Conexiones»)
+#                                   (required; the task definition's budget)
 #   PGBOUNCER_MAX_DB_CONNECTIONS    3: server connections per hub database, also its pool size
 #   PGBOUNCER_SERVER_IDLE_TIMEOUT   10: seconds an unused server connection stays open
 #   PGBOUNCER_MAX_CLIENT_CONN       300: client connections from the app
@@ -61,16 +61,16 @@ chmod 600 "$userlist"
 
 if [[ $trace -eq 1 ]]; then set -x; fi
 
-# PLAN-DB «Conexiones» (round 2026-10-18). One pool per hub database, all as hub_app: a hub
+# One pool per hub database, all as hub_app: a hub
 # without activity costs no server connection (min_pool_size and reserve_pool_size 0, closed after
 # server_idle_timeout), and at max_user_connections pgbouncer evicts another hub's oldest idle
 # connection before it makes a client wait, so the task never holds more than its budget.
 # default_pool_size equals max_db_connections: with a single user they are the same cap. auth_file
-# lives under /tmp (PLAN-DB says /run/pgbouncer, which the non-root user of the image cannot
-# write). log_stats keeps its default: the line it writes every minute carries the average wait for
+# lives under /tmp, not /run/pgbouncer, which the non-root user of the image cannot write.
+# log_stats keeps its default: the line it writes every minute carries the average wait for
 # a server connection, the only sign of a saturated pool without a metrics exporter.
 #
-# Writer change (PLAN-DB round 2026-11-04e, hub#1052). After a Blue/Green switchover or a failover
+# Writer change. After a Blue/Green switchover or a failover
 # the writer's name resolves to another server, and AWS asks that no DNS cache outlives five
 # seconds: past that, writes keep going to the old writer, which is read-only by then. pgbouncer
 # ignores the record's own TTL and keeps an answer for dns_max_ttl and a failed lookup for

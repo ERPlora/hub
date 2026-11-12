@@ -1,4 +1,4 @@
-"""The business's own data as the Hub shows it (APP-BASE-6): its clock, its currency and the names of what the SaaS
+"""The business's own data as the Hub shows it: its clock, its currency and the names of what the SaaS
 registered.
 
 The SaaS owns the business's name, country, time zone and language (CLAUDE.md, «Contrato SaaS ↔ Hub»): it pushes them

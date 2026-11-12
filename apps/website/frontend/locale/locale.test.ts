@@ -1,6 +1,6 @@
-// The website editor's UI texts: English source + Spanish (PLAN §5), kept by hand next to the pages until V6 exports
-// Django's `djangojs` catalogues to JSON. This test is their guardrail: same keys and placeholders in both languages,
-// nothing empty, no vue-i18n syntax by accident, and every key a page, a component or a helper uses exists.
+// The website editor's UI texts: English source + Spanish, kept by hand next to the pages until Django's `djangojs`
+// catalogues are exported to JSON. This test is their guardrail: same keys and placeholders in both languages, nothing
+// empty, no vue-i18n syntax by accident, and every key a page, a component or a helper uses exists.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
