@@ -38,6 +38,7 @@ from django.utils.translation import pgettext_lazy
 from live.context import OperationContext, Scope
 from live.errors import Conflict, NotFound
 from live.operations import INTERNAL, operation
+from psycopg import sql
 
 from apps.customer.queries import find_customer
 from apps.service.models import (
@@ -96,6 +97,7 @@ from apps.service.schemas import (
 )
 from apps.staff.models import Member
 from apps.staff.queries import resolve_member
+from apps.tax.models import TaxCategory
 from base import images
 from base.business import babel_locale, business_zone
 from base.operations import call
@@ -1717,6 +1719,109 @@ def _adjustment_row(ctx: OperationContext, adjustment: GrantAdjustment) -> dict:
         "days_delta": adjustment.days_delta,
         "reason": adjustment.reason,
     }
+
+
+# --- What a separate copy of the business gives back (hub#1283; BASE-F114, SERVICE-F01) ------------
+
+#: What ``service.service.create`` takes of a service of a separate copy, each a column since ``0001_initial``
+#: (``services_in_copy``): all of it but its category and its tax category, which the business names its own way. Not
+#: its photo (``service/services/…``, a file the copy does not hold) nor who performs it (SERVICE-F31, hub#1320).
+COPY_FIELDS = (
+    "name",
+    "pricing_type",
+    "price",
+    "min_price",
+    "max_price",
+    "cost",
+    "duration_minutes",
+    "buffer_before",
+    "buffer_after",
+    "max_capacity",
+    "description",
+    "short_description",
+    "is_bookable",
+    "requires_confirmation",
+    "allow_online_booking",
+    "sort_order",
+    "is_featured",
+    "sku",
+    "barcode",
+    "notes",
+)
+
+
+def services_in_copy(conn) -> list[dict]:
+    """hub#1283: each service a separate copy of the business offers (an archived one was not on offer then), with its
+    ``id`` there, what ``service.service.create`` takes and the ids there of its category (``category_id``) and its tax
+    category (``tax_category_id``), by id; nothing where the app's table is not there. ``conn`` is the copy's direct,
+    read-only connection (``recoverable_from_copy`` on this app's config: the copy is no business and has no alias),
+    so it is read by its own SQL over the model's names, never the ORM."""
+    table = Service._meta.db_table
+    if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
+        return []
+    read = ("id", *COPY_FIELDS, "category", "tax_category")
+    column = {field: sql.Identifier(Service._meta.get_field(field).column) for field in (*read, "is_active")}
+    query = sql.SQL("SELECT {} FROM {} WHERE {} ORDER BY {}").format(
+        sql.SQL(", ").join(column[field] for field in read), sql.Identifier(table), column["is_active"], column["id"]
+    )
+    named = ("id", *COPY_FIELDS, "category_id", "tax_category_id")
+    return [dict(zip(named, row, strict=True)) for row in conn.execute(query)]
+
+
+def services_in_business(services: list[dict]) -> dict[UUID, UUID]:
+    """hub#1283: ``{id in the copy: id in the business}`` of each service of a separate copy (``services_in_copy``) the
+    business holds: the same one, on offer or archived (a service is never deleted; SERVICE-F05 restores it), or one
+    made again, by hand or brought back already: the same name, the case and the spaces aside, in the category it would
+    come back to (``_category_here``). What a recovery of another app matches a service of the copy by."""
+    by_id = set(Service.objects.filter(pk__in=[one["id"] for one in services]).values_list("pk", flat=True))
+    live = _live_categories(services)
+    by_name = {}
+    for pk, name, category in Service.objects.order_by("created_at", "id").values_list("pk", "name", "category"):
+        by_name.setdefault((_same_name(name), category), pk)
+    held = {}
+    for one in services:
+        if one["id"] in by_id:
+            held[one["id"]] = one["id"]
+        elif (twin := by_name.get((_same_name(one["name"]), _category_here(one, live)))) is not None:
+            held[one["id"]] = twin
+    return held
+
+
+def services_not_in_business(services: list[dict]) -> list[dict]:
+    """hub#1283: the services of a separate copy (``services_in_copy``) the business lacks (not in
+    ``services_in_business``), in their order, each as ``service.service.create`` takes it here, with its ``id`` there:
+    the key of its tax category (Taxes never deletes one; one turned off since is the create's to refuse, and without
+    one it takes the settings') and its category while the business still has it (one deleted since leaves it with
+    none, SERVICE-F08)."""
+    held = services_in_business(services)
+    lacking = [one for one in services if one["id"] not in held]
+    keys = dict(TaxCategory.objects.filter(pk__in={one["tax_category_id"] for one in lacking}).values_list("pk", "key"))
+    live = _live_categories(lacking)
+    created = []
+    for one in lacking:
+        record = {field: one[field] for field in ("id", *COPY_FIELDS)}
+        if (category := _category_here(one, live)) is not None:
+            record["category_id"] = category
+        if (key := keys.get(one["tax_category_id"])) is not None:
+            record["tax_category_key"] = key
+        created.append(record)
+    return created
+
+
+def _live_categories(services: list[dict]) -> set[UUID]:
+    """The categories of ``services`` (their ids in the copy) the business still has."""
+    wanted = {one["category_id"] for one in services if one["category_id"] is not None}
+    return set(Category.objects.filter(pk__in=wanted, is_deleted=False).values_list("pk", flat=True))
+
+
+def _category_here(service: dict, live: set[UUID]) -> UUID | None:
+    """The category a service of the copy comes back to: its own while the business still has it, none otherwise."""
+    return service["category_id"] if service["category_id"] in live else None
+
+
+def _same_name(name: str) -> str:
+    """A name as two that are the same compare: single spaces (as it is kept), the case aside."""
+    return " ".join(name.split()).casefold()
 
 
 # --- Helpers ----------------------------------------------------------------------------------------
