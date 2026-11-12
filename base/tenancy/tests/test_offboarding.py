@@ -467,7 +467,7 @@ def test_a_worker_that_stops_during_the_copy_drops_nothing_and_counts_no_attempt
 
 
 def test_a_drop_that_fails_keeps_its_copy_is_tried_again_and_the_pass_over_hub_due_leaves_it(
-    business, dumps_bucket, moto_s3, monkeypatch
+    business, dumps_bucket, moto_s3, monkeypatch, caplog
 ):
     hub = business(left_days_ago=91)
     real = ops.drop_database
@@ -485,7 +485,20 @@ def test_a_drop_that_fails_keeps_its_copy_is_tried_again_and_the_pass_over_hub_d
     assert failed.last_error == "drop_failed: no"
     assert failed.attempts == 1
     assert not HubDue.objects.filter(pk=hub.pk).exists()
-    assert provision.run_due(now + dt.timedelta(days=1)) == 0
+
+    caplog.clear()
+    with caplog.at_level(logging.INFO, logger="base.tenancy.provision"):
+        provision.run_due(now + dt.timedelta(days=1))
+
+    # Its own row, state and log, never how many the pass worked on: control holds whatever else its process has
+    # (hub#1332). The pass logs every business it works on, by id or slug, even one it then leaves as it was.
+    def state(row: Hub) -> tuple:
+        return (row.status, row.attempts, row.last_error, row.next_attempt_at, row.updated_at)
+
+    assert state(fresh(hub)) == state(failed)
+    assert str(hub.pk) not in caplog.text and hub.slug not in caplog.text
+    assert not HubDue.objects.filter(pk=hub.pk).exists()
+    assert hub.db_name in databases(), "its database is the data pass's to drop, not the hub_due pass's"
 
     monkeypatch.setattr(ops, "drop_database", real)
     run_pass(failed.next_attempt_at + dt.timedelta(seconds=1))
