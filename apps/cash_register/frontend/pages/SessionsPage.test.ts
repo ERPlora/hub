@@ -1,11 +1,10 @@
-// Cash register → the sessions (WORKBOOK «Pantallas · Caja»; the old `erp-cashregister-dashboard`): the title
-// «Cash register» and «Open session» (off while a session is open, saying why), the live
-// `cash_register.session.list` newest first in a server-side DataTable — Session, Opened on, Status,
-// Opening, Expected, Counted, Difference — with search, the filters behind the table's funnel, table or
-// cards and 50 a page. «Detail»
-// on every row (the row opens it too) and, on the open session, «Movement», «Count» and «Close», each by
-// its permission. A closing count opens the close. The drawer charged with no session open is said, and
-// so is a forgotten session past its cut-off. Nothing here refetches: it all re-runs by itself.
+// Cash register → the sessions (WORKBOOK «Pantallas · Caja»): the title «Cash register» and «Open session» (off while a
+// session is open, saying why), the live `cash_register.session.list` newest first in a server-side DataTable —
+// Session, Opened on, Status, Opening, Expected, Counted, Difference — with search, the filters behind the table's
+// funnel, table or cards and 50 a page. «Detail» on every row (the row opens it too) and, on the open session,
+// «Movement», «Count» and «Close», each by its permission. A closing count opens the close. The drawer charged with no
+// session open is said, and so is a forgotten session past its cut-off. Nothing here refetches: it all re-runs by
+// itself.
 import { DataTable } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
@@ -152,8 +151,7 @@ describe('SessionsPage: the screen', () => {
   });
 });
 
-describe('SessionsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-FILTERS-2B)', () => {
-  // flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+describe('SessionsPage: the filters behind the table funnel', () => {
   type Filter = { type: string; key?: string; keys?: string[]; amount?: boolean; maxlength?: number; options?: Array<{ value: string; label: string }> };
   const prop = <T,>(s: Awaited<ReturnType<typeof setup>>, name: string) => (s.table().props() as Record<string, unknown>)[name] as T;
 
@@ -349,7 +347,7 @@ describe('SessionsPage: states', () => {
   });
 });
 
-describe('SessionsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('SessionsPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

@@ -1,6 +1,6 @@
-"""What layer 1 of the assistant's QA says of Appointments (erplora-next docs/plans/2026-10-31-asistente-conocimiento-y-qa.md,
-§3): how many tools it offers, and that the owner's requests of the real-model QA (hub#1097), in the owner's own words,
-are offered their existing operation, ahead of Online booking's twin when both could do it.
+"""What layer 1 of the assistant's QA says of Appointments: how many tools it offers, and that the owner's requests
+of the real-model QA (hub#1097), in the owner's own words, are offered their existing operation, ahead of Online
+booking's twin when both could do it.
 
 Every ask of every tool of appointment bringing its tool among the first ten, role by role, in both languages, is
 ``base/tests/test_assistant_asks.py``'s (appointment is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020``

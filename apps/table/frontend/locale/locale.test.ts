@@ -1,7 +1,6 @@
-// The table app's UI texts: English source + Spanish (PLAN §5), kept by hand next to the pages until
-// Django's `djangojs` catalogues are exported to JSON. This test is their guardrail: same keys and
-// placeholders in both languages, nothing empty, every key a page, a component or a helper uses
-// exists, and the words the old screens showed (the old module's `locales/*.json`) are kept.
+// The table app's UI texts: English source + Spanish, kept by hand next to the pages. This test is their
+// guardrail: same keys and placeholders in both languages, nothing empty, every key a page, a component or
+// a helper uses exists, and the screens' established words are kept.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -62,7 +61,7 @@ describe('table catalogues (en source + es)', () => {
     }
   });
 
-  it('count things in the singular and the plural: «1 guest», never «1 guests» (hub#462)', () => {
+  it('count things in the singular and the plural: «1 guest», never «1 guests»', () => {
     // A `{count}` before a noun needs both forms (`one | other`, vue-i18n picks one by `count`), and they
     // differ: a copied «{count} guests | {count} guests» still says «1 guests». «pax» is the same for one
     // and many, and «Seat {count} at once» / «Sentar {count} de un toque» count no noun.

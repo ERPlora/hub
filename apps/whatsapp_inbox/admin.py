@@ -1,4 +1,4 @@
-"""Django admin of the WhatsApp inbox: CRUD for the platform's staff (round 12, PLAN §17).
+"""Django admin of the WhatsApp inbox: CRUD for the platform's staff.
 
 Messages are read only, received and sent alike (WORKBOOK «Modelo»): they are what WhatsApp carried;
 a conversation's data is corrected by erasing it, never by editing a message. The channel, and the

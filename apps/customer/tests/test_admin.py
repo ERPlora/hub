@@ -1,8 +1,6 @@
 """Django admin of the customer app: every table, with full CRUD for the platform's staff.
 
-Round 12 (PLAN §17; CLAUDE.md «Frontend y admin»): the Hub admin, only on ``hubs.erplora.com``, has
-full CRUD over a hub's tables. That supersedes the «read only» the demo app (and an earlier version
-of this one) copied from round 9.
+The Hub admin, only on ``hubs.erplora.com``, has full CRUD over a hub's tables, never a read-only one.
 """
 
 import uuid
@@ -50,7 +48,7 @@ REGISTERED = {
     OrderLink: OrderLinkAdmin,
     HealthRecord: HealthRecordAdmin,
 }
-HOST = "hubs.localhost"  # the admin lives only on the platform host (PLAN §18.1.3)
+HOST = "hubs.localhost"  # the admin lives only on the platform host
 
 
 @pytest.fixture
@@ -77,7 +75,7 @@ def test_every_table_is_registered():
 
 
 def test_the_staff_has_full_crud_on_every_table(superuser):
-    # Round 12: no read-only mixin; what the staff may do is Django's own permissions.
+    # No read-only mixin: what the staff may do is Django's own permissions.
     request = request_by(superuser)
     admins = [admin.site._registry[model] for model in REGISTERED]
     inlines = [inline(Customer, admin.site) for inline in CustomerAdmin.inlines]

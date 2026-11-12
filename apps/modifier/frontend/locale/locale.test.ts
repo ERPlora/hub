@@ -1,8 +1,7 @@
-// The modifier app's UI texts: English source + Spanish (PLAN §5), kept by hand next to the pages until
-// Django's `djangojs` catalogues are exported to JSON. This test is their guardrail: same keys and
-// placeholders in both languages, nothing empty, every key a page, a component or a helper uses
-// exists, and the words the old screen showed (the old module's `locales/*.json`, «Modificadores» renamed
-// «Suplementos», as Sales already called it) are kept.
+// The modifier app's UI texts: English source + Spanish, kept by hand next to the pages. This test is
+// their guardrail: same keys and placeholders in both languages, nothing empty, every key a page, a
+// component or a helper uses exists, and the screen's established words are kept («Suplementos», as
+// Sales calls them, rather than «Modificadores»).
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

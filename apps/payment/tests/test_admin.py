@@ -1,8 +1,8 @@
 """Django admin of the payment app: methods, payments and the counter of the day, with full CRUD.
 
-Round 12 (PLAN §17; CLAUDE.md «Frontend y admin»): the Hub's admin lives only on hubs.erplora.com, for
-the platform's staff, and has full CRUD over every table. The database still refuses what no door may
-save: an amount of 0 or less, an unknown status, a repeated reference or method name.
+The Hub's admin lives only on hubs.erplora.com, for the platform's staff, and has full CRUD over every
+table. The database still refuses what no door may save: an amount of 0 or less, an unknown status, a
+repeated reference or method name.
 """
 
 import pytest
@@ -52,7 +52,7 @@ def test_the_pages_render(client, superuser):
     )
     counter = PaymentCounter.objects.create(day=payment.payment_date, last=1)
     client.force_login(superuser)
-    # The admin lives only on the platform host (PLAN §18.1.3).
+    # The admin lives only on the platform host.
     pages = {
         "/admin/payment/paymentmethod/": b"BBVA account",
         "/admin/payment/payment/": b"PAY-20261014-0001",

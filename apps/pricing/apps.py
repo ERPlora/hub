@@ -10,11 +10,11 @@ class PricingConfig(LiveAppConfig):
     label = "pricing"
     kind = "app"
     verbose_name = _("Price Lists")
-    # The old module's `pricetag`, registered in the shell (ION_ICONS).
+    # Registered in the shell (ION_ICONS).
     icon = "ion:pricetag"
     category = Category.CATALOG
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The public store's texts, which register_apps writes to shared.app.
     summary = _("Price lists per customer group, with dates and quantity breaks, and automatic discounts.")
     description = _(
         "Price Lists keeps other prices for your products and services: a list for wholesale customers, "
@@ -32,7 +32,7 @@ class PricingConfig(LiveAppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     permissions = ["pricing.view", "pricing.manage"]
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). Viewing includes
-    # asking for the price of a line (the old «apply»).
+    # asking for the price of a line.
     role_permissions = {
         "hub_owner": ["pricing.*"],
         "hub_admin": ["pricing.*"],
@@ -40,7 +40,7 @@ class PricingConfig(LiveAppConfig):
         "hub_employee": ["pricing.view"],
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
-    # `icon =` as the module's own icon. One entry, as the old module: lists and rules on one screen.
+    # `icon =` as the module's own icon. One entry: lists and rules on one screen.
     navigation = [
         Nav("lists", _("Price Lists"), "ion:pricetag", "/pricing/lists"),
     ]

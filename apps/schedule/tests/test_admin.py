@@ -1,7 +1,6 @@
 """Django admin of the schedule app: full CRUD on every model, the intervals as lines of their day.
 
-Round 12 (PLAN §17, CLAUDE.md «Frontend y admin») gives the Hub admin full CRUD over all of a hub's
-tables; ids and audit dates are read only.
+The Hub admin has full CRUD over all of a hub's tables; ids and audit dates are read only.
 """
 
 import pytest

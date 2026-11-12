@@ -1,6 +1,5 @@
-// The customer app's UI texts: English source + Spanish (PLAN §5), kept by hand next to the pages
-// until V6 exports Django's `djangojs` catalogues to JSON, like the demo's. This test is their
-// guardrail: same keys and placeholders in both languages, nothing empty, every key a page, a
+// The customer app's UI texts: English source + Spanish, kept by hand next to the pages. This test is
+// their guardrail: same keys and placeholders in both languages, nothing empty, every key a page, a
 // component or a helper names exists, and no vue-i18n special character left unescaped.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

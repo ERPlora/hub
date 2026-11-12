@@ -224,7 +224,7 @@ def test_an_employee_may_not_see_the_stats():
         run("demo.item.stats", ItemStatsIn(), "hub_employee")
 
 
-# demo.item.open_count (the bell's example counter, PLAN-HUB round 2026-10-21)
+# demo.item.open_count (the bell's example counter)
 
 
 def test_the_open_items_for_the_bell():

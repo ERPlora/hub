@@ -1,6 +1,5 @@
-"""What layer 1 of the assistant's QA does not say of the WhatsApp inbox (docs plan 2026-10-31, the assistant's knowledge
-and QA, §3): how many tools it offers, and that the owner's requests of the real-model QA (hub#1108), in the owner's
-own words, are offered their existing operation.
+"""What layer 1 of the assistant's QA does not say of the WhatsApp inbox: how many tools it offers, and that the owner's
+requests of the real-model QA (hub#1108), in the owner's own words, are offered their existing operation.
 
 Every ask of every tool of whatsapp_inbox bringing its tool among the first ten, role by role, in both languages, is
 ``base/tests/test_assistant_asks.py``'s (whatsapp_inbox is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as
@@ -99,8 +98,8 @@ OWN_WORDS = [
     ("whatsapp_inbox.template_sample.detail", "¿qué archivo subí de cabecera?"),
     ("whatsapp_inbox.template_sample.upload", "usa este PDF como cabecera"),
 ]
-#: The tools of other apps whose asks this pull request rewrote because the «plantilla» group took their place (each fell
-#: to the 13th or the 16th): «plantilla de negocio», «business templates» and «el personal» now.
+#: The tools of other apps whose asks say their own words because the «plantilla» group took their place (each fell to
+#: the 13th or the 16th): «plantilla de negocio», «business templates» and «el personal».
 REWRITTEN = ("base.blueprint.list", "staff.member.bulk_create")
 #: The places an ask of another app keeps free below the first ten: the asks of the next app to say its own take them.
 ROOM = 2
