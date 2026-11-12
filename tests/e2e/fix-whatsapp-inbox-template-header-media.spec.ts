@@ -7,12 +7,12 @@
 // erplora.com, which hands the verdict to this Hub) and a conversation sends it with «Template»: the photo comes already
 // chosen, erplora.com puts it on the number (`/<NUMBER_ID>/media`) and sends the template naming it, and the thread
 // names the photo it went with. The sheet and «Send a template» show the photo's thumbnail, loaded from the address the
-// Hub gives it under /p/media/ (FIX-HUB-WHATSAPP-INBOX-TEMPLATE-SHEET-SHOWS-NO-HEADER-THUMBNAIL).
+// Hub gives it under /p/media/.
 // Meta is the run's Graph (whatsapp-graph.ts): `a`'s number is connected first with the code Meta's window gives
 // (door 11, as whatsapp-inbox-connect-return.spec.ts does), so the Graph takes the business's permission; the
-// `afterAll` puts back erplora.com's seed (its made-up permission) for the specs after this one. The sheet in three
-// sizes (FIX-HUB-WHATSAPP-INBOX-TEMPLATE-HEADER-MEDIA-NOW-STORABLE-390|834|1440), the list (…-list-…), «Send a template»
-// with its photo (…-send-…) and the conversation with what was sent (…-sent-…). erplora.com forgets the templates made
+// `afterAll` puts back erplora.com's seed (its made-up permission) for the specs after this one. Captures of the sheet
+// in three sizes, the list, «Send a template» with its photo and the conversation with what was sent. erplora.com
+// forgets the templates made
 // here (`erploraForgetsTemplates`) before and after: its copy would come back to the next run as a row without file.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 

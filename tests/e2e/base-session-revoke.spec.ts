@@ -83,7 +83,7 @@ function documentsLoaded(page: Page): string[] {
   return loaded;
 }
 
-/** `ready` at each size and a capture `APP-HUBS-3-<key>-<size>`; back at 1440 after. */
+/** `ready` at each size, with a capture of each; back at 1440 after. */
 async function atEverySize(page: Page, key: string, ready: () => Promise<void>): Promise<void> {
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });

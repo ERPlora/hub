@@ -27,7 +27,7 @@ const THANKS = 'Thanks for writing! Let me check the reservations book and I wil
 /** How the book's slot and the open day this spec makes are known again (slots have no name). */
 const SENTINEL = 78;
 const OPEN_REASON = 'E2E WhatsApp table open';
-/** The business's day `days` from today (Madrid in phase 1) and its weekday, Monday 0. */
+/** The business's day `days` from today (hub `a` is in Madrid) and its weekday, Monday 0. */
 function madridDay(days: number): { date: string; weekday: number } {
   const date = new Date(Date.now() + days * 86_400_000).toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
   return { date, weekday: (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7 };
@@ -117,7 +117,7 @@ for (const viewport of VIEWPORTS) {
 
       // F24: they write; the relay starts the answer, which thanks them, finds their card and asks the assistant, who
       // books with only their name and phone: Reservas finds the card by that phone itself, though the step holds no
-      // right in Customers (FLOW-F12, FIX-HUB-FLOW-STEP-RESERVATION-BY-PHONE-DENIED).
+      // right in Customers (FLOW-F12).
       const phone = e2ePhone();
       const guest = await api<{ id: string }>(context, A, 'POST', '/customer/customers', { name: 'E2E Lucía', phone, source: 'whatsapp' });
       expect(guest.status, JSON.stringify(guest.data)).toBe(201);

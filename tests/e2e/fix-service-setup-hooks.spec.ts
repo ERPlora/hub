@@ -1,10 +1,9 @@
 // flow: SERVICE-F01
-// Services' hook of the Home (FIX-SERVICE-SETUP-HOOKS; the old module's own `setup` item «Tu catálogo de servicios»,
-// services#26; the old hub's dashboard in docs/reference/old-hub/dashboard-*.png), as the owner of hub `a` reads it in
+// Services' hook of the Home (its `setup` item «Tu catálogo de servicios»), as the owner of hub `a` reads it in
 // Spanish: «Tu catálogo de servicios» pending and «Importante» in «Termina de configurar tu negocio» while no service
 // can be charged, its «Configurar» leading to Services, where the first one is added at a closed price; then «Hecho»,
 // back to pending without a reload when that service is archived and «Hecho» again when it is restored. In each of the
-// three sizes, the capture `FIX-SERVICE-SETUP-HOOKS-<width>` with the step pending in sight. The services the hub
+// three sizes, a capture with the step pending in sight. The services the hub
 // already had on offer are archived for the run and back on offer after it; the run's own are «E2E Svc …», deleted by
 // `cleanUp()` before and after.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';

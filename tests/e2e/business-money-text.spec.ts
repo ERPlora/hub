@@ -1,9 +1,9 @@
-// flow: money-text (FIX-HUB-PYTHON-MONEY-GLUES-CURRENCY-CODE-TO-AMOUNT; base/business.py `money_text`)
+// flow: money-text (base/business.py `money_text`)
 // The server writes an amount as the browser does (`Intl.NumberFormat`): a currency written in letters keeps off the
 // figure by a no-break space (CLDR's currency spacing, which Babel skips), «PLN 15.50», never «PLN15.50». Hub `a`
 // publishes its site with Services' catalog and moves to Poland (`PUT /internal/hubs/{id}`, signed the way the SaaS
 // sends it): the public page the server paints and the public catalog the bundle reads write the price as Intl does,
-// in English «PLN 15.50» at 390, 834 and 1440 (captures `FIX-HUB-PYTHON-MONEY-GLUES-CURRENCY-CODE-TO-AMOUNT-<width>`)
+// in English «PLN 15.50» at 390, 834 and 1440
 // and in Spanish «15,50 PLN». The receipt, the invoice and the inventory export are not painted on a screen of the Hub
 // (the screens paint their own paper with Intl): their pytest says the same. What the run creates is deleted after
 // it, the site saved as it was found and taken offline, and `a`'s registration put back, also when a test fails.

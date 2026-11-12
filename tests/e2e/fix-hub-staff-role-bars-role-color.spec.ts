@@ -1,10 +1,9 @@
 // flow: STAFF-G01
-// Staff's «Empleados por rol» on the Home with each role's own colour (FIX-HUB-STAFF-ROLE-BARS-IGNORE-ROLE-COLOR; the
-// old module's `map.color`, the old hub's `renderBarList`, docs/reference/old-hub/dashboard-*.png): the owner of hub
+// Staff's «Empleados por rol» on the Home with each role's own colour: the owner of hub
 // `a`, in Spanish, adds the panel from «Personalizar panel»; two roles of colours of their own and a third without one,
 // each with Active people: each bar's fill is its role's colour, and the role without one keeps the panel's. base paints
-// a row's colour only when the panel maps it (FIX-HUB-BASE-HOME-BAR-LIST-IGNORES-MAP-COLOR, `bars()` of
-// base/frontend/lib/home.ts), so this checks Staff declares it. Captures `FIX-HUB-STAFF-ROLE-BARS-IGNORE-ROLE-COLOR-<width>`.
+// a row's colour only when the panel maps it (`bars()` of base/frontend/lib/home.ts), so this checks Staff declares
+// it. A capture per width.
 // Everything this file creates is named «E2E-ROLECOLOR …» and removed after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 

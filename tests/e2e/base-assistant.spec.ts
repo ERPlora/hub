@@ -1,12 +1,10 @@
-// The assistant of the Hub (APP-BASE-9), end to end with its real dependencies: the Hub of this stack, its SaaS's
+// The Hub's assistant end to end with its real dependencies: the Hub of this stack, its SaaS's
 // gateway (`/internal/assistant/*`, `/internal/speech/transcribe`) and, behind it, the e2e's provider
 // (assistant-provider.ts, an OpenAI-compatible server on 127.0.0.1 that this spec starts): no mock between the
 // browser and the provider, no real provider, no real key. The SaaS must be seeded with that provider (README of this
 // folder, «El asistente»): `assistant_seed.py gateway http://127.0.0.1:<E2E_AI_PROVIDER_PORT>/v1`.
 // The month's messages of the business `a` are set on the SaaS's database before each test (`spend`), so a run never
 // spends the plan's allowance and the 80 % and the spent month can be seen.
-// flow: BASE-G110 BASE-G111 BASE-G112 BASE-G113 BASE-G114 BASE-G115 BASE-G116 BASE-G117 BASE-G118 BASE-G119
-// flow: BASE-G120 BASE-G121 BASE-G122 BASE-G123 BASE-G124
 import { execSync } from 'node:child_process';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
@@ -123,8 +121,7 @@ async function ask(page: Page, text: string, options: { settle?: boolean } = {})
   if (options.settle ?? true) await expect(panel(page).locator('[data-testid="assistant-send"]')).toBeVisible({ timeout: 30_000 });
 }
 
-/** The panel as a person sees it at each size, saved as `APP-BASE-9-<key>-<size>`; `settled`, when given, must hold at
- *  the very moment of each capture. */
+/** The panel as a person sees it at each size; `settled`, when given, must hold at the very moment of each capture. */
 async function shots(
   page: Page,
   key: string,
@@ -220,13 +217,13 @@ async function freshPage(browser: Browser, credentials = EMPLOYEE): Promise<Page
   return page;
 }
 
-// The browser's fake microphone (BASE-G112's dictation): a worker-wide launch option, so for the whole file.
+// The browser's fake microphone, for the dictation test: a worker-wide launch option, so for the whole file.
 test.use({
   launchOptions: { args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] },
   permissions: ['microphone'],
 });
 
-test('BASE-G110 — the sparkles open the panel on the right (on a phone, from «More options»): docked from 768 px, over the screen on a phone; Escape, × and the veil close it; it stays open across screens and reloads', async ({ page }) => {
+test('the sparkles open the panel on the right (on a phone, from «More options»): docked from 768 px, over the screen on a phone; Escape, × and the veil close it; it stays open across screens and reloads', async ({ page }) => {
   await login(page, A, '/');
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
@@ -292,8 +289,8 @@ test('BASE-G110 — the sparkles open the panel on the right (on a phone, from �
 });
 
 test('hub-e2e-capture — capture() keeps the panel open after a turn at 390, 834 and 1440: on a phone it is all the screen, its border from top to bottom', async ({ page }) => {
-  // FIX-HUB-E2E-CAPTURE-REFUSES-ASSISTANT-PANEL-ON-PHONE: at 390 every capture of the open panel failed as one taken
-  // before the page was painted at its size (its first and last 8 rows, white with its left border, are the same).
+  // At 390 the open panel's first and last 8 rows are the same (white with its left border), which capture() must not
+  // mistake for a page not yet painted at its size.
   const KEY = 'FIX-HUB-E2E-CAPTURE-REFUSES-ASSISTANT-PANEL-ON-PHONE';
   await login(page, A, '/');
   await page.setViewportSize({ width: 390, height: 844 });
@@ -328,7 +325,7 @@ test('hub-e2e-open-panel — on a phone the panel takes a question with Enter as
   await expect(page.locator('ion-popover:not(.overlay-hidden)')).toHaveCount(0);
 });
 
-test('BASE-G121 — «Ask the assistant» on the setup card opens it on the setup; a shortcut asks at once', async ({ page }) => {
+test('«Ask the assistant» on the setup card opens it on the setup; a shortcut asks at once', async ({ page }) => {
   await login(page, A, '/');
   await page.setViewportSize({ width: 1440, height: 900 });
   await home(page);
@@ -347,7 +344,7 @@ test('BASE-G121 — «Ask the assistant» on the setup card opens it on the setu
   expect(instructions).toContain('checklist');
 });
 
-test('BASE-G111 BASE-G113 BASE-G114 — a question and its answer: written as it comes, with its format; «Stop» keeps what came; «Go to Settings» opens it and closes the panel', async ({ page }) => {
+test('a question and its answer: written as it comes, with its format; «Stop» keeps what came; «Go to Settings» opens it and closes the panel', async ({ page }) => {
   await login(page, A, '/');
   await page.setViewportSize({ width: 1440, height: 900 });
   await home(page);
@@ -385,7 +382,7 @@ test('BASE-G111 BASE-G113 BASE-G114 — a question and its answer: written as it
   await expect(panel(page)).toHaveAttribute('data-open', 'false');
 });
 
-test('BASE-G115 — a write waits on its card: «Run it» runs it as the person; «Cancel» runs nothing', async ({ page, context }) => {
+test('a write waits on its card: «Run it» runs it as the person; «Cancel» runs nothing', async ({ page, context }) => {
   await login(page, A, '/');
   await page.setViewportSize({ width: 1440, height: 900 });
   await home(page);
@@ -413,7 +410,7 @@ test('BASE-G115 — a write waits on its card: «Run it» runs it as the person;
   expect(none.data.rows).toEqual([]);
 });
 
-test('BASE-G119 — several things in a row: the read runs by itself, the write waits on its card', async ({ page, context }) => {
+test('several things in a row: the read runs by itself, the write waits on its card', async ({ page, context }) => {
   await login(page, A, '/');
   await page.setViewportSize({ width: 1440, height: 900 });
   await home(page);
@@ -432,7 +429,7 @@ test('BASE-G119 — several things in a row: the read runs by itself, the write 
   await shots(page, 'BASE-G119');
 });
 
-// flow: BASE-F101 (Pedirle varias cosas seguidas): el texto de cada ronda de un turno, párrafo aparte en la misma burbuja
+// flow: BASE-F101 (asking for several things in a row)
 test('BASE-F101 — several things in a row: what each round says is its own paragraph of the one bubble, never glued to the previous one', async ({ page }) => {
   const KEY = 'FIX-HUB-BASE-ASSISTANT-ROUNDS-TEXT-RUN-TOGETHER';
   await login(page, A, '/');
@@ -454,7 +451,7 @@ test('BASE-F101 — several things in a row: what each round says is its own par
   if (process.env.E2E_SAVE_STORAGE_STATE) await page.context().storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 });
 
-test('BASE-G116 — a dangerous write lists its data and runs only after typing the word', async ({ page, context }) => {
+test('a dangerous write lists its data and runs only after typing the word', async ({ page, context }) => {
   await login(page, A, '/');
   const item = await api<{ id: string }>(context, A, 'POST', '/demo/items', { name: `Para borrar ${Date.now().toString(36)}` });
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -463,7 +460,7 @@ test('BASE-G116 — a dangerous write lists its data and runs only after typing 
   await ask(page, `E2E-DELETE ${item.data.id}`, { settle: false });
   await expect(card(page)).toBeVisible();
   await expect(card(page)).toContainText('Delete in Demo. Check each datum before going on.');
-  // FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES: a record is never shown by its id; Demo marks no read that names it.
+  // A record is never shown by its id; Demo marks no read that names it.
   await expect(card(page)).not.toContainText(item.data.id);
   // The native button inside `ion-button` (its host carries no role for `aria-disabled` to count).
   const submit = card(page).locator('[data-testid="assistant-confirm-submit"] button');
@@ -486,10 +483,7 @@ test('BASE-G116 — a dangerous write lists its data and runs only after typing 
   expect(gone.status).toBe(404);
 });
 
-// FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH: a datum the screen does not name itself went by its English
-// title, in Spanish too («Pin Length: 6»), and an action of the platform by its internal name («Cambiar en Base»; the
-// receipt, «en base»): now by the screen where the person does it. Cancelled: nothing changes, so nothing to clean
-// but the language cookie's context, closed at the end.
+// Cancelled: nothing changes, so the only thing to clean is the language cookie's context, closed at the end.
 test('BASE-F97 BASE-F98 — in Spanish the card names every datum in Spanish, also one the screen does not name itself, and the platform by its screen', async ({ browser }) => {
   const KEY = 'FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH';
   const context = await browser.newContext();
@@ -522,9 +516,7 @@ test('BASE-F97 BASE-F98 — in Spanish the card names every datum in Spanish, al
 });
 
 // flow: assistant-card (BASE-F97 BASE-F98)
-// FIX-HUB-BASE-ASSISTANT-CARD-OBJECT-SHOWS-INNER-KEYS-IN-ENGLISH: a datum that is an object went by its inner keys, in
-// English also in Spanish («Plantilla: name: cita_recordatorio · language: es»): now by its values, as a summary says an
-// address. Cancelled: nothing is sent.
+// An object datum is said by its values, as a summary says an address. Cancelled: nothing is sent.
 test('assistant-card — in Spanish an object datum (a WhatsApp template) is said by its values, never by its inner keys', async ({ browser }) => {
   const KEY = 'FIX-HUB-BASE-ASSISTANT-CARD-OBJECT-SHOWS-INNER-KEYS-IN-ENGLISH';
   const context = await browser.newContext();
@@ -550,9 +542,8 @@ test('assistant-card — in Spanish an object datum (a WhatsApp template) is sai
 });
 
 // flow: base-assistant-card-attempt-keys (BASE-F97)
-// FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-ATTEMPT-KEYS: the card of a write showed the key of its attempt, which nobody can
-// judge («Clave del trabajo: e2e-attempt-…»): now it leaves it out, and the write still gets it whole — the same print
-// asked again with its key, as a retry, is still one job.
+// A write's attempt key is nothing a person can judge, so the card leaves it out; the write still gets it whole, and
+// the same print asked again with its key, as a retry, is still one job.
 test('base-assistant-card-attempt-keys — in Spanish a print leaves its key out of the card and runs with it: asked twice, it is one job', async ({ browser }) => {
   const KEY = 'FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-ATTEMPT-KEYS';
   const { context, page, turnedOn } = await signedInWith(browser, ['printing']);
@@ -567,7 +558,7 @@ test('base-assistant-card-attempt-keys — in Spanish a print leaves its key out
   await expect(card(page)).toBeVisible();
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    // The document by the queue's word for it, never as the model sent it (FIX-HUB-PRINTING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS).
+    // The document by the queue's word for it, never as the model sent it.
     await expect(card(page)).toContainText(`Crear en Impresión: Etiqueta de código de barras · ${product}`);
     await expect(card(page)).not.toContainText(jobKey);
     await captureStill(page, `${KEY}-${vp.label}`);
@@ -590,10 +581,9 @@ test('base-assistant-card-attempt-keys — in Spanish a print leaves its key out
   await leave(context, turnedOn);
 });
 
-// flow: whatsapp_inbox-assistant-card (WHATSAPP_INBOX-F33 sigue hecho)
-// FIX-HUB-WHATSAPP-INBOX-ATTEMPT-KEYS-UNMARKED: sending a template with a document header, the card left the file out
-// (it could only name it by its id) and called the message's key a datum to judge unless it looked like an id: now the
-// file goes by the name it was chosen with and the key never shows. Cancelled: nothing is sent.
+// flow: whatsapp_inbox-assistant-card (WHATSAPP_INBOX-F33)
+// A template with a document header: the file goes by the name it was chosen with, never by its id, and the message
+// key never shows. Cancelled: nothing is sent.
 test('whatsapp_inbox-assistant-card — in Spanish a template names its header file by its name and leaves the message key out', async ({ browser }) => {
   const KEY = 'FIX-HUB-WHATSAPP-INBOX-ATTEMPT-KEYS-UNMARKED';
   const { context, page, turnedOn } = await signedInWith(browser, ['customer', 'whatsapp_inbox']);
@@ -629,9 +619,8 @@ test('whatsapp_inbox-assistant-card — in Spanish a template names its header f
 });
 
 // flow: base-assistant-money-mark (BASE-F97)
-// FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS: the card knew an amount only by the words «in cents» of
-// its description, so a payment «in minor units of the currency» said «1500»: now by the mark its app declares, whatever
-// its words, «15,00 €». Cancelled: nothing is recorded.
+// The card knows an amount by the money mark its app declares, whatever its description says («in minor units of the
+// currency»), so 1500 reads «15,00 €». Cancelled: nothing is recorded.
 test('base-assistant-money-mark — in Spanish a payment says its amount in the business’s currency, never in its minor unit', async ({ browser }) => {
   const KEY = 'FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS';
   const { context, page, turnedOn } = await signedInWith(browser, ['payment']);
@@ -798,9 +787,8 @@ async function bookingCardSays(page: Page, services: unknown[], line: string, ne
 }
 
 // flow: assistant-card (BASE-F97)
-// FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES: a booking's card said each datum as the model sent it («2026-11-02T10:00:00+01:00»,
-// «counter», the customer's and the professional's ids): now its day and time as the person's language writes them, at the
-// business's hour, its channel by the label Appointments gives it, and nobody by an id. Cancelled: nothing is booked.
+// A booking's card says its day and time as the person's language writes them, at the business's hour, its channel by
+// the label Appointments gives it, and nobody by an id. Cancelled: nothing is booked.
 test('assistant-card — in Spanish a booking says its day and time and its channel in words, and nobody by an id', async ({ browser }) => {
   const { context, page, turnedOn } = await signedInWith(browser, CITAS);
   await openPanelInSpanish(page);
@@ -825,10 +813,9 @@ test('assistant-card — in Spanish a booking whose service comes by its name sa
 });
 
 // flow: assistant-card (BASE-F97)
-// FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES: a write of the platform that names its record by an id (removing a device,
-// revoking an API key…) no longer said which once the id left the card: now the card names it as its screen does — a
-// device by its name or, with none, by what it is, as Settings › Devices. Revoking an API key names its key the same way
-// (base/tests: hub `a` shares phase 1's database and has no keys to revoke here). Cancelled: the device stays.
+// A write of the platform that names its record by an id says which one as its screen does: a device by its name or,
+// with none, by what it is, as Settings › Devices. Revoking an API key names its key the same way, covered in
+// base/tests. Cancelled: the device stays.
 test('assistant-card — in Spanish removing a device names it as Settings › Devices does, never by its id', async ({ browser }) => {
   const KEY = 'FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES-device';
   const context = await browser.newContext();
@@ -855,7 +842,7 @@ test('assistant-card — in Spanish removing a device names it as Settings › D
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText('Quitar en Ajustes. Revisa cada dato antes de seguir.');
-    // FIX-HUB-BASE-ASSISTANT-DANGER-CARD-CALLS-THE-RECORD-BY-ITS-FIELD-NAME: by the title its schema gives it, never «Registro».
+    // The record by the title its schema gives it, never «Registro».
     await expect(card(page)).toContainText('Dispositivo: Barra');
     await expect(card(page)).not.toContainText(device!.id);
     await captureConfirmation(page, `${KEY}-${vp.label}`);
@@ -868,12 +855,11 @@ test('assistant-card — in Spanish removing a device names it as Settings › D
 });
 
 // flow: RESERVATION-F06 RESERVATION-F08 (the card: BASE-F97)
-// FIX-HUB-RESERVATION-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS: since hub#416 the card left out every record a write of
-// Reservations names by its id — for whom, which table, which reservation — once the UUID left it. Now each one by the
-// name its screen gives it, read as the person: booking says the customer by the name of their card (and the day and the
-// time: a normal card's line carries its first three data); moving a reservation to another table says which
-// reservation, as the book's own dialog does (its guest, its day and its time), and the table by its number. Cancelled:
-// nothing is booked nor moved. What the test made is deleted at the end.
+// Every record a write of Reservations names by its id goes by the name its screen gives it, read as the person:
+// booking says the customer by the name of their card (and the day and the time: a normal card's line carries its first
+// three data); moving a reservation to another table says which reservation, as the book's own dialog does (its guest,
+// its day and its time), and the table by its number. Cancelled: nothing is booked nor moved. What the test made is
+// deleted at the end.
 test('RESERVATION-F06 — booking a table, the card names the customer; moving a reservation, the reservation and its new table; never by an id', async ({ browser }) => {
   const KEY = 'FIX-HUB-RESERVATION-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';
   const context = await browser.newContext();
@@ -960,12 +946,11 @@ test('RESERVATION-F06 — booking a table, the card names the customer; moving a
 });
 
 // flow: FLOW-F03 FLOW-F24 (the card: BASE-F97)
-// FIX-HUB-FLOW-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS: since hub#416 the card left out every record a write of
-// Automations names by its id — which automation, which draft, which run, which question — once the UUID left it. Now
-// each one by the name its screen gives it, read as the person: pausing an automation says it by its name; resuming a run
-// that stopped by an error says it as the History does, with its automation in front («Bienvenida 1234 · 6 nov 2026,
-// 21:30»). Both are dangerous: the card lists each datum and asks to type. Cancelled: nothing is paused nor resumed.
-// What the test made is deleted at the end.
+// Every record a write of Automations names by its id (automation, draft, run, question) goes by the name its screen
+// gives it, read as the person: pausing an automation says it by its name; resuming a run that stopped by an error says
+// it as the History does, with its automation in front («Bienvenida 1234 · 6 nov 2026, 21:30»). Both are dangerous: the
+// card lists each datum and asks to type. Cancelled: nothing is paused nor resumed. What the test made is deleted at
+// the end.
 test('FLOW-F03 — pausing an automation, the card names it; resuming a run, its automation and when; never by an id', async ({ browser }) => {
   const KEY = 'FIX-HUB-FLOW-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';
   const context = await browser.newContext();
@@ -1035,11 +1020,10 @@ test('FLOW-F03 — pausing an automation, the card names it; resuming a run, its
   await leave(context, turnedOn);
 });
 
-// flow: BASE-F98 (Acciones peligrosas: escribir para confirmar; `hecho`) y BASE-F97 (la tarjeta): una acción peligrosa puede enseñar dentro de su tarjeta la vista previa que declara su app
-// FIX-HUB-BASE-ASSISTANT-HIGH-RISK-CARD-NO-OPERATION-PREVIEW: the card listed only what a dangerous write sends («Persona:
-// saas:3»), never what it will do. Base's own preview: «Remove the PIN» names whose PIN goes, as its read
-// (`base.person.detail`) answers it to who asks. One whose preview cannot be read shows no card: nothing to confirm blind.
-// Cancelled, and the second refused: nothing changes.
+// flow: BASE-F98 (dangerous actions: type to confirm) and BASE-F97 (the card)
+// A dangerous write's card shows what it will do, not only what it sends: Base's «Remove the PIN» names whose PIN goes,
+// as its read (`base.person.detail`) answers it to who asks. One whose preview cannot be read shows no card: nothing to
+// confirm blind. Cancelled, and the second refused: nothing changes.
 test('BASE-F98 — a dangerous card shows what will happen, as its app reads it for the person; one whose preview cannot be read shows no card', async ({ browser }) => {
   const KEY = 'FIX-HUB-BASE-ASSISTANT-HIGH-RISK-CARD-NO-OPERATION-PREVIEW';
   // The employee enters once, as on their first day: a fresh database knows only who has entered.
@@ -1063,7 +1047,7 @@ test('BASE-F98 — a dangerous card shows what will happen, as its app reads it 
     await expect(card(page)).toContainText('Quitar en Empleados. Revisa cada dato antes de seguir.');
     await expect(preview).toContainText('Lo que va a pasar');
     await expect(preview.locator('li')).toHaveText([`Nombre: ${employee!.name}`, `Correo: ${EMPLOYEE.email}`]);
-    // FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES: the person by their name, as Employees reads it, never by the id sent.
+    // The person by their name, as Employees reads it, never by the id sent.
     await expect(card(page)).toContainText(`Persona: ${employee!.name}`);
     await expect(card(page)).not.toContainText(employee!.id);
     await captureConfirmation(page, `${KEY}-${vp.label}`);
@@ -1078,7 +1062,7 @@ test('BASE-F98 — a dangerous card shows what will happen, as its app reads it 
   await context.close();
 });
 
-test('BASE-G117 — an answer that says it changed something nothing changed is flagged, outside the answer', async ({ page }) => {
+test('an answer that says it changed something nothing changed is flagged, outside the answer', async ({ page }) => {
   await login(page, A, '/');
   await page.setViewportSize({ width: 1440, height: 900 });
   await home(page);
@@ -1091,7 +1075,7 @@ test('BASE-G117 — an answer that says it changed something nothing changed is 
   await shots(page, 'BASE-G117');
 });
 
-test('BASE-G120 — the conversation stays in the tab across reloads, «New conversation» empties it, and signing out forgets it', async ({ page }) => {
+test('the conversation stays in the tab across reloads, «New conversation» empties it, and signing out forgets it', async ({ page }) => {
   await login(page, A, '/');
   await page.setViewportSize({ width: 1440, height: 900 });
   await home(page);
@@ -1119,7 +1103,7 @@ test('BASE-G120 — the conversation stays in the tab across reloads, «New conv
   await expect(panel(page).locator('[data-testid="assistant-bubble-user"]')).toHaveCount(0);
 });
 
-test('BASE-G122 — from 80 % the foot says what is left and each answer moves it; a spent month says so in the answer and in the foot, with «Upgrade plan» to the owner and who to ask to an employee', async ({ page, browser }) => {
+test('from 80 % the foot says what is left and each answer moves it; a spent month says so in the answer and in the foot, with «Upgrade plan» to the owner and who to ask to an employee', async ({ page, browser }) => {
   await login(page, A, '/');
   spend(25);
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -1138,7 +1122,7 @@ test('BASE-G122 — from 80 % the foot says what is left and each answer moves i
   const failure = panel(page).locator('[data-testid="assistant-failure"]').last();
   await expect(failure).toContainText(/You have used all the assistant's messages of this month \(30 of 30\)\. They renew on \S+ 1\./);
   await expect(failure.locator('[data-testid="assistant-upgrade"]')).toHaveText(/Upgrade plan/);
-  // The foot says the same as the answer (gh:hub#1183), and «Upgrade plan» only once.
+  // The foot says the same as the answer, and «Upgrade plan» only once.
   await expect(foot).toHaveText(/^You have used all 30 messages of this month\. They renew on \S+ 1\.$/);
   await expect(panel(page).locator('[data-testid="assistant-upgrade"]')).toHaveCount(1);
   await shots(page, 'BASE-G122-spent');
@@ -1157,7 +1141,7 @@ test('BASE-G122 — from 80 % the foot says what is left and each answer moves i
   await employee.context().close();
 });
 
-test('BASE-G122 — with a plan without the assistant the foot says so, and its «Upgrade plan» lands inside erplora.com (BASE-F11)', async ({ page }) => {
+test('with a plan without the assistant the foot says so, and its «Upgrade plan» lands inside erplora.com (BASE-F11)', async ({ page }) => {
   // The plan `a` has on erplora.com, or Free without a subscription (`effective_plan`).
   const plan =
     "coalesce((select s.plan_id from hubs_subscription s join hubs_hub h on h.id = s.hub_id where h.slug = 'a'), (select id from hubs_plan where slug = 'free'))";
@@ -1178,7 +1162,7 @@ test('BASE-G122 — with a plan without the assistant the foot says so, and its 
   }
 });
 
-test('BASE-G123 — «Report a problem» sends the answer with its question and a reason', async ({ page }) => {
+test('«Report a problem» sends the answer with its question and a reason', async ({ page }) => {
   await login(page, A, '/');
   await page.setViewportSize({ width: 1440, height: 900 });
   await home(page);
@@ -1196,14 +1180,14 @@ test('BASE-G123 — «Report a problem» sends the answer with its question and 
   await dialog.locator('[data-testid="assistant-report-dialog-submit"]').click();
   const answered = await sent;
   expect(answered.status()).toBe(200);
-  // flow: BASE-F105 (hub#870, saas#287) — the «Hola» turn brought no pages of the web: the Hub closes it saying so
+  // flow: BASE-F105 (hub#870) — the «Hola» turn brought no pages of the web: the Hub closes it saying so
   // (`done.web`) and the chat sends it with the report, so erplora.com's support reads the answer even with its search on.
   expect(answered.request().postDataJSON()).toMatchObject({ reason: 'harmful', question: 'Hola', web: false });
   await expect(page.locator('ion-toast')).toContainText('Thank you, we have received your report.');
   await expect(dialog).toBeHidden();
 });
 
-test('BASE-G124 — without connection the foot says so; a cut or a service down says so in the answer, with «Try again»', async ({ page, context }) => {
+test('without connection the foot says so; a cut or a service down says so in the answer, with «Try again»', async ({ page, context }) => {
   await login(page, A, '/');
   await page.setViewportSize({ width: 1440, height: 900 });
   await home(page);
@@ -1232,7 +1216,7 @@ test('BASE-G124 — without connection the foot says so; a cut or a service down
   await expect(lastAnswer(page)).toHaveText(GREETING.en);
 });
 
-test('BASE-G118 — what the assistant can do is what the person can: a write the employee may not make is refused', async ({ browser, context }) => {
+test('what the assistant can do is what the person can: a write the employee may not make is refused', async ({ browser, context }) => {
   const page = await freshPage(browser);
   await page.setViewportSize({ width: 1440, height: 900 });
   await home(page);
@@ -1252,7 +1236,7 @@ test('BASE-G118 — what the assistant can do is what the person can: a write th
 });
 
 test.describe('dictation and files', () => {
-  test('BASE-G112 — a file goes with the question; one it cannot read is refused; a dictation lands in the box and is not sent', async ({ page }) => {
+  test('a file goes with the question; one it cannot read is refused; a dictation lands in the box and is not sent', async ({ page }) => {
     await login(page, A, '/');
     await page.setViewportSize({ width: 1440, height: 900 });
     await home(page);

@@ -79,8 +79,7 @@ export async function onAutomations(
 /** Python for a one-shot `manage.py shell` playing the worker's relay to flow (in `a`'s database: the e2e stack's worker relays nothing): the
  *  outbox event `FLOW_EVENT`, handed to flow's reaction as the relay does on every tick. What that reaction leaves
  *  for after its COMMIT (the call of FLOW-F27, the question to the assistant of FLOW-F38) goes to `base.outbound`'s
- *  threads, which would die with this process before making it: `OUTBOUND_AT_ONCE` makes it at once
- *  (FIX-HUB-FLOW-E2E-WORKER-CALLS-DIE-WITH-ONE-SHOT-SHELL). */
+ *  threads, which would die with this process before making it: `OUTBOUND_AT_ONCE` makes it at once. */
 export const RELAY = `${OUTBOUND_AT_ONCE}
 import os
 from django.db import transaction

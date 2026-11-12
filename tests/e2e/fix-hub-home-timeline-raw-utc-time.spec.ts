@@ -1,10 +1,9 @@
 // flow: BASE-F06 «Ver los paneles de las apps en Inicio» (panel `kind: timeline`; the «Actividad» tab does not change)
-// — Sales' «Actividad reciente» painted each sale's time as the server sends it, `2026-10-23T02:23:55.572622Z`. The owner
+// — Sales' «Actividad reciente» must not paint a sale's time as the server sends it, `2026-10-23T02:23:55.572622Z`. The owner
 // of hub `a` reads it in Spanish on a device in Madrid whose clock says Friday 23 Oct 2026, 12:00: a sale of 09:15 that
 // day says «9:15», one of yesterday 18:10 «Ayer 18:10» and one of the 20th «20 oct, 18:10», each in a `<time>` with the
-// instant whole; no text cut nor sideways scroll at 390, 834 and 1440 px. Each viewport leaves its capture
-// `FIX-HUB-HOME-TIMELINE-RAW-UTC-TIME-<width>`. What this file creates is deleted after it (`cleanSales()`,
-// `cleanInventory()`).
+// instant whole; no text cut nor sideways scroll at 390, 834 and 1440 px. Each viewport leaves its capture. What this
+// file creates is deleted after it (`cleanSales()`, `cleanInventory()`).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, horizontalOverflow, login, psql, shot, shown, untilStill } from './helpers';

@@ -1,5 +1,5 @@
 // flow: BASE-F84
-// FIX-HUB-BASE-APPROVAL-KEYPAD-CUT-ON-TABLET-DESKTOP (base/WORKBOOK.md BASE-F84): «An approval is needed» shows its
+// «An approval is needed» shows its
 // whole PIN pad, the four rows with the 0 and erase, without scrolling, at a phone, a low phone, a tablet and a desk
 // (Square's and Toast's manager override: the dialog fits its pad), in Spanish, whose texts are the longest. Opened
 // from a real app that asks for it: the cashier
@@ -236,8 +236,8 @@ test('BASE-F84: on a screen too short for the whole pad, the dialog stays on scr
 });
 
 test('BASE-F84: a wrong PIN says those details do not approve it, in the dialog, and the till stays where it was', async () => {
-  // The Hub answers the wrong PIN with a 401 (`base.approval_refused`): the dialog says so, the page is not reloaded
-  // (the SDK took every 401 for a session that ended, FIX-SAAS-PANEL-UNDER-DASHBOARD-PREFIX).
+  // The Hub answers the wrong PIN with a 401 (`base.approval_refused`): the dialog says so and the page is not
+  // reloaded, as it would be if the SDK took that 401 for a session that ended.
   const { page } = cashier;
   const sale = tickets.get(WRONG)!;
   const spentBefore = spentVoids();

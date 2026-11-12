@@ -1,12 +1,12 @@
-// The icon of a dialog's confirm button keeps its distance from the label (FIX-UI-CONFIRMDIALOG-ICON-GAP): in
-// Staff → Staff, «Deactivate» on a member asked with «⊘Deactivate», the icon against the word, while the list's
-// «+ Add» kept its gap. Tailwind's preflight (`* { margin: 0 }`) is a document rule, and a document rule beats the
-// `::slotted(ion-icon[slot=start])` margin Ionic gives an icon inside `ion-button`: every `ion-button` with a
-// `HubIcon slot="start"` lost it (the DataTable puts its own back). Measured in the page at 390×844, 834×1112 and
+// The icon of a dialog's confirm button keeps its distance from the label: in Staff → Staff, «Deactivate» on a member
+// must not ask with «⊘Deactivate», the icon against the word, while the list's «+ Add» keeps its gap. Tailwind's
+// preflight (`* { margin: 0 }`) is a document rule, and a document rule beats the `::slotted(ion-icon[slot=start])`
+// margin Ionic gives an icon inside `ion-button`, so every `ion-button` with a `HubIcon slot="start"` would lose it
+// (the DataTable puts its own back). Measured in the page at 390×844, 834×1112 and
 // 1440×900 (the shell pins Ionic's ios mode, ADR-0143; md has the same rule): from the icon's right edge to the
 // label's first letter, Ionic's 0.3em of the icon, and the same gap from the spinner while the confirmation runs.
-// Only the gap comes back: the outer side (`margin-inline-start`) stays `0px`, as on main, or every SaaS button
-// that sets only its own gap pulled its icon into the padding (saas#54). What the run creates is deleted.
+// Only the gap comes back: the outer side (`margin-inline-start`) stays `0px`, or every SaaS button that sets only
+// its own gap would pull its icon into the padding. What the run creates is deleted.
 // flow: ui:ConfirmDialog
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 

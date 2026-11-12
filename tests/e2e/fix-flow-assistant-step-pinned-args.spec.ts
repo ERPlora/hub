@@ -1,10 +1,10 @@
-// Fixed data of «Ask the assistant» (FIX-HUB-FLOW-ASSISTANT-STEP-ACTS-ON-ANOTHER-CUSTOMER-WITHOUT-ON-BEHALF-OF), end to
-// end with its real dependencies: the Hub of this stack, its SaaS's gateway and, behind it, the e2e's provider
+// Fixed data of «Ask the assistant», end to end with its real dependencies: the Hub of this stack, its SaaS's gateway
+// and, behind it, the e2e's provider
 // (assistant-provider.ts; the SaaS seeded with it, README «El asistente»). Lucía writes; Marta, another guest, has a
 // real reservation. In the editor the step may «Cancel a reservation» and fixes its «On behalf of the customer» to
 // Lucía's card; the assistant asks to cancel Marta's reservation without saying on whose behalf. The card in «Waiting
 // for your answer» says it goes on Lucía's behalf, and after the owner's yes Reservations refuses it: Marta's
-// reservation is still pending (before, the yes cancelled it). «Try it» says each fixed datum with the value it
+// reservation is still pending. «Try it» says each fixed datum with the value it
 // would have, and that «Change a reservation», fixed to a card this trial does not bring, would not be used.
 // flow: FLOW-F37 FLOW-F38 FLOW-F29 FLOW-F13
 import { execFile, execSync } from 'node:child_process';
@@ -35,7 +35,7 @@ function saasSql(sql: string): string {
   return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, { cwd: REPO_DIR, encoding: 'utf8' }).trim();
 }
 
-/** The business's day `days` from now (Madrid in phase 1) and its weekday, Monday 0. */
+/** The business's day `days` from now (hub `a` is in Madrid) and its weekday, Monday 0. */
 function madridDay(days: number): { date: string; weekday: number } {
   const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date(Date.now() + days * 86_400_000));
   return { date, weekday: (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7 };

@@ -1,4 +1,4 @@
-// The customer card in Ioan's Chrome: a note added in one tab shows in the activity of another tab
+// The customer card in Chrome: a note added in one tab shows in the activity of another tab
 // without reloading (CUSTOMER-F05, live); a group and a tag created in their lists are ticked on the
 // card and their «Customers» count follows (F06, F27, F28); «Merge with…» folds a duplicate into the
 // open card (F13); «Erase personal data» asks first and erases (F16); «Delete» on a row asks first

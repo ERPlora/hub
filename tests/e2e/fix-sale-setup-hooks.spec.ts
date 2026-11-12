@@ -1,10 +1,10 @@
-// flow: paneles de Ventas en el Inicio (hooks de LiveAppConfig) — the old hub's dashboard with Sales' four panels
-// (docs/reference/old-hub/dashboard-*.png), as the owner of hub `a` reads it in Spanish: «Ventas hoy» and «Tickets
+// flow: Sales' panels on the Home (LiveAppConfig hooks) — the Home with Sales' four panels, as the owner of hub `a`
+// reads it in Spanish: «Ventas hoy» and «Tickets
 // hoy» on by default with today's figures, both moving without a reload when another sale is charged, and «Ventas
-// últimos 7 días» and «Actividad reciente» turned on from «Customize panel». Each viewport leaves its capture
-// `FIX-SALE-SETUP-HOOKS-<width>` with the four panels on the board.
-// Amounts of three digits (2,50 €): the Home's thousands separator is FIX-HUB-MONEY-THOUSANDS-SEPARATOR's, so the
-// expected text is the server's figure formatted as the panel does, whatever the day's total. What this file creates
+// últimos 7 días» and «Actividad reciente» turned on from «Customize panel». Each viewport leaves its capture with the
+// four panels on the board.
+// Amounts of three digits (2,50 €): the expected text is the server's figure formatted as the panel does, with the
+// Home's own thousands separator, whatever the day's total. What this file creates
 // is deleted after it (`cleanSales()`, `cleanInventory()`).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 

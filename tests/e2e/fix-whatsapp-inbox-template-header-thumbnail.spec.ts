@@ -1,13 +1,12 @@
 // flow: WHATSAPP_INBOX-F29 WHATSAPP_INBOX-F30 WHATSAPP_INBOX-F33
-// FIX-HUB-WHATSAPP-INBOX-TEMPLATE-SHEET-SHOWS-NO-HEADER-THUMBNAIL, in a hidden Chrome (apps/whatsapp_inbox/WORKBOOK.md): the
-// file of a template's photo, video or document header is shown as WhatsApp Manager, WATI or respond.io show it. In
+// In a hidden Chrome (apps/whatsapp_inbox/WORKBOOK.md): the file of a template's photo, video or document header is
+// shown as WhatsApp Manager, WATI or respond.io show it. In
 // «New template» (F29) the photo just chosen shows its thumbnail, loaded from the address the Hub gives it under
 // /p/media/ (served to the hub's sessions only, `members_media`); a video, its first frame with a play sign; a document,
 // its icon. Saved, «Edit» (F30) shows the template's own photo. In a conversation, «Send a template» (F33) shows the
 // thumbnail of the photo chosen now for a template made in WhatsApp Manager; the one made here, which comes with its
-// own photo once Meta approves it, is fix-whatsapp-inbox-template-header-media.spec.ts. The sheet in three sizes
-// (FIX-HUB-WHATSAPP-INBOX-TEMPLATE-SHEET-SHOWS-NO-HEADER-THUMBNAIL-390|834|1440), «Edit» (…-edit-…) and «Send a
-// template» (…-send-…). The channel is pushed as erplora.com pushes it; nothing reaches Meta: what the save hands
+// own photo once Meta approves it, is fix-whatsapp-inbox-template-header-media.spec.ts. Captures of the sheet in three
+// sizes, «Edit» and «Send a template». The channel is pushed as erplora.com pushes it; nothing reaches Meta: what the save hands
 // erplora.com is not looked at here (fix-whatsapp-inbox-template-header-media.spec.ts follows it to Meta's review).
 import { expect, type Locator, type Page, test } from '@playwright/test';
 

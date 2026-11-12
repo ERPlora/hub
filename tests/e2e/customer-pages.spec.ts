@@ -1,4 +1,4 @@
-// The four sections of Customers in Ioan's Chrome (WORKBOOK «Pantallas»): the footer tabs Customers,
+// The four sections of Customers in Chrome (WORKBOOK «Pantallas»): the footer tabs Customers,
 // Groups, Tags and Fields move between them (the address follows, Back leaves the section); a row
 // opens the card and its Back returns; every page at 390×844 (phone), 834×1194 (tablet) and
 // 1440×900 (desktop) without horizontal scroll, with a screenshot of each for the comparison with the

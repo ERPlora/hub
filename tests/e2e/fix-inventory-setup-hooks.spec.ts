@@ -1,11 +1,10 @@
 // flow: INVENTORY-F28 INVENTORY-F17
-// Inventory's hooks of the Home (FIX-INVENTORY-SETUP-HOOKS; the old module's `setup` and `widgets`, the old hub's
-// dashboard in docs/reference/old-hub/dashboard-*.png), as the owner of hub `a` reads them in Spanish: «Tu catálogo»
+// Inventory's hooks of the Home (its `setup` and `widgets`), as the owner of hub `a` reads them in Spanish: «Tu catálogo»
 // pending and «Importante» in «Termina de configurar tu negocio» while the hub has no active product (its «Configurar»
 // leads to Inventory → Products), done without a reload once one is added and pending again when it is turned off;
 // «Productos con stock bajo», «Valor de existencias (a coste)» and «Productos con menos stock» on the board by default
-// with the server's figures, and «Productos en stock» to add, leaving the captures
-// `FIX-INVENTORY-SETUP-HOOKS-INVENTORY-F28-<width>` (the step) and `…-INVENTORY-F17-<width>` (the four panels).
+// with the server's figures, and «Productos en stock» to add, leaving a capture of the step and one of the four
+// panels.
 // The products the hub already had are turned off for the run and back on after it; the run's own are `E2E-…`,
 // which `cleanInventory()` removes.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
