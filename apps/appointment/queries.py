@@ -72,7 +72,7 @@ from apps.customer.queries import card_in_business, cards_in_copy, find_customer
 from apps.schedule.queries import day_label, hours_for_range
 from apps.schedule.schemas import HoursRangeIn
 from apps.service.models import Assignment, Service
-from apps.service.queries import find_service
+from apps.service.queries import find_service, services_in_business, services_in_copy
 from apps.staff.models import Member
 from apps.staff.queries import member_availability, own_member, resolve_member
 from apps.staff.schemas import AvailabilityIn
@@ -1430,7 +1430,8 @@ def appointments_in_copy(conn) -> list[dict]:
     """hub#1284: each appointment of a separate copy of the business still to come and still booked (pending or
     confirmed, neither deleted nor charged: a charged one is the till's), by its start, with its ``id`` there, what
     ``appointment.appointment.create`` takes (its services in their order, its professional, its start, its minutes,
-    its notes and how it was booked) and the card of its customer there (``customer_card``, ``_card_of``), which
+    its notes and how it was booked), the card of its customer there (``customer_card``, ``_card_of``) and every
+    service of the copy as Services reads it (``services_in_copy``, hub#1341: read once, the same list in each), which
     ``appointments_not_in_business`` matches the business's by; nothing where the app's table is not there. One gone by
     is not read: it was charged or not, and the agenda books none in the past. ``conn`` is the copy's direct, read-only
     connection (``recoverable_from_copy`` on this app's config: the copy is no business and has no alias), so it is
@@ -1457,6 +1458,8 @@ def appointments_in_copy(conn) -> list[dict]:
     rows = [dict(zip(read, row, strict=True)) for row in conn.execute(query, [BOOKED, timezone.now()])]
     services = _services_in_copy(conn, [row["id"] for row in rows])
     cards = {card["id"]: card for card in cards_in_copy(conn)}
+    # All of them, never the appointments' alone: Services matches by the whole copy (``services_in_business``).
+    copy_services = services_in_copy(conn) if rows else []
     return [
         {
             "id": row["id"],
@@ -1468,6 +1471,7 @@ def appointments_in_copy(conn) -> list[dict]:
             "notes": row["notes"],
             "internal_notes": row["internal_notes"],
             "source": row["source"],
+            "services_in_copy": copy_services,
         }
         for row in rows
     ]
@@ -1512,14 +1516,18 @@ def appointments_not_in_business(appointments: list[dict]) -> list[dict]:
 
     Its customer is the business's card of hers by Customers' own rule (``card_in_business``: the same card, the one it
     was merged into or the one made again); without one, the copy's, which the create refuses with why: an appointment
-    never comes back for a customer the business does not have. Its services and its professional, by their ids (a
-    service is archived, never deleted; a professional who leaves keeps hers): the create refuses one not bookable any
-    more, as it refuses a moment that does not fit the agenda now."""
+    never comes back for a customer the business does not have. Each of its services is the business's by Services' own
+    rule, given every service of the copy (``services_in_business``, hub#1341: the same one, or the one made again, by
+    hand or brought back by Services first, the apps going in the order of their ``requires``); without one, the
+    copy's, which the create refuses with why. Its professional, by her id (one who leaves keeps hers): the create
+    refuses one not bookable any more, as it refuses a moment that does not fit the agenda now."""
     held = set(
         Appointment.objects.filter(pk__in=[one["id"] for one in appointments], deleted_at__isnull=True).values_list(
             "pk", flat=True
         )
     )
+    # The same list in each (``appointments_in_copy``): every service of the copy, matched once.
+    services = services_in_business(appointments[0]["services_in_copy"]) if appointments else {}
     lacking = []
     for one in appointments:
         if one["id"] in held:
@@ -1527,6 +1535,9 @@ def appointments_not_in_business(appointments: list[dict]) -> list[dict]:
         customer = card_in_business(one["customer_card"]) or one["customer_card"]["id"]
         if Appointment.objects.filter(deleted_at__isnull=True, customer_id=customer, start=one["start"]).exists():
             continue
-        create = {key: value for key, value in one.items() if key not in ("id", "customer_card")}
+        create = {key: value for key, value in one.items() if key not in ("id", "customer_card", "services_in_copy")}
+        create["services"] = [
+            {"service_id": services.get(line["service_id"], line["service_id"])} for line in one["services"]
+        ]
         lacking.append({"id": one["id"], "customer_id": customer} | create)
     return lacking
