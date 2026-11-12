@@ -55,15 +55,16 @@ def spoken() -> list[tuple[str, str, str, str, str]]:
     return said
 
 
-#: The gettext family by what it takes: a message, or a context and a message (``ngettext``'s plurals are left out).
+#: The gettext family by what it takes: a message, or a context and a message (``ngettext``'s plurals are left out:
+#: their English forms are ``base/tests/test_locale_plurals.py``'s).
 SAYS = {"gettext", "gettext_lazy", "gettext_noop"}
 SAYS_IN_CONTEXT = {"pgettext", "pgettext_lazy"}
 
 
-def said_in(source: str) -> list[str]:
-    """The messages ``source`` hands the gettext family as written (a literal, not a variable): imported from
-    ``django.utils.translation`` under any name (``gettext_lazy as _``) or called on ``translation``; a contexted one
-    keyed ``context\x04message``, as the catalogue keeps it."""
+def gettext_calls(source: str) -> list[tuple[str, list[str | None]]]:
+    """Each call ``source`` makes to the gettext family, ``(function, its positional texts)``, a text ``None`` where
+    the argument is no literal (a variable): imported from ``django.utils.translation`` under any name
+    (``gettext_lazy as _``) or called on ``translation``."""
     tree = ast.parse(source)
     names = {
         alias.asname or alias.name: alias.name
@@ -71,18 +72,27 @@ def said_in(source: str) -> list[str]:
         if isinstance(node, ast.ImportFrom) and node.module == "django.utils.translation"
         for alias in node.names
     }
-    said: list[str] = []
+    calls: list[tuple[str, list[str | None]]] = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         called = node.func
-        if isinstance(called, ast.Name):
-            function = names.get(called.id)
+        if isinstance(called, ast.Name) and called.id in names:
+            function = names[called.id]
         elif isinstance(called, ast.Attribute) and isinstance(called.value, ast.Name) and called.value.id == "translation":
             function = called.attr
         else:
             continue
         texts = [arg.value if isinstance(arg, ast.Constant) and isinstance(arg.value, str) else None for arg in node.args]
+        calls.append((function, texts))
+    return calls
+
+
+def said_in(source: str) -> list[str]:
+    """The messages ``source`` hands the gettext family as written (a literal, not a variable); a contexted one keyed
+    ``context\x04message``, as the catalogue keeps it."""
+    said: list[str] = []
+    for function, texts in gettext_calls(source):
         if function in SAYS and texts[:1] and texts[0] is not None:
             said.append(texts[0])
         elif function in SAYS_IN_CONTEXT and len(texts) >= 2 and None not in texts[:2]:
@@ -90,16 +100,19 @@ def said_in(source: str) -> list[str]:
     return said
 
 
-def said_in_code(config) -> set[str]:
-    """Every message the module ``config`` hands the gettext family in its own code, outside its tests and
-    migrations (they are no text a person reads)."""
+def own_code(config) -> list[Path]:
+    """The Python files of the module ``config``, outside its tests and migrations (they are no text a person reads)."""
     root = Path(config.path)
-    return {
-        message
+    return [
+        path
         for path in sorted(root.rglob("*.py"))
-        if path.relative_to(root).parts[0] not in ("tests", "migrations")
-        for message in said_in(path.read_text(encoding="utf-8"))
-    }
+        if {"tests", "migrations"}.isdisjoint(path.relative_to(root).parts[:-1])
+    ]
+
+
+def said_in_code(config) -> set[str]:
+    """Every message the module ``config`` hands the gettext family in its own code."""
+    return {message for path in own_code(config) for message in said_in(path.read_text(encoding="utf-8"))}
 
 
 def counts(app: str, message: str) -> bool:
