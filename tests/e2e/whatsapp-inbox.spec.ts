@@ -75,7 +75,7 @@ async function contrast(bubble: Locator, part: string): Promise<number> {
   }, part);
 }
 
-/** Picks `option` in the inbox's column filter `filter`, through its «Filters» panel (the old hub's funnel). */
+/** Picks `option` in the inbox's column filter `filter`, through its «Filters» panel. */
 async function filterInbox(page: Page, filter: string, option: string): Promise<void> {
   await filterBy(page, 'whatsapp-inbox', filter, option);
 }

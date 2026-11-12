@@ -439,7 +439,7 @@ test('the tabs walk the five sections, each on its address; screenshots of every
   expect(shots).toHaveLength(15);
 });
 
-// flow: none — the column filters sit behind the table's funnel, as in the old hub.
+// flow: none — the column filters sit behind the table's funnel.
 test('Products filter by price in euros behind the funnel, with its count; an amount it cannot read is said under it', async ({ page, context }) => {
   const run = stamp();
   await login(page, A, '/inventory/products');

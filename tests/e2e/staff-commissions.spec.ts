@@ -1,9 +1,9 @@
-// flow: STAFF-F21 (paso 3: la comisión del día) — Staff → Commissions in Chrome, on the real stack: two
+// flow: STAFF-F21 (the day's commission) — Staff → Commissions in Chrome, on the real stack: two
 // professionals with their commission, real sales of a real Inventory product charged by card (one line
 // done by the other professional, one sale partly refunded), and the owner's «Commissions» tab: what each
 // one sold «Today» with the refund taken off whoever sold it, their rate and their commission, the totals,
 // a new charge painted live, «Yesterday» and a custom range whose «To» before «From» is said under «To».
-// Seen at 390×844, 834×1112 and 1440×900 (`.artifacts/FIX-STAFF-COMMISSION-SCREEN-<width>.png`). An
+// Seen at 390×844, 834×1112 and 1440×900. An
 // employee has no Commissions tab, the page tells them «You do not have permission» and the API refuses.
 // A session of a voucher (SALE-F27) charges nothing and still counts for who did it, at its value (hub#685);
 // whoever sold the voucher counts nothing for it (hub#769). One spent outside the checkout saying who did it counts

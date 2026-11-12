@@ -1,10 +1,10 @@
-// flow: modifier-e2e-wait — FIX of the Modifiers specs' wait (FIX-HUB-MODIFIER-E2E-WAIT-BLIND-TO-SHADOW-ROOTS)
+// flow: modifier-e2e-wait — the Modifiers specs' wait
 // Before a capture or a measurement, the Modifiers specs (modifier-*.spec.ts) wait with the harness's one wait,
-// `untilStill(page)` (helpers.ts), which asks every open shadow root too. Their own wait asked the document alone for
-// its animations, blind to Ionic's overlays (`modifier-settled.spec.ts` shows it let the till's options sheet pass for
-// still). Swapping one back would leave every spec green: this keeps them from coming back in the Modifiers files, and
-// no fixed sleep (`waitForTimeout(`) takes their place. The same rule for every spec of the e2e is
-// FIX-HUB-E2E-OWN-ANIMATION-WAIT-UNGUARDED's (hub:base).
+// `untilStill(page)` (helpers.ts), which asks every open shadow root too. A wait of their own that asks the document
+// alone for its animations is blind to Ionic's overlays (`modifier-settled.spec.ts` shows the till's options sheet
+// passing for still), and swapping one back would leave every spec green: this keeps them out of the Modifiers files,
+// and no fixed sleep (`waitForTimeout(`) takes their place. own-animation-waits.test.ts holds the same rule for every
+// spec of the e2e.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

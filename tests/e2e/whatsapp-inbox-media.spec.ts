@@ -11,8 +11,7 @@
 //   on `a.erplora.com` and `erplora.com`, one site, it does), and each bubble says so and keeps «Open the attachment».
 // erplora.com hands each of Meta's messages to this Hub within its webhook's request: one this Hub refused fails at
 // once saying why (`metaHandsOver`), e.g. an attachment linked on another origin than SAAS_URL's.
-// Each screen in three sizes (FIX-HUB-WHATSAPP-INBOX-MEDIA-E2E-NEEDS-SAAS-MEDIA-URL-F06-*). What it creates is named
-// `e2e.…` and deleted after the file.
+// Each screen in three sizes. What it creates is named `e2e.…` and deleted after the file.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, login, SAAS, shot, shown } from './helpers';

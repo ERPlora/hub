@@ -1,6 +1,6 @@
 // What erplora.com recorded of its pushes to this Hub, read back after Meta's webhook so that a message the Hub
-// refused fails saying why (FIX-HUB-WHATSAPP-INBOX-MEDIA-E2E-NEEDS-SAAS-MEDIA-URL): an attachment erplora.com links on
-// another origin than SAAS_URL's is refused (422) and the thread never fills, which said nothing before.
+// refused fails saying why: an attachment erplora.com links on another origin than SAAS_URL's is refused (422) and
+// the thread never fills, which would otherwise say nothing.
 // flow: WHATSAPP_INBOX-F06
 import { describe, expect, it } from 'vitest';
 

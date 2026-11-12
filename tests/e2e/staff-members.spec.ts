@@ -178,7 +178,7 @@ test('on a phone (390×844) Staff is cards, with the same actions', async ({ bro
   }
 });
 
-// flow: none — the column filters sit behind the table's funnel, as in the old hub.
+// flow: none — the column filters sit behind the table's funnel.
 test('Staff filters by Email behind the funnel, with its count, the panel open at every width', async ({ browser }) => {
   const stamp = Date.now().toString(36);
   const kept = `${TAG} Ana Fil${stamp}`;

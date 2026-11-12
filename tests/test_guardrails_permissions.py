@@ -55,7 +55,7 @@ CHECKED_INSIDE = "checked inside"
 OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
     "base.access.door": (
         DEVICE_DOOR,
-        "The PIN pad of a trusted shared device, before anyone signs in (BASE-G55): names and initials of who may "
+        "The PIN pad of a trusted shared device, before anyone signs in: names and initials of who may "
         "enter with a PIN there, never an email or an account; anyone else hears it with nobody in it.",
     ),
     "base.demo.code_create": (PLATFORM, "The SaaS asks for the one-time entry code of a demo (/internal)."),
@@ -256,7 +256,7 @@ def test_what_checks_its_permissions_itself_refuses_without_them(name):
 HUB_HOST = "a.localhost:8000"
 PLATFORM_HOST = "hubs.localhost:8000"
 A = Scope("host", "a")
-#: One SaaS account (Ioan's): the platform's admin, and the owner of a business.
+#: One SaaS account that is both the platform's admin and the owner of a business.
 ROOT_AS_STAFF = RedeemedUser(user_id="7", email="root@erplora.com", name="Root", locale="en", role="platform_admin")
 ROOT_AS_OWNER = RedeemedUser(user_id="7", email="root@erplora.com", name="Root", locale="en", role="hub_owner")
 

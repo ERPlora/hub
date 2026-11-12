@@ -863,15 +863,15 @@ export async function emptyOfTemplateData(context: BrowserContext, origin: strin
   throw new Error('the business could not be emptied of what a template brings');
 }
 
-/** How long the run's worker may take to make an app's tables in a business's own database (S3): its tick, the
+/** How long the run's worker may take to make an app's tables in a business's own database: its tick, the
  *  migrations of the app and what it needs, and its settle. */
 export const APP_SET_UP_MS = 60_000;
 
 /**
  * Turns on `apps` in the business at `origin`, as the person of `context` who runs it, through Apps' own command
  * (`POST /api/apps/enable`, `base.app.enable`): a business is born with every app off.
- * One already on changes nothing. In a business whose own database lacks an app's tables (a demo, a new business:
- * S3) the answer is 202 «creating» and the run's worker makes them: it waits until `base.app.list` says it is on.
+ * One already on changes nothing. In a business whose own database lacks an app's tables (a demo, a new business)
+ * the answer is 202 «creating» and the run's worker makes them: it waits until `base.app.list` says it is on.
  */
 export async function turnOn(context: BrowserContext, origin: string, ...apps: string[]): Promise<void> {
   for (const app of apps) {
@@ -1215,7 +1215,7 @@ export function hubUserIdOf(email: string, hub = 'a'): string {
 /** Takes the plan out of `a`'s photo while a spec runs, keeping the photo in its scratch table `backup` (next to the
  * registry) for `restorePhotoFrom`: for a spec that signs in from more than one browser. With a plan in the photo
  * (erplora.com's Free covers one device, as its seed or a run of the WhatsApp specs can leave it), every entry from
- * another browser ends the sessions of the others on `a` (BASE-G57), and the next request of the first gets a 401. */
+ * another browser ends the sessions of the others on `a`, and the next request of the first gets a 401. */
 export function dropPlanFromPhoto(backup: string): void {
   psql(`drop table if exists ${backup}; create table ${backup} as select id, state from base_hub where slug = 'a'`);
   psql("update base_hub set state = state - 'plan' where slug = 'a'");
