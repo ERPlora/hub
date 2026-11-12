@@ -82,7 +82,7 @@ describe('amountFilterErrors', () => {
 
   it('says under each end what the money field says for it, in both languages; an empty end or an amount says nothing', () => {
     expect(amountFilterErrors({ total_from: 'doce', total_to: '1.000', other: 'x' }, ENDS, say('en'))).toEqual({
-      total_from: field(moneyFieldEn, 'notAmount'),
+      total_from: field(moneyFieldEn, 'notAmount', { amount: '12.50' }),
       total_to: field(moneyFieldEn, 'ambiguous', { typed: '1.000', grouped: formatMoney(100000, 'en', EUR), decimal: formatMoney(100, 'en', EUR) }),
     });
     expect(amountFilterErrors({ total_from: '-5', total_to: ' 1.000 ' }, ENDS, say('es'))).toEqual({
@@ -90,6 +90,23 @@ describe('amountFilterErrors', () => {
       total_to: field(moneyFieldEs, 'ambiguous', { typed: '1.000', grouped: formatMoney(100000, 'es', EUR), decimal: formatMoney(100, 'es', EUR) }),
     });
     expect(amountFilterErrors({ total_from: '1.000,50', total_to: '' }, ENDS, say('en'))).toEqual({});
+  });
+
+  it('«not an amount» gives its example in the business’s money, as the money field does: «12» in yen, «12,500» in dinars (ui#140)', () => {
+    const typed = { total_from: 'doce', total_to: '' };
+    expect(
+      (['en', 'es'] as const).flatMap((locale) =>
+        [EUR, { currency: 'JPY', decimals: 0 }, { currency: 'KWD', decimals: 3 }].map((money) => amountFilterErrors(typed, ENDS, say(locale, { money })).total_from),
+      ),
+    ).toEqual([
+      field(moneyFieldEn, 'notAmount', { amount: '12.50' }),
+      field(moneyFieldEn, 'notAmount', { amount: '12' }),
+      field(moneyFieldEn, 'notAmount', { amount: '12.500' }),
+      field(moneyFieldEs, 'notAmount', { amount: '12,50' }),
+      field(moneyFieldEs, 'notAmount', { amount: '12' }),
+      field(moneyFieldEs, 'notAmount', { amount: '12,500' }),
+    ]);
+    expect(field(moneyFieldEs, 'notAmount', { amount: '12' })).toBe('Esto no es un importe. Escribe una cifra, por ejemplo 12.');
   });
 
   it('a signed end (a difference) reads its minus; the same minus on another end cannot be negative', () => {

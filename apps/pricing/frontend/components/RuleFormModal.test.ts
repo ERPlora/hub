@@ -193,7 +193,8 @@ describe('RuleFormModal', () => {
 });
 
 describe('RuleFormModal: the business answers after the form opened', () => {
-  const NOT_AMOUNT = 'This is not an amount. Type a figure, for example 12.50.';
+  /** What the money field says in yen, with its example in yen (ui#140). */
+  const NOT_AMOUNT_IN_YEN = 'This is not an amount. Type a figure, for example 12.';
   const FIXED = { rule_type: 'fixed' as const, percent: null };
 
   it('an untouched amount per unit is rewritten from the rule with the yen’s decimals, and «Save» keeps its scale', async () => {
@@ -245,7 +246,7 @@ describe('RuleFormModal: the business answers after the form opened', () => {
     s.field('amount').dispatchEvent(new CustomEvent('ionBlur'));
     await settle();
     expect(s.field('amount').value).toBe('1,75');
-    expect(s.field('amount').errorText).toBe(NOT_AMOUNT);
+    expect(s.field('amount').errorText).toBe(NOT_AMOUNT_IN_YEN);
   });
 
   // «1500» reads in any money, so alone it would not tell a guard put after the reading: «¥1500» is not an amount until

@@ -5,11 +5,25 @@
 // amount» in Sales and Invoicing; «1.000» was 1.000 € in Customers and refused elsewhere. Now, in a business in euros,
 // at 390, 834 and 1440, in every one of those lists: «1.000» (a thousand euros or one) filters nothing and says both
 // readings under its box, with the money field's words, and «1.000,50» filters: the list's live subscription asks for
-// 100050 cents, nothing is said.
+// 100050 cents, nothing is said. ui#140: in a business in yen «12,5» is no amount, and the example the warning gives is
+// one in yen, «12» (never «12.50», no amount there either): in the Sales funnel (the lists' `amountFilterErrors`) and
+// under the price of a new product (the money field, `MoneyInput`), at 390, 834 and 1440.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, login, saveSessionForTheSweep, shown, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
+import {
+  A,
+  capture,
+  login,
+  registerBusinessIn,
+  registrationOf,
+  saveSessionForTheSweep,
+  shown,
+  turnOffTurnedOn,
+  turnOnMissing,
+  untilStill,
+} from './helpers';
 import { signedIn, VIEWPORTS } from './cart-checkout-helpers';
+import { dialog } from './inventory-helpers';
 
 const KEY = 'HUB-1196-AMOUNT-FILTER';
 /** Each list with an amount filter: its table's testid, the «from» end of one of its amount ranges, and the list query
@@ -30,6 +44,8 @@ const SIZES = [
 ] as const;
 /** What the money field says for «1.000» in euros, in English (`MoneyInput`). */
 const TWO_READINGS = 'This amount can be read in two ways: «1.000» could be €1,000.00 or €1.00. Write the decimals so there is no doubt.';
+/** What it says for «12,5» in yen, with an example in yen (ui#140). */
+const NOT_AMOUNT_IN_YEN = 'This is not an amount. Type a figure, for example 12.';
 
 const turnedOn: string[] = [];
 
@@ -115,6 +131,44 @@ for (const size of SIZES) {
       }
     } finally {
       await context.close();
+    }
+  });
+}
+
+for (const size of SIZES) {
+  test(`ui#140 at ${size.label}: in a business in yen «12,5» is no amount and the warning's example is «12»`, async ({ browser }) => {
+    const original = registrationOf('a');
+    await registerBusinessIn(original, 'JP');
+    const { context, page } = await signedIn(browser, '/', size.viewport);
+    try {
+      await test.step('Sales: the «Total» filter says it with an example in yen and filters nothing', async () => {
+        await page.goto('/sale/sales');
+        await expect(hook(page, 'sales-table', 'filters-toggle')).toBeVisible();
+        await filterFrom(page, 'sales-table', 'total_min', '12,5');
+        await expect(hook(page, 'sales-table', 'filters-toggle')).toHaveAttribute('data-invalid', 'true');
+        const panel = await openFunnel(page, 'sales-table');
+        const warning = panel.getByText(NOT_AMOUNT_IN_YEN, { exact: true });
+        await expect(warning).toBeVisible();
+        // The panel scrolls: at 1440 the box sits below its fold, and the capture shows what it says.
+        await warning.scrollIntoViewIfNeeded();
+        await capture(page, `UI-140-MONEY-EXAMPLE-sales-table-${size.label}-yen`);
+        await hook(page, 'sales-table', 'filters-close').click();
+      });
+      await test.step('Inventory: the price of a new product says it under the field, with the same example', async () => {
+        await page.goto('/inventory/products');
+        await shown(page).locator('[data-testid=inventory-products-add]').click();
+        const form = dialog(page, 'inventory-product-form');
+        await expect(form).toBeVisible();
+        const price = form.locator('[data-testid=inventory-product-price]');
+        await price.locator('input').fill('12,5');
+        await price.locator('input').blur();
+        // Exactly: «…for example 12.» is the start of «…for example 12.50.».
+        await expect(price).toHaveJSProperty('errorText', NOT_AMOUNT_IN_YEN);
+        await capture(page, `UI-140-MONEY-EXAMPLE-product-price-${size.label}-yen`);
+      });
+    } finally {
+      await context.close();
+      await registerBusinessIn(original, original.country);
     }
   });
 }
