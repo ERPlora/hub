@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5a35b07cae1c22ecd86916b859bb799a8cc2e63159196f462f38e6be7116a03e -->
+<!-- generated from WORKBOOK.md sha256:9dcb6391f2a8d1d5265416cf4cdea41780b8997801bc12ba2f1241e7fede3b4b -->
 
 ## What it is for and who it is for
 
@@ -298,7 +298,9 @@ from Inventory.
 Out: the product, active and linked to the ticked categories, in a single step: either it is saved
 whole or nothing is saved. If initial stock was given, it stays in **Movements** as "Initial".
 Inventory tells the other apps there is a new product: Sales offers it on the till's grid and the
-setup step "Your catalog" is done (INVENTORY-F28).
+setup step "Your catalog" is done (INVENTORY-F28). Through the assistant or the API it can be created
+already inactive, out of the till until it is activated (INVENTORY-F03), as one that was inactive comes
+back when it is recovered from a separate copy (BASE-F114).
 If it fails: "Save" is off while Name, SKU or tax category are missing, and while the business has not
 yet said its currency: the price and the cost are read in it, and without it "1500" yen would be saved
 as 150,000; until then, leaving the price or the cost keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
@@ -310,7 +312,8 @@ respect the step allowed for this unit". A SKU another live product already has:
 exists in the catalog"; a repeated EAN-13: "Another product of the catalog already has that EAN-13". A
 tax category that is no longer in Taxes is refused, also if it arrives through the assistant or the
 API. Every refusal shows inside the panel and nothing is saved.
-Involved: SALE-F01, TAX-F01, TAX-F19, BASE-F05
+Involved: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F114 (the ERPlora staff bring back from a separate copy
+the products that were lost, each by this same creation)
 
 ### INVENTORY-F02 Edit a product
 Status: done
@@ -368,7 +371,8 @@ are free for another product. Its movements stay in **Movements** with its name.
 the product is gone. It does not check whether it has stock or is on an open bill: Sales refuses, when
 charging, the line of a product that is no longer in the catalog.
 If it fails: "The product could not be deleted" (or the reason) above the table.
-Involved: SALE-F01
+Involved: SALE-F01, BASE-F114 (from a separate copy, the ERPlora staff bring the deleted product back as a new
+one, with no stock and without its movements, which stay with the deleted one: hub#1321)
 
 ### INVENTORY-F05 Review the products that cannot be sold for lack of VAT
 Status: done

@@ -13,7 +13,7 @@ the worker does it (``base.tenancy.recovery.run_due``, in the moves' thread), on
    its screen uses: rows are never copied. What the operation refuses is noted with why, and the rest go on.
 
 Real databases on the session's server, committed (``hubs.CopiedHubs``): the business's own and its copy, a clone of
-it. Customers is the app that answers today.
+it. Customers and Inventory (hub#1282, its own tests) are the apps that answer today.
 """
 
 import datetime as dt
@@ -586,11 +586,11 @@ class TestTheLease:
         assert live_cards(hub) == []
 
 
-def test_only_customers_answer_and_no_app_whose_records_reach_the_tax_authority_ever_does():
+def test_the_apps_that_answer_and_never_one_whose_records_reach_the_tax_authority():
     answering = {config.label for config in all_live_app_configs() if hasattr(config, recovery.HOOK)}
     fiscal = {config.label for config in all_live_app_configs() if hasattr(config, "fiscal_record_states")}
 
-    assert answering == {"customer"}
+    assert answering == {"customer", "inventory"}
     assert not answering & fiscal
     assert set(recovery.recoverable_apps()) == answering
 
