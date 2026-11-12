@@ -1,6 +1,6 @@
-"""The contract of S5: the hubs' apps' tables left in control's database get ``<table>_shared_20261101``.
+"""The contract step after the cut: the hubs' apps' tables left in control's database get ``<table>_shared_20261101``.
 
-Since the cut (PLAN-DB, round 2026-11-01c) no business uses them, yet nothing tells their rows from live data. The
+Since the cut no business uses them, yet nothing tells their rows from live data. The
 migration ``control/0007`` renames them, never dropping one. What decides which tables are left over is the routers
 and the inventory, so the suite's control database, whose ``LegacyTablesRouter`` keeps those tables on purpose, stays
 as it is with no test-only branch in the migration: the tests here ask for production's routers themselves.
@@ -32,8 +32,8 @@ from control.models import Hub
 
 MIGRATION = "0007_hub_tables_renamed_shared"
 BEFORE = "0006_hub_activity"
-#: The tables control's migrations after ``MIGRATION`` make, which the deploy makes too (0010: the freeze switch,
-#: hub#930; 0012: the separate copies, hub#1213; 0013: the recoveries from them, hub#1257).
+#: The tables control's migrations after ``MIGRATION`` make, which the deploy makes too (0010: the freeze switch;
+#: 0012: the separate copies; 0013: the recoveries from them).
 LATER_TABLES = {"control_freeze", "control_restoredcopy", "control_copyrecovery"}
 SUFFIX = "_shared_20261101"
 LEGACY_ROUTER = "base.tenancy.tests.legacy.LegacyTablesRouter"

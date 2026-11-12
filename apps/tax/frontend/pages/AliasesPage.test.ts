@@ -72,7 +72,7 @@ describe('AliasesPage: the live list', () => {
     expect(s.listParams()).toEqual([{ sort: 'alias', dir: 'asc', limit: 50, offset: 0 }]);
     expect(s.params('tax.category.list')).toEqual([]);
     expect(s.find('tax-aliases-loading').exists()).toBe(true);
-    // pm#611: while it loads, the list never counts «0 alias…» under the spinner.
+    // While it loads, the list never counts «0 alias…» under the spinner.
     expect(s.wrapper.text()).not.toMatch(/\b0 alias(es)?\b/);
     await s.show(PAGE);
     expect(s.table().props()).toMatchObject({ serverSide: true, searchable: true, testid: 'tax-aliases', total: 2, views: ['table', 'cards'] });
@@ -114,7 +114,6 @@ describe('AliasesPage: the live list', () => {
 
 describe('AliasesPage: the filters (Alias, Category, Origin)', () => {
   it('offers, behind the table funnel, the alias as text (as long as the schema takes it), the category searched on the server and the origin', async () => {
-    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
     const s = await setup();
     await s.show(PAGE);
     expect(s.prop('filterable')).toBe(true);
@@ -198,7 +197,7 @@ describe('AliasesPage: who may create, and the states of the screen', () => {
   });
 });
 
-describe('AliasesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('AliasesPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

@@ -15,7 +15,7 @@
 - ``Event``: the audit trail, its message composed in the reader's language from a key and its parameters.
 - ``AeatRecord``: the last photo of what the AEAT holds (replaced by each query).
 
-Money is in whole cents with a sign. Phase 1 has no tenancy (like ``apps.invoice``).
+Money is in whole cents with a sign.
 """
 
 import datetime as dt
@@ -95,9 +95,8 @@ class Config(UUIDModel):
     representation_reason = models.CharField(
         _("representation note"), max_length=500, blank=True
     )
-    # Retired (PLAN §30, round 2026-10-22b: VeriFactu on Free): no plan gates production any more, so nothing reads
-    # nor writes it. The column stays until a later contract step drops it: the tasks of the previous deployment
-    # still read it while the new one rolls out.
+    # Retired: no plan gates production any more, so nothing reads nor writes it. The column stays until a later
+    # contract step drops it: the tasks of the previous deployment still read it while the new one rolls out.
     live_paid = models.BooleanField(_("live option in the plan"), default=False)
     # From the ERPlora account's photo: the business's commercial status; going live needs it active
     # (``queries.live_problems``).
@@ -108,7 +107,7 @@ class Config(UUIDModel):
         default=HubStatus.ACTIVE,
     )
     # The business's id in ERPlora (the SaaS's ``Hub.id``), told by the photo's path: where the signed authorisation
-    # is sent (VERIFACTU-F05). Phase 2 reads it from the control registry.
+    # is sent (VERIFACTU-F05).
     hub_id = models.UUIDField(_("ERPlora business id"), null=True, blank=True)
     synced_version = models.BigIntegerField(_("synced version"), null=True, blank=True)
     synced_at = models.DateTimeField(_("synced at"), null=True, blank=True)
@@ -506,7 +505,7 @@ WAIT_REASONS = {
 }
 
 
-#: What a refusal of the gateway means, by its code (saas#29), shown in place of the SaaS's own English message.
+#: What a refusal of the gateway means, by its code, shown in place of the SaaS's own English message.
 GATEWAY_REFUSALS = {
     "hub_unknown": _(
         "ERPlora does not recognise this business: contact ERPlora's support"
@@ -611,7 +610,7 @@ class Event(UUIDModel):
             )
         try:
             # Formatted as it is, not through ``str()``: a sentence with a count picks its singular or its plural from
-            # the number in ``params`` (hub#1275), and read before that it is empty.
+            # the number in ``params``, and read before that it is empty.
             return str(template % params)
         except (KeyError, TypeError, ValueError):
             return str(template) or self.message_key
@@ -636,7 +635,7 @@ EVENT_MESSAGES = {
     "anulacion_sealed": _(
         "Cancellation record #%(sequence)s sealed for invoice %(invoice_number)s: %(reason_text)s"
     ),
-    # A count says itself in the singular or the plural (hub#1275): «1 record accepted», never «record(s)».
+    # A count says itself in the singular or the plural: «1 record accepted», never «record(s)».
     "deferred": ngettext_lazy(
         "Not sent to the AEAT yet (%(count)s record): %(why)s.",
         "Not sent to the AEAT yet (%(count)s records): %(why)s.",

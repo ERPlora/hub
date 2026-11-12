@@ -1,4 +1,4 @@
-"""``manage.py migrate_hubs``: the ``hub-migrate`` task of every deploy (aws-next README, «Contrato»; PLAN-DB §7).
+"""``manage.py migrate_hubs``: the ``hub-migrate`` task of every deploy.
 
 1. The control database, under its lock (``base.tenancy.migrator.migrate_control``).
 2. The templates, as canaries, on every server the hubs live on (``clusters_to_migrate``: ``CREATE DATABASE …
@@ -9,8 +9,8 @@
 
 Any failure is logged with its traceback and exits non-zero, which the infra's ``task_failed`` rule reports.
 
-While the platform is frozen for a database upgrade (``control.freeze.set``; hub#930, PLAN-DB round 2026-11-04e,
-«Congelar»: logical replication copies no DDL) a run refuses to start, before it touches anything, with who froze it,
+While the platform is frozen for a database upgrade (``control.freeze.set``: logical
+replication copies no DDL) a run refuses to start, before it touches anything, with who froze it,
 since when and why, and exits non-zero: a deploy meanwhile stops at its migration. Lifted, the next run goes on as
 always. ``--check`` still runs: it applies nothing.
 

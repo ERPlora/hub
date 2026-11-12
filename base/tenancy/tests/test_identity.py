@@ -1,4 +1,4 @@
-"""The identity of a hub's database (PLAN-DB §3 and §14.4; plan 2026-10-22-fase-2-tenencia §4, step 6).
+"""The identity of a hub's database.
 
 Every hub's database holds one row, ``base_hub_identity``, with its hub's id. ``use_hub`` reads it the first time a
 process uses that alias and refuses a database that says it is another hub (a ``db_name`` changed by mistake, a

@@ -1,4 +1,4 @@
-"""Migrations 0002 and 0003 of the website app's theme (round 2026-10-22).
+"""Migrations 0002 and 0003 of the website app's theme.
 
 0002: the two free colours of before become the custom palette.
 

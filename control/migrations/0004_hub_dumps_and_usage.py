@@ -1,4 +1,4 @@
-# The copies of a hub's data and its nightly use (round 2026-10-30 of PLAN-DB, S2b): HubDump, HubUsageDaily, HubVisit,
+# The copies of a hub's data and its nightly use: HubDump, HubUsageDaily, HubVisit,
 # UsageRun and the reset asked on Hub. Expand: new tables and nullable columns only, so the code of before goes on
 # writing the registry without them.
 

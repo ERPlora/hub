@@ -1,5 +1,5 @@
-"""«Ponle foto al café con leche» (INVENTORY-F30 step 5; C.8 of the round 2026-10-30): the assistant puts a product's
-photo from the shared library with the tools every operation is by construction (``ai=``).
+"""«Ponle foto al café con leche» (INVENTORY-F30 step 5): the assistant puts a product's photo from the shared library
+with the tools every operation is by construction (``ai=``).
 
 Asked in Spanish, the turn offers ``inventory.product.suggest_image`` and ``inventory.product.set_image`` (never the
 upload: a file is picked on the screen). The suggestion for «Café con leche» brings the library's coffee with milk first,

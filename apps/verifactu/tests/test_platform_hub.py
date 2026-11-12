@@ -1,8 +1,8 @@
-"""ERPlora's own hub in VeriFactu (PLAN-SAAS §4; plan 2026-10-15, task 4): it files in the AEAT environment of the
-deployment (prod: production; pre: testing) whatever its configuration says, so its switch is fixed (409
-``verifactu.platform_fixed``); and ERPlora's seal presents ERPlora's own records without any signed authorisation
-(it represents nobody), as the old SaaS filed its invoices with its own certificate. Production, though, only once
-ERPlora opens it on the server (``VERIFACTU_PRODUCTION_ENABLED``, working-rules §15): its own invoices skip no lock.
+"""ERPlora's own hub in VeriFactu: it files in the AEAT environment of the deployment (prod: production; pre: testing)
+whatever its configuration says, so its switch is fixed (409 ``verifactu.platform_fixed``); and ERPlora's seal presents
+ERPlora's own records without any signed authorisation (it represents nobody), as the old SaaS filed its invoices with
+its own certificate. Production, though, only once ERPlora opens it on the server (``VERIFACTU_PRODUCTION_ENABLED``):
+its own invoices skip no lock.
 """
 
 import json
@@ -51,7 +51,7 @@ def test_the_platform_hub_files_where_its_deployment_does(
 
 
 def test_the_platform_hub_skips_no_production_lock(db, platform_slug, settings):
-    # Working-rules §15: real filing opens under Ioan's supervision, for ERPlora's own invoices too.
+    # Real filing opens only as a supervised step on the server, for ERPlora's own invoices too.
     settings.ERPLORA_ENVIRONMENT = "prod"
     settings.VERIFACTU_PRODUCTION_ENABLED = False
 
@@ -128,7 +128,7 @@ def test_erploras_seal_files_erploras_own_records_without_an_authorisation(
     )
 
     assert queries.route_problem(config, Environment.PRODUCTION, PLATFORM) == ""
-    # Only on ERPlora's own hub (saas#2524): the same tax ID on any other business is no exemption.
+    # Only on ERPlora's own hub: the same tax ID on any other business is no exemption.
     assert queries.route_problem(config, Environment.PRODUCTION, A) == "representation_not_approved"
 
 
@@ -204,9 +204,9 @@ def test_no_other_business_follows_the_deployment(db, platform_slug):
 
 @pytest.mark.parametrize("scope", [PLATFORM, A], ids=["platform", "business"])
 def test_the_gateway_is_told_the_hub_by_its_slug(db, platform_slug, settings, scope):
-    # The SaaS knows ERPlora's own hub by ``PLATFORM_HUB_SLUG`` and any other by its host's slug (saas#29). ERPlora's
+    # The SaaS knows ERPlora's own hub by ``PLATFORM_HUB_SLUG`` and any other by its host's slug. ERPlora's
     # own hub presents ERPlora's own records: its issuer is ERPlora (whatever tax ID a record bears, it goes as the
-    # hub of its scope, see the tests below, hub#1130).
+    # hub of its scope, see the tests below).
     settings.ERPLORA_ENVIRONMENT = "pre"
     settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
     settings.INTERNAL_SHARED_SECRET = "test-internal-secret"
@@ -239,7 +239,7 @@ def test_the_gateway_is_told_the_hub_by_its_slug(db, platform_slug, settings, sc
 def test_a_business_typing_erploras_tax_id_still_needs_its_approved_authorisation(
     db, platform_slug, settings
 ):
-    # saas#2524, the Hub's side: ERPlora's tax ID typed as an ordinary business's issuer is no exemption. Only
+    # The Hub's side: ERPlora's tax ID typed as an ordinary business's issuer is no exemption. Only
     # ERPlora's own hub files ERPlora's records without an authorisation: anywhere else, once the authorisation is
     # revoked, a new sale in production is refused before anything is numbered (the gateway would refuse it too, and
     # the sale would be charged with no way to the AEAT, HUB-F313).
@@ -274,11 +274,11 @@ def test_a_business_typing_erploras_tax_id_still_needs_its_approved_authorisatio
     assert not Record.objects.exists()
 
 
-# ── hub#1130: a record goes as the hub whose database holds it, whatever tax ID it bears ─────────────────────────
+# ── A record goes as the hub whose database holds it, whatever tax ID it bears ───────────────────────────────────
 #
-# Since the S5 cut (hub#602) every business runs its pass in its own database and ERPlora's own hub's holds ERPlora's
-# records alone, so the send, the AEAT query and the connection test always name the hub of their scope by its slug
-# (saas#29). erplora.com's id of the business (``Config.hub_id``) never names who presents, and nothing waits for it.
+# Every business runs its pass in its own database and ERPlora's own hub's holds ERPlora's records alone, so the send,
+# the AEAT query and the connection test always name the hub of their scope by its slug. erplora.com's id of the
+# business (``Config.hub_id``) never names who presents, and nothing waits for it.
 
 BUSINESS_ID = "0192f0a3-8c4e-7d21-9b6a-3f5e2d1c0b7a"
 URL = "http://saas.internal:8001"

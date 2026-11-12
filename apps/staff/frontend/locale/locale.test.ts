@@ -1,4 +1,4 @@
-// The staff app's UI texts: English source + Spanish (PLAN §5), kept by hand next to the pages until
+// The staff app's UI texts: English source + Spanish, kept by hand next to the pages until
 // Django's `djangojs` catalogues are exported to JSON. This test is their guardrail: same keys and
 // placeholders in both languages, nothing empty, every key a page, a component or a helper uses
 // exists, and the words the old screens showed (WORKBOOK «Pantallas», the old module's
@@ -138,7 +138,7 @@ describe('staff catalogues (en source + es)', () => {
     for (const [key, spanish] of words) expect(ES.get(key), key).toBe(spanish);
   });
 
-  it('no longer carry the eight retired settings (FIX-STAFF-SETTINGS-ORPHANS: they changed nothing)', () => {
+  it('no longer carry the eight retired settings, which changed nothing', () => {
     const settings = [...EN.keys()].filter((key) => key.startsWith('staff.settings.fields.') || key.startsWith('staff.settings.hints.'));
     expect(new Set(settings.map((key) => key.split('.').at(-1)))).toEqual(new Set(['default_work_start', 'default_work_end', 'default_break_duration']));
     expect(EN.has('staff.settings.visibility')).toBe(false);

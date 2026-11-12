@@ -1,4 +1,4 @@
-"""The website app: a hub's public presentation page on its own host, ``<slug>.erplora.com`` (round 2026-10-21, PLAN §29).
+"""The website app: a hub's public presentation page on its own host, ``<slug>.erplora.com``.
 
 The owner picks one of four templates, fills in fixed sections (texts, photos, catalog, contact, address and
 colours), hides the ones she does not use and publishes. A visitor without a session who opens ``/`` gets that page
@@ -21,7 +21,7 @@ class WebsiteConfig(LiveAppConfig):
     icon = "ion:globe-outline"
     category = Category.ORGANIZATION
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The app store's texts, which register_apps writes to shared.app.
     summary = _("Your business's own web page, with your catalog, contact details and a QR code to print.")
     description = _(
         "Website gives your business a simple page of its own at your ERPlora address. Choose one of four "
@@ -50,5 +50,5 @@ class WebsiteConfig(LiveAppConfig):
     # module's own icon.
     navigation = [Nav("site", pgettext_lazy("app name", "Website"), "ion:globe-outline", "/website")]
     # The closed lists kept inside the site's JSON (the palette, the background, the catalog's source, the days of the
-    # opening hours), by the word the editor shows: the assistant's card says each value by it (hub#679).
+    # opening hours), by the word the editor shows: the assistant's card says each value by it.
     choices = CHOICES

@@ -1,9 +1,9 @@
-"""``TenantRouter`` (PLAN-DB §4; plan 2026-10-22-fase-2-tenencia §2.2, §2.7 and §4, step 5).
+"""``TenantRouter``.
 
 Control's models always go to ``default``; a hub's go to the alias of the active ``use_hub`` and, without one, fail
 (``HubContextMissing``): they never fall back to ``default``. The outbox follows the context (control's for the
 registry). Relations stay inside one database, compared by database, not by alias. Control's apps migrate only on
-``default``; a hub's only on a migrator's ``…__ddl`` alias, never on ``default`` (S5: phase 1's shared database is
+``default``; a hub's only on a migrator's ``…__ddl`` alias, never on ``default`` (the old shared database is
 gone). ``migrate`` on a hub's alias is refused.
 """
 

@@ -1,12 +1,12 @@
-// The public page's live catalog (round 2026-10-21): the server paints the catalog from the publication's snapshot
+// The public page's live catalog: the server paints the catalog from the publication's snapshot
 // (`templates/website/sections/catalog.html`, good for search engines and for a visitor without JS) inside
-// `[data-ep-block="catalog"]`; once the page loads, this refreshes it from `/api/website/public/catalog` (the
-// published catalog's source, read live, priced in the visitor's language), rebuilding the same markup (a grid of
-// cards; `catalog.fixture.json` holds it for both sides' tests) element by element with `textContent`, never
-// `innerHTML`: a name the business typed stays text. A failed read (offline, the visit limit) keeps the snapshot,
-// which is the published catalog. The editor's preview (`data-ep-preview`) is never refreshed: it shows the draft's
-// own catalog. Nor is a page on the business's own domain (`data-ep-static`), where `/api` is not: the server read its
-// catalog when it painted it.
+// `[data-ep-block="catalog"]`; once the page loads, this refreshes it from `/api/website/public/catalog` (the published
+// catalog's source, read live, priced in the visitor's language), rebuilding the same markup (a grid of cards;
+// `catalog.fixture.json` holds it for both sides' tests) element by element with `textContent`, never `innerHTML`: a
+// name the business typed stays text. A failed read (offline, the visit limit) keeps the snapshot, which is the
+// published catalog. The editor's preview (`data-ep-preview`) is never refreshed: it shows the draft's own catalog. Nor
+// is a page on the business's own domain (`data-ep-static`), where `/api` is not: the server read its catalog when it
+// painted it.
 import type { CatalogOut } from '../operations';
 
 export const CATALOG_URL = '/api/website/public/catalog';

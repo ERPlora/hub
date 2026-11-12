@@ -1,6 +1,6 @@
-"""ERPlora's own invoices, as the SaaS posts them to its platform hub (PLAN-SAAS §4; ``platform_payload()`` of
-saas-next/billing/services.py): the body → the fields of an ``Invoice`` and its lines. Pure: it reads and writes
-nothing (``services.issue_platform`` writes, ``base.internal`` is the door).
+"""ERPlora's own invoices, as the SaaS posts them to its platform hub (``platform_payload()`` of the SaaS's
+billing/services.py): the body → the fields of an ``Invoice`` and its lines. Pure: it reads and writes nothing
+(``services.issue_platform`` writes, ``base.internal`` is the door).
 
 - The number is the SaaS's own (``ERP-2026-00123``, ``ERPR-…`` for a credit note): its series, its year (of the issue
   date) and its sequence (the number's last digits). No series of the Hub is ever counted for it.
