@@ -61,6 +61,7 @@ from apps.inventory.schemas import (
     CategoryIn,
     CategoryOut,
     CategoryPatchIn,
+    CategoryRecoverIn,
     CategoryRefIn,
     ConfigOut,
     ConfigPatchIn,
@@ -693,16 +694,44 @@ def remove_product_category(ctx: OperationContext, data: ProductCategoryIn) -> d
     },
 )
 def create_category(ctx: OperationContext, data: CategoryIn) -> dict:
+    return load_category(_new_category(ctx, data).id)
+
+
+@operation(
+    "inventory.category.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=CategoryRecoverIn,
+    output=CategoryOut,
+    ai={
+        "description": "Bring a deleted category back as a new one, with the deleted products it had back in it (run "
+        "by the platform when ERPlora's staff recovers the business from a separate copy).",
+        "risk": "normal",
+    },
+)
+def recover_category(ctx: OperationContext, data: CategoryRecoverIn) -> dict:
+    """INVENTORY-F07: the category created as its screen creates it, and each of ``product_ids`` the business still
+    holds deleted put back in it, so that restoring it (INVENTORY-F34) brings it back inside. A live product stays as
+    the business keeps it."""
+    category = _new_category(ctx, data)
+    for product in held(Product.objects.filter(pk__in=data.product_ids, is_deleted=True).order_by("id")):
+        ProductCategory.objects.create(product=product, category=category)
+        _record_link(ctx, events.PRODUCT_CATEGORIZED, product.id, category.id)
+    return load_category(category.id)
+
+
+def _new_category(ctx: OperationContext, data: CategoryIn) -> Category:
     tax_category = _tax_category(data.tax_category_key) if data.tax_category_key else None
     category = Category.objects.create(
-        **data.model_dump(exclude={"slug", "tax_category_key"}),
+        **data.model_dump(include=CategoryIn.model_fields.keys() - {"slug", "tax_category_key"}),
         slug=data.slug or slugify(data.name),
         tax_category=tax_category,
         created_by=_actor(ctx),
         updated_by=_actor(ctx),
     )
     record_event(ctx, events.CATEGORY_CREATED, {"id": str(category.id), "name": category.name})
-    return load_category(category.id)
+    return category
 
 
 @operation(
