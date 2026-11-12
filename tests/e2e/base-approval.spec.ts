@@ -14,6 +14,7 @@ import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, username
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const KEY = 'FIX-HUB-BASE-APPROVAL-KEYPAD-CUT-ON-TABLET-DESKTOP';
 const SKU = `E2E-BAPR-${stamp()}`;
@@ -223,7 +224,9 @@ test('BASE-F84: on a screen too short for the whole pad, the dialog stays on scr
   await dialog.getByTestId('approval-cancel').click();
   await expect(dialog).toBeHidden();
   const modal = page.locator('ion-modal[data-testid=sale-void]');
+  // The reason typed is a change: «Cancel» asks first (BASE-F05) and the person discards it.
   await modal.locator('[data-testid=sale-void-cancel]').click();
+  await discardChanges(page);
   await expect(modal).toBeHidden();
 });
 
@@ -259,6 +262,8 @@ test('BASE-F84: a wrong PIN says those details do not approve it, in the dialog,
   await dialog.getByTestId('approval-cancel').click();
   await expect(dialog).toBeHidden();
   const modal = page.locator('ion-modal[data-testid=sale-void]');
+  // The reason typed is a change: «Cancel» asks first (BASE-F05) and the person discards it.
   await modal.locator('[data-testid=sale-void-cancel]').click();
+  await discardChanges(page);
   await expect(modal).toBeHidden();
 });

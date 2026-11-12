@@ -16,6 +16,7 @@ import { type Browser, expect, type Locator, test } from '@playwright/test';
 import { A, login, psql, shot, shown } from './helpers';
 import { dialog, pickCombo, productsReady } from './inventory-helpers';
 import { pick, post } from './service-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const TAG = 'E2E Chip';
 const RUN = Date.now().toString(36);
@@ -130,7 +131,9 @@ test('UI shell relleno de ion-chip — a category of the product form keeps Ioni
       await chips.last().scrollIntoViewIfNeeded();
       await page.waitForTimeout(400);
       await page.screenshot({ path: shot(`FIX-UI-SHELL-ION-CHIP-PADDING-WIPED-BY-PREFLIGHT-${vp.label}`) });
+      // The categories chosen are a change: «Cancel» asks first (BASE-F05) and the person discards them.
       await form.locator('[data-testid=inventory-product-form-cancel]').click();
+      await discardChanges(page);
       await expect(form).toBeHidden();
     }
   } finally {
@@ -164,7 +167,9 @@ test('UI shell relleno de ion-chip — a service of «New appointment» keeps Io
         await page.waitForTimeout(400);
         await page.screenshot({ path: shot('FIX-UI-SHELL-ION-CHIP-PADDING-WIPED-BY-PREFLIGHT-appointment-390') });
       }
+      // The service chosen is a change: «Cancel» asks first (BASE-F05) and the person discards it.
       await form.locator('[data-testid=appointment-form-cancel]').click();
+      await discardChanges(page);
       await expect(form).toBeHidden();
     }
   } finally {

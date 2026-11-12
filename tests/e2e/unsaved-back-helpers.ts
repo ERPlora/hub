@@ -41,6 +41,17 @@ export const QUESTION = /Discard changes\?|¿Descartar los cambios\?/;
 /** No question on screen. */
 export const noQuestion = (page: Page) => expect(page.locator('ion-modal.ep-confirm-dialog:visible')).toHaveCount(0);
 
+/** Answers «Discard changes?» as the person who meant to leave does: the question is on screen and «Discard changes»
+ *  takes it away. Every spec that leaves a window with something typed («Cancel», the «×», Escape, a tap outside, Back)
+ *  answers through here (hub#1255); whether the window then closes is the caller's to check. */
+export async function discardChanges(page: Page): Promise<void> {
+  const asked = question(page);
+  await expect(asked).toBeVisible();
+  await expect(asked).toContainText(QUESTION);
+  await asked.locator('.ep-form-modal__submit').click();
+  await expect(asked).toBeHidden();
+}
+
 /** `shots` names the captures of the question (`<shots>-<app>-<size>`). */
 export async function expectBackAsksOnDirtyForm(page: Page, item: UnsavedFormCase, shots: string): Promise<void> {
   await login(page, A);
@@ -70,7 +81,7 @@ export async function expectBackAsksOnDirtyForm(page: Page, item: UnsavedFormCas
     await expect(field).toHaveValue(value);
 
     await pressBack(page);
-    await asked.locator('.ep-form-modal__submit').click();
+    await discardChanges(page);
     await expect(form).toBeHidden();
 
     await add.click();
@@ -138,7 +149,7 @@ export async function expectWaysOutAskOnDirtyForm(page: Page, item: UnsavedFormC
     }
 
     await ways[0][1](form, page);
-    await question(page).locator('.ep-form-modal__submit').click();
+    await discardChanges(page);
     await expect(form).toBeHidden();
     await noQuestion(page);
 

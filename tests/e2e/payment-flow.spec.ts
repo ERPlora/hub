@@ -7,6 +7,7 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, horizontalOverflow, login, psql, shot, shown } from './helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const TAG = 'E2E Pay';
 const VIEWPORTS = [
@@ -170,7 +171,9 @@ test('PAYMENT-F01: «New method» creates an Active method that «New payment» 
     await expect(name).toContainText('There is already a payment method with that name. Pick another name.');
     await expect(page.locator('[data-testid=payment-method-form-name] input')).toHaveValue(bank.toUpperCase());
     await threeShots(page, 'PAYMENT-F01', () => name);
+    // «Cancel» asks before losing the refused method (BASE-F05): the person discards it.
     await page.locator('[data-testid=payment-method-form-cancel]').click();
+    await discardChanges(page);
     expect(psql(`select count(*) from payment_paymentmethod where lower(name) = lower('${bank}')`)).toBe('1');
 
     // From now on «New payment» offers it.

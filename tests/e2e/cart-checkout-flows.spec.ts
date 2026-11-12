@@ -25,6 +25,7 @@ import {
   signedIn,
   snap,
 } from './cart-checkout-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
@@ -59,13 +60,15 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await expect(row).toContainText('€0.00');
         expect(psql(`select currency || ' ' || total_amount from cart_checkout_cart where id = '${firstId}'`)).toBe('EUR 0');
 
-        // The same session again: refused under Session, with what was typed kept.
+        // The same session again: refused under Session, with what was typed kept. «Cancel» then asks before losing it
+        // (BASE-F05), and the person discards it.
         await view.locator('[data-testid=cart-checkout-carts-add]').click();
         await page.locator('[data-testid=cart-checkout-cart-form-session] input').fill(first);
         await submit.click();
         await expect(page.locator('[data-testid=cart-checkout-cart-form]')).toContainText('There is already a cart with that session.');
         await expect(page.locator('[data-testid=cart-checkout-cart-form-session] input')).toHaveValue(first);
         await page.locator('[data-testid=cart-checkout-cart-form-cancel]').click();
+        await discardChanges(page);
         await expect(page.locator('[data-testid=cart-checkout-cart-form-submit]')).toBeHidden();
         expect(psql(`select count(*) from cart_checkout_cart where session_token = '${first}'`)).toBe('1');
       });
