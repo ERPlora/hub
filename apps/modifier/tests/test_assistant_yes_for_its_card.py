@@ -21,7 +21,7 @@ from apps.modifier.tests.conftest import ctx_for, make_category, make_product, r
 from apps.modifier.tests.test_integration_assistant import TITLES, modifier_writes
 from base import assistant
 from base.schemas import names
-from base.tests.test_assistant_yes_for_its_card import turn_as, yes_to_its_card
+from base.tests.test_assistant_yes_for_its_card import read_as, turn_as, unless_of, yes_to_its_card
 from base.tests.test_services_assistant import call
 
 pytestmark = pytest.mark.django_db
@@ -203,11 +203,6 @@ def test_only_the_writes_that_take_a_group_by_its_name_check_their_record():
     assert {name: read for name, read in declared.items() if read is not None} == CHECKS
 
 
-def read_as(mark: dict) -> dict:
-    """How the card reads a datum by its mark, but for the data beside which it leaves it unread (``unless``)."""
-    return {"refers": {key: value for key, value in mark["refers"].items() if key != "unless"}}
-
-
 def test_every_write_that_takes_a_group_or_an_option_by_its_name_reads_it_and_says_it_as_said_when_it_cannot():
     """With or without a check before it, a group said by its name is read on its card, and stays on it as said when it
     cannot be read (two fit): never off it. An option, with its group."""
@@ -320,7 +315,7 @@ UNLESS = {
 
 def test_a_name_is_left_unread_beside_each_datum_its_write_takes_its_record_by_instead():
     marked = {
-        (op.name, datum): set(op.input.model_fields[datum].json_schema_extra["refers"].get("unless", ()))
+        (op.name, datum): unless_of(op.input.model_fields[datum].json_schema_extra)
         for op in modifier_writes()
         for datum in ("group", "option")
         if datum in op.input.model_fields

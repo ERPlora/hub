@@ -23,7 +23,7 @@ from apps.combo.tests.conftest import ctx_for, make_combo, make_group, make_opti
 from apps.combo.tests.test_apps import CHECKED_BY_THE_MENU
 from apps.combo.tests.test_assistant_card_records import fields_of, words
 from base.schemas import names
-from base.tests.test_assistant_yes_for_its_card import turn_as, yes_to_its_card
+from base.tests.test_assistant_yes_for_its_card import read_as, turn_as, unless_of, yes_to_its_card
 from base.tests.test_services_assistant import call
 
 pytestmark = pytest.mark.django_db
@@ -333,14 +333,8 @@ def mark_of(op, name: str) -> dict | None:
     """How the card reads the datum ``name`` of ``op``'s input — the mark that names its record, but for the data
     beside which it is left unread (``unless``, below) —, or ``None``."""
     field = op.input.model_fields.get(name)
-    mark = (field.json_schema_extra or {}).get("refers") if field is not None else None
-    return {key: value for key, value in mark.items() if key != "unless"} if mark is not None else None
-
-
-def unless_of(op, name: str) -> set[str]:
-    """The data beside which the card leaves the datum ``name`` of ``op``'s input unread (``unless``)."""
-    field = op.input.model_fields[name]
-    return set(((field.json_schema_extra or {}).get("refers") or {}).get("unless", ()))
+    mark = field.json_schema_extra if field is not None else None
+    return read_as(mark)["refers"] if mark else None
 
 
 #: How the card reads each datum a write of Menus takes by its name.
@@ -478,7 +472,7 @@ UNLESS = {
 
 def test_a_name_is_left_unread_beside_each_datum_its_write_takes_its_record_by_instead():
     marked = {
-        (op.name, datum): unless_of(op, datum)
+        (op.name, datum): unless_of(op.input.model_fields[datum].json_schema_extra)
         for op in assistant_writes()
         for datum in ("combo", "group", "product", "new_product")
         if datum in op.input.model_fields
