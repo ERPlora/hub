@@ -11,14 +11,25 @@
 // Never a PIN in the hubs `a`/`b` (it would change every other spec's way in); the business's dial is put back after.
 import { createHmac } from 'node:crypto';
 
-import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { api, capture, collectProblems, type Credentials, horizontalOverflow, login, MAIL_DIR, psql, SAAS, shot, shown, turnOn, untilStill } from './helpers';
-import { readMailCode } from './mail';
+import {
+  api,
+  capture,
+  collectProblems,
+  horizontalOverflow,
+  login,
+  psql,
+  SAAS,
+  shot,
+  shown,
+  turnOn,
+  untilStill,
+} from './helpers';
+import { businessOnSaas, type SaasBusiness, type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
 import { cleanSales } from './sale-helpers';
 import { STACK } from './stack';
 
-const PASSWORD = 'Masa-madre-y-centeno-26';
 const SIZES = [
   { name: '390', width: 390, height: 844 },
   { name: '834', width: 834, height: 1112 },
@@ -32,50 +43,11 @@ const BADGE = `77${String(Date.now()).slice(-8)}`;
 /** Where the Sales app's till keeps the check it has on screen (`useCurrentCheck`). */
 const CURRENT_CHECK_KEY = 'erplora.sale.pos.currentCheck';
 
-interface Person {
-  context: BrowserContext;
-  page: Page;
-  credentials: Credentials;
-}
-
-interface Business {
-  id: string;
-  slug: string;
-}
-
-async function signUp(browser: Browser, who: string): Promise<Person> {
-  const credentials = { email: `e2e-access-${who}-${Date.now()}@example.com`, password: PASSWORD };
-  const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } });
-  const page = await context.newPage();
-  await page.goto(`${SAAS}/launch?tab=signup`);
-  const form = page.getByTestId('login-form');
-  await expect(page.getByTestId('login-submit')).toHaveText('Create account');
-  await form.getByTestId('login-email').locator('input').fill(credentials.email);
-  await form.getByTestId('login-password').locator('input').fill(credentials.password);
-  const since = Date.now() - 50;
-  await form.getByTestId('login-submit').click();
-  await expect(page).toHaveURL(/\/verify-email$/);
-  const code = await readMailCode({ dir: MAIL_DIR, to: credentials.email, since, timeout: SAAS_STEP });
-  await page.getByTestId('code').locator('input').fill(code);
-  await page.getByTestId('verify-email-submit').click();
-  await expect(page).toHaveURL(/\/launch$/);
-  return { context, page, credentials };
-}
-
-async function saasPost(context: BrowserContext, path: string, data: unknown) {
-  const host = new URL(SAAS).hostname;
-  const csrf = (await context.cookies(SAAS)).find((c) => c.name === 'csrftoken' && c.domain === host)?.value;
-  if (!csrf) throw new Error(`POST ${path}: no csrftoken of the SaaS (sign in first)`);
-  return context.request.post(`${SAAS}/api${path}`, { headers: { 'X-CSRFToken': csrf }, data });
-}
+type Person = SaasOwner;
+type Business = SaasBusiness;
 
 async function businessOf(owner: Person): Promise<Business> {
-  const created = await saasPost(owner.context, '/hubs/businesses', { name: `Access ${Date.now().toString(36)}`, country: 'ES' });
-  expect(created.status(), await created.text()).toBe(201);
-  const business = (await created.json()) as Business;
-  await expect
-    .poll(() => psql(`SELECT status FROM base_hub WHERE id = '${business.id}'`), { timeout: SAAS_STEP, message: 'registered here' })
-    .toBe('ready');
+  const business = await businessOnSaas(owner, { name: `Access ${Date.now().toString(36)}`, country: 'ES' });
   // The plan's photo (Free: one device at a time) comes with the business's ready state.
   await expect
     .poll(() => psql(`SELECT state->'plan'->>'max_devices' FROM base_hub WHERE id = '${business.id}'`), {
@@ -170,8 +142,8 @@ const refused: string[] = [];
 const own = (sql: string): string => psql(sql, business.slug);
 
 test.beforeAll(async ({ browser }) => {
-  owner = await signUp(browser, 'owner');
-  employee = await signUp(browser, 'employee');
+  owner = await signUpOnSaas(browser, 'access-owner');
+  employee = await signUpOnSaas(browser, 'access-employee');
   business = await businessOf(owner);
   await joins(owner, employee, business);
   origin = STACK.hub(business.slug);

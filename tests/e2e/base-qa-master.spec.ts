@@ -18,18 +18,31 @@
 // flow: BASE-G152 BASE-F05
 import { execSync } from 'node:child_process';
 
-import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { GREETING, type Provider, startProvider } from './assistant-provider';
-import { api, compactBar, type Credentials, horizontalOverflow, HUB_DIR, login, MAIL_DIR, openApps, openBell, psql, REPO_DIR, SAAS, shot, shown, untilStill } from './helpers';
-import { readMailCode } from './mail';
+import {
+  api,
+  compactBar,
+  horizontalOverflow,
+  HUB_DIR,
+  login,
+  openApps,
+  openBell,
+  psql,
+  REPO_DIR,
+  SAAS,
+  shot,
+  shown,
+  untilStill,
+} from './helpers';
+import { type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
 import { STACK } from './stack';
 import { type Language, loadCatalog, normalText, rawKeys, wrongLanguage } from './translations';
 
 test.use({ actionTimeout: 30_000 });
 test.describe.configure({ mode: 'serial' });
 
-const PASSWORD = 'Masa-madre-y-centeno-26';
 const SIZES = [
   { label: '390', width: 390, height: 844 },
   { label: '834', width: 834, height: 1112 },
@@ -51,11 +64,7 @@ const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `s
 /** The hub's catalogues, `en` and `es`: what a text on screen is checked against. */
 const CATALOG = loadCatalog(HUB_DIR);
 
-interface Owner {
-  context: BrowserContext;
-  page: Page;
-  credentials: Credentials;
-}
+type Owner = SaasOwner;
 
 let provider: Provider;
 let owner: Owner;
@@ -68,34 +77,6 @@ function saasSql(sql: string): string {
     cwd: REPO_DIR,
     encoding: 'utf8',
   }).trim();
-}
-
-/** A fresh account signed up on the SaaS's «Create account», its address proven with the mailed code; signed in. */
-async function signUp(browser: Browser): Promise<Owner> {
-  const credentials = { email: `e2e-qa-master-${Date.now()}@example.com`, password: PASSWORD };
-  const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } });
-  const page = await context.newPage();
-  await page.goto(`${SAAS}/launch?tab=signup`);
-  const form = page.getByTestId('login-form');
-  await expect(page.getByTestId('login-submit')).toHaveText('Create account');
-  await form.getByTestId('login-email').locator('input').fill(credentials.email);
-  await form.getByTestId('login-password').locator('input').fill(credentials.password);
-  const since = Date.now() - 50;
-  await form.getByTestId('login-submit').click();
-  await expect(page).toHaveURL(/\/verify-email$/);
-  const code = await readMailCode({ dir: MAIL_DIR, to: credentials.email, since, timeout: SAAS_STEP });
-  await page.getByTestId('code').locator('input').fill(code);
-  await page.getByTestId('verify-email-submit').click();
-  await expect(page).toHaveURL(/\/launch$/);
-  return { context, page, credentials };
-}
-
-/** A POST to the SaaS's API as `context`'s account, with the SaaS's CSRF token. */
-async function saasPost(context: BrowserContext, path: string, body: unknown) {
-  const host = new URL(SAAS).hostname;
-  const csrf = (await context.cookies(SAAS)).find((c) => c.name === 'csrftoken' && c.domain === host)?.value;
-  if (!csrf) throw new Error(`POST ${path}: no csrftoken of the SaaS (sign in first)`);
-  return context.request.post(`${SAAS}/api${path}`, { headers: { 'X-CSRFToken': csrf }, data: body });
 }
 
 /** A business type of `vertical` from erplora.com's catalogue (its taxonomy, which every deploy seeds). */
@@ -228,7 +209,7 @@ test.beforeAll(async ({ browser }) => {
   provider = await startProvider(PROVIDER_PORT);
   const seeded = saasSql("select base_url from assistant_aiprovider where slug = 'e2e-local'");
   expect(seeded, `the SaaS ${SAAS_DB} is not seeded with this provider: README «El asistente»`).toBe(provider.url);
-  owner = await signUp(browser);
+  owner = await signUpOnSaas(browser, 'qa-master');
 });
 
 test.afterAll(async () => {
