@@ -8,18 +8,16 @@
 // account's session there, so never the demo accounts whose erplora.com session the other specs reuse (`login`).
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { api, type Credentials, login, MAIL_DIR, psql, SAAS, shot, shown, untilStill } from './helpers';
-import { readMailCode } from './mail';
+import { api, type Credentials, login, SAAS, shot, shown, untilStill } from './helpers';
+import { businessOnSaas, signUpOnSaas } from './saas-owner';
 import { STACK } from './stack';
 
 const KEY = 'FIX-HUB-BASE-LOGOUT-LANDS-ON-SAAS-404';
-const PASSWORD = 'Masa-madre-y-centeno-26';
 const SIZES = [
   { name: '390', width: 390, height: 844 },
   { name: '834', width: 834, height: 1112 },
   { name: '1440', width: 1440, height: 900 },
 ] as const;
-const SAAS_STEP = 30_000;
 /** erplora.com's «Sign out of erplora.com?» (saas `accounts/frontend/pages/SignOutPage.vue`). */
 const SIGN_OUT_PAGE = `${SAAS}/logout`;
 const LAUNCHER = `${SAAS}/launch`;
@@ -32,33 +30,8 @@ let credentials: Credentials;
 let origin: string;
 
 test.beforeAll(async ({ browser }) => {
-  credentials = { email: `e2e-sign-out-${Date.now()}@example.com`, password: PASSWORD };
-  context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } });
-  page = await context.newPage();
-  await page.goto(`${LAUNCHER}?tab=signup`);
-  const form = page.getByTestId('login-form');
-  await expect(page.getByTestId('login-submit')).toHaveText('Create account');
-  await form.getByTestId('login-email').locator('input').fill(credentials.email);
-  await form.getByTestId('login-password').locator('input').fill(credentials.password);
-  const since = Date.now() - 50;
-  await form.getByTestId('login-submit').click();
-  await expect(page).toHaveURL(/\/verify-email$/);
-  const code = await readMailCode({ dir: MAIL_DIR, to: credentials.email, since, timeout: SAAS_STEP });
-  await page.getByTestId('code').locator('input').fill(code);
-  await page.getByTestId('verify-email-submit').click();
-  await expect(page).toHaveURL(/\/launch$/);
-
-  const host = new URL(SAAS).hostname;
-  const csrf = (await context.cookies(SAAS)).find((c) => c.name === 'csrftoken' && c.domain === host)?.value ?? '';
-  const created = await context.request.post(`${SAAS}/api/hubs/businesses`, {
-    headers: { 'X-CSRFToken': csrf },
-    data: { name: `Sign out ${Date.now().toString(36)}`, country: 'ES' },
-  });
-  expect(created.status(), await created.text()).toBe(201);
-  const business = (await created.json()) as { id: string; slug: string };
-  await expect
-    .poll(() => psql(`SELECT status FROM base_hub WHERE id = '${business.id}'`), { timeout: SAAS_STEP, message: 'registered here' })
-    .toBe('ready');
+  ({ context, page, credentials } = await signUpOnSaas(browser, 'sign-out'));
+  const business = await businessOnSaas({ context, page, credentials }, { name: `Sign out ${Date.now().toString(36)}`, country: 'ES' });
   origin = STACK.hub(business.slug);
 });
 
