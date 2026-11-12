@@ -823,8 +823,10 @@ class TestRestoreToASeparateCopy:
         copy = self.a_copy(hub, status=RestoredCopy.Status.MADE, made_at=made)
 
         listed = page(client, COPIES)
-        assert copy.db_name in listed and "Made" in listed and "2026-11-16 15:30 UTC" in listed
+        assert "acme" in listed and "2026-11-09 14:30 UTC" in listed and "Made" in listed and "2026-11-16 15:30 UTC" in listed
+        assert copy.db_name in page(client, COPIES, q=copy.db_name)
         its_page = client.get(f"{COPIES}{copy.pk}/change/", HTTP_HOST=PLATFORM).content.decode()
+        assert copy.db_name in its_page and "default server" in its_page
         assert 'name="_save"' not in its_page and "deletelink" not in its_page
         assert client.post(f"{COPIES}{copy.pk}/delete/", {"post": "yes"}, HTTP_HOST=PLATFORM).status_code == 403
         assert RestoredCopy.objects.filter(pk=copy.pk).exists()

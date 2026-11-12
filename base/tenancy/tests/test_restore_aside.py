@@ -489,7 +489,8 @@ class TestAskedInTheHubAdmin:
         listed = client.get(COPIES, HTTP_HOST=PLATFORM)
         assert listed.status_code == 200
         page = listed.content.decode()
-        assert aside.db_name in page and hub.slug in page and "2026-11-09" in page
+        assert hub.slug in page and "2026-11-09" in page and "Made" in page
+        assert aside.db_name in client.get(f"{COPIES}{aside.pk}/change/", HTTP_HOST=PLATFORM).content.decode()
 
     def test_support_sees_the_copies_but_cannot_ask_one(self, asides, signed_in):
         client = signed_in(superuser=False)

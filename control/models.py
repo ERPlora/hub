@@ -507,7 +507,8 @@ class RestoredCopy(UUIDModel):
         ]
 
     def __str__(self) -> str:
-        return self.db_name
+        # Its hub and its moment, words a phone wraps; its database's name is one piece of 40-odd characters.
+        return f"{self.hub.slug} · {self.restore_point.astimezone(dt.UTC):%Y-%m-%d %H:%M} UTC"
 
 
 class LeftoverDatabase(UUIDModel):

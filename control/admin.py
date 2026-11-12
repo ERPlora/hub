@@ -556,17 +556,9 @@ class RestoredCopyAdmin(base_admin.ReadOnlyAdmin):
     """The separate copies of hubs as they were at a moment (hub#1213, BASE-F114): asked from Hubs with «Restore to a
     separate copy…», made and dropped by the worker; read only, for support too."""
 
-    list_display = (
-        "hub",
-        "moment",
-        "status",
-        "db_name",
-        "on_cluster",
-        "kept_until",
-        "asked_by",
-        "asked_at",
-        "last_error",
-    )
+    # What the staff looks for at a glance; its database (searchable), who asked, when, from where and on which cluster
+    # are on its page: a database's name is 40-odd characters in one piece, which pushes the rest out of sight.
+    list_display = ("hub", "moment", "status", "kept_until", "last_error")
     list_filter = ("status",)
     list_select_related = ("hub", "cluster")
     search_fields = ("hub__slug", "db_name")
