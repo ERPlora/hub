@@ -14,7 +14,7 @@
 // message to erplora.com, which asks Meta) would otherwise hold the very Graph that child waits on. Before a spec uses
 // erplora.com, `configProblem` and `graphProblem` read what erplora.com answered to the Hub's doors 10 and 11 (the
 // latter with `PROBE_CODE`, which only this Graph receives) and name the variable it was started without: a run whose
-// erplora.com would call the real Meta stops there, in seconds (FIX-HUB-WHATSAPP-E2E-STACK-RECIPE-MISSING-META-ENV).
+// erplora.com would call the real Meta stops there, in seconds.
 // Each call is kept in `calls` and in `calls.jsonl` beside the certificates: what erplora.com asked Meta in the run.
 import { execFile } from 'node:child_process';
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -267,8 +267,8 @@ function makeAuthority(certs: string, hubDir: string): Promise<void> {
 /** The command that starts the run's erplora.com: `node tests/e2e/whatsapp-graph.ts <hub port> <SAAS_URL>` makes the
  *  run's authority in `<artifacts>/meta-graph-<hub port>/` unless it is already there, then prints `erploraEnv`, one
  *  `NAME=value` per line, for `env $(…)`. An erplora.com started with SSL_CERT_FILE naming a file that is not there
- *  fails every call it makes, even a plain http one: its assistant answered the Hub 502 until the first WhatsApp spec
- *  made one (FIX-HUB-E2E-SAAS-ASSISTANT-502-BEFORE-META-CA-EXISTS). The Graph makes a new one whenever it starts, and
+ *  fails every call it makes, even a plain http one: its assistant would answer the Hub 502 until the first WhatsApp
+ *  spec made one. The Graph makes a new one whenever it starts, and
  *  erplora.com reads it per call. Resolves with the exit status. */
 export async function runCli(
   args: string[],

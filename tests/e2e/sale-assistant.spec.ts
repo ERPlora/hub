@@ -1,10 +1,9 @@
-// The card of a write of Sales the assistant wants to run (hub#561, FIX-HUB-SALE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS),
-// end to end with its real dependencies: the Hub of this stack, its SaaS's gateway and the e2e's provider
-// (assistant-provider.ts, its marker `E2E-ASK <tool> <JSON>`). The SaaS must be seeded with that provider (README «El
-// asistente»). Since hub#416 a card leaves out every id its app does not name, so the person confirmed sending a round
-// or deleting a section without reading which one. Now each record goes by the name Sales' screens give it, read as the
-// person, never by its id, and the order type by Kitchen's word. Cancelled: nothing is sent nor deleted.
-// What this file creates is deleted after it.
+// The card of a write of Sales the assistant wants to run (hub#561), end to end with its real dependencies: the Hub of
+// this stack, its SaaS's gateway and the e2e's provider (assistant-provider.ts, its marker `E2E-ASK <tool> <JSON>`).
+// The SaaS must be seeded with that provider (README «El asistente»). The person must read which round is sent or which
+// section is deleted before confirming, also when the app does not name the id (hub#416): each record goes by the name
+// Sales' screens give it, read as the person, never by its id, and the order type by Kitchen's word. Cancelled: nothing
+// is sent nor deleted. What this file creates is deleted after it.
 // flow: SALE-F20 SALE-F35 BASE-F97
 import { execSync } from 'node:child_process';
 

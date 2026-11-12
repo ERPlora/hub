@@ -1,9 +1,9 @@
 // @vitest-environment node
-// flow: e2e-capture — FIX of the e2e harness (FIX-HUB-E2E-OWN-ANIMATION-WAIT-UNGUARDED)
+// flow: e2e-capture — the e2e harness's one wait for «nothing moves»
 // Every wait for «nothing moves» in the e2e goes through the one detector of helpers.ts (`settled`, `untilStill`,
 // `movingInPage`), which asks every open shadow root too. `document.getAnimations()` leaves shadow roots out, and Ionic
-// animates its toasts, dialogs and popovers there: the specs that asked for animations themselves let a toast still
-// entering pass for still (the FIX-HUB-*-E2E-WAIT-BLIND-TO-SHADOW-ROOTS family). Their guardrails (`<app>-wait.test.ts`)
+// animates its toasts, dialogs and popovers there: a spec that asks for animations itself lets a toast still
+// entering pass for still. The per-app guardrails (`<app>-wait.test.ts`)
 // keep the copies out of their own app's files; this one keeps them out of every file of the e2e, as a ratchet:
 // `own-animation-waits.json` holds, for each file that still asks for animations itself, how many times; a file can only
 // lose them (and then its count goes down, or its line away), never gain them, and a new file has none.
@@ -95,8 +95,8 @@ const scans = new Map<string, Promise<Record<string, number>>>();
 
 /**
  * Each file under `dir` (the e2e's folder) that reaches for `getAnimations`, and how many times: its files read at
- * once and each parsed once per run. With the machine loaded a file's first open waits on its own, and the scan read
- * and parsed the 273 files of the e2e again in each test: 22 s against Vitest's 5 s beside `pnpm test` (2026-10-30).
+ * once and each parsed once per run. With the machine loaded a file's first open waits on its own, and reading and
+ * parsing every file of the e2e again in each test outlasts Vitest's 5 s beside `pnpm test`.
  */
 function readsByFile(dir = E2E_DIR): Promise<Record<string, number>> {
   let scan = scans.get(dir);

@@ -1,12 +1,12 @@
-// The device takes the paper out of the queue, in Chrome (apps/printing/WORKBOOK.md PRINTING-F18, F05, F13, F14;
-// FIX-HUB-PRINTING-WS-PRINT-CLIENT-IN-PACKAGES-UI): the page runs as the installed app — a fake `window.__TAURI__` that
-// keeps every command it is asked and answers it, well or with the device's error — against the Hub's real /ws/print
-// (daphne). The owner sets this device up from Printing → Devices, and from then on, on any screen:
+// The device takes the paper out of the queue, in Chrome (apps/printing/WORKBOOK.md PRINTING-F18, F05, F13, F14): the
+// page runs as the installed app — a fake `window.__TAURI__` that keeps every command it is asked and answers it, well
+// or with the device's error — against the Hub's real /ws/print (daphne). The owner sets this device up from Printing →
+// Devices, and from then on, on any screen:
 //   - «Test» on its printer leaves the «Test page» in the queue, the device prints it (`erplora_test_print`) and the
 //     queue says «Printed» (F05);
 //   - a cash charge at the till queues the receipt with the drawer's order; the device prints it (`erplora_print`), then
 //     opens the drawer (`erplora_open_drawer`) and the queue says «Printed» (F18, F13); when the drawer does not answer,
-//     the till says so and the receipt is not printed again (hub#2724);
+//     the till says so and the receipt is not printed again;
 //   - a printer that does not print: the job goes back to the queue with the device's error, and after five hand-outs
 //     it is «Failed» (F14).
 // Screenshots of the queue in the three viewports. What is made here is deleted, and the settings put back, after it.

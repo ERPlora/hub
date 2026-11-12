@@ -1,11 +1,11 @@
-// The assistant's card for a write of Tables (FIX-HUB-TABLE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS; base's half is hub#416,
-// BASE-F97): the table it acts on with its zone (the number repeats across zones), the zone it goes to and the check a
-// transfer moves, by the names the room's screens give them, never by the id the model sent (and, since hub#416, never
-// left out for whoever may read them). End to end with the stack's SaaS gateway and the e2e's provider
-// (assistant-provider.ts, `E2E-ASK <tool> <JSON>`): the SaaS must be seeded with it (README of this folder, «El
-// asistente»). The owner asks, in Spanish, to take a table of the terrace to the dining room (TABLE-F04) and, in English,
-// to transfer the check of that table to another one (TABLE-F15, dangerous): each card names them; cancelled, nothing
-// changes. What this file creates carries `E2ETac` and goes away; the apps it turns on are turned off again.
+// The assistant's card for a write of Tables (base's half is hub#416, BASE-F97): the table it acts on with its zone
+// (the number repeats across zones), the zone it goes to and the check a transfer moves, by the names the room's
+// screens give them, never by the id the model sent, and never left out for whoever may read them. End to end with the
+// stack's SaaS gateway and the e2e's provider (assistant-provider.ts, `E2E-ASK <tool> <JSON>`): the SaaS must be seeded
+// with it (README of this folder, «El asistente»). The owner asks, in Spanish, to take a table of the terrace to the
+// dining room (TABLE-F04) and, in English, to transfer the check of that table to another one (TABLE-F15, dangerous):
+// each card names them; cancelled, nothing changes. What this file creates carries `E2ETac` and goes away; the apps it
+// turns on are turned off again.
 // flow: table-assistant-card
 // flow: TABLE-F04 TABLE-F15 BASE-F97
 import { execSync } from 'node:child_process';

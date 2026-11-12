@@ -1,10 +1,9 @@
-// The charge sheet when the server cannot work out the total (FIX-SALE-CHECKOUT-TOTAL-SPINNER): a product
+// The charge sheet when the server cannot work out the total: a product
 // whose tax category has no rule in the business's country is on the check and «Charge» is tapped. The sheet
 // says why, in the server's words, with «Retry», and the error replaces «Working out the total…» — never both
 // at once (Square, Shopify POS, Toast). «Retry» asks the server again and, with the rule still missing, the
-// error comes back alone. Seen at 390×844, 834×1112 and 1440×900 (`FIX-SALE-CHECKOUT-TOTAL-SPINNER-<width>.png`).
-// What the run makes is deleted after it.
-// flow: ninguno — FIX sale
+// error comes back alone. Seen at 390×844, 834×1112 and 1440×900. What the run makes is deleted after it.
+// flow: none — Sales' charge sheet
 import { expect, test } from '@playwright/test';
 
 import { A, login, shot, shown } from './helpers';

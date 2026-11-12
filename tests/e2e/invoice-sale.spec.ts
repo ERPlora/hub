@@ -186,7 +186,7 @@ test('INVOICE-F01 and F09: a ticket refunded whole in Sales gets its rectifying 
   });
 });
 
-// flow: none — the column filters sit behind the table's funnel, as in the old hub.
+// flow: none — the column filters sit behind the table's funnel.
 test('Invoices filter by total in euros behind the funnel, with its count; a «to» day before its «from» is said under it', async ({ page, context }) => {
   await login(page, A, '/invoice/invoices');
   // Two tickets, 12,10 € and 6,05 €, each handed to Invoicing as the relay will.

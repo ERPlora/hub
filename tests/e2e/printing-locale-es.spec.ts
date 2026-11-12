@@ -1,8 +1,8 @@
-// flow: printing-locale — FIX-HUB-PRINTING-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP (PRINTING-F14): Django joins every
-// app's Spanish catalogue and the first that translates a message wins, so printing's job «Cancelled» read
-// appointment's «Cancelada». The owner opens «Cancel» on a job of the queue, someone else cancels it meanwhile (by
-// the API), and the cancel window says the server's refusal as it came: «… este está cancelado.», a job's word,
-// never «cancelada». In Spanish, at 390, 834 and 1440. What this file makes carries its own reference and goes away.
+// flow: printing-locale (PRINTING-F14) — Django joins every app's Spanish catalogue and the first that translates a
+// message wins, so printing's job «Cancelled» could read appointment's «Cancelada». The owner opens «Cancel» on a job
+// of the queue, someone else cancels it meanwhile (by the API), and the cancel window says the server's refusal as it
+// came: «… este está cancelado.», a job's word, never «cancelada». In Spanish, at 390, 834 and 1440. What this file
+// makes carries its own reference and goes away.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, psql, shown } from './helpers';

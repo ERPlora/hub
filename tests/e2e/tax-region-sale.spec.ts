@@ -1,7 +1,7 @@
-// A business of the Canary Islands, end to end (TAX-F11, pm#629 VF-17; FIX-TAX-REGION-IGIC): the owner keeps
+// A business of the Canary Islands, end to end (TAX-F11): the owner keeps
 // «Canary Islands (IGIC)» in Taxes → Settings, the category has its national 21 % VAT and a Canary IGIC 7 % rule,
 // and the till charges the product at the IGIC 7 %: the ticket and its breakdown say IGIC 7 %, never VAT. The
-// settings screen is seen at 390×844, 834×1112 and 1440×900 (`FIX-TAX-REGION-IGIC-<width>.png`). What the run
+// settings screen is seen at 390×844, 834×1112 and 1440×900. What the run
 // makes is deleted after it, and the business goes back to the whole country.
 import { expect, type Page, test } from '@playwright/test';
 

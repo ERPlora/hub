@@ -1,5 +1,5 @@
-// The hub's shell is the old hub's, side menu included. Moving between apps: the ⠿ «My apps» sheet and Home (the first entry of the
-// side menu, pinned from 992 px and a drawer below); no Back on the screens of a module; the sections of
+// The hub's shell. Moving between apps: the ⠿ «My apps» sheet and Home (the first entry of the side menu, pinned from
+// 992 px and a drawer below); no Back on the screens of a module; the sections of
 // an app stay in its bottom tabbar. The menu, the rail and the drawer themselves: shell-split-pane.spec.ts.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -49,10 +49,10 @@ test('390 / 834 / 1440: the way to the menu, the ⠿ apps and no Back in the top
   const results: Record<string, unknown> = {};
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    // The root of an app with sections (Customers, the old hub's reference screen).
+    // The root of an app with sections (Customers).
     await page.goto('/customer/customers');
     const bar = topbar(page);
-    // hub#1831: the way to the menu is there on the first paint: the drawer's below lg, the rail's from lg.
+    // The way to the menu is there on the first paint: the drawer's below lg, the rail's from lg.
     const menuDoor = vp.width >= 992 ? bar.rail : bar.drawer;
     for (const piece of [menuDoor, bar.apps]) await expect(piece).toBeVisible();
     await expect(vp.width >= 992 ? bar.drawer : bar.rail).toBeHidden();
@@ -115,8 +115,8 @@ test('the «My apps» sheet opens another app, and closes', async ({ page }) => 
   record('FIX-SHELL-NAV-open-app', { opened: name, url: page.url() });
 });
 
-// hub#2242 / hub#2241: going to an app and back fast left the address and the page out of step, or
-// the page stuck on its skeleton. Back to Home is the menu's Home now (pinned at this width).
+// Going to an app and back fast must keep the address and the page in step, and never leave the page stuck on its
+// skeleton. Back to Home is the menu's Home (pinned at this width).
 test('apps and Home, fast and repeated: the address and the page stay in step', async ({ page }) => {
   await login(page, A, '/');
   await expect(shown(page).locator('[data-testid=home-my-app]').first()).toBeVisible();
@@ -136,9 +136,9 @@ test('apps and Home, fast and repeated: the address and the page stay in step', 
   await expect(page.locator('ion-router-outlet > .ion-page:not(.ion-page-hidden)')).toHaveCount(1);
 });
 
-// hub#2489 / hub#2325: with a flaky network, tapping an app opened nothing and said nothing. Since gh:hub#438 the
-// notice is the shell router's, for every way of opening a screen (`view-load.ts` of @erplora/ui): the browser still
-// says «online» here, the server does not answer for the file, so the screen stays and the notice names the app.
+// With a flaky network, tapping an app must never open nothing and say nothing. The notice is the shell router's
+// (hub#438), for every way of opening a screen (`view-load.ts` of @erplora/ui): the browser still says «online» here,
+// the server does not answer for the file, so the screen stays and the notice names the app.
 test('an app whose page does not load says so, with a Retry; never silent', async ({ page }) => {
   await login(page, A);
   await page.goto('/demo/items');
@@ -231,7 +231,7 @@ for (const vp of VIEWPORTS) {
       roots[id] = landed;
     }
 
-    // The way out, seen: the root of Customers (the old hub's reference screen) with the sheet open, «Home» first.
+    // The way out, seen: the root of Customers with the sheet open, «Home» first.
     await page.goto('/customer/customers');
     await customersReady(page);
     const sheet = await openApps(page);
@@ -248,12 +248,12 @@ for (const vp of VIEWPORTS) {
   });
 }
 
-// flow: BASE-F05 · gh:hub#1906 — Android's Back button. Tauri does not run in Playwright: the installed app's bridge is
+// flow: BASE-F05 — Android's Back button. Tauri does not run in Playwright: the installed app's bridge is
 // simulated at the edge (`window.__TAURI__`, which records what it is asked and keeps the listener the shell registers
 // on the `app` plugin's `back-button`, what Tauri's `onBackButtonPress` listens to); a press calls that listener, as the
 // app does (system-back-helpers.ts). Hub, SaaS and the screens are the real ones.
 
-test('BASE-F05 gh:hub#1906: Back on the root of an app opened cold goes Home, and only Home leaves the app', async ({ page }) => {
+test('BASE-F05: Back on the root of an app opened cold goes Home, and only Home leaves the app', async ({ page }) => {
   await login(page, A);
   await insideTheApp(page);
   await page.goto('/demo/items'); // cold: a link or a reload straight into the app
@@ -269,7 +269,7 @@ test('BASE-F05 gh:hub#1906: Back on the root of an app opened cold goes Home, an
   await expect(page).toHaveURL(`${A}/`);
 });
 
-test('BASE-F05 gh:hub#1906: Back with «My apps» open closes the sheet, and the screen stays', async ({ page }) => {
+test('BASE-F05: Back with «My apps» open closes the sheet, and the screen stays', async ({ page }) => {
   await login(page, A);
   await insideTheApp(page);
   await page.goto('/demo/items');
@@ -283,7 +283,7 @@ test('BASE-F05 gh:hub#1906: Back with «My apps» open closes the sheet, and the
   expect(await leftTheApp(page)).toBe(false);
 });
 
-test('BASE-F05 gh:hub#1906: Back with the drawer open (390) closes it, and the screen stays', async ({ page }) => {
+test('BASE-F05: Back with the drawer open (390) closes it, and the screen stays', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page, A);
   await insideTheApp(page);
@@ -299,7 +299,7 @@ test('BASE-F05 gh:hub#1906: Back with the drawer open (390) closes it, and the s
   await expect(page).toHaveURL(`${A}/demo/items`);
 });
 
-test('BASE-F05 gh:hub#1906: Back on a detail view opened cold is its own Back, to the list', async ({ page, context }) => {
+test('BASE-F05: Back on a detail view opened cold is its own Back, to the list', async ({ page, context }) => {
   await login(page, A);
   const item = await createItem(context, A, uniqueName('Android Back item'));
   await insideTheApp(page);

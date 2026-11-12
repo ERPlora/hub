@@ -1,20 +1,19 @@
 // flow: WHATSAPP_INBOX-F13
 // A plan that includes no WhatsApp messages, through the run's REAL erplora.com, in a hidden Chrome (only Meta is
 // played: whatsapp-helpers.ts, «The run's real erplora.com»). erplora.com's own test seed gives `a` its number; then
-// `a`'s plan in erplora.com includes 0 WhatsApp messages a month (0 = none, ADR-0474: there is no «unlimited») and
+// `a`'s plan in erplora.com includes 0 WhatsApp messages a month (0 = none: there is no «unlimited») and
 // erplora.com pushes its photo here. The inbox says so above the list with «Upgrade plan» (erplora.com's plans), a
 // customer's message still arrives through erplora.com (the cap only limits what is sent), the open conversation's
 // «Send» says why instead of sending, and Settings → This month says the plan includes none, never «No limit».
-// Captured in three sizes (FIX-HUB-WHATSAPP-INBOX-ZERO-LIMIT-SHOWN-UNLIMITED-390|834|1440, and -settings-…). The
-// plan's figure goes back after the file; what it creates is named `e2e.…` and deleted.
+// Captured in three sizes. The plan's figure goes back after the file; what it creates is named `e2e.…` and deleted.
 // Then the month spent: erplora.com's seed sets `a`'s usage this month to its plan's allowance (`--used`), and pushes
 // it. Settings → This month says it, the inbox too, a customer's message still arrives, and the next send is refused
 // as `cap_reached` — by the Hub when it knows it, by erplora.com when the Hub's figure is behind — before Meta: the
-// run's Graph never receives it and erplora.com's count stays at the allowance
-// (FIX-HUB-WHATSAPP-INBOX-E2E-SEED-TEMPLATES-AND-CAP-UNUSED-F13-…). The month goes back to 0 after the file.
+// run's Graph never receives it and erplora.com's count stays at the allowance. The month goes back to 0 after the
+// file.
 // Before that, the month nearly spent: erplora.com's seed sets `a`'s usage to 80 % of its plan's allowance and pushes
 // it; the inbox says how many are left with «Upgrade plan», and so does Settings → This month, as the assistant says
-// its own from 80 % (BASE-F104). Captured in three sizes (FIX-HUB-WHATSAPP-INBOX-WORKBOOK-KEEPS-SETTLED-DECISIONS-OPEN-…).
+// its own from 80 % (BASE-F104). Captured in three sizes.
 import { execFileSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 

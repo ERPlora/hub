@@ -111,7 +111,7 @@ test('Special days in the three viewports: no horizontal scroll; cards on a phon
   }
 });
 
-// flow: none — the column filters sit behind the table's funnel, as in the old hub.
+// flow: none — the column filters sit behind the table's funnel.
 test('Special days filter by Name behind their own funnel, with its count, the panel open at every width', async ({ page, context }) => {
   const stamp = Date.now().toString(36);
   const kept = `${TAG} Fil${stamp} One`;

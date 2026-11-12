@@ -28,7 +28,7 @@ const VIEWPORTS = [
   { label: '1440', width: 1440, height: 900 },
 ];
 
-/** The business's wall clock (Madrid in phase 1), `now + minutes`, rounded up to 5 minutes. */
+/** The business's wall clock (Madrid, hub `a`'s zone), `now + minutes`, rounded up to 5 minutes. */
 function madrid(minutes = 0): { date: string; time: string; weekday: number } {
   const at = new Date(Date.now() + minutes * 60_000);
   const parts = Object.fromEntries(

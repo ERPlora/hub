@@ -143,7 +143,7 @@ test('SALE-F31: the owner refunds a sale in full by its card', async ({ page, co
   await expect(row(page, card)).toContainText(/Refunded|Devuelta/);
 });
 
-// flow: none — the column filters sit behind the table's funnel, as in the old hub.
+// flow: none — the column filters sit behind the table's funnel.
 test('Sales filter by total in euros and by payment behind the funnel, with its count; a «to» day before its «from» is said under it', async ({ page, context }) => {
   await login(page, A, '/sale/sales');
   const { toggle, panel, count } = funnel(page);
@@ -155,7 +155,7 @@ test('Sales filter by total in euros and by payment behind the funnel, with its 
     await expect(row(page, card)).toBeVisible();
     await toggle.click();
     await expect(panel).toBeVisible();
-    // «Total from 20» is twenty euros (sales#428): the 24,20 € sale stays, the 12,10 € one goes.
+    // «Total from 20» is twenty euros: the 24,20 € sale stays, the 12,10 € one goes.
     await panel.locator('[data-testid=sales-table-filter-total_min] input').fill('20');
     await panel.locator('[data-testid=sales-table-filters-apply]').click();
     await expect(panel).toBeHidden();

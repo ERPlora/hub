@@ -267,7 +267,7 @@ export const settledChipFit = (
   message: string,
 ): Promise<Awaited<ReturnType<typeof chipFit>>> => settled(() => chipFit(chip, options), message, { problems: [], metrics: {} });
 
-/** FIX-UI-DATATABLE-CELL-NO-WRAP-SQUEEZES-CHIP-BESIDE-BADGE - How a «Not configured» chip and the badge painted after
+/** How a «Not configured» chip and the badge painted after
  *  it (`badge`, a selector inside the same box) share their box (`within`, as `chipFit`): what is wrong with them (none
  *  = the chip is whole or as wide as its box, never squeezed by the badge beside it; the badge whole and inside the box;
  *  neither over the other) and their measurements for the report. */
