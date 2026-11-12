@@ -85,8 +85,8 @@ describe('guardrail: the Hub learns the typed decimal mark from the platform (ba
     expect(ownDecimalMarks(component.join('\n'), 'QtyStepper.vue')).toEqual([3]);
   });
 
-  it('no app, nor base, learns the typed decimal mark on its own', () => {
-    expect(findingsByApp(hubFrontends({ ui: false }), ownDecimalMarks), LEARN_IT_FROM_THE_PLATFORM).toEqual({});
-    // It reads every frontend file of the Hub (some 1,600), synchronously: as long as the machine makes it (hub#1200).
+  it('no app, nor base, learns the typed decimal mark on its own', async () => {
+    expect(await findingsByApp(hubFrontends({ ui: false }), ownDecimalMarks), LEARN_IT_FROM_THE_PLATFORM).toEqual({});
+    // It reads every frontend file of the Hub (some 2,000) without holding the worker, as long as the machine makes it (hub#1315).
   }, NO_CLOCK);
 });
