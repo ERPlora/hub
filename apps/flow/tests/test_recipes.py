@@ -272,7 +272,7 @@ def test_two_recipes_with_the_same_id_in_one_app_keep_the_first_and_set_the_othe
     assert [(item.ref, item.code) for item in set_aside] == [("appointment/gap", "flow.recipe_invalid")]
 
 
-# ── The fingerprint: what it does, never how it is explained (hub#2059) ──────────────────────────────
+# ── The fingerprint: what it does, never how it is explained ────────────────────────────────────────
 
 
 def test_the_same_recipe_always_has_the_same_fingerprint(declared):
@@ -328,7 +328,7 @@ def test_nothing_to_repair_when_it_has_the_clauses_or_starts_otherwise(declared)
     current = recipes.digest(recipe)
     event = "appointment.appointment.cancelled"
     # Built from today's version and its clause taken off: it still lacks it. A clause of its app counts whenever it
-    # was built (FIX-HUB-FLOW-FACTORY-SAFETY-FIX-WAITS-FOR-THE-OWNERS-UPDATE): before, this was «the owner's choice».
+    # was built, never as «the owner's choice».
     taken_off = make_flow(trigger_event=event, trigger_filter={}, recipe_digest=current)
     assert recipes.missing_clauses(recipe, taken_off) == {"input.by_customer": {"eq": True}}
     # It already has the clause (the owner's own value of it is kept: only a missing clause is a fault).

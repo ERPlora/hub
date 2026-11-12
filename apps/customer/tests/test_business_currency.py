@@ -1,8 +1,8 @@
 """Money in the business's currency (flow customer-business-currency): its country's, as ``base.business.get`` reads it
-from this hub's registry (APP-BASE-6), never a euro fixed in the app. «Spent» of the CSV export is written with the
-decimals of that currency (the yen has none, the Kuwaiti dinar three); a purchase keeps the currency it was paid in
-(a record is never rewritten) and says the decimals the server counts it in, so the screen never asks the browser's
-Intl (which gives the forint none). Each hub its own."""
+from this hub's registry, never a euro fixed in the app. «Spent» of the CSV export is written with the decimals of that
+currency (the yen has none, the Kuwaiti dinar three); a purchase keeps the currency it was paid in (a record is never
+rewritten) and says the decimals the server counts it in, so the screen never asks the browser's Intl (which gives the
+forint none). Each hub its own."""
 
 import csv
 import io

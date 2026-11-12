@@ -180,8 +180,7 @@ def session_of(make_user, username, role):
 
 @pytest.mark.django_db
 def test_an_employee_takes_no_job_until_a_manager_sets_up_the_device(make_user):
-    # FIX-PRINTING-JOBS-CLAIMED-BY-ANY-DEVICE: POST /api/printing/jobs/claim with an employee's session handed
-    # the job of any printer it named.
+    # POST /api/printing/jobs/claim with an employee's session never hands over the job of whatever printer it names.
     manager = session_of(make_user, "mar", "hub_manager")
     employee = session_of(make_user, "ana", "hub_employee")
     till = post(manager, "/printing/printers", {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"}).json()

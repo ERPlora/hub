@@ -1,7 +1,7 @@
-"""The drawer counts in the business's currency (flow business-currency): its country's, as ``base.business.get``
-reads it from this hub's registry (APP-BASE-6), never a euro fixed in the app nor a call to erplora.com. A business in
-Poland counts zlotys with their notes and coins; one in Spain, euros; each hub its own. An API key holds only the
-permission of the operation it opened, and still gets the business's currency."""
+"""The drawer counts in the business's currency (flow business-currency): its country's, as ``base.business.get`` reads
+it from this hub's registry, never a euro fixed in the app nor a call to erplora.com. A business in Poland counts zlotys
+with their notes and coins; one in Spain, euros; each hub its own. An API key holds only the permission of the operation
+it opened, and still gets the business's currency."""
 
 import pytest
 from live.context import OperationContext, Scope
@@ -68,8 +68,8 @@ def test_the_printed_report_takes_the_decimals_of_the_business_s_currency():
 
 @pytest.mark.parametrize(("country", "currency", "decimals", "three_ones"), [("PL", "PLN", 2, 300), ("JP", "JPY", 0, 3)])
 def test_erploras_own_hub_counts_in_the_currency_of_its_issuer_s_country(settings, country, currency, decimals, three_ones):
-    # Phase 1's platform hub has no business on erplora.com (no registry row, create_platform_hub) and every module is on
-    # in it (base.activation.is_platform): its drawer counts and prints in the currency of its issuer's country, as its
+    # ERPlora's own hub has no business on erplora.com (no registry row, create_platform_hub) and every module is on in
+    # it (base.activation.is_platform): its drawer counts and prints in the currency of its issuer's country, as its
     # sales and invoices do (hub#286), never a 404 because there is no business to read.
     settings.PLATFORM_HUB_SLUG = "erplora"
     settings.PLATFORM_ISSUER_COUNTRY = country

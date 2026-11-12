@@ -104,9 +104,9 @@ ON_AN_ITEM = {"demo.item.update", "demo.item.delete", "demo.item.add_line"}
 
 
 def test_a_write_on_an_item_finds_it_before_its_card():
-    """hub#1162 (BASE-G115, ``base.assistant.checked``): the item said by its name is looked for before the assistant
-    draws the card, so a name two items share, or none has, is told to the model instead of a card that would fail
-    after the person's yes."""
+    """hub#1162 (``base.assistant.checked``): the item said by its name is looked for before the assistant draws the
+    card, so a name two items share, or none has, is told to the model instead of a card that would fail after the
+    person's yes."""
     assert {name for name, op in demo_operations().items() if op.ai.get("check") == "demo.item.detail"} == ON_AN_ITEM
 
 

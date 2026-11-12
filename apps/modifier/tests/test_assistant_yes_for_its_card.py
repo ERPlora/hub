@@ -182,7 +182,7 @@ def test_the_yes_runs_nothing_when_another_group_fits_the_name_better_before_it(
 @pytest.mark.parametrize("write", WRITES)
 def test_a_name_two_groups_fit_draws_no_card_and_the_model_hears_it(write):
     """«salsas» fits «Salsas picantes» and «Salsas dulces»: no card that would act on either; the model hears
-    ``modifier.group_ambiguous`` and asks the person which one (BASE-G115: the data are checked before any card)."""
+    ``modifier.group_ambiguous`` and asks the person which one (the data are checked before any card)."""
     a_group("Salsas picantes")
     a_group("Salsas dulces")
 

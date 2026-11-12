@@ -60,14 +60,14 @@ async function setup(options: MountOptions = {}) {
 }
 
 describe('SeriesPage', () => {
-  it('follows invoice.series.list, this year’s first, with the intro of the old screen', async () => {
+  it('follows invoice.series.list, this year’s first, with its intro', async () => {
     const s = await setup();
     expect(s.params(OP)).toEqual([{ sort: 'year', dir: 'desc', limit: 50, offset: 0 }]);
     expect(s.find('invoice-series-intro').text()).toContain('Each series sets the prefix, the format and the counter');
     expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Invoicing');
   });
 
-  it('paints the nine columns of the old table, in cards under 1280 px', async () => {
+  it('paints its nine columns, in cards under 1280 px', async () => {
     const s = await setup();
     await s.show(PAGE);
     expect(s.prop<Array<{ key: string; label: string }>>('columns').map((c) => [c.key, c.label])).toEqual([
@@ -128,7 +128,7 @@ describe('SeriesPage', () => {
     expect(redNotices(s)).toBe(0);
   });
 
-  it('to whoever may not change the issuer, says once that an administrator has to, with no «Configurar» (gh:hub#435)', async () => {
+  it('to whoever may not change the issuer, says once that an administrator has to, with no «Configurar»', async () => {
     const s = await setup({ platformNotice: true, locale: 'es', session: EMPLOYEE });
     await answerIssuer(s, false, { locale: 'es', actionable: false });
     expect(said(s.wrapper.text(), 'Todavía no puedes facturar')).toBe(1);
@@ -155,7 +155,7 @@ describe('SeriesPage', () => {
   });
 });
 
-describe('SeriesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('SeriesPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
