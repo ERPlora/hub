@@ -20,7 +20,7 @@ from apps.task.tests.conftest import ctx_for, make_member, make_project, make_ta
 from apps.task.tests.test_integration_assistant import SCREENS, SCREENS_EN, task_writes
 from base import assistant
 from base.schemas import names
-from base.tests.test_assistant_yes_for_its_card import turn_as, yes_to_its_card
+from base.tests.test_assistant_yes_for_its_card import read_as, turn_as, unless_of, yes_to_its_card
 from base.tests.test_services_assistant import call
 
 pytestmark = pytest.mark.django_db
@@ -229,7 +229,7 @@ def test_every_write_that_takes_a_task_or_a_project_by_its_name_reads_it_and_say
         (op.name, datum)
         for op in task_writes()
         for datum, mark in marks.items()
-        if datum in op.input.model_fields and op.input.model_fields[datum].json_schema_extra == mark
+        if datum in op.input.model_fields and read_as(op.input.model_fields[datum].json_schema_extra) == mark
     }
     assert reading == (
         {(write, "task") for write in ON_A_TASK}
@@ -298,11 +298,43 @@ def test_the_yes_to_a_write_that_cannot_check_it_touches_only_what_its_card_show
     assert state() == before["state"]
 
 
-# ── Not yet: a record that comes by its id with the name of another one beside it (hub#1250) ───────────────────────
-# The write takes the task or the project by its id and never looks at the name; the card reads that name all the
-# same and says both under one word («Tarea: Llamar al proveedor» and «Tarea: Pedir hielo»). The yes is still held to
-# what the card read, and the write acts on the one of the id. Strict: once the card leaves out a name the write does
-# not use, the first passes and its mark goes.
+# ── A record that comes by its id with the name of another one beside it (hub#1250) ──────────────────────────────────
+# The write takes the task or the project by its id and never looks at the name beside it: the card neither reads nor
+# shows it (``unless``), never «Tarea: Pedir hielo» beside «Tarea: Llamar al proveedor». Moving a task to a project is
+# the other way round: the project said by its name wins over ``project_id``, so the card leaves the id unread.
+
+#: Beside which data each write of Tasks takes its record by them and not by the datum.
+UNLESS = {
+    **{(name, "task"): {"id"} for name in ON_A_TASK},
+    **{(name, "project"): {"id"} for name in ON_A_PROJECT},
+    ("task.comment.add", "task"): {"task_id"},
+    ("task.task.create", "parent"): {"parent_id"},
+    ("task.task.create", "project"): {"project_id"},
+    ("task.task.update", "project"): set(),
+    ("task.task.update", "project_id"): {"project"},
+}
+
+
+def test_a_datum_is_left_unread_beside_each_datum_its_write_takes_its_record_by_instead():
+    marked = {
+        (op.name, datum): unless_of(op.input.model_fields[datum].json_schema_extra)
+        for op in task_writes()
+        for datum in ("task", "project", "parent", "project_id")
+        if datum in op.input.model_fields and (op.input.model_fields[datum].json_schema_extra or {}).get("refers")
+        and (datum != "project_id" or op.name == "task.task.update")
+    }
+    assert marked == UNLESS
+
+
+def test_moving_a_task_names_only_the_project_said_by_its_name_whatever_id_comes_beside_it():
+    """``task.task.update`` moves the task to the project said by its name, whatever ``project_id`` comes beside it:
+    the card says that one, never the project of the id it will not use."""
+    task = make_task("Llamar al proveedor")
+    kept = make_project("p-reforma", "Reforma del baño")
+    make_project("p-apertura", "Apertura")
+    arguments = {"id": str(task.id), "project_id": str(kept.id), "project": "apertura"}
+    shown = [field["value"] for field in assistant.card(get("task.task.update"), arguments, "es", as_admin())["fields"]]
+    assert ("Apertura" in shown, "Reforma del baño" in shown) == (True, False)
 
 OTHER = {"task": ("Pedir hielo", "hielo"), "project": ("Reforma del baño", "reforma")}
 
@@ -317,7 +349,6 @@ def by_its_id_beside_another_name(write: str) -> dict:
     return {**by_its_name(word)[write], "id": str(record.id)}
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="hub#1250: the card reads a name the write does not use")
 @pytest.mark.parametrize("write", sorted(CHECKS))
 def test_a_record_that_comes_by_its_id_names_no_other_one_said_beside_it(write):
     card = assistant.card(get(write), by_its_id_beside_another_name(write), "es", as_admin())

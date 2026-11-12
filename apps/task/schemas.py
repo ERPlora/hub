@@ -27,7 +27,7 @@ from pydantic import (
 
 from apps.task.models import TEXT_MAX_LENGTH, TITLE_MAX_LENGTH, Task
 from base.business import business_zone
-from base.schemas import names
+from base.schemas import names, unless_given
 
 T = TypeVar("T")
 
@@ -156,7 +156,9 @@ A_PROJECT = names("task.project.detail")
 # a project by its code or its name alone, so the card reads it by what was said, as the write will find it, and shows
 # the one the write acts on («Llamar al proveedor» when the person said «llamar», hub#1219), not only the words said;
 # words it cannot read (two fit, none does) it says as said, never off the card, so the writes that cannot check it (a
-# comment's task, a new task's project and parent task, the project a task is moved to) read it too (hub#1245).
+# comment's task, a new task's project and parent task, the project a task is moved to) read it too (hub#1245). Beside
+# the id the write takes it by instead, the card neither reads nor shows it (``unless_given``, hub#1250); moving a task
+# is the other way round: the project said by its name wins over ``project_id``, which is then left unread.
 A_TASK_BY_NAME = names("task.task.detail", by="task", name=("title",), as_said=True)
 A_PROJECT_BY_NAME = names("task.project.detail", by="project", as_said=True)
 A_MEMBER = names("staff.member.detail", name=("full_name",))
@@ -200,7 +202,9 @@ class Page(Schema, Generic[T]):
 
 class TaskRefIn(In):
     id: UUID | None = Field(None, title=T_TASK, description=D_TASK_ID, json_schema_extra=A_TASK)
-    task: Reference | None = Field(None, validate_default=True, description=D_TASK, json_schema_extra=A_TASK_BY_NAME)
+    task: Reference | None = Field(
+        None, validate_default=True, description=D_TASK, json_schema_extra=unless_given(A_TASK_BY_NAME, "id")
+    )
 
     _task_named = _said_by("task", "id", NO_TASK)
 
@@ -208,7 +212,7 @@ class TaskRefIn(In):
 class ProjectRefIn(In):
     id: UUID | None = Field(None, title=T_PROJECT, description=D_PROJECT_ID, json_schema_extra=A_PROJECT)
     project: Reference | None = Field(
-        None, validate_default=True, description=D_PROJECT, json_schema_extra=A_PROJECT_BY_NAME
+        None, validate_default=True, description=D_PROJECT, json_schema_extra=unless_given(A_PROJECT_BY_NAME, "id")
     )
 
     _project_named = _said_by("project", "id", NO_PROJECT)
@@ -288,7 +292,9 @@ class TaskIn(In):
     priority: TaskPriority = Field("medium", description=D_PRIORITY)
     due_date: DueDate = Field(None, description=D_DUE_DATE)
     project_id: UUID | None = Field(None, description=D_PROJECT_ID, json_schema_extra=A_PROJECT)
-    project: Reference | None = Field(None, description=D_PROJECT, json_schema_extra=A_PROJECT_BY_NAME)
+    project: Reference | None = Field(
+        None, description=D_PROJECT, json_schema_extra=unless_given(A_PROJECT_BY_NAME, "project_id")
+    )
     parent_id: UUID | None = Field(
         None,
         description="Id of the task this one is a subtask of. Give it, or its number or title in `parent`.",
@@ -297,7 +303,7 @@ class TaskIn(In):
     parent: Reference | None = Field(
         None,
         description="Number or title of the task this one is a subtask of, when its id is not known.",
-        json_schema_extra=A_TASK_BY_NAME,
+        json_schema_extra=unless_given(A_TASK_BY_NAME, "parent_id"),
     )
     assigned_to_id: UUID | None = Field(
         None, description="Id of the staff member who will do it.", json_schema_extra=A_MEMBER
@@ -318,7 +324,9 @@ class TaskPatchIn(TaskRefIn):
     priority: TaskPriority | None = Field(None, description=D_PRIORITY)
     due_date: DueDate = Field(None, description=D_DUE_DATE + " Send null to clear it.")
     project_id: UUID | None = Field(
-        None, description=D_PROJECT_ID + " Send null to take it out.", json_schema_extra=A_PROJECT
+        None,
+        description=D_PROJECT_ID + " Send null to take it out.",
+        json_schema_extra=unless_given(A_PROJECT, "project"),
     )
     project: Reference | None = Field(None, description=D_PROJECT, json_schema_extra=A_PROJECT_BY_NAME)
     tags: Tags | None = Field(None, description=D_TAGS + " Replaces the list.")
@@ -368,7 +376,9 @@ class CommentListIn(PageIn):
 
 class CommentIn(In):
     task_id: UUID | None = Field(None, description=D_TASK_ID, json_schema_extra=A_TASK)
-    task: Reference | None = Field(None, validate_default=True, description=D_TASK, json_schema_extra=A_TASK_BY_NAME)
+    task: Reference | None = Field(
+        None, validate_default=True, description=D_TASK, json_schema_extra=unless_given(A_TASK_BY_NAME, "task_id")
+    )
     text: CommentText = Field(description="The comment (up to 5000 characters).")
 
     _task_named = _said_by("task", "task_id", NO_TASK)

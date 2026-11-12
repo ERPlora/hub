@@ -361,7 +361,9 @@ tarjeta: si antes de confirmar alguien crea un grupo que encaja mejor con lo dic
 su nombre, la tarjeta enseña igual el grupo que encontró y el «sí» vale solo para él; si lo dicho vale para varios
 grupos, la tarjeta lo enseña tal como se dijo y la acción pregunta cuál. Una opción dicha por su nombre sale como la
 encuentra, con su grupo («Opción: Alioli (Salsas picantes)» cuando se dijo «ali»), o tal como se dijo si vale para
-varias (hub#1245).
+varias (hub#1245). Si el grupo, la opción o el enganche llegan por su identificador junto al nombre de otro grupo,
+la tarjeta no lee ni enseña ese nombre, que la acción no usa: dice el registro del identificador (hub#1250). Una
+opción por su identificador se busca dentro del grupo que se diga a su lado, así que ese grupo sí sale.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -528,9 +530,10 @@ cajero del producto actual es un empleado.
   quepa en la suya, `base.E012`) también la lleva: su huella lleva el grupo encontrado y el «sí» vale solo para él. El
   `option` dicho por su nombre se lee con su grupo (`AN_OPTION_BY_NAME`, `within` `group_id` y `group`). Con ese
   `check`, `modifier.link.detach` por el asistente rechaza antes de la tarjeta un
-  enganche a algo borrado (`modifier.link.get` solo lee `LIVE_LINK`); la operación lo sigue soltando por su id. Y un
-  registro que llega por su id junto al nombre de otro grupo enseña los dos grupos en la tarjeta, porque la marca lee
-  un nombre que la escritura no usa: otro caso en `xfail(strict=True)` (hub#1250).
+  enganche a algo borrado (`modifier.link.get` solo lee `LIVE_LINK`); la operación lo sigue soltando por su id. Junto
+  al id con que la escritura toma su registro en su lugar (el del grupo, la opción o el enganche, o `group_id`), la
+  tarjeta deja sin leer el nombre (`base.schemas.unless_given`, hub#1250); el `group` de `OptionRefIn` solo junto a
+  `group_id`, porque la opción por su id se busca en ese grupo (`UNLESS` de `tests/test_assistant_yes_for_its_card.py`).
 - **Administrador de Django con CRUD completo** (ronda 12, PLAN §17), solo en `hubs.erplora.com` y para
   el staff: lo que guarda no pasa por las operaciones ni deja aviso, y no aplica sus reglas propias (las
   opciones por defecto dentro del máximo, las 100 opciones por grupo); la base de datos sí le rechaza

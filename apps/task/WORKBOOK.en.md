@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4a409bb1b80c9cd567dc7e982fa45c7011ac244c7be73d2b36b49e58fbd5ca2d -->
+<!-- generated from WORKBOOK.md sha256:6cfdc4869dfc8c80189117fd4c3964d34e91805eafaf55928758cf3c27df8fb0 -->
 
 ## What it is for and who it is for
 
@@ -400,6 +400,9 @@ for what the card showed: if, before confirming, someone creates a task that fit
 card said "Call the supplier"), nothing is touched and the new card comes up. The task of a comment, the parent task
 and the project of a new task, and the project a task is moved to, said by their name, also come up as the action finds
 them, and the "yes" counts only for them; if what was said fits several, the card says it as it was said (hub#1245).
+If the task or the project comes by its identifier beside another one's name, the card neither reads nor shows that
+name, which the action does not use; and when a task is moved to a project said by its name, which wins over an
+identifier that comes beside it, the card shows only that project (hub#1250).
 
 ### What it offers: queries (they read and change nothing; all of them can be followed live)
 

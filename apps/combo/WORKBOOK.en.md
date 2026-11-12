@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d1b726219cbb6a325663baefd8f18ba7701b12872100237586fe8f9d211d3ad0 -->
+<!-- generated from WORKBOOK.md sha256:2005bfd5aeaf1c85aeb03eb8f29ddf06e988802aefa59ba302d5e64813773f68 -->
 
 ## What it is for and who it is for
 
@@ -523,7 +523,9 @@ Homemade desserts" when "desserts" was said, "Choice: House flan" when "flan" wa
 courses and choices, and with an Inventory product said by its name, the card also shows the menu, the course and the
 product it found, and the "yes" counts only for them: if, before confirming, someone creates one that fits better what
 was said, nothing is touched and the new card comes up; if what was said fits several, the card shows it as it was said
-and the action asks which one (hub#1245).
+and the action asks which one (hub#1245). If the menu, the course or the choice comes by its identifier beside a name
+the action does not use (another menu's, another course's or another product's), the card neither reads nor shows that
+name: it says the record of the identifier, as when it comes alone (hub#1250).
 
 ### What it offers: queries (they read, they change nothing)
 

@@ -47,6 +47,17 @@ def yes_to_its_card(person: OperationContext, write: str, arguments: dict, meanw
     return yes_to(plan, turn_of=lambda *calls, decision: turn_as(person, *calls, decision=decision))
 
 
+def read_as(mark: dict) -> dict:
+    """How the card reads a datum by its mark (``names``), but for the data beside which it leaves it unread
+    (``unless``, hub#1250): an app compares how it reads each datum apart from where it does not."""
+    return {"refers": {key: value for key, value in mark["refers"].items() if key != "unless"}}
+
+
+def unless_of(mark: dict) -> set[str]:
+    """The data beside which the card leaves a datum by its mark unread (``unless``, hub#1250)."""
+    return set(mark["refers"].get("unless", ()))
+
+
 def said(plan: dict) -> list[tuple[str, object]]:
     return [(field["name"], field["value"]) for field in plan["confirm"]["fields"]]
 
