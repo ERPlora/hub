@@ -127,6 +127,27 @@ def fresh(hub: Hub) -> Hub:
     return Hub.objects.select_related("cluster").get(pk=hub.pk)
 
 
+def worked_on(monkeypatch) -> list:
+    """The hubs a pass over ``hub_due`` works on, as it counts them: each demo it dropped and each preparation that
+    ended. Compared with what ``provision.run_due`` returns, never a fixed total: the pass also works on whatever else
+    its process left due (hub#1332)."""
+    seen = []
+    drop, prepare = provision._drop, provision._prepare
+
+    def dropped(hub_id, now):
+        if result := drop(hub_id, now):
+            seen.append(hub_id)
+        return result
+
+    def prepared(hub_id, **kwargs):
+        prepare(hub_id, **kwargs)
+        seen.append(hub_id)
+
+    monkeypatch.setattr(provision, "_drop", dropped)
+    monkeypatch.setattr(provision, "_prepare", prepared)
+    return seen
+
+
 def test_a_business_is_born_with_its_own_database_its_identity_and_its_schema(registry, hub_databases, told):
     hub = registry.hub()
 
@@ -477,14 +498,17 @@ def test_a_demos_database_that_is_not_dropped_keeps_its_files(registry, monkeypa
     assert set(objects(moto_s3, hub_files_bucket)) == kept
 
 
-def test_a_demo_that_ends_while_it_is_made_is_dropped_not_finished(registry, told):
+def test_a_demo_that_ends_while_it_is_made_is_dropped_not_finished(registry, monkeypatch, told):
     demo = registry.hub(demo=True, status=Hub.Status.CREATING, expires_at=timezone.now() - dt.timedelta(minutes=1))
     HubDue.mark_due(demo)
+    seen = worked_on(monkeypatch)
 
-    provision.run_due()
+    worked = provision.run_due()
 
     assert fresh(demo).status == "purged" and demo.db_name not in databases()
     assert not HubDue.objects.filter(pk=demo.pk).exists()
+    # A drop is work it counts, as a preparation is.
+    assert demo.pk in seen and worked == len(seen)
 
 
 def test_the_due_pass_prepares_what_is_due_and_leaves_what_waits_for_its_retry(registry, told):
