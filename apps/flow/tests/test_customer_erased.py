@@ -13,6 +13,7 @@ writes its notice; one tick hands it to flow.
 
 import datetime as dt
 import json
+import uuid
 
 import pytest
 from django.utils import timezone
@@ -66,6 +67,14 @@ def stored(row: FlowRun) -> str:
     texts = list(Question.objects.filter(run=row).values_list("title", "details", "note"))
     kept = [row.input, row.outputs, row.error_message, row.error_reason, row.log, texts]
     return json.dumps(kept, default=str, ensure_ascii=False)
+
+
+def ids_it_read(row: FlowRun) -> list[str]:
+    """The ids a run keeps of what its steps read and it has forgotten: each one an id and nothing else, so that no
+    name, phone or text of a person outlives there what was read."""
+    row.refresh_from_db()
+    assert [kept for kept in row.read_ids if str(uuid.UUID(kept)) != kept] == []
+    return row.read_ids
 
 
 def run_that_read_her_card(status: str, steps: list[dict], **fields) -> tuple[FlowRun, Customer]:
@@ -365,6 +374,7 @@ def test_a_run_by_hand_that_read_her_card_forgets_her_name_once_it_has_ended(wor
     asking.refresh_from_db()
     assert (asking.status, asking.input, asking.outputs) == (FlowRun.Status.CANCELLED, {}, {})
     assert "Eva Ruiz" in stored(asking) and str(eva.id) not in stored(asking)  # positive control: the issue's gap
+    assert str(eva.id) in ids_it_read(asking)
 
     erase(worker, eva.id)
     worker()
@@ -386,6 +396,7 @@ def test_a_run_whose_assistant_read_her_card_forgets_what_it_answered_about_her(
     answered = by_hand(worker, [helper], ["customer.customer.detail"])
     assert (answered.status, answered.outputs) == (FlowRun.Status.SUCCEEDED, {})
     assert "Eva Ruiz" in stored(answered) and str(eva.id) not in stored(answered)  # positive control
+    assert str(eva.id) in ids_it_read(answered)
 
     erase(worker, eva.id)
     worker()
@@ -409,6 +420,7 @@ def test_a_run_stopped_by_an_error_whose_card_the_hourly_pass_forgot_is_still_fo
                       error_message="Call Ana López is already a task")
     run("flow.run.prune", {}, system_context(A))
     assert str(eva.id) not in stored(failed) and str(ana.id) not in stored(others)  # positive control
+    assert ids_it_read(failed) == [str(eva.id)] and ids_it_read(others) == [str(ana.id)]
     kept_by_others = stored(others)
 
     assert run("flow.customer.erase", {"id": str(eva.id)}, system_context(A)).changed == 1
