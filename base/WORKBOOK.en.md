@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7e446edad986302c017881f162ffdf62d23540abfbcec4fd884217ccef8d3fbc -->
+<!-- generated from WORKBOOK.md sha256:4dc63804ab94467f2d184cff9f4d67f9998fabb8e3b7d60e32d22807f392ed1d -->
 
 ## What it is for and who it is for
 
@@ -523,8 +523,7 @@ Steps:
      (hub#1015, hub#1020, hub#1031, hub#1046). Those same windows ask the same question when "Cancel", "Close", the
      "×" or Escape is pressed and on a tap outside, on the phone and on the computer, and with nothing typed they close
      without asking (hub#1023, hub#1156; the Task and Project sheets and quick customer creation at the till,
-     hub#1233); not yet Cash register's open shift, cash in or out, count and close windows (hub#1234), which only
-     ask with the back button. With nothing open, on a record or a new one it does the same as "Back"; on the main screen
+     hub#1233; Cash register's open shift, cash in or out, count and close windows, hub#1234). With nothing open, on a record or a new one it does the same as "Back"; on the main screen
      of an app it goes back to the Home, also when that screen was reached through a link; and on the Home
      it sends the app to the background.
 In: the apps of the person's menu (the same as the bar's "My apps" button).
