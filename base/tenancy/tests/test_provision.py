@@ -17,6 +17,8 @@ import datetime as dt
 import logging
 import threading
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -166,16 +168,24 @@ def test_a_failed_preparation_leaves_no_connection_open_either(registry, monkeyp
     hubs.assert_nobody_on(hub.db_name)
 
 
-def test_once_born_its_hub_reads_its_own_database_and_control_hears_none_of_its_business(registry, told):
-    hub = registry.hub()
-    provision.provision(hub)
+@contextmanager
+def control_hears() -> Iterator[list[str]]:
+    """The statements control's own connection runs meanwhile."""
     heard: list[str] = []
 
     def record(execute, sql, params, many, context):
         heard.append(sql)
         return execute(sql, params, many, context)
 
-    with django_connections["default"].execute_wrapper(record), use_hub(fresh(hub)) as active:
+    with django_connections["default"].execute_wrapper(record):
+        yield heard
+
+
+def test_once_born_its_hub_reads_its_own_database_and_control_hears_none_of_its_business(registry, told):
+    hub = registry.hub()
+    provision.provision(hub)
+
+    with control_hears() as heard, use_hub(fresh(hub)) as active:
         assert active.alias == tenancy_connections.hub_alias(hub)
         Location.objects.count()
         AppActivation.objects.count()
@@ -878,13 +888,8 @@ def test_two_businesses_are_born_each_with_its_apps_in_its_own_database_and_none
     """A business of Spain and one of Portugal, each with its rows in its own database; the second sign-up leaves the
     first's as they were, and control hears none of their apps."""
     spain, portugal = registry.hub(country="ES"), registry.hub(country="PT")
-    heard: list[str] = []
 
-    def record(execute, sql, params, many, context):
-        heard.append(sql)
-        return execute(sql, params, many, context)
-
-    with django_connections["default"].execute_wrapper(record):
+    with control_hears() as heard:
         assert provision.provision(spain) is True
         with use_hub(fresh(spain)):
             first = set(AppActivation.objects.values_list("host", "app", "state", "chosen", "changed_at"))

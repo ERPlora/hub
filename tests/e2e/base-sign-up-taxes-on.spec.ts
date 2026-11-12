@@ -2,39 +2,23 @@
 // (hub#997, PLAN-HUB round 2026-11-07), end to end against this run's stack: a fresh owner signs up on the SaaS's
 // screens and creates the business through its API as the panel does; the SaaS registers it in this Hub, the worker
 // makes its database, and the owner comes in through the SaaS:
-//   - a business of Spain, in 375, 820 and 1440: Apps › «My apps» has Taxes, «Active» and «Mandatory in Spain», not
+//   - a business of Spain, in 375x667, 820x1180 and 1440x900: Apps › «My apps» has Taxes, «Active» and «Mandatory in Spain», not
 //     chosen (it takes nothing of the plan's limit) and alone; in «Add apps» VeriFactu is «Off» with «Turn on». The
 //     Home asks «Turn on VeriFactu», never «Turn on Taxes»; «Your apps» still asks for an app (Taxes alone sells
 //     nothing), Spain's rates are in («Your taxes» done) and «Start with a business like yours» is offered;
 //   - a business of Portugal, in 1440: Taxes on, «Mandatory in Portugal»; no VeriFactu step, and «Your taxes» says its
 //     country has no factory rates yet (TAX-F17).
-// Each step leaves its capture `SIGN-UP-TAXES-<country>-<step>-<width>`.
+// Each step leaves its capture `SIGN-UP-TAXES-<country>-<step>-<size>`.
 // flow: BASE-F63 BASE-F14 BASE-F01 BASE-F38 TAX-F16 TAX-F17
 import { expect, type Page, test } from '@playwright/test';
 
-import {
-  api,
-  appRow,
-  businessOnSaas,
-  horizontalOverflow,
-  login,
-  type SaasOwner,
-  shot,
-  shown,
-  signUpOnSaas,
-  testid,
-  untilStill,
-} from './helpers';
+import { VIEWPORTS } from './assistant-card-helpers';
+import { api, appRow, login, settledCapture, shown, testid } from './helpers';
+import { businessOnSaas, type SaasOwner, signUpOnSaas } from './saas-owner';
 import { STACK } from './stack';
 
 test.use({ actionTimeout: 30_000 });
 test.describe.configure({ mode: 'serial' });
-
-const SIZES = [
-  { label: '375', width: 375, height: 667 },
-  { label: '820', width: 820, height: 1180 },
-  { label: '1440', width: 1440, height: 900 },
-] as const;
 
 interface App {
   id: string;
@@ -49,13 +33,8 @@ interface SetupDocument {
 
 const setupRow = (page: Page, key: string) => testid(page, 'setup-card').locator(`[data-testid="setup-row"][data-key="${key}"]`);
 
-/** The capture of a step, once the screen settled and nothing scrolls sideways. */
-async function snap(page: Page, step: string, width: number): Promise<void> {
-  await expect(shown(page).locator('ion-skeleton-text:visible')).toHaveCount(0);
-  await untilStill(page);
-  expect(await horizontalOverflow(page), `${step} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
-  await page.screenshot({ path: shot(`SIGN-UP-TAXES-${step}-${width}`) });
-}
+/** The capture of a step at a size, once the screen settled and nothing scrolls sideways. */
+const snap = (page: Page, step: string, size: string): Promise<void> => settledCapture(page, `SIGN-UP-TAXES-${step}-${size}`);
 
 /** A fresh owner's business in `country`, signed up on erplora.com, and the owner in it on the Home: its origin. */
 async function signedUpIn(owner: SaasOwner, country: string): Promise<string> {
@@ -102,7 +81,7 @@ test('BASE-F63 BASE-F14 BASE-F01 TAX-F16 — a business of Spain is born with Ta
   expect(asked.get('tax.rules')).toBe('done');
 
   const { page } = spain;
-  for (const size of SIZES) {
+  for (const size of VIEWPORTS) {
     await page.setViewportSize({ width: size.width, height: size.height });
 
     // BASE-F14 — «My apps»: Taxes, «Active» and «Mandatory in Spain».
@@ -112,7 +91,7 @@ test('BASE-F63 BASE-F14 BASE-F01 TAX-F16 — a business of Spain is born with Ta
     await expect(taxes.locator('[data-testid="apps-state"]')).toContainText('Active');
     await expect(taxes.locator('[data-testid="apps-mandatory"]')).toContainText('Mandatory in Spain');
     await expect(shown(page).locator('[data-testid="apps-row"]')).toHaveCount(1);
-    await snap(page, 'ES-mine', size.width);
+    await snap(page, 'ES-mine', size.label);
 
     // «Add apps»: VeriFactu, mandatory in Spain, is off with «Turn on»: its owner turns it on.
     await page.goto(`${origin}/apps#all`);
@@ -121,7 +100,7 @@ test('BASE-F63 BASE-F14 BASE-F01 TAX-F16 — a business of Spain is born with Ta
     await expect(verifactu.locator('[data-testid="apps-state"]')).toContainText('Off');
     await expect(verifactu.locator('[data-testid="apps-mandatory"]')).toContainText('Mandatory in Spain');
     await expect(verifactu).toContainText('Turn on');
-    await snap(page, 'ES-all', size.width);
+    await snap(page, 'ES-all', size.label);
 
     // BASE-F01, BASE-F38 — the Home: «Turn on VeriFactu», never «Turn on Taxes»; the template card is offered.
     await page.goto(`${origin}/`);
@@ -129,7 +108,7 @@ test('BASE-F63 BASE-F14 BASE-F01 TAX-F16 — a business of Spain is born with Ta
     await expect(setupRow(page, 'base.mandatory.verifactu')).toContainText('Turn on VeriFactu');
     await expect(setupRow(page, 'base.mandatory.tax')).toHaveCount(0);
     await expect(testid(page, 'blueprint-card')).toBeVisible();
-    await snap(page, 'ES-home', size.width);
+    await snap(page, 'ES-home', size.label);
   }
 });
 
@@ -152,11 +131,11 @@ test('BASE-F14 TAX-F17 — a business of Portugal is born with Taxes on, without
   const taxes = appRow(page, 'tax');
   await expect(taxes.locator('[data-testid="apps-state"]')).toContainText('Active');
   await expect(taxes.locator('[data-testid="apps-mandatory"]')).toContainText('Mandatory in Portugal');
-  await snap(page, 'PT-mine', 1440);
+  await snap(page, 'PT-mine', '1440x900');
 
   await page.goto(`${origin}/`);
   await expect(testid(page, 'setup-card')).toHaveAttribute('aria-busy', 'false');
   await expect(setupRow(page, 'tax.rules')).toBeVisible();
   await expect(setupRow(page, 'base.mandatory.verifactu')).toHaveCount(0);
-  await snap(page, 'PT-home', 1440);
+  await snap(page, 'PT-home', '1440x900');
 });

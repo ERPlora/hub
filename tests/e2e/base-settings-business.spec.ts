@@ -14,21 +14,8 @@
 // Each flow leaves its capture `APP-BASE-6-<key>-<width>`.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import {
-  api,
-  businessOnSaas,
-  horizontalOverflow,
-  login,
-  SAAS,
-  type SaasBusiness,
-  type SaasOwner,
-  saasPost,
-  shot,
-  shown,
-  signUpOnSaas,
-  turnOn,
-  untilStill,
-} from './helpers';
+import { api, horizontalOverflow, login, SAAS, shot, shown, turnOn, untilStill } from './helpers';
+import { businessOnSaas, type SaasBusiness, type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
 import { STACK } from './stack';
 
 test.use({ actionTimeout: 30_000 });
