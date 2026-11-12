@@ -9,7 +9,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanSales, drawerOff, openTillCart, restoreDrawer, saleByKey, stamp, tillIsPhone } from './sale-helpers';
+import { cleanSales, drawerOff, expectTakes, linesOf, openTillCart, restoreDrawer, saleByKey, stamp, tillIsPhone } from './sale-helpers';
 
 const RUN = stamp();
 let croquettes: Product;
@@ -42,7 +42,6 @@ test.afterAll(() => {
 });
 
 const tile = (page: Page, product: Product): Locator => shown(page).locator(`[data-testid=pos-product-${product.id}]`);
-const linesOf = (page: Page, product: Product): Locator => shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name });
 
 async function tillReady(page: Page): Promise<void> {
   await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
@@ -68,7 +67,7 @@ test('SALE-F07: a sold-out article is greyed «Sold out» in the till; a tap add
   const soldOut = tile(page, croquettes);
   await expect(soldOut).toBeVisible();
   await expect(soldOut).toHaveClass(/pos-tile--sold-out/);
-  await expect(soldOut).toHaveAttribute('aria-disabled', 'true');
+  await expectTakes(soldOut, false);
   await expect(soldOut.locator('.pos-tile__badge')).toHaveText(/^(Sold out|Agotado)$/);
   await expect(tile(page, bread)).not.toHaveClass(/pos-tile--sold-out/);
 
@@ -84,8 +83,7 @@ test('SALE-F07: a sold-out article is greyed «Sold out» in the till; a tap add
   const search = page.locator('[data-testid=pos-search]');
   await search.locator('input').fill(croquettes.sku);
   const row = search.locator(`[data-testid=pos-search-${croquettes.id}]`);
-  // What the browser keeps, not what Vue wrote: an ion-item drops a hand-set aria-disabled.
-  await expect(row).toHaveAttribute('aria-disabled', 'true');
+  await expectTakes(row, false);
   await expect(search.locator(`[data-testid=pos-search-${bread.id}]`)).toHaveCount(0);
   await expect(row.locator('.pos-search__note')).toHaveText(/^(Sold out|Agotado)$/);
   await page.screenshot({ path: shot('FIX-SALE-SOLD-OUT-LINE-ACCEPTED-search-1440') });
