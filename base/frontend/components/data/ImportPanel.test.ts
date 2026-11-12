@@ -100,7 +100,7 @@ describe('ImportPanel', () => {
     expect(m.wrapper.find('[data-testid="templates-row"]').exists()).toBe(true);
   });
 
-  it('reads the session again after a load or a retry: the apps it turned on reach the menu (round 2026-10-27)', async () => {
+  it('reads the session again after a load or a retry: the apps it turned on reach the menu', async () => {
     let read = 0;
     const count = () => (read += 1);
     window.addEventListener(SESSION_CHANGED, count);

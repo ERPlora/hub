@@ -1,4 +1,4 @@
-// The apps of the business followed on every screen (PLAN-HUB §9; BASE-F22): base keeps the live `base.app.list` open
+// The apps of the business followed on every screen: base keeps the live `base.app.list` open
 // once per signed-in person and, when an app is turned on or off (here or on another device), reads the session
 // again, so the menu says it without a reload; a screen of an app that went off is sent through the app gate again,
 // which shows why it does not open. It paints nothing.

@@ -1,9 +1,9 @@
-"""The documentation of the business's API (APP-BASE-5; BASE-G150, G48, the old hub's ``openapi.rs``): without the ORM.
+"""The documentation of the business's API, without the ORM.
 
 :func:`public_document` cuts the hub's own OpenAPI document (django-ninja's, of every route) down to what the apps a
 business has publish (``expose_api``): their routes, the bearer key that opens them (``erpk_live_…``, ``base.api_keys``)
 and only the schemas those routes use. The platform's own routes (keys, approvals, people…) are never in it. The whole
-document is built once per process: the routes are fixed from start-up (PLAN §15).
+document is built once per process: the routes are fixed from start-up.
 """
 
 import copy

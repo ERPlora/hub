@@ -1,32 +1,32 @@
-"""Turning a business's modules on and off, and the plan's limit on them (PLAN-HUB §9, PLAN-DB §7; BASE-F18, F23–F25).
+"""Turning a business's modules on and off, and the plan's limit on them.
 
 The rules, without the database: ``base.services`` (``base.app.enable``, ``base.app.disable``) and ``base.queries``
 (``base.app.list``, ``base.session.me``) read and write the rows, ``base.models.AppActivation``.
 
 - A module (``kind = "app"``) is ``on`` or ``off`` in a hub. In a hub with its own database its tables are made the
-  first time it is turned on (S3; PLAN-DB §7): meanwhile it is ``creating`` and, if making them failed, ``failed`` (tried
+  first time it is turned on: meanwhile it is ``creating`` and, if making them failed, ``failed`` (tried
   again). Both are **wanted** on: the closure by ``requires``, the plan's limit and what goes off count them as on; only
   ``on`` is active (its operations, the relay, the menu). It is **chosen** when the business turned it on itself; what
   the closure by ``requires`` brought along with it is not, and goes off again with the last chosen module on that
   needs it (Odoo's «an app with its dependencies»).
-- **The baseline** (round 2026-10-27): a hub without rows has every module off. The business turns on what it
+- **The baseline**: a hub without rows has every module off. The business turns on what it
   uses, one by one in Apps or all of a blueprint's at once (``base.blueprint.import`` turns them on, then loads); a
-  module without its row is off (PLAN-DB: «``off`` o sin fila»). The first change writes every module down
+  module without its row is off. The first change writes every module down
   (``base.services``), so two changes at once have rows to lock.
-- **What a business is born with** (hub#997, PLAN-HUB round 2026-11-07): its sign-up writes every module down, off but
+- **What a business is born with**: its sign-up writes every module down, off but
   the apps its country requires that say the platform may turn them on by itself (:func:`born_on`: Taxes, in every
   country), on with what they need and none chosen (:func:`born`), a demo too. Never one that binds the business to a
   tax authority (VeriFactu): its owner turns it on, asked by the Home. A vertical's template turns on its modules with
   their roots chosen (:func:`template`; 13 of 21 for the restaurant): the modules on that no other module on needs.
-- **Every module on** (:func:`every_on`): what a hub had without rows before that round, every module on and its roots
-  chosen (today 17 of 27). The migration ``base.0017`` writes it down for every hub of before, so none loses an app,
+- **Every module on** (:func:`every_on`), its roots chosen: what a hub without rows had before hubs started with every
+  module off. The migration ``base.0017`` writes it down for every hub of before, so none loses an app,
   and the developer's local hubs ``a`` and ``b`` are seeded with it. The platform always has it, rows or not: a scope
   that is no business's and ERPlora's own hub (``PLATFORM_HUB_SLUG``, Invoicing and VeriFactu always active;
   :func:`is_platform`). The worker runs each hub's scheduled tasks on that hub's own scope (``base.scheduler``), so a
   business's apps are its own there too (hub#1053).
 - **The plan's limit**: the SaaS's photo carries ``plan.max_apps`` (0, or no key: no limit), how many modules the
   business may *choose*; the ones brought along do not count. A photo with a lower limit than the chosen ones (a plan
-  lowered) turns nothing off: it only refuses turning on one more (PLAN §32, point 3).
+  lowered) turns nothing off: it only refuses turning on one more.
 - **An app's refusal**: a module may refuse to go off (VeriFactu once on in Spain, VERIFACTU-F32) by defining
   ``can_disable(self, ctx) -> str | None`` on its ``LiveAppConfig``, and to go on (VeriFactu outside Spain,
   VERIFACTU-F01) by defining ``can_enable`` alike: the reason, in the person's language, or ``None``. Each runs in the
@@ -71,7 +71,7 @@ FAILED = "failed"
 STATES = (ON, OFF, CREATING, FAILED)
 #: What the business wants on: on, or on its way (its tables being made, or tried again after failing).
 WANTED = frozenset({ON, CREATING, FAILED})
-#: How long an app may wait for its tables before it counts as stuck (PLAN-DB §7: the alarm past 10 minutes; hub#610).
+#: How long an app may wait for its tables before it counts as stuck: the alarm goes off past it.
 STUCK_AFTER = dt.timedelta(minutes=10)
 
 #: The modules off in a business, kept in Django's cache (Valkey in production, only as a cache) per host: the gate
@@ -84,7 +84,7 @@ OFF_APPS_TTL = 60
 #: to different slots of the Valkey cluster, which refuses a call on both (``base.cache``).
 CREATING_APPS_CACHE = "base.apps_creating:"
 #: The modules whose tables a hub's own database has, as control's row says (``Hub.schema_apps``), kept and forgotten with
-#: them: what is refused is read from control once a minute at most. Behind, it can only say «not yet» (PLAN-DB §9).
+#: them: what is refused is read from control once a minute at most. Behind, it can only say «not yet».
 CREATED_APPS_CACHE = "base.apps_created:"
 #: What the migrator always notes of a database it confirmed: a row without it knows nothing of what that database has.
 CONFIRMED_BY = "base"
@@ -179,12 +179,12 @@ def template(apps: Iterable[str], graph: Graph) -> dict[str, Activation]:
 
 
 def baseline(graph: Graph) -> dict[str, Activation]:
-    """What a hub that never turned anything on or off has: every module off, none chosen (round 2026-10-27)."""
+    """What a hub that never turned anything on or off has: every module off, none chosen."""
     return template((), graph)
 
 
 def born_on(country: str, configs: Iterable[Any] | None = None) -> frozenset[str]:
-    """The modules a business of ``country`` is born with on (hub#997): those it must have on there, as each says in its
+    """The modules a business of ``country`` is born with on: those it must have on there, as each says in its
     ``mandatory`` (``base.home.mandatory_in``; without a country, Spain), that say the platform turns them on by itself
     (``platform_turns_on``: Taxes), never one that binds the business to a tax authority (VeriFactu)."""
     from base.home import MANDATORY_ATTRIBUTE, mandatory_in  # base.home reads the modules' declarations
@@ -212,7 +212,8 @@ def born(labels: Iterable[str], graph: Graph) -> dict[str, Activation]:
 
 
 def every_on(graph: Graph) -> dict[str, Activation]:
-    """Every module on, its roots chosen: the hubs of before round 2026-10-27, the local hubs and the platform."""
+    """Every module on, its roots chosen: the hubs made before every module started off, the local hubs and the
+    platform."""
     return template(graph, graph)
 
 
@@ -382,7 +383,7 @@ def off_apps(scope: Scope) -> frozenset[str]:
 def creating_apps(scope: Scope) -> frozenset[str]:
     """The modules whose tables ``scope``'s business is getting (``creating``), kept with :func:`off_apps`: the session
     tells them «activating». None in the platform, nor in a hub without a database of its own, where nothing is made
-    later (since S5 only the suite's fallback keeps one, hub#611)."""
+    later (only the test suite's fallback keeps one)."""
     if is_platform(scope):
         return frozenset()
     return _kept(scope)[1]

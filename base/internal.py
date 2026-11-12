@@ -1,4 +1,4 @@
-"""The SaaS's door into the Hub: ``/internal/*``, signed with HMAC-SHA256 and a timestamp (PLAN-SAAS §2, §2.2).
+"""The SaaS's door into the Hub: ``/internal/*``, signed with HMAC-SHA256 and a timestamp.
 
 Every call carries ``X-Erplora-Timestamp`` (unix seconds) and up to two hex signatures keyed with the shared
 secret, as the SaaS makes them (``base.signing``, a port of its ``accounts/signing.py``):
@@ -17,12 +17,12 @@ against the caller (``base.throttle.client_key``): past :data:`SIGNATURE_ATTEMPT
 429 ``base.rate_limited`` with ``Retry-After`` until the window of the first refusal ends; a good signature is always
 heard (the SaaS never signs wrong: this is for whatever else reaches the door).
 
-The registry of hubs (plan 2026-10-17, §1.5), each route one operation of ``base`` run as the platform on the
+The registry of hubs, each route one operation of ``base`` run as the platform on the
 registry's scope (``base.registry.REGISTRY_SCOPE``):
 
 - ``PUT /internal/hubs/{id}`` (the SaaS's ``hub_registry()``) → ``base.hub.register``: 202 ``requested`` when it
-  creates the row, with a database of its own that the worker makes (``base.tenancy.provision``; round 2026-10-30 of
-  PLAN-DB) before it tells the SaaS ``ready``; 202 too for an update while it is being made, 200 for one of a ready
+  creates the row, with a database of its own that the worker makes (``base.tenancy.provision``) before it tells the
+  SaaS ``ready``; 202 too for an update while it is being made, 200 for one of a ready
   hub;
 - ``GET /internal/hubs/{id}`` → ``base.hub.get``: the row, whose ``status`` ``ready`` the SaaS waits for (``requested``,
   ``creating``, ``migrating``, ``seeding`` or ``failed`` before), plus ``maintenance`` with control's active freeze
@@ -43,13 +43,13 @@ registry's scope (``base.registry.REGISTRY_SCOPE``):
   ``verifactu.config.sync`` on the hub's slug, and its ``whatsapp`` (the number's state, door 4 of WhatsApp's
   contract) through ``whatsapp_inbox.channel.sync`` with the photo's version, when the app is on in that business,
   its ``members`` (who is in the business, with which role) on the business's memberships, and its ``custom_domain``
-  (the business's own domain, or none: HUBS-F17) on the row, which ``base.custom_domains`` reads;
+  (the business's own domain, or none) on the row, which ``base.custom_domains`` reads;
 
-``POST /internal/sessions/revoke`` (``{user_id, hub_id?}``, PLAN-SAAS §2.1) → ``base.session.revoke``, on the same
+``POST /internal/sessions/revoke`` (``{user_id, hub_id?}``) → ``base.session.revoke``, on the same
 scope: 200 ``{ended}`` with the sessions of that SaaS account it ended, on that business or, without it, everywhere
 (the Hub admin's included); an unknown business ends nothing and answers the same.
 
-The demos (plan 2026-10-17, §1.5 and §1.6), on the same scope:
+The demos, on the same scope:
 
 - ``POST /internal/demos`` (``{session_key, vertical, language}``) → ``base.demo.create``: 202 ``{id, slug, status,
   expires_at, created}`` for a new demo (``requested``: the worker clones its database, and the SaaS waits for
@@ -63,7 +63,7 @@ The demos (plan 2026-10-17, §1.5 and §1.6), on the same scope:
 While the SaaS may still sign v1 only, a body that names the hub of its path (``hub_id`` or ``id``) must name the
 same one (422 ``internal.hub_mismatch``).
 
-``/internal/platform/invoices`` (contract point 4, PLAN-SAAS §4) is the door to ERPlora's own hub, which issues
+``/internal/platform/invoices`` is the door to ERPlora's own hub, which issues
 ERPlora's invoices: ``GET …/health`` (200 ``{"status": "ok"}`` or 503 ``{"status": "unconfigured", "detail"}``),
 ``POST …`` (the body of the SaaS's ``platform_payload()``; 201, or 200 when it was issued before), ``GET …/{id}`` (its
 status) and ``GET …/{id}/pdf`` (its PDF, printed after the read, outside any transaction). Each runs its operation of
@@ -72,16 +72,16 @@ Invoicing as the system on ``PLATFORM_HUB_SLUG`` and answers ``{"status", "qr", 
 ``/internal/whatsapp/*`` are erplora.com's WhatsApp doors (``apps/whatsapp_inbox/WORKBOOK.md``, «Contrato con el
 SaaS», doors 1–3): ``POST …/inbound`` → ``whatsapp_inbox.message.receive`` (200 ``{id, conversation_id, created}``),
 ``POST …/status`` → ``whatsapp_inbox.message.update_status`` (200 ``{updated, status}``) and ``PUT …/channel`` →
-``whatsapp_inbox.channel.sync`` (200 ``{applied, version}``). The body names the business (``hub``: its slug in phase
-1), whose host gate answers first (404 ``not_found`` unknown, 410 gone, 503 being prepared, 402 suspended); then the
+``whatsapp_inbox.channel.sync`` (200 ``{applied, version}``). The body names the business (``hub``: its slug), whose
+host gate answers first (404 ``not_found`` unknown, 410 gone, 503 being prepared, 402 suspended); then the
 app off in it is 404 ``app_inactive`` (erplora.com keeps the message and tries again), and the operation runs as the
 system on that business, whose refusals (422 out of contract…) are answered with their own envelope.
 
-Their databases (phase 2, S1; plan 2026-10-22): the registry's and the demos' operations run on control
+Their databases: the registry's and the demos' operations run on control
 (``base.tenancy.context.operation_database``); the WhatsApp doors enter the business's hub (``use_hub``) before they ask
 whether the app is on in it (its rows are in its database: the host erplora.com calls, ``hub.erplora.internal``, opens
 no context), and a database that fails them there is 503 ``base.hub_unavailable``, logged; ERPlora's invoices run in
-the platform hub's own database (its registry row, made by ``create_platform_hub``; S5).
+the platform hub's own database (its registry row, made by ``create_platform_hub``).
 """
 
 import json
@@ -115,7 +115,7 @@ from base.signing import SIGNATURE_V2_HEADER, sign_v2, verify_request  # noqa: F
 
 logger = logging.getLogger(__name__)
 
-#: The business's commercial status as the photo says it (PLAN-SAAS §2.3).
+#: The business's commercial status as the photo says it.
 HUB_STATUSES = ("active", "past_due", "suspended")
 #: Calls with a refused signature per caller: 30 within 5 minutes of the first (README, «Límites de intentos»).
 SIGNATURE_ATTEMPTS = AttemptLimit("internal", attempts=30, window=300)
@@ -305,7 +305,7 @@ def demo_codes(request: HttpRequest, slug: str) -> HttpResponse:
 @internal_view
 @require_http_methods(["POST"])
 def sessions_revoke(request: HttpRequest) -> HttpResponse:
-    """``POST /internal/sessions/revoke`` (``{user_id, hub_id?}``, PLAN-SAAS §2.1): end the Hub's sessions of a SaaS
+    """``POST /internal/sessions/revoke`` (``{user_id, hub_id?}``): end the Hub's sessions of a SaaS
     account, on one business or everywhere (the Hub admin's included); 200 ``{ended}``, idempotent."""
     body = _body_object(request)
     if body is None:
@@ -411,8 +411,8 @@ def _platform_call(name: str, payload: dict):
     """Runs ``name`` as the system on the platform hub, in its own database: its output, or the response of its
     refusal.
 
-    The platform hub is the registry's row of ``PLATFORM_HUB_SLUG`` with a database of its own, as any business since
-    S5 (``manage.py create_platform_hub --execute`` makes both): without it, 503 ``base.platform_hub_missing``, saying
+    The platform hub is the registry's row of ``PLATFORM_HUB_SLUG`` with a database of its own, as any business
+    (``manage.py create_platform_hub --execute`` makes both): without it, 503 ``base.platform_hub_missing``, saying
     so; a database that is not its own or cannot be reached now, 503 as for any business."""
     hub = registry.hub_by_slug(settings.PLATFORM_HUB_SLUG)
     if hub is None or registry.refusal(hub) is not None:

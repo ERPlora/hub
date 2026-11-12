@@ -1,4 +1,4 @@
-// base's pieces of the shell's chrome (APP-BASE-1, APP-BASE-9): at the end of the topbar, the assistant's sparkles then
+// base's pieces of the shell's chrome: at the end of the topbar, the assistant's sparkles then
 // the bell, as in the old hub — on a phone (under 768 px) folded into one «More options», as the old hub did so that
 // they never push the centred title; beside the pane, the device's notices, the assistant's panel and the business's
 // apps followed live (AppsFollower). «Manage on erplora.com» (BASE-F11) is at the side menu's foot (ManageLink.test.ts).
@@ -70,7 +70,7 @@ describe('the chrome of base', () => {
     expect(empty.findAll('[data-testid="assistant-shortcut"]').map((button) => button.text())).toEqual(['¿Qué falta por configurar?']);
   });
 
-  it('beside the pane, the business’s apps followed live: the menu follows an app turned on or off (PLAN-HUB §9)', async () => {
+  it('beside the pane, the business’s apps followed live: the menu follows an app turned on or off', async () => {
     const m = await mountBase(BackgroundChrome);
     await m.live();
     expect(m.client.stream.subscriptions('base.app.list').map((sub) => sub.params)).toEqual([{}]);

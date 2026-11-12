@@ -72,7 +72,7 @@ describe('BlueprintReview', () => {
     expect(m.wrapper.text()).toContain('Choose at least one app.');
   });
 
-  it('ticks an app off that the load turns on, saying so, and imports it (round 2026-10-27)', async () => {
+  it('ticks an app off that the load turns on, saying so, and imports it', async () => {
     const turnsOn = summary({
       apps: [
         { id: 'table', label: 'Tables', status: 'turns_on', datasets: [{ key: 'table.zone', label: 'Zones', rows: 2, personal: false, travels: true }] },

@@ -1,11 +1,11 @@
-"""Which apps a business has the right to use (BASE-G12; PLAN §20.4–§20.5): the SaaS's photo decides, the Hub applies.
+"""Which apps a business has the right to use: the SaaS's photo decides, the Hub applies.
 
-- A module with ``premium = False`` always has it (PLAN-SAAS §2.2: «the free ones always have the right»).
+- A module with ``premium = False`` always has it: the free ones always have the right.
 - One with ``premium = True`` needs its id in ``modules[]`` of the business's last photo (``Hub.state``, as the SaaS
   pushed it: ``PUT /internal/hubs/{id}/state``), with ``source`` ``plan`` (included in the plan) or ``purchase``
   (bought), or the right on an app that requires it: the Hub owns the ``requires`` graph and closes the rights over
-  it (PLAN §20.5). A right whose ``valid_until`` passed is no right (nobody pushes a photo when a cancelled module's
-  period ends, so it is read against the clock). A slug the Hub has no module for is ignored and logged (§20.4.5).
+  it. A right whose ``valid_until`` passed is no right (nobody pushes a photo when a cancelled module's
+  period ends, so it is read against the clock). A slug the Hub has no module for is ignored and logged.
 - A demo's hub has every app: it has no photo and nothing to bill, and a demo is where the paid apps are tried.
 
 What a business has no right to is **blocked**: its operations answer 402 ``app_entitlement_blocked``
@@ -44,7 +44,7 @@ SOURCES = (FREE, PLAN, PURCHASE, REQUIRED, MISSING)
 
 
 class EntitlementBlocked(OperationError):
-    """An operation of an app the business has no right to (402, PLAN-HUB §1b)."""
+    """An operation of an app the business has no right to (402)."""
 
     status = 402
     code = "app_entitlement_blocked"
@@ -92,7 +92,7 @@ def operation_database(op, ctx) -> Iterator[str]:
     """``LIVE["operation_database"]``: an operation of an app blocked on its business answers 402 before it opens a
     transaction, and one of an app the business turned off (``base.activation``) 404 ``app_inactive``, read in the
     database of the tenancy (``base.tenancy.context.operation_database``); any other goes on to that database, where a
-    manager's pass for it is spent in its transaction (``base.approval_spend``, APP-BASE-5)."""
+    manager's pass for it is spent in its transaction (``base.approval_spend``)."""
     if op.app_label in blocked_apps(ctx.scope):
         raise refused(op.app_label, ctx.language)
     from base import activation

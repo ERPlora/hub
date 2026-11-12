@@ -2,8 +2,8 @@
 // a turn goes to `base.assistant.turn`'s route; the allowance, a dictation and a report go through base's operations;
 // whoever sees the Home uses it and whoever administers the business upgrades the plan, on erplora.com's page the
 // Home's block gives; the verbs of the writes and the platform's screens are base's catalogue (the server's guardrail
-// keeps them complete: base/tests/test_assistant.py); a write a manager must approve goes through APP-BASE-5's
-// approvals (BASE-G118); and the empty conversation offers the setup's shortcuts (BASE-G121).
+// keeps them complete: base/tests/test_assistant.py); a write a manager must approve goes through the managers'
+// approvals; and the empty conversation offers the setup's shortcuts.
 import {
   type AssistantCard,
   AssistantPanel,
@@ -105,7 +105,7 @@ function spaDocument(cookie = 'csrftoken=tok123'): Document {
 const MP3 = new Uint8Array([0x49, 0x44, 0x33, 0x04, 0xff, 0xfb, 0x90, 0x64]);
 const READING = { text: 'Tienes 3 mesas abiertas.', language: 'es' as const, voice: 'a-voice' };
 
-describe("«Read aloud» in the server's voice (round 2026-11-03n)", () => {
+describe("«Read aloud» in the server's voice", () => {
   it("posts the text, its language and its voice to base.assistant.speak's route and hands back the mp3", async () => {
     const fetcher = vi.fn(async () => new Response(MP3, { status: 200, headers: { 'Content-Type': 'audio/mpeg' } }));
     const audio = await speakAloud(READING, spaDocument(), fetcher);
@@ -151,7 +151,7 @@ describe("«Read aloud» in the server's voice (round 2026-11-03n)", () => {
     expect((refused as ApiError).status).toBe(502);
   });
 
-  it('without the server’s voice (the default, round 2026-11-04a) the panel gets no speak: no choice of voice, no request', () => {
+  it('without the server’s voice (the default) the panel gets no speak: no choice of voice, no request', () => {
     expect(HUB_ASSISTANT.speak).toBeUndefined();
     const off = spaDocument();
     off.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify({ server_voice: false })}</script>`);
@@ -371,7 +371,7 @@ describe('setupShortcuts (BASE-G121; gh:hub#373)', () => {
   });
 });
 
-describe('a write a manager must approve (BASE-G118, with APP-BASE-5’s approvals)', () => {
+describe('a write a manager must approve, through the managers’ approvals', () => {
   const QUESTION = { operation: 'demo.item.create', label: 'Create an item', fingerprint: 'f'.repeat(64) };
   const CREATE: PendingCall = { call_id: 'c1', name: 'demo__item__create', arguments: '{"name":"Mesa 4"}' };
   const CARD: AssistantCard = {

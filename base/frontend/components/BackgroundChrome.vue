@@ -1,9 +1,9 @@
 <script setup lang="ts">
 // base's pieces beside the pane (`createShell({ chrome: { background } })`, mounted once per signed-in person): the
-// device's notices (APPOINTMENT-F28), the assistant's panel (APP-BASE-9: the shared one of @erplora/ui, configured as
+// device's notices, the assistant's panel (the shared one of @erplora/ui, configured as
 // the Hub's in main.ts, with base's empty conversation and its setup shortcuts), the business's apps followed live, so the
-// menu follows an app turned on or off on any device (PLAN-HUB §9), the user menu's «Report a problem» (BASE-F108) and
-// the installed app's Back button (BASE-F05).
+// menu follows an app turned on or off on any device, the user menu's «Report a problem» and
+// the installed app's Back button.
 import { AssistantPanel } from '@erplora/ui/components';
 
 import AppsFollower from './AppsFollower.vue';

@@ -1,5 +1,5 @@
-"""Blueprints (PLAN-HUB round 2026-10-21, «Blueprints»): the ``.blueprint.zip``, the catalogue of seeds by vertical and
-what travels of each app. Flows BASE-G101–G109 (Settings › Data) and the Home's card (BASE-G131).
+"""Blueprints: the ``.blueprint.zip``, the catalogue of seeds by vertical and what travels of each app, behind
+Settings › Data and the Home's card.
 
 A blueprint is a manifest (who made it, for what, its language and country, the apps it turns on) and, per dataset,
 the rows that travel. A **dataset** is one kind of thing an app lets travel (inventory's categories, its products,
@@ -12,16 +12,16 @@ dropped on reading (``Bundle.dropped``).
 - The file: ``manifest.json``, ``data/<dataset>.json`` and the rows' own photos at ``media/<name>`` in a zip
   (:func:`read_zip`, :func:`write_zip`), read with limits (20 MB, 100 MB inflated, 1 000 entries) and refused with a
   reason the person can read (:class:`BlueprintInvalid`).
-- Images (INVENTORY-F33; round 2026-10-30, ``base.images``): an image of the shared library travels as its reference
+- Images (``base.images``): an image of the shared library travels as its reference
   (``catalog:<folder>/<name>``), a photo of a row's own inside the file (:func:`export_media`); loading it copies the
   photo under a new name through the app's own upload, and a row whose image cannot be set loads without it and is
   told (:func:`_load_image`).
 - The catalogue: the seeds of ``base/seeds/<vertical>.<language>.json``, one per vertical and language; what a seed
-  turns on is its vertical's apps (``base.catalog.template_apps``, PLAN §15.2), what it brings is its own data.
+  turns on is its vertical's apps (``base.catalog.template_apps``), what it brings is its own data.
 - :func:`apply` loads a blueprint app by app, each part on its own: a row an app refuses fails alone and is told, the
   rest loads, and loading again duplicates nothing (each dataset skips what is already there). Personal data (the
   customers) travels only in a backup, never in a template. Before it, ``base.blueprint.import`` turns on the apps
-  the manifest lists that are off (round 2026-10-27: a hub is born with every app off); one it could not turn on (the
+  the manifest lists that are off (a hub is born with every app off); one it could not turn on (the
   plan's limit, no right to it) loads nothing and its report says why.
 - :func:`undo` removes exactly the rows a load created; :func:`reset` every row of the apps chosen; both through the
   apps' own delete (or archive).
@@ -73,7 +73,7 @@ PURPOSE_TEMPLATE = "template"
 PURPOSES = (PURPOSE_BACKUP, PURPOSE_TEMPLATE)
 #: The largest file read (what the person uploads), before anything is inflated. A photo travels as the 512 × 512 WebP
 #: it was kept as (``base.images``), 20–60 KB and already compressed, so the zip weighs what its photos weigh: 300
-#: photos of 60 KB are 18 MB, and the rows' JSON a few hundred KB more (round 2026-10-30; it was 5 MB without photos).
+#: photos of 60 KB are 18 MB, and the rows' JSON a few hundred KB more.
 MAX_FILE_BYTES = 20 * 1024 * 1024
 #: The most its members may weigh once inflated: a zip bomb stops here, never in memory. The photos inflate to what
 #: they weigh (≤ 20 MB) and the rows' JSON about ten to one: 100 MB holds both with room.
