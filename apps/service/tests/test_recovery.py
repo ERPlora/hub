@@ -10,8 +10,10 @@ then its services (``queries.services_in_copy``): each service the copy offers, 
 (``queries.services_in_business``): the same service, offered or archived (a service is never deleted, SERVICE-F04), or
 one it made again, the same name in the same category; the others it lacks (``queries.services_not_in_business``), each
 as ``service.service.create`` takes it here: the key of its tax category and its category, the same one while the
-business still has it, else the live one with its name (brought back just before, or made again). Each is created by
-that operation, the screen's own.
+business still has it, else the live one with its name (brought back just before, or made again). Each is made again by
+``service.service.recover``: created by that operation, the screen's own, and assigned to each professional who
+performed it in the copy and the business still has (``queries.recoverable_services_in_copy``, hub#1322) by
+``service.assignment.assign``, the screen's own too (SERVICE-F31).
 """
 
 import threading
@@ -26,13 +28,14 @@ from live.models import OutboxEvent
 from live.operations import get
 
 from apps.service import queries
-from apps.service.models import Category, Service
-from apps.service.schemas import CategoryIn, ServiceIn
+from apps.service.models import Assignment, Category, Service
+from apps.service.schemas import CategoryIn, ServiceRecoverIn
+from apps.staff.models import Member
 from apps.tax.models import TaxCategory
 from base.tenancy.context import use_hub
 from base.tenancy.tests.test_recovery import Recoveries, fresh, run, run_in
 
-from .conftest import ctx_for, make_category, make_service, make_tax
+from .conftest import ctx_for, make_category, make_member, make_service, make_tax
 
 pytestmark = pytest.mark.django_db
 
@@ -43,10 +46,11 @@ def direct():
     return connection.connection
 
 
-def create(record: dict, operation: str = "service.service.create") -> dict:
-    """``record`` created as the platform does: its create's input, all of it but its id in the copy."""
+def create(record: dict, operation: str = "service.service.recover") -> dict:
+    """``record`` created as the platform does, as the system: its create's input, all of it but its id in the copy."""
     op = get(operation)
-    return op(ctx_for(), op.input.model_validate({key: value for key, value in record.items() if key != "id"}))
+    ctx = ctx_for(actor="system", permissions={"*"})
+    return op(ctx, op.input.model_validate({key: value for key, value in record.items() if key != "id"}))
 
 
 def test_the_copy_gives_each_service_with_what_its_create_takes_and_whether_it_was_on_offer():
@@ -148,15 +152,18 @@ NEW = {
 }
 
 
-def a_service_of_the_copy(service: Service | None = None, **fields) -> dict:
-    """A service as the copy gives it (``services_in_copy``): ``service``'s, or a new one with ``fields``; its
-    category's name, the one it had there (the copy's moment, before the business deleted or renamed it)."""
+def a_service_of_the_copy(service: Service | None = None, *, assignments=(), **fields) -> dict:
+    """A service as the copy gives it (``recoverable_services_in_copy``): ``service``'s, or a new one with ``fields``;
+    its category's name, the one it had there (the copy's moment, before the business deleted or renamed it), and who
+    performed it there (``assignments``)."""
+    performers = {"assignments": list(assignments)}
     if service is not None:
         fields = {field: getattr(service, field) for field in NEW if field != "category_name"}
-        return {"id": service.pk} | fields | {"category_name": service.category.name if service.category else None}
+        category = {"category_name": service.category.name if service.category else None}
+        return {"id": service.pk} | fields | category | performers
     if fields.get("category_id") is not None and "category_name" not in fields:
         fields["category_name"] = Category.objects.get(pk=fields["category_id"]).name
-    return {"id": uuid.uuid7()} | NEW | fields
+    return {"id": uuid.uuid7()} | NEW | fields | performers
 
 
 def test_the_business_holds_the_same_service_offered_or_archived_and_one_made_again_in_the_same_category():
@@ -308,7 +315,7 @@ def test_each_lacking_service_comes_as_its_create_takes_it_here():
         "tax_category_key": "test.service"
     }
     for record in lacking:
-        ServiceIn.model_validate({key: value for key, value in record.items() if key != "id"})
+        ServiceRecoverIn.model_validate({key: value for key, value in record.items() if key != "id"})
 
 
 def test_the_lacking_are_created_by_the_screens_operation_and_asking_again_makes_none_twice():
@@ -343,6 +350,142 @@ def test_a_tax_category_turned_off_since_is_the_creates_to_refuse():
         create(record)
 
     assert refused.value.code == "service.tax_category_unknown"
+
+
+# ── Who performs each one (hub#1322): each professional the business still has, assigned by the screen's operation ──
+
+
+def an_assignment_of_the_copy(member: Member, **fields) -> dict:
+    """A professional who performed a service in the copy, as ``recoverable_services_in_copy`` gives it."""
+    return {
+        "member_id": member.pk,
+        "custom_duration": None,
+        "custom_price": None,
+        "is_primary": False,
+        "is_active": True,
+    } | fields
+
+
+def performers(name: str) -> list[tuple]:
+    """Who performs the service ``name`` of the business: the professional's first name, their own minutes and price,
+    whether it is their main service and whether the assignment is on, by first name."""
+    return [
+        (one.member.first_name, one.custom_duration, one.custom_price, one.is_primary, one.is_active)
+        for one in Assignment.objects.filter(service__name=name).select_related("member").order_by("member__first_name")
+    ]
+
+
+def test_the_copy_gives_each_service_with_who_performed_it_there_archived_ones_too():
+    tax = make_tax("test.service", "Service — test")
+    ana, sonia = make_member("Ana", "López"), make_member("Sonia", "Ruiz")
+    keratin = make_service("Keratin treatment", tax=tax, price=9000)
+    perm = make_service("Old perm", tax=tax, is_active=False, archived_at=timezone.now())
+    manicure = make_service("Manicure", tax=tax)
+    Assignment.objects.create(service=keratin, member=ana, custom_duration=75, custom_price=9500, is_primary=True)
+    Assignment.objects.create(service=keratin, member=sonia, custom_price=8000, is_active=False)
+    Assignment.objects.create(service=perm, member=sonia)
+
+    read = {one["id"]: one for one in queries.recoverable_services_in_copy(direct())}
+
+    plain = {one["id"]: one for one in queries.services_in_copy(direct())}
+    assert {pk: {key: value for key, value in one.items() if key != "assignments"} for pk, one in read.items()} == plain
+    assert read[keratin.pk]["assignments"] == [
+        an_assignment_of_the_copy(ana, custom_duration=75, custom_price=9500, is_primary=True),
+        an_assignment_of_the_copy(sonia, custom_price=8000, is_active=False),
+    ]
+    assert read[perm.pk]["assignments"] == [an_assignment_of_the_copy(sonia)]
+    assert read[manicure.pk]["assignments"] == []
+
+
+def test_a_copy_without_the_apps_tables_gives_nobody():
+    with connection.cursor() as cursor:
+        # Undone with the test's transaction.
+        cursor.execute("DROP TABLE service_assignment, service_service CASCADE")
+
+    assert queries.recoverable_services_in_copy(direct()) == []
+
+
+def test_each_lacking_service_comes_with_who_performed_it_in_the_copy():
+    tax = make_tax("test.service", "Service — test")
+    ana = make_member("Ana", "López")
+    performed = [an_assignment_of_the_copy(ana, custom_duration=75, custom_price=9500)]
+    lost = a_service_of_the_copy(name="Keratin treatment", tax_category_id=tax.pk, assignments=performed)
+
+    [record] = queries.services_not_in_business([lost])
+
+    assert record["assignments"] == performed
+    ServiceRecoverIn.model_validate({key: value for key, value in record.items() if key != "id"})
+
+
+def test_a_service_made_again_is_assigned_to_each_professional_the_business_still_has_with_their_own_minutes_and_price():
+    tax = make_tax("test.service", "Service — test")
+    ana, raquel = make_member("Ana", "López"), make_member("Raquel", "Gil")
+    on_leave = make_member("Lola", "Vega", status=Member.Status.ON_LEAVE)
+    left = make_member("Marta", "Sanz", status=Member.Status.TERMINATED)
+    nobody = Member(pk=uuid.uuid7(), first_name="Gone", last_name="Long ago")
+    performed = [
+        an_assignment_of_the_copy(ana, custom_duration=75, custom_price=9500),
+        an_assignment_of_the_copy(raquel),
+        an_assignment_of_the_copy(on_leave, custom_price=8000),
+        an_assignment_of_the_copy(left, custom_price=7000),
+        an_assignment_of_the_copy(nobody),
+    ]
+    [record] = queries.services_not_in_business(
+        [a_service_of_the_copy(name="Keratin treatment", tax_category_id=tax.pk, price=9000, assignments=performed)]
+    )
+    before = OutboxEvent.objects.filter(name="service.assignment.assigned").count()
+
+    made = create(record)
+
+    # Who the business terminated, or no longer has at all, is not assigned: Staff no longer has them to book.
+    assert performers("Keratin treatment") == [
+        ("Ana", 75, 9500, False, True),
+        ("Lola", None, 8000, False, True),
+        ("Raquel", None, None, False, True),
+    ]
+    assert Assignment.objects.filter(service_id=made.id).count() == 3
+    # Each by the screen's own operation, with its notice.
+    assert OutboxEvent.objects.filter(name="service.assignment.assigned").count() == before + 3
+
+
+def test_one_switched_off_in_the_copy_comes_back_switched_off():
+    tax = make_tax("test.service", "Service — test")
+    sonia = make_member("Sonia", "Ruiz")
+    performed = [an_assignment_of_the_copy(sonia, custom_price=8000, is_active=False)]
+    [record] = queries.services_not_in_business(
+        [a_service_of_the_copy(name="Manicure", tax_category_id=tax.pk, assignments=performed)]
+    )
+
+    create(record)
+
+    assert performers("Manicure") == [("Sonia", None, 8000, False, False)]
+
+
+def test_the_main_service_comes_back_only_for_whom_the_business_set_none_since():
+    tax = make_tax("test.service", "Service — test")
+    ana, sonia = make_member("Ana", "López"), make_member("Sonia", "Ruiz")
+    # Sonia's main service in the business since the copy: hers stays.
+    nails = make_service("Nails", tax=tax)
+    Assignment.objects.create(service=nails, member=sonia, is_primary=True)
+    performed = [
+        an_assignment_of_the_copy(ana, is_primary=True),
+        an_assignment_of_the_copy(sonia, is_primary=True),
+    ]
+    [record] = queries.services_not_in_business(
+        [a_service_of_the_copy(name="Keratin treatment", tax_category_id=tax.pk, assignments=performed)]
+    )
+
+    create(record)
+
+    assert performers("Keratin treatment") == [("Ana", None, None, True, True), ("Sonia", None, None, False, True)]
+    assert performers("Nails") == [("Sonia", None, None, True, True)]
+
+
+def test_making_a_service_again_with_who_performed_it_is_only_the_systems():
+    op = get("service.service.recover")
+
+    assert op.permission == "service.system"
+    assert not ctx_for("hub_owner").has(op.permission)
 
 
 # ── Its categories (hub#1323): those the business lacks come back first, each by the screen's create ─────────────
@@ -504,9 +647,9 @@ def test_the_app_declares_what_it_gives_back_its_categories_first():
         "service.category.create",
     )
     assert (services.read, services.missing, services.create) == (
-        queries.services_in_copy,
+        queries.recoverable_services_in_copy,
         queries.services_not_in_business,
-        "service.service.create",
+        "service.service.recover",
     )
     assert (str(categories.label), str(services.label)) == ("Service categories", "Services")
     assert categories.reads_since == services.reads_since == "0001_initial"
@@ -680,6 +823,36 @@ class TestServicesComeBack:
         assert live_categories(hub) == [("COLOR", None, "#112233", 0), ("Hair", None, "", 0)]
         with use_hub(hub):
             assert Service.objects.get(name="Highlights").category_id == again
+
+    def test_a_service_comes_back_with_who_the_business_still_has_to_perform_it_each_assigned_by_its_operation(
+        self, recoveries, every_app_on
+    ):
+        hub, tax, ids, _ = self.a_business(recoveries, every_app_on)
+        ana, raquel, sonia = (
+            run_in(hub, "staff.member.create", first_name=first, last_name="Gil").id for first in ("Ana", "Raquel", "Sonia")
+        )
+        run_in(hub, "service.assignment.assign", service_id=ids["keratin"], member_id=ana, custom_duration=75,
+               custom_price=9500)
+        run_in(hub, "service.assignment.assign", service_id=ids["keratin"], member_id=raquel)
+        off = run_in(hub, "service.assignment.assign", service_id=ids["keratin"], member_id=sonia, custom_price=8000)
+        run_in(hub, "service.assignment.update", id=off.id, is_active=False)
+        copy = recoveries.copy_of(hub)
+        gone(hub, ids["keratin"])
+        # Terminated since: Staff no longer has her to book.
+        run_in(hub, "staff.member.terminate", id=raquel)
+        before = created_events(hub, "service.assignment.assigned")
+
+        first = recovered(recoveries, copy)
+        again = recovered(recoveries, copy)
+
+        # One service made again, its professionals with it.
+        assert (first["created"], first["not_created"], first["reasons"], first["refused"]) == (1, 0, [], "")
+        assert (again["created"], again["not_created"], again["refused"]) == (0, 0, "")
+        with use_hub(hub):
+            back = Service.objects.get(name="Keratin treatment")
+            assert back.pk != ids["keratin"]
+            assert performers("Keratin treatment") == [("Ana", 75, 9500, False, True), ("Sonia", None, 8000, False, False)]
+        assert created_events(hub, "service.assignment.assigned") == before + 2
 
     def test_a_service_whose_tax_category_the_create_refuses_is_counted_with_why(self, recoveries, every_app_on):
         hub, tax, ids, _ = self.a_business(recoveries, every_app_on)

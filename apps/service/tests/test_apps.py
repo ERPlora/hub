@@ -124,8 +124,9 @@ def test_navigation_is_the_three_tabs_of_the_old_module_with_registered_icons():
     ]
 
 
-#: What only names a record on the assistant's card: no tool (``INTERNAL``).
-CARD_ONLY = {"service.record.get"}
+#: What only names a record on the assistant's card, and what only the recovery from a separate copy runs (a service
+#: made again with who performed it, hub#1322): no tool (``INTERNAL``).
+NO_TOOL = {"service.record.get", "service.service.recover"}
 
 
 def test_every_operation_is_a_tool_of_the_assistant():
@@ -138,10 +139,11 @@ def test_every_operation_is_a_tool_of_the_assistant():
     operations = [op for name, op in registry.items() if name.startswith("service.")]
     # 45 + the service's image (SERVICE-F34, F35): set_image, upload_image, suggest_image
     # + what the assistant's card names by its id (hub#676): assignment.get, grant.get, session.get
-    # + what it names of Sales and Appointments (hub#756): record.get, which is no tool.
-    assert len(operations) == 52
+    # + what it names of Sales and Appointments (hub#756): record.get, which is no tool
+    # + a service made again from a separate copy with who performed it (hub#1322): service.recover, no tool either.
+    assert len(operations) == 53
     for op in operations:
-        if op.name in CARD_ONLY:
+        if op.name in NO_TOOL:
             assert op.ai is INTERNAL, op.name
             continue
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
