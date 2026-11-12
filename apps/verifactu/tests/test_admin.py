@@ -86,6 +86,13 @@ def said(request) -> list[str]:
     return [str(message) for message in request._messages]
 
 
+def rejecting(payload) -> gateway.Reply:
+    """The AEAT rejects every record of the submission (its real answer, «Incorrecto» 1189, for each)."""
+    body = aeat_answer("alta_2007_aceptado_con_errores_2026-08-02.xml", records_of(payload["envelope"]))
+    body = body.replace(">AceptadoConErrores<", ">Incorrecto<").replace(">2007<", ">1189<")
+    return gateway.Reply(kind=gateway.ANSWERED, aeat_status=200, aeat_body=body)
+
+
 def test_every_model_is_registered():
     for model in (Config, Chain, SendControl, Record, Event, AeatRecord, OwnCertificate):
         assert model in admin.site._registry, model
@@ -229,6 +236,47 @@ def test_resend_sends_the_chain_once_and_says_what_the_aeat_answered(
     assert said(request) == ["Resend finished: 2 accepted, 0 rejected, 0 still waiting."]
 
 
+#: What the AEAT answers a resend, by what the notice counts: every record accepted, every record rejected, or no
+#: answer at all (the submission stays «sent», still waiting).
+RESEND_ANSWERS = {
+    "accepted": answering(),
+    "rejected": rejecting,
+    "waiting": gateway.Reply(kind=gateway.UNKNOWN, message="read timeout"),
+}
+
+
+@pytest.mark.parametrize(
+    ("answer", "count", "language", "notice"),
+    [
+        ("accepted", 1, "en", "Resend finished: 1 accepted, 0 rejected, 0 still waiting."),
+        ("accepted", 2, "en", "Resend finished: 2 accepted, 0 rejected, 0 still waiting."),
+        ("accepted", 1, "es", "Reenvío terminado: 1 aceptado, 0 rechazados, 0 siguen esperando."),
+        ("accepted", 2, "es", "Reenvío terminado: 2 aceptados, 0 rechazados, 0 siguen esperando."),
+        ("rejected", 1, "en", "Resend finished: 0 accepted, 1 rejected, 0 still waiting."),
+        ("rejected", 2, "en", "Resend finished: 0 accepted, 2 rejected, 0 still waiting."),
+        ("rejected", 1, "es", "Reenvío terminado: 0 aceptados, 1 rechazado, 0 siguen esperando."),
+        ("rejected", 2, "es", "Reenvío terminado: 0 aceptados, 2 rechazados, 0 siguen esperando."),
+        ("waiting", 1, "en", "Resend finished: 0 accepted, 0 rejected, 1 still waiting."),
+        ("waiting", 2, "en", "Resend finished: 0 accepted, 0 rejected, 2 still waiting."),
+        ("waiting", 1, "es", "Reenvío terminado: 0 aceptados, 0 rechazados, 1 sigue esperando."),
+        ("waiting", 2, "es", "Reenvío terminado: 0 aceptados, 0 rechazados, 2 siguen esperando."),
+    ],
+)
+def test_resend_says_each_count_in_the_singular_with_one_and_in_the_plural_with_several(
+    issuer, gateway_answers, request_of, answer, count, language, notice
+):
+    # hub#1304: «1 aceptados», «1 rechazados»: each count of the notice had only its plural.
+    sealed = [record() for _ in range(count)]
+    gateway_answers.set(RESEND_ANSWERS[answer])
+    request = request_of()
+    with translation.override(language):
+        model_admin(RecordAdmin, Record).resend_to_aeat(
+            request, Record.objects.filter(pk__in=[item.pk for item in sealed])
+        )
+    assert len(gateway_answers.calls) == 1
+    assert said(request)[-1] == notice
+
+
 def test_resend_of_a_record_out_of_the_queue_says_why_and_sends_nothing(
     issuer, gateway_answers, request_of
 ):
@@ -318,13 +366,7 @@ def rejected_by_the_aeat(gateway_answers) -> Record:
 
 def rejected_together(gateway_answers, count: int) -> list[Record]:
     """``count`` tickets sent together that the AEAT rejected (its real answer, «Incorrecto» 1189, for each)."""
-
-    def reply(payload):
-        body = aeat_answer("alta_2007_aceptado_con_errores_2026-08-02.xml", records_of(payload["envelope"]))
-        body = body.replace(">AceptadoConErrores<", ">Incorrecto<").replace(">2007<", ">1189<")
-        return gateway.Reply(kind=gateway.ANSWERED, aeat_status=200, aeat_body=body)
-
-    gateway_answers.set(reply)
+    gateway_answers.set(rejecting)
     sealed = [record() for _ in range(count)]
     run("verifactu.contingency.process")
     for item in sealed:
@@ -455,8 +497,51 @@ def test_asking_the_aeat_takes_out_of_the_queue_only_what_it_holds(
         request = request_of()
         model_admin(RecordAdmin, Record).ask_the_aeat(request, Record.objects.filter(pk=missing.pk))
         assert said(request) == [
-            "Consulta a la AEAT: 0 ya registrados (fuera de la cola), 1 no están en la AEAT (siguen en la cola)."
+            "Consulta a la AEAT: 0 ya registrados (fuera de la cola), 1 no está en la AEAT (sigue en la cola)."
         ]
+
+
+@pytest.mark.parametrize(
+    ("held", "missing", "language", "notice"),
+    [
+        (
+            1,
+            2,
+            "en",
+            "Asked the AEAT: 1 already registered (out of the queue), 2 not in the AEAT (still in the queue).",
+        ),
+        (
+            2,
+            1,
+            "en",
+            "Asked the AEAT: 2 already registered (out of the queue), 1 not in the AEAT (still in the queue).",
+        ),
+        (
+            1,
+            2,
+            "es",
+            "Consulta a la AEAT: 1 ya registrado (fuera de la cola), 2 no están en la AEAT (siguen en la cola).",
+        ),
+        (
+            2,
+            1,
+            "es",
+            "Consulta a la AEAT: 2 ya registrados (fuera de la cola), 1 no está en la AEAT (sigue en la cola).",
+        ),
+    ],
+)
+def test_asking_the_aeat_says_each_count_in_the_singular_with_one_and_in_the_plural_with_several(
+    issuer, gateway_answers, request_of, held, missing, language, notice
+):
+    # hub#1304: «1 ya registrados», «1 no están en la AEAT»: each count of the notice had only its plural.
+    sealed = left_without_answer(gateway_answers, held + missing)
+    gateway_answers.set(aeat_holds(*sealed[:held]))
+    request = request_of()
+    with translation.override(language):
+        model_admin(RecordAdmin, Record).ask_the_aeat(
+            request, Record.objects.filter(pk__in=[item.pk for item in sealed])
+        )
+    assert said(request) == [notice]
 
 
 def test_asking_the_aeat_about_a_registered_record_asks_nothing(

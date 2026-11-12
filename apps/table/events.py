@@ -92,7 +92,8 @@ SALE_EVENTS = [
     "sale.sale.voided",
 ]
 CUSTOMER_ERASED = "customer.customer.erased"
-#: A check paints its customer's name (a card deleted, merged or erased no longer shows).
+#: A check paints its customer's name (a card deleted, merged or erased no longer shows; one recovered from the
+#: separate copy, CUSTOMER-F33, shows again).
 CUSTOMER_EVENTS = [
     "customer.order.linked",
     "customer.order.unlinked",
@@ -100,6 +101,7 @@ CUSTOMER_EVENTS = [
     CUSTOMER_ERASED,
     "customer.customer.deleted",
     "customer.customer.merged",
+    "customer.customer.restored",
 ]
 
 #: Event of another app → the operation of this app that reacts to it.

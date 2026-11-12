@@ -365,6 +365,13 @@ async function hubSessionOf(context: BrowserContext, origin: string): Promise<Co
  * page, never a route the SPA's router redirects (`/inventory` → `/inventory/dashboard`), which fails at once
  * saying where it landed. Looking earlier on the jump let such a `next` pass alone and time out after other specs.
  *
+ * A page left on the SaaS's launcher (`signUpOnSaas`) may jump into the business by itself: the launcher opens the
+ * one it just made once it is ready (the SaaS's `LaunchPage.vue`, «Opening by itself»), and when that falls while
+ * `page.goto` is on its way, Playwright throws «interrupted by another navigation», on the jump's way out to the SaaS
+ * or on its way back into the hub (`interruptedByTheJump`, hub#1317). That is the jump this login waits for anyway:
+ * it follows it and, back in the hub, goes on to `next` if the jump landed elsewhere (the launcher's lands on `/`).
+ * Any other error of `page.goto` fails it as before.
+ *
  * Each step waits `loginStepTimeout()` and a step that does not come fails at once, saying which and how long
  * it waited. runserver or the SaaS restarting (another session saved a `.py` file) refuses the connection for
  * a moment: the trip through the SaaS then starts again once, a second later (`withRetry`). From
@@ -397,7 +404,7 @@ export async function login(
   const inHub = () => topbarApps(page).waitFor({ state: 'attached', timeout: wait });
   await withRetry(
     async () => {
-      await page.goto(target);
+      const jumped = await goneOrJumped(page, target, origin);
       const where = await Promise.race([
         page.waitForURL((url) => url.origin === SAAS, { timeout: wait }).then(() => 'saas' as const, () => null),
         inHub().then(() => 'hub' as const, () => null),
@@ -418,8 +425,11 @@ export async function login(
         }
         // Back from the SaaS: the hub's callback sends to `next`. In the hub already, the shell is up and the
         // address final (checked below): waiting for `next` there waited for an address that might never come.
-        await page.waitForURL(target, { timeout: wait });
+        // The jump that cut `page.goto` short sends to its own `next`: back in the hub is all it gives.
+        await page.waitForURL(jumped ? (url) => url.origin === origin : target, { timeout: wait });
       }
+      // In with the session that jump opened, wherever it landed: on to `next`.
+      if (jumped && !sameAddress(page.url(), target)) await page.goto(target);
     },
     {
       onRetry: (error) =>
@@ -435,8 +445,37 @@ export async function login(
   // Only now is the address final: the SPA mounts its shell once its router has settled, redirects included
   // (`router.isReady()`, frontend/main.ts). Back from the SaaS, the wait above saw `next` as its document arrived.
   const landed = page.url();
-  if (new URL(landed).href !== new URL(target).href) {
+  if (!sameAddress(landed, target)) {
     throw new Error(`login on ${origin}: landed on ${landed}, not on ${target}: the SPA's router took \`next\` elsewhere`);
+  }
+}
+
+/** Whether two addresses are the same once written the same way (`http://a.localhost:8000` and `…:8000/`). */
+const sameAddress = (one: string, other: string): boolean => new URL(one).href === new URL(other).href;
+
+/** Playwright's error when another navigation commits before the one `page.goto` started: where that one went. */
+const INTERRUPTED = /is interrupted by another navigation to "([^"]+)"/;
+
+/**
+ * Whether `error` is a `page.goto` to the hub at `origin` cut short by the SaaS's jump: another navigation committed
+ * first, on the jump's way out to the SaaS or on its way back into this hub. Not one to anywhere else, nor any other
+ * error.
+ */
+function interruptedByTheJump(error: unknown, origin: string): boolean {
+  const to = error instanceof Error ? INTERRUPTED.exec(error.message)?.[1] : undefined;
+  if (to === undefined || !URL.canParse(to)) return false;
+  const where = new URL(to).origin;
+  return where === new URL(SAAS).origin || where === new URL(origin).origin;
+}
+
+/** `page.goto(target)`; `true` when the SaaS's jump cut it short (`interruptedByTheJump`), any other error thrown. */
+async function goneOrJumped(page: Page, target: string, origin: string): Promise<boolean> {
+  try {
+    await page.goto(target);
+    return false;
+  } catch (error) {
+    if (!interruptedByTheJump(error, origin)) throw error;
+    return true;
   }
 }
 

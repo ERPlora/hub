@@ -3062,10 +3062,11 @@ Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, A
 ### BASE-F114 Devolver un negocio a un momento pasado desde el admin de Hubs
 <!-- origen: nuevo (aws#77; PLAN-DB §13 «Restaurar un hub»: los planes de pago prometen volver a cualquier momento de los últimos 14 días) gh:hub#1198 -->
 Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte, y recuperar desde la copia aparte los
-clientes que se perdieron, los eliminados tal como eran, los productos y las citas que se perdieron; crear y borrar el
-clúster temporal es el procedimiento «Devolver un negocio a un momento» de ERPlora/aws; recuperar servicios, hub#1283; las
-citas periódicas, hub#1327; los grupos, etiquetas y campos propios de un cliente recuperado, hub#1285; la imagen y las
-categorías de un producto recuperado, hub#1319 y hub#1320)
+clientes que se perdieron, los eliminados tal como eran, los productos, los servicios y las citas; crear y borrar el
+clúster temporal es el procedimiento «Devolver un negocio a un momento» de ERPlora/aws; las citas periódicas, hub#1327;
+los grupos, etiquetas y campos propios de un cliente recuperado, hub#1285; la imagen y las categorías de un producto
+recuperado, hub#1319 y hub#1320; la imagen de un servicio recuperado, hub#1319; sus profesionales, hub#1322; las
+categorías de servicios eliminadas, hub#1323)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
 copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
@@ -3098,9 +3099,11 @@ Pasos:
      negocio eliminó y aún guarda vuelve tal como era, con su historial, y que lo que ya no tiene se crea de nuevo como lo
      crea su propia pantalla, sin copiar nada; que lo que el negocio tiene, o ha vuelto a crear, se queda como está; que
      los registros para Hacienda no se recuperan nunca y que el negocio sigue abierto.
-     Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes**, **Productos** y **Citas**). Pulsa
+     Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes**, **Productos**, **Servicios** y
+     **Citas**). Pulsa
      **Recuperar**.
-  10. Sale «1 copia aparte devolverá Clientes a su negocio en unos minutos: Recuperaciones dice cómo fue.». En
+  10. Sale «1 copia aparte devolverá Clientes, Productos, Servicios a su negocio en unos minutos: Recuperaciones dice
+      cómo fue.». En
       Recuperaciones la ve «Pedida» con la copia, qué se pidió y cuándo.
   11. Unos minutos después dice «Hecha» y qué volvió: «Clientes: se restauró 1, se crearon 2» o «Clientes: se crearon 2,
       1 sin crear». Su ficha dice además cuáles no volvieron y por qué (por su identificador en la copia, sin datos
@@ -3115,7 +3118,14 @@ Pasos:
       estaba y en las categorías que el negocio sigue teniendo; sin stock, que se cuenta (INVENTORY-F14), porque el de la
       copia es de otro día; sin su imagen (hub#1319) y sin las categorías que el negocio ya no tiene (hub#1320). Uno que se
       eliminó en el negocio también vuelve como producto nuevo; sus movimientos siguen en el eliminado (hub#1321). No se
-      repite uno que el negocio ya volvió a dar de alta (otro vivo con su SKU o su EAN-13). Pedirlo otra vez no crea nada
+      repite uno que el negocio ya volvió a dar de alta (otro vivo con su SKU o su EAN-13). Con Servicios, «Servicios: se
+      crearon 2»: cada servicio que el negocio ya no tiene vuelve como uno nuevo, en oferta, creado como lo crea la pantalla
+      de Servicios, con su nombre, tarifa, precios, coste, duración, márgenes, capacidad, descripciones, reservas, orden,
+      destacado, SKU, código de barras y notas, su categoría fiscal y su categoría si el negocio aún la tiene (si se
+      eliminó, «Sin categoría», hub#1323); sin su imagen (hub#1319) ni sus profesionales (hub#1322). Uno archivado sigue
+      en el negocio y no vuelve (se restaura en Servicios), tampoco uno que la copia tenía archivado, y no se repite uno
+      que el negocio ya volvió a crear (otro con el mismo nombre en la misma categoría, que no sea ya uno de la copia; cada
+      uno vale por uno solo, así que dos servicios con el mismo nombre vuelven los dos). Pedirlo otra vez no crea nada
       dos veces.
       Las citas van siempre después de los clientes, se pidan en el orden que se pidan, para que cada una encuentre a su
       clienta. Vuelve cada cita que aún no ha llegado y seguía reservada (pendiente o confirmada, sin cobrar), reservada
@@ -3133,8 +3143,9 @@ tal como estaba, sin tocarlo; una base aparte en su clúster con los datos de es
 guardada 7 días; el aviso `control.hub.restore_aside_requested` con quién lo pidió. Al recuperar: en el negocio, cada ficha
 eliminada que aún guardaba, viva otra vez con su aviso de ficha recuperada (`customer.customer.restored`), una ficha
 nueva por cada cliente que ya no tenía, con su aviso de ficha creada (`customer.customer.created`), un producto nuevo
-por cada producto que le faltaba, con su aviso de producto creado (`inventory.product.created`), y una cita nueva por
-cada una que le faltaba, con su aviso de cita creada (`appointment.appointment.created`), y nada más; la copia, sin
+por cada producto que le faltaba, con su aviso de producto creado (`inventory.product.created`), un servicio nuevo por
+cada uno que ya no tenía, con su aviso de servicio creado (`service.service.created`), y una cita nueva por cada una
+que le faltaba, con su aviso de cita creada (`appointment.appointment.created`), y nada más; la copia, sin
 tocar; el aviso `control.copy.recovery_requested` con quién lo pidió.
 Si falla: lo que la restauración no admite lo dice el aviso, negocio a negocio, y ese negocio no se toca: uno que no está
 listo o no tiene base propia, una demo, uno que se está trasladando o restaurando, un clúster abierto a hubs nuevos o con
@@ -3151,17 +3162,17 @@ página lo vuelve a pedir. Lo que no se puede traer de una app lo dice su result
 el negocio («Clientes: nada (app_inactive: …)»), o la copia no la tenía, le falta la migración que su lectura necesita o
 tiene una que este código no conoce (`recover_not_in_copy`, `recover_copy_behind`, `recover_copy_ahead`). Lo que la
 operación de crear no acepta hoy (un teléfono que ya no vale, un producto sin categoría fiscal o con una que Impuestos
-ya no tiene activa, una hora ocupada, una clienta que ya no está) se cuenta «sin crear» con su motivo, y lo demás
-vuelve; también una ficha eliminada que entretanto se unió a otra o se borró («customer.customer_unavailable: …»). Si
-la copia ya no está,
+ya no tiene activa, un servicio cuya categoría fiscal se desactivó (`service.tax_category_unknown`), una hora ocupada,
+una clienta que ya no está) se cuenta «sin crear» con su motivo, y lo demás vuelve; también una ficha eliminada que
+entretanto se unió a otra o se borró («customer.customer_unavailable: …»). Si la copia ya no está,
 la recuperación dice «No se pudo hacer» y por qué («recover_copy_unreadable: …»). Mientras el negocio se traslada o se
 restaura, la recuperación espera sin hacer nada. Con la plataforma congelada para una subida de la base de datos, la restauración espera, con el negocio en
 mantenimiento, hasta que se descongela. Con registros solo del entorno de pruebas, después se recupera la cadena
 (VERIFACTU-F28). El personal de soporte ve la lista, Copias aparte y Recuperaciones, pero no las acciones.
 Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado), CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12,
-CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04, APPOINTMENT-F01, APPOINTMENT-F11; hub#1198,
-hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1319, hub#1320, hub#1321, hub#1326, hub#1327,
-aws#77
+CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04, SERVICE-F01, SERVICE-F04, SERVICE-F05,
+SERVICE-F08, APPOINTMENT-F01, APPOINTMENT-F11; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285,
+hub#1306, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, aws#77
 
 ## Para quien lo mantiene
 
