@@ -3114,7 +3114,7 @@ Pasos:
       contacto, NIF, dirección, fechas, origen, etapa, canal y notas; sin sus grupos, etiquetas ni campos propios
       (hub#1285). Nunca vuelve una ficha cuyos datos personales se borraron (RGPD) ni una que se unió a otra, ni se repite
       una que el negocio ya volvió a crear (el mismo nombre, teléfono y email). Con Productos, «Categorías de productos,
-      Productos: se restauró 1, se crearon 2» (las categorías y los productos que volvieron, juntos): primero vuelve
+      Productos: se restauró 1, se crearon 2» (las categorías y los productos que volvieron, juntos, hub#1355): primero vuelve
       cada categoría de productos que el negocio ya no tiene (la eliminó o la perdió), como una nueva, creada como la
       crea la pantalla de Categorías, con su nombre, slug, descripción, icono, color, orden y categoría fiscal; la
       eliminada sigue eliminada (INVENTORY-F07). Una que el negocio conserva, aunque la renombrara, es la misma, y una

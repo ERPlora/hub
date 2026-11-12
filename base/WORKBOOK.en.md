@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d008ff1b48d2833b4b92891cdd2272bce57150422112f77d59bca360fb800e93 -->
+<!-- generated from WORKBOOK.md sha256:c61f4e2ad67ba10f96f295033d1d2c6555130549498b5db420522a78bd77ce67 -->
 
 ## What it is for and who it is for
 
@@ -2988,7 +2988,7 @@ Steps:
       groups, tags or own fields (hub#1285). A card whose personal data was erased (GDPR) or one merged into another never
       comes back, and one the business has already made again (the same name, phone and email) is not repeated. With
       Products, "Product categories, Products: 1 restored, 2 created" (the categories and the products that came back,
-      together): first each product category the business no longer has (it deleted or lost it) comes back as a new one,
+      together, hub#1355): first each product category the business no longer has (it deleted or lost it) comes back as a new one,
       created as the Categories screen creates it, with its name, slug, description, icon, colour, order and tax
       category; the deleted one stays deleted (INVENTORY-F07). One the business keeps, even renamed, is the same one, and
       one it has already made again (another live one with its name, case and spaces aside, that is not already one of
