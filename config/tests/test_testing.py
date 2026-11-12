@@ -92,6 +92,22 @@ def test_every_test_is_checked_by_the_autouse_fixture(request):
     assert "session_settings_left_as_found" in request.fixturenames
 
 
+def test_the_check_makes_no_pool_where_there_is_none():
+    # As after the first test of an xdist worker that had no database: Django makes the pool the first time it is read,
+    # on the database's name of that moment, the developer's, and a pool made then took the whole worker there
+    # (hub#1332). Only one that is already there is looked at.
+    pools = type(connections[DEFAULT_DB_ALIAS])._connection_pools
+    kept = pools.pop(DEFAULT_DB_ALIAS)
+    try:
+        discard_changed_sessions()
+        made = pools.pop(DEFAULT_DB_ALIAS, None)
+    finally:
+        pools[DEFAULT_DB_ALIAS] = kept
+    if made is not None:
+        made.close()
+    assert made is None
+
+
 def left_on_the_connection(name: str):
     """The connection of this thread keeps its method ``name`` on itself, as ``monkeypatch``'s undo leaves it."""
     wrapper = connections[DEFAULT_DB_ALIAS]

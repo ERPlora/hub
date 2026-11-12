@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ced0509a2b9adaf2496acb039006a2f6ef383cf7af658f2553588190e4031115 -->
+<!-- generated from WORKBOOK.md sha256:6aea977e3085b742d8f7562b45bc9a3f901942c1102bf5d9edfd6e880c092685 -->
 
 ## What it is for and who it is for
 
@@ -410,8 +410,9 @@ Out: the `appointment.appointment.deleted` event.
 If it fails: "This appointment cannot be deleted: it is in progress, completed or charged."; with its check
 open at the till, `appointment.check_open`. An appointment deleted by mistake that has not come yet is recovered by
 ERPlora's staff from a separate copy of the business (BASE-F114): it comes back booked as in APPOINTMENT-F01, with its
-customer, its services, its professional, its time, its minutes and its notes, as a new appointment (another number
-and without its history, hub#1326); if its time is no longer free or the customer is no longer in the business, it does
+customer, its services (one the business made again, with its name in its category, counts as the same), its
+professional, its time, its minutes and its notes, as a new appointment (another number and without its history,
+hub#1326); if its time is no longer free, or the customer or one of its services is no longer in the business, it does
 not come back and Recoveries says why.
 Involved: BASE-F114
 
