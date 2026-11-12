@@ -46,12 +46,11 @@ async function show(file: FileItem, locale: 'en' | 'es' = 'en') {
 
 const inDoc = (testid: string) => document.querySelector<HTMLElement>(`[data-testid="${testid}"]`);
 
-/** Resolves once the preview no longer says «Opening the file»: it shows the file, or says why it cannot. Watched in
- *  the document, with no clock of its own (hub#1293): however long the machine takes to bring a library and read the
- *  file, the test then checks what the preview shows. A read that never ends is cut by the test's budget, as any. */
-function settled(): Promise<void> {
+/** Resolves once `done()` holds, watched in the document (its nodes and their classes) with no clock of its own: however
+ *  long the machine takes, the test then checks what the page shows. A wait that never ends is cut by the test's
+ *  budget, as any. */
+function until(done: () => boolean): Promise<void> {
   return new Promise((resolve) => {
-    const done = (): boolean => !inDoc('file-preview-loading');
     if (done()) {
       resolve();
       return;
@@ -61,9 +60,21 @@ function settled(): Promise<void> {
       watcher.disconnect();
       resolve();
     });
-    watcher.observe(document.body, { childList: true, subtree: true });
+    watcher.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
   });
 }
+
+/** Resolves once the preview no longer says «Opening the file»: it shows the file, or says why it cannot (hub#1293),
+ *  however long the machine takes to bring a library and read the file. At once when it does not say it. */
+const settled = (): Promise<void> => until(() => !inDoc('file-preview-loading'));
+
+/** Resolves once Ionic drew every element of the part `testid` (Stencil marks each one `hydrated`): a sheet's tab reads
+ *  its name only then, a moment after the table, in Ionic's own time (hub#1300). At once when there is no such part. */
+const drawn = (testid: string): Promise<void> =>
+  until(() => {
+    const part = inDoc(testid);
+    return !part || [part, ...part.querySelectorAll('*')].every((el) => !el.localName.startsWith('ion-') || el.classList.contains('hydrated'));
+  });
 
 beforeEach(() => {
   vi.mocked(fetchFile).mockReset();
@@ -164,10 +175,12 @@ describe('FilePreview', () => {
   it('shows a real .xlsx as a table per sheet, its cells as the sheet shows them', async () => {
     arrives(sample('sample.xlsx'), 'ventas.xlsx');
     await show(item('ventas.xlsx', '', XLSX), 'es');
-    await flush();
-    await vi.waitFor(() => expect(inDoc('file-preview-table')).not.toBeNull());
+    // Its library loads cold and reads the file in its own time, as the .docx's does (hub#1300).
+    await settled();
+    expect(inDoc('file-preview-table')).not.toBeNull();
     const cells = [...(inDoc('file-preview-table')?.querySelectorAll('th, td') ?? [])].map((cell) => cell.textContent);
     expect(cells.slice(0, 8)).toEqual(['Producto', 'Precio', 'Fecha', 'Pagado', 'Café solo', '1,2', '03/11/2026', '1']);
+    await drawn('file-preview-sheet-tabs');
     expect([...document.querySelectorAll('[data-testid="file-preview-sheet-tab"]')].map((tab) => tab.textContent?.trim())).toEqual(['Ventas', 'Notas']);
     expect(inDoc('file-preview-none')).toBeNull();
   });
@@ -185,8 +198,10 @@ describe('FilePreview', () => {
   it('a spreadsheet or a document that cannot be read says so (damaged), with the download', async () => {
     arrives(new Uint8Array([80, 75, 3, 4, 9, 9, 9]), 'roto.xlsx');
     await show(item('roto.xlsx', '', XLSX), 'es');
-    await flush();
-    await vi.waitFor(() => expect(inDoc('file-preview-damaged')).not.toBeNull());
+    // Each library is brought cold and refuses the file in its own time (hub#1300): each wait goes right after the
+    // `show()` of a file the preview is still opening.
+    await settled();
+    expect(inDoc('file-preview-damaged')).not.toBeNull();
     expect(inDoc('file-preview-damaged')?.textContent).toContain('No se pudo leer el archivo');
     expect(inDoc('file-preview-damaged')?.textContent).toContain('Descárgalo');
     expect(inDoc('file-preview-error')).toBeNull();
@@ -194,8 +209,8 @@ describe('FilePreview', () => {
     document.body.innerHTML = '';
     arrives(sample('sample.xlsx'), 'informe.docx');
     await show(item('informe.docx', '', DOCX));
-    await flush();
-    await vi.waitFor(() => expect(inDoc('file-preview-damaged')?.textContent).toContain('The file could not be read'));
+    await settled();
+    expect(inDoc('file-preview-damaged')?.textContent).toContain('The file could not be read');
   });
 
   it('one heavier than the preview reads is not even fetched: «too large», with the download', async () => {
