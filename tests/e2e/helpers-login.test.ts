@@ -253,6 +253,13 @@ describe('login, when page.goto fails otherwise', () => {
 
 const target = `${HUB}/demo/items`;
 
+/** What `login()` on `/demo/items` ends in: «signed in», or the error it threw, as text. */
+const outcomeOf = (page: Page): Promise<string> =>
+  login(page, HUB, '/demo/items', OWNER).then(
+    () => 'signed in',
+    (error: unknown) => String(error),
+  );
+
 describe('login, when the hub’s shell takes longer than a sixth of the test’s time to mount', () => {
   it.each([
     ['in a test of 180 s, with the hub’s session kept', TEST_TIME, [{ url: target, for: LATE }, { url: target, shell: true }]],
@@ -274,10 +281,7 @@ describe('login, when the hub’s shell takes longer than a sixth of the test’
     inATestOf(TEST_TIME);
     const { page, clock, listening } = pageDoing([{ stops: [{ url: target }] }]);
 
-    const failure = await login(page, HUB, '/demo/items', OWNER).then(
-      () => 'signed in',
-      (error: unknown) => String(error),
-    );
+    const failure = await outcomeOf(page);
 
     expect(failure).toMatch(new RegExp(`^Error: login on ${HUB}: .*the hub's shell .*${TEST_TIME} ms \\(at ${target}\\)$`));
     expect(clock()).toBeGreaterThanOrEqual(TEST_TIME);
@@ -318,10 +322,7 @@ describe('login, when the hub’s shell is not coming', () => {
     inATestOf(TEST_TIME);
     const { page, clock, listening } = pageDoing([goto]);
 
-    const failure = await login(page, HUB, '/demo/items', OWNER).then(
-      () => 'signed in',
-      (error: unknown) => String(error),
-    );
+    const failure = await outcomeOf(page);
 
     expect(failure).toMatch(new RegExp(`^Error: login on ${HUB}: `));
     expect(failure).toContain(why);
