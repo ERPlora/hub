@@ -866,6 +866,8 @@ def test_a_business_is_born_with_taxes_on_for_its_country_and_never_with_verifac
     assert {label for label, row in states.items() if row.wanted} == {"tax"}
     assert activation.chosen_on(states) == 0
     assert "base.mandatory.tax" not in asked
+    # With only what it is born with on, its till has nothing to sell yet: «Your apps» still asks for one.
+    assert asked["base.apps"]["state"] == "pending"
     assert asked["tax.rules"]["state"] == rules
     assert ("base.mandatory.verifactu" in asked) is verifactu_asked
     if verifactu_asked:
@@ -908,20 +910,21 @@ def test_a_demo_is_born_as_a_business_of_spain_with_taxes_on_and_verifactu_off(r
 
 
 def test_an_app_mandatory_in_one_country_that_the_platform_turns_on_is_on_only_in_a_business_of_it(
-    registry, told, monkeypatch
+    registry, small_template, told, monkeypatch
 ):
-    """Base names no app: what it turns on at sign-up is what each app declares, for the business's own country (a
-    straw declaration on Tasks, mandatory in Portugal only)."""
+    """Base names no app: what it turns on at sign-up, with its tables, is what each app declares, for the business's own
+    country (a straw declaration on Tasks, mandatory in Portugal only; a template without its tables)."""
     monkeypatch.setattr(
         django_apps.get_app_config("task"), "mandatory", {"countries": ["PT"], "platform_turns_on": True}, raising=False
     )
-    portugal, spain = registry.hub(country="PT"), registry.hub(country="ES")
+    portugal, spain = registry.hub(country="PT", vertical="small"), registry.hub(country="ES", vertical="small")
 
     assert provision.provision(portugal) is True
     assert provision.provision(spain) is True
 
     assert born_with(portugal)[0]["task"] == Activation("on", False)
     assert born_with(spain)[0]["task"] == Activation("off", False)
+    assert "task" in fresh(portugal).schema_apps and "task" not in fresh(spain).schema_apps
 
 
 def test_what_its_seeding_read_of_its_apps_is_not_kept_once_it_is_born_with_them(registry, told):

@@ -176,6 +176,13 @@ def born_on(country: str, configs: Iterable[Any] | None = None) -> frozenset[str
     )
 
 
+def born_apps(country: str) -> frozenset[str]:
+    """Every module a business of ``country`` is born with on: :func:`born_on` and what they need. Its sign-up makes
+    their tables and turns them on (``base.tenancy.provision``); none of them makes the business's «Your apps»."""
+    graph = module_graph()
+    return frozenset(label for label, row in born(born_on(country), graph).items() if row.on)
+
+
 def born(labels: Iterable[str], graph: Graph) -> dict[str, Activation]:
     """Every module's state in a business born with ``labels`` on (:func:`born_on`): they and what they need on, none
     chosen (the business chose none: they take nothing of the plan's limit); every other module off."""

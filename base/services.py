@@ -1135,24 +1135,17 @@ def turn_every_app_on(hub: Hub) -> None:
     _every_app_on(hub.slug, then=lambda forget: forget())
 
 
-def born_apps(hub: Hub) -> list[str]:
-    """The modules the business ``hub`` is born with on (hub#997, PLAN-HUB round 2026-11-07): the ones its country
-    requires that the platform turns on by itself (``activation.born_on``: Taxes), with what they need. Its sign-up
-    makes their tables (``base.tenancy.provision``), as it makes its vertical's."""
-    graph = activation.module_graph()
-    return sorted(label for label, row in activation.born(activation.born_on(hub.country), graph).items() if row.on)
-
-
 def turn_on_born_apps(hub: Hub) -> list[str]:
     """Inside ``use_hub(hub)``, at its seeding (``base.tenancy.provision``), before the SaaS's photo kept is applied:
-    write down every module of the business ``hub`` just born, :func:`born_apps` on and not chosen (they take nothing of
-    the plan's limit), every other off; unless it has rows already (its seeding wrote them: the local hubs, born with
+    write down every module of the business ``hub`` just born, those its country requires that the platform turns on by
+    itself and what they need (``activation.born_apps``: Taxes, hub#997) on and not chosen (they take nothing of the
+    plan's limit), every other off; unless it has rows already (its seeding wrote them: the local hubs, born with
     every app on; or a preparation run again). Outside any operation, before the hub serves anything: what was kept of
     its apps is forgotten at once. What went on."""
     host = hub.slug
     if AppActivation.objects.filter(host=host).exists():
         return []
-    states = activation.born(born_apps(hub), activation.module_graph())
+    states = activation.born(activation.born_apps(hub.country), activation.module_graph())
     AppActivation.objects.bulk_create(
         AppActivation(host=host, app=label, state=row.state, chosen=row.chosen) for label, row in states.items()
     )

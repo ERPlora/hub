@@ -45,7 +45,7 @@ from collections.abc import Callable, Iterable
 from django.utils import timezone
 from live.context import system_context
 
-from base import registry, services
+from base import activation, registry, services
 from base.catalog import template_apps
 from base.schemas import DemoSlugIn
 from base.tenancy import connections as tenancy_connections
@@ -211,7 +211,7 @@ def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = N
             # lease is renewed between apps: a long migration never lets another worker take the hub meanwhile.
             migrator.ensure_schema(
                 hub,
-                add=["base", *vertical_apps(hub.vertical), *services.born_apps(hub), *apps],
+                add=["base", *vertical_apps(hub.vertical), *sorted(activation.born_apps(hub.country)), *apps],
                 heartbeat=lambda: services.provision_step(hub_id, Hub.Status.MIGRATING, timezone.now(), LEASE),
             )
         except services.ProvisioningStopped:
