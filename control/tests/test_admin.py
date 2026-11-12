@@ -876,6 +876,9 @@ class TestRecoverIntoTheBusiness:
         assert "Recover into the business" in html and 'value="Recover"' in html
         assert re.search(r'<input[^>]*name="apps"[^>]*value="customer"[^>]*checked', html)
         assert "Customers" in html
+        # hub#1284: and the appointments, after the customers they are booked for.
+        assert re.search(r'<input[^>]*name="apps"[^>]*value="appointment"[^>]*checked', html)
+        assert html.index('value="customer"') < html.index('value="appointment"')
         assert str(copy) in html and f'<div class="readonly">{copy.db_name}</div>' in html
         assert "admin/css/forms.css" in html
         assert not CopyRecovery.objects.exists()
@@ -1017,6 +1020,21 @@ def test_the_recovery_speaks_spanish(client, root):
     assert 'value="Recuperar"' in html and "Clientes" in html and "nunca se copia" in html
     listed = client.get(RECOVERIES, HTTP_HOST=PLATFORM, HTTP_ACCEPT_LANGUAGE="es").content.decode()
     assert "Recuperaciones" in listed or "recuperaciones" in listed
+
+
+def test_what_came_back_is_said_in_spanish_in_words_that_fit_customers_and_appointments_alike():
+    """hub#1284: the counts follow the name of an app whose records are feminine in Spanish («Citas») as well as one
+    whose records are masculine («Clientes»): never «Citas: 2 creados»."""
+    from django.utils import translation
+
+    said = control_admin.CopyRecoveryAdmin.result_said
+    with translation.override("es"):
+        assert said({"app": "appointment", "created": 2, "not_created": 1, "reasons": [], "refused": ""}) == (
+            "Citas: se crearon 2, 1 sin crear"
+        )
+        assert said({"app": "customer", "created": 1, "not_created": 0, "reasons": [], "refused": ""}) == (
+            "Clientes: se creó 1"
+        )
 
 
 def test_the_separate_copy_speaks_spanish(client, root):
