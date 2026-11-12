@@ -23,6 +23,7 @@ import uuid
 import pytest
 from django.apps import apps as django_apps
 from django.db import connections
+from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs
 from live.models import OutboxEvent
@@ -740,7 +741,8 @@ class TestTheLease:
     def test_a_recovery_another_worker_holds_is_left_to_it(self, recoveries, every_app_on):
         hub, _ids = recoveries.business(every_app_on, ANA)
         copy = recoveries.copy_of(hub)
-        held = recoveries.ask(copy, lease_owner="other:1", lease_until=AT + dt.timedelta(minutes=5))
+        # Held by the clock the worker claims it with (``timezone.now()``), never until a fixed moment (hub#1351).
+        held = recoveries.ask(copy, lease_owner="other:1", lease_until=timezone.now() + dt.timedelta(minutes=5))
 
         assert run() == 0
 
