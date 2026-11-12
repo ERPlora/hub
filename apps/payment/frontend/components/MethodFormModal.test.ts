@@ -30,12 +30,17 @@ const BANK: MethodOut = {
 const LISTED: MethodOut = { ...BANK, bank_account_ref: 'ES** **** **** **** **** 1332' };
 const WHOLE: MethodOut = { ...BANK, bank_account_ref: 'ES91 2100 0418 4502 0005 1332' };
 
+type Mounted = Awaited<ReturnType<typeof mountPayment>>;
+
+/** Mounts the window and opens it; `beforeOpening` sets up the network the opening will meet. */
 async function setup(
   method: MethodOut | null = null,
   locale: 'en' | 'es' = 'en',
   answers: Record<string, [number, unknown]> = { '/api/payment/methods/detail': [200, WHOLE] },
+  beforeOpening?: (m: Mounted) => void,
 ) {
   const m = await mountPayment(MethodFormModal, { props: { open: false, method }, locale, path: '/payment/methods', answers });
+  beforeOpening?.(m);
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await m.wrapper.setProps({ open: true });
   await settle();
@@ -137,31 +142,27 @@ describe('MethodFormModal: typed before the whole method arrives', () => {
   async function openHoldingTheMethod(whole: MethodOut = WHOLE) {
     let release!: () => void;
     const held = new Promise<void>((resolve) => (release = resolve));
-    const m = await mountPayment(MethodFormModal, { props: { open: false, method: LISTED }, path: '/payment/methods' });
-    m.net.onApi(async ({ url, init }) => {
-      const path = new URL(url, 'http://a.localhost').pathname;
-      if (path === '/api/payment/methods/detail') {
-        await held;
-        return Response.json(whole, { status: 200 });
-      }
-      if (path === '/api/payment/methods/update') return Response.json({ ...whole, ...JSON.parse(String(init.body)) }, { status: 200 });
-      return Response.json({ error: { code: 'not_found', message: 'Not found' } }, { status: 404 });
-    });
-    await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
-    await m.wrapper.setProps({ open: true });
-    await settle();
-    const field = (name: string) => m.inDoc(`payment-method-form-${name}`) as Control;
-    const save = () => m.inDoc('payment-method-form-submit') as Control;
-    expect(field('account').disabled, 'the account waits for the whole method').toBe(true);
-    expect(save().disabled, 'Save waits for the whole method').toBe(true);
+    const s = await setup(LISTED, 'en', {}, (m) =>
+      m.net.onApi(async ({ url, init }) => {
+        const path = new URL(url, 'http://a.localhost').pathname;
+        if (path === '/api/payment/methods/detail') {
+          await held;
+          return Response.json(whole, { status: 200 });
+        }
+        if (path === '/api/payment/methods/update') return Response.json({ ...whole, ...JSON.parse(String(init.body)) }, { status: 200 });
+        return Response.json({ error: { code: 'not_found', message: 'Not found' } }, { status: 404 });
+      }),
+    );
+    expect(s.field('account').disabled, 'the account waits for the whole method').toBe(true);
+    expect(s.save().disabled, 'Save waits for the whole method').toBe(true);
     async function arrive() {
       release();
       await settle();
       await settle();
-      expect(field('account').disabled).toBe(false);
+      expect(s.field('account').disabled).toBe(false);
     }
-    const posts = () => m.sent().filter((c) => c.method === 'POST');
-    return { ...m, field, save, arrive, posts };
+    const posts = () => s.sent().filter((c) => c.method === 'POST');
+    return { ...s, arrive, posts };
   }
 
   it('a name typed meanwhile stays; the type and the account take the whole method; Save sends only the name', async () => {
