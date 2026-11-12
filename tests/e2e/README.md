@@ -54,8 +54,10 @@ Cada paso del SaaS espera una sexta parte del tiempo del test (30 s con los 180 
 arriba, `topbar-apps`), en cambio, se espera todo el tiempo del test, al entrar y al final: con la máquina cargada la
 SPA tardó más de 30 s en montarla sin nada roto (hub#1342). Lo que dice que no va a llegar cae en el acto y dice por
 qué: en el hub, la página lanza un error (el arranque murió), un script suyo no carga (falla o contesta un error; un
-fallo de red se reintenta una vez, como una conexión rechazada), su documento contesta un error (un 500, el 503 de un
-hub ocupado) o la página se va a una dirección que no es este hub ni el SaaS. Una shell que no llega sin nada de eso
+fallo de red se reintenta una vez, como una conexión rechazada), su documento contesta un error que no se recarga solo
+(un 500, el 503 en texto de un hub ocupado) o la página se va a una dirección que no es este hub ni el SaaS. Las páginas
+503 del negocio que se prepara, en mantenimiento o con la BD cortada traen `Retry-After` y se recargan solas: no cortan,
+se sigue esperando la shell. Una shell que no llega sin nada de eso
 choca con el tope del propio test, y Playwright nombra esa espera (`locator.waitFor`, `topbar-apps`). «code rejected» solo
 sale cuando el SaaS dice que el código no vale; si aún no ha contestado, el error dice «the SaaS did not answer
 the code within … ms».

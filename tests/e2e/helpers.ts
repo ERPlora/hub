@@ -512,6 +512,16 @@ async function goneOrJumped(page: Page, target: string, origin: string): Promise
 /** Chromium's failure of a request the page itself dropped, as it does with what is loading when it navigates away. */
 const ABORTED = 'net::ERR_ABORTED';
 
+/**
+ * Whether the hub's answer to a page is one that reloads by itself until the hub answers: the pages of a business being
+ * prepared, under maintenance or with its database cut are HTML with `Retry-After` and a meta refresh
+ * (`base/templates/base/hub_preparing.html` and its neighbours). The plain text of a busy hub never reloads.
+ */
+const reloadsItself = (response: PageResponse): boolean => {
+  const headers = response.headers();
+  return headers['retry-after'] !== undefined && (headers['content-type'] ?? '').startsWith('text/html');
+};
+
 /** What `watchHub` gives `login`: the first sign it saw that the hub's shell is not coming. */
 interface HubWatch {
   /** Rejects with that sign, at once if it came already; never settles while none comes. */
@@ -525,8 +535,9 @@ interface HubWatch {
 /**
  * Listens to `page` for what says the hub at `origin` will not mount its shell, while `login` runs: on the hub, the
  * page threw (`pageerror`: its boot died), one of its scripts did not load (it failed, or was answered with an error:
- * the SPA never starts), or its document was answered with an error (a 500, the 503 of a busy hub). What happens on
- * the SaaS is not the hub's, nor a script the page drops itself as it navigates away (`ABORTED`).
+ * the SPA never starts), or its document was answered with an error that does not reload by itself (a 500, the 503 of a
+ * busy hub; not `reloadsItself`). What happens on the SaaS is not the hub's, nor a script the page drops itself as it
+ * navigates away (`ABORTED`).
  */
 function watchHub(page: Page, origin: string): HubWatch {
   let seen: Error | undefined;
@@ -544,7 +555,7 @@ function watchHub(page: Page, origin: string): HubWatch {
     const request = response.request();
     if (response.status() < 400) return;
     if (request.isNavigationRequest()) {
-      if (request.frame() === page.mainFrame() && new URL(response.url()).origin === origin) {
+      if (request.frame() === page.mainFrame() && new URL(response.url()).origin === origin && !reloadsItself(response)) {
         saw(`the hub answered ${response.status()} to ${response.url()}`);
       }
     } else if (request.resourceType() === 'script' && onHub()) {

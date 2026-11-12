@@ -30,13 +30,14 @@ const TICK = 100;
 const CLOCK_END = 3_600_000;
 
 /** Where the page is: its address, whether the hub's shell is up there, how long it stays before going on and how
- *  long its page takes to load (ms), and what happens as it arrives: its document answers `status`, the page throws
- *  `threw`, a script of it `script`, an iframe of it goes to `iframe`. */
+ *  long its page takes to load (ms), and what happens as it arrives: its document answers `status` (with `headers`), the
+ *  page throws `threw`, a script of it `script`, an iframe of it goes to `iframe`. */
 interface Stop {
   url: string;
   shell?: boolean;
   for?: number;
   status?: number;
+  headers?: Record<string, string>;
   threw?: string;
   script?: { status?: number; failure?: string };
   iframe?: string;
@@ -103,9 +104,10 @@ function pageDoing(gotos: Goto[]) {
     frame: () => mainFrame,
     failure: () => (failure === undefined ? null : { errorText: failure }),
   });
-  const response = (url: string, kind: 'document' | 'script', status: number) => ({
+  const response = (url: string, kind: 'document' | 'script', status: number, headers: Record<string, string> = {}) => ({
     url: () => url,
     status: () => status,
+    headers: () => headers,
     ok: () => status < 400,
     request: () => request(url, kind),
   });
@@ -116,7 +118,7 @@ function pageDoing(gotos: Goto[]) {
     loaded = now + (stop.loads ?? 0);
     if (moved) emit('framenavigated', mainFrame);
     if (stop.iframe !== undefined) emit('framenavigated', { url: () => stop.iframe });
-    if (status !== undefined) emit('response', response(stop.url, 'document', status));
+    if (status !== undefined) emit('response', response(stop.url, 'document', status, stop.headers));
     if (stop.script?.status !== undefined) emit('response', response(`${HUB}/static/main.js`, 'script', stop.script.status));
     if (stop.script?.failure !== undefined) emit('requestfailed', request(`${HUB}/static/main.js`, 'script', stop.script.failure));
     if (stop.threw !== undefined) emit('pageerror', new Error(stop.threw));
@@ -252,6 +254,9 @@ describe('login, when page.goto fails otherwise', () => {
 });
 
 const target = `${HUB}/demo/items`;
+/** The headers of the hub's pages of a business being prepared, under maintenance or with its database cut: a 503 whose
+ *  meta refresh reloads it until the hub answers (base/templates/base/hub_preparing.html and its neighbours). */
+const RELOADS_ITSELF = { 'retry-after': '10', 'content-type': 'text/html; charset=utf-8' };
 
 /** What `login()` on `/demo/items` ends in: «signed in», or the error it threw, as text. */
 const outcomeOf = (page: Page): Promise<string> =>
@@ -265,6 +270,11 @@ describe('login, when the hub’s shell takes longer than a sixth of the test’
     ['in a test of 180 s, with the hub’s session kept', TEST_TIME, [{ url: target, for: LATE }, { url: target, shell: true }]],
     ['outside a test, with the hub’s session kept', 0, [{ url: target, for: LATE }, { url: target, shell: true }]],
     ['in a test of 180 s, back from the SaaS', TEST_TIME, [onTheSaas, { url: target, for: LATE }, { url: target, shell: true }]],
+    [
+      'in a test of 180 s, through the 503 of a hub being prepared, which reloads by itself',
+      TEST_TIME,
+      [{ url: target, status: 503, headers: RELOADS_ITSELF, for: LATE }, { url: target, status: 200 }, { url: target, shell: true }],
+    ],
   ])('waits for it and ends on next: %s', async (_case, testTime, stops) => {
     if (testTime > 0) inATestOf(testTime);
     const { page, went, clock, listening } = pageDoing([{ stops }]);
@@ -307,6 +317,16 @@ describe('login, when the hub’s shell is not coming', () => {
     ['the page throws (its boot died)', { stops: [{ url: target, threw: 'boot exploded' }] }, 'boot exploded'],
     ['a script of the page is answered with an error', { stops: [{ url: target, script: { status: 500 } }] }, '500'],
     ['the hub answers its page with an error', { status: 503, stops: [{ url: target }] }, '503'],
+    [
+      'the hub answers its page with a 503 that never reloads (the plain text of a busy hub)',
+      { stops: [{ url: target, status: 503, headers: { 'retry-after': '1', 'content-type': 'text/plain; charset=utf-8' } }] },
+      'the hub answered 503',
+    ],
+    [
+      'the hub answers its page with an error page without Retry-After (a 500)',
+      { stops: [{ url: target, status: 500, headers: { 'content-type': 'text/html; charset=utf-8' } }] },
+      'the hub answered 500',
+    ],
     ['the hub sends its page to another address', { stops: [{ url: 'http://other.localhost:8000/there' }] }, 'went to http://other.localhost:8000/there'],
     [
       'the page goes to an address that is neither the hub nor the SaaS',
