@@ -27,7 +27,7 @@ from ninja import Field, Schema
 
 from base import access, assistant
 from base.models import Hub, Membership, TrustedDevice
-from base.schemas import names
+from base.schemas import names, unless_given
 from base.tenancy import context
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
@@ -809,11 +809,13 @@ def serving(mark: dict = A_DISH) -> Operation:
 
     class ServedLineIn(Schema):
         menu: str | None = None
+        dish_id: str | None = None
         dish: str | None = Field(None, json_schema_extra=mark)
 
     class ServeIn(Schema):
         id: str | None = None
         menu: str | None = None
+        dish_id: str | None = None
         dish: str | None = Field(None, json_schema_extra=mark)
         line: ServedLineIn | None = None
 
@@ -915,6 +917,46 @@ def test_without_as_said_words_that_cannot_be_read_are_left_out(dish_reads):
     assert "dish" not in served({"menu": "Infantil", "dish": "postres"}, mark=mark)
 
 
+#: A dish said by its name, which the write does not use when the dish comes by its id (hub#1250).
+UNLESS_ITS_ID = {"refers": {**A_DISH["refers"], "unless": ["dish_id"]}}
+
+
+def test_names_marks_the_data_that_leave_a_name_unread():
+    assert names("demo.item.dish", by="dish", within=("menu",), as_said=True, unless=("dish_id",)) == UNLESS_ITS_ID
+
+
+def test_unless_given_is_a_mark_left_unread_beside_those_data_and_leaves_the_mark_as_it_was():
+    """One mark, declared once, left unread beside a different datum in each object that carries it."""
+    assert unless_given(A_DISH, "dish_id") == UNLESS_ITS_ID
+    assert "unless" not in A_DISH["refers"]
+
+
+@pytest.mark.django_db
+def test_a_name_beside_the_record_the_write_takes_instead_is_neither_read_nor_shown(dish_reads):
+    """The write takes the dish by its id and never looks at the name beside it: the card says no other dish."""
+    found: list = []
+    shown = served({"menu": "Vegano", "dish_id": "D-2", "dish": "postres"}, found=found, mark=UNLESS_ITS_ID)
+    assert "dish" not in shown
+    assert (dish_reads, found) == ([], [])
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("dish_id", [None, ""], ids=["none", "empty"])
+def test_without_the_record_that_leaves_it_unread_a_name_is_read_as_ever(dish_reads, dish_id):
+    shown = served({"menu": "Vegano", "dish_id": dish_id, "dish": "postres"}, mark=UNLESS_ITS_ID)
+    assert shown["dish"] == "Postres caseros"
+
+
+@pytest.mark.django_db
+def test_inside_an_object_only_its_own_record_leaves_its_name_unread(dish_reads):
+    shown = served(
+        {"dish_id": "D-2", "line": {"menu": "Vegano", "dish": "postres"}}, mark=UNLESS_ITS_ID
+    )
+    assert shown["line"] == {"menu": "Vegano", "dish": "Postres caseros"}
+    shown = served({"line": {"menu": "Vegano", "dish_id": "D-2", "dish": "postres"}}, mark=UNLESS_ITS_ID)
+    assert "dish" not in shown["line"]
+
+
 def beside(refers: object, *, kind: type = str) -> Operation:
     class BesideIn(Schema):
         menu: str | None = None
@@ -947,8 +989,18 @@ def test_a_mark_read_with_the_data_beside_it_is_sound(monkeypatch, dish_reads):
         (A_DISH["refers"], UUID, "is said as said, but it is an id"),
         ({**A_DISH["refers"], "within": "menu"}, str, "is not a read, by and name"),
         ({**A_DISH["refers"], "as_said": "yes"}, str, "is not a read, by and name"),
+        ({**A_DISH["refers"], "unless": ["dish_id"]}, str, "is left unread with dish_id, which its own object does not have"),
+        ({**A_DISH["refers"], "unless": "table"}, str, "is not a read, by and name"),
     ],
-    ids=["a datum its read does not take", "one its object does not have", "an id said as said", "no list", "no yes"],
+    ids=[
+        "a datum its read does not take",
+        "one its object does not have",
+        "an id said as said",
+        "no list",
+        "no yes",
+        "left unread with a datum its object does not have",
+        "unless no list",
+    ],
 )
 def test_a_mark_read_with_the_data_beside_it_is_checked_at_start(monkeypatch, dish_reads, refers, kind, why):
     write = beside(refers, kind=kind)

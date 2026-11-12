@@ -447,8 +447,11 @@ def _reference(value: Any, prop: dict, words: _Words) -> Any:
     read with the data of its own object the mark names beside it (``within``: a course by its name with its menu,
     hub#1245) —; or ``_LEFT_OUT`` — no mark, no person at hand, or a read that fails (not there, not theirs to read,
     its app off): the card names nobody by an id, nor reads anything for somebody else. Words a person says that it
-    cannot read (``as_said``: several fit, none does) are said as said instead."""
+    cannot read (``as_said``: several fit, none does) are said as said instead. A datum the write does not use, because
+    a datum of its own object the mark names came (``unless``: the record's id), is neither read nor shown (hub#1250)."""
     declared = refers_of(prop)
+    if declared and any(words.data.get(name) not in (None, "") for name in declared.get("unless", ())):
+        return _LEFT_OUT
     read = registry.get(declared.get("read")) if declared else None
     as_said = value if declared and declared.get("as_said") is True and isinstance(value, str) else _LEFT_OUT
     if read is None or words.ctx is None or not isinstance(value, str):
@@ -875,14 +878,15 @@ def _currency_problems(op: Operation, declared: Any) -> list[str]:
 
 def _beside_problems(prop: dict, props: dict, defs: dict) -> list[str]:
     """What is wrong with the datum ``prop`` of an object (``props``) a mark reads with the data beside it
-    (``within``) or says as said (``as_said``): data its own object does not have, or an id said as said."""
+    (``within``), leaves unread beside others (``unless``) or says as said (``as_said``): data its own object does not
+    have, or an id said as said."""
     declared = prop.get(REFERS)
     if not isinstance(declared, dict):
         return []
-    within = declared.get("within", [])
     problems = [
-        f"is read with {name}, which its own object does not have"
-        for name in (within if isinstance(within, list) else [])
+        f"is {verb} with {name}, which its own object does not have"
+        for key, verb in (("within", "read"), ("unless", "left unread"))
+        for name in (declared.get(key) if isinstance(declared.get(key), list) else [])
         if isinstance(name, str) and name not in props
     ]
     if declared.get("as_said") is True and _is_id(prop, defs):
@@ -906,6 +910,8 @@ def _reference_problems(op: Operation, declared: Any) -> list[str]:
         or not isinstance(declared.get("within", []), list)
         or not all(isinstance(name, str) for name in declared.get("within", []))
         or not isinstance(declared.get("as_said", False), bool)
+        or not isinstance(declared.get("unless", []), list)
+        or not all(isinstance(name, str) for name in declared.get("unless", []))
     ):
         return ["is not a read, by and name"]
     read = registry.get(declared["read"])
