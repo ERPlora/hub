@@ -731,11 +731,15 @@ KEPT_ALIVE = 98
 CHILD = f"""
 import os, runpy, socket, sys, threading, time
 
+def stop(code, why):
+    sys.stdout.flush()  # what the script said up to here, which os._exit would drop
+    os.write(2, f"{{why}}\\n".encode())
+    os._exit(code)
+
 def refused(call):
     def waits(*args, **kwargs):
         if threading.current_thread() is threading.main_thread():
-            os.write(2, f"the main thread waits: {{call.__qualname__}}{{args!r}}\\n".encode())
-            os._exit({WAITED})
+            stop({WAITED}, f"the main thread waits: {{call.__qualname__}}{{args!r}}")
         return call(*args, **kwargs)
     return waits
 
@@ -748,8 +752,7 @@ try:
 finally:
     alive = [t.name for t in threading.enumerate() if not t.daemon and t is not threading.main_thread()]
     if alive:
-        os.write(2, f"threads that keep it from ending: {{alive}}\\n".encode())
-        os._exit({KEPT_ALIVE})
+        stop({KEPT_ALIVE}, f"threads that keep it from ending: {{alive}}")
 """
 
 
@@ -757,7 +760,9 @@ def run_to_the_end(script: Path, *args: str, **kwargs) -> subprocess.CompletedPr
     """Run ``script`` in a fresh Python and wait for it to end, however long the machine takes (hub#807).
 
     No clock: a cut at N seconds cannot tell a stuck child from a slow one, and a loaded machine makes it slow. What the
-    clock was there for, a child that never ends, is what CHILD turns into an exit of its own.
+    clock was there for, a child that never ends, is what CHILD turns into an exit of its own. What it cannot see, a
+    main thread blocked on a lock or an event nobody releases, or a loop that never ends, nothing but a clock tells from
+    a slow child: the cap of the CI job (30 minutes) still ends that run in red.
     """
     return subprocess.run(
         [sys.executable, "-c", CHILD, str(script), *args], capture_output=True, text=True, **kwargs
