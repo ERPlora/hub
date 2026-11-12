@@ -3110,9 +3110,9 @@ Pasos:
       Uno que el negocio ya no tiene vuelve como ficha nueva, creada como la crea la pantalla de Clientes, con su nombre,
       contacto, NIF, dirección, fechas, origen, etapa, canal y notas; sin sus grupos, etiquetas ni campos propios
       (hub#1285). Nunca vuelve una ficha cuyos datos personales se borraron (RGPD) ni una que se unió a otra, ni se repite
-      una que el negocio ya volvió a crear (el mismo nombre, teléfono y email). Con Productos, «Productos: 1 restaurado, 2
-      creados»: un producto que el negocio eliminó y aún guarda vuelve EL MISMO, con su stock, sus categorías que siguen
-      vivas y en Movimientos su historial entero, activo y a la venta (INVENTORY-F34). Uno que el negocio ya no tiene
+      una que el negocio ya volvió a crear (el mismo nombre, teléfono y email). Con Productos, un producto que el negocio
+      eliminó y aún guarda vuelve EL MISMO y cuenta como restaurado, con su stock, sus categorías que siguen vivas y en
+      Movimientos su historial entero, activo y a la venta (INVENTORY-F34). Uno que el negocio ya no tiene
       vuelve como uno nuevo, creado como lo crea la pantalla de Productos, con su nombre, SKU, EAN-13,
       descripción, tipo, precio, coste, unidades, umbral, control de stock y categoría fiscal, activo o desactivado como
       estaba y en las categorías que el negocio sigue teniendo; sin stock, que se cuenta (INVENTORY-F14), porque el de la

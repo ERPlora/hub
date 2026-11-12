@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:30d37b4ab3bd62f07c15b0db8f1deac29c8d140da9709d573f4b9d013b8df446 -->
+<!-- generated from WORKBOOK.md sha256:51abeb059ac137909903526012b3c0d3e4ba89a66d05915737205aa828c056e2 -->
 
 ## What it is for and who it is for
 
@@ -2983,8 +2983,8 @@ Steps:
       screen creates it, with their name, contact, tax ID, address, dates, source, stage, channel and notes; without their
       groups, tags or own fields (hub#1285). A card whose personal data was erased (GDPR) or one merged into another never
       comes back, and one the business has already made again (the same name, phone and email) is not repeated. With
-      Products, "Products: 1 restored, 2 created": a product the business deleted and still holds comes back THE SAME,
-      with its stock, its categories that are still live and its whole history in Movements, active and on sale
+      Products, a product the business deleted and still holds comes back THE SAME and counts as restored, with its
+      stock, its categories that are still live and its whole history in Movements, active and on sale
       (INVENTORY-F34). One the business no longer has comes back as a new one, created as the Products screen creates it,
       with its name, SKU, EAN-13, description, type, price, cost, units, threshold, stock control and tax category, active
       or inactive as it was and in the categories the business still has; with no stock, which is counted
