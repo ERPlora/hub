@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:53e74df80ba1d8cee1056870b5c925c22ea87ae6c1be14a894347b5fba057efb -->
+<!-- generated from WORKBOOK.md sha256:6cfdc4869dfc8c80189117fd4c3964d34e91805eafaf55928758cf3c27df8fb0 -->
 
 ## What it is for and who it is for
 
@@ -316,7 +316,9 @@ Steps:
 2. Tap **Delete** in the notice: the task disappears **with its subtasks and its comments**.
 In: the task.
 Out: `task.task.deleted`.
-If it fails: "That task does not exist in this business.".
+If it fails: "That task does not exist in this business.". Through the assistant, a name that fits several tasks or
+none brings up no card, and if before the "yes" another task fits better what was said, nothing is deleted and the new
+card comes up (BASE-F97).
 Involved: none
 
 ### TASK-F12 Create a project
@@ -357,7 +359,9 @@ Steps:
 2. Tap **Delete** in the notice: the project disappears; **its tasks stay**, without a project.
 In: the project.
 Out: `task.project.deleted`.
-If it fails: "That project does not exist in this business.".
+If it fails: "That project does not exist in this business.". Through the assistant, a name that fits several
+projects or none brings up no card, and if before the "yes" another project fits better what was said, nothing is
+deleted and the new card comes up (BASE-F97).
 Involved: none
 
 ### TASK-F15 When someone leaves the team
@@ -385,7 +389,20 @@ name fits several, it says which and asks to choose (`task.ambiguous_task`,
 (BASE-F97), which names each record as the screens name it, never by its id: the task by its title ("Task: Clean the
 store room"), the project by its name ("Project: Shop opening") and the person by their full name ("Assigned to: Ana
 López"). What the person asking cannot see is left out: an employee does not see another person's task named, as
-they do not see it in their list.
+they do not see it in their list. A task said by its number or its title when changing it, changing its status,
+completing it, assigning it or deleting it, and a project said by its code or its name when changing or deleting it,
+are looked up as the action will look them up (the same title before one that contains it, and an open task before a
+closed one), and the card shows what will be touched, with its full title or name ("Task: Call the supplier" when "call"
+was said). If what was said fits several or none, no card comes up: the assistant hears "There are several tasks called
+"call": …", with the number and title of each one, and asks which one, or "That task does not exist in this
+business.". The "yes" counts only
+for what the card showed: if, before confirming, someone creates a task that fits better what was said ("Call" when the
+card said "Call the supplier"), nothing is touched and the new card comes up. The task of a comment, the parent task
+and the project of a new task, and the project a task is moved to, said by their name, also come up as the action finds
+them, and the "yes" counts only for them; if what was said fits several, the card says it as it was said (hub#1245).
+If the task or the project comes by its identifier beside another one's name, the card neither reads nor shows that
+name, which the action does not use; and when a task is moved to a project said by its name, which wins over an
+identifier that comes beside it, the card shows only that project (hub#1250).
 
 ### What it offers: queries (they read and change nothing; all of them can be followed live)
 

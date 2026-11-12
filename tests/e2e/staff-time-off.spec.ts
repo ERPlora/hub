@@ -7,6 +7,7 @@
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, type Credentials, EMPLOYEE, hubUserIdOf, login, psql, shot, shown } from './helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const TAG = 'E2E';
 
@@ -101,7 +102,9 @@ test('the employee asks, the owner approves live, an overlap is refused in the f
     await requestDays(employee.page, '2027-03-03', '2027-03-04', 'Again');
     await expect(employee.page.locator('[data-testid=staff-time-off-form-error]')).toContainText('already has pending or approved time off');
     await employee.page.screenshot({ path: shot('staff-time-off-overlap') });
+    // «Cancel» asks before losing the refused request (BASE-F05): the person discards it.
     await employee.page.locator('[data-testid=staff-time-off-form-cancel]').click();
+    await discardChanges(employee.page);
 
     // STAFF-F08: «My time off» lists one's own, with its reason.
     await shown(employee.page).locator('[data-testid=staff-time-off-whose]').click();

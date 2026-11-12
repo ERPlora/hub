@@ -84,6 +84,21 @@ describe('CategoriesPage', () => {
     expect([modal().props('open'), modal().props('category')]).toEqual([true, ROWS[1]]);
   });
 
+  // hub#1147: one service is said in the singular and two in the plural, never «service(s)».
+  it.each([
+    { locale: 'en' as const, count: 1, line: '1 service will be left without a category.' },
+    { locale: 'en' as const, count: 2, line: '2 services will be left without a category.' },
+    { locale: 'es' as const, count: 1, line: '1 servicio se quedará sin categoría.' },
+    { locale: 'es' as const, count: 2, line: '2 servicios se quedarán sin categoría.' },
+  ])('«Delete» with $count service ($locale): «$line»', async ({ locale, count, line }) => {
+    const s = await setup({ locale });
+    const row = category('c1', { service_count: count });
+    await s.show(page([row]));
+    s.table().vm.$emit('action', { actionId: 'delete', row });
+    await flush();
+    expect(s.wrapper.findComponent(ConfirmDialog).props('consequences')).toEqual([line]);
+  });
+
   it('deletes after its confirmation, saying how many services are left without a category', async () => {
     const s = await setup();
     await s.show(page(ROWS));
@@ -93,7 +108,7 @@ describe('CategoriesPage', () => {
     expect([dialog.props('title'), dialog.props('message'), dialog.props('consequences'), dialog.props('confirmLabel')]).toEqual([
       'Delete category',
       'Hair — the category disappears; the services in it are kept, without a category.',
-      ['3 service(s) will be left without a category.'],
+      ['3 services will be left without a category.'],
       'Delete',
     ]);
     s.answer(200, { id: 'c1' });

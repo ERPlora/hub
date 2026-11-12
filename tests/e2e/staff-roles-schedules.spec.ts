@@ -8,6 +8,7 @@
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const TAG = 'E2E';
 
@@ -65,7 +66,9 @@ test('Roles: create, a duplicate refused in the form, retire from Edit (still li
     await page.locator('[data-testid=staff-role-form-name] input').fill(name.toUpperCase());
     await page.locator('[data-testid=staff-role-form-submit]').click();
     await expect(page.locator('[data-testid=staff-role-form-error]')).toContainText('A role with that name already exists.');
+    // «Cancel» asks before losing what was typed (BASE-F05): the person discards it.
     await page.locator('[data-testid=staff-role-form-cancel]').click();
+    await discardChanges(page);
 
     // Retire it from «Edit · {name}».
     await row.getByText(name).click();

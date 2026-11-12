@@ -724,6 +724,30 @@ def test_the_pass_that_makes_databases_gives_the_next_tick_its_turn():
     assert provision.DUE_PASS_SECONDS <= worker.TICK_SECONDS
 
 
+#: PLAN-DB §6: a demo ready in under 5 s from its request. The worker takes a hub due on its next pass, so it never waits
+#: longer than that between passes.
+DEMO_READY_AIM_SECONDS = 5.0
+
+
+@pytest.mark.parametrize("databases_only", [True, False], ids=["e2e-worker", "worker"])
+def test_with_its_own_tick_it_takes_a_new_demo_within_plan_dbs_five_seconds(monkeypatch, calls, due, databases_only):
+    """hub#1061: demo.spec.ts gave a demo 15 s, «the worker's 5 s tick plus PLAN-DB §6's 5 s aim, with room for a loaded
+    machine», and dropped that clock: what it held of the tick is this fact, measured on the waits the loop asks for,
+    never on the wall clock. ``run_worker`` passes no tick (``test_run_worker.py``), so this is the tick of production and
+    of the e2e's worker (``--databases-only``): it makes the hubs due on every pass and waits no longer than 5 s between
+    two."""
+    monkeypatch.setattr(worker, "_activations", lambda now: None)
+    monkeypatch.setattr(worker, "_hubs", lambda now: None)
+    monkeypatch.setattr(worker, "_data", lambda now, stop=None: None)
+    stop = threading.Event()
+    wait, waits = stop_after(stop, 3)
+
+    assert worker.run(stop, wait=wait, clock=clock(0, 1, 2), databases_only=databases_only) == 0
+
+    assert due.passes == [ten(0), ten(1), ten(2)]
+    assert len(waits) == 3 and max(waits) <= DEMO_READY_AIM_SECONDS
+
+
 # ── The slow passes run off the loop (PLAN-DB round 2026-10-31b, C8) ──────────────────────────────────────────────
 
 
@@ -885,6 +909,24 @@ def test_the_moves_pass_restores_the_hubs_asked_too_on_control(monkeypatch):
     worker._moves(ten(0), threading.Event())
 
     assert seen == [(context.CONTROL, ten(0))]
+
+
+def test_the_moves_pass_brings_back_what_a_business_lost_from_its_copy_too_on_control(monkeypatch):
+    # hub#1257: a recovery from a separate copy, in the thread of the copies it reads, after they are made.
+    from base.tenancy import move, recovery, restore
+
+    monkeypatch.undo()
+    seen: list[tuple] = []
+    monkeypatch.setattr(move, "run_due", lambda now, *, cancelled: 0)
+    monkeypatch.setattr(restore, "run_due", lambda now, *, cancelled: 0)
+    monkeypatch.setattr(restore, "run_aside_due", lambda now, *, cancelled: seen.append("asides") or 0)
+    monkeypatch.setattr(
+        recovery, "run_due", lambda now, *, cancelled: seen.append((context.current().kind, now, cancelled())) or 1
+    )
+
+    worker._moves(ten(0), threading.Event())
+
+    assert seen == ["asides", (context.CONTROL, ten(0), False)]
 
 
 def test_a_moves_pass_that_fails_is_logged_and_the_next_tick_tries_again(monkeypatch, caplog):

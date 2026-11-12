@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e5a8e199cb5b542183ee9301377c396bb2c84bb4df6e67d149f4165c4b14d942 -->
+<!-- generated from WORKBOOK.md sha256:42801a00048351a6097b1701f754a9683ec369c123586f87a5858028bf53015e -->
 
 ## What it is for and who it is for
 
@@ -229,8 +229,9 @@ Steps:
 In: the name, the description, the colour and the order.
 Out: the zone (announces: `table.zone.created`).
 If it fails: without a name, the button does not turn on. A name another zone already has: "There is
-already a zone with that name.". An employee does not see the "+"; if they ask for it through the API,
-it is refused for lack of permission.
+already a zone with that name.". The reason of a field shows under it and goes away as soon as that field
+is corrected, even if another one says the same (hub#888). An employee does not see the "+"; if they ask
+for it through the API, it is refused for lack of permission.
 Involved: TABLE-F06, TABLE-F09
 
 ### TABLE-F02 Add tables
@@ -257,7 +258,8 @@ all switched off or deleted (TABLE-F04), the step goes back to pending by itself
 does not tick it.
 If it fails: a number repeated in the zone (regardless of case and spaces), through any door: "There is
 already a table with that number in this zone.". A zone deleted in the meantime: "That zone does not
-exist in this business.".
+exist in this business.". In the **Tables** window, the reason of a field shows under it and goes away as
+soon as that field is corrected, even if another one says the same (hub#888).
 Involved: TABLE-F03, TABLE-F04, TABLE-F07, BASE-F01
 
 ### TABLE-F03 Place the tables on the plan
@@ -291,7 +293,8 @@ In: the chosen table.
 Out: the changed table (announces: `table.table.updated`) or the deleted one (announces:
 `table.table.deleted`).
 If it fails: inside the window: "The table number is required", "There is already a table with that
-number in this zone.", "That table does not exist in this business."; deleting a table with an open
+number in this zone.", "That table does not exist in this business.", each reason under its field until
+that field is corrected, even if another one says the same (hub#888); deleting a table with an open
 check: "That table has an open check. Close it or move it before deleting the table.".
 Involved: TABLE-F02, TABLE-F05, TABLE-F21
 
@@ -327,7 +330,8 @@ In: the chosen zone.
 Out: the changed zone (announces: `table.zone.updated`) or the deleted one (announces:
 `table.zone.deleted`).
 If it fails: "That zone still has tables. Move them to another zone or delete them first." or "That zone
-does not exist in this business.".
+does not exist in this business.". The reason of a field shows under it until that field is corrected,
+even if another one says the same (hub#888).
 Involved: TABLE-F01, TABLE-F04
 
 ### TABLE-F07 Create many tables at once
@@ -780,10 +784,12 @@ Steps:
 2. The check of the table stays with that card: Sales gets it back when charging. "Remove customer" lets
    it go.
 3. The assistant can also seat with a customer: "seat Ana García at table 4, there are 3 of us".
+4. If the card is deleted in Customers, the check stops saying her name; if ERPlora's staff recover it from the
+   separate copy (CUSTOMER-F33), it says it again at once, also on the floor plan and the room that are open.
 In: the card, from Customers.
 Out: the check ↔ customer link, which Customers keeps (announces: `customer.order.linked`).
 If it fails: the reason of Customers; the table is seated anyway.
-Involved: CUSTOMER-F17, CUSTOMER-F19, TABLE-F10
+Involved: CUSTOMER-F17, CUSTOMER-F19, CUSTOMER-F33, TABLE-F10
 
 ## Tables: what goes in and what comes out
 

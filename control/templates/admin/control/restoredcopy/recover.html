@@ -1,0 +1,16 @@
+{% extends "admin/control/action_confirmation.html" %}
+{% load i18n %}
+{% comment %}
+«Recover into the business…» of Separate copies (control.admin.RestoredCopyAdmin.recover_into_the_business, hub#1257,
+BASE-F114): the chosen copies and what to bring back. Confirmed, each is asked through control.copy.recover; the worker
+brings back in the business what it deleted and creates what it lacks, each record by its app's own operations
+(base.tenancy.recovery, hub#1306).
+{% endcomment %}
+{% block intro %}{% blocktranslate trimmed %}
+  Each separate copy chosen gives back into its business what the copy holds and the business lacks, of what you tick
+  below: what the business deleted and still holds comes back as it was, with its history, and what it no longer has is
+  created again as its own screen creates it; nothing is ever copied. What the business has, or has made again since,
+  is left as it is, and records for the tax authority are never brought back. The business stays open meanwhile.
+  Recoveries says how it went, a few minutes later.
+{% endblocktranslate %}{% endblock intro %}
+{% block submit %}{% translate 'Recover' %}{% endblock submit %}

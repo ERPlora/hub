@@ -7,6 +7,7 @@ import { expect, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
 import { cleanupExceptions, listsReady, noHorizontalScroll, rowAction, TAG, VIEWPORTS } from './schedule-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 test.beforeAll(cleanupExceptions);
 test.afterAll(cleanupExceptions);
@@ -36,7 +37,9 @@ test('SCHEDULE-F04, F13, F06: a special day added, a taken date refused, correct
   await page.locator('[data-testid=schedule-special-day-form-submit]').click();
   await expect(page.locator('[data-testid=schedule-special-day-form-error]')).toContainText('There is already a special day on that date.');
   await page.screenshot({ path: shot('schedule-special-day-409-1280') });
+  // «Cancel» asks before losing the refused day (BASE-F05): the person discards it.
   await page.locator('[data-testid=schedule-special-day-form-cancel]').click();
+  await discardChanges(page);
 
   // Correct it: open 10:00–14:00 (SCHEDULE-F13).
   await row.getByText(name).click();
@@ -85,7 +88,9 @@ test('SCHEDULE-F05, F06: an override added, another over the same dates refused,
   await page.locator('[data-testid=schedule-override-form-submit]').click();
   await expect(page.locator('[data-testid=schedule-override-form-error]')).toContainText(`Those dates overlap the temporary change “${reason}”`);
   await page.screenshot({ path: shot('schedule-override-409-1280') });
+  // «Cancel» asks before losing the refused dates (BASE-F05): the person discards them.
   await page.locator('[data-testid=schedule-override-form-cancel]').click();
+  await discardChanges(page);
 
   const id = psql(`select id from schedule_override where reason = '${reason}'`);
   await rowAction(page, 'schedule-overrides', id, 'delete');

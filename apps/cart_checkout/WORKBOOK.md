@@ -64,12 +64,15 @@ por un trozo del texto, el estado por lista, los ítems y el total «desde / has
 página. Va ordenada por fecha de alta, el más reciente arriba. El total sale en la moneda del carrito
 (uno creado en euros sigue en euros aunque el negocio cambie de país); el filtro de Total se escribe en
 la moneda del negocio («12» son 12,00 zł en un negocio de Polonia y 12 ¥ en uno de Japón, donde no hay
-céntimos) y compara el importe tal cual, sin convertir monedas. Se puede pegar con sus puntos de miles
-(«1.250,50») o con el símbolo o el código de esa moneda («12,50 zł», «PLN 12,50»); un importe que no se
-entiende («1.250», que puede ser mil doscientos cincuenta o uno con veinticinco, o uno con el símbolo de
-otra moneda) se avisa debajo de su caja, «Escribe un importe, como 12,50» (con los decimales de la moneda
-del negocio: «como 12» en yenes), y no filtra. Mientras el negocio no ha contestado, un importe se lee
-con dos decimales y, cuando contesta, el filtro se vuelve a leer en su moneda desde la primera página.
+céntimos) y compara el importe tal cual, sin convertir monedas. Se lee como en cualquier campo de importe
+del Hub y como en las demás listas (hub#1196): se puede pegar con sus puntos de miles («1.250,50»,
+«1,250.50», «2 500») o con el símbolo o el código de esa moneda («12,50 zł», «PLN 12,50»); uno que no se
+puede leer no filtra y lo dice debajo de su caja con las palabras del campo de importe: «1.250», que puede
+ser mil doscientos cincuenta o uno con veinticinco, «Este importe se puede leer de dos maneras…»; uno con el
+símbolo de otra moneda o con letras, «Esto no es un importe. Escribe una cifra, por ejemplo 12,50.»; uno
+negativo, «Este importe no puede ser negativo.». Mientras el negocio no ha contestado, un importe se lee
+con dos decimales y no se avisa de nada; cuando contesta, el filtro se vuelve a leer en su moneda desde la
+primera página.
 
 El botón **Nuevo carrito** abre el formulario «Nuevo carrito»: **Sesión** (obligatoria; «Guardar» no se
 activa sin ella), **Email** y **Nombre**. Cada fila ofrece **Abandonar** (solo un carrito activo) y
@@ -337,7 +340,7 @@ Pasos:
 1. Abre **Carritos** o **Pedidos**.
 2. Busca por sesión, email o nombre (carritos) o por número de pedido o email (pedidos) y ordena. Para
    filtrar por columna, toca el embudo de la barra: abre «Filtros» con una caja por columna (el Total,
-   como se escribe o se pega: «12», «12,50», «1.250,50»); **Aplicar** filtra y lo cierra, y el embudo
+   como se escribe o se pega: «12», «12,50», «1.250,50», «2 500»); **Aplicar** filtra y lo cierra, y el embudo
    cuenta los filtros en uso.
 3. Las líneas de un carrito y el detalle de un pedido (direcciones, métodos, fechas, notas) se leen con
    el asistente o la API: un carrito por su sesión o por el email o el nombre de su cliente, un pedido
@@ -346,7 +349,8 @@ Entra: permiso «ver carritos» (el empleado lo tiene).
 Sale: listas de 50 filas (hasta 100 por petición). Cantidades con sus decimales, importes en la unidad
 menor de la moneda de la fila (los céntimos; el yen no tiene) con la moneda y sus decimales.
 Si falla: error de carga con «Reintentar»; sin permiso, «No tienes permiso»; un importe de Total que no
-se entiende, «Escribe un importe, como 12,50» debajo de su caja, sin filtrar.
+se puede leer, lo que diría el campo de importe («Esto no es un importe. Escribe una cifra, por ejemplo
+12,50.», o las dos lecturas de «1.250») debajo de su caja, sin filtrar.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F13 Avisar a otras apps de lo que ocurre
@@ -540,9 +544,10 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
 - La barra de arriba lleva el nombre de la app (`cart_checkout.title`), como el hub viejo; la pestaña la
   añade el shell.
 - Los importes agrupan los millares también con cuatro cifras (`useGrouping: 'always'`: el CLDR del
-  español deja «1234,56 €»; hub#1090). El filtro de Total es `{ type: 'range', amount: true }`: `toMinor`
-  lee lo que se pega («1.250,50», «12,50 zł», «PLN 12,50»; lo ambiguo, «1.250», no se adivina; el símbolo de
-  otra moneda tampoco) y `unreadableTotals` da los `filterErrors` (pm#521).
+  español deja «1234,56 €»; hub#1090). El filtro de Total es `{ type: 'range', amount: true }` y se lee con el
+  lector común de las listas (hub#1196): `filterCents` y `amountFilterErrors` de `base/frontend/lib/money.ts`
+  (sobre `parseMoney` de `@erplora/ui`) sobre `TOTAL_BOUNDS`; las dos páginas corren la tabla de textos de
+  `base/frontend/__tests__/amount-filter.ts` (pm#521).
 - Moneda (flujo `cart-checkout-business-currency`, BASE-F50): `queries.business_currency(ctx)` es
   `base.operations.business_currency(ctx.scope)` (la del país del negocio; en el hub propio de ERPlora, la del
   país de su emisor) y solo la usa el alta de un carrito sin `currency`; el modelo no tiene valor por defecto
@@ -550,8 +555,7 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
   (`base.business.currency_decimals`, CLDR: 2 en HUF, que `Intl` da sin decimales) y la pantalla la pinta con
   `formatMoney(…, recordMoney(row))`. El filtro de Total se lee con `useBusinessMoney()` de
   `base/frontend/lib/money` («—» mientras no contesta); un `watch` de su moneda
-  y sus decimales vuelve a leer un Total ya tecleado desde la primera página, y el ejemplo del aviso sale de
-  `amountExample` con los decimales de esa moneda.
+  y sus decimales vuelve a leer un Total ya tecleado desde la primera página.
 - La columna del número de pedido tiene ancho mínimo (`minmax(10.5rem, 1fr)`) y el motivo de un pedido
   fallido parte en líneas dentro de su celda: cortados, dos pedidos del día se leían iguales.
 - Lo que falta de `@erplora/ui` está en `UI-REQUESTS.md` (iconos y piezas copiadas).

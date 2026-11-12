@@ -15,6 +15,8 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { NO_CLOCK } from '../../vitest.load';
+
 // The real reads, watched: the e2e's files are read (and parsed) once per run (see the warm-up).
 vi.mock('node:fs', async (importOriginal) => {
   const fs = await importOriginal<typeof import('node:fs')>();
@@ -128,11 +130,12 @@ function staleInTheRatchet(found: Record<string, number>): string[] {
 }
 
 describe('the e2e waits for «nothing moves» with the one detector of helpers.ts', () => {
-  // The e2e's folder, scanned once here with the limit of the guardrails that read a whole tree (60 s, tsconfig.test.ts);
-  // each test keeps Vitest's 5 s for its own work.
+  // The e2e's folder, scanned once here without a clock (hub#1292): a read of a file of the repo ends, as late as the
+  // machine makes it, which no clock in seconds tells from one that never does; what could still not end, a wait
+  // nobody settles, only the end of the run's job cuts. Each test keeps Vitest's own budget for its own work.
   beforeAll(async () => {
     await readsByFile();
-  }, 60_000);
+  }, NO_CLOCK);
 
   it('reads and parses each file of the e2e once per run: the tests take the warm-up’s scan', async () => {
     const before = filesRead();

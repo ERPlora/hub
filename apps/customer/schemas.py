@@ -24,7 +24,7 @@ from pydantic import (
 
 from apps.customer.models import Activity, Purchase
 from base.business import currency_decimals
-from base.schemas import names
+from base.schemas import names, unless_given
 
 T = TypeVar("T")
 
@@ -55,13 +55,21 @@ CUSTOM_FIELD = gettext_noop("Custom field")
 
 # The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
 # asks, never by its id. An open order is Sales's, which Customers does not require: ``customer.order.get`` asks Sales
-# for its name, and without Sales the card leaves it out.
+# for its name, and without Sales the card leaves it out. A card said by its name beside its own card's id is neither
+# read nor shown: the write takes the card by the id and never looks at the name (``unless_given``, hub#1272).
 A_CUSTOMER = names("customer.customer.detail")
 A_CUSTOMER_REFERENCE = names("customer.customer.detail", by="customer")
 A_GROUP = names("customer.group.detail")
 A_TAG = names("customer.tag.detail")
 A_FIELD = names("customer.field.detail")
 A_ORDER = names("customer.order.get", by="order_id")
+# A card, a group, a tag or a custom field said in words in every other write: read as the write finds it, and said as
+# said when the words fit none or several, as the merge does not (hub#1280). Beside its own record's id the write never
+# looks at the words, and the card neither reads nor shows them (``unless_given``).
+A_CUSTOMER_SAID = names("customer.customer.detail", by="customer", as_said=True)
+A_GROUP_SAID = names("customer.group.detail", by="group", as_said=True)
+A_TAG_SAID = names("customer.tag.detail", by="tag", as_said=True)
+A_FIELD_SAID = names("customer.field.detail", by="field", as_said=True)
 #: A group or a tag of the card by its id, each named on the card.
 GroupId = Annotated[UUID, Field(json_schema_extra=A_GROUP)]
 TagId = Annotated[UUID, Field(json_schema_extra=A_TAG)]
@@ -183,7 +191,12 @@ class CustomerRefIn(Schema):
     """A card by its ``id`` or by its exact name, phone or email (``customer``); the id wins."""
 
     id: UUID | None = Field(None, title=CUSTOMER, description="The customer's id.", json_schema_extra=A_CUSTOMER)
-    customer: Reference | None = Field(None, validate_default=True, description=CUSTOMER_REFERENCE)
+    customer: Reference | None = Field(
+        None,
+        validate_default=True,
+        description=CUSTOMER_REFERENCE,
+        json_schema_extra=unless_given(A_CUSTOMER_SAID, "id"),
+    )
 
     _named = field_validator("customer")(_named_unless("id", CUSTOMER_REF_MISSING))
 
@@ -192,7 +205,12 @@ class CustomerOfIn(Schema):
     """The card something belongs to: ``customer_id``, or its exact name, phone or email."""
 
     customer_id: UUID | None = Field(None, description="The customer's id.", json_schema_extra=A_CUSTOMER)
-    customer: Reference | None = Field(None, validate_default=True, description=CUSTOMER_REFERENCE)
+    customer: Reference | None = Field(
+        None,
+        validate_default=True,
+        description=CUSTOMER_REFERENCE,
+        json_schema_extra=unless_given(A_CUSTOMER_SAID, "customer_id"),
+    )
 
     _named = field_validator("customer")(_named_unless("customer_id", CUSTOMER_REF_MISSING))
 
@@ -200,7 +218,11 @@ class CustomerOfIn(Schema):
 class GroupRefIn(Schema):
     id: UUID | None = Field(None, title=GROUP, description="The group's id.", json_schema_extra=A_GROUP)
     group: Reference | None = Field(
-        None, validate_default=True, title=GROUP, description="The group's current name, when the id is not known."
+        None,
+        validate_default=True,
+        title=GROUP,
+        description="The group's current name, when the id is not known.",
+        json_schema_extra=unless_given(A_GROUP_SAID, "id"),
     )
 
     _named = field_validator("group")(_named_unless("id", GROUP_REF_MISSING))
@@ -209,7 +231,11 @@ class GroupRefIn(Schema):
 class TagRefIn(Schema):
     id: UUID | None = Field(None, title=TAG, description="The tag's id.", json_schema_extra=A_TAG)
     tag: Reference | None = Field(
-        None, validate_default=True, title=TAG, description="The tag's current name, when the id is not known."
+        None,
+        validate_default=True,
+        title=TAG,
+        description="The tag's current name, when the id is not known.",
+        json_schema_extra=unless_given(A_TAG_SAID, "id"),
     )
 
     _named = field_validator("tag")(_named_unless("id", TAG_REF_MISSING))
@@ -218,7 +244,10 @@ class TagRefIn(Schema):
 class FieldRefIn(Schema):
     id: UUID | None = Field(None, title=CUSTOM_FIELD, description="The custom field's id.", json_schema_extra=A_FIELD)
     field: Reference | None = Field(
-        None, validate_default=True, description="The custom field's current name, when the id is not known."
+        None,
+        validate_default=True,
+        description="The custom field's current name, when the id is not known.",
+        json_schema_extra=unless_given(A_FIELD_SAID, "id"),
     )
 
     _named = field_validator("field")(_named_unless("id", FIELD_REF_MISSING))
@@ -468,7 +497,7 @@ class MergeIn(CustomerRefIn):
         None,
         validate_default=True,
         description="The card that stays: its exact name, phone or email, when its id is not known.",
-        json_schema_extra=A_CUSTOMER_REFERENCE,
+        json_schema_extra=unless_given(A_CUSTOMER_REFERENCE, "id"),
     )
     absorbed_id: UUID | None = Field(
         None,
@@ -481,7 +510,7 @@ class MergeIn(CustomerRefIn):
         validate_default=True,
         title=DUPLICATE_CUSTOMER,
         description="The duplicate's exact name, phone or email, when its id is not known.",
-        json_schema_extra=A_CUSTOMER_REFERENCE,
+        json_schema_extra=unless_given(A_CUSTOMER_REFERENCE, "absorbed_id"),
     )
 
     _absorbed_named = field_validator("absorbed")(_named_unless("absorbed_id", ABSORBED_REF_MISSING))
@@ -607,7 +636,9 @@ class OrderLinkIn(Schema):
         None, description="The customer's id; without a customer the link is removed.", json_schema_extra=A_CUSTOMER
     )
     customer: Reference | None = Field(
-        None, description="The customer's exact name, phone or email."
+        None,
+        description="The customer's exact name, phone or email.",
+        json_schema_extra=unless_given(A_CUSTOMER_SAID, "customer_id"),
     )
 
 
@@ -678,10 +709,6 @@ class PurchaseVoidIn(Schema):
 
 
 # ── Groups, tags and custom fields: inputs ──────────────────────────────────────────────────────
-
-
-class ByIdIn(Schema):
-    id: UUID = Field(description="The record's id.")
 
 
 class GroupListIn(PageIn):

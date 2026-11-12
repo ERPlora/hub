@@ -2,7 +2,10 @@
 with what it read of her card — waiting (FLOW-F23), asking someone, or stopped by an error and resumable (FLOW-F24) —
 is cancelled, saying why, and forgets what its steps read; nothing is sent to her and nothing of hers stays. The other
 customers' runs go on, an automation that starts on the erasure still starts (FLOW-F21), a repeated delivery changes
-nothing and an erasure in another business leaves this one's runs alone.
+nothing and an erasure in another business leaves this one's runs alone. In the same pass, every run that names her card
+by its id, also one that has already ended, forgets the free texts its History keeps (hub#1227, FLOW-F16): an answer's
+note, what the assistant or another app answered, the title of a question in a «no»; what happened stays. A run started
+by hand or by a schedule is found too once it has ended (hub#1240): it keeps the ids of what its steps read.
 
 Through the real apps and the worker's real outbox relay (``worker``): Customers' own operation erases the card and
 writes its notice; one tick hands it to flow.
@@ -10,6 +13,7 @@ writes its notice; one tick hands it to flow.
 
 import datetime as dt
 import json
+import uuid
 
 import pytest
 from django.utils import timezone
@@ -26,7 +30,10 @@ from apps.task.models import Task
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 
+from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
+
 from .conftest import A, ctx_for, make_run, run
+from .test_services_assistant_step import CHAT, said, wants
 
 EVA = {"name": "Eva Ruiz", "phone": "+34600111222", "email": "eva@example.com"}
 READ_HER_CARD = {"id": "s1", "kind": "query", "operation": "customer.customer.detail", "params": {"id": "input.id"}}
@@ -54,8 +61,20 @@ def welcome_a_day_later() -> str:
 
 
 def stored(row: FlowRun) -> str:
-    """Everything a run keeps that could hold a person's data, as one text."""
-    return json.dumps([row.input, row.outputs, row.error_message], default=str, ensure_ascii=False)
+    """Everything a run keeps that could hold a person's data, as one text: what started it, what its steps read, its
+    History (its steps and why it ended) and the texts of its questions."""
+    row.refresh_from_db()
+    texts = list(Question.objects.filter(run=row).values_list("title", "details", "note"))
+    kept = [row.input, row.outputs, row.error_message, row.error_reason, row.log, texts]
+    return json.dumps(kept, default=str, ensure_ascii=False)
+
+
+def ids_it_read(row: FlowRun) -> list[str]:
+    """The ids a run keeps of what its steps read and it has forgotten: each one an id and nothing else, so that no
+    name, phone or text of a person outlives there what was read."""
+    row.refresh_from_db()
+    assert [kept for kept in row.read_ids if str(uuid.UUID(kept)) != kept] == []
+    return row.read_ids
 
 
 def run_that_read_her_card(status: str, steps: list[dict], **fields) -> tuple[FlowRun, Customer]:
@@ -285,7 +304,9 @@ def test_a_run_calling_another_system_with_her_card_is_cancelled_and_a_late_answ
 @pytest.mark.django_db
 def test_a_question_of_the_run_answered_before_forgets_its_note_and_keeps_its_answer():
     # Two «Ask someone first» steps: the first was answered yes with a note about her, the second still waits.
-    asking, customer = run_that_read_her_card(FlowRun.Status.ASKING, [A_DAY])
+    note = {"step": "s2", "kind": "ask", "outcome": "answered", "approved": True, "by": "tester",
+            "note": "Eva Ruiz prefers the morning", "at": timezone.now().isoformat()}
+    asking, customer = run_that_read_her_card(FlowRun.Status.ASKING, [A_DAY], log=[note])
     flow = asking.flow
     soon = timezone.now() + dt.timedelta(days=1)
     answered = Question.objects.create(
@@ -300,6 +321,199 @@ def test_a_question_of_the_run_answered_before_forgets_its_note_and_keeps_its_an
     pending.refresh_from_db()
     assert (answered.status, answered.title, answered.details, answered.note) == (Question.Status.APPROVED, "", "", "")
     assert (pending.status, pending.title) == (Question.Status.CANCELLED, "")
+    # The step that told the answer still says who answered and what, without the note.
+    assert "Eva Ruiz" not in stored(asking)
+    assert [(e["outcome"], e["approved"], e["by"]) for e in asking.log] == [("answered", True, "tester")]
+
+
+@pytest.mark.django_db
+def test_a_run_that_ended_on_a_no_about_her_forgets_her_name_and_keeps_who_said_no(worker):
+    # The issue's: «When a customer is created → read her card → ask "Call {name}?"», answered no with a note.
+    ask = {"id": "s2", "kind": "ask", "title": "Call {{steps.s1.name}}?", "details": "Her phone: {{steps.s1.phone}}"}
+    automation([READ_HER_CARD, ask, WELCOME_TASK], ["customer.customer.detail", "task.task.create"])
+    eva = worker.request("customer.customer.create", EVA)
+    worker()
+    question = Question.objects.get()
+    run("flow.question.answer", {"id": str(question.id), "approve": False, "note": "Eva Ruiz moved away"})
+    ended = FlowRun.objects.get()
+    assert (ended.status, ended.error_code, ended.outputs) == (FlowRun.Status.CANCELLED, "flow.question_rejected", {})
+    assert "Eva Ruiz" in stored(ended) and "+34600111222" in stored(ended)  # positive control: in its History
+
+    erase(worker, eva.id)
+    worker()
+
+    assert "Eva Ruiz" not in stored(ended) and "+34600111222" not in stored(ended)
+    said = run("flow.run.get", {"id": str(ended.id)}, ctx_for(language="es")).model_dump(mode="json")
+    assert "Eva Ruiz" not in json.dumps(said, ensure_ascii=False)
+    # What happened stays: cancelled by a no, and who said it.
+    assert (ended.status, ended.error_code, ended.error_reason["values"]["who"]) == (
+        FlowRun.Status.CANCELLED, "flow.question_rejected", "tester",
+    )
+    assert [(e["outcome"], e.get("approved"), e.get("by")) for e in ended.log][-1] == ("answered", False, "tester")
+
+
+BY_HAND = {"kind": "manual"}
+FIND_EVA = {"id": "s1", "kind": "query", "operation": "customer.customer.list", "params": {"search": "Eva"}}
+
+
+def by_hand(worker, steps: list[dict], operations: list[str]) -> FlowRun:
+    """A run of an automation started by hand with nothing typed in: what started it names no card."""
+    ran = worker.request("flow.flow.run", {"id": automation(steps, operations, trigger=BY_HAND)})
+    worker()
+    return FlowRun.objects.get(pk=ran.id)
+
+
+@pytest.mark.django_db
+def test_a_run_by_hand_that_read_her_card_forgets_her_name_once_it_has_ended(worker):
+    # The issue's: «By hand → find "Eva" → ask "Call {name}?"», answered no with a note: it ended, so it no longer
+    # keeps what its steps read, and nothing that started it names her card.
+    eva = worker.request("customer.customer.create", EVA)
+    ask = {"id": "s2", "kind": "ask", "title": "Call {{steps.s1.name}}?", "details": "Her phone: {{steps.s1.phone}}"}
+    asking = by_hand(worker, [FIND_EVA, ask], ["customer.customer.list"])
+    run("flow.question.answer", {"id": str(Question.objects.get().id), "approve": False, "note": "Eva Ruiz moved"})
+    asking.refresh_from_db()
+    assert (asking.status, asking.input, asking.outputs) == (FlowRun.Status.CANCELLED, {}, {})
+    assert "Eva Ruiz" in stored(asking) and str(eva.id) not in stored(asking)  # positive control: the issue's gap
+    assert str(eva.id) in ids_it_read(asking)
+
+    erase(worker, eva.id)
+    worker()
+
+    assert "Eva Ruiz" not in stored(asking) and "+34600111222" not in stored(asking)
+    said_now = run("flow.run.get", {"id": str(asking.id)}, ctx_for(language="es")).model_dump(mode="json")
+    assert "Eva Ruiz" not in json.dumps(said_now, ensure_ascii=False)
+    assert (asking.status, asking.error_code) == (FlowRun.Status.CANCELLED, "flow.question_rejected")
+
+
+@pytest.mark.django_db
+def test_a_run_whose_assistant_read_her_card_forgets_what_it_answered_about_her(gateway, worker):
+    # «By hand → ask the assistant», which reads her card with its tool and answers with her name: once its turn is
+    # over and the run has ended, nothing it keeps names her card by its id.
+    eva = worker.request("customer.customer.create", EVA)
+    helper = {"id": "s1", "kind": "assistant", "prompt": "Who should I call?", "tools": ["customer.customer.detail"]}
+    gateway.reply(CHAT, json=wants("customer__customer__detail", {"id": str(eva.id)}))
+    gateway.reply(CHAT, json=said("Call Eva Ruiz on +34600111222"))
+    answered = by_hand(worker, [helper], ["customer.customer.detail"])
+    assert (answered.status, answered.outputs) == (FlowRun.Status.SUCCEEDED, {})
+    assert "Eva Ruiz" in stored(answered) and str(eva.id) not in stored(answered)  # positive control
+    assert str(eva.id) in ids_it_read(answered)
+
+    erase(worker, eva.id)
+    worker()
+
+    assert "Eva Ruiz" not in stored(answered) and "+34600111222" not in stored(answered)
+    assert [entry["outcome"] for entry in answered.log] == ["thinking", "assistant_used", "assistant_answered"]
+
+
+@pytest.mark.django_db
+def test_a_run_stopped_by_an_error_whose_card_the_hourly_pass_forgot_is_still_found():
+    # Stopped 8 days ago by another app: the hourly pass forgets what its steps read (FLOW-F24); the erasure still
+    # finds it, and a run that read another customer's card is left as it was.
+    eight_days_ago = timezone.now() - dt.timedelta(days=8)
+    failed, eva = run_that_read_her_card(
+        FlowRun.Status.FAILED, [A_DAY], resume_at=None, finished_at=eight_days_ago, error_code="task.title_taken",
+        error_message="Call Eva Ruiz is already a task",
+    )
+    ana = Customer.objects.create(name="Ana López")
+    others = make_run(failed.flow, status=FlowRun.Status.FAILED, input={}, finished_at=eight_days_ago,
+                      outputs={"s1": {"id": str(ana.id), "name": "Ana López"}}, error_code="task.title_taken",
+                      error_message="Call Ana López is already a task")
+    run("flow.run.prune", {}, system_context(A))
+    assert str(eva.id) not in stored(failed) and str(ana.id) not in stored(others)  # positive control
+    assert ids_it_read(failed) == [str(eva.id)] and ids_it_read(others) == [str(ana.id)]
+    kept_by_others = stored(others)
+
+    assert run("flow.customer.erase", {"id": str(eva.id)}, system_context(A)).changed == 1
+
+    assert "Eva Ruiz" not in stored(failed)
+    assert stored(others) == kept_by_others
+
+
+#: What the engine itself said of a step it did not run, as the History keeps it: it names no person.
+NOT_ALLOWED = "The automation is not allowed to run task.task.create"
+#: What a free text says once it is forgotten, in the automation's language.
+ERASED = {"en": "[erased with the customer's personal data]", "es": "[borrado con los datos personales del cliente]"}
+
+
+def a_history_naming(name: str, at: str) -> list[dict]:
+    """The steps of a run as its History keeps them, with every free text a step leaves naming ``name``: an answer's
+    note, what the assistant answered and what another app answered when a step failed (and went on), field by field;
+    and a failure of the engine's own, which names no person."""
+    return [
+        {"step": "s1", "kind": "query", "operation": "customer.customer.detail", "outcome": "found", "count": 1,
+         "at": at},
+        {"step": "s2", "kind": "ask", "outcome": "answered", "approved": True, "by": "tester",
+         "note": f"{name} prefers the morning", "at": at},
+        {"step": "s3", "kind": "assistant", "outcome": "assistant_answered", "text": f"{name} has two bookings",
+         "at": at},
+        {"step": "s4", "kind": "command", "operation": "task.task.create", "outcome": "failed", "continued": True,
+         "error": {"code": "task.title_taken", "message": f"Call {name} is already a task",
+                   "fields": {"title": f"«Call {name}» is already a task"},
+                   "technical": f"IntegrityError: Call {name}"}, "at": at},
+        {"step": "s5", "kind": "command", "operation": "task.task.create", "outcome": "failed", "continued": True,
+         "error": {"code": "flow.not_allowed", "message": NOT_ALLOWED,
+                   "reason": {"key": "flow.not_allowed", "values": {"name": "task.task.create"}}}, "at": at},
+    ]
+
+
+#: How a run about her may have ended, each one keeping its History 90 days (FLOW-F16); ``days_ago``, when it ended
+#: (today when it does not say), read when the test runs.
+ENDINGS = {
+    "finished well": {"status": FlowRun.Status.SUCCEEDED},
+    "stopped by its condition": {"status": FlowRun.Status.STOPPED},
+    "cancelled by a no": {
+        "status": FlowRun.Status.CANCELLED,
+        "error_code": "flow.question_rejected",
+        "error_reason": {"key": "flow.question_rejected", "values": {"who": "tester", "title": "Call Eva Ruiz?"}},
+        "error_message": "Cancelled: tester answered no to «Call Eva Ruiz?».",
+    },
+    "cancelled as nobody answered": {
+        "status": FlowRun.Status.CANCELLED,
+        "error_code": "flow.question_expired",
+        "error_reason": {"key": "flow.question_expired", "values": {"title": "Call Eva Ruiz?"}},
+        "error_message": "Cancelled: nobody answered «Call Eva Ruiz?» in time.",
+    },
+    "stopped by another app too long ago": {
+        "status": FlowRun.Status.FAILED,
+        "error_code": "task.title_taken",
+        "error_message": "Call Eva Ruiz is already a task",
+        "days_ago": 8,
+    },
+}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("language", ERASED)
+@pytest.mark.parametrize("ending", ENDINGS.values(), ids=ENDINGS.keys())
+def test_a_run_about_her_that_has_ended_forgets_every_free_text_of_its_history(ending, language):
+    flow = Flow.objects.create(name="Welcome", trigger_kind=Flow.Trigger.EVENT, language=language,
+                               trigger_event="customer.customer.created", steps=[], enabled=True)
+    eva, ana = Customer.objects.create(name="Eva Ruiz"), Customer.objects.create(name="Ana López")
+    at = timezone.now().isoformat()
+    ended = timezone.now() - dt.timedelta(days=ending.get("days_ago", 0))
+    fields = {name: value for name, value in ending.items() if name != "days_ago"} | {
+        "started_at": ended - dt.timedelta(days=1), "finished_at": ended,
+    }
+    hers = make_run(flow, input={"id": str(eva.id)}, log=a_history_naming("Eva Ruiz", at), **fields)
+    others = make_run(flow, input={"id": str(ana.id)}, log=a_history_naming("Ana López", at), **fields)
+    kept_by_others = stored(others)
+    assert "Eva Ruiz" in stored(hers)  # positive control
+
+    assert run("flow.customer.erase", {"id": str(eva.id)}, system_context(A)).changed == 1
+
+    assert "Eva Ruiz" not in stored(hers)
+    assert (hers.status, hers.error_code) == (ending["status"], ending.get("error_code", ""))
+    assert [entry["outcome"] for entry in hers.log] == ["found", "answered", "assistant_answered", "failed", "failed"]
+    # Each forgotten text says so in the automation's language; which field another app refused stays, not its words.
+    erased = ERASED[language]
+    refused, by_the_engine = hers.log[3]["error"], hers.log[4]["error"]
+    assert (hers.log[1]["note"], hers.log[2]["text"]) == (erased, erased)
+    assert refused == {"code": "task.title_taken", "message": erased, "fields": {"title": erased}}
+    # What the engine itself said names no person: it stays as it was.
+    assert (by_the_engine["code"], by_the_engine["message"]) == ("flow.not_allowed", NOT_ALLOWED)
+    assert stored(others) == kept_by_others  # another customer's History is hers to keep
+    # A repeated delivery changes nothing.
+    assert run("flow.customer.erase", {"id": str(eva.id)}, system_context(A)).changed == 0
 
 
 @pytest.mark.django_db

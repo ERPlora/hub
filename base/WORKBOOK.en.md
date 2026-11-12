@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e8b2e8f3b4bb2fd2eb85363378db4a826043e531bcc57753b752b77bc832d3b2 -->
+<!-- generated from WORKBOOK.md sha256:ccc0faf25c107e0a309a6682502f76b26f608585aabaa3d707a71907a774b4b5 -->
 
 ## What it is for and who it is for
 
@@ -113,8 +113,10 @@ there, the warning alone.
 
 ### Apps
 From "Apps" in the side menu. Three tabs at the bottom: "My apps" (the apps the business has running), "Add
-apps" (every ERPlora app) and "Paid" (the ones subscribed to separately). At the top, how many apps the business
-has chosen against its plan's limit: "17 of 20 apps turned on" or, with no limit, "17 apps turned on · Unlimited".
+apps" (every ERPlora app) and "Paid" (the ones subscribed to separately). At the top, how many apps the business has
+turned on (those in "My apps", also the ones born on, like Taxes, and the ones that came along with another) and how
+many of the ones its plan allows it has chosen: "27 apps turned on · 17 of 20 in your plan" or, with no limit, "27
+apps turned on · Unlimited". A business just signed up: "1 app turned on · 0 of 20 in your plan" (hub#1286).
 Each tab, a table (or cards) with its search, the filters funnel, the order and "Columns": "App" (icon and name),
 "Category" and "Status"; in "Add apps" and "Paid", also "Description", "Price" and "Comes with". "Open" on the
 row of an app the person can open and, for whoever runs the business, "Turn on" or "Turn off". Above the table,
@@ -415,7 +417,7 @@ On the Employees screens and the API documentation:
 | BASE-F110 | Open the business's website on its own domain | done |
 | BASE-F111 | Wait for the database when it is cut for a moment | done |
 | BASE-F112 | Save a downloaded file inside the app | done |
-| BASE-F113 | Keep warning with the screen off (Android app) | partial — the installed app does not have the order to stay listening yet (hub#836) |
+| BASE-F113 | Keep warning with the screen off (Android app) | done |
 | BASE-F114 | Put a business back as it was at a past moment from the Hub admin | done |
 
 ### BASE-F01 See what the business still has to set up
@@ -429,14 +431,17 @@ Steps:
      "Important" ones, each group in the order the apps set, also on a phone, where only two rows fit. The
      "Recommended" ones show folded only if nothing else is left. "View all" shows every step, the done ones
      too, in the order the apps set.
-  3. The platform's are "Your apps" (turn on at least one business app) and "Your team" (add the people
-     who will use the till); the rest come from each app that is on.
+  3. The platform's are "Your apps" (turn on at least one business app; Taxes, which every business is born
+     with, does not count, since with it alone the till has nothing to sell) and "Your team" (add the people who
+     will use the till); the rest come from each app that is on.
   4. Besides, for each app mandatory in the business's country that is off, an "Important" step of the
      platform: "Turn on VeriFactu" with "It is mandatory for businesses in Spain." (VeriFactu, in Spain) or
      "Turn on Taxes" with the business's country (Taxes, in every one). Only whoever runs the business sees it,
      since they are the one who turns apps on; "Set up" leads to **Apps**, to "Add apps". As soon as they turn it
      on, the step goes by itself and the app's own steps come ("Set up VeriFactu", "Your taxes"). A business of
-     another country does not see VeriFactu's (hub#997).
+     another country does not see VeriFactu's (hub#997). A business just signed up does not see "Turn on Taxes",
+     since it is born with it on (BASE-F14); in Spain it does see "Turn on VeriFactu": VeriFactu never turns on by
+     itself.
   5. A step that only applies to another country, or that the person may not see, does not show. A business
      without a country (a demo, ERPlora's own) counts as Spain, ERPlora's market: it sees Spain's steps and none
      of another country (hub#682). A step whose check fails does not show either: what could not be checked is
@@ -520,11 +525,10 @@ Steps:
      or the menu); a window that cannot be closed that way stays, and one that holds something typed and
      not saved and asks for it (when creating and editing a product in Inventory and in the create and edit windows of Sales, Tables, Kitchen, Customers, Reservations, Appointments, Staff, Services, Time clock, Cart & Checkout, Cash register, Menus and combos, Modifiers, Payments, Price Lists, Invoicing, Printing, Schedule, Tasks, Taxes and the WhatsApp Inbox, in Inventory's category and stock windows and in "New API key", in the cancellation-reason windows of Online bookings, Payments, Printing, Reservations, Services, VeriFactu and Kitchen (cancelling a ticket), in the reason for "Discard" on a failed event in System, in "New folder" and "Rename" in Files, in the product-import steps, in the Task and Project sheets and in quick customer creation at the till) asks first "Discard
      changes?": "Keep editing", or back again, leaves it as it was, and "Discard changes" closes it
-     (hub#1015, hub#1020, hub#1031, hub#1046). Those same windows ask the same question when "Cancel", the "×" or
-     Escape is pressed and on a tap outside, on the phone and on the computer, and with nothing typed they close
-     without asking (hub#1023, hub#1156); not yet the Task and Project sheets nor quick customer creation at the till
-     (hub#1233), nor Cash register's open shift, cash in or out, count and close windows (hub#1234), which only ask with
-     the back button. With nothing open, on a record or a new one it does the same as "Back"; on the main screen
+     (hub#1015, hub#1020, hub#1031, hub#1046). Those same windows ask the same question when "Cancel", "Close", the
+     "×" or Escape is pressed and on a tap outside, on the phone and on the computer, and with nothing typed they close
+     without asking (hub#1023, hub#1156; the Task and Project sheets and quick customer creation at the till,
+     hub#1233; Cash register's open shift, cash in or out, count and close windows, hub#1234). With nothing open, on a record or a new one it does the same as "Back"; on the main screen
      of an app it goes back to the Home, also when that screen was reached through a link; and on the Home
      it sends the app to the background.
 In: the apps of the person's menu (the same as the bar's "My apps" button).
@@ -717,7 +721,10 @@ Steps:
   2. While the list arrives: "Loading your apps…". Then one row (or one card, as chosen) for each app the
      business has running, with its icon and its name, its "Category" and its "Status" ("Active"). An app the
      business's country requires also shows, next to its status, "Mandatory in Spain" (or the business's country):
-     Taxes in every country, VeriFactu in Spain (hub#997).
+     Taxes in every country, VeriFactu in Spain (hub#997). A business just signed up already has Taxes here,
+     "Active": it is born on with its country's taxes and does not count against the plan's app limit: the counter at
+     the top says "1 app turned on · 0 of 20 in your plan". The other apps are born off, VeriFactu too, which the
+     owner turns on.
   3. They search in "Search your apps…" (name, description or category), filter by category with the funnel,
      sort or choose columns.
   4. When the business subscribes to an app on erplora.com or stops having it, the list updates by itself,
@@ -789,8 +796,9 @@ Steps:
   2. In "Add apps", whoever runs the business looks for an app the business does not use, "Off", and presses "Turn
      on". If it needs other apps that are off, it asks first, naming them (BASE-F19).
   3. The app becomes "Installed" at once and shows in "My apps" and, without reloading, in the menu of every device
-     of the business. The counter at the top adds one: from "16 of 20 apps turned on" to "17 of 20 apps turned
-     on".
+     of the business. The counter at the top adds the apps turned on and one of the plan's: turning Tasks on, from
+     "26 apps turned on · 16 of 20 in your plan" to "27 apps turned on · 17 of 20 in your plan"; the ones that come
+     along with it add to the apps turned on, not to the plan's.
 In: the chosen app, the ones it needs and what the business has subscribed to on erplora.com.
 Out: the app running in this business, chosen by it: it counts towards its plan's limit of apps.
 If it fails: with the plan's limit reached nothing is turned on and "Your plan’s app limit" shows: "You have
@@ -893,7 +901,8 @@ Steps:
      requires never goes with it: on turning Sales off, Taxes stays on and is not named (hub#997).
   3. They confirm with "Turn off": "Reservations is off. Also turned off: Tables.". Both leave "My apps" and,
      without reloading, the menu of every device of the business; their screens say the app is not available
-     (BASE-F26) and the counter at the top takes one away.
+     (BASE-F26) and the counter at the top takes away the ones turned off and, of the plan's, the one the business
+     chose.
   4. In "Add apps" they stay, with their icon, their name and "Off": from there they are turned on again
      (BASE-F24).
   5. From the assistant ("Turn off the reservations app") the app is named as in BASE-F24, the high-risk card shows
@@ -1225,8 +1234,8 @@ Status: done
 Actor: owner, administrator
 Screen: Home · Summary
 Steps:
-  1. While the business has nothing a template brings (a business is born with every app off), who administers
-     it sees on top "Start with a business like yours" ("Choose the one most like yours: we turn on its apps and
+  1. While the business has nothing a template brings (a business is born with every app off but Taxes), who
+     administers it sees on top "Start with a business like yours" ("Choose the one most like yours: we turn on its apps and
      load its catalogue in one go. Then put in your own details."): up to four templates, one per kind of
      business and in their language when
      there is one (those of its country first), with their description and "Use this one"; "See all templates" opens "Data and backups" and "Not now"
@@ -1765,7 +1774,7 @@ Screen: Your business is being prepared
 Steps:
   1. They open the address of a business erplora.com is still preparing (just created).
   2. "Your business is being prepared" shows — "It takes a few seconds. This page refreshes by itself.".
-  3. When it is ready, the page refreshes and they come in as always.
+  3. When it is ready, the page refreshes and they come in as always, with Taxes already on (BASE-F14).
 In: the business's state erplora.com passes on.
 Out: nothing saved.
 If it fails: an address that belongs to no business does not exist; a business that was closed says "This hub
@@ -2480,7 +2489,11 @@ Steps:
      alone, "Nov 2, 2026"; a time alone, "9:30 PM"); a value of a closed list, with the name its app gives it ("Front
      desk", not the internal value), also that of a datum its app does not call like the field that names it
      ("Rectifying invoice: other causes (R4)", not "R4"); and a record, by its name when its app lets whoever asks read it ("Person: Eva
-     Gil"): otherwise the card leaves it out, never by its code. Nor does it put the key its app uses to avoid doing
+     Gil"): otherwise the card leaves it out, never by its code. A record said in words is looked up as the action will
+     look it up, also inside another (a course inside its menu), and the one it finds comes up ("Course: Homemade
+     desserts" when "desserts" was said); if those words fit several or none, they come up as they were said; and if the action does
+     not use them because its record's identifier comes, they are neither read nor shown. Nor does
+     it put the key its app uses to avoid doing
      the same thing twice on a retry (charging, sending a WhatsApp, printing): nobody can judge it, and the action
      receives it all the same when it runs. Everything shows in the person's language, also the
      name of each datum when the card puts it on its own line (BASE-F98): the
@@ -2892,8 +2905,7 @@ Involved: HUB_APP-F30 (ERPlora/app), BASE-F35, BASE-F74, BASE-F85, BASE-F90, VER
 INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
 
 ### BASE-F113 Keep warning with the screen off (Android app)
-Status: partial — the Hub's part is done, but the installed app does not have the order to stay listening yet: version
-1.1.34 removed it (ERPlora/app#25) and it comes back with the second part of hub#836
+Status: done
 Actor: system
 Screen: none; on Android, the ongoing notification "ERPlora is listening"
 Steps:
@@ -2910,7 +2922,7 @@ Steps:
 In: the notices the person hears and what Android says about the notices.
 Out: the order to the app to stay listening or to stop. Nothing is kept in the Hub.
 If it fails: with the notices refused ("Not now" to our question, or refused on Android), with nothing to warn about or
-without knowing what Android says, the app is not kept awake. An app without this order (1.1.34) refuses it: the Hub
+without knowing what Android says, the app is not kept awake. An app without this order (1.1.34 and 1.1.35) refuses it: the Hub
 notes it in the console, does not ask again on that page and the person sees no error; the notices arrive with the app
 on screen, as before. If Android does not let it start, the same, and it is asked again at the next sign-in. While the
 Hub does not know yet whether there is something to warn about, it asks the app nothing: reloading the page neither
@@ -2919,10 +2931,14 @@ to ask.
 Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APPOINTMENT-F28, BASE-F61; hub#836
 
 ### BASE-F114 Put a business back as it was at a past moment from the Hub admin
-Status: done (the action and the restore; making and deleting the temporary cluster is the procedure "Devolver un negocio
-a un momento" of ERPlora/aws)
+Status: done (the action and the restore, in its place or to a separate copy, and getting back from the separate copy
+the customers that were lost, the deleted ones as they were, and the products; making and deleting the temporary cluster
+is the procedure "Devolver un negocio a un momento" of ERPlora/aws; getting back services and appointments, hub#1283 and
+hub#1284; the groups, tags and own fields of a customer brought back, hub#1285; the image and the categories of a product
+brought back, hub#1319 and hub#1320)
 Actor: the ERPlora staff who run the platform, when a business asks for it
-Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, action "Restore from a copy…"
+Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
+copy…"; Separate copies, action "Recover into the business…"; and Recoveries
 Steps:
   1. A business asks to go back to how its data was at a moment of the last few days. The staff makes a temporary
      cluster restored to that moment and registers it in Clusters, closed to new hubs.
@@ -2937,17 +2953,76 @@ Steps:
   5. A few minutes later the system has copied the business's database from the temporary cluster, kept aside the one
      it had and put the copy in its place. The business opens again with its data of that moment and the arrow leaves
      the list.
-In: the chosen businesses, the temporary cluster with their copy and the moment.
+  To a separate copy (hub#1213), for a business that invoices with VeriFactu in production or when only what was lost
+  is wanted back without touching the rest:
+  6. In Hubs they choose the business and the action "Restore to a separate copy…". The same page asks for the
+     temporary cluster and the moment, and explains that the business stays open without anything changing and that the
+     copy is no business: nobody opens it and nothing in it is sent to the tax authority. They press **Make the
+     copies**.
+  7. "1 hub will get a separate copy as it was at 2026-11-09 14:30 UTC, made from <cluster>: the business stays open as
+     it is. Separate copies lists it, and says if it could not be made." appears. The business is not closed for a
+     second.
+  8. In Separate copies they see it "Being made" and, a few minutes later, "Made", with its moment and until when it is
+     kept (7 days); its page also says its database, its cluster, who asked for it and when. If it could not be made, it
+     says "Failed" and why under "last error".
+  Bringing back into the business what the separate copy has and the business lacks (hub#1257):
+  9. In Separate copies they choose the made copy and the action "Recover into the business…". The page explains that
+     what the business deleted and still holds comes back as it was, with its history, and that what it no longer has is
+     created again as its own screen creates it, nothing copied; that what the business has, or has made again, is left
+     as it is; that records for the tax authority are never brought back and
+     that the business stays open. Below, "What to bring back", with what can be brought ticked (today, **Customers** and
+     **Products**).
+     They press **Recover**.
+  10. "1 separate copy will give back Customers into its business within a few minutes: Recoveries says how it went."
+      appears. In Recoveries they see it "Asked" with the copy, what was asked and when.
+  11. A few minutes later it says "Done" and what came back: "Customers: 1 restored, 2 created" or "Customers: 2
+      created, 1 not created". Its page also says which did not come back and why (by their identifier in the copy,
+      without personal data). A customer the business deleted and still holds comes back THE SAME card, with their
+      purchases and what was spent, their consents, notes and activity, their groups, tags and own fields and their
+      linked orders (CUSTOMER-F33). One the business no longer has comes back as a new card, created as the Customers
+      screen creates it, with their name, contact, tax ID, address, dates, source, stage, channel and notes; without their
+      groups, tags or own fields (hub#1285). A card whose personal data was erased (GDPR) or one merged into another never
+      comes back, and one the business has already made again (the same name, phone and email) is not repeated. With
+      Products, "Products: 3 created": each product comes back as a new one, created as the Products screen creates it,
+      with its name, SKU, EAN-13, description, type, price, cost, units, threshold, stock control and tax category, active
+      or inactive as it was and in the categories the business still has; with no stock, which is counted
+      (INVENTORY-F14), because the copy's is another day's; without its image (hub#1319) and without the categories the
+      business no longer has (hub#1320). One that was deleted in the business also comes back as a new product; its
+      movements stay with the deleted one (hub#1321). One the business has already created again (another live one with
+      its SKU or its EAN-13) is not repeated. Asking
+      again creates nothing twice.
+In: the chosen businesses, the temporary cluster with their copy and the moment; to recover, the made separate copy and
+what to bring back.
 Out: the business's database as it was at that moment; the one it had, kept 7 days on its server; the notice
-`control.hub.restore_requested` with who asked for it. The other businesses notice nothing.
+`control.hub.restore_requested` with who asked for it. The other businesses notice nothing. To a separate copy: the
+business as it was, untouched; a separate database on its cluster with the data of that moment, closed to the
+application and kept 7 days; the notice `control.hub.restore_aside_requested` with who asked for it. When recovering: in
+the business, each deleted card it still held, live again with its card-recovered notice (`customer.customer.restored`),
+a new card for each customer it no longer had, with its card-created notice (`customer.customer.created`), and a new
+product for each product it lacked, with its product-created notice (`inventory.product.created`), and nothing else; the
+copy, untouched; the notice `control.copy.recovery_requested` with who asked for it.
 If it fails: what the restore does not accept is said in the notice, business by business, and that business is not
 touched: one that is not ready or has no database of its own, a demo, one being moved or restored, a cluster open to new
 hubs or with living businesses, the business's own cluster, a copy that is not on that cluster or is too large, and a
 moment that has not come yet. Without a cluster or a moment, the page asks for them again. If the business has
 production VeriFactu records made, sent or changed after that moment, it is not restored and nothing changes, because it
 would use again numbers the AEAT already has: its page says so under "last error" ("restore_fiscal_records: …"); for that
-case, hub#1213. Any other failure undoes the restore by itself: the business keeps its usual database and its page says
-why. With the platform frozen for a database upgrade, the restore waits, with the business under maintenance, until it
+case there is "Restore to a separate copy…", which does not compare them because it does not touch the business. Any
+other failure undoes the restore by itself: the business keeps its usual database and its page says why. A separate copy
+accepts the same as the restore and what it does not accept is said in the notice the same way; if making it fails,
+nothing of it is left and Separate copies says why ("restore_aside_<step>: …"); the business does not notice. Recovering
+is only possible from a made copy and once at a time per copy; otherwise the notice says so ("Only a separate copy that
+is made gives anything back."), and with nothing ticked the page asks again. What cannot be brought from an app is said in
+its result and the rest goes on: the app is turned off in the business ("Customers: nothing (app_inactive: …)"), or the
+copy did not have it, lacks the migration its read needs or has one this code does not know (`recover_not_in_copy`,
+`recover_copy_behind`, `recover_copy_ahead`). A card the create operation does not accept today (a phone no longer valid),
+or a product without a tax category or with one Taxes no longer has active, is counted "not created" with its reason,
+and so is a deleted card that was merged into another or erased meanwhile ("customer.customer_unavailable: …"). If the
+copy is gone, the recovery says "Failed" and why
+("recover_copy_unreadable: …"). While the business is being moved or restored, the recovery waits without doing anything.
+With the platform frozen for a database upgrade, the restore waits, with the business under maintenance, until it
 is unfrozen. With records from the test environment only, the chain is recovered afterwards (VERIFACTU-F28). The
-support staff see the list, but not the action.
-Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move); hub#1198, hub#1213, aws#77
+support staff see the list, Separate copies and Recoveries, but not the actions.
+Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12,
+CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283,
+hub#1284, hub#1285, hub#1306, hub#1319, hub#1320, hub#1321, aws#77

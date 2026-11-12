@@ -19,11 +19,13 @@ import {
   EMPLOYEE,
   flush,
   JAPANESE,
-  type MountOptions,
   mountCartCheckout,
+  type MountOptions,
   page,
   POLISH,
+  totalFilter,
 } from '../__tests__/mount-cart-checkout';
+import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import FailOrderModal from '../components/FailOrderModal.vue';
 import OrdersPage from './OrdersPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -167,14 +169,15 @@ describe('OrdersPage', () => {
 
   it('the total is typed as an amount, read as it is pasted, and one it cannot read says so under its box (pm#521)', async () => {
     const s = await setup();
+    await s.result('base.business.get', business());
     await s.show(page(ROWS));
     const total = s.prop<Array<{ key: string; filter?: unknown }>>('columns').find((c) => c.key === 'total_amount');
     expect(total?.filter).toEqual({ type: 'range', amount: true });
     s.table().vm.$emit('filtersChange', { total_amount_from: '1.250,50', total_amount_to: '1.250' });
     await flush();
-    // «1.250» is 1.250 € or 1,25 €: it filters nothing and says why, never the wrong amount.
+    // «1.250» is 1.250 € or 1,25 €: it filters nothing and says both, as every amount filter of the Hub (hub#1196).
     expect(s.list()).toEqual([{ total_amount_min: 125050, sort: '-created_at', limit: 50, offset: 0 }]);
-    expect(s.prop('filterErrors')).toEqual({ total_amount_to: 'Type an amount, like 12.50' });
+    expect(s.prop('filterErrors')).toEqual({ total_amount_to: 'This amount can be read in two ways: «1.250» could be €1,250.00 or €1.25. Write the decimals so there is no doubt.' });
     s.table().vm.$emit('filtersChange', { total_amount_from: '12' });
     await flush();
     expect(s.prop('filterErrors')).toEqual({});
@@ -313,6 +316,7 @@ describe('OrdersPage: the column filters wait behind the funnel, as the old tabl
 
   it('a Total it cannot read filters nothing, marks the funnel and is said under its box in the panel', async () => {
     const s = await setup();
+    await s.result('base.business.get', business());
     await s.show(page(ROWS));
     await openFunnel(s);
     set(s, 'total_amount_to', 'ionInput', '1.250');
@@ -321,16 +325,17 @@ describe('OrdersPage: the column filters wait behind the funnel, as the old tabl
     expect(s.list()).toEqual([{ sort: '-created_at', limit: 50, offset: 0 }]);
     expect(s.find(`${ID}-filters-toggle`).attributes('data-invalid')).toBe('true');
     await openFunnel(s);
-    expect(field(s, 'total_amount_to').errorText).toBe('Type an amount, like 12.50');
+    expect(field(s, 'total_amount_to').errorText).toBe('This amount can be read in two ways: «1.250» could be €1,250.00 or €1.25. Write the decimals so there is no doubt.');
   });
 
   it('says it in Spanish too', async () => {
     const s = await setup({ locale: 'es' });
+    await s.result('base.business.get', business());
     await s.show(page(ROWS));
     s.table().vm.$emit('filtersChange', { total_amount_from: 'doce' });
     await flush();
     await openFunnel(s);
-    expect(field(s, 'total_amount_from').errorText).toBe('Escribe un importe, como 12,50');
+    expect(field(s, 'total_amount_from').errorText).toBe('Esto no es un importe. Escribe una cifra, por ejemplo 12,50.');
   });
 });
 
@@ -367,7 +372,7 @@ describe('OrdersPage: the business’s currency (cart-checkout-business-currency
     await yen.result(BUSINESS, business(JAPANESE));
     await filter(yen, { total_amount_from: '12', total_amount_to: '12,5' });
     expect(yen.list()).toEqual([{ total_amount_min: 12, sort: '-created_at', limit: 50, offset: 0 }]);
-    expect(yen.prop('filterErrors')).toEqual({ total_amount_to: 'Type an amount, like 12' });
+    expect(yen.prop('filterErrors')).toEqual({ total_amount_to: 'This is not an amount. Type a figure, for example 12.' });
   });
 
   it('an amount typed before the business answers is read again in its currency when it does, from the first page', async () => {
@@ -380,4 +385,8 @@ describe('OrdersPage: the business’s currency (cart-checkout-business-currency
     await s.result(BUSINESS, business(JAPANESE));
     expect(s.list()).toEqual([{ total_amount_min: 12, sort: '-created_at', limit: 50, offset: 0 }]);
   });
+});
+
+describe('OrdersPage: «Total» is read as every amount of the Hub (hub#1196)', () => {
+  itReadsAmountFiltersAsTheHub(totalFilter(setup, page(ROWS)));
 });

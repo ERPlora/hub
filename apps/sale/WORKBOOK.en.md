@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fa4f019b0f86e9ea24cea4585d26b160890935121935a1f188989575e1742031 -->
+<!-- generated from WORKBOOK.md sha256:203dc15b0d5202866f50529e855ed1ba89dd0d64fe59c4c2213a602cd565813f -->
 
 ## What it is for and who it is for
 
@@ -1064,9 +1064,12 @@ period's "Revenue". Sales charged before stay as they were: their line counts fo
 sessions of those vouchers count for nobody, so nothing counts twice.
 If it fails: "Error loading metrics" (the figures show as "—"); if the last 7 days cannot be read, "The
 last 7 days could not be read.". Empty: "No sales yet.". Whoever lacks the reports permission sees the
-table, without the figures. A total that is not an amount says "Type an amount, like 12.50" under its
-field, and an end date before the start one, "The end date cannot be before the start date."; neither of
-them filters and the period rules. On Home, a panel for a day with no sales says 0, and one that cannot
+table, without the figures. The total is read as in any amount field of the Hub and as in the other lists
+(hub#1196: "1.000,50", "1,000.50", "2 500" and "12,50 €" filter); one it cannot read says so under its field
+in the words of the amount field ("This is not an amount. Type a figure, for example 12.50.", "This amount
+cannot be negative." or, with "1.000" in euros, "This amount can be read in two ways…"), and an end date
+before the start one, "The end date cannot be before the start date."; neither of them filters and the
+period rules. On Home, a panel for a day with no sales says 0, and one that cannot
 be read, "Unavailable".
 Involved: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, SALE-F27, SERVICE-F21, SERVICE-F24
 

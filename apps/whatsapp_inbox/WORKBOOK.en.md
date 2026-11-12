@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:880035592453ec243b3dd094afefa2f3a650ab28fdb4518ed3fa65728fc05358 -->
+<!-- generated from WORKBOOK.md sha256:e647fc7c37895c3d61a277160f020589b582941f264f2b68eb9f4b559aed4679 -->
 
 ## What it is for and who it is for
 
@@ -261,12 +261,15 @@ Steps:
 3. The number is compared as a number: written with spaces, with the country prefix or with "00" in front it is the
    same person in a business in Spain, and a foreign number that keeps its zero (a landline in Italy) too; the same
    digits with another country's prefix are another person.
+4. When ERPlora's staff recover from the separate copy a card the business deleted (the same card comes back,
+   CUSTOMER-F33), the conversations of its number that are still without a card are linked to it again within a
+   few seconds, without waiting for the customer to write again.
 In: the conversation's number and the cards with that number.
 Out: the conversation knows which card it belongs to. It only fills an empty link: the one a person set is
 respected. A deleted card counts as empty: its conversation is left without a card and another live card with the
-same number claims it.
+same number claims it; if the card comes back from the separate copy and no other claimed it, it is hers again.
 If it fails: if two cards have the same number, it is linked to neither and the message stays saved.
-Involved: Customers
+Involved: Customers, CUSTOMER-F33
 
 ### WHATSAPP_INBOX-F05 Read a conversation
 Status: done
@@ -1079,7 +1082,8 @@ They carry identifiers, never a number, a name or a text of the conversation.
 - **Customers** (required): `customer.customer.created` and `customer.customer.updated` link the conversations with no
   card of that number (F04); `customer.customer.merged` moves them to the card that stays (F12);
   `customer.customer.deleted` leaves them without a card and another live card of the number claims them;
-  `customer.customer.erased` erases them (F11). It reads the cards by number and the marketing consent by WhatsApp; it
+  `customer.customer.restored` (the deleted card coming back from the separate copy, CUSTOMER-F33) links them again,
+  as a new card does (F04); `customer.customer.erased` erases them (F11). It reads the cards by number and the marketing consent by WhatsApp; it
   creates cards only with `customer.customer.create`.
 
 ### Who uses it

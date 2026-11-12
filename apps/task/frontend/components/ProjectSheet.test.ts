@@ -6,7 +6,7 @@
 import { ConfirmDialog } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, EMPLOYEE, errorFrame, ionValue, mountTask, OWNER, page, settle } from '../__tests__/mount-task';
+import { click, EMPLOYEE, errorFrame, expectSheetDiscardsOnClose, ionValue, mountTask, OWNER, page, settle } from '../__tests__/mount-task';
 import { project } from '../__tests__/project';
 import { task } from '../__tests__/task';
 import ProjectSheet from './ProjectSheet.vue';
@@ -163,15 +163,24 @@ describe('ProjectSheet', () => {
 });
 
 
-describe('ProjectSheet: Android Back with unsaved changes (hub#1046, BASE-F05)', () => {
-  it('as opened closes; a change asks; restored as opened closes again', async () => {
+describe('ProjectSheet: unsaved changes ask before closing (hub#1046, hub#1233, BASE-F05)', () => {
+  it('a changed name: Back, «Close», Escape and a tap outside ask «Discard changes?»; «Keep editing» keeps it', async () => {
     const s = await setup();
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('task-project-sheet'),
       change: () => ionValue(s.el('task-project-sheet-name'), 'Grand opening', 'ionInput'),
       restore: () => ionValue(s.el('task-project-sheet-name'), 'Opening', 'ionInput'),
     });
+  });
+
+  it('a half-written new task asks on «Close» too; «Discard changes» closes it', async () => {
+    await expectSheetDiscardsOnClose(await setup(), 'task-project-sheet', 'task-project-sheet-new-task', 'Hang the sign');
+  });
+
+  it('as opened, «Close», Escape and a tap outside close it without asking', async () => {
+    const { expectUntouchedWindowClosesAtOnce } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUntouchedWindowClosesAtOnce(await setup(), 'task-project-sheet');
   });
 
   it('closing after discarding clears the edited fields and the half-written new task', async () => {

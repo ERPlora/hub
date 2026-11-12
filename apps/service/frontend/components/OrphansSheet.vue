@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // SERVICE-F30 «Rescatar los bonos sin cliente»: «Vouchers with no customer» follows
-// `service.grant.list_orphans` live, the most recent first, 20 at a time: what is left («{n}
-// session(s) left», «No session limit» or «Fully used»), the voucher, the amount (in the business's currency), when the card was
+// `service.grant.list_orphans` live, the most recent first, 20 at a time: what is left («1 session left»,
+// «3 sessions left», «No session limit» or «Fully used»), the voucher, the amount (in the business's currency), when the card was
 // deleted, «Expired» if it is, and the customer's reference — no name, email or phone.
 import { InlineFeedback, StatusPill } from '@erplora/ui/components';
 
@@ -20,7 +20,7 @@ const list = useSheetList('service.grant.list_orphans', () => ({}));
 
 function left(orphan: OrphanOut): string {
   if (orphan.remaining === null) return t('service.orphans.unlimited');
-  return orphan.remaining > 0 ? t('service.orphans.remaining', { remaining: orphan.remaining }) : t('service.orphans.noValue');
+  return orphan.remaining > 0 ? t('service.orphans.remaining', { count: orphan.remaining }) : t('service.orphans.noValue');
 }
 </script>
 

@@ -23,7 +23,7 @@ from pydantic import (
 )
 
 from apps.modifier.models import MAX_CHOICES, MAX_DELTA, NAME_MAX_LENGTH
-from base.schemas import names
+from base.schemas import names, unless_given
 
 T = TypeVar("T")
 
@@ -50,10 +50,30 @@ KITCHEN_TICKET_NAME = gettext_noop("Kitchen ticket name")
 # asks, never by its id: a group, a product and a category by their names; an option by its name and its group, because
 # two groups may have an option with one name; a link by its group and what it hangs from.
 A_GROUP = names("modifier.group.get")
+# A group said by its name, when its id is not known: a group belongs to nothing, so the card reads it by that name
+# alone, as the write will find it, and shows the group the write acts on («Salsas picantes» when the person said
+# «salsa», hub#1218); words it cannot read (two groups fit, none does) it says as said, never off the card, so adding
+# an option or applying a group, which cannot check it, reads it too (hub#1245). Beside the id the write takes its
+# record by instead (the group's, or the link's), the card neither reads nor shows the name, which the write does not
+# use (``unless_given``, hub#1250); an option by its id is looked for in the group said, so that one is read. Beside
+# a link's id the card neither reads nor shows the group, the product or the category whose id comes with it: letting
+# the link go takes it by its id alone (hub#1278).
+A_GROUP_BY_NAME = names("modifier.group.get", by="group", as_said=True)
 AN_OPTION = names("modifier.option.get", name=("label",))
+# An option said by its name: two groups may have an option with one name, so the card reads it with its group when it
+# is told, as the write finds it, and says it as said when it cannot (hub#1245).
+AN_OPTION_BY_NAME = names(
+    "modifier.option.get", by="option", within=("group_id", "group"), name=("label",), as_said=True
+)
 A_LINK = names("modifier.link.get", name=("label",))
 A_PRODUCT = names("inventory.product.get")
 A_CATEGORY = names("modifier.category.get")
+# A product or a category said by its name, when a group is applied to it or let go from it: the card reads it by those
+# words, as the write will find it (a product by its SKU or its name, a category by its name), so it shows the one the
+# write acts on, and says it as said when it cannot read it (hub#1291). Beside the id the write takes its record by
+# instead (the product's or the category's or, letting a group go, the link's), it neither reads nor shows it.
+A_PRODUCT_BY_NAME = names("inventory.product.get", by="product", as_said=True)
+A_CATEGORY_BY_NAME = names("modifier.category.get", by="category", as_said=True)
 
 GroupSort = Literal[
     "name",
@@ -124,7 +144,9 @@ class Page(Schema, Generic[T]):
 class GroupRefIn(_Input):
     id: UUID | None = Field(None, title=GROUP, description="The group's id.", json_schema_extra=A_GROUP)
     group: Said | None = Field(
-        None, description="The group's name, when its id is not known (e.g. «Sauces»)."
+        None,
+        description="The group's name, when its id is not known (e.g. «Sauces»).",
+        json_schema_extra=unless_given(A_GROUP_BY_NAME, "id"),
     )
 
     @model_validator(mode="after")
@@ -139,7 +161,9 @@ class _OwningGroup(_Input):
 
     group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=A_GROUP)
     group: Said | None = Field(
-        None, description="The group's name, when its id is not known (e.g. «Extras»)."
+        None,
+        description="The group's name, when its id is not known (e.g. «Extras»).",
+        json_schema_extra=unless_given(A_GROUP_BY_NAME, "group_id"),
     )
 
     @model_validator(mode="after")
@@ -254,6 +278,7 @@ class OptionRefIn(_Input):
         None,
         title=OPTION,
         description="The option's name, when its id is not known (e.g. «No onion»).",
+        json_schema_extra=unless_given(AN_OPTION_BY_NAME, "id"),
     )
     group_id: UUID | None = Field(
         None,
@@ -263,6 +288,7 @@ class OptionRefIn(_Input):
     group: Said | None = Field(
         None,
         description="Its group's name, when two groups have an option with that name.",
+        json_schema_extra=unless_given(A_GROUP_BY_NAME, "group_id"),
     )
 
     @model_validator(mode="after")
@@ -337,11 +363,15 @@ class LinkListIn(PageIn):
 class _Target(_Input):
     product_id: UUID | None = Field(None, description="The product's id.", json_schema_extra=A_PRODUCT)
     product: Said | None = Field(
-        None, description="The product's SKU or name, when its id is not known."
+        None,
+        description="The product's SKU or name, when its id is not known.",
+        json_schema_extra=unless_given(A_PRODUCT_BY_NAME, "product_id"),
     )
     category_id: UUID | None = Field(None, description="The category's id.", json_schema_extra=A_CATEGORY)
     category: Said | None = Field(
-        None, description="The category's name, when its id is not known."
+        None,
+        description="The category's name, when its id is not known.",
+        json_schema_extra=unless_given(A_CATEGORY_BY_NAME, "category_id"),
     )
 
     def _targets(self) -> int:
@@ -353,7 +383,9 @@ class _Target(_Input):
 class LinkIn(_Target):
     group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=A_GROUP)
     group: Said | None = Field(
-        None, description="The group's name, when its id is not known (e.g. «Sauces»)."
+        None,
+        description="The group's name, when its id is not known (e.g. «Sauces»).",
+        json_schema_extra=unless_given(A_GROUP_BY_NAME, "group_id"),
     )
 
     @model_validator(mode="after")
@@ -366,10 +398,28 @@ class LinkIn(_Target):
 
 
 class LinkRefIn(_Target):
+    product_id: UUID | None = Field(
+        None, description="The product's id.", json_schema_extra=unless_given(A_PRODUCT, "id")
+    )
+    product: Said | None = Field(
+        None,
+        description="The product's SKU or name, when its id is not known.",
+        json_schema_extra=unless_given(A_PRODUCT_BY_NAME, "id", "product_id"),
+    )
+    category_id: UUID | None = Field(
+        None, description="The category's id.", json_schema_extra=unless_given(A_CATEGORY, "id")
+    )
+    category: Said | None = Field(
+        None,
+        description="The category's name, when its id is not known.",
+        json_schema_extra=unless_given(A_CATEGORY_BY_NAME, "id", "category_id"),
+    )
     id: UUID | None = Field(None, title=APPLIES_TO, description="The link's id.", json_schema_extra=A_LINK)
-    group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=A_GROUP)
+    group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=unless_given(A_GROUP, "id"))
     group: Said | None = Field(
-        None, description="The group's name, when its id is not known."
+        None,
+        description="The group's name, when its id is not known.",
+        json_schema_extra=unless_given(A_GROUP_BY_NAME, "id", "group_id"),
     )
 
     @model_validator(mode="after")

@@ -7,6 +7,7 @@ import { createShellI18n, provideSession, type SessionMe } from '@erplora/ui/she
 import { LIVE_CLIENT_KEY, type LiveClient, type OpName } from '@erplora/ui/sdk';
 import { fillHappyDomGaps } from '@erplora/ui/testing';
 import { mount } from '@vue/test-utils';
+import { expect } from 'vitest';
 import { type Component, createApp, ref } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
 
@@ -163,6 +164,23 @@ function answerPaths(harness: ReturnType<typeof createTestClient>, routes: Recor
 export async function settle(): Promise<void> {
   await flush();
   await flush();
+}
+
+/** A sheet of this app (`TaskSheet`, `ProjectSheet`), mounted with `open` as the test's prop. */
+interface MountedSheet {
+  wrapper: { setProps(props: { open: boolean }): Promise<void>; props(name: 'open'): unknown };
+  inDoc(testid: string): HTMLElement | null;
+}
+
+/** Something half-written in a sheet's `field`: «Close» asks «Discard changes?», and «Discard changes» closes it
+ *  (hub#1233, BASE-F05). */
+export async function expectSheetDiscardsOnClose(sheet: MountedSheet, testid: string, field: string, typed: string): Promise<void> {
+  const { answerUnsavedQuestion } = await import('../../../../base/frontend/__tests__/unsaved-form');
+  await ionValue(sheet.inDoc(field), typed, 'ionInput');
+  await click(sheet.inDoc(`${testid}-close`));
+  await answerUnsavedQuestion('discard');
+  await settle();
+  expect(sheet.wrapper.props('open')).toBe(false);
 }
 
 /** Fires an Ionic value event on an element, as Ionic does (`ionInput`/`ionChange` with the value). */

@@ -1,9 +1,10 @@
 {% extends "admin/base_site.html" %}
-{% load i18n static %}
+{% load i18n static admin_urls %}
 {% comment %}
-The confirmation page of an action of the Hub admin that asks for something first (control.admin.HubAdmin.confirmation):
-the chosen hubs, what the action does (block «intro»), its form and its button (block «submit»). Confirmed, the action
-asks each hub through its operation. «Move to cluster…» and «Restore from a copy…» extend it.
+The confirmation page of an action of the Hub admin that asks for something first (control.admin.AsksFirst.confirmation):
+the chosen rows (``rows``: each one's id, name and database), what the action does (block «intro»), its form and its
+button (block «submit»). Confirmed, the action asks each one through its operation. «Move to cluster…», «Restore from a
+copy…» and «Restore to a separate copy…» of Hubs, and «Recover into the business…» of Separate copies, extend it.
 {% endcomment %}
 {# The admin's forms sheet, as a hub's own page loads it: it lays out the aligned rows and wraps a long database name. #}
 {% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'admin/css/forms.css' %}">{% endblock extrastyle %}
@@ -11,7 +12,7 @@ asks each hub through its operation. «Move to cluster…» and «Restore from a
 <div class="breadcrumbs">
   <a href="{% url 'admin:index' %}">{% translate "Home" %}</a>
   &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
-  &rsaquo; <a href="{% url 'admin:control_hub_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
   &rsaquo; {{ title }}
 </div>
 {% endblock breadcrumbs %}
@@ -19,17 +20,17 @@ asks each hub through its operation. «Move to cluster…» and «Restore from a
 <p>{% block intro %}{% endblock intro %}</p>
 {# Read-only rows of an aligned fieldset, as a hub's own page shows its fields: a long database name wraps there. #}
 <fieldset class="module aligned">
-  {% for hub in hubs %}
+  {% for pk, name, database in rows %}
   <div class="form-row">
     <div class="flex-container">
-      <label>{{ hub.slug }}</label>
-      <div class="readonly">{{ hub.db_name }}</div>
+      <label>{{ name }}</label>
+      <div class="readonly">{{ database }}</div>
     </div>
   </div>
   {% endfor %}
 </fieldset>
 <form method="post">{% csrf_token %}
-  {% for hub in hubs %}<input type="hidden" name="{{ action_checkbox_name }}" value="{{ hub.pk }}">{% endfor %}
+  {% for pk, name, database in rows %}<input type="hidden" name="{{ action_checkbox_name }}" value="{{ pk }}">{% endfor %}
   <input type="hidden" name="action" value="{{ action }}">
   {{ form.non_field_errors }}
   {% for field in form %}
@@ -38,6 +39,6 @@ asks each hub through its operation. «Move to cluster…» and «Restore from a
   {% if field.help_text %}<div class="help">{{ field.help_text }}</div>{% endif %}
   {% endfor %}
   <input type="submit" name="apply" value="{% block submit %}{% endblock submit %}">
-  <a href="{% url 'admin:control_hub_changelist' %}" class="button cancel-link">{% translate "No, take me back" %}</a>
+  <a href="{% url opts|admin_urlname:'changelist' %}" class="button cancel-link">{% translate "No, take me back" %}</a>
 </form>
 {% endblock content %}

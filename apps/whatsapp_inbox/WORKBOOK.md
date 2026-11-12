@@ -286,12 +286,15 @@ Pasos:
 3. El número se compara como número: escrito con espacios, con el prefijo del país o con «00» delante
    es la misma persona en un negocio de España, y un número extranjero que conserva su cero (un fijo de
    Italia) también; los mismos dígitos con el prefijo de otro país son otra persona.
+4. Cuando el personal de ERPlora recupera desde la copia aparte una ficha que el negocio eliminó (vuelve la
+   misma ficha, CUSTOMER-F33), las conversaciones de su número que siguen sin ficha se unen otra vez a ella en
+   unos segundos, sin esperar a que la clienta vuelva a escribir.
 Entra: el número de la conversación y las fichas con ese número.
 Sale: la conversación sabe de qué ficha es. Solo rellena un vínculo vacío: el que puso una persona se
 respeta. Una ficha eliminada cuenta como vacío: su conversación queda sin ficha y otra ficha viva del
-mismo número la reclama.
+mismo número la reclama; si la ficha vuelve desde la copia aparte y ninguna otra la reclamó, es suya otra vez.
 Si falla: si dos fichas tienen el mismo número, no se une a ninguna y el mensaje sigue guardado.
-Implicados: Clientes
+Implicados: Clientes, CUSTOMER-F33
 
 ### WHATSAPP_INBOX-F05 Leer una conversación
 <!-- origen: fi:modules/whatsapp_inbox#query-whatsapp_inbox-conversations-get fi:modules/whatsapp_inbox#query-whatsapp_inbox-conversations-list fi:modules/whatsapp_inbox#query-whatsapp_inbox-messages-list old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f05 -->
@@ -1147,7 +1150,8 @@ Llevan identificadores, nunca un número, un nombre ni un texto de la conversaci
 - **Clientes** (obligatoria): `customer.customer.created` y `customer.customer.updated` unen las
   conversaciones sin ficha de ese número (F04); `customer.customer.merged` las pasa a la ficha que
   queda (F12); `customer.customer.deleted` las deja sin ficha y otra ficha viva del número las reclama;
-  `customer.customer.erased` las borra (F11). Lee las fichas por número y el consentimiento de
+  `customer.customer.restored` (la ficha eliminada que vuelve desde la copia aparte, CUSTOMER-F33) las une otra
+  vez, como una ficha nueva (F04); `customer.customer.erased` las borra (F11). Lee las fichas por número y el consentimiento de
   marketing por WhatsApp; crea fichas solo con `customer.customer.create`.
 
 ### Quién la usa
@@ -1631,7 +1635,7 @@ abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta de
   estado HTTP (422 para un cuerpo que no vale).
 - Al recibir la foto de estado con la clave `whatsapp` (puerta 4), se la pasa a
   `whatsapp_inbox.channel.sync` con la versión de la foto (hecho desde hub#127).
-- El relay del outbox entrega `customer.customer.created/updated/merged/deleted/erased` a
+- El relay del outbox entrega `customer.customer.created/updated/merged/deleted/erased/restored` a
   `apps.whatsapp_inbox.events.react` (`base/relay.py`); el worker ejecuta la tarea `resume_deliveries` de
   `apps.py` en cada negocio que sirve (`base.worker._serve_hub`), y el trabajo diferido de esta app corre en el
   hub de la operación que lo pidió (`base.outbound`).

@@ -10,7 +10,7 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import StringConstraints, ValidationInfo, field_validator
 
-from base.schemas import names
+from base.schemas import names, unless_given
 
 T = TypeVar("T")
 
@@ -21,7 +21,8 @@ LineText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1,
 # What the assistant's card calls the item a write acts on (its Spanish in this app's catalog), as its screen calls one,
 # and the read it names that item by (base/assistant.py ``REFERS``), run as whoever asks, never by its id: by its name,
 # as the list and the «Delete» dialog say it. Said by its name, the card reads it by that name too, so it shows the item
-# the write will find («Autumn trial» when the person said «autumn»), not only what was said.
+# the write will find («Autumn trial» when the person said «autumn»), not only what was said; beside the item's id,
+# which the write takes it by instead, the card neither reads nor shows the name (``unless_given``, hub#1272).
 T_ITEM = gettext_noop("Item")
 AN_ITEM = names("demo.item.detail")
 AN_ITEM_BY_NAME = names("demo.item.detail", by="called")
@@ -67,7 +68,7 @@ class ItemRefIn(Schema):
         validate_default=True,
         title=T_ITEM,
         description="The item's name, when its id is not known.",
-        json_schema_extra=AN_ITEM_BY_NAME,
+        json_schema_extra=unless_given(AN_ITEM_BY_NAME, "id"),
     )
 
     @field_validator("called")

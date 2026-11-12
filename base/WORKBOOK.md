@@ -130,8 +130,10 @@ el Inicio. Si desde ahí no hay ninguno que configurar, solo el aviso.
 
 ### Apps
 Desde «Apps» en el menú lateral. Tres pestañas abajo: «Mis apps» (las apps que el negocio tiene en marcha),
-«Añadir apps» (todas las apps de ERPlora) y «De pago» (las que se contratan aparte). Arriba, cuántas apps ha elegido
-el negocio frente al límite de su plan: «17 de 20 apps activadas» o, sin límite, «17 apps activadas · Sin límite».
+«Añadir apps» (todas las apps de ERPlora) y «De pago» (las que se contratan aparte). Arriba, cuántas apps tiene
+activadas el negocio (las de «Mis apps», también las que nacen activadas, como Impuestos, y las que llegaron con otra)
+y cuántas de las que deja su plan ha elegido: «27 apps activadas · 17 de 20 de tu plan» o, sin límite, «27 apps
+activadas · Sin límite». Un negocio recién dado de alta: «1 app activada · 0 de 20 de tu plan» (hub#1286).
 Cada pestaña, una tabla (o tarjetas) con su buscador, el embudo de filtros, el orden y «Columnas»: «App» (icono y
 nombre), «Categoría» y «Estado»; en «Añadir apps» y «De pago», además «Descripción», «Precio» y «Viene con».
 «Abrir» en la fila de una app que la persona puede abrir y, para quien administra, «Activar» o «Desactivar».
@@ -423,7 +425,7 @@ En la pantalla Archivos:
 | BASE-F110 | Abrir la web del negocio por su dominio propio | hecho |
 | BASE-F111 | Esperar a la base de datos cuando se corta un momento | hecho |
 | BASE-F112 | Guardar un archivo descargado dentro de la app | hecho |
-| BASE-F113 | Seguir avisando con la pantalla apagada (app de Android) | parcial — la app instalada aún no tiene la orden de quedarse a la escucha (hub#836) |
+| BASE-F113 | Seguir avisando con la pantalla apagada (app de Android) | hecho |
 | BASE-F114 | Devolver un negocio a un momento pasado desde el admin de Hubs | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
@@ -437,14 +439,16 @@ Pasos:
      luego los «Importante», cada grupo en el orden que fijan las apps, también en el móvil, donde solo caben
      dos filas. Los «Recomendado» salen plegada solo si no queda otra cosa. «Ver todo» enseña todos los pasos,
      también los hechos, en el orden que fijan las apps.
-  3. Los de la plataforma son «Tus apps» (encender al menos una app de negocio) y «Tu equipo» (añadir a
-     las personas que usarán el TPV); el resto los trae cada app encendida.
+  3. Los de la plataforma son «Tus apps» (encender al menos una app de negocio; Impuestos, con la que nace todo
+     negocio, no cuenta, porque con ella sola el TPV no tiene nada que vender) y «Tu equipo» (añadir a las personas
+     que usarán el TPV); el resto los trae cada app encendida.
   4. Además, por cada app obligatoria en el país del negocio que está desactivada, un paso «Importante» de la
      plataforma: «Activa VeriFactu» con «Es obligatoria para los negocios de España.» (VeriFactu, en España) o
      «Activa Impuestos» con el país del negocio (Impuestos, en todos). Solo lo ve quien administra el negocio, que
      es quien activa apps; «Configurar» lleva a **Apps**, a «Añadir apps». En cuanto la activa, el paso se va solo
      y llegan los de la propia app («Configura VeriFactu», «Tus impuestos»). Un negocio de otro país no ve el de
-     VeriFactu (hub#997).
+     VeriFactu (hub#997). Un negocio recién dado de alta no ve «Activa Impuestos», porque nace con ella activada
+     (BASE-F14); en España sí ve «Activa VeriFactu»: VeriFactu nunca se activa sola.
   5. Un paso que solo vale para otro país, o que la persona no puede ver, no sale. Un negocio sin país (una
      demo, el de ERPlora) cuenta como España, el mercado de ERPlora: ve los pasos de España y ninguno de otro país
      (hub#682). Un paso cuya comprobación falla tampoco sale: nunca se da por hecho ni por pendiente lo que no se
@@ -534,10 +538,9 @@ Pasos:
      escrito sin guardar y lo pide (en el alta y la edición de producto de Inventario y en las ventanas de alta y edición de Ventas, Mesas, Cocina, Clientes, Reservas, Citas, Personal, Servicios, Control horario, Carrito y pago, Caja, Menús, Suplementos, Pagos, Tarifas, Facturación, Impresión, Horarios, Tareas, Impuestos y la Bandeja de WhatsApp, en las de categoría y stock de Inventario y en «Nueva API key», en las anulaciones con motivo de Reservas online, Pagos, Impresión, Reservas, Servicios, VeriFactu y Cocina (cancelar una comanda), en el motivo de «Descartar» un evento caído de Sistema, en «Nueva carpeta» y «Renombrar» de Archivos, en los pasos de importar productos, en las fichas de Tarea y Proyecto y en el alta rápida de cliente del TPV) pregunta antes
      «¿Descartar los cambios?»: «Seguir editando», o atrás otra vez, la deja como estaba, y «Descartar
      cambios» la cierra (hub#1015, hub#1020, hub#1031, hub#1046). Esas mismas ventanas hacen la misma pregunta al
-     pulsar «Cancelar», la «×» o Escape y al tocar fuera, en el móvil y en el ordenador, y sin nada escrito se cierran
-     sin preguntar (hub#1023, hub#1156); todavía no las fichas de Tarea y Proyecto ni el alta rápida de cliente del TPV
-     (hub#1233), ni las de abrir el turno, entrada o salida, contar y cerrar de Caja (hub#1234), que solo preguntan con
-     el botón atrás. Sin nada abierto, en una ficha o un alta hace lo mismo que «Atrás»; en
+     pulsar «Cancelar», «Cerrar», la «×» o Escape y al tocar fuera, en el móvil y en el ordenador, y sin nada escrito
+     se cierran sin preguntar (hub#1023, hub#1156; las fichas de Tarea y Proyecto y el alta rápida de cliente del TPV,
+     hub#1233; las de abrir el turno, entrada o salida, contar y cerrar de Caja, hub#1234). Sin nada abierto, en una ficha o un alta hace lo mismo que «Atrás»; en
      la pantalla principal de una app vuelve al Inicio, también si se llegó a ella por un enlace; y en el
      Inicio deja la aplicación en segundo plano.
 Entra: las apps del menú de la persona (las mismas del botón «Mis apps» de la barra).
@@ -739,7 +742,10 @@ Pasos:
   2. Mientras llega la lista: «Cargando tus apps…». Después, una fila (o una tarjeta, a elegir) por cada app que
      el negocio tiene en marcha, con su icono y su nombre, su «Categoría» y su «Estado» («Activa»). Una app que el
      país del negocio exige lleva además, junto a su estado, «Obligatoria en España» (o el país del negocio): Impuestos
-     en todos, VeriFactu en España (hub#997).
+     en todos, VeriFactu en España (hub#997). Un negocio recién dado de alta ya tiene Impuestos aquí, «Activa»: nace
+     activada con los impuestos de su país y no cuenta para el tope de apps del plan: el contador de arriba dice
+     «1 app activada · 0 de 20 de tu plan». Las demás apps nacen desactivadas, también VeriFactu, que activa el
+     dueño.
   3. Busca en «Buscar en tus apps…» (nombre, descripción o categoría), filtra por categoría con el embudo,
      ordena o elige columnas.
   4. Cuando el negocio contrata una app en erplora.com o deja de tenerla, la lista se pone al día sola, sin
@@ -814,8 +820,9 @@ Pasos:
   2. En «Añadir apps», quien administra busca una app que el negocio no usa, «Desactivada», y pulsa «Activar». Si
      necesita otras apps que están desactivadas, antes le pregunta nombrándolas (BASE-F19).
   3. La app pasa a «Instalada» al momento y sale en «Mis apps» y, sin recargar, en el menú de todos los
-     dispositivos del negocio. El contador de arriba suma una: de «16 de 20 apps activadas» a «17 de 20 apps
-     activadas».
+     dispositivos del negocio. El contador de arriba suma las apps que se activan y una de las del plan: al activar
+     Tareas, de «26 apps activadas · 16 de 20 de tu plan» a «27 apps activadas · 17 de 20 de tu plan»; las que
+     llegan con ella suman a las activadas, no a las del plan.
 Entra: la app elegida, las que necesita y lo que el negocio tiene contratado en erplora.com.
 Sale: la app en marcha en este negocio, elegida por él: cuenta para el límite de apps de su plan.
 Si falla: con el límite del plan alcanzado no se activa nada y sale «El límite de apps de tu plan»: «Has llegado al
@@ -923,7 +930,8 @@ Pasos:
      que el país del negocio exige: al desactivar Ventas, Impuestos se queda activa y no se nombra (hub#997).
   3. Confirma con «Desactivar»: «Reservas está desactivada. También se ha desactivado: Mesas.». Las dos salen de
      «Mis apps» y, sin recargar, del menú de todos los dispositivos del negocio; sus pantallas dicen que la app no
-     está disponible (BASE-F26) y el contador de arriba resta una.
+     está disponible (BASE-F26) y el contador de arriba resta las que se desactivan y, de las del plan, la que
+     eligió el negocio.
   4. En «Añadir apps» siguen, con su icono, su nombre y «Desactivada»: desde ahí se vuelven a activar (BASE-F24).
   5. Desde el asistente («Desactiva la app de reservas») la app se nombra como en BASE-F24, la tarjeta de riesgo alto
      la pone con su nombre entero y, si ya estaba desactivada, el asistente lo dice y no cambia nada.
@@ -1278,7 +1286,7 @@ Actor: propietario, administrador
 Pantalla: Inicio · Resumen
 Pasos:
   1. Mientras el negocio no tiene nada de lo que trae una plantilla (un negocio nace con todas las apps
-     desactivadas), quien lo administra ve arriba «Empieza con un negocio como el tuyo» («Elige el que más se
+     desactivadas salvo Impuestos), quien lo administra ve arriba «Empieza con un negocio como el tuyo» («Elige el que más se
      parezca al tuyo: activamos sus apps y cargamos su catálogo de una vez. Después tendrás que poner tus
      propios datos.»): hasta cuatro plantillas, una por
      tipo de negocio y en su idioma si la hay (primero las de su país), con su descripción y «Usar esta»; «Ver todas las plantillas» abre «Datos y
@@ -1838,7 +1846,7 @@ Pantalla: Estamos preparando tu negocio
 Pasos:
   1. Abre la dirección de un negocio que erplora.com aún está preparando (recién creado).
   2. Sale «Estamos preparando tu negocio» — «Tarda unos segundos. Esta página se actualiza sola.».
-  3. Cuando está listo, la página se actualiza y entra como siempre.
+  3. Cuando está listo, la página se actualiza y entra como siempre, con Impuestos ya activa (BASE-F14).
 Entra: el estado del negocio que le pasa erplora.com.
 Sale: nada guardado.
 Si falla: una dirección que no es de ningún negocio no existe; un negocio dado de baja dice «Este hub ya no está
@@ -2604,7 +2612,10 @@ Pasos:
      «21:30»); un valor de una lista cerrada, con el nombre que le da su app («Mostrador», no el valor interno),
      también el de un dato que su app no llama como el campo que lo nombra («Rectificativa: resto de causas (R4)», no «R4»); y
      un registro, por su nombre cuando su app deja leerlo a quien pregunta («Persona: Eva Gil»): si no, la tarjeta
-     no lo pone, nunca por su código. Tampoco pone la clave con que su app evita hacer dos veces lo mismo si se
+     no lo pone, nunca por su código. Un registro que se dijo con palabras se busca como lo buscará la acción, también
+     dentro de otro (un plato dentro de su menú), y sale el que encuentra («Plato: Postres caseros» cuando se dijo
+     «postres»); si esas palabras valen para varios o para ninguno, salen tal como se dijeron; y si la acción no las usa
+     porque llega el identificador de su registro, ni se leen ni salen. Tampoco pone la clave con que su app evita hacer dos veces lo mismo si se
      reintenta (cobrar, enviar un WhatsApp, imprimir): nadie puede juzgarla, y la acción la recibe igual al
      ejecutarse. Todo sale en el idioma de la persona, también el nombre de cada dato
      cuando la tarjeta lo pone en su línea (BASE-F98): el mismo con que lo llama su app, nunca un nombre
@@ -3025,8 +3036,7 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
 
 ### BASE-F113 Seguir avisando con la pantalla apagada (app de Android)
 <!-- origen: old-hub:HUB_APP-F26 old-hub:hub#2307 (la parte del Hub de HUB_APP-F26 de ERPlora/app) gh:hub#836 -->
-Estado: parcial — la parte del Hub está hecha, pero la app instalada aún no tiene la orden de quedarse a la escucha: la
-1.1.34 la quitó (ERPlora/app#25) y vuelve con la segunda parte de hub#836
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna; en Android, el aviso fijo «ERPlora está a la escucha»
 Pasos:
@@ -3042,7 +3052,7 @@ Pasos:
 Entra: los avisos que oye la persona y lo que dice Android de los avisos.
 Sale: la orden a la app de quedarse a la escucha o de dejarlo. En el Hub no se guarda nada.
 Si falla: con los avisos negados («Ahora no» a nuestra pregunta, o negados en Android), sin nada que avisar o sin saber
-qué dice Android, la app no se queda despierta. Una app sin esta orden (la 1.1.34) la rechaza: el Hub lo anota en la
+qué dice Android, la app no se queda despierta. Una app sin esta orden (la 1.1.34 y la 1.1.35) la rechaza: el Hub lo anota en la
 consola, no se la vuelve a pedir en esa página y la persona no ve ningún error; los avisos llegan con la app en
 pantalla, como antes. Si Android no deja empezar, igual, y se vuelve a pedir en la siguiente entrada. Mientras el Hub
 no sabe aún si hay algo que avisar, no pide nada a la app: recargar la página no la para ni la vuelve a encender.
@@ -3051,10 +3061,14 @@ Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, A
 
 ### BASE-F114 Devolver un negocio a un momento pasado desde el admin de Hubs
 <!-- origen: nuevo (aws#77; PLAN-DB §13 «Restaurar un hub»: los planes de pago prometen volver a cualquier momento de los últimos 14 días) gh:hub#1198 -->
-Estado: hecho (la acción y la restauración; crear y borrar el clúster temporal es el procedimiento «Devolver un negocio
-a un momento» de ERPlora/aws)
+Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte, y recuperar desde la copia aparte los
+clientes que se perdieron, los eliminados tal como eran, y los productos; crear y borrar el clúster temporal es el
+procedimiento «Devolver un negocio a un momento» de ERPlora/aws; recuperar servicios y citas, hub#1283 y hub#1284; los
+grupos, etiquetas y campos propios de un cliente recuperado, hub#1285; la imagen y las categorías de un producto
+recuperado, hub#1319 y hub#1320)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
-Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acción «Restaurar desde una copia…»
+Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
+copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
 Pasos:
   1. Un negocio pide volver a cómo estaban sus datos en un momento de los últimos días. El personal crea un clúster
      temporal restaurado a ese momento y lo da de alta en Clústeres, cerrado a hubs nuevos.
@@ -3068,20 +3082,74 @@ Pasos:
   5. Unos minutos después el sistema ha copiado la base del negocio desde el clúster temporal, ha guardado aparte la
      que tenía y ha puesto la copia en su sitio. El negocio vuelve a abrirse con sus datos de ese momento y la flecha desaparece de la
      lista.
-Entra: los negocios elegidos, el clúster temporal con su copia y el momento.
+  En una copia aparte (hub#1213), para un negocio que factura con VeriFactu en producción o cuando solo se quiere
+  recuperar lo perdido sin tocar lo demás:
+  6. En Hubs elige el negocio y la acción «Restaurar en una copia aparte…». La misma página pide el clúster temporal y
+     el momento, y explica que el negocio sigue abierto sin cambiar nada y que la copia no es un negocio: nadie la abre y
+     nada de ella se envía a Hacienda. Pulsa **Hacer las copias**.
+  7. Sale «1 hub tendrá una copia aparte tal como estaba el 2026-11-09 14:30 UTC, hecha desde <clúster>: el negocio
+     sigue abierto tal como está. Copias aparte la lista y dice si no se pudo hacer.». El negocio no se cierra ni un
+     segundo.
+  8. En Copias aparte la ve «Haciéndose» y, unos minutos después, «Hecha», con su momento y hasta cuándo se guarda
+     (7 días); su ficha dice además su base de datos, su clúster, quién la pidió y cuándo. Si no se pudo hacer, dice «No
+     se pudo hacer» y por qué en «último error».
+  Recuperar en el negocio lo que la copia aparte tiene y al negocio le falta (hub#1257):
+  9. En Copias aparte elige la copia hecha y la acción «Recuperar en el negocio…». La página explica que lo que el
+     negocio eliminó y aún guarda vuelve tal como era, con su historial, y que lo que ya no tiene se crea de nuevo como lo
+     crea su propia pantalla, sin copiar nada; que lo que el negocio tiene, o ha vuelto a crear, se queda como está; que los registros para Hacienda no se recuperan nunca y que el negocio sigue abierto.
+     Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes** y **Productos**). Pulsa
+     **Recuperar**.
+  10. Sale «1 copia aparte devolverá Clientes a su negocio en unos minutos: Recuperaciones dice cómo fue.». En
+      Recuperaciones la ve «Pedida» con la copia, qué se pidió y cuándo.
+  11. Unos minutos después dice «Hecha» y qué volvió: «Clientes: 1 restaurado, 2 creados» o «Clientes: 2 creados, 1 sin
+      crear». Su ficha dice además cuáles no volvieron y por qué (por su identificador en la copia, sin datos personales).
+      Un cliente que el negocio eliminó y aún guarda vuelve LA MISMA ficha, con sus compras y lo gastado, sus
+      consentimientos, notas y actividad, sus grupos, etiquetas y campos propios y sus pedidos enlazados (CUSTOMER-F33).
+      Uno que el negocio ya no tiene vuelve como ficha nueva, creada como la crea la pantalla de Clientes, con su nombre,
+      contacto, NIF, dirección, fechas, origen, etapa, canal y notas; sin sus grupos, etiquetas ni campos propios
+      (hub#1285). Nunca vuelve una ficha cuyos datos personales se borraron (RGPD) ni una que se unió a otra, ni se repite
+      una que el negocio ya volvió a crear (el mismo nombre, teléfono y email). Con Productos, «Productos: 3 creados»: cada
+      producto vuelve como uno nuevo, creado como lo crea la pantalla de Productos, con su nombre, SKU, EAN-13,
+      descripción, tipo, precio, coste, unidades, umbral, control de stock y categoría fiscal, activo o desactivado como
+      estaba y en las categorías que el negocio sigue teniendo; sin stock, que se cuenta (INVENTORY-F14), porque el de la
+      copia es de otro día; sin su imagen (hub#1319) y sin las categorías que el negocio ya no tiene (hub#1320). Uno que se
+      eliminó en el negocio también vuelve como producto nuevo; sus movimientos siguen en el eliminado (hub#1321). No se
+      repite uno que el negocio ya volvió a dar de alta (otro vivo con su SKU o su EAN-13). Pedirlo otra vez no crea nada
+      dos veces.
+Entra: los negocios elegidos, el clúster temporal con su copia y el momento; para recuperar, la copia aparte hecha y qué
+recuperar.
 Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso
-`control.hub.restore_requested` con quién lo pidió. Los demás negocios no notan nada.
+`control.hub.restore_requested` con quién lo pidió. Los demás negocios no notan nada. En una copia aparte: el negocio
+tal como estaba, sin tocarlo; una base aparte en su clúster con los datos de ese momento, cerrada a la aplicación y
+guardada 7 días; el aviso `control.hub.restore_aside_requested` con quién lo pidió. Al recuperar: en el negocio, cada ficha
+eliminada que aún guardaba, viva otra vez con su aviso de ficha recuperada (`customer.customer.restored`), una ficha
+nueva por cada cliente que ya no tenía, con su aviso de ficha creada (`customer.customer.created`), y un producto nuevo
+por cada producto que le faltaba, con su aviso de producto creado (`inventory.product.created`), y nada más; la
+copia, sin tocar; el aviso `control.copy.recovery_requested` con quién lo pidió.
 Si falla: lo que la restauración no admite lo dice el aviso, negocio a negocio, y ese negocio no se toca: uno que no está
 listo o no tiene base propia, una demo, uno que se está trasladando o restaurando, un clúster abierto a hubs nuevos o con
 negocios vivos, el propio clúster del negocio, una copia que no está en ese clúster o que es demasiado grande, y un
 momento que aún no ha llegado. Sin clúster o sin momento, la página los vuelve a pedir. Si el negocio tiene registros
 VeriFactu de producción hechos, enviados o cambiados después de ese momento, no se restaura y no cambia nada, porque
 volvería a usar números que la AEAT ya tiene: su ficha lo dice en «último error» («restore_fiscal_records: …»); para ese
-caso, hub#1213. Cualquier otro fallo deshace la restauración sola: el negocio sigue con su base de siempre y su ficha dice
-por qué. Con la plataforma congelada para una subida de la base de datos, la restauración espera, con el negocio en
+caso está «Restaurar en una copia aparte…», que no los compara porque no toca el negocio. Cualquier otro fallo deshace la
+restauración sola: el negocio sigue con su base de siempre y su ficha dice por qué. Una copia aparte admite lo mismo que
+la restauración y lo que no admite lo dice el aviso igual; si falla al hacerla, no queda nada de ella y Copias aparte dice
+por qué («restore_aside_<paso>: …»); el negocio no se entera. Recuperar solo se puede desde una copia hecha y una sola
+vez a la vez por copia; si no, el aviso lo dice («Solo una copia aparte ya hecha devuelve algo.»), y sin nada marcado la
+página lo vuelve a pedir. Lo que no se puede traer de una app lo dice su resultado y lo demás sigue: la app está apagada en
+el negocio («Clientes: nada (app_inactive: …)»), o la copia no la tenía, le falta la migración que su lectura necesita o
+tiene una que este código no conoce (`recover_not_in_copy`, `recover_copy_behind`, `recover_copy_ahead`). Una ficha que la
+operación de crear no acepta hoy (un teléfono que ya no vale), o un producto sin categoría fiscal o con una que Impuestos
+ya no tiene activa, se cuenta «sin crear» con su motivo, y también una ficha eliminada que entretanto se unió a otra o se
+borró («customer.customer_unavailable: …»). Si la copia ya no está,
+la recuperación dice «No se pudo hacer» y por qué («recover_copy_unreadable: …»). Mientras el negocio se traslada o se
+restaura, la recuperación espera sin hacer nada. Con la plataforma congelada para una subida de la base de datos, la restauración espera, con el negocio en
 mantenimiento, hasta que se descongela. Con registros solo del entorno de pruebas, después se recupera la cadena
-(VERIFACTU-F28). El personal de soporte ve la lista, pero no la acción.
-Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado); hub#1198, hub#1213, aws#77
+(VERIFACTU-F28). El personal de soporte ve la lista, Copias aparte y Recuperaciones, pero no las acciones.
+Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado), CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12,
+CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283,
+hub#1284, hub#1285, hub#1306, hub#1319, hub#1320, hub#1321, aws#77
 
 ## Para quien lo mantiene
 
@@ -3176,7 +3244,7 @@ Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado
   menú, `home.shell_icon`, nunca el de la tienda, que `HubIcon` rechazaría) por cada una obligatoria en el país del negocio
   (`country_or_market`: sin país, España) que no está encendida, solo a quien tiene `base.administer_hub`, dentro de
   `base.setup.status`, que ya se re-ejecuta al encender o apagar una app (`APP_EVENTS`). Mientras se crean sus tablas
-  (`creating`) el paso sigue: todavía no está encendida. `platform_turns_on` lo leerá el alta (hub#997, parte 3). Tests:
+  (`creating`) el paso sigue: todavía no está encendida. Tests:
   `test_home.py` y `test_queries_home.py` (con apps de paja), `apps/verifactu/tests/test_mandatory_in_spain.py` (dos
   hubs reales) y `apps/tax/tests/test_apps.py`.
   Una vez encendida no se apaga en ese país (hub#997, parte 2; BASE-F14, F16, F23 y F25): `activation.mandatory_on`
@@ -3191,6 +3259,17 @@ Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado
   como el servidor. Tests: `test_activation.py` (las reglas), `test_app_activation.py` (409, cascada y dos hubs
   reales), `test_queries_apps.py`, `apps/verifactu/tests/test_app_disable.py`, `lib/apps.test.ts`,
   `pages/AppsPage.test.ts` y la e2e `tests/e2e/base-app-activation.spec.ts`.
+  Al alta nacen encendidas (hub#997, parte 3; BASE-F63, F14, F01): `activation.born_on(país)` da las obligatorias del
+  país que dicen `platform_turns_on`, y `activation.born_apps(país)` les suma lo que necesitan. `provision._prepare` hace
+  sus tablas en `migrating` (junto a las del vertical) y, en `seeding`, tras la semilla y antes de la foto del SaaS
+  (cuyos bloques son de las apps encendidas), `services.turn_on_born_apps` escribe todas las filas del negocio: esas
+  `on` y sin elegir (no gastan `max_apps`), las demás `off`, y olvida lo que la caché guardaba de sus apps. Si la semilla
+  ya escribió filas (los hubs locales `a` y `b`, todo encendido) o la preparación se repite, no toca nada. Una demo
+  nace igual (sin país: España). Los hubs que ya existían no cambian. «Tus apps» (`queries._platform_steps`) no cuenta
+  las de `born_apps`: con ellas solas el TPV no vende nada. Tests: `test_activation.py`, `test_queries_home.py` (con
+  apps de paja), `base/tenancy/tests/test_provision.py` (dos BD reales: España, Portugal, sin país, una demo, dos
+  negocios a la vez y una app de paja obligatoria solo en Portugal), `apps/tax/tests/test_apps.py` y la e2e
+  `tests/e2e/base-sign-up-taxes-on.spec.ts`.
 - Un panel `chart` cuyas etiquetas son días (`YYYY-MM-DD`: día civil de negocio, sin zona) los nombra con
   `Intl` en UTC, nunca con `new Date(<día>)` en la zona del navegador (`isoDay` y `formatDay` de
   `base/frontend/lib/home.ts`): una semana, por su día de la semana corto (`vie`); una serie más larga, por su
@@ -3371,7 +3450,9 @@ Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado
   «Mejorar plan» (antes «Contratar en erplora.com») solo con `base.administer_hub` y `useSurface().isWeb`. e2e:
   `tests/e2e/base-apps.spec.ts` y `tests/e2e/base-app-activation.spec.ts`.
 - Activación por negocio y tope del plan (hub#256, PLAN-HUB §9): `base.AppActivation` (por `host`; desde la ronda
-  2026-10-27 un negocio nace con todo apagado, sin filas, también una demo; los hubs de antes conservan todo encendido
+  2026-10-27 un negocio nace con todo apagado, también una demo, salvo las obligatorias de su país que la plataforma
+  enciende sola, con sus filas escritas al nacer (Impuestos, hub#997); un hub sin filas lo tiene todo apagado; los hubs
+  de antes conservan todo encendido
   con sus raíces elegidas, migración `base/0017`, y los locales `a`/`b` salen así de `seed_local_hubs`; el hub de
   ERPlora y el ámbito del worker lo tienen todo encendido siempre, `activation.is_platform`; `base/activation.py`).
   `base.blueprint.import` enciende antes de cargar las apps que lista el manifiesto (sus raíces, elegidas, por
@@ -3983,6 +4064,39 @@ Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado
   el gancho `fiscal_record_states` de cada app que presenta a Hacienda) queda en `Hub.last_error`, que la ficha enseña
   tal cual. Tests: `control/tests/test_admin.py::TestRestoreFromACopy` y, de punta a punta con el worker y dos BD
   reales, `base/tenancy/tests/test_restore.py::TestAskedInTheHubAdmin`.
+- **«Restaurar en una copia aparte…»** (BASE-F114, hub#1213, capa 1) es `control.admin.HubAdmin.restore_aside`: el mismo
+  formulario y la misma página (`HubAdmin.from_a_copy`), con `control.hub.restore_aside`, que comprueba lo mismo que
+  `control.hub.restore` (`control.services._restorable`) y escribe una fila `control.RestoredCopy` con su nombre
+  `<control>_copy_<hex de la fila>` (`base.tenancy.names.copy_db_name`). El worker la hace en el hilo de los traslados
+  (`base.tenancy.restore.run_aside_due`), una por pasada y con el arriendo de la propia fila, nunca el del hub: clona sin
+  conceder nada (`ops.clone_database(aside=True)`), vacía, `pg_restore`, comprueba la identidad, la cierra otra vez y
+  suelta el clúster temporal. El envío a Hacienda está apagado por construcción: ninguna fila de `base_hub` la nombra
+  (el worker sirve solo las del registro), ningún rol de la app conecta y su nombre es de copia que queda atrás
+  (`names.is_left_behind`), así que `connections.register_hub_alias` se niega a darle alias. Se borra con su fila a los
+  `move.MOVED_COPY_DAYS` (`restore.drop_old_aside_copies`); mientras se hace cuenta en `control.freeze.get`. Su esquema
+  es el del momento. Tests: `base/tenancy/tests/test_restore_aside.py` (dos BD reales, la guarda de red y
+  `TestSendingToTheTaxAuthorityIsOffInTheCopy`, que nunca puede caer), `control/tests/test_services.py::TestRestoreAside`
+  y `control/tests/test_admin.py::TestRestoreToASeparateCopy`.
+- **«Recuperar en el negocio…»** (BASE-F114, hub#1257, capa 2a) es `control.admin.RestoredCopyAdmin.recover_into_the_business`:
+  su página (`RecoverForm`, la misma `action_confirmation.html` de las acciones de Hubs, con `AsksFirst`) y, por cada
+  copia, `control.copy.recover`, que escribe una fila `control.CopyRecovery` con las apps pedidas y el idioma del personal.
+  La hace el worker en el hilo de los traslados (`base.tenancy.recovery.run_due`), una por pasada, con el arriendo de la
+  propia fila (`still_recovering` lo renueva antes de cada ficha). La web no puede leer la copia: no tiene el rol del
+  migrador y la copia está cerrada a los de la app. El worker la lee con la conexión directa del migrador
+  (`ops.connect_ops`) con `default_transaction_read_only`, nunca con un alias de hub (`names.is_left_behind`): ni tareas ni
+  cola de VeriFactu corren en ella. Antes de leer lo de cada app mira su `django_migrations` en la copia. Qué devuelve lo
+  dice cada app con el gancho `recoverable_from_copy` de su `LiveAppConfig` (una lista de `base.recovery.Recoverable`:
+  `label`, `reads_since`, `read(conn)` por SQL sobre los nombres del modelo en su `queries.py`, `missing(records)` en su
+  `queries.py` y `create`, la operación que crea cada uno; y, los dos o ninguno, `deleted(records)` en su `queries.py` y
+  `restore`, la operación que devuelve lo que el negocio guarda eliminado, por su `id`, hub#1306); `base/` no nombra
+  ninguna. Primero vuelve lo eliminado y después se crea lo que falta, con las operaciones de la app, en el contexto del
+  sistema y en el idioma del personal, dentro de `use_hub`; un `InvalidPayload` o un `NotFound` es de ese registro y los
+  demás siguen, cualquier otro rechazo para la app. Hoy solo responde Clientes (`cards_in_copy`,
+  `cards_deleted_in_business` con `customer.customer.restore`, `cards_not_in_business`, con `has_live_twin`, la regla de
+  la importación). Ninguna app cuyos
+  registros llegan a Hacienda responde (contrato en `test_recovery.py`). Tests: `base/tenancy/tests/test_recovery.py`
+  (dos BD reales: la copia y el negocio), `apps/customer/tests/test_recovery.py`, `control/tests/test_services.py::TestRecover`,
+  `control/tests/test_admin.py::TestRecoverIntoTheBusiness` y `tests/e2e/base-recover-from-copy.spec.ts`.
 
 ## Lo que queda fuera
 

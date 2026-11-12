@@ -16,6 +16,7 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { bare, findingsByApp, hubFrontends, scriptBlocks } from './__tests__/frontend-sources';
+import { NO_CLOCK } from '../../vitest.load';
 
 const GROUP_THE_AMOUNT =
   'write the amount with formatMoney of @erplora/ui/components (the platform\'s one way to write an amount), or ' +
@@ -218,7 +219,6 @@ describe('guardrail: every amount of the Hub groups its thousands (base-money-th
 
   it('no app, nor base or `ui`, has a currency format that does not group always', () => {
     expect(ungroupedByApp(), GROUP_THE_AMOUNT).toEqual({});
-    // It reads every frontend file of the Hub (some 1,600): the limit of the guardrails that read a whole tree (60 s,
-    // tsconfig.test.ts).
-  }, 60_000);
+    // It reads every frontend file of the Hub (some 1,600), synchronously: as long as the machine makes it (hub#1200).
+  }, NO_CLOCK);
 });

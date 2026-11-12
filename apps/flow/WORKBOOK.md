@@ -590,11 +590,17 @@ Pasos:
 Entra: las ejecuciones de esa automatización de los últimos 90 días, y todas las que siguen esperando.
 Sale: nada. El historial guarda cada ejecución terminada **90 días** y después la olvida; una que
 espera o está en marcha no se borra nunca. Lo que leyeron sus pasos (la ficha de un cliente) no se
-guarda al terminar: solo los ids y los importes del aviso que la arrancó; una parada por un error lo
-guarda 7 días, para poder reanudarla (FLOW-F24).
+guarda al terminar: solo los ids y los importes del aviso que la arrancó y los ids de lo que leyeron, nunca sus
+datos; una parada por un error lo guarda 7 días, para poder reanudarla (FLOW-F24). Si se borran los datos
+personales de un cliente (CUSTOMER-F16), toda ejecución que nombra su ficha (lo que la arrancó o lo que leyeron
+sus pasos, también una lanzada a mano o por horario o cuyo asistente leyó la ficha), también una ya terminada,
+olvida en ese momento los textos libres de su historial que pueden llevar su nombre: la nota de
+una respuesta, lo que contestó el asistente o la app que hizo la acción (también de cada campo, y su texto
+técnico) y el título de la pregunta en un «no» o en un silencio. Cada uno dice «[borrado con los datos personales del cliente]»; lo que pasó
+se queda (cómo terminó, quién contestó y qué). Las de los demás clientes no cambian.
 Si falla: si no se puede leer el historial, el mensaje en rojo con **Reintentar**; sin ejecuciones,
 «Todavía no se ha ejecutado.».
-Implicados: FLOW-F13, FLOW-F15, FLOW-F21, FLOW-F22, FLOW-F23
+Implicados: FLOW-F13, FLOW-F15, FLOW-F21, FLOW-F22, FLOW-F23, CUSTOMER-F16
 
 ### FLOW-F17 Pedirle al asistente una automatización
 <!-- origen: old:flows/workflow/bandejas-y-asistente.md#flows-f26 -->
@@ -724,9 +730,10 @@ Si falla: si la automatización está en pausa al despertar, la ejecución se ca
 automatización se puso en pausa mientras esperaba.»); si está borrada, también («Cancelada: la
 automatización se borró.»). Si mientras espera se borran los datos personales del cliente del que guarda algo
 (CUSTOMER-F16: lo que la arrancó o lo que leyeron sus pasos nombra su ficha), se cancela en ese momento, sin
-esperar a despertar, y olvida lo que leyeron sus pasos: «Cancelada: se borraron los datos personales del
-cliente.». No le manda nada ni le crea nada; lo mismo una que llama a otro sistema o que pregunta a alguien
-(su pregunta se cierra y se queda sin sus textos). Las ejecuciones de los demás clientes siguen.
+esperar a despertar, y olvida lo que leyeron sus pasos y los textos libres de su historial (FLOW-F16):
+«Cancelada: se borraron los datos personales del cliente.». No le manda nada ni le crea nada; lo mismo una que
+llama a otro sistema o que pregunta a alguien (su pregunta se cierra y se queda sin sus textos). Las ejecuciones
+de los demás clientes siguen.
 Implicados: FLOW-F03, FLOW-F07, FLOW-F11, FLOW-F16, CUSTOMER-F16
 
 ### FLOW-F24 Reanudar una ejecución desde el paso que falló
@@ -758,7 +765,7 @@ una ya reanudada, «Solo se puede reanudar una ejecución que se paró por un er
 veces. Ninguna se reanuda sola. Si se borran los datos personales del cliente del que guarda algo (CUSTOMER-F16),
 la que aún se podía reanudar se cancela («Cancelada: se borraron los datos personales del cliente.»), olvida lo
 que leyeron sus pasos y ya no se reanuda; en sus pasos sigue el que había fallado. Una que ya no se podía reanudar
-solo olvida lo que leyeron sus pasos.
+solo olvida lo que leyeron sus pasos. Las dos olvidan los textos libres de su historial (FLOW-F16).
 Implicados: FLOW-F12, FLOW-F15, FLOW-F16, CUSTOMER-F16
 
 ### FLOW-F25 «Solo si…» y «Si falla, sigue» en cada paso
@@ -1284,7 +1291,7 @@ preguntas; una pregunta hecha a otro rol) no sale en la tarjeta.
 | Deja un borrador del asistente | gestionar | F17 | `flow.draft.propose` |
 | Descarta un borrador | gestionar | F19 | `flow.draft.dismiss` |
 | Arranca las automatizaciones de un aviso | solo la plataforma | F21 | `flow.run.react` |
-| Al borrar los datos de un cliente, cancela las ejecuciones que aún podían seguir con lo suyo y les hace olvidar lo que leyeron (CUSTOMER-F16) | solo la plataforma | F23, F24 | `flow.customer.erase` |
+| Al borrar los datos de un cliente, cancela las ejecuciones que aún podían seguir con lo suyo y hace olvidar lo que leyeron y los textos libres de su historial a toda ejecución que nombra su ficha, también a las terminadas (CUSTOMER-F16) | solo la plataforma | F16, F23, F24 | `flow.customer.erase` |
 | Arranca las de horario o fecha que toca | solo la plataforma | F22 | `flow.schedule.fire_due` |
 | Sigue las ejecuciones cuya espera terminó | solo la plataforma | F23 | `flow.run.resume_due` |
 | Reanuda una ejecución parada por un error en el paso que falló | gestionar | F24 | `flow.run.retry` |
@@ -1344,7 +1351,10 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Al borrado de los datos de un cliente** (`customer.customer.erased`, CUSTOMER-F16): antes de arrancar lo que
   espera ese aviso, y en la misma entrega, cancela las ejecuciones que esperan, llaman, preguntan o se pueden
   reanudar y cuyo dato guardado nombra esa ficha (`flow.customer.erase`, FLOW-F23 y F24); lo que leyeron sus pasos y
-  los textos de sus preguntas se vacían. Repetir el aviso no cambia nada.
+  los textos de sus preguntas se vacían. En la misma pasada, toda ejecución que nombra la ficha, también una ya
+  terminada, olvida los textos libres de su historial (FLOW-F16). La busca por el id de la ficha (en lo que la
+  arrancó, en lo que leyeron sus pasos o entre los ids de lo que leyeron y ya olvidó), nunca por un nombre o un
+  teléfono. Repetir el aviso no cambia nada.
 - De la plataforma: la zona horaria del negocio (los horarios) y los avisos del outbox (el último de un
   tipo, para Probar y los ejemplos).
 
@@ -1370,8 +1380,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Modelos**: `Flow` (nombre, encendida, disparador aplanado —`trigger_kind`, `trigger_event`,
   `trigger_filter`, `schedule`, `run_at`, `next_fire_at`—, `steps`, `grants`, `version`, `language`,
   `search_text`, borrado lógico `deleted_at`), `FlowRun` (versión y copia de los pasos con que empezó,
-  `trigger_key` único por automatización, `input`, `status`, `step_index`, `log`, `outputs`, error,
-  `resume_at`, `chain`), `Draft`, `Secret` (nombre único y valor sellado, FLOW-F26) y `Question` (FLOW-F28:
+  `trigger_key` único por automatización, `input`, `status`, `step_index`, `log`, `outputs`, `read_ids`,
+  error, `resume_at`, `chain`), `Draft`, `Secret` (nombre único y valor sellado, FLOW-F26) y `Question` (FLOW-F28:
   ejecución y paso únicos, texto ya rellenado, `role`, `on_no`, `on_timeout`, `expires_at`, `status`, quién
   y cuándo contestó y la nota). UUIDv7, sin `hub_id`. `Flow.recipe` (`<app>/<id>`, vacío en las del negocio) y
   `Flow.recipe_digest` dicen de qué receta y de qué versión salió (FLOW-F33); una restricción única parcial
@@ -1569,7 +1579,11 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   puede seguir: esperando, o parada por un error durante `RESUME_DAYS` (7) para reanudarla (FLOW-F24);
   al terminar bien, por una condición o cancelada se vacía, y la poda de cada hora vacía la de un fallo de
   más de 7 días, así que un historial terminado no guarda copias de datos de otras apps. Lo que trajo el
-  aviso (`input`) sí se queda con la ejecución.
+  aviso (`input`) sí se queda con la ejecución. Antes de olvidarlo (al terminar, al acabar cada turno del
+  asistente, cuya conversación guarda lo que leyeron sus herramientas, y en la poda) se guardan en `read_ids` los
+  ids que había en él, sin sus datos: así `flow.customer.erase` encuentra también una ejecución terminada que
+  leyó la ficha sin que la arrancara un aviso suyo (hub#1240). Una que terminó antes de que existiera
+  `read_ids` no los guardó.
 - **Reanudar** (`flow.run.retry`, FLOW-F24): bloquea la automatización y después la ejecución (el mismo
   orden que toda escritura) y solo sigue si está `failed` en un paso (su última entrada del log es
   `failed` en `step_index`), guarda lo que dejó cada paso anterior que deja algo, tiene menos de 7 días y la
@@ -1856,7 +1870,3 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   se enciende desde la galería de Automatizaciones; la pantalla de cada app puede llamar a `flow.recipe.enable`
   cuando la tenga.
 - **Límites en un permiso** («solo con este cliente»): se concede la acción entera.
-- **El historial de las ejecuciones ya terminadas tras borrar los datos de un cliente** (hub#1227): las que aún
-  podían seguir se cancelan y olvidan lo que leyeron (FLOW-F23, F24), pero una terminada guarda 90 días los textos
-  libres que pueden llevar su nombre (el motivo de un «no» con el título de la pregunta, la nota de una respuesta,
-  lo que contestó el asistente) y lo que traía el aviso que la arrancó, que en las otras apps está por revisar.

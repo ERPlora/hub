@@ -86,21 +86,24 @@ def clone_database(
     roles: bootstrap.Names | None = None,
     waits: Sequence[float] = TEMPLATE_BUSY_WAITS,
     sleep: Callable[[float], object] = time.sleep,
+    aside: bool = False,
 ) -> bool:
     """Make ``name`` a clone of ``template`` on ``cluster`` (or the settings' own server) and private to the
-    environment's roles; whether this call made it.
+    environment's roles; whether this call made it. ``aside``: ``name`` is a separate copy of a hub
+    (``<control>_copy_<hex>``, hub#1213), granted to none of them: closed to the app from the start.
 
     ``False`` when it was there already (its privileges are set again all the same). ``DatabaseOpsError`` when the
     template stayed in use through ``waits`` or the server refused it (a missing template, no ``CREATEDB``).
     """
     control = tenancy_connections.control_name()
-    target = sql.Identifier(names.validate_hub(name, control=control))
+    checked = names.validate_copy_aside(name, control=control) if aside else names.validate_hub(name, control=control)
+    target = sql.Identifier(checked)
     source = names.identifier(template, control=control)
     roles = environment_roles(control) if roles is None else roles
     with connect_ops(cluster=cluster) as conn:
         statement = sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(target, source)
         made = _create(conn, statement, name, template, waits, sleep)
-        _make_private(conn, target, name, roles)
+        _make_private(conn, target, name, None if aside else roles)
     return made
 
 
@@ -127,8 +130,9 @@ def _create(conn, statement, name: str, template: str, waits: Sequence[float], s
     raise AssertionError("unreachable: the last attempt returns or raises")
 
 
-def _make_private(conn, target: sql.Identifier, name: str, roles: bootstrap.Names) -> None:
-    wanted = [roles.hub_app, roles.hub_admin]
+def _make_private(conn, target: sql.Identifier, name: str, roles: bootstrap.Names | None) -> None:
+    """``name`` taken from PUBLIC and given to ``roles``' app roles the server has (none: to nobody)."""
+    wanted = [roles.hub_app, roles.hub_admin] if roles is not None else []
     try:
         conn.execute(sql.SQL("REVOKE ALL ON DATABASE {} FROM PUBLIC").format(target))
         present = {row[0] for row in conn.execute("SELECT rolname FROM pg_roles WHERE rolname = ANY(%s)", [wanted])}

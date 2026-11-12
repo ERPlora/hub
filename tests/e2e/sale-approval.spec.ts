@@ -28,6 +28,7 @@ import { cleanInventory, createProduct, type Product } from './inventory-helpers
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
 import { cleanUp as cleanServices, named, post } from './service-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const KEY = 'FIX-SALE-VOID-REFUND-ASKS-NO-APPROVAL';
 const VOUCHER_KEY = 'FIX-HUB-SALE-OWN-COPY-OF-APPROVED-COMMAND-CONSEQUENCES';
@@ -253,7 +254,9 @@ test('SALE-F30: «Cancel» on the approval leaves its refusal inside the window,
   await expect(modal).toBeVisible();
   await expect(modal.getByTestId('sale-void-error')).toContainText(/This needs a manager.s approval\.|Esto necesita la aprobación de un encargado\./);
   expect((await detail(toKeep)).status).toBe('completed');
+  // The reason typed is a change: «Cancel» asks first (BASE-F05) and the person discards it.
   await modal.locator('[data-testid=sale-void-cancel]').click();
+  await discardChanges(page);
   await expect(modal).toBeHidden();
 });
 

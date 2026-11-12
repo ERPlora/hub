@@ -219,7 +219,8 @@ Pasos:
 Entra: día, desde, hasta, máximo de reservas, máximo de comensales (opcional).
 Sale: la franja (avisa: `reservation.time_slot.created`, `reservation.time_slot.deleted`).
 Si falla: «Hasta» antes o igual que «Desde»: «La franja tiene que terminar después de empezar.»; una
-franja que se pisa con otra del mismo día: «Esa franja se pisa con otra del mismo día (13:00–16:00).».
+franja que se pisa con otra del mismo día: «Esa franja se pisa con otra del mismo día (13:00–16:00).». El
+motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888).
 Implicados: RESERVATION-F05, RESERVATION-F06
 
 ### RESERVATION-F02 Bloquear un día o unas horas
@@ -235,7 +236,8 @@ Pasos:
 Entra: fecha, motivo, todo el día o desde–hasta.
 Sale: el bloqueo (avisa: `reservation.blocked_date.created`, `reservation.blocked_date.deleted`).
 Si falla: sin horas cuando no es todo el día, o «hasta» antes que «desde»: lo dice el campo; ese día
-ya bloqueado a esa hora: «Esa fecha ya está bloqueada a esa hora.».
+ya bloqueado a esa hora: «Esa fecha ya está bloqueada a esa hora.». El motivo de un campo se quita en
+cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888).
 Implicados: RESERVATION-F05, RESERVATION-F06
 
 ### RESERVATION-F03 Ajustar las reglas de reserva
@@ -322,7 +324,9 @@ para ese día.» (al personal se le pregunta «¿Reservar igualmente?» y, si lo
 por internet o WhatsApp, nunca); mesa fuera de servicio: «Esa mesa no se puede reservar: está bloqueada o
 fuera de servicio.»; mesa ya reservada a esa hora: «La mesa 5 ya tiene una reserva de 21:00 a 23:00.».
 Dos reservas a la vez sobre el último hueco o sobre la misma mesa y hora: entra una y la otra recibe su
-motivo (en la franja llena, el personal puede después reservar igualmente; en la mesa, nunca).
+motivo (en la franja llena, el personal puede después reservar igualmente; en la mesa, nunca). En la
+ventana, el motivo de un campo (la Mesa incluida) sale debajo de él y se quita en cuanto se corrige ese
+campo, aunque otro diga lo mismo (hub#888).
 Implicados: CUSTOMER-F10, CUSTOMER-F11, SCHEDULE-F02, RESERVATION-F23, TABLE-F25
 
 ### RESERVATION-F07 Confirmar una reserva
@@ -466,7 +470,8 @@ formato internacional, como en una reserva (RESERVATION-F06), también con la fi
 Sale: la entrada (avisa: `reservation.waitlist.created`).
 Si falla: sin nombre ni cliente: lo dice el formulario; un teléfono que no es de su país: el motivo de
 Clientes, «No es un teléfono válido de su país: revisa las cifras o escríbelo con su prefijo
-internacional (+44…).», en el campo Teléfono, y no se apunta a nadie ni se crea la ficha.
+internacional (+44…).», en el campo Teléfono, y no se apunta a nadie ni se crea la ficha. El motivo de
+un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888).
 Implicados: RESERVATION-F16, CUSTOMER-F10
 
 ### RESERVATION-F15 Marcar contactado o quitar de la lista de espera

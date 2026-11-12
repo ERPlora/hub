@@ -78,7 +78,9 @@ def test_the_card_names_the_kitchen_name_as_the_group_and_option_forms_do():
 
 # ── The records a write names by their id (hub#672) ──────────────────────────────────────────────────────────────────
 
-#: What each write of modifier names by its id, and which record that is.
+#: What each write of modifier names by its id, and which record that is. Letting a link go by its id never looks at
+#: the group, the product or the category beside it, which its card leaves unread (hub#1278): its card by them comes
+#: apart, the link said by its group and what it hangs from.
 NAMED = {
     "modifier.group.update": {"id": "group"},
     "modifier.group.delete": {"id": "group"},
@@ -86,7 +88,8 @@ NAMED = {
     "modifier.option.update": {"id": "option", "group_id": "group"},
     "modifier.option.delete": {"id": "option", "group_id": "group"},
     "modifier.link.attach": {"group_id": "group", "product_id": "product", "category_id": "category"},
-    "modifier.link.detach": {"id": "link", "group_id": "group", "product_id": "product", "category_id": "category"},
+    "modifier.link.detach": {"id": "link"},
+    "modifier.link.detach by its group": {"group_id": "group", "product_id": "product", "category_id": "category"},
 }
 #: How the card names each record of ``a_menu``.
 SAID = {
@@ -109,6 +112,11 @@ def references(op) -> set[str]:
     schema = op.input.model_json_schema()
     props = schema.get("properties", {})
     return {name for name, prop in props.items() if assistant._resolved(prop, schema.get("$defs", {})).get("format") == "uuid"}
+
+
+def write_of(case: str) -> str:
+    """The write of a case of ``NAMED``."""
+    return case.split(" ", 1)[0]
 
 
 def values(card: dict) -> dict:
@@ -140,8 +148,10 @@ def a_menu(hub) -> dict:
 def cards(menu: dict, ctx: OperationContext | None, language: str = "es") -> dict:
     """The card of each write of ``NAMED`` naming every record it names by its id, as ``ctx``'s person would confirm it."""
     return {
-        write: assistant.card(get(write), {datum: str(menu[kind]) for datum, kind in data.items()}, language, ctx)
-        for write, data in NAMED.items()
+        case: assistant.card(
+            get(write_of(case)), {datum: str(menu[kind]) for datum, kind in data.items()}, language, ctx
+        )
+        for case, data in NAMED.items()
     }
 
 
@@ -155,9 +165,10 @@ def left_out() -> dict:
 
 def test_every_record_a_write_of_modifier_names_by_its_id_is_listed_here():
     """Positive control of the tests below: a new reference of a write of modifier comes in here, with its name."""
-    assert {op.name: references(op) for op in modifier_writes() if references(op)} == {
-        write: set(data) for write, data in NAMED.items()
-    }
+    listed: dict[str, set[str]] = {}
+    for case, data in NAMED.items():
+        listed.setdefault(write_of(case), set()).update(data)
+    assert {op.name: references(op) for op in modifier_writes() if references(op)} == listed
     assert {op.name: unnamed(op)[0] for op in modifier_writes() if unnamed(op)[0]} == {}
 
 
@@ -263,7 +274,8 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
     checked = 0
     for role in ROLES:
         mine = ctx_for(role)
-        for name, data in NAMED.items():
+        for case, data in NAMED.items():
+            name = write_of(case)
             op = get(name)
             assert mine.has(op.permission)
             schema = op.input.model_json_schema()

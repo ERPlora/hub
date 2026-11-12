@@ -398,24 +398,29 @@ def _make_destination(hub, target, roles: bootstrap.Names, ours=None) -> None:
     _clone_emptied(hub, target, roles, template)
 
 
-def _clone_emptied(hub, cluster, roles: bootstrap.Names, template: str | None = None) -> None:
+def _clone_emptied(hub, cluster, roles: bootstrap.Names, template: str | None = None, *, aside: str = "") -> None:
     """``hub``'s database on ``cluster`` made anew: whatever has its name there dropped, cloned from the template of its
     vertical there (``template``, found when not given) and the template's tables taken out. The caller makes sure
-    what has that name is never the hub's data."""
+    what has that name is never the hub's data. ``aside``: a separate copy of the hub of that name made instead
+    (``base.tenancy.restore``, hub#1213), granted to none of the app's roles."""
     if template is None:
         try:
             template = provision.template_for(hub)
         except services.ProvisioningFailed as missing:
             raise MoveFailed("move_template_missing", missing) from missing
+    name = aside or hub.db_name
     try:
-        ops.drop_database(hub.db_name, cluster=cluster)
-        ops.clone_database(hub.db_name, template=template, cluster=cluster, roles=roles)
+        if aside:
+            _drop_copy(aside, cluster)
+        else:
+            ops.drop_database(hub.db_name, cluster=cluster)
+        ops.clone_database(name, template=template, cluster=cluster, roles=roles, aside=bool(aside))
     except ops.TemplateMissing as missing:
         raise MoveFailed("move_template_missing", missing) from missing
     except ops.DatabaseOpsError as refused:
         raise MoveFailed("move_clone_failed", refused) from refused
     try:
-        with ops.connect_ops(hub.db_name, cluster=cluster) as conn, conn.transaction():
+        with ops.connect_ops(name, cluster=cluster) as conn, conn.transaction():
             _empty(conn)
     except (psycopg.Error, ops.DatabaseOpsError) as error:
         raise MoveFailed("move_clone_failed", f"its template's tables could not be taken out: {error}") from error

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:aaccd34ae6ac40b962d7235e33becc52f08fd437447561eec70748272757ed4b -->
+<!-- generated from WORKBOOK.md sha256:a15630374a8fcac7285d2314f431488b83da61d4bd684a414bb1bfe16bce44bc -->
 
 ## What it is for and who it is for
 
@@ -187,6 +187,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | CUSTOMER-F30 | Give a customer's card to other apps | done | common |
 | CUSTOMER-F31 | See the customers' figures | done | common |
 | CUSTOMER-F32 | Note allergies or the sensitivity test with their permission | done | hair salon |
+| CUSTOMER-F33 | Recover a deleted card | done | common |
 
 "Done": server and pages with their tests (of the pages and end to end in Chrome).
 "Discarded": it does not go into the app for now; the reason and its issue go in its "Status".
@@ -215,7 +216,7 @@ valid email.". A phone that is not a number of its country: "This is not a valid
 country: check the digits or write it with its international prefix (+44…).". A country that does not
 exist: "Choose a country from the list.". A date that does not exist in "Birthday" or "Anniversary" (a
 31/02): "Enter a valid date.". Nothing is saved. Custom fields are not asked for when adding.
-Involved: WHATSAPP_INBOX-F04
+Involved: WHATSAPP_INBOX-F04, BASE-F114 (the ERPlora staff bring back from a separate copy the cards that were lost, each by this same creation)
 
 ### CUSTOMER-F02 Search and filter cards
 Status: done
@@ -228,14 +229,19 @@ Steps:
    so the card is found however it is written.
 2. With the filters: stage, source, active and spent by range ("From / To", in the business's currency,
    the one of its country in Settings → Business, with its decimals: the yen has none; with or without its
-   symbol, "12,50 zł").
+   symbol, "12,50 zł"). The amount is typed as in any amount field of the Hub and as in the other lists
+   (hub#1196): with or without thousands separators ("1.000,50", "1,000.50", "2 500"); in euros "1.000"
+   could be a thousand euros or one euro, and it asks for the decimals.
 3. Sort by name, email, phone, stage, spent, last purchase or date added. To begin with, by name from A
    to Z, 50 per page (at most 100).
 4. Tap a row to open its card (CUSTOMER-F03).
 In: the text, the filters and the sort.
 Out: nothing; read only. Cards that are deleted, merged into another or with their data erased do not
 show; those marked as not active do.
-If it fails: the table shows the error with "Retry". No results: "No customers.".
+If it fails: the table shows the error with "Retry". No results: "No customers.". A spent amount it cannot
+read does not filter and says so under its box, in the words of the amount field: "This is not an amount.
+Type a figure, for example 12.50.", "This amount cannot be negative." or, with "1.000", "This amount can be
+read in two ways…".
 Involved: none
 
 ### CUSTOMER-F03 Open a customer's card
@@ -335,7 +341,7 @@ card no longer adds up (CUSTOMER-F20). It is not the erasure of personal data: t
 If it fails: a card that does not exist: "This customer is no longer available.", notifying nobody. On a
 card already deleted, merged into another or with its data erased it does NOT fail: it answers fine and
 notifies again.
-Involved: SERVICE-F29
+Involved: SERVICE-F29, CUSTOMER-F33 (the deleted card can come back as it was)
 
 ### CUSTOMER-F08 Import cards from a CSV
 Status: done
@@ -540,11 +546,13 @@ single audit entry (who, when, the reason and what was erased and what was kept)
 notice (`customer.customer.erased`) is listened to by WhatsApp, Services, Appointments, Reservations,
 Online booking and Tables to empty their copies, and by Automations, which cancels the runs that could still
 go on with her data (waiting, asking or resumable) and makes them forget what they read: none sends her
-anything any more. Sales & POS and Invoicing keep their tax copy (it is a tax document).
+anything any more; and every run that names her card, also one that has already ended, forgets the free
+texts of its history that may carry her name (FLOW-F16). Sales & POS and Invoicing keep their tax copy (it
+is a tax document).
 If it fails: "This customer is no longer available." if it does not exist. Repeating it does not change
 the data or duplicate the audit, but notifies again.
 Involved: RESERVATION-F22, SERVICE-F29, WHATSAPP_INBOX-F11, APPOINTMENT-F24, ONLINE_BOOKING-F12, TABLE-F31,
-FLOW-F23, FLOW-F24
+FLOW-F16, FLOW-F23, FLOW-F24
 
 ### CUSTOMER-F17 Assign a customer to the sale at the till
 Status: done — the search is `CustomerSearch` (see "Till customer search · API"); Sales & POS mounts it on its screen
@@ -872,6 +880,29 @@ the next try is refused too; what is not of a field shows in the block and stays
 does not manage cards sees the block without buttons.
 Involved: CUSTOMER-F13, CUSTOMER-F16
 
+### CUSTOMER-F33 Recover a deleted card
+Status: done
+Actor: ERPlora's staff, when the business asks (in the business no screen undoes a deletion)
+Screen: none of the business; the Hubs admin › Separate copies › "Recover into the business…" (BASE-F114)
+Steps:
+1. The business deleted one or more cards by mistake (CUSTOMER-F07) and asks to recover them.
+2. ERPlora's staff make a separate copy of the business from an earlier moment and recover the customers from it
+   (BASE-F114, steps 6 to 11).
+3. Each card the business deleted and still holds comes back to the list, the till and the search by phone: THE SAME
+   card, with its purchases and what was spent, its consents, its notes and its activity, its health data, its
+   groups, tags and custom fields and its linked orders. Recoveries counts it as restored ("Customers: 1
+   restored").
+In: the deleted card, by its identifier.
+Out: the card live again, none of its details changed, and the card-recovered notice
+(`customer.customer.restored`).
+If it fails: a card merged into another (CUSTOMER-F13) or with its personal data erased (CUSTOMER-F16) never comes
+back: its history lives on in the other card, or its data no longer exists ("This customer is no longer
+available."). Nor does it come back if the business has already created the same person again (the same name, phone
+and email, CUSTOMER-F12): the one it made stays. A card the business no longer has at all is created again
+(CUSTOMER-F01). On a live card it does not fail: it answers fine and notifies again. What was charged in its name
+while it was deleted does not add up (CUSTOMER-F20).
+Involved: BASE-F114, CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16
+
 ## What the verticals share
 
 Touching a piece of this table affects the hair salon **and** the restaurant.
@@ -883,7 +914,7 @@ Touching a piece of this table affects the hair salon **and** the restaurant.
 | The list's text search (table, merge, till and Appointments' picker) | F02, F13, F17, F18, F25 |
 | The card-created or card-updated notice, which WhatsApp listens to | F01, F04, F08, F18, F26 |
 | The merge and its notice | F13 |
-| The data erasure and its notice, and the deletion | F07, F16 |
+| The data erasure and its notice, the deletion and recovering a deleted card | F07, F16, F33 |
 | The till's search, the tax copy and the purchase history | F17, F18, F19, F20, F21, F23 |
 | The consent per channel | F14, F15 |
 | Groups, tags and custom fields | F06, F27, F28, F29 |
@@ -901,7 +932,18 @@ its name; if two cards fit, the id, the phone or the email is asked for. Before 
 assistant asks for confirmation with its card (BASE-F97), which names each record as the screens name it, never by
 its id: the card ("Customer: Ana García"), the duplicate card of a merge, the groups and tags it is given, the group,
 tag or field being changed or deleted, by its name, and the open order as Sales names it (its title or, without one,
-its amount; with Sales off, it does not show). What the person asking cannot see does not show.
+its amount; with Sales off, it does not show). What the person asking cannot see does not show. In a merge, if the
+card that stays or the duplicate comes by its id beside another card's name, the confirmation card neither reads nor
+shows that name, which the merge does not use: it says only the two cards being merged (hub#1272). The same goes for
+everything else (changing, deleting or erasing the data of a card, giving it groups or tags, adding a note, an
+activity or a consent to it, withdrawing one, putting it on an order, and changing or deleting a group, a tag or a
+field): if the id of the card, group, tag or field comes beside another one's name, the confirmation card says only
+the one of the id, which is the one touched (hub#1280). Said only by its name, its phone or its email, the
+confirmation card says the card, group, tag or field the action is going to touch ("Customer: Ana García" for
+"ana@ejemplo.com"); if it fits none or fits several, it says it as it was said and the action answers that it cannot
+find it or that there are several. If between the confirmation card and the "yes" that name comes to belong to
+another one (another card with that email, an active group with that name), nothing is touched and the new
+confirmation card is shown.
 
 ### What it offers: queries (they read, they change nothing)
 
@@ -923,9 +965,9 @@ its amount; with Sales off, it does not show). What the person asking cannot see
 | Which customer an order has | view | F17, F19 | yes | `customer.order.customer` |
 | A card's orders (also for API keys) | view | F19 | yes | `customer.order.list` |
 | A card's health data and its permission (on screen only) | view | F32 | yes | `customer.health.detail` |
-| A group by its id, also an inactive one: what the assistant's card reads to name it (BASE-F97) | view | F06, F27 | no | `customer.group.detail` |
-| A tag by its id, also an inactive one: what the assistant's card reads (BASE-F97) | view | F06, F28 | no | `customer.tag.detail` |
-| A custom field by its id: what the assistant's card reads (BASE-F97) | view | F04, F29 | no | `customer.field.detail` |
+| A group by its id or by its name, also an inactive one: what the assistant's card reads to name it (BASE-F97) | view | F06, F27 | no | `customer.group.detail` |
+| A tag by its id or by its name, also an inactive one: what the assistant's card reads (BASE-F97) | view | F06, F28 | no | `customer.tag.detail` |
+| A custom field by its id or by its name: what the assistant's card reads (BASE-F97) | view | F04, F29 | no | `customer.field.detail` |
 | The name of an open order, as Sales names it: what the assistant's card reads (BASE-F97) | view (and view sales, in Sales) | F19 | no | `customer.order.get` |
 
 ### What it offers: actions (they change data)
@@ -938,6 +980,7 @@ its amount; with Sales off, it does not show). What the person asking cannot see
 | Replaces a card's groups | manage | F06 | `customer.customer.set_groups` |
 | Replaces a card's tags | manage | F06 | `customer.customer.set_tags` |
 | Deletes a card (keeps its data) | delete | F07 | `customer.customer.delete` |
+| Puts a deleted card back in the list, as it was (the system only, when recovering from a separate copy) | system | F33 | `customer.customer.restore` |
 | Merges a duplicate card into another | merge | F13 | `customer.customer.merge` |
 | Erases a card's personal data | erase data | F16 | `customer.customer.erase` |
 | Adds a note | manage | F05 | `customer.note.add` |
@@ -967,6 +1010,7 @@ The notices carry only identifiers, never personal data: whoever needs the card 
 | Groups changed | Save groups with some change | `id` | `customer.customer.groups_changed` |
 | Tags changed | Save tags with some change | `id` | `customer.customer.tags_changed` |
 | Card deleted | Delete (also the repetition) | `id` | `customer.customer.deleted` |
+| Card recovered | Recover a deleted card (also the repetition) | `id` | `customer.customer.restored` |
 | Cards merged | Merge | `id` (the one that stays) and `absorbed_id` | `customer.customer.merged` |
 | Personal data erased | Erase data (also the repetition) | `id` | `customer.customer.erased` |
 | Note added | Add note | `id` (the note) and `customer_id` | `customer.note.added` |
@@ -1018,7 +1062,9 @@ their approval. Exporting is a read and is not approved; deleting cards, groups 
 personal data belong only to the owner and the administrator, and are never asked for.
 
 Recording and voiding purchases belongs to no role: the system does it when a sale is charged or voided
-(`customer.record_purchase`, which no app declares and therefore only the system has).
+(`customer.record_purchase`, which no app declares and therefore only the system has). Nor does putting a deleted
+card back: the system does it when ERPlora's staff recover from a separate copy (CUSTOMER-F33, `customer.restore`,
+which no app declares either).
 
 The server applies these permissions even if the screen shows the button, also through the API and the
 assistant. What the "Cashier" profile had in the current product, the employee has here.

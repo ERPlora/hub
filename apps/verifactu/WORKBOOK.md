@@ -820,8 +820,9 @@ Pasos:
 1. En **VeriFactu → Recuperación**, con el «NIF del emisor», pulsa «Validar cadena» («Trabajando…»).
 2. El sistema recalcula la huella de cada registro de la cadena del entorno actual y comprueba que cada uno
    lleva la del anterior.
-3. Sale «Operación completada.» y el veredicto: «Cadena de huellas íntegra: {total} registro(s) con su
-   encadenado SHA-256 verificado ({nif}).» o «Cadena de huellas ROTA en la secuencia {seq} ({nif}).».
+3. Sale «Operación completada.» y el veredicto: «Cadena de huellas íntegra: {total} registros con su
+   encadenado SHA-256 verificado ({nif}).» (con uno, «1 registro»; nunca «registro(s)») o «Cadena de huellas ROTA
+   en la secuencia {seq} ({nif}).».
 Entra: los registros de la cadena.
 Sale: el veredicto como evento (avisa `verifactu.chain.validated`). Solo lee: no repara nada ni re-audita los
 importes.
@@ -1168,10 +1169,11 @@ entre las diez primeras, por rol). Sin ellos, «los cinco acontecimientos fiscal
 ve el modelo (VERIFACTU-F13, F22, F26, F31): contestaba que no tenía herramienta, mandaba a la pantalla de
 Recuperación o creaba otra factura de prueba. Hablan de «Hacienda», «AEAT», «huella», «cadena», «cola» y
 «contingencia», y nombran un registro por su número («el registro 12») o por su factura. Nunca dicen «presenta» (la
-raíz de la presencia de Control horario), «sella» (el asistente lo lee como una venta), «producción» (un producto),
-«comprueba» (una compra; las tres, ERPlora/live#71), «pregunta» (las preguntas de Automatizaciones), «este mes», «factura» en la de prueba
-(empuja las sondas de numeración de Facturación), ni en inglés «record» (la raíz de «recordatorio», de WhatsApp) o
-«waiting» (la de «waiter»). `tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
+raíz de la presencia de Control horario), «pregunta» (las preguntas de Automatizaciones), «este mes», «factura» en la
+de prueba (empuja las sondas de numeración de Facturación), ni en inglés «record» (la raíz de «recordatorio», de
+WhatsApp) o «waiting» (la de «waiter»). Hasta ERPlora/live#71 el asistente leía además «sella» como una venta,
+«producción» como un producto y «comprueba» como una compra; ya las lee como lo que son.
+`tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
 (`tests/e2e/qa/probes/*-es-verifactu-*.json`), nunca con los propios asks, y con una frase propia por herramienta que
 solo la trae con sus asks; el empleado no recibe las escrituras que no puede hacer, y ningún test sale de la máquina
 (ni la AEAT de pruebas ni la de producción). Límite medido: la sonda de pasar a producción («activa el envío real…
@@ -1427,13 +1429,14 @@ necesitan para el soporte». Por eso:
     rechazados, N aún en espera.».
   - **«Reprogramar: enviar en la próxima pasada»** → `verifactu.contingency.retry` (VERIFACTU-F22): el registro y
     los anteriores de su cadena salen en la pasada siguiente (la tarea de cada minuto), sin perder sus intentos.
-    «Reprogramado: N registro(s) salen en la próxima pasada.».
+    «Reprogramado: N registros salen en la próxima pasada.» (con uno, «1 registro sale»; cada aviso con un número
+    lo dice en singular o en plural, nunca con «(s)», hub#1275).
   - **«Consultar a la AEAT (sale de la cola si ya lo tiene)»** → `verifactu.record.reconcile` (VERIFACTU-F35): si
     la AEAT tiene ese mismo registro (misma huella), sale de la cola como registrado; si no, sigue en la cola.
     «Consulta a la AEAT: N ya registrados (fuera de la cola), N no están en la AEAT (siguen en la cola).».
   - **«Subsanar el rechazo con un registro nuevo»** → `verifactu.record.correct` (VERIFACTU-F24), solo sobre un
-    registro rechazado: el rechazado se queda tal cual y entra uno nuevo en la cola. «Subsanado: N registro(s)
-    nuevo(s) en la cola.».
+    registro rechazado: el rechazado se queda tal cual y entra uno nuevo en la cola. «Subsanado: N registros
+    nuevos en la cola.» (con uno, «1 registro nuevo»).
   - **Retirar de la cola**, como en el antiguo («Cancelar» solo si ya aceptado), es solo lo que la AEAT ya tiene,
     y se hace consultándola (la acción de arriba). Nada sale de la cola sin que la AEAT lo tenga (VERIFACTU-F23); un
     rechazo definitivo se resuelve con la subsanación, que deja el rechazado como estaba.

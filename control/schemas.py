@@ -108,6 +108,40 @@ class HubRestoreOut(Schema):
     restore_point: dt.datetime | None
 
 
+class RestoredCopyOut(Schema):
+    """The separate copy asked of a hub (hub#1213): its id, the hub, its database's name and where it will be (none:
+    the settings' own server), the temporary cluster it comes from, the moment and how it goes."""
+
+    id: UUID
+    hub: UUID
+    slug: str
+    db_name: str
+    cluster: UUID | None
+    source: UUID | None
+    restore_point: dt.datetime
+    status: str
+
+
+class CopyRecoverIn(Schema):
+    """Which separate copy a business gets back what it lost from, and the apps whose records it gets back (hub#1257):
+    each an app that says what it gives back from a copy."""
+
+    copy_id: UUID
+    apps: list[str] = Field(min_length=1, description="The labels of the apps to bring back, in that order.")
+
+
+class CopyRecoveryOut(Schema):
+    """The recovery asked of a separate copy (hub#1257): its id, the copy, its business, the apps asked and how it
+    goes."""
+
+    id: UUID
+    copy_id: UUID
+    hub: UUID
+    slug: str
+    apps: list[str]
+    status: str
+
+
 class HubIdIn(Schema):
     """Which hub (``control.hub.move_cancel``)."""
 

@@ -16,6 +16,7 @@ import { A, api, capture, hostPage, login, psql, registerBusinessIn, registratio
 import { openTillCart } from './sale-helpers';
 import { cleanUp as cleanServices, named, noHorizontalScroll, pick, post, settled } from './service-helpers';
 import { dropCountryRules } from './tax-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const KEY = 'FIX-HUB-SERVICE-PRICE-STORED-IN-HUNDREDTHS-WHATEVER-THE-CURRENCY';
 const SIZES = [
@@ -206,7 +207,9 @@ test(`${KEY}: service-business-currency a business in Poland reads its services 
   await expect(price).toContainText(/could be zł\s?1,250\.00 or zł\s?1\.25/);
   await settled(page);
   await page.screenshot({ path: shot(`${KEY}-form-1440`) });
+  // The price typed is a change: «Cancel» asks first (BASE-F05) and the person discards it.
   await form.locator('[data-testid=service-form-cancel]').click();
+  await discardChanges(page);
   await expect(form).toBeHidden();
 
   // A voucher: its closed price in złoty.

@@ -1226,6 +1226,10 @@ class MovementOut(Schema):
     customer_name: str | None
     service_id: UUID | None
     service_name: str | None
+    member_id: UUID | None = Field(
+        description="The professional who did a session; null = nobody said (and on an adjustment)."
+    )
+    member_name: str | None
     sale_id: UUID | None
     appointment_id: UUID | None
     note: str

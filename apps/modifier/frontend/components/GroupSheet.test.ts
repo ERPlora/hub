@@ -156,7 +156,20 @@ describe('GroupSheet', () => {
     await s.result('modifier.group.get', { ...SAUCES, min_choices: 2 });
     await s.result('modifier.option.list', page([OPTIONS[0]], 1, 20));
     await settle();
-    expect(s.text('modifier-sheet-short')).toBe('It asks for at least 2 but has 1 option(s) that cannot repeat: the till could not complete it.');
+    expect(s.text('modifier-sheet-short')).toBe('It asks for at least 2 but has 1 option that cannot repeat: the till could not complete it.');
+  });
+
+  // hub#1147: one option is said in the singular and several in the plural, never «option(s)».
+  it.each([
+    { locale: 'en' as const, options: 2, said: 'It asks for at least 3 but has 2 options that cannot repeat: the till could not complete it.' },
+    { locale: 'es' as const, options: 1, said: 'Pide al menos 3 pero tiene 1 opción que no se repite: el TPV no podría completarlo.' },
+    { locale: 'es' as const, options: 2, said: 'Pide al menos 3 pero tiene 2 opciones que no se repiten: el TPV no podría completarlo.' },
+  ])('the warning with $options option ($locale)', async ({ locale, options, said }) => {
+    const s = await setup({ locale, group: { ...SAUCES, min_choices: 3 } });
+    await s.result('modifier.group.get', { ...SAUCES, min_choices: 3 });
+    await s.result('modifier.option.list', page(OPTIONS.slice(0, options), options, 20));
+    await settle();
+    expect(s.text('modifier-sheet-short')).toBe(said);
   });
 
   it('empty sections say so', async () => {

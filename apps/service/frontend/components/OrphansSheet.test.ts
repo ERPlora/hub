@@ -1,5 +1,5 @@
 // SERVICE-F30 «Rescatar los bonos sin cliente»: the sheet follows `service.grant.list_orphans` live, the
-// most recent first: what is left («{n} session(s) left», «No session limit» or «Fully used»), the
+// most recent first: what is left («1 session left», «3 sessions left», «No session limit» or «Fully used»), the
 // voucher, the amount, when the card was deleted, «Expired» if it is, and the customer's reference.
 import { describe, expect, it, vi } from 'vitest';
 
@@ -53,7 +53,7 @@ describe('OrphansSheet', () => {
   it('paints what is left, the voucher, the amount, when the card went and the reference', async () => {
     const s = await setup();
     await s.show(page(ROWS, 30));
-    for (const part of ['3 session(s) left', 'Bono 5 cortes', '€90.00', 'Customer deleted on Oct 9, 2026', 'Customer reference: cust-1']) {
+    for (const part of ['3 sessions left', 'Bono 5 cortes', '€90.00', 'Customer deleted on Oct 9, 2026', 'Customer reference: cust-1']) {
       expect(s.text('o1'), part).toContain(part);
     }
     expect(s.text('o2')).toContain('No session limit');
@@ -71,7 +71,19 @@ describe('OrphansSheet', () => {
   it('speaks Spanish', async () => {
     const s = await setup('es');
     await s.show(page(ROWS));
-    expect(s.text('o1')).toContain('Quedan 3 sesión(es)');
+    expect(s.text('o1')).toContain('Quedan 3 sesiones');
     expect(s.text('o3')).toContain('Agotado');
+  });
+
+  // hub#1147: one session left is said in the singular and several in the plural, never «session(s)».
+  it.each([
+    { locale: 'en' as const, remaining: 1, said: '1 session left' },
+    { locale: 'en' as const, remaining: 2, said: '2 sessions left' },
+    { locale: 'es' as const, remaining: 1, said: 'Queda 1 sesión' },
+    { locale: 'es' as const, remaining: 2, said: 'Quedan 2 sesiones' },
+  ])('with $remaining left ($locale): «$said»', async ({ locale, remaining, said }) => {
+    const s = await setup(locale);
+    await s.show(page([orphan('o1', { remaining })]));
+    expect(s.text('o1')).toContain(said);
   });
 });

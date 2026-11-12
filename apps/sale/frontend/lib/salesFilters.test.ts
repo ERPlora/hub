@@ -6,7 +6,7 @@
 // flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
 import { describe, expect, it, vi } from 'vitest';
 
-import { filterQuery, filtersInUse, hasDateRange, invalidAmounts, paymentMethodSearch, reversedDates, SALE_STATUSES } from './salesFilters';
+import { filterQuery, filtersInUse, hasDateRange, paymentMethodSearch, reversedDates, SALE_STATUSES } from './salesFilters';
 
 describe('sales filters', () => {
   it('offer the three statuses of a sale', () => {
@@ -36,14 +36,13 @@ describe('sales filters', () => {
 
   it('an amount that is not one, or a status that is not one, never goes', () => {
     expect(filterQuery({ total_min: 'abc', total_max: '-5', status: 'open' })).toEqual({});
-    expect(invalidAmounts({ total_min: 'abc', total_max: '-5' })).toEqual(['total_min', 'total_max']);
-    expect(invalidAmounts({ total_min: '12.50', total_max: ' ' })).toEqual([]);
+    expect(filterQuery({ total_min: '12.50', total_max: ' ' })).toEqual({ total_min: 1250 });
   });
 
   it('«Total» is typed in the business’s currency, with its decimals: yen without them (flow business-currency)', () => {
     const yen = { currency: 'JPY', decimals: 0 };
     expect(filterQuery({ total_min: '1000', total_max: '2500' }, yen)).toEqual({ total_min: 1000, total_max: 2500 });
-    expect(invalidAmounts({ total_min: '10,5' }, yen)).toEqual(['total_min']);
+    expect(filterQuery({ total_min: '10,5' }, yen)).toEqual({});
     expect(filtersInUse({ total_min: '1000' }, yen)).toBe(1);
   });
 

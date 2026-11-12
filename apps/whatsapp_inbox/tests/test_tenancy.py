@@ -7,9 +7,11 @@ import pytest
 from django.db import IntegrityError, connections, transaction
 from live.context import Scope
 from live.errors import NotFound
+from live.models import OutboxEvent
 
+from apps.whatsapp_inbox import events
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Template, TemplateSample
-from apps.whatsapp_inbox.tests.conftest import ctx_for, run, system, template
+from apps.whatsapp_inbox.tests.conftest import ctx_for, receive, run, system, template
 from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests import hubs
 
@@ -112,6 +114,27 @@ def test_a_header_file_of_another_business_is_never_found(hub_a, hub_b):
     with use_hub(hub_a), pytest.raises(NotFound) as gone:
         run("whatsapp_inbox.template_sample.detail", {"id": str(theirs.id)}, ctx_for(scope=scope(hub_a)))
     assert gone.value.code == "whatsapp_inbox.sample_not_found"
+
+
+def test_a_card_recovered_in_one_business_claims_only_its_own_conversation(hub_a, hub_b):
+    """hub#1324: the same number writes to two businesses and both delete her card; the card recovered from the
+    separate copy of A (CUSTOMER-F33) takes back A's conversation, and B's stays without a card."""
+    cards = {}
+    for hub in (hub_a, hub_b):
+        with use_hub(hub):
+            receive("wamid.1", "34600111222", scope(hub))
+            ana = run("customer.customer.create", {"name": "Ana López", "phone": "600111222"}, ctx_for(scope=scope(hub)))
+            run("customer.customer.delete", {"id": str(ana.id)}, ctx_for(scope=scope(hub)))
+            events.react(scope(hub), events.CUSTOMER_DELETED, {"id": str(ana.id)})
+            cards[hub.slug] = ana.id
+    with use_hub(hub_a):
+        system("customer.customer.restore", {"id": str(cards[hub_a.slug])}, scope(hub_a))
+        [restored] = OutboxEvent.objects.filter(name=events.CUSTOMER_RESTORED)
+        assert events.react(scope(hub_a), restored.name, restored.payload).count == 1
+        assert Conversation.objects.get().customer_id == cards[hub_a.slug]
+    with use_hub(hub_b):
+        assert not OutboxEvent.objects.filter(name=events.CUSTOMER_RESTORED).exists()
+        assert Conversation.objects.get().customer_id is None
 
 
 def keep_business(row, host: str) -> None:

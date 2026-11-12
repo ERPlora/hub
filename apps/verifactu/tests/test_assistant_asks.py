@@ -91,8 +91,8 @@ UNTIL_LIVE_TELLS_THE_ACCOUNT_FROM_A_CHECK = pytest.mark.xfail(
 #: here, tool by tool. None says more than two content words of any one of its asks or of its probes, nor half of its
 #: own (hub#1179, hub#1199); none names the thing of its tool as the Hub reads it («contingencia», «diagnóstico»,
 #: «certificado», «modelo», «procesa»: they bring it by its name alone), nor «presenta» (the stem of attendance's
-#: presence), «sella» (a sale), «producción» (a product) or «comprueba» (a purchase), which live reads as other things
-#: (ERPlora/live#71).
+#: presence), which live reads as another thing. Until ERPlora/live#71 live read «sella», «producción» and «comprueba»
+#: as a sale, a product and a purchase too; it reads them now as what they are.
 OWN_WORDS = [
     (
         "verifactu.config.get",

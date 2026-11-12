@@ -103,8 +103,8 @@ botón **Crear servicio**. Tocar una fila (o su **Editar**) abre «Editando serv
 botón **Guardar cambios** y, debajo, **Profesionales que lo hacen** (SERVICE-F31, F32). Por fila:
 **Editar** y **Archivar**; en la vista de archivados, **Restaurar**. **Archivar** pide confirmar:
 «Archivar servicio» — «<nombre> — dejará de ofrecerse y de poder reservarse. Se conservan su
-histórico y las citas ya reservadas.» y, si Citas tiene citas próximas con él, «{count} cita(s)
-próxima(s) siguen usando este servicio. Conservan su reserva, precio y duración; solo dejan de
+histórico y las citas ya reservadas.» y, si Citas tiene citas próximas con él, «{count} citas
+próximas siguen usando este servicio. Conservan su reserva, precio y duración; solo dejan de
 admitirse reservas nuevas.».
 
 La foto del servicio (SERVICE-F34 y F35): para quien puede editar servicios, el formulario lleva «Foto»,
@@ -119,7 +119,7 @@ Tabla con buscador «Buscar categoría…» y columnas **Nombre, Categoría padr
 padre** («Sin padre (raíz)» u otra) y **Orden**, con **Crear categoría** / **Guardar cambios**. Por
 fila: **Editar** y **Eliminar**; **Eliminar** pide confirmar: «Eliminar categoría» — «<nombre> — la
 categoría desaparece; los servicios que contiene se conservan, sin categoría.» y, si tiene servicios,
-«{count} servicio(s) se quedarán sin categoría.».
+«{count} servicios se quedarán sin categoría.» (con uno, «1 servicio se quedará sin categoría.»).
 
 ### Bonos y paquetes
 Arriba, **Bonos sin cliente** (solo responsable, propietario y administrador). Tabla con buscador
@@ -134,7 +134,7 @@ caduca.»), **Usos** («Usos que concede el bono; vacío = ilimitados.») y **Se
 fila por servicio con **Servicio** y, debajo, **Sesiones** y «Quitar línea»; **Añadir servicio**; botón **Crear
 paquete**. Al editar, en lugar de las líneas sale «Los servicios incluidos no se cambian una vez
 creado: elimina este paquete y crea uno nuevo.». Por fila: **Editar, Movimientos, Bonos vendidos** y
-**Eliminar** (con «Eliminar paquete»: «<nombre> — el paquete y sus {count} línea(s) salen del catálogo
+**Eliminar** (con «Eliminar paquete»: «<nombre> — el paquete y sus {count} líneas (o «su línea») salen del catálogo
 y ya no se pueden vender; los bonos ya vendidos se siguen pudiendo gastar y los encuentras filtrando
 Estado por Eliminado.»).
 
@@ -143,14 +143,23 @@ Hojas que se abren encima, todas con **Cerrar**, «Cargando…» mientras llegan
 
 - **Movimientos del bono**: cada sesión y cada ajuste de ese bono, de todas las clientas, el más
   reciente primero, con su etiqueta (**Reservada**, **Entregada**, **Liberada**, **Caducada**,
-  **Devuelta**, **Cortesía**, **Corrección**), el servicio, la fecha, «Cliente: <nombre>», quién y el
-  motivo. Vacía: «Este bono aún no se ha usado.».
+  **Devuelta**, **Cortesía**, **Corrección**), el servicio, la fecha, «Cliente: <nombre>», en una sesión
+  gastada diciendo quién la hizo «Profesional: <nombre>», quién y el motivo. Vacía: «Este bono aún no se ha
+  usado.».
 - **Bonos vendidos**: una fila por compra, con **Activo** o **Anulado**, la clienta, la fecha, el
   importe, «{used} usadas · quedan {remaining}» (o «· sin límite»), «Caduca el …» o «No caduca» y lo
   regalado o corregido después; en una anulada, «Anulado por {who} el {when}» y el motivo. Botones
-  **Ajustar** y **Anular** cuando proceden. Vacía: «Nadie ha comprado este bono todavía.».
-- **Bonos sin cliente**: los bonos vivos cuya ficha se eliminó o se anonimizó, con «Quedan {remaining}
-  sesión(es)», «Sin límite de sesiones» o «Agotado», el bono, el importe, «Cliente borrado el {when}»,
+  **Gastar una sesión** (en un bono sin anular ni caducar y al que le queda alguna sesión, o sin límite),
+  **Ajustar** y **Anular** cuando proceden y para quien puede.
+  Vacía: «Nadie ha comprado este bono todavía.».
+  - **Gastar una sesión** abre su ventana: «Da por entregada una sesión del bono «<bono>» de <clienta>, fuera
+    del cobro.», el saldo «Quedan {n} sesiones · {after} después de esta» («Queda 1 sesión · 0 después de
+    esta»; «Sin límite de sesiones» en uno sin límite), **Servicio** («Elige el servicio», solo los que cubre
+    el bono; con uno solo, ya elegido), **Profesional** (el equipo de Personal; «Quién la hizo: lo que vale la
+    sesión cuenta en su producción en Ventas. Opcional.»), **Nota** y los botones **Cancelar** y **Gastar
+    sesión**. Mientras comprueba el bono, «Comprobando el bono…».
+- **Bonos sin cliente**: los bonos vivos cuya ficha se eliminó o se anonimizó, con «Quedan {count}
+  sesiones» («Queda 1 sesión»), «Sin límite de sesiones» o «Agotado», el bono, el importe, «Cliente borrado el {when}»,
   «Caducado» si lo está y «Referencia del cliente: <identificador>». Vacía: «Ningún bono se ha quedado
   sin cliente.».
 
@@ -203,7 +212,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | SERVICE-F18 | Regalar sesiones, alargar la caducidad o corregir el saldo | hecho |
 | SERVICE-F19 | Ver los movimientos de un bono | hecho |
 | SERVICE-F20 | Un bono caduca | hecho |
-| SERVICE-F21 | Gastar una sesión fuera del cobro | hecho (asistente y API) |
+| SERVICE-F21 | Gastar una sesión fuera del cobro | hecho |
 | SERVICE-F22 | Pagar una línea con un bono | hecho (con Ventas, SALE-F27) |
 | SERVICE-F23 | Soltar la sesión si la línea o la cuenta desaparecen | hecho |
 | SERVICE-F24 | Dar por gastadas las sesiones al cobrar | hecho (conceder los bonos vendidos en el tique, no: ver «Lo que queda fuera») |
@@ -295,8 +304,9 @@ Pasos:
 1. En la fila del servicio pulsa **Archivar**.
 2. Lee «Archivar servicio»: «<nombre> — dejará de ofrecerse y de poder reservarse. Se conservan su
    histórico y las citas ya reservadas.» y, si Citas está activa y tiene citas próximas con ese
-   servicio, «{count} cita(s) próxima(s) siguen usando este servicio. Conservan su reserva, precio y
-   duración; solo dejan de admitirse reservas nuevas.».
+   servicio, «{count} citas próximas siguen usando este servicio. Conservan su reserva, precio y
+   duración; solo dejan de admitirse reservas nuevas.» (con una, «1 cita próxima sigue usando este servicio.
+   Conserva …»).
 3. Pulsa **Archivar** (o **Cancelar**). La fila desaparece de la lista.
 Entra: el servicio y, si Citas está activa y quien archiva ve citas, cuántas citas pendientes o
 confirmadas lo usan desde ahora.
@@ -530,10 +540,11 @@ Pasos:
 3. **Cargar más** trae la siguiente página; **Cerrar** vuelve a la tabla.
 Entra: las compras de ese bono y el nombre de cada clienta (Clientes); de una ficha eliminada, su
 identificador.
-Sale: nada; solo lectura. **Ajustar** y **Anular** salen donde proceden y para quien puede.
+Sale: nada; solo lectura. **Gastar una sesión** (SERVICE-F21), **Ajustar** y **Anular** salen donde proceden
+y para quien puede.
 Si falla: vacía, «Nadie ha comprado este bono todavía.»; si no se puede leer, «No se han podido
 cargar los bonos vendidos» con el motivo.
-Implicados: SERVICE-F17, SERVICE-F18
+Implicados: SERVICE-F17, SERVICE-F18, SERVICE-F21
 
 ### SERVICE-F17 Anular un bono vendido por error
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f13 old:services/workflow/bonos.md#services-f17 -->
@@ -565,7 +576,7 @@ Pasos:
 1. En **Bonos vendidos** pulsa **Ajustar** en una compra viva con límite de sesiones o caducidad.
 2. Elige **Añadir sesiones** o **Quitar sesiones** y cuántas (hasta 100; quitar, hasta las que le
    quedan), y/o «Días que se alarga» (hasta 366).
-3. Escribe el Motivo y revisa «Tras el ajuste: quedan {remaining} sesión(es) · caduca el {when}».
+3. Escribe el Motivo y revisa «Tras el ajuste: quedan {count} sesiones · caduca el {when}» («queda 1 sesión»).
 4. Pulsa **Ajustar**.
 Entra: la compra, las cantidades y el motivo.
 Sale: un movimiento aparte con quién, cuándo, cuánto y por qué (`service.grant.adjusted`), que sale en
@@ -586,7 +597,9 @@ Pasos:
 1. En la fila del bono pulsa **Movimientos**.
 2. Sale cada sesión entregada y cada ajuste, el más reciente primero (ver «Pantallas»); **Cargar
    más** trae los siguientes, cada movimiento una sola vez aunque varios lleven la misma hora.
-Entra: las sesiones y los ajustes de ese bono.
+3. Una sesión gastada diciendo quién la hizo (SERVICE-F21) la nombra junto a la clienta, «Profesional: Ana
+   López»; si cambia su nombre en Personal, la fila lo dice al momento.
+Entra: las sesiones y los ajustes de ese bono; el nombre de la profesional de cada sesión (Personal).
 Sale: nada; solo lectura.
 Si falla: vacía, «Este bono aún no se ha usado.»; si no se puede leer, «No se han podido cargar los
 movimientos» con el motivo.
@@ -609,14 +622,24 @@ Implicados: SERVICE-F18, SERVICE-F21
 
 ### SERVICE-F21 Gastar una sesión fuera del cobro
 <!-- origen: fi:modules/services#command-services-packages-redeem-sql-transaccional fi:modules/services#query-services-packages-redeem_check old:services/workflow/bonos.md#services-f21 -->
-Estado: hecho (asistente y API)
+Estado: hecho
 Actor: empleado, responsable, asistente
-Pantalla: asistente
+Pantalla: Bonos y paquetes, asistente
 Pasos:
-1. Si quieres, pregunta antes al asistente si se podría gastar una sesión de ese bono y por qué no.
-2. Pide al asistente que gaste una sesión de un bono comprado por la clienta, y si quieres que diga
+1. En **Bonos y paquetes**, en la fila del bono pulsa **Bonos vendidos** y, en la compra de la clienta, **Gastar una
+   sesión**. El botón sale en un bono sin anular ni caducar y al que le queda alguna sesión (o sin límite): en uno
+   caducado o agotado la fila ya lo dice, y **Ajustar** (SERVICE-F18) le devuelve días o sesiones.
+2. La ventana comprueba al abrirse, y cada vez que cambias de servicio, si se puede gastar: si no, dice por qué
+   («No se puede gastar esta sesión» y el motivo) y **Gastar sesión** no se puede pulsar; si sí, enseña el saldo,
+   «Quedan 3 sesiones · 2 después de esta».
+3. Elige el **Servicio** que se hizo (de los que cubre el bono; con uno solo ya está elegido), si quieres la
+   **Profesional** que lo hizo y una **Nota**, y pulsa **Gastar sesión**. La ventana se cierra y la fila baja su
+   saldo al momento. Con algo elegido o escrito, **Cancelar**, la «×», Escape o tocar fuera preguntan antes
+   «¿Descartar los cambios?».
+4. Con el asistente: si quieres, pregúntale antes si se podría gastar una sesión de ese bono y por qué no.
+5. Pide al asistente que gaste una sesión de un bono comprado por la clienta, y si quieres que diga
    qué servicio se hizo, qué profesional lo hizo («la hizo Ana») y la enlace a la cita o a la venta.
-3. La tarjeta de confirmación del asistente nombra el bono, el servicio y la profesional y, si la enlazas, la cita
+6. La tarjeta de confirmación del asistente nombra el bono, el servicio y la profesional y, si la enlazas, la cita
    como la dicen las de Citas («Lucía Pérez · martes, 3 de noviembre de 2026 · 10:00 · Ana López») y la venta por su
    número; confírmala.
 Entra: la compra del bono; el servicio y la profesional del equipo de Personal que lo hizo; la cita y la
@@ -631,11 +654,16 @@ Sin Ventas en el negocio, la sesión se gasta igual y guarda quién la hizo, per
 contarla. No emite documento fiscal.
 Si falla: «Este bono está anulado: ya no se puede usar.», «Este bono ya no tiene sesiones
 disponibles.», «Este bono ha caducado.», «Este bono no cubre ese servicio. Un bono de cortes paga
-cortes, no el champú.» o «Esa venta de bono no existe en este negocio.». Una profesional que no está en el
+cortes, no el champú.» o «Esa venta de bono no existe en este negocio.». En la ventana, el motivo sale antes
+de gastar, debajo de «No se puede gastar esta sesión» («Este bono está anulado: ya no se puede usar.», «Este bono
+ha caducado.», «Este bono ya no tiene sesiones disponibles.» o «Este bono no cubre ese servicio.»: lo ve quien
+tenía la hoja abierta cuando otra caja gastó la última sesión o el bono caducó); si no se
+puede comprobar, «No se ha podido comprobar el bono» con el motivo, y al gastar decide el servidor; su negativa
+se queda en la ventana sin perder lo elegido. Una profesional que no está en el
 equipo (o ya se dio de baja), «Ese miembro del personal no existe en este negocio.»; un nombre que vale para
 varias, «Hay varios miembros del personal que se llaman «…»: …. Di cuál.». Nada se gasta. Dos cajas que
 gastan la última sesión a la vez van en fila y la segunda recibe el motivo real.
-Implicados: SERVICE-F19, SERVICE-F20, SERVICE-F24, SALE-F28, STAFF-F21
+Implicados: SERVICE-F16, SERVICE-F19, SERVICE-F20, SERVICE-F24, SALE-F28, STAFF-F21
 
 ### SERVICE-F22 Pagar una línea con un bono
 <!-- origen: qa:verticals/beauty/05-sale-upsell-and-payment wf:peluqueria-dia#rec_peluqueria-f10 wf:peluqueria-dia#rec_peluqueria-f11 old:services/workflow/cobro-y-devolucion.md#services-f22 -->
@@ -797,12 +825,16 @@ Pasos:
 3. Si se borraron sus datos personales (RGPD), Servicios vacía los textos libres de sus bonos: la nota
    de la compra, el motivo de una anulación, el motivo de cada ajuste y la nota y el motivo de
    devolución de cada sesión.
-Entra: la ficha eliminada o anonimizada (Clientes; al anonimizar avisa `customer.customer.erased`).
+4. Si el personal de ERPlora recupera desde la copia aparte una ficha eliminada (CUSTOMER-F33), sus bonos salen
+   de **Bonos sin cliente** y vuelven a su nombre al momento, también en una pantalla abierta; sesiones y saldos
+   no cambian. Una ficha anonimizada no vuelve nunca.
+Entra: la ficha eliminada o anonimizada (Clientes; al anonimizar avisa `customer.customer.erased`; al recuperarla,
+`customer.customer.restored`).
 Sale: el bono conserva la referencia de la ficha, que es lo que lo casa con la venta que lo pagó;
 sesiones, importes y movimientos no cambian. Al anonimizar, los textos libres vacíos
 (`service.grant.erased`). Los anulados no salen en la lista.
 Si falla: repetir el aviso no cambia nada.
-Implicados: CUSTOMER-F07, CUSTOMER-F16
+Implicados: CUSTOMER-F07, CUSTOMER-F16, CUSTOMER-F33
 
 ### SERVICE-F30 Rescatar los bonos sin cliente
 <!-- origen: old:services/workflow/fichas-de-clienta.md#services-f30 -->
@@ -1295,8 +1327,6 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   la sección de su IVA) y se concede con la concesión (asistente o API, F14) diciendo la venta.
 - **Enlazar a su venta un bono concedido sin decirla** (F14, hub#786): el bono sigue sin contar para quien hace
   sus sesiones. Le pasa también a los vendidos antes de esa cifra.
-- **Gastar una sesión fuera del cobro desde Bonos vendidos, eligiendo la profesional, y ver en Movimientos quién
-  la hizo** (F21, F19, hub#1058): hoy es del asistente y de la API.
 - **Importar servicios desde un fichero**: como en el producto actual, el alta de golpe es del
   asistente y la API.
 

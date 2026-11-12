@@ -10,6 +10,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 import { A, api, EMPLOYEE, login, psql, saveSessionForTheSweep, shot, shown } from './helpers';
 import { createProduct, dialog, fill, type Product } from './inventory-helpers';
 import { cleanDocumentsOf, stamp } from './sale-helpers';
+import { discardChanges, expectWaysOutAskOnDirtyForm, type UnsavedFormCase } from './unsaved-back-helpers';
 
 const RUN = stamp();
 const SKU = `E2E-CRF-${RUN}`;
@@ -272,7 +273,9 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three si
   await flowShots(page, 'CASH_REGISTER-F06', async () => {
     await expect(count.locator('[data-testid=cash-register-count-total]')).toBeVisible();
   });
+  // With notes counted, «Cancel» asks before throwing the count away (BASE-F05, hub#1234).
   await count.locator('[data-testid=cash-register-count-cancel]').click();
+  await discardChanges(page);
   await expect(count).toBeHidden();
 
   // F09: the close, with the expected and the difference while typing (cash_register#83, #90).
@@ -291,6 +294,27 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three si
   await expect(close).toBeHidden();
   const closed = await detailOf(context, session.id);
   expect([closed.status, closed.expected_balance]).toEqual(['closed', 6210]);
+});
+
+test('BASE-F05: the windows of a shift ask «Discard changes?» on every way out with something typed (hub#1234)', async ({ page, context }) => {
+  await login(page, A, '/cash_register/sessions');
+  await closeLeftOpen(context);
+  /** A window of the sessions screen, by the button that opens it and a field that opens blank. */
+  const shift = (flow: string, form: string, add: string, field: string): UnsavedFormCase => ({
+    app: 'cash_register',
+    flow,
+    route: '/cash_register/sessions',
+    add: (on) => shown(on).locator(`[data-testid=${add}]`).filter({ visible: true }).first(),
+    form,
+    field,
+  });
+  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F03', 'cash-register-open', 'cash-register-new-session', 'cash-register-open-notes'), 'HUB-1234-open');
+  const id = await openByApi(context, 5000);
+  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F05', 'cash-register-movement', `cash-register-sessions-row-${id}-movement`, 'cash-register-movement-concept'), 'HUB-1234-movement');
+  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F06', 'cash-register-count', `cash-register-sessions-row-${id}-count`, 'cash-register-count-notes'), 'HUB-1234-count');
+  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F09', 'cash-register-close', `cash-register-sessions-row-${id}-close`, 'cash-register-close-notes'), 'HUB-1234-close');
+  expect((await detailOf(context, id)).status).toBe('open');
+  await closeByApi(context, id, 5000);
 });
 
 test('CASH_REGISTER-F04: with the drawer on and no session, the till refuses cash', async ({ page, context }) => {

@@ -81,9 +81,6 @@
         "body": "It closes by itself when the next session opens."
       }
     },
-    "filters": {
-      "amountInvalid": "This is not an amount."
-    },
     "open": {
       "title": "Open cash session",
       "register": "Drawer",

@@ -32,8 +32,9 @@ from control.models import Hub
 
 MIGRATION = "0007_hub_tables_renamed_shared"
 BEFORE = "0006_hub_activity"
-#: The tables control's migrations after ``MIGRATION`` make, which the deploy makes too (0010: the freeze switch, hub#930).
-LATER_TABLES = {"control_freeze"}
+#: The tables control's migrations after ``MIGRATION`` make, which the deploy makes too (0010: the freeze switch,
+#: hub#930; 0012: the separate copies, hub#1213; 0013: the recoveries from them, hub#1257).
+LATER_TABLES = {"control_freeze", "control_restoredcopy", "control_copyrecovery"}
 SUFFIX = "_shared_20261101"
 LEGACY_ROUTER = "base.tenancy.tests.legacy.LegacyTablesRouter"
 #: Control's own tables, Django's and the outbox's: none of them is ever renamed.

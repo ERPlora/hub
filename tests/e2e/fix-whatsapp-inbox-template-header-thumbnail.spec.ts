@@ -13,6 +13,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, capture, login, psql, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, rowAction, settled } from './service-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 import { photo } from './website-helpers';
 import { cleanUp, e2ePhone, keepPhoto, pushChannel, receive, restorePhoto, template } from './whatsapp-helpers';
 
@@ -184,6 +185,8 @@ test('WHATSAPP_INBOX-F33: «Send a template» shows the thumbnail of the photo c
   await shots(page, `${KEY}-send`, async (p) => {
     await expect.poll(() => loadedWidth(inSender(p, 'file-preview-image'))).toBe(600);
   });
+  // The template and its file chosen are a change: «Cancel» asks first (BASE-F05) and the person discards them.
   await sender(page).locator('[data-testid=whatsapp-inbox-template-form-cancel]').click();
+  await discardChanges(page);
   await expect(sender(page)).toBeHidden();
 });

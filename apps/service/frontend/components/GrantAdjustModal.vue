@@ -2,7 +2,7 @@
 // SERVICE-F18 «Regalar sesiones, alargar la caducidad o corregir el saldo»: «Adjust this voucher» adds
 // or removes sessions (only a voucher with a limit; removing, up to what is left) and/or extends the
 // expiry (only one that expires; up to 366 days), with a required Reason and the preview «After the
-// adjustment: {remaining} session(s) left · expires {when}». Adjust sends `service.grant.adjust` with
+// adjustment: 3 sessions left · expires {when}» (one session in the singular). Adjust sends `service.grant.adjust` with
 // the sessions signed (removing is negative) and closes; a refusal stays in the dialog.
 import { FormModal, InlineFeedback } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
@@ -61,7 +61,7 @@ const preview = computed(() => {
     ? t('service.adjust.expiresOn', { when: formatDate(expiryAfter.value, locale.value) })
     : t('service.adjust.neverExpires');
   return limited.value
-    ? t('service.adjust.preview', { remaining: remaining.value + (usesDelta.value ?? 0), expiry })
+    ? t('service.adjust.preview', { count: remaining.value + (usesDelta.value ?? 0), expiry })
     : t('service.adjust.previewUnlimited', { expiry });
 });
 const usesHelp = computed(() =>

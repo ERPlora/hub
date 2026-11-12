@@ -56,15 +56,18 @@ No decide el precio, no emite facturas ni habla con la AEAT, y no guarda el paí
 
 ## Antes de empezar
 
-- Al activar Impuestos, el negocio recibe de fábrica **11 categorías**, **18 alias** y **los tipos de
-  España** (TAX-F16). Con eso un negocio español puede vender sin tocar nada.
-- Activar Inventario, Servicios, Ventas, Facturación, Menús y combos o Suplementos activa Impuestos con
-  ellas. Una vez activa, Impuestos no se desactiva: ni sola («Impuestos es obligatoria para los negocios de
-  España: no se puede desactivar.») ni al desactivar la app con la que llegó (BASE-F25, hub#997).
+- **Un negocio nace con Impuestos activa** (también una demo), sin contar para el tope de apps del plan, y con
+  su catálogo de fábrica: **11 categorías**, **18 alias** y **los tipos de España** (TAX-F16). Con eso un negocio
+  español puede vender sin tocar nada (hub#997).
+- En un negocio de antes que aún no la tiene, activar Inventario, Servicios, Ventas, Facturación, Menús y combos
+  o Suplementos activa Impuestos con ellas. Una vez activa, Impuestos no se desactiva: ni sola («Impuestos es
+  obligatoria para los negocios de España: no se puede desactivar.») ni al desactivar la app con la que llegó
+  (BASE-F25, hub#997).
 - **Es obligatoria en todos los países**: sin ella no se cobra nada, y **Apps** la marca «Obligatoria en España» (o
-  en el país del negocio). Mientras está desactivada, «Termina de configurar tu negocio» del Inicio pide a quien
-  administra el negocio «Activa Impuestos» («Importante»), con «Configurar» que lleva a **Apps**; en cuanto la
-  activa, ese paso se va y llega «Tus impuestos» (BASE-F01, hub#997).
+  en el país del negocio). Mientras está desactivada (solo en un negocio de antes que nunca la activó), «Termina de
+  configurar tu negocio» del Inicio pide a quien administra el negocio «Activa Impuestos» («Importante»), con
+  «Configurar» que lleva a **Apps**; en cuanto la activa, ese paso se va y llega «Tus impuestos» (BASE-F01,
+  hub#997).
 - **País y territorio fiscal del negocio**: el país es el que se eligió al dar de alta el negocio en
   erplora.com, y no se cambia aquí (un negocio sin país, como una demo, está en España); el territorio
   fiscal —todo el país, o Canarias, Ceuta o Melilla en España— se elige en **Impuestos → Ajustes**
@@ -473,8 +476,8 @@ Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. La primera vez que el negocio activa Impuestos (o al nacer con un vertical que lo trae), la app
-   siembra el catálogo; no se hace nada a mano.
+1. El negocio nace con Impuestos activa y el catálogo ya está (hub#997); en un negocio de antes, llega la
+   primera vez que activa Impuestos. No se hace nada a mano.
 2. Se comprueba en Categorías y Reglas.
 Entra: nada.
 Sale: 11 categorías de sistema (`restaurant.food`, `restaurant.drink`, `restaurant.alcohol`,
@@ -758,10 +761,10 @@ cajero del producto actual es un empleado.
   empleado no puede hacer (las escrituras, `tax.manage`) ni se le ofrece. Además, una frase propia por
   herramienta (`OWN_WORDS`, ni ask ni sonda) que solo llega entre las diez primeras por sus `asks`: cambiar
   las de cualquier herramienta lo ve un test. live lee «activar» y «desactivar» como las acciones `activate` y
-  `deactivate` desde ERPlora/live#70, pero toma la app que nombra un complemento con «de» («la regla española
-  de product.qa»: Productos) por lo que se enciende: hasta ERPlora/live#73, reactivar y desactivar una regla
-  en esas frases de la QA salen detrás de encender o apagar una app (`base.app.enable`/`disable`); lo fija un
-  `xfail` estricto que se pone rojo con ese puntero.
+  `deactivate` desde ERPlora/live#70, y «regla» como `rule` desde ERPlora/live#73: aunque «de product.qa»
+  nombre Productos, en esas frases de la QA reactivar y desactivar la regla salen antes que encender o apagar
+  una app (`base.app.enable`/`disable`), y lo vigila
+  `test_the_reported_request_offers_its_tool_before_the_switch_of_an_app`.
   Sin sinónimos propios en
   `base.assistant.SYNONYMS`: «desactiva» ya lo lee el grupo de Personal (hub#1103), y una palabra suelta
   para «termina» o «activa» arrastraría las tareas terminadas o las reglas «activas» de una lista.

@@ -15,6 +15,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { NO_CLOCK } from '../../vitest.load';
+
 import {
   CODE,
   configProblem,
@@ -46,6 +48,13 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const HUB_DIR = join(HERE, '..', '..');
 const SEED_TOKEN = 'EAAG-e2e-made-up';
 const RUN = { saas: 'http://localhost:8241', hubPort: 8240, graphPort: 8249, ca: '/hub/tests/e2e/.artifacts/meta-graph-8240/ca.pem' };
+
+// The tests that make the run's authority (runCli, startGraph, startGraphThread) wait for it without a clock: a cold
+// `uv run python`, under a second at rest and as long as a loaded machine makes it, which no clock in seconds tells
+// from one that never ends (hub#1292). What could keep it from ever ending is no wait of its own: `uv` gives the
+// network up by itself, the Python only computes and writes three files, and a Graph thread left with nothing to wait
+// for ends, which startGraphThread rejects on at once. A child that never stops working, only the end of the run's job
+// cuts.
 
 const call = (method: string, path: string, over: Partial<GraphCall> = {}): GraphCall => ({ method, path, query: {}, token: '', ...over });
 const metaCode = ([, body]: [number, unknown]) => (body as { error?: { code?: number } }).error?.code;
@@ -169,26 +178,26 @@ describe('runCli', () => {
     rmSync(artifacts, { recursive: true, force: true });
   });
 
-  it('makes the run’s authority before it names it: erplora.com never starts trusting a file that is not there', () => {
+  it('makes the run’s authority before it names it: erplora.com never starts trusting a file that is not there', async () => {
     expect(existsSync(ca)).toBe(false);
-    expect(runCli(['8240', 'http://localhost:8241'], deps)).toBe(0);
+    expect(await runCli(['8240', 'http://localhost:8241'], deps)).toBe(0);
     expect(said.lines).toEqual(Object.entries(erploraEnv({ ...RUN, ca })).map(([name, value]) => `${name}=${value}`));
     expect(readFileSync(ca, 'utf8')).toMatch(/^-----BEGIN CERTIFICATE-----\n/);
-  }, 60_000);
+  }, NO_CLOCK);
 
-  it('keeps the authority already there', () => {
+  it('keeps the authority already there', async () => {
     const before = readFileSync(ca, 'utf8');
     said.lines.length = 0;
-    expect(runCli(['8240', 'http://localhost:8241/'], deps)).toBe(0);
+    expect(await runCli(['8240', 'http://localhost:8241/'], deps)).toBe(0);
     expect(said.lines).toContain(`SSL_CERT_FILE=${ca}`);
     expect(readFileSync(ca, 'utf8')).toBe(before);
   });
 
-  it('refuses what it does not understand, saying how it is called, and makes nothing', () => {
+  it('refuses what it does not understand, saying how it is called, and makes nothing', async () => {
     const wrong = [[], ['8240'], ['8240', 'http://localhost:8241', 'more'], ['8a', 'http://localhost:8241'], ['0', 'http://localhost:8241'], ['65530', 'http://localhost:8241'], ['8250', 'localhost:8251']];
     for (const args of wrong) {
       said.errors.length = 0;
-      expect(runCli(args, deps), args.join(' ')).toBe(2);
+      expect(await runCli(args, deps), args.join(' ')).toBe(2);
       expect(said.errors.join('\n'), args.join(' ')).toContain('node tests/e2e/whatsapp-graph.ts <hub port> <SAAS_URL>');
     }
     expect(existsSync(join(artifacts, 'meta-graph-8250'))).toBe(false);
@@ -196,17 +205,17 @@ describe('runCli', () => {
     expect(readFileSync(join(HERE, 'README.md'), 'utf8')).toMatch(/^## WhatsApp /m);
   });
 
-  it('names nothing when the authority cannot be made: env $(…) never gets an SSL_CERT_FILE without it', () => {
+  it('names nothing when the authority cannot be made: env $(…) never gets an SSL_CERT_FILE without it', async () => {
     const blocked = join(artifacts, 'a-file');
     writeFileSync(blocked, '');
     said.lines.length = 0;
     said.errors.length = 0;
-    expect(runCli(['8260', 'http://localhost:8261'], { ...deps, artifacts: blocked })).toBe(1);
+    expect(await runCli(['8260', 'http://localhost:8261'], { ...deps, artifacts: blocked })).toBe(1);
     expect(said.lines).toEqual([]);
     expect(said.errors).toHaveLength(1);
     expect(said.errors[0]).toContain(`the authority ${join(blocked, 'meta-graph-8260', 'ca.pem')} could not be made: NotADirectoryError`);
     expect(said.errors[0]).not.toContain('\n');
-  }, 60_000);
+  }, NO_CLOCK);
 
   it('makes the authority the Graph trusts again in one step: a reader of the old one never finds it half written', async () => {
     const before = readFileSync(ca);
@@ -219,7 +228,7 @@ describe('runCli', () => {
       closeSync(reader);
       await graph.close();
     }
-  }, 60_000);
+  }, NO_CLOCK);
 
   it('does nothing when a spec or Vitest imports it, whatever the process was started with', () => {
     const folder = join(HERE, '.artifacts', 'meta-graph-64970');
@@ -235,31 +244,30 @@ describe('runCli', () => {
   });
 
   it('runs as a script through a symlinked path too (macOS reaches its tmp folder through one): it never prints nothing', () => {
-    const folder = join(HERE, '.artifacts', 'meta-graph-64980');
     const linked = join(artifacts, 'linked-e2e');
     symlinkSync(HERE, linked);
-    rmSync(folder, { recursive: true, force: true });
-    try {
-      const out = execFileSync('node', [join(linked, 'whatsapp-graph.ts'), '64980', 'http://localhost:64981'], { cwd: tmpdir(), encoding: 'utf8' });
-      expect(out.trim().split('\n')).toContain(`SSL_CERT_FILE=${join(folder, 'ca.pem')}`);
-      expect(existsSync(join(folder, 'ca.pem'))).toBe(true);
-    } finally {
-      rmSync(folder, { recursive: true, force: true });
-    }
-  }, 60_000);
+    runsAsScript(linked, 64980);
+  }, NO_CLOCK);
 
   it('runs as a script from erplora.com’s checkout, its authority in this checkout’s .artifacts', () => {
-    const folder = join(HERE, '.artifacts', 'meta-graph-64990');
-    rmSync(folder, { recursive: true, force: true });
-    try {
-      const out = execFileSync('node', [join(HERE, 'whatsapp-graph.ts'), '64990', 'http://localhost:64991'], { cwd: tmpdir(), encoding: 'utf8' });
-      expect(out.trim().split('\n')).toContain(`SSL_CERT_FILE=${join(folder, 'ca.pem')}`);
-      expect(existsSync(join(folder, 'ca.pem'))).toBe(true);
-    } finally {
-      rmSync(folder, { recursive: true, force: true });
-    }
-  }, 60_000);
+    runsAsScript(HERE, 64990);
+  }, NO_CLOCK);
 });
+
+/** Runs whatsapp-graph.ts as a script from `dir` (this folder, or a path to it) for the Graph on `port`, and proves it
+ *  names its authority, in this checkout's .artifacts, and makes it. */
+function runsAsScript(dir: string, port: number): void {
+  const folder = join(HERE, '.artifacts', `meta-graph-${port}`);
+  rmSync(folder, { recursive: true, force: true });
+  try {
+    const args = [join(dir, 'whatsapp-graph.ts'), String(port), `http://localhost:${port + 1}`];
+    const out = execFileSync('node', args, { cwd: tmpdir(), encoding: 'utf8' });
+    expect(out.trim().split('\n')).toContain(`SSL_CERT_FILE=${join(folder, 'ca.pem')}`);
+    expect(existsSync(join(folder, 'ca.pem'))).toBe(true);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+}
 
 const config = (body: Record<string, unknown>, status = 200): DoorAnswer => ({ status, body });
 const OPENS = { configured: true, app_id: META_APP.id, config_id: META_APP.configId, redirect_uri: `${RUN.saas}/whatsapp/return` };
@@ -382,7 +390,7 @@ describe('startGraph', () => {
 
   beforeAll(async () => {
     graph = await startGraph({ port: 0, certs, hubDir: HUB_DIR });
-  }, 60_000);
+  }, NO_CLOCK);
 
   afterAll(async () => {
     await graph?.close();
@@ -402,6 +410,28 @@ describe('startGraph', () => {
     expect((await throughProxy(graph, 'example.com', 'GET', '/', '')).status).toBe(403);
     expect(graph.tunnels.at(-1)).toBe('example.com:443');
   });
+
+  it('makes its authority without holding its thread: the thread that starts it keeps turning meanwhile', async () => {
+    // A cold Python start, seconds and more on a loaded machine: a Vitest worker held past a minute fails its run
+    // (hub#1315), and a spec's Graph thread held could not answer.
+    const fresh = mkdtempSync(join(tmpdir(), 'meta-graph-free-'));
+    try {
+      let madeBeforeATurn: boolean | undefined;
+      const turned = new Promise<void>((resolve) =>
+        setImmediate(() => {
+          madeBeforeATurn = existsSync(join(fresh, 'ca.pem'));
+          resolve();
+        }),
+      );
+      const other = await startGraph({ port: 0, certs: fresh, hubDir: HUB_DIR });
+      await turned;
+      await other.close();
+      expect(madeBeforeATurn).toBe(false);
+      expect(existsSync(join(fresh, 'ca.pem'))).toBe(true);
+    } finally {
+      rmSync(fresh, { recursive: true, force: true });
+    }
+  }, NO_CLOCK);
 
   it('says which port is taken when another process holds it', async () => {
     const holder: Server = createServer();
@@ -442,7 +472,7 @@ describe('startGraphThread', () => {
     } finally {
       await graph.close();
     }
-  }, 60_000);
+  }, NO_CLOCK);
 
   it('says why it could not start', async () => {
     const holder: Server = createServer();
@@ -453,5 +483,5 @@ describe('startGraphThread', () => {
     } finally {
       await new Promise((resolve) => holder.close(resolve));
     }
-  }, 60_000);
+  }, NO_CLOCK);
 });

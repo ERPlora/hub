@@ -10,6 +10,7 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, horizontalOverflow, login, psql, shot, shown } from './helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 /** Categories are never deleted by the app: what this file made goes with the database's own hand
  *  (the hub `a`'s), components first, then rules, aliases and the categories. */
@@ -120,7 +121,9 @@ test('TAX-F04/F07: a rule is created, an overlapping one is refused on «Valid f
   await expect(validFrom.locator('.error-text')).toContainText(/overlaps another active rule|Se solapa con otra regla/);
   await expect(dialog.locator('[data-testid=tax-rule-form-error]')).toBeVisible();
   await page.screenshot({ path: shot('tax-rules-overlap-409-1280') });
+  // «Cancel» asks before losing the refused rule (BASE-F05): the person discards it.
   await dialog.locator('[data-testid=tax-rule-form-cancel]').click();
+  await discardChanges(page);
   await expect(dialog).toBeHidden();
   expect(await rulesOf(context, key)).toHaveLength(1);
 

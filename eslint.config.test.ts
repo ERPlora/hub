@@ -1,53 +1,157 @@
 // @vitest-environment node
 // Lint of hub-next: the SPA reaches the server only through the SDK (`@erplora/ui/sdk`), so the
-// shell entry and every app frontend are linted for raw network globals. Linted for real here.
-import { dirname } from 'node:path';
+// shell entry and every app frontend are linted for raw network globals. Linted for real here, by the hub's ESLint
+// in a thread of its own (`lintInThread`).
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Worker } from 'node:worker_threads';
 
-import { ESLint } from 'eslint';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-const eslint = new ESLint({ cwd: dirname(fileURLToPath(import.meta.url)) });
+import { NO_CLOCK } from './vitest.load';
 
-async function restricted(code: string, filePath: string): Promise<string[]> {
-  const [result] = await eslint.lintText(code, { filePath });
-  return result.messages.filter((m) => m.ruleId === 'no-restricted-globals').map((m) => m.message);
+const HUB_DIR = dirname(fileURLToPath(import.meta.url));
+const nodeRequire = createRequire(import.meta.url);
+
+/** A text to lint and the file ESLint lints it as. */
+type Lint = readonly [code: string, filePath: string];
+/** What ESLint said of each text of a `lintInThread`, in order, and whether it ignores each of its paths. */
+interface Found {
+  lints: { ruleId: string | null; message: string }[][];
+  ignored: boolean[];
 }
 
-// The first lint loads ESLint's parsers and plugins from the disk, so its time is the machine's: with several test
-// runs on one machine (load 20–40) and every opened file scanned, it took up to 7.9 s (2026-10-21), against
-// Vitest's 5 s. 60 s for whichever test lints first, as the guardrails that read the whole tree (tsconfig.test.ts).
-describe('eslint config', { timeout: 60_000 }, () => {
-  it.each(['fetch', 'EventSource', 'WebSocket', 'XMLHttpRequest'])('forbids %s in an app page and in the entry', async (name) => {
-    const code = `export const x = ${name};\n`;
-    expect(await restricted(code, 'apps/demo/frontend/pages/ItemListPage.ts')).toHaveLength(1);
-    expect(await restricted(code, 'frontend/main.ts')).toHaveLength(1);
+/** The thread's side: the ESLint at `workerData.eslint` lints each text as its file and tells whether it ignores each
+ *  path, then says it all at once. */
+const LINTER = `
+const { parentPort, workerData } = require('node:worker_threads');
+const { ESLint } = require(workerData.eslint);
+const eslint = new ESLint({ cwd: workerData.cwd });
+(async () => {
+  const lints = [];
+  for (const [code, filePath] of workerData.lints) {
+    const [result] = await eslint.lintText(code, { filePath });
+    lints.push(result.messages.map(({ ruleId, message }) => ({ ruleId, message })));
+  }
+  const ignored = [];
+  for (const path of workerData.paths) ignored.push(await eslint.isPathIgnored(path));
+  parentPort.postMessage({ lints, ignored });
+})();
+`;
+
+/**
+ * Lints `lints` and asks about `paths` with the hub's ESLint (or `eslint`) in a thread of its own, as `pnpm lint` runs
+ * it in a process of its own. Its first lint loads its parsers and plugins from the disk, and that load holds the
+ * thread it runs in: a second at rest, and for as long as a loaded machine makes it (101 s measured), which no clock in
+ * seconds tells from one that never ends, and Vitest fails a run whose worker it held past a minute (hub#1315). Waited
+ * for without a clock (hub#1292): what could keep it from ever answering ends the thread, a lint left waiting on
+ * nothing that could end it as much as an error, and that fails at once, saying so. A lint that never stops working,
+ * only the end of the run's job cuts.
+ */
+function lintInThread(lints: readonly Lint[], paths: readonly string[], eslint = nodeRequire.resolve('eslint')): Promise<Found> {
+  return new Promise((resolve, reject) => {
+    const thread = new Worker(LINTER, { eval: true, workerData: { eslint, cwd: HUB_DIR, lints, paths } });
+    thread.once('message', resolve);
+    thread.once('error', reject);
+    thread.once('exit', (code) => {
+      reject(new Error(`ESLint's thread ended (exit ${code}) without saying what it found: its lint was left waiting on nothing that could end it`));
+    });
+  });
+}
+
+const RESTRICTED = 'no-restricted-globals';
+const NETWORK = ['fetch', 'EventSource', 'WebSocket', 'XMLHttpRequest'];
+const APP_PAGE = 'apps/demo/frontend/pages/ItemListPage.ts';
+const ENTRY = 'frontend/main.ts';
+const VUE_PAGE = 'apps/demo/frontend/pages/ItemListPage.vue';
+const PROBE = 'apps/demo/frontend/pages/Probe.vue';
+const uses = (name: string) => `export const x = ${name};\n`;
+const SCRIPT_SETUP = `<script setup lang="ts">\nconst items = fetch('/api/demo/items');\n</script>\n<template><div>{{ items }}</div></template>\n`;
+const slottedIn = (tag: string) => `<template><ion-button><${tag} slot="start" /></ion-button></template>\n`;
+
+/** Every lint these tests read. */
+const LINTS: readonly Lint[] = [
+  ...NETWORK.flatMap((name): Lint[] => [
+    [uses(name), APP_PAGE],
+    [uses(name), ENTRY],
+  ]),
+  [SCRIPT_SETUP, VUE_PAGE],
+  ...['ion-icon', 'HubIcon', 'ok-icon'].map((tag): Lint => [slottedIn(tag), PROBE]),
+];
+/** What ESLint must ignore: the build and collectstatic output, the repo's own .venv (uv), which carries the admin's
+ *  JavaScript, and packages/ui and packages/live, linted in their own repos. */
+const IGNORED = [
+  'frontend/dist/assets/main-abc.js',
+  'staticfiles/admin/js/core.js',
+  '.venv/lib/python3.14/site-packages/django/contrib/admin/static/admin/js/core.js',
+  'packages/ui/src/sdk/client.ts',
+];
+
+describe('eslint config', () => {
+  let found: Found;
+
+  // ESLint's own load, in its thread, for as long as the machine takes (see lintInThread).
+  beforeAll(async () => {
+    found = await lintInThread(LINTS, IGNORED);
+  }, NO_CLOCK);
+
+  /** The messages of `rule` in what ESLint said of `code` linted as `filePath`, one of `LINTS`. */
+  function said(code: string, filePath: string, rule: string): string[] {
+    const index = LINTS.findIndex(([text, file]) => text === code && file === filePath);
+    if (index < 0) throw new Error(`no lint of that text as ${filePath} in LINTS`);
+    return found.lints[index].filter((message) => message.ruleId === rule).map((message) => message.message);
+  }
+
+  it.each(NETWORK)('forbids %s in an app page and in the entry', (name) => {
+    expect(said(uses(name), APP_PAGE, RESTRICTED)).toHaveLength(1);
+    expect(said(uses(name), ENTRY, RESTRICTED)).toHaveLength(1);
   });
 
-  it('forbids it in the <script setup> of a .vue page too', async () => {
-    const code = `<script setup lang="ts">\nconst items = fetch('/api/demo/items');\n</script>\n<template><div>{{ items }}</div></template>\n`;
-    expect(await restricted(code, 'apps/demo/frontend/pages/ItemListPage.vue')).toEqual([
-      "Unexpected use of 'fetch'. Network access goes through the SDK (@erplora/ui/sdk).",
-    ]);
+  it('forbids it in the <script setup> of a .vue page too', () => {
+    expect(said(SCRIPT_SETUP, VUE_PAGE, RESTRICTED)).toEqual(["Unexpected use of 'fetch'. Network access goes through the SDK (@erplora/ui/sdk)."]);
   });
 
-  it('takes slot="…" on ion-* and on HubIcon as the Web Components slot, not on a leftover ok-*', async () => {
-    const slotted = async (tag: string) => {
-      const code = `<template><ion-button><${tag} slot="start" /></ion-button></template>\n`;
-      const [result] = await eslint.lintText(code, { filePath: 'apps/demo/frontend/pages/Probe.vue' });
-      return result.messages.filter((m) => m.ruleId === 'vue/no-deprecated-slot-attribute').length;
-    };
-    expect(await slotted('ion-icon')).toBe(0);
-    expect(await slotted('HubIcon')).toBe(0);
-    expect(await slotted('ok-icon')).toBe(1); // OutfitKit is gone (PLAN §16.11): no exception left for it
+  it('takes slot="…" on ion-* and on HubIcon as the Web Components slot, not on a leftover ok-*', () => {
+    const slotted = (tag: string) => said(slottedIn(tag), PROBE, 'vue/no-deprecated-slot-attribute').length;
+    expect(slotted('ion-icon')).toBe(0);
+    expect(slotted('HubIcon')).toBe(0);
+    expect(slotted('ok-icon')).toBe(1); // OutfitKit is gone (PLAN §16.11): no exception left for it
   });
 
-  it('ignores the build and collectstatic output, the virtualenv, and the live and ui submodules', async () => {
-    expect(await eslint.isPathIgnored('frontend/dist/assets/main-abc.js')).toBe(true);
-    expect(await eslint.isPathIgnored('staticfiles/admin/js/core.js')).toBe(true);
-    // The repo's own .venv (uv) carries the admin's JavaScript.
-    expect(await eslint.isPathIgnored('.venv/lib/python3.14/site-packages/django/contrib/admin/static/admin/js/core.js')).toBe(true);
-    // packages/ui and packages/live are linted in their own repos.
-    expect(await eslint.isPathIgnored('packages/ui/src/sdk/client.ts')).toBe(true);
+  it('lints in a thread of its own: this worker never loads ESLint', () => {
+    const loaded = Object.keys(nodeRequire.cache).filter((file) => file.includes(join('node_modules', 'eslint', 'lib')));
+    expect(loaded).toEqual([]);
+  });
+
+  it('ignores the build and collectstatic output, the virtualenv, and the live and ui submodules', () => {
+    expect(IGNORED.filter((_path, index) => !found.ignored[index])).toEqual([]);
+  });
+});
+
+describe('lintInThread', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'eslint-thread-'));
+
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  /** A stand-in for ESLint in the thread, whose `lintText` does `body`. */
+  function eslintThat(name: string, body: string): string {
+    const file = join(dir, `${name}.cjs`);
+    writeFileSync(file, `exports.ESLint = class { lintText() { ${body} } isPathIgnored() { return Promise.resolve(false); } };\n`);
+    return file;
+  }
+
+  it('fails at once, saying so, when its lint is left waiting on nothing that could end it', async () => {
+    const waits = eslintThat('waits', 'return new Promise(() => {});');
+    await expect(lintInThread([['', APP_PAGE]], [], waits)).rejects.toThrow('without saying what it found');
+  });
+
+  it('fails with what ESLint threw', async () => {
+    const throws = eslintThat('throws', "return Promise.reject(new Error('no parser for it'));");
+    await expect(lintInThread([['', APP_PAGE]], [], throws)).rejects.toThrow('no parser for it');
   });
 });

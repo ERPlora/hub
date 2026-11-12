@@ -7,6 +7,7 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const TAG = 'E2E Price';
 const CODE = 'E2EPR';
@@ -138,7 +139,9 @@ test('A VIP list with an Inventory product, a rule, and the price of a VIP custo
       'A price list with that code already exists. Pick a different code.',
     );
     await page.screenshot({ path: shot('pricing-list-duplicate') });
+    // «Cancel» asks before losing the refused list (BASE-F05): the person discards it.
     await page.locator('[data-testid=pricing-list-form-cancel]').click();
+    await discardChanges(page);
     expect(psql(`select count(*) from pricing_pricelist where lower(code) = lower('${listCode}')`)).toBe('1');
 
     // The list's detail: the price of the Inventory product from one unit (PRICING-F06, F07).

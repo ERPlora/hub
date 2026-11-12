@@ -20,6 +20,7 @@ import { useT } from '../composables/useT';
 import { hhmm } from '../lib/clock';
 import { cancellationNote } from '../lib/states';
 import type { BookingSource, FreeTableOut, ReservationIn, ReservationOut, ReservationPatchIn } from '../operations';
+import PartyField from './PartyField.vue';
 
 const props = defineProps<{
   /** The reservation being edited; `null` = «New reservation». */
@@ -234,6 +235,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         <div class="reservation-form__pair">
           <ion-input
             data-testid="reservation-form-guest_name"
+            name="guest_name"
             :value="name"
             :label="$t('reservation.form.name')"
             label-placement="floating"
@@ -247,6 +249,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           />
           <ion-input
             data-testid="reservation-form-guest_phone"
+            name="guest_phone"
             type="tel"
             :value="phone"
             :label="$t('reservation.form.phone')"
@@ -262,6 +265,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         </div>
         <ion-input
           data-testid="reservation-form-guest_email"
+          name="guest_email"
           type="email"
           :value="email"
           :label="$t('reservation.form.email')"
@@ -277,6 +281,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         <div class="reservation-form__when">
           <ion-input
             data-testid="reservation-form-date"
+            name="date"
             type="date"
             :value="date"
             :label="$t('reservation.form.date')"
@@ -290,6 +295,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           />
           <ion-input
             data-testid="reservation-form-time"
+            name="time"
             type="time"
             :value="time"
             :label="$t('reservation.form.time')"
@@ -301,23 +307,16 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             :class="invalid(fieldErrors.time)"
             @ion-input="time = text($event.detail.value)"
           />
-          <ion-input
+          <PartyField
+            v-model="party"
             data-testid="reservation-form-party_size"
-            type="number"
-            inputmode="numeric"
-            min="1"
-            :value="party"
-            :label="$t('reservation.form.party')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            name="party_size"
             :disabled="notesOnly"
             :error-text="fieldErrors.party_size"
-            :class="invalid(fieldErrors.party_size)"
-            @ion-input="party = text($event.detail.value)"
           />
           <ion-input
             data-testid="reservation-form-duration_minutes"
+            name="duration_minutes"
             type="number"
             inputmode="numeric"
             min="1"
@@ -335,6 +334,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         <Combo
           v-model="table"
           testid="reservation-form-table"
+          name="table_id"
           :search="searchTables"
           :label="t('reservation.form.table')"
           :placeholder="t('reservation.form.pickTable')"
@@ -373,6 +373,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         </div>
         <ion-textarea
           data-testid="reservation-form-notes"
+          name="notes"
           :value="notes"
           :label="$t('reservation.form.notes')"
           label-placement="floating"
@@ -385,6 +386,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         />
         <ion-textarea
           data-testid="reservation-form-internal_notes"
+          name="internal_notes"
           :value="internalNotes"
           :label="$t('reservation.form.internalNotes')"
           label-placement="floating"

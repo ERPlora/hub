@@ -3,21 +3,11 @@
 // `money-display-guard.test.ts`, `range-filters.test.ts` and `total-amount-filter.test.ts`): an amount
 // is whole minor units of ITS currency, with the decimals the server counts it in (flow
 // cart-checkout-business-currency: never the browser's Intl, which gives the forint none, nor a euro by
-// default); a quantity carries no decorative zeros; «Total from 12» means twelve units of the business's
-// currency (1200 in złoty, 12 in yen) and «Items from 2» two units.
+// default); a quantity carries no decorative zeros and «Items from 2» means two units. «Total» is read by the
+// platform, as every amount filter of the Hub (hub#1196: `CartsPage.test.ts`, `OrdersPage.test.ts`).
 import { describe, expect, it } from 'vitest';
 
-import {
-  amountExample,
-  CART_TONE,
-  formatMoney,
-  formatQuantity,
-  ORDER_TONE,
-  recordMoney,
-  toMinor,
-  toQuantity,
-  unreadableTotals,
-} from './format';
+import { CART_TONE, formatMoney, formatQuantity, ORDER_TONE, recordMoney, toQuantity } from './format';
 
 const nbsp = (text: string) => text.replace(/[\u00a0\u202f]/g, ' ');
 
@@ -80,97 +70,6 @@ describe('formatQuantity', () => {
 
   it('gives back what is not a number untouched', () => {
     expect(formatQuantity('soon', 'es')).toBe('soon');
-  });
-});
-
-describe('toMinor: a money range filter in the business’s currency', () => {
-  it('«12» is 1200 in złoty, «12.1» and «12,1» 1210, never 1209', () => {
-    expect(toMinor('12', PLN)).toBe(1200);
-    expect(toMinor('12.1', PLN)).toBe(1210);
-    expect(toMinor('12,1', PLN)).toBe(1210);
-    expect(toMinor('0.29', PLN)).toBe(29);
-    expect(toMinor(' 12,5 ', PLN)).toBe(1250);
-  });
-
-  it('uses the decimals the server counts: «12» is 12 in yen, «12,5» is 1250 in forints, «1.5» 1500 in dinars', () => {
-    expect(toMinor('12', JPY)).toBe(12);
-    expect(toMinor('1999', JPY)).toBe(1999);
-    expect(toMinor('12,5', HUF)).toBe(1250);
-    expect(toMinor('1.5', KWD)).toBe(1500);
-  });
-
-  it('while the business has not answered, two decimals and no symbol', () => {
-    expect(toMinor('12')).toBe(1200);
-    expect(toMinor('12,5')).toBe(1250);
-    expect(toMinor('12,50 €')).toBeUndefined();
-  });
-
-  it('text that is not an amount, or nothing, filters nothing (never «from 0»)', () => {
-    expect(toMinor('abc', EUR)).toBeUndefined();
-    expect(toMinor('', EUR)).toBeUndefined();
-    expect(toMinor(undefined, EUR)).toBeUndefined();
-    expect(toMinor('-3', EUR)).toBeUndefined();
-    expect(toMinor('1,2,3', EUR)).toBeUndefined();
-    expect(toMinor('12,345', EUR)).toBe(1234500);
-  });
-
-  it('reads what a person pastes, thousands marks and its currency’s code or symbol included (pm#521)', () => {
-    expect(toMinor('1.250,50', EUR)).toBe(125050);
-    expect(toMinor('1,250.50', EUR)).toBe(125050);
-    expect(toMinor(' 1.234,56 € ', EUR)).toBe(123456);
-    expect(toMinor('1.234.567', EUR)).toBe(123456700);
-    expect(toMinor('1.255', EUR)).toBe(125500);
-    expect(toMinor('1 250,5', EUR)).toBe(125050);
-    expect(toMinor('12,50 zł', PLN)).toBe(1250);
-    expect(toMinor('PLN 12.50', PLN)).toBe(1250);
-    expect(toMinor('¥1,999', JPY)).toBe(1999);
-  });
-
-  it('another currency’s symbol is not the business’s: it filters nothing', () => {
-    expect(toMinor('12,50 €', PLN)).toBeUndefined();
-    expect(toMinor('EUR 12', PLN)).toBeUndefined();
-  });
-
-  it('a mark followed by three digits ending in 0 can be thousands or a third decimal: it is not guessed', () => {
-    // «1.250» is 1.250 zł or 1,25 zł; the filter filters nothing rather than the wrong amount.
-    expect(toMinor('1.250', PLN)).toBeUndefined();
-    expect(toMinor('1,250', PLN)).toBeUndefined();
-    // A currency with three decimals reads it as its decimals; one without decimals, as thousands.
-    expect(toMinor('1.250', KWD)).toBe(1250);
-    expect(toMinor('1.500', JPY)).toBe(1500);
-  });
-
-  it('more decimals than the currency has, or groups that are not of three, filter nothing', () => {
-    expect(toMinor('12,3456', EUR)).toBeUndefined();
-    expect(toMinor('12.5', JPY)).toBeUndefined();
-    expect(toMinor('1.23.456', EUR)).toBeUndefined();
-    expect(toMinor('1.234,5.6', EUR)).toBeUndefined();
-    // With both marks the thousands still go in groups of three.
-    expect(toMinor('12.34,50', EUR)).toBeUndefined();
-    expect(toMinor('1,2.50', EUR)).toBeUndefined();
-  });
-});
-
-describe('unreadableTotals: the ends of the Total filter that are not an amount', () => {
-  it('names the typed ends it cannot read, never an empty one or another filter', () => {
-    expect(unreadableTotals({ total_amount_from: '1.250', total_amount_to: '12,5', total_items_from: 'two' }, PLN)).toEqual(['total_amount_from']);
-    expect(unreadableTotals({ total_amount_from: ' ', total_amount_to: 'abc' }, PLN)).toEqual(['total_amount_to']);
-    expect(unreadableTotals({}, PLN)).toEqual([]);
-  });
-
-  it('reads them in the business’s currency: «12,5» is no amount of yen', () => {
-    expect(unreadableTotals({ total_amount_from: '12,5' }, JPY)).toEqual(['total_amount_from']);
-    expect(unreadableTotals({ total_amount_from: '12,5' }, HUF)).toEqual([]);
-  });
-});
-
-describe('amountExample: the amount the hint under an unreadable Total shows', () => {
-  it('is written with the decimals of the business’s currency, in the page language', () => {
-    expect(amountExample('en', EUR)).toBe('12.50');
-    expect(amountExample('es', PLN)).toBe('12,50');
-    expect(amountExample('en', JPY)).toBe('12');
-    expect(amountExample('es', KWD)).toBe('12,500');
-    expect(amountExample('es')).toBe('12,50');
   });
 });
 

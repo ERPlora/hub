@@ -1135,6 +1135,24 @@ def turn_every_app_on(hub: Hub) -> None:
     _every_app_on(hub.slug, then=lambda forget: forget())
 
 
+def turn_on_born_apps(hub: Hub) -> list[str]:
+    """Inside ``use_hub(hub)``, at its seeding (``base.tenancy.provision``), before the SaaS's photo kept is applied:
+    write down every module of the business ``hub`` just born, those its country requires that the platform turns on by
+    itself and what they need (``activation.born_apps``: Taxes, hub#997) on and not chosen (they take nothing of the
+    plan's limit), every other off; unless it has rows already (its seeding wrote them: the local hubs, born with
+    every app on; or a preparation run again). Outside any operation, before the hub serves anything: what was kept of
+    its apps is forgotten at once. What went on."""
+    host = hub.slug
+    if AppActivation.objects.filter(host=host).exists():
+        return []
+    states = activation.born(activation.born_apps(hub.country), activation.module_graph())
+    AppActivation.objects.bulk_create(
+        AppActivation(host=host, app=label, state=row.state, chosen=row.chosen) for label, row in states.items()
+    )
+    activation.forget(host)
+    return sorted(label for label, row in states.items() if row.on)
+
+
 # ── The provisioning's writes in control (round 2026-10-30 of PLAN-DB, S2a; PLAN-DB §6 and §8) ─────────────────────
 #
 # ``base.tenancy.provision`` makes a hub's database in steps; each step writes control here, in a short transaction of
@@ -4527,8 +4545,9 @@ ACTIVATION_LOCKED_SECONDS = 30
 #: How long an app asked by a newer code waits for a worker of that code (PLAN-DB §7: any other worker queues it +60 s).
 ACTIVATION_NEWER_CODE_SECONDS = 60
 #: How long an app waits for a worker of its code before it fails as ``code_behind`` (PLAN-DB §7: 10 minutes, the
-#: alarm's threshold): after a rollback none is coming, and the business tries again, asked by the code that runs now.
-ACTIVATION_CODE_BEHIND_AFTER = dt.timedelta(minutes=10)
+#: alarm's threshold, ``activation.STUCK_AFTER``): after a rollback none is coming, and the business tries again, asked
+#: by the code that runs now.
+ACTIVATION_CODE_BEHIND_AFTER = activation.STUCK_AFTER
 
 
 class AppLimitReached(OperationError):

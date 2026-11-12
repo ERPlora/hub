@@ -24,7 +24,7 @@ import {
 } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
-import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+import { useSheetWaysOut, useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useLocale, useT } from '../composables/useT';
 import { dueTone, formatDay, formatMoment, isClosed, PRIORITY_TONE, STATUS_TONE } from '../lib/format';
@@ -82,7 +82,11 @@ const newSubtask = ref('');
 const newComment = ref('');
 const editOpen = ref(false);
 const deleteOpen = ref(false);
-useUnsavedFormOnOpen('task-sheet', () => ({ subtask: newSubtask.value, comment: newComment.value }), open);
+/** «Close», Escape and a tap outside ask «Discard changes?» while a comment or a subtask is half-written (hub#1233). */
+const { canDismiss, close } = useSheetWaysOut(
+  useUnsavedFormOnOpen('task-sheet', () => ({ subtask: newSubtask.value, comment: newComment.value }), open),
+  open,
+);
 
 watch(current, () => {
   actionError.value = null;
@@ -171,6 +175,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
 <template>
   <ion-modal
     :is-open="open"
+    :can-dismiss="canDismiss"
     data-testid="task-sheet"
     @did-dismiss="open = false"
   >
@@ -191,7 +196,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
         <ion-buttons slot="end">
           <ion-button
             data-testid="task-sheet-close"
-            @click="open = false"
+            @click="close"
           >
             {{ t('task.actions.close') }}
           </ion-button>

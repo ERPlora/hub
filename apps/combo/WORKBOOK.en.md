@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:29a5786c973545af2a3e768df4142edf163a8dac4e27263016a07b1987c2e339 -->
+<!-- generated from WORKBOOK.md sha256:908962cfe14046d87ff3af4261e7cb1573432cfc1a070c60c59e76dd4cde5996 -->
 
 ## What it is for and who it is for
 
@@ -255,7 +255,8 @@ A minimum or a maximum above 50 is refused, and so are more than 20 courses in a
 holds 20 courses at most."). If the server refuses, the form says so and does not lose what was written. Through the
 assistant, when changing or withdrawing a course said by its name, a name that fits several courses or none brings up
 no card, and if before the "yes" another course or another menu fits better what was said, nothing is touched and the
-new card comes up (BASE-F97).
+new card comes up (BASE-F97). When adding or reordering courses of a menu said by its name, the "yes" counts only for
+the menu the card showed.
 Involved: none
 
 ### COMBO-F06 Choose the products of each course and their supplement
@@ -295,7 +296,8 @@ catalogue does not load, the search box says so with "Retry". A product that doe
 created first in Inventory: the search box finds it as soon as it is saved. Through the assistant, when changing or
 removing a choice said by its product, a name that fits several choices or none brings up no card, and if before the
 "yes" another choice or another menu fits better what was said, nothing is touched and the new card comes up
-(BASE-F97).
+(BASE-F97). When adding or reordering choices, the "yes" counts only for the menu, the course and the product the card
+showed.
 Involved: INVENTORY-F27
 
 ### COMBO-F07 Choose a menu when selling
@@ -504,7 +506,8 @@ its card (BASE-F97), which names each record as the screens name it, never by it
 ("Menu: Menu of the day"), the course by its name ("Course: Starters"), the choice by its product's name ("Choice:
 Lentils"), the product by its name ("New product: Soup") and, when reordering courses or choices or adding several
 products, each one by its name and in the order sent ("Courses: Mains, Starters"). What the person asking cannot see,
-or what no longer exists, is left out. A menu said by its name when changing it, withdrawing it, giving it a photo or
+or what no longer exists, is left out; what was said in words and cannot be read comes up as it was said. A menu said
+by its name when changing it, withdrawing it, giving it a photo or
 reordering its courses is looked up as the action will look it up (the same name before one that contains it), and the
 card shows the menu that will be touched, with its full name ("Menu: Vegan menu" when "vegan" was said). If what was
 said fits several menus or none, no card comes up: the assistant hears "There are several menus called "vegan": Vegan
@@ -515,9 +518,16 @@ by its name when changing or withdrawing it is looked up the same way, inside it
 none, or its menu fits several, no card comes up and the assistant asks which one; the card shows the menu they belong
 to with its full name, and the "yes" counts only for the course or the choice it found: if, before confirming, someone
 adds one that fits better what was said ("Desserts" when "Homemade desserts" was found) or a menu that fits better,
-nothing is touched and the new card comes up (hub#1231). The course and the choice still come up on the card as they
-were said, and so does their menu when adding or reordering courses and choices, without the "yes" being tied to it
-(hub#1245).
+nothing is touched and the new card comes up (hub#1231). The card shows the course and the choice it found ("Course:
+Homemade desserts" when "desserts" was said, "Choice: House flan" when "flan" was said). When adding or reordering
+courses and choices, and with an Inventory product said by its name, the card also shows the menu, the course and the
+product it found, and the "yes" counts only for them: if, before confirming, someone creates one that fits better what
+was said, nothing is touched and the new card comes up; if what was said fits several, the card shows it as it was said
+and the action asks which one (hub#1245). If the menu, the course or the choice comes by its identifier beside a name
+the action does not use (another menu's, another course's or another product's), the card neither reads nor shows that
+name: it says the record of the identifier, as when it comes alone (hub#1250). The same with the identifier of another
+menu or another course that comes beside the course's or the choice's, or beside that of the course a choice is added
+to, reordered in or looked for in: the action does not use it and the card does not show it (hub#1278).
 
 ### What it offers: queries (they read, they change nothing)
 

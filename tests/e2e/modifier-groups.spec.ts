@@ -10,6 +10,7 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, EMPLOYEE, horizontalOverflow, hostPage, login, painted, psql, shown, untilStill } from './helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const STAMP = Date.now().toString(36).toUpperCase();
 const SKU = `E2E-MOD-${STAMP}`;
@@ -233,7 +234,9 @@ test('MODIFIER-F02: «New group» creates it with its rule; a taken name is refu
   await expect(form).toContainText('There is already a group with that name.');
   await expect(form.locator('[data-testid=modifier-group-form-max_choices] input')).toHaveValue('4');
   await shoot(page, 'MODIFIER-F02', () => expect(form).toContainText('There is already a group with that name.'));
+  // «Cancel» asks before losing the refused group (BASE-F05): the person discards it.
   await form.locator('[data-testid=modifier-group-form-cancel]').click();
+  await discardChanges(page);
   await expect(form).toBeHidden();
 });
 
@@ -267,8 +270,8 @@ test('MODIFIER-F03: Edit changes only what is touched, a maximum below the defau
   // Deleting it, after a confirmation that says its options and where it applies go with it.
   await rowAction(page, group.id, 'delete');
   const confirm = dialog(page, 'modifier-groups-delete');
-  await expect(confirm).toContainText('2 option(s) will be deleted with it.');
-  await expect(confirm).toContainText('It will stop applying to 1 product(s) or category(ies).');
+  await expect(confirm).toContainText('2 options will be deleted with it.');
+  await expect(confirm).toContainText('It will stop applying to 1 product or category.');
   await shoot(page, 'MODIFIER-F03-delete', () => expect(confirm).toBeVisible());
   await confirm.locator('[data-testid=modifier-groups-delete-submit]').click();
   await expect(confirm).toBeHidden();
@@ -377,7 +380,9 @@ test('MODIFIER-F05: the group is applied to a product by its SKU and to a catego
   await pickCombo(page, linkForm, 'modifier-link-form-target', SKU, productId);
   await linkForm.locator('[data-testid=modifier-link-form-submit]').click();
   await expect(linkForm).toContainText('This group already applies there.');
+  // «Cancel» asks before losing the refused product (BASE-F05): the person discards it.
   await linkForm.locator('[data-testid=modifier-link-form-cancel]').click();
+  await discardChanges(page);
   await expect(linkForm).toBeHidden();
 
   // It stops applying to the product, after its confirmation: the category stays.

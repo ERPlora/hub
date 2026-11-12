@@ -632,9 +632,12 @@ Pasos:
 4. Pulsa «Ver», o la fila, para abrirla (INVOICE-F17).
 Entra: las facturas del hub.
 Sale: nada; solo se lee.
-Si falla: sin resultados, «Sin resultados»; con un error, el mensaje y «Reintentar». Un total que no
-es un importe dice «Escribe un importe, como 12,50» bajo su campo, y una fecha final anterior a la
-inicial, «La fecha final no puede ser anterior a la inicial.»; ninguno de los dos filtra.
+Si falla: sin resultados, «Sin resultados»; con un error, el mensaje y «Reintentar». El total se lee como
+en cualquier campo de importe del Hub y como en las demás listas (hub#1196: «1.000,50», «1,000.50», «2 500» y
+«12,50 €» filtran); uno que no se puede leer lo dice bajo su campo con las palabras del campo de importe
+(«Esto no es un importe. Escribe una cifra, por ejemplo 12,50.», «Este importe no puede ser negativo.» o, con
+«1.000» en euros, «Este importe se puede leer de dos maneras…»), y una fecha final anterior a la inicial,
+«La fecha final no puede ser anterior a la inicial.»; ninguno de los dos filtra.
 Implicados: ninguno
 
 ### INVOICE-F17 Ver una factura
@@ -1183,7 +1186,8 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   (`tests/e2e/qa/probes/owner-es-invoice-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno,
   «marca como cobrada la FACT-2026-000001» y «rectifícala con una R1» entre las 8 primeras, y una frase propia por
   herramienta solo llega con sus `asks` (`tests/test_assistant_asks.py`). La sonda «…sin tocar caja ni cambiar
-  importes» aún sale 12.ª: live lee el «cambiar» detrás de «ni» como pedido (ERPlora/live#74).
+  importes» sale 5.ª (12.ª antes de ERPlora/live#74): live ya no lee como pedido el «cambiar» detrás de «ni» cuando
+  hay un «sin» antes.
 
 ### Decisiones (dudas abiertas del producto actual, resueltas con el mercado)
 

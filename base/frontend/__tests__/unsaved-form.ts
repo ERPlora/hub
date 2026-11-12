@@ -1,10 +1,11 @@
 // The unsaved-changes contract of a form window (BASE-F05), exercised through its own controls. With the IonModal stub of
 // @erplora/ui (`vi.mock('@ionic/vue', …)` in the window's test), as every window test does.
-//   - `expectUnsavedFormAsksBeforeClosing` — the whole contract of a FormModal window: Android's Back holds it while
+//   - `expectUnsavedFormAsksBeforeClosing` — the whole contract of a form window: Android's Back holds it while
 //     something is typed (hub#1015, hub#1020) and so do its own ways out (hub#1156): «Cancel», the «×», Escape and a tap
-//     outside ask «Discard changes?», and «Keep editing» leaves it open with what was typed.
-//   - `expectUnsavedFormOnAndroidBack` — only the Back, for the windows whose own ways out do not ask yet: those that
-//     are not a FormModal (hub#1233) and those of Caja (hub#1234).
+//     outside ask «Discard changes?», and «Keep editing» leaves it open with what was typed. A FormModal, or a window that
+//     is an `ion-modal` of its own with its close button as `<testid>-close` (hub#1233, `useSheetWaysOut`).
+//   - `expectUntouchedFormClosesAtOnce` — the other half: as opened, each of those ways out closes it without asking;
+//     `expectUntouchedWindowClosesAtOnce` does it for a window a test mounts with `open` as its prop.
 //   - `answerUnsavedQuestion` — answers the question on screen, for a test that follows one way out to its end.
 import { expect, type Mock } from 'vitest';
 
@@ -58,14 +59,16 @@ function escape(content: HTMLElement): void {
   if (!document.contains(content)) document.dispatchEvent(press());
 }
 
-/** The ways out of a FormModal window: its «Cancel» (FormModal's, or the `<testid>-cancel` of a footer of its own,
- *  when it has one), its «×», Escape, and a tap outside when a tap closes it. */
+/** The ways out of a window: its «Cancel» (FormModal's, or the `<testid>-cancel` of a footer of its own, when it has
+ *  one), its «×» (FormModal's, or the `<testid>-close` of a window that is an `ion-modal` of its own), Escape, and a
+ *  tap outside when a tap closes it. */
 function waysOut(modal: HTMLElement): [string, () => void][] {
   const testid = modal.dataset.testid;
-  const cancel = own(modal, '.ep-form-modal__cancel') ?? (testid ? own(modal, `[data-testid="${testid}-cancel"]`) : null);
-  const close = own(modal, '.ep-form-modal__close');
-  const content = own(modal, '.ep-form-modal__content');
-  expect(close, 'the window is a FormModal with its «×»').not.toBeNull();
+  const hook = (part: string) => (testid ? own(modal, `[data-testid="${testid}-${part}"]`) : null);
+  const cancel = own(modal, '.ep-form-modal__cancel') ?? hook('cancel');
+  const close = own(modal, '.ep-form-modal__close') ?? hook('close');
+  const content = own(modal, '.ep-form-modal__content') ?? modal.querySelector<HTMLElement>(':scope > .ion-delegate-host');
+  expect(close, 'the window has its «×»: a FormModal, or its own `<testid>-close`').not.toBeNull();
   const ways: [string, () => void][] = [];
   if (cancel) ways.push(['«Cancel»', () => cancel.click()]);
   ways.push(['the «×»', () => close!.click()]);
@@ -86,13 +89,8 @@ async function expectBackHolds(window: UnsavedFormWindow, between: (overlay: Ele
   expect(unsavedChangesIn(overlay!)).toBeUndefined();
 }
 
-/** Only Android's Back: as opened nothing holds it, a change does, and restored as opened it lets go. */
-export async function expectUnsavedFormOnAndroidBack(window: UnsavedFormWindow): Promise<void> {
-  await expectBackHolds(window, async () => {});
-}
-
-/** Back, and every way out of the window's FormModal, ask «Discard changes?» while something is typed; «Keep editing»
- *  leaves the window open and still holding what was typed. */
+/** Back, and every way out of the window, ask «Discard changes?» while something is typed; «Keep editing» leaves the
+ *  window open and still holding what was typed. */
 export async function expectUnsavedFormAsksBeforeClosing(window: UnsavedFormWindow): Promise<void> {
   await expectBackHolds(window, async (overlay) => {
     const modal = overlay.closest<HTMLElement>('[data-stub="ion-modal"]');
@@ -115,5 +113,44 @@ export async function expectUnsavedFormAsksBeforeClosing(window: UnsavedFormWind
       expect(presented(modal!), `«Keep editing» after ${way} keeps the window open`).toBe(true);
       expect(unsavedChangesIn(overlay), `«Keep editing» after ${way} keeps what was typed`).toBeDefined();
     }
+  });
+}
+
+/** As opened, every way out of the window closes it at once and asks nothing; `reopen` opens it again after each. */
+export async function expectUntouchedFormClosesAtOnce(window: {
+  overlay: UnsavedFormWindow['overlay'];
+  reopen: () => Promise<void> | void;
+  confirm?: Mock;
+}): Promise<void> {
+  const modalOf = () => window.overlay()?.closest<HTMLElement>('[data-stub="ion-modal"]') ?? null;
+  expect(modalOf(), 'the window is an IonModal').not.toBeNull();
+  const count = waysOut(modalOf()!).length;
+  for (let index = 0; index < count; index++) {
+    const modal = modalOf()!;
+    expect(presented(modal), 'the window is open').toBe(true);
+    const [way, leave] = waysOut(modal)[index];
+    leave();
+    await flush();
+    expect(question(), `${way} as opened asks nothing`).toBeNull();
+    if (window.confirm) expect(window.confirm, `${way} as opened asks nothing`).not.toHaveBeenCalled();
+    expect(presented(modal), `${way} as opened closes the window`).toBe(false);
+    await window.reopen();
+  }
+}
+
+/** A window a test mounts with `open` as its prop, by its `data-testid`: as opened, each way out closes it without
+ *  asking, and the test's prop opens it again (hub#1233, hub#1234). */
+export async function expectUntouchedWindowClosesAtOnce(
+  mounted: { wrapper: { setProps(props: { open: boolean }): Promise<void> }; inDoc(testid: string): HTMLElement | null },
+  testid: string,
+): Promise<void> {
+  await expectUntouchedFormClosesAtOnce({
+    overlay: () => mounted.inDoc(testid),
+    reopen: async () => {
+      await mounted.wrapper.setProps({ open: false });
+      await mounted.wrapper.setProps({ open: true });
+      await flush();
+      await flush();
+    },
   });
 }

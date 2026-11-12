@@ -13,6 +13,7 @@ from apps.service.events import (
     CATEGORY_EVENTS,
     CATEGORY_UPDATED,
     CUSTOMER_GONE,
+    CUSTOMER_RESTORED,
     GRANT_EVENTS,
     GRANT_GRANTED,
     PACKAGE_EVENTS,
@@ -25,8 +26,8 @@ from apps.service.events import (
 
 #: A service row shows its category's name; deleting the category leaves it without one.
 CATEGORY_SHOWN = [CATEGORY_UPDATED, CATEGORY_DELETED]
-#: A voucher sold shows its customer's name, or the date the card went.
-CUSTOMER_NAMED = [*CUSTOMER_GONE, "customer.customer.updated"]
+#: A voucher sold shows its customer's name, or the date the card went (until it comes back from the separate copy).
+CUSTOMER_NAMED = [*CUSTOMER_GONE, CUSTOMER_RESTORED, "customer.customer.updated"]
 
 live("service.service.list", on=[*SERVICE_EVENTS, *CATEGORY_SHOWN])
 live("service.service.get", on=[*SERVICE_EVENTS, *CATEGORY_SHOWN])
@@ -60,7 +61,8 @@ live(
     "service.grant.tender_options",
     on=[*GRANT_EVENTS, *SESSION_EVENTS, *PACKAGE_EVENTS, *CUSTOMER_NAMED],
 )
+# A session names its customer and the professional who did it (hub#1236).
 live(
     "service.movement.list",
-    on=[*GRANT_EVENTS, *SESSION_EVENTS, SERVICE_UPDATED, *CUSTOMER_NAMED],
+    on=[*GRANT_EVENTS, *SESSION_EVENTS, SERVICE_UPDATED, *CUSTOMER_NAMED, *STAFF_MEMBER_EVENTS],
 )

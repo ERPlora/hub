@@ -279,7 +279,7 @@ export const EMPLOYEE: Credentials = { email: 'employee@example.com', password: 
 /** Where the local SaaS writes its mails (Django's file backend): `saas/.mail` beside the Hub, or `E2E_MAIL_DIR`. */
 export const MAIL_DIR = mailDirFrom(process.env, REPO_DIR);
 /** Slack between our clock and the mail file's modification time, in ms. */
-const MAIL_CLOCK_SLACK = 50;
+export const MAIL_CLOCK_SLACK = 50;
 /** What each step of `login` waits outside a test, or in one with no time limit, in ms. */
 const LOGIN_STEP_DEFAULT = 30_000;
 

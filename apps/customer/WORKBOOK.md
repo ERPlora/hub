@@ -200,6 +200,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | CUSTOMER-F30 | Dar la ficha de un cliente a otras apps | hecho | común |
 | CUSTOMER-F31 | Ver las cifras de los clientes | hecho | común |
 | CUSTOMER-F32 | Apuntar alergias o la prueba de sensibilidad con su permiso | hecho | peluquería |
+| CUSTOMER-F33 | Recuperar una ficha eliminada | hecho | común |
 
 «Hecho»: servidor y páginas con sus tests (de las páginas y de extremo a extremo en Chrome).
 «Descartado»: no entra en la app por ahora; el motivo y su issue van en su «Estado».
@@ -229,7 +230,7 @@ un email válido.». Un teléfono que no es un número de su país: «No es un t
 revisa las cifras o escríbelo con su prefijo internacional (+44…).». Un país que no existe: «Elige
 un país de la lista.». Una fecha que no existe en «Cumpleaños» o «Aniversario» (un 31/02): «Introduce
 una fecha válida.». No se guarda nada. Los campos personalizados no se piden en el alta.
-Implicados: WHATSAPP_INBOX-F04
+Implicados: WHATSAPP_INBOX-F04, BASE-F114 (el personal de ERPlora recupera desde una copia aparte las fichas que se perdieron, cada una por esta misma alta)
 
 ### CUSTOMER-F02 Buscar y filtrar fichas
 <!-- origen: fi:modules/customers#navigation-web-components fi:modules/customers#query-customers-list fi:modules/customers#query-customers-stats old:customers/workflow/fichas.md#customers-f02 -->
@@ -243,13 +244,19 @@ Pasos:
    el `00` ni el cero nacional, así que la ficha se encuentra se escriba como se escriba.
 2. Con los filtros: etapa, origen, activo y gastado por rango («Desde / Hasta», en la moneda del negocio,
    la de su país en Ajustes → Negocio, con sus decimales: el yen no tiene; con o sin su símbolo, «12,50 zł»).
+   El importe se escribe como en cualquier campo de importe del Hub y como en las demás listas (hub#1196): con
+   o sin puntos de miles («1.000,50», «1,000.50», «2 500»); «1.000» en euros puede ser mil euros o un euro, y
+   pide escribir los decimales.
 3. Ordena por nombre, email, teléfono, etapa, gastado, última compra o fecha de alta. De entrada, por
    nombre de la A a la Z, 50 por página (como mucho 100).
 4. Toca una fila para abrir su ficha (CUSTOMER-F03).
 Entra: el texto, los filtros y el orden.
 Sale: nada; solo lectura. Las fichas eliminadas, unidas a otra o con los datos borrados no salen;
 las marcadas como no activas, sí.
-Si falla: la tabla enseña el error con «Reintentar». Sin resultados: «Sin clientes.».
+Si falla: la tabla enseña el error con «Reintentar». Sin resultados: «Sin clientes.». Un gastado que no se
+puede leer no filtra y lo dice bajo su caja, con las palabras del campo de importe: «Esto no es un importe.
+Escribe una cifra, por ejemplo 12,50.», «Este importe no puede ser negativo.» o, con «1.000», «Este importe
+se puede leer de dos maneras…».
 Implicados: ninguno
 
 ### CUSTOMER-F03 Abrir la ficha de un cliente
@@ -356,7 +363,7 @@ eso es CUSTOMER-F16.
 Si falla: una ficha que no existe: «Este cliente ya no está disponible.», sin avisar a nadie. Sobre
 una ficha ya eliminada, unida a otra o con los datos borrados NO falla: responde bien y vuelve a
 avisar.
-Implicados: SERVICE-F29
+Implicados: SERVICE-F29, CUSTOMER-F33 (la ficha eliminada puede volver tal como era)
 
 ### CUSTOMER-F08 Importar fichas desde un CSV
 <!-- origen: fi:modules/customers#command-customers-bulk_create-handler-wasm-bulk_create old:customers/workflow/fichas.md#customers-f08 -->
@@ -568,12 +575,13 @@ las compras, el gastado, la última compra y la fecha de alta, las compras y los
 y qué se guardó). El aviso de datos borrados (`customer.customer.erased`) lo escuchan WhatsApp,
 Servicios, Citas, Reservas, Reservas online y Mesas para vaciar sus copias, y Automatizaciones, que cancela
 las ejecuciones que aún podían seguir con sus datos (esperando, preguntando o reanudables) y les hace
-olvidar lo que leyeron: ninguna le manda ya nada. Ventas y Facturación conservan su copia fiscal (es un
-documento fiscal).
+olvidar lo que leyeron: ninguna le manda ya nada; y toda ejecución que nombra su ficha, también una ya
+terminada, olvida los textos libres de su historial que pueden llevar su nombre (FLOW-F16). Ventas y
+Facturación conservan su copia fiscal (es un documento fiscal).
 Si falla: «Este cliente ya no está disponible.» si no existe. Repetirlo no cambia los datos ni
 duplica la auditoría, pero vuelve a avisar.
 Implicados: RESERVATION-F22, SERVICE-F29, WHATSAPP_INBOX-F11, APPOINTMENT-F24, ONLINE_BOOKING-F12, TABLE-F31,
-FLOW-F23, FLOW-F24
+FLOW-F16, FLOW-F23, FLOW-F24
 
 ### CUSTOMER-F17 Asignar un cliente a la venta en el TPV
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f09 fi:modules/customers#slot-sales-pos-customer_context-erp-customers-pos-search old:customers/workflow/con-otros-modulos.md#customers-f17 wf:peluqueria-dia#rec_peluqueria-f10 -->
@@ -917,6 +925,30 @@ intento (hub#854). «Este cliente ya no está disponible.» si la ficha ya no es
 fichas ve el bloque sin botones.
 Implicados: CUSTOMER-F13, CUSTOMER-F16
 
+### CUSTOMER-F33 Recuperar una ficha eliminada
+<!-- origen: nuevo (BASE-F114: recuperar desde una copia aparte lo que el negocio perdió) gh:hub#1306 -->
+Estado: hecho
+Actor: el personal de ERPlora, cuando el negocio lo pide (en el negocio ninguna pantalla deshace una eliminación)
+Pantalla: ninguna del negocio; el admin de Hubs › Copias aparte › «Recuperar en el negocio…» (BASE-F114)
+Pasos:
+1. El negocio eliminó por error una o varias fichas (CUSTOMER-F07) y pide recuperarlas.
+2. El personal de ERPlora hace una copia aparte del negocio de un momento anterior y recupera desde ella los
+   clientes (BASE-F114, pasos 6 a 11).
+3. Cada ficha que el negocio eliminó y aún guarda vuelve a la lista, al TPV y a la búsqueda por teléfono: LA MISMA
+   ficha, con sus compras y lo gastado, sus consentimientos, sus notas y su actividad, sus datos de salud, sus
+   grupos, etiquetas y campos propios y sus pedidos enlazados. Recuperaciones la cuenta como restaurada
+   («Clientes: 1 restaurado»).
+Entra: la ficha eliminada, por su identificador.
+Sale: la ficha viva otra vez, sin cambiar ninguno de sus datos, y el aviso de ficha recuperada
+(`customer.customer.restored`).
+Si falla: una ficha unida a otra (CUSTOMER-F13) o con los datos personales borrados (CUSTOMER-F16) no vuelve nunca:
+su historia sigue en la otra ficha, o sus datos ya no existen («Este cliente ya no está disponible.»). Tampoco vuelve
+si el negocio ya creó otra vez a la misma persona (el mismo nombre, teléfono y email, CUSTOMER-F12): se queda la que
+hizo. Una ficha que el negocio ya no tiene en absoluto se crea de nuevo (CUSTOMER-F01). Sobre una ficha viva no
+falla: responde bien y vuelve a avisar. Lo que se cobró a su nombre mientras estuvo eliminada no se suma
+(CUSTOMER-F20).
+Implicados: BASE-F114, CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16
+
 ## Qué comparten los verticales
 
 Tocar una pieza de esta tabla afecta a la peluquería **y** al restaurante.
@@ -928,7 +960,7 @@ Tocar una pieza de esta tabla afecta a la peluquería **y** al restaurante.
 | La búsqueda de texto de la lista (tabla, fusión, TPV y selector de Citas) | F02, F13, F17, F18, F25 |
 | El aviso de ficha creada o actualizada, que escucha WhatsApp | F01, F04, F08, F18, F26 |
 | La fusión y su aviso | F13 |
-| El borrado de datos y su aviso, y la eliminación | F07, F16 |
+| El borrado de datos y su aviso, la eliminación y la recuperación de una ficha eliminada | F07, F16, F33 |
 | El buscador del TPV, la copia fiscal y el historial de compras | F17, F18, F19, F20, F21, F23 |
 | El consentimiento por canal | F14, F15 |
 | Grupos, etiquetas y campos personalizados | F06, F27, F28, F29 |
@@ -946,7 +978,17 @@ campo, por su nombre; si dos fichas encajan, se pide el id, el teléfono o el em
 asistente pide confirmar con su tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunca por
 su id: la ficha («Cliente: Ana García»), la ficha duplicada de una unión, los grupos y las etiquetas que se le ponen,
 el grupo, la etiqueta o el campo que se cambia o se elimina, por su nombre, y el pedido abierto como lo nombra Venta
-(su título o, sin él, su importe; con Venta apagada, no sale). Lo que quien pregunta no puede ver no sale.
+(su título o, sin él, su importe; con Venta apagada, no sale). Lo que quien pregunta no puede ver no sale. En una
+unión, si la ficha que se queda o la duplicada llegan por su id junto al nombre de otra ficha, la tarjeta no lee ni
+enseña ese nombre, que la unión no usa: dice solo las dos fichas que se juntan (hub#1272). Igual en todo lo demás
+(cambiar, eliminar o borrar los datos de una ficha, ponerle grupos o etiquetas, añadirle una nota, una actividad o un
+consentimiento, retirarlo, ponerla en un pedido, y cambiar o eliminar un grupo, una etiqueta o un campo): si llega el
+id de la ficha, el grupo, la etiqueta o el campo junto al nombre de otro, la tarjeta dice solo el del id, que es el
+que se toca (hub#1280). Dicho solo por su nombre, su teléfono o su email, la tarjeta dice la ficha, el grupo, la
+etiqueta o el campo que va a tocar la acción («Cliente: Ana García» para «ana@ejemplo.com»); si no encaja con ninguno
+o encaja con varios, lo dice tal como se dijo y la acción responde que no lo encuentra o que hay varios. Si entre la
+tarjeta y el «sí» ese nombre pasa a ser de otro (otra ficha con ese email, un grupo activo con ese nombre), no se toca
+nada y sale la tarjeta nueva.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -968,9 +1010,9 @@ el grupo, la etiqueta o el campo que se cambia o se elimina, por su nombre, y el
 | Qué cliente tiene un pedido | ver | F17, F19 | sí | `customer.order.customer` |
 | Los pedidos de una ficha (también para las API keys) | ver | F19 | sí | `customer.order.list` |
 | Los datos de salud de una ficha y su permiso (solo en pantalla) | ver | F32 | sí | `customer.health.detail` |
-| Un grupo por su id, también uno no activo: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97) | ver | F06, F27 | no | `customer.group.detail` |
-| Una etiqueta por su id, también una no activa: lo que lee la tarjeta del asistente (BASE-F97) | ver | F06, F28 | no | `customer.tag.detail` |
-| Un campo personalizado por su id: lo que lee la tarjeta del asistente (BASE-F97) | ver | F04, F29 | no | `customer.field.detail` |
+| Un grupo por su id o por su nombre, también uno no activo: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97) | ver | F06, F27 | no | `customer.group.detail` |
+| Una etiqueta por su id o por su nombre, también una no activa: lo que lee la tarjeta del asistente (BASE-F97) | ver | F06, F28 | no | `customer.tag.detail` |
+| Un campo personalizado por su id o por su nombre: lo que lee la tarjeta del asistente (BASE-F97) | ver | F04, F29 | no | `customer.field.detail` |
 | El nombre de un pedido abierto, como lo nombra Venta: lo que lee la tarjeta del asistente (BASE-F97) | ver (y ver las ventas, en Venta) | F19 | no | `customer.order.get` |
 
 ### Lo que ofrece: acciones (cambian datos)
@@ -983,6 +1025,7 @@ el grupo, la etiqueta o el campo que se cambia o se elimina, por su nombre, y el
 | Sustituye los grupos de una ficha | gestionar | F06 | `customer.customer.set_groups` |
 | Sustituye las etiquetas de una ficha | gestionar | F06 | `customer.customer.set_tags` |
 | Elimina una ficha (conserva sus datos) | eliminar | F07 | `customer.customer.delete` |
+| Devuelve a la lista una ficha eliminada, tal como era (solo el sistema, al recuperar desde una copia aparte) | sistema | F33 | `customer.customer.restore` |
 | Une una ficha duplicada en otra | unir | F13 | `customer.customer.merge` |
 | Borra los datos personales de una ficha | borrar datos | F16 | `customer.customer.erase` |
 | Añade una nota | gestionar | F05 | `customer.note.add` |
@@ -1012,6 +1055,7 @@ Los avisos llevan solo identificadores, nunca datos personales: quien necesite l
 | Grupos cambiados | Guardar grupos con algún cambio | `id` | `customer.customer.groups_changed` |
 | Etiquetas cambiadas | Guardar etiquetas con algún cambio | `id` | `customer.customer.tags_changed` |
 | Ficha eliminada | Eliminar (también la repetición) | `id` | `customer.customer.deleted` |
+| Ficha recuperada | Recuperar una ficha eliminada (también la repetición) | `id` | `customer.customer.restored` |
 | Fichas unidas | Fusionar | `id` (la que se queda) y `absorbed_id` | `customer.customer.merged` |
 | Datos personales borrados | Borrar datos (también la repetición) | `id` | `customer.customer.erased` |
 | Nota añadida | Añadir nota | `id` (la nota) y `customer_id` | `customer.note.added` |
@@ -1063,7 +1107,9 @@ lo hace con su aprobación. Exportar es una lectura y no se aprueba; eliminar fi
 etiquetas y borrar datos personales son solo del propietario y del administrador, y nunca se piden.
 
 Apuntar y anular compras no es de ningún papel: lo hace el sistema al cobrarse o anularse una venta
-(`customer.record_purchase`, que ninguna app declara y por eso solo tiene el sistema).
+(`customer.record_purchase`, que ninguna app declara y por eso solo tiene el sistema). Tampoco devolver una ficha
+eliminada: lo hace el sistema cuando el personal de ERPlora recupera desde una copia aparte (CUSTOMER-F33,
+`customer.restore`, que tampoco declara ninguna app).
 
 El servidor aplica estos permisos aunque la pantalla enseñe el botón, también por la API y el
 asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aquí el empleado.
@@ -1094,6 +1140,17 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   ninguna pantalla la pide; exportar, eliminar y borrar datos nunca. La pantalla envuelve esas órdenes
   en `withApproval` (`base/frontend/lib/approval.ts`) y enseña sus botones también a quien solo tiene
   `customer.manage`; `tests/test_approvals.py` es el contrato.
+- **Recuperar desde una copia aparte** (BASE-F114, hub#1257, hub#1306): `apps.py` responde a la plataforma
+  (`recoverable_from_copy`, `base.recovery.Recoverable`) con lo que devuelve una copia aparte del negocio: de sus fichas
+  vivas (`queries.cards_in_copy`, por SQL sobre los nombres del modelo: la copia no es un negocio y no tiene alias), las
+  que el negocio aún guarda eliminadas vuelven las mismas por `customer.customer.restore` (`queries.cards_deleted_in_business`:
+  ni unidas a otra, ni con los datos borrados, ni hechas otra vez, con `has_live_twin`, la misma regla que la
+  importación; CUSTOMER-F33), y las que ya no tiene se crean por `customer.customer.create`
+  (`queries.cards_not_in_business`). `customer.customer.restore` no tiene ruta ni es herramienta del asistente
+  (`ai=INTERNAL`) y su permiso, `customer.restore`, no lo declara ninguna app: solo lo tiene el sistema. Lee desde
+  `0001_initial`; una migración que quite o renombre una de sus columnas cambia también `cards_in_copy` y su
+  `reads_since`. Tests: `tests/test_recovery.py`, `tests/test_services.py` (la operación) y, de punta a punta,
+  `base/tenancy/tests/test_recovery.py`.
 - Las reacciones a Venta (`events.REACTIONS`, `events.react`) las entrega el relay del outbox del
   worker en cada pasada (`base.relay`); `base/tests/test_relay.py` recorre el cobro, la anulación y la
   devolución hasta la ficha.
@@ -1119,14 +1176,28 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   detrás, sin permiso, con un id de otro negocio o de algo que ya no está, el registro queda fuera, nunca su id:
   `tests/test_assistant_card_records.py`, y el trinquete `UNNAMED_REFERENCES` de
   `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca.
-- La fusión (F13) es la única escritura cuyas referencias escritas también llevan marca: `customer` y `absorbed` de
-  `MergeIn`, con `A_CUSTOMER_REFERENCE` (`customer.customer.detail` por `customer`). Así, «junta la ficha del
+- En la fusión (F13), las referencias escritas `customer` y `absorbed` de `MergeIn` llevan `A_CUSTOMER_REFERENCE`
+  (`customer.customer.detail` por `customer`), la única marca de una referencia escrita sin `as_said`. Así, «junta la ficha del
   611 222 444 dentro de la del 611 222 333» sale en la tarjeta como «Cliente: Ana QA» y «Ficha duplicada: Ana QA
   copia», no como los dos teléfonos: se ve quién se queda antes de algo que no se deshace. Si una referencia no encaja
   con una sola ficha viva, ese dato queda fuera de la tarjeta, como un id sin nombre, y la fusión responde con el mismo
   aviso que la ficha (`customer.customer_ambiguous` o `customer.customer_unavailable`) sin tocar nada. Su `AI` dice que
   `customer` es la que se queda («A dentro de B»: B es `customer`, A es `absorbed`) y que no se para en leerlas:
-  `tests/test_assistant_asks.py` (hub#1084).
+  `tests/test_assistant_asks.py` (hub#1084). Junto al id de su propia ficha (`id` para `customer`, `absorbed_id`
+  para `absorbed`), que `find_customer` usa sin mirar el nombre, la tarjeta deja ese nombre sin leer
+  (`base.schemas.unless_given`, hub#1272; `UNLESS` de `tests/test_assistant_card_records.py`); junto al id de la otra
+  ficha, lo lee.
+- En las demás escrituras, la ficha, el grupo, la etiqueta o el campo dichos con palabras (`customer` de
+  `CustomerRefIn`, `CustomerOfIn` y `OrderLinkIn`, `group` de `GroupRefIn`, `tag` de `TagRefIn` y `field` de
+  `FieldRefIn`) llevan `A_CUSTOMER_SAID`, `A_GROUP_SAID`, `A_TAG_SAID` y `A_FIELD_SAID`: se leen por esas palabras con
+  `customer.customer.detail`, `customer.group.detail`, `customer.tag.detail` y `customer.field.detail`, que buscan
+  con el mismo `find_customer`, `find_group`, `find_tag` y `find_field` que la escritura (el grupo, la etiqueta o el
+  campo activo antes que uno que ya no lo está), y lo encontrado va en la huella del «sí» (BASE-F97). Con `as_said`,
+  si las palabras no encajan con uno solo, o no hay persona detrás, la tarjeta las dice tal como llegan, como antes de
+  la marca. Junto al id de su propio registro (`id` o `customer_id`, el que la escritura usa sin mirar el nombre), la
+  tarjeta no las lee ni las enseña (`unless_given`, hub#1280; `UNLESS_SAID` de `tests/test_assistant_card_records.py`,
+  con el control del «sí» que toca solo el registro del id). Las listas `groups` y `tags` de `set_groups` y
+  `set_tags` no van con `unless`: la escritura usa los nombres junto a los ids.
 - Búsqueda: cada ficha guarda `search_text` (nombre, email, teléfono, NIF y empresa en minúsculas y
   sin acentos), recalculado en `Customer.save()`; así no hace falta la extensión `unaccent`.
 - Estados de una ficha: viva (`deleted_at` vacío), eliminada (`deleted_at`), unida (`merged_into`) y
@@ -1255,8 +1326,8 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
 
 ## Lo que queda fuera
 
-Nada abierto: el país de un teléfono sin prefijo (hub#527) ya es el del negocio en Clientes y en todas
-las apps que buscan una ficha por su teléfono.
+El país de un teléfono sin prefijo (hub#527) ya es el del negocio en Clientes y en todas las apps que buscan una
+ficha por su teléfono.
 
 ## Lo que NO hace, a propósito
 

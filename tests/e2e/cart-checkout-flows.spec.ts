@@ -25,6 +25,7 @@ import {
   signedIn,
   snap,
 } from './cart-checkout-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
@@ -59,13 +60,15 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await expect(row).toContainText('€0.00');
         expect(psql(`select currency || ' ' || total_amount from cart_checkout_cart where id = '${firstId}'`)).toBe('EUR 0');
 
-        // The same session again: refused under Session, with what was typed kept.
+        // The same session again: refused under Session, with what was typed kept. «Cancel» then asks before losing it
+        // (BASE-F05), and the person discards it.
         await view.locator('[data-testid=cart-checkout-carts-add]').click();
         await page.locator('[data-testid=cart-checkout-cart-form-session] input').fill(first);
         await submit.click();
         await expect(page.locator('[data-testid=cart-checkout-cart-form]')).toContainText('There is already a cart with that session.');
         await expect(page.locator('[data-testid=cart-checkout-cart-form-session] input')).toHaveValue(first);
         await page.locator('[data-testid=cart-checkout-cart-form-cancel]').click();
+        await discardChanges(page);
         await expect(page.locator('[data-testid=cart-checkout-cart-form-submit]')).toBeHidden();
         expect(psql(`select count(*) from cart_checkout_cart where session_token = '${first}'`)).toBe('1');
       });
@@ -107,16 +110,17 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await totalFrom('1.236,06');
         await expect(row).toBeVisible();
         await expect(rowOf(page, 'cart-checkout-carts', firstId)).toHaveCount(0);
-        // «1.250» is 1.250 € or 1,25 €: it says so under its box (in the panel) and filters nothing.
+        // «1.250» is 1.250 € or 1,25 €: it says both under its box (in the panel), as every amount filter of the Hub
+        // (hub#1196), and filters nothing.
         await totalFrom('1.250');
         await funnel.click();
-        await expect(view.getByText('Type an amount, like 12.50')).toBeVisible();
+        await expect(view.getByText('This amount can be read in two ways: «1.250» could be €1,250.00 or €1.25. Write the decimals so there is no doubt.')).toBeVisible();
         await expect(rowOf(page, 'cart-checkout-carts', firstId)).toBeVisible();
         await totalFrom('');
         // «Apply» closed the panel: opened again, its box no longer warns (else the check below proves nothing).
         await funnel.click();
         await expect(sheet).toBeVisible();
-        await expect(view.getByText('Type an amount, like 12.50')).toHaveCount(0);
+        await expect(view.getByText('This amount can be read in two ways: «1.250» could be €1,250.00 or €1.25. Write the decimals so there is no doubt.')).toHaveCount(0);
         await view.locator('[data-testid=cart-checkout-carts-filters-close]').click();
         await expect(sheet).toBeHidden();
       });

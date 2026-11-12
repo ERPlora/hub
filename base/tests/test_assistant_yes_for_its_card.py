@@ -47,6 +47,43 @@ def yes_to_its_card(person: OperationContext, write: str, arguments: dict, meanw
     return yes_to(plan, turn_of=lambda *calls, decision: turn_as(person, *calls, decision=decision))
 
 
+def read_as(mark: dict) -> dict:
+    """How the card reads a datum by its mark (``names``), but for the data beside which it leaves it unread
+    (``unless``, hub#1250): an app compares how it reads each datum apart from where it does not."""
+    return {"refers": {key: value for key, value in mark["refers"].items() if key != "unless"}}
+
+
+def unless_of(mark: dict) -> set[str]:
+    """The data beside which the card leaves a datum by its mark unread (``unless``, hub#1250)."""
+    return set(mark["refers"].get("unless", ()))
+
+
+def unless_marked(writes, mark: dict) -> dict[tuple[str, str], set[str]]:
+    """Beside which data the card leaves unread each datum of ``writes`` it reads as ``mark`` (``read_as``): an app's
+    ``unless`` table (hub#1250), found by the mark and not by the datum's name."""
+    return {
+        (op.name, datum): unless_of(field.json_schema_extra)
+        for op in writes
+        for datum, field in op.input.model_fields.items()
+        if isinstance(field.json_schema_extra, dict)
+        and "refers" in field.json_schema_extra
+        and read_as(field.json_schema_extra) == read_as(mark)
+    }
+
+
+def unless_by_id(writes) -> dict[tuple[str, str], set[str]]:
+    """Beside which data the card leaves unread each datum of ``writes`` it reads by its id (``names(…, by="id")``),
+    whatever record it names: an app's ``unless`` table of its ids (hub#1278), every one of them, so that a new id the
+    write leaves aside for its record's comes in it."""
+    return {
+        (op.name, datum): unless_of(field.json_schema_extra)
+        for op in writes
+        for datum, field in op.input.model_fields.items()
+        if isinstance(field.json_schema_extra, dict)
+        and field.json_schema_extra.get("refers", {}).get("by") == "id"
+    }
+
+
 def said(plan: dict) -> list[tuple[str, object]]:
     return [(field["name"], field["value"]) for field in plan["confirm"]["fields"]]
 

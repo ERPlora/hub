@@ -278,12 +278,14 @@ def setup_status(ctx: OperationContext, data: SetupStatusIn) -> dict:
 
 
 def _platform_steps(ctx: OperationContext, on: frozenset[str], country: str, demo_hub: bool) -> list[dict]:
-    """«Your apps» (some business app on), «Turn on <app>» for each app mandatory in the business's ``country`` that is
-    off (hub#997) and «Your team» (more than one active person), for who runs the hub: who turns apps on and off."""
+    """«Your apps» (some business app on, but those its country's businesses are born with: with them alone the till has
+    nothing to sell, hub#997), «Turn on <app>» for each app mandatory in the business's ``country`` that is off (hub#997)
+    and «Your team» (more than one active person), for who runs the hub: who turns apps on and off."""
     if not ctx.has(ADMINISTER_HUB):
         return []
     business_apps = home.business_apps()
-    if any(label in on for label in business_apps):
+    born = activation.born_apps(country)
+    if any(label in on and label not in born for label in business_apps):
         apps_state = home.STATE_DONE
     else:
         apps_state = home.STATE_PENDING if business_apps else home.STATE_UNAVAILABLE
@@ -649,6 +651,18 @@ def activation_next_at(host: str) -> dt.datetime | None:
     if waiting.filter(state=activation.CREATING, next_attempt_at__isnull=True).exists():
         return timezone.now()
     return waiting.aggregate(next=Min("next_attempt_at"))["next"]
+
+
+def activations_stuck(host: str, now: dt.datetime) -> int:
+    """How many apps of ``host``'s business are stuck turning on (hub#610; PLAN-DB §7): ``creating`` since it was asked
+    for more than ``activation.STUCK_AFTER`` before ``now`` (``changed_at``: a schema held or a newer code's request
+    puts it off without moving it), or ``failed``, at once: an error the business already sees, and each retry moves its
+    ``changed_at``. Only the apps this code knows."""
+    return (
+        AppActivation.objects.filter(host=host, app__in=list(activation.module_graph()))
+        .filter(Q(state=activation.CREATING, changed_at__lt=now - activation.STUCK_AFTER) | Q(state=activation.FAILED))
+        .count()
+    )
 
 
 def _first_screen(ctx: OperationContext, config: Any) -> str | None:

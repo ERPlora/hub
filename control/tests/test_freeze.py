@@ -13,6 +13,7 @@ changes nothing; each real change records its event in control's outbox, in the 
 """
 
 import datetime as dt
+import uuid
 from importlib import import_module
 
 import pytest
@@ -66,6 +67,24 @@ class TestGet:
         done = Hub.objects.create(slug="other", status=Hub.Status.FAILED)
         HubDue.objects.create(hub=working, due_at=now, lease_until=now + dt.timedelta(seconds=60), lease_owner="w1")
         HubDue.objects.create(hub=done, due_at=now, lease_until=now - dt.timedelta(seconds=1), lease_owner="w1")
+
+        assert queries.freeze_get(support_ctx, FreezeGetIn()).working == 1
+
+    def test_it_counts_the_separate_copies_the_worker_still_makes_under_their_own_lease(self, support_ctx):
+        # A separate copy (hub#1213) makes a database without the hub's lease: the upgrade waits for it too.
+        from control.models import RestoredCopy
+
+        now = timezone.now()
+        hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")
+        for lease_until in (now + dt.timedelta(seconds=60), now - dt.timedelta(seconds=1), None):
+            RestoredCopy.objects.create(
+                hub=hub,
+                restore_point=now,
+                db_name=f"hub_copy_{uuid.uuid7().hex}",
+                asked_by="root",
+                lease_owner="w1" if lease_until else "",
+                lease_until=lease_until,
+            )
 
         assert queries.freeze_get(support_ctx, FreezeGetIn()).working == 1
 
