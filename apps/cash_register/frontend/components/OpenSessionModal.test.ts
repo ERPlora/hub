@@ -141,17 +141,24 @@ describe('OpenSessionModal: a business whose money cannot be read (hub#938)', ()
   });
 });
 
-describe('OpenSessionModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
-  it('as opened closes, also once the only drawer is chosen alone; a change asks; restored closes again', async () => {
+describe('OpenSessionModal: unsaved changes ask before closing (hub#1031, hub#1234, BASE-F05)', () => {
+  it('a typed float: Back, «Cancel», the «×», Escape and a tap outside ask «Discard changes?»; restored, Back closes', async () => {
     const s = await setup();
     await s.result(REGISTERS, page([{ id: 'r1', name: 'Bar', is_active: true }]));
     expect(prop(s.inDoc('cash-register-open-register'), 'value')).toBe('r1');
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('cash-register-open'),
       change: () => ionValue(s.inDoc('cash-register-open-balance'), '150,50', 'ionInput'),
       restore: () => ionValue(s.inDoc('cash-register-open-balance'), '', 'ionInput'),
     });
+  });
+
+  it('as opened, with the only drawer chosen alone, «Cancel», the «×», Escape and a tap outside close it without asking', async () => {
+    const s = await setup();
+    await s.result(REGISTERS, page([{ id: 'r1', name: 'Bar', is_active: true }]));
+    const { expectUntouchedWindowClosesAtOnce } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUntouchedWindowClosesAtOnce(s, 'cash-register-open');
   });
 });
 

@@ -536,8 +536,7 @@ Pasos:
      cambios» la cierra (hub#1015, hub#1020, hub#1031, hub#1046). Esas mismas ventanas hacen la misma pregunta al
      pulsar «Cancelar», «Cerrar», la «×» o Escape y al tocar fuera, en el móvil y en el ordenador, y sin nada escrito
      se cierran sin preguntar (hub#1023, hub#1156; las fichas de Tarea y Proyecto y el alta rápida de cliente del TPV,
-     hub#1233); todavía no las de abrir el turno, entrada o salida, contar y cerrar de Caja (hub#1234), que solo
-     preguntan con el botón atrás. Sin nada abierto, en una ficha o un alta hace lo mismo que «Atrás»; en
+     hub#1233; las de abrir el turno, entrada o salida, contar y cerrar de Caja, hub#1234). Sin nada abierto, en una ficha o un alta hace lo mismo que «Atrás»; en
      la pantalla principal de una app vuelve al Inicio, también si se llegó a ella por un enlace; y en el
      Inicio deja la aplicación en segundo plano.
 Entra: las apps del menú de la persona (las mismas del botón «Mis apps» de la barra).
@@ -2604,7 +2603,9 @@ Pasos:
      «21:30»); un valor de una lista cerrada, con el nombre que le da su app («Mostrador», no el valor interno),
      también el de un dato que su app no llama como el campo que lo nombra («Rectificativa: resto de causas (R4)», no «R4»); y
      un registro, por su nombre cuando su app deja leerlo a quien pregunta («Persona: Eva Gil»): si no, la tarjeta
-     no lo pone, nunca por su código. Tampoco pone la clave con que su app evita hacer dos veces lo mismo si se
+     no lo pone, nunca por su código. Un registro que se dijo con palabras se busca como lo buscará la acción, también
+     dentro de otro (un plato dentro de su menú), y sale el que encuentra («Plato: Postres caseros» cuando se dijo
+     «postres»); si esas palabras valen para varios o para ninguno, salen tal como se dijeron. Tampoco pone la clave con que su app evita hacer dos veces lo mismo si se
      reintenta (cobrar, enviar un WhatsApp, imprimir): nadie puede juzgarla, y la acción la recibe igual al
      ejecutarse. Todo sale en el idioma de la persona, también el nombre de cada dato
      cuando la tarjeta lo pone en su línea (BASE-F98): el mismo con que lo llama su app, nunca un nombre

@@ -424,8 +424,9 @@ que se llaman «llamar»: …», con el número y el título de cada una, y preg
 negocio.». El «sí» vale solo para
 lo que enseñó la tarjeta: si antes de confirmar alguien crea una tarea que encaja mejor con lo dicho («Llamar» cuando la
 tarjeta decía «Llamar al proveedor»), no se toca nada y sale la tarjeta nueva. La tarea de un comentario, la tarea
-madre y el proyecto de una tarea nueva, y el proyecto al que se pasa una tarea, dichos por su nombre, todavía salen
-como se dijeron (hub#1245).
+madre y el proyecto de una tarea nueva, y el proyecto al que se pasa una tarea, dichos por su nombre, salen también
+como los encuentra la acción, y el «sí» vale solo para ellos; si lo dicho vale para varios, la tarjeta lo dice tal como
+se dijo (hub#1245).
 
 ### Lo que ofrece: consultas (leen, no cambian nada; todas se pueden seguir en vivo)
 
@@ -555,8 +556,9 @@ cliente o a un compañero).
   encontrado, así que el «sí» vale solo para ello (hub#1208, hub#1219; `tests/test_assistant_yes_for_its_card.py`,
   con el trinquete de las escrituras que comprueban y las que leen por su nombre; `tests/test_apps.py` admite `check`
   solo en ellas). El `task` de `CommentIn`, el `parent` y el `project` de `TaskIn` y el `project` de `TaskPatchIn` no
-  llevan marca: no hay lectura cuya entrada quepa en la suya (`base.E012`), y sin `check` un nombre que vale para
-  varios dejaría el dato fuera de la tarjeta. Cuatro casos en `xfail(strict=True)` en ese mismo fichero (hub#1245).
+  tienen lectura cuya entrada quepa en la suya (`base.E012`), así que van sin `check`, pero con la misma marca
+  `names(…, as_said=True)`: la tarjeta los lee por su nombre, su id va en la huella y un nombre que vale para varios
+  sale tal como se dijo, nunca fuera de la tarjeta (hub#1245).
   Tareas no tiene listas cerradas sin etiqueta en sus escrituras: el estado y la prioridad salen con las de sus
   modelos.
 - El admin de Django del Hub tiene **CRUD completo** sobre los cuatro modelos (ronda 12, PLAN §17); una

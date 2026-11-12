@@ -1,7 +1,8 @@
-// What the tests of every settings page check the same way (hub#867, hub#897, hub#982): the page builds its form on
-// `useSettingsForm`, paints its number fields with `SettingsNumberField` and ends it with `SettingsFormFooter`
-// (@erplora/ui/components), so where the save's notices sit, what Enter in a field does and what a refused field
-// shows are read alike in every app. `settingsForms` gives the guards the sources of those forms.
+// What the tests of every settings page check the same way (hub#867, hub#897, hub#982, hub#1237): the page builds its
+// form on `useSettingsForm`, paints its number fields with `SettingsNumberField`, ends it with `SettingsFormFooter`
+// (@erplora/ui/components) and never lets the browser judge it (`novalidate`), so where the save's notices sit, what
+// Enter in a field does and what a refused field shows are read alike in every app. `settingsForms` gives the guards
+// the sources of those forms, and `openingTags` the tags of a template they look at.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,6 +36,14 @@ export function settingsForms(): { file: string; source: string }[] {
     })
     .map((path) => ({ file: relative(HUB, path), source: readFileSync(path, 'utf8') }))
     .filter(({ source }) => /\buseSettingsForm\s*\(/.test(source));
+}
+
+/** Each opening tag of `source` named one of `names`, as written (`ion-input` or `IonInput`), up to the `>` that closes
+ *  it: a `<` or a `>` inside a quoted attribute is the attribute's, and a longer name (`<ion-input-otp`, `<formula`)
+ *  is another tag. */
+export function openingTags(source: string, names: readonly string[]): string[] {
+  const tag = new RegExp(`<(?:${names.join('|')})(?=[\\s/>])(?:"[^"]*"|'[^']*'|[^>"'])*>`, 'g');
+  return [...source.matchAll(tag)].map(([found]) => found);
 }
 
 /** Whether `middle` comes after `first` and before `last` on the page. */

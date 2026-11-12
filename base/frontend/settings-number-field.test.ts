@@ -6,13 +6,11 @@
 // there may be none that writes an `ion-input` of `type="number"` by hand.
 import { describe, expect, it } from 'vitest';
 
-import { settingsForms } from './__tests__/settings-form';
+import { openingTags, settingsForms } from './__tests__/settings-form';
 
 /** Each `<ion-input …>` tag of `source` (or `<IonInput …>`, as its import is named), up to the `>` that closes it:
  *  a `<` or a `>` inside a quoted attribute is the attribute's. */
-function ionInputs(source: string): string[] {
-  return [...source.matchAll(/<(?:ion-input|IonInput)\b(?:"[^"]*"|'[^']*'|[^>"'])*>/g)].map(([tag]) => tag);
-}
+const ionInputs = (source: string): string[] => openingTags(source, ['ion-input', 'IonInput']);
 
 describe('settings forms paint their number fields with SettingsNumberField (hub#982)', () => {
   const forms = settingsForms();

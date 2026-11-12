@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5dc4142d3e9f6541b85a845243d754b5ad288b170ac00d84628ede8699735f3b -->
+<!-- generated from WORKBOOK.md sha256:282890ca21224affd41d8cde725f79a818b81a6a571475437b7e707bf2779e30 -->
 
 ## What it is for and who it is for
 
@@ -523,8 +523,7 @@ Steps:
      (hub#1015, hub#1020, hub#1031, hub#1046). Those same windows ask the same question when "Cancel", "Close", the
      "×" or Escape is pressed and on a tap outside, on the phone and on the computer, and with nothing typed they close
      without asking (hub#1023, hub#1156; the Task and Project sheets and quick customer creation at the till,
-     hub#1233); not yet Cash register's open shift, cash in or out, count and close windows (hub#1234), which only
-     ask with the back button. With nothing open, on a record or a new one it does the same as "Back"; on the main screen
+     hub#1233; Cash register's open shift, cash in or out, count and close windows, hub#1234). With nothing open, on a record or a new one it does the same as "Back"; on the main screen
      of an app it goes back to the Home, also when that screen was reached through a link; and on the Home
      it sends the app to the background.
 In: the apps of the person's menu (the same as the bar's "My apps" button).
@@ -2480,7 +2479,10 @@ Steps:
      alone, "Nov 2, 2026"; a time alone, "9:30 PM"); a value of a closed list, with the name its app gives it ("Front
      desk", not the internal value), also that of a datum its app does not call like the field that names it
      ("Rectifying invoice: other causes (R4)", not "R4"); and a record, by its name when its app lets whoever asks read it ("Person: Eva
-     Gil"): otherwise the card leaves it out, never by its code. Nor does it put the key its app uses to avoid doing
+     Gil"): otherwise the card leaves it out, never by its code. A record said in words is looked up as the action will
+     look it up, also inside another (a course inside its menu), and the one it finds comes up ("Course: Homemade
+     desserts" when "desserts" was said); if those words fit several or none, they come up as they were said. Nor does
+     it put the key its app uses to avoid doing
      the same thing twice on a retry (charging, sending a WhatsApp, printing): nobody can judge it, and the action
      receives it all the same when it runs. Everything shows in the person's language, also the
      name of each datum when the card puts it on its own line (BASE-F98): the

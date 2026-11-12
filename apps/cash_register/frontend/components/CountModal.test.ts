@@ -135,16 +135,20 @@ describe('CountModal', () => {
   });
 });
 
-describe('CountModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
-  it('as opened closes; a counted box asks; emptied again closes again', async () => {
+describe('CountModal: unsaved changes ask before closing (hub#1031, hub#1234, BASE-F05)', () => {
+  it('a counted box: Back, «Cancel», the «×», Escape and a tap outside ask «Discard changes?»; emptied again, Back closes', async () => {
     const s = await setup();
     await s.result(CURRENCY, EUR);
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('cash-register-count'),
       change: () => ionValue(s.box('50'), '2', 'ionInput'),
       restore: () => ionValue(s.box('50'), '', 'ionInput'),
     });
+  });
+  it('as opened, «Cancel», the «×», Escape and a tap outside close it without asking', async () => {
+    const { expectUntouchedWindowClosesAtOnce } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUntouchedWindowClosesAtOnce(await setup(), 'cash-register-count');
   });
 });
 

@@ -79,6 +79,7 @@ def test_each_live_query_and_its_events():
             *events.SESSION_EVENTS,
             events.SERVICE_UPDATED,
             *CUSTOMER_NAMED,
+            *events.STAFF_MEMBER_EVENTS,
         ],
     }
 
@@ -104,6 +105,11 @@ def test_a_session_spent_re_runs_the_vouchers_sold_and_the_movements_but_not_the
         "service.movement.list",
     } <= affected
     assert "service.service.list" not in affected
+
+
+def test_a_professional_renamed_re_runs_the_movements_that_name_her():
+    # hub#1236: a session of the movements says who did it, as it says its customer.
+    assert "service.movement.list" in live_registry.affected(["staff.member.updated"])
 
 
 def test_a_professional_leaving_re_runs_who_performs_each_service():

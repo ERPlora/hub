@@ -270,7 +270,8 @@ Un mínimo o un máximo por encima de 50 se rechaza, igual que más de 20 platos
 admite como mucho 20 platos.»). Si el servidor rechaza, el formulario lo dice y no pierde lo escrito. Por el
 asistente, al cambiar o retirar un plato dicho por su nombre, un nombre que vale para varios platos o para ninguno no
 saca tarjeta, y si antes del «sí» otro plato u otro menú encaja mejor con lo dicho no se toca nada y sale la tarjeta
-nueva (BASE-F97).
+nueva (BASE-F97). Al añadir u ordenar platos de un menú dicho por su nombre, el «sí» vale solo para el menú que enseñó
+la tarjeta.
 Implicados: ninguno
 
 ### COMBO-F06 Elegir los productos de cada plato y su suplemento
@@ -312,7 +313,8 @@ sin productos: «Ningún producto coincide.». Si el catálogo no carga, el busc
 «Reintentar». Un producto que aún no existe se crea antes en Inventario: el buscador lo encuentra en
 cuanto se guarda. Por el asistente, al cambiar o quitar una elección dicha por su producto, un nombre que vale para
 varias elecciones o para ninguna no saca tarjeta, y si antes del «sí» otra elección u otro menú encaja mejor con lo
-dicho no se toca nada y sale la tarjeta nueva (BASE-F97).
+dicho no se toca nada y sale la tarjeta nueva (BASE-F97). Al añadir u ordenar elecciones, el «sí» vale solo para el
+menú, el plato y el producto que enseñó la tarjeta.
 Implicados: INVENTORY-F27
 
 ### COMBO-F07 Elegir un menú al vender
@@ -528,7 +530,8 @@ tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunc
 nombre («Menú: Menú del día»), el plato por su nombre («Plato: Primeros»), la elección por el nombre de su producto
 («Elección: Lentejas»), el producto por su nombre («Producto nuevo: Sopa») y, al ordenar platos o elecciones o al
 añadir varios productos, cada uno por su nombre y en el orden enviado («Platos: Segundos, Primeros»). Lo que quien
-pregunta no puede ver, o lo que ya no existe, no sale. Un menú dicho por su nombre al cambiarlo, retirarlo, ponerle foto
+pregunta no puede ver, o lo que ya no existe, no sale; lo que se dijo con palabras y no se puede leer sale tal como se
+dijo. Un menú dicho por su nombre al cambiarlo, retirarlo, ponerle foto
 u ordenar sus platos se busca como lo buscará la acción (el mismo nombre antes que uno que lo contenga), y la tarjeta
 enseña el menú que se va a tocar, con su nombre entero («Menú: Menú vegano» cuando se dijo «vegano»). Si lo dicho vale
 para varios menús o para ninguno, no sale ninguna tarjeta: el asistente oye «Hay varios menús que se llaman
@@ -539,8 +542,12 @@ dichos por su nombre al cambiarlos o retirarlos se buscan igual, dentro de su me
 ninguno, o su menú para varios, no sale ninguna tarjeta y el asistente pregunta cuál; la tarjeta enseña el menú al que
 pertenecen con su nombre entero, y el «sí» vale solo para el plato o la elección que encontró: si antes de confirmar
 alguien añade uno que encaja mejor con lo dicho («Postres» cuando se encontró «Postres caseros») o un menú que encaja
-mejor, no se toca nada y sale la tarjeta nueva (hub#1231). El plato y la elección todavía salen en la tarjeta como se
-dijeron, y al añadir u ordenar platos y elecciones también su menú, sin que el «sí» quede fijado a él (hub#1245).
+mejor, no se toca nada y sale la tarjeta nueva (hub#1231). La tarjeta enseña el plato y la elección que encontró
+(«Plato: Postres caseros» cuando se dijo «postres», «Elección: Flan de la casa» cuando se dijo «flan»). Al añadir u
+ordenar platos y elecciones, y con el producto de Inventario dicho por su nombre, la tarjeta enseña también el menú, el
+plato y el producto que encontró, y el «sí» vale solo para ellos: si antes de confirmar alguien crea uno que encaja
+mejor con lo dicho, no se toca nada y sale la tarjeta nueva; si lo dicho vale para varios, la tarjeta lo enseña tal
+como se dijo y la acción pregunta cuál (hub#1245).
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -734,13 +741,16 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   que el «sí» vale solo para él (hub#1208, hub#1217; `tests/test_assistant_yes_for_its_card.py`). Las escrituras de un
   plato o una elección por su id o por su nombre dentro del menú declaran el `check` de su propio registro
   (`combo.group.update` y `combo.group.delete`, `combo.group.get`; `combo.option.update` y `combo.option.delete`,
-  `combo.option.get`; el del menú leería el id del plato como el de un menú), y el `combo` de su entrada
-  (`_CheckedOfIn`, base de `GroupRefIn` y `OptionRefIn`) lleva `A_MENU_BY_NAME` (hub#1231). La marca y el `check` van
-  juntos: leído por su nombre sin comprobarlo antes, un menú que encaja con varios saldría de la tarjeta, así que las
-  altas y los órdenes (`_ComboOfIn`/`_GroupOfIn`, sin lectura cuya entrada quepa en la suya, `base.E012`) no lo marcan
-  (trinquete `test_a_write_reads_the_menu_said_by_its_name_on_its_card_only_when_it_checks_it`). El `group` y el
-  `product` dichos por su nombre no llevan marca: la plataforma lee un dato marcado por su nombre con él solo, y sin su
-  menú la lectura fallaría siempre (hub#1245, dos casos en `xfail(strict=True)` en ese mismo fichero). Las listas
+  `combo.option.get`; el del menú leería el id del plato como el de un menú; hub#1231). Todo dato dicho por su nombre
+  lleva su marca leída por ese nombre, con `as_said` (`base.schemas.names`, hub#1245): el `combo` de `_ComboOfIn`
+  (`A_MENU_BY_NAME`), el `group` con su menú (`A_COURSE_BY_NAME`, `within` `combo_id` y `combo`), el `product` de una
+  elección con su menú y su plato (`A_CHOICE_BY_NAME`) y el producto de Inventario (`A_PRODUCT_BY_NAME`: el `product`
+  de `OptionIn` y el `new_product`), nunca con el `id` de la escritura, que es su propio registro. Lo que no se puede
+  leer (vale para varios, para ninguno, sin persona) sale como se dijo, así que las altas y los órdenes
+  (`_ComboOfIn`/`_GroupOfIn`, sin lectura cuya entrada quepa en la suya, `base.E012`) también los marcan: su huella
+  lleva lo que encontró y el «sí» vale solo para ello (trinquetes
+  `test_every_write_that_takes_a_menu_or_a_course_by_its_name_reads_it_and_says_it_as_said_when_it_cannot` y
+  `test_a_choice_is_read_by_its_product_with_its_menu_and_its_course_and_a_product_of_inventory_by_its_name`). Las listas
   cerradas de sus escrituras (cómo se vende el menú) ya llevan su etiqueta en `en` + `es` por los `choices` del
   modelo.
 - El admin de Django del Hub tiene **CRUD completo** sobre los tres modelos (ronda 12, PLAN §17); una
