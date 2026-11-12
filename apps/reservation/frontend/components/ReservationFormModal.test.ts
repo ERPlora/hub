@@ -7,6 +7,7 @@
 import { Combo, ConfirmDialog, InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
 import { click, ionValue, mountReservation, settle } from '../__tests__/mount-reservation';
 import { freeTable, reservationRow } from '../__tests__/rows';
@@ -259,6 +260,21 @@ describe('ReservationFormModal: why it was cancelled (RESERVATION-F09, F13)', ()
       s.wrapper.unmount();
     }
   });
+});
+
+describe('ReservationFormModal: fields refused with the same words (hub#888)', () => {
+  // A new reservation's fields, each refused under its own key; the table picker (a Combo) says the refusal of
+  // `table_id`.
+  const FIELD_OF: Record<string, string> = { table_id: 'table' };
+  const KEYS = ['guest_name', 'guest_phone', 'guest_email', 'date', 'time', 'party_size', 'duration_minutes', 'table_id', 'notes', 'internal_notes'];
+  itTellsTheCorrectedFieldApart(KEYS, async (locale, refusal) => {
+    const s = await setup({}, locale);
+    await fillNew(s);
+    s.tablePicker().vm.$emit('update:modelValue', { id: 't5', label: '5 (Terrace)' });
+    await settle();
+    s.answer(422, refusal);
+    return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.submit()), settle };
+  }, 'table_id');
 });
 
 describe('ReservationFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {

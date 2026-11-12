@@ -2,6 +2,7 @@
 // guests; «Create slot». An overlap with another slot of the day goes on top and under «From».
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionValue, mountReservation, settle } from '../__tests__/mount-reservation';
 import { slotRow } from '../__tests__/rows';
 import SlotFormModal from './SlotFormModal.vue';
@@ -54,6 +55,18 @@ describe('SlotFormModal', () => {
     await click(s.submit());
     expect(s.field('start_time').errorText).toBe(message);
   });
+});
+
+describe('SlotFormModal: fields refused with the same words (hub#888)', () => {
+  // From, To and both maximums paint a refusal, each under its own key.
+  itTellsTheCorrectedFieldApart(['start_time', 'end_time', 'max_reservations', 'max_covers'], async (locale, refusal) => {
+    const s = await setup(locale);
+    await ionValue(s.field('start_time'), '20:00', 'ionInput');
+    await ionValue(s.field('end_time'), '23:30', 'ionInput');
+    await ionValue(s.field('max_covers'), '40', 'ionInput');
+    s.answer(422, refusal);
+    return { field: s.field, send: () => click(s.submit()), settle };
+  }, 'max_covers');
 });
 
 describe('SlotFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
