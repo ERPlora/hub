@@ -144,6 +144,26 @@ def needs(labels: Iterable[str], graph: Graph) -> set[str]:
     return found
 
 
+def in_requires_order(labels: Iterable[str], graph: Graph) -> list[str]:
+    """``labels``, each once, each after those of them it requires, directly or not, and otherwise in their order: what
+    is brought back from a separate copy goes so, and a record finds what it points at (hub#1284). One ``graph`` does
+    not know (a platform app) requires none."""
+    asked = list(dict.fromkeys(labels))
+    below = {label: needs([label], graph) if label in graph else set() for label in asked}
+    ordered: list[str] = []
+
+    def place(label: str) -> None:
+        if label not in ordered:
+            for required in asked:
+                if required in below[label]:
+                    place(required)
+            ordered.append(label)
+
+    for label in asked:
+        place(label)
+    return ordered
+
+
 def roots(on: Iterable[str], graph: Graph) -> frozenset[str]:
     """The modules of ``on`` that no other module of ``on`` needs, directly or not."""
     on = set(on)
