@@ -946,6 +946,22 @@ def test_recover_reuses_the_active_one_of_a_name_over_one_deactivated():
 
 
 @pytest.mark.django_db
+def test_recover_reuses_the_oldest_of_a_name_when_the_business_has_none_active():
+    """Deactivating a group frees its name (customers#94), so the business may hold several deactivated ones of a name:
+    the card goes to the one made first, always the same, whatever order the database gives them in."""
+    first = CustomerGroup.objects.create(name="VIP", is_active=False)
+    CustomerGroup.objects.create(name="vip", is_active=False)
+    oldest = CustomerTag.objects.create(name="Regular", is_active=False)
+    CustomerTag.objects.create(name="regular", is_active=False)
+
+    made = system("customer.customer.recover", a_card_of_the_copy(groups=[{"name": "VIP"}], tags=[{"name": "Regular"}]))
+
+    luis = Customer.objects.get(pk=made.id)
+    assert (list(luis.groups.all()), list(luis.tags.all())) == ([first], [oldest])
+    assert (CustomerGroup.objects.count(), CustomerTag.objects.count()) == (2, 2)
+
+
+@pytest.mark.django_db
 def test_recover_without_anything_hanging_makes_the_card_as_its_create_does():
     clear_outbox()
 

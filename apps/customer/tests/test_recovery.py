@@ -214,7 +214,11 @@ def test_the_copy_gives_each_card_with_its_groups_tags_and_custom_field_values_a
     for field, value in ((size, "M"), (pet, "Luna"), (retired, "Gone")):
         CustomFieldValue.objects.create(customer=ana, field=field, value=value)
     luis = Customer.objects.create(name="Luis Pérez")
-    Customer.objects.create(name="Gone", deleted_at=timezone.now(), is_active=False)
+    # A deleted card keeps what hangs from it (CUSTOMER-F07): the copy gives neither the card nor any of that.
+    deleted = Customer.objects.create(name="Gone", deleted_at=timezone.now(), is_active=False)
+    deleted.groups.add(vip)
+    deleted.tags.add(regular)
+    CustomFieldValue.objects.create(customer=deleted, field=pet, value="Rex")
 
     read = queries.recoverable_cards_in_copy(direct())
 
@@ -279,6 +283,15 @@ def named(hub, model) -> list[tuple]:
     """Every group, tag or field of ``hub``: its name and whether it is active, by name."""
     with use_hub(hub):
         return sorted(model.objects.values_list("name", "is_active"))
+
+
+#: The groups, tags and fields of ``a_business``, as its copy holds them (``all_named``).
+AS_IN_THE_COPY = ([("Old", False), ("VIP", True)], [("Regular", True)], [("Pet", True), ("Size", True)])
+
+
+def all_named(hub) -> tuple[list, list, list]:
+    """Every group, tag and field of ``hub`` (``named``)."""
+    return named(hub, CustomerGroup), named(hub, CustomerTag), named(hub, CustomField)
 
 
 def the_new(hub, name: str):
@@ -346,9 +359,7 @@ class TestWhatHangsFromACardComesBack:
         assert [(name, color) for name, _, color in back["tags"]] == [("Regular", "success")]
         assert [(name, value) for name, _, value in back["values"]] == [("Pet", "Luna"), ("Size", "M")]
         assert made["old"] not in [group[1] for group in back["groups"]]
-        assert named(hub, CustomerGroup) == [("Old", False), ("VIP", True)]
-        assert named(hub, CustomerTag) == [("Regular", True)]
-        assert named(hub, CustomField) == [("Pet", True), ("Size", True)]
+        assert all_named(hub) == AS_IN_THE_COPY
         with use_hub(hub):
             assert CustomerGroup.objects.get(name="Old").sort_order == 3
         # Ana, whom the business always had, stays as she is: what it took from her is not given back to her.
@@ -368,9 +379,7 @@ class TestWhatHangsFromACardComesBack:
         assert fresh(asked).results == [CUSTOMERS | {"restored": 1}]
         assert what_hangs(hub, ana) == before
         assert [group[1] for group in before["groups"]] == [made["old"], made["vip"]]
-        assert named(hub, CustomerGroup) == [("Old", False), ("VIP", True)]
-        assert named(hub, CustomerTag) == [("Regular", True)]
-        assert named(hub, CustomField) == [("Pet", True), ("Size", True)]
+        assert all_named(hub) == AS_IN_THE_COPY
 
     def test_asked_again_nothing_is_made_twice(self, recoveries, every_app_on):
         hub, _luis, _made, copy = self.luis_lost(recoveries, every_app_on)
