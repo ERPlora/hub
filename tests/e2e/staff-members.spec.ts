@@ -116,12 +116,28 @@ test('the owner adds, links, edits, deactivates and terminates staff, live, with
       hubUserIdOf(EMPLOYEE.email),
     );
 
-    // STAFF-F02: a row opens «Edit · {name}»; only what changed is saved.
+    // STAFF-F02: a row opens «Edit · {name}»; only what changed is saved. What is typed before the whole record
+    // arrives stays and is saved (hub#1347): the record is held until the email has been typed.
+    let arrive!: () => void;
+    const held = new Promise<void>((resolve) => (arrive = resolve));
+    const isDetail = (url: URL) => url.pathname === '/api/staff/members/detail';
+    await page.route(isDetail, async (route) => {
+      await held;
+      await route.continue();
+    });
+    const email = page.locator('[data-testid=staff-member-form-email] input');
     await rowOf(page, aloneName).getByText(aloneName).click();
     await expect(page.locator('ion-modal[data-testid=staff-member-form] ion-title')).toHaveText(`Edit · ${aloneName}`);
-    await expect(page.locator('[data-testid=staff-member-form-email] input')).toHaveValue('ana.e2e@example.com');
-    await page.locator('[data-testid=staff-member-form-email] input').fill('ana.changed@example.com');
+    await expect(page.locator('[data-testid=staff-member-form-loading]')).toBeVisible();
+    await expect(email).toHaveValue('ana.e2e@example.com');
+    await email.fill('ana.changed@example.com');
+    await page.locator('ion-modal[data-testid=staff-member-form] .ep-form-modal__content').screenshot({ path: shot('staff-members-edit-before-record') });
+    arrive();
+    await expect(page.locator('[data-testid=staff-member-form-loading]')).toHaveCount(0);
+    await expect(email).toHaveValue('ana.changed@example.com');
+    await page.unroute(isDetail);
     await page.locator('[data-testid=staff-member-form-submit]').click();
+    await expect(page.locator('ion-modal[data-testid=staff-member-form]')).toBeHidden();
     await expect(rowOf(page, aloneName)).toContainText('ana.changed@example.com');
 
     // STAFF-F05: «Deactivate» asks first; the row turns Inactive by itself.
