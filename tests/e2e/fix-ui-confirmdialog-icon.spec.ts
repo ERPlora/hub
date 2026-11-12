@@ -11,6 +11,7 @@
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
+import { rowAction } from './service-helpers';
 
 const TAG = 'E2E Gap';
 
@@ -74,12 +75,7 @@ function expectIonicGap(measured: Gap, what: string): void {
 
 /** Opens «Deactivate» on the member's row, from its button or, when the row folded it, from its «⋮» menu. */
 async function openDeactivate(page: Page, id: string): Promise<Locator> {
-  const button = shown(page).locator(`[data-testid=staff-members-row-${id}-deactivate]`);
-  if (await button.isVisible()) await button.click();
-  else {
-    await shown(page).locator(`[data-testid=staff-members-row-${id}-menu]`).click();
-    await page.locator(`ion-popover [data-testid=staff-members-row-${id}-deactivate]`).click();
-  }
+  await rowAction(page, 'staff-members', id, 'deactivate');
   const dialog = page.locator('ion-modal[data-testid=staff-member-deactivate]');
   await expect(dialog).toBeVisible();
   return dialog;
