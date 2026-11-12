@@ -183,18 +183,6 @@ export async function expectSheetDiscardsOnClose(sheet: MountedSheet, testid: st
   expect(sheet.wrapper.props('open')).toBe(false);
 }
 
-/** A sheet as opened: «Close», Escape and a tap outside close it without asking, each in turn (hub#1233, BASE-F05). */
-export async function expectSheetClosesUntouched(sheet: MountedSheet, testid: string): Promise<void> {
-  const { expectUntouchedFormClosesAtOnce } = await import('../../../../base/frontend/__tests__/unsaved-form');
-  await expectUntouchedFormClosesAtOnce({
-    overlay: () => sheet.inDoc(testid),
-    reopen: async () => {
-      await sheet.wrapper.setProps({ open: true });
-      await settle();
-    },
-  });
-}
-
 /** Fires an Ionic value event on an element, as Ionic does (`ionInput`/`ionChange` with the value). */
 export async function ionValue(el: Element | null, value: unknown, event: 'ionInput' | 'ionChange' = 'ionChange'): Promise<void> {
   if (!el) throw new Error('no element to set');

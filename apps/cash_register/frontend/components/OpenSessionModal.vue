@@ -82,7 +82,7 @@ async function confirm(): Promise<void> {
 }
 
 // The only drawer, chosen alone when the drawers answer, is how the window opens, not a choice of the person's.
-useUnsavedFormOnOpen(
+const canDismiss = useUnsavedFormOnOpen(
   'cash-register-open',
   () => ({
     register: drawers.value.length === 1 && registerId.value === drawers.value[0].id ? '' : registerId.value,
@@ -96,6 +96,7 @@ useUnsavedFormOnOpen(
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="cash-register-open"
     :title="$t('cash_register.open.title')"
     :submit-label="$t('cash_register.open.submit')"

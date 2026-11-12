@@ -6,7 +6,7 @@
 import { ConfirmDialog } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, EMPLOYEE, errorFrame, expectSheetClosesUntouched, expectSheetDiscardsOnClose, ionValue, mountTask, OWNER, page, settle } from '../__tests__/mount-task';
+import { click, EMPLOYEE, errorFrame, expectSheetDiscardsOnClose, ionValue, mountTask, OWNER, page, settle } from '../__tests__/mount-task';
 import { project } from '../__tests__/project';
 import { task } from '../__tests__/task';
 import ProjectSheet from './ProjectSheet.vue';
@@ -179,7 +179,8 @@ describe('ProjectSheet: unsaved changes ask before closing (hub#1046, hub#1233, 
   });
 
   it('as opened, «Close», Escape and a tap outside close it without asking', async () => {
-    await expectSheetClosesUntouched(await setup(), 'task-project-sheet');
+    const { expectUntouchedWindowClosesAtOnce } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUntouchedWindowClosesAtOnce(await setup(), 'task-project-sheet');
   });
 
   it('closing after discarding clears the edited fields and the half-written new task', async () => {

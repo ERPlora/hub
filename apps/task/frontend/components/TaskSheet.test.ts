@@ -6,7 +6,7 @@
 import { Combo, ConfirmDialog, StatusPill } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, EMPLOYEE, errorFrame, expectSheetClosesUntouched, expectSheetDiscardsOnClose, ionValue, mountTask, OWNER, page, settle } from '../__tests__/mount-task';
+import { click, EMPLOYEE, errorFrame, expectSheetDiscardsOnClose, ionValue, mountTask, OWNER, page, settle } from '../__tests__/mount-task';
 import { task } from '../__tests__/task';
 import TaskFormModal from './TaskFormModal.vue';
 import TaskSheet from './TaskSheet.vue';
@@ -248,7 +248,8 @@ describe('TaskSheet: unsaved changes ask before closing (hub#1046, hub#1233, BAS
   });
 
   it('as opened, «Close», Escape and a tap outside close it without asking', async () => {
-    await expectSheetClosesUntouched(await setup(), 'task-sheet');
+    const { expectUntouchedWindowClosesAtOnce } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUntouchedWindowClosesAtOnce(await setup(), 'task-sheet');
   });
 
   it('closing after discarding clears the half-written comment and subtask', async () => {
