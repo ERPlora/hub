@@ -12,7 +12,7 @@ CUSTOMER-F07): it comes back the same, with all that hangs from it, by ``custome
 """
 
 import uuid
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 from django.apps import apps
@@ -153,6 +153,20 @@ def test_a_card_of_the_copy_is_in_the_business_live_in_the_one_it_was_merged_int
     assert queries.card_in_business(absent) is None
     # Erased (CUSTOMER-F16): never another card, not even one with the name, phone and email the copy still holds.
     assert queries.card_in_business({"id": erased.pk, "name": live.name, "phone": live.phone, "email": live.email}) is None
+
+
+def test_of_two_cards_made_again_alike_the_business_card_is_the_oldest():
+    """hub#1284: two live cards may share name, phone and email (CUSTOMER-F12 only warns): the record of the copy goes
+    to the one made first, always the same, whatever order the database gives them in."""
+    made_first = timezone.now() - timedelta(days=30)
+    later = Customer.objects.create(name="Marta Ruiz", phone="+34600555666", email="marta@example.com")
+    first = Customer.objects.create(name="Marta Ruiz", phone="+34600555666", email="marta@example.com")
+    Customer.objects.filter(pk=first.pk).update(created_at=made_first)
+    assert first.pk > later.pk
+
+    again = a_card_of_the_copy(name="Marta Ruiz", phone="+34600555666", email="marta@example.com")
+
+    assert queries.card_in_business(again) == first.pk
 
 
 def test_the_app_declares_what_it_gives_back():

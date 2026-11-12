@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5fc815b10ec26cacd92df735e93ff877a1d5585ca9a436ed858e7ccff1c0d2c2 -->
+<!-- generated from WORKBOOK.md sha256:041056b93bcb519df68e47e40a68463954de23b3471190843205b41bb345abec -->
 
 ## What it is for and who it is for
 
@@ -2932,10 +2932,10 @@ Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APP
 
 ### BASE-F114 Put a business back as it was at a past moment from the Hub admin
 Status: done (the action and the restore, in its place or to a separate copy, and getting back from the separate copy
-the customers that were lost, the deleted ones as they were, and the appointments that were lost; making and deleting
-the temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws; getting back products and
-services, hub#1282 and hub#1283; repeating appointments, hub#1327; the groups, tags and own fields of a customer brought
-back, hub#1285)
+the customers that were lost, the deleted ones as they were, the products and the appointments that were lost; making
+and deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws; getting back
+services, hub#1283; repeating appointments, hub#1327; the groups, tags and own fields of a customer brought back,
+hub#1285; the image and the categories of a product brought back, hub#1319 and hub#1320)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -2970,7 +2970,7 @@ Steps:
      what the business deleted and still holds comes back as it was, with its history, and that what it no longer has is
      created again as its own screen creates it, nothing copied; that what the business has, or has made again, is left
      as it is; that records for the tax authority are never brought back and that the business stays open. Below, "What
-     to bring back", with what can be brought ticked (today, **Customers** and **Appointments**). They press
+     to bring back", with what can be brought ticked (today, **Customers**, **Products** and **Appointments**). They press
      **Recover**.
   10. "1 separate copy will give back Customers into its business within a few minutes: Recoveries says how it went."
       appears. In Recoveries they see it "Asked" with the copy, what was asked and when.
@@ -2981,7 +2981,14 @@ Steps:
       linked orders (CUSTOMER-F33). One the business no longer has comes back as a new card, created as the Customers
       screen creates it, with their name, contact, tax ID, address, dates, source, stage, channel and notes; without their
       groups, tags or own fields (hub#1285). A card whose personal data was erased (GDPR) or one merged into another never
-      comes back, and one the business has already made again (the same name, phone and email) is not repeated. Asking
+      comes back, and one the business has already made again (the same name, phone and email) is not repeated. With
+      Products, "Products: 3 created": each product comes back as a new one, created as the Products screen creates it,
+      with its name, SKU, EAN-13, description, type, price, cost, units, threshold, stock control and tax category, active
+      or inactive as it was and in the categories the business still has; with no stock, which is counted
+      (INVENTORY-F14), because the copy's is another day's; without its image (hub#1319) and without the categories the
+      business no longer has (hub#1320). One that was deleted in the business also comes back as a new product; its
+      movements stay with the deleted one (hub#1321). One the business has already created again (another live one with
+      its SKU or its EAN-13) is not repeated. Asking
       again creates nothing twice.
       Appointments always go after customers, whatever the order they are asked in, so each finds its customer. Each
       appointment that has not come yet and was still booked (pending or confirmed, not charged) comes back, booked as the
@@ -2999,8 +3006,9 @@ business as it was, untouched; a separate database on its cluster with the data 
 application and kept 7 days; the notice `control.hub.restore_aside_requested` with who asked for it. When recovering: in
 the business, each deleted card it still held, live again with its card-recovered notice (`customer.customer.restored`),
 a new card for each customer it no longer had, with its card-created notice (`customer.customer.created`), and a new
-appointment for each one it lacked, with its appointment-created notice (`appointment.appointment.created`), and nothing
-else; the copy, untouched; the notice `control.copy.recovery_requested` with who asked for it.
+product for each product it lacked, with its product-created notice (`inventory.product.created`), and a new appointment
+for each one it lacked, with its appointment-created notice (`appointment.appointment.created`), and nothing else; the
+copy, untouched; the notice `control.copy.recovery_requested` with who asked for it.
 If it fails: what the restore does not accept is said in the notice, business by business, and that business is not
 touched: one that is not ready or has no database of its own, a demo, one being moved or restored, a cluster open to new
 hubs or with living businesses, the business's own cluster, a copy that is not on that cluster or is too large, and a
@@ -3016,13 +3024,14 @@ is made gives anything back."), and with nothing ticked the page asks again. Wha
 its result and the rest goes on: the app is turned off in the business ("Customers: nothing (app_inactive: …)"), or the
 copy did not have it, lacks the migration its read needs or has one this code does not know (`recover_not_in_copy`,
 `recover_copy_behind`, `recover_copy_ahead`). What the create operation does not accept today (a phone no longer valid, a
-time taken, a customer no longer there) is counted "not created" with its reason, and the rest comes back; so is a
-deleted card that was merged into another or erased meanwhile ("customer.customer_unavailable: …"). If the copy is gone,
-the recovery says "Failed" and why
+product without a tax category or with one Taxes no longer has active, a time taken, a customer no longer there) is
+counted "not created" with its reason, and the rest comes back; so is a deleted card that was merged into another or
+erased meanwhile ("customer.customer_unavailable: …"). If the copy is gone, the recovery says "Failed" and why
 ("recover_copy_unreadable: …"). While the business is being moved or restored, the recovery waits without doing anything.
 With the platform frozen for a database upgrade, the restore waits, with the business under maintenance, until it
 is unfrozen. With records from the test environment only, the chain is recovered afterwards (VERIFACTU-F28). The
 support staff see the list, Separate copies and Recoveries, but not the actions.
 Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12,
-CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F33, APPOINTMENT-F01, APPOINTMENT-F11; hub#1198, hub#1213, hub#1257, hub#1282,
-hub#1283, hub#1284, hub#1285, hub#1306, hub#1326, hub#1327, aws#77
+CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04, APPOINTMENT-F01, APPOINTMENT-F11; hub#1198,
+hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1319, hub#1320, hub#1321, hub#1326, hub#1327,
+aws#77

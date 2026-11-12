@@ -440,6 +440,9 @@ class ProductIn(Schema):
         title=CATEGORIES,
         description="Categories that group it in the till.",
     )
+    is_active: bool = Field(
+        True, description="Whether it is on sale; one created inactive stays out of the till until it is activated."
+    )
 
 
 class ProductPatchIn(ProductRefIn):

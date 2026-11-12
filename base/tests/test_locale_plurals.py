@@ -6,7 +6,9 @@ parentheses show on screen whatever the number. Read from the compiled catalogue
 message is the key and the Spanish its translation, so both languages are checked. The ``.mo`` drops the English
 plural form, so it is read from the ``.po`` beside it; and since English has no catalogue, the screen says the forms
 the code hands the plural family, read from the code as ``base/tests/test_locale_modules.py`` reads its messages
-(hub#1294). The readers are the ones of every catalogue test, ``base.tests.po``.
+(hub#1294), and the two forms of each ``{% blocktranslate count %}`` of its templates, read with Django's own template
+parser. The server is the platform's (``control``, ``base``), each app's and ``live``'s, whose validation messages
+every form of the Hub shares (hub#1318). The readers are the ones of every catalogue test, ``base.tests.po``.
 """
 
 import re
@@ -15,8 +17,10 @@ from pathlib import Path
 import pytest
 from babel.messages.mofile import write_mo
 from babel.messages.pofile import read_po
-from django.apps import apps
+from django.apps import AppConfig, apps
 from django.conf import settings
+from django.template import Engine
+from django.templatetags.i18n import BlockTranslateNode
 
 from base.tests.po import mo_entries, po_messages
 from base.tests.test_locale_modules import gettext_calls, own_code
@@ -25,12 +29,14 @@ from base.tests.test_locale_modules import gettext_calls, own_code
 IN_PARENTHESES = re.compile(r"[^\W\d_]\((?:s|es|as|os|ies)\)")
 
 def hub_catalogues() -> list[Path]:
-    """Every compiled Spanish catalogue of the Hub: the platform's (``control``, ``base``) and each app's."""
+    """Every compiled Spanish catalogue of the Hub: the platform's (``control``, ``base``), ``live``'s and each
+    app's."""
     root = Path(settings.BASE_DIR)
     return sorted(
         [
             *root.glob("control/locale/es/LC_MESSAGES/django.mo"),
             *root.glob("base/locale/es/LC_MESSAGES/django.mo"),
+            *root.glob("packages/live/live/locale/es/LC_MESSAGES/django.mo"),
             *root.glob("apps/*/locale/es/LC_MESSAGES/django.mo"),
         ]
     )
@@ -68,19 +74,46 @@ def plurals_in(source: str) -> list[tuple[str, str]]:
     return pairs
 
 
-def code_plurals() -> dict[str, list[tuple[str, str]]]:
-    """The plurals the server code of the Hub says, by module: the platform's (``control``, ``base``) and each app's."""
+def template_plurals_in(source: str) -> list[tuple[str, str]]:
+    """Both English forms of each ``{% blocktranslate count %}`` of the template ``source``, its text and its
+    ``{% plural %}``, as ``makemessages`` keeps them (a variable as ``%(name)s``)."""
+    nodes = Engine.get_default().from_string(source).nodelist.get_nodes_by_type(BlockTranslateNode)
+    counted = [node for node in nodes if node.plural]
+    return [(node.render_token_list(node.singular)[0], node.render_token_list(node.plural)[0]) for node in counted]
+
+
+def own_templates(config) -> list[Path]:
+    """The templates of the module ``config``: the files of its ``templates/``, where Django loads them from."""
+    return sorted(path for path in Path(config.path, "templates").rglob("*") if path.is_file())
+
+
+def server_modules() -> list[AppConfig]:
+    """The modules of the Hub's server: the platform's (``control``, ``base``), ``live`` and each app."""
     root = Path(settings.BASE_DIR)
-    return {
-        config.label: [pair for path in own_code(config) for pair in plurals_in(path.read_text(encoding="utf-8"))]
+    return [
+        config
         for config in apps.get_app_configs()
-        if Path(config.path) in (root / "control", root / "base") or Path(config.path).parent == root / "apps"
+        if config.label == "live"
+        or Path(config.path) in (root / "control", root / "base")
+        or Path(config.path).parent == root / "apps"
+    ]
+
+
+def code_plurals() -> dict[str, list[tuple[str, str]]]:
+    """The plurals the server of the Hub says, by module: in its Python code and in its templates."""
+    return {
+        config.label: [
+            *(pair for path in own_code(config) for pair in plurals_in(path.read_text(encoding="utf-8"))),
+            *(pair for path in own_templates(config) for pair in template_plurals_in(path.read_text(encoding="utf-8"))),
+        ]
+        for config in server_modules()
     }
 
 
 def test_the_catalogues_read_are_the_platforms_and_every_apps():
     read = {path.relative_to(settings.BASE_DIR).parts[:2] for path in hub_catalogues()}
-    assert {("control", "locale"), ("base", "locale"), ("apps", "service"), ("apps", "cart_checkout")} <= read
+    assert {("control", "locale"), ("base", "locale"), ("packages", "live")} <= read
+    assert {("apps", "service"), ("apps", "cart_checkout")} <= read
     assert len(read) > 20
 
 
@@ -137,7 +170,8 @@ def test_the_check_reads_the_english_plural_the_catalogue_keeps(tmp_path):
 def test_the_english_plurals_of_every_catalogue_are_read():
     """Positive control: the plurals of the platform's catalogues and of the apps' are found beside their ``.mo``."""
     read = {path.parents[3].name: english_plurals(path) for path in hub_catalogues()}  # <module>/locale/es/LC_MESSAGES
-    assert {"control", "base", "verifactu", "cart_checkout"} <= {module for module, plurals in read.items() if plurals}
+    found = {module for module, plurals in read.items() if plurals}
+    assert {"control", "base", "live", "verifactu", "cart_checkout"} <= found
     assert sum(len(plurals) for plurals in read.values()) > 20
 
 
@@ -186,15 +220,65 @@ def test_the_check_catches_a_count_with_parentheses_in_either_english_form_of_th
 
 
 def test_the_server_code_of_the_platform_and_the_apps_is_read():
-    """Positive control: the plurals of ``control``, ``base`` and the apps' code are found, VeriFactu's among them."""
+    """Positive control: the plurals of ``control``, ``base``, ``live`` and the apps' code are found, VeriFactu's among
+    them, and ``live``'s validation messages every form shares (hub#1318)."""
     said = code_plurals()
-    assert {"control", "base", "verifactu", "cart_checkout"} <= {label for label, pairs in said.items() if pairs}
+    found = {label for label, pairs in said.items() if pairs}
+    assert {"control", "base", "live", "verifactu", "cart_checkout"} <= found
     assert sum(len(pairs) for pairs in said.values()) > 20
 
 
+TEMPLATE_SOURCE = """{% extends "base.html" %}{% load i18n %}
+{% block body %}
+  {% blocktranslate count minutes=minutes trimmed %}
+    Try again in {{ minutes }} minute.
+  {% plural %}
+    Try again in {{ minutes }} minutes.
+  {% endblocktranslate %}
+  {% if carts %}
+    {% blocktrans count counter=carts|length %}{{ counter }} cart{% plural %}{{ counter }} carts{% endblocktrans %}
+  {% endif %}
+  {% for till in tills %}
+    {% blocktranslate context "cash" count n=till.count %}{{ n }} till{% plural %}{{ n }} tills{% endblocktranslate %}
+  {% endfor %}
+  {% blocktranslate %}Hello {{ name }}{% endblocktranslate %}
+  {% translate "one record" %}
+{% endblock %}
+"""
+
+
+def test_the_templates_plurals_are_read_in_english():
+    """Both English forms of each ``{% blocktranslate count %}`` of a template, as ``makemessages`` keeps them (a
+    variable as ``%(name)s``), under either tag name, with a context or inside a block, an ``if`` or a ``for``; a text
+    with no ``{% plural %}`` is not read."""
+    assert template_plurals_in(TEMPLATE_SOURCE) == [
+        ("Try again in %(minutes)s minute.", "Try again in %(minutes)s minutes."),
+        ("%(counter)s cart", "%(counter)s carts"),
+        ("%(n)s till", "%(n)s tills"),
+    ]
+
+
+#: A ``{% plural %}`` tag of a template, as Django's lexer reads it.
+PLURAL_TAG = re.compile(r"\{%\s*plural\s*%\}")
+
+
+def test_every_plural_of_the_server_templates_is_read():
+    """Positive control: each ``{% plural %}`` of the templates of the platform, ``live`` and the apps gives its pair to
+    the guard, ``base``'s «too many attempts» page among them (hub#1318)."""
+    said = code_plurals()
+    tags, read = {}, {}
+    for config in server_modules():
+        texts = [path.read_text(encoding="utf-8") for path in own_templates(config)]
+        tags[config.label] = sum(len(PLURAL_TAG.findall(text)) for text in texts)
+        read[config.label] = [pair for text in texts for pair in template_plurals_in(text)]
+    assert {label: len(pairs) for label, pairs in read.items()} == tags
+    assert tags["base"] >= 1
+    assert all(pair in said[label] for label, pairs in read.items() for pair in pairs)
+
+
 def test_no_code_says_a_count_with_parentheses():
-    """In English there is no catalogue: the screen says the forms the code hands ``ngettext``, whatever the ``.po``
-    keeps (hub#1294)."""
+    """In English there is no catalogue: the screen says the forms the code hands ``ngettext`` and the templates'
+    ``{% blocktranslate count %}``, whatever the ``.po`` keeps (hub#1294, hub#1318)."""
     found = {
         f"{label}: {form}"
         for label, pairs in code_plurals().items()

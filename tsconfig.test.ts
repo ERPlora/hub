@@ -137,7 +137,10 @@ function decoded(file: string, bytes: Buffer): string | undefined {
 /**
  * Reads at once each file not read yet. With the machine loaded, a file's first open waits on its own: 760 files
  * read one by one took 75 s, 99 ms each against 0.5 at rest (2026-10-30), and waiting for them together takes a
- * fraction of their sum. A file that cannot be read is `undefined`, as TypeScript's own read returns it.
+ * fraction of their sum. A file that cannot be read is `undefined`, as TypeScript's own read returns it. The tests
+ * that read through it wait without a clock (hub#1292): a read of a file of the repo ends, as late as the machine
+ * makes it, which no clock in seconds tells from one that never does; what could still not end, a wait nobody
+ * settles, only the end of the run's job cuts.
  */
 async function readAll(files: Iterable<string>): Promise<void> {
   const unread = [...new Set([...files].map((file) => resolve(file)))].filter((file) => !texts.has(file));
@@ -280,7 +283,7 @@ it('reports a process.env planted in the shell entry and in an app of the SPA', 
   ]);
   // Built from its files read at once beforehand: TypeScript read none of them from the disk while building it.
   expect(oneByOne).toBe(0);
-}, 60_000);
+}, NO_CLOCK);
 
 it('keeps in pnpm typecheck every file the single tsconfig.json checked: the SPA, its tests and the root config', () => {
   const single = ts.parseJsonConfigFileContent(
@@ -463,7 +466,7 @@ it('copies into the image every file pnpm build reads for the SPA, and keeps non
   expect([...files].filter((file) => ignored(file)).sort()).toEqual([]);
   // Its files read at once (those the planted program read, taken from it), none one by one from the disk.
   expect(oneByOne).toBe(0);
-}, 60_000);
+}, NO_CLOCK);
 
 /** The repo files Vite loads to read its config, before it builds anything: vite.config.ts and what it imports. */
 function viteConfigReads(): string[] {
