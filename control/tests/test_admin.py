@@ -1,5 +1,4 @@
-"""The Hub admin of control: the database clusters and the hubs with their database (round 2026-10-30b of PLAN-DB,
-decision 1 of Ioan; tranche S7, part 1).
+"""The Hub admin of control: the database clusters and the hubs with their database.
 
 Admin › Clusters lists each cluster with its writer, its PgBouncer, whether it is open, its limit, the hubs on it
 against that limit, its secret and the total size of its hubs' databases, and its every write is an operation
@@ -7,7 +6,7 @@ against that limit, its secret and the total size of its hubs' databases, and it
 (a secret that does not resolve, a writer under its hubs), «Close to new hubs» closes the chosen ones, and one that
 holds hubs is never deleted. Admin › Hubs adds to the registry's columns (``base.admin``) each hub's database, cluster,
 schema and size (``control.cluster.sizes``, one measure per cluster and page), with filters by cluster and status; a
-hub on no cluster says it is on the default server, the settings' own, wherever it has a database (hub#614).
+hub on no cluster says it is on the default server, the settings' own, wherever it has a database.
 Only the platform's admins (staff and superuser) change anything; support reads. On the platform host only.
 """
 
@@ -408,7 +407,7 @@ class TestHubs:
 
 
 class TestTheDefaultServer:
-    """An empty ``Hub.cluster`` is the settings' own server (hub#614): the registry says it instead of «-»."""
+    """An empty ``Hub.cluster`` is the settings' own server: the registry says it instead of «-»."""
 
     def test_a_hub_on_no_cluster_says_it_is_on_the_default_server(self, client, root, hub_databases):
         cluster = local_cluster()
@@ -502,7 +501,7 @@ def test_its_words_are_translated():
 
 
 class TestMoveToCluster:
-    """«Move to cluster…» (round 2026-10-30b of PLAN-DB, decision 3): the platform's admins choose hubs, then an open
+    """«Move to cluster…»: the platform's admins choose hubs, then an open
     cluster on a confirmation page; each is asked to move through ``control.hub.move`` (the worker moves it, its host
     503 meanwhile). Support never sees it."""
 
@@ -619,7 +618,7 @@ AT_MOMENT = dt.datetime(2026, 11, 9, 14, 30, tzinfo=dt.UTC)
 
 
 class TestRestoreFromACopy:
-    """«Restore from a copy…» (hub#1198, BASE-F114): the platform's admins choose hubs, then the temporary cluster their
+    """«Restore from a copy…» (BASE-F114): the platform's admins choose hubs, then the temporary cluster their
     copy is on (one closed to new hubs) and the moment it is of, on a confirmation page; each is asked through
     ``control.hub.restore`` with that moment, and what the operation refuses is said hub by hub. Support never sees it,
     and the operation itself refuses anyone but the platform's admins (403)."""
@@ -753,7 +752,7 @@ class TestRestoreFromACopy:
 
 
 class TestRestoreToASeparateCopy:
-    """«Restore to a separate copy…» (hub#1213, BASE-F114): the same confirmation page and form as «Restore from a
+    """«Restore to a separate copy…» (BASE-F114): the same confirmation page and form as «Restore from a
     copy…», each hub asked through ``control.hub.restore_aside``; the hubs are not touched, and Separate copies lists
     the copies, read only, for support too. Support never sees the action."""
 
@@ -836,7 +835,7 @@ class TestRestoreToASeparateCopy:
 
 
 class TestRecoverIntoTheBusiness:
-    """«Recover into the business…» on Separate copies (hub#1257, BASE-F114): a confirmation page with what the apps
+    """«Recover into the business…» on Separate copies (BASE-F114): a confirmation page with what the apps
     give back from a copy (Customers today), ticked; confirmed, each chosen copy is asked through
     ``control.copy.recover`` and Recoveries lists how each goes, read only, for support too. Support never sees it."""
 
@@ -876,12 +875,12 @@ class TestRecoverIntoTheBusiness:
         assert "Recover into the business" in html and 'value="Recover"' in html
         assert re.search(r'<input[^>]*name="apps"[^>]*value="customer"[^>]*checked', html)
         assert "Customers" in html
-        # hub#1284: and the appointments, after the customers they are booked for.
+        # And the appointments, after the customers they are booked for.
         assert re.search(r'<input[^>]*name="apps"[^>]*value="appointment"[^>]*checked', html)
         assert html.index('value="customer"') < html.index('value="appointment"')
         assert str(copy) in html and f'<div class="readonly">{copy.db_name}</div>' in html
         assert "admin/css/forms.css" in html
-        # hub#1307: before confirming, what will not happen: what comes back greets nobody.
+        # Before confirming, what will not happen: what comes back greets nobody.
         assert "What comes back is nothing new to the business: it starts none of its automations" in html
         assert not CopyRecovery.objects.exists()
 
@@ -938,7 +937,7 @@ class TestRecoverIntoTheBusiness:
         assert f'href="{RECOVERIES}add/"' not in listed
 
     def test_a_recovery_says_how_many_came_back_the_same_apart_from_those_created(self, client, root):
-        # hub#1306: a card the business deleted and still held comes back the same card (CUSTOMER-F33).
+        # A card the business deleted and still held comes back the same card (CUSTOMER-F33).
         self.a_recovery(
             self.made("acme"),
             status="done",
@@ -998,7 +997,7 @@ class TestRecoverIntoTheBusiness:
             ],
         )
 
-        # hub#1306: what was restored before it stopped is said too, never «nothing».
+        # What was restored before it stopped is said too, never «nothing».
         self.a_recovery(
             self.made("bistro"),
             status="done",
@@ -1037,7 +1036,7 @@ class TestRecoverIntoTheBusiness:
     def test_a_long_result_breaks_inside_its_cell_by_the_sheet_recoveries_load(self, client, root):
         """A result can be long and in one piece (why a recovery failed names its copy's database): Recoveries load
         control's admin sheet, whose rule on the results' cells breaks it into lines there instead of pushing the list
-        sideways on a phone (hub#1308). The browser measures it at 375, 768 and 1280 px
+        sideways on a phone. The browser measures it at 375, 768 and 1280 px
         (tests/e2e/base-recoveries-long-result.spec.ts); this keeps the sheet loaded and its rule on the cells the list
         draws."""
         from pathlib import Path
@@ -1082,9 +1081,9 @@ def test_the_recovery_speaks_spanish(client, root):
         HTTP_ACCEPT_LANGUAGE="es",
     ).content.decode()
     assert 'value="Recuperar"' in html and "Clientes" in html and "nunca se copia" in html
-    # hub#1306: what the business deleted and still holds comes back the same, with its history.
+    # What the business deleted and still holds comes back the same, with its history.
     assert "vuelve tal como era, con su historial" in html
-    # hub#1307: and it starts none of the business's automations.
+    # And it starts none of the business's automations.
     assert "Lo que vuelve no es nada nuevo para el negocio: no arranca ninguna de sus automatizaciones" in html
     with translation.override("es"):
         said = control_admin.CopyRecoveryAdmin.result_said(
@@ -1096,7 +1095,7 @@ def test_the_recovery_speaks_spanish(client, root):
 
 
 def test_what_came_back_is_said_in_spanish_in_words_that_fit_customers_and_appointments_alike():
-    """hub#1284: the counts follow the name of an app whose records are feminine in Spanish («Citas») as well as one
+    """The counts follow the name of an app whose records are feminine in Spanish («Citas») as well as one
     whose records are masculine («Clientes»): never «Citas: 2 creados»."""
     from django.utils import translation
 
@@ -1108,7 +1107,7 @@ def test_what_came_back_is_said_in_spanish_in_words_that_fit_customers_and_appoi
         assert said({"app": "customer", "created": 1, "not_created": 0, "reasons": [], "refused": ""}) == (
             "Clientes: se creó 1"
         )
-        # And what comes back the same (hub#1306), whatever app restores it next (hub#1326).
+        # And what comes back the same, whatever app restores it next.
         assert said({"app": "appointment", "restored": 1, "created": 0, "not_created": 0, "reasons": [], "refused": ""}) == (
             "Citas: se restauró 1"
         )
@@ -1214,7 +1213,7 @@ def test_its_confirmation_page_speaks_spanish(client, root):
     assert "Cada hub elegido se cierra unos minutos" in html and 'value="Moverlos"' in html
 
 
-# ── The freeze switch (hub#930; PLAN-DB round 2026-11-04e, «Congelar») ───────────────────────────────────────────────
+# ── The freeze switch ────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def the_switch() -> Freeze:

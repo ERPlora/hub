@@ -1,15 +1,9 @@
 <script setup lang="ts">
-// VeriFactu → Settings (VERIFACTU-F04, F08–F12; the old `erp-verifactu-settings`; «Enable VeriFactu» is gone:
-// turning the app on is enabling it). «Sending»: «Use my own certificate» (owner and admin; ERPlora files for you when
-// off), with its explanation and «Open Configuration»; «AEAT environment» with its pill and «Go live» (asks first;
-// closed while something is missing, listed above it: the server's opening and its gateway, the approved signed
-// authorisation, the own certificate (one this server can open), an active account; no plan option, PLAN §30) or, in
-// production, why records wait (e.g. the authorisation was revoked) and «Back to testing» (asks first; only until the first production
-// record). «Live test»: «Test the connection» (whoever may send), which presents nothing to the AEAT, and «Create test
-// invoice» (owner and admin, in testing), with the last result. «Responsible declaration»: «Read the signed
-// declaration» (a new tab, the system browser in the installed app), its version and the identifying data every record carries (VERIFACTU-F12). Outside Spain VeriFactu is not
-// for the business: «VeriFactu is only for businesses in Spain.» is the one reason in sight, and the switch, «Go live» and
-// the live test are disabled (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN).
+// VeriFactu → Settings (VERIFACTU-F04, F08–F12). Turning the app on is enabling VeriFactu. «Go live» stays closed
+// while something is missing, listed above it: the server's opening and its gateway, the approved signed
+// authorisation, the own certificate (one this server can open), an active account. «Back to testing» is offered only
+// until the first production record. «Test the connection» presents nothing to the AEAT. Outside Spain VeriFactu is not
+// for the business: the switch, «Go live» and the live test are disabled.
 import { formatDateTime, InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, openExternalLink, toastSuccess, useSession } from '@erplora/ui/shell';

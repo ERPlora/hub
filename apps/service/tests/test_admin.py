@@ -1,4 +1,4 @@
-"""Django admin of the service app: full CRUD for support (round 12, PLAN §17).
+"""Django admin of the service app: full CRUD for support.
 
 A second write path, for the staff only on hubs.erplora.com: it adds, changes and deletes every table,
 so that support can repair; it does not go through the operations' rules, so it warns rather than
@@ -139,8 +139,7 @@ def test_changelists_and_change_pages_render(client, superuser):
 @pytest.mark.django_db
 def test_a_voucher_sold_reads_services_own_spanish_in_the_admin(client, superuser):
     """Support reading a voucher sold in Spanish sees who voided it as «Anulado por», the voucher being masculine, and
-    its sessions as «Sesiones del bono», as Servicios says them; not Ventas' «Anulada por» nor «Sesiones de bono»
-    (hub#662)."""
+    its sessions as «Sesiones del bono», as Servicios says them; not Ventas' «Anulada por» nor «Sesiones de bono»."""
     cut = make_service("Haircut", tax=make_tax())
     grant = make_grant(make_package("Bono 5", [cut], max_uses=5), make_customer("Lucía"))
     make_redemption(grant, cut)

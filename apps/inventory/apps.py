@@ -16,7 +16,7 @@ class InventoryConfig(LiveAppConfig):
     icon = "ion:cube-outline"
     category = Category.CATALOG
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The app store's texts, which register_apps writes to shared.app.
     summary = _(
         "Your catalog with its stock: products, categories, goods received, counts and low-stock alerts."
     )
@@ -32,7 +32,7 @@ class InventoryConfig(LiveAppConfig):
     verticals = ["restaurant"]
     # Each product and category points at a tax category (tax.TaxCategory).
     requires = ["tax"]
-    # The products' own photos (round 2026-10-30, base.images): served by /p/media/ to the hub's sessions only.
+    # The products' own photos (base.images): served by /p/media/ to the hub's sessions only.
     members_media = ["inventory/products/"]
     default_auto_field = "django.db.models.BigAutoField"
     permissions = [
@@ -70,8 +70,8 @@ class InventoryConfig(LiveAppConfig):
             path="/inventory",
         )
     ]
-    # The Home's hooks (PLAN-HUB round 2026-10-21): the old module's `setup` and `widgets` (it had no `bell`), on the
-    # Panel's own queries. Registered icons only: the old `trending-down-outline` waits in UI-REQUESTS.md.
+    # The Home's hooks, on the Panel's own queries. Registered icons only: `trending-down-outline` waits in
+    # UI-REQUESTS.md.
     setup = [
         SetupStep(
             key="catalog",
@@ -88,7 +88,7 @@ class InventoryConfig(LiveAppConfig):
         )
     ]
     widgets = [
-        # A KPI says its name once, in its title (gh:hub#1105); the money one in the hub's currency (gh:inventory#123).
+        # A KPI says its name once, in its title; the money one is in the hub's currency.
         Widget(
             key="low_stock_count",
             title=_("Low-stock products"),

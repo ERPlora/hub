@@ -150,7 +150,7 @@ describe('RecordsPage', () => {
     open.mockRestore();
   });
 
-  it('in the installed app, «Verify at the AEAT» opens the AEAT’s page in the system browser (gh:hub#518)', async () => {
+  it('in the installed app, «Verify at the AEAT» opens the AEAT’s page in the system browser', async () => {
     const invoke = vi.fn(() => Promise.resolve());
     (window as TauriWindow).__TAURI__ = { core: { invoke } };
     const s = await setup();
@@ -186,8 +186,7 @@ describe('RecordsPage', () => {
   });
 });
 
-describe('RecordsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-FILTERS-2B)', () => {
-  // flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+describe('RecordsPage: the filters behind the table funnel', () => {
   type Filter = { type: string; key?: string; keys?: string[]; amount?: boolean; label?: string; options?: Array<{ value: string; label: string }> };
 
   it('Date, Type, Total, Environment and Status filter on their columns, the invoice type after them', async () => {
@@ -294,7 +293,7 @@ describe('RecordsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-FI
   });
 });
 
-describe('RecordsPage: whether a rejection is already corrected (VERIFACTU-F24, hub#857)', () => {
+describe('RecordsPage: whether a rejection is already corrected (VERIFACTU-F24)', () => {
   const REJECTIONS = {
     rows: [
       row('TICKET-2026-000004', { sequence: 4, status: 'rejected', correction_status: 'pending' }),
@@ -355,7 +354,7 @@ describe('RecordsPage: whether a rejection is already corrected (VERIFACTU-F24, 
     expect(s.router.currentRoute.value.path).toBe('/verifactu/records/fix-3');
   });
 
-  it('Space on «Corrected» opens the record that corrects it, not the rejected one of its row (hub#865)', async () => {
+  it('Space on «Corrected» opens the record that corrects it, not the rejected one of its row', async () => {
     const s = await setup();
     await s.show(REJECTIONS);
     const push = vi.spyOn(s.router, 'push');
@@ -395,7 +394,7 @@ describe('RecordsPage: whether a rejection is already corrected (VERIFACTU-F24, 
   });
 });
 
-describe('RecordsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('RecordsPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

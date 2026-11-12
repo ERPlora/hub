@@ -8,7 +8,7 @@ documents of a series queue and a refused one leaves no gap) and the document, i
 document lock its row first, so a repeated or simultaneous request waits and answers what the first one
 did, without spending a number.
 
-The clock is ``_now()``: the business's day is its date in the Hub's time zone (Madrid in phase 1).
+The clock is ``_now()``: the business's day is its date in the Hub's time zone (Madrid).
 """
 
 import datetime as dt
@@ -1141,7 +1141,7 @@ def _rectify(
         "number it gave: do not stop at the preview nor wait for a yes in the chat.",
         "risk": "high",
         # Its card shows the rectifying invoice it issues, not only the number and the reason it sends; the next
-        # number is read, never taken (FIX-HUB-INVOICE-ASSISTANT-RECTIFY-CARD-WITHOUT-PREVIEW, BASE-F98).
+        # number is read, never taken (BASE-F98).
         "preview": {
             "operation": "invoice.invoice.rectification_preview",
             "fields": ["invoice_type", "next_number", "base_amount", "tax_amount", "total_amount"],
@@ -1537,7 +1537,7 @@ def update_series(ctx: OperationContext, data: SeriesUpdateIn) -> dict:
     return series_row(series)
 
 
-# ── ERPlora's own invoices (its platform hub, PLAN-SAAS §4) ─────────────────────────────────────────────────────
+# ── ERPlora's own invoices (its platform hub) ───────────────────────────────────────────────────────────────────
 
 PLATFORM_ORIGINAL_UNKNOWN = _(
     "The invoice this credit note rectifies (%(number)s) was never issued here: it has to arrive first."

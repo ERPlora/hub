@@ -188,7 +188,7 @@ def test_the_system_alone_receives_the_issuer_from_the_saas():
 
 
 def test_the_system_alone_issues_erploras_own_invoices():
-    # ERPlora's platform hub (PLAN-SAAS §4): `invoice.issue_platform` is declared by no role and no route serves it;
+    # ERPlora's platform hub: `invoice.issue_platform` is declared by no role and no route serves it;
     # only /internal/platform/invoices, signed by the SaaS, calls it as the system.
     from live.operations import registry
 
@@ -203,9 +203,8 @@ def test_the_system_alone_issues_erploras_own_invoices():
     assert "invoice.issue_platform" not in invoice().permissions
 
 
-# The Home's hooks (PLAN-HUB round 2026-10-21; FIX-INVOICE-SETUP-HOOKS): the old hub's ⛔ «Your business details»
-# (a core item there, ``BLOCKING_KEYS``; here the issuer lives in Invoicing) and the old module's module.json `setup`
-# «Your invoice numbering» (it had no `widgets` nor `bell`), on the queries the Issuer and Series screens read.
+# The Home's steps: ⛔ «Your business details» (the issuer lives in Invoicing) and «Your invoice numbering», on the
+# queries the Issuer and Series screens read.
 
 
 def steps() -> dict[str, SetupStep]:
@@ -218,9 +217,9 @@ def test_the_homes_steps_are_your_business_details_then_your_invoice_numbering()
 
 
 def test_your_business_details_is_done_with_the_issuer_every_document_needs():
-    """INVOICE-F21: done when the issuer has what issuing refuses to go without (``Issuer.configured``: legal name,
-    tax ID and address), set up in Invoicing → Issuer by whoever may change it (gh:hub#1954: the screen with the tax
-    ID in sight, never a settings tab without it)."""
+    """INVOICE-F21: done when the issuer has what issuing refuses to go without (``Issuer.configured``: legal name, tax
+    ID and address), set up in Invoicing → Issuer by whoever may change it (the screen with the tax ID in sight, never a
+    settings tab without it)."""
     step = steps()["business_identity"]
     assert (
         step.operation,
@@ -281,7 +280,7 @@ def test_your_invoice_numbering_is_done_once_the_business_has_its_numbering():
 
 
 def test_the_steps_speak_the_language_of_whoever_reads_them():
-    """gh:hub#868: the old checklist said a module's step in English to a Spanish reader."""
+    """A Spanish reader never reads a module's step in English."""
     texts = {}
     for language in ("en", "es"):
         with translation.override(language):
@@ -311,8 +310,8 @@ def test_the_steps_speak_the_language_of_whoever_reads_them():
 
 
 def test_each_step_is_refreshed_by_the_events_that_change_its_query():
-    # gh:hub#900: the old notice stayed after the business details were saved; the issuer saved or received, a
-    # series created or changed and a document that opens one re-run the steps.
+    # The notice never stays after the business details are saved: the issuer saved or received, a series created or
+    # changed and a document that opens one re-run the steps.
     identity, numbering = steps()["business_identity"], steps()["numbering"]
     assert list(identity.refresh_on) == [E.ISSUER_UPDATED]
     assert list(numbering.refresh_on) == E.SERIES_EVENTS

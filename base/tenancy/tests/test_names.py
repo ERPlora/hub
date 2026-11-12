@@ -1,9 +1,9 @@
-"""Names of the hubs' databases (PLAN-DB §3 and §14.12; plan 2026-10-22-fase-2-tenencia §4, step 1).
+"""Names of the hubs' databases.
 
 A hub's database is the control database's name, ``_`` and the hub's whole UUID in hex (``hub_<hex>``; pre's
 ``pre_hub_<hex>``); a demo's is the control database's, ``_demo_`` and its hex (``hub_demo_<hex>``; pre's
-``pre_hub_demo_<hex>``: round 2026-10-30 of PLAN-DB, proposal (e)). Nothing is ever truncated (the first half of a UUIDv7 is its date),
-every name is validated against the control database it belongs to and reaches SQL only as ``sql.Identifier``.
+``pre_hub_demo_<hex>``). Nothing is ever truncated (the first half of a UUIDv7 is its date), every name is validated
+against the control database it belongs to and reaches SQL only as ``sql.Identifier``.
 """
 
 import uuid
@@ -62,7 +62,7 @@ def test_the_names_of_a_control_database_are_valid(name):
         f"hub_{HEX.upper()}",  # not lowercase hex
         f"hub_{HEX[:-1]}g",  # not hex
         f"pre_hub_{HEX}",  # another control database's
-        f"demo_{HEX}",  # a demo without its control database (before round 2026-10-30)
+        f"demo_{HEX}",  # a demo without its control database's name
         f"pre_hub_demo_{HEX}",  # another control database's demo
         f"hub_demo_{HEX[:-1]}",  # a truncated demo
         f"hub_{HEX}; DROP DATABASE hub",
@@ -141,7 +141,7 @@ def test_only_a_hubs_or_a_demos_database_passes_as_one_a_template_never():
         names.validate_hub(f"pre_hub_{HEX}", control="hub")
 
 
-# ── The copy a hub leaves behind when it moves (round 2026-10-30b of PLAN-DB, decision 3; tranche S7) ────────────────
+# ── The copy a hub leaves behind when it moves ───────────────────────────────────────────────────────────────────────
 
 
 def test_a_moved_copy_is_its_control_databases_move_and_the_hex_of_its_hub():
@@ -159,7 +159,7 @@ def test_only_a_moved_copy_passes_as_one_never_a_hub_a_demo_or_a_template():
             names.validate_moved(other, control="hub")
 
 
-# ── The database a restore replaced, kept aside (hub#1198; base.tenancy.restore) ────────────────────────────────────
+# ── The database a restore replaced, kept aside (base.tenancy.restore) ───────────────────────────────────────────────
 
 
 def test_a_kept_copy_is_its_control_databases_old_and_the_hex_of_its_own_uuid7():
@@ -190,7 +190,7 @@ def test_a_moved_copy_is_no_hubs_own_database_to_drop_with_it():
         names.validate_hub(f"hub_move_{HEX}", control="hub")
 
 
-# ── A hub's database as it was at a moment, made aside (hub#1213; base.tenancy.restore, «restore aside») ─────────────
+# ── A hub's database as it was at a moment, made aside (base.tenancy.restore, «restore aside») ───────────────────────
 
 
 def test_a_copy_aside_is_its_control_databases_copy_and_the_hex_of_its_own_uuid7():

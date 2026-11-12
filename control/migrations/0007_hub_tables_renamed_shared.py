@@ -1,4 +1,4 @@
-# The contract of S5 (PLAN-DB, round 2026-11-01c): the tables of the hubs' apps that phase 1 left in control's database
+# The contract step after the cut: the tables of the hubs' apps left in control's database from when hubs shared it
 # get ``<table>_shared_20261101``. No business has used them since the cut, yet nothing told their rows from live data.
 # Never a DROP: the tables are not deleted, and stepping back returns every name.
 #
@@ -7,7 +7,8 @@
 #   neither has the suite's control database, whose ``LegacyTablesRouter`` keeps those tables on purpose.
 # - The list comes from ``base.tenancy.inventory``, the one place that says whose a table is, and from the installed
 #   models: this migration's historical state knows only the apps it depends on. It is the exception to «a migration
-#   never imports app code», so it holds as long as the inventory does; on a database made after S5 it finds nothing.
+#   never imports app code», so it holds as long as the inventory does; on a database made after the cut it finds
+#   nothing.
 # - It stops, renaming nothing, while a ready business has no database of its own: ``cut_shared_hubs`` still has to
 #   give it one, and ``--copy-all`` reads these tables. A cancelled business (``yfn`` in production) and a demo do not
 #   stop it: neither is served, and neither is ever copied (``base.hub.restore`` makes a database from nothing).

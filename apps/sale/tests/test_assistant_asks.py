@@ -1,5 +1,5 @@
-"""What layer 1 of the assistant's QA does not say of Sales & POS (erplora-next docs plan 2026-10-31, the assistant's
-knowledge and QA): how many phrases its tools put to a turn, and what each role is never offered.
+"""What layer 1 of the assistant's QA does not say of Sales & POS: how many phrases its tools put to a turn, and what
+each role is never offered.
 
 Every ask of every tool of sale bringing its tool among the first ten, role by role, in English and in Spanish, out of
 the catalogue of a business with every app on and ranked as a turn ranks, is ``base/tests/test_assistant_asks.py``'s
@@ -48,12 +48,12 @@ def test_what_the_employee_may_not_do_is_not_in_their_catalogue():
     assert "sale.sale.void" in employee
 
 
-#: How the owner asks layer 2 what the till takes (hub#1193): live reads no «abonar» as paying, so nothing in it names
+#: How the owner asks layer 2 what the till takes: live reads no «abonar» as paying, so nothing in it names
 #: the payment methods, while «clientes» names the customers and «caja» the till; only the asks of
 #: ``sale.payment_method.list`` bring it, and ahead of them.
 PAYING_AT_THE_TILL = ("es", "sale.payment_method.list", "¿de qué maneras pueden abonarme los clientes en caja?")
 
-#: The owner's requests of layer 2 that were not offered their tool (hub#1183, hub#1193), word for word as the probes of
+#: The owner's requests of layer 2 that were not offered their tool, word for word as the probes of
 #: ``tests/e2e/qa/probes/owner-es-sale-2026-11-08.json`` say them: the record named by its bare name («Chuches QA»),
 #: what the asks of each tool bring among the first ten.
 LAYER_2 = [
@@ -62,7 +62,7 @@ LAYER_2 = [
     PAYING_AT_THE_TILL,
 ]
 
-#: The requests of the QA of hub#1085, each as a person says it: a record of the QA's data names what it is («the
+#: The requests of the real-model QA, each as a person says it: a record of the QA's data names what it is («the
 #: QA Sweets section»), as no selection knows a bare name («Chuches QA») without the business's data; and the probes
 #: of ``LAYER_2``, said as they are.
 QA_PROBES = [
@@ -108,7 +108,7 @@ QA_PROBES = [
 
 def test_the_reported_requests_of_layer_2_are_its_probes_word_for_word():
     """A paraphrase of a probe («Renombra la sección Chuches QA…») passed while the owner's own words were never
-    offered their tool (hub#1183): the cases of ``LAYER_2`` are the probes of their tool, as layer 2 says them."""
+    offered their tool: the cases of ``LAYER_2`` are the probes of their tool, as layer 2 says them."""
     phrases = probe_phrases()
     assert [phrases.get(comparable(phrase)) for _, _, phrase in LAYER_2] == [
         f"qa20261108.owner.es.{name}" for _, name, _ in LAYER_2
@@ -126,8 +126,8 @@ def test_the_reported_sales_request_offers_its_existing_operation(language, name
 
 @pytest.mark.django_db
 def test_how_customers_may_pay_at_the_till_brings_the_payment_methods_before_the_customers_and_the_till():
-    """«¿De qué maneras pueden abonarme los clientes en caja?» asks for the payment methods of the till (hub#1193):
-    they come among the first eight, ahead of every tool of Customers and of Cash register its words name."""
+    """«¿De qué maneras pueden abonarme los clientes en caja?» asks for the payment methods of the till: they come among
+    the first eight, ahead of every tool of Customers and of Cash register its words name."""
     language, name, phrase = PAYING_AT_THE_TILL
     offered = [
         op.name
@@ -147,7 +147,7 @@ ROLE_OF = {"owner": "hub_owner", "admin": "hub_admin", "manager": "hub_manager",
 def test_the_asks_of_the_payment_methods_of_the_till_take_no_place_from_the_payments_methods():
     """The payment methods of the till are no accounts the business pays its suppliers from (``payment.method.*``):
     each probe of layer 2 of Payments that brings its tool among the first ten brings it at the same place with the
-    asks of ``sale.payment_method.list`` as without them (hub#1193)."""
+    asks of ``sale.payment_method.list`` as without them."""
     moved = []
     kept = 0
     for probe in probes_of_layer_2():
@@ -170,12 +170,12 @@ def test_the_asks_of_the_payment_methods_of_the_till_take_no_place_from_the_paym
 
 #: Requests in words that are no ask nor probe, each brought among the first ten by its tool's asks and out of them
 #: without: undoing a line's voucher (``sale.order.remove_voucher``, whose asks no longer say the QA's «quita el bono de
-#: la línea» with one word changed, hub#1135); and, for ``sale.department.update`` and ``sale.quick_note.update``
-#: (hub#1183), one for each of their asks in each language, which falls out without that ask alone (it shares two of
-#: its stems at most, and fewer than half of its own), and the English twins of the probes of ``LAYER_2``; and so for
-#: ``sale.payment_method.list`` (hub#1193), but for «¿con qué me pueden pagar?», which ``PAYING_AT_THE_TILL`` needs
-#: instead (the asks of many other tools say «pueden»), and «¿se puede pagar con Bizum?», which says no word the others
-#: do not («Bizum» is in «do we accept Bizum?»).
+#: la línea» with one word changed); and, for ``sale.department.update`` and ``sale.quick_note.update``, one for each of
+#: their asks in each language, which falls out without that ask alone (it shares two of its stems at most, and fewer
+#: than half of its own), and the English twins of the probes of ``LAYER_2``; and so for ``sale.payment_method.list``,
+#: but for «¿con qué me pueden pagar?», which ``PAYING_AT_THE_TILL`` needs instead (the asks of many other tools say
+#: «pueden»), and «¿se puede pagar con Bizum?», which says no word the others do not («Bizum» is in «do we accept
+#: Bizum?»).
 OWN_WORDS = [
     ("en", "sale.payment_method.list", "would we take an Amex card?"),
     ("en", "sale.payment_method.list", "are cheques from regulars accepted?"),
@@ -214,9 +214,9 @@ def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(languag
 
 
 def test_no_qa_probe_is_an_ask():
-    """The probes measure that the selection generalises (erplora-next docs plan 2026-10-31 §1.5): a probe copied into
-    the asks of its tool ranks its own words, layer 2 skips it as a copy of an ask, and a record of the QA's data
-    («Cuenta QA», «Chuches QA») is no phrase a business says."""
+    """The probes measure that the selection generalises: a probe copied into the asks of its tool ranks its own words,
+    layer 2 skips it as a copy of an ask, and a record of the QA's data («Cuenta QA», «Chuches QA») is no phrase a
+    business says."""
     for language, name, phrase in QA_PROBES:
         assert phrase not in asks_of(registry[name]).get(language, ()), phrase
     for op in registry.values():

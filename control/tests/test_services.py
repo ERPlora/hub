@@ -1,9 +1,9 @@
-"""The database clusters, written through their operations (round 2026-10-30b of PLAN-DB, decision 1; tranche S7).
+"""The database clusters, written through their operations.
 
 The Hub admin (``hubs.erplora.com/admin``) is where a cluster is registered, edited, closed to new hubs or deleted,
 and each of those is a ``control.cluster.*`` command (``control/admin.py`` only calls them): for the platform's admins
 (staff and superuser) or the platform itself, never for support (it only reads) nor a customer. A cluster with a
-``secret_name`` is saved only once its app's secret (``…/app``, the one the web may read, aws#23) resolves through
+``secret_name`` is saved only once its app's secret (``…/app``, the one the web may read) resolves through
 ``base.tenancy.credentials.credentials_for``; the migrator's is never asked from here. «Close to new hubs» leaves its
 hubs where they are; a cluster that holds hubs is never deleted, and its writer never changes under them (that is a
 move, ``base.hub.move``). Each write records its event in control's outbox, in the same transaction.
@@ -378,7 +378,7 @@ def test_every_write_is_an_internal_command_of_control():
         assert (op.kind, op.app_label, op.ai_spec(), op.fn.__module__) == ("command", "control", INTERNAL, "control.services")
 
 
-# ── A hub's move to another cluster (round 2026-10-30b of PLAN-DB, decision 3; tranche S7) ──────────────────────────
+# ── A hub's move to another cluster ─────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture
@@ -619,7 +619,7 @@ class TestCancelAMove:
             services.hub_move_cancel(admin_ctx, HubIdIn(id=uuid.uuid7()))
 
 
-# ── A hub's database put back as it was at a moment, from a copy on a temporary cluster (hub#1198) ──────────────────
+# ── A hub's database put back as it was at a moment, from a copy on a temporary cluster ─────────────────────────────
 
 
 class AskedFromATemporaryCluster:
@@ -816,7 +816,7 @@ class TestRestore(AskedFromATemporaryCluster):
 
 class TestRestoreAside(AskedFromATemporaryCluster):
     """``control.hub.restore_aside`` asks the worker to make, on the hub's own cluster, a separate copy of its database
-    as it was at a moment, from its copy on a temporary cluster (hub#1213, layer 1; ``base.tenancy.restore``): the
+    as it was at a moment, from its copy on a temporary cluster (``base.tenancy.restore``): the
     business is never closed nor changed, so a hub with production VeriFactu records made after the moment gets its
     data back this way. The copy is a ``RestoredCopy`` row named ``<control>_copy_<its hex>``; it is asked under the
     same conditions as a restore in place (``control.hub.restore``)."""
@@ -923,12 +923,12 @@ class TestRestoreAside(AskedFromATemporaryCluster):
         )
 
 
-# ── What a business lost, brought back from one of its separate copies (hub#1257) ────────────────────────────────────
+# ── What a business lost, brought back from one of its separate copies ──────────────────────────────────────────────
 
 
 class TestRecover:
     """``control.copy.recover`` asks the worker to bring back into a business what one of its separate copies holds and
-    the business lacks, app by app (hub#1257, layer 2 of hub#1213; ``base.tenancy.recovery``): a ``CopyRecovery`` row
+    the business lacks, app by app (``base.tenancy.recovery``): a ``CopyRecovery`` row
     with the apps asked, the staff member and their language. Only from a made copy, of apps that answer
     ``recoverable_from_copy``, and one recovery of a copy at a time; nothing of the business is touched by the ask."""
 

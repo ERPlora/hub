@@ -1,5 +1,5 @@
-// The inventory's UI texts: English source + Spanish (PLAN §5). Kept by hand next to the pages until
-// V6 exports Django's `djangojs` catalogues to JSON; this test is their guardrail: same keys and
+// The inventory's UI texts: English source + Spanish. Kept by hand next to the pages until
+// Django's `djangojs` catalogues are exported to JSON; this test is their guardrail: same keys and
 // placeholders in both languages, nothing empty, and every key a page, component or composable uses
 // exists (`$t('…')` in templates, `t('…')` in scripts).
 import { readdirSync, readFileSync } from 'node:fs';
@@ -62,7 +62,7 @@ describe('inventory catalogues (en source + es)', () => {
     }
   });
 
-  it('hub#1124: say a count in the singular or the plural, never «(s)»', () => {
+  it('says a count in the singular or the plural, never «(s)»', () => {
     expect(pluralsInParentheses(EN, ES)).toEqual([]);
   });
 
