@@ -993,9 +993,28 @@ class TestRecoverIntoTheBusiness:
             ],
         )
 
+        # hub#1306: what was restored before it stopped is said too, never «nothing».
+        self.a_recovery(
+            self.made("bistro"),
+            status="done",
+            results=[
+                {
+                    "app": "customer",
+                    "restored": 1,
+                    "created": 0,
+                    "not_created": 0,
+                    "reasons": [],
+                    "refused": "base.hub_busy: The business is busy.",
+                }
+            ],
+        )
+
         listed = page(client, RECOVERIES)
         assert "Customers: 2 created, then stopped (base.hub_busy: The business is busy.)" in row_of(
             listed, ">acme<br>"
+        )
+        assert "Customers: 1 restored, then stopped (base.hub_busy: The business is busy.)" in row_of(
+            listed, ">bistro<br>"
         )
 
     def test_support_neither_sees_it_nor_runs_it_but_reads_the_recoveries(self, client, support):

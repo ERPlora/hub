@@ -277,6 +277,24 @@ class TestCustomersComeBack:
         assert why["id"] == str(luis)
         assert why["reason"].startswith("customer.phone_invalid: ")
 
+    def test_what_was_deleted_comes_back_before_anything_is_created_so_the_person_is_not_made_twice(
+        self, recoveries, every_app_on
+    ):
+        # The copy holds Ana twice (the same name, phone and email): the business deleted one and lost the other.
+        hub, (deleted, lost) = recoveries.business(every_app_on, ANA, ANA)
+        copy = recoveries.copy_of(hub)
+        run_in(hub, "customer.customer.delete", id=deleted)
+        gone(hub, lost)
+        asked = recoveries.ask(copy)
+
+        run()
+
+        with use_hub(hub):
+            from apps.customer.models import Customer
+
+            assert list(Customer.objects.live().values_list("pk", flat=True)) == [deleted]
+        assert fresh(asked).results == [CUSTOMERS | {"restored": 1}]
+
     def test_a_card_its_restore_refuses_is_counted_with_why_and_the_others_come_back(
         self, recoveries, every_app_on, monkeypatch
     ):
