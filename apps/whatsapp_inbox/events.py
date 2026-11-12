@@ -79,10 +79,10 @@ CUSTOMER_RESTORED = "customer.customer.restored"
 REACTIONS = {
     CUSTOMER_CREATED: "whatsapp_inbox.conversation.claim_for_customer",
     CUSTOMER_UPDATED: "whatsapp_inbox.conversation.claim_for_customer",
+    CUSTOMER_RESTORED: "whatsapp_inbox.conversation.claim_for_customer",
     CUSTOMER_MERGED: "whatsapp_inbox.conversation.move_customer",
     CUSTOMER_DELETED: "whatsapp_inbox.conversation.release_customer",
     CUSTOMER_ERASED: "whatsapp_inbox.conversation.erase_for_customer",
-    CUSTOMER_RESTORED: "whatsapp_inbox.conversation.claim_for_customer",
 }
 
 

@@ -102,7 +102,7 @@ def test_a_card_deleted_or_erased_in_customers_leaves_its_vouchers_without_a_cus
 
 def test_a_card_recovered_from_the_separate_copy_takes_its_vouchers_back_to_her_name(bono):
     """hub#1324: the deleted card back, the same one (CUSTOMER-F33, run as the system from the separate copy):
-    its vouchers leave «Vouchers without a customer» and say her name again, untouched."""
+    its vouchers leave «Vouchers with no customer» and say her name again, untouched."""
     marta = run("customer.customer.create", {"name": "Marta Gil"})
     granted = run("service.grant.create", {"package": "Bono 5 cortes", "customer_id": str(marta.id)})
     run("customer.customer.delete", {"id": str(marta.id)})

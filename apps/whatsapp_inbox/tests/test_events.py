@@ -32,10 +32,10 @@ def test_the_reactions_are_declared_by_name():
     assert events.REACTIONS == {
         "customer.customer.created": "whatsapp_inbox.conversation.claim_for_customer",
         "customer.customer.updated": "whatsapp_inbox.conversation.claim_for_customer",
+        "customer.customer.restored": "whatsapp_inbox.conversation.claim_for_customer",
         "customer.customer.merged": "whatsapp_inbox.conversation.move_customer",
         "customer.customer.deleted": "whatsapp_inbox.conversation.release_customer",
         "customer.customer.erased": "whatsapp_inbox.conversation.erase_for_customer",
-        "customer.customer.restored": "whatsapp_inbox.conversation.claim_for_customer",
     }
     assert events.react(A, "sale.sale.completed", {"id": "x"}) is None
 

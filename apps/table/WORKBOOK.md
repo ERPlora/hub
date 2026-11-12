@@ -817,10 +817,13 @@ Pasos:
    nombre o teléfono (el buscador de Clientes, el mismo del TPV).
 2. La cuenta de la mesa queda con esa ficha: Ventas la recupera al cobrar. «Quitar cliente» la suelta.
 3. El asistente también puede sentar con cliente: «sienta a Ana García en la mesa 4, somos 3».
+4. Si en Clientes se elimina la ficha, la cuenta deja de decir su nombre; si el personal de ERPlora la recupera
+   desde la copia aparte (CUSTOMER-F33), lo vuelve a decir al momento, también en el plano y la sala que estén
+   abiertos.
 Entra: la ficha, de Clientes.
 Sale: el enlace cuenta ↔ cliente, que guarda Clientes (avisa: `customer.order.linked`).
 Si falla: el motivo de Clientes; la mesa se sienta igual.
-Implicados: CUSTOMER-F17, CUSTOMER-F19, TABLE-F10
+Implicados: CUSTOMER-F17, CUSTOMER-F19, CUSTOMER-F33, TABLE-F10
 
 ## Mesas: lo que entra y lo que sale
 

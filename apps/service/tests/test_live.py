@@ -130,8 +130,8 @@ def test_every_step_of_a_session_of_the_till_re_runs_the_balances_and_the_option
         } <= live_registry.affected([event]), event
 
 
-def test_a_card_recovered_from_the_separate_copy_repaints_her_vouchers_and_the_vouchers_without_a_customer():
-    """hub#1324: as a deletion moves her vouchers to «Vouchers without a customer», the same card back moves them
+def test_a_card_recovered_from_the_separate_copy_repaints_her_vouchers_and_the_vouchers_with_no_customer():
+    """hub#1324: as a deletion moves her vouchers to «Vouchers with no customer», the same card back moves them
     to her name again on an open screen at once (SERVICE-F29, F30)."""
     assert live_registry.affected(["customer.customer.restored"]) >= {
         "service.grant.list",
