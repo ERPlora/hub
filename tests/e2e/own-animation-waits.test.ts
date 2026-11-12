@@ -1,3 +1,4 @@
+// @vitest-environment node
 // flow: e2e-capture — FIX of the e2e harness (FIX-HUB-E2E-OWN-ANIMATION-WAIT-UNGUARDED)
 // Every wait for «nothing moves» in the e2e goes through the one detector of helpers.ts (`settled`, `untilStill`,
 // `movingInPage`), which asks every open shadow root too. `document.getAnimations()` leaves shadow roots out, and Ionic
@@ -16,6 +17,7 @@ import ts from 'typescript';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { NO_CLOCK } from '../../vitest.load';
+import { readTexts } from '../../vitest.offload';
 
 // The real reads, watched: the e2e's files are read (and parsed) once per run (see the warm-up).
 vi.mock('node:fs', async (importOriginal) => {
@@ -104,7 +106,7 @@ function readsByFile(dir = E2E_DIR): Promise<Record<string, number>> {
 
 async function scanFolder(dir: string): Promise<Record<string, number>> {
   const names = readdirSync(dir, { recursive: true, encoding: 'utf8' }).filter(scanned);
-  const sources = await Promise.all(names.map((name) => readFile(join(dir, name), 'utf8')));
+  const sources = await readTexts(names.map((name) => join(dir, name)));
   const found: Record<string, number> = {};
   names.forEach((name, index) => {
     const reads = animationReads(sources[index], name);

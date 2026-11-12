@@ -1,9 +1,9 @@
 // @vitest-environment node
 // The time budgets of the hub's Vitest run follow the machine's load (hub#765): Vitest's own (5 s a test, 10 s a hook,
 // 1 s a `vi.waitFor`) stretched as the machine, with the run's own workers, slows down. A test or hook whose work is
-// synchronous names no clock of its own (hub#1200), and one that waits, or a suite, no fixed one (hub#1292): the
-// guardrail at the end holds every test file of the run to it.
-import { globSync, readFileSync } from 'node:fs';
+// synchronous names no clock of its own (hub#1200), NO_CLOCK neither: its long work goes off the worker's thread
+// (hub#1315); and one that waits, or a suite, no fixed one (hub#1292): the guardrail at the end holds every test file
+// of the run to it.
 import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 
 import config from './vite.config';
 import { loadScale, NO_CLOCK, scaleWaitFor } from './vitest.load';
+import { listAll, readTexts } from './vitest.offload';
 
 const HUB_DIR = dirname(fileURLToPath(import.meta.url));
 
@@ -135,6 +136,39 @@ function stretches(clock: ts.Node, values: Map<string, string>): boolean {
   return /\bloadScale\b/.test(text);
 }
 
+/** A test, hook or suite a test file declares: what declares it, its function and its other arguments (its budget,
+ *  its options). */
+interface Declaration {
+  declares: string;
+  fn: ts.Expression | undefined;
+  others: ts.Expression[];
+}
+
+/** Every test, hook and suite `source` declares, in its order. */
+function declarationsOf(source: ts.SourceFile): Declaration[] {
+  const found: Declaration[] = [];
+  const visit = (node: ts.Node): void => {
+    const declares = ts.isCallExpression(node) ? declaredBy(node.expression) : undefined;
+    if (ts.isCallExpression(node) && declares && (DECLARES.has(declares) || SUITES.has(declares))) {
+      // A test's and a suite's first argument is its name; a hook has none. Its function is the first other argument
+      // that is not its options: written there, passed by name or made by a call.
+      const rest = node.arguments.slice(HOOKS.has(declares) ? 0 : 1);
+      const fn = rest.find((argument) => !ts.isObjectLiteralExpression(argument));
+      found.push({ declares, fn, others: rest.filter((argument) => argument !== fn) });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return found;
+}
+
+/** Whether `declaration` is a test or hook that has returned once its body has run (`isSynchronous`). */
+function returnsAtOnce({ declares, fn }: Declaration): boolean {
+  return DECLARES.has(declares) && fn !== undefined && (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) && isSynchronous(fn);
+}
+
+const lineOf = (source: ts.SourceFile, node: ts.Node) => source.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+
 /**
  * The lines of `text`, a test file, where a test, hook or suite names a clock the load can outrun: any clock on a test
  * or hook that has returned once its body has run (hub#1200), and a fixed one — not stretched by `loadScale` — on one
@@ -143,49 +177,59 @@ function stretches(clock: ts.Node, values: Map<string, string>): boolean {
 function ownClocks(text: string): number[] {
   const source = ts.createSourceFile('test.ts', text, ts.ScriptTarget.Latest, true);
   const values = declaredValues(source);
-  const lines: number[] = [];
-  const visit = (node: ts.Node): void => {
-    const declares = ts.isCallExpression(node) ? declaredBy(node.expression) : undefined;
-    if (ts.isCallExpression(node) && declares && (DECLARES.has(declares) || SUITES.has(declares))) {
-      // A test's and a suite's first argument is its name; a hook has none. Its function is the first other argument
-      // that is not its options: written there, passed by name or made by a call.
-      const rest = node.arguments.slice(HOOKS.has(declares) ? 0 : 1);
-      const fn = rest.find((argument) => !ts.isObjectLiteralExpression(argument));
-      const clock = rest
-        .filter((argument) => argument !== fn)
-        .map(clockOf)
-        .find((found) => found !== undefined);
-      const synchronous =
-        DECLARES.has(declares) && fn !== undefined && (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) && isSynchronous(fn);
-      if (clock && (synchronous || !stretches(clock, values))) {
-        lines.push(source.getLineAndCharacterOfPosition(clock.getStart()).line + 1);
-      }
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(source);
-  return lines;
+  return declarationsOf(source).flatMap((declaration) => {
+    const clock = declaration.others.map(clockOf).find((found) => found !== undefined);
+    return clock && (returnsAtOnce(declaration) || !stretches(clock, values)) ? [lineOf(source, clock)] : [];
+  });
 }
 
-/** The run's test files (the config's `include`), outside node_modules. */
-function testFilesOfTheRun(): string[] {
-  return globSync(config.test?.include ?? [], { cwd: HUB_DIR })
-    .filter((file) => !file.split(sep).includes('node_modules'))
-    .sort();
+/** The `NO_CLOCK` `argument` names: itself, or as the `timeout` of an options object. */
+function noClockOf(argument: ts.Expression): ts.Node | undefined {
+  if (ts.isObjectLiteralExpression(argument)) {
+    const timeout = argument.properties.find((property) => property.name?.getText() === 'timeout');
+    return timeout && ts.isPropertyAssignment(timeout) ? noClockOf(timeout.initializer) : undefined;
+  }
+  return ts.isIdentifier(argument) && argument.text === 'NO_CLOCK' ? argument : undefined;
 }
 
-/** Every test, hook or suite of `files` that names a clock the load can outrun, as `<path>:<line>`. */
-function ownClocksOf(files: string[]): string[] {
-  return files.flatMap((file) => ownClocks(readFileSync(join(HUB_DIR, file), 'utf8')).map((line) => `${file}:${line}`));
+/**
+ * The lines of `text`, a test file, where a test or hook that has returned once its body has run — or a suite, whose
+ * tests and hooks may have — names NO_CLOCK (hub#1315): work long enough to need no clock holds the worker's thread
+ * for as long as it takes, and Vitest fails a run whose worker it held past a minute, with every test green.
+ */
+function heldWorkers(text: string): number[] {
+  const source = ts.createSourceFile('test.ts', text, ts.ScriptTarget.Latest, true);
+  return declarationsOf(source).flatMap((declaration) => {
+    const noClock = declaration.others.map(noClockOf).find((found) => found !== undefined);
+    return noClock && (SUITES.has(declaration.declares) || returnsAtOnce(declaration)) ? [lineOf(source, noClock)] : [];
+  });
+}
+
+/** The run's test files (the config's `include`), outside node_modules, listed without holding the worker. */
+async function testFilesOfTheRun(): Promise<string[]> {
+  return (await listAll(config.test?.include ?? [], HUB_DIR)).filter((file) => !file.split(sep).includes('node_modules'));
+}
+
+/** What `find` sees in each of `files`, as `<path>:<line>`: the files read at once without holding the worker. */
+async function foundIn(files: string[], find: (text: string) => number[]): Promise<string[]> {
+  const texts = await readTexts(files.map((file) => join(HUB_DIR, file)));
+  return files.flatMap((file, index) => find(texts[index]).map((line) => `${file}:${line}`));
 }
 
 const NAME_NO_CLOCK =
   'a test, hook or suite with a clock the load can outrun. On a synchronous one Vitest looks at it only once the ' +
   'test has returned (vitest#2920), so it never cuts one that hangs and only turns red, after the fact, a correct ' +
-  'run the machine made slow: give it NO_CLOCK (vitest.load.ts). A fixed one on one that waits does not stretch ' +
-  'with the load (hub#765): what only the machine makes slow waits with NO_CLOCK, the rest takes Vitest\'s own budget';
+  'run the machine made slow: drop it, and if its work is long, do it off the worker\'s thread (vitest.offload.ts) ' +
+  'and wait for it with NO_CLOCK (vitest.load.ts). A fixed one on one that waits does not stretch with the load ' +
+  '(hub#765): what only the machine makes slow waits with NO_CLOCK, the rest takes Vitest\'s own budget';
 
-describe('guardrail: no test, hook or suite of the Hub names a clock the load can outrun (hub#1200, hub#1292)', () => {
+const HOLD_NOT_THE_WORKER =
+  'a synchronous test, hook or suite that names NO_CLOCK: work long enough to need no clock holds the worker\'s ' +
+  'thread as long, and past a minute Vitest\'s own call to the worker gives up and fails the run with every test ' +
+  'green («Timeout calling "onTaskUpdate"», hub#1315). Do its long work off the worker\'s thread (vitest.offload.ts: ' +
+  'readTexts, listAll, readProgram, inThread; a process with execFile) and wait for it';
+
+describe('guardrail: no test, hook or suite of the Hub names a clock the load can outrun, nor holds the worker without one (hub#1200, hub#1292, hub#1315)', () => {
   it('counts any clock of a test or hook that has returned once its body has run, and a fixed one of one that waits or of a suite', () => {
     const planted = [
       // Synchronous, any clock: a number, a name and the options before or after it, through `each`: lines 3, 6, 7 and 12.
@@ -253,13 +297,54 @@ describe('guardrail: no test, hook or suite of the Hub names a clock the load ca
     expect(ownClocks(planted)).toEqual([3, 6, 7, 12, 15, 18, 19, 31, 32, 46, 47, 48]);
   });
 
-  // It reads every test file of the run (some 900): its work is synchronous, so it names no clock either.
-  it('every test file of the run keeps to it', () => {
-    const files = testFilesOfTheRun();
+  it('counts a synchronous test, hook or suite that names NO_CLOCK, and none that waits (hub#1315)', () => {
+    const planted = [
+      // It holds the worker for as long as its work takes, any way it names NO_CLOCK: lines 3, 6, 7 and 12.
+      "it('walks the tree', () => {",
+      '  expect(walk()).toEqual({});',
+      '}, NO_CLOCK);',
+      'beforeAll(() => {',
+      '  warm();',
+      '}, NO_CLOCK);',
+      "it('reads', { timeout: NO_CLOCK }, () => {",
+      '  read();',
+      '});',
+      "it.each(['a'])('reads %s', function (name) {",
+      '  read(name);',
+      '}, { timeout: NO_CLOCK, retry: 1 });',
+      // It waits, or may wait (what it returns): the worker turns meanwhile.
+      "it('reads at once', async () => {",
+      '  await readAll(files);',
+      '}, NO_CLOCK);',
+      "it('spawns', () => {",
+      '  return spawn();',
+      '}, NO_CLOCK);',
+      "it('polls', () => poll(), NO_CLOCK);",
+      // Synchronous on Vitest's own budget, or on a clock of its own (the other guardrail's): none here.
+      "it('walks a little', () => {",
+      '  walk();',
+      '});',
+      "it('walks on a clock', () => {",
+      '  walk();',
+      '}, 60_000);',
+      // A suite's budget is its tests' and hooks', which may be synchronous: line 26.
+      "describe('a suite', { timeout: NO_CLOCK }, () => {});",
+      // A function passed by name or made by a call is the test's: whether it waits is not read here.
+      "it('runs on fake timers', withFakeTimers(() => {",
+      '  tick();',
+      '}), NO_CLOCK);',
+    ].join('\n');
+    expect(heldWorkers(planted)).toEqual([3, 6, 7, 12, 26]);
+  });
+
+  // It reads every test file of the run (some 900) without holding the worker, as long as the machine makes it.
+  it('every test file of the run keeps to it', async () => {
+    const files = await testFilesOfTheRun();
     // It reads the run's test files, this one and a guardrail that reads the whole tree among them: reading none (the
     // run's `include` moved elsewhere) it would pass on anything.
     const someOfThem = ['vitest.load.test.ts', join('base', 'frontend', 'money-grouping.test.ts')];
     expect(files).toEqual(expect.arrayContaining(someOfThem));
-    expect(ownClocksOf(files), NAME_NO_CLOCK).toEqual([]);
+    expect(await foundIn(files, ownClocks), NAME_NO_CLOCK).toEqual([]);
+    expect(await foundIn(files, heldWorkers), HOLD_NOT_THE_WORKER).toEqual([]);
   }, NO_CLOCK);
 });

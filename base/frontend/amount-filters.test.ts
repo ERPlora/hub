@@ -69,8 +69,8 @@ describe('guardrail: every amount filter of the Hub is read as the money field r
     expect(amountRanges(page.join('\n'), 'CartsPage.vue')).toEqual([3]);
   });
 
-  it('every list with an amount filter runs the table of texts in its own test', () => {
-    const lists = findingsByApp(hubFrontends({ ui: false }), amountRanges);
+  it('every list with an amount filter runs the table of texts in its own test', async () => {
+    const lists = await findingsByApp(hubFrontends({ ui: false }), amountRanges);
     const files = [...new Set(Object.values(lists).flat().map((where) => where.replace(/:\d+$/, '')))];
     // The guard sees the lists it is about (one in each app that filters an amount).
     expect(files.length).toBeGreaterThanOrEqual(8);
