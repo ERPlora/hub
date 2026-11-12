@@ -989,7 +989,7 @@ class HubResetOut(Schema):
     dry_run: bool
     confirm_with: str = Field(description="What to type to confirm: the business's name (its address without one).")
     available: bool = Field(
-        description="False in phase 1: the business shares its database with other hubs, so nothing can be emptied."
+        description="False while the business shares its database with other hubs, so nothing can be emptied."
     )
     sections: list[ResetSectionOut] = Field(description="The apps with rows: what each one would lose.")
     apps: list[RemovalOut] = Field(

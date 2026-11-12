@@ -54,7 +54,7 @@ RUN find packages/live/live -name '*.po' -exec sh -c 'msgfmt --check-format -o "
  && uv sync --frozen --no-dev --no-editable
 COPY . .
 COPY --from=web /app/frontend/dist frontend/dist
-# register_apps --check (round 16, spec §4.3): no image with invalid module metadata, icons or
+# register_apps --check: no image with invalid module metadata, icons or
 # documentation; it reads only files (no database, no network).
 RUN DEBUG=1 python manage.py compilemessages --ignore=packages \
  && DEBUG=1 python manage.py collectstatic --noinput \
@@ -84,7 +84,7 @@ RUN useradd --system --uid 10001 --home-dir /app app
 COPY --from=build /app/.venv /app/.venv
 COPY --from=build /app/project /app/project
 WORKDIR /app/project
-# The release travels with the image (round 16, spec §4.3): deploy.yml passes the commit's sha and its
+# The release travels with the image: deploy.yml passes the commit's sha and its
 # time (ISO 8601); register_apps refuses to write without them in production. Late, for the cache.
 ARG APP_VERSION=""
 ARG APP_RELEASED_AT=""

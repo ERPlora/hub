@@ -1,4 +1,4 @@
-"""The website's theme: «Your colours» stops being a palette of its own (round 2026-10-22, W8).
+"""The website's theme: «Your colours» stops being a palette of its own.
 
 Any palette now takes the owner's two colours over its own (``theme.custom``; null = the palette's colours). A theme
 ``{palette: "custom", custom: {primary, accent}}`` becomes ``ocean`` with the same two colours, painted exactly as

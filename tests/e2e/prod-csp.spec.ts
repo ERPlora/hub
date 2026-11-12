@@ -4,10 +4,11 @@
 // this is the only place the `default` policy of `packages/ui/src/shell/boot/trusted-types.boot.ts`
 // meets the icons (`ionicons/icons` data URLs) for real.
 //
-// It drives a second, production-like Hub (DEBUG=0, daphne as in the Dockerfile) on
-// `http://a.localhost:8002` (override with PROD_ORIGIN); the command that starts it is in
-// `docs/plans/2026-10-13-fase-1-poc-navegador.md` («Tercera pasada»), plus `HUB_BASE_DOMAIN=localhost`:
-// without DEBUG the hubs live under erplora.com, and a.localhost would be no hub. The SaaS sends its one-time
+// It drives a second, production-like Hub on `http://a.localhost:8002` (override with PROD_ORIGIN): the
+// `pnpm --filter hub build` output gathered by `collectstatic` and served by daphne as in the Dockerfile, with
+// `DEBUG=0`, `HUB_BASE_DOMAIN=localhost` (without DEBUG the hubs live under erplora.com, and a.localhost would be no
+// hub) and a settings module over `config.settings` that sets `LIVE["hub_slug_min_length"] = 1` (the hub is `a`)
+// and its own `STATIC_ROOT`. The SaaS sends its one-time
 // code to the dev Hub's `/auth/callback` (`a.localhost:8000`, pinned by the SaaS's settings), so the
 // login runs there; cookies ignore ports and both Hubs share the database and the SECRET_KEY, so the
 // session is also valid on :8002. Without that server the spec is skipped, so the dev suite
@@ -165,7 +166,7 @@ test.beforeAll(async ({ browser }) => {
     (res) => res.ok,
     () => false,
   );
-  test.skip(!up, `no production-like Hub on ${PROD}: start it as the PoC doc says («Tercera pasada»)`);
+  test.skip(!up, `no production-like Hub on ${PROD}: start one with DEBUG=0 under daphne, as the top of prod-csp.spec.ts says`);
   context = await browser.newContext({ viewport: { width: 1280, height: 860 } });
   const page = await context.newPage();
   await login(page, A); // the SaaS's callback is the dev Hub's; the session cookie is a.localhost's

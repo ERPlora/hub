@@ -3,7 +3,7 @@
 // and failed it. Those 15 s held two things, each checked now as a fact, never against the wall clock:
 //   - «the worker's 5 s tick and the 5 s aim for a demo»: the worker takes a demo due on its next pass, never more
 //     than 5 s away (base/tests/test_worker.py,
-//     `test_with_its_own_tick_it_takes_a_new_demo_within_plan_dbs_five_seconds`, on the waits its loop asks for);
+//     `test_with_its_own_tick_it_takes_a_new_demo_within_five_seconds`, on the waits its loop asks for);
 //   - «a sign-up that makes tables again fails here»: this module, in the databases the sign-up left behind.
 // The second fact: a demo's database is the clone of its template (base/tenancy/provision.py), kept
 // current by `migrate_hubs` (which global-setup.ts checks), so its sign-up applies no migration, and every row of its

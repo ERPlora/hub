@@ -247,7 +247,7 @@ comprueba ahora como un hecho, tarde lo que tarde:
 
 - **El tick de 5 s del worker** (el objetivo de 5 s de PLAN-DB §6): el worker coge la demo en su siguiente pasada y
   nunca espera más de 5 s entre dos. Lo comprueba `base/tests/test_worker.py`
-  (`test_with_its_own_tick_it_takes_a_new_demo_within_plan_dbs_five_seconds`), sobre las esperas que pide su bucle, sin
+  (`test_with_its_own_tick_it_takes_a_new_demo_within_five_seconds`), sobre las esperas que pide su bucle, sin
   reloj de pared.
 - **El alta por clon**: la BD de cada demo es el **clon de su plantilla**, sin ninguna migración aplicada en el alta
   (cada fila de su `django_migrations` es de la plantilla, con la misma hora; `demo-born.ts`). Un alta que vuelva a

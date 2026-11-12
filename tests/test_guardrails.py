@@ -391,7 +391,7 @@ LISTEN_RE = re.compile(r"(?:UN)?LISTEN(?:\s+\S+)?\s*;?")
 #: ``transaction.on_commit`` in the modules, by file and count: with the hub's own database the operation's transaction
 #: is on the hub's alias and a bare one registers on ``default`` (it would run at once, also after a rollback). The
 #: last ones moved to ``live.operations.on_commit``: it stays empty.
-PENDING_S2_ON_COMMIT: dict[str, int] = {}
+BARE_ON_COMMIT_ALLOWED: dict[str, int] = {}
 #: Hub models that still have a ``hub_id`` column, each with its reason (the border between hubs is the database).
 HUB_ID_COLUMNS: dict[str, str] = {
     "base.hubidentity": "the identity of the hub's database itself.",
@@ -997,16 +997,16 @@ def _on_commit_counts(files) -> dict[str, int]:
 
 
 def on_commit_problems(counts: dict[str, int]) -> dict[str, tuple[int, int]]:
-    """``{file: (found, listed)}`` wherever the bare calls differ from ``PENDING_S2_ON_COMMIT``."""
+    """``{file: (found, listed)}`` wherever the bare calls differ from ``BARE_ON_COMMIT_ALLOWED``."""
     return {
-        path: (counts.get(path, 0), PENDING_S2_ON_COMMIT.get(path, 0))
-        for path in set(counts) | set(PENDING_S2_ON_COMMIT)
-        if counts.get(path, 0) != PENDING_S2_ON_COMMIT.get(path, 0)
+        path: (counts.get(path, 0), BARE_ON_COMMIT_ALLOWED.get(path, 0))
+        for path in set(counts) | set(BARE_ON_COMMIT_ALLOWED)
+        if counts.get(path, 0) != BARE_ON_COMMIT_ALLOWED.get(path, 0)
     }
 
 
 def test_a_new_bare_on_commit_in_the_modules_is_caught_listed_file_or_not():
-    assert PENDING_S2_ON_COMMIT == {}, "S2's first step emptied it: a module never goes back to a bare on_commit"
+    assert BARE_ON_COMMIT_ALLOWED == {}, "it stays empty: a module never goes back to a bare on_commit"
     assert on_commit_problems({}) == {}
     assert on_commit_problems({"apps/demo/services.py": 1}) == {"apps/demo/services.py": (1, 0)}
     # Moved off (flow's and the inbox's through base.outbound, website's to live.operations.on_commit): none comes back.
