@@ -22,18 +22,17 @@ the business stays open and its own work goes on.
    (``recover_<step>: <why>``). A worker whose lease ran out leaves it to whoever holds it now, who reads the copy
    anew: what was created is not lacking any more, so nothing is made twice.
 
-What each app gives back is its own to say, by a hook of its ``LiveAppConfig`` (:data:`HOOK`, as
+What each app gives back is its own to say, by a hook of its ``LiveAppConfig`` (``base.recovery.HOOK``, as
 ``fiscal_record_states`` says what a restore compares): ``recoverable_from_copy()`` answers a list of
-:class:`Recoverable`, in the order they are given back. ``base`` never names an app. An app whose records reach the tax
-authority never answers it: what was sent is at the tax authority already, and what is new is made in the business.
+:class:`base.recovery.Recoverable`, in the order they are given back. ``base`` never names an app. An app whose records
+reach the tax authority never answers it: what was sent is at the tax authority already, and what is new is made in the
+business.
 A business being moved or restored is left for a later pass: its recovery waits, nothing done.
 """
 
 import datetime as dt
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Any
 
 import psycopg
 import pydantic
@@ -44,6 +43,7 @@ from live.meta import all_live_app_configs
 from live.operations import get as get_operation
 
 from base import registry, services
+from base.recovery import HOOK, Recoverable
 from base.tenancy import migrator, move, ops
 from base.tenancy.context import use_hub
 from control import services as control_services
@@ -51,29 +51,8 @@ from control.models import CopyRecovery, Hub
 
 logger = logging.getLogger(__name__)
 
-#: The hook of a ``LiveAppConfig`` that says what the app gives back from a separate copy.
-HOOK = "recoverable_from_copy"
 #: The worker's lease of a recovery: the moves', renewed before each record it creates.
 LEASE = move.LEASE
-
-
-@dataclass(frozen=True)
-class Recoverable:
-    """What an app gives back from a separate copy of its business (``recoverable_from_copy`` on its config).
-
-    - ``label``: what the staff reads (a lazy translation: «Customers»);
-    - ``reads_since``: the app's migration whose schema ``read`` reads (its tables and columns are there since);
-    - ``read(conn)``: the records the copy holds, through ``conn``, the copy's direct read-only connection (its own SQL
-      over its model's names, never the ORM): each a ``dict`` with its ``id`` in the copy and the input of ``create``;
-    - ``missing(records)``: those the business lacks, read in the business (its ``queries.py``);
-    - ``create``: the operation of the app that creates each, the one its screen uses.
-    """
-
-    label: Any
-    reads_since: str
-    read: Callable[[psycopg.Connection], list[dict]]
-    missing: Callable[[list[dict]], list[dict]]
-    create: str
 
 
 class RecoveryFailed(Exception):
@@ -137,7 +116,7 @@ def recover(row: CopyRecovery, *, now: dt.datetime) -> bool:
         read = _read(copy, row.apps)
         with translation.override(row.language), use_hub(hub):
             for label, declared, records, refused in read:
-                results.append(_give_back(hub, label, declared, records, refused, ours))
+                _give_back(hub, results, label, declared, records, refused, ours)
         control_services.recovery_done(row.pk, results, now, owner)
     except (move.MoveStopped, control_services.MoveTaken) as stopped:
         logger.info("base.tenancy.recovery.stopped copy=%s: %s; left to whoever holds it now.", copy, stopped)
@@ -207,11 +186,15 @@ def _refusal(label: str, declared: list[Recoverable] | None, applied: set[str], 
 # ── Step 2: given back in the business, by the app's own operations ─────────────────────────────────────────────────
 
 
-def _give_back(hub: Hub, label: str, declared, records, refused: str, ours: Callable[[], None]) -> dict:
-    """What ``label`` gave back to ``hub`` (in its ``use_hub``): each record it lacks created by its operation."""
+def _give_back(
+    hub: Hub, results: list[dict], label: str, declared, records, refused: str, ours: Callable[[], None]
+) -> None:
+    """What ``label`` gives back to ``hub`` (in its ``use_hub``): each record it lacks created by its operation. Its
+    result is in ``results`` from the start, so a failure halfway is noted with what had come back until then."""
     result = {"app": label, "created": 0, "not_created": 0, "reasons": [], "refused": refused}
+    results.append(result)
     if refused:
-        return result
+        return
     ctx = OperationContext(
         scope=Scope("host", hub.slug), actor="system", permissions=frozenset({"*"}), language=translation.get_language()
     )
@@ -228,10 +211,9 @@ def _give_back(hub: Hub, label: str, declared, records, refused: str, ours: Call
                 _not_created(result, record, f"{invalid.code}: {invalid.message}")
             except OperationError as stopped:
                 result["refused"] = f"{stopped.code}: {stopped.message}"
-                return result
+                return
             else:
                 result["created"] += 1
-    return result
 
 
 def _not_created(result: dict, record: dict, reason: str) -> None:

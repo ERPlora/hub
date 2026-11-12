@@ -105,7 +105,7 @@ class CustomerConfig(LiveAppConfig):
         ``queries.cards_not_in_business``), each created by ``customer.customer.create``, the till's and the card's
         own. Never one whose personal data was erased."""
         from apps.customer import queries  # the models are not loaded yet when this module is
-        from base.tenancy.recovery import Recoverable
+        from base.recovery import Recoverable
 
         return [
             Recoverable(

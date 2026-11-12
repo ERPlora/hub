@@ -956,6 +956,26 @@ class TestRecoverIntoTheBusiness:
         )
         assert "recover_copy_unreadable: it is gone" in row_of(listed, ">bistro<br>")
 
+    def test_an_app_stopped_halfway_says_what_came_back_and_why_it_stopped(self, client, root):
+        self.a_recovery(
+            self.made("acme"),
+            status="done",
+            results=[
+                {
+                    "app": "customer",
+                    "created": 2,
+                    "not_created": 0,
+                    "reasons": [],
+                    "refused": "base.hub_busy: The business is busy.",
+                }
+            ],
+        )
+
+        listed = page(client, RECOVERIES)
+        assert "Customers: 2 created, then stopped (base.hub_busy: The business is busy.)" in row_of(
+            listed, ">acme<br>"
+        )
+
     def test_support_neither_sees_it_nor_runs_it_but_reads_the_recoveries(self, client, support):
         from control.models import CopyRecovery
 

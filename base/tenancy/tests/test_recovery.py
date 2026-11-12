@@ -104,6 +104,14 @@ class Recoveries(hubs.CopiedHubs):
             asked_by="root",
         )
 
+    def all_lost(self, every_app_on, *cards: dict) -> tuple[Hub, CopyRecovery]:
+        """A business that deleted every one of ``cards`` since its copy, and the recovery asked of that copy."""
+        hub, ids = self.business(every_app_on, *cards)
+        copy = self.copy_of(hub)
+        for card in ids:
+            run_in(hub, "customer.customer.delete", id=card)
+        return hub, self.ask(copy)
+
     def ask(self, copy: RestoredCopy, *apps: str, **fields) -> CopyRecovery:
         """What ``control.copy.recover`` writes: the apps to bring back from ``copy``, asked by the staff."""
         values = {"copy": copy, "apps": list(apps or ["customer"]), "asked_by": "root", "language": "en"}
@@ -279,6 +287,42 @@ class TestCustomersComeBack:
         assert customers["refused"].startswith("app_inactive: ")
         assert fresh(asked).status == "done"
 
+    def test_a_business_that_is_not_ready_fails_with_why_and_nothing_is_made(self, recoveries, every_app_on):
+        hub, (ana,) = recoveries.business(every_app_on, ANA)
+        copy = recoveries.copy_of(hub)
+        run_in(hub, "customer.customer.delete", id=ana)
+        Hub.objects.filter(pk=hub.pk).update(status=Hub.Status.CANCELLED)
+        asked = recoveries.ask(copy)
+
+        assert run() == 1
+
+        failed = fresh(asked)
+        assert (failed.status, failed.results, failed.lease_owner) == ("failed", [], "")
+        assert failed.last_error.startswith("recover_business_unavailable: ")
+        assert live_cards(hub) == []
+
+    def test_a_failure_halfway_keeps_what_had_come_back_until_then(self, recoveries, every_app_on, monkeypatch):
+        hub, asked = recoveries.all_lost(every_app_on, ANA, LUIS)
+        op = get_operation("customer.customer.create")
+        real, made = op.fn, []
+
+        def breaks_at_the_second(ctx, data):
+            if made:
+                raise RuntimeError("the business's database went away")
+            made.append(real(ctx, data))
+            return made[0]
+
+        monkeypatch.setattr(op, "fn", breaks_at_the_second)
+
+        assert run() == 1
+
+        failed = fresh(asked)
+        assert failed.status == "failed"
+        assert failed.last_error == "recover_unexpected: RuntimeError: the business's database went away"
+        # The staff reads what did come back before it broke, not an empty result.
+        assert failed.results == [CUSTOMERS | {"created": 1}]
+        assert len(live_cards(hub)) == 1
+
 
 class TestTheCopyIsOnlyRead:
     def test_no_alias_reaches_the_copy_and_nothing_in_it_changes(self, recoveries, every_app_on):
@@ -431,6 +475,18 @@ class TestTheLease:
         assert len(live_cards(hub)) == 1
         taken = fresh(asked)
         assert (taken.status, taken.results, taken.done_at, taken.lease_owner) == ("asked", [], None, "other:1")
+
+    def test_a_worker_that_is_stopping_takes_none(self, recoveries, every_app_on):
+        hub, (ana,) = recoveries.business(every_app_on, ANA)
+        copy = recoveries.copy_of(hub)
+        run_in(hub, "customer.customer.delete", id=ana)
+        asked = recoveries.ask(copy)
+
+        assert run(cancelled=lambda: True) == 0
+
+        left = fresh(asked)
+        assert (left.status, left.lease_owner, left.results) == ("asked", "", [])
+        assert live_cards(hub) == []
 
     def test_a_business_being_moved_waits_for_it_with_nothing_done(self, recoveries, every_app_on):
         hub, (ana,) = recoveries.business(every_app_on, ANA)
