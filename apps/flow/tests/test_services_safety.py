@@ -109,8 +109,8 @@ def test_a_normal_step_still_runs_with_its_narrow_permission():
 
 
 def test_a_step_that_books_by_phone_still_holds_nothing_of_customers():
-    # FIX-HUB-FLOW-STEP-RESERVATION-BY-PHONE-DENIED: booking finds or makes the guest's card by itself, the step
-    # never gets Customers' rights: it can neither look a card up nor make one on its own.
+    # Booking finds or makes the guest's card by itself, the step never gets Customers' rights: it can neither look a
+    # card up nor make one on its own.
     flow = make_flow(grants=["reservation.reservation.create"])
     started = FlowRun.objects.create(flow=flow, flow_version=1, trigger_kind="manual", trigger_key="k")
     ctx = services._step_context(ctx_for(scope=A), started, flow, get("reservation.reservation.create"))

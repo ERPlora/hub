@@ -1,12 +1,11 @@
 // Cart & Checkout → Carts (WORKBOOK «Pantallas · Carritos»; CART_CHECKOUT-F01, F05, F06, F12): the live
-// `cart_checkout.cart.list` with the old table's Session, Email, Status, Items and Total, «Search session
-// or email…», filters per column (session and email by fragment, the status by list, items and total
-// from / to in the unit the column shows), newest first, 50 a page, list or cards. «New cart» opens the
-// form; each row offers «Abandon» (an active cart only) and «Delete» (confirmed), only to whoever may.
-// The old tests kept here: the create form lives behind the table's «+» (erp-cart-checkout-carts), the
-// status filters by list, the total paints in the cart's own currency (cart_checkout#32), the range
-// filters compare in the unit shown (cart_checkout#26) and a failed load offers Retry. The Total filter is typed
-// in the business's currency, its country's (flow cart-checkout-business-currency), never in euros by default.
+// `cart_checkout.cart.list` with Session, Email, Status, Items and Total, «Search session or email…», filters per
+// column (session and email by fragment, the status by list, items and total from / to in the unit the column shows),
+// newest first, 50 a page, list or cards. «New cart» opens the form; each row offers «Abandon» (an active cart only)
+// and «Delete» (confirmed), only to whoever may. The create form lives behind the table's «+»
+// (erp-cart-checkout-carts), the status filters by list, the total paints in the cart's own currency, the range filters
+// compare in the unit shown and a failed load offers Retry. The Total filter is typed in the business's currency, its
+// country's (flow cart-checkout-business-currency), never in euros by default.
 import { DataTable, type DataTableAction, EmptyState, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -85,7 +84,7 @@ async function setup(options: MountOptions = {}) {
 }
 
 describe('CartsPage', () => {
-  it('while the first page loads, the table paints the loading state and counts nothing (pm#611)', async () => {
+  it('while the first page loads, the table paints the loading state and counts nothing', async () => {
     const s = await setup();
     expect(s.prop('loading')).toBe(true);
     expect(s.find('cart-checkout-carts-loading').exists()).toBe(true);
@@ -95,11 +94,11 @@ describe('CartsPage', () => {
     expect(s.find('cart-checkout-carts-loading').exists()).toBe(false);
   });
 
-  it('follows the carts newest first, with the old table’s columns', async () => {
+  it('follows the carts newest first, with its columns', async () => {
     const s = await setup();
     expect(s.list()).toEqual([{ sort: '-created_at', limit: 50, offset: 0 }]);
     await s.show(page(ROWS));
-    // The topbar names the app, as the old hub's did; the tabbar says which section.
+    // The topbar names the app; the tabbar says which section.
     expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Cart & Checkout');
     expect(s.prop('searchPlaceholder')).toBe('Search session or email…');
     expect(s.prop<{ add: string }>('labels').add).toBe('New cart');
@@ -111,7 +110,7 @@ describe('CartsPage', () => {
       ['total_amount', 'Total'],
     ]);
     expect(s.cells(0).slice(0, 5)).toEqual(['sess_a1', 'a1@example.com', 'Active', '2', '€31.50']);
-    // No email: a dash, as the old table.
+    // No email: a dash.
     expect(s.cells(1)[1]).toBe('—');
   });
 
@@ -175,7 +174,7 @@ describe('CartsPage', () => {
     ]);
   });
 
-  it('the total is typed as an amount, read as it is pasted, and one it cannot read says so under its box (pm#521)', async () => {
+  it('the total is typed as an amount, read as it is pasted, and one it cannot read says so under its box', async () => {
     const s = await setup();
     await s.result('base.business.get', business());
     await s.show(page(ROWS));
@@ -314,7 +313,7 @@ describe('CartsPage', () => {
   });
 });
 
-describe('CartsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('CartsPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
@@ -323,7 +322,7 @@ describe('CartsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
 
 // flow: CART_CHECKOUT-F12 — the old Carts kept its column filters behind the toolbar's funnel, with no
 // open row (docs/reference/old-hub/cart_checkout-carts-{390,834,1440}.png), as Invoices and Sales (hub#31).
-describe('CartsPage: the column filters wait behind the funnel, as the old table (CART_CHECKOUT-F12)', () => {
+describe('CartsPage: the column filters wait behind the funnel (CART_CHECKOUT-F12)', () => {
   const ID = 'cart-checkout-carts';
   type Setup = Awaited<ReturnType<typeof setup>>;
   type Field = HTMLElement & { errorText?: string };

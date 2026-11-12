@@ -164,7 +164,7 @@ def test_every_input_field_says_what_it_is():
 
 
 def test_the_reaction_to_sales_is_the_systems_only():
-    # kitchen.ticket.sync runs as the system (the relay, phase 2): no role holds its permission.
+    # kitchen.ticket.sync runs as the system (the relay's reaction to Sales): no role holds its permission.
     from live.operations import get
 
     assert get("kitchen.ticket.sync").permission == "kitchen.system"
