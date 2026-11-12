@@ -9,11 +9,10 @@
 //     coming back to Import, that last report first, with «Retry what is missing» off and why;
 //   - BASE-G108: Reset › «Undo an import», confirmed, with what was removed;
 //   - BASE-G109: Reset › «Reset the business»: the plan per section, one box each, and its red button off until one is
-//     ticked (`a` has its own database since S2a, round 2026-10-30 of PLAN-DB; one that shares control's says why it
+//     ticked (`a` has its own database; one that shares control's says why it
 //     cannot be emptied: ResetPanel.test.ts). Nothing is reset: the business stays for the other specs;
-//   - BASE-F37: «Copies», the full copies of the business's data made before each reset (S2b): none in `a`.
-// The business is emptied first through the apps' own operations (phase 1: `a` and `b` shared their rows, as
-// `clearItems` does with the demo's). Each flow leaves its capture `APP-BASE-2-<flow>-<width>`.
+//   - BASE-F37: «Copies», the full copies of the business's data made before each reset: none in `a`.
+// The business is emptied first through the apps' own operations, as `clearItems` does with the demo's. Each flow leaves its capture `APP-BASE-2-<flow>-<width>`.
 // flow: BASE-F37 BASE-G101 BASE-G102 BASE-G103 BASE-G104 BASE-G105 BASE-G106 BASE-G107 BASE-G108 BASE-G109 BASE-G131
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';
@@ -211,7 +210,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await submit.scrollIntoViewIfNeeded();
     await snap(page, 'BASE-G109', width);
 
-    // BASE-F37 — «Copies»: what a copy of the data is next to «Export»; `a` was never reset, so it has none (S2b).
+    // BASE-F37 — «Copies»: what a copy of the data is next to «Export»; `a` was never reset, so it has none.
     await expect(testid(page, 'dumps-intro')).toContainText('keeps it for 90 days');
     await expect(testid(page, 'dumps-empty')).toContainText('No copies yet');
     await testid(page, 'dumps-card').scrollIntoViewIfNeeded();

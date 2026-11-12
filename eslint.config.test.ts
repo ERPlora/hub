@@ -109,7 +109,7 @@ describe('eslint config', () => {
     const slotted = (tag: string) => said(slottedIn(tag), PROBE, 'vue/no-deprecated-slot-attribute').length;
     expect(slotted('ion-icon')).toBe(0);
     expect(slotted('HubIcon')).toBe(0);
-    expect(slotted('ok-icon')).toBe(1); // OutfitKit is gone (PLAN §16.11): no exception left for it
+    expect(slotted('ok-icon')).toBe(1); // OutfitKit is gone: no exception left for it
   });
 
   it('lints in a thread of its own: this worker never loads ESLint', () => {

@@ -1,10 +1,10 @@
 // «Read aloud» of the assistant's answers (BASE-F93 step 8), end to end with the stack's Hub and SaaS and the e2e's
 // provider (assistant-provider.ts, started here; README «El asistente»). Headless Chrome has no voice of its own to read
 // with, so the device's `speechSynthesis.speak` is recorded at the edge.
-// - By default there is no server voice (round 2026-11-04a, `ASSISTANT_SERVER_VOICE` off): the panel offers no choice
+// - By default there is no server voice (`ASSISTANT_SERVER_VOICE` off): the panel offers no choice
 //   of voice and reads with the device's, never asking the Hub.
-// - With the stack's Hub started with `ASSISTANT_SERVER_VOICE=True` (round 2026-11-03n, PLAN-HUB §73): nothing to choose
-//   (`@erplora/ui` names no voices since saas#242, and the Hub gives none), and «Read aloud» asks the Hub
+// - With the stack's Hub started with `ASSISTANT_SERVER_VOICE=True`: nothing to choose
+//   (`@erplora/ui` names no voices, and the Hub gives none), and «Read aloud» asks the Hub
 //   (`/api/assistant/speak`), which asks the SaaS (`/internal/speech/synthesize`). The SaaS has no engine that reads:
 //   the Hub answers 503 in its envelope and the panel reads with the device's voice, with no unhandled error.
 //   And the server's audio plays from a `blob:` under the Hub's real CSP (`media-src`): there, and only there, the Hub's

@@ -1,4 +1,4 @@
-"""Guardrail of the permissions (W11, phase 2; ARCHITECTURE.md §4 «Un solo camino»; Ioan, 2026-10-31).
+"""Guardrail of the permissions: no operation of the Hub is open to every employee by omission.
 
 ``live.operations.Operation`` checks ``ctx.has(op.permission)`` before it runs, and ``OperationContext.has(None)`` is
 ``True``: an ``@operation(..., permission=None)`` runs for anyone with a context on the business (any role, and on a
@@ -99,7 +99,7 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
     ),
     "base.hub.cut_finish": (
         PLATFORM,
-        "The last step of the cut of S5 (manage.py cut_shared_hubs): a business of phase 1 gets its own database "
+        "The last step of manage.py cut_shared_hubs: a business that shared control's database gets its own "
         "in control's registry; internal_only refuses anyone else.",
     ),
     "base.usage.list": (

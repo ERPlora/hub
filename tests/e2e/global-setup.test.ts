@@ -2,7 +2,7 @@
 // local `hub` lacked verifactu.0003–0005 and the specs failed with «not valid JSON» (the `post` helper got
 // Django's HTML error page), a red that never said its cause. The check never applies anything: the
 // database is shared with other sessions.
-// flow: ninguno — FIX de proceso (guardarraíl del e2e)
+// flow: none — a guardrail of the e2e run.
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -149,7 +149,7 @@ describe('assertMigrationsApplied', () => {
     expect(() => assertMigrationsApplied(manage.run, 'hub')).not.toThrow('unapplied migrations');
   });
 
-  // flow: ninguno — FIX de la infraestructura e2e del Hub (aislar los datos de cada ejecución)
+  // flow: none — the Hub's e2e harness keeps each run's data apart.
   it('says how to create the e2e database of a stack beside the shared one when it does not exist yet', () => {
     const missing: CommandResult = {
       status: 1,
@@ -229,7 +229,7 @@ describe('managePy', () => {
   });
 });
 
-// The host gate answers 404 to a slug the registry does not have (plan 2026-10-17, §1.3): without `a` and `b` every
+// The host gate answers 404 to a slug the registry does not have: without `a` and `b` every
 // spec would fail on a 404 that never says why. `seed_local_hubs --check` writes nothing.
 describe('assertLocalHubsRegistered', () => {
   it('passes when a and b are ready, asking only the check', () => {
@@ -252,13 +252,13 @@ describe('assertLocalHubsRegistered', () => {
   });
 });
 
-// flow: ninguno — arnés e2e del Hub (FIX-HUB-E2E-README-PARALLEL-STACK-MISSES-DEMO-SEED)
+// flow: none — the Hub's e2e harness.
 // The specs sign in with the SaaS's demo accounts (`login` of helpers.ts), which the SaaS's `manage.py demo_seed`
 // creates. A stack's own SaaS on its fresh database (`saas_e2e_<port>`, the SaaS's tests/e2e/database.ts) has none: on
 // 2026-10-28 the README's recipe never said it, and every login waited 30 s to fail with «The email address and/or
 // password you specified are not correct.». The run stops before the first spec with the command that seeds them,
 // reading the SaaS's database with one select (it writes nothing there).
-// hub-e2e-stack (FIX-HUB-E2E-README-DEMO-SEED-BREAKS-WHATSAPP-SPECS): that command is erplora.com's WhatsApp seed with
+// hub-e2e-stack: that command is erplora.com's WhatsApp seed with
 // this Hub's ids of `a` and `b` (it runs `demo_seed` with them), never `demo_seed` alone: `demo_seed` gives them ids of
 // its own, and every WhatsApp spec then fell on «whatsapp_hub_seed.py: a is … here and … in the Hub: drop this
 // database». It runs with this Hub's runserver stopped: with it running, the seed's photo puts `a` on erplora.com's
@@ -437,7 +437,7 @@ describe('psqlOn', () => {
   });
 });
 
-// flow: ninguno — infraestructura del e2e del Hub (`tests/e2e/global-setup.ts`): una pila compartida no admite `--workers` > 1
+// flow: none — the Hub's e2e harness (`tests/e2e/global-setup.ts`): a shared stack takes no `--workers` above 1.
 // `--workers=N` on the command line overrides `workers: 1` of playwright.config.ts, and Playwright hands globalSetup the
 // resolved count (`--workers=2` → 2, `50%` → half the cores). On 2026-10-23 `--workers=2` ran two specs at once on the one
 // stack: appointment-employee.spec.ts deleted `E2E Apt%`, the rows appointment-agenda.spec.ts was using, and the agenda
@@ -492,7 +492,7 @@ describe('globalSetup', () => {
     expect(() => globalSetup({ workers: 1 }, manage.run, saas.run, start)).not.toThrow();
     expect(manage.calls.map((args) => args[0])).toEqual(['migrate', 'migrate_hubs', 'seed_local_hubs']);
     expect(saas.statements).toHaveLength(1);
-    // Then the worker, which makes the databases of the hubs registered during the run (round 2026-10-30, S2a).
+    // Then the worker, which makes the databases of the hubs registered during the run.
     expect(started).toEqual([[STACK.database, STACK.saasDatabase]]);
   });
 

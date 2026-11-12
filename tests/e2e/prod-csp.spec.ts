@@ -1,4 +1,4 @@
-// PoC §8.10, third pass: the PRODUCTION build (`pnpm --filter hub build`, served by WhiteNoise, no
+// The PRODUCTION build (`pnpm --filter hub build`, served by WhiteNoise, no
 // Vite) under the real production CSP — nonce + 'strict-dynamic' + `require-trusted-types-for
 // 'script'` — in a visible Chrome. DEBUG never enforces Trusted Types (`live.csp.debug_policy`), so
 // this is the only place the `default` policy of `packages/ui/src/shell/boot/trusted-types.boot.ts`

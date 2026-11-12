@@ -1,5 +1,5 @@
-// A hub without rows of its apps has every app off (PLAN-HUB round 2026-10-27; a business signs up with Taxes on since
-// hub#997: base-sign-up-taxes-on.spec.ts) and «Start with a business like yours» on the
+// A hub without rows of its apps has every app off (a business signs up with Taxes on:
+// base-sign-up-taxes-on.spec.ts) and «Start with a business like yours» on the
 // Home turns on the apps of the template it uses, then loads its catalogue (BASE-G131; `base.blueprint.import`), in the
 // three viewports, as the owner of hub `a` put back to how a business is born:
 //   - Apps says nothing is on: «My apps» is empty with its notice, and an app of the catalogue is «Off» in «Add apps»;
@@ -7,10 +7,10 @@
 //     the Home's «My apps» has the apps it turned on without a reload;
 //   - the template's apps are on (its roots chosen, what they need along), «Active» in «My apps», and its products
 //     and tables are in, through the apps' own lists.
-// `a` is emptied of what a template brings first (phase 1: `a` and `b` share those rows), and after each test the load
+// `a` is emptied of what a template brings first, and after each test the load
 // is undone and `a` gets back its rows with every app on (the ones `seed_local_hubs` wrote, as every other spec finds
 // it). Each step leaves its capture `APPS-BORN-OFF-<step>-<width>`.
-// And in a business of Spain (hub#998, PLAN-HUB round 2026-11-07), at 375, 768 and 1440: Settings › Data › «Use
+// And in a business of Spain, at 375, 768 and 1440: Settings › Data › «Use
 // template» reviews the restaurant's without VeriFactu (Invoicing and Kitchen «turn on»), the load goes in whole and
 // VeriFactu stays «Off» in Apps with nothing refusing it, for its owner to turn on (captures `APPS-BORN-OFF-spain-…`).
 // flow: BASE-G131 BASE-G67 BASE-F31 VERIFACTU-F01

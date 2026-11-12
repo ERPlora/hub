@@ -1,5 +1,5 @@
-"""Guardrails of the Hub's source (round 11 plan, H3; CLAUDE.md «Tenencia del Hub» and «Un solo
-camino hacia el servidor»; PLAN-DB §14, items 5 and 10). Static and fast: each check is a pure
+"""Guardrails of the Hub's source: the tenancy (one database per hub) and the single path to the server (every
+read and write through an operation). Static and fast: each check is a pure
 function over source text (or the ``DATABASES`` dict), proven by a made-up offender (the positive
 control), then run over ``base/`` and ``apps/`` (outside ``tests/``).
 
@@ -17,20 +17,20 @@ control), then run over ``base/`` and ``apps/`` (outside ``tests/``).
 (d) Hub aliases (``hub_<hex>``, ``hub_<hex>__ddl``, ``demo_…``, ``hub_template…``) go through PgBouncer in
     transaction mode: no ``pool``, ``CONN_MAX_AGE`` 0, no server-side cursors and no prepared statements; no alias
     has ``ATOMIC_REQUESTS``.
-(e) Phase 2's tenancy (plan 2026-10-22, S1; PLAN-DB §14.5, §14.9): no ``CREATE``/``DROP DATABASE`` built by string
-    formatting (``base.tenancy.names``: ``sql.Identifier``); ``connections.settings`` never changed in place (a copy is
-    swapped in); ``apps/`` never imports ``base.tenancy`` (the context is the platform's); no ``LISTEN`` outside
-    ``live.broker``; phase 1's shared database (``use_shared_database``) is gone since S5 and nobody brings it back;
-    the tests' fallback never set outside the tests; no ``hub_id`` column in a hub's model but the listed ones; no bare
-    ``transaction.on_commit`` in ``apps/`` (``live.operations.on_commit``): S2's first step moved the last ones.
+(e) The tenancy: no ``CREATE``/``DROP DATABASE`` built by string formatting (``base.tenancy.names``:
+    ``sql.Identifier``); ``connections.settings`` never changed in place (a copy is swapped in); ``apps/`` never
+    imports ``base.tenancy`` (the context is the platform's); no ``LISTEN`` outside ``live.broker``; the old shared
+    database (``use_shared_database``) is gone and nobody brings it back; the tests' fallback never set outside the
+    tests; no ``hub_id`` column in a hub's model but the listed ones; no bare ``transaction.on_commit`` in ``apps/``
+    (``live.operations.on_commit``).
 (f) The tests read the clock when they run, never when pytest imports them (``clock_at_import``): a date taken at
     import is the day of the collection, and a run that crosses midnight or New Year's Eve falls. Unlike the others,
     it runs over the suite itself: every ``test_*.py`` and ``conftest.py`` of the repo, and the helpers of its
     ``tests`` folders, but the submodules of ``packages/``.
-(g) Operations that need the hub's own database (PLAN-DB §14.14, round 2026-10-30, decision 3): in a hub that still
-    shares control's (``db_name=""``) each refuses with its domain error before it reads or writes anything of the
-    business in ``default``, and an API key is refused for that reason (never let through by a session). Since S5 such
-    a business is not served at all; the checks stay, the suite's fallback still has one (``base/tenancy/tests/
+(g) Operations that need the hub's own database: in a hub that still shares control's (``db_name=""``) each
+    refuses with its domain error before it reads or writes anything of the business in ``default``, and an API key
+    is refused for that reason (never let through by a session). Production no longer serves such a business at
+    all; the checks stay, the suite's fallback still has one (``base/tenancy/tests/
     legacy.py``). Unlike (a)–(f), these run operations on the test database.
 (i) The tests read who is connected to a database in one place (``sessions_by_hand``): ``base/tenancy/tests/hubs.py``,
     which counts only clients' sessions. A count of its own also counts the server's processes on that database, an
@@ -64,80 +64,78 @@ SOURCE_ROOTS = ("base", "control", "apps")
 ORM_DOORS = frozenset({"services.py", "queries.py"})
 #: Owners of the ORM that are no path to the data from the API: ``models.py`` declares the schema
 #: (managers, QuerySets, constraints with ``Q``); ``admin.py`` is Django's admin, the second write
-#: path the plan accepts (PLAN-DB §14.10, §16; PLAN §17–§18), whose actions call ``services.py``.
+#: path the platform accepts, whose actions call ``services.py``.
 ORM_OWNERS = frozenset({"models.py", "admin.py"})
 #: Files outside the doors that may touch the ORM, each with its reason. Not here on purpose:
 #: ``live.py`` (it only names events), ``api.py`` (one operation per route), ``auth.py`` (reads
 #: ``Membership.Role``, an enum), ``auth_views.py`` (opens the session through ``services``),
 #: ``middleware.py`` (only ``request.user``, loaded by Django), ``management/commands/`` (all by
-#: API, working rules §4: a command calls an operation).
-#: ``/readyz`` (PLAN-AWS §5) is the deploy gate: it must reach the database without an operation.
+#: API: a command calls an operation).
+#: ``/readyz`` is the deploy gate: it must reach the database without an operation.
 READYZ_REASON = (
     "/readyz reads django_migrations on the control database (connections[DEFAULT_DB_ALIAS], "
     "MigrationExecutor): a platform probe that never reads a hub's data."
 )
-#: Round 16 (PLAN §21; spec §3.3): the registry of the Hub's modules in the SaaS's ``shared`` schema.
+#: The registry of the Hub's modules in the SaaS's ``shared`` schema.
 SHARED_CATALOG_REASON = (
     "register_apps writes shared.app and shared.app_doc on the `shared` alias for no hub and no user, "
     "so it is no @operation; it is the only module that imports shared.models and names that alias "
     "(base/tests/test_shared_lint.py), and the hub_shared role (SELECT, INSERT, UPDATE on those two "
     "tables) is the boundary."
 )
-#: APP-BASE-5 (rv-hub-244): a manager's pass is spent in the transaction of the command it lets through.
+#: A manager's pass is spent in the transaction of the command it lets through.
 APPROVAL_SPEND_REASON = (
     "LIVE['operation_database'] wraps @operation's transaction: for the command a request's pass is for, "
     "base.approval_spend opens that transaction on the alias the tenancy gave the command (never one of its own) and "
     "spends the pass through the base.approval.spend operation inside it, so a command that fails rolls the spend back "
     "and two at once lock the same row; it reads and writes nothing itself."
 )
-#: Phase 2 (plan 2026-10-22, S1): the tenancy itself chooses and checks the hubs' aliases.
+#: The tenancy itself chooses and checks the hubs' aliases.
 TENANCY_ALIASES_REASON = (
     "use_hub registers a hub's alias the first time a process uses it, swapping in a copy of "
-    "connections.settings under a lock, never changing it in place (PLAN-DB §4)."
+    "connections.settings under a lock, never changing it in place."
 )
 TENANCY_IDENTITY_REASON = (
     "use_hub reads base_hub_identity on the hub's own alias once per process before serving anything from it: "
-    "a database that says it is another hub is refused (PLAN-DB §3, §14.4); outside any operation by design."
+    "a database that says it is another hub is refused; outside any operation by design."
 )
 ORM_EXCEPTIONS: dict[str, str] = {
     "base/permissions.py": (
         "The context builder reads Membership and a fresh copy of the user before any operation "
-        "runs, so it cannot go through one; read only; phase 2 replaces it with the hub's staff."
+        "runs, so it cannot go through one; read only."
     ),
     "base/health.py": READYZ_REASON,
     "base/registry.py": (
         "The host gate reads the registry's row of the Host's slug (404, 410, 503) before any operation runs, "
-        "so it cannot go through one; read only, one indexed lookup; its writes are base.services' operations "
-        "(plan 2026-10-17, §1.2)."
+        "so it cannot go through one; read only, one indexed lookup; its writes are base.services' operations."
     ),
     "base/approval_spend.py": APPROVAL_SPEND_REASON,
     "base/tenancy/migrator.py": (
-        "Phase 2: the only function that changes a hub's schema, through its direct __ddl "
-        "connection and the schema lock (CLAUDE.md «Tenencia del Hub»)."
+        "The only function that changes a hub's schema, through its direct __ddl "
+        "connection and the schema lock."
     ),
     "base/catalog.py": SHARED_CATALOG_REASON,
     "base/tenancy/bootstrap.py": "bootstrap runs once as the RDS master before any app database exists.",
     "base/tenancy/connections.py": TENANCY_ALIASES_REASON,
     "base/worker.py": (
         "The worker's slow passes (a hub's copy, the nightly measurement) run in threads of their own, one piece at a "
-        "time (PLAN-DB round 2026-10-31b, C8): each closes its thread's connections when it ends "
+        "time: each closes its thread's connections when it ends "
         "(connections.close_all, as migrate_hubs' threads do); no query, no write."
     ),
     "base/tenancy/router.py": (
         "The TenantRouter compares the databases behind two aliases (connections.settings) to allow a relation: it "
-        "routes, it never queries (PLAN-DB §4)."
+        "routes, it never queries."
     ),
     "base/tenancy/identity.py": TENANCY_IDENTITY_REASON,
     "apps/website/qr.py": (
-        "Pillow's Image.save writes the website's QR as a PNG into a memory buffer: no model and no database "
-        "(round 2026-10-21)."
+        "Pillow's Image.save writes the website's QR as a PNG into a memory buffer: no model and no database."
     ),
     "base/images.py": (
         "Pillow's Image.save writes a photo into a memory buffer, and the hub file store's save and delete keep and "
-        "remove its file (storages, not the ORM): no model and no database (round 2026-10-30)."
+        "remove its file (storages, not the ORM): no model and no database."
     ),
     "base/files.py": (
-        "Files (APP-BASE-8) writes the business's files with Django's Storage API on STORAGES['hub_files'] (save, "
+        "The Files module writes the business's files with Django's Storage API on STORAGES['hub_files'] (save, "
         "delete) under the hub's prefix: no model and no database (it imports neither, "
         "base/tests/test_files.py::test_files_touches_no_model_nor_database); only base.file.* operations reach it."
     ),
@@ -178,13 +176,12 @@ ALIAS_EXCEPTIONS: dict[str, str] = {
     "base/health.py": READYZ_REASON,
     "base/registry.py": (
         "The host gate reads the registry's row of the Host's slug (404, 410, 503) before any operation runs, "
-        "so it cannot go through one; read only, one indexed lookup; its writes are base.services' operations "
-        "(plan 2026-10-17, §1.2)."
+        "so it cannot go through one; read only, one indexed lookup; its writes are base.services' operations."
     ),
     "base/approval_spend.py": APPROVAL_SPEND_REASON,
     "base/tenancy/migrator.py": (
-        "Phase 2: the schema migrator opens hub_<hex>__ddl itself and takes the session "
-        "pg_advisory_lock of the schema (CLAUDE.md «Tenencia del Hub», PLAN-DB §14.5)."
+        "The schema migrator opens hub_<hex>__ddl itself and takes the session "
+        "pg_advisory_lock of the schema."
     ),
     "base/catalog.py": SHARED_CATALOG_REASON,
     "base/tenancy/bootstrap.py": "bootstrap runs once as the RDS master before any app database exists.",
@@ -383,7 +380,7 @@ def database_problems(databases: dict) -> list[str]:
     return problems
 
 
-# ── (e) Phase 2's tenancy ──────────────────────────────────────────────────────────────────────
+# ── (e) The tenancy ────────────────────────────────────────────────────────────────────────────
 
 #: ``CREATE DATABASE``/``DROP DATABASE`` in a string: its name may only come through ``sql.Identifier``.
 DATABASE_DDL_RE = re.compile(r"\b(?:CREATE|DROP|ALTER)\s+DATABASE\b", re.IGNORECASE)
@@ -392,15 +389,15 @@ DICT_MUTATORS = frozenset({"update", "pop", "popitem", "setdefault", "clear", "_
 #: A ``LISTEN``/``UNLISTEN`` statement, alone in its string (a docstring that mentions it is no statement).
 LISTEN_RE = re.compile(r"(?:UN)?LISTEN(?:\s+\S+)?\s*;?")
 #: ``transaction.on_commit`` in the modules, by file and count: with the hub's own database the operation's transaction
-#: is on the hub's alias and a bare one registers on ``default`` (it would run at once, also after a rollback). S2's
-#: first step moved the last ones (website's) to ``live.operations.on_commit``: it stays empty.
+#: is on the hub's alias and a bare one registers on ``default`` (it would run at once, also after a rollback). The
+#: last ones moved to ``live.operations.on_commit``: it stays empty.
 PENDING_S2_ON_COMMIT: dict[str, int] = {}
-#: Hub models that still have a ``hub_id`` column, each with its reason (PLAN-DB §11: the border is the database).
+#: Hub models that still have a ``hub_id`` column, each with its reason (the border between hubs is the database).
 HUB_ID_COLUMNS: dict[str, str] = {
-    "base.hubidentity": "the identity of the hub's database itself (PLAN-DB §3).",
-    "website.site": "phase 1's scaffold so that a hub's website is not another's /: it goes in S5 (plan, decision 2).",
-    "website.image": "phase 1's scaffold, with the site's: it goes in S5 (plan, decision 2).",
-    "verifactu.config": "not tenancy: the business's id in the SaaS; it becomes business_id (plan, decision 2).",
+    "base.hubidentity": "the identity of the hub's database itself.",
+    "website.site": "left from when hubs shared one database, so that a hub's website was not another's /.",
+    "website.image": "left from when hubs shared one database, with the site's.",
+    "verifactu.config": "not tenancy: the business's id in the SaaS.",
 }
 
 
@@ -498,7 +495,7 @@ def listen_touches(source: str) -> list[tuple[int, str]]:
 
 
 def shared_database_touches(source: str) -> list[tuple[int, str]]:
-    """``(line, "use_shared_database")`` for every use of phase 1's shared database (a call or an import)."""
+    """``(line, "use_shared_database")`` for every use of the old shared database (a call or an import)."""
     found: set[tuple[int, str]] = set()
     for node in ast.walk(ast.parse(source)):
         if (isinstance(node, ast.Name) and node.id == "use_shared_database") or (
@@ -819,7 +816,7 @@ def test_only_the_doors_touch_the_orm():
     )
 
     assert offenders == [], (
-        "Only services.py and queries.py touch the ORM (CLAUDE.md, PLAN §14): move these reads and "
+        "Only services.py and queries.py touch the ORM: move these reads and "
         f"writes behind an @operation, or add a reasoned entry to ORM_EXCEPTIONS: {offenders}"
     )
 
@@ -837,8 +834,7 @@ def test_no_alias_is_chosen_by_hand():
     )
 
     assert offenders == [], (
-        "The hub's database is chosen by use_hub and the TenantRouter, never by hand (CLAUDE.md "
-        f"«Tenencia del Hub», PLAN-DB §14.5): {offenders}"
+        f"The hub's database is chosen by use_hub and the TenantRouter, never by hand: {offenders}"
     )
 
 
@@ -849,7 +845,7 @@ def test_no_generic_foreign_key():
     )
 
     assert offenders == [], (
-        f"No GenericForeignKey in a hub's models (CLAUDE.md, PLAN-DB §14.5): {offenders}"
+        f"No GenericForeignKey in a hub's models: {offenders}"
     )
 
 
@@ -858,7 +854,7 @@ def test_hub_aliases_go_through_pgbouncer_safely():
 
 
 
-# ── (e) Phase 2's tenancy: positive controls ───────────────────────────────────────────────────
+# ── (e) The tenancy: positive controls ─────────────────────────────────────────────────────────
 
 TENANCY_OFFENDER = """\
 from base.tenancy.context import use_hub
@@ -923,7 +919,7 @@ def test_the_tenancy_scanners_see_what_they_must_and_nothing_else():
         assert check(TENANCY_LOOKALIKES) == [], check.__name__
 
 
-# ── (e) Phase 2's tenancy: the real tree ───────────────────────────────────────────────────────
+# ── (e) The tenancy: the real tree ─────────────────────────────────────────────────────────────
 
 
 def _everywhere(check) -> list[str]:
@@ -934,7 +930,7 @@ def test_no_database_ddl_is_built_by_string_formatting():
     offenders = _everywhere(database_ddl_touches)
 
     assert offenders == [], (
-        "A database's name reaches SQL only as sql.Identifier, validated by base.tenancy.names (PLAN-DB §3): "
+        "A database's name reaches SQL only as sql.Identifier, validated by base.tenancy.names: "
         f"{offenders}"
     )
 
@@ -959,14 +955,14 @@ def test_the_modules_never_import_the_tenancy():
 def test_nothing_but_live_listens():
     offenders = _everywhere(listen_touches)
 
-    assert offenders == [], f"One LISTEN per process, on control, in live.broker (PLAN-DB §9): {offenders}"
+    assert offenders == [], f"One LISTEN per process, on control, in live.broker: {offenders}"
 
 
 def test_nothing_runs_on_a_shared_database_any_more():
     offenders = _offenders(lambda path: shared_database_touches((HUB_DIR / path).read_text()), source_files(HUB_DIR))
 
     assert offenders == [], (
-        "Phase 1's shared database is gone since S5 (base.tenancy.cut): every business has its own; run in "
+        "The shared database is gone (base.tenancy.cut): every business has its own; run in "
         f"use_hub(hub) or use_control(): {offenders}"
     )
 
@@ -990,7 +986,7 @@ def test_no_hub_model_carries_its_hub_but_the_listed_ones():
     )
 
     assert found == sorted(HUB_ID_COLUMNS), (
-        "The border between hubs is the database, not a column (PLAN-DB §11): drop hub_id, or add a reasoned entry "
+        "The border between hubs is the database, not a column: drop hub_id, or add a reasoned entry "
         f"to HUB_ID_COLUMNS (and remove those that no longer have one): {found}"
     )
 
@@ -1145,15 +1141,13 @@ def test_no_test_reads_the_clock_at_import():
     )
 
 
-# ── (g) Operations that need the hub's own database (PLAN-DB §14.14) ─────────────────────────────────────────────────
+# ── (g) Operations that need the hub's own database ───────────────────────────────────────────────────────────────
 
 #: Any key's id: no key exists in a hub without its own database.
 ANY_KEY = "0193a2b4-0000-7000-8000-000000000001"
-#: The operations that run only in a hub with its own database (round 2026-10-30, Ioan's decision 3), with what each
-#: answers in one that still shares control's (``db_name=""``): ``{operation: (payload, status, code)}``, a domain error
-#: that never names the infrastructure. S2b/S3 add the usage (``base.plan.usage``, ``/internal/usage``) and the apps'
-#: activation; S5 retires the ``db_name=""`` branch and, with it, these errors. ``base.api_key.detail`` still answers
-#: as for a key that does not exist (404, ``base/queries.py``), not yet its 409.
+#: The operations that run only in a hub with its own database, with what each answers in one that still shares
+#: control's (``db_name=""``): ``{operation: (payload, status, code)}``, a domain error that never names the
+#: infrastructure. ``base.api_key.detail`` answers as for a key that does not exist (404, ``base/queries.py``).
 OWN_DATABASE_OPERATIONS: dict[str, tuple[dict, int, str]] = {
     "base.api_key.create": ({"name": "Till", "mode": "full"}, 409, "base.api_keys_unavailable"),
     "base.api_key.rotate": ({"id": ANY_KEY}, 409, "base.api_keys_unavailable"),
@@ -1248,9 +1242,10 @@ def _as_admin_of(slug: str):
 
 
 def _run_in_a_hub_without_its_database(name: str, payload: dict):
-    """``name`` as an administrator of ``a`` (``db_name=""``, phase 1), in its context; ``(answer or error, sent)``.
+    """``name`` as an administrator of ``a`` (``db_name=""``, no database of its own), in its context; ``(answer or
+    error, sent)``.
 
-    Since S5 production never enters such a business (``HubWithoutDatabase``, 503 at its door): only the suite's
+    Production never enters such a business (``HubWithoutDatabase``, 503 at its door): only the suite's
     fallback does (``base/tenancy/tests/legacy.py``), and there these refusals still keep its data untouched."""
     from live.errors import OperationError
     from live.operations import get
@@ -1317,7 +1312,7 @@ def test_an_api_key_on_a_hub_without_its_own_database_is_refused_for_that_reason
     assert client.get("/api/demo/items", HTTP_HOST="a.localhost").status_code == 200
 
 
-# ── (h) A hub's model never links to control's (tenancy, W10; PLAN-DB §2) ──────────────────────────────────────────
+# ── (h) A hub's model never links to control's ────────────────────────────────────────────────────────────────────
 
 
 def control_links(models, classify) -> list[str]:

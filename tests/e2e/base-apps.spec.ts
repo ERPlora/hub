@@ -1,7 +1,7 @@
-// Apps and System › «Usage and plan» of the Hub (APP-BASE-4; the old hub's AppsPage and SystemPage,
+// Apps and System › «Usage and plan» of the Hub (the old hub's AppsPage and SystemPage,
 // docs/reference/old-hub/apps-*.png, apps-all-*.png, apps-paid-*.png and system-plan-*.png) in the three viewports,
 // as the owner of hub `a`: «My apps» with each app's state and «Open», «Add apps» (`#all`) with its search and
-// neither «Paid» nor «Price» (every app in every plan, PLAN §32: no app of this deployment is sold apart, so an old
+// neither «Paid» nor «Price» (every app in every plan: no app of this deployment is sold apart, so an old
 // link to `#paid` opens «Add apps»), and the plan's limits against
 // the people of the business — followed live: the SaaS's photo with a plan moves the screen without a reload. The
 // employee reads the apps too (no notice cuts the list on a phone: gh:hub#2570) and is told that «Usage and plan»
@@ -100,7 +100,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     const { context, page } = await signedIn(browser, viewport, '/apps');
     // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
     if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-    // A business is born with every app off (PLAN-HUB round 2026-10-27): the demo is turned on first, so «My apps»
+    // A business is born with every app off: the demo is turned on first, so «My apps»
     // has it whatever this run's `a` was left with (`seed_local_hubs` leaves every app on; then this changes nothing).
     await turnOn(context, A, 'demo');
     await page.reload();
@@ -131,7 +131,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await search.fill('');
     await expect(appRow(page, 'demo')).toBeVisible();
 
-    // BASE-G70 — every app in every plan (PLAN §32): nothing is sold apart, so there is no «Paid» tab and «Add apps»
+    // BASE-G70 — every app in every plan: nothing is sold apart, so there is no «Paid» tab and «Add apps»
     // has no «Price» (it would say «Free» on every row), neither in the table nor in the phone's cards; «Comes with»
     // still names what an app brings (BASE-F19). The demo is «Installed» in the catalogue.
     const labels = shown(page).locator('[role="columnheader"], .data-table__field-label');

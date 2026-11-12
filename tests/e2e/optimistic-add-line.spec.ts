@@ -1,4 +1,4 @@
-// PoC §8.2 and DEMO-F04: «Add line» paints the line at once, before the server answers; on a done
+// DEMO-F04: «Add line» paints the line at once, before the server answers; on a done
 // item the 409 takes the provisional line back and a toast says why; the server's result keeps only
 // the saved lines; repeating a request with the same client_line_id does not duplicate it.
 import { type Page, expect, test } from '@playwright/test';

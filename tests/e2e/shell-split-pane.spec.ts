@@ -1,10 +1,10 @@
-// FIX-SHELL-SPLIT-PANE (PLAN-MIGRATIONS §16, Ioan 2026-10-17): the hub's shell is the old hub's, side menu
+// The hub's shell is the old hub's, side menu
 // included (docs/reference/old-hub/{dashboard,menu-toggle,verifactu-settings}-*.png). The menu is pinned
 // from 992 px and the topbar folds it to a rail of icons; below, a drawer the hamburger opens. In it, the
 // person, the platform's entries whose screen exists (today Home only) and no module; in its footer, the
 // QR «Open on your phone». The topbar: drawer button or rail toggle, the title centred, the ⠿ «My apps»;
 // no Back on the screens of a module nor on Home (only on a detail, as in the old hub).
-// flow: ninguno — FIX shell
+// flow: none — the hub's shell.
 import { type Locator, type Page, expect, test } from '@playwright/test';
 
 import { customersReady } from './customer-helpers';

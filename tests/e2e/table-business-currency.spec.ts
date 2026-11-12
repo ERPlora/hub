@@ -1,5 +1,4 @@
-// flow: table-business-currency (FIX-HUB-TABLE-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY; apps/table/WORKBOOK.md «Sesiones»,
-// TABLE-F17 and TABLE-F22)
+// flow: table-business-currency (apps/table/WORKBOOK.md «Sesiones», TABLE-F17 and TABLE-F22)
 // Tables paints money in the currency it was charged in and, what is not charged yet, in the business's: its country's,
 // as erplora.com registered it (`PUT /internal/hubs/{id}`, signed the way the SaaS sends it), never a fixed euro. Against
 // the real Sales and Inventory, no mocks: a check of the run is charged in euros while hub `a` is in Spain; then `a`
@@ -10,7 +9,7 @@
 // table splits in euros and the Polish check keeps its złoty (`…-es-1440`). What the run creates is deleted after it and
 // `a`'s registration put back, also when a test fails. Like any business in Poland, `a` charges there with a rule of its own
 // country for the dish's category: Spain alone has factory rules (TAX-F16), and without one Sales refuses the charge with
-// `sale.no_tax_rule` (PLAN-HUB §81, hub#1152); the run mounts it and deletes it.
+// `sale.no_tax_rule`; the run mounts it and deletes it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';

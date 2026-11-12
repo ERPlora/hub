@@ -5,7 +5,7 @@
 //   it; on the rail only its icon, still named. The bar no longer has it, nor «More options» on a phone; an employee's
 //   menu has none.
 // - the strip «You cannot invoice yet» (BASE-F01) between the bar and the screen's content, at its own height;
-// - the user menu's «My account» (PLAN-SAAS §1.1): erplora.com's page, in a new tab; its «Report a problem» is the
+// - the user menu's «My account»: erplora.com's page, in a new tab; its «Report a problem» is the
 //   hub's own dialog (BASE-F108, tests/e2e/base-report-problem.spec.ts);
 // No module of main declares a ⛔ step yet (Invoicing's comes with its own task), so the strip's test serves the page
 // a `base.setup.status` with one pending: the live stream is answered by the test, every other query stays loading.

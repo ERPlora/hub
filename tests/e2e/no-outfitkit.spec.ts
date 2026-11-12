@@ -1,4 +1,4 @@
-// OutfitKit is gone (PLAN §16.11; packages/ui, 2026-10-13): no `ok-*` element anywhere in the DOM
+// OutfitKit is gone (the components are our own, in packages/ui): no `ok-*` element anywhere in the DOM
 // (shadow roots included) of the list (table and cards), the detail, «New item» and «Edit item»; no
 // `ok-*` attribute on the demo's own markup; no `ok-*` custom element defined; no OutfitKit module
 // loaded; and no `--ok-*` custom property left in the DataTable's computed styles.
