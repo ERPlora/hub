@@ -39,14 +39,13 @@ HUB_MODULES_PACKAGE = "apps."
 MODEL_CLASSES: dict[str, tuple[str, str]] = {
     "base.membership": (
         CONTROL,
-        "phase 1's session seam: the role of a SaaS user on a host stays in control with Django's sessions "
-        "until the hub's own staff and sessions come (plan 2026-10-22, decision 3).",
+        "the role of a SaaS user on a host lives next to Django's sessions, which are control's: it stays in "
+        "control until each hub has its own staff and sessions.",
     ),
     "base.sessionowner": (
         CONTROL,
         "the index of whose and where every session is (a key to Django's sessions, control's): it lives next to "
-        "the sessions it names, so /internal/sessions/revoke ends them without decoding any (plan 2026-10-22, "
-        "decision 3).",
+        "the sessions it names, so /internal/sessions/revoke ends them without decoding any.",
     ),
     "base.hub": (
         CONTROL,
@@ -59,7 +58,7 @@ MODEL_CLASSES: dict[str, tuple[str, str]] = {
     "live.outboxevent": (
         CONTEXTUAL,
         "a hub's commands record their events in the hub's database; the registry's (base.hub.*, the demos), "
-        "which belong to no hub, in control's (plan 2026-10-22, contradiction 5).",
+        "which belong to no hub, in control's.",
     ),
     "base.eventdelivery": (
         CONTEXTUAL,

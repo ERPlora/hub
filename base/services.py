@@ -3856,7 +3856,7 @@ def api_doc_settings_update(ctx: OperationContext, data: ApiDocSettingsUpdateIn)
     return queries.api_doc_settings(ctx, ApiDocSettingsIn())
 
 
-# ── Files (APP-BASE-8) ─────────────────────────────────────────────────────────────────────────────────────────────
+# ── Files ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 # The old hub's Files (``POST /api/media/upload|folder|rename|move``, ``DELETE /api/media``; HUB_SHELL-F131, F133,
 # F134): the business's files in the hub file store (``base.files``), on the hub of the request only. Who runs the
 # business uploads, makes folders and renames (``base.upload_files``) and deletes (``base.delete_files``); moving takes

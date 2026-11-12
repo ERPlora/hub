@@ -41,7 +41,7 @@ const CONTROL_PENDING: CommandResult = {
 
 const HUBS_UP_TO_DATE: CommandResult = {
   status: 0,
-  stdout: 'migrate_hubs: the control database is up to date (phase 1: no hub databases yet).\n',
+  stdout: 'migrate_hubs: the control database, 1 template(s) and 2 hub(s) are up to date.\n',
   stderr: '',
 };
 
