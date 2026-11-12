@@ -57,13 +57,24 @@ from base.tenancy import names
 from base.tenancy.connections import control_name
 from base.tenancy.credentials import APP, CredentialsUnavailable, credentials_for
 from control import events, queries
-from control.models import Cluster, Freeze, Hub, HubDue, LeftoverDatabase, MovedCopy, RestoredCopy
+from control.models import (
+    Cluster,
+    CopyRecovery,
+    Freeze,
+    Hub,
+    HubDue,
+    LeftoverDatabase,
+    MovedCopy,
+    RestoredCopy,
+)
 from control.schemas import (
     ClusterDeletedOut,
     ClusterIdIn,
     ClusterIn,
     ClusterOut,
     ClusterUpdateIn,
+    CopyRecoverIn,
+    CopyRecoveryOut,
     FreezeIn,
     FreezeOut,
     HubIdIn,
@@ -471,6 +482,55 @@ def hub_restore_aside(ctx: OperationContext, data: HubRestoreIn) -> dict:
     }
 
 
+# Not an assistant tool: the platform's admins, in the Hub admin.
+@operation(
+    "control.copy.recover",
+    kind="command",
+    permission=None,
+    input=CopyRecoverIn,
+    output=CopyRecoveryOut,
+    ai=INTERNAL,
+)
+def copy_recover(ctx: OperationContext, data: CopyRecoverIn) -> dict:
+    """Ask the worker to bring back into its business what the separate copy ``data.copy_id`` holds and the business
+    lacks, of the apps ``data.apps`` (hub#1257; ``base.tenancy.recovery``): each record created by its app's own
+    operation, in the staff member's language. Only from a made copy, of apps that say what they give back from one,
+    and one recovery of a copy at a time; the business is not touched by the ask."""
+    # Imported here: base.tenancy.recovery runs on control.services (its worker's side, below).
+    from base.tenancy.recovery import recoverable_apps
+
+    platform_admin_only(ctx)
+    copy = RestoredCopy.objects.select_related("hub").filter(pk=data.copy_id).first()
+    if copy is None:
+        raise NotFound(gettext("This separate copy does not exist."))
+    if copy.status != RestoredCopy.Status.MADE:
+        raise Conflict(gettext("Only a separate copy that is made gives anything back."), code="control.copy_not_made")
+    recoverable, apps = recoverable_apps(), list(dict.fromkeys(data.apps))
+    unknown = [label for label in apps if label not in recoverable]
+    if unknown:
+        message = gettext("These apps give nothing back from a separate copy: %(apps)s.") % {"apps": ", ".join(unknown)}
+        raise InvalidPayload(message, code="control.copy_app_not_recoverable", fields={"apps": message})
+    if CopyRecovery.objects.filter(copy=copy, status=CopyRecovery.Status.ASKED).exists():
+        raise Conflict(
+            gettext("This separate copy is already giving something back: wait until it is done."),
+            code="control.copy_recovery_pending",
+        )
+    recovery = CopyRecovery.objects.create(copy=copy, apps=apps, language=ctx.language or "en", asked_by=_who(ctx))
+    record_event(
+        ctx,
+        events.COPY_RECOVERY_REQUESTED,
+        {"id": str(recovery.pk), "copy": str(copy.pk), "hub": str(copy.hub_id), "slug": copy.hub.slug, "apps": apps},
+    )
+    return {
+        "id": recovery.pk,
+        "copy_id": copy.pk,
+        "hub": copy.hub_id,
+        "slug": copy.hub.slug,
+        "apps": apps,
+        "status": recovery.status,
+    }
+
+
 def _who(ctx: OperationContext) -> str:
     """Who changes the switch, as the Hub admin shows it: the staff member's name (or username), or the platform."""
     actor = ctx.actor
@@ -720,19 +780,32 @@ def copies_to_make() -> list[UUID]:
     )
 
 
-def claim_copy(copy_id: UUID, now: dt.datetime, lease: dt.timedelta, owner: str) -> RestoredCopy | None:
-    """Take for ``owner`` the lease of the separate copy ``copy_id`` still to make, with its hub and clusters; ``None``
-    when someone else holds it (or it is made, failed or gone)."""
+def _claim(model, row_id: UUID, now: dt.datetime, lease: dt.timedelta, owner: str, status: str) -> bool:
+    """Take for ``owner`` the lease of the row ``row_id`` of ``model`` (a separate copy or a recovery from one) while it
+    is ``status``; whether it was taken (not when someone else holds it, or it is no longer ``status``, or gone)."""
     with _control_transaction():
         row = (
-            RestoredCopy.objects.select_for_update(skip_locked=True, of=("self",))
-            .filter(Q(lease_until__isnull=True) | Q(lease_until__lte=now), pk=copy_id)
-            .filter(status=RestoredCopy.Status.COPYING)
+            model.objects.select_for_update(skip_locked=True, of=("self",))
+            .filter(Q(lease_until__isnull=True) | Q(lease_until__lte=now), pk=row_id, status=status)
             .first()
         )
         if row is None:
-            return None
-        RestoredCopy.objects.filter(pk=copy_id).update(lease_owner=owner, lease_until=now + lease)
+            return False
+        model.objects.filter(pk=row_id).update(lease_owner=owner, lease_until=now + lease)
+    return True
+
+
+def _release(model, row_id: UUID, owner: str) -> None:
+    """``owner``'s lease of the row ``row_id`` of ``model`` given back (a stopped worker's: the next one goes on at
+    once)."""
+    model.objects.filter(pk=row_id, lease_owner=owner).update(lease_owner="", lease_until=None)
+
+
+def claim_copy(copy_id: UUID, now: dt.datetime, lease: dt.timedelta, owner: str) -> RestoredCopy | None:
+    """Take for ``owner`` the lease of the separate copy ``copy_id`` still to make, with its hub and clusters; ``None``
+    when someone else holds it (or it is made, failed or gone)."""
+    if not _claim(RestoredCopy, copy_id, now, lease, owner, RestoredCopy.Status.COPYING):
+        return None
     return RestoredCopy.objects.select_related("hub", "cluster", "source").get(pk=copy_id)
 
 
@@ -776,7 +849,7 @@ def copy_failed(copy_id: UUID, error: str, owner: str) -> None:
 
 def release_copy(copy_id: UUID, owner: str) -> None:
     """``owner``'s lease of the copy ``copy_id`` given back (a stopped worker's: the next one goes on at once)."""
-    RestoredCopy.objects.filter(pk=copy_id, lease_owner=owner).update(lease_owner="", lease_until=None)
+    _release(RestoredCopy, copy_id, owner)
 
 
 def aside_copies_due(before: dt.datetime) -> list[RestoredCopy]:
@@ -796,3 +869,65 @@ def forget_aside_copy(copy_id: UUID) -> None:
     """The separate copy ``copy_id`` is gone: its row goes too."""
     with _control_transaction():
         RestoredCopy.objects.filter(pk=copy_id).delete()
+
+
+# ── The worker's side of a recovery from a separate copy (``base.tenancy.recovery``, hub#1257): its own lease ────────
+
+
+def recoveries_due() -> list[UUID]:
+    """The recoveries still to do, of copies that are made, the longest asked first."""
+    return list(
+        CopyRecovery.objects.filter(status=CopyRecovery.Status.ASKED, copy__status=RestoredCopy.Status.MADE)
+        .order_by("asked_at", "pk")
+        .values_list("pk", flat=True)
+    )
+
+
+def claim_recovery(recovery_id: UUID, now: dt.datetime, lease: dt.timedelta, owner: str) -> CopyRecovery | None:
+    """Take for ``owner`` the lease of the recovery ``recovery_id`` still to do, with its copy, its hub and their
+    clusters; ``None`` when someone else holds it (or it is done, failed or gone)."""
+    if not _claim(CopyRecovery, recovery_id, now, lease, owner, CopyRecovery.Status.ASKED):
+        return None
+    return CopyRecovery.objects.select_related("copy", "copy__cluster", "copy__hub", "copy__hub__cluster").get(
+        pk=recovery_id
+    )
+
+
+def still_recovering(recovery_id: UUID, lease: dt.timedelta, owner: str) -> None:
+    """Before each record a recovery creates: its lease renewed from now while it is still ``owner``'s to do;
+    ``MoveTaken`` otherwise (nothing renewed)."""
+    renewed = CopyRecovery.objects.filter(
+        pk=recovery_id, status=CopyRecovery.Status.ASKED, lease_owner=owner
+    ).update(lease_until=timezone.now() + lease)
+    if not renewed:
+        raise MoveTaken(f"the recovery {recovery_id} is no longer {owner}'s to do.")
+
+
+def _recovery_ended(recovery_id: UUID, owner: str, **ended) -> None:
+    """The recovery ``recovery_id`` ended as ``ended`` says, its lease given back, on its locked row, only if it is
+    still ``owner``'s to do (``MoveTaken`` otherwise: nothing written)."""
+    with _control_transaction():
+        row = CopyRecovery.objects.select_for_update().filter(pk=recovery_id).first()
+        if row is None or row.status != CopyRecovery.Status.ASKED or row.lease_owner != owner:
+            raise MoveTaken(f"the recovery {recovery_id} is no longer {owner}'s to do.")
+        CopyRecovery.objects.filter(pk=recovery_id).update(lease_owner="", lease_until=None, **ended)
+
+
+def recovery_done(recovery_id: UUID, results: list[dict], at: dt.datetime, owner: str) -> None:
+    """The recovery ``recovery_id`` is done: what each app gave back (``results``), dated."""
+    _recovery_ended(
+        recovery_id, owner, status=CopyRecovery.Status.DONE, results=results, done_at=at, last_error=""
+    )
+
+
+def recovery_failed(recovery_id: UUID, error: str, results: list[dict], at: dt.datetime, owner: str) -> None:
+    """The recovery ``recovery_id`` stopped at ``error``: what it gave back until then (``results``), dated."""
+    _recovery_ended(
+        recovery_id, owner, status=CopyRecovery.Status.FAILED, results=results, done_at=at, last_error=error
+    )
+
+
+def release_recovery(recovery_id: UUID, owner: str) -> None:
+    """``owner``'s lease of the recovery ``recovery_id`` given back: a recovery left for later (its business was being
+    moved or restored) or stopped goes on at the next pass."""
+    _release(CopyRecovery, recovery_id, owner)

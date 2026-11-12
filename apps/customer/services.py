@@ -47,6 +47,7 @@ from apps.customer.queries import (
     find_field,
     find_group,
     find_tag,
+    has_live_twin,
     HEALTH_PURPOSE,
     health_consent,
     load_detail,
@@ -483,22 +484,6 @@ def _import_row(
     return values, {}, warnings
 
 
-def _already_imported(values: dict) -> bool:
-    """A live card with the same name, phone and email: the row was imported before (services#152).
-
-    Only the three together: two people may share a phone or an email (CUSTOMER-F12).
-    """
-    return (
-        Customer.objects.live()
-        .filter(
-            name__iexact=values["name"],
-            phone=values["phone"],
-            email__iexact=values["email"],
-        )
-        .exists()
-    )
-
-
 @operation(
     "customer.customer.import",
     kind="command",
@@ -521,7 +506,7 @@ def import_customers(ctx: OperationContext, data: ImportIn) -> dict:
     for index, row in enumerate(data.rows):
         values, errors, warnings = _import_row(row, ctx)
         customer_id = None
-        if not errors and _already_imported(values):
+        if not errors and has_live_twin(values["name"], values["phone"], values["email"]):
             errors = {"name": str(ALREADY_IMPORTED)}
         if not errors:
             customer = Customer.objects.create(**values)

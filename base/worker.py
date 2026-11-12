@@ -99,7 +99,7 @@ from live.operations import get as get_operation
 
 from base import activation, catalog, metrics, outbound, queries, relay, scheduler, services, usage
 from base.services import reap_demos
-from base.tenancy import dumps, migrator, move, offboarding, provision, restore
+from base.tenancy import dumps, migrator, move, offboarding, provision, recovery, restore
 from base.tenancy.connections import close_hub_aliases, close_this_threads_connections
 from base.schemas import AppActivationSettleIn, HubResetApplyIn
 from base.tenancy.context import use_control, use_hub
@@ -507,8 +507,9 @@ def _usage(now: dt.datetime) -> None:
 def _moves(now: dt.datetime, stop: threading.Event | None = None) -> None:
     """Move the hub asked longest ago to its new cluster and drop the copies past their days
     (``base.tenancy.move.run_due``, round 2026-10-30b of PLAN-DB, decision 3), then restore the hub asked longest ago
-    from its copy (``base.tenancy.restore.run_due``, hub#1198) and make the separate copy asked longest ago
-    (``base.tenancy.restore.run_aside_due``, hub#1213), on control, in the worker's move thread
+    from its copy (``base.tenancy.restore.run_due``, hub#1198), make the separate copy asked longest ago
+    (``base.tenancy.restore.run_aside_due``, hub#1213) and bring back into its business what a made copy was asked to
+    give back (``base.tenancy.recovery.run_due``, hub#1257), on control, in the worker's move thread
     (:class:`Background`); a failure is logged and the next tick tries again. ``stop`` set stops the copy in course and
     leaves it for the next worker to go on."""
     cancelled = stop.is_set if stop is not None else None
@@ -517,11 +518,12 @@ def _moves(now: dt.datetime, stop: threading.Event | None = None) -> None:
             moved = move.run_due(now, cancelled=cancelled)
             moved += restore.run_due(now, cancelled=cancelled)
             moved += restore.run_aside_due(now, cancelled=cancelled)
+            moved += recovery.run_due(now, cancelled=cancelled)
     except Exception:
         logger.exception("worker: the moves' pass failed; the next tick tries again.")
     else:
         if moved:
-            logger.info("worker: worked on the move, the restore or a separate copy of %d hub(s).", moved)
+            logger.info("worker: worked on the move, the restore, a separate copy or a recovery of %d hub(s).", moved)
     finally:
         close_old_connections()
 

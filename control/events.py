@@ -26,6 +26,11 @@ HUB_RESTORE_REQUESTED = "control.hub.restore_requested"
 #: (``base.tenancy.restore``) and the business is never closed.
 HUB_RESTORE_ASIDE_REQUESTED = "control.hub.restore_aside_requested"
 
+#: The staff asked to bring back into a business what one of its separate copies holds and it lacks (``id``: the
+#: recovery, ``copy``, ``hub``, ``slug``, ``apps``: the labels asked; hub#1257); the worker does it
+#: (``base.tenancy.recovery``), each record created by its app's own operation.
+COPY_RECOVERY_REQUESTED = "control.copy.recovery_requested"
+
 #: The platform was frozen for a database upgrade (``reason``; hub#930): the worker makes, drops and moves no database
 #: and ``migrate_hubs`` refuses to start until it is lifted.
 FREEZE_STARTED = "control.freeze.started"
@@ -41,6 +46,7 @@ ALL = [
     HUB_MOVE_CANCEL_REQUESTED,
     HUB_RESTORE_REQUESTED,
     HUB_RESTORE_ASIDE_REQUESTED,
+    COPY_RECOVERY_REQUESTED,
     FREEZE_STARTED,
     FREEZE_LIFTED,
 ]

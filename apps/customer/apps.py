@@ -98,3 +98,21 @@ class CustomerConfig(LiveAppConfig):
         from apps.customer import queries  # the models are not loaded yet when this module is
 
         return queries.keeps_fiscal_documents()
+
+    def recoverable_from_copy(self) -> list:
+        """hub#1257: the platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when
+        the staff recovers from it (BASE-F114): the copy's live cards the business lacks (``queries.cards_in_copy``,
+        ``queries.cards_not_in_business``), each created by ``customer.customer.create``, the till's and the card's
+        own. Never one whose personal data was erased."""
+        from apps.customer import queries  # the models are not loaded yet when this module is
+        from base.recovery import Recoverable
+
+        return [
+            Recoverable(
+                label=self.verbose_name,
+                reads_since="0001_initial",
+                read=queries.cards_in_copy,
+                missing=queries.cards_not_in_business,
+                create="customer.customer.create",
+            )
+        ]

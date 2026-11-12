@@ -229,7 +229,7 @@ un email válido.». Un teléfono que no es un número de su país: «No es un t
 revisa las cifras o escríbelo con su prefijo internacional (+44…).». Un país que no existe: «Elige
 un país de la lista.». Una fecha que no existe en «Cumpleaños» o «Aniversario» (un 31/02): «Introduce
 una fecha válida.». No se guarda nada. Los campos personalizados no se piden en el alta.
-Implicados: WHATSAPP_INBOX-F04
+Implicados: WHATSAPP_INBOX-F04, BASE-F114 (el personal de ERPlora recupera desde una copia aparte las fichas que se perdieron, cada una por esta misma alta)
 
 ### CUSTOMER-F02 Buscar y filtrar fichas
 <!-- origen: fi:modules/customers#navigation-web-components fi:modules/customers#query-customers-list fi:modules/customers#query-customers-stats old:customers/workflow/fichas.md#customers-f02 -->
@@ -1111,6 +1111,13 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   ninguna pantalla la pide; exportar, eliminar y borrar datos nunca. La pantalla envuelve esas órdenes
   en `withApproval` (`base/frontend/lib/approval.ts`) y enseña sus botones también a quien solo tiene
   `customer.manage`; `tests/test_approvals.py` es el contrato.
+- **Recuperar desde una copia aparte** (BASE-F114, hub#1257): `apps.py` responde a la plataforma
+  (`recoverable_from_copy`, `base.tenancy.recovery`) con lo que devuelve una copia aparte del negocio: sus fichas vivas
+  (`queries.cards_in_copy`, por SQL sobre los nombres del modelo: la copia no es un negocio y no tiene alias) que el
+  negocio no tiene (`queries.cards_not_in_business`: ni viva, ni unida a otra, ni con los datos borrados, ni hecha otra
+  vez, con `has_live_twin`, la misma regla que la importación), cada una creada por `customer.customer.create`. Lee desde
+  `0001_initial`; una migración que quite o renombre una de sus columnas cambia también `cards_in_copy` y su
+  `reads_since`. Tests: `tests/test_recovery.py` y, de punta a punta, `base/tenancy/tests/test_recovery.py`.
 - Las reacciones a Venta (`events.REACTIONS`, `events.react`) las entrega el relay del outbox del
   worker en cada pasada (`base.relay`); `base/tests/test_relay.py` recorre el cobro, la anulación y la
   devolución hasta la ficha.
