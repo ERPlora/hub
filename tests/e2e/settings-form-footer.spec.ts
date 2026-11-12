@@ -6,7 +6,9 @@
 // Spanish: Tables (hub#866: 378 px wide in English, 425 in Spanish, «Guardar» cut to «Gua») and Reservations in English
 // (hub#906: 382 px) ran past the screen's edge, a switch's long label on one line widening the whole form. Their number
 // fields are one piece too (hub#982: `SettingsNumberField`): in every page, Inventory's included, a refused one turns red
-// with its reason under it. Whatever this file turns on, it turns off again (hub#480).
+// with its reason under it — and only that: the browser never judges the form on its own (hub#1237: «Save» showed its
+// own bubble over the field, and Enter with a number out of range sent nothing and said only the bubble). Whatever this
+// file turns on, it turns off again (hub#480).
 // flow: APPOINTMENT-F19, ATTENDANCE-F04, INVENTORY-F19, KITCHEN-F26, ONLINE_BOOKING-F07, RESERVATION-F03, SERVICE-F11, STAFF-F22, TABLE-F08
 import { type Page, expect, test } from '@playwright/test';
 
@@ -44,6 +46,12 @@ const PHONE = { width: 375, height: 667 } as const;
 const VIEWPORTS = [
   { label: 'desktop', width: 1440, height: 900 },
   { label: 'phone', ...PHONE },
+] as const;
+/** The three sizes the fleet looks at. */
+const SIZES = [
+  { width: 1440, height: 900 },
+  { width: 820, height: 1180 },
+  { width: 375, height: 667 },
 ] as const;
 
 const turnedOn: string[] = [];
@@ -90,6 +98,44 @@ test('a refused number field turns red with its reason under it, in every settin
     await expect(box.locator('.error-text'), `${field} says why`).toBeVisible();
     await box.scrollIntoViewIfNeeded();
     await capture(page, `settings-refused-${field}`);
+  }
+});
+
+/** Counts, from now on, the `invalid` events of the page on screen: the browser fires one at each control it finds out
+ *  of its constraints (`min`, `max`, `step`…) right before it shows its own bubble and holds the submission back. */
+async function countBrowserJudgements(page: Page): Promise<() => Promise<number>> {
+  await page.evaluate(() => {
+    const seen = window as unknown as { browserJudgements: number };
+    seen.browserJudgements = 0;
+    document.addEventListener('invalid', () => (seen.browserJudgements += 1), true);
+  });
+  return () => page.evaluate(() => (window as unknown as { browserJudgements: number }).browserJudgements);
+}
+
+test('the browser never judges a settings form on its own: «Save» or Enter with a number out of range says only the page’s reason', async ({ page }) => {
+  await login(page, A, NUMBER_FIELDS[0].path);
+  for (const size of SIZES) {
+    await page.setViewportSize(size);
+    for (const { path, hook, field } of NUMBER_FIELDS) {
+      const where = `${field} at ${size.width}x${size.height}`;
+      await page.goto(`${A}${path}`);
+      const judgements = await countBrowserJudgements(page);
+      const box = shown(page).locator(`[data-testid="${field}"]`);
+      const input = box.locator('input');
+      await input.fill('-5');
+      await shown(page).locator(`[data-testid="${hook}-save"]`).click();
+      expect(await judgements(), `${where}: «Save» left the browser to judge it (its own bubble)`).toBe(0);
+      await expect(box, `${where}: «Save» marks it red`).toHaveClass(/\bion-invalid\b/);
+      // Typing lifts the reason; Enter sends the form again (the browser held it back and said only its bubble), and
+      // the reason is the page's again.
+      await input.fill('-6');
+      await expect(box, `${where}: a change lifts the red`).not.toHaveClass(/\bion-invalid\b/);
+      await input.press('Enter');
+      expect(await judgements(), `${where}: Enter left the browser to judge it (its own bubble, and nothing sent)`).toBe(0);
+      await expect(box, `${where}: Enter sends and marks it red`).toHaveClass(/\bion-invalid\b/);
+      await expect(box.locator('.error-text'), `${where}: Enter says why`).toHaveText(/\S/);
+      if (field.startsWith('attendance-')) await capture(page, `settings-no-bubble-${field}-${size.width}x${size.height}`);
+    }
   }
 });
 

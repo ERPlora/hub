@@ -167,6 +167,7 @@ async function useMyLocation(): Promise<void> {
         v-else
         class="attendance-settings"
         data-testid="attendance-settings-form"
+        novalidate
         @submit.prevent="save"
       >
         <header>

@@ -102,6 +102,7 @@ function toForm(settings: SettingsOut): Form {
         v-else
         class="service-settings"
         data-testid="service-settings"
+        novalidate
         @submit.prevent="settingsForm.save()"
       >
         <h2 class="service-settings__title">

@@ -118,6 +118,7 @@ function testSound(): void {
         v-else-if="form"
         class="kitchen-settings"
         data-testid="kitchen-settings"
+        novalidate
         @submit.prevent="settingsForm.save()"
       >
         <h2 class="kitchen-settings__title">
