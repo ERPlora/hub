@@ -12,6 +12,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, psql, shot, shown } from './helpers';
 import { ownerPage, pick, post, rowAction, VIEWPORTS } from './service-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const TAG = 'E2E Apt';
 const RUN = Date.now().toString(36);
@@ -186,7 +187,9 @@ test('Agenda: book with a free time, an overlap refused, the grid and the week, 
     await page.locator('[data-testid=appointment-form-submit]').click();
     await expect(page.locator('[data-testid=appointment-form-error]')).toContainText('already has an appointment at that time');
     await page.screenshot({ path: shot('appointment-overlap-refused') });
+    // «Cancel» asks before losing the refused booking (BASE-F05): the person discards it.
     await page.locator('[data-testid=appointment-form-cancel]').click();
+    await discardChanges(page);
 
     // «By professional»: the professional's row with the block; a drag moves it one hour.
     await view.locator('[data-testid=appointment-toolbar-view-staff]').click();

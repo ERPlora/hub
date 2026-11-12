@@ -10,7 +10,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 import { A, api, EMPLOYEE, login, psql, saveSessionForTheSweep, shot, shown } from './helpers';
 import { createProduct, dialog, fill, type Product } from './inventory-helpers';
 import { cleanDocumentsOf, stamp } from './sale-helpers';
-import { expectWaysOutAskOnDirtyForm, question, QUESTION, type UnsavedFormCase } from './unsaved-back-helpers';
+import { discardChanges, expectWaysOutAskOnDirtyForm, type UnsavedFormCase } from './unsaved-back-helpers';
 
 const RUN = stamp();
 const SKU = `E2E-CRF-${RUN}`;
@@ -275,8 +275,7 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three si
   });
   // With notes counted, «Cancel» asks before throwing the count away (BASE-F05, hub#1234).
   await count.locator('[data-testid=cash-register-count-cancel]').click();
-  await expect(question(page)).toContainText(QUESTION);
-  await question(page).locator('.ep-form-modal__submit').click();
+  await discardChanges(page);
   await expect(count).toBeHidden();
 
   // F09: the close, with the expected and the difference while typing (cash_register#83, #90).
