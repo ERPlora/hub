@@ -1,10 +1,11 @@
-// flow: BASE-F114 (steps 6-11), CUSTOMER-F01, CUSTOMER-F07 — hub#1257: in the Hub admin, the ERPlora staff choose a
-// separate copy of a business and bring back into it the customers it lost since, each created again by Customers'
-// own creation (never a copied row). At each size: a card of `a` is made; in Hubs, «Restore to a separate copy…» asks
-// a copy of `a` from a temporary cluster (the stack's own server) and the worker's pass makes it; the card is deleted
-// in `a`; then Separate copies › tick the copy › «Recover into the business…» › Customers ticked › «Recover»; the
-// worker's pass brings it back; Recoveries says «Customers: 1 created» and `a` has the card live again under a new id.
-// The stack's worker serves databases only (no moves' thread), so the spec plays its passes, as the specs play the
+// flow: BASE-F114 (steps 6-11), CUSTOMER-F01, CUSTOMER-F07, INVENTORY-F01, INVENTORY-F04 — hub#1257, hub#1282: in the
+// Hub admin, the ERPlora staff choose a separate copy of a business and bring back into it the customers and the
+// products it lost since, each created again by its app's own creation (never a copied row). At each size: a card and a
+// product of `a` are made; in Hubs, «Restore to a separate copy…» asks a copy of `a` from a temporary cluster (the
+// stack's own server) and the worker's pass makes it; the card and the product are deleted in `a`; then Separate
+// copies › tick the copy › «Recover into the business…» › Customers and Products ticked › «Recover»; the worker's pass
+// brings them back; Recoveries says «Customers: 1 created; Products: 1 created» and `a` has both live again under new
+// ids. The stack's worker serves databases only (no moves' thread), so the spec plays its passes, as the specs play the
 // relay.
 import { spawnSync } from 'node:child_process';
 
@@ -39,33 +40,30 @@ function shell(code: string, hub?: string): string {
   return out.stdout.trim().split('\n').at(-1) ?? '';
 }
 
-/** A card of `a` made by Customers' create, as the platform runs an operation in a business; its id. */
-function aCard(name: string, email: string): string {
+/** `operation` run in `a` with `input`, as the platform runs an operation in a business; what it answers's id. */
+function inA(operation: string, input: Record<string, unknown>): string {
   return shell(
     [
+      'import json',
       'from live.context import OperationContext, Scope',
       'from live.operations import get',
-      'from control.models import Hub',
-      'hub = Hub.objects.get(slug="a")',
       'ctx = OperationContext(scope=Scope("host", "a"), actor="system", permissions=frozenset({"*"}), language="en")',
-      'op = get("customer.customer.create")',
-      `print(op(ctx, op.input(name=${JSON.stringify(name)}, email=${JSON.stringify(email)})).id)`,
+      `op = get(${JSON.stringify(operation)})`,
+      `print(getattr(op(ctx, op.input(**json.loads(${JSON.stringify(JSON.stringify(input))}))), "id", ""))`,
     ].join('\n'),
     'a',
   );
 }
 
-function deleted(card: string): void {
-  shell(
-    [
-      'from live.context import OperationContext, Scope',
-      'from live.operations import get',
-      'ctx = OperationContext(scope=Scope("host", "a"), actor="system", permissions=frozenset({"*"}), language="en")',
-      'op = get("customer.customer.delete")',
-      `op(ctx, op.input(id="${card}"))`,
-    ].join('\n'),
-    'a',
-  );
+/** A card of `a` made by Customers' create; its id. */
+function aCard(name: string, email: string): string {
+  return inA('customer.customer.create', { name, email });
+}
+
+/** A product of `a` made by Inventory's create, with the first active tax category of `a`; its id. */
+function aProduct(name: string, sku: string): string {
+  const tax = shell('from apps.tax.models import TaxCategory\nprint(TaxCategory.objects.filter(is_active=True).order_by("key").first().key)', 'a');
+  return inA('inventory.product.create', { name, sku, price: 250, tax_category_key: tax });
 }
 
 /** Control's side, by `step`: `setup` makes the staff member and the temporary cluster once and opens the staff
@@ -134,11 +132,13 @@ test.afterAll(() => {
 });
 
 for (const { label, viewport } of SIZES) {
-  test(`${KEY}: at ${label}, the staff choose a separate copy and the customer the business lost comes back`, async ({ browser }) => {
+  test(`${KEY}: at ${label}, the staff choose a separate copy and the customer and the product the business lost come back`, async ({ browser }) => {
     test.slow();
     const name = `Recovered ${label} ${RUN}`;
     const email = `recovered-${label}-${RUN}@example.com`;
     const card = aCard(name, email);
+    const sku = `REC-${label}-${RUN}`;
+    const product = aProduct(name, sku);
     const hubId = psql("select id from base_hub where slug = 'a'");
 
     const context = await browser.newContext({ viewport });
@@ -156,9 +156,11 @@ for (const { label, viewport } of SIZES) {
     await page.locator('input[type="submit"][value="Make the copies"]').click();
     await expect(page.locator('.messagelist .success')).toContainText('1 hub will get a separate copy');
     const copy = control('make');
-    // Lost since: the card deleted in the business.
-    deleted(card);
+    // Lost since: the card and the product deleted in the business.
+    inA('customer.customer.delete', { id: card });
+    inA('inventory.product.delete', { id: product });
     expect(psql(`select count(*) from customer_customer where email = '${email}' and deleted_at is null`)).toBe('0');
+    expect(psql(`select count(*) from inventory_product where sku = '${sku}' and not is_deleted`)).toBe('0');
 
     // Separate copies › tick the copy › «Recover into the business…».
     await runOn(page, COPIES, copy, 'recover_into_the_business');
@@ -169,12 +171,13 @@ for (const { label, viewport } of SIZES) {
     // The confirmation page: what comes back, ticked, and the button.
     await expect(page.getByRole('heading', { name: 'Recover into the business' })).toBeVisible();
     await expect(page.locator('input[name="apps"][value="customer"]')).toBeChecked();
+    await expect(page.locator('input[name="apps"][value="inventory"]')).toBeChecked();
     await expect(page.getByText('nothing is ever copied', { exact: false })).toBeVisible();
     await capture(page, `${KEY}-${label}-2-confirm`, { fullPage: true });
     await page.locator('input[type="submit"][value="Recover"]').click();
 
     await expect(page.locator('.messagelist .success')).toContainText(
-      '1 separate copy will give back Customers into its business within a few minutes',
+      '1 separate copy will give back Customers, Products into its business within a few minutes',
     );
     await capture(page, `${KEY}-${label}-3-asked`);
 
@@ -183,16 +186,20 @@ for (const { label, viewport } of SIZES) {
     await page.goto(RECOVERIES);
     const recovered = page.locator('#result_list tbody tr').first();
     await expect(recovered).toContainText('Done');
-    await expect(recovered).toContainText('Customers: 1 created');
+    await expect(recovered).toContainText('Customers: 1 created; Products: 1 created');
     await capture(page, `${KEY}-${label}-4-recoveries`, { fullPage: true });
     await recovered.locator('a').first().click();
-    await expect(page.locator('.field-what .readonly')).toHaveText('Customers');
+    await expect(page.locator('.field-what .readonly')).toHaveText('Customers, Products');
     await capture(page, `${KEY}-${label}-5-recovery`, { fullPage: true });
 
     // In the business, the card is live again, a new one made by Customers' create; the deleted one stays deleted.
     expect(psql(`select count(*) from customer_customer where email = '${email}' and deleted_at is null`)).toBe('1');
     expect(psql(`select id from customer_customer where email = '${email}' and deleted_at is null`)).not.toBe(card);
     expect(psql(`select name from customer_customer where id = '${card}' and deleted_at is not null`)).toBe(name);
+    // And the product, a new one made by Inventory's create; the deleted one stays deleted.
+    expect(psql(`select count(*) from inventory_product where sku = '${sku}' and not is_deleted`)).toBe('1');
+    expect(psql(`select id from inventory_product where sku = '${sku}' and not is_deleted`)).not.toBe(product);
+    expect(psql(`select name from inventory_product where id = '${product}' and is_deleted`)).toBe(name);
     await context.close();
   });
 }

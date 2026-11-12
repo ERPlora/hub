@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:eb53a6393d47683077fe50d16a993dbb6109e5b7d3ff1f4045f18d14b69cd544 -->
+<!-- generated from WORKBOOK.md sha256:c99ec33bd31d0bce01353d8eee16906c1d910473708b29efb95fd14167dd9b11 -->
 
 ## What it is for and who it is for
 
@@ -2932,9 +2932,10 @@ Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APP
 
 ### BASE-F114 Put a business back as it was at a past moment from the Hub admin
 Status: done (the action and the restore, in its place or to a separate copy, and getting back from the separate copy
-the customers that were lost; making and deleting the temporary cluster is the procedure "Devolver un negocio a un
-momento" of ERPlora/aws; getting back products, services and appointments, hub#1282, hub#1283 and hub#1284; the groups,
-tags and own fields of a customer brought back, hub#1285)
+the customers and the products that were lost; making and deleting the temporary cluster is the procedure "Devolver un
+negocio a un momento" of ERPlora/aws; getting back services and appointments, hub#1283 and hub#1284; the groups, tags and
+own fields of a customer brought back, hub#1285; the image and the categories of a product brought back, hub#1319 and
+hub#1320)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -2968,7 +2969,8 @@ Steps:
   9. In Separate copies they choose the made copy and the action "Recover into the business…". The page explains that
      each thing comes back into the business created again as its own screen creates it, nothing copied; that what the
      business has, or has made again, is left as it is; that records for the tax authority are never brought back and
-     that the business stays open. Below, "What to bring back", with what can be brought ticked (today, **Customers**).
+     that the business stays open. Below, "What to bring back", with what can be brought ticked (today, **Customers** and
+     **Products**).
      They press **Recover**.
   10. "1 separate copy will give back Customers into its business within a few minutes: Recoveries says how it went."
       appears. In Recoveries they see it "Asked" with the copy, what was asked and when.
@@ -2978,7 +2980,14 @@ Steps:
       contact, tax ID, address, dates, source, stage, channel and notes; without their groups, tags or own fields
       (hub#1285). One that was deleted in the business comes back as a new card; their purchases stay on the deleted one.
       A card whose personal data was erased (GDPR) or one merged into another never comes back, and one the business has
-      already made again (the same name, phone and email) is not repeated. Asking again creates nothing twice.
+      already made again (the same name, phone and email) is not repeated. With Products, "Products: 3 created": each
+      product comes back as a new one, created as the Products screen creates it, with its name, SKU, EAN-13,
+      description, type, price, cost, units, threshold, stock control and tax category, active or inactive as it was and
+      in the categories the business still has; with no stock, which is counted (INVENTORY-F14), because the copy's is
+      another day's; without its image (hub#1319) and without the categories the business no longer has (hub#1320). One
+      that was deleted in the business comes back as a new product; its movements stay with the deleted one (hub#1321).
+      One the business has already created again (another live one with its SKU or its EAN-13) is not repeated. Asking
+      again creates nothing twice.
 In: the chosen businesses, the temporary cluster with their copy and the moment; to recover, the made separate copy and
 what to bring back.
 Out: the business's database as it was at that moment; the one it had, kept 7 days on its server; the notice
@@ -2986,7 +2995,8 @@ Out: the business's database as it was at that moment; the one it had, kept 7 da
 business as it was, untouched; a separate database on its cluster with the data of that moment, closed to the
 application and kept 7 days; the notice `control.hub.restore_aside_requested` with who asked for it. When recovering: in
 the business, a new card for each customer it lacked, each with its card-created notice (`customer.customer.created`),
-and nothing else; the copy, untouched; the notice `control.copy.recovery_requested` with who asked for it.
+and a new product for each product it lacked, with its product-created notice (`inventory.product.created`), and nothing
+else; the copy, untouched; the notice `control.copy.recovery_requested` with who asked for it.
 If it fails: what the restore does not accept is said in the notice, business by business, and that business is not
 touched: one that is not ready or has no database of its own, a demo, one being moved or restored, a cluster open to new
 hubs or with living businesses, the business's own cluster, a copy that is not on that cluster or is too large, and a
@@ -3001,11 +3011,12 @@ is only possible from a made copy and once at a time per copy; otherwise the not
 is made gives anything back."), and with nothing ticked the page asks again. What cannot be brought from an app is said in
 its result and the rest goes on: the app is turned off in the business ("Customers: nothing (app_inactive: …)"), or the
 copy did not have it, lacks the migration its read needs or has one this code does not know (`recover_not_in_copy`,
-`recover_copy_behind`, `recover_copy_ahead`). A card the create operation does not accept today (a phone no longer valid)
-is counted "not created" with its reason. If the copy is gone, the recovery says "Failed" and why
+`recover_copy_behind`, `recover_copy_ahead`). A card the create operation does not accept today (a phone no longer valid),
+or a product without a tax category or with one Taxes no longer has active, is counted "not created" with its reason. If the copy is gone, the recovery says "Failed" and why
 ("recover_copy_unreadable: …"). While the business is being moved or restored, the recovery waits without doing anything.
 With the platform frozen for a database upgrade, the restore waits, with the business under maintenance, until it
 is unfrozen. With records from the test environment only, the chain is recovered afterwards (VERIFACTU-F28). The
 support staff see the list, Separate copies and Recoveries, but not the actions.
 Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F01, CUSTOMER-F07, CUSTOMER-F12,
-CUSTOMER-F13, CUSTOMER-F16; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, aws#77
+CUSTOMER-F13, CUSTOMER-F16, INVENTORY-F01, INVENTORY-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284,
+hub#1285, hub#1319, hub#1320, hub#1321, aws#77

@@ -219,6 +219,15 @@ def test_the_reactions_to_sales_run_only_as_the_system(name, input):
 # inventory.product.create (INVENTORY-F01, F08, F20, F26)
 
 
+def test_a_product_is_created_active_unless_it_is_asked_inactive():
+    """hub#1282: what a separate copy gives back comes back as it was, a product turned off included (INVENTORY-F03):
+    it stays out of the till until it is turned on."""
+    created, off = create("Coffee", "CAF-1"), create("Tea", "TEA-1", is_active=False)
+
+    assert (created.is_active, off.is_active) == (True, False)
+    assert dict(Product.objects.values_list("sku", "is_active")) == {"CAF-1": True, "TEA-1": False}
+
+
 def test_create_a_product_with_its_categories_in_one_step():
     drinks, hot = (
         Category.objects.create(name="Drinks"),
