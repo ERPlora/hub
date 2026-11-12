@@ -528,6 +528,14 @@ def created_events(hub, name: str = "service.service.created") -> int:
         return OutboxEvent.objects.filter(name=name).count()
 
 
+def recovered(recoveries, copy) -> dict:
+    """Services asked back from ``copy`` and the worker's pass run: what the app gave back."""
+    row = recoveries.ask(copy, "service")
+    assert run() == 1
+    [result] = fresh(row).results
+    return result
+
+
 def live_categories(hub) -> list[tuple]:
     """The business's live categories: name, its parent's name, colour and order, by name."""
     with use_hub(hub):
@@ -608,10 +616,8 @@ class TestServicesComeBack:
         run_in(hub, "service.service.archive", id=ids["cut"])
         before = created_events(hub)
 
-        again = recoveries.ask(copy, "service")
-        assert run() == 1
+        result = recovered(recoveries, copy)
 
-        [result] = fresh(again).results
         assert (result["created"], result["not_created"], result["refused"]) == (0, 0, "")
         assert created_events(hub) == before
         # The one archived since stays archived: SERVICE-F05 restores it.
@@ -633,21 +639,13 @@ class TestServicesComeBack:
         # Its subcategory first (deleting the parent alone would move it up to the root, SERVICE-F08).
         run_in(hub, "service.category.delete", id=toning)
         run_in(hub, "service.category.delete", id=color)
-        row = recoveries.ask(copy, "service")
 
-        assert run() == 1
+        first, again = recovered(recoveries, copy), recovered(recoveries, copy)
 
-        [result] = fresh(row).results
-        assert (result["created"], result["not_created"], result["refused"]) == (3, 0, "")
+        assert (first["created"], first["not_created"], first["refused"]) == (3, 0, "")
+        assert (again["created"], again["not_created"], again["refused"]) == (0, 0, "")
         assert live_categories(hub) == [("Color", None, "#cc0066", 4), ("Hair", None, "", 0), ("Toning", "Color", "", 0)]
         assert [(one[0], one[3]) for one in offered_services(hub) if one[0] == "Highlights"] == [("Highlights", "Toning")]
-
-        again = recoveries.ask(copy, "service")
-        assert run() == 1
-
-        [result] = fresh(again).results
-        assert (result["created"], result["not_created"], result["refused"]) == (0, 0, "")
-        assert live_categories(hub) == [("Color", None, "#cc0066", 4), ("Hair", None, "", 0), ("Toning", "Color", "", 0)]
 
     def test_a_category_the_business_made_again_is_not_duplicated_and_its_services_go_into_it(
         self, recoveries, every_app_on
@@ -658,11 +656,9 @@ class TestServicesComeBack:
         run_in(hub, "service.category.delete", id=color)
         # Made again by hand since, with another colour: the business's stays as it is.
         again = run_in(hub, "service.category.create", name="COLOR", color="#112233").id
-        row = recoveries.ask(copy, "service")
 
-        assert run() == 1
+        result = recovered(recoveries, copy)
 
-        [result] = fresh(row).results
         # Only the service: the category is the business's already.
         assert (result["created"], result["not_created"], result["reasons"], result["refused"]) == (1, 0, [], "")
         assert live_categories(hub) == [("COLOR", None, "#112233", 0), ("Hair", None, "", 0)]
