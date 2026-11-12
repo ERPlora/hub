@@ -14,12 +14,15 @@ from live.operations import get, registry
 from pydantic import ValidationError
 
 from apps.customer.models import Customer, CustomerGroup, CustomerTag, CustomField
+from apps.customer.schemas import A_CUSTOMER_REFERENCE
 from base import assistant
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_yes_for_its_card import unless_marked, yes_to_its_card
 
 from .conftest import ctx_for
+from .test_integration_assistant import customer_writes
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
 #: Sales's read that names an open check, the one Customers asks for an order's name.
@@ -101,6 +104,64 @@ def test_a_merge_says_the_card_that_stays_and_the_duplicate_by_their_names(langu
     said = fields_of("customer.customer.merge", {"id": str(stays.id), "absorbed_id": str(duplicate.id)}, language)
     assert said["id"]["value"] == "Ana López"
     assert (said["absorbed_id"]["value"], said["absorbed_id"]["label"]) == ("Ana Lopez", title)
+
+
+# ── A card that comes by its id with the name of another one beside it (hub#1272) ─────────────────────────────────────
+# A merge takes each card by its id when it comes (``find_customer``) and never looks at the name said beside it: the
+# card neither reads nor shows that name (``unless``, hub#1250), never «Cliente: Bea Ruiz» beside «Cliente: Ana López»
+# when the merge keeps Ana López. Each name is left unread only beside its own card's id: the duplicate's id says
+# nothing of the card that stays, nor the other way round.
+
+#: Beside which data each write of Customers takes its card by them and not by the name said beside them.
+UNLESS = {
+    ("customer.customer.merge", "customer"): {"id"},
+    ("customer.customer.merge", "absorbed"): {"absorbed_id"},
+}
+
+
+def test_a_name_is_left_unread_beside_the_id_its_write_takes_the_card_by_instead():
+    assert unless_marked(customer_writes(), A_CUSTOMER_REFERENCE) == UNLESS
+
+
+def by_their_ids_beside_other_names() -> tuple[dict, Customer]:
+    """A merge of «Ana Lopez» into «Ana López» by their ids, with the names of two other cards beside them. → its data
+    and the card that stays."""
+    stays, duplicate = a_card("Ana López"), a_card("Ana Lopez")
+    a_card("Bea Ruiz")
+    a_card("Carla Gil")
+    arguments = {"id": str(stays.id), "customer": "Bea Ruiz", "absorbed_id": str(duplicate.id), "absorbed": "Carla Gil"}
+    return arguments, stays
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("language", ["en", "es"])
+def test_a_merge_by_ids_names_only_the_two_cards_it_merges_whatever_names_come_beside_them(language):
+    arguments, _ = by_their_ids_beside_other_names()
+    assert shown("customer.customer.merge", arguments, language) == {"id": "Ana López", "absorbed_id": "Ana Lopez"}
+
+
+@pytest.mark.django_db
+def test_a_name_beside_the_id_of_the_other_card_is_still_read():
+    """The card that stays said by its name beside the duplicate's id, and the duplicate said by its name beside the id
+    of the one that stays: each is the card the merge finds by that name."""
+    stays, duplicate = a_card("Ana López"), a_card("Ana Lopez")
+    a_card("Bea Ruiz")
+    a_card("Carla Gil")
+    by_name_and_id = {"customer": "Bea Ruiz", "absorbed_id": str(duplicate.id)}
+    assert shown("customer.customer.merge", by_name_and_id) == {"customer": "Bea Ruiz", "absorbed_id": "Ana Lopez"}
+    by_id_and_name = {"id": str(stays.id), "absorbed": "Carla Gil"}
+    assert shown("customer.customer.merge", by_id_and_name) == {"id": "Ana López", "absorbed": "Carla Gil"}
+
+
+@pytest.mark.django_db
+def test_the_yes_to_a_merge_by_ids_merges_those_two_cards_whatever_names_come_beside_them():
+    """Control of the above: the merge keeps the card of ``id`` and absorbs the one of ``absorbed_id``; the cards the
+    names beside them fit are not touched."""
+    arguments, stays = by_their_ids_beside_other_names()
+    done = yes_to_its_card(ctx_for(language="es"), "customer.customer.merge", arguments)
+    assert [row["outcome"] for row in done["executed"]] == ["ok"]
+    merged = dict(Customer.objects.values_list("name", "merged_into_id"))
+    assert merged == {"Ana López": None, "Ana Lopez": stays.id, "Bea Ruiz": None, "Carla Gil": None}
 
 
 # ── Groups, tags and custom fields ────────────────────────────────────────────────────────────────────────────────────

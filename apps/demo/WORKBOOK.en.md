@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5a6fe49f9453fb75540886c332e030e1cac026b0002c653909dca6fefbfe2274 -->
+<!-- generated from WORKBOOK.md sha256:4aca80dd64500058619799b3ce91d262130ccfad5ffbaa984afe8f7df9886687 -->
 
 ## What it is for and who it is for
 
@@ -205,7 +205,8 @@ what was said fits several items, no card comes up: the assistant hears "There a
 Ensayo 1, Ensayo 2. Say which one." and asks which; when it fits none, "No item is called "Ensayo"". The yes holds only
 for the item the card showed (BASE-F97): if before confirming someone creates one that fits what was said better
 ("Mesa" when the card said "Mesa 4") or the item is renamed, nothing is touched and the new card shows; if it was
-deleted, the assistant says so.
+deleted, the assistant says so. If the item comes by its id beside another one's name, the card neither reads nor
+shows that name, which the action does not use: it says only the item of the id (hub#1272).
 
 ### What it offers: queries (they read and change nothing; all of them can be followed live)
 

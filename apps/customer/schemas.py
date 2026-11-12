@@ -24,7 +24,7 @@ from pydantic import (
 
 from apps.customer.models import Activity, Purchase
 from base.business import currency_decimals
-from base.schemas import names
+from base.schemas import names, unless_given
 
 T = TypeVar("T")
 
@@ -55,7 +55,8 @@ CUSTOM_FIELD = gettext_noop("Custom field")
 
 # The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
 # asks, never by its id. An open order is Sales's, which Customers does not require: ``customer.order.get`` asks Sales
-# for its name, and without Sales the card leaves it out.
+# for its name, and without Sales the card leaves it out. A card said by its name beside its own card's id is neither
+# read nor shown: the write takes the card by the id and never looks at the name (``unless_given``, hub#1272).
 A_CUSTOMER = names("customer.customer.detail")
 A_CUSTOMER_REFERENCE = names("customer.customer.detail", by="customer")
 A_GROUP = names("customer.group.detail")
@@ -468,7 +469,7 @@ class MergeIn(CustomerRefIn):
         None,
         validate_default=True,
         description="The card that stays: its exact name, phone or email, when its id is not known.",
-        json_schema_extra=A_CUSTOMER_REFERENCE,
+        json_schema_extra=unless_given(A_CUSTOMER_REFERENCE, "id"),
     )
     absorbed_id: UUID | None = Field(
         None,
@@ -481,7 +482,7 @@ class MergeIn(CustomerRefIn):
         validate_default=True,
         title=DUPLICATE_CUSTOMER,
         description="The duplicate's exact name, phone or email, when its id is not known.",
-        json_schema_extra=A_CUSTOMER_REFERENCE,
+        json_schema_extra=unless_given(A_CUSTOMER_REFERENCE, "absorbed_id"),
     )
 
     _absorbed_named = field_validator("absorbed")(_named_unless("absorbed_id", ABSORBED_REF_MISSING))

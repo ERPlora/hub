@@ -14,12 +14,14 @@ from live.context import OperationContext, Scope
 from live.operations import get, registry
 
 from apps.demo.models import Item
+from apps.demo.schemas import AN_ITEM_BY_NAME
 from apps.demo.tests.conftest import A, ctx_for
 from base import assistant
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_yes_for_its_card import unless_marked, yes_to_its_card
 from base.tests.test_services_assistant import asked, call
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
@@ -314,3 +316,44 @@ def test_a_name_no_item_has_draws_no_card():
     plan = turn_of(owner_in(), DELETE_BY_ITS_NAME, call("demo.item.delete", {"called": "Ejemplo QA"}))
     assert (plan["confirm"], plan["executed"][0]["code"]) == (None, "not_found")
     assert Item.objects.count() == 1
+
+
+# ── An item that comes by its id with the name of another one beside it (hub#1272) ────────────────────────────────────
+# Each write of Demo takes its item by its id when it comes (``find_item``) and never looks at the name said beside it:
+# the card neither reads nor shows that name (``unless``, hub#1250), never «Elemento: Terraza» beside «Elemento: Mesa
+# 4».
+
+#: Beside which data each write of Demo takes its item by them and not by the name said beside them.
+UNLESS = {(write, "called"): {"id"} for write, _ in BY_ITS_NAME}
+
+
+def test_the_name_is_left_unread_beside_the_id_its_write_takes_the_item_by_instead():
+    assert unless_marked(demo_writes(), AN_ITEM_BY_NAME) == UNLESS
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("write", "rest"), BY_ITS_NAME)
+def test_an_item_that_comes_by_its_id_names_no_other_one_said_beside_it(write, rest):
+    item = Item.objects.create(name="Mesa 4")
+    Item.objects.create(name="Terraza")
+    for language in ("es", "en"):
+        said = shown(write, {"id": str(item.id), "called": "terraza", **rest}, language)
+        assert (said["id"], "called" in said, "Terraza" in said.values()) == ("Mesa 4", False, False), (write, language)
+
+
+def everything_of(item: Item) -> tuple:
+    """``item`` and its lines, as the writes of Demo change them."""
+    row = Item.objects.filter(pk=item.pk).values_list("name", "status", "note", "updated_at").first()
+    return row, sorted(item.lines.values_list("text", "qty"))
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("write", "rest"), BY_ITS_NAME)
+def test_the_yes_to_an_item_that_comes_by_its_id_runs_on_it_whatever_name_is_said_beside_it(write, rest):
+    """Control of the above: the write acts on the item of the id, never on the one the name beside it fits."""
+    item = Item.objects.create(name="Mesa 4")
+    other = Item.objects.create(name="Terraza")
+    before = everything_of(other), everything_of(item)
+    done = yes_to_its_card(owner_in(), write, {"id": str(item.id), "called": "terraza", **rest})
+    assert [row["outcome"] for row in done["executed"]] == ["ok"]
+    assert (everything_of(other), everything_of(item) != before[1]) == (before[0], True)

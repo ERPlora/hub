@@ -953,7 +953,9 @@ campo, por su nombre; si dos fichas encajan, se pide el id, el teléfono o el em
 asistente pide confirmar con su tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunca por
 su id: la ficha («Cliente: Ana García»), la ficha duplicada de una unión, los grupos y las etiquetas que se le ponen,
 el grupo, la etiqueta o el campo que se cambia o se elimina, por su nombre, y el pedido abierto como lo nombra Venta
-(su título o, sin él, su importe; con Venta apagada, no sale). Lo que quien pregunta no puede ver no sale.
+(su título o, sin él, su importe; con Venta apagada, no sale). Lo que quien pregunta no puede ver no sale. En una
+unión, si la ficha que se queda o la duplicada llegan por su id junto al nombre de otra ficha, la tarjeta no lee ni
+enseña ese nombre, que la unión no usa: dice solo las dos fichas que se juntan (hub#1272).
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -1133,7 +1135,10 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   con una sola ficha viva, ese dato queda fuera de la tarjeta, como un id sin nombre, y la fusión responde con el mismo
   aviso que la ficha (`customer.customer_ambiguous` o `customer.customer_unavailable`) sin tocar nada. Su `AI` dice que
   `customer` es la que se queda («A dentro de B»: B es `customer`, A es `absorbed`) y que no se para en leerlas:
-  `tests/test_assistant_asks.py` (hub#1084).
+  `tests/test_assistant_asks.py` (hub#1084). Junto al id de su propia ficha (`id` para `customer`, `absorbed_id`
+  para `absorbed`), que `find_customer` usa sin mirar el nombre, la tarjeta deja ese nombre sin leer
+  (`base.schemas.unless_given`, hub#1272; `UNLESS` de `tests/test_assistant_card_records.py`); junto al id de la otra
+  ficha, lo lee.
 - Búsqueda: cada ficha guarda `search_text` (nombre, email, teléfono, NIF y empresa en minúsculas y
   sin acentos), recalculado en `Customer.save()`; así no hace falta la extensión `unaccent`.
 - Estados de una ficha: viva (`deleted_at` vacío), eliminada (`deleted_at`), unida (`merged_into`) y
@@ -1262,8 +1267,10 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
 
 ## Lo que queda fuera
 
-Nada abierto: el país de un teléfono sin prefijo (hub#527) ya es el del negocio en Clientes y en todas
-las apps que buscan una ficha por su teléfono.
+El país de un teléfono sin prefijo (hub#527) ya es el del negocio en Clientes y en todas las apps que buscan una
+ficha por su teléfono. Abierto: en las demás escrituras (cambiar, eliminar, borrar los datos, grupos y etiquetas,
+notas, actividad, consentimientos, pedido; y los grupos, etiquetas y campos), el nombre que llega junto al id de su
+ficha no lleva marca y la tarjeta del asistente lo enseña tal como llega (hub#1280).
 
 ## Lo que NO hace, a propósito
 
