@@ -18,8 +18,20 @@ msgid "Erase the personal data of their customers"
 msgstr "Borrar los datos personales de sus clientes"
 
 #, python-format
-msgid "%(email)s: personal data erased from %(carts)s cart(s) and %(orders)s order(s)."
-msgstr "%(email)s: datos personales borrados de %(carts)s carrito(s) y %(orders)s pedido(s)."
+msgid "%(email)s: personal data erased from %(carts)s and %(orders)s."
+msgstr "%(email)s: datos personales borrados de %(carts)s y %(orders)s."
+
+msgid "%(count)d cart"
+msgid_plural "%(count)d carts"
+msgstr[0] "%(count)d carrito"
+msgstr[1] "%(count)d carritos"
+msgstr[2] "%(count)d carritos"
+
+msgid "%(count)d order"
+msgid_plural "%(count)d orders"
+msgstr[0] "%(count)d pedido"
+msgstr[1] "%(count)d pedidos"
+msgstr[2] "%(count)d pedidos"
 
 msgctxt "cart_checkout"
 msgid "Choose a hub first (its link in the SaaS admin): the action runs on that hub."

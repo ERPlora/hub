@@ -189,7 +189,7 @@ describe('ServicesPage', () => {
   describe('the upcoming appointments of the service being archived', () => {
     const COUNT = '/api/appointment/appointments/count_for_service';
     const WITH_AGENDA = { ...OWNER, permissions: [...OWNER.permissions, 'appointment.view_own_appointment'] };
-    const LINE = '2 upcoming appointment(s) still use this service. They keep their booking, price and length; only new bookings stop.';
+    const LINE = '2 upcoming appointments still use this service. They keep their booking, price and length; only new bookings stop.';
 
     async function archiving(session = WITH_AGENDA, answers: Record<string, [number, unknown]> = {}) {
       const s = await setup({ session });
@@ -207,16 +207,20 @@ describe('ServicesPage', () => {
       expect(s.dialog().props('consequences')).toEqual([LINE]);
     });
 
-    it('in Spanish', async () => {
-      const s = await setup({ session: WITH_AGENDA, locale: 'es' });
+    // hub#1147: one appointment is said in the singular and two in the plural, never «appointment(s)».
+    it.each([
+      { locale: 'en' as const, count: 1, line: '1 upcoming appointment still uses this service. It keeps its booking, price and length; only new bookings stop.' },
+      { locale: 'en' as const, count: 2, line: LINE },
+      { locale: 'es' as const, count: 1, line: '1 cita próxima sigue usando este servicio. Conserva su reserva, precio y duración; solo dejan de admitirse reservas nuevas.' },
+      { locale: 'es' as const, count: 2, line: '2 citas próximas siguen usando este servicio. Conservan su reserva, precio y duración; solo dejan de admitirse reservas nuevas.' },
+    ])('with $count upcoming ($locale): «$line»', async ({ locale, count, line }) => {
+      const s = await setup({ session: WITH_AGENDA, locale });
       await s.show(page(ROWS));
-      s.answerBy({ [COUNT]: [200, { count: 1, earliest: null }] });
+      s.answerBy({ [COUNT]: [200, { count, earliest: null }] });
       s.table().vm.$emit('action', { actionId: 'archive', row: ROWS[0] });
       await flush();
       await flush();
-      expect(s.wrapper.findComponent(ConfirmDialog).props('consequences')).toEqual([
-        '1 cita(s) próxima(s) siguen usando este servicio. Conservan su reserva, precio y duración; solo dejan de admitirse reservas nuevas.',
-      ]);
+      expect(s.wrapper.findComponent(ConfirmDialog).props('consequences')).toEqual([line]);
     });
 
     it('says nothing when none uses it', async () => {

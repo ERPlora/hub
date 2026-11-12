@@ -92,6 +92,18 @@ describe('RecoveryPage', () => {
     expect((await setup(CHAIN(false, 2))).find('verifactu-recovery-integrity').text()).toContain('BROKEN ✗ at sequence 2');
   });
 
+  // hub#1147: when it was checked says one record in the singular and several in the plural, never «record(s)».
+  it.each([
+    { locale: 'en' as const, total: 1, said: '1 record checked on' },
+    { locale: 'en' as const, total: 3, said: '3 records checked on' },
+    { locale: 'es' as const, total: 1, said: '1 registro comprobado el' },
+    { locale: 'es' as const, total: 3, said: '3 registros comprobados el' },
+  ])('a chain of $total checked ($locale): «$said …»', async ({ locale, total, said }) => {
+    const chain = CHAIN(true);
+    const s = await setup({ ...chain, chains: [{ ...chain.chains[0], total }] }, { locale });
+    expect(s.find('verifactu-recovery-integrity').text()).toContain(said);
+  });
+
   it('«Validate chain» validates the issuer’s chain', async () => {
     const s = await setup();
     s.answer(200, { issuer_nif: 'B12345674', environment: 'testing', valid: true, total: 3, first_invalid_sequence: null });

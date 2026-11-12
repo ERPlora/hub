@@ -174,13 +174,28 @@ describe('GroupsPage', () => {
     expect([dialog.props('title'), dialog.props('message'), dialog.props('consequences'), dialog.props('confirmLabel')]).toEqual([
       'Delete group',
       'Doneness — the group disappears with its options and stops being asked in the till. What was already ordered keeps it.',
-      ['3 option(s) will be deleted with it.', 'It will stop applying to 2 product(s) or category(ies).'],
+      ['3 options will be deleted with it.', 'It will stop applying to 2 products or categories.'],
       'Delete',
     ]);
     s.answer(200, { id: 'g1' });
     dialog.vm.$emit('confirm');
     await flush();
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/modifier/groups/delete', query: {}, body: { id: 'g1' } }]);
+  });
+
+  // hub#1147: one option or link is said in the singular and several in the plural, never «option(s)».
+  it.each([
+    { locale: 'en' as const, count: 1, said: ['1 option will be deleted with it.', 'It will stop applying to 1 product or category.'] },
+    { locale: 'en' as const, count: 2, said: ['2 options will be deleted with it.', 'It will stop applying to 2 products or categories.'] },
+    { locale: 'es' as const, count: 1, said: ['Se borrará 1 opción con él.', 'Dejará de aplicarse a 1 producto o categoría.'] },
+    { locale: 'es' as const, count: 2, said: ['Se borrarán 2 opciones con él.', 'Dejará de aplicarse a 2 productos o categorías.'] },
+  ])('«Delete» of a group with $count option and link ($locale)', async ({ locale, count, said }) => {
+    const s = await setup({ locale });
+    const row = group('g1', { option_count: count, link_count: count });
+    await s.show(page([row]));
+    s.table().vm.$emit('action', { actionId: 'delete', row });
+    await flush();
+    expect(s.wrapper.findComponent(ConfirmDialog).props('consequences')).toEqual(said);
   });
 
   it('an empty group says nothing more when deleted', async () => {

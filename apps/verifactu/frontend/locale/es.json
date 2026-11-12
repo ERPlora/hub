@@ -222,7 +222,7 @@
       "valid": "Cadena de huellas íntegra ✓",
       "broken": "Cadena de huellas ROTA ✗ en la secuencia {seq}",
       "unknown": "Sin validar todavía",
-      "checked": "{total} registro(s) comprobados el {date}.",
+      "checked": "{count} registro comprobado el {date}. | {count} registros comprobados el {date}.",
       "scope": "Recalcula las huellas SHA-256 y verifica el encadenado. No vuelve a auditar los importes: la base, la cuota y el total se toman como los declaró la factura.",
       "validate": "Validar cadena",
       "query": "Consultar AEAT",

@@ -65,10 +65,10 @@ describe('MovementsSheet', () => {
     await s.show(page(ROWS));
     const labels = s.wrapper.findAllComponents(StatusPill).map((p) => p.props('label'));
     expect(labels).toEqual(['Correction', 'Courtesy', 'Delivered', 'Delivered']);
-    expect(s.text('m3')).toContain('−1 session(s) · +0 day(s)');
+    expect(s.text('m3')).toContain('−1 session · +0 days');
     expect(s.text('m3')).toContain('Corrected by boss');
     expect(s.text('m3')).toContain('typo');
-    expect(s.text('m2')).toContain('+2 session(s) · +30 day(s)');
+    expect(s.text('m2')).toContain('+2 sessions · +30 days');
     expect(s.text('m2')).toContain('Given by boss');
     expect(s.text('m1')).toContain('Cut');
     expect(s.text('m1')).toContain('Customer: Lucía Pérez');
@@ -80,6 +80,19 @@ describe('MovementsSheet', () => {
 
   // SERVICE-F19, SERVICE-F21 (hub#1236): a session spent saying who did it names her beside its customer; one said by
   // nobody, and a courtesy, name nobody.
+  // hub#1147: a courtesy and a correction say one session or day in the singular and several in the plural.
+  it.each([
+    { locale: 'en' as const, uses: 1, days: 1, given: '+1 session · +1 day', corrected: '−1 session · +1 day' },
+    { locale: 'en' as const, uses: 2, days: 30, given: '+2 sessions · +30 days', corrected: '−2 sessions · +30 days' },
+    { locale: 'es' as const, uses: 1, days: 1, given: '+1 sesión · +1 día', corrected: '−1 sesión · +1 día' },
+    { locale: 'es' as const, uses: 2, days: 30, given: '+2 sesiones · +30 días', corrected: '−2 sesiones · +30 días' },
+  ])('$uses and $days ($locale): «$given», «$corrected»', async ({ locale, uses, days, given, corrected }) => {
+    const s = await setup(locale);
+    const moved = { service_id: null, service_name: null, actor: 'boss', reason: 'x', days_delta: days };
+    await s.show(page([movement('m2', { ...moved, kind: 'adjusted', uses_delta: uses }), movement('m1', { ...moved, kind: 'corrected', uses_delta: -uses })]));
+    expect([s.line('m2').includes(given), s.line('m1').includes(corrected)]).toEqual([true, true]);
+  });
+
   it('says the professional who did a session, beside its customer', async () => {
     const s = await setup();
     await s.show(

@@ -9,7 +9,7 @@ API and the assistant use.
 
 from django.contrib import admin, messages
 from django.utils.translation import gettext_lazy as _
-from django.utils.translation import pgettext_lazy
+from django.utils.translation import ngettext, pgettext_lazy
 from live.context import OperationContext, Scope
 from live.errors import OperationError
 from live.operations import get
@@ -20,7 +20,8 @@ from base.admin import ADMIN_HUB_SESSION_KEY
 #: Set by the database or the model: shown, never typed.
 AUDIT = ("id", "created_at", "updated_at")
 ERASE = _("Erase the personal data of their customers")
-ERASED = _("%(email)s: personal data erased from %(carts)s cart(s) and %(orders)s order(s).")
+#: Each count says itself in the singular or the plural (hub#1147): «1 cart and 2 orders», never «cart(s)».
+ERASED = _("%(email)s: personal data erased from %(carts)s and %(orders)s.")
 CHOOSE_A_HUB = pgettext_lazy(OWN, "Choose a hub first (its link in the SaaS admin): the action runs on that hub.")
 
 
@@ -58,7 +59,11 @@ class EraseCustomerData:
             except OperationError as refusal:
                 self.message_user(request, f"{email}: {refusal.message}", messages.WARNING)
             else:
-                said = str(ERASED) % {"email": email, "carts": done.carts, "orders": done.orders}
+                said = str(ERASED) % {
+                    "email": email,
+                    "carts": ngettext("%(count)d cart", "%(count)d carts", done.carts) % {"count": done.carts},
+                    "orders": ngettext("%(count)d order", "%(count)d orders", done.orders) % {"count": done.orders},
+                }
                 self.message_user(request, said, messages.SUCCESS)
 
 

@@ -66,8 +66,8 @@
       "delete": {
         "title": "Delete group",
         "message": "{name} — the group disappears with its options and stops being asked in the till. What was already ordered keeps it.",
-        "options": "{count} option(s) will be deleted with it.",
-        "links": "It will stop applying to {count} product(s) or category(ies).",
+        "options": "{count} option will be deleted with it. | {count} options will be deleted with it.",
+        "links": "It will stop applying to {count} product or category. | It will stop applying to {count} products or categories.",
         "confirm": "Delete"
       }
     },
@@ -79,7 +79,7 @@
       "addLink": "Add product or category",
       "noOptions": "This group has no options yet.",
       "noLinks": "This group does not apply to anything yet: it will not show in the till.",
-      "short": "It asks for at least {min} but has {count} option(s) that cannot repeat: the till could not complete it.",
+      "short": "It asks for at least {min} but has {count} option that cannot repeat: the till could not complete it. | It asks for at least {min} but has {count} options that cannot repeat: the till could not complete it.",
       "default": "By default",
       "ownTax": "Own tax: {name}",
       "product": "Product · {name} ({sku})",

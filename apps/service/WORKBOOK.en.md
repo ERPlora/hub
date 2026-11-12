@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a802d757c09d519a75764968e059e068fcb7a7ca6a2fa0bf7117668b9b6df2ed -->
+<!-- generated from WORKBOOK.md sha256:815f292e13b99f48cac104fd975c1d073df4f222f35c63f1a3fabc9ba1acd973 -->
 
 ## What it is for and who it is for
 
@@ -92,7 +92,7 @@ list) and **Tax category** (with no empty option; the one from the Settings come
 **Edit** and **Archive**; in the archived view, **Restore**. **Archive** asks to confirm: "Archive
 service" — "<name> — it will no longer be offered or bookable. Its history and the appointments already
 booked are kept." and, if Appointments has upcoming appointments with it, "{count} upcoming
-appointment(s) still use this service. They keep their booking, price and length; only new bookings
+appointments still use this service. They keep their booking, price and length; only new bookings
 stop.".
 
 The service photo (SERVICE-F34 and F35): for whoever may edit services, the form has "Photo", with the
@@ -107,7 +107,7 @@ Table with the search box "Search category…" and columns **Name, Parent catego
 category** ("No parent (root)" or another) and **Order**, with **Create category** / **Save changes**.
 Per row: **Edit** and **Delete**; **Delete** asks to confirm: "Delete category" — "<name> — the category
 disappears; the services in it are kept, without a category." and, if it has services, "{count}
-service(s) will be left without a category.".
+services will be left without a category." (with one, "1 service will be left without a category.").
 
 ### Packages
 At the top, **Vouchers with no customer** (manager, owner and administrator only). Table with the search
@@ -122,7 +122,7 @@ empty to price it as the sum of its lines minus the discount."), **Validity (day
 **Service** and, below, **Sessions** and "Remove line"; **Add service**; **Create package** button. When
 editing, instead of the lines it shows "The services included cannot be changed once created: delete
 this package and create a new one.". Per row: **Edit, Movements, Sold vouchers** and **Delete** (with
-"Delete package": "<name> — the package and its {count} line(s) leave the catalogue and can no longer be
+"Delete package": "<name> — the package and its {count} lines (or "its line") leave the catalogue and can no longer be
 sold; vouchers already sold can still be spent, and you find them filtering Status by Deleted.").
 
 Sheets that open on top, all with **Close**, "Loading…" while they arrive, their empty state, their error
@@ -145,7 +145,7 @@ and **Load more** with "Showing {shown} of {total}" when there are more:
     worth counts in their production in Sales. Optional."), **Note** and the **Cancel** and **Spend session**
     buttons. While it checks the voucher, "Checking the voucher…".
 - **Vouchers with no customer**: the live vouchers whose card was deleted or anonymised, with
-  "{remaining} session(s) left", "No session limit" or "Fully used", the voucher, the amount, "Customer
+  "{count} sessions left" ("1 session left"), "No session limit" or "Fully used", the voucher, the amount, "Customer
   deleted on {when}", "Expired" if it is and "Customer reference: <identifier>". Empty: "No voucher has
   lost its customer.".
 
@@ -289,8 +289,9 @@ Steps:
 1. In the service's row tap **Archive**.
 2. Read "Archive service": "<name> — it will no longer be offered or bookable. Its history and the
    appointments already booked are kept." and, if Appointments is active and has upcoming appointments
-   with that service, "{count} upcoming appointment(s) still use this service. They keep their booking,
-   price and length; only new bookings stop.".
+   with that service, "{count} upcoming appointments still use this service. They keep their booking,
+   price and length; only new bookings stop." (with one, "1 upcoming appointment still uses this service. It
+   keeps …").
 3. Tap **Archive** (or **Cancel**). The row disappears from the list.
 In: the service and, if Appointments is active and whoever archives sees appointments, how many pending or
 confirmed appointments use it from now on.
@@ -549,7 +550,7 @@ Steps:
 1. In **Sold vouchers** tap **Adjust** on a live purchase with a session limit or an expiry.
 2. Choose **Add sessions** or **Remove sessions** and how many (up to 100; removing, up to the ones it has
    left), and/or "Days to extend" (up to 366).
-3. Type the Reason and check "After the adjustment: {remaining} session(s) left · expires {when}".
+3. Type the Reason and check "After the adjustment: {count} sessions left · expires {when}" ("1 session left").
 4. Tap **Adjust**.
 In: the purchase, the quantities and the reason.
 Out: a separate movement with who, when, how much and why (`service.grant.adjusted`), which shows in

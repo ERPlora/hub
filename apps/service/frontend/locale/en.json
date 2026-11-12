@@ -31,6 +31,10 @@
       "variable": "Variable",
       "free": "Free"
     },
+    "counts": {
+      "sessions": "{count} session | {count} sessions",
+      "days": "{count} day | {count} days"
+    },
     "tax": {
       "exempt": "exempt"
     },
@@ -65,7 +69,7 @@
       "archive": {
         "title": "Archive service",
         "message": "{name} — it will no longer be offered or bookable. Its history and the appointments already booked are kept.",
-        "upcoming": "{count} upcoming appointment(s) still use this service. They keep their booking, price and length; only new bookings stop.",
+        "upcoming": "{count} upcoming appointment still uses this service. It keeps its booking, price and length; only new bookings stop. | {count} upcoming appointments still use this service. They keep their booking, price and length; only new bookings stop.",
         "confirm": "Archive"
       },
       "restoreError": "Could not restore the service",
@@ -136,7 +140,7 @@
       "delete": {
         "title": "Delete category",
         "message": "{name} — the category disappears; the services in it are kept, without a category.",
-        "impact": "{count} service(s) will be left without a category.",
+        "impact": "{count} service will be left without a category. | {count} services will be left without a category.",
         "confirm": "Delete"
       }
     },
@@ -198,7 +202,7 @@
       },
       "delete": {
         "title": "Delete package",
-        "message": "{name} — the package and its {count} line(s) leave the catalogue and can no longer be sold; vouchers already sold can still be spent, and you find them filtering Status by Deleted.",
+        "message": "{name} — the package and its line leave the catalogue and can no longer be sold; vouchers already sold can still be spent, and you find them filtering Status by Deleted. | {name} — the package and its {count} lines leave the catalogue and can no longer be sold; vouchers already sold can still be spent, and you find them filtering Status by Deleted.",
         "confirm": "Delete"
       }
     },
@@ -219,8 +223,8 @@
       "expires": "Expires {when}",
       "noExpiry": "Never expires",
       "expired": "Expired",
-      "given": "Given afterwards: +{uses} session(s), +{days} day(s)",
-      "corrected": "Corrected afterwards: −{uses} session(s)",
+      "given": "Given afterwards: +{sessions}, +{days}",
+      "corrected": "Corrected afterwards: −{sessions}",
       "voidedBy": "Voided by {who} on {when}",
       "redeem": "Spend a session",
       "adjust": "Adjust",
@@ -246,7 +250,7 @@
       "daysHelp": "Expires {when} now. Up to 366.",
       "reason": "Reason",
       "reasonHelp": "Required. It stays on the voucher's record, e.g. «we were closed in August».",
-      "preview": "After the adjustment: {remaining} session(s) left · {expiry}",
+      "preview": "After the adjustment: {count} session left · {expiry} | After the adjustment: {count} sessions left · {expiry}",
       "previewUnlimited": "After the adjustment: no session limit · {expiry}",
       "expiresOn": "expires {when}",
       "neverExpires": "never expires",
@@ -291,8 +295,8 @@
       "professional": "Professional: {name}",
       "sale": "Sale: {id}",
       "noService": "No service on the line",
-      "given": "+{uses} session(s) · +{days} day(s)",
-      "correctedDelta": "−{uses} session(s) · +{days} day(s)",
+      "given": "+{sessions} · +{days}",
+      "correctedDelta": "−{sessions} · +{days}",
       "givenBy": "Given by {who}",
       "correctedBy": "Corrected by {who}",
       "releasedBy": "Released by {who}",
@@ -303,7 +307,7 @@
       "hint": "Their customer card was deleted or anonymised. The voucher keeps everything it was sold with: to give the money back, find the sale in Sales; to void it if it was not used, open it from Sold vouchers.",
       "empty": "No voucher has lost its customer.",
       "error": "The vouchers with no customer could not be loaded.",
-      "remaining": "{remaining} session(s) left",
+      "remaining": "{count} session left | {count} sessions left",
       "unlimited": "No session limit",
       "noValue": "Fully used",
       "deletedAt": "Customer deleted on {when}",

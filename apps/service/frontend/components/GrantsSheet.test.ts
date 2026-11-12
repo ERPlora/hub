@@ -55,7 +55,7 @@ describe('GrantsSheet', () => {
     const s = await setup();
     await s.show(page(ROWS));
     const first = s.text('g1');
-    for (const part of ['Active', 'Customer: Lucía Pérez', 'Oct 1, 2026', '€90.00', '2 used · 3 left', 'Sale: sale-9', 'Expires Mar 30, 2027', 'Given afterwards: +2 session(s), +30 day(s)']) {
+    for (const part of ['Active', 'Customer: Lucía Pérez', 'Oct 1, 2026', '€90.00', '2 used · 3 left', 'Sale: sale-9', 'Expires Mar 30, 2027', 'Given afterwards: +2 sessions, +30 days']) {
       expect(first, part).toContain(part);
     }
     expect(s.text('g2')).toContain('Customer reference: cust-2');
@@ -63,7 +63,7 @@ describe('GrantsSheet', () => {
     expect(s.text('g2')).toContain('Never expires');
     expect(s.text('g3')).toContain('Voided by boss on Oct 5, 2026');
     expect(s.text('g3')).toContain('wrong customer');
-    expect(s.text('g3')).toContain('Corrected afterwards: −1 session(s)');
+    expect(s.text('g3')).toContain('Corrected afterwards: −1 session');
     const pills = s.wrapper.findAllComponents(StatusPill).map((p) => p.props('label'));
     expect(pills).toEqual(['Active', 'Active', 'Voided']);
   });
@@ -128,6 +128,18 @@ describe('GrantsSheet', () => {
     await s.show(page(ROWS));
     expect(s.text('g1')).toContain('Lucía Pérez');
     expect([s.inDoc('service-grants-adjust-g1'), s.inDoc('service-grants-void-g2')]).toEqual([null, null]);
+  });
+
+  // hub#1147: what was given or corrected afterwards says one in the singular and several in the plural.
+  it.each([
+    { locale: 'en' as const, uses: 1, days: 1, given: 'Given afterwards: +1 session, +1 day', corrected: 'Corrected afterwards: −1 session' },
+    { locale: 'en' as const, uses: 2, days: 30, given: 'Given afterwards: +2 sessions, +30 days', corrected: 'Corrected afterwards: −2 sessions' },
+    { locale: 'es' as const, uses: 1, days: 1, given: 'Regalado después: +1 sesión, +1 día', corrected: 'Corregido después: −1 sesión' },
+    { locale: 'es' as const, uses: 2, days: 30, given: 'Regalado después: +2 sesiones, +30 días', corrected: 'Corregido después: −2 sesiones' },
+  ])('$uses and $days afterwards ($locale): «$given», «$corrected»', async ({ locale, uses, days, given, corrected }) => {
+    const s = await setup(MANAGER, locale);
+    await s.show(page([grant({ uses_added: uses, days_added: days, uses_removed: uses })]));
+    expect([s.text('g1').includes(given), s.text('g1').includes(corrected)]).toEqual([true, true]);
   });
 
   it('says when nobody bought it, and when the sales cannot be loaded', async () => {

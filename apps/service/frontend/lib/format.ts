@@ -60,3 +60,12 @@ export function formatDate(value: string | null | undefined, locale: string, tim
   }
   return found.format(date);
 }
+
+/** A translator of the app's catalogue: what `useT()` gives. */
+type Translate = (key: string, named?: Record<string, unknown>) => string;
+
+/** What a courtesy or a correction moved, «1 session» / «2 sessions» and «1 day» / «30 days» (hub#1147): each
+ *  count goes to the catalogue as `count`, so vue-i18n picks its singular or plural; never «session(s)». */
+export function sessionsAndDays(t: Translate, sessions: number, days: number): { sessions: string; days: string } {
+  return { sessions: t('service.counts.sessions', { count: sessions }), days: t('service.counts.days', { count: days }) };
+}

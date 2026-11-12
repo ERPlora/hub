@@ -12,7 +12,7 @@ import { ref } from 'vue';
 
 import { useSheetList } from '../composables/useSheetList';
 import { useLocale, useT } from '../composables/useT';
-import { formatDate, formatMoney, useBusinessMoney } from '../lib/format';
+import { formatDate, formatMoney, sessionsAndDays, useBusinessMoney } from '../lib/format';
 import type { GrantOut, PackageOut } from '../operations';
 import GrantAdjustModal from './GrantAdjustModal.vue';
 import GrantRedeemModal from './GrantRedeemModal.vue';
@@ -127,13 +127,13 @@ const day = (value: string | null) => formatDate(value, locale.value);
           v-if="grant.uses_added || grant.days_added"
           class="service-sheet-list__line"
         >
-          {{ t('service.grants.given', { uses: grant.uses_added, days: grant.days_added }) }}
+          {{ t('service.grants.given', sessionsAndDays(t, grant.uses_added, grant.days_added)) }}
         </div>
         <div
           v-if="grant.uses_removed"
           class="service-sheet-list__line"
         >
-          {{ t('service.grants.corrected', { uses: grant.uses_removed }) }}
+          {{ t('service.grants.corrected', sessionsAndDays(t, grant.uses_removed, 0)) }}
         </div>
         <div
           v-if="grant.status === 'voided'"
