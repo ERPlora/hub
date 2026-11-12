@@ -241,9 +241,22 @@ class TestCustomersComeBack:
         keeps it as its actor in the outbox, and what reacts to it tells what came back from what the business does
         (an automation of «customer created» starts nothing for a card brought back, FLOW-F21)."""
         hub, (ana, luis) = recoveries.business(every_app_on, ANA, LUIS)
+        # Luis in a group the business keeps and in a deactivated one, with a tag and a custom field's value: the
+        # deactivated group, the tag and the field are deleted after the copy, so his card makes them again.
+        vip = run_in(hub, "customer.group.create", name="VIP").id
+        old = run_in(hub, "customer.group.create", name="Old").id
+        regular = run_in(hub, "customer.tag.create", name="Regular").id
+        pet = run_in(hub, "customer.field.create", name="Pet").id
+        run_in(hub, "customer.customer.set_groups", id=luis, group_ids=[vip, old])
+        run_in(hub, "customer.customer.set_tags", id=luis, tag_ids=[regular])
+        run_in(hub, "customer.customer.update", id=luis, field_values=[{"field_id": pet, "value": "Luna"}])
+        run_in(hub, "customer.group.update", id=old, is_active=False)
         copy = recoveries.copy_of(hub)
         run_in(hub, "customer.customer.delete", id=ana)
         gone(hub, luis)
+        for operation, deleted in (("customer.group.delete", old), ("customer.tag.delete", regular)):
+            run_in(hub, operation, id=deleted)
+        run_in(hub, "customer.field.delete", id=pet)
         asked = recoveries.ask(copy)
         with use_hub(hub):
             before = list(OutboxEvent.objects.values_list("pk", flat=True))
@@ -258,9 +271,15 @@ class TestCustomersComeBack:
         assert said == [
             ("customer.customer.restored", mark),
             ("customer.customer.created", mark),
+            ("customer.group.created", mark),
+            ("customer.group.updated", mark),
+            ("customer.customer.groups_changed", mark),
+            ("customer.tag.created", mark),
+            ("customer.customer.tags_changed", mark),
+            ("customer.field.created", mark),
             ("customer.customer.created", "system"),
         ]
-        assert [base_recovery.brought_back(actor) for _name, actor in said] == [True, True, False]
+        assert [base_recovery.brought_back(actor) for _name, actor in said] == [True] * 8 + [False]
 
     def test_asked_again_nothing_is_made_twice(self, recoveries, every_app_on):
         hub, (ana, _luis) = recoveries.business(every_app_on, ANA, LUIS)

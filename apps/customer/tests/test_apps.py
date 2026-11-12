@@ -52,6 +52,7 @@ OPERATIONS = {
     "customer.customer.merge": "customer.merge",
     "customer.customer.erase": "customer.erase",
     "customer.customer.restore": "customer.restore",
+    "customer.customer.recover": "customer.restore",
     "customer.note.add": "customer.manage",
     "customer.activity.add": "customer.record_activity",
     "customer.consent.grant": "customer.manage",
@@ -96,12 +97,13 @@ SCREEN_ONLY = {
 }
 #: What only the system runs, by a permission declared by no app: no person's tool. The sale app's reactions
 #: (``customer.record_purchase``) and the restore of a deleted card, whose only door is the recovery from a separate
-#: copy (``customer.restore``, BASE-F114).
+#: copy (``customer.restore``, BASE-F114), as the card it makes again with what hung from it there (hub#1285).
 SYSTEM_ONLY = {
     "customer.purchase.record",
     "customer.purchase.void",
     "customer.purchase.refund",
     "customer.customer.restore",
+    "customer.customer.recover",
 }
 #: What names a group, a tag, a custom field or an open order on the card of a write (hub#513): only the card reads
 #: them, the model finds those records in their lists.
