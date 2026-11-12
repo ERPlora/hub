@@ -5,9 +5,9 @@ A blueprint is a manifest (who made it, for what, its language and country, the 
 the rows that travel. A **dataset** is one kind of thing an app lets travel (inventory's categories, its products,
 the tables of the room…): it reads its rows with that app's own list and writes them with that app's own create, so
 the app's rules hold for an import too, and never a table is dumped (hub#426). Rows name each other by their natural
-key — a product's categories by name, a table's zone by name — never by an id of the business that made the file
-(hub#2626). People, PINs and fiscal data have no dataset: they never travel, and a file that brings them has them
-dropped on reading (``Bundle.dropped``).
+key — a product's categories by name, a table's zone by name — never by an id of the business that made the file.
+People, PINs and fiscal data have no dataset: they never travel, and a file that brings them has them dropped on
+reading (``Bundle.dropped``).
 
 - The file: ``manifest.json``, ``data/<dataset>.json`` and the rows' own photos at ``media/<name>`` in a zip
   (:func:`read_zip`, :func:`write_zip`), read with limits (20 MB, 100 MB inflated, 1 000 entries) and refused with a
@@ -95,7 +95,7 @@ MEDIA_FILE_RE = re.compile(r"^media/((?:[a-z][a-z0-9_]*/){2}[0-9a-f]{32}\.webp)$
 #: What a spreadsheet runs as a formula; the customers' export quotes a cell that starts with one (CUSTOMER-F09).
 FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
 
-# Statuses of a dataset and of an app in the report of a load (the screen names each one, hub#1891).
+# Statuses of a dataset and of an app in the report of a load (the screen names each one).
 APPLIED, PARTIAL, ALREADY, FAILED, EMPTY, DISCARDED = "applied", "partial", "already", "failed", "empty", "discarded"
 INACTIVE, UNKNOWN, NOT_SELECTED = "inactive", "unknown", "not_selected"
 # An app of a template its load turned on and its business's database is still making the tables of (hub#609): the load
@@ -481,7 +481,7 @@ def template_out(seed: Template) -> dict:
 
 
 def summary(ctx: OperationContext, bundle: Bundle, *, seed: Template | None) -> dict:
-    """What a blueprint brings and what of it would load here (BASE-G105), writing nothing."""
+    """What a blueprint brings and what of it would load here, writing nothing."""
     on = active_apps(ctx.scope)
     blocked = blocked_apps(ctx.scope)
     known = {config.label for config in module_configs()}
@@ -1109,7 +1109,7 @@ def _inventory_product_load(ctx: OperationContext, rows: list[dict], loaded: Loa
             elif outcome.status == "skipped":
                 loaded.already += 1
             else:
-                # Named as the person knows it (hub#1891): its name, its code only without one.
+                # Named as the person knows it: its name, its code only without one.
                 loaded.refuse(_text(row, "name") or outcome.key or _text(row, "sku"), outcome.reason)
     if not by_sku:
         return

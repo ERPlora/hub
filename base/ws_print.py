@@ -93,7 +93,7 @@ claim, a confirmation, a cancellation) does not, and neither does the job this d
 hand-outs). It runs as the device's user (its permissions re-read every time), on its hub's channel only, and never
 carries the document, which travels only in the answer to ``claim``.
 
-**The presence** (the old hub's heartbeat, ``print_hosts::heartbeat``; FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE):
+**The presence** (the old hub's heartbeat, ``print_hosts::heartbeat``):
 the ``hello`` and every ``beat`` of a device that prints for something are news that it is there. The app that keeps
 the print hosts says where that news goes with ``print_presence`` on its ``LiveAppConfig``: the name of a command of
 its own whose input takes ``device``, which the socket runs with the device's id and context, as every other

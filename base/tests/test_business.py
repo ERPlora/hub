@@ -1,4 +1,4 @@
-"""The business's own data as the Hub shows it (APP-BASE-6, BASE-G97…G99): what ``base.business`` derives and names.
+"""The business's own data as the Hub shows it: what ``base.business`` derives and names.
 
 The SaaS owns the country, the time zone and the language (it pushes them in ``PUT /internal/hubs/{id}``); the
 currency is not chosen anywhere: it is the one the country pays in (CLDR, through Babel), as Square, SumUp or Zettle

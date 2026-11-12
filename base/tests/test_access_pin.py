@@ -1,4 +1,4 @@
-"""BASE-G54/G55 (and the server's side of G60): the PIN of a person and entering with it on a shared device.
+"""The PIN of a person and entering with it on a shared device.
 
 On a device of the hub (one where someone entered with their account) that is shared, of a business that asks who is
 at the till, the way in is the PIN pad: the people of this hub with a PIN (name and initials, never their email), and
@@ -77,7 +77,7 @@ class TestTheDoor:
 
     def test_an_account_without_a_name_is_on_the_grid_without_its_email(self, client, make_user):
         # The SaaS names a person without a name by their email (`full_name or email`); the grid is seen by anyone at
-        # the till, so it shows the part before the «@», never the address (gh:hub#2536).
+        # the till, so it shows the part before the «@», never the address.
         a_device(client)
         with_pin(make_user("saas:5", host="a", first_name="carla.ruiz@example.com", email="carla.ruiz@example.com"), "4826")
         faces = door(client)["people"]
@@ -104,7 +104,7 @@ class TestTheDoor:
         assert (answer["pin"], answer["people"]) == (False, [])
 
     def test_the_door_carries_erplora_com_s_plans_without_naming_the_business(self, client, ana, settings):
-        # BASE-G57: «Upgrade plan» after another device's entry ended this one; nobody is signed in, so the link is
+        # «Upgrade plan» after another device's entry ended this one; nobody is signed in, so the link is
         # the Store's plans of erplora.com (which asks who it is), never this hub's id.
         settings.SAAS_URL = "https://erplora.example"
         answer = door(client)
@@ -142,7 +142,7 @@ class TestEnteringWithThePin:
 
     @pytest.mark.parametrize(("own", "business", "cookie"), [("en", "es", "en"), ("", "es", "es")])
     def test_the_entry_leaves_the_person_s_language_so_a_reload_speaks_it_at_once(self, client, ana, own, business, cookie):
-        # gh:hub#2639: the page Django serves after the entry, and every reload, is in the person's language from the
+        # The page Django serves after the entry, and every reload, is in the person's language from the
         # first paint (their «My profile» choice, else the business's): never a moment in the business's.
         from django.conf import settings
 
@@ -156,7 +156,7 @@ class TestEnteringWithThePin:
 
     @pytest.mark.usefixtures("spa_manifest")
     def test_who_has_not_chosen_a_language_sees_the_business_s_not_the_browser_s(self, client, ana):
-        # BASE-F51 (APP-BASE-6): «The business's language — the one of whoever has not chosen theirs». The browser asks
+        # BASE-F51: «The business's language — the one of whoever has not chosen theirs». The browser asks
         # for English; the business is in Spanish and the person chose nothing in «My profile»: the page is Spanish.
         from base.models import Hub, Profile
 

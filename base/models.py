@@ -500,7 +500,7 @@ class ApiKey(UUIDModel):
 
 
 class ApiSettings(UUIDModel):
-    """Whether the business shows the documentation of its API (BASE-G100): one row at most; without it, hidden."""
+    """Whether the business shows the documentation of its API: one row at most; without it, hidden."""
 
     singleton = models.BooleanField(_("single row"), default=True, editable=False)
     docs_enabled = models.BooleanField(pgettext_lazy("api settings", "show the API documentation"), default=False)
@@ -523,7 +523,7 @@ class ApiSettings(UUIDModel):
 
 
 class Approval(UUIDModel):
-    """A manager's approval of one refused command, given with their PIN or badge (BASE-G136), and its record (G145).
+    """A manager's approval of one refused command, given with their PIN or badge, and its record.
 
     The pass handed back is kept as its SHA-256 only, and works once, until ``expires_at``, for the person who asked
     (``requested_by``), that command (``operation``) and that very request of this business (``fingerprint``,

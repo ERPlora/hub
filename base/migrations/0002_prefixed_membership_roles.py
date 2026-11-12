@@ -35,6 +35,6 @@ class Migration(migrations.Migration):
             name='role',
             field=models.CharField(choices=[('hub_owner', 'Owner'), ('hub_admin', 'Admin'), ('hub_manager', 'Manager'), ('hub_employee', 'Employee')], max_length=16, verbose_name='role'),
         ),
-        # The hint keeps it on control's database, where Membership lives (phase 2, S1: base.tenancy.router).
+        # The hint makes base.tenancy.router run it on control's database, where Membership lives.
         migrations.RunPython(add_prefix, remove_prefix, hints={"model_name": "membership"}),
     ]

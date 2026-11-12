@@ -1,10 +1,10 @@
-"""BASE-F108 · «Report a problem» from the user menu, without leaving the hub (FIX-HUB-BASE-REPORT-PROBLEM-MODAL).
+"""BASE-F108 · «Report a problem» from the user menu, without leaving the hub.
 
 ``base.support.report`` sends erplora.com what the person wrote, signed v1 + v2 like ``/internal/auth/redeem``
 (``POST {SAAS_INTERNAL_URL}/internal/support/report``), with who and where they are: the SaaS account of the session,
 the business (its slug and id), the screen and the browser. erplora.com mails its support mailbox «Reply-To» that
 account (ACCOUNTS-F38), so only a session opened with the account may report: a PIN on a shared till has nobody to
-answer to (gh:hub#2506). Its limit is erplora.com's, per account (``SUPPORT_REPORT_RATELIMIT``): the hub keeps none.
+answer to. Its limit is erplora.com's, per account (``SUPPORT_REPORT_RATELIMIT``): the hub keeps none.
 A refusal of erplora.com, or erplora.com out of reach, is said with the address to write to; never a silent failure.
 """
 
@@ -198,7 +198,7 @@ class TestOnlyWithTheAccount:
 
     def test_a_badge_session_on_a_till_cannot_report_and_nothing_leaves(self, client, ana, make_user, fake_saas):
         # A card on a shared till is the device's way in, like a PIN: the browser's erplora.com account is whoever
-        # made it a device of the hub, never the person who swiped (gh:hub#2506).
+        # made it a device of the hub, never the person who swiped.
         saas = fake_saas(body=SENT)
         bea = make_user("saas:2", host="a", role=Membership.Role.EMPLOYEE, first_name="Bea")
         a_device(client)
