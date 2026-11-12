@@ -1168,10 +1168,11 @@ entre las diez primeras, por rol). Sin ellos, «los cinco acontecimientos fiscal
 ve el modelo (VERIFACTU-F13, F22, F26, F31): contestaba que no tenía herramienta, mandaba a la pantalla de
 Recuperación o creaba otra factura de prueba. Hablan de «Hacienda», «AEAT», «huella», «cadena», «cola» y
 «contingencia», y nombran un registro por su número («el registro 12») o por su factura. Nunca dicen «presenta» (la
-raíz de la presencia de Control horario), «sella» (el asistente lo lee como una venta), «producción» (un producto),
-«comprueba» (una compra; las tres, ERPlora/live#71), «pregunta» (las preguntas de Automatizaciones), «este mes», «factura» en la de prueba
-(empuja las sondas de numeración de Facturación), ni en inglés «record» (la raíz de «recordatorio», de WhatsApp) o
-«waiting» (la de «waiter»). `tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
+raíz de la presencia de Control horario), «pregunta» (las preguntas de Automatizaciones), «este mes», «factura» en la
+de prueba (empuja las sondas de numeración de Facturación), ni en inglés «record» (la raíz de «recordatorio», de
+WhatsApp) o «waiting» (la de «waiter»). Hasta ERPlora/live#71 el asistente leía además «sella» como una venta,
+«producción» como un producto y «comprueba» como una compra; ya las lee como lo que son.
+`tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
 (`tests/e2e/qa/probes/*-es-verifactu-*.json`), nunca con los propios asks, y con una frase propia por herramienta que
 solo la trae con sus asks; el empleado no recibe las escrituras que no puede hacer, y ningún test sale de la máquina
 (ni la AEAT de pruebas ni la de producción). Límite medido: la sonda de pasar a producción («activa el envío real…
