@@ -54,3 +54,9 @@ duplicados tests/e2e/base-access.spec.ts:30-38 el SIZES de tres tamaños viene d
 duplicados tests/e2e/tax-rules.spec.ts:13-47 clon heredado de main (la limpieza de categorías, copiada en tax-categories.spec.ts; deuda de hub#837); hub#1255 solo añade encima el import de discardChanges de unsaved-back-helpers.ts
 duplicados tests/e2e/staff-roles-schedules.spec.ts:11-31 clon heredado de main (la limpieza de personal, copiada en staff-employee.spec.ts; deuda de hub#837); hub#1255 solo añade encima el import de discardChanges de unsaved-back-helpers.ts
 duplicados tests/e2e/base-session-revoke.spec.ts:14-25 el SIZES de tres tamaños viene de main (decenas de specs lo copian, deuda de hub#837); hub#1302 solo añade encima el import de rowAction de service-helpers.ts y quita su copia de rowAction
+duplicados frontend/main.test.ts:294-301 clon heredado de main (dos menús de usuario montados igual); hub#1388 solo reescribe dentro el comentario de «Profile» sin referencias internas
+duplicados frontend/main.test.ts:329-336 el otro lado del mismo clon heredado de main.test.ts:294-301; hub#1388 solo cambia comentarios en el fichero
+duplicados base/frontend/components/data/ImportPanel.test.ts:103-111 clon heredado de main (cada caso monta el panel y carga igual); hub#1388 solo quita del nombre del test la referencia a la ronda
+duplicados base/frontend/components/data/ImportPanel.test.ts:131-138 el otro lado del mismo clon heredado de ImportPanel.test.ts:103-111; hub#1388 solo cambia el nombre de un test en el fichero
+duplicados base/frontend/components/data/ImportPanel.test.ts:96-103 clon heredado de main (cada caso monta el panel y carga igual); hub#1388 solo quita del nombre del test de la línea 103 la referencia a la ronda
+duplicados base/frontend/components/data/ImportPanel.test.ts:251-257 el otro lado del mismo clon heredado de ImportPanel.test.ts:96-103; hub#1388 solo cambia el nombre de un test en el fichero
