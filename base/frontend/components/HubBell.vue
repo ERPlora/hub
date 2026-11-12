@@ -1,12 +1,10 @@
 <script setup lang="ts">
-// The bell at the end of the topbar (BASE-G137; the old hub's, hub#1678): `base.bell.counters`, live — a write
-// anywhere in the business re-runs it on the server, so it no longer asks every 30 s. The badge sums the counters
-// above zero; opened, one row per counter («Failed events (2)») that leads to its screen when this hub has it.
-// A failed read keeps the last counters (`useLive` keeps its data); one that never came says so. `folded` (a phone's
-// «More options», TopbarChrome.vue): no button of its own; the list opens from that menu's row (`show`, `total`).
-// A counter whose figure moves as time passes, with no event (a job waiting a minute with no device alive), makes the
+// `base.bell.counters` is live: a write anywhere in the business re-runs it on the server, so the bell never polls.
+// A failed read keeps the last counters. `folded` (a phone's «More options», TopbarChrome.vue): no button of its own;
+// the list opens from that menu's row (`show`, `total`).
+// A counter whose figure moves as time passes with no event (a job waiting a minute with no device alive) makes the
 // result carry `refresh_every`: the bell reads the counters again that often while the page is in sight, and a reading
-// older than a live result that came meanwhile is dropped (FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE).
+// older than a live result that came meanwhile is dropped.
 import { useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonBadge, IonButton, IonItem, IonLabel, IonList, IonPopover } from '@ionic/vue';

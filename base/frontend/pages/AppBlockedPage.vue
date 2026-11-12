@@ -1,14 +1,9 @@
 <script setup lang="ts">
-// «Why it does not open» (BASE-G132, G134; the old hub's ModuleView states): mounted by the app gate (`lib/app-gate.ts`)
-// in the address of a screen whose app `base.session.me` gives `off`. Which app it is comes from the address (the
-// app's own route, `meta.app`); why, from the live `base.app.list`: a paid app without its right gets «Subscription
-// needed» — its data is safe and comes back once it is bought on erplora.com (the Store's link only for whoever runs
-// the business and only on the web: the Hub never sells) —; an app the business does not have says so; one whose tables
-// its own database is getting (S3) says it opens in a moment, and one that could not be set up leads to Apps, where it
-// is tried again. Bought
-// meanwhile (the SaaS's photo re-runs the list), it offers to open the app with a full load, which brings the
-// session (a snapshot of the page load) up to date. A failed check says so; it never makes up a reason. The Store's
-// link goes the Hub's one way out, `openExternalLink` (gh:hub#439: the installed app opens nothing on `_blank`).
+// Mounted by the app gate (`lib/app-gate.ts`) in the address of a screen whose app cannot open. Which app it is comes
+// from the route's `meta.app`; why, from the live `base.app.list`. The Store's link shows only for whoever runs the
+// business and only on the web, because the Hub never sells, and it leaves by `openExternalLink` because the installed
+// app opens nothing on `_blank`. An app bought meanwhile opens with a full load, which brings the session (a snapshot
+// of the page load) up to date. A failed check says so; it never makes up a reason.
 import { EmptyState, InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { AppPage, openExternalLink, useSession, useSurface } from '@erplora/ui/shell';

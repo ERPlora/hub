@@ -1,4 +1,4 @@
-// The guard every list page's test runs (FIX-DATATABLE-HUB): a list fills its page between the topbar
+// The guard every list page's test runs: a list fills its page between the topbar
 // and the tabbar only when AppPage gets `content-layout="fill"`, its DataTable gets `fill` and every box
 // between them is a `.page-fill` stack (polish.css: a plain wrapper breaks the height chain).
 import { DataTable } from '@erplora/ui/components';

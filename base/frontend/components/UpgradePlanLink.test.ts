@@ -1,6 +1,3 @@
-// «Upgrade plan» at the foot of the side menu (BASE-G169): this hub's plan page on erplora.com (`hub-home`,
-// embedded by base/spa.py), for every profile, in a new tab. It sells, so only on the web: the app surfaces
-// (and the store's copy) have no such button.
 import { applySurface } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

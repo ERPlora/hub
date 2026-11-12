@@ -1,10 +1,7 @@
 <script setup lang="ts">
-// «Review what it brings» (BASE-G105; the old hub's ImportPanel review): what a template or a file is — name, type,
-// language and country by name, how many apps, when a file was made —, one box per app with what it brings, ticked
-// when the app is on here or the load turns it on (`turns_on`: an app the blueprint lists that is off, round
-// 2026-10-27, says so); an app left off or that this hub does not have, and personal data in a template, say they stay
-// out. What this hub never loads (people, fiscal data…) is listed. «Import» emits the apps ticked, in the file's order;
-// the page imports them and passes back `pending` and the reason it failed.
+// One box per app with what it brings, ticked when the app is on here or the load turns it on (`turns_on`). An app left
+// off or that this hub does not have, and personal data in a template, say they stay out. «Import» emits the ticked
+// apps in the file's order; the page imports them and passes back `pending` and the reason it failed.
 import { InlineFeedback } from '@erplora/ui/components';
 import { IonButton, IonCheckbox } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';

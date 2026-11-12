@@ -1,5 +1,3 @@
-// The rules of the Home that are not the server's (the old hub's `dashboard-heading.ts`, `setup-status.ts`,
-// `dashboard-widgets.ts` and the «My apps» card): pure, so each one is pinned here once.
 import * as components from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -66,7 +64,7 @@ function widget(key: string, fields: Partial<WidgetDef> = {}): WidgetDef {
   };
 }
 
-describe('heading (BASE-G127)', () => {
+describe('heading', () => {
   it('greets by the hour while the business has no name: morning before 12, afternoon before 20, evening after', () => {
     expect([0, 11, 12, 19, 20, 23].map(greetingSlot)).toEqual([
       'morning',
@@ -97,7 +95,7 @@ describe('readJsonBlock', () => {
   });
 });
 
-describe('checklistView (BASE-G22, BASE-G130)', () => {
+describe('checklistView', () => {
   it('is empty with nothing to show: an empty answer is silence, never «your business is ready»', () => {
     expect(checklistView(undefined, {}).empty).toBe(true);
     expect(checklistView(status([]), {}).empty).toBe(true);
@@ -183,10 +181,9 @@ describe('blockingItems (the strip)', () => {
 const EUR = { currency: 'EUR', decimals: 2 };
 const PLN = { currency: 'PLN', decimals: 2 };
 
-// BASE-G98: an amount of the Home is in the business's currency (its country's, as Settings › Business says), with
-// its decimals and the symbol a till of that country prints — a Polish business reads «zł», a Spanish one «€» —,
-// never a fixed euro; until the business is known, a dash, never another currency's.
-describe('formatValue: the business currency (BASE-G98)', () => {
+// An amount of the Home is in the business's currency, with its decimals and the symbol a till of that country prints;
+// until the business is known, a dash, never another currency's.
+describe('formatValue: the business currency', () => {
   it("writes an amount (the server's minor unit of the currency) in the business's currency, by its local symbol", () => {
     expect(formatValue(1250, 'currency', 'es', EUR)).toBe('12,50\u00a0€');
     expect(formatValue(1250, 'currency', 'es', PLN)).toBe('12,50\u00a0zł');
@@ -194,9 +191,9 @@ describe('formatValue: the business currency (BASE-G98)', () => {
   });
 
   it('with as many decimals as the currency has, the amount being in its minor unit', () => {
-    // FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: every amount the server sends is in the minor
-    // unit of its currency (`currency_decimals`: 0 in JPY, 3 in KWD), as Sales, Cash register and Inventory paint the
-    // same figures; this test said «¥1,234» for ¥123,400, a hundred times less, by dividing every currency by 100.
+    // Every amount the server sends is in the minor unit of its currency (`currency_decimals`: 0 in JPY, 3 in KWD), as
+    // Sales, Cash register and Inventory paint the same figures; dividing every currency by 100 would read «¥1,234» for
+    // ¥123,400.
     expect(formatValue(123400, 'currency', 'en', { currency: 'JPY', decimals: 0 })).toBe('¥123,400');
     expect(formatValue(123456, 'currency', 'en', { currency: 'KWD', decimals: 3 })).toBe('KWD\u00a0123.456');
     expect(formatValue(123456, 'currency', 'en', EUR)).toBe('€1,234.56');
@@ -238,7 +235,7 @@ describe('formatValue: the business currency (BASE-G98)', () => {
   });
 });
 
-describe('rowsOf / widgetView (BASE-G166)', () => {
+describe('rowsOf / widgetView', () => {
   it('reads the rows of a page, a list or one object, as the server reads the first row', () => {
     expect(rowsOf({ rows: [{ a: 1 }], total: 1 })).toEqual([{ a: 1 }]);
     expect(rowsOf({ items: [{ a: 2 }] })).toEqual([{ a: 2 }]);
@@ -453,11 +450,10 @@ describe('a bar-list with negatives (BASE-F06): the bar measures the size, only 
   });
 });
 
-// BASE-F06 — a bar-list with the colour of its row (FIX-HUB-BASE-HOME-BAR-LIST-IGNORES-MAP-COLOR): Staff's «Staff by
-// role» painted every role's bar in the panel's colour although each role has its own; the old hub's `renderBarList`
-// gave each bar `color: row[map.color]`. The colour is typed by a person (a role's colour in Staff), so only a hex
-// colour (#rgb, #rrggbb) reaches the bar: anything else paints as before. A negative stays red whatever its row's
-// colour: the alarm wins over the category, as Excel's data bars, Power BI's rules or Grafana's thresholds do.
+// A bar-list with the colour of its row (`map.color`). The colour is typed by a person (a role's colour in Staff), so
+// only a hex colour (#rgb, #rrggbb) reaches the bar: anything else keeps the panel's colour. A negative stays red
+// whatever its row's colour: the alarm wins over the category, as Excel's data bars, Power BI's rules or Grafana's
+// thresholds do.
 describe('a bar-list with the colour of its row (BASE-F06): `map.color`, only a hex colour, red still wins', () => {
   const byRole = widget('staff.by_role', {
     kind: 'bar-list',
@@ -518,8 +514,6 @@ describe('a bar-list with the colour of its row (BASE-F06): `map.color`, only a 
   });
 });
 
-// BASE-F06 — a chart of business days (Sales' «Sales, last 7 days»): the old hub's gh:hub#2392 painted each day
-// as `2026-10-17` and no amount at all.
 /** The zones a business day is read in, west to east: the day is the same in all of them. */
 const ZONES = ['America/Los_Angeles', 'Europe/Madrid', 'Pacific/Kiritimati'];
 
@@ -547,7 +541,7 @@ async function copiesOfHome(count: number): Promise<(typeof import('./home'))[]>
 
 const zoned = await copiesOfHome(ZONES.length);
 
-describe('a chart of business days (BASE-F06, gh:hub#2392)', () => {
+describe('a chart of business days (BASE-F06)', () => {
   const WEEK = ['2026-10-17', '2026-10-18', '2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23'];
   const chart = widget('sale.last_7_days', { kind: 'chart', map: { label: 'day', value: 'total' }, options: { format: 'currency' } });
   const days = (labels: string[], total = 0) => ({ rows: labels.map((day) => ({ day, total })) });
@@ -675,7 +669,7 @@ describe('when a timeline entry happened (BASE-F06, BASE-F09)', () => {
   });
 });
 
-describe('activeWidgetKeys (BASE-G167)', () => {
+describe('activeWidgetKeys', () => {
   const catalogue = [widget('a.one', { default: true }), widget('a.two'), widget('b.three', { default: true })];
 
   it("starts from the catalogue's defaults while this browser chose nothing", () => {
@@ -691,7 +685,7 @@ describe('activeWidgetKeys (BASE-G167)', () => {
   });
 });
 
-describe('orderByUse (BASE-G165)', () => {
+describe('orderByUse', () => {
   it('puts the apps opened most in this browser first, the rest in their order', () => {
     const apps = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }];
     expect(orderByUse(apps, { c: 3, b: 1 }).map((a) => a.id)).toEqual(['c', 'b', 'a', 'd']);
@@ -707,7 +701,7 @@ describe('orderByUse (BASE-G165)', () => {
   });
 });
 
-describe('saleStatus (BASE-G129)', () => {
+describe('saleStatus', () => {
   it("speaks the sales history's words, with «Other» for a status this screen does not know", () => {
     expect(['completed', 'voided', 'refunded', 'parked'].map(saleStatus)).toEqual([
       { key: 'completed', tone: 'success' },

@@ -1,10 +1,3 @@
-// The API's documentation (BASE-G150, G04; the old hub's ApiDocsPage, without Swagger UI: production enforces Trusted
-// Types): `base.api_doc.get` asked once (the document is far bigger than a live result may be), and only once the live
-// `base.api_doc.settings` says it is shown — hidden, nothing is asked, so no refused request reaches the console; one
-// section per app with its routes — method, path, what it does — and each route's parameters and body on opening it; how
-// to call it (a key from Employees › API keys, as a bearer), said too when this business cannot make keys yet;
-// «Download the OpenAPI file». Hidden, it says so, and who runs the business is sent to Settings › General to show it; a
-// document that cannot be read says so with «Retry»; none published, says so.
 import { AppPage } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

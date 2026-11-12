@@ -1,6 +1,5 @@
 <script setup lang="ts">
-// One row of a Settings card, as the old hub's: icon, name, the line that says what it is for and, at the end, its
-// value (read-only) or — with `to` — a chevron that opens another screen. Business and Printing (APP-BASE-6) use it.
+// One row of a Settings card: at its end either a read-only value or, with `to`, a chevron that opens another screen.
 import { HubIcon } from '@erplora/ui/shell';
 import { IonItem, IonLabel, IonNote } from '@ionic/vue';
 import { useRouter } from 'vue-router';

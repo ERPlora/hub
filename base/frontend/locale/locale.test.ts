@@ -67,7 +67,7 @@ describe('base catalogues (en source + es)', () => {
     }
   });
 
-  it('say «tique» in Spanish, never «ticket» (FIX-HUB-BASE-BLOCKING-STRIP-SAYS-TICKET-WHERE-INVOICING-SAYS-TIQUE)', () => {
+  it('say «tique» in Spanish, never «ticket»', () => {
     expect(anglicisedReceipts(es as Catalogue)).toEqual([]);
   });
 

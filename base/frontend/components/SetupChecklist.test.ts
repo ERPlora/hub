@@ -1,6 +1,3 @@
-// «Finish setting up your business» (BASE-G22, BASE-G130, BASE-G164; hub#372): one live read of
-// `base.setup.status`, painted as the server ordered and filtered it. «Set up» only where a screen exists and
-// the person can do it; a ⛔ only an administrator can do says so; folded to 5 rows (2 on a phone).
 import { IonProgressBar } from '@ionic/vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -72,7 +69,7 @@ describe('SetupChecklist', () => {
     expect(s.rows()[0].get('[data-testid="setup-pill"]').attributes('data-tone')).toBe('danger');
   });
 
-  it('«Set up» opens the screen of the step (BASE-G130)', async () => {
+  it('«Set up» opens the screen of the step', async () => {
     const s = await setup({ routes: ['/a/one'] });
     await s.show(status([item('a.one')]));
     const configure = s.wrapper.get('[data-testid="setup-configure-a.one"]');
@@ -88,7 +85,7 @@ describe('SetupChecklist', () => {
     expect(s.wrapper.find('[data-testid="setup-configure-a.one"]').exists()).toBe(false);
   });
 
-  it('a pending step this person cannot do says an administrator has to, with no button (BASE-G164)', async () => {
+  it('a pending step this person cannot do says an administrator has to, with no button', async () => {
     const s = await setup({ locale: 'es', routes: ['/invoice/business_identity'] });
     await s.show(status([item('invoice.business_identity', { level: 'legal', actionable: false })]));
     expect(s.wrapper.find('[data-testid="setup-configure-invoice.business_identity"]').exists()).toBe(false);
@@ -157,7 +154,7 @@ describe('SetupChecklist', () => {
     expect(error.text()).toContain('Could not load what is left to set up');
     expect(error.find('[data-testid="setup-retry"]').exists()).toBe(true);
   });
-  // BASE-G121 (gh:hub#373): «Ask the assistant» opens its panel on the setup; every step keeps its own «Set up».
+
   it('«Ask the assistant» opens the assistant on the setup, while something is left', async () => {
     const assistant = createAssistant({ storage: memoryStorage(), openStorage: memoryStorage(), post: async () => undefined });
     installAssistant(assistant);
