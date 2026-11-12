@@ -270,7 +270,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await pushPhoto(GRATIS);
       await page.reload();
 
-      await expect(testid(page, 'apps-counter')).toHaveText('20 of 20 apps turned on');
+      // Every app on but Website (26), 20 of them chosen: the plan's part is at its limit.
+      await expect(testid(page, 'apps-counter')).toHaveText('26 apps turned on · 20 of 20 in your plan');
       await search(page, 'Website');
       await expect(appRow(page, 'website').locator('[data-testid="apps-state"]')).toHaveText('Off');
       await testid(page, 'apps-row-website-toggle').click();
@@ -300,7 +301,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       const off = await api<{ app: string; state: string }>(context, A, 'POST', '/apps/disable', { app: 'flow' });
       expect(off, 'Automations off before the flow').toMatchObject({ status: 200, data: { app: 'flow', state: 'off' } });
       await page.reload();
-      await expect(testid(page, 'apps-counter')).toHaveText('16 de 20 apps activadas');
+      await expect(testid(page, 'apps-counter')).toHaveText('26 apps activadas · 16 de 20 de tu plan');
       await expect(shown(page).locator('[data-testid="apps-row"]').first()).toBeVisible();
       expect(await namesCutShort(page), `every name whole or ending in «…» at ${width}`).toEqual([]);
       expect(await menuApps(page)).not.toContain('Automatizaciones');
@@ -312,7 +313,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(toast(page, 'Automatizaciones está activada.')).toBeVisible();
       await expect(page.locator('.ep-confirm-dialog:visible')).toHaveCount(0);
       await expect(appRow(page, 'flow').locator('[data-testid="apps-state"]')).toHaveText('Instalada');
-      await expect(testid(page, 'apps-counter')).toHaveText('17 de 20 apps activadas');
+      await expect(testid(page, 'apps-counter')).toHaveText('27 apps activadas · 17 de 20 de tu plan');
       expect(stored('flow')).toBe('on:true');
       await expect.poll(() => menuApps(page), { message: 'the menu follows without a reload' }).toContain('Automatizaciones');
 
@@ -331,7 +332,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await pushPhoto(GRATIS);
     const { context, page } = await signedInSpanish(browser, viewport, '/apps');
     try {
-      await expect(testid(page, 'apps-counter')).toHaveText('17 de 20 apps activadas');
+      await expect(testid(page, 'apps-counter')).toHaveText('27 apps activadas · 17 de 20 de tu plan');
       expect(await menuApps(page)).toEqual(expect.arrayContaining(['Reservas', 'Mesas']));
       await search(page, 'Reservas');
 
@@ -347,7 +348,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await askOff.getByRole('button', { name: 'Desactivar' }).click();
       await expect(toast(page, 'Reservas está desactivada. También se ha desactivado: Mesas.')).toBeVisible();
       await expect(appRow(page, 'reservation')).toHaveCount(0);
-      await expect(testid(page, 'apps-counter')).toHaveText('16 de 20 apps activadas');
+      // Both go off (two fewer turned on); only Reservations was chosen (one fewer of the plan's).
+      await expect(testid(page, 'apps-counter')).toHaveText('25 apps activadas · 16 de 20 de tu plan');
       expect([stored('reservation'), stored('table')]).toEqual(['off:false', 'off:false']);
       await expect
         .poll(async () => (await menuApps(page)).filter((name) => name === 'Reservas' || name === 'Mesas'), {
@@ -369,7 +371,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await askOn.getByRole('button', { name: 'Activar' }).click();
       await expect(toast(page, 'Reservas está activada. También se ha activado: Mesas.')).toBeVisible();
       await expect(appRow(page, 'reservation').locator('[data-testid="apps-state"]')).toHaveText('Instalada');
-      await expect(testid(page, 'apps-counter')).toHaveText('17 de 20 apps activadas');
+      await expect(testid(page, 'apps-counter')).toHaveText('27 apps activadas · 17 de 20 de tu plan');
       // Reservations chosen; Tables came along with it, so it does not count.
       expect([stored('reservation'), stored('table')]).toEqual(['on:true', 'on:false']);
       await expect
