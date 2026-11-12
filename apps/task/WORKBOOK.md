@@ -426,7 +426,9 @@ lo que enseñó la tarjeta: si antes de confirmar alguien crea una tarea que enc
 tarjeta decía «Llamar al proveedor»), no se toca nada y sale la tarjeta nueva. La tarea de un comentario, la tarea
 madre y el proyecto de una tarea nueva, y el proyecto al que se pasa una tarea, dichos por su nombre, salen también
 como los encuentra la acción, y el «sí» vale solo para ellos; si lo dicho vale para varios, la tarjeta lo dice tal como
-se dijo (hub#1245).
+se dijo (hub#1245). Si la tarea o el proyecto llegan por su identificador junto al nombre de otra u otro, la tarjeta no
+lee ni enseña ese nombre, que la acción no usa; y al pasar una tarea a un proyecto dicho por su nombre, que gana a un
+identificador que llegue a su lado, la tarjeta solo enseña ese proyecto (hub#1250).
 
 ### Lo que ofrece: consultas (leen, no cambian nada; todas se pueden seguir en vivo)
 
@@ -558,7 +560,9 @@ cliente o a un compañero).
   solo en ellas). El `task` de `CommentIn`, el `parent` y el `project` de `TaskIn` y el `project` de `TaskPatchIn` no
   tienen lectura cuya entrada quepa en la suya (`base.E012`), así que van sin `check`, pero con la misma marca
   `names(…, as_said=True)`: la tarjeta los lee por su nombre, su id va en la huella y un nombre que vale para varios
-  sale tal como se dijo, nunca fuera de la tarjeta (hub#1245).
+  sale tal como se dijo, nunca fuera de la tarjeta (hub#1245). Junto al id con que la escritura toma su registro en
+  su lugar, la tarjeta deja sin leer el nombre (`base.schemas.unless_given`, hub#1250), y en `TaskPatchIn` al revés:
+  el `project_id` junto a un `project` (`UNLESS` de `tests/test_assistant_yes_for_its_card.py`).
   Tareas no tiene listas cerradas sin etiqueta en sus escrituras: el estado y la prioridad salen con las de sus
   modelos.
 - El admin de Django del Hub tiene **CRUD completo** sobre los cuatro modelos (ronda 12, PLAN §17); una

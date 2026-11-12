@@ -547,7 +547,9 @@ mejor, no se toca nada y sale la tarjeta nueva (hub#1231). La tarjeta enseña el
 ordenar platos y elecciones, y con el producto de Inventario dicho por su nombre, la tarjeta enseña también el menú, el
 plato y el producto que encontró, y el «sí» vale solo para ellos: si antes de confirmar alguien crea uno que encaja
 mejor con lo dicho, no se toca nada y sale la tarjeta nueva; si lo dicho vale para varios, la tarjeta lo enseña tal
-como se dijo y la acción pregunta cuál (hub#1245).
+como se dijo y la acción pregunta cuál (hub#1245). Si el menú, el plato o la elección llegan por su identificador
+junto a un nombre que la acción no usa (el de otro menú, otro plato u otro producto), la tarjeta no lee ni enseña ese
+nombre: dice el registro del identificador, igual que cuando llega solo (hub#1250).
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -750,7 +752,10 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   (`_ComboOfIn`/`_GroupOfIn`, sin lectura cuya entrada quepa en la suya, `base.E012`) también los marcan: su huella
   lleva lo que encontró y el «sí» vale solo para ello (trinquetes
   `test_every_write_that_takes_a_menu_or_a_course_by_its_name_reads_it_and_says_it_as_said_when_it_cannot` y
-  `test_a_choice_is_read_by_its_product_with_its_menu_and_its_course_and_a_product_of_inventory_by_its_name`). Las listas
+  `test_a_choice_is_read_by_its_product_with_its_menu_and_its_course_and_a_product_of_inventory_by_its_name`). Cada
+  dato dicho por su nombre se deja sin leer junto al id con que la escritura toma su registro en su lugar
+  (`base.schemas.unless_given`, hub#1250): el suyo y el del registro que lo contiene (el menú de un plato es el del
+  plato). La lista exacta de cada escritura, en `UNLESS` de `tests/test_assistant_yes_for_its_card.py`. Las listas
   cerradas de sus escrituras (cómo se vende el menú) ya llevan su etiqueta en `en` + `es` por los `choices` del
   modelo.
 - El admin de Django del Hub tiene **CRUD completo** sobre los tres modelos (ronda 12, PLAN §17); una

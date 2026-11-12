@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5109da179699ac321f838c5de1e56a7a5733b0d1a8382d97da7cac95ab3f6a73 -->
+<!-- generated from WORKBOOK.md sha256:5ac62c4cd3188899d2987fda37fd8aa49ddd4c8fd4d0909619ee4e23baf95ff0 -->
 
 ## What it is for and who it is for
 
@@ -2481,7 +2481,8 @@ Steps:
      ("Rectifying invoice: other causes (R4)", not "R4"); and a record, by its name when its app lets whoever asks read it ("Person: Eva
      Gil"): otherwise the card leaves it out, never by its code. A record said in words is looked up as the action will
      look it up, also inside another (a course inside its menu), and the one it finds comes up ("Course: Homemade
-     desserts" when "desserts" was said); if those words fit several or none, they come up as they were said. Nor does
+     desserts" when "desserts" was said); if those words fit several or none, they come up as they were said; and if the action does
+     not use them because its record's identifier comes, they are neither read nor shown. Nor does
      it put the key its app uses to avoid doing
      the same thing twice on a retry (charging, sending a WhatsApp, printing): nobody can judge it, and the action
      receives it all the same when it runs. Everything shows in the person's language, also the
