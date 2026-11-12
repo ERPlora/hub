@@ -5,6 +5,7 @@ Customers' own operations create, merge, delete and erase the cards; the merge e
 """
 
 import pytest
+from live.context import system_context
 from live.models import OutboxEvent
 from live.operations import get
 
@@ -98,6 +99,21 @@ def test_a_card_deleted_or_erased_in_customers_leaves_its_vouchers_without_a_cus
         erased.id,
     }
 
+
+def test_a_card_recovered_from_the_separate_copy_takes_its_vouchers_back_to_her_name(bono):
+    """hub#1324: the deleted card back, the same one (CUSTOMER-F33, run as the system from the separate copy):
+    its vouchers leave «Vouchers without a customer» and say her name again, untouched."""
+    marta = run("customer.customer.create", {"name": "Marta Gil"})
+    granted = run("service.grant.create", {"package": "Bono 5 cortes", "customer_id": str(marta.id)})
+    run("customer.customer.delete", {"id": str(marta.id)})
+    assert run("service.grant.list_orphans", {}).total == 1
+
+    op = get("customer.customer.restore")
+    op(system_context(A), op.input.model_validate({"id": str(marta.id)}))
+
+    assert run("service.grant.list_orphans", {}).total == 0
+    [row] = run("service.grant.list", {"package": "Bono 5 cortes"}).rows
+    assert (row.id, row.customer_id, row.customer_name, row.remaining) == (granted.id, marta.id, "Marta Gil", 5)
 
 def test_who_may_not_read_customers_sees_the_voucher_without_the_name(bono):
     lucia = run("customer.customer.create", {"name": "Lucía Pérez"})

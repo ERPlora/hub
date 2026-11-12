@@ -2479,8 +2479,8 @@ def record_delete(ctx: OperationContext, data: RecordTemplateDeletionIn) -> dict
     input=CustomerEventIn,
     output=ReactionOut,
     ai={
-        "description": "System only (customer.customer.created/updated): joins the conversations of the card's "
-        "number that have no live card to it, when no other live card has that number.",
+        "description": "System only (customer.customer.created/updated/restored): joins the conversations of "
+        "the card's number that have no live card to it, when no other live card has that number.",
         "risk": "normal",
     },
 )

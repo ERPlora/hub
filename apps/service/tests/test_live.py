@@ -24,7 +24,8 @@ CUSTOMER_GONE = [
     "customer.customer.erased",
     "customer.customer.merged",
 ]
-CUSTOMER_NAMED = [*CUSTOMER_GONE, "customer.customer.updated"]
+#: A card back from the separate copy (CUSTOMER-F33) shows her name again where it showed its deletion.
+CUSTOMER_NAMED = [*CUSTOMER_GONE, "customer.customer.restored", "customer.customer.updated"]
 
 
 def service_queries():
@@ -127,3 +128,14 @@ def test_every_step_of_a_session_of_the_till_re_runs_the_balances_and_the_option
             "service.grant.tender_options",
             "service.movement.list",
         } <= live_registry.affected([event]), event
+
+
+def test_a_card_recovered_from_the_separate_copy_repaints_her_vouchers_and_the_vouchers_without_a_customer():
+    """hub#1324: as a deletion moves her vouchers to «Vouchers without a customer», the same card back moves them
+    to her name again on an open screen at once (SERVICE-F29, F30)."""
+    assert live_registry.affected(["customer.customer.restored"]) >= {
+        "service.grant.list",
+        "service.grant.list_orphans",
+        "service.grant.tender_options",
+        "service.movement.list",
+    }
