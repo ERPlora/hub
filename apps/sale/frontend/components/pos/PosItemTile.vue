@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
-import { computed } from 'vue';
+import { computed, onMounted, onUpdated, useTemplateRef } from 'vue';
 
 import ItemImage from '../../../../../base/frontend/components/ItemImage.vue';
+import { syncAriaDisabled } from '../../lib/ariaDisabled';
 
 const props = withDefaults(
   defineProps<{
@@ -33,15 +34,23 @@ const props = withDefaults(
 
 const emit = defineEmits<{ pick: [] }>();
 const fromCatalog = computed(() => props.imageReference?.startsWith('catalog:') === true);
+// A tile that sells out or goes back on sale with the till open tells its native button too (Ionic only reads the
+// host's aria-disabled when it loads).
+const tile = useTemplateRef<{ $el: HTMLElement }>('tile');
+const syncDisabled = () => syncAriaDisabled(tile.value?.$el);
+onMounted(syncDisabled);
+onUpdated(syncDisabled);
 </script>
 
 <template>
   <ion-button
+    ref="tile"
     class="pos-tile"
     :class="{ 'pos-tile--blocked': blocked, 'pos-tile--sold-out': soldOut }"
     fill="clear"
     :data-testid="testid"
     :aria-disabled="blocked || soldOut ? 'true' : undefined"
+    :data-aria-disabled="String(blocked || soldOut)"
     :aria-label="label"
     :title="label"
     @click="emit('pick')"

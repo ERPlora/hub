@@ -17,4 +17,19 @@ describe('syncAriaDisabled', () => {
     expect(blocked.shadowRoot?.querySelector('button')?.getAttribute('aria-disabled')).toBe('true');
     expect(available.shadowRoot?.querySelector('button')?.hasAttribute('aria-disabled')).toBe(false);
   });
+
+  it('also brings the root itself in step when the root is the Ionic button (a tile of the till)', () => {
+    const tile = document.createElement('ion-button');
+    tile.innerHTML = '<span></span>';
+    tile.attachShadow({ mode: 'open' }).innerHTML = '<button type="button" aria-disabled="true"></button>';
+    const native = () => tile.shadowRoot?.querySelector('button');
+
+    tile.dataset.ariaDisabled = 'false';
+    syncAriaDisabled(tile);
+    expect(native()?.hasAttribute('aria-disabled')).toBe(false);
+
+    tile.dataset.ariaDisabled = 'true';
+    syncAriaDisabled(tile);
+    expect(native()?.getAttribute('aria-disabled')).toBe('true');
+  });
 });
