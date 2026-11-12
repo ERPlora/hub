@@ -87,6 +87,7 @@ def modules(monkeypatch, settings):
     def use(*configs, on=None):
         labels = {config.label for config in configs} if on is None else set(on)
         monkeypatch.setattr("base.home.module_configs", lambda: list(configs))
+        monkeypatch.setattr("base.activation.module_configs", lambda: list(configs))
         monkeypatch.setattr("base.queries.active_apps", lambda scope: frozenset(labels | {"base"}))
 
     use()
@@ -218,11 +219,24 @@ def test_whoever_cannot_administer_the_hub_gets_no_platform_step(modules):
 # --- base.setup.status: the apps a business must have on in its country (hub#997) -----------------------------------
 
 
-def fiscal(countries=("ES",), **more):
+def fiscal(countries=("ES",), turns_on=False, **more):
     """A stand-in app mandatory in ``countries`` (or ``"all"``), declared as its ``LiveAppConfig`` would."""
-    declared = {"countries": countries if countries == "all" else list(countries), "platform_turns_on": False}
+    declared = {"countries": countries if countries == "all" else list(countries), "platform_turns_on": turns_on}
     navigation = [Nav("records", "Records", "ion:list-outline", "/fiscal/records")]
     return module("fiscal", mandatory=declared, icon="ion:calculator-outline", navigation=navigation, **more)
+
+
+def test_an_app_the_platform_turns_on_by_itself_is_not_one_of_your_apps_in_its_country(modules):
+    """A business is born with it on (hub#997): with it alone its till has nothing to sell, so «Your apps» still asks for
+    one. In a country where the platform does not turn it on, the business chose it: it counts."""
+    modules(module("sale"), fiscal(("PT",), turns_on=True), on=["fiscal"])
+    Hub.objects.filter(slug="a").update(country="PT")
+    assert by_key(setup_status(ctx(ADMIN)))["base.apps"]["state"] == "pending"
+    # B has no country: Spain, where it is no app the platform turns on.
+    assert by_key(setup_status(ctx(ADMIN, scope=B)))["base.apps"]["state"] == "done"
+
+    modules(module("sale"), fiscal(("PT",), turns_on=True), on=["fiscal", "sale"])
+    assert by_key(setup_status(ctx(ADMIN)))["base.apps"]["state"] == "done"
 
 
 def test_a_mandatory_app_off_in_the_businesss_country_is_an_important_step_until_it_is_on(modules, make_user):

@@ -16,9 +16,10 @@ of its own (``base.services``, «The provisioning's writes in control»):
    (``migrator.templates``, PLAN-DB round 2026-11-01), so the clone has them; an app it lacks (one ported after its
    template was made) gets its tables the first time the business turns it on (S3: ``base.app.enable`` → ``creating``
    → the worker's ``ensure_schema``, PLAN-DB §7);
-3. ``seeding``: inside ``use_hub``, the SaaS's photo kept on the row (its people, and the blocks of the apps it has
-   on: none at birth, a business is born with every app off, PLAN §33); a newer photo that arrives meanwhile is
-   applied too before ``ready`` (:data:`SEED_ROUNDS`);
+3. ``seeding``: inside ``use_hub``, its apps written down: every one off but those its country requires that the
+   platform turns on by itself (``base.services.turn_on_born_apps``: Taxes, hub#997), on and not chosen, whose tables
+   the step before made; then the SaaS's photo kept on the row (its people, and the blocks of the apps it has on); a
+   newer photo that arrives meanwhile is applied too before ``ready`` (:data:`SEED_ROUNDS`);
 4. ``ready``, and the SaaS of a business hears it after the COMMIT (``base.services.report_ready``).
 
 Every step is safe to run again: a database already there is gone on with (``42P04``), its identity is written once,
@@ -44,7 +45,7 @@ from collections.abc import Callable, Iterable
 from django.utils import timezone
 from live.context import system_context
 
-from base import registry, services
+from base import activation, registry, services
 from base.catalog import template_apps
 from base.schemas import DemoSlugIn
 from base.tenancy import connections as tenancy_connections
@@ -98,9 +99,11 @@ def provision(
 
     ``apps``: more apps than its template's whose tables it gets now (the local hubs a and b, born with every app on:
     ``seed_local_hubs``); none by default, as the worker's pass (:func:`run_due`): a business and a demo are born with
-    their template's tables (every portable app's) and every app off (PLAN §33); an app their template lacked gets its
-    tables when it is turned on (S3).
-    ``seed``: what its seeding writes, inside its database (``use_hub``), after the photo kept. A hub already ready is
+    their template's tables (every portable app's) and every app off (PLAN §33) but those their country requires that
+    the platform turns on (hub#997), whose tables they get too; an app their template lacked gets its tables when it is
+    turned on (S3).
+    ``seed``: what its seeding writes, inside its database (``use_hub``), before the apps it is born with (none when it
+    wrote its apps itself) and the photo kept. A hub already ready is
     left as it is (``True``); one that is not being prepared (cancelled, gone) or whose lease someone else holds is not
     touched (``False``). A failure is noted on the hub (``failed``), never raised. ``tell_saas=False``: the SaaS does
     not hear it is ready (the local hubs, which are no business of the SaaS's).
@@ -136,8 +139,8 @@ def drop(hub, *, now: dt.datetime | None = None) -> bool:
 def run_due(now: dt.datetime | None = None, *, limit: int = DUE_BATCH, budget: float = DUE_PASS_SECONDS) -> int:
     """The worker's pass over ``hub_due``: one hub at a time, each leased right before it is worked on (so no lease runs
     out while it waits its turn), up to ``limit`` hubs or ``budget`` seconds: make the databases still to make (a
-    failed one once its ``next_attempt_at`` came; its template's tables, every app off: :func:`provision`) and drop the
-    demos that ended (a failed drop once its wait is over);
+    failed one once its ``next_attempt_at`` came; its template's tables, every app off but what it is born with:
+    :func:`provision`) and drop the demos that ended (a failed drop once its wait is over);
     how many it worked on. A hub that fails is logged and given back: the others go on."""
     now = now or timezone.now()
     started = time.monotonic()
@@ -208,7 +211,7 @@ def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = N
             # lease is renewed between apps: a long migration never lets another worker take the hub meanwhile.
             migrator.ensure_schema(
                 hub,
-                add=["base", *vertical_apps(hub.vertical), *apps],
+                add=["base", *vertical_apps(hub.vertical), *sorted(activation.born_apps(hub.country)), *apps],
                 heartbeat=lambda: services.provision_step(hub_id, Hub.Status.MIGRATING, timezone.now(), LEASE),
             )
         except services.ProvisioningStopped:
@@ -218,9 +221,13 @@ def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = N
         step.done("migrating", hub)
         hub = services.provision_step(hub_id, Hub.Status.SEEDING, timezone.now(), LEASE)
         with use_hub(hub):
-            services.apply_kept_photo(hub)
             if seed is not None:
                 seed(hub)
+            # The apps it is born with on, those its country requires that the platform turns on (hub#997): after its
+            # seeding, which may have written its apps already (the local hubs, every app on), and before the photo,
+            # whose blocks belong to the apps it has on.
+            services.turn_on_born_apps(hub)
+            services.apply_kept_photo(hub)
         for _ in range(SEED_ROUNDS):
             # Ready only with the photo it applied still the row's: one that came meanwhile was kept on the row only
             # (its database was not made yet) and the SaaS never sends it again, so it is applied now and checked again.

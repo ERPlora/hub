@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e4b9cb44140645ad2e71386e4ec331a36948a49ab6a18b1f11e2131fab6be1cd -->
+<!-- generated from WORKBOOK.md sha256:c48eefa34cb44c163626b789435a9089d33ba62070f595db82f1385247c58d05 -->
 
 ## What it is for and who it is for
 
@@ -429,14 +429,17 @@ Steps:
      "Important" ones, each group in the order the apps set, also on a phone, where only two rows fit. The
      "Recommended" ones show folded only if nothing else is left. "View all" shows every step, the done ones
      too, in the order the apps set.
-  3. The platform's are "Your apps" (turn on at least one business app) and "Your team" (add the people
-     who will use the till); the rest come from each app that is on.
+  3. The platform's are "Your apps" (turn on at least one business app; Taxes, which every business is born
+     with, does not count, since with it alone the till has nothing to sell) and "Your team" (add the people who
+     will use the till); the rest come from each app that is on.
   4. Besides, for each app mandatory in the business's country that is off, an "Important" step of the
      platform: "Turn on VeriFactu" with "It is mandatory for businesses in Spain." (VeriFactu, in Spain) or
      "Turn on Taxes" with the business's country (Taxes, in every one). Only whoever runs the business sees it,
      since they are the one who turns apps on; "Set up" leads to **Apps**, to "Add apps". As soon as they turn it
      on, the step goes by itself and the app's own steps come ("Set up VeriFactu", "Your taxes"). A business of
-     another country does not see VeriFactu's (hub#997).
+     another country does not see VeriFactu's (hub#997). A business just signed up does not see "Turn on Taxes",
+     since it is born with it on (BASE-F14); in Spain it does see "Turn on VeriFactu": VeriFactu never turns on by
+     itself.
   5. A step that only applies to another country, or that the person may not see, does not show. A business
      without a country (a demo, ERPlora's own) counts as Spain, ERPlora's market: it sees Spain's steps and none
      of another country (hub#682). A step whose check fails does not show either: what could not be checked is
@@ -716,7 +719,9 @@ Steps:
   2. While the list arrives: "Loading your apps…". Then one row (or one card, as chosen) for each app the
      business has running, with its icon and its name, its "Category" and its "Status" ("Active"). An app the
      business's country requires also shows, next to its status, "Mandatory in Spain" (or the business's country):
-     Taxes in every country, VeriFactu in Spain (hub#997).
+     Taxes in every country, VeriFactu in Spain (hub#997). A business just signed up already has Taxes here,
+     "Active": it is born on with its country's taxes and does not count against the plan's app limit. The other
+     apps are born off, VeriFactu too, which the owner turns on.
   3. They search in "Search your apps…" (name, description or category), filter by category with the funnel,
      sort or choose columns.
   4. When the business subscribes to an app on erplora.com or stops having it, the list updates by itself,
@@ -1224,8 +1229,8 @@ Status: done
 Actor: owner, administrator
 Screen: Home · Summary
 Steps:
-  1. While the business has nothing a template brings (a business is born with every app off), who administers
-     it sees on top "Start with a business like yours" ("Choose the one most like yours: we turn on its apps and
+  1. While the business has nothing a template brings (a business is born with every app off but Taxes), who
+     administers it sees on top "Start with a business like yours" ("Choose the one most like yours: we turn on its apps and
      load its catalogue in one go. Then put in your own details."): up to four templates, one per kind of
      business and in their language when
      there is one (those of its country first), with their description and "Use this one"; "See all templates" opens "Data and backups" and "Not now"
@@ -1764,7 +1769,7 @@ Screen: Your business is being prepared
 Steps:
   1. They open the address of a business erplora.com is still preparing (just created).
   2. "Your business is being prepared" shows — "It takes a few seconds. This page refreshes by itself.".
-  3. When it is ready, the page refreshes and they come in as always.
+  3. When it is ready, the page refreshes and they come in as always, with Taxes already on (BASE-F14).
 In: the business's state erplora.com passes on.
 Out: nothing saved.
 If it fails: an address that belongs to no business does not exist; a business that was closed says "This hub

@@ -437,14 +437,16 @@ Pasos:
      luego los «Importante», cada grupo en el orden que fijan las apps, también en el móvil, donde solo caben
      dos filas. Los «Recomendado» salen plegada solo si no queda otra cosa. «Ver todo» enseña todos los pasos,
      también los hechos, en el orden que fijan las apps.
-  3. Los de la plataforma son «Tus apps» (encender al menos una app de negocio) y «Tu equipo» (añadir a
-     las personas que usarán el TPV); el resto los trae cada app encendida.
+  3. Los de la plataforma son «Tus apps» (encender al menos una app de negocio; Impuestos, con la que nace todo
+     negocio, no cuenta, porque con ella sola el TPV no tiene nada que vender) y «Tu equipo» (añadir a las personas
+     que usarán el TPV); el resto los trae cada app encendida.
   4. Además, por cada app obligatoria en el país del negocio que está desactivada, un paso «Importante» de la
      plataforma: «Activa VeriFactu» con «Es obligatoria para los negocios de España.» (VeriFactu, en España) o
      «Activa Impuestos» con el país del negocio (Impuestos, en todos). Solo lo ve quien administra el negocio, que
      es quien activa apps; «Configurar» lleva a **Apps**, a «Añadir apps». En cuanto la activa, el paso se va solo
      y llegan los de la propia app («Configura VeriFactu», «Tus impuestos»). Un negocio de otro país no ve el de
-     VeriFactu (hub#997).
+     VeriFactu (hub#997). Un negocio recién dado de alta no ve «Activa Impuestos», porque nace con ella activada
+     (BASE-F14); en España sí ve «Activa VeriFactu»: VeriFactu nunca se activa sola.
   5. Un paso que solo vale para otro país, o que la persona no puede ver, no sale. Un negocio sin país (una
      demo, el de ERPlora) cuenta como España, el mercado de ERPlora: ve los pasos de España y ninguno de otro país
      (hub#682). Un paso cuya comprobación falla tampoco sale: nunca se da por hecho ni por pendiente lo que no se
@@ -738,7 +740,9 @@ Pasos:
   2. Mientras llega la lista: «Cargando tus apps…». Después, una fila (o una tarjeta, a elegir) por cada app que
      el negocio tiene en marcha, con su icono y su nombre, su «Categoría» y su «Estado» («Activa»). Una app que el
      país del negocio exige lleva además, junto a su estado, «Obligatoria en España» (o el país del negocio): Impuestos
-     en todos, VeriFactu en España (hub#997).
+     en todos, VeriFactu en España (hub#997). Un negocio recién dado de alta ya tiene Impuestos aquí, «Activa»: nace
+     activada con los impuestos de su país y no cuenta para el tope de apps del plan. Las demás apps nacen
+     desactivadas, también VeriFactu, que activa el dueño.
   3. Busca en «Buscar en tus apps…» (nombre, descripción o categoría), filtra por categoría con el embudo,
      ordena o elige columnas.
   4. Cuando el negocio contrata una app en erplora.com o deja de tenerla, la lista se pone al día sola, sin
@@ -1277,7 +1281,7 @@ Actor: propietario, administrador
 Pantalla: Inicio · Resumen
 Pasos:
   1. Mientras el negocio no tiene nada de lo que trae una plantilla (un negocio nace con todas las apps
-     desactivadas), quien lo administra ve arriba «Empieza con un negocio como el tuyo» («Elige el que más se
+     desactivadas salvo Impuestos), quien lo administra ve arriba «Empieza con un negocio como el tuyo» («Elige el que más se
      parezca al tuyo: activamos sus apps y cargamos su catálogo de una vez. Después tendrás que poner tus
      propios datos.»): hasta cuatro plantillas, una por
      tipo de negocio y en su idioma si la hay (primero las de su país), con su descripción y «Usar esta»; «Ver todas las plantillas» abre «Datos y
@@ -1837,7 +1841,7 @@ Pantalla: Estamos preparando tu negocio
 Pasos:
   1. Abre la dirección de un negocio que erplora.com aún está preparando (recién creado).
   2. Sale «Estamos preparando tu negocio» — «Tarda unos segundos. Esta página se actualiza sola.».
-  3. Cuando está listo, la página se actualiza y entra como siempre.
+  3. Cuando está listo, la página se actualiza y entra como siempre, con Impuestos ya activa (BASE-F14).
 Entra: el estado del negocio que le pasa erplora.com.
 Sale: nada guardado.
 Si falla: una dirección que no es de ningún negocio no existe; un negocio dado de baja dice «Este hub ya no está
@@ -3193,7 +3197,7 @@ Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado
   menú, `home.shell_icon`, nunca el de la tienda, que `HubIcon` rechazaría) por cada una obligatoria en el país del negocio
   (`country_or_market`: sin país, España) que no está encendida, solo a quien tiene `base.administer_hub`, dentro de
   `base.setup.status`, que ya se re-ejecuta al encender o apagar una app (`APP_EVENTS`). Mientras se crean sus tablas
-  (`creating`) el paso sigue: todavía no está encendida. `platform_turns_on` lo leerá el alta (hub#997, parte 3). Tests:
+  (`creating`) el paso sigue: todavía no está encendida. Tests:
   `test_home.py` y `test_queries_home.py` (con apps de paja), `apps/verifactu/tests/test_mandatory_in_spain.py` (dos
   hubs reales) y `apps/tax/tests/test_apps.py`.
   Una vez encendida no se apaga en ese país (hub#997, parte 2; BASE-F14, F16, F23 y F25): `activation.mandatory_on`
@@ -3208,6 +3212,17 @@ Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado
   como el servidor. Tests: `test_activation.py` (las reglas), `test_app_activation.py` (409, cascada y dos hubs
   reales), `test_queries_apps.py`, `apps/verifactu/tests/test_app_disable.py`, `lib/apps.test.ts`,
   `pages/AppsPage.test.ts` y la e2e `tests/e2e/base-app-activation.spec.ts`.
+  Al alta nacen encendidas (hub#997, parte 3; BASE-F63, F14, F01): `activation.born_on(país)` da las obligatorias del
+  país que dicen `platform_turns_on`, y `activation.born_apps(país)` les suma lo que necesitan. `provision._prepare` hace
+  sus tablas en `migrating` (junto a las del vertical) y, en `seeding`, tras la semilla y antes de la foto del SaaS
+  (cuyos bloques son de las apps encendidas), `services.turn_on_born_apps` escribe todas las filas del negocio: esas
+  `on` y sin elegir (no gastan `max_apps`), las demás `off`, y olvida lo que la caché guardaba de sus apps. Si la semilla
+  ya escribió filas (los hubs locales `a` y `b`, todo encendido) o la preparación se repite, no toca nada. Una demo
+  nace igual (sin país: España). Los hubs que ya existían no cambian. «Tus apps» (`queries._platform_steps`) no cuenta
+  las de `born_apps`: con ellas solas el TPV no vende nada. Tests: `test_activation.py`, `test_queries_home.py` (con
+  apps de paja), `base/tenancy/tests/test_provision.py` (dos BD reales: España, Portugal, sin país, una demo, dos
+  negocios a la vez y una app de paja obligatoria solo en Portugal), `apps/tax/tests/test_apps.py` y la e2e
+  `tests/e2e/base-sign-up-taxes-on.spec.ts`.
 - Un panel `chart` cuyas etiquetas son días (`YYYY-MM-DD`: día civil de negocio, sin zona) los nombra con
   `Intl` en UTC, nunca con `new Date(<día>)` en la zona del navegador (`isoDay` y `formatDay` de
   `base/frontend/lib/home.ts`): una semana, por su día de la semana corto (`vie`); una serie más larga, por su
@@ -3388,7 +3403,9 @@ Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado
   «Mejorar plan» (antes «Contratar en erplora.com») solo con `base.administer_hub` y `useSurface().isWeb`. e2e:
   `tests/e2e/base-apps.spec.ts` y `tests/e2e/base-app-activation.spec.ts`.
 - Activación por negocio y tope del plan (hub#256, PLAN-HUB §9): `base.AppActivation` (por `host`; desde la ronda
-  2026-10-27 un negocio nace con todo apagado, sin filas, también una demo; los hubs de antes conservan todo encendido
+  2026-10-27 un negocio nace con todo apagado, también una demo, salvo las obligatorias de su país que la plataforma
+  enciende sola, con sus filas escritas al nacer (Impuestos, hub#997); un hub sin filas lo tiene todo apagado; los hubs
+  de antes conservan todo encendido
   con sus raíces elegidas, migración `base/0017`, y los locales `a`/`b` salen así de `seed_local_hubs`; el hub de
   ERPlora y el ámbito del worker lo tienen todo encendido siempre, `activation.is_platform`; `base/activation.py`).
   `base.blueprint.import` enciende antes de cargar las apps que lista el manifiesto (sus raíces, elegidas, por
