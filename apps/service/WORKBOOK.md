@@ -371,7 +371,8 @@ sale debajo del campo: «Ya hay una categoría con ese nombre. Elige otro nombre
 puede ser su propio padre ni colgar de una de sus hijas: «Una categoría no puede colgar de sí misma
 ni de una de sus subcategorías.». Un padre eliminado: «Esa categoría padre no está disponible: no
 existe en este negocio o se ha eliminado.».
-Implicados: SERVICE-F01, SERVICE-F08
+Implicados: SERVICE-F01, SERVICE-F08, BASE-F114 (el personal de ERPlora recupera desde una copia aparte las categorías
+que el negocio ya no tiene, cada una por esta misma alta)
 
 ### SERVICE-F08 Eliminar una categoría
 <!-- origen: fi:modules/services#command-services-categories-delete-sql-transaccional old:services/workflow/catalogo.md#services-f08 -->
@@ -386,7 +387,8 @@ Entra: la categoría y cuántos servicios en oferta tiene.
 Sale: la categoría eliminada, no borrada (`service.category.deleted`); su nombre queda libre. Sus
 servicios se quedan **sin categoría** y sus subcategorías pasan a colgar de su padre (o a ser raíz).
 Si falla: en la confirmación, el motivo (por ejemplo, «Esa categoría no existe en este negocio.»).
-Implicados: SERVICE-F07, SERVICE-F02
+Implicados: SERVICE-F07, SERVICE-F02, BASE-F114 (desde una copia aparte, la categoría eliminada vuelve como una nueva,
+con los servicios perdidos dentro; los que el negocio conserva se quedan como están)
 
 ### SERVICE-F09 Vender un servicio en el TPV
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f09 old:services/workflow/catalogo.md#services-f09 -->
@@ -1197,12 +1199,19 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
 - **Nombres únicos** entre los vivos, sin distinguir mayúsculas: categorías
   (`service_category_live_name_unique`) y bonos (`service_package_live_name_unique`); el servicio lo
   comprueba antes para dar el 409 y traduce la violación (dos guardados a la vez) al mismo 409.
-- **Recuperar desde una copia aparte** (BASE-F114, hub#1283): `apps.py` responde a la plataforma
-  (`recoverable_from_copy`, `base.tenancy.recovery`) con lo que devuelve una copia aparte del negocio: sus servicios en
-  oferta que el negocio no tiene (`queries.services_not_in_business`), cada uno creado por `service.service.create` con
-  la clave de su categoría fiscal y su categoría si el negocio aún la tiene. `queries.services_in_copy` lee por SQL sobre
-  los nombres del modelo (la copia no es un negocio y no tiene alias) todos los servicios de la copia, en oferta o
-  archivados (`is_active`). Un servicio de la copia lo tiene el negocio (`queries.services_in_business`, `{id en la
+- **Recuperar desde una copia aparte** (BASE-F114, hub#1283, hub#1323): `apps.py` responde a la plataforma
+  (`recoverable_from_copy`, `base.tenancy.recovery`) con lo que devuelve una copia aparte del negocio, en dos
+  declaraciones que se devuelven en su orden. Primero sus categorías vivas que el negocio no tiene
+  (`queries.categories_not_in_business`: eliminadas o perdidas, y no hechas otra vez, es decir, sin otra viva con su
+  nombre sin distinguir mayúsculas ni espacios, que es único entre las vivas), cada una creada por
+  `service.category.create`, padres primero: dentro de su padre por su id si el negocio lo tiene (el mismo o hecho otra
+  vez), por su nombre si vuelve también (se acaba de crear y aquí aún no tiene id), y en la raíz si la copia no lo tenía
+  vivo; `queries.categories_in_copy` las lee por SQL. Después sus servicios en oferta que el negocio no tiene
+  (`queries.services_not_in_business`), cada uno creado por `service.service.create` con la clave de su categoría fiscal
+  y su categoría aquí (`_category_held`): la misma si sigue viva, si no la viva con su nombre en la copia (la que acaba de
+  volver o una hecha a mano), si no ninguna. `queries.services_in_copy` lee por SQL sobre los nombres del modelo (la
+  copia no es un negocio y no tiene alias) todos los servicios de la copia, en oferta o archivados (`is_active`), con el
+  nombre de su categoría allí (`category_name`). Un servicio de la copia lo tiene el negocio (`queries.services_in_business`, `{id en la
   copia: id en el negocio}`, con la lista entera de la copia) si es el mismo, en oferta o archivado, o, si la copia lo
   tenía en oferta, uno hecho otra vez: un servicio que no es ninguno de la copia, con el mismo nombre (sin distinguir
   mayúsculas ni espacios) en la categoría a la que volvería. Los nombres no son únicos: cada hecho otra vez responde por
@@ -1344,9 +1353,8 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   sus sesiones. Le pasa también a los vendidos antes de esa cifra.
 - **Importar servicios desde un fichero**: como en el producto actual, el alta de golpe es del
   asistente y la API.
-- **Lo que no vuelve con un servicio recuperado desde una copia aparte** (BASE-F114): su imagen (hub#1319), sus
-  profesionales con su precio y su duración propios (hub#1322) y la categoría que el negocio eliminó después (vuelve
-  «Sin categoría», hub#1323).
+- **Lo que no vuelve con un servicio recuperado desde una copia aparte** (BASE-F114): su imagen (hub#1319) y sus
+  profesionales con su precio y su duración propios (hub#1322).
 
 ## Lo que NO hace, a propósito
 

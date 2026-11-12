@@ -44,6 +44,10 @@ msgstr ""
 msgid "Categories"
 msgstr "Categorías"
 
+# hub#1323: what a separate copy gives back first (BASE-F114), before the services.
+msgid "Service categories"
+msgstr "Categorías de servicios"
+
 msgid "Packages"
 msgstr "Bonos y paquetes"
 
