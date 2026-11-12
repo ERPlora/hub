@@ -21,6 +21,7 @@ import {
   searchFor,
   threeShots,
 } from './tax-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 test.afterAll(() => cleanUp());
 
@@ -60,7 +61,9 @@ test('TAX-F02: «+» creates a custom category; a repeated key is refused under 
   await dialog.locator('[data-testid=tax-category-form-name] input').fill('Again');
   await dialog.locator('[data-testid=tax-category-form-submit]').click();
   await expect(dialog.locator('[data-testid=tax-category-form-key] .error-text')).toContainText('already a tax category');
+  // «Cancel» asks before losing the refused category (BASE-F05): the person discards it.
   await dialog.locator('[data-testid=tax-category-form-cancel]').click();
+  await discardChanges(page);
 });
 
 // flow: TAX-F03 · gh:taxes#12
@@ -158,7 +161,9 @@ test('TAX-F04: a rule is created with the Country and Category combos; an overla
   const validFrom = () => dialog.locator('[data-testid=tax-rule-form-valid_from]');
   await expect(validFrom().locator('.error-text')).toContainText('overlaps another active rule');
   await threeShots(page, 'TAX-F04', () => validFrom());
+  // «Cancel» asks before losing the refused rule (BASE-F05): the person discards it.
   await dialog.locator('[data-testid=tax-rule-form-cancel]').click();
+  await discardChanges(page);
   expect(await rulesOf(context, key)).toHaveLength(1);
 });
 
@@ -347,7 +352,9 @@ test('TAX-F14: «+» teaches an alias, kept lowercase; a repeated one is refused
   await pickCombo(page, dialog, 'tax-alias-form-category', 'alcohol', 'restaurant.alcohol');
   await dialog.locator('[data-testid=tax-alias-form-submit]').click();
   await expect(dialog.locator('[data-testid=tax-alias-form-alias] .error-text')).toContainText('That alias already exists.');
+  // «Cancel» asks before losing the refused alias (BASE-F05): the person discards it.
   await dialog.locator('[data-testid=tax-alias-form-cancel]').click();
+  await discardChanges(page);
 });
 
 // flow: TAX-F17

@@ -37,6 +37,7 @@ import {
   stamp,
   TAG,
 } from './pricing-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 test.use({ viewport: DESKTOP, locale: 'en-US' });
 test.beforeAll(cleanPricing);
@@ -143,7 +144,9 @@ test('PRICING-F02: a new list, and a repeated code said under Code in sight on a
   // The refused field keeps its label and outline, marked in red (pricing#43).
   await expect(page.locator('[data-testid=pricing-list-form-code]')).toHaveClass(/ion-invalid/);
   await page.screenshot({ path: shot('APP-PRICING-PRICING-F02-refused-390') });
+  // «Cancel» asks before losing the refused list (BASE-F05): the person discards it.
   await page.locator('[data-testid=pricing-list-form-cancel]').click();
+  await discardChanges(page);
   expect(psql(`select count(*) from pricing_pricelist where lower(code) = lower('${code}')`)).toBe('1');
 });
 

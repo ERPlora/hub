@@ -8,6 +8,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, horizontalOverflow, login, psql, shot, shown } from './helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const SEED = [
   'product.generic',
@@ -134,7 +135,9 @@ test('TAX-F02: a malformed key is refused under Key; a good category closes the 
   await dialog.locator('[data-testid=tax-category-form-name] input').fill('Again');
   await dialog.locator('[data-testid=tax-category-form-submit]').click();
   await expect(dialog.locator('[data-testid=tax-category-form-key] .error-text')).toContainText(/already a tax category|Ya hay una categoría/);
+  // «Cancel» asks before losing the refused category (BASE-F05): the person discards it.
   await dialog.locator('[data-testid=tax-category-form-cancel]').click();
+  await discardChanges(page);
 
   // Server-side evidence: one category with that key.
   const res = await api<{ total: number }>(context, A, 'GET', `/tax/categories?key=${key}`);

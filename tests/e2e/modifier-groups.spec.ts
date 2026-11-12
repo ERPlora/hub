@@ -10,6 +10,7 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, EMPLOYEE, horizontalOverflow, hostPage, login, painted, psql, shown, untilStill } from './helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const STAMP = Date.now().toString(36).toUpperCase();
 const SKU = `E2E-MOD-${STAMP}`;
@@ -233,7 +234,9 @@ test('MODIFIER-F02: «New group» creates it with its rule; a taken name is refu
   await expect(form).toContainText('There is already a group with that name.');
   await expect(form.locator('[data-testid=modifier-group-form-max_choices] input')).toHaveValue('4');
   await shoot(page, 'MODIFIER-F02', () => expect(form).toContainText('There is already a group with that name.'));
+  // «Cancel» asks before losing the refused group (BASE-F05): the person discards it.
   await form.locator('[data-testid=modifier-group-form-cancel]').click();
+  await discardChanges(page);
   await expect(form).toBeHidden();
 });
 
@@ -377,7 +380,9 @@ test('MODIFIER-F05: the group is applied to a product by its SKU and to a catego
   await pickCombo(page, linkForm, 'modifier-link-form-target', SKU, productId);
   await linkForm.locator('[data-testid=modifier-link-form-submit]').click();
   await expect(linkForm).toContainText('This group already applies there.');
+  // «Cancel» asks before losing the refused product (BASE-F05): the person discards it.
   await linkForm.locator('[data-testid=modifier-link-form-cancel]').click();
+  await discardChanges(page);
   await expect(linkForm).toBeHidden();
 
   // It stops applying to the product, after its confirmation: the category stays.

@@ -14,6 +14,7 @@ import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, username
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const KEY = 'FIX-HUB-BASE-APPROVAL-KEYPAD-CUT-ON-TABLET-DESKTOP';
 const SKU = `E2E-BAPR-${stamp()}`;
@@ -153,6 +154,17 @@ async function openOnThePad(page: Page, sale: SaleOut, viewport: { width: number
   return dialog;
 }
 
+/** «Cancel» on the pad, then on the void window under it: the reason typed there is a change, so it asks first
+ *  (BASE-F05) and the person discards it. */
+async function cancelPadAndVoid(page: Page, dialog: Locator): Promise<void> {
+  await dialog.getByTestId('approval-cancel').click();
+  await expect(dialog).toBeHidden();
+  const modal = page.locator('ion-modal[data-testid=sale-void]');
+  await modal.locator('[data-testid=sale-void-cancel]').click();
+  await discardChanges(page);
+  await expect(modal).toBeHidden();
+}
+
 /** The last row of the pad (the 0 and erase) lies inside the dialog's visible frame and the screen, unscrolled. */
 async function expectWholePad(page: Page, dialog: Locator, label: string): Promise<void> {
   const frame = await dialog.locator('.modal-wrapper').boundingBox();
@@ -220,11 +232,7 @@ test('BASE-F84: on a screen too short for the whole pad, the dialog stays on scr
       return zero !== null && zero.y + zero.height <= frame.y + frame.height + 0.5;
     })
     .toBe(true);
-  await dialog.getByTestId('approval-cancel').click();
-  await expect(dialog).toBeHidden();
-  const modal = page.locator('ion-modal[data-testid=sale-void]');
-  await modal.locator('[data-testid=sale-void-cancel]').click();
-  await expect(modal).toBeHidden();
+  await cancelPadAndVoid(page, dialog);
 });
 
 test('BASE-F84: a wrong PIN says those details do not approve it, in the dialog, and the till stays where it was', async () => {
@@ -256,9 +264,5 @@ test('BASE-F84: a wrong PIN says those details do not approve it, in the dialog,
   expect(spentVoids()).toBe(spentBefore);
   expect((await api<{ status: string }>(owner.context, A, 'GET', `/sale/sales/detail?sale_id=${sale.id}`)).data.status).not.toBe('voided');
 
-  await dialog.getByTestId('approval-cancel').click();
-  await expect(dialog).toBeHidden();
-  const modal = page.locator('ion-modal[data-testid=sale-void]');
-  await modal.locator('[data-testid=sale-void-cancel]').click();
-  await expect(modal).toBeHidden();
+  await cancelPadAndVoid(page, dialog);
 });
