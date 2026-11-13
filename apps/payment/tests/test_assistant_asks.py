@@ -1,9 +1,9 @@
-"""What layer 1 of the assistant's QA does not say of Payments (docs plan 2026-10-31, the assistant's knowledge and QA,
-§3): how many tools it offers, what an employee is never offered, that the real-model QA's requests (hub#1090), in the
-owner's and the employee's own words, are offered their existing operation, and that a payment to a supplier is never
-taken for a charge of the till, nor the other way round. And what the Hub's words of Payments are for (a «cuenta
-bancaria» or «del banco» is a Payments' method, ``base.assistant.SYNONYMS``), and that each tool's asks, not only its
-name, bring what a person says in words of their own.
+"""What layer 1 of the assistant's QA does not say of Payments: how many tools it offers, what an employee is never
+offered, that the real-model QA's requests (hub#1090), in the owner's and the employee's own words, are offered their
+existing operation, and that a payment to a supplier is never taken for a charge of the till, nor the other way round.
+And what the Hub's words of Payments are for (a «cuenta bancaria» or «del banco» is a Payments' method,
+``base.assistant.SYNONYMS``), and that each tool's asks, not only its name, bring what a person says in words of their
+own.
 
 Every ask of every tool of payment bringing its tool among the first ten, role by role, in both languages, is
 ``base/tests/test_assistant_asks.py``'s (payment is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over
@@ -189,8 +189,8 @@ def test_a_tender_of_the_till_is_never_taken_for_where_the_business_pays_its_sup
 
 
 #: live reads «habilitar» and «activar» as the action ``activate`` of a tool too, not only as turning something on
-#: (``enable``, an app's ``base.app.enable``; ERPlora/live#70), so the request to bring Banco QA back is offered ahead
-#: of turning an app on.
+#: (``enable``, an app's ``base.app.enable``), so the request to bring Banco QA back is offered ahead of turning an app
+#: on.
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_the_reported_request_to_bring_a_method_back_goes_ahead_of_turning_an_app_on(catalog_of):
     offered = offered_to(catalog_of(Membership.Role.OWNER, "es"), dict(REPORTED)["payment.method.activate"])

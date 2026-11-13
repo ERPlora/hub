@@ -1,13 +1,12 @@
-// flow: cart-checkout-business-currency (FIX-HUB-CART_CHECKOUT-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY; apps/cart_checkout/WORKBOOK.md
-// «Carritos», CART_CHECKOUT-F01 and CART_CHECKOUT-F12)
+// flow: cart-checkout-business-currency (apps/cart_checkout/WORKBOOK.md «Carritos», CART_CHECKOUT-F01 and
+// CART_CHECKOUT-F12)
 // Cart & Checkout works in the business's currency: its country's, as erplora.com registered it (`PUT /internal/hubs/{id}`,
 // signed the way the SaaS sends it), never a fixed euro. Against the real stack, no mocks: a cart of the run is created
 // while hub `a` is in Spain (euros) and gets its order; then `a` moves to Poland. In 390, 834 and 1440 a cart created
 // from Carts → «New cart» is born in złoty, its line and its total read in złoty while the Spanish cart keeps its euros
 // (a record is never rewritten), «Total from» is read in złoty («20 zł» leaves the Polish cart, not the Spanish one), and
-// in Orders its order reads in złoty beside the Spanish order in euros (captures
-// `FIX-HUB-CART_CHECKOUT-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY-<width>` and `…-orders-<width>`). Back in Spain a new cart is
-// born in euros and the Polish ones keep their złoty (`…-es-1440`). Everything carries the session prefix «e2e-cc» and is
+// in Orders its order reads in złoty beside the Spanish order in euros. Back in Spain a new cart is
+// born in euros and the Polish ones keep their złoty. Everything carries the session prefix «e2e-cc» and is
 // deleted before and after the run, and `a`'s registration is put back, also when a test fails.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
@@ -88,7 +87,7 @@ test.afterAll(async () => {
 });
 
 for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
-  test(`${KEY}: cart-checkout-business-currency a business in Poland creates, reads and filters its carts and orders in złoty at ${width} wide`, async ({
+  test(`a business in Poland creates, reads and filters its carts and orders in złoty at ${width} wide`, async ({
     browser,
   }) => {
     await registerBusinessIn(original, 'PL');
@@ -135,7 +134,7 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
   });
 }
 
-test(`${KEY}: cart-checkout-business-currency back in Spain a new cart is born in euros and the Polish ones keep their złoty`, async ({ browser }) => {
+test(`back in Spain a new cart is born in euros and the Polish ones keep their złoty`, async ({ browser }) => {
   await registerBusinessIn(original, 'ES');
   const { context, page } = await signedIn(browser, '/cart_checkout/carts');
   try {

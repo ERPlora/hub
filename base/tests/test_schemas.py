@@ -41,7 +41,7 @@ def test_unknown_app_state_is_rejected():
 
 
 def test_a_demo_s_session_says_when_it_ends():
-    # plan 2026-10-17, §1.6: ``demo`` is always there, ``null`` on a business's hub.
+    # ``demo`` is always there, ``null`` on a business's hub.
     on_a_demo = {**FULL, "demo": {"expires_at": "2026-10-17T18:00:00Z"}}
     assert SessionMeOut.model_validate(on_a_demo).model_dump(mode="json") == on_a_demo
     without = {key: value for key, value in FULL.items() if key != "demo"}

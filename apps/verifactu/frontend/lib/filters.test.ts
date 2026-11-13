@@ -1,5 +1,5 @@
 // The filters of the VeriFactu lists (Records and Events) as the table's funnel holds them (as typed) and as
-// the list queries take them: the totals in cents (hub#2271), a day «until» before its «from» left out.
+// the list queries take them: the totals in cents, a day «until» before its «from» left out.
 import { describe, expect, it } from 'vitest';
 
 import { backwardsDays, filterParams, filtersInUse, unreadableAmounts } from './filters';

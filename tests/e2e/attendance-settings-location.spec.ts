@@ -1,7 +1,7 @@
 // A denied location on «Use my current location» in the time clock's Settings says where to allow it again
-// (FIX-HUB-ATTENDANCE-SETTINGS-LOCATION-DENIED-SAYS-BROWSER-INSIDE-THE-APP; apps/attendance/WORKBOOK.md
-// ATTENDANCE-F04 «Si falla»): in a browser, the browser; inside the installed app (Android, Windows), which has
-// no browser bar, the device's settings, as the till's «Speak» key (sale-speak-microphone.spec.ts, SALE-F01).
+// (apps/attendance/WORKBOOK.md ATTENDANCE-F04 «Si falla»): in a browser, the browser; inside the installed app
+// (Android, Windows), which has no browser bar, the device's settings, as the till's «Speak» key
+// (sale-speak-microphone.spec.ts, SALE-F01).
 // The Hub and its SaaS are the real ones. Tauri does not run in Playwright: the app's bridge is simulated at the
 // edge (`window.__TAURI__`). The location is refused by Chrome itself (no permission granted to the hub), in a
 // file of its own: attendance-flows.spec.ts grants it for F04. Nothing is saved: what was typed stays on screen.

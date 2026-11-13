@@ -3,7 +3,7 @@
 // row per comparison — Data, Is, Value — and every one must hold. The data are chosen from what the
 // automation has (`choices`), never typed; «present» asks yes or no; «one of» takes values separated
 // by commas; a number or a yes/no typed is sent as one. A row without its data does not count yet. The
-// value may also be another datum (hub#1712: «the total is what the event brought»), picked with the
+// value may also be another datum («the total is what the event brought»), picked with the
 // editor's picker and shown as a pill in words. What a step leaves as yes or no («Failed», «Skipped»,
 // «Approved», «Expired», «Found»; FLOW-F25, F28) is compared with Yes / No chosen: a «yes» typed is text.
 import { HubIcon } from '@erplora/ui/shell';

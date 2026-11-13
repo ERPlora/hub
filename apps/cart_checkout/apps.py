@@ -14,7 +14,7 @@ class CartCheckoutConfig(LiveAppConfig):
     icon = "lucide:shopping-bag"
     category = Category.SALES
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The public store's texts, which register_apps writes to shared.app.
     summary = _(
         "An internal notebook of shopping carts and the orders made from them, with a payment status you mark."
     )
@@ -25,10 +25,9 @@ class CartCheckoutConfig(LiveAppConfig):
         "it some other way. It is not the till and nothing in it is fiscal: it charges nothing and creates "
         "no sale, invoice, VeriFactu record, cash movement or stock movement."
     )
-    # In no template: the old catalogue left it out of the MVP; a business turns it on from the store.
+    # In no template: a business turns it on from the store.
     verticals = []
-    # Nothing: products and prices are free text and the customer an email and a name, as in the old
-    # module (WORKBOOK «Decisión»).
+    # Nothing: products and prices are free text and the customer an email and a name (WORKBOOK «Decisión»).
     requires = []
     default_auto_field = "django.db.models.BigAutoField"
     permissions = [
@@ -36,8 +35,8 @@ class CartCheckoutConfig(LiveAppConfig):
         "cart_checkout.manage_cart",
         "cart_checkout.checkout",
     ]
-    # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). As in the old
-    # module: the manager has all three; the employee only looks.
+    # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The manager has all
+    # three; the employee only looks.
     role_permissions = {
         "hub_owner": ["cart_checkout.*"],
         "hub_admin": ["cart_checkout.*"],
@@ -45,8 +44,8 @@ class CartCheckoutConfig(LiveAppConfig):
         "hub_employee": ["cart_checkout.view_cart"],
     }
     # CART_CHECKOUT-F07: the Hub's worker (`base.scheduler`) expires the overdue carts as the system
-    # every quarter of an hour (cron in UTC; phase 1: on the worker's scope). Reading already shows
-    # them as expired. `tests/test_scheduled_expiry.py` runs it without waiting for the clock.
+    # every quarter of an hour (cron in UTC). Reading already shows them as expired.
+    # `tests/test_scheduled_expiry.py` runs it without waiting for the clock.
     scheduled_tasks = [
         {
             "name": "expire_overdue_carts",
@@ -63,8 +62,9 @@ class CartCheckoutConfig(LiveAppConfig):
     ]
 
     def fiscal_documents_kept(self) -> bool:
-        """hub#599: the platform asks (``base.tenancy.offboarding``) before it drops the database of a business that
-        left: Its shop orders (no sale backs them: «paid» is a mark) here are documents nothing archives yet (PLAN-DB §6), so the database stays."""
+        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left:
+        its shop orders (no sale backs them: «paid» is a mark) are documents nothing archives yet, so the database
+        stays."""
         from apps.cart_checkout import queries  # the models are not loaded yet when this module is
 
         return queries.keeps_fiscal_documents()

@@ -1,21 +1,17 @@
-// flow: UI DataTable filtro de fechas — FIX-UI-DATATABLE-DATERANGE-ICON-CLIPS-PLACEHOLDER (seen by APP-PAYMENT,
-// hub#182): in Payments › Payments the Date column filters by a range, two native date fields with the browser's
-// calendar icon. In the filter row each end was as narrow as a numeric «From/To» box (5.5–7rem): the icon covered
-// the last character of the empty field at 1440 and 834 px, «dd/mm/yyy▢». As in the market (Shopify, Odoo,
-// Square) the date field fits whole: each end of the Date range shows its whole date with the icon apart from it
-// in the filter row (1440, 834), in the 360px panel of the cards at 1440 and in the sheet behind the funnel at 390
-// (ui#28), with the browser in Spanish and in English, and nothing runs past the row, the panel or the sheet
-// (saas#558). The Amount range keeps its short boxes. With ui ca89d4a the row's ends left the icon 3px from a cut
-// «y» (the panel and the sheet already fitted).
+// flow: UI DataTable date filter — in Payments › Payments the Date column filters by a range, two native date fields
+// with the browser's calendar icon (hub#182). As in the market (Shopify, Odoo, Square) the date field fits whole: each
+// end of the Date range shows its whole date with the icon apart from it, never «dd/mm/yyy▢» with the icon over its
+// last character as in a box as narrow as a numeric «From/To» (5.5–7rem), in the panel behind the funnel (1440, 834),
+// in the 360px panel of the cards at 1440 and in the sheet at 390, with the browser in Spanish and in English, and
+// nothing runs past the panel or the sheet. The Amount range keeps its short boxes.
 //
 // How it is measured (Chromium): the native field's `scrollWidth` never exceeds its `clientWidth`, clipped or not,
 // so the evidence is its pixels: the blank columns between the date's last ink and the icon's. 3px is the icon's
 // own padding, all a clipped or touching date leaves; a whole date keeps 8px or more (box 112px: 3, cut; 117px: 3,
 // touching; 122px: 8 — measured on this field). In the row each end also gets the width a free date field of its
 // font asks for (116px at 13px), what the browser gives a date field by default.
-// Since FIX-HUB-PAYMENT-LIST-FILTERS-BEHIND-FUNNEL Payments keeps its column filters behind the funnel, as the old
-// list did: at 1440 and 834 the same ends are measured in its panel (no hub list paints a date range in the open row
-// any more; the row's 8.75rem stays guarded by ui's DataTable.visual.test.ts).
+// Payments keeps its column filters behind the funnel: at 1440 and 834 the ends are measured in its panel (no hub
+// list paints a date range in the open row; the row's 8.75rem is guarded by ui's DataTable.visual.test.ts).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, login, record, shot, shown, untilStill } from './helpers';
@@ -42,7 +38,7 @@ const CASES: Case[] = [
   // The list is `filterable`: its filters live behind the funnel in every view and size.
   { label: '1440', width: 1440, height: 900, where: 'panel' },
   { label: '834', width: 834, height: 1112, where: 'panel' },
-  // The cards fold the filters behind the funnel too (ui#28): at 1440 its panel is 360px beside the cards.
+  // The cards fold the filters behind the funnel too: at 1440 its panel is 360px beside the cards.
   { label: '1440-cards', width: 1440, height: 900, view: 'cards', where: 'panel' },
   // A phone paints cards: the panel is the sheet over the content area.
   { label: '390', width: 390, height: 844, where: 'panel' },
@@ -164,7 +160,7 @@ for (const size of CASES) {
           }
         }
         for (const [name, own] of Object.entries({ ...dates, ...amounts })) {
-          // saas#558: nothing runs past the row, the panel or the sheet.
+          // Nothing runs past the row, the panel or the sheet.
           expect(own.x, `${locale} ${name} starts inside the ${where}`).toBeGreaterThanOrEqual(area.x - 0.5);
           expect(own.x + own.box, `${locale} ${name} ends inside the ${where}`).toBeLessThanOrEqual(area.x + area.width + 0.5);
         }

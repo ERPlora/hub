@@ -1,4 +1,4 @@
-// The one way a file the page holds leaves the Hub (hub#1041; the old hub's `save-download.ts`, hub#480): the
+// The one way a file the page holds leaves the Hub (hub#1041; the old hub's `save-download.ts`): the
 // representation model of VeriFactu, a backup export, a file of Files, a CSV of a list, the API's document.
 //
 // - **A browser** gets it through a temporary link on an object URL, never added to the page; its own downloads say

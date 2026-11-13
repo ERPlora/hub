@@ -1,4 +1,4 @@
-"""The migrator's maintenance connection: a hub's database made and dropped (PLAN-DB §6; round 2026-10-30, S2a).
+"""The migrator's maintenance connection: a hub's database made and dropped.
 
 ``CREATE DATABASE`` and ``DROP DATABASE`` cannot run in a transaction, nor through PgBouncer in transaction mode, nor
 on a Django alias (whose transactions the tests and ``@operation`` wrap): :func:`connect_ops` opens a direct ``psycopg``
@@ -90,7 +90,7 @@ def clone_database(
 ) -> bool:
     """Make ``name`` a clone of ``template`` on ``cluster`` (or the settings' own server) and private to the
     environment's roles; whether this call made it. ``aside``: ``name`` is a separate copy of a hub
-    (``<control>_copy_<hex>``, hub#1213), granted to none of them: closed to the app from the start.
+    (``<control>_copy_<hex>``), granted to none of them: closed to the app from the start.
 
     ``False`` when it was there already (its privileges are set again all the same). ``DatabaseOpsError`` when the
     template stayed in use through ``waits`` or the server refused it (a missing template, no ``CREATEDB``).

@@ -1,7 +1,6 @@
-// gh:staff#39, gh:hub#1060, gh:pm#152 (STAFF-F01, F02): the shell starts in iOS mode, and there an
-// `ion-input`, `ion-select` or `ion-textarea` with `fill="outline"` paints no box: the old record form
-// showed «Hourly rate» and «Commission» as invisible fields. Every outlined control of the staff app's
-// pages and components carries `mode="md"` (working-rules §2.4), and this test keeps it so.
+// STAFF-F01, F02: the shell starts in iOS mode, and there an `ion-input`, `ion-select` or `ion-textarea` with
+// `fill="outline"` paints no box: the old record form showed «Hourly rate» and «Commission» as invisible fields. Every
+// outlined control of the staff app's pages and components carries `mode="md"`, and this test keeps it so.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

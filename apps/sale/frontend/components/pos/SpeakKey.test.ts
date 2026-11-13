@@ -1,10 +1,9 @@
-// The till's «Speak» key (WORKBOOK «Vender»; PLAN §30 point 4, PLAN-HUB §8 round 2026-10-22b): open the assistant by
-// dictating. Only to whoever may use the assistant (`base.view_home`) on a device that can record; offline it stays,
-// greyed, and a tap says why. A first tap records («Listening…», the key turns «Stop»), a second one stops; the words
-// are transcribed by erplora.com, land in the assistant's box after what was written and the panel opens: the person
-// sees what was understood and sends it. Nothing is sent by itself. A refusal, an empty or too long dictation and a
-// failure are a toast. The dictation is the shared assistant's (`useDictation`, PLAN-HUB §18): the key only says each
-// reason its way and keeps its own offline guard.
+// The till's «Speak» key (WORKBOOK «Vender»): open the assistant by dictating. Only to whoever may use the assistant
+// (`base.view_home`) on a device that can record; offline it stays, greyed, and a tap says why. A first tap records
+// («Listening…», the key turns «Stop»), a second one stops; the words are transcribed by erplora.com, land in the
+// assistant's box after what was written and the panel opens: the person sees what was understood and sends it. Nothing
+// is sent by itself. A refusal, an empty or too long dictation and a failure are a toast. The dictation is the shared
+// assistant's (`useDictation`): the key only says each reason its way and keeps its own offline guard.
 import {
   ASSISTANT_ICONS,
   type Assistant,
@@ -345,7 +344,7 @@ describe('SpeakKey: without connection', () => {
   });
 });
 
-// PLAN-HUB §18: the dictation lives once, in base; the key only says each reason its way and keeps its offline guard.
+// The dictation lives once, in base; the key only says each reason its way and keeps its offline guard.
 describe("SpeakKey: base's dictation", () => {
   it("is base's useDictation, on the key's microphone: a tap is its toggle", async () => {
     const dictation = fakeDictation();

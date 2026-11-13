@@ -51,7 +51,7 @@ admin.site.site_title = "ERPlora Hub Admin"
 admin.site.index_title = gettext_lazy("Administration")
 
 urlpatterns = [
-    # The deep link of the SaaS admin's «Open in the Hub admin» (PLAN §18.1); before the admin's own
+    # The deep link of the SaaS admin's «Open in the Hub admin»; before the admin's own
     # admin/<app_label>/, which would otherwise take it.
     path("admin/hub/<str:slug>/", admin.site.admin_view(open_hub), name="admin-hub"),
     path("admin/", admin.site.urls),

@@ -1,4 +1,4 @@
-// «Start with a business like yours» on the Home (BASE-G131, BASE-F02; PLAN-HUB round 2026-10-21): to who administers
+// «Start with a business like yours» on the Home: to who administers
 // the hub, while the business has nothing a template brings, up to four templates with «Use this one», «See all
 // templates» (Settings › Data) and «Not now» (remembered on this device). «Use this one» loads it in one go and says
 // how it went in the card — ready, not all of it (what, with «See the report»), not started (with why and «Try
@@ -129,7 +129,7 @@ describe('BlueprintCard', () => {
     expect(m.wrapper.get('[data-testid="blueprint-card-outcome"]').text()).toContain('Your apps and your catalogue are ready');
   });
 
-  it('promises to turn the template\'s apps on, never that they are on already (round 2026-10-27)', async () => {
+  it('promises to turn the template\'s apps on, never that they are on already', async () => {
     const m = await card(() => Response.json(load()));
     expect(m.wrapper.get('[data-testid="blueprint-card"]').text()).toContain(
       'Choose the one most like yours: we turn on its apps and load its catalogue in one go.',

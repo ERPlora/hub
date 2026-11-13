@@ -93,7 +93,7 @@ async function setup(options: MountOptions = {}) {
 }
 
 describe('CustomerListPage: the screen', () => {
-  it('on a phone the card names the row once: its title stands for the Name column (customers#95)', async () => {
+  it('on a phone the card names the row once: its title stands for the Name column', async () => {
     const s = await setup();
     expect(s.prop('cardTitleColumn')).toBe('name');
   });
@@ -180,7 +180,6 @@ describe('CustomerListPage: the screen', () => {
   });
 
   it('filters behind the table funnel: stage and spent (euros, as typed) on their columns, then source and active', async () => {
-    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
     const s = await setup();
     await s.show(PAGE);
     expect(s.prop('filterable')).toBe(true);
@@ -450,7 +449,7 @@ describe('CustomerListPage: the business\'s currency (customer-business-currency
     expect(spent(s)).toEqual(['€45.50', '€45.50']);
   });
 
-  it('an amount of four figures groups its thousands, in both languages (hub#512)', async () => {
+  it('an amount of four figures groups its thousands, in both languages', async () => {
     const big = { ...PAGE, rows: [row('c1', 'Ana García', { total_spent: 123456 })], total: 1 };
     const es = await setup({ locale: 'es' });
     await es.result(es.call, BUSINESS, business());
@@ -523,14 +522,14 @@ describe('CustomerListPage: language and markup', () => {
   });
 });
 
-describe('CustomerListPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('CustomerListPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });
 
-describe('CustomerListPage: «Spent» is read as every amount of the Hub (hub#1196)', () => {
+describe('CustomerListPage: «Spent» is read as every amount of the Hub', () => {
   itReadsAmountFiltersAsTheHub({
     ends: ['spent_from', 'spent_to'],
     params: ['spent_min', 'spent_max'],

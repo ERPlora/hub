@@ -1,6 +1,3 @@
-// BASE-G98: the Home writes its amounts in the business's currency, as `base.business.get` says it (its country's,
-// with its decimals): followed live, one subscription for the whole tab however many pieces ask, and unknown — never
-// the euro by default — until the business answers or when its read fails.
 import { createShellI18n } from '@erplora/ui/shell';
 import { afterEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { defineComponent, h } from 'vue';
@@ -92,7 +89,7 @@ describe('amountFilterErrors', () => {
     expect(amountFilterErrors({ total_from: '1.000,50', total_to: '' }, ENDS, say('en'))).toEqual({});
   });
 
-  it('«not an amount» gives its example in the business’s money, as the money field does: «12» in yen, «12,500» in dinars (ui#140)', () => {
+  it('«not an amount» gives its example in the business’s money, as the money field does: «12» in yen, «12,500» in dinars', () => {
     const typed = { total_from: 'doce', total_to: '' };
     expect(
       (['en', 'es'] as const).flatMap((locale) =>

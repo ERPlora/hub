@@ -1,9 +1,8 @@
-"""Invoicing on the Home (PLAN-HUB round 2026-10-21; FIX-INVOICE-SETUP-HOOKS): base's own query brings «Your business
-details», the ⛔ of the list, pending while the issuer lacks what every document needs and done once it has it, told
-also to whoever may not set it up (``actionable: false``, gh:hub#435: it is what stops their invoice); and «Your
-invoice numbering», recommended, to whoever keeps the series only, pending while the business has no series and done
-once it has one, created by hand or born with the first document (INVOICE-F14). The issuer saved in hub B re-runs
-B's checklist and tells A nothing.
+"""Invoicing on the Home: base's own query brings «Your business details», the ⛔ of the list, pending while the issuer
+lacks what every document needs and done once it has it, told also to whoever may not set it up (``actionable: false``:
+it is what stops their invoice); and «Your invoice numbering», recommended, to whoever keeps the series only, pending
+while the business has no series and done once it has one, created by hand or born with the first document
+(INVOICE-F14). The issuer saved in hub B re-runs B's checklist and tells A nothing.
 
 base and invoice run for real: the steps come from InvoiceConfig through base's own query, as the person.
 """
@@ -69,7 +68,7 @@ def test_a_hub_without_an_issuer_has_your_business_details_pending_as_the_wall_a
         "Your business details",
         "Legal name, tax ID and address: without them you cannot issue an invoice.",
     )
-    # The red strip of every screen reads this count (PLAN-HUB round 2026-10-21, «Franja bloqueante»).
+    # The red strip of every screen reads this count.
     assert status["blocking_pending"] == 1
 
 
@@ -94,7 +93,7 @@ def test_an_issuer_without_its_address_is_still_the_wall_as_issuing_refuses_it()
 
 @pytest.mark.django_db
 def test_whoever_may_not_set_up_the_issuer_is_told_about_the_pending_wall_without_the_way_to_set_it_up():
-    """gh:hub#435: an employee or a manager is told what stops their invoice, but not offered to set it up; once
+    """An employee or a manager is told what stops their invoice, but not offered to set it up; once
     the issuer is there, they are told nothing more about it."""
     for role in ("hub_employee", "hub_manager"):
         ctx = ctx_for(role)
@@ -173,7 +172,7 @@ def test_whoever_may_not_keep_the_series_is_not_told_about_the_numbering():
 
 @pytest.mark.django_db
 def test_a_spanish_request_reads_both_steps_in_spanish(client, make_user):
-    """gh:hub#868: the old checklist said a module's step in English although the module carried its Spanish."""
+    """A Spanish request never reads a module's step in English: the module carries its Spanish."""
     client.force_login(make_user("boss", host="a", role="hub_owner"))
     setup = client.get("/api/home/setup", HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE="es")
     assert setup.status_code == 200

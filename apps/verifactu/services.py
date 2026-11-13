@@ -11,7 +11,7 @@
   answer, as the gateway hands it back, settles each one. Nothing is ever taken as accepted without that answer.
 - A sealed record is never edited in its figures nor its XML: it is corrected with a new one.
 
-The clock is the Hub's time zone (Madrid in phase 1): ``FechaHoraHusoGenRegistro`` carries its offset.
+The clock is the Hub's time zone (Madrid): ``FechaHoraHusoGenRegistro`` carries its offset.
 """
 
 import base64
@@ -140,7 +140,8 @@ AEAT_REFUSED = _("The AEAT refused the query: %(detail)s")
 AEAT_UNREACHABLE = _("The AEAT could not be asked: %(detail)s")
 SAME_PAGE = _("it named the same page of records again")
 TOO_MANY_PAGES = _("it has more than %(pages)s pages of records")
-#: A query's pages followed at most (10,000 records each, §6.4.3): far beyond any business's month.
+#: A query's pages followed at most (10,000 records each, by the AEAT's web service description, section 6.4.3):
+#: far beyond any business's month.
 MAX_QUERY_PAGES = 50
 NOTHING_TO_RECOVER = _(
     "The AEAT has no records of that issuer this month: there is nothing to recover."
@@ -522,9 +523,9 @@ def _seal(ctx: OperationContext, config: Config, record: Record) -> Record:
 
 
 def _rechazo_previo(corrects: Record) -> str:
-    """RechazoPrevio of a correction (Descripción del servicio web VERI*FACTU §9.1.2–§9.1.3): «X» while the AEAT
-    holds no registration of the invoice (every alta of it was rejected); «S» when it holds one and what is
-    corrected was a later correction it rejected; «N» for the usual correction of a record it holds."""
+    """RechazoPrevio of a correction (the AEAT's «Descripción del servicio web VERI*FACTU», sections 9.1.2 and
+    9.1.3): «X» while the AEAT holds no registration of the invoice (every alta of it was rejected); «S» when it holds
+    one and what is corrected was a later correction it rejected; «N» for the usual correction of a record it holds."""
     held = Record.objects.filter(
         invoice_id=corrects.invoice_id,
         environment=corrects.environment,
@@ -537,9 +538,9 @@ def _rechazo_previo(corrects: Record) -> str:
 
 
 def _refuse_without_a_way(config: Config, environment: str, scope: Scope) -> None:
-    """In production nothing is sealed that can never reach the AEAT (working-rules §15; the old Hub's
-    ``enforce_fiscal_road``, HUB-1935): 409 with the route's own code, inside the transaction of the sale or
-    invoice, so the document is undone and the series gives its number back. Testing never refuses."""
+    """In production nothing is sealed that can never reach the AEAT: 409 with the route's own code, inside the
+    transaction of the sale or invoice, so the document is undone and the series gives its number back. Testing never
+    refuses."""
     if environment != Environment.PRODUCTION:
         return
     problem = route_problem(config, environment, scope)
@@ -726,7 +727,8 @@ def cancel_record(ctx: OperationContext, data: RecordCancelIn) -> RecordCreateOu
         invoice_number=target.invoice_number,
         issue_date=target.issue_date,
         description=data.reason,
-        # §9.2.2 «anulación por rechazo»: an earlier anulación of the same registration was rejected.
+        # «Anulación por rechazo» (the AEAT's web service description, section 9.2.2): an earlier anulación of the
+        # same registration was rejected.
         previous_rejection="S"
         if Record.objects.filter(cancels=target, status=Record.Status.REJECTED).exists()
         else "",
@@ -782,7 +784,7 @@ def _mark(ctx: OperationContext, records, code: str, detail: str, tally: _Tally)
 def _outlast_the_gateway() -> None:
     """A call to the gateway waits inside its operation's transaction, whose locks keep two passes from sending the same
     chain, and it can take longer than the cluster lets a transaction sit idle: without this, the cut comes first and
-    what the AEAT answered is lost with the transaction (hub#623). Said before every call, for that transaction only."""
+    what the AEAT answered is lost with the transaction. Said before every call, for that transaction only."""
     platform.allow_idle_wait(gateway.LONGEST_WAIT_SECONDS)
 
 
@@ -2244,7 +2246,7 @@ def sync_config(ctx: OperationContext, data: ConfigSyncIn) -> ConfigSyncOut:
     return ConfigSyncOut(applied=True, version=data.version)
 
 
-# ── ERPlora's own hub (PLAN-SAAS §4) ───────────────────────────────────────────────────────────────────────────
+# ── ERPlora's own hub ───────────────────────────────────────────────────────────────────────────
 
 
 @operation(

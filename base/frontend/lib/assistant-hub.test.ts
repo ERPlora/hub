@@ -2,8 +2,8 @@
 // a turn goes to `base.assistant.turn`'s route; the allowance, a dictation and a report go through base's operations;
 // whoever sees the Home uses it and whoever administers the business upgrades the plan, on erplora.com's page the
 // Home's block gives; the verbs of the writes and the platform's screens are base's catalogue (the server's guardrail
-// keeps them complete: base/tests/test_assistant.py); a write a manager must approve goes through APP-BASE-5's
-// approvals (BASE-G118); and the empty conversation offers the setup's shortcuts (BASE-G121).
+// keeps them complete: base/tests/test_assistant.py); a write a manager must approve goes through the managers'
+// approvals; and the empty conversation offers the setup's shortcuts.
 import {
   type AssistantCard,
   AssistantPanel,
@@ -105,7 +105,7 @@ function spaDocument(cookie = 'csrftoken=tok123'): Document {
 const MP3 = new Uint8Array([0x49, 0x44, 0x33, 0x04, 0xff, 0xfb, 0x90, 0x64]);
 const READING = { text: 'Tienes 3 mesas abiertas.', language: 'es' as const, voice: 'a-voice' };
 
-describe("«Read aloud» in the server's voice (round 2026-11-03n)", () => {
+describe("«Read aloud» in the server's voice", () => {
   it("posts the text, its language and its voice to base.assistant.speak's route and hands back the mp3", async () => {
     const fetcher = vi.fn(async () => new Response(MP3, { status: 200, headers: { 'Content-Type': 'audio/mpeg' } }));
     const audio = await speakAloud(READING, spaDocument(), fetcher);
@@ -151,7 +151,7 @@ describe("«Read aloud» in the server's voice (round 2026-11-03n)", () => {
     expect((refused as ApiError).status).toBe(502);
   });
 
-  it('without the server’s voice (the default, round 2026-11-04a) the panel gets no speak: no choice of voice, no request', () => {
+  it('without the server’s voice (the default) the panel gets no speak: no choice of voice, no request', () => {
     expect(HUB_ASSISTANT.speak).toBeUndefined();
     const off = spaDocument();
     off.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify({ server_voice: false })}</script>`);
@@ -173,12 +173,12 @@ describe("«Read aloud» in the server's voice (round 2026-11-03n)", () => {
 });
 
 describe('HUB_ASSISTANT: who', () => {
-  it('whoever sees the Home uses the assistant (BASE-G110)', () => {
+  it('whoever sees the Home uses the assistant', () => {
     expect(HUB_ASSISTANT.canUse!(session(EMPLOYEE.permissions))).toBe(true);
     expect(HUB_ASSISTANT.canUse!(session(['demo.view']))).toBe(false);
   });
 
-  it('whoever administers the business upgrades the plan (gh:hub#1259)', () => {
+  it('whoever administers the business upgrades the plan', () => {
     expect(HUB_ASSISTANT.canUpgrade!(session(OWNER.permissions))).toBe(true);
     expect(HUB_ASSISTANT.canUpgrade!(session(EMPLOYEE.permissions))).toBe(false);
   });
@@ -269,8 +269,7 @@ describe("the verb of a write (base's catalogue)", () => {
   it('is named by its own verb, never by the operation', () => {
     expect(actionKey('create')).toBe('base.assistant.card.actions.create');
     expect(actionKey('bulk_delete')).toBe('base.assistant.card.actions.bulk_delete');
-    // FIX-HUB-BASE-ASSISTANT-CARD-RECTIFY-SAYS-DO-THIS-IN-INVOICING: these were «Do this» (a closed list of 24 verbs);
-    // every action the assistant may run now has its own (guardrail: base/tests/test_assistant.py).
+    // Every action the assistant may run has its own verb (guardrail: base/tests/test_assistant.py).
     expect(actionKey('rectify')).toBe('base.assistant.card.actions.rectify');
     expect(actionKey('settle')).toBe('base.assistant.card.actions.settle');
   });
@@ -281,9 +280,9 @@ describe("the verb of a write (base's catalogue)", () => {
   });
 
   it('an operation its action’s verb does not say has its own: emptying a cart is «Vaciar», removing one of its lines «Quitar»', () => {
-    // FIX-HUB-BASE-ASSISTANT-CARD-SAYS-REMOVE-FOR-EMPTYING-A-CART: the card to empty a cart (`cart_checkout.cart.clear`)
-    // said «Quitar en Carrito y pago», the verb of taking one line out; a cash count (`cash_register.count.add`) said
-    // «Añadir en Caja», as if it put money in. The verb goes by the whole operation first, then by its action.
+    // By its action alone, emptying a cart (`cart_checkout.cart.clear`) would read «Quitar», the verb of taking one
+    // line out, and a cash count (`cash_register.count.add`) «Añadir», as if it put money in. The verb goes by the
+    // whole operation first, then by its action.
     const verb = (operation: string): [string, string] => [said(es)(actionKey(operation)), said(en)(actionKey(operation))];
     expect(verb('cart_checkout.cart.clear')).toEqual(['Vaciar', 'Clear']);
     expect(verb('cart_checkout.item.remove')).toEqual(['Quitar', 'Remove']);
@@ -344,7 +343,7 @@ function status(items: SetupItem[]): SetupStatus {
   return { total: items.length, pending: items.filter((row) => row.state === 'pending').length, unavailable: 0, blocking_pending: 0, items };
 }
 
-describe('setupShortcuts (BASE-G121; gh:hub#373)', () => {
+describe('setupShortcuts', () => {
   it('«What is left to set up?» and, of what is pending for this person, up to four, in the checklist’s order', () => {
     const steps = ['A', 'B', 'C', 'D', 'E'].map((title) => item({ key: `base.${title}`, title }));
     expect(setupShortcuts(status(steps))).toEqual([
@@ -371,7 +370,7 @@ describe('setupShortcuts (BASE-G121; gh:hub#373)', () => {
   });
 });
 
-describe('a write a manager must approve (BASE-G118, with APP-BASE-5’s approvals)', () => {
+describe('a write a manager must approve, through the managers’ approvals', () => {
   const QUESTION = { operation: 'demo.item.create', label: 'Create an item', fingerprint: 'f'.repeat(64) };
   const CREATE: PendingCall = { call_id: 'c1', name: 'demo__item__create', arguments: '{"name":"Mesa 4"}' };
   const CARD: AssistantCard = {

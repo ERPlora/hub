@@ -1,12 +1,11 @@
 // Payments → Payments (WORKBOOK «Pantallas · Pagos»; PAYMENT-F02 to F06): «Outgoing payments», the live
-// `payment.payment.list` with the old table's Reference, Date, Beneficiary, Amount and Status (and
-// Method in the column chooser), «Search reference or beneficiary…», filters per column (the
-// reference and the beneficiary by fragment, the date from / to, the amount from / to in the business's currency,
-// the status by list), newest payment date first, 50 a page. Each row offers the step it can take, named
-// by what it does (Approve, Mark as sent, Mark as completed), and «Cancel payment» while not finished;
-// none on a finished one, and only what the person may do. «New payment» opens the form; a payment
-// recorded from a later page brings the list back to the first one (the old payments#40). Each amount is painted in
-// its payment's own currency with the decimals the server says for it (never the browser's Intl: the forint).
+// `payment.payment.list` with Reference, Date, Beneficiary, Amount and Status (and Method in the column chooser),
+// «Search reference or beneficiary…», filters per column (the reference and the beneficiary by fragment, the date from
+// / to, the amount from / to in the business's currency, the status by list), newest payment date first, 50 a page.
+// Each row offers the step it can take, named by what it does (Approve, Mark as sent, Mark as completed), and «Cancel
+// payment» while not finished; none on a finished one, and only what the person may do. «New payment» opens the form; a
+// payment recorded from a later page brings the list back to the first one. Each amount is painted in its payment's own
+// currency with the decimals the server says for it (never the browser's Intl: the forint).
 import { DataTable, type DataTableAction, EmptyState, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
@@ -87,7 +86,7 @@ async function setup(options: MountOptions = {}) {
 }
 
 describe('PaymentsPage', () => {
-  it('follows the payments newest payment date first, with the old table’s columns', async () => {
+  it('follows the payments newest payment date first, with its columns', async () => {
     const s = await setup();
     expect(s.list()).toEqual([{ sort: '-payment_date', limit: 50, offset: 0 }]);
     await s.show(page(ROWS));
@@ -170,8 +169,8 @@ describe('PaymentsPage', () => {
     expect(s.list()).toEqual([{ payment_date_to: '2026-08-31', sort: '-payment_date', limit: 50, offset: 0 }]);
   });
 
-  // flow: PAYMENT-F06 (lista de Pagos: filtros tras el embudo) — FIX-HUB-PAYMENT-LIST-FILTERS-BEHIND-FUNNEL
-  it('keeps the column filters behind the funnel, as the old list: no open filter row; «Apply» sends them as before (PAYMENT-F06)', async () => {
+  // flow: PAYMENT-F06 (Payments list: filters behind the funnel)
+  it('keeps the column filters behind the funnel: no open filter row; «Apply» sends them (PAYMENT-F06)', async () => {
     const s = await setup();
     await s.show(page(ROWS));
     const testid = (id: string) => s.wrapper.find(`[data-testid="${id}"]`);
@@ -195,7 +194,7 @@ describe('PaymentsPage', () => {
     expect(testid('payment-payments-filters-count').text()).toBe('3');
   });
 
-  it('a list that cannot load says so in the table and offers «Retry», never «No payments.» (pm#533)', async () => {
+  it('a list that cannot load says so in the table and offers «Retry», never «No payments.»', async () => {
     const s = await setup();
     s.net.lastStream().push(errorFrame(s.subId(OP), 'internal_error'));
     await flush();
@@ -359,7 +358,7 @@ describe('PaymentsPage', () => {
   });
 });
 
-describe('PaymentsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('PaymentsPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

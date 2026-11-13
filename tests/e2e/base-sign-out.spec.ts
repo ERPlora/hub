@@ -1,5 +1,5 @@
 // flow: BASE-F61 (base/WORKBOOK.md, «Cerrar sesión») · ACCOUNTS-F09 of the SaaS (accounts/WORKBOOK.md)
-// FIX-HUB-BASE-LOGOUT-LANDS-ON-SAAS-404: «Sign out» of a business on a device without the PIN pad ends the Hub's
+// «Sign out» of a business on a device without the PIN pad ends the Hub's
 // session and goes on to erplora.com, which asks before closing its own (a redirect is a GET, and a GET never signs
 // anybody out), never to the 404 of allauth's old `/accounts/logout/`. «Stay signed in» keeps erplora.com's session (the
 // launcher with the account's business); «Sign out» ends it too, and erplora.com and the business ask to sign in again.

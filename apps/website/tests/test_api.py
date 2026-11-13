@@ -15,6 +15,7 @@ from apps.website.api import router
 from apps.website.queries import PUBLIC_LIMIT
 from apps.website.tests.conftest import full_content
 from apps.website.tests.test_apps import CARD_ONLY
+from base.tests.routes import spa_routes
 from config.api import api
 
 ROUTES = {
@@ -88,10 +89,7 @@ def test_what_only_the_assistants_card_reads_has_no_route():
 
 
 def test_the_spas_route_map_names_every_website_route():
-    # frontend/generated/operations.json: the op → route map the SDK's client uses (hand-written until V3).
-    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
-    mine = {(route["method"].upper(), route["path"].removeprefix("/api"), op) for op, route in spa.items() if op.startswith("website.")}
-    assert mine == ROUTES
+    assert spa_routes("website.") == ROUTES
 
 
 @pytest.mark.django_db

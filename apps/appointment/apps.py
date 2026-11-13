@@ -7,7 +7,7 @@ from apps.appointment.events import TO_CONFIRM_EVENTS
 
 #: What may add a notice: a booking, and a cancellation (the query keeps the customer's own).
 NOTICE_EVENTS = ["appointment.appointment.created", "appointment.appointment.cancelled"]
-#: The old shell's body (old-hub:HUB_SHELL-F66): the services, «{day} at {hour}» and the professional.
+#: The notice's body: the services, «{day} at {hour}» and the professional.
 NOTICE_BODY = ["{service_names}", _("{start_date_label} at {start_time_label}"), "{staff_name}"]
 #: A tap opens the agenda on the appointment's day (its start, on the business's clock).
 NOTICE_ROUTE = "/appointment/agenda?date={start:.10}"
@@ -21,7 +21,7 @@ class AppointmentConfig(LiveAppConfig):
     icon = "ion:calendar-outline"
     category = Category.PEOPLE
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The public store's texts, which register_apps writes to shared.app.
     summary = _(
         "Your diary: appointments by professional, free times, repeating bookings and charging them at the till."
     )
@@ -73,7 +73,7 @@ class AppointmentConfig(LiveAppConfig):
         ],
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with `icon =`
-    # as the module's own icon. The old module's single entry (`calendar-outline`).
+    # as the module's own icon.
     navigation = [
         Nav(
             "appointments",
@@ -82,10 +82,8 @@ class AppointmentConfig(LiveAppConfig):
             "/appointment/agenda",
         ),
     ]
-    # The Home's hooks (PLAN-HUB round 2026-10-21): the old module's counter of the bell, the customers' own bookings
-    # waiting for confirmation, on the query the agenda's «N to confirm» reads (whoever sees an agenda counts her
-    # own, or everybody's when she sees them all). No steps of «Finish setting up your business» nor panels of the
-    # dashboard: the old module had none.
+    # The bell counts the customers' own bookings waiting for confirmation, on the query the agenda's «N to
+    # confirm» reads (whoever sees an agenda counts her own, or everybody's when she sees them all).
     bell = [
         BellCounter(
             key="to_confirm",
@@ -97,8 +95,8 @@ class AppointmentConfig(LiveAppConfig):
             refresh_on=TO_CONFIRM_EVENTS,
         )
     ]
-    # APPOINTMENT-F28 (old-hub:HUB_SHELL-F66): the device is told what the customer booked or cancelled herself, of
-    # the agenda the person sees (the query's rules: never the front desk's, an employee only hears her own).
+    # The device is told what the customer booked or cancelled herself, of the agenda the person sees (the
+    # query's rules: never the front desk's, an employee only hears her own).
     notices = [
         DeviceNotice(
             key="booked",
@@ -123,12 +121,12 @@ class AppointmentConfig(LiveAppConfig):
     ]
 
     def recoverable_from_copy(self) -> list:
-        """hub#1284: the platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when
-        the staff recovers from it (BASE-F114): the copy's appointments still to come and booked that the business
-        lacks (``queries.appointments_in_copy``, ``queries.appointments_not_in_business``), each created by
-        ``appointment.appointment.create``, the agenda's own, for the business's card of its customer; what does not
-        fit the agenda now (its time taken, outside the hours, a customer or a service it no longer has) is refused
-        with why, never booked over another."""
+        """The platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when the staff
+        recovers from it: the copy's appointments still to come and booked that the business lacks
+        (``queries.appointments_in_copy``, ``queries.appointments_not_in_business``), each created by
+        ``appointment.appointment.create``, the agenda's own, for the business's card of its customer; what does not fit
+        the agenda now (its time taken, outside the hours, a customer or a service it no longer has) is refused with
+        why, never booked over another."""
         from apps.appointment import queries  # the models are not loaded yet when this module is
         from base.recovery import Recoverable
 

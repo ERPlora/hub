@@ -1,6 +1,6 @@
-"""What layer 1 of the assistant's QA says of Menus and combos (docs plan 2026-10-31, the assistant's knowledge and QA,
-§3): which tools it offers, what an employee is never offered, and that the requests of the real-model QA (hub#1091),
-in the owner's and the employee's own words, are offered their existing operation.
+"""What layer 1 of the assistant's QA says of Menus and combos: which tools it offers, what an employee is never
+offered, and that the requests of the real-model QA (hub#1091), in the owner's and the employee's own words, are
+offered their existing operation.
 
 Every ask of every tool of combo bringing its tool among the first ten, role by role, in English and in Spanish, out of
 the catalogue of a business with every app on and ranked as a turn ranks, is ``base/tests/test_assistant_asks.py``'s
@@ -41,9 +41,9 @@ WRITES = {
     "combo.option.reorder",
 }
 #: The request of hub#1091's QA as the owner said it, and nothing of the tools' ``asks``: before Menus and combos said
-#: its asks, «opciones» named no choice of a menu and «ordena» named a device too (the stem of «ordenador»,
-#: ERPlora/live#61), so the turn offered the changes of a menu, of a choice and of a printer ahead of putting the
-#: choices in order, and the model chose to delete the choices and create them again.
+#: its asks, «opciones» named no choice of a menu and «ordena» named a device too (the stem of «ordenador»), so the turn
+#: offered the changes of a menu, of a choice and of a printer ahead of putting the choices in order, and the model
+#: chose to delete the choices and create them again.
 REPORTED = (
     "combo.option.reorder",
     "ordena las opciones de Platos QA del Menú QA así: flan, merluza, lentejas y café, incluyendo todas",
@@ -52,8 +52,8 @@ REPORTED = (
 #: tools of the apps that say their asks later may climb past it before the model loses it.
 WITH_ROOM = 20
 PROBES_DIR = Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes"
-#: Every probe of layer 2 of Menus and combos, the owner's and the employee's real phrases of the QA (2026-11-08), and
-#: the owner's of the day a restaurant gets ready to sell (2026-11-09).
+#: Every probe of layer 2 of Menus and combos, the owner's and the employee's real phrases from QA, and
+#: the owner's of the day a restaurant gets ready to sell.
 PROBES = [
     probe
     for path in sorted(PROBES_DIR.glob("*.json"))

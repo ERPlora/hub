@@ -1,6 +1,6 @@
-"""HMAC-SHA256 + timestamp of the internal calls between the Hub and the SaaS (PLAN-SAAS §2, §2.1).
+"""HMAC-SHA256 + timestamp of the internal calls between the Hub and the SaaS.
 
-A port, byte for byte, of the SaaS's ``accounts/signing.py`` (docs/plans/2026-10-17-demo-hubs-fase-1.md, §1.4): the
+A port, byte for byte, of the SaaS's ``accounts/signing.py``: the
 same functions, headers, window and secrets, so each side verifies what the other signs. Every call carries
 ``X-Erplora-Timestamp`` (unix seconds) and up to two signatures, hex HMAC-SHA256 keyed with the shared secret:
 
@@ -19,8 +19,7 @@ one that is not 1 to 20 ASCII digits (``int()`` raises beyond 4300: a 500 on eve
 
 Rotation, the same three steps in both projects (each one deployed to both before the next): the new secret as
 ``…_PREVIOUS``; then as ``INTERNAL_SHARED_SECRET`` with the old one as ``…_PREVIOUS``; then ``…_PREVIOUS`` empty.
-Once both sides sign v2, a call without it will be refused on both (v1 dropped; its unification in ``live`` is a
-follow-up of the plan, §5).
+Once both sides sign v2, a call without it will be refused on both (v1 dropped).
 """
 
 import hashlib

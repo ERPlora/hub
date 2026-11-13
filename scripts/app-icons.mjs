@@ -1,12 +1,12 @@
 // `pnpm gen:app-icons`: bakes the `icon` of every module's apps.py into
-// frontend/generated/app-icons.json, `{"<icon>": "<svg>"}` (round 16, spec §4.6). `register_apps`
+// frontend/generated/app-icons.json, `{"<icon>": "<svg>"}`. `register_apps`
 // copies each SVG into `shared.app.icon_svg`, which the SaaS paints inline after cleaning it with
 // nh3, so every SVG is whole and self-contained: no CSS classes, painted in currentColor. Commit the
 // result: frontend/generated/app-icons.test.ts fails when it falls out of step with the apps.py files.
 //
 // The sources are the shell's own icon packages, resolved from @erplora/ui (packages/ui):
 // `ionicons/icons` for `ion:`, `@iconify-json/<set>` for the Iconify sets. Everything is read from
-// disk: no network, ever (PLAN §16.4).
+// disk: no network, ever.
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';

@@ -1,9 +1,9 @@
 // Types of the appointment app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from
-// apps/appointment/schemas.py. Written by hand, as the other apps', until V3 generates them from
-// `/api/openapi.json`. Keep it in step with schemas.py and `frontend/generated/operations.json`.
-// One input per operation (ninja's parity): no path parameters, an id travels in the input.
-// On the wire: money in whole cents, minutes as integers, days `YYYY-MM-DD`, times on the business's
-// clock with its offset (`2026-10-19T10:00:00+02:00`); a time sent without offset is wall clock.
+// apps/appointment/schemas.py. Written by hand, as the other apps' are: nothing generates them from
+// `/api/openapi.json`. Keep it in step with schemas.py and `frontend/generated/operations.json`. One input per
+// operation (ninja's parity): no path parameters, an id travels in the input. On the wire: money in whole cents,
+// minutes as integers, days `YYYY-MM-DD`, times on the business's clock with its offset (`2026-10-19T10:00:00+02:00`);
+// a time sent without offset is wall clock.
 import type { Page } from '../../../frontend/sdk-types';
 
 export type AppointmentStatus = 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
@@ -91,7 +91,7 @@ export interface AppointmentOut extends AppointmentRow {
   label: string;
 }
 
-/** What a customer did herself (G01): a booking or a cancellation, as the notice says it. */
+/** What a customer did herself: a booking or a cancellation, as the notice says it. */
 export interface NoticeOut {
   kind: 'booked' | 'cancelled';
   at: string;

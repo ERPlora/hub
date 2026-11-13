@@ -1,6 +1,6 @@
-"""The outbox relay, run by the worker on every tick (PLAN-HUB «Eventos entre módulos»; round 2026-10-20).
+"""The outbox relay, run by the worker on every tick.
 
-A port of the old Hub's ``crates/runtime/src/outbox.rs``. A command records its events in the outbox in its own
+A command records its events in the outbox in its own
 transaction (``live.outbox.record_event``); the relay hands each one to the reactions of the apps that listen to
 it, the ``REACTIONS`` of their ``events.py`` (``"*"``: every event of the other apps):
 
@@ -21,10 +21,10 @@ it, the ``REACTIONS`` of their ``events.py`` (``"*"``: every event of the other 
 
 Both steps claim their rows with ``SKIP LOCKED``: the old worker and the new one overlap on a deploy. Every
 transaction releases its connection, so the worker never idles holding one. The events recorded before the relay
-existed were taken without a delivery by its migration (``base/migrations/0006_event_delivery.py``): the backlog
-of phase 1 is never applied. The worker runs it in each hub with its own database, under ``use_hub``
-(``base.worker._hubs``; review of hub#471), and on control for control's own events (``of_hubs=False``: the registry's
-and the demos', which no app hears); since S5 what a business of phase 1 recorded in control before its cut is never
+existed were taken without a delivery by its migration (``base/migrations/0006_event_delivery.py``): that old
+backlog is never applied. The worker runs it in each hub with its own database, under ``use_hub``
+(``base.worker._hubs``), and on control for control's own events (``of_hubs=False``: the registry's
+and the demos', which no app hears); what a business that shared a database recorded in control before its cut is never
 taken there (its cut copies its own events into its database, ``base.tenancy.cut``).
 """
 

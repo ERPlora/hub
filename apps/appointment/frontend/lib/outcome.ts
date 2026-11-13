@@ -2,7 +2,7 @@
 // appointments booked», «{skipped} could not be booked», or that the window was already booked —, each
 // skipped date with the server's reason (in the reader's language), and either the dates still to book (from
 // `next_from`: «Book appointments» again) or, when nothing was in the window yet, the series' next date beyond it. Editing a
-// series «from this occurrence on» (APPOINTMENT-F14) says only what happened (appointments#293), to whom
+// series «from this occurrence on» (APPOINTMENT-F14) says only what happened, to whom
 // and for which services the appointments now go (#256, #294), and what kept its time.
 import type { MaterializeOut, RecurringUpdatedOut, RecurringUpdateIn } from '../operations';
 import { formatDay } from './clock';

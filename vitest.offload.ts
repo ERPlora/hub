@@ -29,7 +29,7 @@ function decoded(file: string, bytes: Buffer): string | undefined {
 /**
  * Reads at once each file not read yet, by Node's own pool of threads, without holding the worker. With the machine
  * loaded, a file's first open waits on its own: 760 files read one by one took 75 s, 99 ms each against 0.5 at rest
- * (2026-10-30), and 2,046 took 38 s at load 19 against 1 s to parse them (2026-11-12); waiting for them together takes
+ * and 2,046 took 38 s at load 19 against 1 s to parse them; waiting for them together takes
  * a fraction of their sum. A file that cannot be read is `undefined`, as TypeScript's own read returns it. The tests
  * that read through it wait without a clock (NO_CLOCK): a read of a file of the repo ends, as late as the machine makes
  * it, which no clock in seconds tells from one that never does; what could still not end, a wait nobody settles, only

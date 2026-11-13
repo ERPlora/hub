@@ -1,14 +1,13 @@
-"""Settings › Data, the writes (PLAN-HUB round 2026-10-21, «Blueprints»): load a blueprint, undo a load, reset.
+"""Settings › Data, the writes: load a blueprint, undo a load, reset.
 
-``base.blueprint.import`` (BASE-G103–G107) loads a template of the catalogue or a ``.blueprint.zip`` and keeps its
-report and the rows it created as an ``ImportBatch``; a load that did not go in whole is retried from the same
-template version (never from an uploaded file). ``base.import.undo`` (BASE-G108) removes exactly the rows of one
-load. ``base.hub.reset`` (BASE-G109) gives the plan of what each app would lose (``dry_run``) and, typed the
-business's name, asks for it: the worker copies the business's database first and only then empties the sections
-(round 2026-10-30 of PLAN-DB, decision 2; ``base/tests/test_worker_data.py``), so the answer is ``copying`` and nothing
-is removed yet. In phase 1 the business's data shares one database with every other hub, so the reset is refused
-until the hub has its own (plan 2026-10-22-fase-2-tenencia, S5); without a bucket for the copy it is unavailable, and
-a second one waits for the first. Each one only for who runs the hub.
+``base.blueprint.import`` loads a template of the catalogue or a ``.blueprint.zip`` and keeps its report and the rows
+it created as an ``ImportBatch``; a load that did not go in whole is retried from the same template version (never
+from an uploaded file). ``base.import.undo`` removes exactly the rows of one load. ``base.hub.reset`` gives the plan of
+what each app would lose (``dry_run``) and, typed the business's name, asks for it: the worker copies the business's
+database first and only then empties the sections (``base/tests/test_worker_data.py``), so the answer is ``copying``
+and nothing is removed yet. A business without its own database shares it with other hubs, so the reset is refused
+until the hub has its own; without a bucket for the copy it is unavailable, and a second one waits for the first.
+Each one only for who runs the hub.
 """
 
 import base64
@@ -79,7 +78,7 @@ def a_file(purpose="template", data=None, apps=("table",)):
     return base64.b64encode(blueprint.write_zip(bundle)).decode()
 
 
-# ── Load a template of the catalogue (BASE-G103, BASE-G105, BASE-G106) ─────────────────────────────────────────────
+# ── Load a template of the catalogue ───────────────────────────────────────────────────────────────────────────────
 
 
 def test_an_administrator_loads_a_template_and_keeps_its_report(owner):
@@ -133,7 +132,7 @@ def test_only_the_apps_chosen_load(owner):
     assert ImportBatch.objects.get(pk=loaded.id).apps == ["table"]
 
 
-# ── Load a file (BASE-G104) ────────────────────────────────────────────────────────────────────────────────────────
+# ── Load a file ────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def test_an_uploaded_file_loads_like_a_template(owner):
@@ -153,7 +152,7 @@ def test_a_file_that_is_not_a_blueprint_is_refused_with_its_reason(owner):
     assert not ImportBatch.objects.exists()
 
 
-# ── Retry what did not go in (BASE-G107) ───────────────────────────────────────────────────────────────────────────
+# ── Retry what did not go in ───────────────────────────────────────────────────────────────────────────────────────
 
 
 def a_partial_load(owner, monkeypatch):
@@ -206,7 +205,7 @@ def test_a_load_that_went_in_whole_has_nothing_to_retry(owner):
     assert refused.value.code == "base.import_complete"
 
 
-# ── Undo a load (BASE-G108) ────────────────────────────────────────────────────────────────────────────────────────
+# ── Undo a load ────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def test_undoing_a_load_removes_its_rows_and_marks_it_undone(owner):
@@ -243,12 +242,12 @@ def test_who_does_not_run_the_hub_cannot_undo(owner, manager):
         call(manager, "base.import.undo", id=loaded.id)
 
 
-# ── Reset by sections (BASE-G109) ──────────────────────────────────────────────────────────────────────────────────
+# ── Reset by sections ──────────────────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture
 def own_database(monkeypatch):
-    """The hub has its own database (phase 2): its reset touches no one else's data. And a bucket for its copy."""
+    """The hub has its own database: its reset touches no one else's data. And a bucket for its copy."""
     monkeypatch.setattr(services, "has_own_database", lambda hub: True)
     monkeypatch.setenv("HUB_DUMPS_BUCKET", "erplora-test-hub-dumps")
 
@@ -278,7 +277,7 @@ def test_without_a_business_name_the_hubs_address_is_typed(owner):
     assert call(owner, "base.hub.reset", dry_run=True).confirm_with == "a"
 
 
-def test_in_phase_1_the_reset_says_why_it_is_not_available_and_removes_nothing(owner):
+def test_without_its_own_database_the_reset_says_why_it_is_not_available_and_removes_nothing(owner):
     call(owner, "base.blueprint.import", template="restaurant.es")
 
     plan = call(owner, "base.hub.reset", dry_run=True)
@@ -404,7 +403,7 @@ def test_who_does_not_run_the_hub_cannot_reset(manager, own_database):
         call(manager, "base.hub.reset", dry_run=True)
 
 
-# ── A business born with every app off (round 2026-10-27): the blueprint turns its apps on, then loads ──────────────
+# ── A business born with every app off: the blueprint turns its apps on, then loads ─────────────────────────────────
 
 C = Scope("host", "c")
 

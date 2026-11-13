@@ -481,7 +481,7 @@ def _open_for_writing(session_id, number) -> Session:
         "nor wait for a yes in the chat, its card is where the person confirms.",
         "risk": "high",
         # Its card shows what closing gives, not only the session and the count it sends; a blind count's expected
-        # stays hidden from whoever may not see it (FIX-HUB-CASH_REGISTER-ASSISTANT-CLOSE-CARD-WITHOUT-PREVIEW, BASE-F98).
+        # stays hidden from whoever may not see it (BASE-F98).
         "preview": {
             "operation": "cash_register.session.closing_summary",
             "fields": ["number", "register_name", "expected_balance", "difference"],

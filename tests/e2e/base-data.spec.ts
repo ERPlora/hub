@@ -1,20 +1,6 @@
-// Settings › Data and backups and the Home's templates card (APP-BASE-2; the old hub's settings-data-*.png and
-// dashboard-*.png) in the three viewports, as the owner of hub `a`, end to end against the real apps:
-//   - BASE-G131: in an empty business the Home offers «Start with a business like yours»; «Use this one» loads the
-//     template and the Home is up to date without a reload («Finish setting up your business» counts the catalogue);
-//   - BASE-G103, G105, G106: Settings › Data › Import, a template of the catalogue reviewed and loaded again: what was
-//     already there stays («You had it already»);
-//   - BASE-G101, G102: Export, the data of Inventory without one of its tables, saved as a file;
-//   - BASE-G104, G106, G107: a file uploaded by hand with a row an app refuses: «Applied in part» with the reason, and on
-//     coming back to Import, that last report first, with «Retry what is missing» off and why;
-//   - BASE-G108: Reset › «Undo an import», confirmed, with what was removed;
-//   - BASE-G109: Reset › «Reset the business»: the plan per section, one box each, and its red button off until one is
-//     ticked (`a` has its own database since S2a, round 2026-10-30 of PLAN-DB; one that shares control's says why it
-//     cannot be emptied: ResetPanel.test.ts). Nothing is reset: the business stays for the other specs;
-//   - BASE-F37: «Copies», the full copies of the business's data made before each reset (S2b): none in `a`.
-// The business is emptied first through the apps' own operations (phase 1: `a` and `b` shared their rows, as
-// `clearItems` does with the demo's). Each flow leaves its capture `APP-BASE-2-<flow>-<width>`.
-// flow: BASE-F37 BASE-G101 BASE-G102 BASE-G103 BASE-G104 BASE-G105 BASE-G106 BASE-G107 BASE-G108 BASE-G109 BASE-G131
+// The business is emptied first through the apps' own operations, as `clearItems` does with the demo's. «Reset the
+// business» is never pressed, so the business stays for the other specs.
+// flow: BASE-F37
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -106,12 +92,12 @@ async function section(page: Page, name: 'import' | 'export' | 'reset'): Promise
 for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   const width = Number(label);
 
-  test(`BASE-G131 BASE-G101–G109 — the templates card and Settings › Data at ${width}`, async ({ browser }) => {
+  test(`the templates card and Settings › Data at ${width}`, async ({ browser }) => {
     test.setTimeout(240_000);
     const { context, page } = await hostPage(browser, A, { viewport, next: '/' });
     await emptyOfTemplateData(context, A);
 
-    // BASE-G131 — the card in an empty business; the checklist before loading.
+    // The Home's templates card in an empty business; the checklist before loading.
     await page.goto(`${A}/`);
     const card = testid(page, 'blueprint-card');
     await expect(card).toBeVisible();
@@ -128,14 +114,14 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await card.locator('[data-testid="blueprint-card-continue"]').click();
     await expect(card).toHaveCount(0);
 
-    // BASE-G103 — Settings › Data › Import: the catalogue.
+    // Settings › Data › Import: the catalogue.
     await page.goto(`${A}/settings#data`);
     await expect(testid(page, 'tab-data')).toBeVisible();
     const catalogue = testid(page, 'templates-row').first();
     await expect(catalogue).toBeVisible();
     await snap(page, 'BASE-G103', width);
 
-    // BASE-G105 — review a template; BASE-G106 — load it again: what is there stays.
+    // Review a template, then load it again: what is there stays.
     await testid(page, 'templates-row').first().locator('[data-testid$="-use"]').click();
     const review = testid(page, 'review');
     await expect(review).toBeVisible();
@@ -146,7 +132,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await expect(report.locator('[data-testid="report-app-status"]').first()).toContainText('You had it already');
     await snap(page, 'BASE-G106', width);
 
-    // BASE-G101, BASE-G102 — export Inventory's data without its categories, as a file.
+    // Export Inventory's data without its categories, as a file.
     await section(page, 'export');
     await expect(testid(page, 'export-app').first()).toBeVisible();
     await snap(page, 'BASE-G101', width);
@@ -161,7 +147,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await download.saveAs(saved);
     expect(readFileSync(saved).subarray(0, 2).toString('latin1')).toBe('PK');
 
-    // BASE-G104, BASE-G106 — a file by hand, with a row an app refuses: in part, and why.
+    // A file by hand, with a row an app refuses: in part, and why.
     const stamp = `${width}-${Date.now().toString(36)}`;
     await section(page, 'import');
     await testid(page, 'import-file').setInputFiles(partialFile(stamp));
@@ -171,7 +157,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await expect(testid(page, 'report-status')).toContainText('Not everything went in.');
     await expect(testid(page, 'report')).toContainText(`E2E broken ${stamp}`);
 
-    // BASE-G107 — back to Import: that report first, «Retry what is missing» off with why (it came by hand).
+    // Back to Import: that report first, «Retry what is missing» off with why (it came by hand).
     await section(page, 'reset');
     await section(page, 'import');
     await expect(testid(page, 'report-unfinished')).toContainText(`E2E partial ${stamp}`);
@@ -181,7 +167,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await testid(page, 'report-templates').click();
     await expect(testid(page, 'templates-row').first()).toBeVisible();
 
-    // BASE-G108 — undo that file's load: the product it created goes.
+    // Undo that file's load: the product it created goes.
     const good = () =>
       api<{ rows: { name: string }[] }>(context, A, 'GET', `/inventory/products?limit=100&offset=0&search=${encodeURIComponent(`E2E good ${stamp}`)}`);
     expect((await good()).data.rows.map((row) => row.name)).toEqual([`E2E good ${stamp}`]);
@@ -197,7 +183,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     expect((await good()).data.rows).toEqual([]);
     await snap(page, 'BASE-G108', width);
 
-    // BASE-G109 — the plan per section, a box each, and «Reset the business» off until one is ticked (never pressed).
+    // Reset: the plan per section, a box each, and «Reset the business» off until one is ticked (never pressed).
     const first = testid(page, 'reset-section').first();
     await expect(first).toBeVisible();
     await expect(testid(page, 'reset-shared')).toHaveCount(0);
@@ -211,7 +197,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await submit.scrollIntoViewIfNeeded();
     await snap(page, 'BASE-G109', width);
 
-    // BASE-F37 — «Copies»: what a copy of the data is next to «Export»; `a` was never reset, so it has none (S2b).
+    // BASE-F37 — «Copies»: what a copy of the data is next to «Export»; `a` was never reset, so it has none.
     await expect(testid(page, 'dumps-intro')).toContainText('keeps it for 90 days');
     await expect(testid(page, 'dumps-empty')).toContainText('No copies yet');
     await testid(page, 'dumps-card').scrollIntoViewIfNeeded();

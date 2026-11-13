@@ -1,10 +1,10 @@
-"""Django settings of hub-next (phase 1: one Postgres database, scope = the Host's label on HUB_BASE_DOMAIN).
+"""Django settings of the Hub: a control database plus one database per hub, the hub chosen by the Host's label.
 
 Configuration comes from the environment (or a ``.env`` file) through python-decouple. ``DEBUG`` is
 off unless set: local development opts in with ``DEBUG=True`` in ``.env`` and then gets defaults for
 ``compose.yaml`` and the local SaaS; without it the settings demand ``SECRET_KEY``, ``SAAS_URL`` and
-``INTERNAL_SHARED_SECRET``. The production variables are the contract of ``aws-next/stacks/prod/apps.tf``
-(``aws-next/README.md``, «Contrato app ↔ infra»).
+``INTERNAL_SHARED_SECRET``. The production variables are the contract of ERPlora/aws's ``stacks/prod/apps.tf``
+(its README, «Contrato app ↔ infra»).
 """
 
 import hashlib
@@ -87,11 +87,11 @@ INSTALLED_APPS = [
     # Before daphne: its runserver (daphne + Vite) must win.
     "live",
     "daphne",
-    # The control database's registry of hubs (phase 2, S1): never inside a hub's database.
+    # The control database's registry of hubs: never inside a hub's database.
     "control",
     # Before the admin: base/templates/admin/ overrides its templates (the chosen hub's banner).
     "base",
-    # The mirror of the SaaS's `shared` schema (round 16): only base/catalog.py writes it.
+    # The mirror of the SaaS's `shared` schema: only base/catalog.py writes it.
     "shared",
     # Django's admin, its site the Hub's own: a hub's model only once a business is chosen (base/admin_site.py).
     "base.admin_site.AdminConfig",
@@ -146,13 +146,13 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     # A host that is no hub (reserved or invalid first label, live.slugs) answers 404 on hub paths.
     "base.middleware.HubHostRequiredMiddleware",
-    # The rest runs in the request's database: use_hub(request.hub), the admin's chosen hub (phase 2, S1).
+    # The rest runs in the request's database: use_hub(request.hub), the admin's chosen hub.
     "base.middleware.HubDatabaseMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    # A session opened on another host (another hub's, the platform's) is no session here (phase 2, S1).
+    # A session opened on another host (another hub's, the platform's) is no session here.
     "base.middleware.SessionHostMiddleware",
-    # The platform host (hubs.localhost) is only the Hub admin for the staff (PLAN §18.1).
+    # The platform host (hubs.localhost) is only the Hub admin for the staff.
     "base.middleware.PlatformHostMiddleware",
     # No login of its own: a browser without a session on a SPA route goes to the SaaS's login.
     "base.middleware.SaasLoginRequiredMiddleware",
@@ -191,8 +191,8 @@ ASGI_APPLICATION = "config.asgi.application"
 # (DB_APPLICATION_NAME, pg_stat_activity); each option only when set. A dead database fails within
 # DB_CONNECT_TIMEOUT seconds, both waiting for a pooled connection and per connection attempt
 # (psycopg: 30 s and 130 s), so /readyz answers 503 before its probes give up. The pool keeps one
-# connection and gives back the rest of a burst one per minute (max_idle; psycopg's 600 s held a
-# scanner's 8 for over an hour): PLAN-DB «Conexiones», round 2026-10-18.
+# connection and gives back the rest of a burst one per minute (max_idle; psycopg's default of 600 s kept
+# a scanner's 8 connections open for over an hour).
 
 db_optional_options = {
     "DB_SSLMODE": "sslmode",
@@ -241,7 +241,7 @@ DATABASES = {
     }
 }
 
-# The migrator's role (hub_migrator: DDL and CREATEDB; PLAN-DB §10) for the direct connections that make and change a
+# The migrator's role (hub_migrator: DDL and CREATEDB) for the direct connections that make and change a
 # hub's database: its `<db_name>__ddl` alias and the maintenance connection to `postgres` (base.tenancy.connections,
 # base.tenancy.ops). Only the worker and the hub-migrate task have it (aws stacks/prod/apps.tf,
 # hub_migrator_credentials; never the web). Unset, there is no migrator (base.tenancy.credentials fails closed, never
@@ -249,7 +249,7 @@ DATABASES = {
 DB_MIGRATOR_USER = config("DB_MIGRATOR_USER", default=DATABASES["default"]["USER"] if DEBUG else "")
 DB_MIGRATOR_PASSWORD = config("DB_MIGRATOR_PASSWORD", default=DATABASES["default"]["PASSWORD"] if DEBUG else "")
 
-# The SaaS's `saas` database, schema `shared`, only for register_apps (round 16, PLAN §21; spec §3.3).
+# The SaaS's `saas` database, schema `shared`, only for register_apps.
 # Declared only where its credentials exist: in production the worker task (SHARED_DB_USER, role
 # hub_shared), locally always (compose.yaml's user). Straight to Aurora's writer (the PgBouncer
 # sidecar only knows hub_app) with the TLS and timeout of every direct connection; one short
@@ -273,7 +273,7 @@ if SHARED_DB_USER:
         },
         "TEST": {"NAME": f"{TEST_DB_NAME}_shared"},
     }
-# The template of every hub's alias (PLAN-DB §4 and §5; phase 2, plan 2026-10-22, S1): base.tenancy.connections copies
+# The template of every hub's alias: base.tenancy.connections copies
 # it, NAME aside, for each hub with a database of its own, and nobody ever connects to the template itself (its clone
 # would fail). The hubs' databases go through the PgBouncer sidecar of the task in transaction mode
 # (PGBOUNCER_HOST/PORT, aws stacks/prod/apps.tf; locally the Postgres of compose.yaml, directly): no pool,
@@ -333,8 +333,8 @@ CACHES = {
     )
 }
 
-# Login through the SaaS (PLAN-SAAS §2.1): its URL, and the secret both sign /internal calls with
-# (the same value in saas-next). Production refuses to start without them.
+# Login through the SaaS: its URL, and the secret both sign /internal calls with
+# (the same value in the SaaS). Production refuses to start without them.
 
 # The SaaS is erplora.com, locally http://localhost:8001 (hubs.localhost is the Hub admin's host):
 # SAAS_URL is where the browser goes (/hub-login/, the admin's Hubs page, the logout).
@@ -356,20 +356,20 @@ INTERNAL_SHARED_SECRET_PREVIOUS = config("INTERNAL_SHARED_SECRET_PREVIOUS", defa
 #: SaaS's own support mailbox.
 SUPPORT_EMAIL = config("SUPPORT_EMAIL", default="support@erplora.com")
 #: Whether erplora.com reads the assistant's answers aloud in its own voices (base.assistant.speak). Off until a voice
-#: provider is configured there (round 2026-11-04a): the panel reads with the device's voice and offers no choice.
+#: provider is configured there: the panel reads with the device's voice and offers no choice.
 ASSISTANT_SERVER_VOICE = config("ASSISTANT_SERVER_VOICE", default=False, cast=bool)
 # How far an internal call's X-Erplora-Timestamp may be from now (both ways), as in the SaaS.
 INTERNAL_SIGNATURE_MAX_AGE_SECONDS = 300
-# The demo hubs (plan 2026-10-17, §1.11), which the SaaS's /demo/ asks for: how many may be live at once (503
-# base.demo_full beyond; the final figure after measuring, PLAN-SAAS §3.5), how long each lives, and how many days a
+# The demo hubs, which the SaaS's /demo/ asks for: how many may be live at once (503
+# base.demo_full beyond), how long each lives, and how many days a
 # purged one still answers 410 before its host is 404. Defaults for every environment; the variables only tune them.
 MAX_CONCURRENT_DEMOS = config("MAX_CONCURRENT_DEMOS", default=50, cast=int)
 DEMO_TTL_MINUTES = config("DEMO_TTL_MINUTES", default=60, cast=int)
 DEMO_TOMBSTONE_DAYS = config("DEMO_TOMBSTONE_DAYS", default=7, cast=int)
 # Whether a module kept out of the store (``listed = False``: today only apps/demo, the platform's reference) shows:
-# in the menu, in «My apps» and with its example steps, panels and counters on the Home (base.home.shown_modules,
-# PLAN-HUB round 2026-10-21). On with DEBUG (development, the tests and the e2e), off in prod and pre: a customer
-# never sees the reference app; a demo's hub shows it whatever this says.
+# in the menu, in «My apps» and with its example steps, panels and counters on the Home (base.home.shown_modules).
+# On with DEBUG (development, the tests and the e2e), off in prod and pre: a customer never sees the reference app;
+# a demo's hub shows it whatever this says.
 SHOW_UNLISTED_MODULES = config("SHOW_UNLISTED_MODULES", default=DEBUG, cast=bool)
 # The Fernet key (32 bytes, URL-safe base64; Secrets Manager in AWS) that seals a business's own VeriFactu
 # certificate in its hub database (apps/verifactu/certificates.py). Empty: the Hub starts, and uploading a
@@ -383,10 +383,10 @@ FLOW_SECRETS_KEY = config("FLOW_SECRETS_KEY", default="")
 # place for its website (apps/website/reviews.py; Place Details and Text Search, from the server only). Secrets Manager
 # and the task definition in AWS. Empty: the reviews section asks nothing and shows only what was read before.
 GOOGLE_PLACES_API_KEY = config("GOOGLE_PLACES_API_KEY", default="")
-# Whether a business may go live with VeriFactu on this server (VERIFACTU-F08): ERPlora opens it under Ioan's
-# supervision, and only the prod deployment honours it (apps.verifactu.queries.production_open; pre files in testing).
+# Whether a business may go live with VeriFactu on this server (VERIFACTU-F08): ERPlora opens it by hand,
+# and only the prod deployment honours it (apps.verifactu.queries.production_open; pre files in testing).
 VERIFACTU_PRODUCTION_ENABLED = config("VERIFACTU_PRODUCTION_ENABLED", default=False, cast=bool)
-# ERPlora's own hub (PLAN-SAAS §4): it issues ERPlora's invoices to its customers, which the SaaS posts to
+# ERPlora's own hub: it issues ERPlora's invoices to its customers, which the SaaS posts to
 # /internal/platform/invoices (base.internal). A reserved slug, so no business can ever take it; it files in the
 # AEAT's environment of the deployment (prod: production; pre: testing), never by its own switch.
 PLATFORM_HUB_SLUG = config("PLATFORM_HUB_SLUG", default="erplora")
@@ -398,16 +398,16 @@ PLATFORM_ISSUER_POSTAL_CODE = config("PLATFORM_ISSUER_POSTAL_CODE", default="288
 PLATFORM_ISSUER_CITY = config("PLATFORM_ISSUER_CITY", default="Coslada")
 PLATFORM_ISSUER_PROVINCE = config("PLATFORM_ISSUER_PROVINCE", default="Madrid")
 PLATFORM_ISSUER_COUNTRY = config("PLATFORM_ISSUER_COUNTRY", default="ES")
-# The hub the worker runs the apps' scheduled tasks on (base.scheduler). Phase 1 has no registry of hubs, so
-# it is one fixed scope; phase 2 replaces it with the loop over the hubs whose hub_due has come.
+# The hub base.scheduler.run_due runs the apps' scheduled tasks on when it is given no scope; the worker
+# itself loops over the hubs whose hub_due has come.
 WORKER_SCOPE_SLUG = config("WORKER_SCOPE_SLUG", default=PLATFORM_HUB_SLUG)
 # First label of the platform host: hubs.erplora.com, locally hubs.localhost:8000, only the Hub admin
-# for the staff (round 13, PLAN §18.1). `hub` stays a reserved slug but is not the platform host.
+# for the staff. `hub` stays a reserved slug but is not the platform host.
 PLATFORM_HOST_LABEL = "hubs"
 # The domain the hubs live under: a hub is <slug>.<HUB_BASE_DOMAIN> and the platform host
 # hubs.<HUB_BASE_DOMAIN>; any other host is no hub (base.operations). erplora.com in prod,
 # pre.erplora.com in pre, localhost locally. Empty: no base domain, the hub is the Host's first label
-# wherever it is (the behaviour before 2026-10-14).
+# wherever it is.
 HUB_BASE_DOMAIN = (
     config("HUB_BASE_DOMAIN", default="localhost" if DEBUG else "erplora.com")
     .strip()
@@ -446,7 +446,7 @@ saas_origin = "{0.scheme}://{0.netloc}".format(urlsplit(SAAS_URL))
 SECURE_CSP["form-action"] = [*SECURE_CSP["form-action"], saas_origin]
 # The SaaS serves a WhatsApp conversation's photos and voice notes (/whatsapp/media/<id>): the inbox's thread
 # shows and plays them from its origin, and from no other (never Meta's CDN). The assistant plays an answer read
-# aloud in the server's voice (round 2026-11-03n) from a blob: the page made of /api/assistant/speak's mp3.
+# aloud in the server's voice from a blob: the page made of /api/assistant/speak's mp3.
 SECURE_CSP["img-src"] = [*SECURE_CSP["img-src"], saas_origin]
 SECURE_CSP["media-src"] = [CSP.SELF, "blob:", saas_origin]
 
@@ -463,14 +463,14 @@ STORAGES = {
 }
 WHITENOISE_IMMUTABLE_FILE_TEST = r"^/static/spa/assets/"
 # Django's two finders plus the modules' documentation images: apps/<id>/docs/img/ is published as
-# /static/catalog/<id>/img/ (round 16, spec §4.4), on hubs.erplora.com and on every hub.
+# /static/catalog/<id>/img/, on hubs.erplora.com and on every hub.
 STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.FileSystemFinder",
     "django.contrib.staticfiles.finders.AppDirectoriesFinder",
     "base.catalog.AppImagesFinder",
 ]
 
-# The hub's file store (PLAN-HUB block 7; base.storage): the S3 bucket Terraform names, with the task role's
+# The hub's file store (base.storage): the S3 bucket Terraform names, with the task role's
 # credentials, or MEDIA_ROOT on disk without one. Every module reaches it as storages["hub_files"].
 
 MEDIA_ROOT = config("MEDIA_ROOT", default=BASE_DIR / "media", cast=Path)
@@ -481,7 +481,7 @@ STORAGES["hub_files"] = hub_files_storage(
     },
     MEDIA_ROOT,
 )
-# The shared image library (base.image_catalog, round 2026-10-30): ERPlora/blueprints' img/. With a bucket, its copy
+# The shared image library (base.image_catalog): ERPlora/blueprints' img/. With a bucket, its copy
 # under shared/catalog/ in it (publish.yml writes it); without one, the ERPlora/blueprints checkout beside this repo.
 # CATALOG_DIR names a folder that wins over the bucket.
 CATALOG_DIR = config(
@@ -489,7 +489,7 @@ CATALOG_DIR = config(
     default="" if config("AWS_STORAGE_BUCKET_NAME", default="") else str(BASE_DIR.parent / "blueprints" / "img"),
 )
 
-# The apps' registry in the SaaS (round 16, PLAN §21; spec §4). The image's build fixes the release:
+# The apps' registry in the SaaS. The image's build fixes the release:
 # APP_VERSION (the commit's sha) and APP_RELEASED_AT (its time, ISO 8601), which register_apps
 # demands in production and which decide that an older release never overwrites a newer one.
 APP_VERSION = config("APP_VERSION", default="")
@@ -505,13 +505,13 @@ WORKBOOK_TRANSLATION_MODEL = config(
 LIVE = {
     "context_builder": "base.operations.HubContextBuilder",
     "control_alias": "default",
-    # Every operation's transaction opens on the alias of its use_hub; the registry's, on control (phase 2, S1). An
-    # operation of an app the business has no right to answers 402 before (base.entitlement, BASE-G12).
+    # Every operation's transaction opens on the alias of its use_hub; the registry's, on control. An
+    # operation of an app the business has no right to answers 402 before (base.entitlement).
     "operation_database": "base.entitlement.operation_database",
     # Where live.operations.atomic() opens (a services.py's savepoint): the active use_hub's alias, inside an operation
-    # its transaction's; without a context HubContextMissing, never control's by omission (phase 2, W9).
+    # its transaction's; without a context HubContextMissing, never control's by omission.
     "current_database": "base.tenancy.context.current_alias",
-    # A cut of the database (a restart, AWS's maintenance, the Blue/Green switchover; PLAN-DB, round 2026-11-04e, point 5;
+    # A cut of the database (a restart, AWS's maintenance, the Blue/Green switchover;
     # BASE-F111): a read, and what was not applied, waits and tries again up to this long in the whole request, far below
     # the 120 s of the load balancer. What tries again on its own gets its 503 at once: the SaaS's /internal, and
     # /readyz, which has to say the database is gone before its probes give up.
@@ -588,8 +588,8 @@ LIVE_ASSISTANT_ASKS_REQUIRED = (
     "whatsapp_inbox",
 )
 
-# Email: the console locally; in production the SES API signed by the task role (no static keys,
-# PLAN-AWS §3), or SMTP from EMAIL_* when SES_REGION is unset. EMAIL_BACKEND overrides the choice.
+# Email: the console locally; in production the SES API signed by the task role (no static keys),
+# or SMTP from EMAIL_* when SES_REGION is unset. EMAIL_BACKEND overrides the choice.
 
 smtp_email_backend = "django.core.mail.backends.smtp.EmailBackend"
 ses_email_backend = "django_ses.SESBackend"

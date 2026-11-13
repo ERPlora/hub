@@ -1,4 +1,4 @@
-"""What the customer taps answers a question the Hub asked (WHATSAPP_INBOX-F38, old HUB-F265).
+"""What the customer taps answers a question the Hub asked (WHATSAPP_INBOX-F38).
 
 A template's quick reply (or an interactive button or list row) comes back as a message with the option
 tapped (its id and its text) and the WhatsApp id of the message it answers. The Hub keeps the option and, in

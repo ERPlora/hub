@@ -1,4 +1,4 @@
-// TASK-F13 and F14 in the project's sheet (tasks#43): its name with its colour, Active or Inactive and
+// TASK-F13 and F14 in the project's sheet: its name with its colour, Active or Inactive and
 // its code; Name and Color editable with Save (only what changed); Deactivate / Activate, which keeps
 // the saved name and colour; Delete, asked first; the 50 most recent tasks of the project with «Showing
 // {shown} of {total}. Find the rest in Tasks.», and «Add task», which creates it inside the project.

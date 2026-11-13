@@ -1,6 +1,4 @@
-// flow: BASE-G52 BASE-G53 BASE-G54 BASE-G55 BASE-G56 BASE-G57 BASE-G58 BASE-G59 BASE-G60 BASE-G61 BASE-G62 BASE-G63
-// BASE-G64 BASE-G65 BASE-G66 BASE-G72 BASE-G81 BASE-G125 BASE-G126 BASE-G151 BASE-F64 (base/WORKBOOK.md, «Acceso»;
-// APP-BASE-3)
+// flow: BASE-F64 (base/WORKBOOK.md, «Acceso»)
 // The way in of a business on the Free plan (one device at a time), two people and two browsers: the owner enters with
 // their erplora.com account on a first device (A), names themselves (the side menu takes the name at once) and chooses
 // a PIN in «My profile», names the device in Settings and sees it in use in System › «Usage and plan»; the employee enters with theirs on a till (B), which asks them to create their PIN and ends A's
@@ -13,32 +11,15 @@ import { createHmac } from 'node:crypto';
 
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import {
-  api,
-  capture,
-  collectProblems,
-  horizontalOverflow,
-  login,
-  psql,
-  SAAS,
-  shot,
-  shown,
-  turnOn,
-  untilStill,
-} from './helpers';
+import { api, capture, collectProblems, horizontalOverflow, login, psql, SAAS, shot, shown, THREE_SIZES as SIZES, turnOn, untilStill } from './helpers';
 import { businessOnSaas, type SaasBusiness, type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
 import { cleanSales } from './sale-helpers';
 import { STACK } from './stack';
 
-const SIZES = [
-  { name: '390', width: 390, height: 844 },
-  { name: '834', width: 834, height: 1112 },
-  { name: '1440', width: 1440, height: 900 },
-] as const;
 const SAAS_STEP = 30_000;
 const OWNER_PIN = '4826';
 const EMPLOYEE_PIN = '9071';
-/** A card's number, one per run: a badge opens one person's door only, and phase 1 keeps every hub's in one table. */
+/** A card's number, one per run: a badge opens one person's door only, so a run never reuses another run's. */
 const BADGE = `77${String(Date.now()).slice(-8)}`;
 /** Where the Sales app's till keeps the check it has on screen (`useCurrentCheck`). */
 const CURRENT_CHECK_KEY = 'erplora.sale.pos.currentCheck';
@@ -72,15 +53,15 @@ async function joins(owner: Person, person: Person, business: Business): Promise
 }
 
 /**
- * `ready` at each size and a capture `APP-BASE-3-<key>-<size>` once nothing moves (a page pushed over another slides
+ * `ready` at each size and a capture once nothing moves (a page pushed over another slides
  * in for half a second: mid-way, the screen it leaves shows at its edge); back at 1440 after.
  */
 async function atEverySize(page: Page, key: string, ready: () => Promise<void>): Promise<void> {
-  for (const size of SIZES) {
-    await page.setViewportSize({ width: size.width, height: size.height });
+  for (const { label, width, height } of SIZES) {
+    await page.setViewportSize({ width, height });
     await ready();
     await untilStill(page);
-    await page.screenshot({ path: shot(`APP-BASE-3-${key}-${size.name}`), fullPage: true });
+    await page.screenshot({ path: shot(`APP-BASE-3-${key}-${label}`), fullPage: true });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 }
@@ -137,7 +118,7 @@ let till: Page;
 let problems: Awaited<ReturnType<typeof collectProblems>>;
 /** Every answer of 400 or more the till got: its method and path. */
 const refused: string[] = [];
-/** `sql` on the business this file signs up: its tables live in its own database (round 2026-10-30 of PLAN-DB, S2a),
+/** `sql` on the business this file signs up: its tables live in its own database,
  *  control's where they are (`psql`). */
 const own = (sql: string): string => psql(sql, business.slug);
 
@@ -152,20 +133,20 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(async () => {
   // The check of «Switch user» (its title is `e2e …`), with the Sales app's own cleanup.
   cleanSales();
-  // The business's dial back to the factory's, in its own database (phase 1 shared it with every hub).
+  // The business's dial back to the factory's, in its own database.
   if (business) own("UPDATE base_accesssettings SET pin_policy = 'per_shift', pin_inactivity_minutes = 5, pin_length = 4");
   await owner?.context.close();
   await employee?.context.close();
 });
 
-test('BASE-G52 BASE-G125 BASE-G126: the owner enters with the account, names themselves and chooses their PIN', async () => {
+test('the owner enters with the account, names themselves and chooses their PIN', async () => {
   const page = owner.page;
   await login(page, origin, '/profile', owner.credentials);
-  // A business is born with every app off (PLAN-HUB round 2026-10-27): Sales, for the sale of BASE-G60 on the till.
+  // A business is born with every app off: Sales, for the sale «Switch user» takes over on the till.
   await turnOn(owner.context, origin, 'sale');
   const profile = shown(page);
   await expect(profile.getByTestId('profile-summary')).toBeVisible();
-  // BASE-F11: entered with the account, the owner's menu has «Manage on erplora.com» (with a badge, BASE-G56, it has
+  // BASE-F11: entered with the account, the owner's menu has «Manage on erplora.com» (entered with a badge, it has
   // none).
   await expect(page.locator('ion-menu [data-testid="menu-manage"]')).toBeVisible();
   await fill(profile.getByTestId('profile-first-name'), 'Ana');
@@ -189,7 +170,7 @@ test('BASE-G52 BASE-G125 BASE-G126: the owner enters with the account, names the
   });
 });
 
-test('BASE-G125 BASE-F64: the personal interface scale is saved, painted and kept at every viewport', async () => {
+test('BASE-F64: the personal interface scale is saved, painted and kept at every viewport', async () => {
   const page = owner.page;
   await page.goto(`${origin}/profile`);
   const profile = shown(page);
@@ -226,7 +207,7 @@ test('BASE-G125 BASE-F64: the personal interface scale is saved, painted and kep
     for (const size of SIZES) {
       await page.setViewportSize({ width: size.width, height: size.height });
       await untilStill(page);
-      expect(await horizontalOverflow(page), `${scale}% at ${size.name}`).toBeLessThanOrEqual(1);
+      expect(await horizontalOverflow(page), `${scale}% at ${size.label}`).toBeLessThanOrEqual(1);
       if (scale === 120 && size.width === 834) {
         await range.scrollIntoViewIfNeeded();
         await capture(page, 'APP-BASE-3-BASE-F64-scale-120-834', { fullPage: true });
@@ -260,7 +241,7 @@ async function nameLayout(name: Locator) {
   });
 }
 
-test('BASE-G125: a name that is an email address shows whole or ends in «…» at every size, never cut mid-word', async () => {
+test('a name that is an email address shows whole or ends in «…» at every size, never cut mid-word', async () => {
   const page = owner.page;
   const address = 'ana.lopez.fernandez@restaurante-ejemplo.es';
   await page.goto(`${origin}/profile`);
@@ -269,18 +250,18 @@ test('BASE-G125: a name that is an email address shows whole or ends in «…» 
   await fill(profile.getByTestId('profile-last-name'), '');
   await profile.getByTestId('profile-save').click();
   await expect(profile.getByTestId('profile-saved')).toHaveText('Profile saved');
-  for (const size of [{ name: '375', width: 375, height: 667 }, ...SIZES]) {
+  for (const size of [{ label: '375', width: 375, height: 667 }, ...SIZES]) {
     await page.setViewportSize({ width: size.width, height: size.height });
     const name = shown(page).getByTestId('profile-name');
     await expect(name).toHaveText(address);
     await untilStill(page);
     const layout = await nameLayout(name);
     // One line, inside the screen: whole where it fits, else ending in «…»; never broken across lines mid-word.
-    expect({ size: size.name, ...layout }).toMatchObject({ size: size.name, lines: 1, inside: true, title: address });
-    expect(layout.fits || layout.ellipsis, `${size.name}: cut without «…»`).toBe(true);
-    if (size.width >= 834) expect(layout.fits, `${size.name}: whole`).toBe(true);
+    expect({ size: size.label, ...layout }).toMatchObject({ size: size.label, lines: 1, inside: true, title: address });
+    expect(layout.fits || layout.ellipsis, `${size.label}: cut without «…»`).toBe(true);
+    if (size.width >= 834) expect(layout.fits, `${size.label}: whole`).toBe(true);
     await toTop(page);
-    await page.screenshot({ path: shot(`APP-BASE-3-BASE-G125-email-${size.name}`), fullPage: true });
+    await page.screenshot({ path: shot(`APP-BASE-3-BASE-G125-email-${size.label}`), fullPage: true });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   // The name the rest of the run expects.
@@ -290,7 +271,7 @@ test('BASE-G125: a name that is an email address shows whole or ends in «…» 
   await expect(shown(page).getByTestId('profile-name')).toHaveText('Ana López');
 });
 
-test('BASE-G72 BASE-G151 BASE-G62 BASE-G63 BASE-G64: Settings › General shows this device, the PIN pad and the devices; one is named', async () => {
+test('Settings › General shows this device, the PIN pad and the devices; one is named', async () => {
   const page = owner.page;
   await page.goto(`${origin}/settings`);
   const settings = shown(page);
@@ -308,7 +289,7 @@ test('BASE-G72 BASE-G151 BASE-G62 BASE-G63 BASE-G64: Settings › General shows 
   });
 });
 
-test('BASE-F40 BASE-G81: «Usage and plan» counts the devices in use: the one in hand, of the one the Free plan covers', async () => {
+test('BASE-F40: «Usage and plan» counts the devices in use: the one in hand, of the one the Free plan covers', async () => {
   const page = owner.page;
   await page.goto(`${origin}/system#usage`);
   const devices = shown(page).getByTestId('system-usage-row-devices');
@@ -322,7 +303,7 @@ test('BASE-F40 BASE-G81: «Usage and plan» counts the devices in use: the one i
   });
 });
 
-test('BASE-G54 BASE-G57: the employee enters on a till, creates their PIN there, and the first device’s session ends', async () => {
+test('the employee enters on a till, creates their PIN there, and the first device’s session ends', async () => {
   till = await employee.context.newPage();
   problems = await collectProblems(till);
   till.on('response', (response) => {
@@ -367,7 +348,7 @@ test('BASE-G54 BASE-G57: the employee enters on a till, creates their PIN there,
   });
 });
 
-test('BASE-G61 BASE-G55: signing out on the till leaves its PIN pad; a wrong PIN says so, the right one enters', async () => {
+test('signing out on the till leaves its PIN pad; a wrong PIN says so, the right one enters', async () => {
   await till.goto(`${origin}/profile`);
   await fill(shown(till).getByTestId('profile-first-name'), 'Bea');
   await shown(till).getByTestId('profile-save').click();
@@ -388,7 +369,7 @@ test('BASE-G61 BASE-G55: signing out on the till leaves its PIN pad; a wrong PIN
   expect(await whoIsIn(till, origin)).toBe('Bea');
 });
 
-test('BASE-G56: a badge that opens nothing says so; the owner’s badge enters as them, with no face chosen', async () => {
+test('a badge that opens nothing says so; the owner’s badge enters as them, with no face chosen', async () => {
   await userMenu(till, 'logout');
   await expect(till).toHaveURL(/\/login(\?|$)/);
   await expect(shown(till).getByTestId('pin-face').first()).toBeVisible();
@@ -405,13 +386,13 @@ test('BASE-G56: a badge that opens nothing says so; the owner’s badge enters a
   await till.keyboard.press('Enter');
   await expect(till).toHaveURL(/\/$/);
   expect(await whoIsIn(till, origin)).toBe('Ana López');
-  // BASE-F11 (gh:hub#2506): a badge on a till is the shift's, not the owner's erplora.com account: no «Manage on
+  // BASE-F11: a badge on a till is the shift's, not the owner's erplora.com account: no «Manage on
   // erplora.com».
   await expect(shown(till).getByTestId('assistant-button')).toBeVisible();
   await expect(till.locator('ion-menu [data-testid="menu-manage"]')).toHaveCount(0);
 });
 
-test('BASE-G60: «Switch user» over the sale in progress: whoever takes over enters with their PIN and the sale stays', async () => {
+test('«Switch user» over the sale in progress: whoever takes over enters with their PIN and the sale stays', async () => {
   // The sale in progress: a check of the Sales app with a line, the one this till has on screen (it keeps its id).
   const opened = await api<{ id: string }>(till.context(), origin, 'POST', '/sale/orders', {
     label: `e2e G60 ${Date.now().toString(36)}`,
@@ -441,7 +422,7 @@ test('BASE-G60: «Switch user» over the sale in progress: whoever takes over en
   await expect(shown(till).getByTestId('devices-admin-only')).toBeVisible();
 });
 
-test('BASE-G59: a till of a business that always asks goes back to the PIN pad after its idle minutes', async () => {
+test('a till of a business that always asks goes back to the PIN pad after its idle minutes', async () => {
   await userMenu(till, 'switch-user');
   await shown(till).getByTestId('pin-face').filter({ hasText: 'Ana López' }).click();
   await press(till, OWNER_PIN);
@@ -463,7 +444,7 @@ test('BASE-G59: a till of a business that always asks goes back to the PIN pad a
   await expect.poll(() => own('SELECT pin_policy FROM base_accesssettings')).toBe('per_shift');
 });
 
-test('BASE-G58: the till’s session ends while working: its next page is its PIN pad, which says so', async () => {
+test('the till’s session ends while working: its next page is its PIN pad, which says so', async () => {
   // Its shift is over (or an administrator ended it): the session is past its time. The business's only live session
   // is the till's (A's ended with the employee's entry).
   const ended = own(
@@ -472,7 +453,7 @@ test('BASE-G58: the till’s session ends while working: its next page is its PI
       'SELECT count(*) FROM ended',
   );
   expect(ended, 'the till’s session, and only it').toBe('1');
-  // A link to a tab (BASE-G52), opened as a page load (from /settings itself it would be a jump inside the shell): the
+  // A link to a tab, opened as a page load (from /settings itself it would be a jump inside the shell): the
   // PIN pad keeps its fragment, and the entry goes back to that tab.
   await till.goto('about:blank');
   await till.goto(`${origin}/settings#data`);
@@ -492,9 +473,9 @@ test('BASE-G58: the till’s session ends while working: its next page is its PI
   expect(during.length <= 1 && during.every((answer) => answer === '401 GET /api/live'), refused.join('\n')).toBe(true);
 });
 
-test('BASE-G66 BASE-G65: the device nobody uses goes; removing the one in hand ends its session', async () => {
+test('the device nobody uses goes; removing the one in hand ends its session', async () => {
   own(`UPDATE base_trusteddevice SET last_entry_at = now() - interval '40 days' WHERE name = 'Office'`);
-  // A page load of Settings › General (BASE-G58 left the till on its Data tab).
+  // A page load of Settings › General (the previous test left the till on its Data tab).
   await till.goto(`${origin}/settings`);
   const devices = shown(till).getByTestId('devices-card');
   await expect(devices.getByTestId('devices-prune')).toHaveText(/Remove the (device|\d+ devices) unused for 30 days/);
@@ -510,7 +491,7 @@ test('BASE-G66 BASE-G65: the device nobody uses goes; removing the one in hand e
   const mine = devices.getByTestId('device-row').filter({ hasText: 'The one you are using' });
   await mine.getByTestId('device-remove').click();
   await expect(mine.getByTestId('device-remove-ask')).toContainText('It is the device you are using');
-  // gh:hub#2577: two sign-outs, an ended session, a badge and three switches of user so far, and the till's only
+  // Two sign-outs, an ended session, a badge and three switches of user so far, and the till's only
   // refusals (and console errors: the browser logs every one) are the wrong PIN's, the unknown badge's and, at most,
   // the live stream's when the session ended.
   expect(refused.slice(0, 2)).toEqual(['401 POST /auth/pin', '401 POST /auth/badge']);

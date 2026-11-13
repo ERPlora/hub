@@ -1,4 +1,4 @@
-// Settings › Data › Reset › «Copies» (round 2026-10-30 of PLAN-DB, decision 2 and proposal (l)): the full copies of the
+// Settings › Data › Reset › «Copies»: the full copies of the
 // business's data ERPlora keeps for 90 days (one before each reset), newest first, each with its date, why it was made
 // and its size, and «Download», whose link (15 minutes) is asked on each click; what a copy is next to «Export». Its
 // states: reading, could not be read (with «Retry»), none yet; hidden while the business shares its database.

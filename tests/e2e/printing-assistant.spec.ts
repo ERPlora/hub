@@ -1,9 +1,8 @@
-// The assistant's card for a write of Printing (FIX-HUB-PRINTING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS; base's half is
-// hub#416, BASE-F97): since hub#416 the card left out every id its schema does not mark, so «cambia las impresoras de la
-// tablet del mostrador» or «reintenta el ticket» said no device, no printer and no job, and «imprime la comanda» said
-// its document as the model sent it («kitchen_order»). Now each record is named as the Printing screens show it — a
+// The assistant's card for a write of Printing (base's half is hub#416, BASE-F97): «cambia las impresoras de la tablet
+// del mostrador», «reintenta el ticket» or «imprime la comanda» name every record as the Printing screens show it — a
 // device and its printers by their names, a job as the queue titles it («Recibo …») —, read as the person, never by
-// its id, and a document by the queue's word for it («Comanda de cocina»). End to end with the stack's SaaS gateway and
+// its id, also the ids its schema does not mark, and a document by the queue's word for it («Comanda de cocina»),
+// never as the model sent it («kitchen_order»). End to end with the stack's SaaS gateway and
 // the e2e's provider (assistant-provider.ts, `E2E-ASK <tool> <JSON>`): the SaaS must be seeded with it (README of this
 // folder, «El asistente»). Cancelled, nothing changes. What this file creates carries its own prefix (E2E PAC) and goes
 // away; the app it turns on is turned off again.
@@ -14,6 +13,7 @@ import { randomUUID } from 'node:crypto';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { sentCard, type SentCard } from './assistant-card-helpers';
 import { type Provider, startProvider } from './assistant-provider';
 import { A, api, capture, compactBar, login, psql, REPO_DIR, shown, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
 import { forgetDevices } from './printing-helpers';
@@ -113,25 +113,6 @@ async function ask(page: Page, text: string): Promise<void> {
   await box(page).fill(text);
   await box(page).press('Enter');
   await expect(answers(page)).toHaveCount(before + 1);
-}
-
-type SentCard = { fields: { name: string; kind: string; label: string; value: unknown }[] };
-
-/** The card of the confirm frame of a turn's answer (`text/event-stream`: one `data: <JSON>` per frame), if any. */
-function confirmedCard(stream: string): SentCard | undefined {
-  const frames = stream
-    .split('\n')
-    .filter((line) => line.startsWith('data:'))
-    .map((line) => JSON.parse(line.slice(5)) as { type: string; card?: SentCard });
-  return frames.find((frame) => frame.type === 'confirm')?.card;
-}
-
-/** The card the server sends for the person to confirm, as it arrives: the answer of the turn that carries it. */
-async function sentCard(page: Page): Promise<SentCard> {
-  const answer = await page.waitForResponse(
-    async (response) => response.url().endsWith('/api/assistant/turn') && confirmedCard(await response.text()) !== undefined,
-  );
-  return confirmedCard(await answer.text())!;
 }
 
 const said = (sent: SentCard): Record<string, unknown> => Object.fromEntries(sent.fields.map((field) => [field.name, field.value]));

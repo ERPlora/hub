@@ -156,7 +156,7 @@ def test_pages(three):
     assert (len(page.rows), page.total) == (1, 3)
 
 
-# Corrections in the list (VERIFACTU-F24, hub#857)
+# Corrections in the list (VERIFACTU-F24)
 
 
 def correct(record: Record) -> Record:
@@ -239,7 +239,7 @@ def test_filters_the_rejections_pending_or_already_corrected(three):
 
 
 def test_the_corrections_cost_no_query_per_row(issuer):
-    # Reviewer guard (hub#857): one subquery in the page's SELECT, never one query per rejected row.
+    # One subquery in the page's SELECT, never one query per rejected row.
     def queries_listing() -> int:
         with CaptureQueriesContext(connection) as captured:
             page = run("verifactu.record.list")
@@ -579,8 +579,8 @@ def test_production_opens_only_in_prod_with_the_flag(settings, env, flag, open_)
 
 
 def test_erplora_route_in_production_needs_only_the_approved_authorisation(server_ready):
-    # PLAN §30 (round 2026-10-22b, VeriFactu on Free): no plan gates production any more; ERPlora's route files
-    # with the approved authorisation alone, whatever the retired ``live_paid`` column still holds.
+    # No plan gates production any more; ERPlora's route files with the approved authorisation alone, whatever the
+    # retired ``live_paid`` column still holds.
     config = Config(route="erplora", representation_status="approved", live_paid=False)
     assert queries.route_problem(config, "production", A) == ""
     config.representation_status = "submitted"
@@ -604,7 +604,7 @@ def test_the_configuration_says_why_new_sales_are_refused_only_in_production(
 ):
     assert run("verifactu.config.get").issue_blocker is None
     Config.objects.create(environment="production", representation_status="approved")
-    # On any plan (PLAN §30): the approved authorisation is ERPlora's whole way to the AEAT.
+    # On any plan: the approved authorisation is ERPlora's whole way to the AEAT.
     assert run("verifactu.config.get").issue_blocker is None
     Config.objects.update(representation_status="revoked")
     blocker = run("verifactu.config.get").issue_blocker
@@ -625,8 +625,7 @@ def own_certificate(days=30):
 
 def test_own_route_in_production_needs_only_its_valid_certificate(server_ready):
     # As in the old Hub (an_own_certificate_needs_no_grant_to_go_live): the business files with its own
-    # certificate, so ERPlora's approval does not apply (Ioan's model, 2026-10-15: «con certificado propio, como
-    # en el Hub antiguo»).
+    # certificate, so ERPlora's approval does not apply.
     config = Config(route="own")
     assert queries.route_problem(config, "production", A) == "own_certificate_missing"
     own_certificate(days=-1)
@@ -640,7 +639,7 @@ def test_own_route_in_production_needs_only_its_valid_certificate(server_ready):
 def test_the_configuration_lists_everything_that_keeps_it_from_going_live(
     issuer, server_ready
 ):
-    # No plan option among them (PLAN §30, round 2026-10-22b: VeriFactu on Free).
+    # No plan option among them: VeriFactu is on every plan.
     assert [reason.code for reason in run("verifactu.config.get").live_blockers] == [
         "representation_not_approved",
     ]
@@ -668,7 +667,7 @@ def test_with_the_own_certificate_no_authorisation_is_asked(issuer, server_ready
     assert [r.code for r in run("verifactu.config.get").live_blockers] == ["hub_not_active"]
 
 
-# The way to production, what «Finish setting up your business» asks (FIX-VERIFACTU-SETUP-HOOKS)
+# The way to production, what «Finish setting up your business» asks
 
 
 def approve(version: int, status: str = "approved") -> None:

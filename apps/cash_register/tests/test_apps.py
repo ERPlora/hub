@@ -1,5 +1,5 @@
 """The cash register app declares its module metadata, its menu, its permissions, what each role gets,
-its scheduled task (the daily auto-close the phase-2 worker runs) and its hooks of the Home."""
+its scheduled task (the daily auto-close the worker runs) and its hooks of the Home."""
 
 from pathlib import Path
 
@@ -101,7 +101,7 @@ def test_what_each_role_may_do():
         *TILL,
         "cash_register.view_expected_totals",
     }
-    # The employee (the old cashier too) opens, records, counts and closes.
+    # The employee is the cashier: opens, records, counts and closes.
     assert permissions_for_role([config()], "hub_employee") == set(TILL)
 
 
@@ -115,7 +115,7 @@ def test_navigation_is_the_drawer_and_its_settings():
 
 
 def test_the_daily_auto_close_is_a_scheduled_task_of_the_app():
-    # Declared in the AppConfig for the phase-2 worker: every 5 minutes, collapsed when it catches up.
+    # Declared in the AppConfig for the worker: every 5 minutes, collapsed when it catches up.
     assert config().scheduled_tasks == [
         {
             "name": "auto_close_sessions",
@@ -158,8 +158,7 @@ def test_opening_closing_moving_and_counting_cash_are_high_risk():
     }
 
 
-# The Home's hooks (PLAN-HUB round 2026-10-21; FIX-CASH_REGISTER-SETUP-HOOKS): the old module's module.json `setup`
-# and `widgets` (it had no `bell`), on the queries the drawer's own screens already read (CASH_REGISTER-F01, F12).
+# The Home's step and panels, on the queries the drawer's own screens already read (CASH_REGISTER-F01, F12).
 
 #: What re-runs the sessions and their figures: an opening, a close, a movement, Sales' lines, the settings (the blind
 #: count decides who reads the expected) and a drawer's name, shown on its sessions.
@@ -234,9 +233,9 @@ def test_the_step_is_refreshed_when_the_settings_are_saved():
 PANELS = ["current_session", "recent_sessions"]
 
 
-def test_the_homes_panels_are_the_old_modules_two():
+def test_the_homes_panels_are_the_expected_cash_and_the_last_differences():
     """The open session's expected cash on by default, to whoever may see it (F07); the differences of the last eight
-    closed sessions, the latest first, to add (gh:cash_register#119: the filter is the one the sessions take)."""
+    closed sessions, the latest first, to add (the filter is the one the sessions take)."""
     panels = config().widgets
     assert all(isinstance(panel, Widget) for panel in panels)
     assert [
@@ -279,26 +278,26 @@ def test_the_homes_panels_are_the_old_modules_two():
             {"valueFormat": "currency"},
         ),
     ]
-    # Every business with Cash register on, grouped under the app's own name in «Customize panel»
-    # (gh:cash_register#123: never a literal category).
+    # Every business with Cash register on, grouped under the app's own name in «Customize panel», never a
+    # literal category.
     assert all(not panel.verticals and not panel.category for panel in panels)
     row = registry["cash_register.session.list"].output.model_fields["rows"].annotation.__args__[0].model_fields
     for panel in panels:
         assert set(panel.map.values()) <= set(row), panel.key
-        # The params are the ones the query takes (an unknown filter is refused, gh:cash_register#119).
+        # The params are the ones the query takes (an unknown filter is refused).
         registry[panel.operation].input.model_validate(dict(panel.params))
 
 
 def test_a_kpi_says_its_name_once():
-    # gh:hub#1105: the old KPIs painted their header twice (the title and options.label with its icon).
+    # A KPI with options.label and an icon painted its header twice.
     for panel in config().widgets:
         if panel.kind == "kpi":
             assert not {"label", "icon"} & set(panel.options), panel.key
 
 
 def test_a_money_panel_pins_no_currency_nor_scale():
-    """gh:cash_register#121 / gh:hub#2387 / gh:outfitkit#243: the money is in the hub's currency, with its decimals and
-    in the reader's language; the old panels fixed EUR, es-ES and a divisor of 100."""
+    """The money is in the hub's currency, with its decimals and in the reader's language, never a fixed EUR,
+    es-ES nor a divisor of 100."""
     money = [
         panel
         for panel in config().widgets
@@ -337,5 +336,4 @@ def test_the_hooks_icons_are_registered_in_the_shell():
 
 
 def test_cash_register_has_no_bell_counters():
-    # The old module declared none (its module.json has no `bell`).
     assert config().bell == []

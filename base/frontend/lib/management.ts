@@ -1,9 +1,9 @@
-// «Manage on erplora.com» at the menu's foot (BASE-F11; the old hub's `management-link.ts`, gh:hub#364): which copy of
+// «Manage on erplora.com» at the menu's foot (BASE-F11; the old hub's `management-link.ts`): which copy of
 // the Hub may offer the way to this business on erplora.com's panel. Who may (the permission) and how they entered
 // (never with a PIN) the server already decided: it embeds the address only then (`hub-home`'s `manage_url`,
 // `base/spa.py`).
 //
-// The cut is the DISTRIBUTION, not the operating system (gh:hub#1897): the panel is next door to the page that charges,
+// The cut is the DISTRIBUTION, not the operating system: the panel is next door to the page that charges,
 // three taps from the till, so the Google Play copy never shows it; a browser and the other copies of the app do. A
 // browser is known from the first frame; the installed app says where its binary came from (`device_context`'s
 // `distribution`: `play`, `msstore` or `direct`), and until it answers nothing is shown, so a Play copy never paints

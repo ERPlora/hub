@@ -1,14 +1,14 @@
 """The software producer's facts (VERIFACTU-F12): the ``SistemaInformatico`` block of every record.
 
 The manufacturer's identity and the product's capabilities are constants **in code** on purpose: they are what
-ERPlora's signed responsible declaration states (art. 13 RRSIF; ``saas-next/public/declaracion/v1``), they
+ERPlora's signed responsible declaration states (art. 13 RRSIF; the SaaS's ``public/declaracion/v1``), they
 change only with a new declaration (review and git history, never a form), and a typo would be AEAT error 1100
 on every record of every business. ``IndicadorMultiplesOT`` is a constant too: ERPlora is one platform for many
 businesses, a system that serves several taxpayers by definition, so it is «S» on every record and owes nothing to
-the account (decision of 2026-10-15). Two facts are not ERPlora's to state once for all:
+the account. Two facts are not ERPlora's to state once for all:
 
 - ``Version``: the running image's commit (``APP_VERSION``), ``dev`` locally;
-- ``NumeroInstalacion``: this business's installation (its scope; in phase 2 the hub's id).
+- ``NumeroInstalacion``: this business's installation, the key of its scope.
 """
 
 from dataclasses import dataclass

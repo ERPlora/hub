@@ -2,7 +2,7 @@
 // confirm by themselves» or «I review them first» writes Citas' rule (`auto_confirm_online`), «Reservations confirm by
 // themselves» Reservas' (`auto_confirm`), at once; with «I review them first» it says where they wait. A failed save says
 // so and goes back to how it was. Each choice is a full-width row whose words wrap: never cut on a phone
-// (whatsapp_inbox#285).
+//.
 import { describe, expect, it } from 'vitest';
 
 import { ADMIN, ionValue, type MountOptions, mountInbox, settle } from '../__tests__/mount-inbox';

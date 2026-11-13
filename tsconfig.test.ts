@@ -1,6 +1,6 @@
 // @vitest-environment node
 // The SPA runs in the browser, so the type project that checks it must not see Node's types: with them, a
-// `process.env` in a page passes `pnpm typecheck` and throws in the browser. Until 2026-10-17 the root
+// `process.env` in a page passes `pnpm typecheck` and throws in the browser. Once the root
 // tsconfig.json held the SPA, its Vitest tests and the root config together, and `vite` and `vitest` brought
 // @types/node into all of them. These tests read the projects the `typecheck` script checks (one per chained
 // `vue-tsc` run), plant a `process.env` in SPA files in memory and prove the SPA's project reports it, and prove
@@ -131,7 +131,7 @@ async function readsOneByOne<T>(run: () => T | Promise<T>): Promise<[T, number]>
 // lookup asked for them once per file of the repo. At rest that is 1.3 s and 160 garbage collections; under load what
 // counts is the opening of files and folders, whose time is the machine's (1,687 files read in 38–50 s with 15 busy
 // cores, 0.1–0.3 s at rest): a run opened 2,588 folders, 930 of them in one test, and a test of this file took 118 s
-// beside `pnpm test` at load ~30 (2026-10-29). Here, once per run (465 folders), walked ahead in a thread of its own
+// beside `pnpm test` at load ~30. Here, once per run (465 folders), walked ahead in a thread of its own
 // (`walkAhead`), as long as the machine makes it; each test keeps its own work (the planted program, the build's reads).
 beforeAll(async () => {
   await walkAhead(() => {

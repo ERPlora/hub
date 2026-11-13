@@ -483,10 +483,10 @@ const kitchenTickets = computed(() => kitchenActive.value && session.can('kitche
 const NOTHING_TO_SEND = new Set(['sale.nothing_to_fire', 'kitchen.nothing_to_cook']);
 
 async function sendRound(rush: boolean): Promise<boolean> {
-  // kitchen#82: the ticket names who attends the check («Atiende»); with «Yo», the kitchen names who sends it.
+  // The ticket names who attends the check («Atiende»); with «Yo», the kitchen names who sends it.
   const sent = await till.sendToKitchen(rush, staff.value.id ? staff.value.name : null);
   if (sent.ok) {
-    // hub#2257: sent, but its sheet did not print — said in words (the reason is Printing's, not the waiter's).
+    // Sent, but its sheet did not print — said in words (the reason is Printing's, not the waiter's).
     const notPrinted = sent.printed === false;
     const words = notPrinted ? t('sale.pos.kitchen.sentNotPrinted', { n: sent.round ?? '' }) : t('sale.pos.kitchen.sent', { n: sent.round ?? '' });
     // At the bottom it would lie over what comes next, and a tap there would fall on the notice: «Charge» after
@@ -507,7 +507,7 @@ async function charge(): Promise<void> {
     askCustomer();
     return;
   }
-  // sales#439: what is pending goes to the kitchen before the charge, or the customer pays for a dish nobody cooks.
+  // What is pending goes to the kitchen before the charge, or the customer pays for a dish nobody cooks.
   if (kitchenOn.value && lines.value.some((line) => !line.fired_at && !line.is_service) && !(await sendRound(false))) return;
   chargingLines = lines.value.map((line) => line.id);
   heldWhileCharging = null;
@@ -543,8 +543,8 @@ const prebillOpen = shallowRef(false);
 
 // ── Layout: the phone's drawer and its button ────────────────────────────────────────────────────
 const PHONE = '(max-width: 820px), (max-height: 500px)';
-/** The till's own width under which the catalogue and the check no longer fit side by side (FIX-SALE-POS-NO-SPEAK-KEY:
- *  the docked assistant takes up to 420px of a tablet). Without it, the narrowest two-column till is a 992px
+/** The till's own width under which the catalogue and the check no longer fit side by side (the docked assistant
+ *  takes up to 420px of a tablet). Without it, the narrowest two-column till is a 992px
  *  window with the side menu, about 720px. */
 const NARROW_TILL = 700;
 const phoneWindow = shallowRef(false);

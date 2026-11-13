@@ -231,7 +231,7 @@ check "prod's services keep their desired count" '! grep -q "desired-count" "$CA
 check "every revision is read before any is registered" \
   '[ "$(last_line_of "describe-task-definition")" -lt "$(line_of "register-task-definition")" ]'
 
-# The calls of a prod deploy before pre existed (2026-10-14): the same calls with the same arguments;
+# The calls of a prod deploy before pre existed: the same calls with the same arguments;
 # only the reads moved, so the three revisions are read (and checked) before any is registered.
 check "prod: the calls are exactly today's" \
   '[ "$(sed -E "s|file://[^ ]*/|file://<workdir>/|" "$CALLS_LOG")" = "$(cat <<'"'"'CALLS'"'"'

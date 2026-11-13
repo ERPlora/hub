@@ -1,5 +1,5 @@
 // The floor plan's geometry and rules, apart from the screen: how big the plan is, where a dragged table
-// may go, what each status looks like (colour, icon, written word: never the colour alone, tables#64),
+// may go, what each status looks like (colour, icon, written word: never the colour alone),
 // whose reservation a table paints and which tables a transfer or a merge may pick.
 import { describe, expect, it } from 'vitest';
 

@@ -1,4 +1,4 @@
-// The translations the master QA of the Hub checks on screen (BASE-G152, base-qa-master.spec.ts). The hub writes in
+// The translations the master QA of the Hub checks on screen (BASE-F107, base-qa-master.spec.ts). The hub writes in
 // English and translates to Spanish: the SPA's catalogues (`<…>/locale/{en,es}.json` of base and of each app,
 // `packages/ui/src/**/locales/{en,es}.json` of the shell and its components) and Django's (`locale/es/LC_MESSAGES/
 // django.po`, the apps' names, menus and server messages). A text on screen that only the other language's catalogue has

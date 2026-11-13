@@ -1,7 +1,3 @@
-// Employees › Approvals (BASE-G145; the old hub's HUB_SHELL-F93): the record of each action that needed a manager's PIN,
-// live (`base.approval.list`), read only. Its explanation, then a row per approval: when, what in words (never the
-// command's technical name), who approved it, who asked, how (PIN or badge) and whether it was used; search by person or
-// action. Empty, it says nobody had to approve anything yet; a record that cannot be read says so with «Retry».
 import { DataTable } from '@erplora/ui/components';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -62,8 +58,6 @@ describe('ApprovalsList', () => {
     expect(rows[1].find('[data-testid="approvals-used"]').text()).toBe('Sin usar');
   });
 
-  // FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE (BASE-F85): each row says the figure of what was done («Discount
-  // a line by 50 %»), and the «Action» filter offers each action once, by its name without figures.
   it('shows each row with its figure and offers each action once, without figures, behind the funnel', async () => {
     const m = await open({ locale: 'es' });
     const line = { operation: 'sale.order.set_line_discount_over_limit', operation_label: 'Descontar una línea por encima del máximo' };
@@ -84,8 +78,6 @@ describe('ApprovalsList', () => {
     ]);
   });
 
-  // The old hub filtered the record by dates, action and level (HUB_SHELL-F93): here by day, action, how and whether it
-  // was used, behind the funnel; the actions offered are the ones on the record, in words, each once.
   it('filters by day, action, how and whether it was used behind the funnel', async () => {
     const m = await open({ locale: 'es' });
     await m.result(m.call, 'base.approval.list', {
@@ -140,8 +132,6 @@ describe('ApprovalsList', () => {
     ]);
   });
 
-  // The old hub's record had its download (HUB_SHELL-F93): «Export CSV» in the table's bar asks for the file with what
-  // the person has on screen, the search and the active filters, and nothing else.
   it('carries «Export CSV» in its bar, with the search and the filters on screen', async () => {
     const m = await open();
     await m.result(m.call, 'base.approval.list', { approvals: [approval()] });

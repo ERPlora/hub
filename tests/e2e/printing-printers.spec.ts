@@ -76,7 +76,7 @@ test('PRINTING-F03, F05, F01: the owner adds a network printer and sends it a te
   await printersReady(page);
   await expect(shown(page).locator('[data-testid=printing-printers-intro]')).toBeVisible();
   await expect(shown(page).locator('[data-testid=printing-summary-heading]')).toBeVisible();
-  // In a browser the note speaks of the browser (printing#37): it cannot reach a printer by itself.
+  // In a browser the note speaks of the browser: it cannot reach a printer by itself.
   await expect(shown(page).locator('[data-testid=printing-printers-app-note]')).toContainText(/browser|navegador/);
   await shown(page).locator('[data-testid=printing-printers-add]').click();
   const modal = dialog(page, 'printing-printer');
@@ -96,7 +96,7 @@ test('PRINTING-F03, F05, F01: the owner adds a network printer and sends it a te
   await rowAction(page, 'printing-printers', till.id, 'test');
   await expect.poll(async () => (await api<{ total: number }>(context, A, 'GET', `/printing/jobs?printer_id=${till.id}`)).data.total).toBe(1);
   // The summary is live: the receipt role now has a job waiting, and its card names the printer it prints
-  // on (hub#1527) — the one the server says, the default or else the first active receipt printer.
+  // on — the one the server says, the default or else the first active receipt printer.
   const receipt = shown(page).locator('[data-testid=printing-summary-card-receipt]');
   await expect(receipt).toContainText(/Waiting: \d+|En cola: \d+/);
   const on = await printsOn(context, 'receipt');
@@ -191,7 +191,7 @@ test('PRINTING-F02: inside the app «Search printers» lists what the device fou
   );
   await login(page, A, '/printing/printers');
   await printersReady(page);
-  // Inside the app nobody is told about a browser (printing#37).
+  // Inside the app nobody is told about a browser.
   await expect(shown(page).locator('[data-testid=printing-printers-app-note]')).not.toContainText(/browser|navegador/);
   await shown(page).locator('[data-testid=printing-printers-discover]').click();
   const modal = dialog(page, 'printing-discover');

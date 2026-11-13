@@ -1,6 +1,6 @@
 // The filters of the Invoices list (INVOICE-F16: status, type, series, source, issue dates and total), as
 // the table's funnel holds them (by the list's parameter names, as typed; a filter not in use is absent)
-// and as `invoice.invoice.list` takes them (the total in cents, invoice#113, read as every amount filter of the Hub:
+// and as `invoice.invoice.list` takes them (the total in cents, read as every amount filter of the Hub:
 // `filterCents`, hub#1196). An amount that is not one, or a «to» day before its «from», never reaches the server: the
 // table says it under the field (the page, with `amountFilterErrors` on `TOTAL_ENDS`).
 import type { DataTableFilters } from '@erplora/ui/components';

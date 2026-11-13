@@ -1,5 +1,5 @@
 // A business outside Spain charges nothing without a tax rule of its own country: Spain alone has factory rules (TAX-F16),
-// and since hub#996 (PLAN-HUB §81) every category with no rule of the business's country refuses to be charged, with
+// and every category with no rule of the business's country refuses to be charged, with
 // «cannot be charged: no tax rule applies to its tax category … here» on the till and `sale.no_tax_rule` (409) from
 // `POST /sale/sales`. A spec that moves hub `a` out of Spain and charges there, or reads the till's total there, has to
 // mount the rule a business of that country makes before it sells (TAX-F04), as the Japanese one did after hub#1069.

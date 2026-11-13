@@ -228,8 +228,7 @@ def sees_member(ctx: OperationContext, staff_id: UUID) -> bool:
 def is_own(ctx: OperationContext, staff_id: UUID | None) -> bool:
     """Whether «their own» appointments take those of ``staff_id``. A person's are their staff record's. A caller that
     is not a person (``by_person``: a flow's step, an API key…) has none, so what it was granted on «its own» takes the
-    whole team's — as the customer, who books with any professional — and is judged by her rules
-    (FIX-HUB-FLOW-STEP-CANNOT-BOOK-FOR-A-PROFESSIONAL)."""
+    whole team's — as the customer, who books with any professional — and is judged by her rules."""
     if not by_person(ctx):
         return True
     return staff_id is not None and staff_id == own_staff_id(ctx)
@@ -316,8 +315,7 @@ def row(appointment: Appointment) -> dict:
 def by_person(ctx: OperationContext) -> bool:
     """Whether a person of the team acts (a user account). Only a person gets the front desk's exceptions
     and reads what is the salon's: an automation — a flow's step, the platform itself, an anonymous caller,
-    any kind still to come — is judged and answered as the customer (appointments#143, #177, #180,
-    hub#1623, hub#1662, hub#2113)."""
+    any kind still to come — is judged and answered as the customer."""
     return hasattr(ctx.actor, "get_username")
 
 
@@ -334,8 +332,8 @@ def for_caller(ctx: OperationContext, answer: dict) -> dict:
 
 
 def start_labels(ctx: OperationContext, start: dt.datetime) -> dict:
-    """``start``'s day and hour ready to say (a flow's template has no clock nor formatter, appointments#151):
-    the weekday and the date in the caller's language, and the hour in 24 hours (the old product's messages)."""
+    """``start``'s day and hour ready to say (a flow's template has no clock nor formatter): the weekday and the date in
+    the caller's language, and the hour in 24 hours."""
     wall = start.astimezone(business_zone())
     return {"start_date_label": day_label(wall.date(), ctx.language), "start_time_label": f"{wall:%H:%M}"}
 
@@ -616,9 +614,9 @@ def count_to_confirm(ctx: OperationContext, data: NoIn) -> dict:
     }
 
 
-# ── What the team is told as it happens (G01) ────────────────────────────────────────────────
+# ── What the team is told as it happens (APPOINTMENT-F28) ────────────────────────────────────
 
-#: How far back the notices go when nobody says (old-hub:HUB_SHELL-F66 told each one as it came).
+#: How far back the notices go when nobody says.
 NOTICES_WINDOW = dt.timedelta(hours=24)
 
 

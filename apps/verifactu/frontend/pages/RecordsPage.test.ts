@@ -7,6 +7,8 @@ import { AppPage } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
+import { outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
+import { insideTheInstalledApp } from '../__tests__/system-browser';
 import { errorFrame, flush, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
 import { plain } from '../lib/format';
 import type { RecordRowOut } from '../operations';
@@ -19,12 +21,6 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 });
 
 const OP = 'verifactu.record.list';
-
-type TauriWindow = { __TAURI__?: { core: { invoke: (command: string, args?: unknown) => Promise<unknown> } } };
-
-afterEach(() => {
-  delete (window as TauriWindow).__TAURI__;
-});
 
 /** The links clicked on the page while `act` runs: what a browser would open, read as they reach the document
  *  (stopped there, so the test's page navigates nowhere). */
@@ -90,6 +86,8 @@ async function setup(options: MountOptions = {}) {
   return { ...m, table, prop, rows, emit, show: (page: unknown) => m.result(OP, page) };
 }
 
+afterEach(outOfTheApp);
+
 describe('RecordsPage', () => {
   it('follows verifactu.record.list, the last sealed first, 50 from the first', async () => {
     const s = await setup();
@@ -150,9 +148,8 @@ describe('RecordsPage', () => {
     open.mockRestore();
   });
 
-  it('in the installed app, «Verify at the AEAT» opens the AEAT’s page in the system browser (gh:hub#518)', async () => {
-    const invoke = vi.fn(() => Promise.resolve());
-    (window as TauriWindow).__TAURI__ = { core: { invoke } };
+  it('in the installed app, «Verify at the AEAT» opens the AEAT’s page in the system browser', async () => {
+    const invoke = insideTheInstalledApp();
     const s = await setup();
     await s.show(PAGE);
     const links = await clickedLinks(() => s.emit('action', { actionId: 'verify', row: PAGE.rows[0] }));
@@ -186,8 +183,7 @@ describe('RecordsPage', () => {
   });
 });
 
-describe('RecordsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-FILTERS-2B)', () => {
-  // flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+describe('RecordsPage: the filters behind the table funnel', () => {
   type Filter = { type: string; key?: string; keys?: string[]; amount?: boolean; label?: string; options?: Array<{ value: string; label: string }> };
 
   it('Date, Type, Total, Environment and Status filter on their columns, the invoice type after them', async () => {
@@ -294,7 +290,7 @@ describe('RecordsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-FI
   });
 });
 
-describe('RecordsPage: whether a rejection is already corrected (VERIFACTU-F24, hub#857)', () => {
+describe('RecordsPage: whether a rejection is already corrected (VERIFACTU-F24)', () => {
   const REJECTIONS = {
     rows: [
       row('TICKET-2026-000004', { sequence: 4, status: 'rejected', correction_status: 'pending' }),
@@ -355,7 +351,7 @@ describe('RecordsPage: whether a rejection is already corrected (VERIFACTU-F24, 
     expect(s.router.currentRoute.value.path).toBe('/verifactu/records/fix-3');
   });
 
-  it('Space on «Corrected» opens the record that corrects it, not the rejected one of its row (hub#865)', async () => {
+  it('Space on «Corrected» opens the record that corrects it, not the rejected one of its row', async () => {
     const s = await setup();
     await s.show(REJECTIONS);
     const push = vi.spyOn(s.router, 'push');
@@ -395,7 +391,7 @@ describe('RecordsPage: whether a rejection is already corrected (VERIFACTU-F24, 
   });
 });
 
-describe('RecordsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('RecordsPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

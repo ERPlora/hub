@@ -1,15 +1,15 @@
-// The card of a write of Sales the assistant wants to run (hub#561, FIX-HUB-SALE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS),
-// end to end with its real dependencies: the Hub of this stack, its SaaS's gateway and the e2e's provider
-// (assistant-provider.ts, its marker `E2E-ASK <tool> <JSON>`). The SaaS must be seeded with that provider (README «El
-// asistente»). Since hub#416 a card leaves out every id its app does not name, so the person confirmed sending a round
-// or deleting a section without reading which one. Now each record goes by the name Sales' screens give it, read as the
-// person, never by its id, and the order type by Kitchen's word. Cancelled: nothing is sent nor deleted.
-// What this file creates is deleted after it.
+// The card of a write of Sales the assistant wants to run (hub#561), end to end with its real dependencies: the Hub of
+// this stack, its SaaS's gateway and the e2e's provider (assistant-provider.ts, its marker `E2E-ASK <tool> <JSON>`).
+// The SaaS must be seeded with that provider (README «El asistente»). The person must read which round is sent or which
+// section is deleted before confirming, also when the app does not name the id (hub#416): each record goes by the name
+// Sales' screens give it, read as the person, never by its id, and the order type by Kitchen's word. Cancelled: nothing
+// is sent nor deleted. What this file creates is deleted after it.
 // flow: SALE-F20 SALE-F35 BASE-F97
 import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { sentCard, type SentCard } from './assistant-card-helpers';
 import { type Provider, startProvider } from './assistant-provider';
 import { A, api, capture, compactBar, login, psql, REPO_DIR, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
@@ -108,25 +108,6 @@ async function cancelCard(page: Page): Promise<void> {
   await card(page).locator('[data-testid="assistant-confirm-cancel"]').click();
   await expect(card(page)).toBeHidden();
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
-}
-
-type SentCard = { fields: { name: string; label: string; value: unknown }[] };
-
-/** The card of the confirm frame of a turn's answer (`text/event-stream`: one `data: <JSON>` per frame), if any. */
-function confirmedCard(stream: string): SentCard | undefined {
-  const frames = stream
-    .split('\n')
-    .filter((line) => line.startsWith('data:'))
-    .map((line) => JSON.parse(line.slice(5)) as { type: string; card?: SentCard });
-  return frames.find((frame) => frame.type === 'confirm')?.card;
-}
-
-/** The card the server sends for the person to confirm, as it arrives: the answer of the turn that carries it. */
-async function sentCard(page: Page): Promise<SentCard> {
-  const answer = await page.waitForResponse(
-    async (response) => response.url().endsWith('/api/assistant/turn') && confirmedCard(await response.text()) !== undefined,
-  );
-  return confirmedCard(await answer.text())!;
 }
 
 const saidBy = (sent: SentCard) => Object.fromEntries(sent.fields.map((field) => [field.name, [field.label, field.value]]));

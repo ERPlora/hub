@@ -1,5 +1,4 @@
-// Layer 2 of the assistant's QA with the real model (docs plan 2026-10-31 of erplora-next, the assistant's knowledge
-// and QA, §1.5): PROBES. A probe is one NEW natural phrase a QA agent writes for one tool, as a person of one role
+// Layer 2 of the assistant's QA, with the real model: PROBES. A probe is one NEW natural phrase a QA agent writes for one tool, as a person of one role
 // would type it in one language (never one of the tool's own `asks`: it measures that the assistant generalises), and
 // what that turn must do: run the read, show the write's card, refuse what the role may not do, or search the docs.
 // Pure, so Vitest proves it (assistant-probes.test.ts): reading and checking the probe files (qa/probes/*.json, schema

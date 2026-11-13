@@ -170,14 +170,14 @@ def test_two_sends_of_the_same_check_make_one_round(product):
     assert Ticket.objects.count() == 1
 
 
-# A product, a category or a station deleted while a write names it (FIX-KITCHEN-ROUTE-PRODUCT-RACE). A route
-# read its product or category unheld: a deletion committed between that read and the write either left a route
-# to a deleted product (Inventory's «Delete»: the row stays, marked deleted) or made the database refuse the
-# write at its COMMIT (the Hub admin's: the row goes), a 500. The same for a station the Hub admin deleted while
-# a route, a round or a ticket by hand named it. The Hub admin's «Delete» (Django's collector) takes the rows
-# that point at the row first and the row last, so a write that held the row and then locked those rows made a
-# circle (a deadlock, review of hub#61): a route locks the route it replaces before it holds its product or
-# category, and the Hub admin's «Delete» of a station goes in line with the kitchen's writes.
+# A product, a category or a station deleted while a write names it. A route read its product or category unheld: a
+# deletion committed between that read and the write either left a route to a deleted product (Inventory's «Delete»: the
+# row stays, marked deleted) or made the database refuse the write at its COMMIT (the Hub admin's: the row goes), a 500.
+# The same for a station the Hub admin deleted while a route, a round or a ticket by hand named it. The Hub admin's
+# «Delete» (Django's collector) takes the rows that point at the row first and the row last, so a write that held the
+# row and then locked those rows made a circle (a deadlock, review of hub#61): a route locks the route it replaces
+# before it holds its product or category, and the Hub admin's «Delete» of a station goes in line with the kitchen's
+# writes.
 
 #: The business's «Delete» (its own app's operation) and the Hub admin's, by the registered ModelAdmin as its
 #: delete page (``delete_model``) or its bulk action (``delete_queryset``) does.
@@ -574,12 +574,12 @@ def test_a_station_being_deleted_when_a_dish_goes_to_it_leaves_the_dish_with_no_
     assert landed() is None
 
 
-# A station or a ticket deleted while a command finds it (FIX-KITCHEN-STATION-DELETE-RACE). A command found its
-# station or its ticket and then locked it again by its id: one gone between the two reads (the Hub admin's
-# «Delete» of a ticket did not go in line with the kitchen's writes) raised DoesNotExist, a 500, and one marked
-# deleted meanwhile (the Hub admin's change page) was changed, printed or deleted again as if it were live. Locked,
-# a row deleted since it was found is not found, as one deleted before. The kitchen's own «Delete» and the Hub
-# admin's «Delete» of a station or a ticket go in line with every write of the kitchen: they wait for it instead.
+# A station or a ticket deleted while a command finds it. A command found its station or its ticket and then locked it
+# again by its id: one gone between the two reads (the Hub admin's «Delete» of a ticket did not go in line with the
+# kitchen's writes) raised DoesNotExist, a 500, and one marked deleted meanwhile (the Hub admin's change page) was
+# changed, printed or deleted again as if it were live. Locked, a row deleted since it was found is not found, as one
+# deleted before. The kitchen's own «Delete» and the Hub admin's «Delete» of a station or a ticket go in line with every
+# write of the kitchen: they wait for it instead.
 
 #: Who takes a station or a ticket away while a command finds it: the ones that go in line with the kitchen's
 #: writes (``locked_settings``) wait for it; the Hub admin's change page comes between its two reads.
@@ -786,12 +786,12 @@ def test_a_ticket_deleted_while_its_round_is_received_is_not_received(world, how
     left_as_the_admin_left_it(ticket.pk, before)
 
 
-# The Hub admin's «Delete» of a ticket a cook is working on (FIX-KITCHEN-STATION-DELETE-RACE). Django's collector
-# takes a ticket's History and dishes first and the ticket last, while a cook's command holds the ticket and then
-# its dishes and writes its History: out of line, the two waited for each other in a circle (a deadlock, 40P01) or
-# the ticket went while the cook's new History line named it (the FK refused the deletion at its end). In line
-# with the kitchen's writes (``locked_settings`` → ticket, as the operations take them), the «Delete» waits for the
-# cook and then takes what the cook added; started first, the cook waits for it and hears the ticket is gone.
+# The Hub admin's «Delete» of a ticket a cook is working on. Django's collector takes a ticket's History and dishes
+# first and the ticket last, while a cook's command holds the ticket and then its dishes and writes its History: out of
+# line, the two waited for each other in a circle (a deadlock, 40P01) or the ticket went while the cook's new History
+# line named it (the FK refused the deletion at its end). In line with the kitchen's writes (``locked_settings`` →
+# ticket, as the operations take them), the «Delete» waits for the cook and then takes what the cook added; started
+# first, the cook waits for it and hears the ticket is gone.
 
 
 def locks_the_dishes(sql: str) -> bool:

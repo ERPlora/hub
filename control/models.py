@@ -1,16 +1,16 @@
-"""The control database's models (PLAN-DB §2; plan 2026-10-22-fase-2-tenencia, S1).
+"""The control database's models.
 
-``Hub`` is the registry of the hubs this Hub serves (docs/plans/2026-10-17-demo-hubs-fase-1.md, §1.1): the SaaS
+``Hub`` is the registry of the hubs this Hub serves: the SaaS
 writes it through ``/internal/hubs/{id}`` (``base.internal``) and the host gate reads it (``base.registry``).
 ``DemoCode`` is a one-time code into a demo hub, which the SaaS asks for (``POST /internal/demos/{slug}/codes``) and
-the demo's ``/auth/callback`` redeems here, without calling the SaaS back. Both moved from ``base`` in S1 keeping
+the demo's ``/auth/callback`` redeems here, without calling the SaaS back. Both moved from ``base`` keeping
 their tables (``base_hub``, ``base_democode``): their migration only moved them in Django's state.
 
 ``Hub.db_name`` says where a hub's data lives: its own database (``<control>_<hex>``, ``<control>_demo_<hex>``;
-``base.tenancy.names``) or, empty, control's, where every hub of phase 1 keeps its data until the cut of S5 (plan,
-decision 1); since S2 every new hub and demo is born with its own (round 2026-10-30 of PLAN-DB, decision 1).
-``Cluster`` is a database cluster a hub's database is on; ``HubDue``, the work a hub has due (the worker's index,
-PLAN-DB §8): since S2, the making of its database and a demo's drop (``base.tenancy.provision``).
+``base.tenancy.names``) or, empty, control's, where a hub not cut yet keeps its data until its cut
+(``base.tenancy.cut``); every new hub and demo is born with its own.
+``Cluster`` is a database cluster a hub's database is on; ``HubDue``, the work a hub has due (the worker's index):
+the making of its database and a demo's drop (``base.tenancy.provision``).
 """
 
 import uuid
@@ -47,10 +47,10 @@ def db_name_validator(value: str) -> None:
 
 class Cluster(UUIDModel):
     """A database cluster that holds hubs' databases: its writer (the migrator's way in) and the PgBouncer of the
-    tasks in front of it (every request's). ``is_open``: new hubs may be placed on it (PLAN-DB §6, «Colocación»), up
+    tasks in front of it (every request's). ``is_open``: new hubs may be placed on it, up
     to ``max_hubs`` of them (0: no limit); a new hub goes to the open one with the fewest
     (``base.tenancy.provision``). ``secret_name`` is the prefix of the two Secrets Manager secrets with this cluster's
-    own roles, ``…/app`` and ``…/migrator`` (``base.tenancy.credentials``; aws#23); empty, the environment's, as the
+    own roles, ``…/app`` and ``…/migrator`` (``base.tenancy.credentials``); empty, the environment's, as the
     settings' own server. Its row says where it is; its secrets only who connects."""
 
     name = models.CharField(_("name"), max_length=63, unique=True)
@@ -89,7 +89,7 @@ class Cluster(UUIDModel):
 class Hub(models.Model):
     """One hub this Hub serves, keyed by the SaaS's id (``PUT /internal/hubs/{id}``) or its own (a demo, ``a``/``b``).
 
-    ``status`` is PLAN-DB §6's vocabulary: ``requested`` → ``creating`` (its database cloned) → ``migrating`` (its
+    ``status`` is the lifecycle of its database: ``requested`` → ``creating`` (its database cloned) → ``migrating`` (its
     schema checked) → ``seeding`` (what the sign-up brought) → ``ready``, or ``failed`` with its ``attempts``, its
     ``last_error`` and its ``next_attempt_at`` (1 min, 5 min, 15 min, then every hour) until it is ready; then
     ``cancelled`` (the SaaS deleted the business; ``restore`` brings it back) or, for a demo, ``expired`` →
@@ -102,10 +102,10 @@ class Hub(models.Model):
     in two photos in any order, and while both name it nobody has it. ``demo_session_key`` is the sha256 of the
     SaaS's browser session that owns a demo, never the session key itself.
 
-    ``db_name`` is the hub's own database, or empty for a business of phase 1 not cut yet, which is not served (S5,
-    ``base.tenancy.cut``; ``base.tenancy.context.use_hub``);
-    ``schema_state`` and ``schema_apps`` are what the migrator confirmed of its schema (S3); ``cluster`` the cluster
-    its database is on (none: the settings' own); ``is_platform`` marks ERPlora's own hub (PLAN-SAAS §4).
+    ``db_name`` is the hub's own database, or empty for a business not cut yet, which is not served
+    (``base.tenancy.cut``; ``base.tenancy.context.use_hub``);
+    ``schema_state`` and ``schema_apps`` are what the migrator confirmed of its schema; ``cluster`` the cluster
+    its database is on (none: the settings' own); ``is_platform`` marks ERPlora's own hub.
     """
 
     class Status(models.TextChoices):
@@ -165,12 +165,12 @@ class Hub(models.Model):
     ready_at = models.DateTimeField(pgettext_lazy("hub registry", "ready at"), null=True, blank=True)
     cancelled_at = models.DateTimeField(pgettext_lazy("hub registry", "cancelled at"), null=True, blank=True)
     purged_at = models.DateTimeField(_("purged at"), null=True, blank=True)
-    # «Reset the business» (round 2026-10-30 of PLAN-DB, decision 2): asked by who runs it, done by the worker after it
+    # «Reset the business»: asked by who runs it, done by the worker after it
     # copied the database (``base.tenancy.dumps``). ``reset_requested_at`` is set while it is to do; ``reset_sections``
     # keeps what was asked and how it went (``base.services``, «The reset of a business»), shown on Settings › Data.
     reset_requested_at = models.DateTimeField(_("reset asked"), null=True, blank=True)
     reset_sections = models.JSONField(_("reset"), null=True, blank=True)
-    # Its move to another cluster (round 2026-10-30b of PLAN-DB, decision 3; tranche S7): asked in the Hub admin
+    # Its move to another cluster: asked in the Hub admin
     # (``control.hub.move``) and done by the worker (``base.tenancy.move``). Set while it is to do: its host answers 503
     # «maintenance» meanwhile, and the cluster cannot be deleted.
     moving_to = models.ForeignKey(
@@ -184,7 +184,7 @@ class Hub(models.Model):
     # Its move is to be undone (``control.hub.move_cancel``, or an undo that could not finish): the worker puts it back
     # on its origin on its next pass, never taking it forward. Its restore's too (below): its own database back.
     move_undo_asked_at = models.DateTimeField(_("move undo asked"), null=True, blank=True)
-    # Its database put back as it was at a moment (hub#1198; PLAN-DB §13, «Restaurar un hub»): asked in the Hub admin
+    # Its database put back as it was at a moment: asked in the Hub admin
     # (``control.hub.restore``) and done by the worker (``base.tenancy.restore``). ``restoring_from`` is the temporary
     # cluster its copy is on (a point-in-time restore of its own, closed to new hubs), set while it is to do: its host
     # answers 503 «maintenance» meanwhile, and that cluster cannot be deleted. ``restore_point``, the moment.
@@ -220,7 +220,7 @@ class Hub(models.Model):
 
 
 class DemoCode(UUIDModel):
-    """A one-time code into a demo hub (plan 2026-10-17, §1.1 and §1.6), kept by its sha256 only, never in clear.
+    """A one-time code into a demo hub, kept by its sha256 only, never in clear.
 
     The SaaS asks for one for the browser that owns the demo and posts it to the demo's ``/auth/callback`` in a form
     (never in a URL); it opens one session, within its minute (``expires_at``), and ``used_at`` says it was spent. A
@@ -244,7 +244,7 @@ class DemoCode(UUIDModel):
 
 
 class HubDue(models.Model):
-    """When a hub has work due in the worker (PLAN-DB §8): its outbox, tasks, fiscal sending or activations.
+    """When a hub has work due in the worker: its outbox, tasks, fiscal sending or activations.
 
     One row per hub, keyed by it: ``mark_due`` moves ``due_at`` earlier, the worker takes the due ones with
     ``SKIP LOCKED`` and a lease (``lease_until``) that is its process's (``lease_owner``): only its holder renews or
@@ -289,11 +289,10 @@ class HubDue(models.Model):
 
 
 class HubDump(UUIDModel):
-    """A copy of a hub's database (``pg_dump -Fc``) in the dumps bucket (round 2026-10-30 of PLAN-DB, decision 2 and
-    proposals (a), (k), (m)): made before its data is reset (``reset``) and when the business leaves (``offboarding``),
-    at ``<hex>/<AAAAMMDDTHHMMSSZ>-<kind>.dump`` (``key``, unique: no versions in the bucket), kept 90 days by the
-    bucket's lifecycle rule. ``created_at`` is when it was made, the key's time; ``requested_by`` who asked for it
-    (the reset's person; empty for a business that left)."""
+    """A copy of a hub's database (``pg_dump -Fc``) in the dumps bucket: made before its data is reset (``reset``) and
+    when the business leaves (``offboarding``), at ``<hex>/<AAAAMMDDTHHMMSSZ>-<kind>.dump`` (``key``, unique: no
+    versions in the bucket), kept 90 days by the bucket's lifecycle rule. ``created_at`` is when it was made, the key's
+    time; ``requested_by`` who asked for it (the reset's person; empty for a business that left)."""
 
     class Kind(models.TextChoices):
         RESET = "reset", pgettext_lazy("data copy", "Before a reset")
@@ -407,12 +406,11 @@ class UsageRun(UUIDModel):
 
 
 class MovedCopy(UUIDModel):
-    """The database a hub left behind on the server it moved from (round 2026-10-30b of PLAN-DB, decision 3; tranche
-    S7): its ``<control>_move_<hex>`` (``base.tenancy.names``), closed to the app, kept a few days in case the move must
-    be undone by hand, then dropped by the worker with its row (``base.tenancy.move``). ``cluster`` empty: the settings'
-    own server. One per database name and server: a newer move off the same server replaces the older copy. A restore
-    keeps the hub's database it replaced the same way (``<control>_old_<hex>``, its own UUIDv7: hub#1198,
-    ``base.tenancy.restore``), one per restore.
+    """The database a hub left behind on the server it moved from: its ``<control>_move_<hex>``
+    (``base.tenancy.names``), closed to the app, kept a few days in case the move must be undone by hand, then dropped
+    by the worker with its row (``base.tenancy.move``). ``cluster`` empty: the settings' own server. One per database
+    name and server: a newer move off the same server replaces the older copy. A restore keeps the hub's database it
+    replaced the same way (``<control>_old_<hex>``, its own UUIDv7; ``base.tenancy.restore``), one per restore.
 
     Written before the worker renames the hub's database, without ``moved_at`` while the move goes on: the hub's data
     is in that copy then, whatever else of that name the servers hold, so a move cut short is undone or gone on from it
@@ -465,8 +463,8 @@ class AskedOfTheWorker(UUIDModel):
 
 
 class RestoredCopy(AskedOfTheWorker):
-    """A hub's database as it was at a moment, made aside on the hub's own cluster while the business goes on (hub#1213,
-    layer 1; BASE-F114): asked in the Hub admin (``control.hub.restore_aside``), made by the worker from the hub's copy
+    """A hub's database as it was at a moment, made aside on the hub's own cluster while the business goes on
+    (BASE-F114): asked in the Hub admin (``control.hub.restore_aside``), made by the worker from the hub's copy
     on a temporary cluster (``base.tenancy.restore``, «restore aside»), then dropped with its row after
     ``move.MOVED_COPY_DAYS``. Its database, ``<control>_copy_<its hex>`` (``base.tenancy.names``), is no business: no
     hub's row names it, it is granted to none of the app's roles and no process registers an alias of it, so nothing in
@@ -522,16 +520,17 @@ class RestoredCopy(AskedOfTheWorker):
 
 
 class CopyRecovery(AskedOfTheWorker):
-    """What the staff asked to bring back into a business from one of its separate copies (hub#1257, layer 2 of
-    hub#1213; BASE-F114): asked in the Hub admin (``control.copy.recover``), done by the worker
-    (``base.tenancy.recovery``), which reads the copy and, by each app's own operations, brings back in the business
-    what it deleted and still holds and creates what it lacks. Dropped with its copy.
+    """What the staff asked to bring back into a business from one of its separate copies (BASE-F114): asked in the Hub
+    admin (``control.copy.recover``), done by the worker (``base.tenancy.recovery``), which reads the copy and, by each
+    app's own operations, brings back in the business what it deleted and still holds and creates what it lacks. Dropped
+    with its copy.
 
     ``apps`` are the labels asked, each an app that answers ``recoverable_from_copy`` on its ``LiveAppConfig``;
     ``language`` is the staff's, which the apps' refusals are said in. ``results`` says, app by app, how many were
-    restored (hub#1306; absent from one noted before), created and not, with why (``reasons``, the first :data:`REASONS_KEPT`, by the copy's id: no personal
-    data), or why the app gave nothing back (``refused``). The worker holds the row's own lease (``lease_owner``,
-    ``lease_until``) while it recovers, never the hub's: the business's own work does not wait for it."""
+    restored (absent from a result noted before that count existed), created and not, with why (``reasons``, the first
+    :data:`REASONS_KEPT`, by the copy's id: no personal data), or why the app gave nothing back (``refused``). The
+    worker holds the row's own lease (``lease_owner``, ``lease_until``) while it recovers, never the hub's: the
+    business's own work does not wait for it."""
 
     #: How many records a recovery notes the reason of, app by app, when its operation refuses them.
     REASONS_KEPT = 50
@@ -562,8 +561,8 @@ class CopyRecovery(AskedOfTheWorker):
 
 
 class LeftoverDatabase(UUIDModel):
-    """A database a move may have left on its destination when it was undone without reaching it (round 2026-10-31 of
-    the review of W8): the hub's name on that cluster, dropped by the worker on a later pass (``base.tenancy.move``)
+    """A database a move may have left on its destination when it was undone without reaching it: the hub's
+    name on that cluster, dropped by the worker on a later pass (``base.tenancy.move``)
     under the hub's lease, never while control says a hub's database is there (the hub on that cluster, moving to it,
     or living on the same server), and forgotten then."""
 
@@ -587,8 +586,8 @@ class LeftoverDatabase(UUIDModel):
 
 
 class Freeze(UUIDModel):
-    """The freeze of what changes a database's schema, for a database upgrade with Blue/Green (hub#930; PLAN-DB round
-    2026-11-04e, «Congelar»: logical replication copies no DDL). While ``frozen``, the worker makes, drops and moves no
+    """The freeze of what changes a database's schema, for a database upgrade with Blue/Green (logical
+    replication copies no DDL). While ``frozen``, the worker makes, drops and moves no
     database and makes no app's tables (``base.worker``: what was asked waits in its queue and is done once it is
     lifted), and ``manage.py migrate_hubs`` refuses to start; the relay, the tasks and the sends to the AEAT go on.
     ``since`` and ``by`` say when and by whom it was last frozen or lifted; ``reason``, why it is frozen.

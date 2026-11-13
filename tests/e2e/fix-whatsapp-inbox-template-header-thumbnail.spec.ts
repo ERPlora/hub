@@ -1,21 +1,20 @@
 // flow: WHATSAPP_INBOX-F29 WHATSAPP_INBOX-F30 WHATSAPP_INBOX-F33
-// FIX-HUB-WHATSAPP-INBOX-TEMPLATE-SHEET-SHOWS-NO-HEADER-THUMBNAIL, in a hidden Chrome (apps/whatsapp_inbox/WORKBOOK.md): the
-// file of a template's photo, video or document header is shown as WhatsApp Manager, WATI or respond.io show it. In
+// In a hidden Chrome (apps/whatsapp_inbox/WORKBOOK.md): the file of a template's photo, video or document header is
+// shown as WhatsApp Manager, WATI or respond.io show it. In
 // «New template» (F29) the photo just chosen shows its thumbnail, loaded from the address the Hub gives it under
 // /p/media/ (served to the hub's sessions only, `members_media`); a video, its first frame with a play sign; a document,
 // its icon. Saved, «Edit» (F30) shows the template's own photo. In a conversation, «Send a template» (F33) shows the
 // thumbnail of the photo chosen now for a template made in WhatsApp Manager; the one made here, which comes with its
-// own photo once Meta approves it, is fix-whatsapp-inbox-template-header-media.spec.ts. The sheet in three sizes
-// (FIX-HUB-WHATSAPP-INBOX-TEMPLATE-SHEET-SHOWS-NO-HEADER-THUMBNAIL-390|834|1440), «Edit» (…-edit-…) and «Send a
-// template» (…-send-…). The channel is pushed as erplora.com pushes it; nothing reaches Meta: what the save hands
+// own photo once Meta approves it, is fix-whatsapp-inbox-template-header-media.spec.ts. Captures of the sheet in three
+// sizes, «Edit» and «Send a template». The channel is pushed as erplora.com pushes it; nothing reaches Meta: what the save hands
 // erplora.com is not looked at here (fix-whatsapp-inbox-template-header-media.spec.ts follows it to Meta's review).
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, capture, login, psql, shown } from './helpers';
-import { FLOW_VIEWPORTS, noHorizontalScroll, rowAction, settled } from './service-helpers';
+import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 import { photo } from './website-helpers';
-import { cleanUp, e2ePhone, keepPhoto, pushChannel, receive, restorePhoto, template } from './whatsapp-helpers';
+import { chooseInTemplateSheet as choose, cleanUp, e2ePhone, keepPhoto, pushChannel, receive, restorePhoto, settledShots as shots, template } from './whatsapp-helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -72,25 +71,6 @@ const sender = (page: Page) => page.locator('ion-modal[data-testid=whatsapp-inbo
 const inSender = (page: Page, name: string) => sender(page).locator(`[data-testid=whatsapp-inbox-template-${name}]`);
 /** The width of a photo the browser decoded (0 until then, or if it could not). */
 const loadedWidth = (image: Locator) => image.evaluate((img: HTMLImageElement) => (img.complete ? img.naturalWidth : 0));
-
-/** Picks `label` in an `ion-select` of the sheet (its popover). */
-async function choose(page: Page, name: string, label: string): Promise<void> {
-  await field(page, name).click();
-  await page.locator('ion-popover.select-popover ion-radio', { hasText: label }).click();
-  await expect(page.locator('ion-popover.select-popover')).toBeHidden();
-}
-
-/** The screen in the three sizes (`<name>-390|834|1440`), with `ready` in sight. */
-async function shots(page: Page, name: string, ready: (page: Page) => Promise<void>): Promise<void> {
-  for (const viewport of FLOW_VIEWPORTS) {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await ready(page);
-    await settled(page);
-    await noHorizontalScroll(page, `${name} ${viewport.label}`);
-    await capture(page, `${name}-${viewport.label}`);
-  }
-  await page.setViewportSize({ width: 1280, height: 860 });
-}
 
 test('WHATSAPP_INBOX-F29, F30: the template’s sheet shows the thumbnail of its photo, the first frame of its video and a document’s icon', async ({ page }) => {
   await login(page, A, '/whatsapp_inbox/settings');

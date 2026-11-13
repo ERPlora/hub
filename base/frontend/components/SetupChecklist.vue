@@ -1,10 +1,8 @@
 <script setup lang="ts">
-// «Finish setting up your business» (BASE-G22, BASE-G130, BASE-G164; hub#372, ADR-0063): ONE live read of
-// `base.setup.status` — the platform's steps and the modules', already ordered and filtered by country,
-// vertical and permission on the server — painted as it comes. «Set up» only where the step's screen exists
-// and the person can do it; a ⛔ only an administrator can do says who can. Folded: ⛔ first, then 🔴, at
-// most 5 rows (2 on a phone); «Your apps» is the «My apps» card's, so the fold does not repeat it. While something is
-// left, «Ask the assistant» opens its panel on the setup (BASE-G121).
+// One live read of `base.setup.status`: the platform's and the apps' steps, already ordered and filtered by country,
+// vertical and permission on the server, painted as they come. «Set up» shows only where the step's screen exists and
+// the person can do it. Folded, ⛔ goes first, then 🔴, at most 5 rows (2 on a phone); «Your apps» is left to the
+// «My apps» card, so the fold does not repeat it.
 import { InlineFeedback, StatusPill, type StatusPillTone } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
@@ -189,7 +187,6 @@ function note(item: SetupItem): string {
       >
         {{ expanded ? $t('base.setup.viewLess') : $t('base.setup.viewAll') }}
       </ion-button>
-      <!-- BASE-G121 (gh:hub#373): the setup with the assistant; each step keeps its own «Set up» if it is down. -->
       <ion-button
         v-if="!view.complete"
         size="small"
@@ -303,7 +300,7 @@ function note(item: SetupItem): string {
   margin: 8px 0;
 }
 
-/* On a phone the pill and the button go under the text, as the old hub's. */
+/* On a phone the pill and the button go under the text. */
 @media (max-width: 767px) {
   .setup-row {
     grid-template-columns: auto minmax(0, 1fr);

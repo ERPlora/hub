@@ -1,4 +1,4 @@
-// PoC §8.5 (second half): changing a `.vue` hot-swaps the module without a reload and without
+// Changing a `.vue` hot-swaps the module without a reload and without
 // losing the live stream; changing a `.py` restarts Django and the page's stream reconnects alone.
 // Every file touched is restored byte for byte.
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -75,7 +75,7 @@ async function touchPython(page: Page, context: BrowserContext, log: LiveLog, la
   };
 }
 
-// flow: ninguno — FIX demo (PoC §8.5: the HMR of a `.vue`, whatever the layout of its root tag)
+// flow: none — the HMR of a `.vue`, whatever the layout of its root tag.
 test('.vue edit → HMR applies without reload and without reopening the stream', async ({ page, context }) => {
   const log = trackLive(page);
   const navEntries = await openList(page);
@@ -124,7 +124,7 @@ test('.py edit → Django restarts and the page recovers by itself, without a fu
   await openList(page);
   const result = await touchPython(page, context, log, 'plain');
   record('07-hmr-py-plain', result);
-  // §8.5: «cambiar un .py → reinicio y reconexión sola». A reload would drop unsaved input.
+  // A changed .py restarts Django and the page reconnects on its own; a reload would drop unsaved input.
   expect(result.sameDocument, 'the page was fully reloaded (Vite «page reload apps/demo/queries.py»)').toBe(true);
 });
 

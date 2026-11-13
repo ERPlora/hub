@@ -1,5 +1,5 @@
-"""Sales asks Printing for its paper by name (PRINTING-F07, F08, F09, F13; SALE-F21, F29; PLAN-HUB «El cobro y la
-comanda llaman a la cola dentro de su propia transacción»): the receipt at checkout inside the charge's own
+"""Sales asks Printing for its paper by name (PRINTING-F07, F08, F09, F13; SALE-F21, F29): the receipt at checkout
+inside the charge's own
 transaction, a reprint marked as a copy and the bill of a check. No mocks: Inventory owns the products,
 Invoicing numbers the ticket and VeriFactu seals it, Printing queues the paper. Without Printing on, without a
 printer that takes the paper or with a fiscal document still pending, nothing is queued and the screen prints
@@ -194,7 +194,7 @@ def test_the_bill_of_a_check_prints_with_its_lines(bar, till):
 
 
 def test_the_employee_at_the_till_gets_the_receipt_and_the_drawer(bar, till):
-    """Whoever charges, not only the owner (pm#630): an employee's cash charge queues its receipt, with its QR and the
+    """Whoever charges, not only the owner: an employee's cash charge queues its receipt, with its QR and the
     order to open the drawer."""
     run("printing.settings.update", {"open_drawer_on_sale": True})
     out = charge("sale-print-employee", payments=CASH, ctx=ctx_for("hub_employee"))

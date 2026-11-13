@@ -100,7 +100,7 @@ def test_the_csp_header_lets_the_thread_show_the_saas_s_attachments_and_widens_n
     policy = debug_policy(dev_server) if dev_server else base_policy()
     nonce = f"'nonce-{csp_nonce(response)}'"
     assert directives["img-src"] == " ".join([*policy["img-src"], saas])
-    # The assistant's answers read aloud in the server's voice play from a blob: of the page (round 2026-11-03n).
+    # The assistant's answers read aloud in the server's voice play from a blob: of the page.
     assert directives["media-src"] == f"'self' blob: {saas}"
     for name in ("default-src", "script-src", "connect-src"):
         assert directives[name] == " ".join(nonce if value == CSP.NONCE else value for value in policy[name])
@@ -118,9 +118,9 @@ def test_the_shell_paints_every_palette_of_the_ui_and_the_default_for_any_other(
 
 @pytest.mark.parametrize("slug", ["a", "b"])
 def test_the_shell_embeds_this_hub_s_name_and_where_its_plan_is_changed_on_the_saas(client, settings, make_user, slug):
-    # BASE-G127: the Home is headed by the business's name; BASE-G169: «Upgrade plan» opens its plan on erplora.com.
-    # APP-BASE-1 (PLAN-SAAS §1.1): the user menu's «My account» opens the SaaS's own page; «Report a problem» is the
-    # hub's own dialog (BASE-F108), so no address of the SaaS's page goes in the HTML.
+    # The Home is headed by the business's name; «Upgrade plan» opens its plan on erplora.com. The user menu's
+    # «My account» opens the SaaS's own page; «Report a problem» is the hub's own dialog (BASE-F108), so no address of
+    # the SaaS's page goes in the HTML.
     from base.models import Hub
 
     Hub.objects.filter(slug=slug).update(name=f"Bar {slug.upper()}")
@@ -132,14 +132,14 @@ def test_the_shell_embeds_this_hub_s_name_and_where_its_plan_is_changed_on_the_s
         "name": f"Bar {slug.upper()}",
         "plan_url": f"{saas}/dashboard/store/plans?business={hub.id}",
         "account_url": f"{saas}/dashboard/account",
-        # APP-BASE-5: «Members» of the business on erplora.com, where people are invited and given a role.
+        # «Members» of the business on erplora.com, where people are invited and given a role.
         "members_url": f"{saas}/dashboard/businesses/{hub.id}/members",
         # BASE-F11: «erplora.com» of the bar, not an employee's (test_the_bar_s_way_to_erplora_com_is_for_who_runs_the_business).
         "manage_url": "",
-        # APP-BASE-3: the session's way in (base/tests/test_access_spa.py).
+        # The session's way in (base/tests/test_access_spa.py).
         "access": {"credential": "account", "switch_user": False, "idle_minutes": None},
         "preferences": {"theme_mode": "", "palette": "", "ui_scale": 100},
-        # Round 2026-11-04a: no server voice for the assistant unless ASSISTANT_SERVER_VOICE (base/tests/test_assistant_speak.py).
+        # No server voice for the assistant unless ASSISTANT_SERVER_VOICE (base/tests/test_assistant_speak.py).
         "server_voice": False,
         # hub#683: where erplora.com serves the ERPlora app of each system it publishes (PUBLIC-F24: no macOS), to anyone.
         "app_downloads": {
@@ -154,7 +154,7 @@ def test_the_shell_embeds_this_hub_s_name_and_where_its_plan_is_changed_on_the_s
     ("role", "offered"), [("hub_owner", True), ("hub_admin", True), ("hub_manager", True), ("hub_employee", False)]
 )
 def test_the_bar_s_way_to_erplora_com_is_for_who_runs_the_business(client, settings, make_user, role, offered):
-    # BASE-F11 (gh:hub#364): «erplora.com» of the bar opens this business on erplora.com's panel, for the owner, an
+    # BASE-F11: «erplora.com» of the bar opens this business on erplora.com's panel, for the owner, an
     # administrator and a manager (``base.open_management``); an employee's bar has none (an empty address).
     from base.models import Hub
 
@@ -186,9 +186,9 @@ def test_the_platform_s_superuser_gets_no_way_to_a_business_that_is_not_its_own(
 
 
 def test_the_shell_embeds_the_persons_panels_so_the_home_opens_one_live_stream(client, make_user):
-    """FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH: the Home's board learnt its panels from its first live
-    stream and reopened it for their data on every load (``net::ERR_ABORTED``). The shell carries ``base.widget.list``
-    as its live query answers it to this person (``widget-list``), so the board subscribes everything at once."""
+    """A Home board that learns its panels from its first live stream reopens it for their data on every load
+    (``net::ERR_ABORTED``). The shell carries ``base.widget.list`` as its live query answers it to this person
+    (``widget-list``), so the board subscribes everything at once."""
     client.force_login(make_user("ana", host="a", role="hub_admin"))
     _, embedded = json_block(client.get("/", HTTP_HOST="a.localhost:8000"), "widget-list")
     live = client.get("/api/home/widgets", HTTP_HOST="a.localhost:8000").json()
@@ -306,8 +306,8 @@ def test_a_file_s_path_with_a_trailing_slash_is_the_same_404_and_no_redirect_to_
         assert (response.status_code, dict(response.cookies)) == (404, {}), path
 
 
-# The old hub's <head> (FIX-HUB-SPA-STATIC-PROBES-SET-CSRF-COOKIE): with /favicon.ico a 404, the shell declares its
-# tab and home-screen icons, static files of the Hub (live.spa, LIVE["spa"]["icons"]), never a CDN.
+# With /favicon.ico a 404, the shell declares its tab and home-screen icons, as the old hub's <head> did: static files
+# of the Hub (live.spa, LIVE["spa"]["icons"]), never a CDN.
 HUB_ICONS = [
     ("icon", "base/icons/favicon.ico", ' sizes="any"'),
     ("apple-touch-icon", "base/icons/apple-touch-icon.png", ""),

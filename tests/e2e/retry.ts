@@ -1,6 +1,6 @@
-// One more try when a dev server refused the connection. The browser PoC drives runserver (:8000)
+// One more try when a dev server refused the connection. The e2e drives runserver (:8000)
 // and the SaaS (:8001), and both restart whenever any session saves a `.py` file: a navigation in
-// that window fails with `net::ERR_CONNECTION_REFUSED` (PoC report of 2026-10-13). That is retried,
+// that window fails with `net::ERR_CONNECTION_REFUSED`. That is retried,
 // once by default; an assertion, a timeout or any other error never is, so a real failure still
 // fails the first time.
 

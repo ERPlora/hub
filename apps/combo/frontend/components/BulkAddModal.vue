@@ -7,7 +7,7 @@
 // Only portions are offered (sold and priced by the unit); while the catalogue is on its way it says
 // «Loading…», a failure offers «Retry», and an answer older than the last search is dropped. A category
 // of Inventory narrows the list to its products (all of them, the course takes 40 at most) and «Tick all
-// of “category” (N)» ticks the ones the course does not offer yet, in the list's order (combos#12: Square
+// of “category” (N)» ticks the ones the course does not offer yet, in the list's order (as Square
 // and WooCommerce Composite add a whole category at once). Each product's price is in the business's currency.
 import { Combo, type ComboOption, FormModal, InlineFeedback, syncSearchbarInputName } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';

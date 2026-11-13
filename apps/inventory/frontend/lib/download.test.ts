@@ -1,19 +1,13 @@
 // The export hands the person the CSV the server wrote (WORKBOOK INVENTORY-F11): the server's name, content and media
 // type, saved by the Hub's `saveFile` — a link in a browser, the app's Downloads inside it (hub#1041).
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { browserDownloads, insideTheAppSaving, keyText, outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
+import { browserDownloads, insideTheAppSaving, keyText, outOfTheAppAfterEach } from '../../../../base/frontend/__tests__/app-download';
 import { saveTextFile } from './download';
 
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastSuccess: vi.fn(() => Promise.resolve()),
-}));
+vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../../../../base/frontend/__tests__/toast-spies')).shellWithToastSpies(importOriginal));
 
-afterEach(() => {
-  outOfTheApp();
-  vi.restoreAllMocks();
-});
+outOfTheAppAfterEach();
 
 describe('saveTextFile', () => {
   it('saves the content under its name with its media type in UTF-8, never left in the page', async () => {

@@ -1,11 +1,10 @@
-// The Hub's pages keep the windows they open (FIX-HUB-COOP-ALLOW-POPUPS, asked by WHATSAPP_INBOX-F01/F02): Meta's
+// The Hub's pages keep the windows they open (WHATSAPP_INBOX-F01/F02 need it): Meta's
 // window to connect a WhatsApp number, and erplora.com's return page after it, post back to the page that opened
-// them. With Django's default Cross-Origin-Opener-Policy, `same-origin`, a window on another origin lost its opener
-// and nothing came back. The page answers `same-origin-allow-popups` (never `unsafe-none`), opens a window on
+// them. With Django's default Cross-Origin-Opener-Policy, `same-origin`, a window on another origin loses its opener
+// and nothing comes back. The page answers `same-origin-allow-popups` (never `unsafe-none`), opens a window on
 // another origin that sends no policy of its own (this stack's Vite: no third party) and that window sees its opener
-// and posts to it; the page receives the message and still holds the window. The page in three sizes
-// (FIX-HUB-COOP-ALLOW-POPUPS-390|834|1440).
-// flow: ninguno — FIX base (COOP del Hub; la piden WHATSAPP_INBOX-F01/F02, de otro carril)
+// and posts to it; the page receives the message and still holds the window. The page in three sizes.
+// flow: none — the Hub's COOP, which WHATSAPP_INBOX-F01/F02 need
 import { expect, test } from '@playwright/test';
 
 import { A, login, shot, topbarApps } from './helpers';

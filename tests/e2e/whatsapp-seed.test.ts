@@ -1,5 +1,5 @@
 // What the WhatsApp e2e ask erplora.com's own test seed (whatsapp_hub_seed.py) and what it leaves in `a`: the month's
-// usage it is told (`--used`) and the templates it keeps as Meta lists them (FIX-HUB-WHATSAPP-INBOX-E2E-SEED-TEMPLATES-AND-CAP-UNUSED).
+// usage it is told (`--used`) and the templates it keeps as Meta lists them.
 // flow: WHATSAPP_INBOX-F13, WHATSAPP_INBOX-F27, WHATSAPP_INBOX-F28
 import { describe, expect, it } from 'vitest';
 

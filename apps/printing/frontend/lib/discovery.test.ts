@@ -96,7 +96,7 @@ describe('discoverPrinters', () => {
     expect(await discoverPrinters(vi.fn().mockResolvedValue({ status: 'scanned', printers: [] }), [])).toEqual({ kind: 'found', printers: [] });
   });
 
-  it('the permission the device denied is said, never shown as no printers (hub#1773)', async () => {
+  it('the permission the device denied is said, never shown as no printers', async () => {
     const invoke = vi.fn().mockResolvedValue({ status: 'local_network_permission_denied', permission: 'NEARBY_WIFI_DEVICES' });
     expect(await discoverPrinters(invoke, [])).toEqual({ kind: 'denied' });
   });

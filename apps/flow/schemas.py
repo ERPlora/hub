@@ -432,7 +432,7 @@ DraftStep = Annotated[
 
 
 def _condition_reads(condition: dict) -> list[str]:
-    # The data it looks at and the data it compares with (hub#1712).
+    # The data it looks at and the data it compares with.
     return [*condition, *document.references(list(condition.values()))]
 
 

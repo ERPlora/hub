@@ -904,7 +904,7 @@ def test_the_reactions_are_the_platforms_only():
     assert run("reservation.customer.erase", {}, system_context(A)).changed == 0
 
 
-# ── Review of 2026-10-21: who changes a guest's own booking (F08) and the WhatsApp door (F17, F18) ─────────
+# ── Who changes a guest's own booking (F08) and the WhatsApp door (F17, F18) ─────────────────────
 
 
 def test_the_staff_change_a_booking_the_guest_made_herself_without_her_rules(week):

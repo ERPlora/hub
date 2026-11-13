@@ -1,11 +1,10 @@
-"""Django admin of the sale app, for the platform's staff only (hubs.erplora.com, PLAN §17–§18).
+"""Django admin of the sale app, for the platform's staff only (hubs.erplora.com).
 
-The open tables (payment methods, settings, departments, quick notes, open checks and their lines) keep
-full CRUD. What was charged is a fiscal document (PLAN-HUB §3.2, round 2026-10-20): sales, their lines and
-payments, the day's counter that numbers them, refunds with their lines and payments, and the voucher
-sessions done outside the till that count in a production are shown whole and never added nor deleted; only
-the notes of a sale and of a refund can change. A charge is corrected by its void or its refunds, as at the
-till. Ids and timestamps are shown, never typed.
+The open tables (payment methods, settings, departments, quick notes, open checks and their lines) keep full CRUD. What
+was charged is a fiscal document: sales, their lines and payments, the day's counter that numbers them, refunds with
+their lines and payments, and the voucher sessions done outside the till that count in a production are shown whole and
+never added nor deleted; only the notes of a sale and of a refund can change. A charge is corrected by its void or its
+refunds, as at the till. Ids and timestamps are shown, never typed.
 """
 
 import re
@@ -402,7 +401,7 @@ def test_the_admin_in_spanish_says_ventas_own_words(staff, product):
     """The open checks' list filters and shows the «Abierta» ones (an open check is a «cuenta»), a line names what it
     carries of Modifiers its «Suplementos» (SALE-F11) and a sale says when it was «Anulada el»: Ventas' words, not
     the «Abierto», «Opciones» and «Anulado el» of Demo and Clientes, loaded before it with the same English. The
-    product data a line freezes reads as in Inventory (hub#560)."""
+    product data a line freezes reads as in Inventory."""
     product()
     check = run("sale.order.open", {"lines": [{"product": "COF"}]})
     sold = charge("admin-es-0001")

@@ -1,7 +1,7 @@
 // The floor plan's geometry and rules, apart from the screen (WORKBOOK «Plano de sala»).
 // - Tables keep their real size: the plan is as large as its farthest table (it scrolls sideways on a
-//   phone and grows down), and a dragged table never leaves it (tables#131 of the old module).
-// - A status is never the colour alone (tables#64): colour, written word and an icon of its own.
+//   phone and grows down), and a dragged table never leaves it (in the old module it could).
+// - A status is never the colour alone: colour, written word and an icon of its own.
 // - A transfer picks a free or reserved table in service; a merge an occupied one (its own table only
 //   when it holds another check: the two halves of a split join back).
 import type { StatusPillTone } from '@erplora/ui/components';
@@ -14,7 +14,7 @@ export const BOX = 72;
 export const TILE_CHROME = 10;
 /** Below this many pixels of pointer travel a press is a tap (edit), above it a drag (move). */
 export const DRAG_THRESHOLD = 5;
-/** An arrow key moves a focused table this far; with Shift, four times as far (tables#16). */
+/** An arrow key moves a focused table this far; with Shift, four times as far. */
 export const KEY_STEP = 8;
 
 export interface Size {

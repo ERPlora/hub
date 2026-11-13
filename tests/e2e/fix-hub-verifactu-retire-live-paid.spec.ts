@@ -1,5 +1,5 @@
 // flow: VERIFACTU-F08
-// FIX-HUB-VERIFACTU-RETIRE-LIVE-PAID (PLAN §30, round 2026-10-22b: VeriFactu on Free): «Pasar a producción» asks for no
+// VeriFactu is on every plan, Free included: «Pasar a producción» asks for no
 // plan option any more. In VeriFactu → Ajustes, in Spanish, against the real Hub: with ERPlora filing and the
 // authorisation approved by the SaaS's photo, what is missing is that this server has not opened real filing
 // (`production_closed`: the e2e server keeps it closed), never «la opción en vivo…», with the photo of today's SaaS

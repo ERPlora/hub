@@ -18,11 +18,11 @@
 // without reloading; Meta's cancelled window and an expired code connect nothing and say why. F02: with «Needs
 // reconnecting», the inbox's notice leads to Settings, «Reconnect» opens the same window and connects the number
 // again, and the inbox's notice goes by itself (disconnecting: whatsapp-inbox-connect.spec.ts).
-// Captures, three sizes: FIX-HUB-WHATSAPP-INBOX-LOCAL-HTTP-RETURN-PAGE-REFUSED[-F01|-F02]-390|834|1440.
+// Captured in three sizes.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, capture, login, SAAS, shown } from './helpers';
-import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
+import { A, login, SAAS, shown } from './helpers';
+import { capturedAtSizes, FLOW_VIEWPORTS, settled } from './service-helpers';
 import { BUSINESS_ID, CODE, EXPIRED_CODE, type GraphCall, type GraphThread, NUMBER_ID, SHOWN_NAME, WABA_ID } from './whatsapp-graph';
 import { cleanUp, metaGraph, pushChannel, restorePhoto, seedErplora } from './whatsapp-helpers';
 
@@ -84,16 +84,12 @@ async function pressAndFinish(page: Page, label: string): Promise<void> {
 /** `page` in the three sizes once `ready` holds in each: painted at that size (`capture`) and without sideways
  *  scroll. */
 async function shots(page: Page, name: string, ready: (page: Page) => Promise<void>): Promise<void> {
-  for (const viewport of FLOW_VIEWPORTS) {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+  await capturedAtSizes(page, name, FLOW_VIEWPORTS, async (viewport) => {
     // The pointer stays where the last button was pressed: away, so no hover is captured.
     await page.mouse.move(0, viewport.height - 1);
     await ready(page);
     await settled(page);
-    await noHorizontalScroll(page, `${name} ${viewport.label}`);
-    await capture(page, `${name}-${viewport.label}`);
-  }
-  await page.setViewportSize({ width: 1280, height: 860 });
+  });
 }
 
 test.describe.configure({ mode: 'serial' });

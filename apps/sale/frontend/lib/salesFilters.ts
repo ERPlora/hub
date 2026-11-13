@@ -1,10 +1,10 @@
 // The filters of the Sales list (SALE-F28: status, payment, date, total), as the table's funnel holds them
 // (by the list's parameter names, as typed; a filter not in use is absent) and as `sale.sale.list` takes
-// them (the total in cents, sales#428, read as every amount filter of the Hub: `filterCents`, hub#1196). An amount
+// them (the total in cents, read as every amount filter of the Hub: `filterCents`, hub#1196). An amount
 // that is not one, or a «to» day before its «from», never reaches the server: the table says it under the field (the
 // page, with `amountFilterErrors` on `TOTAL_ENDS`). A date range, when there is one, replaces the
-// period. «Payment» searches the business's methods on the server (sales#260): each shown as the reader
-// reads it, sent by its stored name, the one a sale keeps (sales#181).
+// period. «Payment» searches the business's methods on the server: each shown as the reader
+// reads it, sent by its stored name, the one a sale keeps.
 import type { DataTableFilterOption, DataTableFilters } from '@erplora/ui/components';
 import type { LiveClient } from '@erplora/ui/sdk';
 

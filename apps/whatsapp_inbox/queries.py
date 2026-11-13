@@ -137,14 +137,14 @@ _TEMPLATE_REASONS = {
 
 #: What a phone typed in the search box may hold besides digits.
 _PHONE_TEXT = re.compile(r"^[\d\s+().\-/]+$")
-#: erplora.com's plans (its Store), where the owner upgrades for more WhatsApp messages (ADR-0474: no packs).
+#: erplora.com's plans (its Store), where the owner upgrades for more WhatsApp messages (no packs).
 PLANS_PATH = f"{SAAS_PANEL_PATH}/store/plans"
 
 
 def e164(raw: str, ctx: OperationContext, *, from_whatsapp: bool = False) -> str:
     """``raw`` as the conversation's key (E.164). WhatsApp's bare digits are international; a number a
     person typed is one of the business's country unless it says its own, as Customers reads a card's phone
-    (gh:whatsapp_inbox#279: in a Spanish business ``600222333`` is Spain's, never +60's; hub#527).
+    (in a Spanish business ``600222333`` is Spain's, never +60's; hub#527).
 
     Raises ``InvalidPhone`` when it is no number.
     """

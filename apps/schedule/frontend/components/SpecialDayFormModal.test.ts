@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { SpecialDayOut } from '../operations';
-import { click, ionValue, mountSchedule, settle } from '../__tests__/mount-schedule';
+import { click, ionChecked, ionValue, mountSchedule, settle } from '../__tests__/mount-schedule';
 import SpecialDayFormModal from './SpecialDayFormModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -15,13 +15,6 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 });
 
 type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; disabled?: boolean; errorText?: string; type?: string; placeholder?: string };
-
-async function toggle(el: Element | null, checked: boolean): Promise<void> {
-  if (!el) throw new Error('no checkbox');
-  (el as HTMLElement & { checked?: boolean }).checked = checked;
-  el.dispatchEvent(new CustomEvent('ionChange', { detail: { checked, value: 'on' }, bubbles: true }));
-  await settle();
-}
 
 const EVE: SpecialDayOut = {
   id: 'sd1',
@@ -72,7 +65,7 @@ describe('SpecialDayFormModal (SCHEDULE-F04, F13)', () => {
     s.answer(201, SAVED);
     await ionValue(s.field('date'), '2026-12-25', 'ionInput');
     await ionValue(s.field('name'), ' Christmas ', 'ionInput');
-    await toggle(s.field('recurring'), true);
+    await ionChecked(s.field('recurring'), true);
     await click(s.submit());
     expect(s.sent()).toEqual([
       {

@@ -3,7 +3,7 @@ the printer, made here at the door so a document that would come out wrong is re
 (WORKBOOK «Contrato con la plataforma»).
 
 The bytes are the app's (``crates/peripherals/src/escpos.rs`` of ERPlora/app, ``erplora_print``): the
-document travels structured, never rendered on the server (PLAN-HUB §5; hub#501). This file holds no ORM.
+document travels structured, never rendered on the server. This file holds no ORM.
 """
 
 import json
@@ -23,10 +23,10 @@ DOCUMENT_TYPES = (
     "generic",
 )
 
-#: The function that prints a document when the caller does not say (the old hub's routes).
+#: The function that prints a document when the caller does not say.
 _USAGE = {"kitchen_order": "kitchen", "barcode_label": "label"}
 
-#: A print job is a ticket or an invoice, not a file: bounded like the old hub's queue.
+#: A print job is a ticket or an invoice, not a file: bounded.
 MAX_DOCUMENT_BYTES = 512 * 1024
 
 NOT_AN_OBJECT = _("A document is a JSON object of fields to print.")

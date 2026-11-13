@@ -1,7 +1,7 @@
 """Sale and Inventory together, no mocks: the catalog that prices a line and the stock a sale moves.
 
 The sale's real event (``sale.sale.completed`` / ``voided``, as recorded in the outbox) is handed to
-Inventory's real reaction (``apps.inventory.events.react``), as the outbox relay will in phase 2.
+Inventory's real reaction (``apps.inventory.events.react``), as the worker's outbox relay does.
 """
 
 from decimal import Decimal

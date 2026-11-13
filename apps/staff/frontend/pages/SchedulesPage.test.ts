@@ -1,7 +1,7 @@
 // Staff → Schedules (WORKBOOK «Pantallas · Horarios»): the Member picker (searched on the server: a
 // business may have more than 100) above the schedules of the chosen member — the first one by name to
 // begin with. With no member at all there is nobody to schedule: only «No staff members yet» and «Add
-// staff member», which opens Staff (the old staff#98).
+// staff member», which opens Staff.
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
@@ -75,7 +75,7 @@ describe('SchedulesPage', () => {
   });
 });
 
-describe('SchedulesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('SchedulesPage: the list fills the page', () => {
   it('the chosen member\'s schedules: AppPage `fill` and its DataTable `fill`, only stacks between them', async () => {
     const s = await setup();
     await s.result('staff.member.list', FIRST);

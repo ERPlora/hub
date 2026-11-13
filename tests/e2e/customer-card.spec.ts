@@ -1,4 +1,4 @@
-// The customer card in Ioan's Chrome: a note added in one tab shows in the activity of another tab
+// The customer card in Chrome: a note added in one tab shows in the activity of another tab
 // without reloading (CUSTOMER-F05, live); a group and a tag created in their lists are ticked on the
 // card and their «Customers» count follows (F06, F27, F28); «Merge with…» folds a duplicate into the
 // open card (F13); «Erase personal data» asks first and erases (F16); «Delete» on a row asks first
@@ -34,7 +34,7 @@ test('a note added in one tab shows live in the other tab\'s activity', async ({
 });
 
 // flow: CUSTOMER-F06 — saving the groups refreshes the card live; that refresh must not untick the tag
-// ticked right after and not saved yet (hub#114: «Save tags» sent none and the card lost it).
+// ticked right after and not saved yet («Save tags» sent none and the card lost it).
 test('a group and a tag made in their lists are assigned on the card; their counts follow', async ({ page, context }) => {
   await login(page, A, '/customer/groups');
   const card = await createCard(context, { name: e2eName('Member') });

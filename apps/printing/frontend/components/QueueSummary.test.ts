@@ -67,7 +67,7 @@ describe('QueueSummary', () => {
     expect(s.find('printing-summary-all-clear').exists()).toBe(false);
   });
 
-  it('names the printer each role prints on even when none was chosen (hub#1527)', async () => {
+  it('names the printer each role prints on even when none was chosen', async () => {
     const s = await setup('es');
     await s.result(OP, summary(usage('receipt', { printers: 2, prints_on: 'Caja' }), usage('kitchen', { printers: 1, prints_on: 'Plancha', default_printer: 'Plancha' })));
     expect(words(s.find('printing-summary-card-receipt').element)).toBe('Recibo Listo Nada en cola Imprime en: Caja.');
@@ -134,7 +134,7 @@ describe('QueueSummary by the clock', () => {
   });
 
   it('a role whose device set up is off says so, not «Ready», and what to do', async () => {
-    // The bell rings for it too (FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF): a minute in the queue, its device quiet.
+    // The bell rings for it too: a minute in the queue, its device quiet.
     const s = await setup('es');
     await s.result(OP, summary(usage('receipt', { printers: 1, prints_on: 'Caja', pending: 1, oldest_pending_at: ago(2), stalled: 1 })));
     const card = words(s.find('printing-summary-card-receipt').element);
@@ -161,10 +161,10 @@ describe('QueueSummary by the clock', () => {
 });
 
 describe('QueueSummary reads the summary again by the clock', () => {
-  // FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF: «Device off» moves as time passes (a job reaching its minute, a device
-  // going quiet for 90 s) with no event to re-run the live query. While something waits and the page is in sight, the
-  // card reads `printing.job.summary` once every 30 s, the bell's pace (HubBell.vue): a reading older than a live result
-  // that came meanwhile is dropped, one that fails keeps the last. The fake timers are the test's only.
+  // «Device off» moves as time passes (a job reaching its minute, a device going quiet for 90 s) with no event to
+  // re-run the live query. While something waits and the page is in sight, the card reads `printing.job.summary` once
+  // every 30 s, the bell's pace (HubBell.vue): a reading older than a live result that came meanwhile is dropped, one
+  // that fails keeps the last. The fake timers are the test's only.
   const SUMMARY = '/api/printing/jobs/summary';
   const waitingOn = (more: Partial<UsageSummary> = {}) =>
     summary(usage('receipt', { printers: 1, prints_on: 'Till', pending: 1, oldest_pending_at: ago(2), ...more }));

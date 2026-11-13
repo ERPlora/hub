@@ -1,4 +1,4 @@
-"""Migrations the code of before survives (PLAN-DB §7, expand/contract; README «Migraciones que conviven…»).
+"""Migrations the code of before survives (expand/contract; README «Migraciones que conviven…»).
 
 The deploy (``.github/scripts/ecs-deploy.sh``) runs ``hub-migrate`` before it replaces the services, and a
 rollback puts the code of before back on the migrated schema: for a while, the code of before reads and writes
@@ -21,8 +21,7 @@ The step of a change that only a later deploy may run (the contract) is the one 
 goes in ``ACCEPTED`` with the PR of its first step as the reason.
 
 Every migration the project loads is checked (``base``, ``live``, the apps and Django's own): ``hub-migrate``
-applies all of them. In phase 1 they all live in the control database; with the tenancy of phase 2 the same
-migrations run in every hub database, under the same deploy.
+applies them to the control database and to every hub database, under the same deploy.
 """
 
 import math
@@ -132,20 +131,21 @@ ACCEPTED = {
         "AddConstraint",
         "template.whatsapp_inbox_template_live_host_name_language_unique",
     ),
-    # Tenancy W10 (the people of a business in its own database, base.HubUser): «one user, one live record» moves onto
-    # the new column hub_user_id, which only the new code writes; the code of before writes the old user_id and leaves
+    # The people of a business in its own database (base.HubUser): «one user, one live record» moves onto the new
+    # column hub_user_id, which only the new code writes; the code of before writes the old user_id and leaves
     # hub_user_id NULL, outside the constraint's condition, so no row of it can break it.
     ("staff", "0004_hub_users", "AddConstraint", "member.staff_member_hub_user_unique"),
-    # Tenancy S3 (an app's tables made when it is turned on): the state's check is widened, dropped and added again in
-    # one migration with ``creating`` and ``failed``; ``on`` and ``off``, all the code of before writes, still pass it.
+    # An app's tables made when it is turned on: the state's check is widened, dropped and added again in one
+    # migration with ``creating`` and ``failed``; ``on`` and ``off``, all the code of before writes, still pass it.
     ("base", "0022_app_activation_creating", "AddConstraint", "appactivation.base_appactivation_state"),
-    # Its contract, a later deploy's, once no code of before W10 runs (written here, not applied): the old columns to
-    # control's users, which W10 took out of the state and nobody writes any more, leave the database through
+    # The contract of the move to base.HubUser, a later deploy's, once no code from before the move runs (written here,
+    # not applied): the old columns to control's users, which the move took out of the state and nobody writes any
+    # more, leave the database through
     # SeparateDatabaseAndState(database_operations=[RunSQL("ALTER TABLE … DROP COLUMN …")]), with no state, and
-    # nothing is linked again first: an old column keeps forever what it said before W10, so filling the new links from
-    # it again (link_hub_users overwrites them) would undo every reassignment made since and could break
-    # staff_member_hub_user_unique. A row the code of before linked during W10's own deploy keeps no person: it is
-    # linked again on its screen. The columns:
+    # nothing is linked again first: an old column keeps forever what it said before the move, so filling the new
+    # links from it again (link_hub_users overwrites them) would undo every reassignment made since and could break
+    # staff_member_hub_user_unique. A row the code of before linked during the move's own deploy keeps no person: it
+    # is linked again on its screen. The columns:
     #   staff_member.user_id, staff_timeoff.approved_by_id,
     #   attendance_record.created_by_id, attendance_record.updated_by_id, attendance_correction.created_by_id,
     #   attendance_attendancesettings.updated_by_id, task_task.created_by_id, task_comment.author_id,

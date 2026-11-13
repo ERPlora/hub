@@ -367,7 +367,7 @@ describe('TemplateFormModal: a header with a file (WHATSAPP_INBOX-F29)', () => {
     expect(s.field('header-file-error').textContent).toContain(message);
   });
 
-  it('the photo just kept shows its thumbnail next to its name (FIX-HUB-WHATSAPP-INBOX-TEMPLATE-SHEET-SHOWS-NO-HEADER-THUMBNAIL)', async () => {
+  it('the photo just kept shows its thumbnail next to its name', async () => {
     const s = await setup();
     await s.choose('header-format', 'IMAGE');
     expect(s.field('header-file-preview')).toBeNull();

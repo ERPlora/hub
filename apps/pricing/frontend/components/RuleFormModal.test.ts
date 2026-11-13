@@ -193,7 +193,7 @@ describe('RuleFormModal', () => {
 });
 
 describe('RuleFormModal: the business answers after the form opened', () => {
-  /** What the money field says in yen, with its example in yen (ui#140). */
+  /** What the money field says in yen, with its example in yen. */
   const NOT_AMOUNT_IN_YEN = 'This is not an amount. Type a figure, for example 12.';
   const FIXED = { rule_type: 'fixed' as const, percent: null };
 

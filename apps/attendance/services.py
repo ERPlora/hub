@@ -168,7 +168,7 @@ def device_source(ctx: OperationContext) -> str:
 
 
 def _measure(values: dict, data: PositionIn, source: str, mine: bool) -> dict[str, Any]:
-    """What is kept of where the device is (ATTENDANCE-F03; review of 2026-10-15, finding 7).
+    """What is kept of where the device is (ATTENDANCE-F03).
 
     With the workplace set, the distance the Hub measures, inside/outside and the accuracy. The exact
     coordinates only when the business requires the location and the person clocks their own day from a

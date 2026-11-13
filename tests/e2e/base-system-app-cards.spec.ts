@@ -1,5 +1,5 @@
-// System › «Usage and plan» has, at its end, the cards the apps on put there (hub#683; BASE-F39 step 5, PRINTING-F21;
-// the old hub's «Your printer» of «Resources», HUB_SHELL-F137/F138), as the owner of hub `a` and in the three viewports
+// System › «Usage and plan» has, at its end, the cards the apps on put there (hub#683; BASE-F39 step 5, PRINTING-F21),
+// as the owner of hub `a` and in the three viewports
 // of the fleet: with Printing on, «Your printer» says who prints, «Set up printing» leads to Printing's printers and,
 // in this browser, the ERPlora app for Windows, Linux and Android comes from erplora.com (the stack's SaaS), each
 // opening outside the hub. Printing turned off takes the card away without a reload and turned on brings it back. The

@@ -112,7 +112,7 @@ def test_a_new_printer():
 
 
 def test_a_role_is_one_of_the_four_never_a_free_word():
-    # hub#457: «Kitchen», «kitchn» or «cocina» would open a queue that no printer ever drains.
+    # «Kitchen», «kitchn» or «cocina» would open a queue that no printer ever drains.
     for usage in ("Kitchen", "kitchn", "cocina", " kitchen", ""):
         refused(schemas.PrinterIn, {"name": "Till", "kind": "network", "usage": usage})
         refused(schemas.PrinterUpdateIn, {"printer": "Till", "usage": usage})

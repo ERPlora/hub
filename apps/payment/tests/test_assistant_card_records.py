@@ -1,7 +1,7 @@
-"""FIX-HUB-PAYMENT-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (hub#674): the card of a write of Payments says which payment
-or method it acts on by its name, read as whoever asks, never by an id, and leaves it out when that person may not read
-it or it is not there. A payment goes by its reference and a method by its name, as the screens say them («Cancel
-payment — PAY-20261014-0003», «Editing method — BBVA account»), under the word each list calls one.
+"""hub#674: the card of a write of Payments says which payment or method it acts on by its name, read as whoever asks,
+never by an id, and leaves it out when that person may not read it or it is not there. A payment goes by its reference
+and a method by its name, as the screens say them («Cancel payment — PAY-20261014-0003», «Editing method — BBVA
+account»), under the word each list calls one.
 """
 
 import dataclasses

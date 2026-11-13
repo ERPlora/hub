@@ -1,4 +1,4 @@
-// flow: VERIFACTU-F01 (with VERIFACTU-F13, F17 and F19; FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN)
+// flow: VERIFACTU-F01 (with VERIFACTU-F13, F17 and F19)
 // VeriFactu is only for businesses in Spain. erplora.com registers `a`'s business in Poland (`PUT /internal/hubs/{id}`,
 // signed the way the SaaS sends it): with VeriFactu on, an invoice is issued without a record («unavailable») and its
 // detail shows no «VeriFactu receipt»; a ticket sealed while the business was in Spain stays unsent, its invoice shows
@@ -15,7 +15,7 @@ import { createHmac } from 'node:crypto';
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown, untilStill } from './helpers';
-import { cleanInvoices, ensureIssuer, issuedIds, issuerNow, type IssuerOut, restoreIssuer, snapshotSeries } from './invoice-helpers';
+import { ensureIssuer, issuedIds, issuerBackAndInvoicesGone, issuerNow, type IssuerOut, snapshotSeries } from './invoice-helpers';
 import { STACK } from './stack';
 
 const KEY = 'FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN';
@@ -113,16 +113,10 @@ test.beforeAll(async ({ browser }) => {
 
 test.afterAll(async ({ browser }) => {
   if (original) await registerIn(original.country);
-  if (issuer) {
-    const context = await browser.newContext({ baseURL: A });
-    await login(await context.newPage(), A, '/invoice/invoices');
-    await restoreIssuer(context, issuer);
-    await context.close();
-  }
-  cleanInvoices();
+  await issuerBackAndInvoicesGone(browser, issuer);
 });
 
-test(`${KEY}: VERIFACTU-F01 a business in Poland issues its invoices without a VeriFactu record or receipt, in 390, 834 and 1440`, async ({ page, context }) => {
+test(`VERIFACTU-F01: a business in Poland issues its invoices without a VeriFactu record or receipt, in 390, 834 and 1440`, async ({ page, context }) => {
   // A ticket sealed while the business was in Spain: its record waits («Pendiente»).
   await registerIn('ES');
   await login(page, A, '/invoice/invoices');
@@ -185,7 +179,7 @@ test(`${KEY}: VERIFACTU-F01 a business in Poland issues its invoices without a V
   }
 });
 
-test(`${KEY}: VERIFACTU-F13 back in Spain an invoice is sealed and shows its VeriFactu receipt`, async ({ page, context }) => {
+test(`VERIFACTU-F13: back in Spain an invoice is sealed and shows its VeriFactu receipt`, async ({ page, context }) => {
   await registerIn('ES');
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/invoice/invoices');

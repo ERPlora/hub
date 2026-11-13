@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Taxes → Settings (TAX-F11, pm#629 VF-17; the WORKBOOK's «Ajustes»): «Your business's tax region». The
+// Taxes → Settings (TAX-F11; the WORKBOOK's «Ajustes»): «Your business's tax region». The
 // country is the business's (`tax.settings.get`, read only: it is the one of its ERPlora account); «Tax
 // region» picks one of its territories with taxes of their own — the Canary Islands (IGIC), Ceuta or Melilla
 // (IPSI) — or the whole country (VAT), and «Save» keeps it. From then on every sale and invoice charges the

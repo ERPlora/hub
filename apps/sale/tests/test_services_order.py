@@ -450,7 +450,7 @@ def test_a_round_says_who_sends_it_by_the_name_a_person_reads(steak, django_user
 
 
 def test_a_round_names_who_attends_the_check_else_who_sends_it(steak, django_user_model):
-    """KITCHEN-F18, F08 (kitchen#82, hub#2033): the till names who attends the check («Atiende», a member of the
+    """KITCHEN-F18, F08: the till names who attends the check («Atiende», a member of the
     team who may have no login); the kitchen reads that name. Empty or blank: who sends it."""
     luis = django_user_model.objects.create_user("saas:45", first_name="Luis", last_name="Pérez")
     named = []

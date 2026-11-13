@@ -1,4 +1,4 @@
-"""The HTTP server of the tests' doubles (``base/tests/fake_gateway.py``), as saas#283 left the SaaS's.
+"""The HTTP server of the tests' doubles (``base/tests/fake_gateway.py``), the same as the SaaS's.
 
 Importable without Django.
 """

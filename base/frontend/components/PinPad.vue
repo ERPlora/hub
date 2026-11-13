@@ -1,8 +1,6 @@
 <script setup lang="ts">
-// The PIN pad (BASE-G54, G55, G60): as many circles as the business's PIN has digits (4 or 6), the keypad and the entry
-// at the last digit, without a button (Clover's, hub#974; the old hub's LoginPage). The digits of a keyboard count
-// too (a till with one), and Backspace erases. The arrow left of the 0 goes back (to the faces) where the screen
-// offers it. The PIN never leaves this component but in `complete`, and its circles are emptied at once.
+// The PIN is entered at its last digit, without a button, as on Clover. The PIN never leaves this component except in
+// `complete`, and its circles are emptied at once.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 import { HubIcon } from '@erplora/ui/shell';

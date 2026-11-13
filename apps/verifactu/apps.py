@@ -9,7 +9,7 @@ from apps.verifactu import events as E
 
 VIEW = "verifactu.view_record"
 #: VeriFactu binds the taxpayers of Spain alone (RD 1007/2023, Orden HAC/1177/2024); the Canary Islands, Ceuta and
-#: Melilla are regions of ES (the tax territory of PLAN-HUB, round 2026-10-17), not other countries.
+#: Melilla are regions of ES, not other countries.
 SPAIN = "ES"
 
 
@@ -21,7 +21,7 @@ class VerifactuConfig(LiveAppConfig):
     icon = "ion:shield-checkmark-outline"
     category = Category.SALES
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The app store's texts, which register_apps writes to shared.app.
     summary = _(
         "Every invoice and ticket becomes a chained VeriFactu record with its QR, sent to the AEAT."
     )
@@ -33,12 +33,12 @@ class VerifactuConfig(LiveAppConfig):
         "Records, queue, audit events and the chain's recovery are all here, in the test environment until you go "
         "live."
     )
-    # In no template (PLAN-HUB round 2026-11-07, hub#998): it binds the business to the AEAT until the end of the
-    # calendar year and never goes off once on (VERIFACTU-F32), so its owner turns it on from Apps, never a template.
+    # In no template: it binds the business to the AEAT until the end of the calendar year and never goes off once on
+    # (VERIFACTU-F32), so its owner turns it on from Apps.
     verticals = []
-    # Mandatory in Spain (hub#997, PLAN-HUB round 2026-11-07): the Home asks whoever runs a business there to turn it on
-    # while it is off (base.home.mandatory_steps). The platform never turns it on by itself: it binds the business to
-    # the AEAT until the end of the calendar year and needs its authorisation, so its owner does, from Apps.
+    # Mandatory in Spain: the Home asks whoever runs a business there to turn it on while it is off
+    # (base.home.mandatory_steps). The platform never turns it on by itself: it binds the business to the AEAT until the
+    # end of the calendar year and needs its authorisation, so its owner does, from Apps.
     mandatory = {"countries": [SPAIN], "platform_turns_on": False}
     # A record is born from an issued invoice, read from its row (a foreign key).
     requires = ["invoice"]
@@ -78,17 +78,14 @@ class VerifactuConfig(LiveAppConfig):
         Nav("config", _("Configuration"), "ion:key-outline", "/verifactu/config"),
         Nav("settings", _("Settings"), "ion:settings-outline", "/verifactu/settings"),
     ]
-    # The Home's hooks (PLAN-HUB round 2026-10-21), the old module's module.json `setup` and `widgets` (it had no
-    # `bell`). The step is done once the chosen way could carry the records to the AEAT of production (VERIFACTU-F08,
-    # no plan gating it: PLAN §30), which is what the business has to do. Its level is base's: functional in testing,
-    # which files without it while the till sells (gh:hub#1726); ⛔ legal where the hub files in production, which
-    # refuses every sale without it (``base.home.LEGAL_IN_PRODUCTION``, on the row's ``environment``). Only a business in
-    # Spain is asked (hub#682): outside it VeriFactu seals and sends nothing (``queries.outside_spain``), and a hub
-    # without a country (a demo, ERPlora's own) is in Spain, base's reading (``base.business.country_or_market``).
-    # The panels read the queries of the old ones, each
-    # refreshed by the events live.py re-runs it on; the latest events are a component of the app, which names each
-    # event's type in the reader's language (gh:verifactu#139). Registered icons only: the old
-    # `stats-chart-outline` waits in UI-REQUESTS.md.
+    # The Home's step is done once the chosen way could carry the records to the AEAT's production environment
+    # (VERIFACTU-F08), whatever the plan. Its level is base's: functional in testing, which files without it while the
+    # till sells; ⛔ legal where the hub files in production, which refuses every sale without it
+    # (``base.home.LEGAL_IN_PRODUCTION``, on the row's ``environment``). Only a business in Spain is asked: outside it
+    # VeriFactu seals and sends nothing (``queries.outside_spain``), and a hub without a country (a demo, ERPlora's own)
+    # is in Spain, base's reading (``base.business.country_or_market``). Each panel is refreshed by the events live.py
+    # re-runs it on; the latest events are a component of the app, which names each event's type in the reader's
+    # language. Registered icons only: `stats-chart-outline` waits in UI-REQUESTS.md.
     setup = [
         SetupStep(
             key="sending_route",
@@ -181,7 +178,7 @@ class VerifactuConfig(LiveAppConfig):
         return queries.disable_refusal(ctx)
 
     def fiscal_pending_since(self):
-        """hub#488: the platform's metrics (``base.metrics``) ask, in each database they read, since when the oldest
+        """The platform's metrics (``base.metrics``) ask, in each database they read, since when the oldest
         production record not in the AEAT yet waits (``queries.oldest_unsent_at``), or ``None``: its age pages the
         team after 5 minutes (``ERPlora/Fiscal`` ``OldestPendingAgeSeconds``)."""
         from apps.verifactu import queries  # the models are not loaded yet when this module is
@@ -189,14 +186,14 @@ class VerifactuConfig(LiveAppConfig):
         return queries.oldest_unsent_at()
 
     def fiscal_documents_kept(self) -> bool:
-        """hub#599: the platform asks (``base.tenancy.offboarding``) before it drops the database of a business that
-        left: Its records for the tax authority here are documents nothing archives yet (PLAN-DB §6), so the database stays."""
+        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left:
+        its records for the tax authority here are documents nothing archives yet, so the database stays."""
         from apps.verifactu import queries  # the models are not loaded yet when this module is
 
         return queries.keeps_fiscal_documents()
 
     def fiscal_record_states(self, conn) -> dict:
-        """hub#1205: the platform asks (``base.tenancy.restore``) before it puts a business's database back as it was
+        """The platform asks (``base.tenancy.restore``) before it puts a business's database back as it was
         at a moment, in its database and in the copy, through ``conn``, a direct connection to one of them: what each
         production record says of its life at the AEAT, by id (``queries.record_states``)."""
         from apps.verifactu import queries  # the models are not loaded yet when this module is

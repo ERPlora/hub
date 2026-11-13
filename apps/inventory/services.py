@@ -470,7 +470,7 @@ def set_sold_out(ctx: OperationContext, data: ProductSoldOutIn) -> dict:
     return load_product(product.id, ctx.scope)
 
 
-# The product's image (round 2026-10-30, base.images)
+# The product's image (base.images)
 
 #: Where a product's own photos are kept under its hub's prefix: the folder ``members_media`` serves (apps.py).
 PHOTOS = "inventory/products/"
@@ -1009,7 +1009,7 @@ def write_off_stock(ctx: OperationContext, data: WriteOffIn) -> dict:
         raise _service_has_no_stock("product_id" if data.product_id is not None else "product")
     _check_grid(data.qty, product.unit, "qty")
     settings = current_settings()
-    # Never a silent success: a write-off that would lower nothing says so (2026-10-14).
+    # Never a silent success: a write-off that would lower nothing says so.
     if not tracks_stock(product, settings):
         raise Conflict(str(STOCK_NOT_TRACKED), code="inventory.stock_not_tracked", fields={"qty": str(STOCK_NOT_TRACKED)})
     if not settings.allow_sell_without_stock and product.stock < data.qty:

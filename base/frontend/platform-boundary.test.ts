@@ -1,7 +1,7 @@
-// base is the platform (CLAUDE.md «Apps»): always installed and with no `requires`, so its frontend never imports
+// base is the platform: always installed and with no `requires`, so its frontend never imports
 // a module's code (a type, a component, an operation). Such an import ties the Home to an app a hub may not have:
 // «Activity» reads Sales by the operation's name (`sale.sale.list`) and keeps its own type of the row.
-// The one door into `apps/` is the extension point of the hooks (PLAN-HUB, round 2026-10-21; hub#683): `lib/app-components.ts`
+// The one door into `apps/` is the extension point of the hooks: `lib/app-components.ts`
 // loads the component a module declares for its panel of the Home or its card of System with `import.meta.glob`, so base
 // never names a module.
 import { readdirSync, readFileSync } from 'node:fs';

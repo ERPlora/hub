@@ -6,7 +6,7 @@ server refuses (``tests/test_countries.py`` checks they match). Regenerate with
 ``uv run python -m apps.customer.countries``.
 
 ``country_from_text`` reads what a file or a person writes — a code, or a name in Spanish or English,
-case and accents aside — as the screen does (product customers#72); Canarias (IC) and Ceuta y Melilla
+case and accents aside — as the screen does; Canarias (IC) and Ceuta y Melilla
 (EA) are Spain. No ORM.
 """
 

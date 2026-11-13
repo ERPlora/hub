@@ -7,11 +7,12 @@ from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs
 from live.operations import registry
 
 from apps.table import events as E
 from base import home
+from base.tests.roles import grants_by_role
 
 PERMISSIONS = [
     "table.view_zone",
@@ -37,7 +38,7 @@ ADMIN_ONLY = {
     "table.delete_session",
     "table.manage_settings",
 }
-#: The waiter (the old employee and cashier): sees the room and serves it, never draws it.
+#: The waiter (an employee, cashier or not): sees the room and serves it, never draws it.
 EMPLOYEE = {
     "table.view_zone",
     "table.view_table",
@@ -66,7 +67,7 @@ def test_table_is_a_free_module_of_the_restaurant_group_with_a_registered_icon()
     assert config in module_configs()
     assert config.category is Category.RESTAURANT
     assert config.premium is False
-    # Registered in the shell (ION_ICONS); the old `map-outline` waits in UI-REQUESTS.md.
+    # Registered in the shell (ION_ICONS); `map-outline` waits in UI-REQUESTS.md.
     assert config.icon == "ion:grid-outline"
     assert str(config.verbose_name) == "Tables"
 
@@ -98,18 +99,17 @@ def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
 
 
 def test_what_each_role_gets():
-    config = table()
-    for role in ("hub_owner", "hub_admin"):
-        assert permissions_for_role([config], role) == set(PERMISSIONS), role
-    assert (
-        permissions_for_role([config], "hub_manager") == set(PERMISSIONS) - ADMIN_ONLY
-    )
-    assert permissions_for_role([config], "hub_employee") == EMPLOYEE
+    everything = set(PERMISSIONS)
+    assert grants_by_role(table()) == {
+        "hub_owner": everything,
+        "hub_admin": everything,
+        "hub_manager": everything - ADMIN_ONLY,
+        "hub_employee": EMPLOYEE,
+    }
 
 
-def test_navigation_is_the_four_sections_of_the_old_module_with_registered_icons():
-    # Settings is a tab of the pages (frontend/tabs.ts), shown only to whoever may save them, as the
-    # old shell generated it.
+def test_navigation_is_four_sections_with_registered_icons():
+    # Settings is a tab of the pages (frontend/tabs.ts), shown only to whoever may save them.
     entries = table().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
     assert [
@@ -195,7 +195,7 @@ def test_every_input_field_says_what_it_is():
 
 
 def test_the_expired_holds_are_swept_every_hour_as_the_system():
-    # TABLE-F29: the phase-2 worker runs it on every hub; reading the plan already ignores them.
+    # TABLE-F29: the worker runs it on every hub; reading the plan already ignores them.
     assert table().scheduled_tasks == [
         {
             "name": "expire_table_holds",
@@ -209,14 +209,12 @@ def test_the_expired_holds_are_swept_every_hour_as_the_system():
     assert get("table.hold.expire").permission == "table.system"
 
 
-# The Home's hook (PLAN-HUB round 2026-10-21; FIX-TABLE-SETUP-HOOKS): the old module's own item «Your tables»
-# (module.json `setup`, tables#24), which reads the floor's status. The old module declared no panel and no bell row.
+# The Home's step «Your tables», which reads the floor's status.
 
 
 def test_the_homes_step_is_your_tables_done_once_one_table_is_in_use():
-    """The old module's item, same order and words: recommended, as it declared it (`required: false`), done once one
-    table is in use (not deleted, active: an occupied or blocked one still counts), for whoever adds tables, leading to
-    the list of tables (the old `/m/tables/tables`)."""
+    """Recommended (`required: false`), done once one table is in use (not deleted, active: an occupied or blocked one
+    still counts), for whoever adds tables, leading to the list of tables."""
     (step,) = table().setup
     assert isinstance(step, SetupStep)
     assert (
@@ -271,12 +269,11 @@ def test_the_step_is_refreshed_on_what_changes_the_tables_in_use():
 
 
 def test_the_steps_icon_is_registered():
-    # The old `map-outline` waits in UI-REQUESTS.md, as the menu's.
+    # `map-outline` waits in UI-REQUESTS.md, as the menu's.
     (step,) = table().setup
     icons = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
     assert f"'{step.icon.removeprefix('ion:')}'" in icons
 
 
 def test_tables_brings_no_panels_and_no_bell_rows_to_the_home():
-    # The old module declared neither (its module.json has `widgets` and `bell` null).
     assert (table().widgets, table().bell) == ([], [])

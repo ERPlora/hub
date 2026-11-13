@@ -1,14 +1,8 @@
 <script setup lang="ts">
-// Files › the preview (BASE-G84; the old hub's FilePreviewModal, HUB_SHELL-F132): a large viewer inside the hub with
-// the file's name as its title, «Download» and «Close», and «Zoom in»/«Zoom out» on images and PDFs. Images, audio
-// and video load from the hub's own address (`/api/files/raw`, with the session; never the bucket's); a PDF, a text,
-// a CSV/TSV, a JSON, a spreadsheet (.xlsx) or a Word document (.docx) is fetched through the SDK and drawn here: a PDF
-// with pdf.js (its first 30 pages), a text as text (never as markup), a CSV and each sheet of a spreadsheet as a table
-// (`FileSheets`), a JSON as a tree that folds (`FileJsonTree`; a broken one as it is), a Word document as its formatted
-// text (`FileDocument`, never HTML painted) — hub#578. Any other type (an old .xls or .doc, a presentation) says «No
-// preview» and offers the download. A failure to bring it reads «The file could not be opened»; one to read it (damaged,
-// or another format) «The file could not be read»; a spreadsheet or document over `OFFICE_PREVIEW_MAX_BYTES` (or one
-// that unpacks to too much) «Too large to preview», never fetched. The header's «Download» is always there.
+// Images, audio and video load from the hub's own address (`/api/files/raw`, with the session), never from the bucket.
+// Other previewable files are fetched through the SDK and drawn here, never painted as HTML: a PDF with pdf.js (its
+// first 30 pages), a text as text, a CSV or each sheet of a spreadsheet as a table, a JSON as a tree that folds and a
+// Word document as its formatted text. A spreadsheet or document over `OFFICE_PREVIEW_MAX_BYTES` is never fetched.
 import { InlineFeedback } from '@erplora/ui/components';
 import { fetchFile } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';

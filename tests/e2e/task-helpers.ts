@@ -1,7 +1,7 @@
 // Shared steps of the task e2e (task-*.spec.ts): a signed-in page in English, the apps' APIs for setup
 // and server-side evidence (never the check itself), a Combo pick and the cleanup every spec runs before and
-// after it: what a run creates is named «E2E Task …» (projects `e2e-…`) and deleted from the hub's database
-// (phase 1: `a` and `b` share it). A row action is service-helpers.ts's `rowAction`.
+// after it: what a run creates is named «E2E Task …» (projects `e2e-…`) and deleted from the hub's database.
+// A row action is service-helpers.ts's `rowAction`.
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
 import { A, api, capture, type Credentials, horizontalOverflow, hubUserIdOf, login, psql, shown, untilStill } from './helpers';

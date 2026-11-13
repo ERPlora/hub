@@ -1,5 +1,5 @@
-"""What a business does during the day, counted in each process and written to control every minute (BASE-F40; PLAN-HUB
-§66): its requests, the most transactions it had at once, the requests that found no room, and who has activity.
+"""What a business does during the day, counted in each process and written to control every minute (BASE-F40): its
+requests, the most transactions it had at once, the requests that found no room, and who has activity.
 
 Counting never reaches the network and never makes a request wait; what could not be written stays for the next pass; a
 hub that went away does not stop the others; and a process that serves no requests (the worker, a command, these tests

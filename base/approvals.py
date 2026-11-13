@@ -1,4 +1,4 @@
-"""A manager's PIN lets one refused command through (APP-BASE-5; BASE-G136, the old hub's HUB_SHELL-F51): without the ORM.
+"""A manager's PIN lets one refused command through: the rules, without the ORM.
 
 An app names the commands of its own a manager may approve on the spot, with what is approved in words:
 ``approvals = {"sale.sale.void": _("Void a sale")}`` in its ``LiveAppConfig`` (a module cannot name another's, a query
@@ -372,7 +372,7 @@ def install(api: NinjaAPI) -> list[str]:
 @checks.register("base")
 def check_approvals(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
     """``base.E004``: a command an app names as approvable opens its transaction, where the manager's pass is spent
-    (``base.approval_spend``); one declared ``database=False`` (live#10) has none, and is said at start."""
+    (``base.approval_spend``); one declared ``database=False`` has none, and is said at start."""
     errors: list[checks.CheckMessage] = []
     for config in all_live_app_configs():
         named = getattr(config, "approvals", None)

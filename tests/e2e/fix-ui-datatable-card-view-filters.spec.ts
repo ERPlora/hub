@@ -1,15 +1,12 @@
-// flow: UI DataTable filtros en tarjetas — FIX-UI-DATATABLE-CARD-VIEW-FILTERS-OPEN-390 (seen by the worker of
-// FIX-UI-TOPBAR-LONG-APP-NAME-390): at 390×844, where Cart & Checkout › Carts paints cards, its column filters
-// (Session, Email, Status and the From/To ranges) sat open under the toolbar, each of its own width: half the
-// screen before the first card. As in the old hub (docs/reference/old-hub/cart_checkout-carts-390.png), in the
-// cards they wait behind the funnel next to list/cards and «New cart»: it opens the modal sheet (outfitkit#75)
-// with those controls, the ranges inside it (saas#558); «Apply» filters the cards, closes the sheet
-// (outfitkit#207) and the funnel counts 1. With ui 0c21d14 the row was open in the cards.
-// Since FIX-HUB-CART-CHECKOUT-ORDERS-FILTERS-BEHIND-FUNNEL (CART_CHECKOUT-F12) Carts is `filterable` as the old list
-// (cart_checkout-carts-{834,1440}.png): the wide list (1440) has no row either, its panel filters and switching to
-// the cards and back keeps the filter in use; at 834, whatever paints by default, the filters wait behind the funnel.
-// The rule for a list that keeps its filter row (not `filterable`) is measured since then on Modifiers › Groups (its
-// Name filter is a text box, as Carts' Session was): at 1440 the list opens the row, the cards fold it behind the
+// flow: UI DataTable filters in cards — at 390×844, where Cart & Checkout › Carts paints cards, its column filters
+// (Session, Email, Status and the From/To ranges) never sit open under the toolbar, each of its own width, half the
+// screen before the first card: they wait behind the funnel next to list/cards and «New cart», which opens the modal
+// sheet with those controls, the ranges inside it; «Apply» filters the cards, closes the sheet and the funnel
+// counts 1.
+// Carts is `filterable` (CART_CHECKOUT-F12): the wide list (1440) has no row either, its panel filters and switching
+// to the cards and back keeps the filter in use; at 834, whatever paints by default, the filters wait behind the funnel.
+// The rule for a list that keeps its filter row (not `filterable`) is measured on Modifiers › Groups (its Name filter
+// is a text box): at 1440 the list opens the row, the cards fold it behind the
 // funnel with the filter in use (count 1) and back in the list the row shows it; at 834 each view follows the rule.
 import { type Page, expect, test } from '@playwright/test';
 
@@ -64,7 +61,7 @@ test('UI DataTable filtros en tarjetas at 390: the filters wait behind the funne
     await funnel.click();
     const sheet = hook(page, 'filters-panel');
     await expect(sheet).toBeVisible();
-    await expect(sheet, 'on a phone the panel is the modal sheet (outfitkit#75)').toHaveAttribute('aria-modal', 'true');
+    await expect(sheet, 'on a phone the panel is the modal sheet').toHaveAttribute('aria-modal', 'true');
     // It slides in (0.18 s): measured once it stands still.
     await untilStill(page);
     const box = (await sheet.boundingBox())!;
@@ -72,7 +69,7 @@ test('UI DataTable filtros en tarjetas at 390: the filters wait behind the funne
       const control = sheet.locator(`[data-testid=${TABLE}-filter-${name}]`);
       await expect(control, `${name} is in the sheet`).toBeVisible();
       const own = (await control.boundingBox())!;
-      // saas#558: a range's From/To fits the sheet, nothing runs past its edge.
+      // A range's From/To fits the sheet, nothing runs past its edge.
       expect(own.x, `${name} starts inside the sheet`).toBeGreaterThanOrEqual(box.x - 0.5);
       expect(own.x + own.width, `${name} ends inside the sheet`).toBeLessThanOrEqual(box.x + box.width + 0.5);
     }
@@ -82,7 +79,7 @@ test('UI DataTable filtros en tarjetas at 390: the filters wait behind the funne
     // A draft: nothing filters until «Apply».
     await expect(rowOf(page, TABLE, two.id)).toBeAttached();
     await hook(page, 'filters-apply').click();
-    await expect(sheet, '«Apply» closes the sheet and shows the result (outfitkit#207)').toBeHidden();
+    await expect(sheet, '«Apply» closes the sheet and shows the result').toBeHidden();
     await expect(rowOf(page, TABLE, one.id)).toBeVisible();
     await expect(rowOf(page, TABLE, two.id)).toHaveCount(0);
     await expect(hook(page, 'filters-count')).toHaveText('1');

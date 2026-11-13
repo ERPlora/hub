@@ -2,10 +2,9 @@
 
 Planted the first time a hub creates the app's tables (and in every template that carries it), only on
 an empty week: a business that has any weekday keeps its own. The week is the market's (Odoo, Google
-Calendar, Microsoft Bookings, Business Central, Lightspeed Reservations; schedules#36 of the current
-product), not the business's: it stays unconfirmed (the «default week» notice) until somebody saves a
-day or confirms it. All seven days, the weekend as explicit closed days: a missing day answers
-``no_hours``, «nothing configured», not «closed».
+Calendar, Microsoft Bookings, Business Central, Lightspeed Reservations), not the business's: it stays
+unconfirmed (the «default week» notice) until somebody saves a day or confirms it. All seven days, the weekend as
+explicit closed days: a missing day answers ``no_hours``, «nothing configured», not «closed».
 
 The reverse removes the week while it is still unconfirmed; a confirmed week is the business's and stays.
 The data is frozen here on purpose (a migration never imports the app's code).

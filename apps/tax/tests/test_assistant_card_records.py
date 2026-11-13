@@ -1,9 +1,8 @@
-"""FIX-HUB-TAX-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (hub#678): the card of a write of Taxes says which rule it acts on
-by its name, read as whoever asks, never by its id, and leaves it out when that person may not read it or it is not
-there. A rule goes by its category, its country (and region), and its rate — a component, with its label after its
-category —, what tells one rule from another on the Rules screen; and a country by its name, never its ISO code. The
-datum that names a rule by its id is titled with the list's word for one («Regla»); the root rule a component hangs
-from, by its field's name («Regla raíz»), never «Registro».
+"""The card of a write of Taxes (hub#678) says which rule it acts on by its name, read as whoever asks, never by its id,
+and leaves it out when that person may not read it or it is not there. A rule goes by its category, its country (and
+region), and its rate — a component, with its label after its category —, what tells one rule from another on the Rules
+screen; and a country by its name, never its ISO code. The datum that names a rule by its id is titled with the list's
+word for one («Regla»); the root rule a component hangs from, by its field's name («Regla raíz»), never «Registro».
 """
 
 import dataclasses

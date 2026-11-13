@@ -1,5 +1,4 @@
-// The image of a product, a service or a set menu (round 2026-10-30; INVENTORY-F30 to F32, SERVICE-F34/F35,
-// COMBO-F14). A form keeps a draft while the person chooses (an image of the shared library, a photo of their own read
+// The image of a product, a service or a set menu. A form keeps a draft while the person chooses (an image of the shared library, a photo of their own read
 // on the device, or none) and sends one step once the record is saved: `set_image` for a library image or none,
 // `upload_image` for a photo of its own (the server makes it a 512 × 512 WebP). The step's refusal is kept with the
 // saved record for «Retry»: the record saved, the photo not, and it keeps the one it had.
