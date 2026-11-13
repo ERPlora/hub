@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:002b838adaddda808d4e6d550025f000fa086f704fa6be1172f1944ce8891a7c -->
+<!-- generated from WORKBOOK.md sha256:e00e84b559e6c52b61f4253a3a51adad8b65f25e1ec772687975cc0618dfaa41 -->
 
 ## What it is for and who it is for
 
@@ -435,6 +435,8 @@ category. Recoveries counts those links apart ("Product links to categories"). A
 renamed or with products taken out of it since, is the same one: it is neither repeated nor filled; nor is one it made
 again with its name (case and spaces aside): its own is used, as it is, and only the products created again go into it.
 A deleted product that comes back (INVENTORY-F34) does not go into the one the business made again by hand.
+If the recovery is asked again from a copy made before the category it brought back, that category still counts as
+brought back: the live products the business took out of it since go back into it.
 If it fails: "The category could not be deleted" (or the reason) above the table.
 Involved: KITCHEN-F04, SALE-F01, BASE-F114, INVENTORY-F34
 

@@ -461,6 +461,8 @@ conserva, aunque la haya renombrado o le haya quitado productos, es la misma: no
 que volvió a crear con su nombre (sin distinguir mayúsculas ni espacios): se usa la suya, tal como está, y solo entran
 en ella los productos que se crean de nuevo. Un producto eliminado que vuelve (INVENTORY-F34) no entra en la que el
 negocio rehízo a mano.
+Si la recuperación se pide otra vez desde una copia anterior a la categoría que trajo, esa categoría sigue contando
+como traída: los productos vivos que el negocio le quitó después vuelven a ella.
 Si falla: «No se pudo eliminar la categoría» (o el motivo) encima de la tabla.
 Implicados: KITCHEN-F04, SALE-F01, BASE-F114, INVENTORY-F34
 
