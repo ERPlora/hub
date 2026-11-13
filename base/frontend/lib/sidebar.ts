@@ -1,6 +1,6 @@
-// The side menu's `visible` (APP-BASE-5; `ShellSidebarItem.visible`, which the shell runs once in its setup): an entry
-// shows only to whoever may open its screen — the conventional menu (Square, Toast) never offers what the person
-// cannot open — and «API» only while the business shows its API's documentation, as the old hub's menu did.
+// The side menu's `visible` (`ShellSidebarItem.visible`, which the shell runs once in its setup): an entry shows only
+// to whoever may open its screen, as in Square or Toast, and «API» only while the business shows its API's
+// documentation.
 import { useSession } from '@erplora/ui/shell';
 import { useLiveClient } from '@erplora/ui/sdk';
 import { computed, shallowRef, watch } from 'vue';

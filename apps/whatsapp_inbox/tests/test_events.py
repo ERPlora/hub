@@ -1,8 +1,8 @@
 """The WhatsApp inbox's events and its reactions to Customers (WHATSAPP_INBOX-F04, F11, F12).
 
 Each reaction is driven by the very event Customers records in its outbox when its own operation runs
-(create, update, merge, erase): the dependency is real, never a mock. The relay of phase 2 hands the
-delivered event to ``events.react``; here the test hands it over the same way, twice where the outbox
+(create, update, merge, erase): the dependency is real, never a mock. The worker's outbox relay hands
+the delivered event to ``events.react``; here the test hands it over the same way, twice where the outbox
 may deliver twice.
 """
 

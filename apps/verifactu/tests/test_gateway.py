@@ -294,7 +294,7 @@ def test_what_the_gateway_will_never_present_is_a_refusal_with_its_code(
 
 @respx.mock
 def test_a_hub_the_saas_does_not_know_is_a_refusal_not_a_retry(configured):
-    # saas#29: the gateway answers 404 ``hub_unknown`` when the body's ``hub`` names no hub of the SaaS; trying it
+    # The gateway answers 404 ``hub_unknown`` when the body's ``hub`` names no hub of the SaaS; trying it
     # again as it is would be refused forever.
     respx.post(f"{URL}/internal/verifactu/submit").mock(
         return_value=httpx.Response(

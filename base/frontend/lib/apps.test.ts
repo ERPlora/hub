@@ -54,7 +54,7 @@ describe('the tabs of Apps', () => {
     expect(appsOfTab(APPS, 'paid').map((row) => row.id)).toEqual(['customer', 'invoice', 'stock']);
   });
 
-  it('a free app never shows under «Paid» (hub#2655: «Free» in the paid tab)', () => {
+  it('a free app never shows under «Paid»', () => {
     expect(appsOfTab([TAX, app('sale')], 'paid')).toEqual([]);
   });
 
@@ -171,7 +171,7 @@ describe('turning an app on or off', () => {
   });
 });
 
-describe('an app whose tables the business’s database is still getting (S3)', () => {
+describe('an app whose tables the business’s database is still getting', () => {
   // flow is being set up; website could not be; sale (being set up) needs customer, which came along with it.
   const FLOW = app('flow', { name: 'Flows', state: 'creating', path: null });
   const WEBSITE = app('website', { name: 'Website', state: 'failed', path: null });

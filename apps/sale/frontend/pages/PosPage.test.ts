@@ -724,7 +724,7 @@ describe('PosPage: the phone', () => {
   });
 
 
-  // FIX-SALE-POS-NO-SPEAK-KEY: «Speak» opens the assistant docked beside the screen (from 768 px); on a tablet the till
+  // «Speak» opens the assistant docked beside the screen (from 768 px); on a tablet the till
   // left beside it is too narrow for the catalogue and the check side by side, whatever the window's width.
   it('a till narrower than the catalogue and the check need (beside the docked assistant) is laid out as on a phone', async () => {
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener: () => {}, removeEventListener: () => {} }));
@@ -930,7 +930,7 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     expect(toastSuccess).not.toHaveBeenCalled();
   });
 
-  it('the round names who attends the check («Atiende»); with «Yo», nobody: the kitchen names who sends it (kitchen#82)', async () => {
+  it('the round names who attends the check («Atiende»); with «Yo», nobody: the kitchen names who sends it', async () => {
     const s = await setup({ session: WITH_KITCHEN });
     await click(s.find('pos-staff-chip').element);
     await settle();
@@ -952,7 +952,7 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     ]);
   });
 
-  it('a round sent whose sheet did not print says so in words at the top, never the raw reason (hub#2257, KITCHEN-F08, hub#748)', async () => {
+  it('a round sent whose sheet did not print says so in words at the top, never the raw reason (KITCHEN-F08, hub#748)', async () => {
     const s = await setup({ session: WITH_KITCHEN, locale: 'es' });
     await s.addProduct();
     kitchenAnswers(s, () => Response.json({ id: 't1', round_no: 2, print_error: 'no printer for usage kitchen' }));
@@ -992,7 +992,7 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     expect(toastSuccess).not.toHaveBeenCalled();
   });
 
-  it('a round a charge sends whose sheet did not print is said at the top, for just as long (hub#732, hub#2257)', async () => {
+  it('a round a charge sends whose sheet did not print is said at the top, for just as long (hub#732)', async () => {
     const s = await setup({ session: WITH_KITCHEN, locale: 'es' });
     await s.addProduct();
     kitchenAnswers(s, () => Response.json({ id: 't1', round_no: 2, print_error: 'no printer for usage kitchen' }));

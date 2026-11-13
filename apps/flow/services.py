@@ -150,7 +150,7 @@ QUESTION_DECIDED = _("Someone already answered this one. Nothing was done twice.
 QUESTION_TOO_LATE = _("Too late: nobody answered it in time, so it was closed. Nothing was done.")
 APPROVAL_BEYOND_YOU = _("Only someone who may do it themselves can say yes to «%(name)s».")
 
-#: How long the history keeps a finished run (hub#699: the old Hub's 90 days, fixed, for every hub).
+#: How long the history keeps a finished run (the old Hub's 90 days, fixed, for every hub).
 HISTORY_DAYS = 90
 #: At most this many runs go per pass: bounded, never one mass delete at the busiest hour.
 PRUNE_BATCH = 500
@@ -165,7 +165,7 @@ FINISHED = (
 #: The actor prefix of what a run does (``flow_run:<id>``): the outbox keeps it, the loop guard reads it.
 RUN_ACTOR = "flow_run:"
 #: A call's ``Idempotency-Key`` is ``uuid5(IDEMPOTENCY_NAMESPACE, "<run id>:<step id>")``: the same in every
-#: attempt of a run's step, another in every run (hub#2659, hub#2675).
+#: attempt of a run's step, another in every run.
 IDEMPOTENCY_NAMESPACE = uuid.UUID("0199f6a0-6b1f-7c3e-9a51-3f1b2c4d5e6f")
 #: How long a call that left holds its run: after it, a call that never answered is sent again, with the
 #: same key (at least once; the old hub's 5 minutes).
@@ -2075,7 +2075,7 @@ def react(ctx: OperationContext, data: ReactIn) -> dict:
         # What its recipe excludes today counts too, whenever it was built (FLOW-F36).
         wanted = recipes.fixed_filter(flow)
         if not document.readable(wanted):
-            # Never «does not hold» in silence (hub#1766): the owner reads why in its history.
+            # Never «does not hold» in silence: the owner reads why in its history.
             run = _start(
                 ctx,
                 flow,

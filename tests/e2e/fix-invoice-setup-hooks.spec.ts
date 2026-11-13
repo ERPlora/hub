@@ -1,15 +1,12 @@
 // flow: INVOICE-F14 INVOICE-F21
-// Invoicing's steps of the Home (FIX-INVOICE-SETUP-HOOKS; the old hub's ⛔ «Your business details» and the old module's
-// `setup`, the old dashboard in docs/reference/old-hub/dashboard-*.png), as hub `a` reads them in Spanish: with no
+// Invoicing's steps of the Home (its `setup`), as hub `a` reads them in Spanish: with no
 // issuer, the owner has «Los datos de tu negocio» pending and «Necesario para facturar» in «Termina de configurar tu
 // negocio»; its «Configurar» leads to Invoicing → Issuer and, once the legal name, tax ID and address are saved there,
 // the step is done without a reload. «Tu numeración de facturas» is «Recomendado» and pending while the business has no
 // series, and done without a reload once it has one; an employee is told about the ⛔ without «Configurar» (and the red
-// strip of the other screens says who has to set it up, gh:hub#2567) and never about the numbering. On Invoices and
+// strip of the other screens says who has to set it up) and never about the numbering. On Invoices and
 // Series the red strip is the one notice: Invoicing does not say it again under it, and it goes, without a reload,
-// once the issuer is saved (FIX-HUB-INVOICE-TWO-NEAR-IDENTICAL-BUSINESS-DATA-NOTICES). Captures
-// `FIX-INVOICE-SETUP-HOOKS-INVOICE-F21-<width>` (the ⛔), `…-INVOICE-F14-<width>` (the numbering) and
-// `FIX-HUB-INVOICE-TWO-NEAR-IDENTICAL-BUSINESS-DATA-NOTICES-[series-]<width>` (Invoices and Series with no issuer).
+// once the issuer is saved. Captures of the ⛔, of the numbering and of Invoices and Series with no issuer.
 // The hub's issuer row is parked for the run and put back as it was after it (other specs need it); the run's own
 // series are `E2E…`, which the cleanup removes.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
@@ -201,7 +198,7 @@ test('INVOICE-F21 and INVOICE-F14: an employee is told about the ⛔ without «C
     await expect(row(page, IDENTITY).locator(`[data-testid="setup-note-${IDENTITY}"]`)).toHaveText('Esto lo tiene que configurar un administrador.');
     await expect(row(page, NUMBERING)).toHaveCount(0);
 
-    // Any other screen: the red strip says it, whole, on a phone (gh:hub#2567).
+    // Any other screen: the red strip says it, whole, on a phone.
     await page.goto(`${A}/invoice/invoices`);
     const strip = shown(page).locator('[data-testid="blocking-strip"]');
     await expect(strip).toBeVisible();

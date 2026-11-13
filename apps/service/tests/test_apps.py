@@ -7,11 +7,12 @@ from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs
 from live.operations import registry
 
 from apps.service import events as E
 from base import home
+from base.tests.roles import grants_by_role
 
 PERMISSIONS = [
     "service.view_service",
@@ -103,13 +104,13 @@ def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
 
 
 def test_what_each_role_gets():
-    config = service()
-    for role in ("hub_owner", "hub_admin"):
-        assert permissions_for_role([config], role) == set(PERMISSIONS), role
-    assert (
-        permissions_for_role([config], "hub_manager") == set(PERMISSIONS) - ADMIN_ONLY
-    )
-    assert permissions_for_role([config], "hub_employee") == EMPLOYEE
+    everything = set(PERMISSIONS)
+    assert grants_by_role(service()) == {
+        "hub_owner": everything,
+        "hub_admin": everything,
+        "hub_manager": everything - ADMIN_ONLY,
+        "hub_employee": EMPLOYEE,
+    }
 
 
 def test_navigation_is_the_three_tabs_of_the_old_module_with_registered_icons():
@@ -124,8 +125,9 @@ def test_navigation_is_the_three_tabs_of_the_old_module_with_registered_icons():
     ]
 
 
-#: What only names a record on the assistant's card: no tool (``INTERNAL``).
-CARD_ONLY = {"service.record.get"}
+#: What only names a record on the assistant's card, and what only the recovery from a separate copy runs (a service
+#: made again with who performed it): no tool (``INTERNAL``).
+NO_TOOL = {"service.record.get", "service.service.recover"}
 
 
 def test_every_operation_is_a_tool_of_the_assistant():
@@ -138,10 +140,11 @@ def test_every_operation_is_a_tool_of_the_assistant():
     operations = [op for name, op in registry.items() if name.startswith("service.")]
     # 45 + the service's image (SERVICE-F34, F35): set_image, upload_image, suggest_image
     # + what the assistant's card names by its id: assignment.get, grant.get, session.get
-    # + what it names of Sales and Appointments: record.get, which is no tool.
-    assert len(operations) == 52
+    # + what it names of Sales and Appointments: record.get, which is no tool
+    # + a service made again from a separate copy with who performed it: service.recover, no tool either.
+    assert len(operations) == 53
     for op in operations:
-        if op.name in CARD_ONLY:
+        if op.name in NO_TOOL:
             assert op.ai is INTERNAL, op.name
             continue
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name

@@ -1,7 +1,7 @@
 // The sections of Staff (WORKBOOK «Pantallas»; the old manifest's `navigation`): Staff, Roles, Time Off
 // and Schedules, as the footer tabbar of every staff page, plus «Commissions» (STAFF-F21), shown only to
 // whoever sees the pay, and «Settings» — the tab the old shell generated from the module's settings
-// block, shown only to whoever may save them (old hub#2588, hub#2621). Each tab follows its route and
+// block, shown only to whoever may save them. Each tab follows its route and
 // wears a registered icon, the same as the menu's.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

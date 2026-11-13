@@ -48,7 +48,7 @@ describe('schedule routes.ts', () => {
     const appsPy = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
     const paths = [...new Set([...appsPy.matchAll(/"(\/schedule\/[a-z-]+)"/g)].map((m) => m[1]))];
     expect(paths).toEqual(routes.map((r) => r.path));
-    // The step «Confirm your opening hours» (FIX-SCHEDULE-SETUP-HOOKS) leads to the week.
+    // The step «Confirm your opening hours» leads to the week.
     expect([...appsPy.matchAll(/route="(\/schedule\/[a-z-]+)"/g)].map((m) => m[1])).toEqual(['/schedule/hours']);
   });
 });

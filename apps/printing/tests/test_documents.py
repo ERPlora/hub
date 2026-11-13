@@ -48,7 +48,7 @@ def test_a_document_is_an_object():
 
 
 def test_a_bill_without_lines_is_refused():
-    # The renderer refuses it rather than cutting a blank bill (hub#501).
+    # The renderer refuses it rather than cutting a blank bill.
     message = "A bill has lines to charge for: this one has none."
     assert documents.problems("prebill", {"items": []}) == message
     assert documents.problems("prebill", {"lines": [ITEM]}) == message

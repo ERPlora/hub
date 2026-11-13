@@ -130,7 +130,7 @@ describe('ServicesPage', () => {
     expect(s.prop('rowClickable')).toBe(false);
   });
 
-  it("wears the old module's icons: the briefcase on its cards and its empty list, «Archive» its archive box", async () => {
+  it('wears its icons: the briefcase on its cards and its empty list, «Archive» its archive box', async () => {
     const s = await setup();
     await s.show(page(ROWS));
     expect(s.prop<Array<{ id: string; icon?: string }>>('actions').map((a) => [a.id, a.icon])).toEqual([
@@ -335,7 +335,7 @@ describe('ServicesPage', () => {
   });
 });
 
-describe('ServicesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('ServicesPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

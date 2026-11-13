@@ -1,5 +1,5 @@
 """The verifactu app's migrations: declarative (no SQL, no RunPython), in step with the models, and reversible
-(the app's tables come and go with its migrations, which phase 2's migrator runs per hub)."""
+(the app's tables come and go with its migrations, which the migrator runs per hub)."""
 
 import io
 from pathlib import Path

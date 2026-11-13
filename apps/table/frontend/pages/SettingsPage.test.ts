@@ -64,7 +64,7 @@ describe('SettingsPage', () => {
     expect(s.field('save-error')?.textContent).toContain('The red warning cannot come before the amber one.');
   });
 
-  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: ui#102, hub#821)', () => {
+  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: hub#821)', () => {
     const REFUSAL = {
       error: {
         code: 'invalid_payload',
@@ -106,7 +106,8 @@ describe('SettingsPage', () => {
   });
 
   // hub#914: the page's form is the shared piece (`useSettingsForm`). Only what was sent is saved; what was
-  // changed while the save was on its way stays on screen, still to send. Falls with `packages/ui` behind ui#108.
+  // changed while the save was on its way stays on screen, still to send. Falls with a `packages/ui` whose
+  // `useSettingsForm` does not keep it.
   it('a change made while «Save» is on its way stays, and the next save sends only it', async () => {
     const s = await setup();
     await s.show(SETTINGS);

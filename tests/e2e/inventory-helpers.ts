@@ -141,7 +141,7 @@ export async function shoot(page: Page, name: string, restore = { width: 1280, h
   return files;
 }
 
-/** The screenshots of a flow of the migration (APP-INVENTORY): `APP-INVENTORY-<key>-<390|834|1440>`. */
+/** The screenshots of a flow: `APP-INVENTORY-<key>-<390|834|1440>`. */
 export async function shootFlow(page: Page, key: string, restore = { width: 1280, height: 860 }): Promise<string[]> {
   return shoot(page, `APP-INVENTORY-${key}`, restore);
 }

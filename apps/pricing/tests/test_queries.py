@@ -564,8 +564,8 @@ def test_each_type_of_rule_and_the_best_single_one_wins():
 
 
 def test_rules_count_a_product_sold_by_weight_in_the_unit_of_its_price():
-    # Coffee at 20 €/kg, sold in grams (market-decision 2026-10-15: Odoo, Business Central, Dynamics 365
-    # Commerce): an amount per unit is per kg, buy 2 get 1 gives 1 kg of every 3 kg, a tier or a minimum
+    # Coffee at 20 €/kg, sold in grams (as Odoo, Business Central and Dynamics 365
+    # Commerce count it): an amount per unit is per kg, buy 2 get 1 gives 1 kg of every 3 kg, a tier or a minimum
     # of 3 needs 3 kg. Never grams: 0,50 € off each of 250 grams would give the coffee away.
     coffee = make_product("Coffee", "CF", price=2000, unit="g", pricing_unit="kg")
     fixed = make_rule("FIX", "fixed", amount=50)

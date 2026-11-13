@@ -1,10 +1,8 @@
-// The Home's board (BASE-G166, BASE-G167): the panels this person may put (`base.widget.list`, live), the
-// defaults until this browser chooses, and «Customize panel» (⋮): «Recommended», the active ones to reorder or
-// remove and the available ones to add. The choice is kept in this browser (`dashboard-hub`).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { WidgetDef } from '../operations';
 import { accessibleName, errorFrame, flush, memoryStorage, mountBase, subId } from '../__tests__/mount-base';
+import { widget as homeWidget } from '../__tests__/home-fixtures';
 import WidgetBoard from './WidgetBoard.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -12,25 +10,9 @@ vi.mock('@ionic/vue', async (importOriginal) => {
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
 
+/** A panel titled «Panel <key>», small. */
 function widget(key: string, fields: Partial<WidgetDef> = {}): WidgetDef {
-  return {
-    key,
-    app: key.split('.')[0],
-    title: `Panel ${key}`,
-    icon: '',
-    category: 'Demo',
-    size: 'sm',
-    default: false,
-    kind: 'kpi',
-    operation: 'demo.item.stats',
-    params: {},
-    map: { value: 'open' },
-    options: {},
-    component: null,
-    refresh_on: [],
-    live: true,
-    ...fields,
-  };
+  return homeWidget(key, { title: `Panel ${key}`, size: 'sm', ...fields });
 }
 
 const CATALOGUE = [widget('a.one', { default: true }), widget('a.two'), widget('b.three', { default: true })];
@@ -70,8 +52,8 @@ afterEach(() => {
 
 describe('WidgetBoard', () => {
   it('paints the panels the shell embedded at once, before base.widget.list answers; the live answer wins', async () => {
-    // FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH: the board learnt its panels from its first live stream, and
-    // the stream reopened for their data on every load of the Home (`net::ERR_ABORTED`).
+    // Learning the panels from the first live stream reopened the stream for their data on every load of the Home
+    // (`net::ERR_ABORTED`).
     embed({ widgets: CATALOGUE });
     const s = await setup();
     expect(s.panels()).toEqual(['a.one', 'b.three']);

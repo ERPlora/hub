@@ -480,7 +480,7 @@ def test_the_ends_of_the_allowed_calendar_answer(empty_week):
 
 
 def test_a_descending_sort_breaks_its_ties_by_id_descending_too():
-    # The tie-break follows the direction (rule hub#2355 of the current product), so a touched row does not
+    # The tie-break follows the direction (``base/ordering.py``), so a touched row does not
     # jump and the pages neither repeat nor lose rows (WORKBOOK «Para quien lo mantiene», «Listas»).
     holidays = sorted(
         [make_special_day("2026-01-06", "Holiday").id, make_special_day("2026-05-01", "Holiday").id]

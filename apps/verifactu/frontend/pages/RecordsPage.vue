@@ -6,8 +6,8 @@
 // invoice type and the correction; the total typed in euros). Beside its status, a registration the AEAT rejected (or
 // accepted with errors) says «Pending correction», or «Corrected» linking to the record that corrects it
 // (VERIFACTU-F24, hub#857). A row, or «View», opens its record;
-// «Verify at the AEAT» opens the QR's link of the AEAT in a new tab (in the installed app, the system browser:
-// gh:hub#518). New, sent and answered records come back through the stream by themselves.
+// «Verify at the AEAT» opens the QR's link of the AEAT in a new tab (in the installed app, the system browser).
+// New, sent and answered records come back through the stream by themselves.
 import {
   type DataTableAction,
   type DataTableColumn,
@@ -132,7 +132,7 @@ function open(row: RecordRowOut): void {
 
 /**
  * «Verify at the AEAT» of a row: the QR's link, clicked as a link is. A browser opens it in a new tab by itself; the
- * installed app opens nothing on `_blank`, so `openExternalLink` hands it to the system browser (gh:hub#518).
+ * installed app opens nothing on `_blank`, so `openExternalLink` hands it to the system browser.
  */
 function verify(url: string): void {
   const link = document.createElement('a');

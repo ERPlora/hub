@@ -1,11 +1,11 @@
-// FIX-DATATABLE-HUB evidence (ui 070e74f): a list page with AppPage `content-layout="fill"` and a
+// A list page with AppPage `content-layout="fill"` and a
 // DataTable `fill` fills its page down to its bottom edge — the section tabbar when the page has one
 // (Customers), the bottom of its content area when it has none (the demo) — at 390, 834 and 1440 px, with
 // its footer fixed and its rows scrolling inside, one scroll only (on a phone the list grows with the page
-// and only the page scrolls, #218);
+// and only the page scrolls);
 // the demo's funnel (`filterable`) counts the filters in use; its panel pushes the list into two columns
-// from 834 px and is a sheet strictly between the header and that bottom edge (outfitkit#75/#197).
-// flow: ui:DataTable — FIX-UI-DATATABLE-CLIP: nothing of the table is cut off — a date range fits its
+// from 834 px and is a sheet strictly between the header and that bottom edge.
+// flow: ui:DataTable — nothing of the table is cut off — a date range fits its
 // 360px panel (both ends whole, outline included) and a card title wraps instead of ending in «…».
 import { type BrowserContext, type Locator, type Page, expect, test } from '@playwright/test';
 
@@ -60,7 +60,7 @@ function bottomEdge(g: Geometry): number {
 }
 
 /** The list fills its page down to `bottomEdge` with one scroll only: on a desk the rows scroll inside the
- *  table and its footer stays on screen; on a phone the list grows with its rows and only the page scrolls (#218). */
+ *  table and its footer stays on screen; on a phone the list grows with its rows and only the page scrolls. */
 function expectFills(g: Geometry, width: number): void {
   const c = g.content!;
   const edge = bottomEdge(g);
@@ -79,7 +79,7 @@ function expectFills(g: Geometry, width: number): void {
   }
 }
 
-test('FIX-DATATABLE-HUB: the demo (no tabs) fills to the bottom of its content, funnel with count, panel in two columns ≥834 and a sheet below', async ({ page, context }) => {
+test('the demo (no tabs) fills to the bottom of its content, funnel with count, panel in two columns ≥834 and a sheet below', async ({ page, context }) => {
   test.setTimeout(240_000);
   await login(page, A);
   const prefix = `FXDT${Date.now().toString(36)}`;
@@ -125,7 +125,7 @@ test('FIX-DATATABLE-HUB: the demo (no tabs) fills to the bottom of its content, 
         expect(Math.abs(d.right - open.table!.right)).toBeLessThanOrEqual(1);
         expect(Math.abs(d.bottom - open.table!.bottom)).toBeLessThanOrEqual(1);
       } else {
-        // A sheet strictly between the header and the bottom edge (#197).
+        // A sheet strictly between the header and the bottom edge.
         expect(d.top).toBe(open.content!.top);
         expect(d.bottom).toBe(bottomEdge(open));
         expect(d.width).toBe(vp.width);
@@ -141,7 +141,7 @@ test('FIX-DATATABLE-HUB: the demo (no tabs) fills to the bottom of its content, 
   }
 });
 
-test('FIX-DATATABLE-HUB: a list with section tabs (Customers) fills down to its tabbar, one scroll only', async ({ page, context }) => {
+test('a list with section tabs (Customers) fills down to its tabbar, one scroll only', async ({ page, context }) => {
   test.setTimeout(240_000);
   await login(page, A, '/customer/customers');
   const stamp = `FXDT${Date.now().toString(36)}`;
@@ -199,7 +199,7 @@ const RANGE_PAGES = [
   { path: '/schedule/special-days', table: 'schedule-special-days', ends: ['date_from', 'date_to'] as [string, string] },
 ];
 
-test('FIX-UI-DATATABLE-CLIP: a date range fits the 360px filter panel at 1440 and 834 (Staff «Hire date», Special days «Date»)', async ({ page }) => {
+test('a date range fits the 360px filter panel at 1440 and 834 (Staff «Hire date», Special days «Date»)', async ({ page }) => {
   test.setTimeout(180_000);
   await login(page, A, RANGE_PAGES[0].path);
   const results: Record<string, unknown> = {};
@@ -244,7 +244,7 @@ const CARD_VIEWPORTS = [
   { label: '820', width: 820, height: 1180 },
 ];
 
-test('FIX-UI-DATATABLE-CLIP: card titles wrap whole at 375 and 820, never «…» on one line (Taxes → Categories, Rules)', async ({ page }) => {
+test('card titles wrap whole at 375 and 820, never «…» on one line (Taxes → Categories, Rules)', async ({ page }) => {
   test.setTimeout(180_000);
   await login(page, A, '/tax/categories');
   const results: Record<string, unknown> = {};

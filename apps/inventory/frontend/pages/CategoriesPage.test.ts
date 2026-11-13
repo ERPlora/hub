@@ -46,7 +46,14 @@ async function setup(options: MountOptions = {}) {
     table().vm.$emit('action', { actionId, row });
     await flush();
   }
-  return { ...m, call, testid, table, prop, rows, form, act, show: (data: unknown, rev?: number) => m.result(call, 'inventory.category.list', data, rev) };
+  /** Types `text` in the search bar, as a person does. */
+  async function search(text: string) {
+    const bar = testid('inventory-categories-search').element as HTMLElement & { value?: string };
+    bar.value = text;
+    bar.dispatchEvent(new CustomEvent('ionInput', { detail: { value: text } }));
+    await flush();
+  }
+  return { ...m, call, testid, table, prop, rows, form, act, search, show: (data: unknown, rev?: number) => m.result(call, 'inventory.category.list', data, rev) };
 }
 
 describe('CategoriesPage: the list', () => {
@@ -78,10 +85,7 @@ describe('CategoriesPage: the list', () => {
     s.table().vm.$emit('sortChange', { sort: 'product_count', dir: 'desc' });
     await flush();
     expect(s.params('inventory.category.list')).toEqual([{ sort: '-product_count', limit: 25, offset: 0 }]);
-    const bar = s.testid('inventory-categories-search').element as HTMLElement & { value?: string };
-    bar.value = 'dri';
-    bar.dispatchEvent(new CustomEvent('ionInput', { detail: { value: 'dri' } }));
-    await flush();
+    await s.search('dri');
     expect(s.params('inventory.category.list')).toEqual([{ search: 'dri', sort: '-product_count', limit: 25, offset: 0 }]);
   });
 
@@ -89,10 +93,7 @@ describe('CategoriesPage: the list', () => {
     const s = await setup();
     await s.show(page([], 0, 25));
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No categories.');
-    const bar = s.testid('inventory-categories-search').element as HTMLElement & { value?: string };
-    bar.value = 'zzz';
-    bar.dispatchEvent(new CustomEvent('ionInput', { detail: { value: 'zzz' } }));
-    await flush();
+    await s.search('zzz');
     await s.clock.advance(150);
     await s.result(s.net.lastStream(), 'inventory.category.list', page([], 0, 25));
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No category matches the search.');
@@ -229,10 +230,7 @@ describe('CategoriesPage: import and export', () => {
   it('exports what the search finds, with the file the server wrote', async () => {
     const s = await setup();
     await s.show(LIST);
-    const bar = s.testid('inventory-categories-search').element as HTMLElement & { value?: string };
-    bar.value = 'dri';
-    bar.dispatchEvent(new CustomEvent('ionInput', { detail: { value: 'dri' } }));
-    await flush();
+    await s.search('dri');
     s.net.onApi(() => ok({ filename: 'inventario-categorias.csv', content_type: 'text/csv', content: '﻿Nombre;Slug;Productos\n' }));
     s.wrapper.findComponent(CsvButtons).vm.$emit('export');
     await flush();

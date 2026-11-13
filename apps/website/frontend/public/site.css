@@ -1,4 +1,4 @@
-/* The public website's one stylesheet of our own (apps/website, rounds 2026-10-22). The pages are Bootstrap 5.3: its
+/* The public website's one stylesheet of our own (apps/website). The pages are Bootstrap 5.3: its
  * grid, navbar, cards, list groups, badges, pills and utilities do the layout (frontend/public/classes.test.ts checks
  * every class). This file only
  *   1. maps the palette onto Bootstrap's variables where Bootstrap writes a fixed colour instead of a variable (the

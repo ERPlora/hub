@@ -1,5 +1,5 @@
 // base-money-thousands-grouping (hub#692): the Hub writes an amount one way, its thousands grouped from four digits on
-// («1.234,56 €», legacy hub#1090), with the platform's `formatMoney` (`@erplora/ui/components`, `format/money.ts`). A
+// («1.234,56 €»), with the platform's `formatMoney` (`@erplora/ui/components`, `format/money.ts`). A
 // money formatter of an app's own keeps Intl's Spanish default, which waits for five digits: «1234,56 €» in one screen
 // beside «1.234,56 €» in the next. This guard looks, by app (and `ui`, the shared package), for the currency formats
 // that do not group always, and there may be none.

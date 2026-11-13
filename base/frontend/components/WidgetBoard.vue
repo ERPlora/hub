@@ -1,9 +1,7 @@
 <script setup lang="ts">
-// The Home's board (BASE-G166, BASE-G167; the old hub's `ok-widget-board`): the panels of the apps on that
-// this person may see (`base.widget.list`, live: turning an app on or off brings or takes its panels), the
-// catalogue's defaults until this browser chooses, and «Customize panel» (⋮): «Recommended» (back to the
-// defaults), the active ones to drag or remove, the available ones to add. The choice lives in this browser
-// (`dashboard-hub`): every person of this device shares it, and it does not travel to another one.
+// The Home's panels from the apps that are on and this person may see; the catalogue's defaults show until this
+// browser chooses. The choice lives in this browser (`dashboard-hub`): every person of this device shares it, and it
+// does not travel to another one.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';

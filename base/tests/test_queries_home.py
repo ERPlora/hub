@@ -388,7 +388,7 @@ def test_a_step_needing_a_permission_the_person_lacks_is_not_on_their_list(modul
 
 
 def test_a_pending_wall_stays_for_who_cannot_clear_it_but_not_actionable(modules, declare):
-    """hub#435: the person at the till cannot set the business details up, yet they are what stops the invoice."""
+    """The person at the till cannot set the business details up, yet they are what stops the invoice."""
     answer = {"configured": False}
     declare("invoice.identity.status", lambda c, data: answer, permission="invoice.view_invoice")
     wall = step("business_identity", "invoice.identity.status", permission="invoice.change_settings",

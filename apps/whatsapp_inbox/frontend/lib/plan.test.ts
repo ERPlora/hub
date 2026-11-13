@@ -1,5 +1,5 @@
 // The plan's WhatsApp messages as the screens read them (WHATSAPP_INBOX-F13): erplora.com sends how many the plan
-// includes each month, and 0 means none (ADR-0474: there is no «unlimited»). Before erplora.com speaks, the 0 is
+// includes each month, and 0 means none (there is no «unlimited»). Before erplora.com speaks, the 0 is
 // only the channel's default: nothing is known of the plan yet. From 80 % of the month's messages the screens say how
 // many are left of how many, as the assistant does with its own (BASE-F104).
 import { describe, expect, it } from 'vitest';

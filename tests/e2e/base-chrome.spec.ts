@@ -1,4 +1,4 @@
-// The Hub's pieces of the shell's chrome (ERPlora/ui#19), as a person sees them at 390, 834 and 1440:
+// The Hub's pieces of the shell's chrome, as a person sees them at 390, 834 and 1440:
 // - «Upgrade plan» at the foot of the side menu (BASE-F11): lined up with the QR above it and inside the menu, and on
 //   the rail (≥992 px, the menu folded to its icons) only its icon, still named, inside the 68 px;
 // - «Manage on erplora.com» right below it (BASE-F11): this business on erplora.com's panel, in a new tab, for who runs
@@ -7,8 +7,8 @@
 // - the strip «You cannot invoice yet» (BASE-F01) between the bar and the screen's content, at its own height;
 // - the user menu's «My account»: erplora.com's page, in a new tab; its «Report a problem» is the
 //   hub's own dialog (BASE-F108, tests/e2e/base-report-problem.spec.ts);
-// No module of main declares a ⛔ step yet (Invoicing's comes with its own task), so the strip's test serves the page
-// a `base.setup.status` with one pending: the live stream is answered by the test, every other query stays loading.
+// The strip's test does not depend on any app's setup: it serves the page a `base.setup.status` with one pending ⛔
+// step; the live stream is answered by the test, every other query stays loading.
 // flow: BASE-F01 BASE-F11
 import { expect, type Locator, type Page, type Route, test } from '@playwright/test';
 

@@ -124,7 +124,7 @@ def test_the_templates_are_the_platforms_and_one_per_vertical_cloned_from_it():
         assert template.source == platform.db_name
         assert set(template.apps) == set(PLATFORM) | every | (wanted & portable)
         assert set(template.left_out) == wanted - portable
-        # Since tenancy W10 a vertical's template holds its whole list: a hair salon is born with its staff.
+        # A vertical's template holds its whole list: a hair salon is born with its staff.
         assert template.left_out == ()
 
 
@@ -344,7 +344,7 @@ def test_a_database_control_s_row_does_not_name_yet_never_changes_that_row(new_d
 
 
 def test_add_creates_the_people_apps_and_what_waited_for_them(new_database, make_hub):
-    # Tenancy W10: an appointment hangs from a staff record, and a staff record from the business's own person.
+    # An appointment hangs from a staff record, and a staff record from the business's own person.
     hub = make_hub(new_database)
 
     migrator.ensure_schema(hub, add=["appointment"])
@@ -520,7 +520,7 @@ def test_a_hub_is_behind_when_an_app_it_has_is_not_at_the_codes_leaf():
 
 
 def test_a_hub_without_an_app_it_never_turned_on_is_not_behind():
-    """S3: an app's tables are made the first time its hub turns it on (``base.app.enable`` → the worker's
+    """An app's tables are made the first time its hub turns it on (``base.app.enable`` → the worker's
     ``ensure_schema``), never by ``migrate_hubs``: a hub with its own database that lacks one is up to date."""
     leaf = leaves()
     every = {label: leaf[label] for label in (*PLATFORM, *migrator.portable_apps())}

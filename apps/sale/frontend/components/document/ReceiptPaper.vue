@@ -10,7 +10,7 @@
 // (SALE-F27), the note), «Subtotal», a VAT row per fiscal key from the sale's breakdown (an
 // exempt key names its cause), «TOTAL», the payment rows and «Change», the discount already applied and
 // the fiscal QR and the footer. Every figure is the server's; this only lays them out. The fiscal QR is
-// VeriFactu's (VERIFACTU-F19, sales#411): «Tax QR:» over it, «VERI*FACTU» under it and how to check the ticket or
+// VeriFactu's (VERIFACTU-F19): «Tax QR:» over it, «VERI*FACTU» under it and how to check the ticket or
 // the invoice at the AEAT — its CSV once the AEAT answered. `printPaper` prints a copy of this very element.
 import { formatDateTime } from '@erplora/ui/components';
 import { computed } from 'vue';
@@ -69,7 +69,7 @@ const lines = computed(() =>
     child: !!line.parent_line_id || isDishPart(line),
     head:
       isDishPart(line) && (index === 0 || menuOf(props.sale.lines[index - 1]) !== menuOf(line)) ? line.combo_name : '',
-    // A menu in one line prints each of its dishes on a line of its own under it (hub#1165).
+    // A menu in one line prints each of its dishes on a line of its own under it.
     dishes: line.combo_id && !isDishPart(line) ? line.components.map(dishLabel) : [],
     options: line.modifiers.join(', '),
     detail: `${quantityWithUnit(line.quantity, line.unit, locale.value)} × ${money(line.unit_price)}`,

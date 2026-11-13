@@ -22,7 +22,7 @@
 // figure in the three viewports; the maximum goes back to what it was.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, usernamesOf } from './helpers';
+import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, usernameOf, usernamesOf } from './helpers';
 import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';
@@ -54,19 +54,6 @@ let cashierName = '';
 let article: Product;
 /** The till's discount settings as the run found them (`null`: not read yet), given back after it. */
 let discountsWere: { allow_discounts: boolean; max_discount_percent: number } | null = null;
-
-/**
- * The username of whoever is signed in on `context`. Not by email: a hub database kept from a stack whose SaaS was
- * created again holds an older account with the same email (a new SaaS, new users), and the email names both.
- */
-async function usernameOf(context: BrowserContext): Promise<string> {
-  const me = await api<{ user: { id: string } | null }>(context, A, 'GET', '/me');
-  expect(me.status, 'GET /api/me').toBe(200);
-  const id = me.data.user?.id ?? '';
-  expect(id, 'the person signed in').not.toBe('');
-  // `/api/me` names the person of the business's database (base.HubUser, W10), whose username is the session's.
-  return psql(`SELECT username FROM base_hubuser WHERE id = '${id}'`);
-}
 
 /** Every account of `email` (their usernames, read from control's): the cleanup leaves none of them with what this file made. */
 const accountsOf = (email: string): string => usernamesOf(email);

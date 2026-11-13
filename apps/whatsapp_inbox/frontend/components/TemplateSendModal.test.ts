@@ -193,7 +193,7 @@ describe('TemplateSendModal: a header with a file (WHATSAPP_INBOX-F33)', () => {
     expect(s.sent().at(-1)?.body).toMatchObject({ template: { name: 'promo_foto', header_sample: 's2' } });
   });
 
-  it('shows the thumbnail of the template’s own photo next to its name (FIX-HUB-WHATSAPP-INBOX-TEMPLATE-SHEET-SHOWS-NO-HEADER-THUMBNAIL)', async () => {
+  it('shows the thumbnail of the template’s own photo next to its name', async () => {
     const s = await setup();
     await s.result(OP, PHOTO_TEMPLATES);
     await s.pick('t3');

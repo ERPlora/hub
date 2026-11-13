@@ -1,5 +1,5 @@
 // `useScrollEdges(el)`: which edges of a sideways scroller have something behind them, so each one fades out
-// (a hard cut reads «nothing more»: tables#97). Measured when the scroller appears, on its scroll, and when
+// (a hard cut reads «nothing more»). Measured when the scroller appears, on its scroll, and when
 // it or what it holds is resized; `mark()` measures again on demand (new content of the same size).
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';

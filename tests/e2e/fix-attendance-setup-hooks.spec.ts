@@ -1,9 +1,8 @@
 // flow: ATTENDANCE-F11
-// The time clock's panel of the Home (FIX-ATTENDANCE-SETUP-HOOKS; the old module's one `widgets`, the old hub's
-// dashboard in docs/reference/old-hub/dashboard-*.png), as the owner of hub `a` reads it in Spanish: «Fichados ahora» on
+// The time clock's panel of the Home, as the owner of hub `a` reads it in Spanish: «Fichados ahora» on
 // the board by default with the server's count, which follows a clock-in and a clock-out made elsewhere (by the API, as
-// the assistant would) without a reload; the employee, who does not see the whole team, never gets it. Captures
-// `FIX-ATTENDANCE-SETUP-HOOKS-<width>`. Everything this file creates is named «E2E-PRESENCE …» and removed after it.
+// the assistant would) without a reload; the employee, who does not see the whole team, never gets it. A capture per
+// width. Everything this file creates is named «E2E-PRESENCE …» and removed after it.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, OWNER, psql, shot, shown, untilStill } from './helpers';
@@ -100,7 +99,7 @@ test('ATTENDANCE-F11: «Fichados ahora» on the owner\'s Home by default with th
   const { context, page } = await spanish(browser, { width: 1440, height: 900 });
   try {
     await expect(panel(page, CLOCKED_IN_NOW).locator('[data-testid="widget-title"]')).toHaveText('Fichados ahora');
-    // A KPI says its name once (gh:hub#1105): the title, no second label inside.
+    // A KPI says its name once: the title, no second label inside.
     await expect(panel(page, CLOCKED_IN_NOW).getByText('Fichados ahora')).toHaveCount(1);
     const before = await presence(context);
     expect(before).toBeGreaterThanOrEqual(1); // Ana

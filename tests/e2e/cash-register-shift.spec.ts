@@ -264,7 +264,7 @@ test('Sessions filter by Opening (euros) behind the funnel, with its count, the 
     await expect(rowOf(page, other)).toBeVisible();
     await toggle.click();
     await expect(panel).toBeVisible();
-    // «43,21» as typed: euros, sent as 4321 cents (cash_register#103, hub#2271).
+    // «43,21» as typed: euros, sent as 4321 cents.
     await box('opening_min').fill('43,21');
     await box('opening_max').fill('43,21');
     await panel.locator('[data-testid=cash-register-sessions-filters-apply]').click();

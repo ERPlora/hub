@@ -7,7 +7,7 @@ back in the queue at the next claim. A person retries a failed (or unanswered) j
 ended (printed, cancelled or failed) is forgotten 30 days later by the hourly prune, the platform's own (PRINTING-F20).
 
 Every app that prints calls ``printing.job.create`` by name inside its own transaction; the job is the
-structured document the app's renderer paints, never bytes (hub#501).
+structured document the app's renderer paints, never bytes.
 
 Only a device set up to print takes, confirms and fails jobs, and only those of the printers it reaches: a
 session that prints is not enough, or a waiter's phone would drain the till's receipts. Whoever sets up the
@@ -446,7 +446,7 @@ def _given_printer(ref: str, paper: str) -> Printer:
 def _stamped(ctx: OperationContext, data: JobCreateIn) -> dict:
     """The document with the envelope the paper needs when the caller left it out: its language (the
     caller's) and, but on a generic document (which prints every key), its money scale: the decimals of the
-    caller's currency or, when it does not say, of the business's (hub#1159)."""
+    caller's currency or, when it does not say, of the business's."""
     document = dict(data.document)
     if data.format != PrintJob.Format.RECEIPT:
         return document

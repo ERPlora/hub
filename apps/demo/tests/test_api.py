@@ -24,7 +24,7 @@ ROUTES = {
     ("POST", "/demo/items/delete", "demo.item.delete"),
     ("POST", "/demo/items/add_line", "demo.item.add_line"),
 }
-# The SPA's op → route map (hand-written for the PoC until V3 generates it from the OpenAPI).
+# The SPA's op → route map (written by hand: nothing generates it from the OpenAPI).
 SPA_ROUTES = settings.BASE_DIR / "frontend" / "generated" / "operations.json"
 
 

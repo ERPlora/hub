@@ -74,6 +74,16 @@ function renderShellHtml(session: object | null = ME) {
 let main: Main;
 let importBoot: ReturnType<typeof shellOptions>;
 
+/** Boots the Hub under the fake shell with `home` as the `hub-home` block base/spa.py embeds in the page. */
+async function bootWithHome(home: object): Promise<void> {
+  document.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify(home)}</script>`);
+  fakeShell();
+  await main.boot({});
+}
+
+/** «Profile», the person's own page in this hub, first in every user menu. */
+const PROFILE_ITEM = { id: 'profile', labelKey: 'base.userMenu.profile', icon: 'ion:person-circle-outline', to: '/profile' };
+
 beforeAll(async () => {
   sdk.client.api.call = vi.fn();
   renderShellHtml();
@@ -120,7 +130,7 @@ describe('main.ts', () => {
     ]);
   });
 
-  // BASE-G120: signing out forgets the assistant's conversation of the tab, from the menu and from the idle lock.
+  // From the menu and from the idle lock alike.
   it('signing out forgets the conversation with the assistant, then leaves', async () => {
     sessionStorage.setItem('erplora.assistant.history', JSON.stringify({ user: 'u1', bubbles: [], conversation: [] }));
     await main.signOut();
@@ -251,13 +261,10 @@ describe('main.ts', () => {
     expect(shellOptions().home).toBe(true);
   });
 
-  // The old hub's shell, side menu included. Its entries are the
-  // platform's, in the old hub's two groups and order, never a module (they open from «My apps» and
-  // Home); each shows once its screen exists (the shell checks the router), so today only Home does.
-  // Each entry only for whoever may open its screen — the
-  // permission its screen's operation asks —, and «API» (the old hub's, between System and Settings) only while the
-  // business shows its API's documentation.
-  it("paints the old hub's side menu: the platform's entries in its two groups, no module, each for who may open it", async () => {
+  // The side menu's entries are the platform's, never a module (modules open from «My apps» and Home); each shows once
+  // its screen exists (the shell checks the router) and only for whoever may open it, «API» only while the business
+  // shows its API's documentation.
+  it("paints the side menu: the platform's entries in its two groups, no module, each for who may open it", async () => {
     fakeShell();
     await main.boot({});
     expect(shellOptions().sidebar).toEqual({
@@ -293,13 +300,10 @@ describe('main.ts', () => {
       plan_url: 'https://erplora.com/store/plans?business=h1',
       account_url: 'https://erplora.com/account',
     };
-    document.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify(home)}</script>`);
-    fakeShell();
-    await main.boot({});
+    await bootWithHome(home);
     expect(shellOptions().userMenu).toEqual({
       items: [
-        // «Profile», the person's own page in this hub, first.
-        { id: 'profile', labelKey: 'base.userMenu.profile', icon: 'ion:person-circle-outline', to: '/profile' },
+        PROFILE_ITEM,
         { id: 'account', labelKey: 'base.userMenu.account', icon: 'ion:person-outline', href: home.account_url },
         { id: 'report', labelKey: 'base.userMenu.reportProblem', icon: 'ion:chatbubbles-outline', run: openReportProblem },
       ],
@@ -309,9 +313,7 @@ describe('main.ts', () => {
 
   it('«Report a problem» opens the dialog in the Hub, never an address of erplora.com', async () => {
     const home = { name: 'Bar A', plan_url: '', account_url: 'https://erplora.com/account' };
-    document.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify(home)}</script>`);
-    fakeShell();
-    await main.boot({});
+    await bootWithHome(home);
     const report = shellOptions().userMenu?.items?.find((item) => item.id === 'report');
     expect(report).not.toHaveProperty('href');
     expect(reportProblemOpen.value).toBe(false);
@@ -328,12 +330,10 @@ describe('main.ts', () => {
       account_url: '',
       access: { credential: 'pin', switch_user: true, idle_minutes: null },
     };
-    document.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify(home)}</script>`);
-    fakeShell();
-    await main.boot({});
+    await bootWithHome(home);
     expect(shellOptions().userMenu).toEqual({
       items: [
-        { id: 'profile', labelKey: 'base.userMenu.profile', icon: 'ion:person-circle-outline', to: '/profile' },
+        PROFILE_ITEM,
         { id: 'switch-user', labelKey: 'base.userMenu.switchUser', icon: 'ion:people-outline', to: '/switch-user' },
       ],
       logout: main.signOut,
@@ -345,9 +345,7 @@ describe('main.ts', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     try {
       const home = { name: 'Bar A', access: { credential: 'pin', switch_user: true, idle_minutes: 1 } };
-      document.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify(home)}</script>`);
-      fakeShell();
-      await main.boot({});
+      await bootWithHome(home);
       expect(logout).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(60_000);
       expect(stopNoticeListening).toHaveBeenCalledOnce();
@@ -503,7 +501,7 @@ describe('main.ts', () => {
     expect(router.replace).not.toHaveBeenCalled();
   });
 
-  it("hands the screen's uncaught errors to base's report before mounting (BASE-G95)", async () => {
+  it("hands the screen's uncaught errors to base's report before mounting", async () => {
     const { app } = fakeShell();
     await main.boot({});
     expect(app.config.errorHandler).toBeTypeOf('function');
@@ -516,7 +514,7 @@ describe('main.ts', () => {
   });
 });
 
-describe('import order guards (hub#1060)', () => {
+describe('import order guards', () => {
   it('imports the shell before anything that loads @ionic/vue (the SDK, the generated routes)', () => {
     const source = readFileSync(join(HERE, 'main.ts'), 'utf8');
     const runtimeImports = [...source.matchAll(/^import\s+(?!type\b)[^;]*?from\s+'([^']+)';/gms)].map((m) => m[1]);

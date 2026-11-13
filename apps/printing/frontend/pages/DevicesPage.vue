@@ -1,9 +1,9 @@
 <script setup lang="ts">
-// Printing → Devices (PRINTING-F18; WORKBOOK «Pantallas · Dispositivos»; the old hub's print hosts, hub#342):
+// Printing → Devices (PRINTING-F18; WORKBOOK «Pantallas · Dispositivos»; the old hub's print hosts):
 // only the devices set up here print the queue, with anybody's session. The list, live, by name — Name (this
 // device marked), Printers, Last seen and Set up by — and what the device the page runs on does. Whoever
 // sets up the printers sets this device up («Print from this device»), edits any device and retires one after
-// asking; everybody else reads. A device's own id is never shown (hub#2551): the server marks this one.
+// asking; everybody else reads. A device's own id is never shown: the server marks this one.
 import { DataTable, type DataTableAction, type DataTableColumn, EmptyState, InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, toastError, toastSuccess, useSession } from '@erplora/ui/shell';

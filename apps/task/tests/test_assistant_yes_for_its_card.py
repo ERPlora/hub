@@ -171,7 +171,7 @@ def test_the_yes_runs_nothing_when_another_record_fits_the_name_better_before_it
 @pytest.mark.parametrize("write", sorted(CHECKS))
 def test_a_name_two_records_fit_draws_no_card_and_the_model_hears_it(write):
     """«llamar» fits «Llamar al proveedor» and «Llamar al gestor»: no card that would act on either; the model hears
-    the ambiguity and asks the person which one (BASE-G115: the data are checked before any card)."""
+    the ambiguity and asks the person which one (the data are checked before any card)."""
     datum, found, make = two(write)
     make(found)
     make("Llamar al gestor" if datum == "task" else "Apertura de la terraza")

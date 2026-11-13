@@ -199,7 +199,7 @@ describe('BulkAddModal', () => {
     expect(s.inDoc('combo-bulk-row-p3')).not.toBeNull();
   });
 
-  it('combos#12: a whole category at once — its products listed, «Tick all» ticks the ones not in the course yet', async () => {
+  it('a whole category at once — its products listed, «Tick all» ticks the ones not in the course yet', async () => {
     const s = await setup();
     s.answerBy({
       '/api/inventory/categories': [200, page([{ id: 'c1', name: 'Starters', product_count: 3 }])],

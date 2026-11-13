@@ -407,7 +407,7 @@ PLATFORM_HOST_LABEL = "hubs"
 # The domain the hubs live under: a hub is <slug>.<HUB_BASE_DOMAIN> and the platform host
 # hubs.<HUB_BASE_DOMAIN>; any other host is no hub (base.operations). erplora.com in prod,
 # pre.erplora.com in pre, localhost locally. Empty: no base domain, the hub is the Host's first label
-# wherever it is (the behaviour before 2026-10-14).
+# wherever it is.
 HUB_BASE_DOMAIN = (
     config("HUB_BASE_DOMAIN", default="localhost" if DEBUG else "erplora.com")
     .strip()

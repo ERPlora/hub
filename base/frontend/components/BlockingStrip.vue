@@ -1,12 +1,8 @@
 <script setup lang="ts">
-// The blocking strip over every screen (hub#374; BASE-G22): while a ⛔ step is pending (`blocking_pending` of
-// `base.setup.status`, live) the invoice is refused, so it says the CONSEQUENCE — never «error»: nothing is
-// broken, something is missing — and names each missing step with its way in. On the Home's «Summary» it stands
-// down: the checklist there says strictly more, a screenful below; on «Activity» (`/#actividad`) it is back. On a
-// screen as low as a phone on its side (500 px high or less, the till's cut, hub#800) it is one line (hub#838): the
-// consequence and one «Set up», to the first step that can be set up from there, with no sentence and no step named;
-// the strip, the top bar and the tab bar had left the screen 21 to 132 px. With no step to set up from there, the
-// consequence alone.
+// While a step that blocks invoicing is pending (`blocking_pending` of `base.setup.status`), every screen says the
+// consequence — never «error»: nothing is broken, something is missing — and names each missing step with its way in.
+// The Home's «Summary» hides it because its own checklist says more just below. On a screen 500 px high or less (a
+// phone on its side) it shrinks to one line with a single «Set up», so the top bar and the tab bar stay on screen.
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
@@ -154,8 +150,8 @@ const firstToConfigure = computed(() => items.value.find(canConfigure));
   color: var(--ion-color-medium-shade, #555);
 }
 
-/* As low as a phone on its side (hub#838): one line of 48 px at most, «Set up» and 4 above and under it. It may wrap on
-   a window too narrow for both, never cut. By touch «Set up» is a 44 px target (ui#131, hub#1074) and the line is just
+/* As low as a phone on its side: one line of 48 px at most, «Set up» and 4 above and under it. It may wrap on
+   a window too narrow for both, never cut. By touch «Set up» is a 44 px target and the line is just
    that: at 568x320 the till keeps 150 px, room for a tile with a name in two lines (147 px). */
 .blocking-strip--low {
   align-items: center;

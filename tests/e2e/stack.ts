@@ -1,4 +1,4 @@
-// Where the browser PoC finds the dev stack. The shared one is runserver on :8000, its Vite on :5173,
+// Where the e2e finds the dev stack. The shared one is runserver on :8000, its Vite on :5173,
 // the SaaS on :8001 and the database `hub`; a branch checked out beside it (another session's
 // runserver keeps :8000) starts its own with other ports and its own database, and points the specs
 // at it with the same variables Django and Vite read: `E2E_HUB_PORT` (runserver's port, only the

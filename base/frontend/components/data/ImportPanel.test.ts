@@ -1,7 +1,3 @@
-// Settings › Data › Import (BASE-G103–G107), end to end over the fake API: only an administrator reads it; the last
-// import that did not go in whole opens first (its report, «Retry what is missing», «See the templates»); otherwise
-// the catalogue and «Upload from file» → review → import → report. A file or template that cannot be read says why
-// and stays on the choice; an import refused stays on the review with the reason.
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { load, summary, template, waitingLoad } from '../../__tests__/data-fixtures';
@@ -47,20 +43,31 @@ async function settle() {
   for (let i = 0; i < 4; i += 1) await flush();
 }
 
-/** The panel past its review: the template chosen and imported, answered with `row`. */
-async function imported(row: ImportRow, imports?: { imports: ImportRow[]; unfinished: ImportRow | null }) {
-  const m = await panel(
-    {
-      '/api/settings/data/blueprints/inspect': () => Response.json(summary()),
-      '/api/settings/data/blueprints/import': () => Response.json(row),
-    },
-    imports,
-  );
-  await m.wrapper.get('[data-testid="templates-row-restaurant.es-use"]').trigger('click');
+type Panel = Awaited<ReturnType<typeof panel>>;
+
+/** A tap on the element `testid`, and what it sets off. */
+async function press(m: Panel, testid: string): Promise<void> {
+  await m.wrapper.get(`[data-testid="${testid}"]`).trigger('click');
   await settle();
-  await m.wrapper.get('[data-testid="review-import"]').trigger('click');
-  await settle();
+}
+
+/** The panel past its review: the template chosen and imported, the import answered by `answer`. */
+async function importAnswered(answer: () => Response, imports?: { imports: ImportRow[]; unfinished: ImportRow | null }) {
+  const m = await panel({ '/api/settings/data/blueprints/inspect': () => Response.json(summary()), '/api/settings/data/blueprints/import': answer }, imports);
+  await press(m, 'templates-row-restaurant.es-use');
+  await press(m, 'review-import');
   return m;
+}
+
+/** The panel past its review, the import answered with `row`. */
+function imported(row: ImportRow, imports?: { imports: ImportRow[]; unfinished: ImportRow | null }) {
+  return importAnswered(() => Response.json(row), imports);
+}
+
+/** «Templates» on the report goes back to the catalogue. */
+async function expectBackToTheCatalogue(m: Panel): Promise<void> {
+  await press(m, 'report-templates');
+  expect(m.wrapper.find('[data-testid="templates-row"]').exists()).toBe(true);
 }
 
 describe('ImportPanel', () => {
@@ -84,20 +91,16 @@ describe('ImportPanel', () => {
       '/api/settings/data/blueprints/inspect': () => Response.json(summary()),
       '/api/settings/data/blueprints/import': () => Response.json(load()),
     });
-    await m.wrapper.get('[data-testid="templates-row-restaurant.es-use"]').trigger('click');
-    await settle();
+    await press(m, 'templates-row-restaurant.es-use');
     expect(m.calls.at(-1)).toEqual({ url: '/api/settings/data/blueprints/inspect', body: { template: 'restaurant.es' } });
     expect(m.wrapper.find('[data-testid="review"]').exists()).toBe(true);
-    await m.wrapper.get('[data-testid="review-import"]').trigger('click');
-    await settle();
+    await press(m, 'review-import');
     expect(m.calls.at(-1)).toEqual({
       url: '/api/settings/data/blueprints/import',
       body: { template: 'restaurant.es', apps: ['inventory', 'customer'] },
     });
     expect(m.wrapper.get('[data-testid="report-status"]').text()).toContain('Everything went in.');
-    await m.wrapper.get('[data-testid="report-templates"]').trigger('click');
-    await settle();
-    expect(m.wrapper.find('[data-testid="templates-row"]').exists()).toBe(true);
+    await expectBackToTheCatalogue(m);
   });
 
   it('reads the session again after a load or a retry: the apps it turned on reach the menu', async () => {
@@ -112,16 +115,12 @@ describe('ImportPanel', () => {
         },
         { imports: [UNFINISHED], unfinished: UNFINISHED },
       );
-      await m.wrapper.get('[data-testid="report-retry"]').trigger('click');
-      await settle();
+      await press(m, 'report-retry');
       expect(read).toBe(1);
-      await m.wrapper.get('[data-testid="report-templates"]').trigger('click');
-      await settle();
-      await m.wrapper.get('[data-testid="templates-row-restaurant.es-use"]').trigger('click');
-      await settle();
+      await press(m, 'report-templates');
+      await press(m, 'templates-row-restaurant.es-use');
       expect(read).toBe(1); // reviewing writes nothing
-      await m.wrapper.get('[data-testid="review-import"]').trigger('click');
-      await settle();
+      await press(m, 'review-import');
       expect(read).toBe(2);
     } finally {
       window.removeEventListener(SESSION_CHANGED, count);
@@ -133,14 +132,7 @@ describe('ImportPanel', () => {
     const count = () => (read += 1);
     window.addEventListener(SESSION_CHANGED, count);
     try {
-      const m = await panel({
-        '/api/settings/data/blueprints/inspect': () => Response.json(summary()),
-        '/api/settings/data/blueprints/import': refused('The app refused it.'),
-      });
-      await m.wrapper.get('[data-testid="templates-row-restaurant.es-use"]').trigger('click');
-      await settle();
-      await m.wrapper.get('[data-testid="review-import"]').trigger('click');
-      await settle();
+      await importAnswered(refused('The app refused it.'));
       expect(read).toBe(0);
     } finally {
       window.removeEventListener(SESSION_CHANGED, count);
@@ -149,8 +141,7 @@ describe('ImportPanel', () => {
 
   it('a template that cannot be read says why and stays on the choice', async () => {
     const m = await panel({ '/api/settings/data/blueprints/inspect': refused('This template is not in the catalogue.') });
-    await m.wrapper.get('[data-testid="templates-row-restaurant.es-use"]').trigger('click');
-    await settle();
+    await press(m, 'templates-row-restaurant.es-use');
     expect(m.wrapper.get('[data-testid="import-read-error"]').text()).toContain(
       'The file could not be read: This template is not in the catalogue.',
     );
@@ -182,14 +173,7 @@ describe('ImportPanel', () => {
   });
 
   it('an import refused stays on the review with the reason', async () => {
-    const m = await panel({
-      '/api/settings/data/blueprints/inspect': () => Response.json(summary()),
-      '/api/settings/data/blueprints/import': refused('The app refused it.'),
-    });
-    await m.wrapper.get('[data-testid="templates-row-restaurant.es-use"]').trigger('click');
-    await settle();
-    await m.wrapper.get('[data-testid="review-import"]').trigger('click');
-    await settle();
+    const m = await importAnswered(refused('The app refused it.'));
     expect(m.wrapper.get('[data-testid="review-error"]').text()).toContain('The import failed: The app refused it.');
   });
 
@@ -246,12 +230,9 @@ describe('ImportPanel', () => {
     );
     expect(m.wrapper.find('[data-testid="report-unfinished"]').exists()).toBe(true);
     expect(m.wrapper.find('[data-testid="templates-row"]').exists()).toBe(false);
-    await m.wrapper.get('[data-testid="report-retry"]').trigger('click');
-    await settle();
+    await press(m, 'report-retry');
     expect(m.calls.at(-1)).toEqual({ url: '/api/settings/data/blueprints/import', body: { retry_of: UNFINISHED.id } });
     expect(m.wrapper.get('[data-testid="report-status"]').text()).toContain('Everything went in.');
-    await m.wrapper.get('[data-testid="report-templates"]').trigger('click');
-    await settle();
-    expect(m.wrapper.find('[data-testid="templates-row"]').exists()).toBe(true);
+    await expectBackToTheCatalogue(m);
   });
 });

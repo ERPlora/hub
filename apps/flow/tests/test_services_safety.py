@@ -1,4 +1,4 @@
-"""What an automation may never do, and with what it acts (review 2026-10-15, items 1 and 2).
+"""What an automation may never do, and with what it acts.
 
 - An action that needs a person in front (``ai.risk == "high"``: voiding, refunding, erasing, sending to
   the tax agency…) is refused when the automation is saved, when it is granted and when it runs, with

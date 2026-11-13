@@ -11,8 +11,8 @@ Sales refuses, nothing of the table changes either.
 
 Concurrency: a write that seats a check locks the table first (``select_for_update``) and checks it is
 still free under the lock, so two waiters seating the same table at once leave one check; a write on a
-check locks the check. Phase 1 has no relay: before deciding, a write closes the checks whose check of
-Sales already ended (``settle``), as the reads already show them.
+check locks the check. Before deciding, a write closes the checks whose check of Sales already ended
+(``settle``), as the reads already show them, without waiting for the relay.
 """
 
 import datetime as dt
@@ -114,7 +114,7 @@ SYSTEM = "table.system"
 GAP = 16
 CELL = BOX + GAP
 COLS = 5
-#: How long a reservation holds its table when it does not say (the old module's default).
+#: How long a reservation holds its table when it does not say.
 DEFAULT_RESERVATION_MINUTES = 120
 
 ZONE_NAME_TAKEN = _("There is already a zone with that name.")
@@ -214,8 +214,8 @@ def retitle(ctx: OperationContext, order_id: UUID | None, table: Table) -> None:
 
 def settle(sessions) -> None:
     """Closes the open and parked checks of ``sessions`` whose check of Sales already ended (charged in
-    full or voided), at the hour Sales closed it: what the reads already show (no relay in phase 1). A
-    parked one has no stretch at a table left to end; it stays without a table."""
+    full or voided), at the hour Sales closed it: what the reads already show. A parked one has no
+    stretch at a table left to end; it stays without a table."""
     ending = list(
         sessions.filter(status__in=LIVE, is_deleted=False, order_id__in=ended_orders())
     )
@@ -459,7 +459,7 @@ def _number_taken(number: str, zone: Zone | None, *, except_id=None) -> bool:
 
 
 def _next_number(zone: Zone | None) -> str:
-    """The first free number of the zone, from its count of tables plus one (the old canvas' rule)."""
+    """The first free number of the zone, from its count of tables plus one."""
     numbers = {
         n.strip().lower()
         for n in Table.objects.filter(is_deleted=False, zone=zone).values_list(
@@ -1483,7 +1483,7 @@ def expire_holds(ctx: OperationContext, data: NoIn) -> dict:
         hold.status = Hold.Status.EXPIRED
         hold.label = ""
         hold.save(update_fields=["status", "label", "updated_at"])
-        # One notice per hold, saying its table (hub#2681): never one for the whole sweep.
+        # One notice per hold, saying its table: never one for the whole sweep.
         _hold_event(ctx, events.TABLE_HOLD_RELEASED, hold)
     return {"expired": len(over)}
 

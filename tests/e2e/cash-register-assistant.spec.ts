@@ -24,7 +24,8 @@ import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { DONE, NOT_DONE, type Provider, startProvider } from './assistant-provider';
+import { NOT_DONE, type Provider, startProvider } from './assistant-provider';
+import { confirmedWithTheWord } from './assistant-card-helpers';
 import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, psql, REPO_DIR, shot, shown, untilStill } from './helpers';
 import { createProduct, type Product } from './inventory-helpers';
 import { cleanDocumentsOf, stamp } from './sale-helpers';
@@ -318,10 +319,7 @@ test('CASH_REGISTER-F09 — «close the drawer with 250 € counted»: the summa
   await ask(page, 'E2E-CLOSE-CASH 25000 cierra la caja con 250 € contados');
   await expect(card(page)).toBeVisible({ timeout: 30_000 });
   await expect(previewBlock(page).locator('li')).toHaveText(willHappen);
-  await card(page).locator('[data-testid="assistant-confirm-input"] input').fill('confirm');
-  await expect(submit).toBeEnabled();
-  await decide(page, 'submit');
-  await expect(lastAnswer(page)).toContainText(DONE.en);
+  await confirmedWithTheWord(page);
   await expect(receipts(page).last()).toContainText('Done: Close in Cash register');
   const closed = await detailOf(context, shift.id);
   expect([closed.status, closed.expected_balance, closed.closing_balance, closed.difference]).toEqual([

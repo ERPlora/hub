@@ -112,7 +112,7 @@ def test_the_system_block_merges_the_manufacturer_with_this_installation():
 
 def test_erplora_always_serves_several_taxpayers():
     # IndicadorMultiplesOT: ERPlora is one platform for many businesses, a multi-taxpayer system by definition,
-    # so it is «S» on every record and owes nothing to the account's photo (decision of 2026-10-15, T2b).
+    # so it is «S» on every record and owes nothing to the account's photo.
     assert producer.MULTIPLE_OT == "S"
     assert producer.system_info(version="abc", installation="a").multiple_ot == "S"
 

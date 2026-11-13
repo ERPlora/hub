@@ -1,4 +1,4 @@
-"""Payments in the business's currency (PAYMENT-F02, the old payments#35 and #38): a payment that does not say its
+"""Payments in the business's currency (PAYMENT-F02): a payment that does not say its
 currency is recorded in the business's, its country's as ``base.business.get`` reads it from this hub's registry
 (BASE-F50), never in a euro fixed in the app: by the screen, by the API and by the assistant (the same operation).
 A payment keeps the currency it was recorded in (a record is never rewritten), and says the decimals the server counts
@@ -57,7 +57,7 @@ def admin_client(client, make_user):
 
 @pytest.mark.parametrize("said", [{}, {"currency": None}, {"currency": "  "}])
 def test_a_payment_that_does_not_say_its_currency_is_recorded_in_the_business_s(said):
-    # The old payments#35 (the screen sends none) and #38 (the assistant or the API may leave it out).
+    # The screen sends none, and the assistant or the API may leave it out.
     business_in("PL")
     created = record(make_method(), **said)
     assert created.currency == "PLN"
@@ -104,7 +104,7 @@ def test_each_hub_records_in_its_own_business_s_currency():
 
 
 def test_the_same_attempt_sent_again_answers_the_payment_already_recorded_in_the_business_s_currency():
-    # payments#8 on top of #38: the retry does not say the currency either; it is the same attempt, not a 409.
+    # The retry does not say the currency either; it is the same attempt, not a 409.
     business_in("PL")
     method = make_method()
     key = "0199f4a2-0000-7000-8000-000000000001"

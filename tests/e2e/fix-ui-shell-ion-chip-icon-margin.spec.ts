@@ -1,13 +1,12 @@
-// The icon of an Ionic chip keeps its gap to the chip's text under the shell (FIX-UI-SHELL-ION-CHIP-ICON-MARGIN-WIPED-BY-PREFLIGHT):
-// the icon of every `ion-chip` of the Hub sat against its text, as the «⚠Not configured» of Inventory › Products and of the
-// product form (`margin-inline-end: 0px` measured on its `ion-icon`). Tailwind's preflight (`* { margin: 0 }`, layer `base`)
+// The icon of an Ionic chip keeps its gap to the chip's text under the shell, as on the «⚠Not configured» of
+// Inventory › Products and of the product form. Tailwind's preflight (`* { margin: 0 }`, layer `base`)
 // is a document rule, and a document rule always beats the `::slotted(ion-icon:first-child|last-child)` margins Ionic gives
 // the icon of a chip (both modes: 8px to the text, 4px pulled toward the chip's edge and 4px into its padding on top and
-// below); the shell's theme takes the reset back for the chip's own icons, as it did for its sides and for the icon of a
+// below); the shell's theme takes the reset back for the chip's own icons, as it does for its sides and for the icon of a
 // button. Measured at 390×844, 834×1112 and 1440×900 on the chip of a product with no usable tax category, in the list
 // filtered by «Not configured» and in the product's form: Ionic's margins, a gap of at least 6px between the icon and the
 // text, the icon 8px from the chip's edge (Ionic's 12px padding less its 4px pull) and whole inside the chip, and the chip
-// no taller than Ionic's 32px, as on main. The table's «Clear filters» ends in its own icon, mirrored: measured at 1440×900
+// no taller than Ionic's 32px. The table's «Clear filters» ends in its own icon, mirrored: measured at 1440×900
 // (its row of column filters is a desk's), the icon after the text with the same gap and 8px from the chip's end edge.
 // What the run creates is deleted.
 // flow: ui-shell-ion-chip-icon-margin
@@ -25,7 +24,7 @@ const IONIC_ICON = {
 };
 /** How far Ionic pulls the icon toward the chip's edge. */
 const IONIC_ICON_PULL = 4;
-/** Ionic's `:host` padding of `ion-chip` on each side (both modes), which the shell keeps (FIX-UI-SHELL-ION-CHIP-PADDING-WIPED-BY-PREFLIGHT). */
+/** Ionic's `:host` padding of `ion-chip` on each side (both modes), which the shell keeps. */
 const IONIC_INLINE = 12;
 /** Ionic's `min-height` of `ion-chip`. */
 const IONIC_MIN_HEIGHT = 32;

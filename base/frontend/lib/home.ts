@@ -1,12 +1,11 @@
 // The rules of the Home the browser applies (the server already ordered, filtered and counted): the heading,
 // the fold of «Finish setting up your business», the blocking strip's steps, a panel's data → what it paints,
-// the panels this browser keeps on, and «My apps» in the order this browser opens them. Ported from the old
-// hub's `dashboard-heading.ts`, `setup-status.ts` and `dashboard-widgets.ts`.
+// the panels this browser keeps on, and «My apps» in the order this browser opens them.
 import { formatDateTime, formatMoney, type Money } from '@erplora/ui/components';
 
 import type { SetupItem, SetupStatus, WidgetDef } from '../operations';
 
-// ── Heading (BASE-G127) ─────────────────────────────────────────────────────────────────────────────────────
+// ── Heading ─────────────────────────────────────────────────────────────────────────────────────────────────
 
 export type GreetingSlot = 'morning' | 'afternoon' | 'evening';
 
@@ -20,7 +19,7 @@ export function greetingSlot(hour: number): GreetingSlot {
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** The business's name; while it has none (or only an account address), a greeting by the hour (hub#366). */
+/** The business's name; while it has none (or only an account address), a greeting by the hour. */
 export function heading(name: string | null | undefined, hour: number): Heading {
   const trimmed = (name ?? '').trim();
   if (trimmed && !EMAIL.test(trimmed)) return { kind: 'business', name: trimmed };
@@ -54,9 +53,9 @@ export interface HubHome {
   app_downloads?: Record<string, string>;
 }
 
-// ── «Finish setting up your business» (BASE-G22, BASE-G130, BASE-G164) ────────────────────────────────────
+// ── «Finish setting up your business» ─────────────────────────────────────────────────────────────────────
 
-/** Rows the card shows folded on a desk and on a phone (hub#1197). */
+/** Rows the card shows folded on a desk and on a phone. */
 export const MAX_VISIBLE_ROWS = 5;
 export const PHONE_MAX_VISIBLE_ROWS = 2;
 
@@ -102,13 +101,13 @@ export function checklistView(status: SetupStatus | undefined, options: Checklis
   return { total, done, rows, hidden: items.length - rows.length, complete, empty };
 }
 
-/** The ⛔ steps still pending, while the server counts some: what the blocking strip names (hub#374). */
+/** The ⛔ steps still pending, while the server counts some: what the blocking strip names. */
 export function blockingItems(status: SetupStatus | undefined): SetupItem[] {
   if (!status || status.blocking_pending <= 0) return [];
   return status.items.filter((item) => item.level === 'legal' && item.state === 'pending');
 }
 
-// ── Panels (BASE-G166, BASE-G167) ───────────────────────────────────────────────────────────────────────────
+// ── Panels ──────────────────────────────────────────────────────────────────────────────────────────────────
 
 type Row = Record<string, unknown>;
 
@@ -123,7 +122,7 @@ export function rowsOf(result: unknown): Row[] {
   return [result as Row];
 }
 
-/** A business's currency (ISO 4217) and its decimals, as `base.business.get` says them (BASE-G98). */
+/** A business's currency (ISO 4217) and its decimals, as `base.business.get` says them. */
 /** A currency and its minor unit's decimals: the shared one of `@erplora/ui/components`. */
 export type { Money };
 
@@ -209,10 +208,10 @@ const NO_VALUE = '—';
  *  Staff) and it goes into the bar's style. */
 const HEX_COLOR = /^#(?:[0-9a-f]{3}){1,2}$/i;
 
-/** The bars of a bar-list or a chart: a row without its value stays, as «—» with no share (BASE-F06); one whose value is
- *  no number is left out. A bar measures the size of its value against the biggest size, so a shortfall of 0,40 € is
- *  a short bar beside a surplus of 5,50 €, and only a value below zero is marked `negative` (BASE-F06). A bar takes its
- *  row's colour when the panel maps one (`map.color`, the old hub's `renderBarList`), except a negative: red wins. */
+/** The bars of a bar-list or a chart: a row without its value stays, as «—» with no share; one whose value is no
+ *  number is left out. A bar measures the size of its value against the biggest size, so a shortfall of 0,40 € is a
+ *  short bar beside a surplus of 5,50 €, and only a value below zero is marked `negative`. A bar takes its row's colour
+ *  when the panel maps one (`map.color`), except a negative: red wins. */
 function bars(widget: WidgetDef, rows: Row[], locale: string, format: unknown, money: Money | undefined): Bar[] {
   const colorField = widget.map.color;
   const read = rows
@@ -343,7 +342,7 @@ export function formatMoment(value: string, locale: string, options: MomentOptio
   return { text: momentFormat(locale, sameYear ? 'date-time' : 'year-date-time', timeZone).format(instant), detail };
 }
 
-/** A chart's bars, its days named in the person's language (the old hub's gh:hub#2392): a week by its weekdays, a
+/** A chart's bars, its days named in the person's language: a week by its weekdays, a
  *  longer series by its dates (its weekdays would repeat); a label that is no day stays as it is. */
 function chartBars(widget: WidgetDef, rows: Row[], locale: string, format: unknown, money: Money | undefined): ChartBar[] {
   const read = bars(widget, rows, locale, format, money);
@@ -424,7 +423,7 @@ export function widgetView(widget: WidgetDef, result: unknown, locale: string, m
   }
 }
 
-/** Where this browser keeps the panels it shows (the old hub's key: one board per device). */
+/** Where this browser keeps the panels it shows: one board per device. */
 export const BOARD_STORAGE_KEY = 'dashboard-hub';
 
 /** The panels on: the stored choice (in its order, without the ones whose app is gone), else the defaults. */
@@ -434,7 +433,7 @@ export function activeWidgetKeys(stored: readonly string[] | null, catalogue: re
   return stored.filter((key) => known.has(key));
 }
 
-// ── «My apps» (BASE-G165) ───────────────────────────────────────────────────────────────────────────────────
+// ── «My apps» ───────────────────────────────────────────────────────────────────────────────────────────────
 
 /** Where this browser counts how often each app is opened (only to order «My apps»). */
 export const USAGE_STORAGE_KEY = 'hub-app-usage';
@@ -463,7 +462,7 @@ export function orderByUse<T extends { id: string }>(apps: readonly T[], usage: 
   return [...apps].sort((a, b) => (Number(usage[b.id]) || 0) - (Number(usage[a.id]) || 0));
 }
 
-// ── Activity (BASE-G129) ────────────────────────────────────────────────────────────────────────────────────
+// ── Activity ────────────────────────────────────────────────────────────────────────────────────────────────
 
 export type SaleTone = 'success' | 'danger' | 'warning' | 'neutral';
 

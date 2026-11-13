@@ -8,11 +8,11 @@ without a session calls them in-process from base. The platform's reaction has n
 import json
 
 import pytest
-from django.conf import settings
 from live.ninja import ensure_api_parity
 
 from apps.appointment.models import Appointment
 from apps.online_booking.api import router
+from base.tests.routes import spa_routes
 from config.api import api
 
 from .conftest import TUESDAY, at, booking_data, make_appointment
@@ -88,15 +88,7 @@ def test_the_openapi_describes_the_online_booking_routes(client):
 
 
 def test_the_spas_route_map_names_every_online_booking_route():
-    spa = json.loads(
-        (settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text()
-    )
-    mine = {
-        (route["method"].upper(), route["path"].removeprefix("/api"), op)
-        for op, route in spa.items()
-        if op.startswith("online_booking.")
-    }
-    assert mine == ROUTES
+    assert spa_routes("online_booking.") == ROUTES
 
 
 # Authentication and permissions

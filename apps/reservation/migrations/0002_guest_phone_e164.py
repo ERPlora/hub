@@ -1,16 +1,16 @@
-# The guest's phone kept as Customers keeps it (RESERVATION-F06, F08, F14, F16).
-# Before this, a reservation or a waitlist entry whose card was chosen kept the phone as typed («600 111 222»),
-# and the inbox, which looks for exactly the international number, told nobody (RESERVATION-F19). Every kept
-# phone is read with Customers' rules (``apps.customer.phones.to_e164``, copied here: a migration never imports
-# code that may change) in the business's country, Spain in phase 1 (``apps.customer.queries.business_country``),
-# and written in E.164. What is not a valid number of its country stays as it is: never guessed.
-# Backwards, nothing to undo: the typed form is not known any more, and E.164 is what every reader accepts.
+# The guest's phone kept as Customers keeps it (RESERVATION-F06, F08, F14, F16). Before this, a reservation or a
+# waitlist entry whose card was chosen kept the phone as typed («600 111 222»), and the inbox, which looks for exactly
+# the international number, told nobody (RESERVATION-F19). Every kept phone is read with Customers' rules
+# (``apps.customer.phones.to_e164``, copied here: a migration never imports code that may change) in Spain, the country
+# of every business this migration met (``apps.customer.queries.business_country``), and written in E.164. What is not a
+# valid number of its country stays as it is: never guessed. Backwards, nothing to undo: the typed form is not known any
+# more, and E.164 is what every reader accepts.
 
 import phonenumbers
 from django.db import migrations
 from phonenumbers import NumberParseException, PhoneNumberFormat
 
-#: The business's country in phase 1: a number without prefix is one of Spain.
+#: Every business this migration met was in Spain: a number without prefix is one of Spain.
 COUNTRY = "ES"
 #: What may separate the digits of a typed number (a no-break space included).
 SEPARATORS = frozenset("  \t-./()")

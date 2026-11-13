@@ -305,7 +305,7 @@ def give_back(sale, amount: int, *lines: dict):
 
 
 def test_by_professional_a_refund_comes_off_who_sold_what_came_back(catalog):
-    # flow: ninguno — FIX sale/cash_register (de STAFF-F21 y REC_PELUQUERIA-F15): what each one sold
+    # flow: STAFF-F21: what each one sold
     # squares with the period's revenue to the cent, refunds taken off, so a commission is never paid
     # on money that went back.
     ana, luis, bea = uuid7(), uuid7(), uuid7()
@@ -776,7 +776,7 @@ def _quick_note(text: str):
 def test_rows_tied_on_the_column_go_by_their_label_then_id_in_the_lists_own_direction(
     listing, create
 ):
-    """hub#684 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included."""
+    """hub#684: a descending list is the ascending one read backwards, ties included."""
     tied = sorted(create("Tied") for _ in range(3))
     ascending = [create("Another"), *tied]
 
@@ -792,7 +792,7 @@ def test_rows_tied_on_the_column_go_by_their_label_then_id_in_the_lists_own_dire
 
 
 def test_the_sales_list_settles_its_ties_by_id_in_its_own_direction(catalog):
-    """hub#684: the sales list already followed hub#2355, and holds it now through the shared order."""
+    """hub#684: the sales list already settled its ties this way; now the shared order keeps it so."""
     by_id = sorted(charge(f"list-key-{n:04}").id for n in range(3))
 
     def listed(direction):

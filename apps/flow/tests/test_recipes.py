@@ -1,5 +1,4 @@
-"""The factory recipes of the apps (WORKBOOK FLOW-F33 to F36; the old Hub's HUB-F104 and its
-``crates/runtime/src/flows/templates.rs``): what ``apps.flow.recipes`` reads from each active app's
+"""The factory recipes of the apps (WORKBOOK FLOW-F33 to F36): what ``apps.flow.recipes`` reads from each active app's
 ``recipes.py`` and offers, and what it sets aside, with why.
 
 A recipe is data its app declares (``RECIPES``): an id, its words, its trigger, its steps and the

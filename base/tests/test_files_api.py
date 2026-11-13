@@ -4,7 +4,7 @@ Everyone of the hub sees and opens the files (``base.view_files``); who runs it 
 folders and renames (``base.upload_files``) and deletes (``base.delete_files``; moving takes both, as the old hub).
 Every write records its event (``base.file.<fact>``) in its transaction, and the live listing follows it after the
 COMMIT. A file is read at ``/api/files/raw`` with the session, never cached, sandboxed and, unless it is a type that is
-safe to show, as an attachment: never from ``/p/media/`` (public), never a URL of the bucket (saas#968, saas#972).
+safe to show, as an attachment: never from ``/p/media/`` (public), never a URL of the bucket.
 """
 
 import base64
@@ -14,7 +14,6 @@ import psycopg
 import pytest
 from django.core.files.base import ContentFile
 from django.core.files.storage import storages
-from django.urls import resolve
 from live.assistant import description
 from live.context import OperationContext, Scope
 from live.errors import InvalidPayload, NotFound, OperationError, PermissionDenied
@@ -29,6 +28,7 @@ from base import events, files
 from base.models import Hub
 from base.queries import refuse_past_the_plans_space
 from base.storage import hub_prefix
+from base.tests.routes import assert_bound, spa_route_map
 
 A = Scope("host", "a")
 B = Scope("host", "b")
@@ -314,17 +314,11 @@ ROUTES = {
 
 @pytest.mark.parametrize(("method", "path", "operation"), sorted(ROUTES))
 def test_each_route_is_bound_to_its_operation(method, path, operation):
-    from base.api import router
-
-    [route] = router.path_operations[path.removeprefix("/api")].operations
-    assert (route.methods, route.operation_id) == ([method], operation)
-    assert resolve(path).url_name
+    assert_bound(method, path.removeprefix("/api"), operation)
 
 
-def test_the_spa_s_route_map_names_the_files_routes(settings):
-    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
-    mine = {(route["method"].upper(), route["path"], op) for op, route in spa.items() if op.startswith("base.file.")}
-    assert mine == ROUTES
+def test_the_spa_s_route_map_names_the_files_routes():
+    assert spa_route_map("base.file.") == ROUTES
 
 
 def owner(client, make_user, slug="a"):

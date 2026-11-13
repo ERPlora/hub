@@ -8,7 +8,8 @@ import type { Component } from 'vue';
 
 import type { Business } from '../../../../base/frontend/operations';
 import { business, POLISH, priceList } from '../__tests__/fixtures';
-import { EMPLOYEE, errorFrame, flush, mountPricing, type MountOptions, page } from '../__tests__/mount-pricing';
+import { EMPLOYEE, flush, mountPricing, type MountOptions, page } from '../__tests__/mount-pricing';
+import { itRetriesAFailedLoad, itStartsOnTheActiveOnes } from '../__tests__/table-checks';
 import ListConfirm from './ListConfirm.vue';
 import PriceListFormModal from './PriceListFormModal.vue';
 import PriceListsTable from './PriceListsTable.vue';
@@ -95,24 +96,7 @@ describe('PriceListsTable', () => {
     ]);
   });
 
-  it('starts on the active ones, its Status filter says so, and its blank option is every list', async () => {
-    const s = await setup();
-    expect(s.prop('filters')).toEqual({ status: 'active' });
-    const status = s.prop<Array<{ key: string; filter?: { options?: Array<{ value: string; label: string }> } }>>('columns').find(
-      (c) => c.key === 'status',
-    );
-    // The table's own blank option is «All»: no second «All» beside it that means something else.
-    expect(status?.filter?.options).toEqual([
-      { value: 'active', label: 'Active' },
-      { value: 'inactive', label: 'Inactive' },
-    ]);
-    s.table().vm.$emit('filtersChange', { status: '' });
-    await flush();
-    expect(s.params(OP)).toEqual([{ status: 'all', sort: 'name', dir: 'asc', limit: 50, offset: 0 }]);
-    s.table().vm.$emit('filtersChange', { status: 'inactive' });
-    await flush();
-    expect(s.params(OP)).toEqual([{ status: 'inactive', sort: 'name', dir: 'asc', limit: 50, offset: 0 }]);
-  });
+  itStartsOnTheActiveOnes(setup, OP, 'list');
 
   it('with only the default filter, an empty answer is «No price lists.», not a search without results', async () => {
     const s = await setup();
@@ -124,24 +108,7 @@ describe('PriceListsTable', () => {
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No price lists.');
   });
 
-  it('says it is loading until the first answer, and a load that fails says so with «Retry»', async () => {
-    const s = await setup();
-    expect(s.prop('loading')).toBe(true);
-    expect(s.prop('error')).toBeUndefined();
-    s.net.lastStream().push(errorFrame(s.subId(OP), 'internal_error'));
-    await flush();
-    expect(s.prop('loading')).toBe(false);
-    expect(s.prop('error')).toBe('The price lists could not be loaded.');
-    expect(s.prop<{ retry: string; loadError: string }>('labels')).toMatchObject({ retry: 'Retry', loadError: 'The price lists could not be loaded.' });
-    // «Retry» asks again (the stream reopens and the server runs the query anew); its answer clears the error.
-    const streams = s.net.streams.length;
-    s.table().vm.$emit('retry');
-    await flush();
-    expect(s.net.streams.length).toBe(streams + 1);
-    await s.show(page([VIP]));
-    expect(s.prop('error')).toBeUndefined();
-    expect(s.prop('loading')).toBe(false);
-  });
+  itRetriesAFailedLoad(setup, OP, 'The price lists could not be loaded.', page([VIP]));
 
   it('no list at all says «No price lists.»', async () => {
     const s = await setup();

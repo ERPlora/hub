@@ -29,7 +29,7 @@ def visible_texts() -> set[str]:
     """The English source of every lazy text the app shows (menu, store, admin, choices, messages, CSV)."""
     config = apps.get_app_config("inventory")
     lazies = [*config_texts(config)]
-    # The Home's step and panels (gh:hub#868: the old checklist spoke English to a Spanish reader).
+    # The Home's step and panels (the old checklist spoke English to a Spanish reader).
     lazies += [text for step in config.setup for text in (step.title, step.description)]
     lazies += [panel.title for panel in config.widgets]
     lazies += module_texts(queries, services, schemas)

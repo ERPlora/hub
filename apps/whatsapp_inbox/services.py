@@ -153,7 +153,7 @@ WINDOW_CLOSED = _(
 SAAS_UNCONFIGURED = _(
     "This server cannot reach erplora.com, so nothing can be sent from it."
 )
-#: A plan that includes no WhatsApp messages (0, ADR-0474): no month brings any, so not «until next month».
+#: A plan that includes no WhatsApp messages (0): no month brings any, so not «until next month».
 NO_PLAN_MESSAGES = _("Your plan does not include WhatsApp messages: nothing can be sent until you upgrade the plan.")
 NOT_RETRYABLE = _("This message cannot be sent again: write a new one.")
 TEMPLATE_NOT_FOUND = _("There is no template called “%(name)s”.")
@@ -218,7 +218,7 @@ _REFUSALS = {
     HEADER_SAMPLE_MISSING_CODE: HEADER_SAMPLE_MISSING_CODE,
 }
 #: erplora.com's 409 codes for a template the Hub says in its own words when read (never blaming ERPlora for
-#: Meta: gh:hub#2731); any other is Meta's refusal, with Meta's reason as it came.
+#: Meta); any other is Meta's refusal, with Meta's reason as it came.
 _TEMPLATE_REFUSALS = {
     "whatsapp.meta_unreachable": "whatsapp_inbox.meta_unreachable",
     "whatsapp.meta_rate_limited": "whatsapp_inbox.meta_rate_limited",
@@ -1140,7 +1140,7 @@ def retry_message(ctx: OperationContext, data: MessageRefIn) -> dict:
 
 def _exact_number(raw: str, ctx: OperationContext) -> str:
     """``raw`` when it is a number written exactly in international format; ``InvalidPayload`` otherwise (a
-    national or half-typed number is never guessed: it could be somebody else's, gh:whatsapp_inbox#279)."""
+    national or half-typed number is never guessed: it could be somebody else's)."""
     text = (raw or "").strip()
     message = str(NOT_INTERNATIONAL % {"phone": text})
     if not _INTERNATIONAL.fullmatch(text):
@@ -1343,7 +1343,7 @@ def record_delivery(ctx: OperationContext, data: RecordDeliveryIn) -> dict:
     else:
         message.status = Message.Status.SENDING
         if data.code == "whatsapp.meta_unreachable":
-            message.error_code = "whatsapp_inbox.meta_unreachable"  # Meta's silence, never ERPlora's (gh:hub#2731)
+            message.error_code = "whatsapp_inbox.meta_unreachable"  # Meta's silence, never ERPlora's
         else:
             message.error_code = SEND_UNKNOWN_CODE if data.kind == gateway.UNKNOWN else SAAS_UNREACHABLE_CODE
         message.error_message = ""
@@ -1475,7 +1475,7 @@ def _assignee(ctx: OperationContext, data: AssignIn) -> HubUser | None:
         return person
     reference = (data.assignee or "").strip()
     if reference.lower() == "me":
-        # Whoever takes it is a person of the business's database: made if their session came before it (W10).
+        # Whoever takes it is a person of the business's database: made if their session came before it.
         me = acting_hub_user(ctx)
         if me is None:
             raise InvalidPayload(

@@ -13,7 +13,7 @@
 // month spent and a number to reconnect are said and go by themselves. An employee notes and takes a
 // conversation but neither erases nor opens Settings. «Retry» on another business's reply, from an inbox shared
 // with it, hands it to erplora.com at once, for that business (WHATSAPP_INBOX-F34). Each flow's screen in three sizes
-// (APP-WHATSAPP_INBOX-1-<flow>-390|834|1440). What it creates is deleted after the file.
+// (`…-<flow>-390|834|1440`). What it creates is deleted after the file.
 import { execFileSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';

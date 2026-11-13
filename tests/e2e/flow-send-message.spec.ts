@@ -26,6 +26,7 @@ import { spawnSync } from 'node:child_process';
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { choose, confirmDialog, signedIn } from './flow-helpers';
+import { aMonday } from './appointment-helpers';
 import { A, api, HUB_DIR, login, psql, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, post, rowAction, settled } from './service-helpers';
 import {
@@ -183,13 +184,6 @@ for (const viewport of FLOW_VIEWPORTS) {
       await context.close();
     }
   });
-}
-
-/** A Monday five weeks ahead (inside the 90 days of advance), as `YYYY-MM-DD`. */
-function aMonday(): string {
-  const day = new Date();
-  day.setUTCDate(day.getUTCDate() + 35 + ((8 - day.getUTCDay()) % 7));
-  return day.toISOString().slice(0, 10);
 }
 
 /** Whether the day of the bookings is open already (one special day per run). */

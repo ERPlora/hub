@@ -29,7 +29,7 @@ const ICON_LITERAL = /"((?:ion|material-symbols|mdi|heroicons|tabler|lucide|fa):
 
 describe('guardrail: every icon the hub names is registered', () => {
   // It reads each of the ~1,500 sources once, from the disk, so its time is the machine's: with several test runs on
-  // one machine (load 20–40) and every opened file scanned, it took up to 7.5 s (2026-10-21), against Vitest's 5 s.
+  // one machine (load 20–40) and every opened file scanned, it took up to 7.5 s, against Vitest's 5 s.
   // Read at once without holding the worker (`scanIconsAsync`), as long as the machine makes it (hub#1315).
   it('every icon named in the apps, the entry and the menus is registered, and every glob reads something', async () => {
     expect(await scanIconsAsync({ root: HUB_DIR, sources: SOURCES })).toEqual({ unregistered: [], emptyGlobs: [] });
@@ -50,7 +50,7 @@ describe('guardrail: every icon the hub names is registered', () => {
   // An app's apps.py names the icons of its menu (the positional `Nav("id", _("Label"), "ion:…", "/path")`) and of
   // its Home hooks (`"icon": "ion:…"` of a setup step, a widget, a bell counter) as plain strings, which
   // `scanIcons` does not read either; the menu, the apps tiles and the Home paint them with HubIcon, so an
-  // unregistered one leaves the entry without its icon (old hub#160). The module's own `icon = "…"` is not one:
+  // unregistered one leaves the entry without its icon. The module's own `icon = "…"` is not one:
   // only the store shows it, from the SVG `pnpm gen:app-icons` bakes (base/catalog.py).
   it('every icon an app names in its apps.py, but its store icon, is registered', () => {
     const apps = join(HUB_DIR, 'apps');

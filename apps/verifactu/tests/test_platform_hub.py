@@ -242,7 +242,7 @@ def test_a_business_typing_erploras_tax_id_still_needs_its_approved_authorisatio
     # The Hub's side: ERPlora's tax ID typed as an ordinary business's issuer is no exemption. Only
     # ERPlora's own hub files ERPlora's records without an authorisation: anywhere else, once the authorisation is
     # revoked, a new sale in production is refused before anything is numbered (the gateway would refuse it too, and
-    # the sale would be charged with no way to the AEAT, HUB-F313).
+    # the sale would be charged with no way to the AEAT).
     settings.ERPLORA_ENVIRONMENT = "prod"
     settings.VERIFACTU_PRODUCTION_ENABLED = True
     settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
@@ -387,9 +387,10 @@ def test_the_aeat_query_on_the_platform_hub_presents_the_platform_hub(platform_p
 
 
 def test_a_wait_for_the_link_left_before_the_cut_is_no_longer_told_but_still_reads_in_the_queue(db):
-    # A pass before S5 could leave ``hub_unregistered`` on a business's record (its id from erplora.com had not come
-    # yet). Nothing waits for that link any more, so the record does not say it waits for it; the queue still reads
-    # the stored wait in words, never as a bare code, until the next pass replaces it.
+    # A pass made while businesses still shared one database could leave ``hub_unregistered`` on a business's record
+    # (its id from erplora.com had not come yet). Nothing waits for that link any more, so the record does not say it
+    # waits for it; the queue still reads the stored wait in words, never as a bare code, until the next pass
+    # replaces it.
     ctx = ctx_for()
     run("invoice.issuer.update", ISSUER, ctx)
     record = sealed(ctx)

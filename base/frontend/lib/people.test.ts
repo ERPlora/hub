@@ -1,5 +1,3 @@
-// Employees (APP-BASE-5; the old hub's EmployeesPage): its tabs in the address hash, how each person gets in and the
-// rules a badge follows before it is sent (BASE-G11, G140, G142).
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -13,7 +11,7 @@ import {
 } from './people';
 
 describe('Employees tabs', () => {
-  it('keeps the old hub’s four tabs in its order, each in the address (Personal without a hash)', () => {
+  it('keeps its four tabs in order, each in the address (Personal without a hash)', () => {
     expect(EMPLOYEES_TABS).toEqual(['personal', 'roles', 'apikeys', 'approvals']);
     expect(EMPLOYEES_TAB_HASH).toEqual({ personal: '', roles: '#roles', apikeys: '#apikeys', approvals: '#approvals' });
   });
@@ -29,7 +27,7 @@ describe('Employees tabs', () => {
     expect(employeesTabOf('#approvals', true)).toBe('approvals');
     expect(employeesTabOf('', true)).toBe('personal');
     expect(employeesTabOf('#nope', true)).toBe('personal');
-    // The old hub left a blank page here (HUB_SHELL-F93): now it is Personal.
+    // A tab this person does not have opens Personal, never a blank page.
     expect(employeesTabOf('#approvals', false)).toBe('personal');
     expect(employeesTabOf('#apikeys', false)).toBe('personal');
   });

@@ -1,7 +1,7 @@
 """Two devices at once (TABLE-F10, F15, F16): real sessions in threads, real row locks.
 
-Two waiters seating the same table at the same instant leave one check (the old module let both in:
-TABLES-F10 «sin ejecutar»); two transfers to the same free table, one; two crossed merges never deadlock.
+Two waiters seating the same table at the same instant leave one check;
+two transfers to the same free table, one; two crossed merges never deadlock.
 
 A detail (a zone, a table, a check) that a deletion lands in the middle of answers what it read or 404,
 never a 500.

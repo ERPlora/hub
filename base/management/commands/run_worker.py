@@ -18,7 +18,10 @@ STOP_SIGNALS = (signal.SIGTERM, signal.SIGINT)
 
 
 class Command(BaseCommand):
-    help = "Run the Hub's worker until SIGTERM or SIGINT (phase 1: register the apps, then wait)."
+    help = (
+        "Run the Hub's worker until SIGTERM or SIGINT: register the apps in the SaaS, then, every few seconds, relay "
+        "each hub's outbox and run its due tasks."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(

@@ -9,13 +9,14 @@
 // the worker's outbox relay hands Inventory's notice over (run here as a tick runs it); the menu is withdrawn after its
 // confirmation; a menu withdrawn from another tab while its builder is open says it no longer exists. In
 // Spanish, the search box of «Añadir varios» is named by its hint, never Ionic's English «search text»
-// (flow: combo-searchbar, FIX-HUB-COMBO-SEARCHBAR-NAMED-IN-ENGLISH).
+// (flow: combo-searchbar).
 // Screenshots of the list, the form and the builder at three viewports, with nothing past the right edge. What it creates is named «E2E Combo …» / «E2E-CMB-…» and deleted before and after.
 import { spawnSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, horizontalOverflow, HUB_DIR, login, painted, psql, shown, untilStill } from './helpers';
+import { A, api, capture, HUB_DIR, login, painted, psql, shown, untilStill } from './helpers';
+import { capturedAtSizes } from './service-helpers';
 
 const TAG = 'E2E Combo';
 const STAMP = Date.now().toString(36).toUpperCase();
@@ -119,7 +120,7 @@ const loadedAt = (page: Page): Promise<number> => page.evaluate(() => performanc
  *  wait until no list of a previous pick is still closing, click the field, wait for its list, type,
  *  choose. Reopening a Combo while its previous popover is still animating out loses the typing: the
  *  late `didDismiss` of the old presentation closes the new one and reverts the text, and no search
- *  reaches the server (measured 2026-10-15 on the second pick of a course; reported for
+ *  reaches the server (seen on the second pick of a course; reported for
  *  `@erplora/ui`'s Combo). The dev server is shared with other sessions: a search cut by its restart
  *  shows the list's own «Retry», which is pressed; a page Vite reloaded is picked again; anything else
  *  fails at once. */
@@ -157,13 +158,6 @@ async function fill(page: Page, testid: string, value: string): Promise<void> {
   await input.blur();
 }
 
-/** No horizontal scroll: the page is not wider than the window (polled while the layout settles). */
-async function noHorizontalScroll(page: Page, label: string): Promise<void> {
-  await expect
-    .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${label}` })
-    .toBeLessThanOrEqual(0);
-}
-
 /** Nothing inside `selector` reaches past the window's right edge (clipped content is not a scroll):
  *  the hooks of whatever does, with how far, so a failure says which element it is. */
 async function nothingPastTheEdge(page: Page, selector: string, label: string): Promise<void> {
@@ -186,19 +180,15 @@ async function nothingPastTheEdge(page: Page, selector: string, label: string): 
 }
 
 async function shoot(page: Page, name: string, inside?: string): Promise<void> {
-  for (const viewport of VIEWPORTS) {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+  await capturedAtSizes(page, name, VIEWPORTS, async (viewport) => {
     // The page laid out at its new size, then nothing moving: Ionic's sheets and notices animate in their shadow roots.
     await painted(page);
     await untilStill(page);
-    await noHorizontalScroll(page, `${name} ${viewport.label}`);
     if (inside) await nothingPastTheEdge(page, inside, `${name} ${viewport.label}`);
-    await capture(page, `${name}-${viewport.label}`);
-  }
-  await page.setViewportSize({ width: 1280, height: 860 });
+  });
 }
 
-/** combos#29: whether the dialog's title and its «Cancel» overlap (the title once sat on it on a phone). */
+/** Whether the dialog's title and its «Cancel» overlap. */
 async function titleOverCancel(page: Page, dialog: string): Promise<boolean> {
   const title = await page.locator(`ion-modal[data-testid=${dialog}] ion-title`).boundingBox();
   const cancel = await page.locator(`[data-testid=${dialog}-cancel]`).boundingBox();
@@ -212,7 +202,7 @@ async function titleOverCancel(page: Page, dialog: string): Promise<boolean> {
   return text.x < cancel.x + cancel.width && cancel.x < text.right && text.y < cancel.y + cancel.height && cancel.y < text.bottom;
 }
 
-/** combos#28: the clear buttons a search field paints: Ionic's own, and whether the input is a native search
+/** The clear buttons a search field paints: Ionic's own, and whether the input is a native search
  *  field whose own cross the browser paints (unless its appearance is `none`). */
 async function clearCrosses(page: Page, searchbar: string): Promise<{ ionic: number; nativeSearch: boolean; appearance: string }> {
   return page.locator(`[data-testid=${searchbar}]`).evaluate((bar) => {
@@ -222,7 +212,7 @@ async function clearCrosses(page: Page, searchbar: string): Promise<{ ionic: num
   });
 }
 
-/** combos#4: the buttons of a course's head and of each choice row smaller than 44×44, with their size. */
+/** The buttons of a course's head and of each choice row smaller than 44×44, with their size. */
 async function smallTargets(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const small: string[] = [];
@@ -326,7 +316,7 @@ test('COMBO-F02, F05, F06, F12: the owner builds the menu of the day from Invent
   await page.reload();
   await expect.poll(order).toEqual(['Mains', 'Starters', 'Drink']);
   await shoot(page, 'APP-COMBO-COMBO-F05', '.ion-page:not(.ion-page-hidden) .combo-builder [data-testid]');
-  // combos#4: on a phone and on a tablet every button of a course and of a choice reaches 44×44.
+  // On a phone and on a tablet every button of a course and of a choice reaches 44×44.
   for (const width of [390, 834]) {
     await page.setViewportSize({ width, height: 1000 });
     await expect.poll(() => smallTargets(page), { message: `touch targets at ${width}` }).toEqual([]);
@@ -360,11 +350,11 @@ test('COMBO-F03, F05, F06: several dishes at once, choices and courses changed, 
   await page.locator('[data-testid=combo-bulk-search] input').fill(STAMP);
   await expect(page.locator(`[data-testid=combo-bulk-item-${made.LEN}]`)).toContainText('Already in this course');
   await shoot(page, 'APP-COMBO-COMBO-F06', 'ion-modal[data-testid=combo-bulk] [data-testid]');
-  // combos#28: never two crosses to clear the search: Ionic's, at most, and the browser's own is not painted.
+  // Never two crosses to clear the search: Ionic's, at most, and the browser's own is not painted.
   const crosses = await clearCrosses(page, 'combo-bulk-search');
   expect(crosses.ionic).toBeLessThanOrEqual(1);
   expect(crosses.nativeSearch && crosses.appearance !== 'none').toBe(false);
-  // combos#29: on a phone the title never sits on «Cancel».
+  // On a phone the title never sits on «Cancel».
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     expect(await titleOverCancel(page, 'combo-bulk'), `title over «Cancel» at ${viewport.label}`).toBe(false);
@@ -406,7 +396,7 @@ test('COMBO-F03, F05, F06: several dishes at once, choices and courses changed, 
   await shown(page).locator('[data-testid=combo-course-form-save]').click();
   await expect(shown(page).locator(`[data-testid=combo-course-${mains}-rule]`)).toHaveText('Compulsory · pick at least 1 · up to 2 · no repeats');
 
-  // combos#12: a whole category of Inventory at once — Dessert gets every sweet of the category.
+  // A whole category of Inventory at once — Dessert gets every sweet of the category.
   const sweets = await call<{ id: string }>(context, 'POST', '/inventory/categories', { name: `${TAG} Sweets ${STAMP}` }, 201);
   await product(context, 'FLA', 'Flan', 400, 'restaurant.food', [sweets.id]);
   await product(context, 'CAK', 'Cake', 450, 'restaurant.food', [sweets.id]);

@@ -21,7 +21,7 @@ import type { ImportRow, Template } from '../operations';
 import BlueprintCardPending from './BlueprintCardPending.vue';
 import '../home.css';
 
-/** «Not now» on this device (the old hub forgot it on reload: a defect of HUB_SHELL-F26). */
+/** «Not now» on this device, kept across reloads. */
 const DISMISSED_KEY = 'hub-blueprint-card-dismissed';
 const DATA_PAGE = '/settings#data';
 

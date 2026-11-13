@@ -1,4 +1,4 @@
-// Where the browser PoC finds the dev stack: the defaults are the shared one (runserver on :8000, its
+// Where the e2e finds the dev stack: the defaults are the shared one (runserver on :8000, its
 // Vite on :5173, the SaaS on :8001, the database `hub`); a branch checked out beside it runs its own
 // stack on other ports and its own e2e database, set by the same variables Django and Vite read.
 import { describe, expect, it } from 'vitest';

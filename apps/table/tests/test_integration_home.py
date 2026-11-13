@@ -91,7 +91,7 @@ def test_a_full_or_blocked_room_is_still_set_up():
 
 @pytest.mark.django_db
 def test_the_manager_who_adds_tables_is_told_and_the_waiter_is_not():
-    # Recommended, never ⛔: who cannot add a table is not told (base's rule; hub#435 is for the wall only).
+    # Recommended, never ⛔: who cannot add a table is not told (base's rule; only a pending ⛔ is told to all).
     assert step(ctx_for("hub_manager"))["state"] == "pending"
     assert step(ctx_for("hub_employee")) is None
 

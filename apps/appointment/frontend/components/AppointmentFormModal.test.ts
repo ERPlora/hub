@@ -262,7 +262,7 @@ describe('AppointmentFormModal: New appointment', () => {
     expect(s.field('time').value).toBe('10:00');
   });
 
-  // appointments#204, #239, #240, #241: the day and the time are the device's own date and time pickers (never a
+  // The day and the time are the device's own date and time pickers (never a
   // numeric keypad without «:» or «/»), and a time typed with the keyboard counts at once.
   it('the day and the time are the device’s pickers, and a typed time counts at once', async () => {
     const s = await setup();
@@ -278,7 +278,7 @@ describe('AppointmentFormModal: New appointment', () => {
     expect(s.submit().disabled).toBe(false);
   });
 
-  // appointments#319, #333: services or professionals that cannot load are never an empty list nor only the
+  // Services or professionals that cannot load are never an empty list nor only the
   // appointment's own: their search fails, and the picker says so with «Retry» (Combo's error state).
   it('services and professionals that cannot load fail their search, new and edited alike', async () => {
     const broken: Record<string, [number, unknown]> = {
@@ -382,7 +382,7 @@ describe('AppointmentFormModal: Edit appointment', () => {
         body: { id: 'r1', from_date: '2026-10-19', time: '12:00' },
       },
     ]);
-    // appointments#293: only what happened, never «0 cancelled».
+    // Only what happened, never «0 cancelled».
     expect(s.wrapper.emitted('outcome')?.[0]).toEqual(['3 appointments moved · 1 left alone because they are already charged']);
   });
 });

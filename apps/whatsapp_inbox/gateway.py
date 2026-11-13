@@ -161,7 +161,7 @@ def send(
         return response
     reply = _read(response)
     if reply.kind == UNKNOWN and _error_code(response) == "whatsapp.meta_unreachable":
-        # erplora.com says Meta did not answer and nothing left: Meta's silence, never ERPlora's (gh:hub#2731).
+        # erplora.com says Meta did not answer and nothing left: Meta's silence, never ERPlora's.
         return Reply(kind=UNREACHABLE, code="whatsapp.meta_unreachable", message=reply.message)
     return reply
 
@@ -247,7 +247,7 @@ def submit_template(*, hub: str, idempotency_key: str, template: dict) -> Reply:
 def delete_template(*, hub: str, name: str, language: str, meta_id: str) -> Reply:
     """Ask erplora.com to delete that one template at Meta. Its 404 saying ``whatsapp.template_not_found``
     (Meta no longer has it) is a deletion; any other 404 (a door it does not serve, a wrong address) is
-    «nothing left», never a deletion (gh:whatsapp_inbox#296)."""
+    «nothing left», never a deletion."""
     response = _post(
         TEMPLATES_DELETE_PATH, {"hub": hub, "name": name, "language": language, "meta_id": meta_id}
     )

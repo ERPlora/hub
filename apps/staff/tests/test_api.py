@@ -8,11 +8,11 @@ import json
 import uuid
 
 import pytest
-from django.conf import settings
 from live.ninja import ensure_api_parity
 
 from apps.staff.api import router
 from apps.staff.models import Member, TimeOff
+from base.tests.routes import spa_routes
 from config.api import api
 
 from .conftest import make_member, make_time_off
@@ -114,13 +114,7 @@ def test_openapi_publishes_the_operations_with_their_ids(client):
 
 
 def test_the_spas_route_map_names_every_staff_route():
-    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
-    mine = {
-        (route["method"].upper(), route["path"].removeprefix("/api"), op)
-        for op, route in spa.items()
-        if op.startswith("staff.")
-    }
-    assert mine == ROUTES
+    assert spa_routes("staff.") == ROUTES
 
 
 # Authentication and permissions
@@ -437,7 +431,7 @@ def test_settings_and_bulk_over_http(boss, client):
 
 @pytest.mark.django_db
 def test_a_field_the_batch_does_not_know_never_brings_it_down(boss, client):
-    # gh:services#152 (STAFF-F07): the old batch was refused whole for a field it did not know, and a
+    # STAFF-F07: the old batch was refused whole for a field it did not know, and a
     # row past the hundredth was lost without a word; now that field is left out and 101 rows are a 422.
     bulk = post(
         client,

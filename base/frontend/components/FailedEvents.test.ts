@@ -1,8 +1,3 @@
-// System › Failed events (BASE-G91…G94; the old hub's SystemPage `#events`, HUB_SHELL-F145…F148): the live
-// `base.failed_event.list` — each event the relay gave up on with where it went, its attempts and its last error —,
-// «Resend» and «Discard» with their labels (the old icons had none), «Resend all» confirmed first, discarding in the
-// product's own dialog with an optional reason, and a failed read that is never «All in order» and keeps «Retry» in
-// sight (hub#2540). The reasons of a failure come from the error's code.
 import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -195,7 +190,7 @@ describe('FailedEvents', () => {
     expect(toastSuccess).toHaveBeenCalledWith('Event discarded (kept for the audit).');
   });
 
-  it('a failed read is never «All in order»: it says so and keeps «Retry» in sight (hub#2540)', async () => {
+  it('a failed read is never «All in order»: it says so and keeps «Retry» in sight', async () => {
     const m = await open();
     m.call.push(errorFrame(subId(m.client, OP), 'internal_error'));
     await flush();

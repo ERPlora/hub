@@ -261,7 +261,7 @@ def test_control_s_rows_are_copied_only_once_into_one_business(phase_one):
     assert fresh(second).db_name == ""
 
 
-# ── After the contract of S5 (``control/0007``): control no longer holds the hubs' tables under their names ─────────
+# ── After the contract migration (``control/0007``): control no longer holds the hubs' tables under their names ─────
 
 
 @pytest.fixture

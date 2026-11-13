@@ -46,7 +46,7 @@ export function formatPercent(rate: string | number, locale: string): string {
 }
 
 /** The ledger's date as the page language writes it short: numeric day, month and year, and the time
- *  («7/3/25, 9:05»), so a tablet column keeps the time of day (inventory#130, #139). `timeZone`: the
+ *  («7/3/25, 9:05»), so a tablet column keeps the time of day. `timeZone`: the
  *  page's when not given. Not a date: the text as it came. */
 export function formatShortDateTime(value: string, locale: string, timeZone?: string): string {
   if (!value) return '';

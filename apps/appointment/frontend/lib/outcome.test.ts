@@ -60,8 +60,8 @@ describe('describeOutcome', () => {
 });
 
 // What editing a series «from this occurrence on» tells the person (APPOINTMENT-F14): only what happened
-// (appointments#293: never «0 cancelled · 0 left alone»), to whom the appointments now go (#256) and for which
-// services (#294), and each appointment that kept its time with its date in the reader's language.
+// (never «0 cancelled · 0 left alone»), to whom the appointments now go and for which
+// services, and each appointment that kept its time with its date in the reader's language.
 describe('describeUpdate', () => {
   const series = { staff_name: 'Bea Ruiz', service_names: 'Haircut, Colour' } as RecurringUpdatedOut['recurring'];
   const updated = (over: Partial<RecurringUpdatedOut>): RecurringUpdatedOut => ({

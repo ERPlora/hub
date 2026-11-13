@@ -1,10 +1,3 @@
-// Settings (the old hub's `/settings`; BASE-G96): the footer tabbar of its sections with the tab in the hash, so a link
-// opens it and Back leaves the page. In the old hub's order: «General» (APP-BASE-3: «This device», «PIN pad» and
-// «Devices», BASE-G72, G151, G62, G63…G66), «Business» (APP-BASE-6: the business's data, its fiscal data), «Printing»
-// (APP-BASE-6: printers and the ticket) and «Data and backups» (APP-BASE-2). The old hub's addresses still land: `#hub`
-// on General, `#tax` on Business; one it does not have (`#store`, `#permissions`) on the first tab. Whoever does not
-// run the hub sees the first two cards of General disabled and, instead of the devices (whose list is an
-// administrator's), why: no list is asked for.
 import { AppPage } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -21,7 +14,7 @@ async function settings(path = '/settings', locale: 'en' | 'es' = 'en', session?
   });
 }
 
-// «API documentation» (APP-BASE-5, BASE-G100) closes General.
+// «API documentation» closes General.
 const GENERAL_CARDS = ['device-mode-card', 'pin-policy-card', 'devices-card', 'api-docs-card'];
 
 afterEach(() => {
@@ -29,7 +22,7 @@ afterEach(() => {
 });
 
 describe('SettingsPage', () => {
-  it('is «Settings» with its four tabs, in the old hub’s order, «General» first', async () => {
+  it('is «Settings» with its four tabs, «General» first', async () => {
     const m = await settings('/settings#data', 'es');
     const page = m.wrapper.getComponent(AppPage);
     expect(page.props('title')).toBe('Ajustes');
@@ -42,7 +35,7 @@ describe('SettingsPage', () => {
     expect(page.props('tabsLabel')).toBe('Secciones de Ajustes');
   });
 
-  it('opens «General» from an address with no tab, its own, the old hub’s `#hub` or one it does not have', async () => {
+  it('opens «General» from an address with no tab, its own, the older `#hub` or one it does not have', async () => {
     for (const path of ['/settings', '/settings#general', '/settings#hub', '/settings#permissions']) {
       const m = await settings(path);
       expect(m.wrapper.find('[data-testid="tab-general"]').exists(), path).toBe(true);
@@ -66,7 +59,7 @@ describe('SettingsPage', () => {
     }
   });
 
-  it('lands the old hub’s `#tax` on Business, the business’s own tab', async () => {
+  it('lands the older `#tax` on Business, the business’s own tab', async () => {
     const m = await settings('/settings#tax');
     expect(m.wrapper.find('business-panel-stub').exists()).toBe(true);
     expect(m.wrapper.find('[data-testid="device-mode-card"]').exists()).toBe(false);

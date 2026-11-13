@@ -1,5 +1,5 @@
-// Android's Back button on the installed app (BASE-F05, gh:hub#1906; ported from the old hub's
-// `apps/web/src/router/back-closes-overlay.ts`, origin/develop): it closes what is open on top BEFORE it leaves the
+// Android's Back button on the installed app (BASE-F05; ported from the old hub's
+// `apps/web/src/router/back-closes-overlay.ts`): it closes what is open on top BEFORE it leaves the
 // screen, and only Home leaves the app.
 //
 // On the installed Android app, Tauri's activity turns the system Back into `webView.goBack()` — but only while nobody

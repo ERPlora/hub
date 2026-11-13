@@ -1,7 +1,9 @@
 """The online booking app declares its module metadata, its menu, its permissions and what each role gets."""
 
 from django.apps import apps
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, module_configs
+
+from base.tests.roles import grants_by_role
 
 PERMISSIONS = [
     "online_booking.view_booking",
@@ -59,14 +61,12 @@ def test_permissions_are_the_workbook_ones():
 
 
 def test_what_each_role_gets():
-    config = online_booking()
-    for role in ("hub_owner", "hub_admin"):
-        assert permissions_for_role([config], role) == set(PERMISSIONS), role
-    assert (
-        permissions_for_role([config], "hub_manager") == set(PERMISSIONS) - ADMIN_ONLY
-    )
-    assert permissions_for_role([config], "hub_employee") == {
-        "online_booking.view_booking"
+    everything = set(PERMISSIONS)
+    assert grants_by_role(online_booking()) == {
+        "hub_owner": everything,
+        "hub_admin": everything,
+        "hub_manager": everything - ADMIN_ONLY,
+        "hub_employee": {"online_booking.view_booking"},
     }
 
 

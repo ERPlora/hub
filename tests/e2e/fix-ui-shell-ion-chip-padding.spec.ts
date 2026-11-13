@@ -1,16 +1,14 @@
-// An Ionic chip keeps its own side padding under the shell (FIX-UI-SHELL-ION-CHIP-PADDING-WIPED-BY-PREFLIGHT): every
-// `ion-chip` of the Hub lost it and its text sat against the pill's edge (`paddingLeft: 0px` measured on a service of
-// «New appointment» and on the table's «Clear filters»; Inventory's categories carried 12px of their own on one side).
+// An Ionic chip keeps its own side padding under the shell, so its text never sits against the pill's edge.
 // Tailwind's preflight (`* { padding: 0 }`, layer `base`) is a document rule, and a document rule always beats the
 // `:host` padding Ionic gives the chip (6px 12px, both modes); the shell's theme takes the reset back for the chip's
-// sides, as it did for `ion-title.md` and `ion-badge`. Measured at 390×844, 834×1112 and 1440×900 on the two chips with
+// sides, as it does for `ion-title.md` and `ion-badge`. Measured at 390×844, 834×1112 and 1440×900 on the two chips with
 // a remove button, a category of the product form (Inventory) and a service of «New appointment» (Appointments), and at
 // 1440×900 on «Clear filters»: Ionic's 12px on both sides, the label and the button that far from the edge, the margin
-// still 0 (each row sets its gap), and the chip no taller than Ionic's 32px or its 40px remove button, as on main (with
-// Ionic's 6px on top and below too, a chip with a remove button grew from 40 to 52px, nearly the 56px of its field).
-// «Clear filters» ends in its own icon, which keeps Ionic's margin too (FIX-UI-SHELL-ION-CHIP-ICON-MARGIN-WIPED-BY-PREFLIGHT):
-// pulled 4px toward the edge, it sits 8px from it. What the run creates is deleted.
-// flow: UI shell relleno de ion-chip
+// still 0 (each row sets its gap), and the chip no taller than Ionic's 32px or its 40px remove button (with Ionic's
+// 6px on top and below too, a chip with a remove button would grow from 40 to 52px, nearly the 56px of its field).
+// «Clear filters» ends in its own icon, which keeps Ionic's margin too: pulled 4px toward the edge, it sits 8px from
+// it. What the run creates is deleted.
+// flow: UI shell ion-chip padding
 import { type Browser, expect, type Locator, test } from '@playwright/test';
 
 import { A, login, psql, shot, shown } from './helpers';

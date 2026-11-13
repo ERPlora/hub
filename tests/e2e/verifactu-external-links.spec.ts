@@ -1,11 +1,12 @@
-// The four links of VeriFactu and of an invoice's receipt that leave the app (VERIFACTU-F12, F18, F19 and INVOICE-F17;
-// gh:hub#518), in Chrome against the real Hub, Invoicing and VeriFactu:
+// The four links of VeriFactu and of an invoice's receipt that leave the app (VERIFACTU-F12, F18, F19 and INVOICE-F17),
+// in Chrome against the real Hub, Invoicing and VeriFactu:
 //   - in the installed app, each one asks the system browser for its address and opens no tab of its own (a `_blank` in
 //     the app's webview opens nothing, which was the bug);
 //   - in a browser, each one opens its address in a new tab and asks nothing.
 // Tauri does not run in Playwright: the installed app's bridge is simulated at the edge, as in `shell-nav.spec.ts`
-// (`window.__TAURI__`, which records what it is asked). Whether the app takes the AEAT's address is ERPlora/app#20 and
-// its own tests'. Nothing here reaches the AEAT: its test site is stubbed. The declaration lives on the stack's own SaaS.
+// (`window.__TAURI__`, which records what it is asked). Whether the app takes the AEAT's address is for the native
+// app's own tests. Nothing here reaches the AEAT: its test site is stubbed. The declaration lives on the stack's own
+// SaaS.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shown } from './helpers';
@@ -132,7 +133,7 @@ test.afterAll(() => {
 });
 
 for (const link of LINKS) {
-  test(`gh:hub#518 ${link.name}: in the installed app it asks the system browser and opens no tab`, async ({ page, context }) => {
+  test(`${link.name}: in the installed app it asks the system browser and opens no tab`, async ({ page, context }) => {
     await stubTheAeat(context);
     await login(page, A, '/verifactu/records');
     const address = await link.address(context);
@@ -154,7 +155,7 @@ for (const link of LINKS) {
     expect(page.url()).toBe(before);
   });
 
-  test(`gh:hub#518 ${link.name}: in a browser it opens its address in a new tab`, async ({ page, context }) => {
+  test(`${link.name}: in a browser it opens its address in a new tab`, async ({ page, context }) => {
     await stubTheAeat(context);
     await login(page, A, link.path());
     const address = await link.address(context);

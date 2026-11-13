@@ -196,7 +196,7 @@ def test_the_panel_maps_a_field_its_query_gives_and_takes_its_params():
 
 
 def test_a_kpi_says_its_name_once():
-    # hub#1105: a KPI with options.label and an icon painted its header twice.
+    # A KPI with options.label and an icon painted its header twice.
     for panel in attendance().widgets:
         assert not {"label", "icon"} & set(panel.options), panel.key
 

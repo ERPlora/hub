@@ -1,14 +1,8 @@
 <script setup lang="ts">
-// Settings › Data › Reset: only for who administers the hub.
-// «Undo an import»: one row per import that can be undone (live `base.import.list`), confirmed without typing (it can
-// be imported again), then what was removed per app; a refusal stays in the dialog with its reason (the old
-// screen said nothing). «Reset the business»: the plan per section (`base.hub.reset` with `dry_run`), what never goes,
-// and — when the business has its own database — the sections ticked and, after typing its name, asked: the worker
-// copies the business's data first and only then empties them. The live
-// `base.hub.dumps` tells each step — copying, emptying, done with what went (the plan read again), or failed with
-// nothing emptied, why, and «Try again» with the same sections — and lists the copies below («Copies», DumpsCard);
-// while one runs, no second one is offered. When the business shares its database with others the screen says
-// so and offers no red button (the server refuses too).
+// Only for whoever administers the hub. Undoing an import is confirmed without typing, because it can be imported
+// again. Resetting the business asks for its name; the worker copies the business's data first and only then empties
+// the chosen sections, and `base.hub.dumps` tells each step live. While one reset runs, no second one is offered. When
+// the server says a reset is not available (`plan.available`), the screen says so and offers no red button.
 import { ConfirmDialog, EmptyState, type FormModalError, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
@@ -52,7 +46,7 @@ function removalLines(apps: Removal[]): { text: string; problems: string[]; fail
   ]);
 }
 
-// ── Undo an import (BASE-G108) ──
+// ── Undo an import ──
 const undoing = ref<ImportRow | null>(null);
 const undoOpen = ref(false);
 const undoPending = ref(false);
@@ -82,7 +76,7 @@ async function undo(): Promise<void> {
   }
 }
 
-// ── Reset the business (BASE-G109) ──
+// ── Reset the business ──
 const plan = ref<HubReset | undefined>();
 const planFailed = ref(false);
 const chosen = ref(new Set<string>());

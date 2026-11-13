@@ -5,7 +5,7 @@
 // «E2E Svc …» and deleted from the hub's database, the appointments of its customers included.
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, horizontalOverflow, login, psql, shown } from './helpers';
+import { A, api, capture, horizontalOverflow, login, psql, shown } from './helpers';
 
 /** Every name a service spec gives starts like this. */
 export const TAG = 'E2E Svc';
@@ -20,7 +20,7 @@ export const VIEWPORTS = {
   phone: { width: 390, height: 844 },
 } as const;
 
-/** The three sizes every flow with a screen is walked and captured at (brief APP-SERVICE). */
+/** The three sizes every flow with a screen is walked and captured at. */
 export const FLOW_VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
   { label: '834', width: 834, height: 1112 },
@@ -35,6 +35,23 @@ export async function noHorizontalScroll(page: Page, label: string): Promise<voi
   await expect
     .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${label}` })
     .toBeLessThanOrEqual(0);
+}
+
+/** `name` captured at each of `sizes` once `ready` has set the page there, with nothing scrolling sideways; back to
+ *  1280×860 after. */
+export async function capturedAtSizes(
+  page: Page,
+  name: string,
+  sizes: readonly { label: string; width: number; height: number }[],
+  ready: (viewport: { label: string; width: number; height: number }) => Promise<void>,
+): Promise<void> {
+  for (const viewport of sizes) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await ready(viewport);
+    await noHorizontalScroll(page, `${name} ${viewport.label}`);
+    await capture(page, `${name}-${viewport.label}`);
+  }
+  await page.setViewportSize({ width: 1280, height: 860 });
 }
 
 export async function ownerPage(browser: Browser, next: string, viewport: { width: number; height: number } = VIEWPORTS.desktop) {
@@ -62,7 +79,7 @@ export async function pick(page: Page, testid: string, query: string, text: stri
 
 /**
  * Runs a row action: its button, or the same entry inside «⋮» when the row folds its actions. The table folds them by
- * measuring its box, a frame or more after a resize or new rows (`DataTable`, W-19), so what the row showed a moment ago
+ * measuring its box, a frame or more after a resize or new rows (`DataTable`), so what the row showed a moment ago
  * is not what the click finds: the click goes to whichever of the two the row shows when it lands, and the entry is
  * looked for in «⋮» only when that is where it landed. Deciding first and clicking after waited for an «Edit» the table
  * had folded meanwhile until the test's time ran out (hub#1279; service-helpers.spec.ts). It is the one every spec of the
@@ -147,4 +164,15 @@ export function cleanUp(): void {
       `delete from customer_customer where name like '${TAG}%'`,
     ].join('; '),
   );
+}
+
+/** The customer `customerId` deleted in Customers: her voucher `voucherId` shows among the ones with no customer, with
+ *  her reference and its 5 sessions left. That sheet, open. */
+export async function voucherWithNoCustomer(page: Page, context: BrowserContext, customerId: string, voucherId: string): Promise<Locator> {
+  await post(context, '/customer/customers/delete', { id: customerId }, 200);
+  await shown(page).locator('[data-testid=service-packages-orphans-open]').click();
+  const orphans = page.locator('ion-modal[data-testid=service-orphans]');
+  await expect(orphans.locator(`[data-testid=service-orphans-row-${voucherId}]`)).toContainText(`Customer reference: ${customerId}`);
+  await expect(orphans.locator(`[data-testid=service-orphans-row-${voucherId}]`)).toContainText('5 sessions left');
+  return orphans;
 }

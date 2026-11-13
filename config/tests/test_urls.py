@@ -137,7 +137,7 @@ def test_the_admin_bears_erploras_name(client, admin_user, language, index_title
 
 
 def test_the_admin_index_names_the_outbox_in_spanish(client, admin_user):
-    # The outbox of packages/live has its section and model named in the staff's language (ERPlora/live#7).
+    # The outbox of packages/live has its section and model named in the staff's language.
     client.force_login(admin_user)
 
     page = client.get("/admin/", HTTP_HOST=PLATFORM, HTTP_ACCEPT_LANGUAGE="es").content.decode()

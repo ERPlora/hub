@@ -163,7 +163,7 @@ def test_a_round_sales_fires_alone_is_saved_and_printed_by_the_relay_once(relay,
 
 
 def test_a_beer_sold_at_the_bar_without_a_table_prints_at_the_bar_never_as_takeaway(relay, product):
-    """KITCHEN-F04, F05, F08 (kitchen#148): a drink routed to the bar, fired with no title and no channel, opens
+    """KITCHEN-F04, F05, F08: a drink routed to the bar, fired with no title and no channel, opens
     a «dine in» ticket whose sheet goes to the bar's printer, never the kitchen's nor as «takeaway»."""
     from apps.printing.models import PrintJob
 
@@ -238,7 +238,7 @@ def test_voiding_a_check_cancels_its_rounds_through_the_relay(relay, clock, prod
 def test_a_printed_round_whose_check_is_deleted_in_the_till_prints_its_cancel_slip_through_the_relay(
     relay, clock, product
 ):
-    """KITCHEN-F22, F28 (kitchen#168): the round went to paper; deleting its check in the till cancels it, and the
+    """KITCHEN-F22, F28: the round went to paper; deleting its check in the till cancels it, and the
     tick prints the «CANCELLED» slip of what was left, so the kitchen stops cooking it."""
     from apps.printing.models import PrintJob
 
@@ -261,7 +261,7 @@ def test_a_printed_round_whose_check_is_deleted_in_the_till_prints_its_cancel_sl
 
 
 def test_a_line_voided_in_the_till_strikes_its_dish_and_prints_its_slip_through_the_relay(relay, clock, product):
-    """KITCHEN-F29 (hub#2640): the tick brings the voided line; its dish is struck with the reason, the rest of the
+    """KITCHEN-F29: the tick brings the voided line; its dish is struck with the reason, the rest of the
     round cooks on, and the station that had it on paper gets its void slip."""
     order = open_check("Table 4")
     add_line(order.id, product("Burger"))

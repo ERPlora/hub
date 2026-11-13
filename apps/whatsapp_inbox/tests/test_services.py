@@ -291,7 +291,7 @@ def test_a_number_on_exactly_one_card_joins_the_conversation_to_it():
 
 
 def test_a_number_that_keeps_its_leading_zero_abroad_is_recognised():
-    """gh:whatsapp_inbox#201: an Italian landline keeps its 0 after +39, on the card and on WhatsApp."""
+    """An Italian landline keeps its 0 after +39, on the card and on WhatsApp."""
     gianni = card("Gianni Rossi", "+39 06 1234 5678")
     receive("wamid.1", "390612345678")
     assert (conv().phone, conv().customer_id) == ("+390612345678", gianni.id)
@@ -661,7 +661,7 @@ def test_with_the_month_s_messages_spent_nothing_is_kept():
 
 
 def test_with_the_month_s_messages_spent_what_customers_write_still_arrives():
-    """gh:whatsapp_inbox#287, gh:hub#2726: the cap only limits what the business sends."""
+    """The cap only limits what the business sends."""
     c = ready()
     connect(version=5, monthly_limit=150, monthly_usage=150, usage_month="2026-10")
     out = receive("wamid.AFTER", text="¿Tenéis hora el viernes?")
@@ -933,7 +933,7 @@ def test_a_template_to_a_number_that_never_wrote_opens_its_conversation():
 
 @pytest.mark.parametrize("typed", ["600222333", "600 222 333", "+34 600 222 333", "0034600222333"])
 def test_a_number_typed_by_hand_goes_to_that_person_never_to_another_country(typed):
-    """gh:whatsapp_inbox#279: a number written on a card or by voice is national unless it says its country."""
+    """A number written on a card or by voice is national unless it says its country."""
     connect(templates=[template("recordatorio")])
     send({"to": typed, "template": {"name": "recordatorio", "variables": ["Ana", "lunes"]}})
     assert list(Conversation.objects.values_list("phone", flat=True)) == ["+34600222333"]
@@ -1233,7 +1233,7 @@ ERASE = f"{SAAS}/internal/whatsapp/erase"
 
 @respx.mock
 def test_no_notice_of_the_app_keeps_her_number_her_name_or_what_was_said(delivered):
-    """gh:hub#2474, #2467, #2477: the internal history keeps the notices for days after an erasure; they
+    """The internal history keeps the notices for days after an erasure; they
     carry identifiers only, so erasing the conversation leaves nothing of her there."""
     c = ready(contact_name="Ana Secreta", text="Mi alergia es al tinte")
     answering()

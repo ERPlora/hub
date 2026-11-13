@@ -149,8 +149,7 @@ def test_a_category_filter_keeps_only_those_categories(products_catalog):
 
 
 def source_off(monkeypatch, label: str) -> None:
-    """``label`` off in every hub (``base.relay.active_apps``: in phase 1 every installed app is on; in phase 2 the
-    hub's activation), the website and the rest still on."""
+    """``label`` off in every hub (``base.relay.active_apps``), the website and the rest still on."""
     from base import relay
 
     real = relay.active_apps

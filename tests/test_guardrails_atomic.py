@@ -79,7 +79,7 @@ DJANGO_ATOMIC_ALLOWED: dict[str, str] = {
     ),
     "base/services.py::hub_register": (
         "base.hub.register is the platform's operation (use_control): its writes (control.Hub) and its two savepoints "
-        "are control's, the alias of its own transaction. The registry block is S2a's; it is left as it is here."
+        "are control's, the alias of its own transaction. The registry block is left as it is here."
     ),
     "base/services.py::open_session_from_saas": CONTROL_LOGIN,
     "base/services.py::open_session_on_device": CONTROL_LOGIN,

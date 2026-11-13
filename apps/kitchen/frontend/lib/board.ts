@@ -58,7 +58,7 @@ export interface DishGroup {
   items: ItemOut[];
 }
 
-/** The dishes of a ticket as the card paints them (kitchen#57): the consecutive dishes of a menu's line
+/** The dishes of a ticket as the card paints them: the consecutive dishes of a menu's line
  * under that menu, each other dish on its own. */
 export function groupMenus(items: readonly ItemOut[]): DishGroup[] {
   const groups: DishGroup[] = [];

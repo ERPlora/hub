@@ -14,7 +14,7 @@ panels of the dashboard (``widgets``) and its counters of the bell (``bell``), e
   row says the hub files in production, for the ones of ``LEGAL_IN_PRODUCTION``; else ``required`` gives functional
   and its absence recommended;
 - whoever lacks a step's permission is not told about it, except a pending ⛔ (``actionable: false``): it is what
-  will stop their invoice, whoever clears it (hub#435).
+  will stop their invoice, whoever clears it.
 
 A counter whose figure moves as time passes, with no event (a job waiting a minute with no device alive to print
 it), names in ``bell_refresh_every`` of its module's ``LiveAppConfig`` (counter key → seconds) how often the bell reads
@@ -66,7 +66,7 @@ logger = logging.getLogger(__name__)
 
 STATE_DONE = "done"
 STATE_PENDING = "pending"
-#: Ours, not the person's task: nothing could be turned on (the old hub's empty catalogue, hub#371).
+#: Ours, not the person's task: nothing could be turned on (the old hub's empty catalogue).
 STATE_UNAVAILABLE = "unavailable"
 LEVEL_LEGAL = "legal"
 LEVEL_FUNCTIONAL = "functional"

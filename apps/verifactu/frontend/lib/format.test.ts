@@ -18,7 +18,7 @@ describe('formatUnitPrice', () => {
     expect(formatUnitPrice(null, 'en')).toBe('—');
   });
 
-  it('groups the thousands from four digits on, in Spanish too (hub#1090)', () => {
+  it('groups the thousands from four digits on, in Spanish too', () => {
     expect(plain(formatUnitPrice('123456.00', 'es'))).toBe('1.234,56 €');
     expect(plain(formatUnitPrice('123456.78', 'es'))).toBe('1.234,5678 €');
     expect(plain(formatUnitPrice('1234567.00', 'es'))).toBe('12.345,67 €');
@@ -34,7 +34,7 @@ describe('formatMoney', () => {
     expect(spaced(formatMoney(-1210, 'es'))).toBe('-12,10 €');
   });
 
-  it('groups the thousands from four digits on, in Spanish too (hub#1090)', () => {
+  it('groups the thousands from four digits on, in Spanish too', () => {
     // Spanish CLDR only groups from five digits on (minimumGroupingDigits 2): «1234,56 €» beside
     // «12.345,67 €», and unlike Carts, Price lists and Payments, which paint «1.234,56 €».
     expect(spaced(formatMoney(123456, 'es'))).toBe('1.234,56 €');

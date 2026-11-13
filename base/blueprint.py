@@ -4,7 +4,7 @@ Settings › Data and the Home's card.
 A blueprint is a manifest (who made it, for what, its language and country, the apps it turns on) and, per dataset,
 the rows that travel. A **dataset** is one kind of thing an app lets travel (inventory's categories, its products,
 the tables of the room…): it reads its rows with that app's own list and writes them with that app's own create, so
-the app's rules hold for an import too, and never a table is dumped (hub#426). Rows name each other by their natural
+the app's rules hold for an import too, and never a table is dumped. Rows name each other by their natural
 key — a product's categories by name, a table's zone by name — never by an id of the business that made the file.
 People, PINs and fiscal data have no dataset: they never travel, and a file that brings them has them dropped on
 reading (``Bundle.dropped``).
@@ -791,7 +791,7 @@ def _overall(app_reports: list[dict], created: dict[str, list[str]]) -> str:
 
 
 def app_label(app: str) -> str:
-    """The app's name as the person reads it (hub#488), or its id for an app this hub does not have."""
+    """The app's name as the person reads it, or its id for an app this hub does not have."""
     try:
         return str(django_apps.get_app_config(app).verbose_name)
     except LookupError:

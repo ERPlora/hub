@@ -166,7 +166,7 @@ def effective_environment(ctx: OperationContext, config: Config) -> str:
     production; ``pre``: testing), whatever its switch says, but production only once ERPlora opens it on the server
     (``production_open``: its own invoices skip no lock); once live there, it stays in production while the server is
     closed, its records waiting (``production_closed``), so its real invoices never move to the test chain. A demo,
-    always testing (HUB-F315), whatever its configuration says: it never goes live (``go_live_forbidden``). Any other
+    always testing, whatever its configuration says: it never goes live (``go_live_forbidden``). Any other
     business, its configuration's."""
     if platform.is_demo_hub(ctx.scope):
         return Environment.TESTING

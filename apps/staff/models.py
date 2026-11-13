@@ -1,8 +1,7 @@
 """Models of the staff app: roles, the record of each professional, their schedules and time off.
 
-Phase 1 has no tenancy: every scope (``a``, ``b``) shares these tables; only the live notifications
-are per scope. Phase 2 moves them to each hub's database. The record and the approval hang from the person in the
-business's own database (``base.HubUser``), never from control's user (tenancy W10): their columns are new
+Each business keeps these tables in its own database. The record and the approval hang from the person in the
+business's own database (``base.HubUser``), never from control's user: their columns are new
 (``hub_user_id``, ``approved_by_hub_user_id``); the old ones, to control's users, wait empty for a later deploy to
 drop them (``migrations/0004_hub_users``).
 """
@@ -324,9 +323,9 @@ class StaffSettings(UUIDModel):
     """The settings of the staff app: one row, created by the first save (until then, the defaults).
 
     The default working day (start, end and break) proposes the week of a new schedule (STAFF-F13).
-    The other eight columns are the old module's settings that nothing ever read: retired from the
-    screen, the API and the admin (FIX-STAFF-SETTINGS-ORPHANS), they stay until the contract step that
-    drops them, so a deployment still running the previous code can read them.
+    The other eight columns are settings that nothing reads: out of the screen, the API and the admin,
+    they stay until the contract step that drops them, so a deployment still running the previous code
+    can read them.
     """
 
     slot = models.PositiveSmallIntegerField(_("slot"), default=1, editable=False)
