@@ -29,8 +29,8 @@ from live.operations import get
 
 from apps.service import queries
 from apps.service.models import Assignment, Category, Service
-from apps.service.schemas import CategoryIn, ServiceRecoverIn
-from apps.service.services import MEMBER_TERMINATED_LEFT
+from apps.service.schemas import CategoryRecoverIn, ServiceRecoverIn
+from apps.service.services import MEMBER_TERMINATED_LEFT, SERVICE_MOVED_LEFT
 from apps.staff.models import Member
 from apps.tax.models import TaxCategory
 from base.tenancy.context import use_hub
@@ -531,24 +531,47 @@ def test_making_a_service_again_with_who_performed_it_is_only_the_systems():
 
 
 #: A category of the copy with what a new one has, as ``categories_in_copy`` gives it.
-NEW_CATEGORY = {"name": "", "description": "", "icon": "", "color": "", "sort_order": 0, "parent_id": None}
+NEW_CATEGORY = {
+    "name": "",
+    "description": "",
+    "icon": "",
+    "color": "",
+    "sort_order": 0,
+    "parent_id": None,
+    "service_ids": [],
+}
 
 
 def a_category_of_the_copy(category: Category | None = None, **fields) -> dict:
     """A category as the copy gives it (``categories_in_copy``): ``category``'s, or a new one with ``fields``."""
     if category is not None:
-        return {"id": category.pk} | {field: getattr(category, field) for field in NEW_CATEGORY}
+        held = {field: getattr(category, field) for field in NEW_CATEGORY if field != "service_ids"}
+        return {"id": category.pk, "service_ids": []} | held | fields
     return {"id": uuid.uuid7()} | NEW_CATEGORY | fields
 
 
-def test_the_copy_gives_each_live_category_with_what_its_create_takes():
+def made_again(one: dict, *subcategories: dict, **parent) -> dict:
+    """``one`` of the copy as ``categories_not_in_business`` gives it, to ``service.category.recover``: its parent here
+    (``parent``), the one it stands for and what it had inside it there, its services and its ``subcategories``."""
+    return (
+        {key: value for key, value in one.items() if key != "parent_id"}
+        | {"stands_for": one["id"], "subcategory_ids": [sub["id"] for sub in subcategories]}
+        | parent
+    )
+
+
+def test_the_copy_gives_each_live_category_with_what_its_create_takes_and_the_services_in_it():
+    tax = make_tax("test.service", "Service — test")
     hair = make_category("Hair", description="Cuts and styling", icon="ion:cut-outline", color="#aa3300", sort_order=2)
     kids = make_category("Kids", parent=hair)
     make_category("Old", is_deleted=True, deleted_at=timezone.now())
+    cut = make_service("Haircut", tax=tax, category=hair)
+    perm = make_service("Old perm", tax=tax, category=hair, is_active=False, archived_at=timezone.now())
+    make_service("Gloss", tax=tax)
 
     read = sorted(queries.categories_in_copy(direct()), key=lambda one: one["name"])
 
-    # One the copy had deleted already is not the moment's: it never comes back.
+    # One the copy had deleted already is not the moment's: it never comes back. Its services, archived ones too.
     assert read == [
         {
             "id": hair.pk,
@@ -558,9 +581,28 @@ def test_the_copy_gives_each_live_category_with_what_its_create_takes():
             "color": "#aa3300",
             "sort_order": 2,
             "parent_id": None,
+            "service_ids": sorted([cut.pk, perm.pk]),
         },
-        {"id": kids.pk, "name": "Kids", "description": "", "icon": "", "color": "", "sort_order": 0, "parent_id": hair.pk},
+        {
+            "id": kids.pk,
+            "name": "Kids",
+            "description": "",
+            "icon": "",
+            "color": "",
+            "sort_order": 0,
+            "parent_id": hair.pk,
+            "service_ids": [],
+        },
     ]
+
+
+def test_a_copy_without_the_service_table_gives_its_categories_with_no_service():
+    hair = make_category("Hair")
+    with connection.cursor() as cursor:
+        # Undone with the test's transaction.
+        cursor.execute("DROP TABLE service_service CASCADE")
+
+    assert [(one["id"], one["service_ids"]) for one in queries.categories_in_copy(direct())] == [(hair.pk, [])]
 
 
 def test_a_copy_without_the_category_table_gives_no_category():
@@ -587,19 +629,16 @@ def test_the_categories_the_business_lacks_come_parents_first_each_as_its_create
 
     lacking = queries.categories_not_in_business(copy)
 
-    def created(one: dict, **parent) -> dict:
-        return {key: value for key, value in one.items() if key != "parent_id"} | parent
-
     assert lacking == [
-        created(hands),
-        created(in_color),
+        made_again(hands, nails),
+        made_again(in_color, toning),
         # Into a parent brought back just before, by its name (it has no id here yet); into one kept, by its id.
-        created(nails, parent="Hands"),
-        created(toning, parent="Color"),
-        created(kids, parent_id=hair.pk),
+        made_again(nails, parent="Hands"),
+        made_again(toning, parent="Color"),
+        made_again(kids, parent_id=hair.pk),
     ]
     for record in lacking:
-        CategoryIn.model_validate({key: value for key, value in record.items() if key != "id"})
+        CategoryRecoverIn.model_validate({key: value for key, value in record.items() if key != "id"})
 
 
 def test_a_category_the_business_made_again_is_never_made_twice_and_its_children_go_into_it():
@@ -608,9 +647,7 @@ def test_a_category_the_business_made_again_is_never_made_twice_and_its_children
     again = make_category("color ")
     copy = [a_category_of_the_copy(gone), toning := a_category_of_the_copy(name="Toning", parent_id=gone.pk)]
 
-    assert queries.categories_not_in_business(copy) == [
-        {key: value for key, value in toning.items() if key != "parent_id"} | {"parent_id": again.pk}
-    ]
+    assert queries.categories_not_in_business(copy) == [made_again(toning, parent_id=again.pk)]
 
 
 def test_a_loop_a_raw_write_left_in_the_copy_never_hangs_and_gives_each_category_once():
@@ -632,18 +669,114 @@ def test_a_loop_a_raw_write_left_in_the_copy_never_hangs_and_gives_each_category
     ]
 
 
-def test_the_lacking_categories_are_created_by_the_screens_operation_and_asking_again_makes_none_twice():
+def test_the_lacking_categories_are_created_as_the_screen_creates_them_and_asking_again_makes_none_twice():
     color = make_category("Color", is_deleted=True, deleted_at=timezone.now())
     copy = [
         a_category_of_the_copy(name="Toning", parent_id=color.pk, sort_order=2),
         a_category_of_the_copy(color),
     ]
 
-    made = [create(record, "service.category.create") for record in queries.categories_not_in_business(copy)]
+    made = [create(record, "service.category.recover") for record in queries.categories_not_in_business(copy)]
 
     assert [(one.name, one.parent_name) for one in made] == [("Color", None), ("Toning", "Color")]
     assert color.pk not in {one.id for one in made}
     assert queries.categories_not_in_business(copy) == []
+
+
+def test_a_category_made_again_takes_back_what_the_business_kept_where_its_deletion_left_it():
+    tax = make_tax("test.service", "Service — test")
+    hair = make_category("Hair")
+    gone = make_category("Color", parent=hair, is_deleted=True, deleted_at=timezone.now())
+    # Where deleting it left them: its services without a category, its subcategory under its parent.
+    gloss, perm = make_service("Gloss", tax=tax), make_service("Old perm", tax=tax, is_active=False)
+    toning = make_category("Toning", parent=hair)
+    copy = a_category_of_the_copy(gone, service_ids=[gloss.pk, perm.pk, uuid.uuid7()])
+    # One the business no longer has at all comes back by Categories' own part, into it by its name.
+    lost = a_category_of_the_copy(name="Pastel", parent_id=gone.pk)
+    in_copy = [a_category_of_the_copy(hair), copy, a_category_of_the_copy(toning, parent_id=gone.pk), lost]
+    [record, _lost] = queries.categories_not_in_business(in_copy)
+
+    made = create(record, "service.category.recover")
+
+    assert (made.name, made.parent_id, made.left_out) == ("Color", hair.pk, [])
+    assert made.id != gone.pk
+    assert {one.pk: one.category_id for one in Service.objects.filter(pk__in=[gloss.pk, perm.pk])} == {
+        gloss.pk: made.id,
+        perm.pk: made.id,
+    }
+    assert Category.objects.get(pk=toning.pk).parent_id == made.id
+    assert Category.objects.get(pk=made.id).created_by == "system"
+
+
+def test_a_lost_category_takes_back_the_subcategories_its_loss_left_at_the_root():
+    toning = make_category("Toning")
+    copy = a_category_of_the_copy(name="Color")
+    [record] = queries.categories_not_in_business([copy, a_category_of_the_copy(toning, parent_id=copy["id"])])
+
+    made = create(record, "service.category.recover")
+
+    assert Category.objects.get(pk=toning.pk).parent_id == made.id
+
+
+def test_what_the_business_moved_since_stays_where_it_is_and_the_category_says_it_came_back_without_it():
+    tax = make_tax("test.service", "Service — test")
+    hair = make_category("Hair")
+    gone = make_category("Color", is_deleted=True, deleted_at=timezone.now())
+    # Moved by hand since its deletion: a service into Hair, a subcategory from the root into Hair.
+    balayage = make_service("Balayage", tax=tax, category=hair)
+    toning = make_category("Toning", parent=hair)
+    [record] = queries.categories_not_in_business(
+        [a_category_of_the_copy(gone, service_ids=[balayage.pk]), a_category_of_the_copy(toning, parent_id=gone.pk)]
+    )
+
+    made = create(record, "service.category.recover")
+
+    assert Service.objects.get(pk=balayage.pk).category_id == hair.pk
+    assert Category.objects.get(pk=toning.pk).parent_id == hair.pk
+    assert [(one.code, str(subject) in one.message) for one, subject in zip(made.left_out, (balayage.pk, toning.pk))] == [
+        ("service.service_moved", True),
+        ("service.subcategory_moved", True),
+    ]
+
+
+def test_a_subcategory_whose_return_would_close_a_loop_stays_where_it_is_and_is_said():
+    gone = make_category("Color", is_deleted=True, deleted_at=timezone.now())
+    # Left at the root by the deletion; since then the business hung Hair, Color's parent in the copy, from it.
+    toning = make_category("Toning")
+    hair = make_category("Hair", parent=toning)
+    in_copy = [
+        a_category_of_the_copy(hair, parent_id=None),
+        a_category_of_the_copy(gone, parent_id=hair.pk),
+        a_category_of_the_copy(toning, parent_id=gone.pk),
+    ]
+    [record] = queries.categories_not_in_business(in_copy)
+
+    made = create(record, "service.category.recover")
+
+    assert made.parent_id == hair.pk
+    assert Category.objects.get(pk=toning.pk).parent_id is None
+    assert [(one.code, str(toning.pk) in one.message) for one in made.left_out] == [("service.subcategory_loop", True)]
+
+
+def test_what_a_category_came_back_without_is_said_in_the_language_it_is_made_in():
+    tax = make_tax("test.service", "Service — test")
+    gone = make_category("Color", is_deleted=True, deleted_at=timezone.now())
+    balayage = make_service("Balayage", tax=tax, category=make_category("Hair"))
+    [record] = queries.categories_not_in_business([a_category_of_the_copy(gone, service_ids=[balayage.pk])])
+
+    with translation.override("es"):
+        [said] = create(record, "service.category.recover").left_out
+        spanish = SERVICE_MOVED_LEFT % {"service": balayage.pk}
+
+    assert said.message == spanish
+    assert said.message != SERVICE_MOVED_LEFT % {"service": balayage.pk}
+
+
+def test_making_a_category_again_with_what_it_had_inside_is_only_the_systems():
+    op = get("service.category.recover")
+
+    assert op.permission == "service.system"
+    assert not ctx_for("hub_owner").has(op.permission)
 
 
 def test_a_service_whose_category_came_back_goes_into_it():
@@ -683,7 +816,7 @@ def test_the_app_declares_what_it_gives_back_its_categories_first():
     assert (categories.read, categories.missing, categories.create) == (
         queries.categories_in_copy,
         queries.categories_not_in_business,
-        "service.category.create",
+        "service.category.recover",
     )
     assert (services.read, services.missing, services.create) == (
         queries.recoverable_services_in_copy,
@@ -747,6 +880,15 @@ def live_categories(hub) -> list[tuple]:
         return [
             (one.name, one.parent.name if one.parent else None, one.color, one.sort_order)
             for one in Category.objects.filter(is_deleted=False).select_related("parent").order_by("name", "id")
+        ]
+
+
+def in_categories(hub) -> list[tuple]:
+    """The business's services, archived too: name and its category's name, by name."""
+    with use_hub(hub):
+        return [
+            (one.name, one.category.name if one.category else None)
+            for one in Service.objects.select_related("category").order_by("name", "id")
         ]
 
 
@@ -893,6 +1035,76 @@ class TestServicesComeBack:
             assert back.pk != ids["keratin"]
             assert performers("Keratin treatment") == [("Ana", 75, 9500, False, True), ("Sonia", None, 8000, False, False)]
         assert created_events(hub, "service.assignment.assigned") == before + 2
+
+    def a_full_category(self, recoveries, every_app_on):
+        """The business of ``a_business`` with two more services and a subcategory in Color, and its copy as it is."""
+        hub, tax, ids, color = self.a_business(recoveries, every_app_on)
+        ids["toning"] = run_in(hub, "service.category.create", name="Toning", parent_id=color).id
+        for name, price in (("Gloss", 3500), ("Balayage", 8000)):
+            ids[name.lower()] = run_in(
+                hub, "service.service.create", name=name, price=price, category_id=color, tax_category_key=tax
+            ).id
+        with use_hub(hub):
+            ids["hair"] = Service.objects.get(pk=ids["cut"]).category_id
+        return hub, ids, color, recoveries.copy_of(hub)
+
+    def test_a_category_comes_back_with_what_the_business_kept_where_its_deletion_left_it(
+        self, recoveries, every_app_on
+    ):
+        hub, ids, color, copy = self.a_full_category(recoveries, every_app_on)
+        # Its services left without a category and its subcategory moved up to the root (SERVICE-F08).
+        run_in(hub, "service.category.delete", id=color)
+        before = created_events(hub, "service.service.updated")
+
+        # The category made again, nothing else: what was inside it the business still has.
+        assert recovered(recoveries, copy) == [CATEGORIES | {"created": 1}, SERVICES]
+        # Back inside it: the same subcategory and the same three services, each by its own change.
+        assert live_categories(hub) == [("Color", None, "#cc0066", 4), ("Hair", None, "", 0), ("Toning", "Color", "", 0)]
+        assert in_categories(hub) == [
+            ("Balayage", "Color"),
+            ("Gloss", "Color"),
+            ("Haircut", "Hair"),
+            ("Highlights", "Color"),
+            ("Keratin treatment", "Hair"),
+            ("Old perm", None),
+        ]
+        with use_hub(hub):
+            assert Category.objects.get(name="Toning", is_deleted=False).pk == ids["toning"]
+        assert created_events(hub, "service.service.updated") == before + 3
+
+    def test_what_the_business_moved_since_stays_where_it_is_and_recoveries_says_so(self, recoveries, every_app_on):
+        hub, ids, color, copy = self.a_full_category(recoveries, every_app_on)
+        run_in(hub, "service.category.delete", id=color)
+        # Moved by hand since: the business put Balayage in Hair and Toning under Hair.
+        run_in(hub, "service.service.update", id=ids["balayage"], category_id=ids["hair"])
+        run_in(hub, "service.category.update", id=ids["toning"], parent_id=ids["hair"])
+
+        [categories, services] = recovered(recoveries, copy)
+
+        notes = categories.pop("notes")
+        assert (categories, services) == (CATEGORIES | {"created": 1, "noted": 1}, SERVICES)
+        assert {one["id"] for one in notes} == {str(color)}
+        assert sorted(one["note"].split(":")[0] for one in notes) == ["service.service_moved", "service.subcategory_moved"]
+        assert any(str(ids["balayage"]) in one["note"] for one in notes)
+        assert any(str(ids["toning"]) in one["note"] for one in notes)
+        assert live_categories(hub) == [("Color", None, "#cc0066", 4), ("Hair", None, "", 0), ("Toning", "Hair", "", 0)]
+        assert [one for one in in_categories(hub) if one[0] in {"Balayage", "Gloss", "Highlights"}] == [
+            ("Balayage", "Hair"),
+            ("Gloss", "Color"),
+            ("Highlights", "Color"),
+        ]
+
+    def test_asked_again_a_category_brought_back_is_the_businesss_and_is_not_filled_again(
+        self, recoveries, every_app_on
+    ):
+        hub, ids, color, copy = self.a_full_category(recoveries, every_app_on)
+        run_in(hub, "service.category.delete", id=color)
+        recovered(recoveries, copy)
+        # Taken out of it by hand after the first recovery: asked again, it stays out.
+        run_in(hub, "service.service.update", id=ids["gloss"], category_id=None)
+
+        assert recovered(recoveries, copy) == [CATEGORIES, SERVICES]
+        assert [one for one in in_categories(hub) if one[0] == "Gloss"] == [("Gloss", None)]
 
     def test_a_service_whose_tax_category_the_create_refuses_is_counted_with_why(self, recoveries, every_app_on):
         hub, tax, ids, _ = self.a_business(recoveries, every_app_on)

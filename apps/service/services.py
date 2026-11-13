@@ -77,6 +77,8 @@ from apps.service.schemas import (
     CategoryIn,
     CategoryOut,
     CategoryPatchIn,
+    CategoryRecoveredOut,
+    CategoryRecoverIn,
     CategoryRefIn,
     DeletedOut,
     ExpiredOut,
@@ -147,6 +149,12 @@ CUSTOMER_UNAVAILABLE = _("That customer's card does not exist in this business."
 #: Who a service made again from a separate copy came back without, said by their id (``service.service.recover``).
 MEMBER_TERMINATED_LEFT = _("came back without the professional %(member)s: terminated in Staff")
 MEMBER_GONE_LEFT = _("came back without the professional %(member)s: no longer in Staff")
+#: What a category made again from a separate copy came back without, said by its id (``service.category.recover``).
+SERVICE_MOVED_LEFT = _("came back without the service %(service)s: moved to another category since")
+SUBCATEGORY_MOVED_LEFT = _("came back without the subcategory %(category)s: moved elsewhere since")
+SUBCATEGORY_LOOP_LEFT = _(
+    "came back without the subcategory %(category)s: it would hang from one of its own subcategories"
+)
 #: Why a session cannot be spent (queries.redeem_refusal) → its code and its message.
 REDEEM_REFUSALS = {
     "voided": (
@@ -786,6 +794,52 @@ def delete_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
     category.save()
     record_event(ctx, events.CATEGORY_DELETED, {"id": str(category.id)})
     return {"id": category.id}
+
+
+# Not an assistant tool and no route: its one door is the recovery from a separate copy (BASE-F114), for a category
+# the business no longer has at all.
+@operation(
+    "service.category.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=CategoryRecoverIn,
+    output=CategoryRecoveredOut,
+    ai=INTERNAL,
+)
+def recover_category(ctx: OperationContext, data: CategoryRecoverIn) -> dict:
+    """A category of a separate copy the business no longer has, made again by ``service.category.create``, with what
+    it had inside it there and the business keeps where deleting it left it (SERVICE-F08): each service still without
+    a category, and each subcategory still hanging where the deleted one hung (at the root, for one the business no
+    longer holds at all). What the business moved since stays where it is, and the output says the category came back
+    without it, and why (``left_out``). Every category is held before the services, in the order of a «Delete»."""
+    parent_of = lock_tree()
+    made = create_category(ctx, CategoryIn.model_validate(data.model_dump(include=set(CategoryIn.model_fields))))
+    parent_of[made.id] = made.parent_id
+    left_in = Category.objects.filter(pk=data.stands_for, is_deleted=True).values_list("parent", flat=True).first()
+    left_out = []
+    for service in held_rows(Service.objects.filter(pk__in=data.service_ids)):
+        if service.category_id is not None:
+            left_out.append(
+                LeftOut(code="service.service_moved", message=SERVICE_MOVED_LEFT % {"service": service.pk})
+            )
+            continue
+        _apply(service, {"category_id": made.id}, ctx)
+        service.save()
+        record_event(ctx, events.SERVICE_UPDATED, {"id": str(service.id)})
+    for child in Category.objects.filter(pk__in=data.subcategory_ids, is_deleted=False).order_by("id"):
+        if child.parent_id != left_in:
+            message, code = SUBCATEGORY_MOVED_LEFT, "service.subcategory_moved"
+        elif parent_problem(child.pk, made.id, parent_of):
+            message, code = SUBCATEGORY_LOOP_LEFT, "service.subcategory_loop"
+        else:
+            _apply(child, {"parent_id": made.id}, ctx)
+            child.save()
+            parent_of[child.pk] = made.id
+            record_event(ctx, events.CATEGORY_UPDATED, {"id": str(child.id)})
+            continue
+        left_out.append(LeftOut(code=code, message=message % {"category": child.pk}))
+    return load_category(made.id) | {"left_out": left_out}
 
 
 # ── Settings (SERVICE-F11) ────────────────────────────────────────────────────────────────────

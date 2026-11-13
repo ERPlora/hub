@@ -913,3 +913,63 @@ def test_a_row_deleted_between_its_name_and_its_detail_is_not_found(world, detai
     assert deleted(deletions) == ["ok"]
     assert isinstance(outcome, OperationError), outcome
     assert (outcome.status, outcome.code) == (404, missing)
+
+
+# ── A recovery from a separate copy and the business's own edits ───────────────────────────────
+
+
+def run_as_platform(name, data):
+    """``name`` run as a recovery runs it: as the system, with every permission."""
+    op = get(name)
+    return op(ctx_for(actor="system", permissions={"*"}), op.input.model_validate(data))
+
+
+@contextmanager
+def edited_in_flight(service, **changes):
+    """The business's edit of ``service`` under way in another session when this one first reads the services'
+    table: it holds the row with ``changes`` made, and commits a moment later while this one goes on."""
+    table = f'FROM "{Service._meta.db_table}"'
+    holds = threading.Event()
+    edits: list = []
+
+    def edit():
+        try:
+            with transaction.atomic():
+                Service.objects.select_for_update().get(pk=service.pk)
+                Service.objects.filter(pk=service.pk).update(**changes)
+                holds.set()
+                time.sleep(IN_FLIGHT)
+            edits.append("ok")
+        except Exception as error:  # reported to the test, which fails on it
+            edits.append(error)
+        finally:
+            holds.set()
+            connection.close()
+
+    thread = threading.Thread(target=edit)
+
+    def wrapper(execute, sql, params, many, context):
+        if thread.ident is None and sql.lstrip().upper().startswith("SELECT") and table in sql:
+            thread.start()
+            holds.wait(5)
+        return execute(sql, params, many, context)
+
+    try:
+        with connection.execute_wrapper(wrapper):
+            yield edits
+    finally:
+        if thread.ident is not None:
+            thread.join(30)
+
+
+def test_a_category_brought_back_waits_for_an_edit_of_its_service_and_keeps_what_the_edit_changed(world):
+    # The recovery put the service back in its category from the row as it read it before the edit committed,
+    # and saved it whole over the edit: the new price was lost.
+    gone = make_category("Color", is_deleted=True)
+    with edited_in_flight(world.cut, price=4200) as edits:
+        made = run_as_platform(
+            "service.category.recover", {"name": "Color", "stands_for": str(gone.pk), "service_ids": [str(world.cut.pk)]}
+        )
+    assert deleted(edits) == ["ok"]
+    cut = Service.objects.get(pk=world.cut.pk)
+    assert (cut.category_id, cut.price) == (made.id, 4200)
