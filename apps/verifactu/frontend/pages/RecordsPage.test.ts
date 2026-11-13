@@ -7,6 +7,8 @@ import { AppPage } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
+import { outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
+import { insideTheInstalledApp } from '../__tests__/system-browser';
 import { errorFrame, flush, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
 import { plain } from '../lib/format';
 import type { RecordRowOut } from '../operations';
@@ -19,12 +21,6 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 });
 
 const OP = 'verifactu.record.list';
-
-type TauriWindow = { __TAURI__?: { core: { invoke: (command: string, args?: unknown) => Promise<unknown> } } };
-
-afterEach(() => {
-  delete (window as TauriWindow).__TAURI__;
-});
 
 /** The links clicked on the page while `act` runs: what a browser would open, read as they reach the document
  *  (stopped there, so the test's page navigates nowhere). */
@@ -90,6 +86,8 @@ async function setup(options: MountOptions = {}) {
   return { ...m, table, prop, rows, emit, show: (page: unknown) => m.result(OP, page) };
 }
 
+afterEach(outOfTheApp);
+
 describe('RecordsPage', () => {
   it('follows verifactu.record.list, the last sealed first, 50 from the first', async () => {
     const s = await setup();
@@ -151,8 +149,7 @@ describe('RecordsPage', () => {
   });
 
   it('in the installed app, «Verify at the AEAT» opens the AEAT’s page in the system browser', async () => {
-    const invoke = vi.fn(() => Promise.resolve());
-    (window as TauriWindow).__TAURI__ = { core: { invoke } };
+    const invoke = insideTheInstalledApp();
     const s = await setup();
     await s.show(PAGE);
     const links = await clickedLinks(() => s.emit('action', { actionId: 'verify', row: PAGE.rows[0] }));

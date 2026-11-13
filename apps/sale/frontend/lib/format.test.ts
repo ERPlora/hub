@@ -6,6 +6,7 @@
 // decimals it may not have (hub#936: 1,500 yen painted «15.00»).
 import { describe, expect, it } from 'vitest';
 
+import { itGroupsThousandsAndDashesAMissingAmount } from '../../../../base/frontend/__tests__/money-format';
 import {
   centsFromAmount,
   currencySign,
@@ -36,21 +37,7 @@ describe('formatMoney', () => {
     expect(formatMoney(-350, 'en', EUR)).toBe('-€3.50');
   });
 
-  it('groups the thousands from four digits on, in Spanish too', () => {
-    // Spanish CLDR only groups from five digits on (minimumGroupingDigits 2): «1234,56 €» beside
-    // «12.345,67 €», and unlike Carts, Price lists and Payments, which paint «1.234,56 €».
-    expect(spaced(formatMoney(123456, 'es', EUR))).toBe('1.234,56 €');
-    expect(spaced(formatMoney(1234567, 'es', EUR))).toBe('12.345,67 €');
-    expect(spaced(formatMoney(-123456, 'es', EUR))).toBe('-1.234,56 €');
-    expect(formatMoney(123456, 'en', EUR)).toBe('€1,234.56');
-    expect(formatMoney(1234567, 'en', EUR)).toBe('€12,345.67');
-  });
-
-  it('a missing amount is a dash, never «NaN», and a broken language falls back to English', () => {
-    expect(formatMoney(null, 'en', EUR)).toBe('—');
-    expect(formatMoney(undefined, 'es', EUR)).toBe('—');
-    expect(formatMoney(100, 'not a tag!', EUR)).toBe('€1.00');
-  });
+  itGroupsThousandsAndDashesAMissingAmount(formatMoney, plain);
 });
 
 describe('money of the business (flow business-currency)', () => {

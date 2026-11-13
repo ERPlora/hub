@@ -3,7 +3,7 @@
 // with the sale's own currency, never the euro by default nor rewritten when the business's changes. Until the
 // business answers, the till paints no figure: a dash where the amount goes (hub#936: never 15.00 for 1,500 yen).
 import { describe, expect, it, vi } from 'vitest';
-import { type Component, h, ref } from 'vue';
+import type { Component } from 'vue';
 
 import type { TargetGroupOut } from '../../../modifier/frontend/operations';
 import { business, click, JAPANESE, mountSale, POLISH, settle } from '../__tests__/mount-sale';
@@ -16,9 +16,9 @@ import CartFooter from './pos/CartFooter.vue';
 import CartLine from './pos/CartLine.vue';
 import ComboSheet from './pos/ComboSheet.vue';
 import ComboTiles from './pos/ComboTiles.vue';
-import DiscountSheet from './pos/DiscountSheet.vue';
 import ModifierSheet from './pos/ModifierSheet.vue';
 import OpenChecksPopover from './pos/OpenChecksPopover.vue';
+import { mountDiscountSheet } from './pos/__tests__/discount-sheet';
 import { line, orderRow, page, product, service } from './pos/__tests__/fixtures';
 import ProductGrid from './pos/ProductGrid.vue';
 import ProductSearch from './pos/ProductSearch.vue';
@@ -59,14 +59,7 @@ describe('the till, in the business’s currency', () => {
   });
 
   it('the discount switches to an amount with the business’s sign, not «€»', async () => {
-    const open = ref(true);
-    const m = await mountSale(
-      {
-        setup: () => () =>
-          h(DiscountSheet, { open: open.value, 'onUpdate:open': (v: boolean) => (open.value = v), name: null, amount: 0, pending: false, error: null }),
-      },
-      { locale: 'es', business: business(POLISH) },
-    );
+    const m = await mountDiscountSheet({}, { locale: 'es', business: business(POLISH) });
     await m.live();
     await settle();
     expect(m.find('pos-discount-mode').findAll('ion-label').map((l) => l.element.innerHTML.trim())).toEqual(['%', 'zł']);
@@ -77,14 +70,7 @@ describe('the till, in the business’s currency', () => {
   });
 
   it('a discount in yen is typed without a decimal key', async () => {
-    const open = ref(true);
-    const m = await mountSale(
-      {
-        setup: () => () =>
-          h(DiscountSheet, { open: open.value, 'onUpdate:open': (v: boolean) => (open.value = v), name: null, amount: 0, pending: false, error: null }),
-      },
-      { locale: 'en', business: business(JAPANESE) },
-    );
+    const m = await mountDiscountSheet({}, { locale: 'en', business: business(JAPANESE) });
     await m.live();
     m.find('pos-discount-mode').element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: 'amount' } }));
     await settle();

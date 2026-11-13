@@ -1,7 +1,8 @@
 import * as components from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { SetupItem, SetupStatus, WidgetDef } from '../operations';
+import { setupItem as item, setupStatus as status, widget } from '../__tests__/home-fixtures';
+import type { WidgetDef } from '../operations';
 import {
   activeWidgetKeys,
   blockingItems,
@@ -18,51 +19,6 @@ import {
   saleStatus,
   widgetView,
 } from './home';
-
-function item(key: string, fields: Partial<SetupItem> = {}): SetupItem {
-  return {
-    key,
-    app: key.split('.')[0],
-    state: 'pending',
-    level: 'functional',
-    required: true,
-    actionable: true,
-    title: key,
-    description: '',
-    icon: 'ion:settings-outline',
-    route: `/${key}`,
-    order: 50,
-    ...fields,
-  };
-}
-
-function status(items: SetupItem[], fields: Partial<SetupStatus> = {}): SetupStatus {
-  const pending = items.filter((i) => i.state === 'pending').length;
-  const unavailable = items.filter((i) => i.state === 'unavailable').length;
-  const blocking = items.filter((i) => i.state === 'pending' && i.level === 'legal').length;
-  return { total: items.length, pending, unavailable, blocking_pending: blocking, items, ...fields };
-}
-
-function widget(key: string, fields: Partial<WidgetDef> = {}): WidgetDef {
-  return {
-    key,
-    app: key.split('.')[0],
-    title: key,
-    icon: '',
-    category: 'Demo',
-    size: 'md',
-    default: false,
-    kind: 'kpi',
-    operation: 'demo.item.stats',
-    params: {},
-    map: { value: 'open' },
-    options: {},
-    component: null,
-    refresh_on: [],
-    live: true,
-    ...fields,
-  };
-}
 
 describe('heading', () => {
   it('greets by the hour while the business has no name: morning before 12, afternoon before 20, evening after', () => {

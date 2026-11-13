@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { EMPLOYEE, flush, mountTask, type MountOptions, page } from '../__tests__/mount-task';
+import { itKeepsTheFiltersBehindTheFunnel } from '../__tests__/filters-funnel';
 import { project } from '../__tests__/project';
 import ProjectFormModal from '../components/ProjectFormModal.vue';
 import ProjectSheet from '../components/ProjectSheet.vue';
@@ -71,15 +72,7 @@ describe('ProjectsPage', () => {
     expect(s.params(OP)).toEqual([{ code: 'open', name: 'grand', is_active: false, search: 'op', sort: 'name', limit: 50, offset: 0 }]);
   });
 
-  it('keeps the filters behind the toolbar funnel until it is pressed', async () => {
-    const s = await setup();
-    await s.show(page(ROWS));
-    expect(s.prop('filterable')).toBe(true);
-    expect(s.wrapper.find('[data-testid="task-projects-filter-is_active"]').exists()).toBe(false);
-    await s.wrapper.find('[data-testid="task-projects-filters-toggle"]').trigger('click');
-    await flush();
-    expect(s.wrapper.find('[data-testid="task-projects-filters-panel"] [data-testid="task-projects-filter-is_active"]').exists()).toBe(true);
-  });
+  itKeepsTheFiltersBehindTheFunnel(setup, page(ROWS), 'task-projects', 'is_active');
 
   it('wears its icons: «Open» opens, the folder on its cards and its empty list', async () => {
     const s = await setup();

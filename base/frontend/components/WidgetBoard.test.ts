@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { WidgetDef } from '../operations';
 import { accessibleName, errorFrame, flush, memoryStorage, mountBase, subId } from '../__tests__/mount-base';
+import { widget as homeWidget } from '../__tests__/home-fixtures';
 import WidgetBoard from './WidgetBoard.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -9,25 +10,9 @@ vi.mock('@ionic/vue', async (importOriginal) => {
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
 
+/** A panel titled «Panel <key>», small. */
 function widget(key: string, fields: Partial<WidgetDef> = {}): WidgetDef {
-  return {
-    key,
-    app: key.split('.')[0],
-    title: `Panel ${key}`,
-    icon: '',
-    category: 'Demo',
-    size: 'sm',
-    default: false,
-    kind: 'kpi',
-    operation: 'demo.item.stats',
-    params: {},
-    map: { value: 'open' },
-    options: {},
-    component: null,
-    refresh_on: [],
-    live: true,
-    ...fields,
-  };
+  return homeWidget(key, { title: `Panel ${key}`, size: 'sm', ...fields });
 }
 
 const CATALOGUE = [widget('a.one', { default: true }), widget('a.two'), widget('b.three', { default: true })];
