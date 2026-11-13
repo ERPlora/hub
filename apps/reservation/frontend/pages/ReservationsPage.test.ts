@@ -8,6 +8,7 @@ import { DataTable, EmptyState } from '@erplora/ui/components';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
+import { itFillsThePage } from '../__tests__/list-fills-the-page';
 import { click, EMPLOYEE, flush, ionValue, type MountOptions, mountReservation, page } from '../__tests__/mount-reservation';
 import { dayOut, reservationRow, settingsOut } from '../__tests__/rows';
 import DayBar from '../components/DayBar.vue';
@@ -15,7 +16,6 @@ import en from '../locale/en.json';
 import ReservationFormModal from '../components/ReservationFormModal.vue';
 import StepDialog from '../components/StepDialog.vue';
 import ReservationsPage from './ReservationsPage.vue';
-import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -267,13 +267,5 @@ describe('ReservationsPage: why a reservation was cancelled (RESERVATION-F09, F1
 });
 
 describe('ReservationsPage: the list fills the page', () => {
-  it('keeps its column filters behind the table’s funnel: the list is not pushed down', async () => {
-    const s = await setup();
-    expect(s.prop('filterable')).toBe(true);
-  });
-
-  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
-    const s = await setup();
-    expect(listFillProblems(s.wrapper)).toEqual([]);
-  });
+  itFillsThePage(setup);
 });

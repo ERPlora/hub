@@ -4,6 +4,8 @@
 import { toast, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
+import { expectTapOpensInTheSystemBrowser, insideTheInstalledApp } from '../__tests__/system-browser';
 import { click, EMPLOYEE, errorFrame, flush, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
 import type { RecordOut } from '../operations';
 import RecordDetailPage from './RecordDetailPage.vue';
@@ -26,12 +28,6 @@ beforeEach(() => {
   mocks.confirm.mockReset();
   vi.mocked(toastSuccess).mockClear();
   vi.mocked(toast).mockClear();
-});
-
-type TauriWindow = { __TAURI__?: { core: { invoke: (command: string, args?: unknown) => Promise<unknown> } } };
-
-afterEach(() => {
-  delete (window as TauriWindow).__TAURI__;
 });
 
 const OP = 'verifactu.record.get';
@@ -105,6 +101,8 @@ async function setup(record: Partial<RecordOut> = {}, options: MountOptions = {}
   await m.result(OP, { ...RECORD, ...record });
   return m;
 }
+
+afterEach(outOfTheApp);
 
 describe('RecordDetailPage', () => {
   it('follows its record by id and names it by its invoice', async () => {
@@ -221,13 +219,9 @@ describe('RecordDetailPage', () => {
   });
 
   it('in the installed app, «Verify at the AEAT» opens the AEAT’s page in the system browser', async () => {
-    const invoke = vi.fn(() => Promise.resolve());
-    (window as TauriWindow).__TAURI__ = { core: { invoke } };
+    const invoke = insideTheInstalledApp();
     const s = await setup();
-    const tap = new MouseEvent('click', { bubbles: true, cancelable: true });
-    s.find('verifactu-record-verify').element.dispatchEvent(tap);
-    expect(tap.defaultPrevented).toBe(true);
-    expect(invoke).toHaveBeenCalledWith('open_external_url', { url: RECORD.qr_url });
+    expectTapOpensInTheSystemBrowser(s.find('verifactu-record-verify').element, invoke, RECORD.qr_url);
   });
 
   it('the first record of a chain says so; a record without its XML yet says it is built when it is sent', async () => {

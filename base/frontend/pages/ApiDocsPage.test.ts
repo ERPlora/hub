@@ -2,26 +2,15 @@ import { AppPage } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
+import { OPENAPI_HEAD, TAX_CATEGORY_LIST } from '../__tests__/openapi-document';
 import { saveFile } from '../lib/download';
 import ApiDocsPage from './ApiDocsPage.vue';
 
 vi.mock('../lib/download', () => ({ saveFile: vi.fn(async () => true) }));
 
 const DOCUMENT = {
-  openapi: '3.1.0',
-  info: { title: 'ERPlora Hub API', version: '1' },
-  paths: {
-    '/api/tax/categories': {
-      get: {
-        operationId: 'tax.category.list',
-        summary: 'Category List',
-        description: 'Lists the tax categories.',
-        tags: ['tax'],
-        parameters: [{ in: 'query', name: 'limit', required: false, schema: { type: 'integer' }, description: 'How many.' }],
-        responses: {},
-      },
-    },
-  },
+  ...OPENAPI_HEAD,
+  paths: { '/api/tax/categories': { get: { ...TAX_CATEGORY_LIST, responses: {} } } },
   components: { securitySchemes: { ApiKey: { type: 'http', scheme: 'bearer' } } },
 };
 const ANSWER = { document: DOCUMENT, apps: [{ id: 'tax', name: 'Taxes', read: true, write: false }], keys_available: true };

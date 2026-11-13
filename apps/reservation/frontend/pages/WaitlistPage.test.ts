@@ -6,11 +6,11 @@ import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
+import { itFillsThePage } from '../__tests__/list-fills-the-page';
 import { flush, ionValue, type MountOptions, mountReservation, page } from '../__tests__/mount-reservation';
 import { entryRow, reservationRow } from '../__tests__/rows';
 import WaitlistFormModal from '../components/WaitlistFormModal.vue';
 import WaitlistPage from './WaitlistPage.vue';
-import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -173,13 +173,5 @@ describe('WaitlistPage', () => {
 });
 
 describe('WaitlistPage: the list fills the page', () => {
-  it('keeps its column filters behind the table’s funnel: the list is not pushed down', async () => {
-    const s = await setup();
-    expect(s.prop('filterable')).toBe(true);
-  });
-
-  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
-    const s = await setup();
-    expect(listFillProblems(s.wrapper)).toEqual([]);
-  });
+  itFillsThePage(setup);
 });

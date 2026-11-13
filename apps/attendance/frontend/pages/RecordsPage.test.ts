@@ -148,21 +148,22 @@ describe('RecordsPage for a manager (ATTENDANCE-F07)', () => {
     expect(open[6]).toBe('Open');
   });
 
-  it('the worked time of an open day runs on by the minute', async () => {
+  /** The open day's worked time a minute after the list shows. */
+  async function workedTimeAMinuteLater(): Promise<string> {
     const s = await setup();
     await s.show(page(ROWS));
     vi.advanceTimersByTime(60_000);
     await flush();
-    expect(s.cells(0)[5]).toContain('1:31');
+    return s.cells(0)[5];
+  }
+
+  it('the worked time of an open day runs on by the minute', async () => {
+    expect(await workedTimeAMinuteLater()).toContain('1:31');
   });
 
   it('runs on the server’s clock, not the device’s', async () => {
     vi.setSystemTime(new Date('2026-10-06T08:20:00Z')); // ten minutes behind the server
-    const s = await setup();
-    await s.show(page(ROWS));
-    vi.advanceTimersByTime(60_000);
-    await flush();
-    expect(s.cells(0)[5]).toContain('1:31');
+    expect(await workedTimeAMinuteLater()).toContain('1:31');
   });
 
   it('filters by month, status, person and search', async () => {
