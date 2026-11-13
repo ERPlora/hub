@@ -14,6 +14,7 @@ from live.operations import get as get_operation
 
 from apps.sale.api import router
 from apps.sale.tests.conftest import A, run
+from base.tests.routes import bound_routes, spa_route_map
 from config.api import api
 
 ROUTES = {
@@ -109,20 +110,11 @@ def employee_client(client, make_user):
 
 
 def test_every_route_is_bound_to_its_operation():
-    routes = {
-        (method, path, route.operation_id)
-        for path, view in router.path_operations.items()
-        for route in view.operations
-        for method in route.methods
-    }
-    assert routes == ROUTES
+    assert bound_routes(router) == ROUTES
 
 
-def test_the_spas_route_map_names_every_sale_route(settings):
-    # frontend/generated/operations.json: the op → route map the SDK's client uses (written by hand).
-    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
-    mine = {(route["method"].upper(), route["path"], op) for op, route in spa.items() if op.startswith("sale.")}
-    assert mine == {(method, f"/api{path}", op) for method, path, op in ROUTES}
+def test_the_spas_route_map_names_every_sale_route():
+    assert spa_route_map("sale.") == {(method, f"/api{path}", op) for method, path, op in ROUTES}
 
 
 def test_no_sale_operation_republishes_the_tax_of_the_territory():

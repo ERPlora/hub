@@ -7,11 +7,12 @@ from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs
 from live.operations import registry
 
 from apps.table import events as E
 from base import home
+from base.tests.roles import grants_by_role
 
 PERMISSIONS = [
     "table.view_zone",
@@ -98,13 +99,13 @@ def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
 
 
 def test_what_each_role_gets():
-    config = table()
-    for role in ("hub_owner", "hub_admin"):
-        assert permissions_for_role([config], role) == set(PERMISSIONS), role
-    assert (
-        permissions_for_role([config], "hub_manager") == set(PERMISSIONS) - ADMIN_ONLY
-    )
-    assert permissions_for_role([config], "hub_employee") == EMPLOYEE
+    everything = set(PERMISSIONS)
+    assert grants_by_role(table()) == {
+        "hub_owner": everything,
+        "hub_admin": everything,
+        "hub_manager": everything - ADMIN_ONLY,
+        "hub_employee": EMPLOYEE,
+    }
 
 
 def test_navigation_is_four_sections_with_registered_icons():

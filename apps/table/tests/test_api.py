@@ -13,6 +13,7 @@ from django.test import Client
 from live.ninja import ensure_api_parity
 
 from apps.table.api import router
+from base.tests.routes import spa_routes
 from config.api import api
 
 from .conftest import make_hold, make_session, make_table, make_zone
@@ -269,12 +270,5 @@ def test_many_tables_are_made_at_once_over_http_or_none_with_the_taken_numbers(a
     assert refused.status_code == 403
 
 
-def test_the_spas_route_map_names_every_table_route(settings):
-    # frontend/generated/operations.json: the op → route map the SDK's client uses (written by hand).
-    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
-    mine = {
-        (route["method"].upper(), route["path"].removeprefix("/api"), op)
-        for op, route in spa.items()
-        if op.startswith("table.")
-    }
-    assert mine == ROUTES
+def test_the_spas_route_map_names_every_table_route():
+    assert spa_routes("table.") == ROUTES

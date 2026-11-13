@@ -21,6 +21,7 @@ from psycopg.conninfo import make_conninfo
 
 from base import events, relay, services
 from base.models import EventDelivery
+from base.tests.routes import assert_bound
 
 A = Scope("host", "a")
 B = Scope("host", "b")
@@ -253,13 +254,7 @@ def test_a_discarded_event_cannot_be_discarded_again_nor_resent():
     ],
 )
 def test_the_routes_are_bound_to_their_commands(path, operation, db):
-    from django.urls import resolve
-
-    from base.api import router
-
-    [route] = router.path_operations[path].operations
-    assert (route.methods, route.operation_id) == (["POST"], operation)
-    assert resolve(f"/api{path}").url_name
+    assert_bound("POST", path, operation)
 
 
 @pytest.mark.django_db

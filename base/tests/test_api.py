@@ -3,6 +3,8 @@
 import pytest
 from django.urls import resolve
 
+from base.tests.routes import assert_bound, spa_route_map
+
 pytestmark = pytest.mark.django_db
 
 
@@ -52,11 +54,7 @@ def test_language_follows_the_request(client):
     ],
 )
 def test_the_homes_routes_are_bound_to_its_queries(path, operation):
-    from base.api import router
-
-    [route] = router.path_operations[path].operations
-    assert (route.methods, route.operation_id) == (["GET"], operation)
-    assert resolve(f"/api{path}").url_name
+    assert_bound("GET", path, operation)
 
 
 def test_the_list_of_an_owner_over_http(client, make_user, settings):
@@ -80,21 +78,17 @@ def test_an_anonymous_visitor_gets_no_home(client):
         assert response.status_code in (401, 403), path
 
 
-def test_the_spas_route_map_names_every_base_route(settings):
-    # frontend/generated/operations.json: the op → route map the SDK's client uses.
-    import json
-
+def test_the_spas_route_map_names_every_base_route():
     from base.tests.test_access_routes import ROUTES as WAY_IN
     from base.tests.test_api_keys import KEY_ROUTES as KEYS
     from base.tests.test_api_docs import API_DOC_ROUTES as API_DOCS
     from base.tests.test_approvals import APPROVAL_ROUTES as APPROVALS
+    from base.tests.test_files_api import ROUTES as FILES
     from base.tests.test_image_catalog import CATALOG_IMAGE_ROUTES as CATALOG_IMAGES
     from base.tests.test_location import LOCATION_ROUTES as LOCATIONS
     from base.tests.test_people import PEOPLE_ROUTES as PEOPLE
 
-    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
-    mine = {(route["method"].upper(), route["path"], op) for op, route in spa.items() if op.startswith("base.")}
-    assert mine == {
+    assert spa_route_map("base.") == {
         ("GET", "/api/me", "base.session.me"),
         ("GET", "/api/home/setup", "base.setup.status"),
         ("GET", "/api/home/widgets", "base.widget.list"),
@@ -121,14 +115,7 @@ def test_the_spas_route_map_names_every_base_route(settings):
         ("POST", "/api/system/failed-events/retry", "base.failed_event.retry"),
         ("POST", "/api/system/failed-events/retry_all", "base.failed_event.retry_all"),
         ("POST", "/api/system/failed-events/discard", "base.failed_event.discard"),
-        # Files: base/tests/test_files_api.py.
-        ("GET", "/api/files", "base.file.list"),
-        ("GET", "/api/files/raw", "base.file.read"),
-        ("POST", "/api/files/upload", "base.file.upload"),
-        ("POST", "/api/files/folder", "base.file.create_folder"),
-        ("POST", "/api/files/rename", "base.file.rename"),
-        ("POST", "/api/files/move", "base.file.move"),
-        ("POST", "/api/files/delete", "base.file.delete"),
+        *FILES,
         # Assistant.
         ("POST", "/api/assistant/turn", "base.assistant.turn"),
         ("GET", "/api/assistant/usage", "base.assistant.usage"),
@@ -160,11 +147,7 @@ DATA_ROUTES = {
 
 @pytest.mark.parametrize(("method", "path", "operation"), sorted(DATA_ROUTES))
 def test_the_data_routes_are_bound_to_their_operations(method, path, operation):
-    from base.api import router
-
-    [route] = router.path_operations[path.removeprefix("/api")].operations
-    assert (route.methods, route.operation_id) == ([method], operation)
-    assert resolve(path).url_name
+    assert_bound(method, path.removeprefix("/api"), operation)
 
 
 def test_an_owner_loads_a_file_over_http_bigger_than_any_other_body(client, make_user, settings):

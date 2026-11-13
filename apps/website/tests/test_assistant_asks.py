@@ -7,21 +7,19 @@ of the catalogue of a business with every app on and ranked as a turn ranks, is 
 """
 
 import json
-import re
-import unicodedata
 from pathlib import Path
 
 import pytest
 from django.conf import settings
-from live import assistant as shared
-from live.context import OperationContext, Scope
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
-from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
+from base.tests.test_assistant_asks import (
+    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
+    comparable,
+    place_of_no_ask,
+)
 
-A = Scope("host", "a")
 #: Website's assistant tools: what the page is, the categories its catalog can show, and the draft's save, publication
 #: and taking offline.
 TOOLS = {
@@ -35,18 +33,6 @@ TOOLS = {
 THE_MANAGERS = {"website.site.get"}
 #: The probes of layer 2 (``tests/e2e/qa/assistant-probes.spec.ts``) that hub#1093's QA ran on Website.
 PROBES = Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes"
-
-
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
 
 
 def test_website_offers_its_five_tools():
@@ -97,12 +83,6 @@ REPORTED = [
 ]
 
 
-def comparable(text: str) -> str:
-    """``text`` as layer 2 compares a probe with the asks: lower case, without accents, punctuation or extra spaces."""
-    bare = "".join(c for c in unicodedata.normalize("NFD", text) if not unicodedata.combining(c)).lower()
-    return " ".join(re.sub(r"[^\w]+|_", " ", bare).split())
-
-
 def test_the_reported_requests_are_the_owners_probes_of_layer_2():
     """Each phrase above is word for word the owner's probe of its tool: the test measures what layer 2 measures."""
     probes = {
@@ -119,8 +99,4 @@ def test_the_reported_requests_are_the_owners_probes_of_layer_2():
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_website_request_is_offered_its_tool_without_being_its_asks(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, language := "es")
-    assert name in tools  # positive control: the owner holds it, so the model can receive it
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get(language, ())}
-    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
-    assert name in offered, offered
+    assert place_of_no_ask(catalog_of(Membership.Role.OWNER, "es"), name, phrase) is not None
