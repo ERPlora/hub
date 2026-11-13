@@ -305,6 +305,14 @@ function park(): void {
   background: var(--ep-surface-muted);
   border-radius: 12px;
 }
+/* A column too low to keep «Send order» pinned (KitchenSendBar): the tabs give up 8 px of spare room around them, so
+   that a phone on its side still shows some of the first line as the check opens (hub#800). */
+@container pos-cart-middle (max-height: 13rem) {
+  .pos-cart__tabs {
+    margin-bottom: 0.25rem;
+    padding: 0.125rem;
+  }
+}
 .pos-cart__tab {
   min-width: 0;
   min-height: 2.5rem;
