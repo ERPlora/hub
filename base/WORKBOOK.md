@@ -3103,10 +3103,11 @@ Pasos:
      nuevo para el negocio: no arranca ninguna de sus automatizaciones, así que a nadie se le da la bienvenida ni se le
      avisa otra vez de una cita que ya tenía (hub#1307).
      Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes**, **Categorías de productos,
-     Productos, Enlaces de productos a categorías**, **Categorías de servicios, Servicios** y **Citas**). Pulsa
-     **Recuperar**.
+     Productos, Enlaces de productos a categorías**, **Categorías de servicios, Servicios** y **Citas, Citas
+     periódicas**). Pulsa **Recuperar**.
   10. Sale «1 copia aparte devolverá Clientes, Categorías de productos, Productos, Enlaces de productos a categorías,
-      Categorías de servicios, Servicios, Citas a su negocio en unos minutos: Recuperaciones dice cómo fue.». En
+      Categorías de servicios, Servicios, Citas, Citas periódicas a su negocio en unos minutos: Recuperaciones dice cómo
+      fue.». En
       Recuperaciones la ve «Pedida» con la copia, qué se pidió y cuándo.
   11. Unos minutos después dice «Hecha» y qué volvió, cada cosa aparte y con su nombre: «Clientes: se restauró 1, se
       crearon 2» o «Clientes: se crearon 2, 1 sin crear». Su ficha dice además cuáles no volvieron y por qué (por su identificador en la copia, sin datos
@@ -3156,6 +3157,8 @@ Pasos:
       que el negocio ya volvió a crear (otro con el mismo nombre en la misma categoría, que no sea ya uno de la copia; cada
       uno vale por uno solo, así que dos servicios con el mismo nombre vuelven los dos). Pedirlo otra vez no crea nada
       dos veces.
+      Con Citas, «Citas: se restauró 1; Citas periódicas: se restauró 1» (las citas y las citas periódicas que
+      volvieron, cada una con su cuenta).
       Las citas van siempre después de los clientes y los servicios, se pidan en el orden que se pidan, para que cada
       una encuentre a su clienta y sus servicios. Vuelve cada cita que aún no ha llegado y seguía reservada (pendiente o
       confirmada, sin cobrar). Una que el negocio borró y aún guarda vuelve LA MISMA y cuenta como restaurada, tal como

@@ -30,6 +30,7 @@ from base.tenancy.context import use_hub
 from base.tenancy.tests.test_recovery import (
     ANA,
     APPOINTMENTS,
+    SERIES,
     Recoveries,
     Salon,
     a_monday_at,
@@ -594,7 +595,7 @@ class TestTheServiceMadeAgain:
         assert run() == 1
 
         assert services_of(salon) == [[again]]
-        assert fresh(asked).results == [SERVICE_CATEGORIES, SERVICES, APPOINTMENTS | {"created": 1}]
+        assert fresh(asked).results == [SERVICE_CATEGORIES, SERVICES, APPOINTMENTS | {"created": 1}, SERIES]
 
     def test_an_appointment_whose_service_is_brought_back_in_the_same_recovery_comes_back_with_it(
         self, recoveries, every_app_on
@@ -608,7 +609,12 @@ class TestTheServiceMadeAgain:
             [back] = Service.objects.filter(name="Haircut").values_list("pk", flat=True)
         assert back != salon.cut
         assert services_of(salon) == [[back]]
-        assert fresh(asked).results == [SERVICE_CATEGORIES, SERVICES | {"created": 1}, APPOINTMENTS | {"created": 1}]
+        assert fresh(asked).results == [
+            SERVICE_CATEGORIES,
+            SERVICES | {"created": 1},
+            APPOINTMENTS | {"created": 1},
+            SERIES,
+        ]
 
     def test_an_appointment_whose_service_the_business_no_longer_has_does_not_come_back_and_says_why(
         self, recoveries, every_app_on
@@ -628,7 +634,8 @@ class TestTheServiceMadeAgain:
         assert run() == 1
 
         assert salon.live() == []
-        [result] = fresh(asked).results
+        [result, series] = fresh(asked).results
+        assert series == SERIES
         assert (result["created"], result["not_created"], result["refused"]) == (0, 1, "")
         [why] = result["reasons"]
         assert why["reason"].startswith("service.service_not_found: ")
@@ -672,7 +679,7 @@ class TestTheSeriesComesBack:
             assert (back.deleted_at, back.is_active) == (None, True)
             assert Appointment.objects.filter(recurring_id=series.id, deleted_at__isnull=True).count() == 3
         assert booked_events(salon.hub, "appointment.recurring.restored") == 1
-        assert fresh(asked).results == [APPOINTMENTS | {"restored": 1}]
+        assert fresh(asked).results == [APPOINTMENTS, SERIES | {"restored": 1}]
         booked = run_in(salon.hub, "appointment.recurring.materialize", id=series.id)
         assert (booked.booked, booked.already_booked) == (0, 3)
 
@@ -704,4 +711,4 @@ class TestTheSeriesComesBack:
                 3,
             )
             assert list(anew.lines.values_list("service_id", flat=True)) == [salon.cut]
-        assert fresh(asked).results == [APPOINTMENTS | {"created": 4}]
+        assert fresh(asked).results == [APPOINTMENTS | {"created": 3}, SERIES | {"created": 1}]

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:609b4372da71e1a74233117bbd326e5380ae52df178a343545d12c593e946e9b -->
+<!-- generated from WORKBOOK.md sha256:c7a86df21a12a3e0f8ac799d7feeb9b5c6b0086f820eeee0acca2982681e0971 -->
 
 ## What it is for and who it is for
 
@@ -2975,9 +2975,10 @@ Steps:
      what comes back is nothing new to the business: it starts none of its automations, so nobody is welcomed or told
      again of a booking they already had (hub#1307). Below, "What to bring back", with what can be brought ticked
      (today, **Customers**, **Product categories, Products, Product links to categories**, **Service categories,
-     Services** and **Appointments**). They press **Recover**.
+     Services** and **Appointments, Repeating appointments**). They press **Recover**.
   10. "1 separate copy will give back Customers, Product categories, Products, Product links to categories, Service
-      categories, Services, Appointments into its business within a few minutes: Recoveries says how it went." appears.
+      categories, Services, Appointments, Repeating appointments into its business within a few minutes: Recoveries
+      says how it went." appears.
       In Recoveries they
       see it "Asked" with the copy, what
       was asked and when.
@@ -3027,6 +3028,8 @@ Steps:
       back (it is restored in Services), nor does one the copy had archived, and one the business has already made again
       (another with the same name in the same category, not itself one of the copy's; each counts for one only, so two
       services with the same name both come back) is not repeated. Asking again creates nothing twice.
+      With Appointments, "Appointments: 1 restored; Repeating appointments: 1 restored" (the appointments and the
+      repeating appointments that came back, each with its count).
       Appointments always go after customers and services, whatever the order they are asked in, so each finds its
       customer and its services. Each appointment that has not come yet and was still booked (pending or confirmed, not
       charged) comes back. One the business deleted and still holds comes back THE SAME and counts as restored, as it
