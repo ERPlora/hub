@@ -526,13 +526,15 @@ class CopyRecovery(AskedOfTheWorker):
     with its copy.
 
     ``apps`` are the labels asked, each an app that answers ``recoverable_from_copy`` on its ``LiveAppConfig``;
-    ``language`` is the staff's, which the apps' refusals are said in. ``results`` says, app by app, how many were
-    restored (absent from a result noted before that count existed), created and not, with why (``reasons``, the first
-    :data:`REASONS_KEPT`, by the copy's id: no personal data), or why the app gave nothing back (``refused``). The
+    ``language`` is the staff's, which the apps' refusals are said in. ``results`` says, for each thing each app
+    declares it gives back (its ``label``, as the code writes it; absent from a result noted before each was counted
+    apart, which is the app's whole, and from that of an app that declares nothing), how many were restored (absent
+    from a result noted before that count existed), created and not, with why (``reasons``, the first
+    :data:`REASONS_KEPT`, by the copy's id: no personal data), or why it gave nothing back (``refused``). The
     worker holds the row's own lease (``lease_owner``, ``lease_until``) while it recovers, never the hub's: the
     business's own work does not wait for it."""
 
-    #: How many records a recovery notes the reason of, app by app, when its operation refuses them.
+    #: How many records a recovery notes the reason of, result by result, when its operation refuses them.
     REASONS_KEPT = 50
 
     class Status(models.TextChoices):

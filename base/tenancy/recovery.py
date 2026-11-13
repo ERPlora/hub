@@ -24,8 +24,8 @@ the business stays open and its own work goes on.
    gone since, or the business as it is now: a time taken) is counted with why and the others go on; what it refuses
    for all (the app turned off, the business busy) ends that app's part with why (``refused``), and the next app goes
    on.
-3. **Noted**: control notes the recovery done with what each app gave back, or failed with why
-   (``recover_<step>: <why>``). A worker whose lease ran out leaves it to whoever holds it now, who reads the copy
+3. **Noted**: control notes the recovery done with what each thing each app declares gave back, apart and under its
+   name, or failed with why (``recover_<step>: <why>``). A worker whose lease ran out leaves it to whoever holds it now, who reads the copy
    anew: what was created is not lacking any more, so nothing is made twice.
 
 What each app gives back is its own to say, by a hook of its ``LiveAppConfig`` (``base.recovery.HOOK``, as
@@ -202,13 +202,14 @@ def _give_back(
     refused: str,
     ours: Callable[[], None],
 ) -> None:
-    """What ``label`` gives back to ``hub`` (in its ``use_hub``): each record it holds deleted brought back by its
-    restore, then each it no longer has created by its create. Its result is in ``results`` from the start, so a failure
-    halfway is noted with what had come back until then; ``not_created`` counts what either refused. The operations run
-    as the recovery (``base.recovery.actor_of``), with the system's permissions: their events say it came back."""
-    result = {"app": label, "restored": 0, "created": 0, "not_created": 0, "reasons": [], "refused": refused}
-    results.append(result)
-    if refused:
+    """What ``label`` gives back to ``hub`` (in its ``use_hub``), each thing it declares in turn and counted in a result
+    of its own: each record it holds deleted brought back by its restore, then each it no longer has created by its
+    create. A result is in ``results`` from the start of its part, so a failure halfway is noted with what had come back
+    until then; ``not_created`` counts what either refused. What the app refuses for all ends its part, and what it had
+    left to give back is noted with the same why. An app that declares nothing has one result, its own. The operations
+    run as the recovery (``base.recovery.actor_of``), with the system's permissions: their events say it came back."""
+    if not declared:
+        results.append(_result(label, refused))
         return
     ctx = OperationContext(
         scope=Scope("host", hub.slug),
@@ -216,13 +217,29 @@ def _give_back(
         permissions=frozenset({"*"}),
         language=translation.get_language(),
     )
-    for one, found in zip(declared, records, strict=True):
+    for index, one in enumerate(declared):
+        result = _result(label, refused, one.label)
+        results.append(result)
+        if refused:
+            continue
         steps = [(one.create, one.missing, "created", _create_input)]
         if one.restore:
             steps.insert(0, (one.restore, one.deleted, "restored", _restore_input))
         for name, which, counted, payload in steps:
-            if not _each(ctx, get_operation(name), which(found), payload, counted, result, ours):
-                return
+            if not _each(ctx, get_operation(name), which(records[index]), payload, counted, result, ours):
+                refused = result["refused"]
+                break
+
+
+def _result(app: str, refused: str, named=None) -> dict:
+    """What ``app`` gave back, nothing yet: of the thing it declares ``named``, whose name is kept as the code writes
+    it (``label``) and said in the language of whoever reads it, as Django keeps an object's name in its admin's
+    history; without ``named``, of the app as a whole."""
+    result = {"app": app, "restored": 0, "created": 0, "not_created": 0, "reasons": [], "refused": refused}
+    if named is not None:
+        with translation.override(None):
+            result["label"] = str(named)
+    return result
 
 
 def _each(ctx, op, records: list[dict], payload, counted: str, result: dict, ours: Callable[[], None]) -> bool:
