@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:908962cfe14046d87ff3af4261e7cb1573432cfc1a070c60c59e76dd4cde5996 -->
+<!-- generated from WORKBOOK.md sha256:8a65ba63f4493932e4bb1fdfe85948dfdbbe7cc4b5f0598a075e27316fd78d1a -->
 
 ## What it is for and who it is for
 
@@ -190,7 +190,7 @@ field: "The menu needs a name.", "A menu eaten in needs its own VAT category:
 without it, it cannot be billed.", "This amount cannot be
 negative." (to make a choice cheaper, it gets a negative supplement: COMBO-F06), "This is not an amount. Type a figure, for example 12.50." (also with
 another currency's sign: "€13.50" in a business in Poland) and the one about the two possible readings of an amount ("1.250"), which quotes what was typed. A VAT category that
-does not exist in Taxes: "That tax category does not exist in Taxes.". Without the right to manage
+does not exist in Taxes: "That tax category does not exist in Taxes.". The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888). Without the right to manage
 there is no + button.
 Involved: TAX-F01
 

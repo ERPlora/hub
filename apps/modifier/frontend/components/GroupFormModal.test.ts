@@ -4,6 +4,7 @@
 // A refusal goes under its field (a taken name, a maximum below the minimum) and what was typed stays.
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { GroupOut } from '../operations';
 import { click, ionChecked, ionValue, mountModifier, settle } from '../__tests__/mount-modifier';
 import GroupFormModal from './GroupFormModal.vue';
@@ -139,4 +140,14 @@ describe('GroupFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)
       restore: () => ionChecked(s.field('allow_repeat'), SAUCES.allow_repeat),
     });
   });
+});
+
+describe('GroupFormModal: fields refused with the same words (hub#888)', () => {
+  // A new group: Name, Kitchen ticket name, Minimum, Maximum and Order paint a refusal, each under its own key.
+  itTellsTheCorrectedFieldApart(['name', 'kitchen_name', 'min_choices', 'max_choices', 'sort_order'], async (locale, refusal) => {
+    const s = await setup(null, locale);
+    await ionValue(s.field('name'), 'Sauces', 'ionInput');
+    s.answer(422, refusal);
+    return { field: s.field, send: () => click(s.save()), settle };
+  }, 'max_choices');
 });
