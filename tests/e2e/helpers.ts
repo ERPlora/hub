@@ -964,6 +964,20 @@ export const compactBar = (page: Page): boolean => (page.viewportSize()?.width ?
 export const bellBadge = (page: Page): Locator =>
   shown(page).locator(compactBar(page) ? '[data-testid=topbar-chrome-more-badge]' : '[data-testid=hub-bell] [data-testid=hub-bell-badge]');
 
+/** The bell's count says `total`, or shows nothing when it is 0. */
+export async function badgeSays(page: Page, total: number, options: { timeout?: number } = {}): Promise<void> {
+  if (total > 0) await expect(bellBadge(page)).toHaveText(String(total), options);
+  else await expect(bellBadge(page)).toHaveCount(0, options);
+}
+
+/** The page still, with nothing past its right edge at the size `label`, then captured as `name`. */
+export async function capturedFitting(page: Page, name: string, label: string): Promise<void> {
+  await untilStill(page);
+  const overflow = await horizontalOverflow(page);
+  expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
+  await capture(page, name);
+}
+
 /**
  * Opens the bell's list (BASE-F10) and resolves once it is presented: the bell itself, or on a phone its row in «More
  * options» (TopbarChrome.vue). Ionic animates a popover in a shadow root, so it waits for its `ionPopoverDidPresent`.

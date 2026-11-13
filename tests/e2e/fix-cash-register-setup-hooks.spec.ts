@@ -12,7 +12,8 @@
 // open per business), as cash-register-shift.spec.ts does.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, OWNER, psql, shot, shown, untilStill } from './helpers';
+import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, psql, shot, shown, untilStill } from './helpers';
+import { boardShown, boardWidget, setupRow, spanishOnTheHome, unfoldedTo } from './home-helpers';
 import { VIEWPORTS } from './inventory-helpers';
 import { stamp } from './sale-helpers';
 
@@ -101,40 +102,18 @@ test.afterAll(() => {
   );
 });
 
-/** A person of `a` in Spanish (the Hub's language cookie, as the sign-in sets it from the account), on the Home. */
-async function spanish(
-  browser: Browser,
-  viewport: { width: number; height: number },
-  options: { board?: string[]; who?: Credentials } = {},
-): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
-  const { board } = options;
-  if (board) await context.addInitScript(([key, keys]) => localStorage.setItem(key, keys), [BOARD, JSON.stringify(board)]);
-  const page = await context.newPage();
-  await login(page, A, '/', options.who ?? OWNER);
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.goto(`${A}/`);
-  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-  await expect(shown(page).locator('[data-testid="widget-board"]')).toBeVisible();
-  // The owner's Spanish session with both panels for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`).
-  if (board && !options.who && process.env.E2E_SAVE_STORAGE_STATE) {
-    await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-  }
-  return { context, page };
-}
+/** A person of `a` in Spanish on the Home: the owner unless `who`, with `board`'s panels laid out (and then, for the owner,
+ *  the session saved for the fleet's visual sweep, when asked). */
+const spanish = (browser: Browser, viewport: { width: number; height: number }, options: { board?: string[]; who?: Credentials } = {}) =>
+  spanishOnTheHome(browser, viewport, boardShown, {
+    who: options.who,
+    board: options.board && { key: BOARD, panels: options.board },
+    sweep: Boolean(options.board) && !options.who,
+  });
 
-const card = (page: Page): Locator => shown(page).locator('[data-testid="setup-card"]');
-const row = (page: Page): Locator => card(page).locator(`[data-testid="setup-row"][data-key="${STEP}"]`);
-const panel = (page: Page, key: string): Locator =>
-  shown(page).locator(`[data-testid="widget-board"] [data-testid="widget"][data-key="${key}"]`);
+const row = (page: Page): Locator => setupRow(page, STEP);
 
-/** «Ver todo»: a «Recomendado» step is folded while «Importante» or «Necesario para facturar» ones are pending. */
-async function unfolded(page: Page): Promise<void> {
-  await expect(card(page)).toHaveAttribute('aria-busy', 'false');
-  const toggle = card(page).locator('[data-testid="setup-toggle"]');
-  if ((await toggle.count()) && (await toggle.textContent())?.trim() === 'Ver todo') await toggle.click();
-  await expect(row(page)).toBeVisible();
-}
+const unfolded = (page: Page): Promise<void> => unfoldedTo(page, STEP);
 
 async function money(context: BrowserContext): Promise<Intl.NumberFormat> {
   const res = await api<Currency>(context, A, 'GET', '/cash_register/currency');
@@ -204,10 +183,10 @@ test('CASH_REGISTER-F12: «Caja (sesión actual)» by default with the server\'s
   const { context, page } = await spanish(browser, { width: 1440, height: 900 });
   try {
     const format = await money(context);
-    const expected = panel(page, EXPECTED);
+    const expected = boardWidget(page, EXPECTED);
     await expect(expected.locator('[data-testid="widget-title"]')).toHaveText('Caja (sesión actual)');
     await expect(expected.locator('[data-testid="widget-value"]')).toHaveText(format.format((await expectedNow(context)) / 100));
-    await expect(panel(page, RECENT)).toHaveCount(0);
+    await expect(boardWidget(page, RECENT)).toHaveCount(0);
 
     // 5.00 € out for a supplier: the panel follows without a reload.
     const before = await expectedNow(context);
@@ -222,7 +201,7 @@ test('CASH_REGISTER-F12: «Caja (sesión actual)» by default with the server\'s
     await expect(picker).toContainText('Caja');
     await picker.locator(`[data-testid="widgets-add-${RECENT}"]`).click();
     await picker.locator('[data-testid="widgets-close"]').click();
-    const recent = panel(page, RECENT);
+    const recent = boardWidget(page, RECENT);
     await expect(recent.locator('[data-testid="widget-title"]')).toHaveText('Descuadres recientes');
     const closed = await closedSessions(context);
     expect(closed.length).toBeGreaterThanOrEqual(2);
@@ -241,9 +220,9 @@ test('CASH_REGISTER-F12: «Caja (sesión actual)» by default with the server\'s
 test('CASH_REGISTER-F12: an employee counts blind and never gets the expected cash panel, but reads the discrepancies', async ({ browser }) => {
   const { context, page } = await spanish(browser, { width: 1440, height: 900 }, { board: [EXPECTED, RECENT], who: EMPLOYEE });
   try {
-    await expect(panel(page, RECENT).locator('[data-testid="widget-title"]')).toHaveText('Descuadres recientes');
-    await expect(panel(page, RECENT)).toHaveAttribute('aria-busy', 'false');
-    await expect(panel(page, EXPECTED)).toHaveCount(0);
+    await expect(boardWidget(page, RECENT).locator('[data-testid="widget-title"]')).toHaveText('Descuadres recientes');
+    await expect(boardWidget(page, RECENT)).toHaveAttribute('aria-busy', 'false');
+    await expect(boardWidget(page, EXPECTED)).toHaveCount(0);
     await shown(page).locator('[data-testid="widgets-customize"]').click();
     const picker = page.locator('ion-modal[data-testid="widgets-picker"]:not(.overlay-hidden)');
     await expect(picker).toBeVisible();
@@ -267,12 +246,12 @@ for (const size of VIEWPORTS) {
 
       const format = await money(context);
       for (const key of [EXPECTED, RECENT]) {
-        await expect(panel(page, key)).toHaveAttribute('aria-busy', 'false');
-        await expect(panel(page, key).locator('[data-testid="widget-error"]')).toHaveCount(0);
+        await expect(boardWidget(page, key)).toHaveAttribute('aria-busy', 'false');
+        await expect(boardWidget(page, key).locator('[data-testid="widget-error"]')).toHaveCount(0);
       }
-      await expect(panel(page, EXPECTED).locator('[data-testid="widget-value"]')).toHaveText(format.format((await expectedNow(context)) / 100));
-      await expect(panel(page, RECENT).locator('[data-testid="widget-bar"]')).toHaveCount((await closedSessions(context)).length);
-      await panel(page, EXPECTED).evaluate((element) => element.scrollIntoView({ block: 'start' }));
+      await expect(boardWidget(page, EXPECTED).locator('[data-testid="widget-value"]')).toHaveText(format.format((await expectedNow(context)) / 100));
+      await expect(boardWidget(page, RECENT).locator('[data-testid="widget-bar"]')).toHaveCount((await closedSessions(context)).length);
+      await boardWidget(page, EXPECTED).evaluate((element) => element.scrollIntoView({ block: 'start' }));
       await untilStill(page);
       expect(await overflow(), `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
       await page.screenshot({ path: shot(`${KEY}-CASH_REGISTER-F12-${size.label}`) });

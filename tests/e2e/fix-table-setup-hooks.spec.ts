@@ -5,9 +5,10 @@
 // pending without a reload when that table is switched off. In each of the three sizes, a capture with the step
 // pending in sight. The tables the hub already had in use are switched
 // off for the run and back on after it; the run's own zones are «E2E Tsh …», deleted with their tables before and after.
-import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, psql, shot, shown, untilStill } from './helpers';
+import { A, api, psql, shown } from './helpers';
+import { setupStep } from './home-helpers';
 import { VIEWPORTS } from './inventory-helpers';
 import { liveStreamsSettled, RELEASE_WINDOW_MS, spanishOwner } from './live-streams';
 import { stamp } from './sale-helpers';
@@ -46,18 +47,8 @@ test.afterAll(() => {
   }
 });
 
-const card = (page: Page): Locator => shown(page).locator('[data-testid="setup-card"]');
-const step = (page: Page): Locator => card(page).locator(`[data-testid="setup-row"][data-key="${STEP}"]`);
-const pill = (page: Page): Locator => step(page).locator('[data-testid="setup-pill"]');
-const configure = (page: Page): Locator => step(page).locator(`[data-testid="setup-configure-${STEP}"]`);
+const { row: step, pill, configure, unfolded, inSight, backDone } = setupStep(STEP);
 
-/** «Ver todo»: a «Recomendado» step, or a done one, is folded while more important ones are pending. */
-async function unfolded(page: Page): Promise<void> {
-  await expect(card(page)).toHaveAttribute('aria-busy', 'false');
-  const toggle = card(page).locator('[data-testid="setup-toggle"]');
-  if ((await toggle.count()) && (await toggle.textContent())?.trim() === 'Ver todo') await toggle.click();
-  await expect(step(page)).toBeVisible();
-}
 
 /** A zone of this run (TABLE-F01 has its own e2e), by the API as the owner. */
 async function newZone(context: BrowserContext, name: string): Promise<string> {
@@ -100,11 +91,7 @@ test(`TABLE-F02: «Tus mesas» pending without tables, it leads to Tables, the f
     expect(tableId, 'the table was added in the zone of the run').toMatch(/^[0-9a-f-]{36}$/);
 
     // Back on the Home: done, with nothing left to configure.
-    await page.goBack();
-    await expect(page).toHaveURL(`${A}/`);
-    await unfolded(page);
-    await expect(pill(page)).toHaveText('Hecho');
-    await expect(configure(page)).toHaveCount(0);
+    await backDone(page);
 
     // Switched off, the room has no table in use: pending again without a reload, over the stream already open.
     await liveStreamsSettled(streams, TABLES_OPS);
@@ -130,13 +117,7 @@ for (const size of VIEWPORTS) {
   }) => {
     const { context, page, streams } = await spanishOwner(browser, { width: size.width, height: size.height });
     try {
-      await unfolded(page);
-      await expect(pill(page)).toHaveText('Recomendado');
-      await step(page).evaluate((element) => element.scrollIntoView({ block: 'center' }));
-      await untilStill(page);
-      const overflow = await horizontalOverflow(page);
-      expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
-      await page.screenshot({ path: shot(`${KEY}-${size.label}`) });
+      await inSight(page, 'Recomendado', { name: `${KEY}-${size.label}`, label: size.label });
 
       // A table in a zone of the run, added elsewhere (another device): the step is done over the stream already open.
       const zoneId = await newZone(context, `${TAG} ${stamp()} Terraza`);

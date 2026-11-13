@@ -11,7 +11,8 @@
 // for the run and put back after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, bellBadge, horizontalOverflow, login, openBell, psql, shot, shown, untilStill } from './helpers';
+import { A, api, badgeSays, capturedFitting, login, openBell, psql, shown } from './helpers';
+import { setupStep } from './home-helpers';
 import { liveStreamsSettled, spanishOwner } from './live-streams';
 import { FLOW_VIEWPORTS, forgetDevices } from './printing-helpers';
 import { stamp } from './sale-helpers';
@@ -91,24 +92,10 @@ async function setUpDevice(context: BrowserContext, device: string): Promise<str
 /** The operations Printing → Devices subscribes, which the Home does not. */
 const DEVICES_OPS = ['printing.device.list', 'printing.printer.list'];
 
-const card = (page: Page): Locator => shown(page).locator('[data-testid="setup-card"]');
-const step = (page: Page): Locator => card(page).locator(`[data-testid="setup-row"][data-key="${STEP}"]`);
-const pill = (page: Page): Locator => step(page).locator('[data-testid="setup-pill"]');
+const { row: step, pill, unfolded } = setupStep(STEP);
 const stalledRow = (page: Page): Locator =>
   page.locator('ion-popover [data-testid="hub-bell-row"]', { hasText: /^\s*Nadie está imprimiendo «Recibo» \(\d+\)\s*$/ });
 
-/** «Ver todo»: a «Recomendado» step is folded while more important ones are pending (two rows on a phone). */
-async function unfolded(page: Page): Promise<void> {
-  await expect(card(page)).toHaveAttribute('aria-busy', 'false');
-  const toggle = card(page).locator('[data-testid="setup-toggle"]');
-  if ((await toggle.count()) && (await toggle.textContent())?.trim() === 'Ver todo') await toggle.click();
-  await expect(step(page)).toBeVisible();
-}
-
-async function badgeSays(page: Page, total: number, options = {}): Promise<void> {
-  if (total > 0) await expect(bellBadge(page)).toHaveText(String(total), options);
-  else await expect(bellBadge(page)).toHaveCount(0, options);
-}
 
 FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
   test(`PRINTING-F01: «Configura la impresora» and «Nadie está imprimiendo «Recibo»» on the Home, live — ${label}`, async ({
@@ -160,10 +147,7 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
       await openBell(page);
       const row = stalledRow(page);
       await expect(row).toHaveText(`Nadie está imprimiendo «Recibo» (${before.stalled + 1})`);
-      await untilStill(page);
-      const overflow = await horizontalOverflow(page);
-      expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
-      await page.screenshot({ path: shot(`${KEY}-${label}`) });
+      await capturedFitting(page, `${KEY}-${label}`, label);
 
       // The row leads to the printers, where the receipts' card says why and where to fix it.
       await row.click();

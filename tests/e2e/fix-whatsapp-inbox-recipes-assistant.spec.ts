@@ -13,64 +13,27 @@
 // flow: WHATSAPP_INBOX-F15 WHATSAPP_INBOX-F17 WHATSAPP_INBOX-F24 FLOW-F33 FLOW-F12
 import { expect, test } from '@playwright/test';
 
-import { saasSql } from './assistant-real';
 import { A, api, capture, psql, shown } from './helpers';
 import { confirmDialog, parkedEvent, signedIn } from './flow-helpers';
+import { chats, relay } from './provider-helpers';
+import { madridDay, openTheBook } from './reservation-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
-import { answerSpec, chats, customerWrites, openTheBook, relay } from './whatsapp-answer-helpers';
-import { cleanUp as inboxCleanUp, e2ePhone, keepPhoto, restorePhoto } from './whatsapp-helpers';
+import { answerSpec, bookingCleanUp, customerWrites } from './whatsapp-answer-helpers';
+import { e2ePhone, keepPhoto, restorePhoto } from './whatsapp-helpers';
 
 const TASK = 'FIX-HUB-WHATSAPP-INBOX-RECIPES-USE-ASSISTANT-STEP';
 const ANSWER = 'whatsapp_inbox/reservation_from_whatsapp';
 const NOTICE = 'whatsapp_inbox/reservation_confirmed';
 const THANKS = 'Thanks for writing! Let me check the reservations book and I will come straight back to you.';
-/** How the book's slot and the open day this spec makes are known again (slots have no name). */
-const SENTINEL = 78;
-const OPEN_REASON = 'E2E WhatsApp table open';
-/** The business's day `days` from today (hub `a` is in Madrid) and its weekday, Monday 0. */
-function madridDay(days: number): { date: string; weekday: number } {
-  const date = new Date(Date.now() + days * 86_400_000).toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
-  return { date, weekday: (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7 };
-}
-
-const DAY = madridDay(3);
-
-/** The inbox's answers and notices (with their runs and questions), the reservations and cards their runs made, the
- *  book's slot and open day of this spec, the conversations and channel of the inbox's specs, and the month's
- *  messages of the business `a`: each size starts with the card off. */
-function cleanUp(): void {
-  const flows = "select id from flow_flow where recipe like 'whatsapp_inbox/%'";
-  const reservations = "select id from reservation_reservation where guest_phone like '+3469900%'";
-  const cards = "select id from customer_customer where source = 'whatsapp' and phone like '%69900%'";
-  psql(
-    [
-      `delete from flow_question where flow_id in (${flows})`,
-      `delete from flow_flowrun where flow_id in (${flows})`,
-      `delete from flow_flow where id in (${flows})`,
-      `delete from table_hold where source_ref in (select id::text from reservation_reservation where guest_phone like '+3469900%')`,
-      `delete from reservation_reservation where id in (${reservations})`,
-      `delete from reservation_timeslot where max_reservations = ${SENTINEL}`,
-      `delete from schedule_overrideinterval where override_id in (select id from schedule_override where reason = '${OPEN_REASON}')`,
-      `delete from schedule_override where reason = '${OPEN_REASON}'`,
-    ].join('; '),
-  );
-  inboxCleanUp();
-  psql(
-    [
-      ...['customer_activity', 'customer_consent', 'customer_customer_groups', 'customer_customer_tags', 'customer_customfieldvalue', 'customer_orderlink', 'customer_purchase'].map(
-        (table) => `delete from ${table} where customer_id in (${cards})`,
-      ),
-      `delete from customer_customer where id in (${cards})`,
-    ].join('; '),
-  );
-  saasSql("delete from assistant_assistantusage where hub_id = (select id from hubs_hub where slug = 'a')");
-}
+/** The day this spec books on, and how its slot and open day are known again (slots have no name). */
+const BOOK = { day: madridDay(3), sentinel: 78, reason: 'E2E WhatsApp table open' };
 
 const built = (ref: string): string =>
   psql(`select enabled::text || ' ' || (deleted_at is null)::text from flow_flow where recipe = '${ref}'`);
 
 test.beforeAll(keepPhoto);
-const provider = answerSpec(cleanUp);
+// Each size starts with the card off.
+const provider = answerSpec(() => bookingCleanUp(BOOK));
 test.afterAll(restorePhoto);
 
 for (const viewport of VIEWPORTS) {
@@ -78,7 +41,7 @@ for (const viewport of VIEWPORTS) {
     test.setTimeout(180_000);
     const { context, page } = await signedIn(browser, '/whatsapp_inbox/settings', viewport);
     try {
-      await openTheBook(context, DAY, SENTINEL, OPEN_REASON);
+      await openTheBook(context, BOOK);
 
       // F15: the card says what it does; on, after a question, with its notice.
       const card = shown(page).locator('[data-testid=whatsapp-inbox-autoreply-tables]');
@@ -124,7 +87,7 @@ for (const viewport of VIEWPORTS) {
       const booking = {
         guest_name: 'E2E Lucía',
         guest_phone: phone,
-        date: DAY.date,
+        date: BOOK.day.date,
         time: '21:00',
         party_size: 4,
         source: 'whatsapp',

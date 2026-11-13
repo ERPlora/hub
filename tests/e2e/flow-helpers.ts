@@ -3,7 +3,7 @@
 // automation (the screens under test build their own steps; the API only sets the stage).
 import { execFileSync } from 'node:child_process';
 
-import { type Browser, type BrowserContext, expect, type Page } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
 import { A, api, type Credentials, HUB_DIR, login, OWNER, psql, saveSessionForTheSweep, settledCapture, shown } from './helpers';
 import { OUTBOUND_AT_ONCE } from './whatsapp-helpers';
@@ -59,6 +59,19 @@ export async function askingFlow(context: BrowserContext, name: string, steps: u
   return id;
 }
 
+/** The owner signed in on `path` of Automations at `viewport`, with a name for what the test creates
+ *  (`<tag> <size> <stamp>`) and its stamp. */
+export async function ownerOnAutomations(
+  browser: Browser,
+  viewport: { label: string; width: number; height: number },
+  tag: string,
+  path = '/flow/automations',
+): Promise<{ context: BrowserContext; page: Page; name: string; stamp: string }> {
+  const stamp = Date.now().toString(36);
+  const { context, page } = await signedIn(browser, path, viewport);
+  return { context, page, name: `${tag} ${viewport.label} ${stamp}`, stamp };
+}
+
 /** Runs `body` as the owner on Automations at `viewport`, with a name for what it creates (`<tag> <size> <stamp>`),
  *  and closes its context after, whatever happens. */
 export async function onAutomations(
@@ -67,8 +80,7 @@ export async function onAutomations(
   tag: string,
   body: (stage: { context: BrowserContext; page: Page; name: string }) => Promise<void>,
 ): Promise<void> {
-  const name = `${tag} ${viewport.label} ${Date.now().toString(36)}`;
-  const { context, page } = await signedIn(browser, '/flow/automations', viewport);
+  const { context, page, name } = await ownerOnAutomations(browser, viewport, tag);
   try {
     await body({ context, page, name });
   } finally {
@@ -118,6 +130,39 @@ export async function addToANewCart(context: BrowserContext, prefix: string): Pr
   expect(cart.status, JSON.stringify(cart.data)).toBe(201);
   const line = { session_token: session, product_ref: 'p-1', product_name: 'Champú', quantity: '2', unit_price: 1250 };
   return { id: 's1', kind: 'command', operation: 'cart_checkout.item.add', params: line };
+}
+
+/** On the editor of a saved automation: everything its steps need granted at once, then switched on and saved. */
+export async function grantAllAndSwitchOn(page: Page): Promise<void> {
+  await shown(page).locator('[data-testid=flow-editor-tab-permissions]').click();
+  await shown(page).locator('[data-testid=flow-perm-grantall]').click();
+  await expect(page.locator('ion-toast').filter({ hasText: 'Permissions updated.' }).last()).toBeVisible();
+  await shown(page).locator('[data-testid=flow-editor-enabled]').click();
+  await shown(page).locator('[data-testid=flow-editor-save]').click();
+  await expect(shown(page).locator('[data-testid=flow-editor-notice]')).toHaveText('Saved.');
+}
+
+/** The new automation saved from its editor, then granted everything its steps need, switched on and saved: its id. */
+export async function saveGrantAndSwitchOn(page: Page): Promise<string> {
+  await shown(page).locator('[data-testid=flow-editor-save]').click();
+  await page.waitForURL(/\/flow\/automations\/[0-9a-f-]+$/);
+  const flowId = idFromUrl(page);
+  await grantAllAndSwitchOn(page);
+  return flowId;
+}
+
+/** «Run now» from the editor of an automation whose step asks the assistant, confirmed. */
+export async function runNowAsksTheAssistant(page: Page): Promise<void> {
+  await shown(page).locator('[data-testid=flow-editor-run]').click();
+  await confirmDialog(page, 'Run it now?');
+  await expect(page.locator('ion-toast').filter({ hasText: 'the assistant is on it' }).last()).toBeVisible();
+}
+
+/** The owner's yes to `question`, a card of «Waiting for your answer»: the automation carries on and the card leaves. */
+export async function approve(page: Page, question: Locator): Promise<void> {
+  await question.locator('[data-testid^=flow-question-yes-]').click();
+  await expect(page.locator('ion-toast').filter({ hasText: 'Approved: the automation carries on.' }).last()).toBeVisible();
+  await expect(question).toHaveCount(0);
 }
 
 /** On Automations, the question of the automation `name` says `said` in «Waiting for your answer»: captured as `shot`

@@ -5,9 +5,10 @@
 // and, with the default week back, «Hecho» again without a reload when a day of it is saved elsewhere. In each of the
 // three sizes, a capture with the step pending in sight. The week and the settings
 // the hub had before the file are put back after it (`afterAll`).
-import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { A, api, capture, horizontalOverflow, login, psql, shown } from './helpers';
+import { A, api, capture, horizontalOverflow, psql, shown } from './helpers';
+import { setupStep, spanishOwnerOnTheSetupCard as spanishOwner, streamsQuiet as settled } from './home-helpers';
 import { DEFAULT_WEEK, restoreWeek, snapshotWeek, VIEWPORTS, weekReady } from './schedule-helpers';
 
 test.describe.configure({ mode: 'serial' });
@@ -26,48 +27,7 @@ test.afterAll(() => {
   restoreWeek(before);
 });
 
-/**
- * The owner on `a` in Spanish (the Hub's language cookie, as the sign-in sets it from the account), on the Home, with
- * the instant of every `/api/live` the page opens: a new stream brings every result again, so a step that changes
- * without one came over the stream already open, re-run by its events.
- */
-async function spanishOwner(
-  browser: Browser,
-  viewport: { width: number; height: number },
-): Promise<{ context: BrowserContext; page: Page; streams: number[] }> {
-  const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
-  const page = await context.newPage();
-  const streams: number[] = [];
-  page.on('request', (request) => {
-    if (request.url().includes('/api/live')) streams.push(Date.now());
-  });
-  await login(page, A, '/');
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.goto(`${A}/`);
-  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-  await expect(card(page)).toHaveAttribute('aria-busy', 'false');
-  // The owner's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
-  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-  return { context, page, streams };
-}
-
-/** Waits until the page has opened no `/api/live` for a second: every subscription of the screen is declared. */
-async function settled(streams: number[]): Promise<void> {
-  await expect.poll(() => Date.now() - (streams.at(-1) ?? 0), { timeout: 15_000 }).toBeGreaterThan(1_000);
-}
-
-const card = (page: Page): Locator => shown(page).locator('[data-testid="setup-card"]');
-const step = (page: Page): Locator => card(page).locator(`[data-testid="setup-row"][data-key="${STEP}"]`);
-const pill = (page: Page): Locator => step(page).locator('[data-testid="setup-pill"]');
-const configure = (page: Page): Locator => step(page).locator(`[data-testid="setup-configure-${STEP}"]`);
-
-/** «Ver todo»: a «Recomendado» step, or a done one, is folded while more important ones are pending. */
-async function unfolded(page: Page): Promise<void> {
-  await expect(card(page)).toHaveAttribute('aria-busy', 'false');
-  const toggle = card(page).locator('[data-testid="setup-toggle"]');
-  if ((await toggle.count()) && (await toggle.textContent())?.trim() === 'Ver todo') await toggle.click();
-  await expect(step(page)).toBeVisible();
-}
+const { row: step, pill, configure, unfolded, inSight, backDone } = setupStep(STEP);
 
 /** Saves a day of the week by the API as the owner (SCHEDULE-F02 has its own e2e): Tuesday from 10:00 to 20:00. */
 async function saveADay(context: BrowserContext): Promise<void> {
@@ -106,11 +66,7 @@ test(`SCHEDULE-F03: «Confirma tu horario» pending with the default week, it le
     expect(psql('select hours_confirmed from schedule_schedulesettings'), 'the week was confirmed').toBe('t');
 
     // Back on the Home: done, with nothing left to configure.
-    await page.goBack();
-    await expect(page).toHaveURL(`${A}/`);
-    await unfolded(page);
-    await expect(pill(page)).toHaveText('Hecho');
-    await expect(configure(page)).toHaveCount(0);
+    await backDone(page);
 
     // The default week back (by the database's own hand, no notice): pending once the Home is read again.
     psql(DEFAULT_WEEK);
@@ -138,9 +94,7 @@ for (const size of VIEWPORTS) {
     psql(DEFAULT_WEEK);
     const { context, page, streams } = await spanishOwner(browser, { width: size.width, height: size.height });
     try {
-      await unfolded(page);
-      await expect(pill(page)).toHaveText('Recomendado');
-      await step(page).evaluate((element) => element.scrollIntoView({ block: 'center' }));
+      await inSight(page, 'Recomendado');
       expect(await horizontalOverflow(page), `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
       await capture(page, `${KEY}-${size.label}`);
 
