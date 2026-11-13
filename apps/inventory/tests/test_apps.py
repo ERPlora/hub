@@ -108,9 +108,9 @@ def test_every_operation_is_a_tool_of_the_assistant():
     # permission is its only door. A command says its risk; a read has none.
     operations = [op for name, op in registry.items() if name.startswith("inventory.")]
     # 31 + the product's image (INVENTORY-F30, F31): set_image, upload_image, suggest_image; + the category the
-    # assistant's card names; + the restore of a deleted product and the recovery of a deleted category, the
-    # platform's alone (INVENTORY-F34, INVENTORY-F07).
-    assert len(operations) == 37
+    # assistant's card names; + the restore of a deleted product, the recovery of a deleted category and of a product
+    # no longer held, the platform's alone (INVENTORY-F34, INVENTORY-F07, BASE-F114).
+    assert len(operations) == 38
     for op in operations:
         if op.name in CARD_ONLY:
             assert op.ai is INTERNAL and op.expose_api is False, op.name

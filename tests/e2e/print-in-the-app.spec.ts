@@ -11,6 +11,7 @@ import { A, api, capture, login, psql, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, numberRow, restoreDrawer, stamp } from './sale-helpers';
+import { rowAction } from './service-helpers';
 
 const RUN = stamp();
 let coffee: Product;
@@ -119,12 +120,7 @@ test('SALE-F29: «Print» on a sale\'s document opens the app\'s print screen wi
   await page.goto(`${A}/sale/sales`);
   const row = shown(page).locator(`[data-testid=sales-table-row][data-id="${sale.id}"]`).first();
   await expect(row).toBeVisible();
-  const inline = shown(page).locator(`[data-testid=sales-table-row-${sale.id}-document]`);
-  if ((await inline.count()) > 0 && (await inline.first().isVisible())) await inline.first().click();
-  else {
-    await shown(page).locator(`[data-testid=sales-table-row-${sale.id}-menu]`).first().click();
-    await page.locator(`ion-popover [data-testid=sales-table-row-${sale.id}-document]`).click();
-  }
+  await rowAction(page, 'sales-table', sale.id, 'document');
   const modal = page.locator('[data-testid=sale-document-modal]');
   await expect(modal.locator('[data-testid=sale-document-print]')).toBeEnabled();
   await modal.locator('[data-testid=sale-document-print]').click();
