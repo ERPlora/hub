@@ -762,6 +762,10 @@ msgid "not brought back"
 msgstr "sin recuperar"
 
 msgctxt "recovery"
+msgid "notes"
+msgstr "notas"
+
+msgctxt "recovery"
 msgid "%(what)s: nothing (%(why)s)"
 msgstr "%(what)s: nada (%(why)s)"
 
@@ -782,6 +786,12 @@ msgid_plural "%(count)d not created"
 msgstr[0] "%(count)d sin crear"
 msgstr[1] "%(count)d sin crear"
 msgstr[2] "%(count)d sin crear"
+
+msgid "%(count)d with notes"
+msgid_plural "%(count)d with notes"
+msgstr[0] "%(count)d con notas"
+msgstr[1] "%(count)d con notas"
+msgstr[2] "%(count)d con notas"
 
 msgctxt "recovery"
 msgid "%(what)s: %(counts)s"

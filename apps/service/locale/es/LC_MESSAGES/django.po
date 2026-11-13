@@ -466,6 +466,14 @@ msgstr "No puedes quitar más sesiones de las que le quedan al cliente."
 msgid "That customer's card does not exist in this business."
 msgstr "Esa ficha de cliente no existe en este negocio."
 
+#, python-format
+msgid "came back without the professional %(member)s: terminated in Staff"
+msgstr "volvió sin el profesional %(member)s: dado de baja en Personal"
+
+#, python-format
+msgid "came back without the professional %(member)s: no longer in Staff"
+msgstr "volvió sin el profesional %(member)s: ya no está en Personal"
+
 msgid "This voucher was voided: it can no longer be used."
 msgstr "Este bono está anulado: ya no se puede usar."
 

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import psycopg
+from ninja import Field, Schema
 
 #: The hook of a ``LiveAppConfig`` that says what the app gives back from a separate copy.
 HOOK = "recoverable_from_copy"
@@ -61,3 +62,22 @@ class Recoverable:
     def __post_init__(self) -> None:
         if (self.deleted is None) != (not self.restore):
             raise ValueError("A Recoverable restores what it reads deleted: deleted and restore come together.")
+
+
+class LeftOut(Schema):
+    """One thing a record came back without, and why: ``code`` (``<app>.<why>``) and ``message``, said in the language
+    the operation runs in, which a recovery sets to the staff's."""
+
+    code: str
+    message: str
+
+
+class RecoveredOut(Schema):
+    """Mixed into the output of an operation a recovery runs (a ``Recoverable``'s ``create`` or ``restore``) whose
+    record may come back without something that hung from it in the copy (a professional who has left since): the
+    recovery notes each by the record's id in the copy, as it notes why one did not come back at all. An output without
+    it notes nothing."""
+
+    left_out: list[LeftOut] = Field(
+        default_factory=list, description="What the record came back without, each with why."
+    )

@@ -530,11 +530,13 @@ class CopyRecovery(AskedOfTheWorker):
     declares it gives back (its ``label``, as the code writes it; absent from a result noted before each was counted
     apart, which is the app's whole, and from that of an app that declares nothing), how many were restored (absent
     from a result noted before that count existed), created and not, with why (``reasons``, the first
-    :data:`REASONS_KEPT`, by the copy's id: no personal data), or why it gave nothing back (``refused``). The
-    worker holds the row's own lease (``lease_owner``, ``lease_until``) while it recovers, never the hub's: the
-    business's own work does not wait for it."""
+    :data:`REASONS_KEPT`, by the copy's id: no personal data), how many came back without something that hung from
+    them and what (``noted`` and ``notes``, the same way; both absent while none did), or why it gave nothing back
+    (``refused``). The worker holds the row's own lease (``lease_owner``, ``lease_until``) while it recovers, never
+    the hub's: the business's own work does not wait for it."""
 
-    #: How many records a recovery notes the reason of, result by result, when its operation refuses them.
+    #: How many reasons a recovery keeps, result by result, of the records its operation refuses, and how many notes of
+    #: what the records it brought back came back without.
     REASONS_KEPT = 50
 
     class Status(models.TextChoices):

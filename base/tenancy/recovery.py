@@ -25,8 +25,9 @@ the business stays open and its own work goes on.
    for all (the app turned off, the business busy) ends that app's part with why (``refused``), and the next app goes
    on.
 3. **Noted**: control notes the recovery done with what each thing each app declares gave back, apart and under its
-   name, or failed with why (``recover_<step>: <why>``). A worker whose lease ran out leaves it to whoever holds it now, who reads the copy
-   anew: what was created is not lacking any more, so nothing is made twice.
+   name, with what a record came back without when its operation says so (``base.recovery.RecoveredOut``), or failed
+   with why (``recover_<step>: <why>``). A worker whose lease ran out leaves it to whoever holds it now, who reads the
+   copy anew: what was created is not lacking any more, so nothing is made twice.
 
 What each app gives back is its own to say, by a hook of its ``LiveAppConfig`` (``base.recovery.HOOK``, as
 ``fiscal_record_states`` says what a restore compares): ``recoverable_from_copy()`` answers a list of
@@ -49,7 +50,7 @@ from live.meta import all_live_app_configs
 from live.operations import get as get_operation
 
 from base import activation, registry, services
-from base.recovery import HOOK, Recoverable, actor_of
+from base.recovery import HOOK, LeftOut, Recoverable, RecoveredOut, actor_of
 from base.tenancy import migrator, move, ops
 from base.tenancy.context import use_hub
 from control import services as control_services
@@ -243,12 +244,13 @@ def _result(app: str, refused: str, named=None) -> dict:
 
 
 def _each(ctx, op, records: list[dict], payload, counted: str, result: dict, ours: Callable[[], None]) -> bool:
-    """``op`` run on each of ``records``, its input ``payload(record)``, counted in ``result[counted]``; ``False`` once it
-    refuses them all (``refused``), and the app's part ends."""
+    """``op`` run on each of ``records``, its input ``payload(record)``, counted in ``result[counted]``, with what its
+    output says the record came back without; ``False`` once it refuses them all (``refused``), and the app's part
+    ends."""
     for record in records:
         ours()
         try:
-            op(ctx, op.input.model_validate(payload(record)))
+            done = op(ctx, op.input.model_validate(payload(record)))
         except pydantic.ValidationError as invalid:
             _not_created(result, record, f"invalid_payload: {_first_error(invalid)}")
         except (InvalidPayload, NotFound, Conflict) as refused_one:
@@ -259,6 +261,8 @@ def _each(ctx, op, records: list[dict], payload, counted: str, result: dict, our
             return False
         else:
             result[counted] += 1
+            if isinstance(done, RecoveredOut) and done.left_out:
+                _noted(result, record, done.left_out)
     return True
 
 
@@ -276,6 +280,15 @@ def _not_created(result: dict, record: dict, reason: str) -> None:
     result["not_created"] += 1
     if len(result["reasons"]) < CopyRecovery.REASONS_KEPT:
         result["reasons"].append({"id": str(record["id"]), "reason": reason})
+
+
+def _noted(result: dict, record: dict, left_out: list[LeftOut]) -> None:
+    """``record`` came back without what ``left_out`` says: counted once (``noted``) and each said with why
+    (``notes``), the first :data:`CopyRecovery.REASONS_KEPT` of the result, by its id in the copy."""
+    result["noted"] = result.get("noted", 0) + 1
+    notes = result.setdefault("notes", [])
+    for one in left_out[: CopyRecovery.REASONS_KEPT - len(notes)]:
+        notes.append({"id": str(record["id"]), "note": f"{one.code}: {one.message}"})
 
 
 def _first_error(invalid: pydantic.ValidationError) -> str:

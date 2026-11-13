@@ -100,6 +100,7 @@ from apps.service.schemas import (
     ServiceImageUploadIn,
     ServiceOut,
     ServicePatchIn,
+    ServiceRecoveredOut,
     ServiceRecoverIn,
     ServiceRefIn,
     ServicesOut,
@@ -118,6 +119,7 @@ from apps.tax.models import TaxCategory
 from apps.tax.queries import held_categories
 from base import images
 from base.operations import call
+from base.recovery import LeftOut
 
 TAX_REQUIRED = _("Pick a tax category: without one the service cannot be charged.")
 TAX_UNKNOWN = _("That tax category does not exist in Taxes or is deactivated.")
@@ -142,6 +144,9 @@ GRANT_UNLIMITED = _(
 GRANT_NO_EXPIRY = _("That voucher never expires: there is no expiry to extend.")
 GRANT_BELOW_USED = _("You cannot take away more sessions than the customer has left.")
 CUSTOMER_UNAVAILABLE = _("That customer's card does not exist in this business.")
+#: Who a service made again from a separate copy came back without, said by their id (``service.service.recover``).
+MEMBER_TERMINATED_LEFT = _("came back without the professional %(member)s: terminated in Staff")
+MEMBER_GONE_LEFT = _("came back without the professional %(member)s: no longer in Staff")
 #: Why a session cannot be spent (queries.redeem_refusal) → its code and its message.
 REDEEM_REFUSALS = {
     "voided": (
@@ -1030,19 +1035,20 @@ def release_member(ctx: OperationContext, data: MemberReleaseIn) -> dict:
     repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=SYSTEM,
     input=ServiceRecoverIn,
-    output=ServiceOut,
+    output=ServiceRecoveredOut,
     ai=INTERNAL,
 )
 def recover_service(ctx: OperationContext, data: ServiceRecoverIn) -> dict:
     """A service of a separate copy the business no longer has, made again with who performed it there, all
     or nothing, each by the operation its screen uses: the service by ``service.service.create``; each professional the
     business still has by ``service.assignment.assign`` (SERVICE-F31), with their own minutes and price. One who left
-    (terminated) or whom the business no longer has is not assigned: Staff no longer books them. It is their main
-    service only if the business gave them none since (the business's choice stays), and it comes back switched off,
-    by ``service.assignment.update``, if it was."""
+    (terminated) or whom the business no longer has is not assigned: Staff no longer books them, and the output says it
+    came back without them, and why (``left_out``). It is their main service only if the business gave them none since
+    (the business's choice stays), and it comes back switched off, by ``service.assignment.update``, if it was."""
     made = create_service(ctx, ServiceIn.model_validate(data.model_dump(include=set(ServiceIn.model_fields))))
     asked = [one.member_id for one in data.assignments]
     staying = set(live_members().filter(pk__in=asked).values_list("pk", flat=True))
+    known = set(Member.objects.filter(pk__in=asked).values_list("pk", flat=True))
     with_main = set(
         Assignment.objects.filter(member_id__in=asked, is_primary=True).values_list("member_id", flat=True)
     )
@@ -1059,7 +1065,14 @@ def recover_service(ctx: OperationContext, data: ServiceRecoverIn) -> dict:
         )
         if not one.is_active:
             update_assignment(ctx, AssignmentPatchIn(id=assigned.id, is_active=False))
-    return load_service(made.id, ctx.scope)
+    left_out = [
+        LeftOut(code="service.member_terminated", message=MEMBER_TERMINATED_LEFT % {"member": member})
+        if member in known
+        else LeftOut(code="service.member_not_in_business", message=MEMBER_GONE_LEFT % {"member": member})
+        for member in asked
+        if member not in staying
+    ]
+    return load_service(made.id, ctx.scope) | {"left_out": left_out}
 
 
 # ── Packages (SERVICE-F12, F13) ───────────────────────────────────────────────────────────────
