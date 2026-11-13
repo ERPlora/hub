@@ -4,7 +4,7 @@
 // them), creates one from «New group» (F02; a taken name is refused under Name), edits it (F03; a maximum below its
 // defaults is refused under Maximum) and deletes it after a confirmation that says what goes with it, adds, edits and
 // deletes the options of its sheet (F04: a supplement, a discount with the ± key, a soft drink with its own tax
-// category), and applies it to a product found by its SKU and to a category, then stops applying it (F05). Each screen
+// category; one default too many is refused under «Chosen by default» until it is switched off), and applies it to a product found by its SKU and to a category, then stops applying it (F05). Each screen
 // in 390×844, 834×1112 and 1440×900. Its data are named `E2E Mod …` / `E2E-MOD-…`
 // and `afterAll` deletes exactly them.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
@@ -333,6 +333,41 @@ test('MODIFIER-F04: the sheet adds, edits and deletes the options with their sup
   await page.locator('[data-testid=modifier-sheet-option-delete-submit]').click();
   await expect(optionRows).toHaveCount(2);
   await expect(optionRows.filter({ hasText: 'Soda' })).toHaveCount(0);
+});
+
+test('MODIFIER-F04: one default too many is refused under «Chosen by default», and switching it off takes the refusal away', async ({ page, context }) => {
+  await login(page, A, '/modifier/groups');
+  const group = await makeGroup(context, { name: named('Dips'), max_choices: 2 }, [
+    { name: 'Ketchup', is_default: true },
+    { name: 'Mayo', is_default: true },
+  ]);
+  await openGroups(page);
+  await groupRow(page, group.id).locator('[role=cell]').first().click();
+  await expect(sheet(page)).toBeVisible();
+  const optionForm = dialog(page, 'modifier-option-form');
+  const isDefault = optionForm.locator('[data-testid=modifier-option-form-is_default]');
+  const refused = optionForm.locator('[data-testid=modifier-option-form-is_default-error]');
+
+  await sheet(page).locator('[data-testid=modifier-sheet-options-add]').click();
+  await expect(optionForm).toBeVisible();
+  await fill(optionForm, 'modifier-option-form-name', 'Mustard');
+  await isDefault.click();
+  await optionForm.locator('[data-testid=modifier-option-form-submit]').click();
+  await expect(refused).toHaveText('This group has more options chosen by default than its maximum.');
+  await shoot(page, 'MODIFIER-F04-too-many-defaults', () => expect(refused).toBeVisible());
+
+  // Switched off, the refusal goes at once, before saving again.
+  await isDefault.click();
+  await expect(refused).toHaveCount(0);
+  await shoot(page, 'MODIFIER-F04-default-switched-off', () => expect(refused).toHaveCount(0));
+  await optionForm.locator('[data-testid=modifier-option-form-submit]').click();
+  await expect(optionForm).toBeHidden();
+  const options = await api<{ rows: { name: string; is_default: boolean }[] }>(context, A, 'GET', `/modifier/options?group_id=${group.id}`);
+  expect(options.data.rows.map((row) => [row.name, row.is_default]).sort()).toEqual([
+    ['Ketchup', true],
+    ['Mayo', true],
+    ['Mustard', false],
+  ]);
 });
 
 test('MODIFIER-F05: the group is applied to a product by its SKU and to a category, and stops applying', async ({ page, context }) => {
