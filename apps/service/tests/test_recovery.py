@@ -689,12 +689,19 @@ def created_events(hub, name: str = "service.service.created") -> int:
         return OutboxEvent.objects.filter(name=name).count()
 
 
-def recovered(recoveries, copy) -> dict:
-    """Services asked back from ``copy`` and the worker's pass run: what the app gave back."""
+CATEGORIES = {
+    "app": "service", "label": "Service categories", "restored": 0, "created": 0, "not_created": 0, "reasons": [],
+    "refused": "",
+}
+SERVICES = CATEGORIES | {"label": "Services"}
+
+
+def recovered(recoveries, copy) -> list[dict]:
+    """Services asked back from ``copy`` and the worker's pass run: what it gave back, its categories then its
+    services, each counted apart."""
     row = recoveries.ask(copy, "service")
     assert run() == 1
-    [result] = fresh(row).results
-    return result
+    return fresh(row).results
 
 
 def live_categories(hub) -> list[tuple]:
@@ -744,12 +751,9 @@ class TestServicesComeBack:
         assert run() == 1
 
         row = fresh(row)
-        [result] = row.results
         assert row.status == "done"
-        # The category the business deleted and the two services: one result, the app's.
-        assert (result["app"], result["created"], result["not_created"], result["reasons"], result["refused"]) == (
-            "service", 3, 0, [], ""
-        )
+        # The category the business deleted, then the two services: each counted apart, under its own name.
+        assert row.results == [CATEGORIES | {"created": 1}, SERVICES | {"created": 2}]
         # The category back first, by Categories' create, as the copy had it; the deleted one stays deleted.
         assert live_categories(hub) == [("Color", None, "#cc0066", 4), ("Hair", None, "", 0)]
         assert created_events(hub, "service.category.created") == categories_before + 1
@@ -777,9 +781,7 @@ class TestServicesComeBack:
         run_in(hub, "service.service.archive", id=ids["cut"])
         before = created_events(hub)
 
-        result = recovered(recoveries, copy)
-
-        assert (result["created"], result["not_created"], result["refused"]) == (0, 0, "")
+        assert recovered(recoveries, copy) == [CATEGORIES, SERVICES]
         assert created_events(hub) == before
         # The one archived since stays archived: SERVICE-F05 restores it.
         assert [(one[0], one[-1]) for one in offered_services(hub)] == [
@@ -803,8 +805,7 @@ class TestServicesComeBack:
 
         first, again = recovered(recoveries, copy), recovered(recoveries, copy)
 
-        assert (first["created"], first["not_created"], first["refused"]) == (3, 0, "")
-        assert (again["created"], again["not_created"], again["refused"]) == (0, 0, "")
+        assert (first, again) == ([CATEGORIES | {"created": 2}, SERVICES | {"created": 1}], [CATEGORIES, SERVICES])
         assert live_categories(hub) == [("Color", None, "#cc0066", 4), ("Hair", None, "", 0), ("Toning", "Color", "", 0)]
         assert [(one[0], one[3]) for one in offered_services(hub) if one[0] == "Highlights"] == [("Highlights", "Toning")]
 
@@ -818,10 +819,8 @@ class TestServicesComeBack:
         # Made again by hand since, with another colour: the business's stays as it is.
         again = run_in(hub, "service.category.create", name="COLOR", color="#112233").id
 
-        result = recovered(recoveries, copy)
-
         # Only the service: the category is the business's already.
-        assert (result["created"], result["not_created"], result["reasons"], result["refused"]) == (1, 0, [], "")
+        assert recovered(recoveries, copy) == [CATEGORIES, SERVICES | {"created": 1}]
         assert live_categories(hub) == [("COLOR", None, "#112233", 0), ("Hair", None, "", 0)]
         with use_hub(hub):
             assert Service.objects.get(name="Highlights").category_id == again
@@ -848,8 +847,7 @@ class TestServicesComeBack:
         again = recovered(recoveries, copy)
 
         # One service made again, its professionals with it.
-        assert (first["created"], first["not_created"], first["reasons"], first["refused"]) == (1, 0, [], "")
-        assert (again["created"], again["not_created"], again["refused"]) == (0, 0, "")
+        assert (first, again) == ([CATEGORIES, SERVICES | {"created": 1}], [CATEGORIES, SERVICES])
         with use_hub(hub):
             back = Service.objects.get(name="Keratin treatment")
             assert back.pk != ids["keratin"]
@@ -867,7 +865,8 @@ class TestServicesComeBack:
 
         assert run() == 1
 
-        [result] = fresh(row).results
-        assert (result["created"], result["not_created"], result["refused"]) == (0, 2, "")
+        [categories, result] = fresh(row).results
+        assert categories == CATEGORIES
+        assert (result["label"], result["created"], result["not_created"], result["refused"]) == ("Services", 0, 2, "")
         assert {one["id"] for one in result["reasons"]} == {str(ids["cut"]), str(ids["keratin"])}
         assert all(one["reason"].startswith("service.tax_category_unknown: ") for one in result["reasons"])

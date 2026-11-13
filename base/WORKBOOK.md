@@ -3108,8 +3108,8 @@ Pasos:
   10. Sale «1 copia aparte devolverá Clientes, Categorías de productos, Productos, Enlaces de productos a categorías,
       Categorías de servicios, Servicios, Citas a su negocio en unos minutos: Recuperaciones dice cómo fue.». En
       Recuperaciones la ve «Pedida» con la copia, qué se pidió y cuándo.
-  11. Unos minutos después dice «Hecha» y qué volvió: «Clientes: se restauró 1, se crearon 2» o «Clientes: se crearon 2,
-      1 sin crear». Su ficha dice además cuáles no volvieron y por qué (por su identificador en la copia, sin datos
+  11. Unos minutos después dice «Hecha» y qué volvió, cada cosa aparte y con su nombre: «Clientes: se restauró 1, se
+      crearon 2» o «Clientes: se crearon 2, 1 sin crear». Su ficha dice además cuáles no volvieron y por qué (por su identificador en la copia, sin datos
       personales). Un cliente que el negocio eliminó y aún guarda vuelve LA MISMA ficha, con sus compras y lo gastado, sus
       consentimientos, notas y actividad, sus grupos, etiquetas y campos propios y sus pedidos enlazados (CUSTOMER-F33).
       Uno que el negocio ya no tiene vuelve como ficha nueva, creada como la crea la pantalla de Clientes, con su nombre,
@@ -3118,9 +3118,9 @@ Pasos:
       vuelve a crear como estaba (hub#1285); un valor de un campo que el negocio desactivó no vuelve. A una ficha
       eliminada que vuelve no le vuelve el grupo, la etiqueta o el campo que el negocio borró después (hub#1356). Nunca
       vuelve una ficha cuyos datos personales se borraron (RGPD) ni una que se unió a otra, ni se repite una que el
-      negocio ya volvió a crear (el mismo nombre, teléfono y email). Con Productos, «Categorías de productos,
-      Productos, Enlaces de productos a categorías: se restauró 1, se crearon 3» (las categorías, los productos y los
-      enlaces que volvieron, juntos, hub#1355): primero vuelve
+      negocio ya volvió a crear (el mismo nombre, teléfono y email). Con Productos, «Categorías de productos: se
+      creó 1; Productos: se restauró 1, se creó 1; Enlaces de productos a categorías: se creó 1» (las categorías, los
+      productos y los enlaces que volvieron, cada uno con su cuenta): primero vuelve
       cada categoría de productos que el negocio ya no tiene (la eliminó o la perdió), como una nueva, creada como la
       crea la pantalla de Categorías, con su nombre, slug, descripción, icono, color, orden y categoría fiscal; la
       eliminada sigue eliminada (INVENTORY-F07). Una que el negocio conserva, aunque la renombrara, es la misma, y una
@@ -3138,7 +3138,8 @@ Pasos:
       recuperación toca de lo que el negocio tiene, y se cuenta aparte, como «Enlaces de productos a categorías». Una
       categoría que el negocio conserva (aunque le quitara productos) o que volvió a crear a mano no se rellena. Con
       Servicios,
-      «Categorías de servicios, Servicios: se crearon 3» (las categorías y los servicios que volvieron, juntos): primero
+      «Categorías de servicios: se creó 1; Servicios: se crearon 2» (las categorías y los servicios que volvieron, cada uno
+      con su cuenta): primero
       vuelve cada categoría de servicios que el negocio ya no tiene (la eliminó o la perdió), como una nueva, creada como
       la crea la pantalla de Categorías, con su nombre, descripción, icono, color y orden, dentro de su categoría padre si
       el negocio la tiene o vuelve también (si no, en la raíz); la eliminada sigue eliminada. Una que el negocio ya volvió
@@ -3207,7 +3208,8 @@ la restauración y lo que no admite lo dice el aviso igual; si falla al hacerla,
 por qué («restore_aside_<paso>: …»); el negocio no se entera. Recuperar solo se puede desde una copia hecha y una sola
 vez a la vez por copia; si no, el aviso lo dice («Solo una copia aparte ya hecha devuelve algo.»), y sin nada marcado la
 página lo vuelve a pedir. Lo que no se puede traer de una app lo dice su resultado y lo demás sigue: la app está apagada en
-el negocio («Clientes: nada (app_inactive: …)»), o la copia no la tenía, le falta la migración que su lectura necesita o
+el negocio («Clientes: nada (app_inactive: …)»; en una app que devuelve varias cosas, cada una lo dice: «Categorías de
+servicios: nada (app_inactive: …); Servicios: nada (app_inactive: …)»), o la copia no la tenía, le falta la migración que su lectura necesita o
 tiene una que este código no conoce (`recover_not_in_copy`, `recover_copy_behind`, `recover_copy_ahead`). Lo que la
 operación de crear no acepta hoy (un teléfono que ya no vale, un valor de un campo propio que su campo ya no admite, un producto sin categoría fiscal o con una que Impuestos
 ya no tiene activa, un servicio cuya categoría fiscal se desactivó (`service.tax_category_unknown`), una hora ocupada,
@@ -3223,7 +3225,7 @@ CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F
 INVENTORY-F07, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08, SERVICE-F31,
 APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282,
 hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327,
-hub#1341, hub#1356, hub#1365, hub#1373, hub#1375, aws#77
+hub#1341, hub#1355, hub#1356, hub#1365, hub#1373, hub#1375, aws#77
 
 ## Para quien lo mantiene
 

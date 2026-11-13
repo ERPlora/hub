@@ -15,13 +15,14 @@
 // the first product, the products' category, the service's category and the appointment are deleted in `a`, the second
 // card, the tag and the service are gone from it; then Separate copies › tick the copy › «Recover into the business…» ›
 // Customers, Products, Services and Appointments ticked (with whatever else answers) › «Recover»; the worker's pass
-// brings them back; Recoveries says «Customers: 1 restored, 1 created», «Product categories, Products, Product links to
-// categories: 1 restored, 2 created» (the category and the kept product's link), «Services: 2 created» (the category
-// and the service) and «Appointments: 1 restored», and `a` has the same card live again in its group, the second one
-// again in that group with its tag and its value, the same product live again in its category back under a new id, the
-// kept product in it again, the same appointment (its number, its history ending in «restored») live again, and the
-// service category and the service live again under new ids, the service in that category and performed by that
-// professional again; in its Agenda, the appointment's «History» ends in «Restored» (APPOINTMENT-F10).
+// brings them back; Recoveries says how each thing came back, apart: «Customers: 1 restored, 1 created», «Product
+// categories: 1 created; Products: 1 restored; Product links to categories: 1 created» (the kept product's link),
+// «Service categories: 1 created; Services: 1 created» and «Appointments: 1 restored»; and `a` has the same card live
+// again in its group, the second one again in that group with its tag and its value, the same product live again in
+// its category back under a new id, the kept product in it again, the same appointment (its number, its history
+// ending in «restored») live again, and the service category and the service live again under new ids, the service in
+// that category and performed by that professional again; in its Agenda, the appointment's «History» ends in
+// «Restored» (APPOINTMENT-F10).
 // The stack's worker serves databases only (no moves' thread), so the spec plays its passes, as the specs play the
 // relay.
 import { spawnSync } from 'node:child_process';
@@ -288,8 +289,10 @@ for (const { label, viewport } of SIZES) {
     const recovered = page.locator('#result_list tbody tr').first();
     await expect(recovered).toContainText('Done');
     await expect(recovered).toContainText('Customers: 1 restored, 1 created');
-    await expect(recovered).toContainText('Product categories, Products, Product links to categories: 1 restored, 2 created');
-    await expect(recovered).toContainText('Services: 2 created');
+    await expect(recovered).toContainText(
+      'Product categories: 1 created; Products: 1 restored; Product links to categories: 1 created',
+    );
+    await expect(recovered).toContainText('Service categories: 1 created; Services: 1 created');
     await expect(recovered).toContainText('Appointments: 1 restored');
     await capture(page, `${KEY}-${label}-4-recoveries`, { fullPage: true });
     await recovered.locator('a').first().click();
