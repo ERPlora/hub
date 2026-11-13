@@ -47,10 +47,10 @@ import { createHmac } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
-import type { APIRequestContext, Page } from '@playwright/test';
+import { type APIRequestContext, expect, type Page } from '@playwright/test';
 
 import { ARTIFACTS, capture, HUB_DIR, psql, REPO_DIR, SAAS } from './helpers';
-import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
+import { capturedAtSizes, FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { STACK } from './stack';
 import {
   BUSINESS_ID,
@@ -402,6 +402,21 @@ export async function flowShots(page: Page, flow: string, ready: (page: Page) =>
     await capture(page, `APP-WHATSAPP_INBOX-1-${flow}-${viewport.label}`);
   }
   await page.setViewportSize({ width: 1280, height: 860 });
+}
+
+/** Picks `label` in the `ion-select` `name` of the template's sheet (its popover). */
+export async function chooseInTemplateSheet(page: Page, name: string, label: string): Promise<void> {
+  await page.locator(`ion-modal[data-testid=whatsapp-inbox-template-editor] [data-testid=whatsapp-inbox-template-editor-${name}]`).click();
+  await page.locator('ion-popover.select-popover ion-radio', { hasText: label }).click();
+  await expect(page.locator('ion-popover.select-popover')).toBeHidden();
+}
+
+/** The screen in the three sizes (`<name>-390|834|1440`), with `ready` in sight and settled. */
+export async function settledShots(page: Page, name: string, ready: (page: Page) => Promise<void>): Promise<void> {
+  await capturedAtSizes(page, name, FLOW_VIEWPORTS, async () => {
+    await ready(page);
+    await settled(page);
+  });
 }
 
 export interface ChannelPush {
