@@ -37,7 +37,8 @@ def brought_back(actor: str) -> bool:
 class Recoverable:
     """What an app gives back from a separate copy of its business (``recoverable_from_copy`` on its config).
 
-    - ``label``: what the staff reads (a lazy translation: «Customers»);
+    - ``label``: what the staff reads, a lazy translation without a context («Customers»): a recovery keeps it as the
+      code writes it, counted apart from the app's other things, and Recoveries says it in its reader's language;
     - ``reads_since``: the app's migration whose schema ``read`` reads (its tables and columns are there since);
     - ``read(conn)``: the records the copy holds, through ``conn``, the copy's direct read-only connection (its own SQL
       over its model's names, never the ORM): each a ``dict`` with its ``id`` in the copy and the input of ``create``;

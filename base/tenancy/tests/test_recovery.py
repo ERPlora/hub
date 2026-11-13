@@ -157,7 +157,9 @@ def in_the_copy(copy: RestoredCopy, statement: str, params=()) -> list[tuple]:
         return cursor.fetchall() if cursor.description else []
 
 
-CUSTOMERS = {"app": "customer", "restored": 0, "created": 0, "not_created": 0, "reasons": [], "refused": ""}
+CUSTOMERS = {
+    "app": "customer", "label": "Customers", "restored": 0, "created": 0, "not_created": 0, "reasons": [], "refused": ""
+}
 
 
 def test_only_the_actor_of_a_recovery_says_it_brought_something_back():
@@ -485,7 +487,15 @@ class TestCustomersComeBack:
         assert len(live_cards(hub)) == 1
 
 
-APPOINTMENTS = {"app": "appointment", "restored": 0, "created": 0, "not_created": 0, "reasons": [], "refused": ""}
+APPOINTMENTS = {
+    "app": "appointment",
+    "label": "Appointments",
+    "restored": 0,
+    "created": 0,
+    "not_created": 0,
+    "reasons": [],
+    "refused": "",
+}
 
 
 def a_monday_at(hhmm: str) -> str:
@@ -658,6 +668,108 @@ class TestAppointmentsComeBack:
         why = the_one_not_booked(asked)
         assert why["id"] == str(lost.id)
         assert why["reason"].startswith("customer.customer_unavailable: ")
+
+
+GROUPS = CUSTOMERS | {"label": "Groups"}
+
+
+def groups_given_back_too(monkeypatch, missing=list) -> None:
+    """Customers declares a second thing it gives back after its cards: the copy's group «VIP», made by
+    ``customer.group.create`` when ``missing`` says the business lacks it."""
+    from django.utils.translation import gettext_lazy
+
+    from base.recovery import Recoverable
+
+    declared = recovery.recoverable_apps
+
+    def with_groups():
+        answers = declared()
+        groups = Recoverable(
+            label=gettext_lazy("Groups"),
+            reads_since="0001_initial",
+            read=lambda conn: [{"id": str(uuid.uuid7()), "name": "VIP"}],
+            missing=missing,
+            create="customer.group.create",
+        )
+        return answers | {"customer": [*answers["customer"], groups]}
+
+    monkeypatch.setattr(recovery, "recoverable_apps", with_groups)
+
+
+def live_groups(hub: Hub) -> list[str]:
+    with use_hub(hub):
+        from apps.customer.models import CustomerGroup
+
+        return list(CustomerGroup.objects.values_list("name", flat=True))
+
+
+class TestEachThingAnAppGivesBack:
+    """An app may declare several things it gives back (a category before what goes in it): each is counted apart,
+    under its own name, so Recoveries says how each went."""
+
+    def test_each_is_counted_apart_under_its_name_as_the_code_writes_it(self, recoveries, every_app_on, monkeypatch):
+        groups_given_back_too(monkeypatch)
+        hub, (ana,) = recoveries.business(every_app_on, ANA)
+        copy = recoveries.copy_of(hub)
+        gone(hub, ana)
+        # Asked by staff who read Spanish: the name is kept as the code writes it, and said in whoever reads it's.
+        asked = recoveries.ask(copy, language="es")
+
+        assert run() == 1
+
+        assert fresh(asked).results == [CUSTOMERS | {"created": 1}, GROUPS | {"created": 1}]
+        assert live_groups(hub) == ["VIP"]
+
+    def test_what_an_app_refuses_for_all_ends_its_part_and_what_was_left_of_it_says_why(
+        self, recoveries, every_app_on, monkeypatch
+    ):
+        asked_for = []
+        groups_given_back_too(monkeypatch, missing=lambda records: asked_for.append(records) or records)
+        hub, (ana,) = recoveries.business(every_app_on, ANA)
+        copy = recoveries.copy_of(hub)
+        run_in(hub, "customer.customer.delete", id=ana)
+        with use_hub(hub):
+            from base import activation
+            from base.models import AppActivation
+
+            AppActivation.objects.filter(host=hub.slug, app="customer").update(state="off")
+            activation.forget(hub.slug)
+        asked = recoveries.ask(copy)
+
+        run()
+
+        [customers, groups] = fresh(asked).results
+        assert customers["refused"].startswith("app_inactive: ")
+        assert groups == GROUPS | {"refused": customers["refused"]}
+        # Never even looked for in the business.
+        assert (asked_for, live_groups(hub)) == ([], [])
+
+    def test_an_app_the_copy_cannot_give_back_says_why_for_each_thing_it_declares(
+        self, recoveries, every_app_on, monkeypatch
+    ):
+        groups_given_back_too(monkeypatch)
+        hub, (ana,) = recoveries.business(every_app_on, ANA)
+        copy = recoveries.copy_of(hub)
+        gone(hub, ana)
+        in_the_copy(copy, "DELETE FROM django_migrations WHERE app = 'customer'")
+        asked = recoveries.ask(copy)
+
+        run()
+
+        why = "recover_not_in_copy: customer was not in the business at the copy's moment"
+        assert fresh(asked).results == [CUSTOMERS | {"refused": why}, GROUPS | {"refused": why}]
+        assert (live_cards(hub), live_groups(hub)) == ([], [])
+
+    def test_an_app_that_declares_nothing_says_so_as_a_whole(self, recoveries, every_app_on):
+        hub, _ = recoveries.business(every_app_on)
+        asked = recoveries.ask(recoveries.copy_of(hub), "task")
+
+        assert run() == 1
+
+        why = "recover_not_recoverable: task gives nothing back from a copy"
+        assert fresh(asked).results == [
+            {"app": "task", "restored": 0, "created": 0, "not_created": 0, "reasons": [], "refused": why}
+        ]
 
 
 class TestTheCopyIsOnlyRead:
@@ -857,6 +969,20 @@ def test_each_declaration_names_a_migration_of_its_app_and_an_operation_of_its_a
             for name in filter(None, (one.create, one.restore)):
                 op = get_operation(name)
                 assert (op.app_label, op.kind) == (label, "command")
+
+
+def test_each_declaration_is_named_in_words_every_language_of_the_staff_says():
+    """A result keeps the name of what it counts as the code writes it, and Recoveries says it in the language of
+    whoever reads it: so each name is a plain translation (never one with a context), and Spanish has it."""
+    from django.utils import translation
+    from django.utils.translation import gettext
+
+    for label, declared in recovery.recoverable_apps().items():
+        for one in declared:
+            with translation.override(None):
+                written = str(one.label)
+            with translation.override("es"):
+                assert gettext(written) == str(one.label) != written, (label, written)
 
 
 @pytest.mark.parametrize("half", [{"restore": "customer.customer.restore"}, {"deleted": list}])

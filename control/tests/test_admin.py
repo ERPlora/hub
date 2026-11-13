@@ -1064,6 +1064,25 @@ class TestRecoverIntoTheBusiness:
             listed, ">bistro<br>"
         )
 
+    def test_each_thing_an_app_gives_back_is_said_apart_by_its_own_name(self, client, root):
+        # Services gives back its categories before its services: each says how it went.
+        nothing = {"app": "service", "restored": 0, "not_created": 0, "reasons": [], "refused": ""}
+        self.a_recovery(
+            self.made("acme"),
+            apps=["service"],
+            status="done",
+            results=[
+                nothing | {"label": "Service categories", "created": 1},
+                nothing | {"label": "Services", "created": 2, "not_created": 1},
+            ],
+        )
+        # One noted before each thing was counted apart is said as it was then, the app's names together.
+        self.a_recovery(self.made("bistro"), apps=["service"], status="done", results=[nothing | {"created": 3}])
+
+        listed = page(client, RECOVERIES)
+        assert "Service categories: 1 created; Services: 2 created, 1 not created<" in row_of(listed, ">acme<br>")
+        assert "Service categories, Services: 3 created<" in row_of(listed, ">bistro<br>")
+
     def test_support_neither_sees_it_nor_runs_it_but_reads_the_recoveries(self, client, support):
         from control.models import CopyRecovery
 
@@ -1153,6 +1172,22 @@ def test_what_came_back_is_said_in_spanish_in_words_that_fit_customers_and_appoi
         # And what comes back the same, whatever app restores it next.
         assert said({"app": "appointment", "restored": 1, "created": 0, "not_created": 0, "reasons": [], "refused": ""}) == (
             "Citas: se restauró 1"
+        )
+
+
+def test_each_thing_an_app_gives_back_is_said_in_spanish_by_its_own_name():
+    """A result keeps the name of what it counts as the code writes it: Recoveries says it in the reader's language."""
+    from django.utils import translation
+
+    said = control_admin.CopyRecoveryAdmin.result_said
+    nothing = {"restored": 0, "not_created": 0, "reasons": [], "refused": ""}
+    with translation.override("es"):
+        assert said(nothing | {"app": "service", "label": "Service categories", "created": 1}) == (
+            "Categorías de servicios: se creó 1"
+        )
+        assert said(nothing | {"app": "service", "label": "Services", "created": 2}) == "Servicios: se crearon 2"
+        assert said(nothing | {"app": "inventory", "label": "Product categories", "created": 1}) == (
+            "Categorías de productos: se creó 1"
         )
 
 
