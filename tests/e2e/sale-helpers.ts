@@ -98,7 +98,7 @@ export async function expectTakes(button: Locator, takes: boolean): Promise<void
 }
 
 /** A tile of the till's grid, a child of it: `PosItemTile.vue`, an Ionic button for products, services and menus alike. */
-const TILL_TILE = ':scope > ion-button.pos-tile';
+export const TILL_TILE = ':scope > ion-button.pos-tile';
 
 /** The till's grid on screen. «Services» keeps its own grid in the page, hidden while «All» is chosen. */
 export const tillGrid = (page: Page): Locator => shown(page).locator('.pos-grid').filter({ visible: true });
