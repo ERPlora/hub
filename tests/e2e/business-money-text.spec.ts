@@ -130,7 +130,7 @@ test.afterAll(async () => {
   }
 });
 
-test(`${KEY}: money-text the server writes a price in złoty as the browser does, «PLN 15.50» in English, in 390, 834 and 1440`, async ({
+test(`the server writes a price in złoty as the browser does, «PLN 15.50» in English, in 390, 834 and 1440`, async ({
   browser,
 }) => {
   if (!original) throw new Error('beforeAll did not run');
@@ -150,7 +150,7 @@ test(`${KEY}: money-text the server writes a price in złoty as the browser does
   }
 });
 
-test(`${KEY}: money-text a visitor speaking Spanish reads «15,50 PLN», as the browser writes it`, async ({ browser }) => {
+test(`a visitor speaking Spanish reads «15,50 PLN», as the browser writes it`, async ({ browser }) => {
   if (!original) throw new Error('beforeAll did not run');
   await registerBusinessIn(original, 'PL');
   expect(INTL.es).toBe('15,50 PLN');

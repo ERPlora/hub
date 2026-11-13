@@ -164,7 +164,7 @@ async function badgeSays(page: Page, total: number): Promise<void> {
 }
 
 FLOW_VIEWPORTS.forEach(({ label, width, height }, index) => {
-  test(`${KEY} el contador «Citas por confirmar» de la campana: a customer's booking waiting counts live, leads to the agenda and goes once confirmed — ${label}`, async ({
+  test(`the bell's «Citas por confirmar» counter: a customer's booking waiting counts live, leads to the agenda and goes once confirmed — ${label}`, async ({
     browser,
   }) => {
     const day = aMonday(index);

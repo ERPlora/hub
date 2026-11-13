@@ -91,7 +91,7 @@ export interface AppointmentOut extends AppointmentRow {
   label: string;
 }
 
-/** What a customer did herself (G01): a booking or a cancellation, as the notice says it. */
+/** What a customer did herself: a booking or a cancellation, as the notice says it. */
 export interface NoticeOut {
   kind: 'booked' | 'cancelled';
   at: string;

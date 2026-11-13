@@ -399,8 +399,8 @@ test('STAFF-F19: «Cancel» on an approved absence asks first; confirmed, it is 
   }
 });
 
-// flow: STAFF-F20, STAFF-G05 — «today» is the business's day
-test('STAFF-F20 and G05: «Today’s time off» above Time Off lists who is away today, live', async ({ browser }) => {
+// flow: STAFF-F20 — «today» is the business's day
+test('STAFF-F20: «Today’s time off» above Time Off lists who is away today, live', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/time-off');
   try {
     const card = shown(page).locator('[data-testid=staff-away-today]');
@@ -490,8 +490,8 @@ test('STAFF-F22: Settings saves the default working day, and a new schedule prop
 /** The value a figure above the staff list shows. */
 const figure = (page: Page, id: string): Locator => shown(page).locator(`[data-testid=staff-figures-${id}] .staff-figure__value`);
 
-// flow: STAFF-F23, STAFF-G02, STAFF-G03, STAFF-G04
-test('STAFF-F23 and G02–G04: the figures above Staff follow a new person, an absence and a request live', async ({ browser }) => {
+// flow: STAFF-F23
+test('STAFF-F23: the figures above Staff follow a new person, an absence and a request live', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/members');
   try {
     await expect(figure(page, 'active')).toHaveText(/^\d+$/);
@@ -519,8 +519,8 @@ test('STAFF-F23 and G02–G04: the figures above Staff follow a new person, an a
   }
 });
 
-// flow: STAFF-G01
-test('STAFF-G01: «Members» in Roles counts the Active people of each role', async ({ browser }) => {
+// flow: STAFF-F23
+test('STAFF-F23: «Members» in Roles counts the Active people of each role', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/roles');
   try {
     const role = await api<{ id: string; name: string }>(context, A, 'POST', '/staff/roles', { name: `${TAG} Barber ${stamp()}` });

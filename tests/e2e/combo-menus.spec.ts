@@ -119,7 +119,7 @@ const loadedAt = (page: Page): Promise<number> => page.evaluate(() => performanc
  *  wait until no list of a previous pick is still closing, click the field, wait for its list, type,
  *  choose. Reopening a Combo while its previous popover is still animating out loses the typing: the
  *  late `didDismiss` of the old presentation closes the new one and reverts the text, and no search
- *  reaches the server (measured 2026-10-15 on the second pick of a course; reported for
+ *  reaches the server (seen on the second pick of a course; reported for
  *  `@erplora/ui`'s Combo). The dev server is shared with other sessions: a search cut by its restart
  *  shows the list's own «Retry», which is pressed; a page Vite reloaded is picked again; anything else
  *  fails at once. */

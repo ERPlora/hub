@@ -229,7 +229,7 @@ describe('SalesPage: the period (SALE-F28 step 1)', () => {
     expect(s.paramsOf('sale.sale.stats')).toEqual([{}]);
   });
 
-  it('«7 days» adds what was sold each of those days, under the figures (SALE-G01)', async () => {
+  it('«7 days» adds what was sold each of those days, under the figures (SALE-F28)', async () => {
     const s = await setup();
     await s.show(PAGE);
     expect(s.paramsOf('sale.sale.last_7_days')).toEqual([]);

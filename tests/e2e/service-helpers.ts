@@ -20,7 +20,7 @@ export const VIEWPORTS = {
   phone: { width: 390, height: 844 },
 } as const;
 
-/** The three sizes every flow with a screen is walked and captured at (brief APP-SERVICE). */
+/** The three sizes every flow with a screen is walked and captured at. */
 export const FLOW_VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
   { label: '834', width: 834, height: 1112 },

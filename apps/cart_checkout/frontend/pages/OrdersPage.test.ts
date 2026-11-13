@@ -272,7 +272,7 @@ describe('OrdersPage: the list fills the page', () => {
 });
 
 // flow: CART_CHECKOUT-F12 — the old Orders kept its column filters behind the toolbar's funnel, with no
-// open row (docs/reference/old-hub/cart_checkout-orders-{390,834,1440}.png), as Invoices and Sales (hub#31).
+// open row, as Invoices and Sales (hub#31).
 describe('OrdersPage: the column filters wait behind the funnel (CART_CHECKOUT-F12)', () => {
   const ID = 'cart-checkout-orders';
   type Setup = Awaited<ReturnType<typeof setup>>;

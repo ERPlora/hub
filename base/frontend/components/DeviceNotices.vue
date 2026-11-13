@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The device's notices (APPOINTMENT-F28; the old hub's HUB_SHELL-F66): `base.notice.list`, live — the rows the
+// The device's notices (APPOINTMENT-F28): `base.notice.list`, live — the rows the
 // modules on tell this person, with their texts filled in on the server — handed to the shell, which tells each new
 // one once with the installed app's system notice and opens its screen on a tap. Mounted once beside the pane while
 // a person is signed in (`chrome.background`); it paints nothing. Only inside the installed app: a browser has the

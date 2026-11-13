@@ -78,7 +78,7 @@ async function saveADay(context: BrowserContext): Promise<void> {
   expect(saved.status, JSON.stringify(saved.data)).toBe(200);
 }
 
-test(`${KEY} SCHEDULE-F03: «Confirma tu horario» pending with the default week, it leads to Hours, «Sí, este es mi horario» ticks it, and a day saved elsewhere ticks it over the stream already open`, async ({
+test(`SCHEDULE-F03: «Confirma tu horario» pending with the default week, it leads to Hours, «Sí, este es mi horario» ticks it, and a day saved elsewhere ticks it over the stream already open`, async ({
   browser,
 }) => {
   psql(DEFAULT_WEEK);
@@ -132,7 +132,7 @@ test(`${KEY} SCHEDULE-F03: «Confirma tu horario» pending with the default week
 });
 
 for (const size of VIEWPORTS) {
-  test(`${KEY} SCHEDULE-F03 at ${size.label}: «Confirma tu horario» pending in sight, then done without a reload once the week is confirmed`, async ({
+  test(`SCHEDULE-F03 at ${size.label}: «Confirma tu horario» pending in sight, then done without a reload once the week is confirmed`, async ({
     browser,
   }) => {
     psql(DEFAULT_WEEK);

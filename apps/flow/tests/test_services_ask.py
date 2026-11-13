@@ -1,5 +1,4 @@
-"""«Ask someone first» (WORKBOOK FLOW-F28, F29 and F30; old hub HUB-F96, HUB-F100, HUB-F101; the old module's
-flows-f18 and flows-f24).
+"""«Ask someone first» (WORKBOOK FLOW-F28, F29 and F30).
 
 A run that reaches the step leaves its question — title and details filled in at that moment — in «Waiting
 for you» and waits. Only the role it was asked of answers it (whoever runs the business always can); a yes

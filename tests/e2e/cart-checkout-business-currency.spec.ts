@@ -87,7 +87,7 @@ test.afterAll(async () => {
 });
 
 for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
-  test(`${KEY}: cart-checkout-business-currency a business in Poland creates, reads and filters its carts and orders in złoty at ${width} wide`, async ({
+  test(`a business in Poland creates, reads and filters its carts and orders in złoty at ${width} wide`, async ({
     browser,
   }) => {
     await registerBusinessIn(original, 'PL');
@@ -134,7 +134,7 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
   });
 }
 
-test(`${KEY}: cart-checkout-business-currency back in Spain a new cart is born in euros and the Polish ones keep their złoty`, async ({ browser }) => {
+test(`back in Spain a new cart is born in euros and the Polish ones keep their złoty`, async ({ browser }) => {
   await registerBusinessIn(original, 'ES');
   const { context, page } = await signedIn(browser, '/cart_checkout/carts');
   try {

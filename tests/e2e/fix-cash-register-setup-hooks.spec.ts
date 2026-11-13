@@ -1,6 +1,6 @@
 // flow: CASH_REGISTER-F01 CASH_REGISTER-F12
 // Cash register's hooks of the Home (the old module's `setup` and `widgets`, the old
-// hub's dashboard in docs/reference/old-hub/dashboard-*.png), as the owner of hub `a` reads them in Spanish: «Tu caja»
+// hub's dashboard), as the owner of hub `a` reads them in Spanish: «Tu caja»
 // pending and «Recomendado» in «Termina de configurar tu negocio» while the drawer runs on its factory values, done
 // without a reload once the settings are saved (also as they came, from the «Configurar» it leads to);
 // «Caja (sesión actual)» on the board by default with the open session's expected cash as the server gives it, which

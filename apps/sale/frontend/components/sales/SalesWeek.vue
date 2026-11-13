@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// What was sold each of the last seven business days, today last (SALE-F28; the old Home's «Last 7 days» panel,
-// SALE-G01), from `sale.sale.last_7_days`, followed live (a charge, a void or a refund re-runs it). Sales shows it
+// What was sold each of the last seven business days, today last (SALE-F28; the old Home's «Last 7 days» panel),
+// from `sale.sale.last_7_days`, followed live (a charge, a void or a refund re-runs it). Sales shows it
 // under the figures when the period is «7 days», to whoever may see the reports. A day without sales says 0; a
 // failure says so.
 import { InlineFeedback } from '@erplora/ui/components';

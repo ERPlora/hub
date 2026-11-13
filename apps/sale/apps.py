@@ -59,8 +59,8 @@ class SaleConfig(LiveAppConfig):
             "sale.view_paymentmethod",
         ],
     }
-    # What a manager approves on the spot with their PIN on the cashier's own device (BASE-F84; the old hub's
-    # HUB_SHELL-F51; Square, Toast, Lightspeed and Shopify's manager override), in the words the dialog «An approval
+    # What a manager approves on the spot with their PIN on the cashier's own device (BASE-F84;
+    # Square, Toast, Lightspeed and Shopify's manager override), in the words the dialog «An approval
     # is needed» says: every command of the till whose permission the employee lacks. Who holds it is never asked.
     approvals = {
         "sale.sale.void": _("Void a sale"),

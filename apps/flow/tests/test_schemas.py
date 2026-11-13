@@ -405,7 +405,7 @@ def test_an_assistant_step_without_its_task_or_out_of_bounds_is_refused(more, fi
 
 
 def test_an_assistant_step_never_hands_a_secret_to_the_assistant():
-    # Old HUB-F95: «a secret in the task is not saved»: what the step asks reaches the model.
+    # What the step asks reaches the model, so a secret is never written in it.
     found = errors(schemas.CreateIn, {"steps": [ASSISTANT | {"prompt": "Use {{secret.STRIPE_KEY}}"}]})
     assert found == {"steps": "Value error, Step 1 reads «secret.STRIPE_KEY»: a secret or the call's key only go in «Call another system»."}
 

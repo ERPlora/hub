@@ -87,7 +87,7 @@ test.afterAll(async () => {
   cleanUp();
 });
 
-test(`${KEY}: customer-business-currency a business in Poland reads and types «Spent» in złoty in 390, 834 and 1440`, async ({
+test(`a business in Poland reads and types «Spent» in złoty in 390, 834 and 1440`, async ({
   page,
   context,
 }) => {
@@ -128,7 +128,7 @@ test(`${KEY}: customer-business-currency a business in Poland reads and types «
   }
 });
 
-test(`${KEY}: customer-business-currency back in Spain «Spent» is in euros`, async ({ page }) => {
+test(`back in Spain «Spent» is in euros`, async ({ page }) => {
   await registerBusinessIn(original, 'ES');
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/customer/customers');

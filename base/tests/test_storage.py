@@ -69,7 +69,7 @@ HUB_ID = uuid.UUID("0199c4b0-0000-7000-8000-00000000abcd")
 
 
 def test_a_hub_s_files_live_under_its_own_prefix():
-    # The id's hex, as the hub databases are named (``hub_<hex>``, PLAN-DB): one prefix per hub, never shared.
+    # The id's hex, as the hub databases are named (``hub_<hex>``): one prefix per hub, never shared.
     assert hub_prefix(HUB_ID) == "hub-0199c4b000007000800000000000abcd"
 
 

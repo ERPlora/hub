@@ -111,7 +111,7 @@ async function badgeSays(page: Page, total: number, options = {}): Promise<void>
 }
 
 FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
-  test(`${KEY} PRINTING-F01 «Configura la impresora» and «Nadie está imprimiendo «Recibo»» on the Home, live — ${label}`, async ({
+  test(`PRINTING-F01: «Configura la impresora» and «Nadie está imprimiendo «Recibo»» on the Home, live — ${label}`, async ({
     browser,
   }) => {
     const { context, page, streams } = await spanishOwner(browser, { width, height });

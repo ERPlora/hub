@@ -1,5 +1,5 @@
-"""What the cashier's role does not allow at the till, a manager approves on the spot with their PIN (BASE-F84; the old
-hub's HUB_SHELL-F51; Square, Toast, Lightspeed and Shopify's manager override): SALE-F30 and F31 (void and refund a
+"""What the cashier's role does not allow at the till, a manager approves on the spot with their PIN (BASE-F84;
+Square, Toast, Lightspeed and Shopify's manager override): SALE-F30 and F31 (void and refund a
 sale), F20 (void an item sent to the kitchen), F14 (a discount above the maximum, on a line, on the check or at the
 charge), F09 (an open price) and F18 (delete an open check with something on it).
 

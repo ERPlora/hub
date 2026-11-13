@@ -235,7 +235,7 @@ describe('TimeOffPage: «+» and «My time off» (STAFF-F08, F17, F24)', () => {
   });
 });
 
-describe('TimeOffPage: today’s time off (STAFF-G05, STAFF-F20)', () => {
+describe('TimeOffPage: today’s time off (STAFF-F20)', () => {
   it('lists who is away today above the list, also for an employee', async () => {
     const s = await setup({ session: EMPLOYEE });
     expect(s.params('staff.time_off.today')).toEqual([{ limit: 100 }]);

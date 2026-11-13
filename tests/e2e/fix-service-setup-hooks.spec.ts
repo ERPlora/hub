@@ -96,7 +96,7 @@ async function offer(context: BrowserContext, id: string, action: 'archive' | 'r
   expect(changed.status, JSON.stringify(changed.data)).toBe(200);
 }
 
-test(`${KEY} SERVICE-F01: «Tu catálogo de servicios» pending with nothing to charge, it leads to Services, the first service ticks it, archived it is pending again and restored done`, async ({
+test(`SERVICE-F01: «Tu catálogo de servicios» pending with nothing to charge, it leads to Services, the first service ticks it, archived it is pending again and restored done`, async ({
   browser,
 }) => {
   const { context, page, streams } = await spanishOwner(browser, { width: 1440, height: 900 });
@@ -149,7 +149,7 @@ test(`${KEY} SERVICE-F01: «Tu catálogo de servicios» pending with nothing to 
 });
 
 for (const size of VIEWPORTS) {
-  test(`${KEY} SERVICE-F01 at ${size.label}: «Tu catálogo de servicios» pending in sight, then done without a reload once a service is added`, async ({
+  test(`SERVICE-F01 at ${size.label}: «Tu catálogo de servicios» pending in sight, then done without a reload once a service is added`, async ({
     browser,
   }) => {
     const { context, page, streams } = await spanishOwner(browser, { width: size.width, height: size.height });

@@ -1,7 +1,7 @@
 """Write operations of the schedule app: one operation = one transaction with its events in the outbox.
 
 A refused command leaves no trace (no row, no event). Cases from the old module's WORKFLOW
-(SCHEDULES-F02 … F08) and its handler and engine tests, plus the
+(SCHEDULE-F02 … F08) and its handler and engine tests, plus the
 corrections of the port (SCHEDULE-F13, freed dates).
 """
 

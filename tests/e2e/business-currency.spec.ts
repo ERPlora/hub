@@ -97,7 +97,7 @@ test.afterAll(async ({ browser }) => {
   cleanInvoices();
 });
 
-test(`${KEY}: a business in Poland counts, invoices and prices in złoty in 390, 834 and 1440 (flow business-currency)`, async ({ page, context }) => {
+test(`a business in Poland counts, invoices and prices in złoty in 390, 834 and 1440 (flow business-currency)`, async ({ page, context }) => {
   await registerIn('PL');
   await login(page, A, '/cash_register/sessions');
   // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
@@ -170,7 +170,7 @@ test(`${KEY}: a business in Poland counts, invoices and prices in złoty in 390,
   }
 });
 
-test(`${KEY}: in Poland the price of a manual invoice is typed with its «zł» and the invoice is in złoty (flow business-currency)`, async ({ page }) => {
+test(`in Poland the price of a manual invoice is typed with its «zł» and the invoice is in złoty (flow business-currency)`, async ({ page }) => {
   await registerIn('PL');
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/invoice/invoices');
@@ -202,7 +202,7 @@ test(`${KEY}: in Poland the price of a manual invoice is typed with its «zł» 
   await expect(listed).toContainText(/zł\s?30[.,]25|30[.,]25\s?zł/);
 });
 
-test(`${KEY}: back in Spain the same screens are in euros, and the invoice issued in Poland keeps its złoty (flow business-currency)`, async ({ page, context }) => {
+test(`back in Spain the same screens are in euros, and the invoice issued in Poland keeps its złoty (flow business-currency)`, async ({ page, context }) => {
   await registerIn('ES');
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/cash_register/sessions');

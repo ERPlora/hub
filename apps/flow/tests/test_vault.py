@@ -1,5 +1,5 @@
-"""The automations' secrets box (WORKBOOK FLOW-F26; old hub HUB-F99, ``secret_box.rs``): a value is sealed
-with Fernet under ``settings.FLOW_SECRETS_KEY`` and only opened to make a call; what a call leaves (its
+"""The automations' secrets box (WORKBOOK FLOW-F26): a value is sealed with Fernet
+under ``settings.FLOW_SECRETS_KEY`` and only opened to make a call; what a call leaves (its
 answer, its error) hides every secret it used."""
 
 import pytest

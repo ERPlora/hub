@@ -91,7 +91,7 @@ async function inForce(context: BrowserContext, id: string, action: 'deactivate'
   expect(changed.status, JSON.stringify(changed.data)).toBe(200);
 }
 
-test(`${KEY} TAX-F17: «Tus impuestos» pending with no rate in force, it leads to Rules, the first rule ticks it, deactivated it is pending again and restored done`, async ({
+test(`TAX-F17: «Tus impuestos» pending with no rate in force, it leads to Rules, the first rule ticks it, deactivated it is pending again and restored done`, async ({
   browser,
 }) => {
   const { context, page, streams } = await spanishOwner(browser, { width: 1440, height: 900 });
@@ -149,7 +149,7 @@ test(`${KEY} TAX-F17: «Tus impuestos» pending with no rate in force, it leads 
 });
 
 for (const size of FLOW_VIEWPORTS) {
-  test(`${KEY} TAX-F17 at ${size.label}: «Tus impuestos» pending in sight, then done without a reload once a rule is created`, async ({
+  test(`TAX-F17 at ${size.label}: «Tus impuestos» pending in sight, then done without a reload once a rule is created`, async ({
     browser,
   }) => {
     const { context, page, streams } = await spanishOwner(browser, { width: size.width, height: size.height });

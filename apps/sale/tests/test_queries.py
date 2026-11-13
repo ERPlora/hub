@@ -305,7 +305,7 @@ def give_back(sale, amount: int, *lines: dict):
 
 
 def test_by_professional_a_refund_comes_off_who_sold_what_came_back(catalog):
-    # flow: ninguno — FIX sale/cash_register (de STAFF-F21 y REC_PELUQUERIA-F15): what each one sold
+    # flow: STAFF-F21: what each one sold
     # squares with the period's revenue to the cent, refunds taken off, so a commission is never paid
     # on money that went back.
     ana, luis, bea = uuid7(), uuid7(), uuid7()

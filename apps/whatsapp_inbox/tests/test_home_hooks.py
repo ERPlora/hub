@@ -1,4 +1,4 @@
-"""WHATSAPP_INBOX-F09 on the Home's bell and on the device (PLAN-HUB rounds 2026-10-21 and 2026-10-23): base's
+"""WHATSAPP_INBOX-F09 on the Home's bell and on the device: base's
 ``base.bell.counters`` shows «WhatsApp customers waiting for an answer» while an open conversation's last message is
 the customer's, and leads to the inbox; at zero it is not shown. ``base.notice.list`` tells the device of each
 customer left waiting, and whoever reads the inbox hears it, so the installed app asks to notify for a

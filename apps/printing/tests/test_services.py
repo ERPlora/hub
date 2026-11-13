@@ -1072,7 +1072,7 @@ def test_a_chosen_printer_that_is_inactive_is_passed_over_for_the_first_active_o
     assert (queued.job.printer_id, queued.job.printer_name) == (spare.id, "Spare")
 
 
-# ── PRINTING-F20 How long the queue keeps a job (HUB-F206) ──────────────────────────────────────────
+# ── PRINTING-F20 How long the queue keeps a job ─────────────────────────────────────────────────────
 
 
 def ended(days: int, status: str, **more) -> PrintJob:
