@@ -449,6 +449,7 @@ def relay_deliver_next(
     *,
     deliver: Callable[[str, OutboxEvent], object],
     listeners: Callable[[OutboxEvent], list[str]],
+    carried: Callable[[str], bool],
     max_depth: int,
     max_attempts: int,
     backoff: Callable[[int], dt.timedelta],
@@ -458,7 +459,10 @@ def relay_deliver_next(
     one transaction; returns ``(delivery, delivered)``, or ``None`` when nothing is due.
 
     The claim is ``SKIP LOCKED``, as the scheduler's. ``deliver(app_label, event)`` runs in a savepoint, and the
-    events it records (and keeps) are handed over in it, one level deeper: a reaction that raises has its writes
+    events it records (and keeps) are handed over in it, one level deeper. Those it records as the system take the
+    event's actor when ``carried(actor)`` says it is passed on (``base.relay.carried``: a recovery's, whose events are
+    nothing new to the business, or one an app declares to follow its own chain through the others' reactions), however
+    deep the chain goes; those it records as someone of its own keep theirs. A reaction that raises has its writes
     undone and waits ``backoff(attempts)``; after ``max_attempts`` it is given up (``dead``). Either way it is
     logged with the event, and the other deliveries go on: a refusal of the business (an ``OperationError``) as a
     warning with its code; anything else, and the delivery given up, as an error with its traceback.
@@ -485,6 +489,11 @@ def relay_deliver_next(
                 kept = list(
                     OutboxEvent.objects.filter(pk__in=[event.pk for event in recorded]).order_by("created_at", "id")
                 )
+                if carried(delivery.event.actor):
+                    system = system_context(Scope(delivery.event.scope_kind, delivery.event.scope_key)).actor
+                    OutboxEvent.objects.filter(pk__in=[event.pk for event in kept], actor=system).update(
+                        actor=delivery.event.actor
+                    )
                 _hand_over(kept, now=now, depth=delivery.depth + 1, listeners=listeners, max_depth=max_depth)
         except Exception as error:
             delivered = False

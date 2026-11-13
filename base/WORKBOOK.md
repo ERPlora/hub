@@ -3065,9 +3065,9 @@ Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte,
 clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías y las citas;
 crear y borrar el clúster temporal es el procedimiento «Devolver un negocio a un momento» de ERPlora/aws; las citas
 periódicas, hub#1327; el grupo, la etiqueta o el campo propio que el negocio borró después de eliminar un cliente que
-vuelve, hub#1356; la imagen de un producto recuperado, hub#1319; los productos que el negocio conserva vivos en una
-categoría de productos que vuelve, hub#1373; la imagen de un servicio recuperado, hub#1319; que Recuperaciones nombre al
-profesional que no vuelve con su servicio, hub#1375)
+vuelve, hub#1356; la imagen de un producto recuperado, hub#1319; que la página «Recuperar en el negocio…» nombre la
+excepción de lo que vuelve a una categoría recuperada, hub#1364; la imagen de un servicio recuperado, hub#1319; que
+Recuperaciones nombre al profesional que no vuelve con su servicio, hub#1375)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
 copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
@@ -3103,9 +3103,10 @@ Pasos:
      nuevo para el negocio: no arranca ninguna de sus automatizaciones, así que a nadie se le da la bienvenida ni se le
      avisa otra vez de una cita que ya tenía (hub#1307).
      Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes**, **Categorías de productos,
-     Productos**, **Categorías de servicios, Servicios** y **Citas**). Pulsa **Recuperar**.
-  10. Sale «1 copia aparte devolverá Clientes, Categorías de productos, Productos, Categorías de servicios, Servicios,
-      Citas a su negocio en unos minutos: Recuperaciones dice cómo fue.». En
+     Productos, Enlaces de productos a categorías**, **Categorías de servicios, Servicios** y **Citas**). Pulsa
+     **Recuperar**.
+  10. Sale «1 copia aparte devolverá Clientes, Categorías de productos, Productos, Enlaces de productos a categorías,
+      Categorías de servicios, Servicios, Citas a su negocio en unos minutos: Recuperaciones dice cómo fue.». En
       Recuperaciones la ve «Pedida» con la copia, qué se pidió y cuándo.
   11. Unos minutos después dice «Hecha» y qué volvió: «Clientes: se restauró 1, se crearon 2» o «Clientes: se crearon 2,
       1 sin crear». Su ficha dice además cuáles no volvieron y por qué (por su identificador en la copia, sin datos
@@ -3118,7 +3119,8 @@ Pasos:
       eliminada que vuelve no le vuelve el grupo, la etiqueta o el campo que el negocio borró después (hub#1356). Nunca
       vuelve una ficha cuyos datos personales se borraron (RGPD) ni una que se unió a otra, ni se repite una que el
       negocio ya volvió a crear (el mismo nombre, teléfono y email). Con Productos, «Categorías de productos,
-      Productos: se restauró 1, se crearon 2» (las categorías y los productos que volvieron, juntos, hub#1355): primero vuelve
+      Productos, Enlaces de productos a categorías: se restauró 1, se crearon 3» (las categorías, los productos y los
+      enlaces que volvieron, juntos, hub#1355): primero vuelve
       cada categoría de productos que el negocio ya no tiene (la eliminó o la perdió), como una nueva, creada como la
       crea la pantalla de Categorías, con su nombre, slug, descripción, icono, color, orden y categoría fiscal; la
       eliminada sigue eliminada (INVENTORY-F07). Una que el negocio conserva, aunque la renombrara, es la misma, y una
@@ -3130,9 +3132,12 @@ Pasos:
       SKU, EAN-13, descripción, tipo, precio, coste, unidades, umbral, control de stock y categoría fiscal, activo o
       desactivado como estaba y en sus categorías: la misma si el negocio aún la tiene, y si no, la que acaba de volver
       o la que el negocio volvió a crear con su nombre; sin stock, que se cuenta (INVENTORY-F14), porque el de la copia es
-      de otro día, y sin su imagen (hub#1319). Los productos que el negocio conserva vivos se quedan como están: los que
-      estaban en una categoría que vuelve siguen sin ella (hub#1373). No vuelve ni se repite uno que el negocio ya volvió
-      a dar de alta (otro vivo con su SKU o su EAN-13). Con Servicios,
+      de otro día, y sin su imagen (hub#1319). No vuelve ni se repite uno que el negocio ya volvió a dar de alta (otro
+      vivo con su SKU o su EAN-13). Al final, los productos que el negocio conserva vivos y estaban en la copia en una
+      categoría que acaba de volver vuelven a ella, sin perder ninguna otra (INVENTORY-F07): es lo único que la
+      recuperación toca de lo que el negocio tiene, y se cuenta aparte, como «Enlaces de productos a categorías». Una
+      categoría que el negocio conserva (aunque le quitara productos) o que volvió a crear a mano no se rellena. Con
+      Servicios,
       «Categorías de servicios, Servicios: se crearon 3» (las categorías y los servicios que volvieron, juntos): primero
       vuelve cada categoría de servicios que el negocio ya no tiene (la eliminó o la perdió), como una nueva, creada como
       la crea la pantalla de Categorías, con su nombre, descripción, icono, color y orden, dentro de su categoría padre si
@@ -3152,15 +3157,18 @@ Pasos:
       dos veces.
       Las citas van siempre después de los clientes y los servicios, se pidan en el orden que se pidan, para que cada
       una encuentre a su clienta y sus servicios. Vuelve cada cita que aún no ha llegado y seguía reservada (pendiente o
-      confirmada, sin cobrar), reservada como la reserva la agenda: para la ficha de su clienta en el negocio (la misma,
-      aquella en la que se unió o la que se volvió a crear), con sus servicios en el negocio como los empareja Servicios
-      (el mismo o, si ya no está, el que se volvió a crear a mano o acaba de volver con Servicios: el mismo nombre en la
-      misma categoría, el más antiguo si hay dos), su profesional, su hora, sus minutos y sus notas; como cita nueva, con
-      otro número y sin su historial (hub#1326). Nunca se reserva encima de otra: una cuya hora ya está ocupada, ya no
-      encaja en el horario del negocio o del profesional o está bloqueada, o cuya clienta, servicio o profesional ya no
-      están, no vuelve y su motivo lo dice («appointment.slot_taken: …», «service.service_not_found: …»). Las que ya
-      pasaron no vuelven, y tampoco una que el negocio tiene (aunque la cancelara) o que volvió a reservar (la misma
-      clienta a la misma hora).
+      confirmada, sin cobrar). Una que el negocio borró y aún guarda vuelve LA MISMA y cuenta como restaurada, tal como
+      estaba al borrarla: con su número, su clienta, sus servicios, su profesional, su hora, sus notas, su serie y su
+      historial, que suma «Recuperada» (APPOINTMENT-F11). Una que el negocio ya no tiene vuelve reservada como la reserva
+      la agenda: para la ficha de su clienta en el negocio (la misma, aquella en la que se unió o la que se volvió a
+      crear), con sus servicios en el negocio como los empareja Servicios (el mismo o, si ya no está, el que se volvió a
+      crear a mano o acaba de volver con Servicios: el mismo nombre en la misma categoría, el más antiguo si hay dos), su
+      profesional, su hora, sus minutos y sus notas; como cita nueva, con otro número y sin su historial. Nunca se
+      reserva encima de otra: una cuya hora ya está ocupada, ya no encaja en el horario del negocio o del profesional o
+      está bloqueada, o cuya clienta, servicio o profesional ya no están, no vuelve y su motivo lo dice
+      («appointment.slot_taken: …», «service.service_not_found: …»); una borrada que no vuelve por eso no se crea de
+      nuevo. Las que ya pasaron no vuelven, y tampoco una que el negocio tiene (aunque la cancelara) o que volvió a
+      reservar (la misma clienta a la misma hora, o su serie en esa fecha).
 Entra: los negocios elegidos, el clúster temporal con su copia y el momento; para recuperar, la copia aparte hecha y qué
 recuperar.
 Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso
@@ -3178,11 +3186,14 @@ eliminado que aún guardaba, vivo otra vez con su aviso de producto recuperado (
 producto nuevo por cada producto que ya no tenía, con su aviso de producto creado (`inventory.product.created`), una
 categoría de servicios nueva por cada una que le faltaba, con su aviso de categoría creada (`service.category.created`),
 un servicio nuevo por cada uno que ya no tenía, con su aviso de servicio creado (`service.service.created`) y uno de
-profesional asignado (`service.assignment.assigned`) por cada profesional que vuelve con él, y una cita
-nueva por cada una que le faltaba, con su aviso de cita creada (`appointment.appointment.created`), y nada más. Cada uno
+profesional asignado (`service.assignment.assigned`) por cada profesional que vuelve con él, cada cita borrada que aún
+guardaba, viva otra vez con su aviso de cita recuperada (`appointment.appointment.restored`), y una cita nueva por cada
+una que ya no tenía, con su aviso de cita creada (`appointment.appointment.created`), y nada más. Cada uno
 de esos avisos dice que lo hizo la recuperación (su autor es `copy_recovery:<id>`, el de la fila de Recuperaciones), así
 que ninguna automatización del negocio arranca con ellos (FLOW-F21), sea de algo creado o de algo recuperado; lo que
-solo pone al día lo del negocio con ellos sigue igual (la Bandeja de WhatsApp enlaza a la ficha su conversación). La
+solo pone al día lo del negocio con ellos sigue igual (la Bandeja de WhatsApp enlaza a la ficha su conversación), y lo
+que graba al hacerlo lleva la misma marca, así que tampoco arranca ninguna, ni de primera ni de segunda mano (la
+conversación enlazada otra vez no arranca «se vincula una conversación de WhatsApp a un cliente»; hub#1365). La
 copia, sin tocar; el aviso `control.copy.recovery_requested` con quién lo pidió.
 Si falla: lo que la restauración no admite lo dice el aviso, negocio a negocio, y ese negocio no se toca: uno que no está
 listo o no tiene base propia, una demo, uno que se está trasladando o restaurando, un clúster abierto a hubs nuevos o con
@@ -3210,9 +3221,9 @@ mantenimiento, hasta que se descongela. Con registros solo del entorno de prueba
 Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
 INVENTORY-F07, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08, SERVICE-F31,
-APPOINTMENT-F01, APPOINTMENT-F11, FLOW-F21; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285,
-hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1356, hub#1373,
-hub#1375, aws#77
+APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282,
+hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327,
+hub#1341, hub#1356, hub#1365, hub#1373, hub#1375, aws#77
 
 ## Para quien lo mantiene
 
@@ -3567,6 +3578,12 @@ hub#1375, aws#77
   fallara en él se alimentaría solo). `base/live.py` re-ejecuta `base.failed_event.list`, `base.event.list` y
   `base.bell.counters` con `created`, `retried` y `discarded`; `base.system.status`, con `base.hub.state_applied`. Tests:
   `base/tests/test_services_system.py`, `test_relay.py`, `test_live.py`.
+- Lo que una reacción graba como el sistema al contestar un aviso cuyo autor se pasa (`base.relay.carried`) lleva ese
+  autor, de primera y de segunda mano; lo que graba como alguien propio conserva el suyo. Se pasan el de una
+  recuperación (`copy_recovery:<id>`, BASE-F114) y los que una app declara en `carried_actors` de su `LiveAppConfig`
+  (`<label>:` o `<label>_<nombre>:`; hoy Automatizaciones, para que su guarda de bucles siga una cadena a través de
+  otra app). Una declaración que no es de la propia app (vacía, `system`, la de otra) la rechaza `base.E017` al
+  arrancar y no se usa. Tests: `base/tests/test_relay_carried.py`.
 - Lo que una reacción o una tarea programada deja para después del COMMIT y espera a la red va por
   `base.outbound.after_commit(fn, *args)` (FIX-HUB-BASE-RELAY-BLOCKED-BY-SLOW-REACTION-CALLS): `THREADS` (4) hilos del
   worker en el contexto de BD de la operación que lo pidió (`base.tenancy.context.use_again`), `QUEUED` (1000) en

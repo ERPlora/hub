@@ -165,10 +165,10 @@ def test_it_tells_the_device_of_the_customers_own_bookings_and_cancellations():
 # ── The Home's hooks ────────────────────────────────────────────────────────────────────────────────
 
 #: What changes how many upcoming bookings wait for confirmation in the agenda the person sees: one is booked
-#: pending; it is confirmed, started, completed (charged at the till), cancelled or deleted; it moves (to the past
-#: or to another professional) or its professional leaves. Never a no-show (only once its start is past, when it
-#: no longer counts), an edit of its notes or phone, a charge that leaves it as it was, nor a card merged into
-#: another (same professional, time and state).
+#: pending; it is confirmed, started, completed (charged at the till), cancelled, deleted or restored; it moves (to
+#: the past or to another professional) or its professional leaves. Never a no-show (only once its start is past,
+#: when it no longer counts), an edit of its notes or phone, a charge that leaves it as it was, nor a card merged
+#: into another (same professional, time and state).
 TO_CONFIRM = [
     "appointment.appointment.created",
     "appointment.appointment.confirmed",
@@ -178,6 +178,7 @@ TO_CONFIRM = [
     "appointment.appointment.rescheduled",
     "appointment.appointment.unassigned",
     "appointment.appointment.deleted",
+    "appointment.appointment.restored",
 ]
 
 

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:57b39908820422fec44930f4965b48a0b8b6b6d7b51e4adb7f8e4a6abf645f67 -->
+<!-- generated from WORKBOOK.md sha256:e00e84b559e6c52b61f4253a3a51adad8b65f25e1ec772687975cc0618dfaa41 -->
 
 ## What it is for and who it is for
 
@@ -428,11 +428,15 @@ In: the chosen category.
 Out: the category is deleted and all its products, active or not, unlinked in the same step; the
 products stay. The till stops grouping them under it.
 A category deleted by mistake is recovered by the ERPlora staff from a separate copy (BASE-F114): it comes back as a
-new one, with its name, slug, description, icon, colour, order and tax category, before the products, and in it the
-products that come back with the recovery: those the business deleted and still holds (the same ones, INVENTORY-F34)
-and those it no longer has (created again). A category the business keeps, even renamed, is the same one and is not
-repeated; nor is one it made again with its name (case and spaces aside): its own is used, as it is. The products the
-business keeps live stay as they are, without it (hub#1373).
+new one, with its name, slug, description, icon, colour, order and tax category, before the products, and with what it
+had inside in the copy: the products the business deleted and still holds (the same ones, INVENTORY-F34), those it no
+longer has (created again) and, last, those the business keeps live, which go back into it without losing any other
+category. Recoveries counts those links apart ("Product links to categories"). A category the business keeps, even
+renamed or with products taken out of it since, is the same one: it is neither repeated nor filled; nor is one it made
+again with its name (case and spaces aside): its own is used, as it is, and only the products created again go into it.
+A deleted product that comes back (INVENTORY-F34) does not go into the one the business made again by hand.
+If the recovery is asked again from a copy made before the category it brought back, that category still counts as
+brought back: the live products the business took out of it since go back into it.
 If it fails: "The category could not be deleted" (or the reason) above the table.
 Involved: KITCHEN-F04, SALE-F01, BASE-F114, INVENTORY-F34
 
@@ -1161,7 +1165,7 @@ or what no longer exists, is left out.
 | Marks a product as sold out or puts it back on sale | change products | one tap | F29 | `inventory.product.set_sold_out` |
 | Sets a product's photo, from the library, or removes it | change products | one tap | F30 | `inventory.product.set_image` |
 | Uploads a product's own photo (JPG, PNG or WebP of up to 2 MB; kept as a 512 × 512 WebP) | change products | not the assistant's: the file is chosen on the card | F31 | `inventory.product.upload_image` |
-| Adds a product to a category | change products | one tap | F08 | `inventory.product_category.add` |
+| Adds a product to a category (also the platform, when recovering a deleted category from a separate copy with the products the business keeps) | change products | one tap | F08, F07 | `inventory.product_category.add` |
 | Removes a product from a category | change products | one tap | F08 | `inventory.product_category.remove` |
 | Creates a category | create categories | one tap | F06 | `inventory.category.create` |
 | Creates many categories at once, with a report per row | create categories | one tap | F10 | `inventory.category.bulk_create` |

@@ -17,7 +17,8 @@ HOOK = "recoverable_from_copy"
 #: The actor prefix of what a recovery does in the business (``copy_recovery:<id>``, the ``CopyRecovery``'s id): its
 #: operations run as it, so every event they record keeps it in the outbox, as a run of an automation keeps its own
 #: (hub#1307). What comes back is nothing new to the business: a reaction that greets or announces something new (an
-#: automation of «customer created») starts nothing for it, while one that keeps the business's data whole still runs.
+#: automation of «customer created») starts nothing for it, while one that keeps the business's data whole still runs,
+#: and the events that one records keep the mark too (the relay gives it), so nothing starts from them either.
 ACTOR = "copy_recovery:"
 
 

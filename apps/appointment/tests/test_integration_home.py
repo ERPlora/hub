@@ -138,6 +138,13 @@ def professional_leaves(salon, appointment):
     op(system_context(A), op.input.model_validate({"id": str(salon.ana.id)}))
 
 
+def restored_from_a_copy(salon, appointment):
+    """Another booking waiting for the business, deleted, back on the agenda (BASE-F114)."""
+    deleted = waiting(salon, start=at(MONDAY, "15:00"), deleted_at=timezone.now())
+    op = get("appointment.appointment.restore")
+    op(system_context(A), op.input.model_validate({"id": str(deleted.id)}))
+
+
 def ref(name):
     return lambda salon, appointment: run(name, {"id": str(appointment.id)})
 
@@ -156,6 +163,7 @@ CHANGES = {
     ),
     "appointment.appointment.unassigned": professional_leaves,
     "appointment.appointment.deleted": ref("appointment.appointment.delete"),
+    "appointment.appointment.restored": restored_from_a_copy,
 }
 
 
