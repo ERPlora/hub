@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ff4bbe3a8718def67b34a0faace940fdae26dc101b96cf8edafa18801f373b7b -->
+<!-- generated from WORKBOOK.md sha256:12866b34247c9f7a926e36e7c31da69487a928c48fe579e95ba339466ca4af99 -->
 
 ## What it is for and who it is for
 
@@ -440,7 +440,9 @@ settings.
 Out: the active series, its appointments and the `appointment.recurring.created` event.
 If it fails: the reason in the panel; if the series was created and some date did not fit, they are listed
 with their reason.
-Involved: SERVICE-F33
+Involved: SERVICE-F33, BASE-F114 (ERPlora's staff recover from a separate copy the series the business no longer has
+with this same creation, after its appointments: it books no date that already has an appointment; a deleted one comes
+back the same, APPOINTMENT-F15)
 
 ### APPOINTMENT-F13 Book the appointments of a series
 Status: done
@@ -503,8 +505,17 @@ Steps:
    are kept.
 In: a series.
 Out: `appointment.recurring.updated` or `appointment.recurring.deleted`.
-If it fails: "The repeating appointment's status could not be changed." and the series stays as it was.
-Involved: none
+If it fails: "The repeating appointment's status could not be changed." and the series stays as it was. A series
+deleted by mistake is recovered by ERPlora's staff from a separate copy of the business (BASE-F114) if in the copy it
+was still booking (active, with its professional and not ended): THE SAME one comes back to **Repeating**, active, with
+its customer, its services, its professional, its repetition and the appointments it had already booked, with the
+`appointment.recurring.restored` event. It books nothing by itself: its next dates are booked with **Book
+appointments** (APPOINTMENT-F13), which skips those that already have an appointment. It only comes back if it could be
+created today (APPOINTMENT-F12): if its customer is no longer in the business, or its professional or one of its
+services can no longer be booked, it does not come back and Recoveries says why. One the business created again (the
+same customer, repeating the same way on the same day at the same time) stays as it is. One the business no longer has
+is created again as in APPOINTMENT-F12.
+Involved: BASE-F114
 
 ### APPOINTMENT-F16 Block time in the agenda
 Status: done
@@ -802,6 +813,7 @@ confirmation before doing them.
 | `appointment.appointment.reassigned` | Merging of cards | The card that stays and the absorbed one |
 | `appointment.blocked_time.created`, `.deleted` | Blocks | The block |
 | `appointment.recurring.created`, `.updated`, `.deleted` | Series | The series |
+| `appointment.recurring.restored` | A deleted series comes back to Repeating (recovering from a separate copy) | The series and its customer |
 | `appointment.settings.updated` | Saving settings with some change | Nothing |
 
 The events carry identifiers, never notes or reasons (they may carry health data).
