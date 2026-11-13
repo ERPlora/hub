@@ -180,7 +180,8 @@ Entra: lo que escribe la persona.
 Sale: el grupo (avisa: grupo creado). No crea opciones ni enganches.
 Si falla: un nombre vacío o de más de 255 caracteres, un mínimo o máximo fuera de 0–50 o un máximo por
 debajo del mínimo salen debajo de su campo; un nombre que ya tiene otro grupo, «Ya hay un grupo con ese
-nombre.» debajo del Nombre. Lo escrito se queda.
+nombre.» debajo del Nombre. El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo
+mismo (hub#888). Lo escrito se queda.
 Implicados: ninguno
 
 ### MODIFIER-F03 Cambiar o borrar un grupo
@@ -228,7 +229,9 @@ entonces, salir del suplemento lo deja como se escribió, sin inventarle decimal
 salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, el botón se enciende (hub#938). Un
 nombre vacío o repetido en el grupo, un suplemento que no es un importe, una categoría
-fiscal que no existe en Impuestos o más opciones por defecto que el máximo salen junto a su campo. Una
+fiscal que no existe en Impuestos o más opciones por defecto que el máximo salen junto a su campo; el del nombre,
+el nombre de comanda, el suplemento, la categoría fiscal o el orden se quita en cuanto se corrige ese campo, aunque
+otro diga lo mismo (hub#888). Una
 opción con categoría fiscal propia se cobra en una línea aparte, que no puede valer cero ni menos: «Una
 opción con su propia categoría fiscal se cobra en una línea aparte: su suplemento tiene que ser mayor
 que cero.». Un grupo admite hasta 100 opciones. Por el asistente, al cambiar o quitar una opción, un grupo dicho por
