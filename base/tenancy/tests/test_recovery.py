@@ -798,6 +798,93 @@ class TestEachThingAnAppGivesBack:
         ]
 
 
+def came_back_without(monkeypatch, operation: str, left_out) -> None:
+    """``operation`` says, as an app's operation says it (its output mixes in ``base.recovery.RecoveredOut``), what
+    each record it brings back came back without: ``left_out(data)``, by its input."""
+    op = get_operation(operation)
+    real, plain = op.fn, op.output
+
+    class Recovered(plain, base_recovery.RecoveredOut):
+        pass
+
+    def saying_what_it_left(ctx, data):
+        made = plain.model_validate(real(ctx, data))
+        return Recovered(**made.model_dump(), left_out=left_out(data))
+
+    monkeypatch.setattr(op, "fn", saying_what_it_left)
+    monkeypatch.setattr(op, "output", Recovered)
+
+
+def left(code: str, message: str):
+    return base_recovery.LeftOut(code=code, message=message)
+
+
+class TestWhatARecordCameBackWithout:
+    """A record can come back without something that hung from it (a professional of a service who has left since):
+    its operation says so and why, and the recovery notes it by the record's id in the copy, as it notes why one did not
+    come back at all."""
+
+    def test_each_is_noted_by_the_records_id_in_the_copy_with_why_and_counted_once_a_record(
+        self, recoveries, every_app_on, monkeypatch
+    ):
+        hub, (ana, luis, marta) = recoveries.business(every_app_on, ANA, LUIS, MARTA)
+        copy = recoveries.copy_of(hub)
+        # Ana deleted and still held, Luis and Marta gone: only Ana and Luis come back without something.
+        gone(hub, luis, marta)
+        run_in(hub, "customer.customer.delete", id=ana)
+        came_back_without(
+            monkeypatch,
+            "customer.customer.restore",
+            lambda data: [left("customer.test_left_out", "came back without its tag Regular")],
+        )
+        came_back_without(
+            monkeypatch,
+            "customer.customer.recover",
+            lambda data: [left("customer.test_left_out", f"came back without its group {group}") for group in "AB"]
+            if data.name == LUIS["name"]
+            else [],
+        )
+        asked = recoveries.ask(copy)
+
+        run()
+
+        assert fresh(asked).results == [
+            CUSTOMERS
+            | {
+                "restored": 1,
+                "created": 2,
+                "noted": 2,
+                "notes": [
+                    {"id": str(ana), "note": "customer.test_left_out: came back without its tag Regular"},
+                    {"id": str(luis), "note": "customer.test_left_out: came back without its group A"},
+                    {"id": str(luis), "note": "customer.test_left_out: came back without its group B"},
+                ],
+            }
+        ]
+
+    def test_only_the_first_notes_are_kept_and_every_record_noted_is_counted(
+        self, recoveries, every_app_on, monkeypatch
+    ):
+        hub, asked = recoveries.all_lost(every_app_on, ANA, LUIS)
+        came_back_without(
+            monkeypatch, "customer.customer.recover", lambda data: [left("customer.test_left_out", data.name)]
+        )
+        monkeypatch.setattr(CopyRecovery, "REASONS_KEPT", 1)
+
+        run()
+
+        [customers] = fresh(asked).results
+        assert (customers["created"], customers["noted"], len(customers["notes"])) == (2, 2, 1)
+
+    def test_an_output_that_says_nothing_left_notes_nothing(self, recoveries, every_app_on, monkeypatch):
+        hub, asked = recoveries.all_lost(every_app_on, ANA)
+        came_back_without(monkeypatch, "customer.customer.recover", lambda data: [])
+
+        run()
+
+        assert fresh(asked).results == [CUSTOMERS | {"created": 1}]
+
+
 class TestTheCopyIsOnlyRead:
     def test_no_alias_reaches_the_copy_and_nothing_in_it_changes(self, recoveries, every_app_on):
         hub, (ana,) = recoveries.business(every_app_on, ANA)

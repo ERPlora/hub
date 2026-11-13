@@ -882,7 +882,8 @@ enciende (hub#946). Mientras llega la lista sale
 «Cargando…»; si no se puede leer, «No se han podido cargar los profesionales.» con el motivo y
 «Reintentar», nunca «Nadie asignado todavía».
 Implicados: STAFF-F01, SALE-F38, BASE-F114 (desde una copia aparte, un servicio recuperado vuelve asignado, por esta
-misma operación, a quien lo hacía y el negocio sigue teniendo de alta)
+misma operación, a quien lo hacía y el negocio sigue teniendo de alta; a quien no, Recuperaciones lo nombra con el
+porqué)
 
 ### SERVICE-F32 Cambiar o quitar un profesional de un servicio
 <!-- origen: old:staff/workflow/disponibilidad.md#staff-f11 -->
@@ -1360,8 +1361,7 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   sus sesiones. Le pasa también a los vendidos antes de esa cifra.
 - **Importar servicios desde un fichero**: como en el producto actual, el alta de golpe es del
   asistente y la API.
-- **Lo que no vuelve con un servicio recuperado desde una copia aparte** (BASE-F114): su imagen (hub#1429); y
-  Recuperaciones no nombra al profesional dado de baja que no vuelve con él (hub#1375).
+- **Lo que no vuelve con un servicio recuperado desde una copia aparte** (BASE-F114): su imagen (hub#1429).
 
 ## Lo que NO hace, a propósito
 
