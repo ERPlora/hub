@@ -128,6 +128,20 @@ class Recoveries(hubs.CopiedHubs):
         gone(hub, *ids)
         return hub, self.ask(copy)
 
+    def deleted_with_customers_off(self, every_app_on) -> tuple[Hub, CopyRecovery]:
+        """A business that deleted Ana's card since its copy and then turned Customers off, and the recovery asked of
+        that copy."""
+        hub, (ana,) = self.business(every_app_on, ANA)
+        copy = self.copy_of(hub)
+        run_in(hub, "customer.customer.delete", id=ana)
+        with use_hub(hub):
+            from base import activation
+            from base.models import AppActivation
+
+            AppActivation.objects.filter(host=hub.slug, app="customer").update(state="off")
+            activation.forget(hub.slug)
+        return hub, self.ask(copy)
+
     def ask(self, copy: RestoredCopy, *apps: str, **fields) -> CopyRecovery:
         """What ``control.copy.recover`` writes: the apps to bring back from ``copy``, asked by the staff."""
         values = {"copy": copy, "apps": list(apps or ["customer"]), "asked_by": "root", "language": "en"}
@@ -431,16 +445,7 @@ class TestCustomersComeBack:
         assert (customers["created"], customers["not_created"], len(customers["reasons"])) == (0, 2, 1)
 
     def test_an_app_the_business_turned_off_is_refused_with_why_and_nothing_is_made(self, recoveries, every_app_on):
-        hub, (ana,) = recoveries.business(every_app_on, ANA)
-        copy = recoveries.copy_of(hub)
-        run_in(hub, "customer.customer.delete", id=ana)
-        with use_hub(hub):
-            from base import activation
-            from base.models import AppActivation
-
-            AppActivation.objects.filter(host=hub.slug, app="customer").update(state="off")
-            activation.forget(hub.slug)
-        asked = recoveries.ask(copy)
+        hub, asked = recoveries.deleted_with_customers_off(every_app_on)
 
         run()
 
@@ -725,16 +730,7 @@ class TestEachThingAnAppGivesBack:
     ):
         asked_for = []
         groups_given_back_too(monkeypatch, missing=lambda records: asked_for.append(records) or records)
-        hub, (ana,) = recoveries.business(every_app_on, ANA)
-        copy = recoveries.copy_of(hub)
-        run_in(hub, "customer.customer.delete", id=ana)
-        with use_hub(hub):
-            from base import activation
-            from base.models import AppActivation
-
-            AppActivation.objects.filter(host=hub.slug, app="customer").update(state="off")
-            activation.forget(hub.slug)
-        asked = recoveries.ask(copy)
+        hub, asked = recoveries.deleted_with_customers_off(every_app_on)
 
         run()
 
