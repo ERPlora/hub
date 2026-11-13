@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f03cab73224d442a43109239a66d805b1b73731b213761e7173e232b85ce3b78 -->
+<!-- generated from WORKBOOK.md sha256:a1285e73b0885a613397640848150dda224af00190cdf587f338b56b98412452 -->
 
 ## What it is for and who it is for
 
@@ -3029,15 +3029,19 @@ Steps:
       services with the same name both come back) is not repeated. Asking again creates nothing twice.
       Appointments always go after customers and services, whatever the order they are asked in, so each finds its
       customer and its services. Each appointment that has not come yet and was still booked (pending or confirmed, not
-      charged) comes back, booked as the agenda books it: for its customer's card in the business (the same one, the one
-      it was merged into or the one made again), with its services in the business as Services matches them (the same
-      one or, if it is gone, the one made again by hand or just brought back by Services: the same name in the same
-      category, the oldest if there are two), its professional, its time, its minutes and its notes; as a new
-      appointment, with another number and without its history (hub#1326). It is never booked over another: one whose
-      time is already taken, no longer fits the business's or the professional's hours or is blocked, or whose customer,
-      service or professional is no longer there, does not come back and its reason says why ("appointment.slot_taken:
-      …", "service.service_not_found: …"). Those gone by do not come back, nor one the business has (even if it
-      cancelled it) or booked again (the same customer at the same time).
+      charged) comes back. One the business deleted and still holds comes back THE SAME and counts as restored, as it
+      was when it was deleted: with its number, its customer, its services, its professional, its time, its notes, its
+      series and its history, which adds "Restored" (APPOINTMENT-F11). One the business no longer has comes back booked
+      as the agenda books it: for its customer's card in the business (the same one, the one it was merged into or the
+      one made again), with its services in the business as Services matches them (the same one or, if it is gone, the
+      one made again by hand or just brought back by Services: the same name in the same category, the oldest if there
+      are two), its professional, its time, its minutes and its notes; as a new appointment, with another number and
+      without its history. It is never booked over another: one whose time is already taken, no longer fits the
+      business's or the professional's hours or is blocked, or whose customer, service or professional is no longer
+      there, does not come back and its reason says why ("appointment.slot_taken: …", "service.service_not_found: …");
+      a deleted one that does not come back for that is not created anew. Those gone by do not come back, nor one the
+      business has (even if it cancelled it) or booked again (the same customer at the same time, or its series on that
+      date).
 In: the chosen businesses, the temporary cluster with their copy and the moment; to recover, the made separate copy and
 what to bring back.
 Out: the business's database as it was at that moment; the one it had, kept 7 days on its server; the notice
@@ -3055,12 +3059,13 @@ product it still held, live again with its product-recovered notice (`inventory.
 each product it no longer had, with its product-created notice (`inventory.product.created`), a new service category
 for each one it lacked, with its category-created notice (`service.category.created`), a new service for each one it
 no longer had, with its service-created notice (`service.service.created`) and a professional-assigned notice
-(`service.assignment.assigned`) for each professional who comes back with it, and a new appointment for each one it
-lacked, with its appointment-created notice (`appointment.appointment.created`), and nothing else. Each of those notices
-says the recovery did it (its actor is `copy_recovery:<id>`, that of the row in Recoveries), so no automation of the
-business starts on them (FLOW-F21), whether of something created or of something recovered; what only brings the
-business's own data up to date with them goes on the same (the WhatsApp Inbox links its conversation to the card), and
-what it records in doing so carries the same mark, so none starts from it either, first or second hand (the
+(`service.assignment.assigned`) for each professional who comes back with it, each deleted appointment it still held,
+live again with its appointment-recovered notice (`appointment.appointment.restored`), and a new appointment for each
+one it no longer had, with its appointment-created notice (`appointment.appointment.created`), and nothing else. Each of
+those notices says the recovery did it (its actor is `copy_recovery:<id>`, that of the row in Recoveries), so no
+automation of the business starts on them (FLOW-F21), whether of something created or of something recovered; what only
+brings the business's own data up to date with them goes on the same (the WhatsApp Inbox links its conversation to the
+card), and what it records in doing so carries the same mark, so none starts from it either, first or second hand (the
 conversation linked again does not start "a WhatsApp conversation is linked to a customer"; hub#1365). The
 copy, untouched; the notice `control.copy.recovery_requested` with who asked for it.
 If it fails: what the restore does not accept is said in the notice, business by business, and that business is not
@@ -3091,6 +3096,6 @@ support staff see the list, Separate copies and Recoveries, but not the actions.
 Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
 INVENTORY-F07, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08, SERVICE-F31,
-APPOINTMENT-F01, APPOINTMENT-F11, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283,
-hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341,
-hub#1356, hub#1365, hub#1373, hub#1375, aws#77
+APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282,
+hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327,
+hub#1341, hub#1356, hub#1365, hub#1373, hub#1375, aws#77

@@ -548,43 +548,70 @@ class Salon:
             ]
 
 
-def booked_events(hub: Hub) -> int:
+def booked_events(hub: Hub, name: str = "appointment.appointment.created") -> int:
     with use_hub(hub):
-        return OutboxEvent.objects.filter(name="appointment.appointment.created").count()
+        return OutboxEvent.objects.filter(name=name).count()
+
+
+def gone_from_the_agenda(hub: Hub, *appointments) -> None:
+    """``appointments``' rows gone altogether from ``hub``, with what hangs from them: what the business no longer has
+    (no operation destroys an appointment: a lost database does)."""
+    from apps.appointment.models import Appointment
+
+    with use_hub(hub):
+        Appointment.objects.filter(pk__in=[one.id for one in appointments]).delete()
 
 
 def the_one_not_booked(asked: CopyRecovery) -> dict:
-    """Why the only appointment of ``asked`` that did not come back did not, the others having come back."""
+    """Why the only appointment of ``asked`` that did not come back did not, the others having come back the same: a
+    deleted one the restore refuses is never booked anew."""
     [appointments] = fresh(asked).results
-    assert (appointments["created"], appointments["not_created"], appointments["refused"]) == (1, 1, "")
+    assert (appointments["restored"], appointments["created"], appointments["not_created"], appointments["refused"]) == (
+        1,
+        0,
+        1,
+        "",
+    )
     [why] = appointments["reasons"]
     return why
 
 
 class TestAppointmentsComeBack:
-    def test_the_appointments_the_business_lost_come_back_each_booked_by_its_operation(self, recoveries, every_app_on):
+    def test_a_deleted_appointment_comes_back_the_same_and_one_gone_is_booked_anew(self, recoveries, every_app_on):
+        """hub#1326: the one the business deleted (APPOINTMENT-F11 keeps it) comes back by Appointments' restore, with
+        its number and its history; only the one it no longer has is booked again, by the agenda's create."""
+        from apps.appointment.models import Appointment
+
         salon = Salon(recoveries, every_app_on, ANA, LUIS)
         ana, luis = salon.cards
-        first = salon.book(ana, "10:00", notes="Bring the colour reference")
-        second = salon.book(luis, "11:00", duration_minutes=45)
+        deleted = salon.book(ana, "10:00", notes="Bring the colour reference")
+        lost = salon.book(luis, "11:00", duration_minutes=45)
         then = salon.live()
-        asked = recoveries.ask(salon.lost_since_a_copy(first, second), "appointment")
-        before = booked_events(salon.hub)
+        copy = salon.lost_since_a_copy(deleted)
+        gone_from_the_agenda(salon.hub, lost)
+        asked = recoveries.ask(copy, "appointment")
+        before = (booked_events(salon.hub), booked_events(salon.hub, "appointment.appointment.restored"))
 
         assert run() == 1
 
         assert salon.live() == then
-        # Through the agenda's create, never a copied row: new appointments, each with its number and its event.
-        from apps.appointment.models import Appointment
-
         with use_hub(salon.hub):
-            back = Appointment.objects.filter(deleted_at__isnull=True)
-            assert not {one.pk for one in back} & {first.id, second.id}
-            assert not {one.number for one in back} & {first.number, second.number}
-        assert booked_events(salon.hub) == before + 2
+            back = Appointment.objects.get(pk=deleted.id)
+            assert (back.deleted_at, back.number) == (None, deleted.number)
+            assert list(back.history.order_by("at", "id").values_list("action", flat=True)) == [
+                "created",
+                "deleted",
+                "restored",
+            ]
+            [anew] = Appointment.objects.exclude(pk=deleted.id)
+            assert (anew.pk, anew.number) != (lost.id, lost.number)
+        assert (booked_events(salon.hub), booked_events(salon.hub, "appointment.appointment.restored")) == (
+            before[0] + 1,
+            before[1] + 1,
+        )
         done = fresh(asked)
         assert (done.status, done.last_error) == ("done", "")
-        assert done.results == [APPOINTMENTS | {"created": 2}]
+        assert done.results == [APPOINTMENTS | {"restored": 1, "created": 1}]
 
     def test_asked_again_nothing_is_booked_twice(self, recoveries, every_app_on):
         salon = Salon(recoveries, every_app_on, ANA)
@@ -624,7 +651,7 @@ class TestAppointmentsComeBack:
         [(name, *_rest)] = salon.live()
         assert name == "Ana López"
         assert [result["app"] for result in fresh(asked).results] == ["customer", "appointment"]
-        assert fresh(asked).results[1] == APPOINTMENTS | {"created": 1}
+        assert fresh(asked).results[1] == APPOINTMENTS | {"restored": 1}
 
     def test_one_whose_time_was_taken_since_is_never_booked_over_and_says_why_and_the_others_come_back(
         self, recoveries, every_app_on

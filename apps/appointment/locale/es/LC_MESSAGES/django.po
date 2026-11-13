@@ -342,6 +342,10 @@ msgstr "Venta anulada"
 msgid "Deleted"
 msgstr "Borrada"
 
+msgctxt "appointment history"
+msgid "Restored"
+msgstr "Recuperada"
+
 msgid "action"
 msgstr "acción"
 
@@ -494,6 +498,9 @@ msgstr "Pide como mucho 62 días de una vez."
 
 msgid "The calendar has to end after it starts."
 msgstr "El calendario tiene que terminar después de empezar."
+
+msgid "Its repeating appointment has booked that date again since."
+msgstr "Su cita periódica ya ha vuelto a reservar esa fecha."
 
 msgid ""
 "This appointment can no longer be confirmed: it is not pending any more."
