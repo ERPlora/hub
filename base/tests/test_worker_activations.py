@@ -15,6 +15,7 @@ the platform (``base``, ``live``) and two businesses cloned from it, A and B.
 import datetime as dt
 import threading
 import uuid
+from collections.abc import Callable
 
 import pytest
 from django.db import connections
@@ -177,6 +178,22 @@ def run_pass(now: dt.datetime | None = None) -> None:
     worker._activations(now or timezone.now())
 
 
+def run_pass_at(at: dt.datetime) -> None:
+    """A pass at ``at`` with the deployment's clock standing still there while it runs. What it puts off or tries again
+    later is written from that clock, so it is ``at`` plus its wait exactly, however long a loaded machine takes to get
+    there (hub#826)."""
+    with pytest.MonkeyPatch.context() as clock:
+        clock.setattr(timezone, "now", lambda: at)
+        run_pass(at)
+
+
+def tables_failing(monkeypatch) -> Callable[[], None]:
+    """Making the tables raises ``RuntimeError("boom")`` until the function returned puts the real one back."""
+    real = migrator.ensure_schema
+    monkeypatch.setattr(migrator, "ensure_schema", lambda hub, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    return lambda: monkeypatch.setattr(migrator, "ensure_schema", real)
+
+
 # ── What is due in a hub ────────────────────────────────────────────────────────────────────────────────────────
 # (A ``django_db`` test: pytest-django sets the test databases up for the session before any of this module's.)
 
@@ -263,24 +280,23 @@ def test_the_pass_leaves_no_connection_to_the_hubs_database_open(business):
 def test_making_its_tables_failing_leaves_it_failed_with_why_and_a_try_a_minute_later_finishes_it(business, monkeypatch):
     a = business("a")
     turn_on(a)
-    real = migrator.ensure_schema
-    monkeypatch.setattr(migrator, "ensure_schema", lambda hub, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    mend = tables_failing(monkeypatch)
     now = timezone.now()
 
-    run_pass(now)
+    run_pass_at(now)
 
     failed = row(a)
     assert (failed.state, failed.attempts) == (FAILED, 1)
     assert "boom" in failed.last_error
-    assert dt.timedelta(seconds=55) <= failed.next_attempt_at - now <= dt.timedelta(seconds=65)
+    assert failed.next_attempt_at == now + dt.timedelta(seconds=60)
     assert outbox(a)[-1] == (events.APP_ACTIVATION_FAILED, {"apps": [APP], "error": "schema_failed"})
     assert not hubs.hub_tables([APP]) & tables(a)
 
-    monkeypatch.setattr(migrator, "ensure_schema", real)
-    run_pass(now + dt.timedelta(seconds=30))  # not due yet
+    mend()
+    run_pass_at(now + dt.timedelta(seconds=30))  # not due yet
     assert row(a).state == FAILED
 
-    run_pass(now + dt.timedelta(seconds=61))
+    run_pass_at(now + dt.timedelta(seconds=61))
     done = row(a)
     assert (done.state, done.attempts, done.last_error, done.next_attempt_at) == (ON, 0, "", None)
     assert hubs.hub_tables([APP]) <= tables(a)
@@ -292,14 +308,14 @@ def test_each_failure_waits_longer_up_to_an_hour(business, monkeypatch, attempts
     turn_on(a)
     with use_hub(fresh(a)):
         AppActivation.objects.filter(host=a.slug, app=APP).update(attempts=attempts)
-    monkeypatch.setattr(migrator, "ensure_schema", lambda hub, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    tables_failing(monkeypatch)
     now = timezone.now()
 
-    run_pass(now)
+    run_pass_at(now)
 
     failed = row(a)
     assert failed.attempts == attempts + 1
-    assert abs((failed.next_attempt_at - now).total_seconds() - wait) < 5
+    assert failed.next_attempt_at == now + dt.timedelta(seconds=wait)
 
 
 # ── Two at once in one hub, one waits or is put off; no 42P07 ───────────────────────────────────────────────────
@@ -311,15 +327,15 @@ def test_a_schema_held_by_another_run_puts_it_off_30_seconds(business):
     now = timezone.now()
     with hubs._maintenance(a.db_name) as holder:
         holder.execute("SELECT pg_advisory_lock(hashtext('erplora.schema'))")
-        run_pass(now)
+        run_pass_at(now)
         waiting = row(a)
         assert waiting.state == CREATING and waiting.attempts == 0
-        assert dt.timedelta(seconds=25) <= waiting.next_attempt_at - now <= dt.timedelta(seconds=35)
+        assert waiting.next_attempt_at == now + dt.timedelta(seconds=30)
         assert not hubs.hub_tables([APP]) & tables(a)
-        run_pass(now + dt.timedelta(seconds=10))  # not due yet
+        run_pass_at(now + dt.timedelta(seconds=10))  # not due yet
         assert row(a).state == CREATING
 
-    run_pass(now + dt.timedelta(seconds=40))  # its wait counts from when the lock was found held (1 s of waiting)
+    run_pass_at(now + dt.timedelta(seconds=40))  # past its 30 s
     assert row(a).state == ON
 
 
@@ -387,11 +403,11 @@ def test_a_request_of_a_newer_code_waits_for_a_worker_of_that_code(business, cap
         AppActivation.objects.filter(host=a.slug, app=APP).update(target="9999_of_a_newer_code")
     now = timezone.now()
 
-    run_pass(now)
+    run_pass_at(now)
 
     waiting = row(a)
     assert waiting.state == CREATING
-    assert dt.timedelta(seconds=55) <= waiting.next_attempt_at - now <= dt.timedelta(seconds=65)
+    assert waiting.next_attempt_at == now + dt.timedelta(seconds=60)
     assert not hubs.hub_tables([APP]) & tables(a)
     assert "base.app.activation_newer_code" in caplog.text
 
@@ -436,27 +452,26 @@ def test_a_schema_held_puts_it_off_30_seconds_in_hub_due_and_the_pass_over_the_h
     now = timezone.now()
     with hubs._maintenance(a.db_name) as holder:
         holder.execute("SELECT pg_advisory_lock(hashtext('erplora.schema'))")
-        run_pass(now)
-    assert dt.timedelta(seconds=25) <= due_at(a) - now <= dt.timedelta(seconds=35)
+        run_pass_at(now)
+    assert due_at(a) == now + dt.timedelta(seconds=30)
 
     provision.run_due(now + dt.timedelta(seconds=40))  # the worker's own pass over hub_due, after the ring came
 
     assert due_at(a) is not None
-    run_pass(now + dt.timedelta(seconds=40))
+    run_pass_at(now + dt.timedelta(seconds=40))
     assert row(a).state == ON
 
 
 def test_a_failure_rings_its_hub_at_its_next_try_and_nothing_pending_ends_the_ring(business, monkeypatch):
     a = business("a")
     turn_on(a)
-    real = migrator.ensure_schema
-    monkeypatch.setattr(migrator, "ensure_schema", lambda hub, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    mend = tables_failing(monkeypatch)
     now = timezone.now()
 
     run_pass(now)
 
     assert due_at(a) == row(a).next_attempt_at
-    monkeypatch.setattr(migrator, "ensure_schema", real)
+    mend()
     run_pass(row(a).next_attempt_at)
     assert row(a).state == ON
     assert due_at(a) is None
@@ -555,12 +570,14 @@ def test_an_app_asked_by_a_code_that_is_gone_fails_as_code_behind_after_ten_minu
         Hub.objects.filter(pk=a.pk).update(schema_apps={**fresh(a).schema_apps, APP: "9999_of_a_code_rolled_back"})
     now = timezone.now()
 
-    run_pass(now)
+    run_pass_at(now)
     assert row(a).state == CREATING  # a newer worker may still be coming: put off
 
+    later = now + dt.timedelta(minutes=2)  # past its wait of a minute
     with use_hub(fresh(a)):
-        AppActivation.objects.filter(host=a.slug, app=APP).update(changed_at=now - dt.timedelta(minutes=10))
-    run_pass(now + dt.timedelta(minutes=2))  # past its wait of a minute
+        # Asked for exactly ten minutes before the clock the pass stands at, so a longer threshold leaves it waiting.
+        AppActivation.objects.filter(host=a.slug, app=APP).update(changed_at=later - dt.timedelta(minutes=10))
+    run_pass_at(later)
 
     failed = row(a)
     assert (failed.state, failed.attempts) == (FAILED, 1)
