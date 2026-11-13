@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e8b9ce598239ac84079bff76ee574026210a628168d1509707548677fa21bdb6 -->
+<!-- generated from WORKBOOK.md sha256:7bb1f16f1eecff2411e9e585b07e3b65726dd6a0d8b73397c5c7c031d0fb778b -->
 
 ## What it is for and who it is for
 
@@ -2980,8 +2980,8 @@ Steps:
       Appointments into its business within a few minutes: Recoveries says how it went." appears. In Recoveries they
       see it "Asked" with the copy, what
       was asked and when.
-  11. A few minutes later it says "Done" and what came back: "Customers: 1 restored, 2 created" or "Customers: 2
-      created, 1 not created". Its page also says which did not come back and why (by their identifier in the copy,
+  11. A few minutes later it says "Done" and what came back, each thing apart and by its name: "Customers: 1
+      restored, 2 created" or "Customers: 2 created, 1 not created". Its page also says which did not come back and why (by their identifier in the copy,
       without personal data). A customer the business deleted and still holds comes back THE SAME card, with their
       purchases and what was spent, their consents, notes and activity, their groups, tags and own fields and their
       linked orders (CUSTOMER-F33). One the business no longer has comes back as a new card, created as the Customers
@@ -2991,8 +2991,8 @@ Steps:
       does not come back. A deleted card that comes back does not get back the group, tag or field the business deleted
       afterwards (hub#1356). A card whose personal data was erased (GDPR) or one merged into another never
       comes back, and one the business has already made again (the same name, phone and email) is not repeated. With
-      Products, "Product categories, Products: 1 restored, 2 created" (the categories and the products that came back,
-      together, hub#1355): first each product category the business no longer has (it deleted or lost it) comes back as a new one,
+      Products, "Product categories: 1 created; Products: 1 restored, 1 created" (the categories and the products that
+      came back, each with its own count): first each product category the business no longer has (it deleted or lost it) comes back as a new one,
       created as the Categories screen creates it, with its name, slug, description, icon, colour, order and tax
       category; the deleted one stays deleted (INVENTORY-F07). One the business keeps, even renamed, is the same one, and
       one it has already made again (another live one with its name, case and spaces aside, that is not already one of
@@ -3006,8 +3006,8 @@ Steps:
       because the copy's is another day's, and without its image (hub#1319). The products the business keeps live stay
       as they are: those that were in a category that comes back stay without it (hub#1373). One the business has
       already created again (another live one with its SKU or its
-      EAN-13) neither comes back nor is repeated. With Services, "Service categories, Services: 3 created" (the categories
-      and the services that came back, together): first each service category the business no longer has (it deleted or
+      EAN-13) neither comes back nor is repeated. With Services, "Service categories: 1 created; Services: 2 created" (the
+      categories and the services that came back, each with its own count): first each service category the business no longer has (it deleted or
       lost it) comes back as a new one, created as the Categories screen creates it, with its name, description, icon,
       colour and order, inside its parent category if the business has it or it comes back too (otherwise at the root);
       the deleted one stays deleted. One the business has already created again (another live one with its name, case
@@ -3072,7 +3072,8 @@ accepts the same as the restore and what it does not accept is said in the notic
 nothing of it is left and Separate copies says why ("restore_aside_<step>: …"); the business does not notice. Recovering
 is only possible from a made copy and once at a time per copy; otherwise the notice says so ("Only a separate copy that
 is made gives anything back."), and with nothing ticked the page asks again. What cannot be brought from an app is said in
-its result and the rest goes on: the app is turned off in the business ("Customers: nothing (app_inactive: …)"), or the
+its result and the rest goes on: the app is turned off in the business ("Customers: nothing (app_inactive: …)"; in an app that gives back several
+things, each says so: "Service categories: nothing (app_inactive: …); Services: nothing (app_inactive: …)"), or the
 copy did not have it, lacks the migration its read needs or has one this code does not know (`recover_not_in_copy`,
 `recover_copy_behind`, `recover_copy_ahead`). What the create operation does not accept today (a phone no longer valid, a value of an own field its field no longer
 accepts, a
@@ -3090,4 +3091,4 @@ CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F
 INVENTORY-F07, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08, SERVICE-F31,
 APPOINTMENT-F01, APPOINTMENT-F11, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283,
 hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341,
-hub#1356, hub#1365, hub#1373, hub#1375, aws#77
+hub#1355, hub#1356, hub#1365, hub#1373, hub#1375, aws#77
