@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:baa85c8936dd85733d130a971859871a3d8519137c69ea748192568685660974 -->
+<!-- generated from WORKBOOK.md sha256:c8b5ee694ed0f42fee55ffdeeb6e07adc66327ed805a80ad9fe11cf8326efe8e -->
 
 ## What it is for and who it is for
 
@@ -653,9 +653,10 @@ card again). What the business creates afterwards starts them as always.
 Out: a run (`flow.run.started`, `flow.run.finished` or `flow.run.parked` if it waits), in the business
 where the notice happened. The same notice delivered twice starts **a single** run per automation.
 If it fails: each step that fails stops the run with its reason, visible in History; the previous steps
-stay done. An automation that would set itself off in a chain is stopped (see "Para quien lo mantiene"). An
-"Only continue if…" that can no longer be read stops the run with "This "Only continue if…" can no longer be
-read…".
+stay done. An automation that would set itself off in a chain is stopped (see "Para quien lo mantiene"), also
+when the chain goes through another app: the WhatsApp Inbox linking the conversation of her number to the card an
+automation made does not make the next one start over. An "Only continue if…" that can no longer be read stops the
+run with "This "Only continue if…" can no longer be read…".
 Involved: FLOW-F10, FLOW-F11, FLOW-F15, FLOW-F16, BASE-F114, WHATSAPP_INBOX-F04
 
 ### FLOW-F22 When the time comes, the automation starts
