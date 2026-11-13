@@ -186,6 +186,7 @@ def test_what_the_business_does_in_the_same_pass_never_takes_a_carried_actor(db,
         pytest.param(PERSON, False, id="a person"),
         pytest.param("another_run:01a1cff9-afb1-777e-af7c-92ec1c30390e", False, id="undeclared"),
         pytest.param("base_runner:x", False, id="only the declared prefix"),
+        pytest.param(f"shift {DECLARED}x", False, id="the prefix further in"),
     ],
 )
 def test_carried_says_which_actors_are_passed_on(actor, carried):
