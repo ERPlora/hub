@@ -22,11 +22,7 @@ const APPS: AppDatasets[] = [
 
 const FILE = { filename: 'bar-pepe_en.blueprint.zip', content_type: 'application/zip', content_base64: 'UEsDBA==' };
 
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastSuccess: vi.fn(() => Promise.resolve()),
-  toastError: vi.fn(() => Promise.resolve()),
-}));
+vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../../__tests__/toast-spies')).shellWithToastSpies(importOriginal));
 
 let clicked: string[] = [];
 

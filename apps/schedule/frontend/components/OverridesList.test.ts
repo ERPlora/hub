@@ -7,7 +7,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import type { OverrideOut } from '../operations';
-import { EMPLOYEE, errorFrame, flush, type MountOptions, mountSchedule, page, settle } from '../__tests__/mount-schedule';
+import { flush, type MountOptions, mountSchedule, page, settle } from '../__tests__/mount-schedule';
+import { itNamesTheListThatDoesNotLoad, itOnlyReadsForAnEmployee } from '../__tests__/list-checks';
 import OverrideFormModal from './OverrideFormModal.vue';
 import OverridesList from './OverridesList.vue';
 
@@ -153,21 +154,9 @@ describe('OverridesList', () => {
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/schedule/overrides/delete', query: {}, body: { id: 'o1' } }]);
   });
 
-  it('an employee only reads', async () => {
-    const s = await setup({ session: EMPLOYEE });
-    await s.show(page(ROWS));
-    expect([s.prop('addable'), s.prop('rowClickable'), s.prop('actions')]).toEqual([false, false, []]);
-  });
+  itOnlyReadsForAnEmployee(setup, page(ROWS));
 
-  it('a list that does not load names itself, then the cause, never the generic text', async () => {
-    const s = await setup({ locale: 'es' });
-    s.net.lastStream().push(errorFrame(s.subId(OP), 'boom'));
-    await flush();
-    const box = s.wrapper.find('.data-table__error');
-    expect(box.find('.data-table__error-title').text()).toBe('No se han podido cargar los cambios temporales.');
-    expect(box.find('.data-table__error-reason').text()).toBe('msg boom');
-    expect(box.text()).not.toContain('No se han podido cargar los datos');
-  });
+  itNamesTheListThatDoesNotLoad(setup, OP, 'No se han podido cargar los cambios temporales.');
 
   it('speaks Spanish', async () => {
     const s = await setup({ locale: 'es' });

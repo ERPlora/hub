@@ -14,10 +14,7 @@ import { pkg } from '../__tests__/package';
 import type { GrantOut, PackageOut, RedeemCheckOut } from '../operations';
 import GrantRedeemModal from './GrantRedeemModal.vue';
 
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
-});
+vi.mock('@ionic/vue', async (importOriginal) => (await import('../../../../base/frontend/__tests__/ion-modal-stub')).ionicWithModalStub(importOriginal));
 
 const CHECK = '/api/service/grants/redeem_check';
 const REDEEM = '/api/service/grants/redeem';

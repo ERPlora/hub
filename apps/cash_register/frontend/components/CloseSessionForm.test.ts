@@ -48,19 +48,45 @@ const queue = (usages: ReturnType<typeof usage>[] = []) => ({
   failed: usages.reduce((sum, row) => sum + row.failed, 0),
 });
 
+/** What the hub answers once the session is closed with its expected cash counted. */
+const CLOSED = { id: 's1', number: 'S-261014-0001', status: 'closed', expected_balance: 10150, closing_balance: 10150, difference: 0 };
+
 async function setup(locale: 'en' | 'es' = 'en', options: { business?: Business | null } = {}) {
   const m = await mountCash(CloseSessionForm, { props: { session: SESSION }, locale, ...options });
   await m.live();
   const counted = () => m.inDoc('cash-register-close-counted');
   const submit = () => click(m.inDoc('cash-register-close-submit'));
-  const ready = async (expected: number | null = 10150, countRows: unknown[] = [], checkRows: unknown[] = []) => {
+  /** The session, its counts and the open checks answered; the kitchen and the print queue not yet. */
+  const answerTheSession = async (expected: number | null = 10150, countRows: unknown[] = [], checkRows: unknown[] = []) => {
     await m.result(DETAIL, detail(expected));
     await m.result(COUNTS, counts(countRows));
     await m.result(CHECKS, checks(checkRows));
+  };
+  const ready = async (expected: number | null = 10150, countRows: unknown[] = [], checkRows: unknown[] = []) => {
+    await answerTheSession(expected, countRows, checkRows);
     await m.result(KITCHEN, board());
     await m.result(PRINTS, queue());
   };
-  return { ...m, counted, submit, ready };
+  /** Counts the expected cash and presses «Close» once. */
+  const closeCountingTheExpected = async () => {
+    await ionValue(counted(), '101,50', 'ionInput');
+    m.answer(200, CLOSED);
+    await submit();
+  };
+  return { ...m, counted, submit, answerTheSession, ready, closeCountingTheExpected };
+}
+
+/** Counts the expected cash and presses «Close» twice: the first press only warns, its button now «Close anyway»; the
+ *  second closes. */
+async function expectClosesOnTheSecondPress(s: Awaited<ReturnType<typeof setup>>): Promise<void> {
+  await ionValue(s.counted(), '101,50', 'ionInput');
+  await s.submit();
+  expect(s.sent()).toEqual([]);
+  expect(s.find('cash-register-review-confirm').exists()).toBe(true);
+  expect(s.inDoc('cash-register-close-submit')?.textContent?.trim()).toBe('Close anyway');
+  s.answer(200, CLOSED);
+  await s.submit();
+  expect(s.sent()).toHaveLength(1);
 }
 
 describe('CloseSessionForm', () => {
@@ -126,21 +152,12 @@ describe('CloseSessionForm', () => {
     const s = await setup();
     await s.ready(10150, [], [{ id: 'o1', label: 'Table 4' }]);
     expect(s.find('cash-register-review').text()).toContain('Table 4');
-    await ionValue(s.counted(), '101,50', 'ionInput');
-    await s.submit();
-    expect(s.sent()).toEqual([]);
-    expect(s.find('cash-register-review-confirm').exists()).toBe(true);
-    expect(s.inDoc('cash-register-close-submit')?.textContent?.trim()).toBe('Close anyway');
-    s.answer(200, { id: 's1', number: 'S-261014-0001', status: 'closed', expected_balance: 10150, closing_balance: 10150, difference: 0 });
-    await s.submit();
-    expect(s.sent()).toHaveLength(1);
+    await expectClosesOnTheSecondPress(s);
   });
 
   it('warns of the kitchen tickets not served and the prints that did not come out', async () => {
     const s = await setup();
-    await s.result(DETAIL, detail(10150));
-    await s.result(COUNTS, counts([]));
-    await s.result(CHECKS, checks([]));
+    await s.answerTheSession();
     await s.result(KITCHEN, board([{ label: 'Table 4', short_number: '12', number: 'K-12' }], [{ label: '', short_number: '13', number: 'K-13' }]));
     await s.result(PRINTS, queue([usage('receipt', 1), usage('kitchen', 0, 1), usage('bar')]));
     const review = s.find('cash-register-review').text();
@@ -149,29 +166,19 @@ describe('CloseSessionForm', () => {
     expect(review).toContain('Prints not out yet: 2');
     expect(review).toContain('Receipts · Kitchen');
     expect(review).not.toContain('Open checks');
-    await ionValue(s.counted(), '101,50', 'ionInput');
-    await s.submit();
-    expect(s.sent()).toEqual([]);
-    expect(s.inDoc('cash-register-close-submit')?.textContent?.trim()).toBe('Close anyway');
-    s.answer(200, { id: 's1', number: 'S-261014-0001', status: 'closed', expected_balance: 10150, closing_balance: 10150, difference: 0 });
-    await s.submit();
-    expect(s.sent()).toHaveLength(1);
+    await expectClosesOnTheSecondPress(s);
   });
 
   it('Kitchen or Printing off in this hub leaves nothing pending, not an incomplete review', async () => {
     const s = await setup();
-    await s.result(DETAIL, detail(10150));
-    await s.result(COUNTS, counts([]));
-    await s.result(CHECKS, checks([]));
+    await s.answerTheSession();
     s.net.lastStream().push(errorFrame(s.subId(KITCHEN), 'app_inactive'));
     s.net.lastStream().push(errorFrame(s.subId(PRINTS), 'app_inactive'));
     await flush();
     expect(s.find('cash-register-review-checking').exists()).toBe(false);
     expect(s.find('cash-register-review').exists()).toBe(false);
     expect(s.find('cash-register-review-unavailable').exists()).toBe(false);
-    await ionValue(s.counted(), '101,50', 'ionInput');
-    s.answer(200, { id: 's1', number: 'S-261014-0001', status: 'closed', expected_balance: 10150, closing_balance: 10150, difference: 0 });
-    await s.submit();
+    await s.closeCountingTheExpected();
     expect(s.sent()).toHaveLength(1);
   });
 
@@ -203,9 +210,7 @@ describe('CloseSessionForm', () => {
     s.net.lastStream().push(errorFrame(s.subId(CHECKS), 'permission_denied'));
     await flush();
     expect(s.find('cash-register-review-unavailable').exists()).toBe(true);
-    await ionValue(s.counted(), '101,50', 'ionInput');
-    s.answer(200, { id: 's1', number: 'S-261014-0001', status: 'closed', expected_balance: 10150, closing_balance: 10150, difference: 0 });
-    await s.submit();
+    await s.closeCountingTheExpected();
     expect(s.sent()).toHaveLength(1);
   });
 

@@ -7,6 +7,7 @@ import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
+import { askToDelete, confirmDeletion } from '../../../../base/frontend/__tests__/table-delete';
 import { business, click, EMPLOYEE, flush, MANAGER, type MountOptions, mountService, page, POLISH } from '../__tests__/mount-service';
 import { pkg } from '../__tests__/package';
 import GrantsSheet from '../components/GrantsSheet.vue';
@@ -129,18 +130,12 @@ describe('PackagesPage', () => {
 
   it('deletes after its confirmation, saying what happens to the vouchers sold', async () => {
     const s = await setup();
-    await s.show(page(ROWS));
-    s.table().vm.$emit('action', { actionId: 'delete', row: ROWS[0] });
-    await flush();
-    const dialog = s.wrapper.findComponent(ConfirmDialog);
+    const dialog = await askToDelete(s, page(ROWS), ROWS[0]);
     expect([dialog.props('title'), dialog.props('message')]).toEqual([
       'Delete package',
       'Bono 5 cortes — the package and its line leave the catalogue and can no longer be sold; vouchers already sold can still be spent, and you find them filtering Status by Deleted.',
     ]);
-    s.answer(200, { id: 'p1' });
-    dialog.vm.$emit('confirm');
-    await flush();
-    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/service/packages/delete', query: {}, body: { id: 'p1' } }]);
+    expect(await confirmDeletion(s, dialog, 'p1')).toEqual([{ method: 'POST', path: '/api/service/packages/delete', query: {}, body: { id: 'p1' } }]);
   });
 
   it('«Vouchers with no customer» opens its sheet, for whoever may see them', async () => {

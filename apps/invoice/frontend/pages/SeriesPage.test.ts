@@ -8,7 +8,8 @@ import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { answerIssuer, EMPLOYEE, errorFrame, flush, type MountOptions, mountInvoice, redNotices, said } from '../__tests__/mount-invoice';
+import { answerIssuer, EMPLOYEE, errorFrame, flush, type MountOptions, mountInvoice } from '../__tests__/mount-invoice';
+import { expectAnAdministratorToSetUpTheIssuer, expectIssuerSaidNoMore, expectIssuerToSetUp } from '../__tests__/issuer-notice';
 import SeriesFormModal from '../components/SeriesFormModal.vue';
 import type { SeriesOut } from '../operations';
 import SeriesPage from './SeriesPage.vue';
@@ -118,23 +119,15 @@ describe('SeriesPage', () => {
   it('without an issuer, says once that nothing can be invoiced, with «Configurar» to the issuer, and nothing once it is set', async () => {
     const s = await setup({ platformNotice: true, locale: 'es' });
     await answerIssuer(s, false, { locale: 'es' });
-    expect(said(s.wrapper.text(), 'Todavía no puedes facturar')).toBe(1);
-    expect(redNotices(s)).toBe(1);
-    expect(said(s.wrapper.text(), 'Los datos de tu negocio')).toBe(1);
-    const setUp = s.wrapper.findAll('ion-button').filter((b) => b.text() === 'Configurar');
-    expect(setUp).toHaveLength(1);
+    expectIssuerToSetUp(s);
     await answerIssuer(s, true, { locale: 'es', rev: 2 });
-    expect(said(s.wrapper.text(), 'Todavía no puedes facturar')).toBe(0);
-    expect(redNotices(s)).toBe(0);
+    expectIssuerSaidNoMore(s);
   });
 
   it('to whoever may not change the issuer, says once that an administrator has to, with no «Configurar»', async () => {
     const s = await setup({ platformNotice: true, locale: 'es', session: EMPLOYEE });
     await answerIssuer(s, false, { locale: 'es', actionable: false });
-    expect(said(s.wrapper.text(), 'Todavía no puedes facturar')).toBe(1);
-    expect(redNotices(s)).toBe(1);
-    expect(said(s.wrapper.text(), 'Esto lo tiene que configurar un administrador.')).toBe(1);
-    expect(s.wrapper.findAll('ion-button').filter((b) => b.text() === 'Configurar')).toHaveLength(0);
+    expectAnAdministratorToSetUpTheIssuer(s);
   });
 
   it('empty, it says so; an error says it with Retry', async () => {

@@ -74,6 +74,16 @@ function renderShellHtml(session: object | null = ME) {
 let main: Main;
 let importBoot: ReturnType<typeof shellOptions>;
 
+/** Boots the Hub under the fake shell with `home` as the `hub-home` block base/spa.py embeds in the page. */
+async function bootWithHome(home: object): Promise<void> {
+  document.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify(home)}</script>`);
+  fakeShell();
+  await main.boot({});
+}
+
+/** «Profile», the person's own page in this hub, first in every user menu. */
+const PROFILE_ITEM = { id: 'profile', labelKey: 'base.userMenu.profile', icon: 'ion:person-circle-outline', to: '/profile' };
+
 beforeAll(async () => {
   sdk.client.api.call = vi.fn();
   renderShellHtml();
@@ -290,13 +300,10 @@ describe('main.ts', () => {
       plan_url: 'https://erplora.com/store/plans?business=h1',
       account_url: 'https://erplora.com/account',
     };
-    document.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify(home)}</script>`);
-    fakeShell();
-    await main.boot({});
+    await bootWithHome(home);
     expect(shellOptions().userMenu).toEqual({
       items: [
-        // «Profile», the person's own page in this hub, first.
-        { id: 'profile', labelKey: 'base.userMenu.profile', icon: 'ion:person-circle-outline', to: '/profile' },
+        PROFILE_ITEM,
         { id: 'account', labelKey: 'base.userMenu.account', icon: 'ion:person-outline', href: home.account_url },
         { id: 'report', labelKey: 'base.userMenu.reportProblem', icon: 'ion:chatbubbles-outline', run: openReportProblem },
       ],
@@ -306,9 +313,7 @@ describe('main.ts', () => {
 
   it('«Report a problem» opens the dialog in the Hub, never an address of erplora.com', async () => {
     const home = { name: 'Bar A', plan_url: '', account_url: 'https://erplora.com/account' };
-    document.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify(home)}</script>`);
-    fakeShell();
-    await main.boot({});
+    await bootWithHome(home);
     const report = shellOptions().userMenu?.items?.find((item) => item.id === 'report');
     expect(report).not.toHaveProperty('href');
     expect(reportProblemOpen.value).toBe(false);
@@ -325,12 +330,10 @@ describe('main.ts', () => {
       account_url: '',
       access: { credential: 'pin', switch_user: true, idle_minutes: null },
     };
-    document.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify(home)}</script>`);
-    fakeShell();
-    await main.boot({});
+    await bootWithHome(home);
     expect(shellOptions().userMenu).toEqual({
       items: [
-        { id: 'profile', labelKey: 'base.userMenu.profile', icon: 'ion:person-circle-outline', to: '/profile' },
+        PROFILE_ITEM,
         { id: 'switch-user', labelKey: 'base.userMenu.switchUser', icon: 'ion:people-outline', to: '/switch-user' },
       ],
       logout: main.signOut,
@@ -342,9 +345,7 @@ describe('main.ts', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     try {
       const home = { name: 'Bar A', access: { credential: 'pin', switch_user: true, idle_minutes: 1 } };
-      document.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify(home)}</script>`);
-      fakeShell();
-      await main.boot({});
+      await bootWithHome(home);
       expect(logout).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(60_000);
       expect(stopNoticeListening).toHaveBeenCalledOnce();
