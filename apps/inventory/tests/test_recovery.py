@@ -5,7 +5,8 @@ read-only connection, and Inventory answers with its own SQL over its models' na
 business lacks is created again by ``inventory.category.recover``, with the products the copy had in it that the
 business still holds deleted, so they come back inside it. Then its products: each one the business still holds deleted
 comes back the same by ``inventory.product.restore``, and each one it no longer holds at all is created by
-``inventory.product.create`` in its categories here (the same one, or the one with its name).
+``inventory.product.recover`` in its categories here (the same one, or the one with its name), with the image of the
+library it had.
 
 Then, end to end on real databases (``hubs.CopiedHubs``): the business's own and its copy, a clone of it.
 """

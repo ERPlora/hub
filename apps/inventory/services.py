@@ -491,7 +491,7 @@ def recover_product(ctx: OperationContext, data: ProductRecoverIn) -> dict:
     ``inventory.product.create``, then the image of the library it showed there (INVENTORY-F30)."""
     made = create_product(ctx, ProductIn.model_validate(data.model_dump(include=set(ProductIn.model_fields))))
     if image := _library_image(ctx, data.image):
-        _change_image(ctx, find_product(made.id, None, lock=True), image)
+        _change_image(ctx, find_product(made.id, None), image)
     return load_product(made.id, ctx.scope)
 
 
