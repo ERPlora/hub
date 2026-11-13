@@ -437,7 +437,7 @@ def test_settings_and_bulk_over_http(boss, client):
 
 @pytest.mark.django_db
 def test_a_field_the_batch_does_not_know_never_brings_it_down(boss, client):
-    # gh:services#152 (STAFF-F07): the old batch was refused whole for a field it did not know, and a
+    # STAFF-F07: the old batch was refused whole for a field it did not know, and a
     # row past the hundredth was lost without a word; now that field is left out and 101 rows are a 422.
     bulk = post(
         client,

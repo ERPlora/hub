@@ -343,7 +343,7 @@ class TestOpenPrice:
 
 
 # ── SALE-F14 and F09 What is approved, with its figure ───────────────────────────────────────────────────────────────
-# sales#398, sales#403, hub#2180: the manager read «Discount a line above the maximum» and approved blind. «An
+# The manager read «Discount a line above the maximum» and approved blind. «An
 # approval is needed» says how much they approve, as Square, Toast and Lightspeed print it («Discount 50% requires
 # manager»): the sentences of ``approval_figures`` (BASE-F84), filled with the figures of that very request in the
 # language of whoever asks; an amount in the business's currency. A figure in zero or empty fills no hole: the next

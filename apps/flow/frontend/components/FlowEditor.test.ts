@@ -116,7 +116,7 @@ describe('FlowEditor: a new automation', () => {
     expect(mine.wrapper.findComponent(TriggerCard).props('fixedByApp')).toBeNull();
   });
 
-  it('«Save» says its word, never an empty button (flows#144)', async () => {
+  it('«Save» says its word, never an empty button', async () => {
     const s = await setup({ flow: null, initial: emptyDocument() });
     expect(s.find('flow-editor-save').text()).toBe('Save');
   });

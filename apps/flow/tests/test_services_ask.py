@@ -216,7 +216,7 @@ def test_a_question_past_its_time_is_too_late_even_before_the_sweep(clock):
 
 
 def test_a_paused_automation_refuses_a_yes_in_the_person_s_language_and_keeps_the_question(clock):
-    # flows#166: the old tray said why in English.
+    # The old tray said why in English.
     clock(NOON)
     flow, _, question = _asked()
     run("flow.flow.set_enabled", {"id": str(flow.id), "enabled": False})

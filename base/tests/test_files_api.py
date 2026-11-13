@@ -4,7 +4,7 @@ Everyone of the hub sees and opens the files (``base.view_files``); who runs it 
 folders and renames (``base.upload_files``) and deletes (``base.delete_files``; moving takes both, as the old hub).
 Every write records its event (``base.file.<fact>``) in its transaction, and the live listing follows it after the
 COMMIT. A file is read at ``/api/files/raw`` with the session, never cached, sandboxed and, unless it is a type that is
-safe to show, as an attachment: never from ``/p/media/`` (public), never a URL of the bucket (saas#968, saas#972).
+safe to show, as an attachment: never from ``/p/media/`` (public), never a URL of the bucket.
 """
 
 import base64

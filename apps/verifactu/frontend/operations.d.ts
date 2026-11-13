@@ -1,8 +1,8 @@
 // Types of the verifactu app's operations for the SDK (`useLive`, `useCommand`), from apps/verifactu/schemas.py.
-// Written by hand, as the other apps' are, until V3 generates them from `/api/openapi.json`. Keep it in step with
+// Written by hand, as the other apps' are: nothing generates them from `/api/openapi.json`. Keep it in step with
 // schemas.py and with `frontend/generated/operations.json`. One input per operation (ninja's parity): no path
-// parameters, a record's id or its invoice's number travels in the input. Money is whole cents with a sign;
-// dates are ISO `YYYY-MM-DD`; moments ISO 8601.
+// parameters, a record's id or its invoice's number travels in the input. Money is whole cents with a sign; dates are
+// ISO `YYYY-MM-DD`; moments ISO 8601.
 import type { Page } from '../../../frontend/sdk-types';
 
 export type SortDir = 'asc' | 'desc';

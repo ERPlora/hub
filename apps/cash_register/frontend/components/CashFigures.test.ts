@@ -33,7 +33,7 @@ async function setup(locale: 'en' | 'es' = 'en') {
 }
 
 describe('CashFigures', () => {
-  it('reads the open session, the last eight closed by their close and the currency of the business (cash_register#119)', async () => {
+  it('reads the open session, the last eight closed by their close and the currency of the business', async () => {
     const m = await setup();
     expect(m.params(CURRENT)).toEqual([{}]);
     expect(m.params(LIST)).toEqual([{ status: 'closed', sort: 'closed_at', dir: 'desc', limit: 8 }]);
@@ -62,7 +62,7 @@ describe('CashFigures', () => {
     expect(m.find('cash-register-figures-expected').exists()).toBe(false);
   });
 
-  it('lists the recent discrepancies with their cents and a bar for each sign (outfitkit#243, #244)', async () => {
+  it('lists the recent discrepancies with their cents and a bar for each sign', async () => {
     const m = await setup();
     await m.result(CURRENCY, currency());
     await m.result(CURRENT, none);
@@ -91,7 +91,7 @@ describe('CashFigures', () => {
     expect((m.find('cash-register-figures-bar').element as HTMLElement).style.width).toBe('100%');
   });
 
-  it('money goes in the currency of the business (cash_register#121, hub#2387)', async () => {
+  it('money goes in the currency of the business', async () => {
     const m = await setup();
     await m.result(CURRENCY, currency('USD'));
     await m.result(CURRENT, open(12550));
@@ -119,7 +119,7 @@ describe('CashFigures', () => {
     expect(m.find('cash-register-figures-error').exists()).toBe(true);
   });
 
-  it('speaks Spanish (cash_register#123)', async () => {
+  it('speaks Spanish', async () => {
     const m = await setup('es');
     await m.result(CURRENCY, currency());
     await m.result(CURRENT, open(18405));

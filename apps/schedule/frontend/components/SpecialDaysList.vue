@@ -93,7 +93,7 @@ const columns = computed<DataTableColumn<SpecialDayOut>[]>(() => [
   },
 ]);
 
-/** The screen has two lists (schedules#58): its funnel and view buttons say they are the special
+/** The screen has two lists: its funnel and view buttons say they are the special
  *  days'. DataTable fills the `{n}` of the count itself. */
 const tableLabels = computed<Partial<DataTableLabels>>(() => ({
   add: t('schedule.specialDays.add'),

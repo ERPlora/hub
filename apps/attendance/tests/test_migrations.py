@@ -71,7 +71,7 @@ def test_existing_corrections_get_who_made_them(make_user):
 
 
 def test_in_a_hub_s_own_database_it_joins_no_control_users(monkeypatch):
-    # Tenancy W10: a hub's own database has no auth_user to join (its history replays there), and no corrections of
+    # A hub's own database has no auth_user to join (its history replays there), and no corrections of
     # before; the coordinates of the shared device still go.
     shared = _day(source="shared", in_lat=40.4, in_lng=-3.7)
     monkeypatch.setattr(MIGRATION.router, "allow_migrate_model", lambda alias, model: False)

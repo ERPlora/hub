@@ -336,7 +336,7 @@ def test_my_tasks_are_my_open_ones_dated_first_then_the_newest(team, today):
 
 
 def test_writing_a_task_does_not_move_its_card_in_my_tasks(team, today):
-    """tasks#45: «My tasks» ordered by due date alone, so starting a card sent it to the bottom."""
+    """«My tasks» ordered by due date alone, so starting a card sent it to the bottom."""
     me = team["worker_member"]
     for title in ("Oldest", "Middle", "Newest"):
         make_task(title, assigned_to=me)

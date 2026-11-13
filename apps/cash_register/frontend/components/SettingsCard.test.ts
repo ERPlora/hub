@@ -98,7 +98,7 @@ describe('SettingsCard', () => {
     expect(s.find('cash-register-settings-read-only').text()).toContain('You do not have permission');
   });
 
-  it('every switch has its name, there is no URL field and the heading speaks the page\'s language (cash_register#28)', async () => {
+  it('every switch has its name, there is no URL field and the heading speaks the page\'s language', async () => {
     const s = await setup(true, 'es');
     await s.result(OP, FACTORY);
     const toggles = [...s.wrapper.element.querySelectorAll('ion-toggle')];

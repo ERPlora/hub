@@ -26,7 +26,7 @@ export interface CustomerFields {
 
 export type CustomerField = keyof CustomerFields;
 
-/** In sight in «Add»: identity and the tax id (the market's split, product customers#51). */
+/** In sight in «Add»: identity and the tax id (the market's split). */
 export const ESSENTIAL_FIELDS: readonly CustomerField[] = ['name', 'phone', 'email', 'tax_id', 'company_name'];
 
 /** Behind «More details» in «Add»; right after the essentials in «Edit». */

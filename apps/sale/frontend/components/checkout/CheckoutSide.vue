@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The side group of the charge sheet (the old `.pay-side`, sales#324/#341): what the sale is. «Receipt» or
+// The side group of the charge sheet (the old `.pay-side`): what the sale is. «Receipt» or
 // «Invoice» and, with an invoice, its recipient right below; over the ticket limit no «Receipt» at all
 // (the law), only the recipient, on top. Below 821 px the sheet opens on the tender, so an invoice folds
 // into one summary line («Invoice · Bar Pepe SL») that opens with a tap; folding is CSS only, nothing

@@ -5,7 +5,7 @@
 // amount» in Sales and Invoicing; «1.000» was 1.000 € in Customers and refused elsewhere. Now, in a business in euros,
 // at 390, 834 and 1440, in every one of those lists: «1.000» (a thousand euros or one) filters nothing and says both
 // readings under its box, with the money field's words, and «1.000,50» filters: the list's live subscription asks for
-// 100050 cents, nothing is said. ui#140: in a business in yen «12,5» is no amount, and the example the warning gives is
+// 100050 cents, nothing is said. In a business in yen «12,5» is no amount, and the example the warning gives is
 // one in yen, «12» (never «12.50», no amount there either): in the Sales funnel (the lists' `amountFilterErrors`) and
 // under the price of a new product (the money field, `MoneyInput`), at 390, 834 and 1440.
 import { expect, type Locator, type Page, test } from '@playwright/test';
@@ -44,7 +44,7 @@ const SIZES = [
 ] as const;
 /** What the money field says for «1.000» in euros, in English (`MoneyInput`). */
 const TWO_READINGS = 'This amount can be read in two ways: «1.000» could be €1,000.00 or €1.00. Write the decimals so there is no doubt.';
-/** What it says for «12,5» in yen, with an example in yen (ui#140). */
+/** What it says for «12,5» in yen, with an example in yen. */
 const NOT_AMOUNT_IN_YEN = 'This is not an amount. Type a figure, for example 12.';
 
 const turnedOn: string[] = [];
@@ -136,7 +136,7 @@ for (const size of SIZES) {
 }
 
 for (const size of SIZES) {
-  test(`ui#140 at ${size.label}: in a business in yen «12,5» is no amount and the warning's example is «12»`, async ({ browser }) => {
+  test(`at ${size.label}: in a business in yen «12,5» is no amount and the warning's example is «12»`, async ({ browser }) => {
     const original = registrationOf('a');
     await registerBusinessIn(original, 'JP');
     const { context, page } = await signedIn(browser, '/', size.viewport);

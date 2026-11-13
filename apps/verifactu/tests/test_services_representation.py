@@ -433,7 +433,7 @@ def test_the_model_comes_with_the_business_of_invoicing(issuer):
     route = respx.get(MODEL_URL).mock(return_value=a_model())
     run("verifactu.representation.model")
     # The taxpayer of the upload (Invoicing's issuer), as the SaaS writes it in the model's blanks; the number goes
-    # within the street, as the issuer keeps its address. Never a signer: that one is written by hand (saas#1743).
+    # within the street, as the issuer keeps its address. Never a signer: that one is written by hand.
     assert dict(route.calls.last.request.url.params) == {
         "taxpayer_tax_id": "B12345674",
         "taxpayer_name": "Peluquería Ana SL",

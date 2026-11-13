@@ -1,7 +1,7 @@
 """The rules of the business's hours, without a database (engine.py): what an interval is, how a set of
 intervals is checked, which rule governs a day, the spans of a day and «is it open?».
 
-Cases from the old module's handler tests (``handler/src/lib.rs``, schedules#1, #2, #8, #10, #23, #28)
+Cases from the old module's handler tests (``handler/src/lib.rs``)
 and its WORKFLOW (SCHEDULES-F02, F04, F05, F10, F11). 2026-08-17 is a Monday.
 """
 
@@ -83,7 +83,7 @@ def test_span_text_is_hh_mm_en_dash_hh_mm():
     assert span_text(iv("09:00", "14:00")) == "09:00–14:00"
 
 
-# ── normalize: the rules of a set of intervals (schedules#8, #23) ──────────────────────────────
+# ── normalize: the rules of a set of intervals ─────────────────────────────────────────────────
 
 
 def test_intervals_are_sorted_by_their_opening():
@@ -451,7 +451,7 @@ def test_daylight_saving_does_not_move_the_opening_hours():
         assert not is_open(calendar, at(f"{day}T20:00")).is_open
 
 
-# ── parse_when: the moment asked about, on the business clock (schedules#1) ────────────────────
+# ── parse_when: the moment asked about, on the business clock ──────────────────────────────────
 
 NOW = dt.datetime(2026, 8, 17, 20, 0, tzinfo=dt.UTC)
 

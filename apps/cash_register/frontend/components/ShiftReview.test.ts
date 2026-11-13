@@ -45,7 +45,7 @@ describe('ShiftReview', () => {
     expect(m.find('cash-register-review-confirm').text()).toBe('The shift will be closed anyway. Press again to confirm.');
   });
 
-  it('names the kitchen tickets not served yet (cash_register#68)', async () => {
+  it('names the kitchen tickets not served yet', async () => {
     const m = await setup({ unserved: 3, unservedLabels: ['Table 4', '#12'] });
     const review = m.find('cash-register-review');
     expect(review.text()).toContain('Kitchen tickets not served: 3');
@@ -53,7 +53,7 @@ describe('ShiftReview', () => {
     expect(review.text()).not.toContain('Open checks');
   });
 
-  it('names the prints that did not come out, by function (cash_register#68)', async () => {
+  it('names the prints that did not come out, by function', async () => {
     const m = await setup({ prints: 2, printUsages: ['receipt', 'kitchen'] });
     const review = m.find('cash-register-review');
     expect(review.text()).toContain('Prints not out yet: 2');

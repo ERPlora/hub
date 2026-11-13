@@ -49,7 +49,7 @@ async function usernameOf(context: BrowserContext): Promise<string> {
   expect(me.status, 'GET /api/me').toBe(200);
   const id = me.data.user?.id ?? '';
   expect(id, 'the person signed in').not.toBe('');
-  // `/api/me` names the person of the business's database (base.HubUser, W10), whose username is the session's.
+  // `/api/me` names the person of the business's database (base.HubUser), whose username is the session's.
   return psql(`SELECT username FROM base_hubuser WHERE id = '${id}'`);
 }
 

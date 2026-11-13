@@ -1,6 +1,6 @@
 """The phone contract: ONE reading of a typed phone, in E.164 (CUSTOMER-F10, F11).
 
-Ported from the product's guest SDK (``crates/guest-sdk/tests/phone_test.rs``, appointments#313),
+Ported from the product's guest SDK (``crates/guest-sdk/tests/phone_test.rs``),
 which copied libphonenumber's rules; here the rules ARE libphonenumber (``phonenumbers``), and these
 cases pin the reading the product's cards and lookups depend on.
 """

@@ -1,6 +1,6 @@
 // CART_CHECKOUT-F01 «Crear un carrito»: «New cart» asks for Session (required: «Save» stays off without
 // it), Email and Name, with the old panel's placeholders, and sends `cart_checkout.cart.create` without a
-// currency (the server gives the business's one: the old cart_checkout#32 sent a literal EUR). A session
+// currency (the server gives the business's one: the old module sent a literal EUR). A session
 // another cart has (409) or an email that is not one (422) goes under its field, and what was typed stays
 // (the old form-error-in-panel: the refusal travels with the form, never under it).
 import { describe, expect, it, vi } from 'vitest';

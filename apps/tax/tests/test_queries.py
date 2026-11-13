@@ -470,7 +470,7 @@ def test_the_date_defaults_to_the_business_today(no_seed):
 
 
 def test_when_the_rules_cannot_be_read_the_calculation_stops(no_seed):
-    # taxes#82: an outage is not «no rate», and allow_missing_rate must not turn it into 0 %.
+    # An outage is not «no rate», and allow_missing_rate must not turn it into 0 %.
     rule(category(), "21")
     with connection.cursor() as cursor:
         cursor.execute("ALTER TABLE tax_taxrule RENAME TO tax_taxrule_hidden")
@@ -567,7 +567,7 @@ def test_the_search_finds_the_stored_and_the_translated_texts(no_seed):
 
 
 def test_the_column_filters_read_what_the_column_shows(no_seed):
-    # taxes#44: the description column shows the translated text; its filter reads that text.
+    # The description column shows the translated text; its filter reads that text.
     category("service.health", "Service — healthcare (VAT exempt)", system=True, description="Assistance by medics")
     category("product.books", "Libros", description="Solo papel")
     keys = lambda **where: [r.key for r in categories(language="es", **where).rows]  # noqa: E731

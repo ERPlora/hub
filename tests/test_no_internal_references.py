@@ -104,8 +104,8 @@ OTHER_REPO_ISSUE = re.compile(
     r"|(?<![\w/.:@#-])(?!hub#)[A-Za-z][\w-]*#[0-9]"
 )
 
-# A piece of work named by a letter and its number («tenancy W10», «until V3 generates them»): the reader cannot know
-# what it was, so the prose states the fact. A version inside a header's name, a system check's id and the V8 engine
+# A piece of work named by a W or a V and its number, as in «tenancy W» or «until V generates them» followed by one or
+# two digits: the reader cannot know what it was, so the prose states the fact. A version inside a header's name, a system check's id and the V8 engine
 # are data, not work.
 WORK_LABEL = re.compile(r"(?<![\w./-])(?:W[0-9]{1,2}|V(?!8\b)[0-9]{1,2})(?![\w-])")
 
@@ -750,6 +750,8 @@ def test_the_scan_catches_a_work_label(text):
         "the W3C's rule for focus",
         "an address in IPv4 or IPv6",
         "keys are UUIDv7",
+        "AWS SigV4 signs the request",
+        "the version path /api/V2/ and the module api.V2",
         "the V8 engine collects it later",
         "reCAPTCHA v3 scores the request",
         "a ticket F2 or its rectification (R5)",

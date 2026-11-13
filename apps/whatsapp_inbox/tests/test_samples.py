@@ -1,5 +1,5 @@
 """WHATSAPP_INBOX-F29 · The file of a template's header: what Meta takes as its sample, told by its bytes, and where
-the Hub keeps it (``samples``; the old product's ``header_samples.py``, gh:saas#2377)."""
+the Hub keeps it (``samples``; the old product's ``header_samples.py``)."""
 
 import uuid
 

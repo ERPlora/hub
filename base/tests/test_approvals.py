@@ -434,7 +434,7 @@ class TestNotOfTheBusiness:
 
 class TestACommandThatTouchesNoDatabase:
     """rv-live-10: a manager's pass is spent in the transaction of the command it lets through (base.approval_spend).
-    A command declared ``database=False`` (live#10) opens none, so naming it approvable is an error of the declaration,
+    A command declared ``database=False`` opens none, so naming it approvable is an error of the declaration,
     said at start, and never a ``LiveMisuse`` at the till."""
 
     NO_DATABASE = "base.assistant.report"

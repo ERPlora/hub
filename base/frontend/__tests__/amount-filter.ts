@@ -5,7 +5,7 @@
 // in both ends of one of the list's amount ranges, in a business in euros and in one in yen: the list asks for exactly
 // those minor units, or for nothing and says why («1.000» in euros: its two readings). Each list's test calls it in one
 // line, with its own mount (`amount-filters.test.ts` checks that every list with an amount filter does). A text that is
-// no amount says it with an example in the business's money: «12.50» in euros, «12» in yen, «12.500» in dinars (ui#140).
+// no amount says it with an example in the business's money: «12.50» in euros, «12» in yen, «12.500» in dinars.
 import { formatMoney, type Money } from '@erplora/ui/components';
 import { expect, it } from 'vitest';
 
@@ -15,7 +15,7 @@ export const EUR: Money = { currency: 'EUR', decimals: 2 };
 export const JPY: Money = { currency: 'JPY', decimals: 0 };
 export const KWD: Money = { currency: 'KWD', decimals: 3 };
 
-/** The example the money field gives, in English, for a text that is no amount of each money (ui#140). */
+/** The example the money field gives, in English, for a text that is no amount of each money. */
 const EXAMPLE: Record<string, string> = { EUR: '12.50', JPY: '12', KWD: '12.500' };
 
 /** How the Hub reads a text in one money: its minor units, or why it is no amount (`grouped`/`decimal`: the two

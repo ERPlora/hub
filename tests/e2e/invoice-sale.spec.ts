@@ -206,7 +206,7 @@ test('Invoices filter by total in euros behind the funnel, with its count; a «t
     await expect(rowOf(cheap.number)).toBeVisible();
     await toggle.click();
     await expect(panel).toBeVisible();
-    // «Total from 10» is ten euros (invoice#113): the 12,10 € ticket stays, the 6,05 € one goes.
+    // «Total from 10» is ten euros: the 12,10 € ticket stays, the 6,05 € one goes.
     await panel.locator('[data-testid=invoice-list-filter-total_amount_from] input').fill('10');
     await panel.locator('[data-testid=invoice-list-filters-apply]').click();
     await expect(panel).toBeHidden();

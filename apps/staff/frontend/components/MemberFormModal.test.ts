@@ -303,7 +303,7 @@ describe('MemberFormModal: Edit · {name} (STAFF-F02, F03)', () => {
     ]);
   });
 
-  // gh:staff#70: closing the panel while the record loads drops that read: a late answer never fills the
+  // Closing the panel while the record loads drops that read: a late answer never fills the
   // form opened next.
   it('a record that answers after the panel closed never fills the next form', async () => {
     let release!: () => void;
@@ -522,7 +522,7 @@ describe('MemberFormModal: the business\'s currency (staff-business-currency)', 
     expect(symbol(s)).toBeNull();
   });
 
-  // gh:staff#64: in yen what is typed is yen: «1500» is 1500, not 150000.
+  // In yen what is typed is yen: «1500» is 1500, not 150000.
   it('a business in Japan types whole yen: «1500» goes as 1500', async () => {
     const s = await setup(null, { business: null });
     await answer(s, JAPANESE);

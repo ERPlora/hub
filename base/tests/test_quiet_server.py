@@ -3,9 +3,9 @@
 The harm is an interpreter that aborts on its way out, code 134 after every test has passed: ``socketserver`` prints
 what a request raises to stderr from a daemon thread, and a daemon thread caught holding stderr's lock as the
 interpreter closes is fatal. The Hub's assistant tests cut conversations on purpose: a turn the Hub stops reading, a
-voice it stops waiting for (``test_assistant_speak.py``: the Hub waits 0.2 s, the door answers in 1 s). Same harm as
-saas#283, same cure (``base/tests/quiet_server.py`` of ERPlora/saas). That every double answering in threads runs on
-it is ``tests/test_guardrails.py`` (j).
+voice it stops waiting for (``test_assistant_speak.py``: the Hub waits 0.2 s, the door answers in 1 s). The SaaS had
+the same harm and has the same cure (its own ``base/tests/quiet_server.py``). That every double answering in threads
+runs on it is ``tests/test_guardrails.py`` (j).
 """
 
 import socket

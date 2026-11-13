@@ -144,7 +144,7 @@ PLANS_PATH = f"{SAAS_PANEL_PATH}/store/plans"
 def e164(raw: str, ctx: OperationContext, *, from_whatsapp: bool = False) -> str:
     """``raw`` as the conversation's key (E.164). WhatsApp's bare digits are international; a number a
     person typed is one of the business's country unless it says its own, as Customers reads a card's phone
-    (gh:whatsapp_inbox#279: in a Spanish business ``600222333`` is Spain's, never +60's; hub#527).
+    (in a Spanish business ``600222333`` is Spain's, never +60's; hub#527).
 
     Raises ``InvalidPhone`` when it is no number.
     """

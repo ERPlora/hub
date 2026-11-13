@@ -15,7 +15,7 @@
 // count, hub#1286); at the limit, the notice with «Upgrade plan» (erplora.com's plans,
 // only on the web). The menu of this screen is read again after each change; the other screens of the business
 // follow the live list (AppsFollower). «Upgrade plan» is the platform's PlanUpgradeLink, with the pass (BASE-F11), and the Store's link
-// by `openExternalLink` (gh:hub#439: the installed app opens nothing on a `_blank` link). In a business with its own database an app turned on
+// by `openExternalLink` (the installed app opens nothing on a `_blank` link). In a business with its own database an app turned on
 // for the first time gets its tables first when its template lacked them: the answer says «creating», the toast
 // «Turning on…» and its row «Turning on…» until the live list says it is on; one that could not be set up says so with
 // «Retry» (`base.app.retry`); both can be turned off. What the server would always refuse is never offered (hub#618,

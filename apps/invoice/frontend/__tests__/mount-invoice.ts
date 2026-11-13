@@ -187,7 +187,7 @@ export async function mountInvoice(component: Component, options: MountOptions =
 
 export type MountedInvoice = Awaited<ReturnType<typeof mountInvoice>>;
 
-/** Invoicing's ⛔ «Your business details» as `base.setup.status` tells it (apps.py `setup`; gh:hub#435: also to whoever
+/** Invoicing's ⛔ «Your business details» as `base.setup.status` tells it (apps.py `setup`; also to whoever
  *  may not set it up, with `actionable: false`), in the person's language. */
 export function issuerStatus(fields: { configured: boolean; actionable: boolean; locale?: 'en' | 'es' }): SetupStatus {
   const pending = fields.configured ? 0 : 1;

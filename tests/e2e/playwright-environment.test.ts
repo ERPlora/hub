@@ -3,7 +3,7 @@
 // source-map-support takes a global `window` with an `XMLHttpRequest` for a browser: loaded in happy-dom (the
 // config's default, vite.config.ts), it fetched its own files by synchronous XHR from happy-dom's
 // http://localhost:3000, and every request crashed a Node child process (`ECONNREFUSED 127.0.0.1:3000`) behind a
-// green run (playwright.config.test.ts, 3 of 3 runs on 2026-10-19; the SaaS fixed the same in saas#46).
+// green run (playwright.config.test.ts, 3 of 3 runs on 2026-10-19; the SaaS has the same fix).
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

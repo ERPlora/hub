@@ -170,7 +170,7 @@ def outbound_pool(request, monkeypatch):
 class _NoSlowPasses:
     """``base.worker.Background`` in the tests: the worker's loop starts no slow pass. They run in threads of their own,
     on their own connections, so in a test they would commit outside its transaction (a nightly ``UsageRun`` the relay's
-    tests left broke the next tests, W8 2026-10-31). Their own tests call ``worker._data``/``_usage`` directly."""
+    tests left broke the next tests). Their own tests call ``worker._data``/``_usage`` directly."""
 
     def __init__(self, name: str) -> None:
         self.name = name

@@ -118,7 +118,7 @@ describe('SettingsPage: the number and the month', () => {
   });
 
   // «Upgrade plan» sells, and everything that sells is web only (surface.ts): in the installed app the link opened
-  // nothing (gh:hub#439), so there the month says it without the link.
+  // nothing, so there the month says it without the link.
   it('«Upgrade plan» sells: never on the app surfaces, where the month still says it is spent', async () => {
     applySurface('mobile');
     try {

@@ -95,7 +95,7 @@ def test_a_mixed_payment_leaves_one_line_per_tender_and_only_the_cash_in_the_dra
     shirt,
 ):
     session = open_session(0)
-    # The product's own case (cash_register#59): 121.00 € = 50.00 € by card + 71.00 € in cash (90.00 handed over).
+    # The product's own case: 121.00 € = 50.00 € by card + 71.00 € in cash (90.00 handed over).
     run(
         "sale.sale.complete",
         {
@@ -173,7 +173,7 @@ def test_a_card_sale_voided_moves_no_cash(coffee):
 
 
 def test_a_sale_refunded_in_part_cannot_be_voided_so_the_drawer_never_pays_twice(coffee):
-    # cash_register#63: voiding a sale already refunded in part reverted the WHOLE sale, so the drawer was
+    # Voiding a sale already refunded in part reverted the WHOLE sale, so the drawer was
     # short by what had been refunded. Sales refuses that void: the refund is the only way back.
     session = open_session(10000)
     sale = charge("2")
@@ -191,7 +191,7 @@ def test_a_sale_refunded_in_part_cannot_be_voided_so_the_drawer_never_pays_twice
 def test_a_card_sale_voided_with_the_drawer_closed_is_out_of_every_shift_and_moves_no_cash(
     coffee,
 ):
-    # cash_register#82: a card void with no shift open, end to end against the real Sales: it is not lost,
+    # A card void with no shift open, end to end against the real Sales: it is not lost,
     # it is said as unassigned, and it takes no cash out of any drawer.
     open_session(10000)
     sale = charge("1", payments=[{"method": "card"}])
@@ -238,7 +238,7 @@ def test_a_sale_voided_after_its_shift_closed_takes_the_cash_out_of_the_open_shi
 
 
 def test_a_card_sale_refunded_in_cash_takes_cash_out_of_the_drawer(shirt):
-    # The product's own case (cash_register#62): float 100.00, a 121.00 sale by card, 50.00 back in cash.
+    # The product's own case: float 100.00, a 121.00 sale by card, 50.00 back in cash.
     session = open_session(10000)
     sale = run(
         "sale.sale.complete",

@@ -167,7 +167,7 @@ describe('OptionFormModal: in the business’s currency', () => {
 });
 
 describe('OptionFormModal: the business answers after the form opened', () => {
-  /** What the money field says in yen, with its examples in yen (ui#140). */
+  /** What the money field says in yen, with its examples in yen. */
   const NOT_AMOUNT_IN_YEN = 'This is not an amount. Type a figure, for example 1, or -1 for a discount.';
 
   it('an untouched supplement is rewritten from the option with the yen’s decimals, and «Save» keeps its scale', async () => {

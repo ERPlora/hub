@@ -448,7 +448,7 @@ def test_a_guest_cancels_their_table_and_after_the_owner_s_yes_it_is_cancelled(
 def test_the_answer_never_cancels_the_reservation_of_another_number(
     gateway, tick, django_capture_on_commit_callbacks, later  # noqa: F811 - the fixture
 ):
-    """reservations#50: on their behalf, another guest's reservation is refused even after the yes, saying nothing of it;
+    """On their behalf, another guest's reservation is refused even after the yes, saying nothing of it;
     the assistant hears the refusal and what it says then goes to them.
 
     ``past_the_minute``: the tick after the yes lands on another minute than the first one, as in the CI run that got

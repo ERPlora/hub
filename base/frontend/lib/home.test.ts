@@ -354,7 +354,7 @@ describe('a value the row does not have (BASE-F06): «—», never a made-up 0',
 
 // BASE-F06 — a bar-list with negatives (Cash register's «Recent discrepancies»: a drawer 0,40 € short and one 5,50 €
 // over) painted the shortfall as long as the biggest bar: its share was -0.0727, a width the browser drops (the old
-// hub's outfitkit#244 drew none at all). The bar measures the size of the value against the biggest size; as a report
+// hub's OutfitKit drew none at all). The bar measures the size of the value against the biggest size; as a report
 // says it (Excel, QuickBooks, Square), only a negative figure is marked — red, with its sign in the text («-0,40 €») —
 // and every other bar keeps the panel's colour: a surplus is a discrepancy too, and a product with 1 left beside one
 // at -1 is still low on stock (rv-hub-264), so neither is ever painted as «good».

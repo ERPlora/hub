@@ -58,7 +58,7 @@ describe('the till, in the business’s currency', () => {
     expect({ before, after }).toEqual({ before: ['—', 'Cobrar · —'], after: ['1.500 ¥', 'Cobrar · 1.500 ¥'] });
   });
 
-  it('the discount switches to an amount with the business’s sign, not «€» (gh:sales#380)', async () => {
+  it('the discount switches to an amount with the business’s sign, not «€»', async () => {
     const open = ref(true);
     const m = await mountSale(
       {

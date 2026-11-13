@@ -245,7 +245,7 @@ def charge(key: str, options: dict, *skus: str, quantity: str = "1", scope=A):
 
 
 def test_combo_f10_three_menus_lower_three_portions_of_each_dish_through_the_relay(tick, till_menu):
-    """inventory#69: the menu has no stock of its own; each dish picked moves, times the menus and the times
+    """The menu has no stock of its own; each dish picked moves, times the menus and the times
     it was picked (two coffees in each), and the service moves nothing."""
     sale = charge("f10-three", till_menu, "LEN", "STK", "COF", "COF", "TIP", quantity="3")
     (line,) = sale.lines
@@ -319,7 +319,7 @@ def kitchen_paper() -> dict[str, list[dict]]:
 
 
 def test_combo_f11_a_menu_fired_reaches_each_station_under_its_kitchen_name_through_the_relay(tick, till_menu):
-    """sales#522 and hub#1156: the kitchen gets the dishes the table chose, each at its own station, under the
+    """The kitchen gets the dishes the table chose, each at its own station, under the
     menu's kitchen name, on the card and on paper; the service is never cooked."""
     station("Cold")
     station("Grill")
@@ -366,7 +366,7 @@ def test_combo_f11_a_menu_fired_reaches_each_station_under_its_kitchen_name_thro
 
 
 def test_combo_f11_a_menu_short_of_a_required_course_never_reaches_the_kitchen(tick, till_menu):
-    """sales#535: a menu without its main course is refused by Menus when it is ordered, so the check has
+    """A menu without its main course is refused by Menus when it is ordered, so the check has
     nothing to fire and the kitchen never gets half a menu."""
     order = run("sale.order.open", {"label": "Table 4"})
     with pytest.raises(Conflict) as refused:

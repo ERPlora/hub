@@ -381,7 +381,7 @@ def test_with_a_recipient_tax_id_it_is_a_full_invoice_f1():
 
 
 def test_without_a_tax_id_it_is_a_simplified_invoice_f2_up_to_400_euros():
-    # The old fiscal/invoice_type.py (saas#1070): a subscription sold to someone without a tax ID is an F2.
+    # The old fiscal/invoice_type.py: a subscription sold to someone without a tax ID is an F2.
     nobody = {**BODY["recipient"], "tax_id": ""}
     limit = line(net_cents=33058, tax_cents=6942, total_cents=40000)
 
