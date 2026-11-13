@@ -23,7 +23,8 @@ export type HistoryAction =
   | 'unassigned'
   | 'charged'
   | 'uncharged'
-  | 'deleted';
+  | 'deleted'
+  | 'restored';
 
 type NoInput = Record<string, never>;
 

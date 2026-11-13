@@ -417,6 +417,7 @@ class History(UUIDModel):
         CHARGED = "charged", _("Charged")
         UNCHARGED = "uncharged", _("Sale voided")
         DELETED = "deleted", _("Deleted")
+        RESTORED = "restored", pgettext_lazy("appointment history", "Restored")
 
     appointment = models.ForeignKey(
         Appointment,
@@ -456,6 +457,7 @@ class History(UUIDModel):
                         "charged",
                         "uncharged",
                         "deleted",
+                        "restored",
                     ]
                 ),
                 name="appointment_history_action",
