@@ -62,7 +62,7 @@ export async function pick(page: Page, testid: string, query: string, text: stri
 
 /**
  * Runs a row action: its button, or the same entry inside «⋮» when the row folds its actions. The table folds them by
- * measuring its box, a frame or more after a resize or new rows (`DataTable`, W-19), so what the row showed a moment ago
+ * measuring its box, a frame or more after a resize or new rows (`DataTable`), so what the row showed a moment ago
  * is not what the click finds: the click goes to whichever of the two the row shows when it lands, and the entry is
  * looked for in «⋮» only when that is where it landed. Deciding first and clicking after waited for an «Edit» the table
  * had folded meanwhile until the test's time ran out (hub#1279; service-helpers.spec.ts). It is the one every spec of the

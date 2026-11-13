@@ -293,7 +293,7 @@ def test_a_line_with_a_tax_category_takes_its_rule_not_the_rate_typed(issuer):
 
 
 def test_a_line_with_a_tax_category_takes_the_rule_of_the_business_region(issuer):
-    # TAX-F11 (pm#629 VF-17): a business of the Canary Islands declares the IGIC of its rule, never the
+    # TAX-F11: a business of the Canary Islands declares the IGIC of its rule, never the
     # national VAT of the same category.
     run(
         "tax.rule.create",

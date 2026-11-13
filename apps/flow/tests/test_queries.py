@@ -535,7 +535,7 @@ def test_the_system_context_reads_everything():
     assert run("flow.flow.list", {}, system_context(A)).total == 1
 
 
-# What needs a person in front is never offered (review 2026-10-15, item 1)
+# What needs a person in front is never offered
 
 
 def test_the_catalog_never_offers_an_action_that_needs_a_person():

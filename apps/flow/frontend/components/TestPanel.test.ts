@@ -95,7 +95,7 @@ describe('TestPanel', () => {
   });
 });
 
-describe('TestPanel: review 2026-10-15, item 1', () => {
+describe('TestPanel: what each kind of step would do', () => {
   it('an action that needs a person is said to be no automation’s', async () => {
     const step = { ...ANSWER.steps[2], outcome: 'high_risk' as const, operation: 'sale.order.void' };
     const m = await setup([200, { ...ANSWER, steps: [step] }]);

@@ -189,7 +189,7 @@ def test_the_preview_and_the_charge_agree_to_the_cent(product):
     )
 
 
-# The business's tax region (TAX-F11, pm#629 VF-17): a business of the Canary Islands charges IGIC and one of
+# The business's tax region (TAX-F11): a business of the Canary Islands charges IGIC and one of
 # Ceuta or Melilla IPSI; the regional rule beats the national one, and without a region the national one applies.
 
 

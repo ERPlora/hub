@@ -663,7 +663,7 @@ def test_the_takeaway_map_is_explicit():
     assert TAKEAWAY_CATEGORY == {"restaurant.alcohol": "retail.alcohol"}
 
 
-# An open check is charged at what was ordered, even if a dish ran out since (review 2)
+# An open check is charged at what was ordered, even if a dish ran out since
 
 
 def test_charging_an_open_check_does_not_ask_for_availability_again():
@@ -693,7 +693,7 @@ def test_charging_an_open_check_still_checks_the_courses_and_the_tax():
     )
 
 
-# What the till cannot charge is not offered (review 4, 9)
+# What the till cannot charge is not offered
 
 
 def statuses(combo) -> dict[str, str]:

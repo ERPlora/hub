@@ -19,7 +19,7 @@ and rescheduled; the others still run. ``check_scheduled_tasks`` (``base.E001``â
 declaration the engine could not run, at ``manage.py check`` and before every command.
 
 Every hub has its own schedule in its own database: the worker's pass over the hubs (``base.worker``) writes it once
-per process and runs, under ``use_hub(hub)``, the tasks of its active apps on its own scope (review of hub#471, C1).
+per process and runs, under ``use_hub(hub)``, the tasks of its active apps on its own scope (hub#471).
 Without a ``scope`` (the suite's tests written before the tenancy) they run on ``settings.WORKER_SCOPE_SLUG``'s.
 """
 

@@ -1,4 +1,4 @@
-"""Migration 0002 of the attendance app (review of 2026-10-15, findings 4 and 7), reversible:
+"""Migration 0002 of the attendance app, reversible:
 
 - a correction says explicitly whether the system made it and keeps the name of who made it, so a user
   deleted later never turns their corrections into the system's;
