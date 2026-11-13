@@ -19,7 +19,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, horizontalOverflow, HUB_DIR, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
+import { cleanSales, drawerOff, expectFirstTile, restoreDrawer, stamp, tillGrid } from './sale-helpers';
 
 const RUN = stamp();
 const SKU = `E2E-CMT-${RUN}`;
@@ -200,12 +200,10 @@ test('COMBO-F07, COMBO-F08: the menu goes first in «All», its sheet asks every
   const tile = shown(page).locator(`[data-testid=pos-menu-${menuId}]`);
   await expect(tile).toContainText(MENU);
   await expect(tile.locator(`[data-testid=pos-menu-${menuId}-badge]`)).toHaveText('Menu');
-  // The till opens in «All», and the grid on screen starts with the menus, before any product. «Services» keeps
-  // its own grid in the page, hidden, and earlier in it: the order is read in the grid that shows.
+  // The till opens in «All», and the grid on screen starts with the menus, before any product.
   await expect(shown(page).locator('[data-testid=pos-category-all]')).toHaveClass(/segment-button-checked/);
-  const grid = shown(page).locator('.pos-grid').filter({ visible: true });
-  await expect(grid).toHaveCount(1);
-  await expect(grid.locator(':scope > button').first()).toHaveAttribute('data-testid', /^pos-menu-/);
+  await expectFirstTile(page, /^pos-menu-/);
+  const grid = tillGrid(page);
   // Once this run's products are on screen, none of the grid's products goes before this run's menu.
   await expect(grid.locator(`[data-testid=pos-product-${products.LEN.id}]`)).toBeVisible();
   await expect(grid.locator(`xpath=./*[starts-with(@data-testid, 'pos-product-')][following-sibling::*[@data-testid='pos-menu-${menuId}']]`)).toHaveCount(0);

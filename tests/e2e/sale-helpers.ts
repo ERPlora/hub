@@ -97,6 +97,19 @@ export async function expectTakes(button: Locator, takes: boolean): Promise<void
   else await expect(native).toHaveAttribute('aria-disabled', 'true');
 }
 
+/** A tile of the till's grid, a child of it: `PosItemTile.vue`, an Ionic button for products, services and menus alike. */
+const TILL_TILE = ':scope > ion-button.pos-tile';
+
+/** The till's grid on screen. «Services» keeps its own grid in the page, hidden while «All» is chosen. */
+export const tillGrid = (page: Page): Locator => shown(page).locator('.pos-grid').filter({ visible: true });
+
+/** That one grid of the till is on screen and its first tile is `testid`'s (COMBO-F07, SALE-F12: the menus go first). */
+export async function expectFirstTile(page: Page, testid: string | RegExp): Promise<void> {
+  const grid = tillGrid(page);
+  await expect(grid, 'one grid of the till on screen').toHaveCount(1);
+  await expect(grid.locator(TILL_TILE).first()).toHaveAttribute('data-testid', testid);
+}
+
 /** The lines of the check on screen that sell `product`. */
 export const linesOf = (page: Page, product: { name: string }): Locator =>
   shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name });

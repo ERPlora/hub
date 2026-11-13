@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e9824d1b8303af7fb2f27ed400fdd60b76c5791b2e91daf8e2f267dc3f12591c -->
+<!-- generated from WORKBOOK.md sha256:afbf56a1243772f269ea19ea780d66da1b3457f487f8ef465f7387701d630a85 -->
 
 ## What it is for and who it is for
 
@@ -3062,7 +3062,9 @@ one it no longer had, with its appointment-created notice (`appointment.appointm
 those notices says the recovery did it (its actor is `copy_recovery:<id>`, that of the row in Recoveries), so no
 automation of the business starts on them (FLOW-F21), whether of something created or of something recovered; what only
 brings the business's own data up to date with them goes on the same (the WhatsApp Inbox links its conversation to the
-card). The copy, untouched; the notice `control.copy.recovery_requested` with who asked for it.
+card), and what it records in doing so carries the same mark, so none starts from it either, first or second hand (the
+conversation linked again does not start "a WhatsApp conversation is linked to a customer"; hub#1365). The
+copy, untouched; the notice `control.copy.recovery_requested` with who asked for it.
 If it fails: what the restore does not accept is said in the notice, business by business, and that business is not
 touched: one that is not ready or has no database of its own, a demo, one being moved or restored, a cluster open to new
 hubs or with living businesses, the business's own cluster, a copy that is not on that cluster or is too large, and a
@@ -3091,6 +3093,6 @@ support staff see the list, Separate copies and Recoveries, but not the actions.
 Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
 INVENTORY-F07, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08, SERVICE-F31,
-APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, FLOW-F21; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284,
-hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1356,
-hub#1373, hub#1375, aws#77
+APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282,
+hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327,
+hub#1341, hub#1356, hub#1365, hub#1373, hub#1375, aws#77
