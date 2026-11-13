@@ -350,7 +350,7 @@ def test_the_hours_of_a_range_take_up_to_366_days_and_one_day_alone():
     }
 
 
-# ── The ends of the calendar: a 422 under the field, never a 500 (review of 2026-10-14) ────────
+# ── The ends of the calendar: a 422 under the field, never a 500 ─────────────────────────────────
 
 
 @pytest.mark.parametrize(

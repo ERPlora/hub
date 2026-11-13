@@ -1338,7 +1338,7 @@ def test_a_refused_command_notifies_nobody(listen):
     assert received(on_b, timeout=QUIET) == []
 
 
-# staff.member.bulk_create: the row's own problems, and the pay permission (review of 2026-10-14)
+# staff.member.bulk_create: the row's own problems, and the pay permission
 
 
 def test_a_badly_written_date_skips_only_its_row():

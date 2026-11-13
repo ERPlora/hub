@@ -87,7 +87,7 @@ async function steady(table: Locator): Promise<Painted> {
   return seen!;
 }
 
-/** The orders list once it shows every seeded email and its ladder (W-19) stands still. */
+/** The orders list once it shows every seeded email and what it gives up to fit stands still. */
 async function listWith(page: Page, emails: string[]): Promise<Locator> {
   await page.goto(`/cart_checkout/orders`);
   const view = shown(page);
@@ -141,7 +141,7 @@ test('UI DataTable anchos de columna at 834: out of room, the longest email give
       expect(column.cut, `«${column.label}» keeps its text`).toEqual([]);
       expect(column.drift, `«${column.label}» lines up with its cells`).toBeLessThanOrEqual(1);
     }
-    // The ladder of W-19 is untouched: still the list, its row actions out, nothing hidden sideways.
+    // Nothing else is given up to fit: still the list, its row actions out, nothing hidden sideways.
     await expect(table.locator('.data-table__row--data').first()).toBeVisible();
     await expect(table.locator('.data-table__card')).toHaveCount(0);
     expect(seen.overflow).toBeLessThanOrEqual(0);

@@ -88,7 +88,8 @@ for (const vp of VIEWPORTS) {
       await expect(row).toContainText(EMAIL.slice(0, 20));
       await settled(page);
       const table = view.locator('.data-table').first();
-      // The ladder (W-19) settles in a few frames after the last resize; a phone always gets cards.
+      // What the table gives up to fit its box settles in a few frames after the last resize; a phone always
+      // gets cards.
       await expect.poll(() => probe(table, EMAIL).then((seen) => seen !== null)).toBe(true);
       await settled(page);
       const seen = await probe(table, EMAIL);

@@ -396,7 +396,7 @@ def test_before_the_first_shift_there_is_nothing_unassigned(coffee):
     assert (current.unassigned_count, current.unassigned_cash) == (0, 0)
 
 
-# ── Review 2026-10-14: what falls between shifts is never lost ─────────────────────────────────
+# ── What falls between shifts is never lost ────────────────────────────────────────────────────
 
 
 def _due(session, days: int = 2) -> None:

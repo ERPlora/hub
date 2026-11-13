@@ -1,4 +1,4 @@
-"""The take-away alcohol category for the hubs that ran the first 0002 (TAX-F16, review 2026-10-14).
+"""The take-away alcohol category for the hubs that ran the first 0002 (TAX-F16).
 
 Alcoholic drinks served to drink on the premises are a hospitality service, 10 % (art. 91.Uno.2.2º of
 Law 37/1992): 0002 now plants restaurant.alcohol at 10 %. Alcohol sold to take away or delivered is a

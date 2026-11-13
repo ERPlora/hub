@@ -557,7 +557,7 @@ def _admin():
 
 
 def test_a_finished_run_keeps_no_copy_of_what_its_steps_read(clock):
-    # Review 2026-10-15, item 6: a read leaves a customer's card in the run; only a waiting run needs it.
+    # A read leaves a customer's card in the run; only a waiting run needs it.
     clock(NOON)
     make_flow(
         steps=[

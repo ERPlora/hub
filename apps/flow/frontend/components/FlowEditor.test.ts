@@ -245,8 +245,8 @@ describe('FlowEditor: a saved automation', () => {
   });
 });
 
-describe('FlowEditor: review 2026-10-15', () => {
-  it('the switch is saved by «set_enabled», after the document (item 3)', async () => {
+describe('FlowEditor: the switch, a run by hand, the permissions and an unreadable catalog', () => {
+  it('the switch is saved by «set_enabled», after the document', async () => {
     const s = await setup(
       { flow: null, initial: emptyDocument() },
       { '/api/flow/flows': [201, { ...FLOW, id: 'f9' }], '/api/flow/flows/set_enabled': [200, { ...FLOW, id: 'f9', enabled: true }] },
@@ -262,7 +262,7 @@ describe('FlowEditor: review 2026-10-15', () => {
     expect(s.wrapper.emitted('saved')?.at(-1)).toEqual([{ ...FLOW, id: 'f9', enabled: true }]);
   });
 
-  it('a run by hand that stopped by an error says so, never «Run.» (item 11)', async () => {
+  it('a run by hand that stopped by an error says so, never «Run.»', async () => {
     const on = { ...FLOW, enabled: true };
     const s = await setup(
       { flow: on, initial: fromFlow(on) },
@@ -275,7 +275,7 @@ describe('FlowEditor: review 2026-10-15', () => {
     expect(mocks.toastSuccess).not.toHaveBeenCalled();
   });
 
-  it('with unsaved changes «Run now» waits for the save: it would run the saved version (item 11)', async () => {
+  it('with unsaved changes «Run now» waits for the save: it would run the saved version', async () => {
     const on = { ...FLOW, enabled: true };
     const s = await setup({ flow: on, initial: fromFlow(on) });
     await ionValue(s.find('flow-editor-name').element, 'Changed', 'ionInput');
@@ -283,7 +283,7 @@ describe('FlowEditor: review 2026-10-15', () => {
     expect(s.find('flow-editor-run-hint').text()).toBe('Save it first: «Run now» runs what is saved.');
   });
 
-  it('the permissions are read from what is saved, and ask to save the changes first (item 12)', async () => {
+  it('the permissions are read from what is saved, and ask to save the changes first', async () => {
     const s = await setup({ flow: FLOW, initial: fromFlow(FLOW) });
     await ionValue(s.find('flow-editor-tabs').element, 'permissions');
     expect(s.wrapper.findComponent(PermissionsPanel).props()).toMatchObject({ flow: FLOW, dirty: false });
@@ -291,7 +291,7 @@ describe('FlowEditor: review 2026-10-15', () => {
     expect(s.wrapper.findComponent(PermissionsPanel).props('dirty')).toBe(true);
   });
 
-  it('a catalog that could not be read is said, with «Retry» (item 5)', async () => {
+  it('a catalog that could not be read is said, with «Retry»', async () => {
     const s = await setup({ flow: FLOW, initial: fromFlow(FLOW) }, { '/api/flow/catalog': [500, { error: { code: 'internal_error', message: 'Internal error' } }] });
     expect(s.find('flow-catalog-error').text()).toContain('What automations can use here could not be read.');
     expect(s.find('flow-catalog-error').text()).not.toContain('Internal error');

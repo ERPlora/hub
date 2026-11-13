@@ -173,7 +173,7 @@ describe('ClockPage (ATTENDANCE-F01, F02)', () => {
     s.answerBy({ '/api/attendance/clock_in': [200, day()] });
     await click(s.find('attendance-clock-in').element);
     await flush();
-    // The device mode is the server's to know (review of 2026-10-15, finding 6): never in the payload.
+    // The device mode is the server's to know: never in the payload.
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/attendance/clock_in', query: {}, body: {} }]);
     expect(s.text('attendance-clock-message')).toBe('Clocked in at 09:00.');
   });
@@ -225,7 +225,7 @@ describe('ClockPage (ATTENDANCE-F01, F02)', () => {
     expect(s.text('attendance-clock-status')).toBe('You are clocked out');
   });
 
-  it('runs on the server’s clock, not the device’s (review of 2026-10-15, finding 8)', async () => {
+  it('runs on the server’s clock, not the device’s', async () => {
     // The device is ten minutes behind the server.
     vi.setSystemTime(new Date('2026-10-06T08:20:00Z'));
     const s = await setup(OPEN);
@@ -237,7 +237,7 @@ describe('ClockPage (ATTENDANCE-F01, F02)', () => {
     expect(s.text('attendance-clock-timer')).toBe('1:31:00');
   });
 
-  it('a second tap while the first one is on its way sends nothing (review of 2026-10-15, finding 9)', async () => {
+  it('a second tap while the first one is on its way sends nothing', async () => {
     const s = await setup();
     let answer!: (response: Response) => void;
     s.net.onApi(() => new Promise<Response>((resolve) => (answer = resolve)));

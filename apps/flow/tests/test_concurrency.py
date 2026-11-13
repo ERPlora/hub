@@ -75,7 +75,7 @@ def test_two_workers_fire_a_due_schedule_once(monkeypatch):
 
 
 def test_two_workers_resume_each_waiting_run_once(monkeypatch):
-    # Review 2026-10-15, item 8: `resume_due` claims its runs with SKIP LOCKED.
+    # `resume_due` claims its runs with SKIP LOCKED.
     from django.utils import timezone
 
     start = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)

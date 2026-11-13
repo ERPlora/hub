@@ -314,7 +314,7 @@ def test_a_regional_rule_with_its_tax_family(no_seed):
 
 @pytest.mark.django_db
 def test_a_rule_without_its_tax_family_takes_the_one_of_its_territory(no_seed):
-    # TAX-F11 (pm#629 VF-17): said by voice or through the API without «IGIC», a Canary rule is still IGIC;
+    # TAX-F11: said by voice or through the API without «IGIC», a Canary rule is still IGIC;
     # a family said out loud is kept.
     category()
     canary = create_rule(region_code="ES-CN", rate_pct="7")
@@ -1007,7 +1007,7 @@ def test_a_batch_with_twin_rows_is_refused_as_an_overlap_not_a_crash(no_seed):
     assert TaxRule.objects.count() == 1
 
 
-# tax.settings.update (TAX-F11, pm#629 VF-17): the business keeps its region
+# tax.settings.update (TAX-F11): the business keeps its region
 
 
 def keep(region, role="hub_admin", scope=A):

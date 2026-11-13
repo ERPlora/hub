@@ -1117,7 +1117,7 @@ def test_only_tax_resolves_a_rule():
     assert offenders == []
 
 
-# The business's jurisdiction (TAX-F11, pm#629 VF-17): its country and the region it keeps in Taxes. Every
+# The business's jurisdiction (TAX-F11): its country and the region it keeps in Taxes. Every
 # calculation that names no country reads it: sales and invoice call these functions without one.
 
 

@@ -353,13 +353,13 @@ def test_the_name_is_trimmed_and_at_most_120_characters():
 
 
 def test_turning_on_is_only_set_enabled_s_which_the_assistant_confirms():
-    # Review 2026-10-15, item 3: create and update carry no switch.
+    # Create and update carry no switch.
     assert "enabled" in errors(schemas.CreateIn, {"name": "A", "enabled": True})
     assert "enabled" in errors(schemas.UpdateIn, {"flow": "A", "enabled": True})
 
 
 def test_a_draft_reads_only_what_its_earlier_steps_leave():
-    # Review 2026-10-15, item 10: the same check as a person's document.
+    # The same check as a person's document.
     later = [COMMAND | {"params": {"title": "steps.s2.id"}}, COMMAND | {"id": "s2"}]
     found = errors(schemas.DraftProposeIn, {"name": "A", "definition": {"steps": later}, "notes": []})
     assert found == {"definition.steps": "Value error, Step 1 reads «steps.s2.id», which no earlier step leaves."}
