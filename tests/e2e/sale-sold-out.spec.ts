@@ -245,6 +245,9 @@ test.describe('SALE-F07 (hub#1366): a catalogue longer than the screen', () => {
       await login(page, A, '/sale/pos');
       await tillReady(page);
       await expect(tile(page, croquettes).locator('.pos-tile__badge')).toBeVisible();
+      // The cut only shows in a grid with no room to spare: in one that does not scroll, a fixed-height tile passes too.
+      const scrolls = await tillGrid(page).evaluate((grid) => grid.scrollHeight > grid.clientHeight);
+      expect(scrolls, `the grid scrolls at ${size.label}: the catalogue is longer than the screen`).toBe(true);
       const tiles = await tillGrid(page).evaluate(tilesOf, TILL_TILE);
       const soldOut = tiles.find((each) => each.id === `pos-product-${croquettes.id}`);
       expect(soldOut?.texts.badge, `${croquettes.name} in the grid with its «Sold out»`).toBeTruthy();
