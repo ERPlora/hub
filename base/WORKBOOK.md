@@ -3578,7 +3578,7 @@ hub#1341, hub#1356, hub#1365, hub#1373, hub#1375, aws#77
   recuperación (`copy_recovery:<id>`, BASE-F114) y los que una app declara en `carried_actors` de su `LiveAppConfig`
   (`<label>:` o `<label>_<nombre>:`; hoy Automatizaciones, para que su guarda de bucles siga una cadena a través de
   otra app). Una declaración que no es de la propia app (vacía, `system`, la de otra) la rechaza `base.E017` al
-  arrancar y no se usa. Tests: `base/tests/test_relay_carried.py` y `test_relay_brought_back.py`.
+  arrancar y no se usa. Tests: `base/tests/test_relay_carried.py`.
 - Lo que una reacción o una tarea programada deja para después del COMMIT y espera a la red va por
   `base.outbound.after_commit(fn, *args)` (FIX-HUB-BASE-RELAY-BLOCKED-BY-SLOW-REACTION-CALLS): `THREADS` (4) hilos del
   worker en el contexto de BD de la operación que lo pidió (`base.tenancy.context.use_again`), `QUEUED` (1000) en

@@ -1588,7 +1588,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   (`base.recovery.brought_back`): la cuenta va a `skipped`, sin ejecución ni Historial. El criterio vive en `base/`, no
   en esta app. Lo que graba la reacción de otra app a uno de esos avisos lleva el mismo actor, y lo que se reacciona a
   eso también: se lo da el relay (`base/services.py::relay_deliver_next`, hub#1365), así que tampoco arranca nada de
-  segunda mano. Lo prueban `tests/test_recovery.py` y `base/tests/test_relay_brought_back.py`.
+  segunda mano. Lo prueban `tests/test_recovery.py` y `base/tests/test_relay_carried.py`.
 - **Lo que leyeron los pasos** (`outputs`: la ficha de un cliente…) solo se guarda mientras la ejecución
   puede seguir: esperando, o parada por un error durante `RESUME_DAYS` (7) para reanudarla (FLOW-F24);
   al terminar bien, por una condición o cancelada se vacía, y la poda de cada hora vacía la de un fallo de

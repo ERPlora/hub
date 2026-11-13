@@ -151,10 +151,10 @@ def test_what_reactions_record_for_anyone_else_is_the_system_s(db, actor):
     }
 
 
-def test_what_the_business_does_in_the_same_pass_never_takes_a_carried_actor(db):
+@pytest.mark.parametrize("mark", MARKS)
+def test_what_the_business_does_in_the_same_pass_never_takes_a_carried_actor(db, mark):
     """The business at work in the same pass as a carried actor's event: only what answers that event takes it, not what
-    answered the business's a moment before, nor what the business records while the relay delivers."""
-    mark = f"{DECLARED}{uuid.uuid7()}"
+    answered the business's a moment before, nor what the platform records as the system while the relay delivers."""
     record(A, "two.card.made", PERSON)
     record(A, "one.card.made", mark)
     now = timezone.now()
