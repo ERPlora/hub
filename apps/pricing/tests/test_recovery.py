@@ -87,11 +87,15 @@ def test_lacking_is_a_price_the_business_no_longer_has_in_a_place_it_left_free()
     # Its place taken again by the business, at another price: the business's stays, never a second one.
     make_item(bulk, shampoo, price=850, min_quantity="10.000")
     put_back = a_price_of_the_copy(bulk, product=shampoo, price=800, min_quantity="10")
+    # The same for a service's place: the business priced that service in that list again.
+    colour = make_service("Colour")
+    make_item(bulk, None, price=2000, service_id=colour.id, service_name="Colour")
+    service_put_back = a_price_of_the_copy(bulk, service=colour, price=1900)
     # Lacking: the same product from another quantity, and a service's.
     from_five = a_price_of_the_copy(bulk, product=shampoo, price=820, min_quantity="5")
     cut = a_price_of_the_copy(vip, service=haircut, price=1500)
 
-    lacking = queries.prices_not_in_business([still, put_back, from_five, cut])
+    lacking = queries.prices_not_in_business([still, put_back, service_put_back, from_five, cut])
 
     # As the list detail's add takes each, with its id in the copy: its list, its one article, price and quantity.
     assert lacking == [
