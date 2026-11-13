@@ -1,8 +1,8 @@
 """Write operations of the tax app: one transaction each, with its event in the outbox.
 
-The cases are those of the current product's batteries: overlapping rules refused (taxes#66),
-concurrently too (taxes#69); no rate on a class that charges no tax and coherent components
-(taxes#9, #59); a closed jurisdiction (taxes#41); end, deactivate and reactivate (taxes#52).
+The cases are those of the current product's batteries: overlapping rules refused,
+concurrently too; no rate on a class that charges no tax and coherent components; a closed
+jurisdiction; end, deactivate and reactivate.
 """
 
 import json
@@ -324,7 +324,7 @@ def test_a_rule_without_its_tax_family_takes_the_one_of_its_territory(no_seed):
     assert [rule.tax_type for rule in (canary, melilla, national, said)] == ["igic", "ipsi", "vat", "vat"]
 
 
-# Components (taxes#9, #59)
+# Components
 
 
 @pytest.mark.django_db
@@ -386,7 +386,7 @@ def test_an_incoherent_component_is_refused(no_seed):
     )
 
 
-# Overlaps (taxes#66): two active root rules of one slot are never in force the same day
+# Overlaps: two active root rules of one slot are never in force the same day
 
 
 def overlap(**fields):
@@ -737,7 +737,7 @@ def test_an_employee_cannot_write(no_seed):
     assert TaxRule.objects.get().is_active and outbox() == []
 
 
-# Two people saving at the same instant (taxes#69): the second waits for the first, then is refused
+# Two people saving at the same instant: the second waits for the first, then is refused
 
 
 def _in_thread(target):

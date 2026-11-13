@@ -408,7 +408,7 @@ def test_whoever_corrects_days_reads_the_one_they_correct(person):
         run("attendance.record.detail", {"id": str(record.id)}, ctx_for(permissions={"attendance.clock"}))
 
 
-# attendance.correction.list: the history (ATTENDANCE-F09; the employee's own, attendance#8)
+# attendance.correction.list: the history (ATTENDANCE-F09; the employee's own)
 
 
 def test_the_history_newest_first_with_who(person, make_user):

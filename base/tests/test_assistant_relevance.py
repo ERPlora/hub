@@ -84,8 +84,8 @@ def test_an_everyday_request_is_offered_the_tool_that_does_it(owner, language, a
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_the_people_of_a_reservation_never_bring_the_staffs_tools(owner):
-    """«personas» is not «Personal» (the staff app in Spanish): before live#18's review, «reserva una mesa para 4
-    personas» filled the turn with 11 tools of staff and left the reservation's own at 16."""
+    """«personas» is not «Personal» (the staff app in Spanish): before live offered the tool of what is asked,
+    «reserva una mesa para 4 personas» filled the turn with 11 tools of staff and left the reservation's own at 16."""
     got = offered(owner("es"), "reserva una mesa para 4 personas")
     assert got.index("reservation.reservation.create") == len(assistant.ALWAYS)  # first after what is always at hand
     assert sum(name.startswith("staff.") for name in got) <= 1, [name for name in got if name.startswith("staff.")]
@@ -139,13 +139,13 @@ HUB_WORDS = [
 @pytest.mark.parametrize(("language", "asked", "expected"), HUB_WORDS)
 def test_the_hubs_own_words_bring_the_tool_they_mean_among_the_first_ten(owner, language, asked, expected):
     """Before the Hub said what its words mean, these came at 11 to 31, or not at all: «cuenta» shared no word with an
-    order and «ticket» brought the kitchen's tickets (live#22 leaves those meanings to each project)."""
+    order and «ticket» brought the kitchen's tickets (live leaves those meanings to each project)."""
     ctx = owner(language)
     assert expected in assistant.catalog(ctx)  # the owner holds it: only the selection can leave it out
     assert expected in offered(ctx, asked)[:10]
 
 
-#: «retira» and «anota» are the verbs they are (ERPlora/live#64), in phrases no tool says as its asks: «retira» takes
+#: «retira» and «anota» are the verbs they are, in phrases no tool says as its asks: «retira» takes
 #: something out (deletes, removes, retires or withdraws it, as the thing named says) and «anota» writes in what exists
 #: or adds to it. None is a probe of layer 2 of its tool with other names: each shares two stems at most with one
 #: (``live.assistant.stems``), so this test and the probes' do not fix the same sentence twice.
@@ -161,8 +161,8 @@ RETIRA_AND_ANOTA = [
 @pytest.mark.parametrize(("language", "asked", "expected"), RETIRA_AND_ANOTA)
 def test_retira_and_anota_bring_the_tool_they_mean_among_the_first_ten(owner, language, asked, expected):
     """Before the Hub read live with «anota» and «retira» among its verbs, they asked for no action and the tool came
-    only by the thing named: these came 14th to 23rd. A pointer of ``packages/live`` back to before ERPlora/live#66
-    fails here."""
+    only by the thing named: these came 14th to 23rd. A pointer of ``packages/live`` back to before live read «anota»
+    and «retira» as editing and removing fails here."""
     ctx = owner(language)
     assert expected in assistant.catalog(ctx)  # the owner holds it: only the selection can leave it out
     assert expected in offered(ctx, asked)[:10]

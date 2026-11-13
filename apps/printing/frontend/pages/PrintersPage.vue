@@ -26,7 +26,7 @@ const session = useSession();
 const canManage = computed(() => session.can('printing.manage_settings'));
 const canPrint = computed(() => session.can('printing.print'));
 const t = useT();
-// Inside the installed app nobody is told about a browser (printing#37); the account the app opens in the
+// Inside the installed app nobody is told about a browser; the account the app opens in the
 // system browser is a browser.
 const { surface } = useSurface();
 const appNote = computed(() =>

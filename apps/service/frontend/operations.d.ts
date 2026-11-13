@@ -1,8 +1,8 @@
 // Types of the service app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from
-// apps/service/schemas.py. Written by hand, as the other apps', until V3 generates them from
-// `/api/openapi.json`. Keep it in step with schemas.py and `frontend/generated/operations.json`.
-// One input per operation (ninja's parity): no path parameters, an id travels in the input.
-// On the wire: money in whole minor units of the business's currency, minutes as integers, dates and moments ISO 8601.
+// apps/service/schemas.py. Written by hand, as the other apps' are: nothing generates them from `/api/openapi.json`.
+// Keep it in step with schemas.py and `frontend/generated/operations.json`. One input per operation (ninja's parity):
+// no path parameters, an id travels in the input. On the wire: money in whole minor units of the business's currency,
+// minutes as integers, dates and moments ISO 8601.
 import type { CatalogImage } from '../../../base/frontend/operations';
 import type { Page } from '../../../frontend/sdk-types';
 

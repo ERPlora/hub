@@ -1,6 +1,6 @@
 // The filters of Products (WORKBOOK «Productos»: name, SKU, price from/to, stock from/to and status), as
 // the table's funnel holds them (by the list's parameter names, as typed; a filter not in use is absent)
-// and as `inventory.product.list` takes them: the price in cents (typed in the business's money, inventory#115, read as
+// and as `inventory.product.list` takes them: the price in cents (typed in the business's money, read as
 // every amount filter of the Hub: `filterCents`, hub#1196) and the stock as an exact quantity. An end it cannot read
 // does not filter: the table says why under it (the page, with `amountFilterErrors` on `PRICE_ENDS` and
 // `unreadableQuantities`).

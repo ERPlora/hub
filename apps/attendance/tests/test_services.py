@@ -2,7 +2,7 @@
 
 The cases come from the old module's batteries (clock_cycle against the kernel; data.pg: two clock-ins
 in a row, the geofence, clock-out closing the running break, the correction guards and the overlap of
-attendance#12, the review of forgotten days, the settings singleton) and the WORKBOOK. A refused command
+two days of a person, the review of forgotten days, the settings singleton) and the WORKBOOK. A refused command
 leaves no trace: no row, no event.
 """
 
@@ -660,7 +660,7 @@ def test_a_day_waiting_for_review_is_closed_with_a_correction_and_its_break_too(
 
 
 class TestOverlap:
-    """attendance#12: a correction never puts two days of the same person over each other."""
+    """A correction never puts two days of the same person over each other."""
 
     @pytest.fixture
     def days(self, person, clock):

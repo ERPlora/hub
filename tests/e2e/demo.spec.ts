@@ -39,7 +39,7 @@ async function doorSays(page: Page, state: string): Promise<void> {
   await expect(page.getByTestId(`demo-state-${state}`)).toBeVisible();
 }
 
-/** The door's «Back to my demo»: a link, as the public web draws its buttons (`{% button %}`, saas#246), found by its
+/** The door's «Back to my demo»: a link, as the public web draws its buttons (`{% button %}`), found by its
  *  role and name, not by the element that draws it (an `ion-button` until then: hub#1040). */
 function backToMyDemo(page: Page): Locator {
   return page.getByRole('link', { name: 'Back to my demo', exact: true });

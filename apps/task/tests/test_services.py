@@ -285,7 +285,7 @@ GHOST_WRITES = [
 @pytest.mark.parametrize("by", ["id", "number", "title"])
 @pytest.mark.parametrize(("name", "extra"), GHOST_WRITES)
 def test_a_write_on_a_task_that_does_not_exist_is_refused_and_says_nothing(team, name, extra, by):
-    """tasks#22 and tasks#24: the old module reported an assignment of a missing task as done, and the
+    """The old module reported an assignment of a missing task as done, and the
     database's own words for a comment on one; here every write is a «does not exist», with no event."""
     real = make_task("Real one", number="TSK-20261014-0001")
     key = "task_id" if name.startswith("task.comment.") else "id"
@@ -377,7 +377,7 @@ def test_a_comment_is_signed_by_the_caller(team):
 def test_a_comment_or_a_task_of_someone_the_business_s_database_does_not_know_yet_makes_their_person(
     team, django_user_model
 ):
-    # A session opened before the business's database knew them (W10): their first write signs with a person of its
+    # A session opened before the business's database knew them: their first write signs with a person of its
     # own, and they own what they created.
     late = django_user_model.objects.create_user(username="saas:late", first_name="Eva")
     Membership.objects.create(user=late, host="a", role="hub_employee")

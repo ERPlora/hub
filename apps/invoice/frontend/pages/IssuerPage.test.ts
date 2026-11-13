@@ -97,7 +97,7 @@ describe('IssuerPage', () => {
     expect(prop(s.field('tax-id'), 'errorText')).toBe('That tax ID is not valid.');
   });
 
-  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: ui#102, hub#821)', () => {
+  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: hub#821)', () => {
     const TAX_ID = 'That tax ID is not valid.';
     const POSTAL = 'Ensure this value has at most 5 characters.';
     const REFUSAL = { error: { code: 'invalid_payload', message: 'Invalid payload', fields: { tax_id: TAX_ID, postal_code: POSTAL } } };

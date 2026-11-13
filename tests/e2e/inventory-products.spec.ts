@@ -443,7 +443,7 @@ test('the tabs walk the five sections, each on its address; screenshots of every
 test('Products filter by price in euros behind the funnel, with its count; an amount it cannot read is said under it', async ({ page, context }) => {
   const run = stamp();
   await login(page, A, '/inventory/products');
-  // 2,20 € and 15,00 €: «Price from 10» is ten euros (inventory#115), never ten cents.
+  // 2,20 € and 15,00 €: «Price from 10» is ten euros, never ten cents.
   const cheap = await createProduct(context, { name: `E2E Cheap ${run}`, sku: `E2E-FIL-C-${run}`, price: 220 });
   const dear = await createProduct(context, { name: `E2E Dear ${run}`, sku: `E2E-FIL-D-${run}`, price: 1500 });
   const panel = shown(page).locator('[data-testid=inventory-products-filters-panel]');

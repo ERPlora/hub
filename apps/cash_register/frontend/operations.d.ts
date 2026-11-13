@@ -1,8 +1,7 @@
 // Types of the cash register app's operations for the SDK (`useLive`, `useCommand`), from
-// apps/cash_register/schemas.py. Written by hand, as `frontend/sdk-types.d.ts` is for the PoC, until V3
-// generates them from `/api/openapi.json`. Keep it in step with schemas.py and with
-// `frontend/generated/operations.json`. One input per operation (ninja's parity): no path parameters.
-// Money is whole cents; dates and times are ISO 8601 strings.
+// apps/cash_register/schemas.py. Written by hand, as `frontend/sdk-types.d.ts` is: nothing generates them from
+// `/api/openapi.json`. Keep it in step with schemas.py and with `frontend/generated/operations.json`. One input per
+// operation (ninja's parity): no path parameters. Money is whole cents; dates and times are ISO 8601 strings.
 import type { Page } from '../../../frontend/sdk-types';
 
 export type SortDir = 'asc' | 'desc';

@@ -6,10 +6,9 @@ to the kitchen (``kitchen.ticket.receive``), as production runs it: nothing is c
 reaches the dish by its kitchen name, in the order chosen, under the dish on the card and as one line each
 on paper, with the waiter's note after them.
 
-Traps of the old product: pm#93 and sales#237 (the chain of options till → ticket → kitchen, end to end),
-hub#1156 (the paper lost the options that the row had), kitchen#64 (the options travel to paper as a LIST,
-one line each, never a joined string), sales#156 and pm#115 (the note of the line, the only place an allergy
-lives, reaches card and paper).
+Traps of the old product: the chain of options till → ticket → kitchen, end to end; the paper lost the options
+that the row had; the options travel to paper as a LIST, one line each, never a joined string; the note of the
+line, the only place an allergy lives, reaches card and paper.
 """
 
 import pytest

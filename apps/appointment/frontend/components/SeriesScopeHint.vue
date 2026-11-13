@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // APPOINTMENT-F14: what editing a series from a date reaches — its booked appointments from that date on,
-// and how many of those are charged (an edit never touches them; said only when there are some,
-// appointments#293). Live: it follows the date picked.
+// and how many of those are charged (an edit never touches them; said only when there are some).
+// Live: it follows the date picked.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { computed } from 'vue';

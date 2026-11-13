@@ -945,7 +945,7 @@ def keeps_fiscal_documents() -> bool:
 
 def has_live_twin(name: str, phone: str, email: str) -> bool:
     """A live card with the same name, phone and email, the case of the name and the email aside: the same card made
-    again (an import of a row already imported, services#152; a card brought back from a copy already, hub#1257).
+    again (an import of a row already imported; a card brought back from a copy already, hub#1257).
 
     Only the three together: two people may share a phone or an email (CUSTOMER-F12).
     """

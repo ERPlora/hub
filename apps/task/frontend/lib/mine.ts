@@ -1,4 +1,4 @@
-// tasks#45 · «My tasks» lists only OPEN tasks, so the one just completed vanished on the next result and
+// «My tasks» lists only OPEN tasks, so the one just completed vanished on the next result and
 // the next card slid into its slot. It stays where it was, shown as done, until the person leaves the
 // tab (Things, Apple Reminders, Asana): the fresh rows keep the server's order and each kept task goes
 // back right after the card that preceded it. A kept task the server lists again (reopened) is painted

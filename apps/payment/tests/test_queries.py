@@ -2,7 +2,7 @@
 the methods.
 
 The filter cases come from the old module's tests: typing a piece of the reference (its last digits,
-its date) finds the payment (payments#21, `text_filters_narrow_by_fragment`), the beneficiary narrows
+its date) finds the payment (`text_filters_narrow_by_fragment`), the beneficiary narrows
 by fragment too, and every filter box the screen paints has its filter in the query's input
 (`filter_boxes_match_the_manifest`).
 """

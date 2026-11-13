@@ -300,7 +300,7 @@ def test_one_line_by_its_id(lines):
 
 
 def test_the_lines_of_a_deleted_cart_are_gone_with_it(shop):
-    # cart_checkout#8 (CART_CHECKOUT-F06): a deleted cart's lines stay in the database for its orders,
+    # CART_CHECKOUT-F06: a deleted cart's lines stay in the database for its orders,
     # but nobody reads them any more, neither the cart's list nor one line by its id.
     gone = Cart.objects.get(session_token="sess_gone")
     line = make_item(gone, product_name="Champú")

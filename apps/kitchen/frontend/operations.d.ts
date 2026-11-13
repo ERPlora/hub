@@ -1,8 +1,8 @@
 // Types of the kitchen app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from
-// apps/kitchen/schemas.py. Written by hand, as the other apps', until V3 generates them from
-// `/api/openapi.json`. Keep it in step with schemas.py and `frontend/generated/operations.json`.
-// One input per operation (ninja's parity): no path parameters, an id travels in the input.
-// On the wire: moments ISO 8601 with their zone, money in whole cents, quantities as decimal strings.
+// apps/kitchen/schemas.py. Written by hand, as the other apps' are: nothing generates them from `/api/openapi.json`.
+// Keep it in step with schemas.py and `frontend/generated/operations.json`. One input per operation (ninja's parity):
+// no path parameters, an id travels in the input. On the wire: moments ISO 8601 with their zone, money in whole cents,
+// quantities as decimal strings.
 import type { Page } from '../../../frontend/sdk-types';
 
 export type TicketStatus = 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled';

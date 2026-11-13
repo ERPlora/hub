@@ -136,7 +136,7 @@ describe('CloseSessionForm', () => {
     expect(s.sent()).toHaveLength(1);
   });
 
-  it('warns of the kitchen tickets not served and the prints that did not come out (cash_register#68)', async () => {
+  it('warns of the kitchen tickets not served and the prints that did not come out', async () => {
     const s = await setup();
     await s.result(DETAIL, detail(10150));
     await s.result(COUNTS, counts([]));

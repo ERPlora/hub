@@ -90,7 +90,7 @@ def _shell(request: HttpRequest) -> HttpResponse:
         # user menu's «Report a problem» (only for the account) and its operation (BASE-F108) say the same.
         request.session.setdefault(CREDENTIAL_SESSION_KEY, way_in["credential"])
         # erplora.com's pages only for a session opened with the account: on a shared till, the browser's erplora.com
-        # session is whoever made it a device of the hub, never the person who entered with a PIN (gh:hub#2506).
+        # session is whoever made it a device of the hub, never the person who entered with a PIN.
         account = way_in["credential"] == SessionOwner.Credential.ACCOUNT
         extra_json[HUB_HOME_ID] = {
             "name": hub.name,

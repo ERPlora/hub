@@ -149,7 +149,7 @@ describe('KdsTicket', () => {
     const head = s.find('kitchen-menu-m1');
     expect(head.text()).toContain('MENU');
     expect(head.text()).toContain('2 dishes');
-    // kitchen#157: one dish is «1 dish», never «1 dishes».
+    // One dish is «1 dish», never «1 dishes».
     expect(s.find('kitchen-menu-m2').text()).toContain('1 dish');
     expect(s.find('kitchen-menu-m2').text()).not.toContain('1 dishes');
     // The header carries the menu, never a dish's options; the dishes follow it in order, inside the menu.

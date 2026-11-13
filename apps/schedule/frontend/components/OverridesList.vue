@@ -89,7 +89,7 @@ const columns = computed<DataTableColumn<OverrideOut>[]>(() => [
   },
 ]);
 
-/** The screen has two lists (schedules#58): its funnel and view buttons say they are the overrides'.
+/** The screen has two lists: its funnel and view buttons say they are the overrides'.
  *  DataTable fills the `{n}` of the count itself. */
 const tableLabels = computed<Partial<DataTableLabels>>(() => ({
   add: t('schedule.overrides.add'),

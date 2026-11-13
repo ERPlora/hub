@@ -136,7 +136,7 @@ def test_a_menu_freezes_its_amount_and_dishes_and_charges_one_line_at_the_menus_
 
 
 def test_to_take_away_the_amount_is_split_per_dish_by_catalogue_price_with_no_parent_line(takeaway):
-    """sales#152: 6,00 € over a sandwich of 4,50 € (10 %) and a beer of 2,00 € (21 % to take away):
+    """6,00 € over a sandwich of 4,50 € (10 %) and a beer of 2,00 € (21 % to take away):
     4,15 € + 1,85 €, each line at its own VAT, and no line of the menu with money."""
     picks = [{"product": "SAN"}, {"product": "BEE"}]
     preview = run("sale.checkout.preview", {"combo_lines": [{"combo": "Sandwich and beer", "choices": picks}]})
@@ -159,7 +159,7 @@ def test_to_take_away_the_amount_is_split_per_dish_by_catalogue_price_with_no_pa
 
 
 def test_an_open_check_keeps_the_menu_and_charging_it_later_equals_charging_it_at_once(takeaway):
-    """sales#169 and sales#238: open a check with a menu, take it up again and charge it — the same
+    """Open a check with a menu, take it up again and charge it — the same
     lines and money as charging the menu at the counter."""
     picks = [{"product": "SAN"}, {"product": "BEE"}]
     order_id = str(
@@ -192,7 +192,7 @@ def test_an_open_check_keeps_the_menu_and_charging_it_later_equals_charging_it_a
 
 
 def test_the_sale_notice_carries_each_dish_times_the_menus_and_inventory_lowers_them(menu):
-    """sales#171: the menu has no stock; each dish moves, times the menus sold."""
+    """The menu has no stock; each dish moves, times the menus sold."""
     sale = charge(
         "combo-stock-0001",
         combo_lines=[
@@ -238,7 +238,7 @@ def test_refunding_a_menu_gives_each_dish_back(menu):
 
 
 def test_a_menu_missing_a_required_course_is_refused_and_never_reaches_the_kitchen(menu):
-    """sales#535: a half menu does not enter the check, so it can never be fired without its dishes."""
+    """A half menu does not enter the check, so it can never be fired without its dishes."""
     order_id = open_check()
     with pytest.raises(Conflict) as refused:
         add_menu(order_id, choices(menu["LEN"]))
@@ -250,7 +250,7 @@ def test_a_menu_missing_a_required_course_is_refused_and_never_reaches_the_kitch
 
 
 def test_firing_sends_the_menu_with_its_kitchen_name_and_its_dishes(menu):
-    """sales#522: the kitchen learns which dishes the table chose, each with its product and category."""
+    """The kitchen learns which dishes the table chose, each with its product and category."""
     order_id = open_check()
     add_menu(order_id, choices(menu["SAL"], menu["HAK"], menu["FLA"]), quantity="2")
     run("sale.order.fire", {"order_id": order_id})

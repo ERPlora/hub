@@ -3,7 +3,7 @@ per fiscal key, the audit that refuses what does not square, and the rectificati
 prorates what is left of each key.
 
 Cases taken from the current product's tests (`number_format`, `rectify_from_refund`, `rectify_lines`)
-and handler (`invoice#50`, `invoice#65`, the TEAC's four lines of 0.50 € at 21 %).
+and handler (the TEAC's four lines of 0.50 € at 21 %).
 """
 
 from decimal import Decimal

@@ -231,7 +231,7 @@ def test_a_customers_visits_come_newest_first_with_their_notes(salon):
     )
 
 
-# gh:appointments#143, #146 · gh:hub#1662 — a model reading a stranger's message (a flow's step gets every
+# A model reading a stranger's message (a flow's step gets every
 # read of the app) composes these reads: what is the salon's (its notes, a cancellation's reason) and the
 # customer's contact never reach a caller that is not a person. The team, and its assistant with the person's
 # own session, read them; the day's agenda carries neither, for anybody.
@@ -266,7 +266,7 @@ def test_a_caller_who_is_not_a_person_reads_a_visit_without_the_salons_notes_nor
     assert not set(agenda.rows[0].model_dump()) & set(private)
 
 
-# gh:appointments#151 — a flow's template prints a value as it comes, with no clock nor formatter: an
+# A flow's template prints a value as it comes, with no clock nor formatter: an
 # automation confirming a booking says «el martes a las 10:30» because the appointment gives its day and its
 # hour ready to read, in the language of whoever asks, on the business's clock (24 hours, as the old
 # product's messages; the year kept: a booking can be months away).

@@ -1,5 +1,5 @@
 // flow: WHATSAPP_INBOX-F09
-// The WhatsApp inbox's counter of the bell (FIX-WHATSAPP_INBOX-SETUP-HOOKS; the old module's `bell`, whatsapp_inbox#244,
+// The WhatsApp inbox's counter of the bell (FIX-WHATSAPP_INBOX-SETUP-HOOKS; the old module's `bell`,
 // hub#1678; the old hub's bell, docs/reference/old-hub/notifications-*.png): on the Home of hub `a`, as its owner reads
 // it in Spanish, a customer writes on WhatsApp and the bell's badge counts her without a reload; opened, the row
 // «Clientes de WhatsApp esperando respuesta (N)» leads to the inbox, where the owner answers her from the composer, and

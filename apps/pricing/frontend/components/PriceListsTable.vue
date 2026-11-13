@@ -32,7 +32,7 @@ import PriceListFormModal from './PriceListFormModal.vue';
 
 const BASES: readonly TaxBasis[] = ['business', 'included', 'excluded'];
 // The active ones until the person picks another status; the table's own blank option («All») asks for
-// every one, so there is no second «All» beside it that meant something else (pm#254).
+// every one, so there is no second «All» beside it that meant something else.
 const STATUSES: readonly Status[] = ['active', 'inactive'];
 const DEFAULT_STATUS = 'active';
 

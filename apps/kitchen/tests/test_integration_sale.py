@@ -195,7 +195,7 @@ def test_a_round_sent_from_the_till_says_its_waiter_by_name(product, ana):
 
 
 def test_a_round_sent_for_whoever_attends_the_check_names_them_even_after_the_relay(relay, product, ana):
-    """KITCHEN-F18, F08, F10 (kitchen#82, hub#2033, staff#59): the till sends the round naming who attends the
+    """KITCHEN-F18, F08, F10: the till sends the round naming who attends the
     check («Atiende»: a member of the team, who may have no login); the card, the detail, the ticket and its paper
     say that person, also once the relay brings the fire. With nobody in «Atiende», who sends it (above)."""
     order = open_check("Table 4")

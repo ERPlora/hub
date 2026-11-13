@@ -270,7 +270,7 @@ def test_many_tables_are_made_at_once_over_http_or_none_with_the_taken_numbers(a
 
 
 def test_the_spas_route_map_names_every_table_route(settings):
-    # frontend/generated/operations.json: the op → route map the SDK's client uses (hand-written until V3).
+    # frontend/generated/operations.json: the op → route map the SDK's client uses (written by hand).
     spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
     mine = {
         (route["method"].upper(), route["path"].removeprefix("/api"), op)

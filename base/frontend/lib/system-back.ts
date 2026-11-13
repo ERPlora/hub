@@ -1,4 +1,4 @@
-// Android's Back button on the installed app (BASE-F05, gh:hub#1906; ported from the old hub's
+// Android's Back button on the installed app (BASE-F05; ported from the old hub's
 // `apps/web/src/router/back-closes-overlay.ts`, origin/develop): it closes what is open on top BEFORE it leaves the
 // screen, and only Home leaves the app.
 //

@@ -111,7 +111,7 @@ def test_a_409_without_the_envelope_is_still_a_refusal():
 @respx.mock
 def test_a_4xx_other_than_409_means_nothing_left(status):
     # erplora.com read the request and did not take it: nothing reached Meta, a retry is safe. A 429 (go
-    # slower) is never «the month is spent» (gh:hub#2649).
+    # slower) is never «the month is spent».
     respx.post(SEND).mock(return_value=httpx.Response(status, json={}))
     reply = send_text()
     assert reply.kind == gateway.UNREACHABLE
@@ -373,7 +373,7 @@ def test_a_template_meta_no_longer_has_is_deleted_and_a_refusal_keeps_its_reason
 )
 @respx.mock
 def test_a_404_that_is_not_erplora_saying_meta_has_no_such_template_deletes_nothing(answer):
-    """gh:whatsapp_inbox#296: a door erplora.com does not serve yet (or a wrong address) also answers 404;
+    """A door erplora.com does not serve yet (or a wrong address) also answers 404;
     reading it as «Meta no longer has it» would drop the template here while Meta keeps it alive."""
     respx.post(TEMPLATES_DELETE).mock(return_value=answer)
     reply = gateway.delete_template(hub="a", name="x", language="es", meta_id="1")

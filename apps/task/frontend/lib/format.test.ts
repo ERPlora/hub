@@ -1,5 +1,5 @@
 // How the task screens paint days, moments, tones and tags (pages never format by hand). A due date is
-// a pure day: painted without moving it across time zones (tasks#23: 00:00 UTC went back a day west of
+// a pure day: painted without moving it across time zones (00:00 UTC went back a day west of
 // Greenwich). «Today» is the business's day, on the clock it is given (hub#779; WORKBOOK «Antes de empezar»).
 import { describe, expect, it } from 'vitest';
 

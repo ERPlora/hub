@@ -194,7 +194,7 @@ def test_the_bill_of_a_check_prints_with_its_lines(bar, till):
 
 
 def test_the_employee_at_the_till_gets_the_receipt_and_the_drawer(bar, till):
-    """Whoever charges, not only the owner (pm#630): an employee's cash charge queues its receipt, with its QR and the
+    """Whoever charges, not only the owner: an employee's cash charge queues its receipt, with its QR and the
     order to open the drawer."""
     run("printing.settings.update", {"open_drawer_on_sale": True})
     out = charge("sale-print-employee", payments=CASH, ctx=ctx_for("hub_employee"))

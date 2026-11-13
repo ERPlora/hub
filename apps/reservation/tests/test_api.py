@@ -101,7 +101,7 @@ def test_the_api_keeps_parity():
 
 
 def test_the_spas_route_map_names_every_reservation_route(settings):
-    # frontend/generated/operations.json: the op → route map the SDK's client uses (hand-written until V3).
+    # frontend/generated/operations.json: the op → route map the SDK's client uses (written by hand).
     spa = json.loads(
         (settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text()
     )

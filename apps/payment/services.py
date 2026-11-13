@@ -377,7 +377,7 @@ def _recorded(data: PaymentIn, currency: str) -> dict | None:
     },
 )
 def create_payment(ctx: OperationContext, data: PaymentIn) -> dict:
-    # Without one, the business's currency: its country's (BASE-F50), never a euro fixed here (payments#35, #38).
+    # Without one, the business's currency: its country's (BASE-F50), never a euro fixed here.
     currency = data.currency or platform.business_currency(ctx.scope)
     recorded = _recorded(data, currency)
     if recorded is not None:

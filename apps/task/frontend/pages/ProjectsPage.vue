@@ -2,7 +2,7 @@
 // Tasks → Projects (WORKBOOK «Pantallas · Proyectos»; TASK-F12 to F14): the live `task.project.list` in a
 // server-side DataTable — Code, Name, Color (with its swatch) and Active (Yes / No, a list filter) —, the
 // newest first, «Search code or name…», column filters behind the toolbar funnel, list or cards, 50 a
-// page. A row and its «Open» open the project's sheet (tasks#43); «+», for whoever manages projects, opens
+// page. A row and its «Open» open the project's sheet; «+», for whoever manages projects, opens
 // «New project».
 import {
   DataTable,

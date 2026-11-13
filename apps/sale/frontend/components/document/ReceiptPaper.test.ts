@@ -260,7 +260,7 @@ describe('ReceiptPaper', () => {
     expect(source).not.toMatch(/<ok[-]/);
   });
 
-  describe('the fiscal QR (VERIFACTU-F19, sales#411)', () => {
+  describe('the fiscal QR (VERIFACTU-F19)', () => {
     const RECORD = {
       qr_svg: 'data:image/svg+xml;base64,PHN2Zy8+',
       qr_url: 'https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B12345674&numserie=TICKET-2026-000031',

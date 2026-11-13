@@ -1,7 +1,7 @@
 // flow: KITCHEN-F19, KITCHEN-F20 — one round of the check in «Order tickets»: «Order N», the time it was sent
 // (the business's), its state, «Rush» if it is, its dishes (a voided one struck, with «Voided») and, to whoever
 // may change tickets, «Mark rush» / «Remove rush» while it cooks (never on a VIP round). The words are the
-// kitchen's own (kitchen#112: the till and the kitchen's list name a state the same way).
+// kitchen's own (the till and the kitchen's list name a state the same way).
 import { describe, expect, it } from 'vitest';
 
 import kitchenEn from '../../../../kitchen/frontend/locale/en.json';
@@ -102,7 +102,7 @@ describe('KitchenTicketCard', () => {
     expect((m.find('pos-kitchen-ticket-t1-rush').element as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('the till’s words are the kitchen’s words (kitchen#112), in English and in Spanish', () => {
+  it('the till’s words are the kitchen’s words, in English and in Spanish', () => {
     for (const [sale, kitchen] of [
       [en, kitchenEn],
       [es, kitchenEs],
