@@ -35,6 +35,7 @@ from apps.appointment.models import (
     BlockedTime,
     History,
     Recurring,
+    RecurringService,
     Settings,
 )
 from apps.appointment.schemas import (
@@ -1416,6 +1417,8 @@ def get_settings(ctx: OperationContext, data: NoIn) -> dict:
 
 # ── What a separate copy of the business gives back (hub#1284; BASE-F114, APPOINTMENT-F01) ──────────────────────
 
+#: A series' rule, as its create takes it.
+RULE_FIELDS = ("frequency", "day_of_week", "time", "duration_minutes", "start_date", "end_date", "max_occurrences")
 #: What an appointment of a separate copy is read with (``appointments_in_copy``): each a column since ``0001_initial``.
 COPY_FIELDS = ("id", "customer", "staff", "start", "duration_minutes", "notes", "internal_notes", "source")
 #: What the appointment kept of its customer when it was booked: who she is when the copy no longer has her card live.
@@ -1454,7 +1457,7 @@ def appointments_in_copy(conn) -> list[dict]:
         column["id"],
     )
     rows = [dict(zip(read, row, strict=True)) for row in conn.execute(query, [BOOKED, timezone.now()])]
-    services = _services_in_copy(conn, [row["id"] for row in rows])
+    services = _lines_in_copy(conn, AppointmentService, "appointment", [row["id"] for row in rows])
     cards = {card["id"]: card for card in cards_in_copy(conn)}
     # All of them, never the appointments' alone: Services matches by the whole copy (``services_in_business``).
     copy_services = services_in_copy(conn) if rows else []
@@ -1475,33 +1478,34 @@ def appointments_in_copy(conn) -> list[dict]:
     ]
 
 
-def _services_in_copy(conn, ids: list[UUID]) -> dict[UUID, list[dict]]:
-    """``{id of an appointment of the copy: its services in their order}``, as its create takes them, of ``ids``."""
+def _lines_in_copy(conn, lines, owner: str, ids: list[UUID]) -> dict[UUID, list[dict]]:
+    """``{id of an appointment or a series of the copy: its services in their order}``, as its create takes them, of
+    ``ids``: ``lines`` is the model of its services (``AppointmentService``, ``RecurringService``), ``owner`` its field
+    that points at the appointment or the series."""
     if not ids:
         return {}
-    column = {
-        field: sql.Identifier(AppointmentService._meta.get_field(field).column)
-        for field in ("appointment", "service", "position")
-    }
+    column = {field: sql.Identifier(lines._meta.get_field(field).column) for field in (owner, "service", "position")}
     query = sql.SQL("SELECT {}, {} FROM {} WHERE {} = ANY(%s) ORDER BY {}, {}").format(
-        column["appointment"],
+        column[owner],
         column["service"],
-        sql.Identifier(AppointmentService._meta.db_table),
-        column["appointment"],
-        column["appointment"],
+        sql.Identifier(lines._meta.db_table),
+        column[owner],
+        column[owner],
         column["position"],
     )
     services: dict[UUID, list[dict]] = {}
-    for appointment, service in conn.execute(query, [ids]):
-        services.setdefault(appointment, []).append({"service_id": service})
+    for record, service in conn.execute(query, [ids]):
+        services.setdefault(record, []).append({"service_id": service})
     return services
 
 
 def _card_of(card: dict | None, row: dict) -> dict:
-    """The customer of an appointment of the copy as Customers matches her (``card_in_business``): the copy's live card
-    (``cards_in_copy``), or, when the copy no longer has it live, what the appointment kept of her."""
+    """The customer of an appointment or a series of the copy as Customers matches her (``card_in_business``): the
+    copy's live card (``cards_in_copy``), or, when the copy no longer has it live, what the appointment or the series
+    kept of her (a series keeps her name alone)."""
     if card is None:
-        card = {"id": row["customer"]} | {field.removeprefix("customer_"): row[field] for field in KEPT_OF_THE_CUSTOMER}
+        kept = {field.removeprefix("customer_"): row.get(field, "") for field in KEPT_OF_THE_CUSTOMER}
+        card = {"id": row["customer"]} | kept
     return {field: card[field] for field in ("id", "name", "phone", "email")}
 
 
@@ -1547,9 +1551,105 @@ def appointments_not_in_business(appointments: list[dict]) -> list[dict]:
         customer = card_in_business(one["customer_card"]) or one["customer_card"]["id"]
         if Appointment.objects.filter(deleted_at__isnull=True, customer_id=customer, start=one["start"]).exists():
             continue
-        create = {key: value for key, value in one.items() if key not in ("id", "customer_card", "services_in_copy")}
-        create["services"] = [
-            {"service_id": services.get(line["service_id"], line["service_id"])} for line in one["services"]
-        ]
-        lacking.append({"id": one["id"], "customer_id": customer} | create)
+        lacking.append(_as_created_here(one, customer, services))
+    return lacking
+
+
+def _as_created_here(one: dict, customer: UUID, services: dict[UUID, UUID]) -> dict:
+    """An appointment or a series of the copy as its create takes it in the business, with its ``id`` there: for
+    ``customer``, the business's card of hers, and each of its services the business's (``services``, from
+    ``services_in_business``) or, without one, the copy's, which the create refuses with why."""
+    create = {key: value for key, value in one.items() if key not in ("id", "customer_card", "services_in_copy")}
+    create["services"] = [{"service_id": services.get(line["service_id"], line["service_id"])} for line in one["services"]]
+    return {"id": one["id"], "customer_id": customer} | create
+
+
+#: What a series of a separate copy is read with (``series_in_copy``): each a column since ``0001_initial``.
+SERIES_COPY_FIELDS = ("id", "customer", "customer_name", "staff", *RULE_FIELDS)
+
+
+def series_in_copy(conn) -> list[dict]:
+    """hub#1327: each series of a separate copy of the business still booking (neither deleted nor paused, with its
+    professional and not ended by its end date: one that books nothing is not lacking, as a cancelled appointment is
+    not), by its id, with its ``id`` there, what ``appointment.recurring.create`` takes (its services in their order,
+    its professional and its rule), the card of its customer there (``customer_card``, ``_card_of``) and every service
+    of the copy as Services reads it (``services_in_copy``: read once, the same list in each), which
+    ``series_not_in_business`` matches the business's by; nothing where the app's table is not there. ``conn`` is the
+    copy's direct, read-only connection, so it is read by its own SQL over the models' names, never the ORM."""
+    table = Recurring._meta.db_table
+    if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
+        return []
+    column = {
+        field: sql.Identifier(Recurring._meta.get_field(field).column)
+        for field in (*SERIES_COPY_FIELDS, "deleted_at", "is_active")
+    }
+    query = sql.SQL(
+        "SELECT {} FROM {} WHERE {} IS NULL AND {} AND {} IS NOT NULL AND ({} IS NULL OR {} >= %s) ORDER BY {}"
+    ).format(
+        sql.SQL(", ").join(column[field] for field in SERIES_COPY_FIELDS),
+        sql.Identifier(table),
+        column["deleted_at"],
+        column["is_active"],
+        column["staff"],
+        column["end_date"],
+        column["end_date"],
+        column["id"],
+    )
+    rows = [dict(zip(SERIES_COPY_FIELDS, row, strict=True)) for row in conn.execute(query, [today()])]
+    if not rows:
+        return []
+    services = _lines_in_copy(conn, RecurringService, "recurring", [row["id"] for row in rows])
+    cards = {card["id"]: card for card in cards_in_copy(conn)}
+    copy_services = services_in_copy(conn)
+    return [
+        {
+            "id": row["id"],
+            "customer_card": _card_of(cards.get(row["customer"]), row),
+            "staff_id": row["staff"],
+            "services": services.get(row["id"], []),
+            **{field: row[field] for field in RULE_FIELDS},
+            "services_in_copy": copy_services,
+        }
+        for row in rows
+    ]
+
+
+def _made_again(customer: UUID, rule: dict) -> bool:
+    """Whether the business holds a live series of ``customer`` that repeats as ``rule`` says, on its day and at its
+    time: the same series made again since, by hand or brought back already, whoever does it."""
+    same = {field: rule[field] for field in ("frequency", "day_of_week", "time")}
+    return Recurring.objects.filter(deleted_at__isnull=True, customer_id=customer, **same).exists()
+
+
+def series_deleted_in_business(series: list[dict]) -> list[dict]:
+    """hub#1327: the series of a separate copy (``series_in_copy``) the business still holds deleted (APPOINTMENT-F15),
+    in their order, for ``appointment.recurring.restore``: the same series back, with the appointments it booked. The
+    same by its id, whatever the copy says of it; never one made again since, as the business holds it (that one
+    stays)."""
+    held = Recurring.objects.filter(pk__in=[one["id"] for one in series], deleted_at__isnull=False)
+    deleted = {row["id"]: row for row in held.values("id", "customer_id", "frequency", "day_of_week", "time")}
+    return [
+        one
+        for one in series
+        if one["id"] in deleted and not _made_again(deleted[one["id"]]["customer_id"], deleted[one["id"]])
+    ]
+
+
+def series_not_in_business(series: list[dict]) -> list[dict]:
+    """hub#1327: the series of a separate copy (``series_in_copy``) the business lacks, in their order, each as
+    ``appointment.recurring.create`` takes it here (``_as_created_here``), with its ``id`` there. Not lacking: one the
+    business holds, live or deleted (a deleted one comes back the same, ``series_deleted_in_business``), and one made
+    again for the business's card of her customer (``_made_again``). Its customer and its services are matched as an
+    appointment's are (``appointments_not_in_business``); the create refuses with why what is not there any more, and
+    books the dates of its window that still fit, so none where an appointment came back before it."""
+    held = set(Recurring.objects.filter(pk__in=[one["id"] for one in series]).values_list("pk", flat=True))
+    # The same list in each (``series_in_copy``): every service of the copy, matched once.
+    services = services_in_business(series[0]["services_in_copy"]) if series else {}
+    lacking = []
+    for one in series:
+        if one["id"] in held:
+            continue
+        customer = card_in_business(one["customer_card"]) or one["customer_card"]["id"]
+        if not _made_again(customer, one):
+            lacking.append(_as_created_here(one, customer, services))
     return lacking

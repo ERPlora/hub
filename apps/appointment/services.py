@@ -55,6 +55,7 @@ from apps.appointment.queries import (
     CHANGE_OWN,
     CUSTOMER_SOURCES,
     MOVABLE,
+    RECURRING_NOT_FOUND,
     SERIES_DEFAULT_WINDOW,
     blocked_out,
     by_person,
@@ -1931,6 +1932,41 @@ def delete_series(ctx: OperationContext, data: RecurringRefIn) -> dict:
     series.save(update_fields=["deleted_at", "is_active", "updated_at"])
     record_event(ctx, events.RECURRING_DELETED, {"id": str(series.id)})
     return {"id": series.id}
+
+
+@operation(
+    "appointment.recurring.restore",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=RecurringRefIn,
+    output=RecurringOut,
+    ai={
+        "description": "Bring a deleted repeating appointment back to Repeating, the same one with the appointments it "
+        "had booked, active and booking nothing by itself (run by the platform when ERPlora's staff recovers the "
+        "business from a separate copy).",
+        "risk": "normal",
+    },
+)
+def restore_series(ctx: OperationContext, data: RecurringRefIn) -> dict:
+    """A deleted series back in Repeating (deleting keeps it and its appointments, APPOINTMENT-F15), active, only as
+    Repeating would create it now: for a live card, with its services and its professional bookable. It books nothing:
+    its next dates wait for «Book» (APPOINTMENT-F13), which skips those it has booked. One already in Repeating is
+    answered as it is."""
+    series = Recurring.objects.select_for_update(of=("self",)).filter(pk=data.id).first()
+    if series is None:
+        raise NotFound(str(RECURRING_NOT_FOUND), code="appointment.recurring_not_found")
+    if series.deleted_at is not None:
+        find_customer(ctx, series.customer_id, None)
+        if series.staff_id is None:
+            raise Conflict(str(RECURRING_NO_STAFF), code="appointment.recurring_no_staff")
+        services = resolve_services([ServiceRefIn(service_id=line.service_id) for line in series.lines.all()])
+        _member_for_booking(ctx, series.staff_id, None, services)
+        series.deleted_at = None
+        series.is_active = True
+        series.save(update_fields=["deleted_at", "is_active", "updated_at"])
+        record_event(ctx, events.RECURRING_RESTORED, {"id": str(series.id), "customer_id": str(series.customer_id)})
+    return load_series(series.id)
 
 
 # ── Settings (F19) ───────────────────────────────────────────────────────────────────────────

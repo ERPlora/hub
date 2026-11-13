@@ -476,6 +476,24 @@ def test_a_deleted_appointment_restored_twice_at_once_comes_back_once(salon):
     ]
 
 
+def test_a_deleted_series_restored_twice_at_once_comes_back_once(salon):
+    """The restore holds the series' row while it judges and writes: a second restore of it, from its first read of the
+    series, waits, then finds it back in Repeating and answers it as it is, with nothing written."""
+    from live.models import OutboxEvent
+
+    series = make_series(salon)
+    run("appointment.recurring.delete", {"id": str(series.id)})
+    restore = get("appointment.recurring.restore")
+    asked = restore.input.model_validate({"id": str(series.id)})
+    again = lambda: restore(system_context(A), asked)  # noqa: E731
+    with meanwhile(lambda sql: 'FROM "appointment_recurring"' in sql, again) as outcomes:
+        restore(system_context(A), asked)
+    [outcome] = outcomes
+    assert not isinstance(outcome, Exception), outcome
+    assert Recurring.objects.get(pk=series.pk).deleted_at is None
+    assert OutboxEvent.objects.filter(name="appointment.recurring.restored").count() == 1
+
+
 def test_the_agenda_and_the_hub_admin_deleting_the_same_appointments_never_wait_in_a_circle(
     salon, hub_staff
 ):
