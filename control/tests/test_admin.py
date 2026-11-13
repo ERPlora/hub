@@ -1083,6 +1083,46 @@ class TestRecoverIntoTheBusiness:
         assert "Service categories: 1 created; Services: 2 created, 1 not created<" in row_of(listed, ">acme<br>")
         assert "Service categories, Services: 3 created<" in row_of(listed, ">bistro<br>")
 
+    def test_what_a_record_came_back_without_is_counted_in_its_result_and_said_on_its_page(self, client, root):
+        # A service made again without a professional who performed it in the copy and has left since (SERVICE-F31).
+        member, service = uuid.uuid7(), str(uuid.uuid7())
+        left = f"service.member_terminated: came back without the professional {member}: terminated in Staff"
+        gone = f"service.member_not_in_business: came back without the professional {member}: no longer in Staff"
+        nothing = {"app": "service", "restored": 0, "not_created": 0, "reasons": [], "refused": ""}
+        noted = self.a_recovery(
+            self.made("acme"),
+            apps=["service"],
+            status="done",
+            results=[
+                nothing | {"label": "Service categories", "created": 1},
+                nothing
+                | {
+                    "label": "Services",
+                    "created": 2,
+                    "noted": 1,
+                    "notes": [{"id": service, "note": left}, {"id": service, "note": gone}],
+                },
+            ],
+        )
+        # One where nothing came back without anything says no note.
+        plain = self.a_recovery(
+            self.made("bistro"),
+            apps=["service"],
+            status="done",
+            results=[nothing | {"label": "Services", "created": 1}],
+        )
+
+        listed = page(client, RECOVERIES)
+        assert "Service categories: 1 created; Services: 2 created, 1 with notes<" in row_of(listed, ">acme<br>")
+        assert "Services: 1 created<" in row_of(listed, ">bistro<br>")
+        its_page = client.get(f"{RECOVERIES}{noted.pk}/change/", HTTP_HOST=PLATFORM).content.decode()
+        [said] = read_only_values(its_page, "notes")
+        assert said == f"<ul><li>{service}: {left}</li><li>{service}: {gone}</li></ul>"
+        # Never as a record that did not come back.
+        assert left not in "".join(read_only_values(its_page, "why_not"))
+        plain_page = client.get(f"{RECOVERIES}{plain.pk}/change/", HTTP_HOST=PLATFORM).content.decode()
+        assert read_only_values(plain_page, "notes") == read_only_values(plain_page, "why_not")
+
     def test_support_neither_sees_it_nor_runs_it_but_reads_the_recoveries(self, client, support):
         from control.models import CopyRecovery
 
@@ -1190,6 +1230,22 @@ def test_each_thing_an_app_gives_back_is_said_in_spanish_by_its_own_name():
         assert said(nothing | {"app": "inventory", "label": "Product categories", "created": 1}) == (
             "Categorías de productos: se creó 1"
         )
+
+
+def test_what_a_record_came_back_without_is_said_in_spanish():
+    """In words that fit a service as well as a card or an appointment: «1 con notas», never «1 notado»."""
+    from django.utils import translation
+
+    said = control_admin.CopyRecoveryAdmin.result_said
+    nothing = {"restored": 0, "not_created": 0, "reasons": [], "refused": ""}
+    note = {"id": str(uuid.uuid7()), "note": "service.member_terminated: …"}
+    with translation.override("es"):
+        assert said(nothing | {"app": "service", "label": "Services", "created": 2, "noted": 1, "notes": [note]}) == (
+            "Servicios: se crearon 2, 1 con notas"
+        )
+        cards = {"app": "customer", "label": "Customers", "restored": 1, "created": 1}
+        assert said(nothing | cards | {"noted": 2, "notes": [note]}) == "Clientes: se restauró 1, se creó 1, 2 con notas"
+        assert str(control_admin.CopyRecoveryAdmin.notes.short_description) == "notas"
 
 
 def test_the_separate_copy_speaks_spanish(client, root):
