@@ -8,17 +8,20 @@
 // a product category and a service category the business deleted come back as new ones, before what goes in them, the
 // product category with the product the business kept live put back in it by Inventory's link; and a service as a new
 // one, made by Services' create, into its category, and assigned by Services' assign to the professional who performed
-// it, with her own minutes and price. At each size: two cards in a group, the second with a tag and a custom field's
-// value, two products in their own category, a service in its own category, performed by a professional of Staff, and
+// it, with her own minutes and price, never to the one Staff terminated since, whom Recoveries names with why. At each
+// size: two cards in a group, the second with a tag and a custom field's
+// value, two products in their own category, a service in its own category, performed by two professionals of Staff, and
 // an appointment of another card with its own professional of `a` are made; in Hubs, «Restore to a separate copy…»
 // asks a copy of `a` from a temporary cluster (the stack's own server) and the worker's pass makes it; the first card,
 // the first product, the products' category, the service's category and the appointment are deleted in `a`, the second
+// professional is terminated, the second
 // card, the tag and the service are gone from it; then Separate copies › tick the copy › «Recover into the business…» ›
 // Customers, Products, Services and Appointments ticked (with whatever else answers) › «Recover»; the worker's pass
 // brings them back; Recoveries says how each thing came back, apart: «Customers: 1 restored, 1 created», «Product
 // categories: 1 created; Products: 1 restored; Product links to categories: 1 created» (the kept product's link),
-// «Service categories: 1 created; Services: 1 created» and «Appointments: 1 restored; Repeating appointments: 0
-// created» (its series did not change); and `a` has the same card live
+// «Service categories: 1 created; Services: 1 created, 1 with notes» and «Appointments: 1 restored; Repeating
+// appointments: 0 created» (its series did not change), and its page notes that the service came back without the
+// terminated professional, and why; and `a` has the same card live
 // again in its group, the second one again in that group with its tag and its value, the same product live again in
 // its category back under a new id, the kept product in it again, the same appointment (its number, its history
 // ending in «restored») live again, and the service category and the service live again under new ids, the service in
@@ -219,6 +222,9 @@ for (const { label, viewport } of SIZES) {
     const service = aService(name, category);
     const professional = inA('staff.member.create', { first_name: 'Recovered', last_name: `${label} ${RUN}` });
     inA('service.assignment.assign', { service_id: service, member_id: professional, custom_duration: 50, custom_price: 2800 });
+    // And one who performed it too and leaves the business before it comes back.
+    const leaving = inA('staff.member.create', { first_name: 'Leaving', last_name: `${label} ${RUN}` });
+    inA('service.assignment.assign', { service_id: service, member_id: leaving });
     const appointment = anAppointment(label);
     const number = psql(`select number from appointment_appointment where id = '${appointment}'`);
     const hubId = psql("select id from base_hub where slug = 'a'");
@@ -244,6 +250,7 @@ for (const { label, viewport } of SIZES) {
     inA('inventory.category.delete', { id: shelf });
     inA('service.category.delete', { id: category });
     inA('appointment.appointment.delete', { id: appointment });
+    inA('staff.member.terminate', { id: leaving });
     expect(psql(`select count(*) from customer_customer where email = '${email}' and deleted_at is null`)).toBe('0');
     expect(psql(`select count(*) from inventory_product where sku = '${sku}' and not is_deleted`)).toBe('0');
     expect(psql(`select count(*) from inventory_productcategory where product_id = '${kept}'`)).toBe('0');
@@ -293,11 +300,15 @@ for (const { label, viewport } of SIZES) {
     await expect(recovered).toContainText(
       'Product categories: 1 created; Products: 1 restored; Product links to categories: 1 created',
     );
-    await expect(recovered).toContainText('Service categories: 1 created; Services: 1 created');
+    // The service came back without the professional Staff terminated: counted, and said on its page.
+    await expect(recovered).toContainText('Service categories: 1 created; Services: 1 created, 1 with notes');
     await expect(recovered).toContainText('Appointments: 1 restored; Repeating appointments: 0 created');
     await capture(page, `${KEY}-${label}-4-recoveries`, { fullPage: true });
     await recovered.locator('a').first().click();
     await expect(page.locator('.field-what .readonly')).toHaveText(/^(.+, )?Customers, (.+, )?Products, (.+, )?Services(, .+)?$/);
+    await expect(page.locator('.field-notes .readonly li')).toHaveText([
+      `${service}: service.member_terminated: came back without the professional ${leaving}: terminated in Staff`,
+    ]);
     await capture(page, `${KEY}-${label}-5-recovery`, { fullPage: true });
 
     // In the business, the same card is live again, by Customers' restore, and no new one was made.
