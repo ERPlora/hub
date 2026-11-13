@@ -24,7 +24,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import AppInactive, Conflict, InvalidPayload, NotFound, PermissionDenied
+from live.errors import AppInactive, Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
 from live.operations import UnknownOperation, atomic, get, operation
 from live.outbox import record_event
 
@@ -78,6 +78,7 @@ from apps.inventory.schemas import (
     ProductIdIn,
     ProductOut,
     ProductPatchIn,
+    ProductRecoverIn,
     ProductRefIn,
     PrintLabelOut,
     ProductSoldOutIn,
@@ -393,11 +394,12 @@ def update_product(ctx: OperationContext, data: ProductPatchIn) -> dict:
     },
 )
 def delete_product(ctx: OperationContext, data: ProductRefIn) -> dict:
-    """INVENTORY-F04: its movements stay; its photo of its own goes with it (INVENTORY-F31), once this is saved."""
+    """INVENTORY-F04: its movements stay; its photo of its own goes with it (INVENTORY-F31), once this is saved. An
+    image of the library is ERPlora's, not the business's: it stays, so that restoring it (INVENTORY-F34) shows it."""
     product = find_product(data.id, data.product, lock=True)
     photo = product.image
     product.is_deleted, product.is_active, product.deleted_at = True, False, timezone.now()
-    product.image = ""
+    product.image = photo if images.kind_of(photo) == images.CATALOG else ""
     product.updated_by = _actor(ctx)
     product.save(update_fields=["is_deleted", "is_active", "deleted_at", "image", "updated_by", "updated_at"])
     images.let_go(ctx, photo)
@@ -420,7 +422,8 @@ def delete_product(ctx: OperationContext, data: ProductRefIn) -> dict:
 )
 def restore_product(ctx: OperationContext, data: ProductIdIn) -> dict:
     """INVENTORY-F34: a deleted product back in every list and in the till, the same product (deleting keeps it,
-    INVENTORY-F04): its id, its codes, its categories and its stock, with every movement that hangs from it. Active and
+    INVENTORY-F04): its id, its codes, its categories, its stock and its image of the library, with every movement that
+    hangs from it. Active and
     on sale, as unarchiving does: the «sold out» it had was another day's. Not while another live product holds its
     SKU or its EAN-13 (it was made again since). Repeating it on a product already back answers well and announces
     again, as deleting does."""
@@ -468,6 +471,43 @@ def set_sold_out(ctx: OperationContext, data: ProductSoldOutIn) -> dict:
         product.save(update_fields=["is_sold_out", "updated_by", "updated_at"])
         record_event(ctx, events.PRODUCT_UPDATED, _product_payload(product))
     return load_product(product.id, ctx.scope)
+
+
+@operation(
+    "inventory.product.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=ProductRecoverIn,
+    output=ProductOut,
+    ai={
+        "description": "Make again a product the business no longer holds, with the image of the library it had (run "
+        "by the platform when ERPlora's staff recovers the business from a separate copy).",
+        "risk": "normal",
+    },
+)
+def recover_product(ctx: OperationContext, data: ProductRecoverIn) -> dict:
+    """BASE-F114: a product of a separate copy made again as its screen makes it, all or nothing: the product by
+    ``inventory.product.create``, then the image of the library it showed there (INVENTORY-F30)."""
+    made = create_product(ctx, ProductIn.model_validate(data.model_dump(include=set(ProductIn.model_fields))))
+    if image := _library_image(ctx, data.image):
+        _change_image(ctx, find_product(made.id, None), image)
+    return load_product(made.id, ctx.scope)
+
+
+def _library_image(ctx: OperationContext, image: str) -> str:
+    """Of the image a product showed in a separate copy, what comes back with it: one of the library, unless the library
+    says it no longer has it (as a template or an import leaves it out, INVENTORY-F12, INVENTORY-F33); never a photo of
+    its own, deleted with the product (INVENTORY-F31). While the library cannot be read it comes back as the copy had
+    it: the product is never left out for it, the library never renames an image, and the screens show the initials of
+    one they cannot load."""
+    try:
+        images.check(ctx, image)
+    except InvalidPayload:  # a photo of its own, or one the library no longer has
+        return ""
+    except OperationError:  # the library cannot be read now (503 base.image_library_unavailable)
+        return image
+    return image
 
 
 # The product's image (base.images)

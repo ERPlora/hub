@@ -1097,9 +1097,9 @@ def _csv(filename, headers, rows) -> dict:
 #: and its tax category, by its key here.
 CATEGORY_FIELDS = ("name", "slug", "description", "icon", "color", "order")
 
-#: What ``inventory.product.create`` takes of a product of a separate copy, all of its columns since
-#: ``0001_initial`` (``products_in_copy``). Not its stock (the copy's balance is another day's: a count says today's,
-#: INVENTORY-F14), its «sold out» (a day's state) nor its image (hub#1319).
+#: What ``inventory.product.recover`` takes of a product of a separate copy, all of its columns since
+#: ``0001_initial`` (``products_in_copy``): its create's and the image it showed. Not its stock (the copy's balance is
+#: another day's: a count says today's, INVENTORY-F14) nor its «sold out» (a day's state).
 PRODUCT_FIELDS = (
     "name",
     "sku",
@@ -1114,6 +1114,7 @@ PRODUCT_FIELDS = (
     "pricing_unit",
     "track_stock",
     "is_active",
+    "image",
 )
 
 
@@ -1134,7 +1135,7 @@ def categories_in_copy(conn) -> list[dict]:
 
 
 def products_in_copy(conn) -> list[dict]:
-    """Each live product of a separate copy of the business, with its ``id`` there, what ``inventory.product.create``
+    """Each live product of a separate copy of the business, with its ``id`` there, what ``inventory.product.recover``
     takes, its tax category's id there (``tax_category``) and the ids of its live categories there
     (``category_ids``); and with every one, the copy's live categories by id (``copy_categories``), to tell its own from
     one the business made again with its name. Nothing where the app's table is not there. ``conn`` is the copy's
@@ -1297,7 +1298,7 @@ def products_deleted_in_business(products: list[dict]) -> list[dict]:
 
 def products_not_in_business(products: list[dict]) -> list[dict]:
     """The products of a separate copy (``products_in_copy``) the business lacks, in their order, each as
-    ``inventory.product.create`` takes it here. Not lacking: any product it still holds, live or deleted (it comes back
+    ``inventory.product.recover`` takes it here. Not lacking: any product it still holds, live or deleted (it comes back
     the same, ``products_deleted_in_business``), nor one with the SKU or the EAN-13 of a live one (the code is the
     article's identity: one made again by hand, or brought back already). Lacking: one gone altogether. Each takes the
     key of its tax category (Taxes never deletes one; one no longer active is the create's to refuse, and one without
@@ -1319,7 +1320,7 @@ def products_not_in_business(products: list[dict]) -> list[dict]:
 
 
 def _as_created(product: dict, tax_key: str | None, categories: dict[UUID, UUID]) -> dict:
-    """``product`` of the copy as ``inventory.product.create`` takes it in the business, with its ``id`` there."""
+    """``product`` of the copy as ``inventory.product.recover`` takes it in the business, with its ``id`` there."""
     created = {field: product[field] for field in ("id", *PRODUCT_FIELDS)}
     created["category_ids"] = [categories[one] for one in product["category_ids"] if one in categories]
     if tax_key is not None:

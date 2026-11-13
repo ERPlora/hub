@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a38e89c55882e40b8912a9fa0b3d6978b13a9838cf6475306ccacb8c1055247d -->
+<!-- generated from WORKBOOK.md sha256:67c37d2be8cee6f1e724e1ae1890a23f1a4480f6526a4ad37aa6789c6577777e -->
 
 ## What it is for and who it is for
 
@@ -2935,9 +2935,9 @@ Status: done (the action and the restore, in its place or to a separate copy, an
 the customers that were lost, the deleted ones as they were, the products, the services with their categories and the
 appointments; making and deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of
 ERPlora/aws; repeating appointments, hub#1327; the group, tag or own field the business deleted after deleting a
-customer who comes back, hub#1356; the image of a product brought back, hub#1319; the page "Recover into the
-business…" naming the exception of what goes back into a recovered category, hub#1364; the image of a service brought
-back, hub#1319; Recoveries naming the professional who does not come back with their service, hub#1375)
+customer who comes back, hub#1356; the image of a product deleted before deleting left it, hub#1431; the page
+"Recover into the business…" naming the exception of what goes back into a recovered category, hub#1364; the image of a
+service brought back, hub#1429; Recoveries naming the professional who does not come back with their service, hub#1375)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -2999,12 +2999,13 @@ Steps:
       one it has already made again (another live one with its name, case and spaces aside, that is not already one of
       the copy's; the oldest if there are two) is not repeated: its own is used, as it is. Then a product the business
       deleted and still holds comes back THE SAME and counts as restored, with its stock, its categories that are still
-      live, the one that just came back if it had it in the copy, and its whole history in Movements, active and on sale
-      (INVENTORY-F34). One the business no longer has comes back as a new one, created as the Products screen creates it,
+      live, the one that just came back if it had it in the copy, its image of the library and its whole history in
+      Movements, active and on sale (INVENTORY-F34). One the business no longer has comes back as a new one, created as the Products screen creates it,
       with its name, SKU, EAN-13, description, type, price, cost, units, threshold, stock control and tax category, active
       or inactive as it was and in its categories: the same one if the business still has it, and otherwise the one that
       just came back or the one the business made again with its name; with no stock, which is counted (INVENTORY-F14),
-      because the copy's is another day's, and without its image (hub#1319). One the business has already created again
+      because the copy's is another day's, and with the image of the library it had (not one the library no longer
+      has; never an own photo, which was deleted with the product). One the business has already created again
       (another live one with its SKU or its EAN-13) neither comes back nor is repeated. Last, the products the business
       keeps live that were, in the copy, in a category that has just come back go back into it, without losing any other
       (INVENTORY-F07): it is the only thing the recovery touches of what the business has, and it is counted apart, as
@@ -3022,7 +3023,7 @@ Steps:
       business still has on its staff, each with their own minutes and price, assigned as Services assigns them
       (SERVICE-F31): as their main service if the business has not given them another since, and switched off if it
       was. Someone Staff terminated, or the business no longer has, is not assigned, because they can no longer be
-      booked (Recoveries does not name them yet, hub#1375). Without its image (hub#1319). An archived one is still in
+      booked (Recoveries does not name them yet, hub#1375). Without its image (hub#1429). An archived one is still in
       the business and does not come
       back (it is restored in Services), nor does one the copy had archived, and one the business has already made again
       (another with the same name in the same category, not itself one of the copy's; each counts for one only, so two
@@ -3096,7 +3097,7 @@ is unfrozen. With records from the test environment only, the chain is recovered
 support staff see the list, Separate copies and Recoveries, but not the actions.
 Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
-INVENTORY-F07, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08, SERVICE-F31,
-APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282,
-hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327,
-hub#1341, hub#1355, hub#1356, hub#1365, hub#1373, hub#1375, aws#77
+INVENTORY-F07, INVENTORY-F30, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08,
+SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213,
+hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323,
+hub#1326, hub#1327, hub#1341, hub#1355, hub#1356, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, aws#77

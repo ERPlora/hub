@@ -42,6 +42,7 @@ from apps.inventory.schemas import (
     ImportReportOut,
     ProductCategoryIn,
     ProductCategoryLinkOut,
+    ProductImageIn,
     ProductImportIn,
     ProductIn,
     ProductOut,
@@ -56,12 +57,14 @@ from apps.inventory.schemas import (
     WriteOffIn,
 )
 from apps.tax.models import TaxCategory
+from base.tests.test_image_catalog import image_library  # noqa: F401 - the library fixture
 
 from .conftest import A, B, ctx_for, ctx_with
 
 pytestmark = pytest.mark.django_db
 
 TAX = "test.general"
+LATTE = "catalog:hospitality/cafe_con_leche"
 
 
 @pytest.fixture(autouse=True)
@@ -704,6 +707,15 @@ def test_restoring_an_unknown_product_is_not_found():
     assert outbox() == []
 
 
+def test_restore_brings_back_the_image_of_the_library_it_had(image_library):  # noqa: F811
+    created = create("Coffee", "CAF-1")
+    run("inventory.product.set_image", ProductImageIn(id=created.id, image=LATTE))
+    run("inventory.product.delete", ProductRefIn(id=created.id))
+
+    assert restore(created.id).image == LATTE
+    assert Product.objects.get().image == LATTE
+
+
 def test_restore_is_the_platforms_without_a_route():
     op = get("inventory.product.restore")
     assert (op.kind, op.permission, op.expose_api, op.repeatable) == ("command", "inventory.system", False, True)
@@ -713,6 +725,93 @@ def test_restore_is_the_platforms_without_a_route():
     # Not a permission of any role: the owner holds every permission inventory declares, not this one.
     refused(PermissionDenied, lambda: restore(created.id, ctx_for("hub_owner")))
     assert Product.objects.get().is_deleted is True
+
+
+# inventory.product.recover (INVENTORY-F01, INVENTORY-F30, BASE-F114)
+
+def recover_product(ctx=None, **data):
+    op = get("inventory.product.recover")
+    product = {"name": "Latte", "sku": "LAT-1", "price": 250, "tax_category_key": TAX} | data
+    return op(ctx or system_context(A), op.input.model_validate(product))
+
+
+def test_a_product_recovered_is_created_as_its_screen_does_with_the_image_of_the_library_it_had(image_library):  # noqa: F811
+    drinks = Category.objects.create(name="Drinks")
+
+    back = recover_product(category_ids=[str(drinks.id)], is_active=False, image=LATTE)
+
+    product = Product.objects.get()
+    assert (back.id, back.image) == (product.pk, LATTE)
+    assert (product.name, product.sku, product.price, product.is_active, product.image) == (
+        "Latte",
+        "LAT-1",
+        250,
+        False,
+        LATTE,
+    )
+    assert (product.created_by, product.updated_by) == ("system", "system")
+    # As the screen does it: the create with its categories, then its image.
+    assert [name for name, _ in outbox()] == [
+        events.PRODUCT_CREATED,
+        events.PRODUCT_CATEGORIZED,
+        events.PRODUCT_UPDATED,
+    ]
+
+
+def test_a_product_recovered_without_an_image_is_the_screens_create(image_library):  # noqa: F811
+    back = recover_product()
+
+    assert (back.image, Product.objects.get().image) == ("", "")
+    assert [name for name, _ in outbox()] == [events.PRODUCT_CREATED]
+
+
+def test_an_image_the_library_no_longer_has_stays_out_and_the_product_comes_back(image_library):  # noqa: F811
+    back = recover_product(image="catalog:hospitality/gone_since")
+
+    assert (back.sku, Product.objects.get().image) == ("LAT-1", "")
+    assert [name for name, _ in outbox()] == [events.PRODUCT_CREATED]
+
+
+def test_with_the_library_unread_the_image_comes_back_as_the_copy_had_it(settings, tmp_path):
+    settings.CATALOG_DIR = str(tmp_path / "nowhere")
+
+    back = recover_product(image=LATTE)
+
+    assert (back.image, Product.objects.get().image) == (LATTE, LATTE)
+
+
+def test_a_photo_of_its_own_never_comes_back(image_library):  # noqa: F811
+    # It was deleted with the product (INVENTORY-F31), and no row may point at a file it does not own.
+    back = recover_product(image=f"file:inventory/products/{uuid.uuid7().hex}.webp")
+
+    assert (back.image, Product.objects.get().image) == ("", "")
+
+
+def test_a_product_recovered_that_its_create_refuses_is_not_created(image_library):  # noqa: F811
+    TaxCategory.objects.filter(key=TAX).update(is_active=False)
+
+    error = refused(InvalidPayload, lambda: recover_product(image=LATTE))
+
+    assert list(error.fields) == ["tax_category_key"]
+    assert not Product.objects.exists()
+    assert outbox() == []
+
+
+def test_recovering_a_product_is_the_platforms_without_a_route():
+    op = get("inventory.product.recover")
+    assert (op.kind, op.permission, op.output, op.expose_api, op.repeatable) == (
+        "command",
+        "inventory.system",
+        ProductOut,
+        False,
+        True,
+    )
+    # What the screen's create takes, and the image the product showed in the copy.
+    assert issubclass(op.input, ProductIn) and "image" in op.input.model_fields
+    assert op.ai["risk"] == "normal" and op.ai["description"]
+    # Not a permission of any role: the owner holds every permission inventory declares, not this one.
+    refused(PermissionDenied, lambda: recover_product(ctx_for("hub_owner")))
+    assert not Product.objects.exists()
 
 
 # inventory.product.set_sold_out (INVENTORY-F29)
