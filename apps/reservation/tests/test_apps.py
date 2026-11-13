@@ -1,9 +1,10 @@
 """The reservation app declares its module metadata, its menu, its permissions and what each role gets."""
 
 from django.apps import apps
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, module_configs
 
 from base import assistant
+from base.tests.roles import grants_by_role
 
 PERMISSIONS = [
     "reservation.view_reservation",
@@ -121,13 +122,13 @@ def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
 
 
 def test_what_each_role_gets():
-    config = reservation()
-    for role in ("hub_owner", "hub_admin"):
-        assert permissions_for_role([config], role) == set(PERMISSIONS), role
-    assert (
-        permissions_for_role([config], "hub_manager") == set(PERMISSIONS) - ADMIN_ONLY
-    )
-    assert permissions_for_role([config], "hub_employee") == EMPLOYEE
+    everything = set(PERMISSIONS)
+    assert grants_by_role(reservation()) == {
+        "hub_owner": everything,
+        "hub_admin": everything,
+        "hub_manager": everything - ADMIN_ONLY,
+        "hub_employee": EMPLOYEE,
+    }
 
 
 def test_navigation_is_the_three_sections_of_the_old_module_with_its_icons():

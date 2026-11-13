@@ -22,6 +22,7 @@ from live.operations import get
 from base import blueprint
 from base.models import AppActivation, Hub, ImportBatch, Membership
 from base.permissions import permissions_for
+from base.tests.test_services_data import born  # noqa: F401 (a fixture: the tests below take it by name)
 
 pytestmark = pytest.mark.django_db
 
@@ -118,18 +119,6 @@ def test_an_empty_business_is_told_so_until_something_is_loaded(owner):
     call(owner, "base.blueprint.import", template="hair_salon.es")
 
     assert call(owner, "base.blueprint.list").empty is False
-
-
-C = Scope("host", "c")
-
-
-@pytest.fixture
-def born():
-    """A business as it is born: ready in the registry, every app off (no row), and its owner."""
-    Hub.objects.create(slug="c", status=Hub.Status.READY)
-    user = get_user_model().objects.create_user(username="carla", password="pw")
-    Membership.objects.create(user=user, host="c", role=Membership.Role.OWNER)
-    return OperationContext(scope=C, actor=user, permissions=permissions_for(user, C), language="es")
 
 
 def test_a_business_born_with_every_app_off_is_empty_for_the_homes_card(born):

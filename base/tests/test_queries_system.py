@@ -6,7 +6,6 @@ business (the errors may carry a customer's tax id and name), and a hub never se
 import datetime as dt
 
 import pytest
-from django.urls import resolve
 from django.utils import timezone
 from live.assistant import description
 from live.context import OperationContext, Scope
@@ -15,6 +14,7 @@ from live.models import OutboxEvent
 from live.operations import get
 
 from base.models import EventDelivery, Hub
+from base.tests.routes import assert_bound
 
 pytestmark = pytest.mark.django_db
 
@@ -254,11 +254,7 @@ def test_the_page_is_bounded(data):
     ],
 )
 def test_the_routes_are_bound_to_their_queries(path, operation):
-    from base.api import router
-
-    [route] = router.path_operations[path].operations
-    assert (route.methods, route.operation_id) == (["GET"], operation)
-    assert resolve(f"/api{path}").url_name
+    assert_bound("GET", path, operation)
 
 
 @pytest.mark.parametrize("path", ["/api/system/status", "/api/system/events", "/api/system/failed-events"])

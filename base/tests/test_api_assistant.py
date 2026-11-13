@@ -6,9 +6,9 @@ import json
 
 import pytest
 from asgiref.sync import async_to_sync
-from django.urls import resolve
 
 from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
+from base.tests.routes import assert_bound
 
 pytestmark = pytest.mark.django_db
 
@@ -43,11 +43,7 @@ def post(client, path, body, **extra):
     ],
 )
 def test_each_route_is_bound_to_its_operation(path, method, operation):
-    from base.api import router
-
-    [route] = router.path_operations[path].operations
-    assert (route.methods, route.operation_id) == ([method], operation)
-    assert resolve(f"/api{path}").url_name
+    assert_bound(method, path, operation)
 
 
 def test_nobody_without_a_session_talks_to_the_assistant(client, gateway):
