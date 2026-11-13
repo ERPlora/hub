@@ -691,10 +691,10 @@ def test_a_category_made_again_takes_back_what_the_business_kept_where_its_delet
     gloss, perm = make_service("Gloss", tax=tax), make_service("Old perm", tax=tax, is_active=False)
     toning = make_category("Toning", parent=hair)
     copy = a_category_of_the_copy(gone, service_ids=[gloss.pk, perm.pk, uuid.uuid7()])
-    # One the business no longer has at all comes back by Categories' own part, into it by its name.
-    lost = a_category_of_the_copy(name="Pastel", parent_id=gone.pk)
-    in_copy = [a_category_of_the_copy(hair), copy, a_category_of_the_copy(toning, parent_id=gone.pk), lost]
-    [record, _lost] = queries.categories_not_in_business(in_copy)
+    # One the business deleted too comes back by Categories' own part, into it by its name: the deleted one stays.
+    pastel = make_category("Pastel", parent=hair, is_deleted=True, deleted_at=timezone.now())
+    in_copy = [a_category_of_the_copy(hair), copy, a_category_of_the_copy(toning, parent_id=gone.pk)]
+    [record, _pastel] = queries.categories_not_in_business([*in_copy, a_category_of_the_copy(pastel, parent_id=gone.pk)])
 
     made = create(record, "service.category.recover")
 
@@ -705,6 +705,7 @@ def test_a_category_made_again_takes_back_what_the_business_kept_where_its_delet
         perm.pk: made.id,
     }
     assert Category.objects.get(pk=toning.pk).parent_id == made.id
+    assert Category.objects.get(pk=pastel.pk).parent_id == hair.pk
     assert Category.objects.get(pk=made.id).created_by == "system"
 
 

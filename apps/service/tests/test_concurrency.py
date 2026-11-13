@@ -973,3 +973,50 @@ def test_a_category_brought_back_waits_for_an_edit_of_its_service_and_keeps_what
     assert deleted(edits) == ["ok"]
     cut = Service.objects.get(pk=world.cut.pk)
     assert (cut.category_id, cut.price) == (made.id, 4200)
+
+
+@contextmanager
+def deleted_once_a_category_is_held(target):
+    """The business's «Delete» of the category ``target`` started in another session right after this one first
+    holds a category, and left to run a moment: it locks every category in id order, so it waits for this one."""
+    deletions: list = []
+
+    def deletion():
+        try:
+            run("service.category.delete", {"id": str(target.pk)})
+            deletions.append("ok")
+        except Exception as error:  # reported to the test, which fails on it
+            deletions.append(error)
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=deletion)
+
+    def wrapper(execute, sql, params, many, context):
+        result = execute(sql, params, many, context)
+        if thread.ident is None and 'FROM "service_category"' in sql and " FOR " in sql:
+            thread.start()
+            time.sleep(IN_FLIGHT)
+        return result
+
+    try:
+        with connection.execute_wrapper(wrapper):
+            yield deletions
+    finally:
+        if thread.ident is not None:
+            thread.join(30)
+
+
+def test_a_category_brought_back_while_another_is_deleted_never_waits_in_a_circle(world):
+    # Made inside its parent, it held that parent first and then every category; the deletion of an older one locks
+    # every category in id order: each waited for the other, and Postgres killed one (a 500).
+    older = make_category("Older")
+    hair = make_category("Hair")
+    gone = make_category("Color", is_deleted=True)
+    with deleted_once_a_category_is_held(older) as deletions:
+        made = run_as_platform(
+            "service.category.recover", {"name": "Color", "parent_id": str(hair.pk), "stands_for": str(gone.pk)}
+        )
+    assert deleted(deletions) == ["ok"]
+    assert Category.objects.get(pk=made.id).parent_id == hair.pk
+    assert Category.objects.get(pk=older.pk).is_deleted

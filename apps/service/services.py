@@ -816,7 +816,7 @@ def recover_category(ctx: OperationContext, data: CategoryRecoverIn) -> dict:
     parent_of = lock_tree()
     made = create_category(ctx, CategoryIn.model_validate(data.model_dump(include=set(CategoryIn.model_fields))))
     parent_of[made.id] = made.parent_id
-    left_in = Category.objects.filter(pk=data.stands_for, is_deleted=True).values_list("parent", flat=True).first()
+    left_in = Category.objects.filter(pk=data.stands_for).values_list("parent", flat=True).first()
     left_out = []
     for service in held_rows(Service.objects.filter(pk__in=data.service_ids)):
         if service.category_id is not None:
@@ -835,7 +835,6 @@ def recover_category(ctx: OperationContext, data: CategoryRecoverIn) -> dict:
         else:
             _apply(child, {"parent_id": made.id}, ctx)
             child.save()
-            parent_of[child.pk] = made.id
             record_event(ctx, events.CATEGORY_UPDATED, {"id": str(child.id)})
             continue
         left_out.append(LeftOut(code=code, message=message % {"category": child.pk}))
