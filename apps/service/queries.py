@@ -1721,7 +1721,7 @@ def _adjustment_row(ctx: OperationContext, adjustment: GrantAdjustment) -> dict:
     }
 
 
-# --- What a separate copy of the business gives back (hub#1283, hub#1323; BASE-F114, SERVICE-F01, F07) ------------
+# --- What a separate copy of the business gives back (BASE-F114, SERVICE-F01, F07, F31) ----------------------------
 
 #: What ``service.category.create`` takes of a category of a separate copy, each a column since ``0001_initial``
 #: (``categories_in_copy``): all of it but its parent, which the business names its own way.
@@ -1797,8 +1797,8 @@ def _category_held(category_id: UUID | None, name: str | None, here: tuple[set[U
 
 
 #: What ``service.service.create`` takes of a service of a separate copy, each a column since ``0001_initial``
-#: (``services_in_copy``): all of it but its category and its tax category, which the business names its own way. Not
-#: its image (hub#1319) nor who performs it (SERVICE-F31, hub#1322).
+#: (``services_in_copy``): all of it but its category and its tax category, which the business names its own way, and
+#: who performs it, read apart (``recoverable_services_in_copy``). Not its image.
 COPY_FIELDS = (
     "name",
     "pricing_type",
@@ -1857,6 +1857,31 @@ def services_in_copy(conn) -> list[dict]:
     return [dict(zip(named, row, strict=True)) for row in conn.execute(query)]
 
 
+#: What ``service.service.recover`` takes of each professional who performed a service of a separate copy, besides who
+#: they are (``AssignmentOfCopyIn``), each a column since ``0001_initial``.
+ASSIGNMENT_COPY_FIELDS = ("custom_duration", "custom_price", "is_primary", "is_active")
+
+
+def recoverable_services_in_copy(conn) -> list[dict]:
+    """Each service of ``services_in_copy`` with who performed it in the copy (``assignments``), as
+    ``service.service.recover`` takes them: each professional by their id there, the same in the business, and their
+    own minutes and price, whether it was their main service and whether it was switched on, in the order they were
+    assigned. The same connection and rule as ``services_in_copy``: its own SQL over the model's names, never the ORM."""
+    services = services_in_copy(conn)
+    if not services:
+        return []
+    read = ("service", "member", *ASSIGNMENT_COPY_FIELDS)
+    query = sql.SQL("SELECT {} FROM {} ORDER BY {}").format(
+        sql.SQL(", ").join(sql.Identifier(Assignment._meta.get_field(field).column) for field in read),
+        sql.Identifier(Assignment._meta.db_table),
+        sql.Identifier(Assignment._meta.pk.column),
+    )
+    performed: dict[UUID, list[dict]] = {}
+    for service_id, *row in conn.execute(query):
+        performed.setdefault(service_id, []).append(dict(zip(("member_id", *ASSIGNMENT_COPY_FIELDS), row, strict=True)))
+    return [one | {"assignments": performed.get(one["id"], [])} for one in services]
+
+
 def services_in_business(services: list[dict]) -> dict[UUID, UUID]:
     """hub#1283: ``{id in the copy: id in the business}`` of each service of a separate copy (all of
     ``services_in_copy``, never a part) the business holds: the same one, on offer or archived (a service is never
@@ -1881,17 +1906,18 @@ def services_in_business(services: list[dict]) -> dict[UUID, UUID]:
 
 
 def services_not_in_business(services: list[dict]) -> list[dict]:
-    """hub#1283: the services a separate copy (``services_in_copy``) had on offer and the business lacks (not in
-    ``services_in_business``), in their order, each as ``service.service.create`` takes it here, with its ``id`` there:
-    the key of its tax category (Taxes never deletes one; one turned off since is the create's to refuse, and without
-    one it takes the settings') and its category here (``_category_here``)."""
+    """The services a separate copy (``recoverable_services_in_copy``) had on offer and the business lacks (not
+    in ``services_in_business``), in their order, each as ``service.service.recover`` takes it here, with its ``id``
+    there: the key of its tax category (Taxes never deletes one; one turned off since is the create's to refuse, and
+    without one it takes the settings'), its category here (``_category_here``) and who performed it there
+    (``assignments``)."""
     held = services_in_business(services)
     lacking = [one for one in services if one["is_active"] and one["id"] not in held]
     keys = dict(TaxCategory.objects.filter(pk__in={one["tax_category_id"] for one in lacking}).values_list("pk", "key"))
     here = _categories_here()
     created = []
     for one in lacking:
-        record = {field: one[field] for field in ("id", *COPY_FIELDS)}
+        record = {field: one[field] for field in ("id", *COPY_FIELDS, "assignments")}
         if (category := _category_here(one, here)) is not None:
             record["category_id"] = category
         if (key := keys.get(one["tax_category_id"])) is not None:
