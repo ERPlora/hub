@@ -6,6 +6,7 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { Business } from '../../../../base/frontend/operations';
 import type { GroupOut, OptionOut } from '../operations';
 import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
@@ -313,4 +314,18 @@ describe('OptionFormModal: Android Back with unsaved changes (hub#1031, BASE-F05
     await ionValue(s.field('price_delta'), '200', 'ionInput');
     expect(unsavedChangesIn(overlay)).toBeDefined();
   });
+});
+
+describe('OptionFormModal: fields refused with the same words (hub#888)', () => {
+  // A new option: Name, Kitchen ticket name, Supplement, Own tax category (the picker) and Order paint a refusal,
+  // each under its own key.
+  itTellsTheCorrectedFieldApart(['name', 'kitchen_name', 'price_delta', 'tax_category_key', 'sort_order'], async (locale, refusal) => {
+    const s = await setup(null, locale);
+    await ionValue(s.field('name'), 'Soda', 'ionInput');
+    await ionValue(s.field('price_delta'), '1.50', 'ionInput');
+    s.tax().vm.$emit('update:modelValue', { id: 'product.generic', label: 'Product — generic' });
+    await settle();
+    s.answer(422, refusal);
+    return { field: s.field, send: () => click(s.save()), settle };
+  }, 'tax_category_key');
 });

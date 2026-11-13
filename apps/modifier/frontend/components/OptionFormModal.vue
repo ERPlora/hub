@@ -167,6 +167,7 @@ const canDismiss = useUnsavedFormOnOpen(
         <BusinessMoneyError />
         <ion-input
           data-testid="modifier-option-form-name"
+          name="name"
           :value="form.name"
           :label="$t('modifier.options.form.name')"
           label-placement="floating"
@@ -179,6 +180,7 @@ const canDismiss = useUnsavedFormOnOpen(
         />
         <ion-input
           data-testid="modifier-option-form-kitchen_name"
+          name="kitchen_name"
           :value="form.kitchenName"
           :label="$t('modifier.options.form.kitchenName')"
           label-placement="floating"
@@ -193,6 +195,7 @@ const canDismiss = useUnsavedFormOnOpen(
           v-model="form.price"
           signed
           testid="modifier-option-form-price_delta"
+          name="price_delta"
           :label="money ? $t('modifier.options.form.priceIn', { currency: money.currency }) : $t('modifier.options.form.price')"
           :money="money"
           :helper-text="$t('modifier.options.form.priceHint')"
@@ -201,6 +204,7 @@ const canDismiss = useUnsavedFormOnOpen(
         />
         <Combo
           testid="modifier-option-form-tax_category_key"
+          name="tax_category_key"
           :model-value="form.tax"
           :search="searchTax"
           :label="$t('modifier.options.form.tax')"
@@ -227,6 +231,7 @@ const canDismiss = useUnsavedFormOnOpen(
         </p>
         <ion-input
           data-testid="modifier-option-form-sort_order"
+          name="sort_order"
           type="number"
           inputmode="numeric"
           min="0"
