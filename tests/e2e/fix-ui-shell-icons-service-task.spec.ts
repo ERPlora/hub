@@ -9,11 +9,21 @@
 //     check) of a task, and «Open» (open) of a project.
 //   - Price Lists: the pricetag of its «My apps» tile.
 // «Painted» = the `ion-icon` names that icon (its `name`, or the data URL the shell registered for it, which a
-// DataTable action hands as its `icon`) and draws a non-empty SVG. What the run creates is deleted.
+// DataTable action hands as its `icon`), draws a non-empty SVG and is visible. What the run creates is deleted.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, openApps, psql, shot, shown } from './helpers';
-import { cleanUp as cleanServices, FLOW_VIEWPORTS, named, ownerPage, post, settled } from './service-helpers';
+import { A, openApps, psql, scrolledTo, shot, shown } from './helpers';
+import {
+  cleanUp as cleanServices,
+  FLOW_VIEWPORTS,
+  iconPaint,
+  named,
+  ownerPage,
+  PAINTED,
+  post,
+  rowActionIcon,
+  settled,
+} from './service-helpers';
 import { cleanUp as cleanTasks, named as taskNamed } from './task-helpers';
 
 const KEY = 'FIX-UI-SHELL-ICONS-SERVICE-TASK';
@@ -30,35 +40,14 @@ test.afterAll(cleanUp);
 async function expectPaints(icon: Locator, name: string, what: string): Promise<void> {
   await expect(icon, what).toBeVisible();
   await icon.scrollIntoViewIfNeeded();
-  await expect
-    .poll(
-      () =>
-        icon.evaluate((el, wanted) => {
-          const registry = (window as unknown as { Ionicons?: { map?: Map<string, string> } }).Ionicons?.map;
-          const src = registry?.get(wanted);
-          const ion = el as HTMLElement & { name?: string; icon?: string };
-          const svg = ion.shadowRoot?.querySelector('.icon-inner svg');
-          return {
-            registered: typeof src === 'string',
-            named: ion.name === wanted || (src !== undefined && ion.icon === src),
-            drawn: (svg?.childElementCount ?? 0) > 0,
-          };
-        }, name),
-      { message: `${what} paints ${name}` },
-    )
-    .toEqual({ registered: true, named: true, drawn: true });
+  await expect.poll(() => iconPaint(icon, name), { message: `${what} paints ${name}` }).toEqual(PAINTED);
 }
 
-/** The icon of a row action: on its button, or on the same entry inside «⋮» when the row folds its actions
- *  (the menu is left open; `closeMenu` shuts it). */
-async function actionIcon(page: Page, table: string, id: string, action: string): Promise<Locator> {
-  const button = shown(page).locator(`[data-testid=${table}-row-${id}-${action}]`);
-  const menu = shown(page).locator(`[data-testid=${table}-row-${id}-menu]`);
-  await button.or(menu).first().waitFor({ state: 'visible' });
-  if (await button.isVisible()) return button.locator('ion-icon').first();
-  const open = page.locator('ion-popover:not(.overlay-hidden)');
-  if (!(await open.isVisible())) await menu.click();
-  return open.locator(`[data-testid=${table}-row-${id}-${action}] ion-icon`).first();
+/** The icon of a row action paints `name`: on its button, or on the same entry inside «⋮» when the row folds its
+ *  actions (the menu is left open; `closeMenu` shuts it). */
+async function expectActionPaints(page: Page, table: string, id: string, action: string, name: string, what: string): Promise<void> {
+  await scrolledTo(shown(page).locator(`[data-testid=${table}-row][data-id="${id}"]`));
+  await expect.poll(() => rowActionIcon(page, table, id, action, name), { message: `${what} paints ${name}` }).toEqual(PAINTED);
 }
 
 async function closeMenu(page: Page): Promise<void> {
@@ -103,7 +92,7 @@ FLOW_VIEWPORTS.forEach((vp) => {
       await expect(view.locator('[data-testid=service-services-row]', { hasText: service.name })).toBeVisible();
       await expectPaints(view.locator('[data-testid=tab-services] ion-icon'), 'briefcase-outline', `Services tab ${vp.label}`);
       await expectPaints(view.locator('[data-testid=tab-packages] ion-icon'), 'gift-outline', `Packages tab ${vp.label}`);
-      await expectPaints(await actionIcon(page, 'service-services', service.id, 'archive'), 'archive-outline', `«Archive» ${vp.label}`);
+      await expectActionPaints(page, 'service-services', service.id, 'archive', 'archive-outline', `«Archive» ${vp.label}`);
       await closeMenu(page);
 
       // «Professionals who do it»: the filled star on Ana's, the empty one (a button) on Bea's.
@@ -143,7 +132,7 @@ FLOW_VIEWPORTS.forEach((vp) => {
         ['start', 'play-circle-outline'],
         ['complete', 'checkmark-done-outline'],
       ] as const) {
-        await expectPaints(await actionIcon(page, 'task-tasks', task.id, action), icon, `«${action}» ${vp.label}`);
+        await expectActionPaints(page, 'task-tasks', task.id, action, icon, `«${action}» ${vp.label}`);
       }
       await closeMenu(page);
       await settled(page);
@@ -152,7 +141,7 @@ FLOW_VIEWPORTS.forEach((vp) => {
       // Projects: «Open».
       await page.goto(`${A}/task/projects`);
       await expect(shown(page).locator('[data-testid=task-projects-row]').first()).toBeVisible();
-      await expectPaints(await actionIcon(page, 'task-projects', project.id, 'open'), 'open-outline', `«Open» ${vp.label}`);
+      await expectActionPaints(page, 'task-projects', project.id, 'open', 'open-outline', `«Open» ${vp.label}`);
       await closeMenu(page);
 
       // «My apps»: the tiles of Services, Tasks and Price Lists.

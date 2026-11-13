@@ -10,7 +10,7 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, horizontalOverflow, hostPage, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
-import { settled } from './service-helpers';
+import { rowAction, settled } from './service-helpers';
 
 const KEY = 'FIX-HUB-COMBO-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';
 const SIZES = [
@@ -81,14 +81,7 @@ async function menuRow(page: Page): Promise<Locator> {
 
 /** «Edit details» of the run's row: a button of the row on a wide screen, in the row's menu on a narrow one. */
 async function editDetails(page: Page): Promise<Locator> {
-  const action = shown(page).locator(`[data-testid=combo-menus-row-${menuId}-edit]`);
-  const menu = shown(page).locator(`[data-testid=combo-menus-row-${menuId}-menu]`);
-  await action.or(menu).first().waitFor({ state: 'visible' });
-  if (await action.isVisible()) await action.click();
-  else {
-    await menu.click();
-    await page.locator(`ion-popover [data-testid=combo-menus-row-${menuId}-edit]`).click();
-  }
+  await rowAction(page, 'combo-menus', menuId, 'edit');
   const form = page.locator('ion-modal[data-testid=combo-menu-form]');
   await expect(form).toBeVisible();
   return form;
