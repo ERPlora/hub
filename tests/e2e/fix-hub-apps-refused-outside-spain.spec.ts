@@ -7,6 +7,7 @@
 // flow: VERIFACTU-F01 VERIFACTU-F32 BASE-F25
 import { expect, type Page, test } from '@playwright/test';
 
+import { appRowsCopy } from './app-rows-helpers';
 import {
   A,
   api,
@@ -32,7 +33,7 @@ const ONLY_IN_SPAIN_ES = 'VeriFactu solo es para negocios de España.';
 const ONLY_IN_SPAIN_EN = 'VeriFactu is only for businesses in Spain.';
 const NEVER_OFF_ES = 'VeriFactu no se puede desactivar una vez activada: la ley obliga a que tus facturas sigan llegando a la AEAT.';
 /** The copy the run keeps of `a`'s rows. */
-const ROWS = 'e2e_apps_refused_outside_spain_rows';
+const appRows = appRowsCopy('e2e_apps_refused_outside_spain_rows');
 
 let registration: Registration;
 
@@ -55,16 +56,12 @@ test.describe.configure({ mode: 'serial' });
 test.beforeAll(() => {
   registration = registrationOf('a');
   expect(stored(), 'VeriFactu on in a (seed_local_hubs: every app on)').toMatch(/^on:/);
-  psql(`drop table if exists ${ROWS}; create table ${ROWS} as select * from base_appactivation where host = 'a'`);
+  appRows.keep();
 });
 
 test.afterEach(async () => {
   await registerBusinessIn(registration, registration.country);
-  psql(`delete from base_appactivation where host = 'a'; insert into base_appactivation select * from ${ROWS}`);
-});
-
-test.afterAll(() => {
-  psql(`drop table if exists ${ROWS}`);
+  appRows.putBack();
 });
 
 for (const [label, viewport] of Object.entries(VIEWPORTS)) {

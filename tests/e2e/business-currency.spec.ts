@@ -10,7 +10,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { A, api, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown, untilStill } from './helpers';
 import { createProduct, dialog, productsReady } from './inventory-helpers';
-import { cleanInvoices, ensureIssuer, issuedIds, issuerNow, type IssuerOut, restoreIssuer, snapshotSeries } from './invoice-helpers';
+import { ensureIssuer, issuedIds, issuerBackAndInvoicesGone, issuerNow, type IssuerOut, snapshotSeries } from './invoice-helpers';
 
 const KEY = 'FIX-HUB-APPS-CHARGE-IN-EUR-WHATEVER-THE-COUNTRY';
 const SIZES = [
@@ -88,13 +88,7 @@ test.afterAll(async ({ browser }) => {
   }
   psql(`delete from inventory_stockmovement where product_id in (select id from inventory_product where sku = '${SKU}')`);
   psql(`delete from inventory_product where sku = '${SKU}'`);
-  if (issuer) {
-    const context = await browser.newContext({ baseURL: A });
-    await login(await context.newPage(), A, '/invoice/invoices');
-    await restoreIssuer(context, issuer);
-    await context.close();
-  }
-  cleanInvoices();
+  await issuerBackAndInvoicesGone(browser, issuer);
 });
 
 test(`a business in Poland counts, invoices and prices in złoty in 390, 834 and 1440 (flow business-currency)`, async ({ page, context }) => {

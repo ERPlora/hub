@@ -7,55 +7,15 @@
 //   - «Deactivate» (confirmed) takes it off the list; Status «Deactivated» shows it with «Restore»;
 //   - a phone (390×844) shows the rules as cards. Screenshots of each step and of the 3 viewports.
 // What it creates is deleted after the file (`afterAll`).
-import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, login, psql, shot, shown } from './helpers';
+import { A, api, login, shot, shown, THREE_SIZES_TALL_TABLET as VIEWPORTS } from './helpers';
+import { noHorizontalScroll } from './service-helpers';
+import { cleanUp, freshCategory, pickSelect as pick, type Rule, rulesOf } from './tax-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
-/** Categories are never deleted by the app: what this file made goes with the database's own hand
- *  (the hub `a`'s), components first, then rules, aliases and the categories. */
-const CLEANUP = [
-  "delete from tax_taxalias where category_id in (select id from tax_taxcategory where key like 'e2e.%')",
-  "delete from tax_taxrule where parent_id is not null and category_id in (select id from tax_taxcategory where key like 'e2e.%')",
-  "delete from tax_taxrule where category_id in (select id from tax_taxcategory where key like 'e2e.%')",
-  "delete from tax_taxcategory where key like 'e2e.%'",
-].join('; ');
-
-test.afterAll(() => {
-  psql(CLEANUP);
-});
-
-/** No horizontal scroll: the page is not wider than the window (polled while the layout settles). */
-async function noHorizontalScroll(page: Page, label: string): Promise<void> {
-  await expect
-    .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${label}` })
-    .toBeLessThanOrEqual(0);
-}
-
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1194 },
-  { label: '1440', width: 1440, height: 900 },
-];
-
-interface Rule {
-  id: string;
-  valid_to: string | null;
-}
-
-/** A fresh category of this run, created through the API (setup, not the check). */
-async function freshCategory(context: BrowserContext, prefix: string): Promise<string> {
-  const key = `e2e.${prefix}_${Date.now().toString(36)}`;
-  const res = await api(context, A, 'POST', '/tax/categories', { key, name: `E2E ${prefix} ${key.slice(-6)}` });
-  expect(res.status, `create category ${key}`).toBe(201);
-  return key;
-}
-
-async function rulesOf(context: BrowserContext, key: string, status = 'all'): Promise<Rule[]> {
-  const res = await api<{ rows: Rule[] }>(context, A, 'GET', `/tax/rules?tax_category_key=${key}&status=${status}&limit=100`);
-  expect(res.status).toBe(200);
-  return res.data.rows;
-}
+// What this file made goes after it: categories are never deleted by the app (tax-helpers.ts).
+test.afterAll(cleanUp);
 
 /** Types `text` in a searchable field (a Combo) and picks the option `value` from its list. */
 async function choose(page: Page, field: Locator, testid: string, text: string, value: string): Promise<void> {
@@ -64,15 +24,6 @@ async function choose(page: Page, field: Locator, testid: string, text: string, 
   await input.fill(text);
   await page.locator(`[data-testid="${testid}-option-${value}"]`).click();
   await expect(page.locator(`[data-testid="${testid}-option-${value}"]`)).toHaveCount(0);
-}
-
-/** Opens an `ion-select` and picks the option whose text is `text` (popover interface). */
-async function pick(page: Page, select: Locator, text: string | RegExp): Promise<void> {
-  await select.click();
-  const popover = page.locator('ion-popover').last();
-  await popover.waitFor({ state: 'visible' });
-  await popover.locator('ion-radio, ion-item').filter({ hasText: text }).first().click();
-  await expect(popover).toBeHidden();
 }
 
 const rows = (page: Page) => shown(page).locator('[data-testid=tax-rules-row]');

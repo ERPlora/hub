@@ -36,6 +36,20 @@ import { STACK } from './stack';
 export { api };
 
 export const A = STACK.hub('a');
+
+/** The three sizes with the taller tablet, 834×1194. */
+export const THREE_SIZES_TALL_TABLET = [
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1194 },
+  { label: '1440', width: 1440, height: 900 },
+] as const;
+
+/** The three sizes the e2e looks at a screen in: a phone, a tablet and a desk. */
+export const THREE_SIZES = [
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1112 },
+  { label: '1440', width: 1440, height: 900 },
+] as const;
 export const B = STACK.hub('b');
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -964,6 +978,20 @@ export const compactBar = (page: Page): boolean => (page.viewportSize()?.width ?
 export const bellBadge = (page: Page): Locator =>
   shown(page).locator(compactBar(page) ? '[data-testid=topbar-chrome-more-badge]' : '[data-testid=hub-bell] [data-testid=hub-bell-badge]');
 
+/** The bell's count says `total`, or shows nothing when it is 0. */
+export async function badgeSays(page: Page, total: number, options: { timeout?: number } = {}): Promise<void> {
+  if (total > 0) await expect(bellBadge(page)).toHaveText(String(total), options);
+  else await expect(bellBadge(page)).toHaveCount(0, options);
+}
+
+/** The page still, with nothing past its right edge at the size `label`, then captured as `name`. */
+export async function capturedFitting(page: Page, name: string, label: string): Promise<void> {
+  await untilStill(page);
+  const overflow = await horizontalOverflow(page);
+  expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
+  await capture(page, name);
+}
+
 /**
  * Opens the bell's list (BASE-F10) and resolves once it is presented: the bell itself, or on a phone its row in «More
  * options» (TopbarChrome.vue). Ionic animates a popover in a shadow root, so it waits for its `ionPopoverDidPresent`.
@@ -1198,6 +1226,19 @@ export function psql(sql: string, hub = 'a'): string {
     .map((run) => psqlOn(run.database, run.sql))
     .filter(Boolean)
     .join('\n');
+}
+
+/**
+ * The username of whoever is signed in on `context`. Not by email: a hub database kept from a stack whose SaaS was
+ * created again holds an older account with the same email (a new SaaS, new users), and the email names both.
+ */
+export async function usernameOf(context: BrowserContext): Promise<string> {
+  const me = await api<{ user: { id: string } | null }>(context, A, 'GET', '/me');
+  expect(me.status, 'GET /api/me').toBe(200);
+  const id = me.data.user?.id ?? '';
+  expect(id, 'the person signed in').not.toBe('');
+  // `/api/me` names the person of the business's database (base.HubUser), whose username is the session's.
+  return psql(`SELECT username FROM base_hubuser WHERE id = '${id}'`);
 }
 
 /** The usernames of every account of `email` (control's ``auth_user``), quoted for the `in (…)` of a statement on a

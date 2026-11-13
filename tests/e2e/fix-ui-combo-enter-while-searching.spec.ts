@@ -8,6 +8,7 @@
 import { type Browser, expect, type Route, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
+import { staffCleanUp } from './staff-helpers';
 
 const TAG = 'CMB';
 const VIEWPORTS = [
@@ -17,18 +18,7 @@ const VIEWPORTS = [
 ];
 
 /** Removes every record this spec creates (first names «CMB…», roles «CMB…»). */
-function cleanup(): void {
-  const members = `select id from staff_member where first_name like '${TAG}%'`;
-  psql(
-    [
-      `delete from staff_timeoff where member_id in (${members})`,
-      `delete from staff_scheduleday where schedule_id in (select id from staff_schedule where member_id in (${members}))`,
-      `delete from staff_schedule where member_id in (${members})`,
-      `delete from staff_member where first_name like '${TAG}%'`,
-      `delete from staff_role where name like '${TAG}%'`,
-    ].join('; '),
-  );
-}
+const cleanup = (): void => staffCleanUp(TAG);
 
 test.beforeAll(cleanup);
 test.afterAll(cleanup);

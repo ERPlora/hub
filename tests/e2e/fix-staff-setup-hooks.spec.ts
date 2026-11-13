@@ -8,7 +8,8 @@
 // it parks nothing.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, OWNER, psql, shot, shown, untilStill } from './helpers';
+import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, OWNER, shot, shown, untilStill } from './helpers';
+import { staffCleanUp } from './staff-helpers';
 import { VIEWPORTS } from './inventory-helpers';
 import { stamp } from './sale-helpers';
 
@@ -41,18 +42,7 @@ interface RoleRow {
 
 test.describe.configure({ mode: 'serial' });
 
-function cleanup(): void {
-  const members = `select id from staff_member where first_name like '${TAG}%'`;
-  psql(
-    [
-      `delete from staff_timeoff where member_id in (${members})`,
-      `delete from staff_scheduleday where schedule_id in (select id from staff_schedule where member_id in (${members}))`,
-      `delete from staff_schedule where member_id in (${members})`,
-      `delete from staff_member where first_name like '${TAG}%'`,
-      `delete from staff_role where name like '${TAG}%'`,
-    ].join('; '),
-  );
-}
+const cleanup = (): void => staffCleanUp(TAG);
 
 /** A civil day `days` away from this machine's today; ±1 covers the business's today whatever its time zone. */
 function day(days: number): string {

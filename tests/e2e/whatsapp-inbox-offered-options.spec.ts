@@ -12,65 +12,29 @@
 import { execFileSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { saasSql } from './assistant-real';
-import { A, api, capture, psql, REPO_DIR, shown } from './helpers';
-import { confirmDialog, parkedEvent, signedIn } from './flow-helpers';
+import { capture, psql, REPO_DIR, shown } from './helpers';
+import { parkedEvent, signedIn } from './flow-helpers';
+import { chats, relay } from './provider-helpers';
+import { guestRowInTheBook, madridDay } from './reservation-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { STACK } from './stack';
-import { answerSpec, chats, customerWrites, openTheBook, relay } from './whatsapp-answer-helpers';
+import { answerSpec, bookingCleanUp, customerWrites, tablesAnswered } from './whatsapp-answer-helpers';
 import { NUMBER_ID, TOKEN } from './whatsapp-graph';
-import { cleanUp as inboxCleanUp, e2ePhone, metaGraph, restorePhoto, seedErplora } from './whatsapp-helpers';
+import { e2ePhone, metaGraph, restorePhoto, seedErplora } from './whatsapp-helpers';
 
 const TASK = 'CLOSE-WHATSAPP_INBOX';
 const ANSWER = 'whatsapp_inbox/reservation_from_whatsapp';
 const GUEST = 'E2E WhatsApp Nora';
-/** How this spec's slot and open day are known again (slots have no name); not reservation-whatsapp.spec.ts's. */
-const SENTINEL = 78;
-const OPEN_REASON = 'E2E WhatsApp offered options open';
 /** How many days ahead the booking is: past the minimum notice and within the days ahead of the guest's rules. */
 const AHEAD = 3;
 const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `saas_e2e_${STACK.hubPort + 1}`);
 const SAAS_DIR = resolve(process.env.E2E_SAAS_DIR || join(REPO_DIR, 'saas'));
-
-/** The business's day `days` from today (Madrid, hub `a`'s zone) and its weekday, Monday 0. */
-function madridDay(days: number): { date: string; weekday: number } {
-  const date = new Date(Date.now() + days * 86_400_000).toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
-  return { date, weekday: (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7 };
-}
-
-const DAY = madridDay(AHEAD);
-
-/** The inbox's answers (with their runs and questions), this spec's reservations and cards, its slot and open day, the
- *  conversations and channel of the inbox's specs, and the month's messages of the business `a`. */
-function cleanUp(): void {
-  const flows = "select id from flow_flow where recipe like 'whatsapp_inbox/%'";
-  const reservations = "select id from reservation_reservation where guest_phone like '+3469900%'";
-  const cards = "select id from customer_customer where source = 'whatsapp' and phone like '%69900%'";
-  psql(
-    [
-      `delete from flow_question where flow_id in (${flows})`,
-      `delete from flow_flowrun where flow_id in (${flows})`,
-      `delete from flow_flow where id in (${flows})`,
-      `delete from table_hold where source_ref in (${reservations.replace('select id', 'select id::text')})`,
-      `delete from reservation_reservation where id in (${reservations})`,
-      `delete from reservation_timeslot where max_reservations = ${SENTINEL}`,
-      `delete from schedule_overrideinterval where override_id in (select id from schedule_override where reason = '${OPEN_REASON}')`,
-      `delete from schedule_override where reason = '${OPEN_REASON}'`,
-    ].join('; '),
-  );
-  inboxCleanUp();
-  psql(
-    [
-      ...['customer_activity', 'customer_consent', 'customer_customer_groups', 'customer_customer_tags', 'customer_customfieldvalue', 'customer_orderlink', 'customer_purchase'].map(
-        (table) => `delete from ${table} where customer_id in (${cards})`,
-      ),
-      `delete from customer_customer where id in (${cards})`,
-    ].join('; '),
-  );
-  saasSql("delete from assistant_assistantusage where hub_id = (select id from hubs_hub where slug = 'a')");
-}
+/** The day this spec books on, and how its slot and open day are known again (slots have no name); not
+ *  reservation-whatsapp.spec.ts's. */
+const BOOK = { day: madridDay(AHEAD), sentinel: 78, reason: 'E2E WhatsApp offered options open' };
+const DAY = BOOK.day;
 
 /** erplora.com's seed gives `a`'s number a made-up permission that the run's Meta refuses, so whatever the Hub writes
  *  a customer ends «Not sent» (flow-send-message.spec.ts). A list she never got is not one she can answer (F19), so this
@@ -102,13 +66,7 @@ const lastWritten = (phone: string): string =>
   );
 
 /** The Reservations book on DAY, and the guest's row in it. */
-async function bookRow(page: Page) {
-  await page.goto('/reservation/reservations');
-  const view = shown(page);
-  for (let step = 0; step < AHEAD; step++) await view.locator('[data-testid=reservation-day-next]').click();
-  await expect(view.locator('[data-testid=reservation-day]')).toHaveAttribute('data-day', DAY.date);
-  return view.locator('[data-testid=reservation-list-row]', { hasText: GUEST });
-}
+const bookRow = (page: Page): Promise<Locator> => guestRowInTheBook(page, { ahead: AHEAD, day: DAY }, GUEST);
 
 test.beforeAll(async () => {
   // erplora.com takes `a`'s number (connected) and this Hub keeps its photo; it reaches Meta only through the run's
@@ -117,7 +75,7 @@ test.beforeAll(async () => {
   await metaGraph();
   numberSends();
 });
-const provider = answerSpec(cleanUp);
+const provider = answerSpec(() => bookingCleanUp(BOOK));
 test.afterAll(() => {
   seedErplora(); // the seed's made-up permission back, for the specs after this one
   restorePhoto();
@@ -129,15 +87,8 @@ for (const viewport of VIEWPORTS) {
     test.setTimeout(600_000);
     const { context, page } = await signedIn(browser, '/whatsapp_inbox/settings', viewport);
     try {
-      await openTheBook(context, DAY, SENTINEL, OPEN_REASON);
-      const rules = await api(context, A, 'POST', '/reservation/settings', { auto_confirm: false });
-      expect(rules.status, JSON.stringify(rules.data)).toBe(200);
-
-      // The owner turns «Book a table» on.
-      const card = shown(page).locator('[data-testid=whatsapp-inbox-autoreply-tables]');
-      await card.locator('[data-testid=whatsapp-inbox-autoreply-tables-on]').click();
-      await confirmDialog(page, 'Book a table');
-      await expect(card).toContainText('On');
+      // The owner turns «Book a table» on, the book reviewing every new reservation.
+      await tablesAnswered(context, page, BOOK, true);
 
       // No room at 21:00: the answer offers two other times and nothing waits for the owner yet.
       const phone = e2ePhone();

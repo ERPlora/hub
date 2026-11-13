@@ -65,6 +65,14 @@ export const inputOf = (scope: Page | Locator, testid: string): Locator => scope
 
 const quoted = (ids: Iterable<string>): string => [...ids].map((id) => `'${id.replace(/'/g, '')}'`).join(',');
 
+/** The statements that delete the cards `cards` (a `select id …`) with the rows that hang from them. */
+export const cardDeletes = (cards: string): string[] => [
+  ...['customer_activity', 'customer_consent', 'customer_customer_groups', 'customer_customer_tags', 'customer_customfieldvalue', 'customer_orderlink', 'customer_purchase'].map(
+    (table) => `delete from ${table} where customer_id in (${cards})`,
+  ),
+  `delete from customer_customer where id in (${cards})`,
+];
+
 /** Deletes what the specs created: the recorded cards, any `e2e.` card, group, tag and field. */
 export function cleanUp(): void {
   const named = psql(`select string_agg(id::text, ',') from customer_customer where name like '${PREFIX}%'`);

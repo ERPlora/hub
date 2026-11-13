@@ -7,7 +7,8 @@
 // Citas's settings are put back as they were.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, bellBadge, horizontalOverflow, login, openBell, psql, shot, shown, untilStill } from './helpers';
+import { A, api, badgeSays, capturedFitting, login, openBell, psql, shown } from './helpers';
+import { spanishOwnerOnMyApps as spanishOwner, streamsQuiet as settled } from './home-helpers';
 import { FLOW_VIEWPORTS, post } from './service-helpers';
 
 const KEY = 'FIX-APPOINTMENT-SETUP-HOOKS';
@@ -122,47 +123,10 @@ async function counters(context: BrowserContext): Promise<{ total: number; toCon
   return { total, toConfirm };
 }
 
-/**
- * The owner on `a` in Spanish (the Hub's language cookie, as the sign-in sets it from the account), on the Home, with
- * the instant of every `/api/live` the page opens: a new stream brings every result again, so a count that changes
- * without one came over the stream already open, re-run by the counter's own events.
- */
-async function spanishOwner(
-  browser: Browser,
-  viewport: { width: number; height: number },
-): Promise<{ context: BrowserContext; page: Page; streams: number[] }> {
-  const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
-  const page = await context.newPage();
-  const streams: number[] = [];
-  page.on('request', (request) => {
-    if (request.url().includes('/api/live')) streams.push(Date.now());
-  });
-  await login(page, A, '/');
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.goto(`${A}/`);
-  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-  await expect(shown(page).locator('[data-testid="home-my-apps"]')).toBeVisible();
-  // The owner's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
-  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-  return { context, page, streams };
-}
-
-/** Waits until the page has opened no `/api/live` for a second: every subscription of the screen is declared. */
-async function settled(streams: number[]): Promise<void> {
-  await expect.poll(() => Date.now() - (streams.at(-1) ?? 0), { timeout: 15_000 }).toBeGreaterThan(1_000);
-}
-
-const badge = (page: Page): Locator => bellBadge(page);
 const toConfirmRow = (page: Page): Locator =>
   page.locator('ion-popover [data-testid="hub-bell-row"]', { hasText: /^\s*Citas por confirmar \(\d+\)\s*$/ });
 
-
 /** The badge says `total`, or is not shown at zero. */
-async function badgeSays(page: Page, total: number): Promise<void> {
-  if (total > 0) await expect(badge(page)).toHaveText(String(total));
-  else await expect(badge(page)).toHaveCount(0);
-}
-
 FLOW_VIEWPORTS.forEach(({ label, width, height }, index) => {
   test(`the bell's «Citas por confirmar» counter: a customer's booking waiting counts live, leads to the agenda and goes once confirmed — ${label}`, async ({
     browser,
@@ -208,10 +172,7 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }, index) => {
       const row = toConfirmRow(page);
       await expect(row).toHaveText(`Citas por confirmar (${before.toConfirm + 1})`);
       await expect(row).toHaveAttribute('data-reachable', 'true');
-      await untilStill(page);
-      const overflow = await horizontalOverflow(page);
-      expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
-      await page.screenshot({ path: shot(`${KEY}-${label}`) });
+      await capturedFitting(page, `${KEY}-${label}`, label);
 
       // The row leads to the agenda.
       await row.click();

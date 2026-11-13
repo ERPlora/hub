@@ -15,7 +15,8 @@ import { spawnSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, horizontalOverflow, HUB_DIR, login, painted, psql, shown, untilStill } from './helpers';
+import { A, api, capture, HUB_DIR, login, painted, psql, shown, untilStill } from './helpers';
+import { capturedAtSizes } from './service-helpers';
 
 const TAG = 'E2E Combo';
 const STAMP = Date.now().toString(36).toUpperCase();
@@ -157,13 +158,6 @@ async function fill(page: Page, testid: string, value: string): Promise<void> {
   await input.blur();
 }
 
-/** No horizontal scroll: the page is not wider than the window (polled while the layout settles). */
-async function noHorizontalScroll(page: Page, label: string): Promise<void> {
-  await expect
-    .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${label}` })
-    .toBeLessThanOrEqual(0);
-}
-
 /** Nothing inside `selector` reaches past the window's right edge (clipped content is not a scroll):
  *  the hooks of whatever does, with how far, so a failure says which element it is. */
 async function nothingPastTheEdge(page: Page, selector: string, label: string): Promise<void> {
@@ -186,16 +180,12 @@ async function nothingPastTheEdge(page: Page, selector: string, label: string): 
 }
 
 async function shoot(page: Page, name: string, inside?: string): Promise<void> {
-  for (const viewport of VIEWPORTS) {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+  await capturedAtSizes(page, name, VIEWPORTS, async (viewport) => {
     // The page laid out at its new size, then nothing moving: Ionic's sheets and notices animate in their shadow roots.
     await painted(page);
     await untilStill(page);
-    await noHorizontalScroll(page, `${name} ${viewport.label}`);
     if (inside) await nothingPastTheEdge(page, inside, `${name} ${viewport.label}`);
-    await capture(page, `${name}-${viewport.label}`);
-  }
-  await page.setViewportSize({ width: 1280, height: 860 });
+  });
 }
 
 /** Whether the dialog's title and its «Cancel» overlap. */

@@ -16,6 +16,7 @@ import { writeFileSync } from 'node:fs';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { sentCard } from './assistant-card-helpers';
 import { type Provider, startProvider } from './assistant-provider';
 import { type Cart, cleanUp, code, get, type Line, type Order, post } from './cart-checkout-helpers';
 import { A, capture, compactBar, exposeMovingInPage, login, REPO_DIR, shot, shown, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
@@ -235,26 +236,6 @@ test('cart-checkout-assistant-card — in Spanish marking an order paid names it
   expect(after.status).toBe('initiated');
   await context.close();
 });
-
-type SentCard = { fields: { name: string; kind: string; value: unknown; money?: unknown }[] };
-
-/** The card of the confirm frame of a turn's answer (`text/event-stream`: one `data: <JSON>` per frame), if any. */
-function confirmedCard(stream: string): SentCard | undefined {
-  const frames = stream
-    .split('\n')
-    .filter((line) => line.startsWith('data:'))
-    .map((line) => JSON.parse(line.slice(5)) as { type: string; card?: SentCard });
-  return frames.find((frame) => frame.type === 'confirm')?.card;
-}
-
-/** The card the server sends for the person to confirm, as it arrives: the answer of the turn that carries it (the
- *  first one only asks for the tool). */
-async function sentCard(page: Page): Promise<SentCard> {
-  const answer = await page.waitForResponse(
-    async (response) => response.url().endsWith('/api/assistant/turn') && confirmedCard(await response.text()) !== undefined,
-  );
-  return confirmedCard(await answer.text())!;
-}
 
 // flow: base-assistant-money-mark (BASE-F97)
 // A line added to a cart in dollars must not read «12,50 €»: the write names the cart, not its currency. The card

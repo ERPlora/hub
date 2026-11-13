@@ -11,7 +11,8 @@
 // «e2e Off …», deleted before and after.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, bellBadge, horizontalOverflow, login, openBell, psql, shot, shown, untilStill } from './helpers';
+import { A, api, badgeSays, capturedFitting, login, openBell, psql, shown } from './helpers';
+import { streamsQuiet as settled } from './home-helpers';
 import { FLOW_VIEWPORTS, forgetDevices } from './printing-helpers';
 import { stamp } from './sale-helpers';
 
@@ -132,16 +133,6 @@ async function spanishOwner(browser: Browser, viewport: { width: number; height:
   return { context, page, streams, reads, loads, cardReads };
 }
 
-/** Waits until the page has opened no `/api/live` for a second: every subscription of the screen is declared. */
-async function settled(streams: number[]): Promise<void> {
-  await expect.poll(() => Date.now() - (streams.at(-1) ?? 0), { timeout: 15_000 }).toBeGreaterThan(1_000);
-}
-
-async function badgeSays(page: Page, total: number, options = {}): Promise<void> {
-  if (total > 0) await expect(bellBadge(page)).toHaveText(String(total), options);
-  else await expect(bellBadge(page)).toHaveCount(0, options);
-}
-
 FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
   test(`PRINTING-F01: «Nadie está imprimiendo «Recibo»» with the device off, by the clock — ${label}`, async ({ browser }) => {
     const device = `${TAG} device ${RUN} ${label}`;
@@ -179,10 +170,7 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
       await openBell(page);
       const row = page.locator('ion-popover [data-testid="hub-bell-row"]', { hasText: /^\s*Nadie está imprimiendo «Recibo» \(\d+\)\s*$/ });
       await expect(row).toHaveText(`Nadie está imprimiendo «Recibo» (${before.stalled + 1})`);
-      await untilStill(page);
-      const overflow = await horizontalOverflow(page);
-      expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
-      await page.screenshot({ path: shot(`${KEY}-${label}`) });
+      await capturedFitting(page, `${KEY}-${label}`, label);
 
       // The row leads to the printers, where the receipts' card says the device is off and what to do.
       await row.click();

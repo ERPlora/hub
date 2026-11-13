@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 
 import { type Browser, type BrowserContext, expect, test } from '@playwright/test';
 
+import { clockIn } from './attendance-helpers';
 import { A, api, type Credentials, EMPLOYEE, login, psql, shot, shown } from './helpers';
 
 type Envelope = { error?: { code: string } };
@@ -65,10 +66,7 @@ test('an employee clocks a whole day with a break and sees only their own days',
     await expect(view.locator('[data-testid=attendance-clock-greeting]')).toHaveText(`Hello, ${anaName} Clock`);
     await expect(view.locator('[data-testid=attendance-clock-status]')).toHaveText('You are clocked out');
 
-    await view.locator('[data-testid=attendance-clock-in]').click();
-    await expect(view.locator('[data-testid=attendance-clock-message]')).toContainText('Clocked in at');
-    await expect(view.locator('[data-testid=attendance-clock-status]')).toContainText('Clocked in since');
-    await expect(view.locator('[data-testid=attendance-clock-timer]')).toBeVisible();
+    await clockIn(view);
 
     await view.locator('[data-testid=attendance-break-start]').click();
     await expect(view.locator('[data-testid=attendance-clock-status]')).toContainText('On break since');

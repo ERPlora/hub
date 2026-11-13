@@ -7,9 +7,10 @@
 // panels.
 // The products the hub already had are turned off for the run and back on after it; the run's own are `E2E-…`,
 // which `cleanInventory()` removes.
-import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, login, psql, shot, shown, untilStill } from './helpers';
+import { A, api, horizontalOverflow, psql, shot, shown, untilStill } from './helpers';
+import { boardWidget, setupStep, spanishOwnerWithPanels as spanishOwner } from './home-helpers';
 import { cleanInventory, createProduct, stamp, VIEWPORTS } from './inventory-helpers';
 
 const KEY = 'FIX-INVENTORY-SETUP-HOOKS';
@@ -18,7 +19,6 @@ const PANELS = ['inventory.low_stock_count', 'inventory.value', 'inventory.in_st
 const DEFAULT_PANELS = PANELS.filter((key) => key !== 'inventory.in_stock');
 const TITLES = ['Productos con stock bajo', 'Valor de existencias (a coste)', 'Productos en stock', 'Productos con menos stock'];
 /** Where the Home keeps this browser's board (base/frontend/lib/home.ts `BOARD_STORAGE_KEY`). */
-const BOARD = 'dashboard-hub';
 /** The hub's own active products, turned off while the run needs an empty catalog. */
 const PARKED = 'e2e_fix_inv_hooks_parked';
 
@@ -40,30 +40,7 @@ test.afterAll(() => {
   psql([`update inventory_product set is_active = true where id in (select id from ${PARKED})`, `drop table ${PARKED}`].join('; '));
 });
 
-/** The owner on `a` in Spanish (the Hub's language cookie, as the sign-in sets it from the account), on the Home. */
-async function spanishOwner(
-  browser: Browser,
-  viewport: { width: number; height: number },
-  board?: string[],
-): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
-  if (board) await context.addInitScript(([key, keys]) => localStorage.setItem(key, keys), [BOARD, JSON.stringify(board)]);
-  const page = await context.newPage();
-  await login(page, A, '/');
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.goto(`${A}/`);
-  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-  await expect(card(page)).toHaveAttribute('aria-busy', 'false');
-  // The owner's Spanish session with Inventory's four panels for the fleet's visual sweep
-  // (`ui-clip-sweep.sh --storage-state`), when asked.
-  if (board && process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-  return { context, page };
-}
-
-const card = (page: Page): Locator => shown(page).locator('[data-testid="setup-card"]');
-const row = (page: Page): Locator => card(page).locator(`[data-testid="setup-row"][data-key="${STEP}"]`);
-const panel = (page: Page, key: string): Locator =>
-  shown(page).locator(`[data-testid="widget-board"] [data-testid="widget"][data-key="${key}"]`);
+const { row, doneUnderTheFold } = setupStep(STEP);
 
 /** A low-stock article: 2 left at 1.25 € each, under its threshold of 5. */
 async function lowStockProduct(context: BrowserContext): Promise<{ id: string; name: string }> {
@@ -100,10 +77,7 @@ test('INVENTORY-F28: «Tu catálogo» pending without products, done with one an
 
     // One product: the step is done without a reload (it leaves the folded list; «Ver todo» says «Hecho»).
     const product = await lowStockProduct(context);
-    await expect(row(page)).toHaveCount(0);
-    await card(page).locator('[data-testid="setup-toggle"]').click();
-    await expect(row(page).locator('[data-testid="setup-pill"]')).toHaveText('Hecho');
-    await expect(row(page).locator(`[data-testid="setup-configure-${STEP}"]`)).toHaveCount(0);
+    await doneUnderTheFold(page);
 
     // Turned off, the catalog is empty again: pending without a reload.
     const off = await api(context, A, 'POST', '/inventory/products/update', { id: product.id, is_active: false });
@@ -124,17 +98,17 @@ test('INVENTORY-F17: Inventory\'s three default panels on the Home with the serv
     expect(summary.status).toBe(200);
     expect(summary.data.products_low_stock).toBeGreaterThan(0);
 
-    for (const key of DEFAULT_PANELS) await expect(panel(page, key)).toBeVisible();
-    await expect(panel(page, 'inventory.in_stock')).toHaveCount(0);
+    for (const key of DEFAULT_PANELS) await expect(boardWidget(page, key)).toBeVisible();
+    await expect(boardWidget(page, 'inventory.in_stock')).toHaveCount(0);
     const number = new Intl.NumberFormat('es-ES');
     const money = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
-    const low = panel(page, 'inventory.low_stock_count');
+    const low = boardWidget(page, 'inventory.low_stock_count');
     await expect(low.locator('[data-testid="widget-title"]')).toHaveText('Productos con stock bajo');
     await expect(low.locator('[data-testid="widget-value"]')).toHaveText(number.format(summary.data.products_low_stock));
-    const value = panel(page, 'inventory.value');
+    const value = boardWidget(page, 'inventory.value');
     await expect(value.locator('[data-testid="widget-title"]')).toHaveText('Valor de existencias (a coste)');
     await expect(value.locator('[data-testid="widget-value"]')).toHaveText(money.format(summary.data.stock_value / 100));
-    const lowest = panel(page, 'inventory.low_stock_products');
+    const lowest = boardWidget(page, 'inventory.low_stock_products');
     await expect(lowest.locator('[data-testid="widget-title"]')).toHaveText('Productos con menos stock');
     await expect(lowest).toContainText(product.name);
 
@@ -155,9 +129,9 @@ for (const size of VIEWPORTS) {
     try {
       // The step in sight while pending, with no sideways scroll; the panels read, with nothing to count yet.
       await expect(row(page).locator('[data-testid="setup-pill"]')).toHaveText('Importante');
-      for (const key of PANELS) await expect(panel(page, key)).toHaveAttribute('aria-busy', 'false');
-      await expect(panel(page, 'inventory.low_stock_count').locator('[data-testid="widget-value"]')).toHaveText('0');
-      await expect(panel(page, 'inventory.low_stock_products').locator('[data-testid="widget-empty"]')).toHaveText('Sin datos');
+      for (const key of PANELS) await expect(boardWidget(page, key)).toHaveAttribute('aria-busy', 'false');
+      await expect(boardWidget(page, 'inventory.low_stock_count').locator('[data-testid="widget-value"]')).toHaveText('0');
+      await expect(boardWidget(page, 'inventory.low_stock_products').locator('[data-testid="widget-empty"]')).toHaveText('Sin datos');
       await row(page).evaluate((element) => element.scrollIntoView({ block: 'start' }));
       await untilStill(page);
       const overflow = () => horizontalOverflow(page);
@@ -168,13 +142,13 @@ for (const size of VIEWPORTS) {
       const product = await lowStockProduct(context);
       await expect(row(page)).toHaveCount(0);
       for (const [index, key] of PANELS.entries()) {
-        await expect(panel(page, key).locator('[data-testid="widget-title"]')).toHaveText(TITLES[index]);
-        await expect(panel(page, key).locator('[data-testid="widget-error"]')).toHaveCount(0);
-        await expect(panel(page, key)).toHaveAttribute('aria-busy', 'false');
+        await expect(boardWidget(page, key).locator('[data-testid="widget-title"]')).toHaveText(TITLES[index]);
+        await expect(boardWidget(page, key).locator('[data-testid="widget-error"]')).toHaveCount(0);
+        await expect(boardWidget(page, key)).toHaveAttribute('aria-busy', 'false');
       }
-      await expect(panel(page, 'inventory.in_stock').locator('[data-testid="widget-value"]')).toHaveText('1');
-      await expect(panel(page, 'inventory.low_stock_products')).toContainText(product.name);
-      await panel(page, 'inventory.low_stock_count').evaluate((element) => element.scrollIntoView({ block: 'start' }));
+      await expect(boardWidget(page, 'inventory.in_stock').locator('[data-testid="widget-value"]')).toHaveText('1');
+      await expect(boardWidget(page, 'inventory.low_stock_products')).toContainText(product.name);
+      await boardWidget(page, 'inventory.low_stock_count').evaluate((element) => element.scrollIntoView({ block: 'start' }));
       await untilStill(page);
       expect(await overflow(), `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
       await page.screenshot({ path: shot(`${KEY}-INVENTORY-F17-${size.label}`) });

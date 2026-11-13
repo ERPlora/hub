@@ -5,7 +5,7 @@
 // «E2E Svc …» and deleted from the hub's database, the appointments of its customers included.
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, horizontalOverflow, login, psql, shown } from './helpers';
+import { A, api, capture, horizontalOverflow, login, psql, shown } from './helpers';
 
 /** Every name a service spec gives starts like this. */
 export const TAG = 'E2E Svc';
@@ -35,6 +35,23 @@ export async function noHorizontalScroll(page: Page, label: string): Promise<voi
   await expect
     .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${label}` })
     .toBeLessThanOrEqual(0);
+}
+
+/** `name` captured at each of `sizes` once `ready` has set the page there, with nothing scrolling sideways; back to
+ *  1280×860 after. */
+export async function capturedAtSizes(
+  page: Page,
+  name: string,
+  sizes: readonly { label: string; width: number; height: number }[],
+  ready: (viewport: { label: string; width: number; height: number }) => Promise<void>,
+): Promise<void> {
+  for (const viewport of sizes) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await ready(viewport);
+    await noHorizontalScroll(page, `${name} ${viewport.label}`);
+    await capture(page, `${name}-${viewport.label}`);
+  }
+  await page.setViewportSize({ width: 1280, height: 860 });
 }
 
 export async function ownerPage(browser: Browser, next: string, viewport: { width: number; height: number } = VIEWPORTS.desktop) {
@@ -147,4 +164,15 @@ export function cleanUp(): void {
       `delete from customer_customer where name like '${TAG}%'`,
     ].join('; '),
   );
+}
+
+/** The customer `customerId` deleted in Customers: her voucher `voucherId` shows among the ones with no customer, with
+ *  her reference and its 5 sessions left. That sheet, open. */
+export async function voucherWithNoCustomer(page: Page, context: BrowserContext, customerId: string, voucherId: string): Promise<Locator> {
+  await post(context, '/customer/customers/delete', { id: customerId }, 200);
+  await shown(page).locator('[data-testid=service-packages-orphans-open]').click();
+  const orphans = page.locator('ion-modal[data-testid=service-orphans]');
+  await expect(orphans.locator(`[data-testid=service-orphans-row-${voucherId}]`)).toContainText(`Customer reference: ${customerId}`);
+  await expect(orphans.locator(`[data-testid=service-orphans-row-${voucherId}]`)).toContainText('5 sessions left');
+  return orphans;
 }

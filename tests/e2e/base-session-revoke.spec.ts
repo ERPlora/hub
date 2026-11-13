@@ -9,16 +9,11 @@
 // registers it in this Hub with the same id. The SaaS's changes are made on its panel, as the owner makes them.
 import { expect, type Page, test } from '@playwright/test';
 
-import { api, listReady, login, psql, SAAS, shot, shown, turnOn } from './helpers';
+import { api, listReady, login, psql, SAAS, shot, shown, THREE_SIZES as SIZES, turnOn } from './helpers';
 import { businessOnSaas, type SaasBusiness, type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
 import { rowAction } from './service-helpers';
 import { STACK } from './stack';
 
-const SIZES = [
-  { name: '390', width: 390, height: 844 },
-  { name: '834', width: 834, height: 1112 },
-  { name: '1440', width: 1440, height: 900 },
-] as const;
 /** What the SaaS's steps wait (its pushes to this Hub happen after its COMMIT). */
 const SAAS_STEP = 30_000;
 
@@ -85,12 +80,12 @@ function documentsLoaded(page: Page): string[] {
 
 /** `ready` at each size, with a capture of each; back at 1440 after. */
 async function atEverySize(page: Page, key: string, ready: () => Promise<void>): Promise<void> {
-  for (const size of SIZES) {
-    await page.setViewportSize({ width: size.width, height: size.height });
+  for (const { label, width, height } of SIZES) {
+    await page.setViewportSize({ width, height });
     await ready();
     // A frame's callbacks run before it is painted; the next frame's, once the new size has been.
     await page.evaluate(() => new Promise<void>((painted) => requestAnimationFrame(() => requestAnimationFrame(() => painted()))));
-    await page.screenshot({ path: shot(`APP-HUBS-3-${key}-${size.name}`), fullPage: true });
+    await page.screenshot({ path: shot(`APP-HUBS-3-${key}-${label}`), fullPage: true });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 }

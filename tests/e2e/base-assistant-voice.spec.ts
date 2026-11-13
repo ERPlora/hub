@@ -14,26 +14,17 @@
 // flow: BASE-F93
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { GREETING, type Provider, startProvider } from './assistant-provider';
-import { emptyMonth, openPanel, panel, saasSql } from './assistant-real';
-import { capture, login, A } from './helpers';
-import { STACK } from './stack';
-
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
+import { GREETING, type Provider } from './assistant-provider';
+import { emptyMonth, openPanel, panel } from './assistant-real';
+import { A, capture, login, THREE_SIZES as VIEWPORTS } from './helpers';
+import { seededProvider } from './provider-helpers';
 
 const KEY = 'APP-BASE-9-SERVER-VOICE';
-const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
 
 let provider: Provider;
 
 test.beforeAll(async () => {
-  provider = await startProvider(PROVIDER_PORT);
-  const seeded = saasSql("select base_url from assistant_aiprovider where slug = 'e2e-local'");
-  expect(seeded, `the SaaS ${STACK.saasDatabase} is not seeded with this provider: README «El asistente»`).toBe(provider.url);
+  provider = await seededProvider();
 });
 
 test.afterAll(async () => {
@@ -95,6 +86,19 @@ async function answered(page: Page): Promise<void> {
   await expect(listen(page)).toBeVisible();
 }
 
+/** The device read the answer in Spanish, «Leer en voz alta» is back and nothing failed; the answer captured at each size as
+ *  `<KEY>-<shot>-<size>`. */
+async function deviceReadIt(page: Page, shot: string): Promise<void> {
+  await expect.poll(() => deviceSaid(page)).toEqual([{ text: GREETING.es, lang: 'es-ES' }]);
+  await expect(listen(page)).toHaveText('Leer en voz alta');
+  await expect(panel(page).locator('[data-testid="assistant-listen-failed"]')).toHaveCount(0);
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(listen(page)).toBeVisible();
+    await capture(page, `${KEY}-${shot}-${vp.label}`);
+  }
+}
+
 test('BASE-F93 — with no server voice (the default) there is no choice of voice and the device reads the answer, never asking the Hub', async ({ page }) => {
   const problems = watchProblems(page);
   const asked: string[] = [];
@@ -107,14 +111,7 @@ test('BASE-F93 — with no server voice (the default) there is no choice of voic
 
   await expect(voice(page)).toHaveCount(0);
   await listen(page).click();
-  await expect.poll(() => deviceSaid(page)).toEqual([{ text: GREETING.es, lang: 'es-ES' }]);
-  await expect(listen(page)).toHaveText('Leer en voz alta');
-  await expect(panel(page).locator('[data-testid="assistant-listen-failed"]')).toHaveCount(0);
-  for (const vp of VIEWPORTS) {
-    await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(listen(page)).toBeVisible();
-    await capture(page, `${KEY}-device-only-${vp.label}`);
-  }
+  await deviceReadIt(page, 'device-only');
   expect(asked).toEqual([]);
   expect(problems).toEqual([]);
 });
@@ -139,14 +136,7 @@ test('BASE-F93 — with the server’s voice on there is nothing to choose: the 
     language: 'es',
     voice: '',
   });
-  await expect.poll(() => deviceSaid(page)).toEqual([{ text: GREETING.es, lang: 'es-ES' }]);
-  await expect(listen(page)).toHaveText('Leer en voz alta');
-  await expect(panel(page).locator('[data-testid="assistant-listen-failed"]')).toHaveCount(0);
-  for (const vp of VIEWPORTS) {
-    await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(listen(page)).toBeVisible();
-    await capture(page, `${KEY}-answer-${vp.label}`);
-  }
+  await deviceReadIt(page, 'answer');
   expect(problems).toEqual([]);
 });
 

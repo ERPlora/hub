@@ -7,15 +7,9 @@
 // does. Hub, SaaS and the till are the real ones; nothing is written.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, login, openApps, shot, shown } from './helpers';
+import { A, login, openApps, shot, shown, THREE_SIZES as VIEWPORTS } from './helpers';
 import { openTillCart } from './sale-helpers';
 import { insideTheApp, leftTheApp, pressBack } from './system-back-helpers';
-
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-] as const;
 
 /** The till of the installed app, opened cold (a link or a reload straight into it). */
 async function tillInsideTheApp(page: Page): Promise<void> {

@@ -9,7 +9,8 @@
 // it, the site saved as it was found and taken offline, and `a`'s registration put back, also when a test fails.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, hostPage, psql, registerBusinessIn, registrationOf, type Registration, settled, shot } from './helpers';
+import { A, psql, registerBusinessIn, shot } from './helpers';
+import { atRest, publicPriceLabel, publishedSiteSpec } from './website-helpers';
 
 const KEY = 'FIX-HUB-PYTHON-MONEY-GLUES-CURRENCY-CODE-TO-AMOUNT';
 const SIZES = [
@@ -26,20 +27,6 @@ const INTL = {
   en: new Intl.NumberFormat('en', { style: 'currency', currency: 'PLN' }).format(15.5),
   es: new Intl.NumberFormat('es', { style: 'currency', currency: 'PLN' }).format(15.5),
 };
-
-interface Site {
-  template: string;
-  theme: Record<string, unknown>;
-  content: Record<string, Record<string, unknown>>;
-}
-interface Catalog {
-  groups: { items: { name: string; price_label: string }[] }[];
-}
-
-/** `a`'s registration and its site as the run found them (put back after). */
-let original: Registration | undefined;
-let found: Site | undefined;
-let owner: { context: BrowserContext; page: Page } | undefined;
 
 test.describe.configure({ mode: 'serial' });
 test.use({ actionTimeout: 30_000 });
@@ -70,69 +57,15 @@ async function cardPrice(page: Page): Promise<string> {
 }
 
 /** The public catalog as the bundle reads it (no session, in the visitor's `language`): the label of the run's service. */
-async function publicLabel(context: BrowserContext, language: string): Promise<string> {
-  const answer = await context.request.get(`${A}/api/website/public/catalog`, { headers: { 'Accept-Language': language } });
-  expect(answer.status()).toBe(200);
-  const catalog = (await answer.json()) as Catalog;
-  const item = catalog.groups.flatMap((group) => group.items).find((row) => row.name === SERVICE);
-  expect(item, `${SERVICE} in the public catalog`).toBeTruthy();
-  return item?.price_label ?? '';
-}
+const publicLabel = (context: BrowserContext, language: string): Promise<string> => publicPriceLabel(context, SERVICE, language);
 
-/** The public page at rest for its capture: no focus ring, nothing still moving (`settled`: no colour in transition). */
-async function atRest(page: Page): Promise<void> {
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await settled(page);
-}
-
-test.beforeAll(async ({ browser }) => {
-  cleanUp();
-  original = registrationOf('a');
-  owner = await hostPage(browser, A, { next: '/website', viewport: WIDE });
-  const site = await api<Site>(owner.context, A, 'GET', '/website/site');
-  expect(site.status).toBe(200);
-  found = site.data;
-  const created = await api(owner.context, A, 'POST', '/service/services', {
-    name: SERVICE,
-    price: 1550,
-    duration_minutes: 30,
-    tax_category_key: 'service.generic',
-  });
-  expect(created.status, JSON.stringify(created.data)).toBe(201);
-  // The site as it was, with Services' whole catalog and its prices shown, published.
-  const content = {
-    ...found.content,
-    catalog: { ...found.content.catalog, hidden: false, source: 'service', category_ids: [], show_prices: true },
-  };
-  const saved = await api(owner.context, A, 'POST', '/website/site', { template: found.template, theme: found.theme, content });
-  expect(saved.status, JSON.stringify(saved.data)).toBe(200);
-  const published = await api(owner.context, A, 'POST', '/website/site/publish');
-  expect(published.status, JSON.stringify(published.data)).toBe(200);
-});
-
-test.afterAll(async () => {
-  try {
-    if (original) await registerBusinessIn(original, original.country);
-    if (owner && found) {
-      const restored = await api(owner.context, A, 'POST', '/website/site', {
-        template: found.template,
-        theme: found.theme,
-        content: found.content,
-      });
-      expect(restored.status, JSON.stringify(restored.data)).toBe(200);
-      // The other specs on hub `a` expect `/` to jump to the login.
-      const offline = await api(owner.context, A, 'POST', '/website/site/unpublish');
-      expect(offline.status, JSON.stringify(offline.data)).toBe(200);
-    }
-  } finally {
-    cleanUp();
-    await owner?.context.close();
-  }
-});
+/** `a`'s registration and its site as the run found them (put back after). */
+const kept = publishedSiteSpec(SERVICE, cleanUp);
 
 test(`the server writes a price in złoty as the browser does, «PLN 15.50» in English, in 390, 834 and 1440`, async ({
   browser,
 }) => {
+  const { original } = kept;
   if (!original) throw new Error('beforeAll did not run');
   await registerBusinessIn(original, 'PL');
   expect(INTL.en).toBe('PLN 15.50');
@@ -151,6 +84,7 @@ test(`the server writes a price in złoty as the browser does, «PLN 15.50» in 
 });
 
 test(`a visitor speaking Spanish reads «15,50 PLN», as the browser writes it`, async ({ browser }) => {
+  const { original } = kept;
   if (!original) throw new Error('beforeAll did not run');
   await registerBusinessIn(original, 'PL');
   expect(INTL.es).toBe('15,50 PLN');

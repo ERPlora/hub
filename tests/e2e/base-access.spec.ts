@@ -11,28 +11,11 @@ import { createHmac } from 'node:crypto';
 
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import {
-  api,
-  capture,
-  collectProblems,
-  horizontalOverflow,
-  login,
-  psql,
-  SAAS,
-  shot,
-  shown,
-  turnOn,
-  untilStill,
-} from './helpers';
+import { api, capture, collectProblems, horizontalOverflow, login, psql, SAAS, shot, shown, THREE_SIZES as SIZES, turnOn, untilStill } from './helpers';
 import { businessOnSaas, type SaasBusiness, type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
 import { cleanSales } from './sale-helpers';
 import { STACK } from './stack';
 
-const SIZES = [
-  { name: '390', width: 390, height: 844 },
-  { name: '834', width: 834, height: 1112 },
-  { name: '1440', width: 1440, height: 900 },
-] as const;
 const SAAS_STEP = 30_000;
 const OWNER_PIN = '4826';
 const EMPLOYEE_PIN = '9071';
@@ -74,11 +57,11 @@ async function joins(owner: Person, person: Person, business: Business): Promise
  * in for half a second: mid-way, the screen it leaves shows at its edge); back at 1440 after.
  */
 async function atEverySize(page: Page, key: string, ready: () => Promise<void>): Promise<void> {
-  for (const size of SIZES) {
-    await page.setViewportSize({ width: size.width, height: size.height });
+  for (const { label, width, height } of SIZES) {
+    await page.setViewportSize({ width, height });
     await ready();
     await untilStill(page);
-    await page.screenshot({ path: shot(`APP-BASE-3-${key}-${size.name}`), fullPage: true });
+    await page.screenshot({ path: shot(`APP-BASE-3-${key}-${label}`), fullPage: true });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 }
@@ -224,7 +207,7 @@ test('BASE-F64: the personal interface scale is saved, painted and kept at every
     for (const size of SIZES) {
       await page.setViewportSize({ width: size.width, height: size.height });
       await untilStill(page);
-      expect(await horizontalOverflow(page), `${scale}% at ${size.name}`).toBeLessThanOrEqual(1);
+      expect(await horizontalOverflow(page), `${scale}% at ${size.label}`).toBeLessThanOrEqual(1);
       if (scale === 120 && size.width === 834) {
         await range.scrollIntoViewIfNeeded();
         await capture(page, 'APP-BASE-3-BASE-F64-scale-120-834', { fullPage: true });
@@ -267,18 +250,18 @@ test('a name that is an email address shows whole or ends in «…» at every si
   await fill(profile.getByTestId('profile-last-name'), '');
   await profile.getByTestId('profile-save').click();
   await expect(profile.getByTestId('profile-saved')).toHaveText('Profile saved');
-  for (const size of [{ name: '375', width: 375, height: 667 }, ...SIZES]) {
+  for (const size of [{ label: '375', width: 375, height: 667 }, ...SIZES]) {
     await page.setViewportSize({ width: size.width, height: size.height });
     const name = shown(page).getByTestId('profile-name');
     await expect(name).toHaveText(address);
     await untilStill(page);
     const layout = await nameLayout(name);
     // One line, inside the screen: whole where it fits, else ending in «…»; never broken across lines mid-word.
-    expect({ size: size.name, ...layout }).toMatchObject({ size: size.name, lines: 1, inside: true, title: address });
-    expect(layout.fits || layout.ellipsis, `${size.name}: cut without «…»`).toBe(true);
-    if (size.width >= 834) expect(layout.fits, `${size.name}: whole`).toBe(true);
+    expect({ size: size.label, ...layout }).toMatchObject({ size: size.label, lines: 1, inside: true, title: address });
+    expect(layout.fits || layout.ellipsis, `${size.label}: cut without «…»`).toBe(true);
+    if (size.width >= 834) expect(layout.fits, `${size.label}: whole`).toBe(true);
     await toTop(page);
-    await page.screenshot({ path: shot(`APP-BASE-3-BASE-G125-email-${size.name}`), fullPage: true });
+    await page.screenshot({ path: shot(`APP-BASE-3-BASE-G125-email-${size.label}`), fullPage: true });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   // The name the rest of the run expects.

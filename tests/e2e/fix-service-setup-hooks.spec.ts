@@ -6,9 +6,10 @@
 // three sizes, a capture with the step pending in sight. The services the hub
 // already had on offer are archived for the run and back on offer after it; the run's own are «E2E Svc …», deleted by
 // `cleanUp()` before and after.
-import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, login, psql, shot, shown, untilStill } from './helpers';
+import { A, api, psql, shown } from './helpers';
+import { setupStep, spanishOwnerOnTheSetupCard as spanishOwner, streamsQuiet as settled } from './home-helpers';
 import { VIEWPORTS } from './inventory-helpers';
 import { cleanUp, named, pick } from './service-helpers';
 
@@ -40,48 +41,7 @@ test.afterAll(() => {
   }
 });
 
-/**
- * The owner on `a` in Spanish (the Hub's language cookie, as the sign-in sets it from the account), on the Home, with
- * the instant of every `/api/live` the page opens: a new stream brings every result again, so a step that changes
- * without one came over the stream already open, re-run by its events.
- */
-async function spanishOwner(
-  browser: Browser,
-  viewport: { width: number; height: number },
-): Promise<{ context: BrowserContext; page: Page; streams: number[] }> {
-  const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
-  const page = await context.newPage();
-  const streams: number[] = [];
-  page.on('request', (request) => {
-    if (request.url().includes('/api/live')) streams.push(Date.now());
-  });
-  await login(page, A, '/');
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.goto(`${A}/`);
-  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-  await expect(card(page)).toHaveAttribute('aria-busy', 'false');
-  // The owner's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
-  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-  return { context, page, streams };
-}
-
-/** Waits until the page has opened no `/api/live` for a second: every subscription of the screen is declared. */
-async function settled(streams: number[]): Promise<void> {
-  await expect.poll(() => Date.now() - (streams.at(-1) ?? 0), { timeout: 15_000 }).toBeGreaterThan(1_000);
-}
-
-const card = (page: Page): Locator => shown(page).locator('[data-testid="setup-card"]');
-const step = (page: Page): Locator => card(page).locator(`[data-testid="setup-row"][data-key="${STEP}"]`);
-const pill = (page: Page): Locator => step(page).locator('[data-testid="setup-pill"]');
-const configure = (page: Page): Locator => step(page).locator(`[data-testid="setup-configure-${STEP}"]`);
-
-/** «Ver todo»: a step below a more important pending one, or a done one, may be folded. */
-async function unfolded(page: Page): Promise<void> {
-  await expect(card(page)).toHaveAttribute('aria-busy', 'false');
-  const toggle = card(page).locator('[data-testid="setup-toggle"]');
-  if ((await toggle.count()) && (await toggle.textContent())?.trim() === 'Ver todo') await toggle.click();
-  await expect(step(page)).toBeVisible();
-}
+const { row: step, pill, configure, unfolded, inSight, backDone } = setupStep(STEP);
 
 /** A service of this run by the API as the owner (SERVICE-F01 has its own e2e), at a closed price. */
 async function newService(context: BrowserContext, name: string): Promise<string> {
@@ -127,11 +87,7 @@ test(`SERVICE-F01: «Tu catálogo de servicios» pending with nothing to charge,
     expect(serviceId, 'the service was added on offer').toMatch(/^[0-9a-f-]{36}$/);
 
     // Back on the Home: done, with nothing left to configure.
-    await page.goBack();
-    await expect(page).toHaveURL(`${A}/`);
-    await unfolded(page);
-    await expect(pill(page)).toHaveText('Hecho');
-    await expect(configure(page)).toHaveCount(0);
+    await backDone(page);
 
     // Archived, nothing can be charged: pending again without a reload, over the stream already open; restored, done.
     await settled(streams);
@@ -154,13 +110,7 @@ for (const size of VIEWPORTS) {
   }) => {
     const { context, page, streams } = await spanishOwner(browser, { width: size.width, height: size.height });
     try {
-      await unfolded(page);
-      await expect(pill(page)).toHaveText('Importante');
-      await step(page).evaluate((element) => element.scrollIntoView({ block: 'center' }));
-      await untilStill(page);
-      const overflow = await horizontalOverflow(page);
-      expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
-      await page.screenshot({ path: shot(`${KEY}-${size.label}`) });
+      await inSight(page, 'Importante', { name: `${KEY}-${size.label}`, label: size.label });
 
       // A service added elsewhere (another device, the assistant): the step is done over the stream already open.
       await settled(streams);

@@ -5,7 +5,8 @@
 // old module's screens; the page never scrolls sideways.
 import { type Browser, expect, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, login, openApps, psql, shot, shown, topbarApps } from './helpers';
+import { A, api, horizontalOverflow, login, openApps, shot, shown, topbarApps } from './helpers';
+import { staffCleanUp } from './staff-helpers';
 
 const TAG = 'E2E';
 const VIEWPORTS = {
@@ -22,18 +23,7 @@ const PAGES = [
   ['settings', '/staff/settings', 'Ajustes'],
 ] as const;
 
-function cleanup(): void {
-  const members = `select id from staff_member where first_name like '${TAG}%'`;
-  psql(
-    [
-      `delete from staff_timeoff where member_id in (${members})`,
-      `delete from staff_scheduleday where schedule_id in (select id from staff_schedule where member_id in (${members}))`,
-      `delete from staff_schedule where member_id in (${members})`,
-      `delete from staff_member where first_name like '${TAG}%'`,
-      `delete from staff_role where name like '${TAG}%'`,
-    ].join('; '),
-  );
-}
+const cleanup = (): void => staffCleanUp(TAG);
 
 test.beforeAll(cleanup);
 test.afterAll(cleanup);
