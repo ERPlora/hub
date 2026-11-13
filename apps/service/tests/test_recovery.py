@@ -22,7 +22,7 @@ import uuid
 import pytest
 from django.apps import apps
 from django.db import connection
-from django.utils import timezone
+from django.utils import timezone, translation
 from live.errors import InvalidPayload
 from live.models import OutboxEvent
 from live.operations import get
@@ -30,6 +30,7 @@ from live.operations import get
 from apps.service import queries
 from apps.service.models import Assignment, Category, Service
 from apps.service.schemas import CategoryIn, ServiceRecoverIn
+from apps.service.services import MEMBER_TERMINATED_LEFT
 from apps.staff.models import Member
 from apps.tax.models import TaxCategory
 from base.tenancy.context import use_hub
@@ -446,6 +447,42 @@ def test_a_service_made_again_is_assigned_to_each_professional_the_business_stil
     assert Assignment.objects.filter(service_id=made.id).count() == 3
     # Each by the screen's own operation, with its notice.
     assert OutboxEvent.objects.filter(name="service.assignment.assigned").count() == before + 3
+    # Who was left out is said, by their id, with why; who came back with it is not.
+    assert [one.code for one in made.left_out] == ["service.member_terminated", "service.member_not_in_business"]
+    assert [str(left.pk) in made.left_out[0].message, str(nobody.pk) in made.left_out[1].message] == [True, True]
+
+
+def test_who_a_service_came_back_without_is_said_in_the_language_it_is_made_in():
+    tax = make_tax("test.service", "Service — test")
+    left = make_member("Marta", "Sanz", status=Member.Status.TERMINATED)
+    [record] = queries.services_not_in_business(
+        [
+            a_service_of_the_copy(
+                name="Keratin treatment", tax_category_id=tax.pk, assignments=[an_assignment_of_the_copy(left)]
+            )
+        ]
+    )
+
+    with translation.override("es"):
+        [said] = create(record).left_out
+        spanish = MEMBER_TERMINATED_LEFT % {"member": left.pk}
+
+    assert said.message == spanish
+    assert said.message != MEMBER_TERMINATED_LEFT % {"member": left.pk}
+
+
+def test_a_service_made_again_with_everyone_who_performed_it_says_nothing_left():
+    tax = make_tax("test.service", "Service — test")
+    ana = make_member("Ana", "López")
+    [record] = queries.services_not_in_business(
+        [
+            a_service_of_the_copy(
+                name="Keratin treatment", tax_category_id=tax.pk, assignments=[an_assignment_of_the_copy(ana)]
+            )
+        ]
+    )
+
+    assert create(record).left_out == []
 
 
 def test_one_switched_off_in_the_copy_comes_back_switched_off():
@@ -846,8 +883,11 @@ class TestServicesComeBack:
         first = recovered(recoveries, copy)
         again = recovered(recoveries, copy)
 
-        # One service made again, its professionals with it.
-        assert (first, again) == ([CATEGORIES, SERVICES | {"created": 1}], [CATEGORIES, SERVICES])
+        # One service made again, its professionals with it; Recoveries says it came back without Raquel, and why.
+        [note] = first[1].pop("notes")
+        assert (first, again) == ([CATEGORIES, SERVICES | {"created": 1, "noted": 1}], [CATEGORIES, SERVICES])
+        assert note["id"] == str(ids["keratin"])
+        assert note["note"].startswith("service.member_terminated: ") and str(raquel) in note["note"]
         with use_hub(hub):
             back = Service.objects.get(name="Keratin treatment")
             assert back.pk != ids["keratin"]
