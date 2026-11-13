@@ -8,23 +8,27 @@ plural form, so it is read from the ``.po`` beside it; and since English has no 
 the code hands the plural family, read from the code as ``base/tests/test_locale_modules.py`` reads its messages
 (hub#1294), and the two forms of each ``{% blocktranslate count %}`` of its templates, read with Django's own template
 parser. A text with no count is read there too, before ``makemessages`` takes it to the ``.po`` (hub#1333): the
-messages the code hands ``gettext``/``pgettext`` (``said_in_code``, as ``test_locale_modules.py`` reads them) and each
-``{% translate %}`` and ``{% blocktranslate %}`` with no count of the templates. The server is the platform's
-(``control``, ``base``), each app's and ``live``'s, whose validation messages every form of the Hub shares (hub#1318).
-The readers are the ones of every catalogue test, ``base.tests.po``.
+messages the code hands ``gettext``/``pgettext`` (``said_in_code``, as ``test_locale_modules.py`` reads them), each
+``{% translate %}`` and ``{% blocktranslate %}`` with no count of the templates, and each ``_("…")`` a template says
+between braces or as the argument of a tag or a filter, read as ``makemessages`` reads it (hub#1353). The server is
+the platform's (``control``, ``base``), each app's and ``live``'s, whose validation messages every form of the Hub
+shares (hub#1318). The readers are the ones of every catalogue test, ``base.tests.po``.
 """
 
 import re
+from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from babel.messages.extract import extract_python
 from babel.messages.mofile import write_mo
 from babel.messages.pofile import read_po
 from django.apps import AppConfig, apps
 from django.conf import settings
 from django.template import Engine
 from django.templatetags.i18n import BlockTranslateNode, TranslateNode
+from django.utils.translation.template import templatize
 
 from base.tests.po import mo_entries, po_messages
 from base.tests.test_locale_modules import gettext_calls, own_code, said_in_code
@@ -101,6 +105,17 @@ def template_messages_in(source: str) -> list[str]:
     return said
 
 
+def template_underscored_in(source: str) -> list[str]:
+    """The English text of each ``_("…")`` the template ``source`` says between braces or as the argument of a tag or
+    a filter, in its order, read as ``makemessages`` reads it: Django's ``templatize`` turns it into a call, and Babel's
+    extractor reads that call as xgettext does."""
+    # Babel tokenizes as Python and trips on the template's indentation, which xgettext ignores; no call that templatize
+    # writes spans two lines, since Django reads a tag within one.
+    written = "\n".join(line.lstrip() for line in templatize(source).splitlines())
+    calls = extract_python(BytesIO(written.encode()), {"_": None}, [], {})
+    return [message for _line, _function, message, _comments in calls]
+
+
 def own_templates(config) -> list[Path]:
     """The templates of the module ``config``: the files of its ``templates/``, where Django loads them from."""
     return sorted(path for path in Path(config.path, "templates").rglob("*") if path.is_file())
@@ -132,14 +147,15 @@ def code_plurals() -> dict[str, list[tuple[str, str]]]:
 def code_messages() -> dict[str, list[str]]:
     """The texts with no count the server of the Hub says, by module: the messages of its Python code (as
     ``base/tests/test_locale_modules.py`` reads them; a contexted one without its context, which the screen does not
-    show) and those of its templates."""
+    show) and those of its templates, said by a tag or as a ``_("…")``."""
     return {
         config.label: [
             *sorted(message.rpartition("\x04")[2] for message in said_in_code(config)),
             *(
                 text
                 for path in own_templates(config)
-                for text in template_messages_in(path.read_text(encoding="utf-8"))
+                for source in [path.read_text(encoding="utf-8")]
+                for text in [*template_messages_in(source), *template_underscored_in(source)]
             ),
         ]
         for config in server_modules()
@@ -326,6 +342,35 @@ def test_the_templates_texts_without_a_count_are_read_in_english():
     assert said == ["Clear the cart.", "Close %(name)s", "Hello %(name)s", "one record"]
 
 
+UNDERSCORE_SOURCE = """{% load i18n %}
+<p>{{ _("Clear the field(s).") }}</p>
+{% if answer %}
+    <p>{{ answer|yesno:_("yes,no,maybe") }}</p>
+  {% firstof nickname _('Nobody — yet') %}
+{% endif %}
+{% include "base/gate.html" with title=_("Signed out") only %}
+{% blocktranslate with name=_("guest") %}Hello {{ name }}{% endblocktranslate %}
+{{ title|default:_("Untitled")|upper }}
+<p>Write _("Hello") between braces to translate it.</p>
+{# Translators: no message, _("a comment") #}
+{% translate heading %}
+"""
+
+
+def test_the_templates_texts_said_with_an_underscore_are_read_in_english():
+    """Each ``_("…")`` of a template as ``makemessages`` reads it, in the template's order: between braces, as the
+    argument of a filter or of a tag, in either quotes and however indented; a tag's own text is the tags' reader's,
+    and the page's text and a translator's comment say none."""
+    assert template_underscored_in(UNDERSCORE_SOURCE) == [
+        "Clear the field(s).",
+        "yes,no,maybe",
+        "Nobody — yet",
+        "Signed out",
+        "guest",
+        "Untitled",
+    ]
+
+
 #: A tag of a template that says a text with no count, as Django's lexer reads it: a ``{% translate %}`` of a literal
 #: message, or a ``{% blocktranslate %}`` with no ``count``.
 TEXT_TAG = re.compile(
@@ -348,6 +393,17 @@ def test_every_text_without_a_count_of_the_server_templates_is_read():
     assert sum(tags.values()) > 50
     assert "Too many sign-in attempts" in read["base"]
     assert all(message in said[label] for label, messages in read.items() for message in messages)
+
+
+def test_a_text_said_with_an_underscore_leaves_the_count_of_the_tags_right(tmp_path, monkeypatch):
+    """A template that says a text only as ``_("…")`` has no tag for the control of the tags to count, and its text
+    still reaches the guard."""
+    (tmp_path / "templates").mkdir()
+    (tmp_path / "templates" / "form.html").write_text('<p>{{ _("Clear the fields.") }}</p>\n', encoding="utf-8")
+    modules = [*server_modules(), SimpleNamespace(label="probe", path=str(tmp_path))]
+    monkeypatch.setitem(globals(), "server_modules", lambda: modules)
+    test_every_text_without_a_count_of_the_server_templates_is_read()
+    assert code_messages()["probe"] == ["Clear the fields."]
 
 
 def test_the_server_codes_texts_without_a_count_are_read():
@@ -373,14 +429,17 @@ def test_the_server_codes_texts_without_a_count_are_read():
             "{% load i18n %}{% blocktranslate with form=name %}Clear the field(s) of {{ form }}."
             "{% endblocktranslate %}\n",
         ),
+        ("templates/probe/braces.html", '<p>{{ _("Clear the field(s).") }}</p>\n'),
+        ("templates/probe/filter.html", '<p>{{ answer|default:_("Clear the field(s).") }}</p>\n'),
+        ("templates/probe/tag.html", '{% firstof nickname _("Clear the field(s).") %}\n'),
     ],
-    ids=["code", "translate", "blocktranslate"],
+    ids=["code", "translate", "blocktranslate", "braces", "filter", "tag"],
 )
 def test_the_check_catches_a_text_with_parentheses_the_catalogue_does_not_keep_yet(
     name, content, tmp_path, monkeypatch
 ):
-    """«Clear the field(s).» said with no count in a module's code or in one of its templates, before ``makemessages``
-    takes it to the ``.po``, turns the guard red (hub#1333)."""
+    """«Clear the field(s).» said with no count in a module's code or in one of its templates, by a tag or as a
+    ``_("…")``, before ``makemessages`` takes it to the ``.po``, turns the guard red (hub#1333, hub#1353)."""
     path = tmp_path / name
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
