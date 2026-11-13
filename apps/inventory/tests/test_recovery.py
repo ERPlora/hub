@@ -482,6 +482,17 @@ def test_a_category_the_business_kept_or_made_again_by_hand_stays_as_the_busines
 
 
 @pytest.mark.django_db
+def test_a_category_an_earlier_recovery_brought_back_and_the_business_kept_is_its_own():
+    # Brought back by an earlier recovery before this copy was made, then kept: the business took its product out of it
+    # since, and that stays.
+    specials = brought_back("Specials")
+    soup = product("Soup", "SOU-1")
+    links = [a_link_of_the_copy(soup.pk, specials, [specials])]
+
+    assert queries.product_links_not_in_business(links) == []
+
+
+@pytest.mark.django_db
 def test_the_copys_category_is_the_business_own_by_its_id_before_any_name():
     drinks = category("Drinks")
     coffee = product("Coffee", "COF-1")
