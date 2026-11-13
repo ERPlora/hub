@@ -47,8 +47,9 @@ import { createHmac } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
-import { type APIRequestContext, expect, type Page } from '@playwright/test';
+import { type APIRequestContext, expect, type Page, test } from '@playwright/test';
 
+import { WORKER_START_TIMEOUT_MS } from './global-setup';
 import { ARTIFACTS, capture, HUB_DIR, psql, REPO_DIR, SAAS } from './helpers';
 import { capturedAtSizes, FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { STACK } from './stack';
@@ -163,6 +164,22 @@ export const BUSINESS_PHONE = '34910000101';
 const SAAS_DIR = resolve(process.env.E2E_SAAS_DIR || join(REPO_DIR, 'saas'));
 const SAAS_DB = process.env.E2E_SAAS_DB || `saas_e2e_${new URL(SAAS).port || '80'}`;
 
+/** Runs erplora.com's Python (`uv run python <args>`) in its checkout, on the run's database and with this Hub as its
+ *  Hub (`env` adds to that), and returns the JSON of its last line. Each run is a cold start: seconds on a quiet machine,
+ *  a minute or more on a loaded one, and none of it is the test's time. So the test or hook it runs in gets, before it
+ *  starts, what the run gives its own worker to start (`WORKER_START_TIMEOUT_MS` of global-setup.ts); one without a
+ *  limit keeps none. */
+export function inErplora<T>(args: string[], env: Record<string, string> = {}): T {
+  const info = test.info();
+  if (info.timeout > 0) info.setTimeout(info.timeout + WORKER_START_TIMEOUT_MS);
+  const out = execFileSync('uv', ['run', 'python', ...args], {
+    cwd: SAAS_DIR,
+    encoding: 'utf8',
+    env: { ...process.env, DEBUG: 'True', DB_NAME: SAAS_DB, HUB_INTERNAL_URL: `http://127.0.0.1:${STACK.hubPort}`, ...env },
+  });
+  return JSON.parse(out.trim().split('\n').at(-1) ?? '{}') as T;
+}
+
 /** The Hub's ids of `a` and `b` (the ones erplora.com's seed gives them). */
 const hubIds = (): Record<string, string> =>
   Object.fromEntries(
@@ -193,7 +210,7 @@ export function keepPhoto(): void {
   );
   psql(
     `set client_min_messages = warning; create table if not exists ${CHANNEL_BACKUP} as ` +
-      "select coalesce(json_agg(c), '[]') as channel from whatsapp_inbox_channel c where c.host = 'a'",
+      "select coalesce(json_agg(c), '[]') as channel from whatsapp_inbox_channel c",
   );
 }
 
@@ -213,12 +230,7 @@ export function seedErplora(seed: ErploraSeed = {}): { delivered: boolean; hub_e
   }
   const ids = hubIds();
   keepPhoto();
-  const out = execFileSync('uv', ['run', 'python', script, ids.a, ids.b, ...seedArguments(seed)], {
-    cwd: SAAS_DIR,
-    encoding: 'utf8',
-    env: { ...process.env, DEBUG: 'True', DB_NAME: SAAS_DB, HUB_INTERNAL_URL: `http://127.0.0.1:${STACK.hubPort}` },
-  });
-  return JSON.parse(out.trim().split('\n').at(-1) ?? '{}');
+  return inErplora([script, ids.a, ids.b, ...seedArguments(seed)]);
 }
 
 /** Puts back `a`'s photo as it was at the spec's first `keepPhoto` (or `seedErplora`), its version too, and the row
@@ -233,7 +245,7 @@ export function restorePhoto(): void {
     [
       `update base_hub h set state = b.state, state_version = b.state_version from ${PHOTO_BACKUP} b where b.id = h.id`,
       `drop table ${PHOTO_BACKUP}`,
-      "delete from whatsapp_inbox_channel where host = 'a'",
+      'delete from whatsapp_inbox_channel',
       `insert into whatsapp_inbox_channel select * from json_populate_recordset(null::whatsapp_inbox_channel, (select channel from ${CHANNEL_BACKUP}))`,
       `drop table ${CHANNEL_BACKUP}`,
     ].join('; '),
