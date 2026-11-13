@@ -348,28 +348,29 @@ def deleted_just_before(statement: str, target, how: str):
 
 
 @contextmanager
-def deleted_in_flight(target, how: str):
-    """A deletion of ``target`` under way in another session when this one first reads its table: it holds
-    the row, as a deletion takes it first, and commits a moment later while this one goes on."""
+def held_in_flight(target, *, made: Callable = lambda: None, then: Callable = lambda: None):
+    """A write on ``target`` under way in another session when this one first reads its table: it holds the row,
+    makes ``made`` while it holds it, and ``then`` a moment later, and commits while this one goes on."""
     table = f'FROM "{type(target)._meta.db_table}"'
     holds = threading.Event()
-    deletions: list = []
+    writes: list = []
 
-    def deletion():
+    def write():
         try:
             with transaction.atomic():
                 type(target).objects.select_for_update().get(pk=target.pk)
+                made()
                 holds.set()
                 time.sleep(IN_FLIGHT)
-                remove(target, how)
-            deletions.append("ok")
+                then()
+            writes.append("ok")
         except Exception as error:  # reported to the test, which fails on it
-            deletions.append(error)
+            writes.append(error)
         finally:
             holds.set()
             connection.close()
 
-    thread = threading.Thread(target=deletion)
+    thread = threading.Thread(target=write)
 
     def wrapper(execute, sql, params, many, context):
         if thread.ident is None and sql.lstrip().upper().startswith("SELECT") and table in sql:
@@ -379,10 +380,16 @@ def deleted_in_flight(target, how: str):
 
     try:
         with connection.execute_wrapper(wrapper):
-            yield deletions
+            yield writes
     finally:
         if thread.ident is not None:
             thread.join(30)
+
+
+def deleted_in_flight(target, how: str):
+    """A deletion of ``target`` under way in another session when this one first reads its table: it holds
+    the row, as a deletion takes it first, and commits a moment later while this one goes on."""
+    return held_in_flight(target, then=lambda: remove(target, how))
 
 
 def deleted(deletions) -> list[str]:
@@ -629,11 +636,17 @@ def test_a_row_being_deleted_when_a_write_names_it_is_refused(world, write, how)
     assert not case.named(world)
 
 
-@contextmanager
 def deleted_once_locked(target):
     """The business's «Delete» of the category ``target`` started in another session right after this one
     locks a service, and left to run a moment: it locks every category and then empties ``target``'s
     services, so it waits for this session's service."""
+    return deleted_once(target, lambda sql: 'FROM "service_service"' in sql and "FOR UPDATE" in sql)
+
+
+@contextmanager
+def deleted_once(target, holding: Callable[[str], bool]):
+    """The business's «Delete» of the category ``target`` started in another session right after the first statement
+    of this one for which ``holding`` holds, and left to run a moment before this one goes on."""
     deletions: list = []
 
     def deletion():
@@ -649,7 +662,7 @@ def deleted_once_locked(target):
 
     def wrapper(execute, sql, params, many, context):
         result = execute(sql, params, many, context)
-        if thread.ident is None and 'FROM "service_service"' in sql and "FOR UPDATE" in sql:
+        if thread.ident is None and holding(sql):
             thread.start()
             time.sleep(IN_FLIGHT)
         return result
@@ -924,49 +937,14 @@ def run_as_platform(name, data):
     return op(ctx_for(actor="system", permissions={"*"}), op.input.model_validate(data))
 
 
-@contextmanager
-def edited_in_flight(service, **changes):
-    """The business's edit of ``service`` under way in another session when this one first reads the services'
-    table: it holds the row with ``changes`` made, and commits a moment later while this one goes on."""
-    table = f'FROM "{Service._meta.db_table}"'
-    holds = threading.Event()
-    edits: list = []
-
-    def edit():
-        try:
-            with transaction.atomic():
-                Service.objects.select_for_update().get(pk=service.pk)
-                Service.objects.filter(pk=service.pk).update(**changes)
-                holds.set()
-                time.sleep(IN_FLIGHT)
-            edits.append("ok")
-        except Exception as error:  # reported to the test, which fails on it
-            edits.append(error)
-        finally:
-            holds.set()
-            connection.close()
-
-    thread = threading.Thread(target=edit)
-
-    def wrapper(execute, sql, params, many, context):
-        if thread.ident is None and sql.lstrip().upper().startswith("SELECT") and table in sql:
-            thread.start()
-            holds.wait(5)
-        return execute(sql, params, many, context)
-
-    try:
-        with connection.execute_wrapper(wrapper):
-            yield edits
-    finally:
-        if thread.ident is not None:
-            thread.join(30)
-
-
 def test_a_category_brought_back_waits_for_an_edit_of_its_service_and_keeps_what_the_edit_changed(world):
     # The recovery put the service back in its category from the row as it read it before the edit committed,
     # and saved it whole over the edit: the new price was lost.
     gone = make_category("Color", is_deleted=True)
-    with edited_in_flight(world.cut, price=4200) as edits:
+    def edit():
+        Service.objects.filter(pk=world.cut.pk).update(price=4200)
+
+    with held_in_flight(world.cut, made=edit) as edits:
         made = run_as_platform(
             "service.category.recover", {"name": "Color", "stands_for": str(gone.pk), "service_ids": [str(world.cut.pk)]}
         )
@@ -975,45 +953,13 @@ def test_a_category_brought_back_waits_for_an_edit_of_its_service_and_keeps_what
     assert (cut.category_id, cut.price) == (made.id, 4200)
 
 
-@contextmanager
-def deleted_once_a_category_is_held(target):
-    """The business's «Delete» of the category ``target`` started in another session right after this one first
-    holds a category, and left to run a moment: it locks every category in id order, so it waits for this one."""
-    deletions: list = []
-
-    def deletion():
-        try:
-            run("service.category.delete", {"id": str(target.pk)})
-            deletions.append("ok")
-        except Exception as error:  # reported to the test, which fails on it
-            deletions.append(error)
-        finally:
-            connection.close()
-
-    thread = threading.Thread(target=deletion)
-
-    def wrapper(execute, sql, params, many, context):
-        result = execute(sql, params, many, context)
-        if thread.ident is None and 'FROM "service_category"' in sql and " FOR " in sql:
-            thread.start()
-            time.sleep(IN_FLIGHT)
-        return result
-
-    try:
-        with connection.execute_wrapper(wrapper):
-            yield deletions
-    finally:
-        if thread.ident is not None:
-            thread.join(30)
-
-
 def test_a_category_brought_back_while_another_is_deleted_never_waits_in_a_circle(world):
     # Made inside its parent, it held that parent first and then every category; the deletion of an older one locks
     # every category in id order: each waited for the other, and Postgres killed one (a 500).
     older = make_category("Older")
     hair = make_category("Hair")
     gone = make_category("Color", is_deleted=True)
-    with deleted_once_a_category_is_held(older) as deletions:
+    with deleted_once(older, lambda sql: 'FROM "service_category"' in sql and " FOR " in sql) as deletions:
         made = run_as_platform(
             "service.category.recover", {"name": "Color", "parent_id": str(hair.pk), "stands_for": str(gone.pk)}
         )
