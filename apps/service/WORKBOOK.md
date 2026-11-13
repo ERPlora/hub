@@ -388,7 +388,10 @@ Sale: la categoría eliminada, no borrada (`service.category.deleted`); su nombr
 servicios se quedan **sin categoría** y sus subcategorías pasan a colgar de su padre (o a ser raíz).
 Si falla: en la confirmación, el motivo (por ejemplo, «Esa categoría no existe en este negocio.»).
 Implicados: SERVICE-F07, SERVICE-F02, BASE-F114 (desde una copia aparte, la categoría eliminada vuelve como una nueva,
-con los servicios perdidos dentro; los que el negocio conserva se quedan como están)
+con los servicios perdidos dentro y con lo que el negocio conserva donde lo dejó eliminarla: sus servicios sin
+categoría y sus subcategorías donde colgaba ella. Lo que el negocio movió después se queda donde está, y Recuperaciones
+lo dice en las notas de la categoría. Si se pide otra vez, la categoría ya es del negocio y no se rellena: lo que le
+quitó después se queda fuera)
 
 ### SERVICE-F09 Vender un servicio en el TPV
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f09 old:services/workflow/catalogo.md#services-f09 -->
@@ -1201,14 +1204,26 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
 - **Nombres únicos** entre los vivos, sin distinguir mayúsculas: categorías
   (`service_category_live_name_unique`) y bonos (`service_package_live_name_unique`); el servicio lo
   comprueba antes para dar el 409 y traduce la violación (dos guardados a la vez) al mismo 409.
-- **Recuperar desde una copia aparte** (BASE-F114, hub#1283, hub#1322, hub#1323): `apps.py` responde a la plataforma
-  (`recoverable_from_copy`, `base.tenancy.recovery`) con lo que devuelve una copia aparte del negocio, en dos
+- **Recuperar desde una copia aparte** (BASE-F114, hub#1283, hub#1322, hub#1323, hub#1364): `apps.py` responde a la
+  plataforma (`recoverable_from_copy`, `base.tenancy.recovery`) con lo que devuelve una copia aparte del negocio, en dos
   declaraciones que se devuelven en su orden. Primero sus categorías vivas que el negocio no tiene
   (`queries.categories_not_in_business`: eliminadas o perdidas, y no hechas otra vez, es decir, sin otra viva con su
-  nombre sin distinguir mayúsculas ni espacios, que es único entre las vivas), cada una creada por
-  `service.category.create`, padres primero: dentro de su padre por su id si el negocio lo tiene (el mismo o hecho otra
-  vez), por su nombre si vuelve también (se acaba de crear y aquí aún no tiene id), y en la raíz si la copia no lo tenía
-  vivo; `queries.categories_in_copy` las lee por SQL. Después sus servicios en oferta que el negocio no tiene
+  nombre sin distinguir mayúsculas ni espacios, que es único entre las vivas), cada una hecha otra vez por
+  `service.category.recover` (solo el sistema, sin ruta ni herramienta del asistente), padres primero: creada por
+  `service.category.create` dentro de su padre por su id si el negocio lo tiene (el mismo o hecho otra vez), por su
+  nombre si vuelve también (se acaba de crear y aquí aún no tiene id), y en la raíz si la copia no lo tenía vivo; y con
+  lo que tenía dentro en la copia (`service_ids` de `queries.categories_in_copy`, archivados también, y sus
+  subcategorías vivas, `subcategory_ids`) que el negocio conserva con el mismo id donde lo dejó eliminarla
+  (SERVICE-F08): el servicio sin categoría y la subcategoría colgando de donde colgaba la eliminada (`stands_for`, la
+  fila eliminada que el negocio guarda con el id de la copia; la raíz si ya no la tiene: el «Eliminar» del admin de
+  Hubs la borra y deja a sus hijas en la raíz). Coge primero todas las categorías (`lock_tree`) y después cada servicio
+  (`held_rows`, `select_for_update`), en el orden del «Eliminar» de una categoría, y cambia cada uno como lo cambia la
+  pantalla, con su `service.service.updated` o `service.category.updated`. Lo que el negocio movió después (un servicio
+  con otra categoría, una subcategoría en otro sitio) se queda donde está, y lo mismo una subcategoría que colgaría de
+  una de sus propias subcategorías: la salida lo dice (`left_out`: `service.service_moved`,
+  `service.subcategory_moved`, `service.subcategory_loop`) y Recuperaciones lo anota en la categoría. Solo se rellena
+  una categoría que se acaba de crear: una que el negocio conserva o rehízo a mano, o la que trajo una recuperación
+  anterior, se queda como está. `queries.categories_in_copy` las lee por SQL. Después sus servicios en oferta que el negocio no tiene
   (`queries.services_not_in_business`), cada uno hecho otra vez por `service.service.recover` (solo el sistema, sin
   ruta ni herramienta del asistente), todo o nada: el servicio, por `service.service.create` con la clave de su
   categoría fiscal y su categoría aquí (`_category_held`): la misma si sigue viva, si no la viva con su nombre en la

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:99a2af41c7adb9d10dbe9029b3e6ef71584bfaa225231695ab520ac039e77355 -->
+<!-- generated from WORKBOOK.md sha256:74e7b31aa8cf8897084aed10785f873aa3ea00280c0fb946da39277dbdf10255 -->
 
 ## What it is for and who it is for
 
@@ -2935,8 +2935,7 @@ Status: done (the action and the restore, in its place or to a separate copy, an
 the customers that were lost, the deleted ones as they were, the products, the services with their categories, the
 appointments and the repeating appointments; making and deleting the temporary cluster is the procedure "Devolver un
 negocio a un momento" of ERPlora/aws; the group, tag or own field the business deleted after deleting a customer who
-comes back, hub#1356; the image of a product deleted before deleting left it, hub#1431; the page "Recover into the
-business…" naming the exception of what goes back into a recovered category, hub#1364; the image of a service brought
+comes back, hub#1356; the image of a product deleted before deleting left it, hub#1431; the image of a service brought
 back, hub#1429)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
@@ -2971,7 +2970,9 @@ Steps:
   9. In Separate copies they choose the made copy and the action "Recover into the business…". The page explains that
      what the business deleted and still holds comes back as it was, with its history, and that what it no longer has is
      created again as its own screen creates it, nothing copied; that what the business has, or has made again, is left
-     as it is; that records for the tax authority are never brought back and that the business stays open. And that
+     as it is, but for one thing: a category that comes back takes back what it had inside and the business still keeps,
+     without taking it out of where the business has put it since; that records for the tax authority are never brought
+     back and that the business stays open. And that
      what comes back is nothing new to the business: it starts none of its automations, so nobody is welcomed or told
      again of a booking they already had (hub#1307). Below, "What to bring back", with what can be brought ticked
      (today, **Customers**, **Product categories, Products, Product links to categories**, **Service categories,
@@ -3017,8 +3018,15 @@ Steps:
       categories and the services that came back, each with its own count): first each service category the business no longer has (it deleted or
       lost it) comes back as a new one, created as the Categories screen creates it, with its name, description, icon,
       colour and order, inside its parent category if the business has it or it comes back too (otherwise at the root);
-      the deleted one stays deleted. One the business has already created again (another live one with its name, case
-      and extra spaces aside) is not repeated: its own is used, as it is. Then each service the business no longer has
+      the deleted one stays deleted. It comes back with what it had inside in the copy and the business keeps where
+      deleting it left it (SERVICE-F08): its services still without a category, archived ones too, and its
+      subcategories still hanging where it hung (the root, if it was at the root), each changed as the screen changes it.
+      What the business moved since (a service into another category, a subcategory elsewhere) stays where it is, and
+      the category's count says so ("Service categories: 1 created, 1 with notes"), with the reason in its notes
+      ("service.service_moved: came back without the service <its identifier>: moved to another category since"). One
+      the business has already created again (another live one with its name, case
+      and extra spaces aside) is not repeated: its own is used, as it is, and it is not filled, nor is the one an earlier
+      recovery brought back if it is asked again. Then each service the business no longer has
       comes back as a new one, on offer, created as the Services screen creates it, with its name, pricing, prices, cost,
       duration, buffers, capacity, descriptions, booking settings, order, featured flag, SKU, barcode and notes, its tax
       category and its category: the same one if the business still has it, and otherwise the one that has just come
@@ -3075,7 +3083,9 @@ product category for each one it lacked, with its category-created notice (`inve
 each deleted product that comes back in it (`inventory.product.categorized`), each deleted
 product it still held, live again with its product-recovered notice (`inventory.product.restored`), a new product for
 each product it no longer had, with its product-created notice (`inventory.product.created`), a new service category
-for each one it lacked, with its category-created notice (`service.category.created`), a new service for each one it
+for each one it lacked, with its category-created notice (`service.category.created`) and the one of each service or
+subcategory the business kept that goes back into it (`service.service.updated`, `service.category.updated`), a new
+service for each one it
 no longer had, with its service-created notice (`service.service.created`) and a professional-assigned notice
 (`service.assignment.assigned`) for each professional who comes back with it, each deleted appointment it still held,
 live again with its appointment-recovered notice (`appointment.appointment.restored`), a new appointment for each one
@@ -3120,5 +3130,5 @@ CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F
 INVENTORY-F07, INVENTORY-F30, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08,
 SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, FLOW-F21,
 WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319,
-hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1355, hub#1356, hub#1365, hub#1373, hub#1375,
+hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375,
 hub#1429, hub#1431, aws#77

@@ -925,6 +925,8 @@ class TestRecoverIntoTheBusiness:
         assert "admin/css/forms.css" in html
         # Before confirming, what will not happen: what comes back greets nobody.
         assert "What comes back is nothing new to the business: it starts none of its automations" in html
+        # And the one thing it touches of what the business has: a category that comes back takes back what it had.
+        assert "but for one thing: a category that comes back takes back what it had inside" in html
         assert not CopyRecovery.objects.exists()
 
     def test_confirmed_each_copy_is_asked_and_recoveries_says_how_it_goes(self, client, root):

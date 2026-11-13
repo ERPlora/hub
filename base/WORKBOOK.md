@@ -3065,8 +3065,7 @@ Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte,
 clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías, las citas y
 las citas periódicas; crear y borrar el clúster temporal es el procedimiento «Devolver un negocio a un momento» de
 ERPlora/aws; el grupo, la etiqueta o el campo propio que el negocio borró después de eliminar un cliente que
-vuelve, hub#1356; la imagen de un producto eliminado antes de que eliminar se la dejara, hub#1431; que la página
-«Recuperar en el negocio…» nombre la excepción de lo que vuelve a una categoría recuperada, hub#1364; la imagen de un
+vuelve, hub#1356; la imagen de un producto eliminado antes de que eliminar se la dejara, hub#1431; la imagen de un
 servicio recuperado, hub#1429)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
@@ -3098,8 +3097,10 @@ Pasos:
   Recuperar en el negocio lo que la copia aparte tiene y al negocio le falta (hub#1257):
   9. En Copias aparte elige la copia hecha y la acción «Recuperar en el negocio…». La página explica que lo que el
      negocio eliminó y aún guarda vuelve tal como era, con su historial, y que lo que ya no tiene se crea de nuevo como lo
-     crea su propia pantalla, sin copiar nada; que lo que el negocio tiene, o ha vuelto a crear, se queda como está; que
-     los registros para Hacienda no se recuperan nunca y que el negocio sigue abierto. Y que lo que vuelve no es nada
+     crea su propia pantalla, sin copiar nada; que lo que el negocio tiene, o ha vuelto a crear, se queda como está,
+     salvo una cosa: una categoría que vuelve recupera lo que tenía dentro y el negocio aún conserva, sin sacarlo de
+     donde el negocio lo haya puesto después; que los registros para Hacienda no se recuperan nunca y que el negocio
+     sigue abierto. Y que lo que vuelve no es nada
      nuevo para el negocio: no arranca ninguna de sus automatizaciones, así que a nadie se le da la bienvenida ni se le
      avisa otra vez de una cita que ya tenía (hub#1307).
      Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes**, **Categorías de productos,
@@ -3147,8 +3148,15 @@ Pasos:
       con su cuenta): primero
       vuelve cada categoría de servicios que el negocio ya no tiene (la eliminó o la perdió), como una nueva, creada como
       la crea la pantalla de Categorías, con su nombre, descripción, icono, color y orden, dentro de su categoría padre si
-      el negocio la tiene o vuelve también (si no, en la raíz); la eliminada sigue eliminada. Una que el negocio ya volvió
-      a crear (otra viva con su nombre, sin distinguir mayúsculas ni espacios) no se repite: se usa la suya, tal como está.
+      el negocio la tiene o vuelve también (si no, en la raíz); la eliminada sigue eliminada. Vuelve con lo que tenía
+      dentro en la copia y el negocio conserva donde lo dejó eliminarla (SERVICE-F08): sus servicios que siguen sin
+      categoría, archivados también, y sus subcategorías que siguen colgando de donde colgaba ella (la raíz, si estaba en
+      la raíz), cada uno cambiado como lo cambia la pantalla. Lo que el negocio movió después (un servicio en otra
+      categoría, una subcategoría en otro sitio) se queda donde está, y la cuenta de la categoría lo dice («Categorías de
+      servicios: se creó 1, 1 con notas»), con el porqué en sus notas («service.service_moved: volvió sin el servicio <su
+      identificador>: se movió a otra categoría después»). Una que el negocio ya volvió
+      a crear (otra viva con su nombre, sin distinguir mayúsculas ni espacios) no se repite: se usa la suya, tal como está,
+      y no se rellena, como tampoco la que trajo una recuperación anterior si se pide otra vez.
       Después, cada servicio que el negocio ya no tiene vuelve como uno nuevo, en oferta, creado como lo crea la pantalla
       de Servicios, con su nombre, tarifa, precios, coste, duración, márgenes, capacidad, descripciones, reservas, orden,
       destacado, SKU, código de barras y notas, su categoría fiscal y su categoría: la misma si el negocio aún la tiene,
@@ -3202,8 +3210,9 @@ productos nueva por cada una que le faltaba, con su aviso de categoría creada (
 producto eliminado que vuelve en ella (`inventory.product.categorized`), cada producto
 eliminado que aún guardaba, vivo otra vez con su aviso de producto recuperado (`inventory.product.restored`), un
 producto nuevo por cada producto que ya no tenía, con su aviso de producto creado (`inventory.product.created`), una
-categoría de servicios nueva por cada una que le faltaba, con su aviso de categoría creada (`service.category.created`),
-un servicio nuevo por cada uno que ya no tenía, con su aviso de servicio creado (`service.service.created`) y uno de
+categoría de servicios nueva por cada una que le faltaba, con su aviso de categoría creada (`service.category.created`)
+y el de cada servicio o subcategoría que el negocio conservaba y vuelve a ella (`service.service.updated`,
+`service.category.updated`), un servicio nuevo por cada uno que ya no tenía, con su aviso de servicio creado (`service.service.created`) y uno de
 profesional asignado (`service.assignment.assigned`) por cada profesional que vuelve con él, cada cita borrada que aún
 guardaba, viva otra vez con su aviso de cita recuperada (`appointment.appointment.restored`), una cita nueva por cada
 una que ya no tenía, con su aviso de cita creada (`appointment.appointment.created`), cada cita periódica borrada que
@@ -3245,7 +3254,7 @@ CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F
 INVENTORY-F07, INVENTORY-F30, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08,
 SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, FLOW-F21,
 WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319,
-hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1355, hub#1356, hub#1365, hub#1373, hub#1375,
+hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375,
 hub#1429, hub#1431, aws#77
 
 ## Para quien lo mantiene
