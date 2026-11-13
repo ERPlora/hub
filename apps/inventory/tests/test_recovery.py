@@ -17,6 +17,7 @@ import pytest
 from django.apps import apps
 from django.db import connection
 from live.models import OutboxEvent
+from live.operations import get as get_operation
 
 from apps.inventory import queries
 from apps.inventory.models import (
@@ -32,6 +33,7 @@ from apps.tax.models import TaxCategory
 from base.recovery import actor_of
 from base.tenancy.context import use_hub
 from base.tenancy.tests.test_recovery import Recoveries, fresh, run, run_in
+from base.tests.test_image_catalog import image_library  # noqa: F401 - the library fixture
 
 TAX = "test.general"
 BARCODE = "8412345678905"
@@ -101,6 +103,7 @@ def test_the_copy_gives_each_live_product_with_what_its_create_takes(general):
         "pricing_unit": "g",
         "track_stock": True,
         "is_active": False,
+        "image": "catalog:drinks/coffee",
     }
 
 
@@ -130,6 +133,7 @@ def a_product_of_the_copy(found: Product | None = None, **fields) -> dict:
         "pricing_unit": "ud",
         "track_stock": None,
         "is_active": True,
+        "image": "",
         "tax_category": None,
         "category_ids": [],
         "copy_categories": {},
@@ -186,14 +190,18 @@ def test_a_lacking_product_is_what_the_create_takes_in_the_categories_the_busine
         name="Coffee", sku="COF-1", price=250, is_active=False, tax_category=general.pk,
         category_ids=[drinks.pk, lost.pk, gone],
         copy_categories={drinks.pk: "Drinks", lost.pk: "Desserts", gone: "Old menu"},
+        image="catalog:drinks/coffee",
     )
 
     [lacking] = queries.products_not_in_business([coffee])
 
     assert lacking["id"] == coffee["id"]
-    payload = ProductIn.model_validate({key: value for key, value in lacking.items() if key != "id"})
+    recover = get_operation("inventory.product.recover").input
+    payload = recover.model_validate({key: value for key, value in lacking.items() if key != "id"})
     assert (payload.tax_category_key, payload.category_ids, payload.is_active) == (TAX, [drinks.pk], False)
     assert (payload.initial_stock, payload.price) == (Decimal("0"), 250)
+    # The image it showed in the copy: its recover sets it as the screen does after the create.
+    assert payload.image == "catalog:drinks/coffee"
 
 
 @pytest.mark.django_db
@@ -543,7 +551,7 @@ def test_the_app_declares_what_it_gives_back_its_categories_first_its_links_last
     assert (products.read, products.missing, products.create, products.deleted, products.restore) == (
         queries.products_in_copy,
         queries.products_not_in_business,
-        "inventory.product.create",
+        "inventory.product.recover",
         queries.products_deleted_in_business,
         "inventory.product.restore",
     )
@@ -724,6 +732,31 @@ class TestProductsComeBack:
         with use_hub(hub):
             assert Category.objects.filter(name="Desserts", is_deleted=False).count() == 1
             assert ProductCategory.objects.filter(product=brownie, category=back).count() == 1
+
+    def test_each_product_comes_back_with_the_image_of_the_library_it_had(
+        self, recoveries, every_app_on, image_library  # noqa: F811
+    ):
+        hub, ids, _ = self.a_business(recoveries, every_app_on)
+        latte, espresso = "catalog:hospitality/cafe_con_leche", "catalog:hospitality/cafe_solo"
+        run_in(hub, "inventory.product.set_image", id=ids["coffee"], image=latte)
+        run_in(hub, "inventory.product.set_image", id=ids["cake"], image=espresso)
+        copy = recoveries.copy_of(hub)
+        run_in(hub, "inventory.product.delete", id=ids["coffee"])
+        run_in(hub, "inventory.product.delete", id=ids["cake"])
+        gone_altogether(hub, ids["cake"])
+        row = recoveries.ask(copy, "inventory")
+
+        assert run() == 1
+
+        assert fresh(row).status == "done"
+        # The deleted one, the same product with its image; the one no longer held, made again with the copy's.
+        with use_hub(hub):
+            assert dict(Product.objects.filter(is_deleted=False).values_list("sku", "image")) == {
+                "COF-1": latte,
+                "TEA-1": "",
+                "CAK-1": espresso,
+            }
+            assert Product.objects.get(sku="COF-1").pk == ids["coffee"]
 
     def test_asked_again_nothing_is_made_twice_and_what_the_business_has_stays(self, recoveries, every_app_on):
         hub, ids, _ = self.a_business(recoveries, every_app_on)

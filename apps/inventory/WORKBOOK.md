@@ -1046,8 +1046,10 @@ Sale: el artículo con su imagen de la librería. El negocio no guarda una copia
 es, así que no gasta espacio de su plan. Inventario avisa del cambio (`inventory.product.updated`) y el
 TPV la enseña sin recargar (INVENTORY-F32). Elegir otra la sustituye; si la anterior era una foto
 propia (INVENTORY-F31), se borra de la carpeta del negocio. «Quitar foto» deja el artículo con sus
-iniciales. Las candidatas las da `inventory.product.suggest_image`, el buscador es
-`base.catalog_image.search` y la foto la pone o la quita `inventory.product.set_image`.
+iniciales. Eliminar el artículo le deja la imagen de la librería (solo la foto propia se borra), y si el personal de
+ERPlora lo recupera desde una copia aparte vuelve con la que tenía (INVENTORY-F34, BASE-F114). Las candidatas las da
+`inventory.product.suggest_image`, el buscador es `base.catalog_image.search` y la foto la pone o la quita
+`inventory.product.set_image`.
 Si falla: si la librería no contesta, «No se pudo cargar la librería de imágenes.» con «Reintentar», y
 el producto se sigue pudiendo guardar sin foto. Sin resultados: «Ninguna imagen coincide con tu
 búsqueda. Prueba con otra palabra o sube una foto.». El asistente que no encuentra candidatas lo dice y
@@ -1056,7 +1058,7 @@ la foto: el panel dice «El producto se ha guardado, pero la foto no: Esa imagen
 Elige otra.» con «Reintentar», y el artículo se queda con la foto que tenía (por el asistente o la API no
 se guarda nada). Quien no puede cambiar productos no ve «Foto», y la app lo rechaza también por el
 asistente o la API.
-Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F32, BASE-F93
+Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F32, INVENTORY-F34, BASE-F93, BASE-F114
 
 ### INVENTORY-F31 Subir una foto propia del artículo
 <!-- origen: nuevo (decisión de Ioan del 2026-10-30: cada negocio guarda las fotos de sus artículos en su propia carpeta, convertidas a WebP de 512 × 512 y de hasta 2 MB al subirlas; encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next) -->
@@ -1147,7 +1149,7 @@ Pasos:
    productos (BASE-F114, pasos 6 a 11).
 3. Cada producto que el negocio eliminó y aún guarda vuelve a **Productos**, al TPV y al catálogo de venta: EL MISMO
    producto, con su SKU, su EAN-13, sus categorías que siguen vivas y la que vuelve con la recuperación si el negocio
-   la eliminó después (INVENTORY-F07), su categoría fiscal y su stock, y en
+   la eliminó después (INVENTORY-F07), su categoría fiscal, su stock y su imagen de la librería, y en
    **Movimientos** su historial entero (inicial, recepciones, ventas, recuentos y bajas) sigue siendo suyo.
    Vuelve activo y a la venta, como al desarchivar en Odoo o Square: si estaba desactivado o marcado como agotado
    antes de eliminarse, se vuelve a hacer a mano (INVENTORY-F03, INVENTORY-F29). Recuperaciones lo cuenta entre los
@@ -1157,11 +1159,12 @@ Sale: el producto vivo otra vez, activo y a la venta, sin cambiar ninguno de sus
 recuperado (`inventory.product.restored`), con el producto tal como vuelve.
 Si falla: no vuelve si el negocio ya hizo otro producto con su SKU o su EAN-13 desde que lo eliminó: se queda el que
 hizo, y la recuperación no lo cuenta ni lo crea. Un producto que el negocio ya no tiene en absoluto se crea de nuevo
-(INVENTORY-F01), sin stock. Sobre un producto vivo no falla: responde bien y vuelve a avisar. Su foto no vuelve: la
-propia se borró al eliminarlo (INVENTORY-F31) y la de la librería se le quitó (hub#1319). Lo que las demás apps le
-colgaban (sus precios en las tarifas, sus grupos de suplementos, sus opciones en los menús) se borró al eliminarlo y
-todavía no vuelve con él (hub#1343).
-Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29,
+(INVENTORY-F01), sin stock, con la imagen de la librería que tenía en la copia. Sobre un producto vivo no falla:
+responde bien y vuelve a avisar. Su foto propia no vuelve: se borró al eliminarlo (INVENTORY-F31). La imagen de la
+librería sí, porque eliminar se la deja; uno eliminado antes de que se la dejara vuelve sin ella (hub#1431). Lo que
+las demás apps le colgaban (sus precios en las tarifas, sus grupos de suplementos, sus opciones en los menús) se borró
+al eliminarlo y todavía no vuelve con él (hub#1343).
+Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29, INVENTORY-F30,
 PRICING-F14, MODIFIER-F09, COMBO-F13
 
 ## Qué comparten los verticales
@@ -1334,7 +1337,12 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   eliminado, ni otro vivo con su SKU o su EAN-13) se crean, cada uno por `inventory.product.create` con la clave de su
   categoría fiscal y sus categorías aquí por la misma regla (`_categories_held`: la misma, o la que acaba de volver o
   el negocio volvió a crear con su nombre), activo o no como estaba (`ProductIn.is_active`), sin stock (el saldo de la
-  copia es de otro día) y sin imagen (hub#1319). Al final, los enlaces vivos de la copia (`queries.product_links_in_copy`:
+  copia es de otro día). No es `inventory.product.create` sino `inventory.product.recover` (permiso `inventory.system`,
+  sin ruta, `ProductRecoverIn`): el alta de la pantalla y, en el mismo paso, la imagen que tenía en la copia, como la
+  pone la pantalla con `set_image` (`_library_image`: la de la librería, salvo una que la librería dice que ya no
+  tiene; nunca una foto propia; con la librería sin leer, tal como estaba, para no dejar el producto fuera). El
+  eliminado vuelve con la suya porque `inventory.product.delete` ya no le quita la de la librería, solo la foto propia.
+  Al final, los enlaces vivos de la copia (`queries.product_links_in_copy`:
   producto y categoría vivos allí, con el id del enlace y `copy_categories`): cada uno que le falta a una categoría que
   trajo una recuperación (`queries.product_links_not_in_business`: la de la copia ya no está viva aquí y la que ocupa su
   sitio por `_categories_held` la creó una recuperación, `created_by` según `base.recovery.brought_back`; el producto
