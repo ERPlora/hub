@@ -456,6 +456,26 @@ def test_a_deleted_date_of_a_series_restored_while_the_series_books_its_dates_is
     assert list(live.values_list("pk", flat=True)) == [deleted.pk]
 
 
+def test_a_deleted_appointment_restored_twice_at_once_comes_back_once(salon):
+    """The restore holds the appointment's row while it judges and writes: a second restore of it waits, then finds
+    it on the agenda and answers it as it is, with nothing written."""
+    deleted = make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"))
+    run("appointment.appointment.delete", {"id": str(deleted.id)})
+    restore = get("appointment.appointment.restore")
+    asked = restore.input.model_validate({"id": str(deleted.id)})
+    again = lambda: restore(system_context(A), asked)  # noqa: E731
+    its_row = lambda sql: locks("appointment_appointment")(sql) and "appointment_recurring" not in sql  # noqa: E731
+    with meanwhile(its_row, again) as outcomes:
+        restore(system_context(A), asked)
+    [outcome] = outcomes
+    assert not isinstance(outcome, Exception), outcome
+    assert Appointment.objects.get(pk=deleted.pk).deleted_at is None
+    assert list(deleted.history.order_by("at", "id").values_list("action", flat=True)) == [
+        "deleted",
+        "restored",
+    ]
+
+
 def test_the_agenda_and_the_hub_admin_deleting_the_same_appointments_never_wait_in_a_circle(
     salon, hub_staff
 ):
