@@ -1157,21 +1157,22 @@ def test_the_recovery_speaks_spanish(client, root):
 
 
 def test_what_came_back_is_said_in_spanish_in_words_that_fit_customers_and_appointments_alike():
-    """The counts follow the name of an app whose records are feminine in Spanish («Citas») as well as one
-    whose records are masculine («Clientes»): never «Citas: 2 creados»."""
+    """The counts follow the names of an app whose records are feminine in Spanish («Citas, Citas periódicas»: its
+    appointments and its series, hub#1327) as well as one whose records are masculine («Clientes»): never «Citas: 2
+    creados»."""
     from django.utils import translation
 
     said = control_admin.CopyRecoveryAdmin.result_said
     with translation.override("es"):
         assert said({"app": "appointment", "created": 2, "not_created": 1, "reasons": [], "refused": ""}) == (
-            "Citas: se crearon 2, 1 sin crear"
+            "Citas, Citas periódicas: se crearon 2, 1 sin crear"
         )
         assert said({"app": "customer", "created": 1, "not_created": 0, "reasons": [], "refused": ""}) == (
             "Clientes: se creó 1"
         )
         # And what comes back the same, whatever app restores it next.
         assert said({"app": "appointment", "restored": 1, "created": 0, "not_created": 0, "reasons": [], "refused": ""}) == (
-            "Citas: se restauró 1"
+            "Citas, Citas periódicas: se restauró 1"
         )
 
 

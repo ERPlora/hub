@@ -1,6 +1,8 @@
-"""Restoring a deleted appointment (APPOINTMENT-F11, BASE-F114): the platform's own operation, run when ERPlora's staff
-recover the business from a separate copy. The same appointment comes back to the agenda, with its number, its history
-and its series, as long as it still fits it as a booking does; a refusal leaves no trace.
+"""Restoring a deleted appointment (APPOINTMENT-F11) or a deleted series (APPOINTMENT-F15), BASE-F114: the platform's
+own operations, run when ERPlora's staff recover the business from a separate copy. The same appointment comes back to
+the agenda, with its number, its history and its series, as long as it still fits it as a booking does; the same series
+comes back to Repeating, active, as long as it could be created now, and books nothing by itself. A refusal leaves no
+trace.
 """
 
 import datetime as dt
@@ -13,7 +15,7 @@ from live.errors import Conflict, NotFound, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
 
-from apps.appointment.models import Appointment, Counter, History
+from apps.appointment.models import Appointment, Counter, History, Recurring
 from apps.customer.models import Customer
 from apps.service.models import Service
 from apps.staff.models import Member
@@ -213,3 +215,101 @@ def test_it_is_judged_at_the_moment_it_is_restored(salon, monkeypatch):
     monkeypatch.setattr("django.utils.timezone.now", lambda: later.astimezone(dt.UTC))
 
     refused("appointment.in_past", gone.id)
+
+
+# ── A deleted series (APPOINTMENT-F15) ───────────────────────────────────────────────────────────────────────────────
+
+RESTORE_SERIES = "appointment.recurring.restore"
+
+
+def restore_series(series_id):
+    op = get(RESTORE_SERIES)
+    return op(system_context(A), op.input.model_validate({"id": str(series_id)}))
+
+
+def deleted_series(salon, **fields):
+    """A weekly series with the appointment it booked on its first Monday, deleted from Repeating (its appointment
+    stays, APPOINTMENT-F15)."""
+    series = make_series(salon, **fields)
+    make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), recurring=series, occurrence_date=MONDAY)
+    run("appointment.recurring.delete", {"id": str(series.id)})
+    return Recurring.objects.get(pk=series.id)
+
+
+def series_trace() -> tuple:
+    return (
+        list(Recurring.objects.order_by("id").values_list("id", "deleted_at", "is_active")),
+        list(Appointment.objects.order_by("id").values_list("id", "deleted_at")),
+        OutboxEvent.objects.count(),
+    )
+
+
+def series_refused(code: str, series_id, error=Conflict):
+    before = series_trace()
+    with pytest.raises(error) as caught:
+        restore_series(series_id)
+    assert caught.value.code == code
+    assert series_trace() == before
+
+
+def test_the_same_series_comes_back_active_with_its_appointments_and_says_so(salon):
+    gone = deleted_series(salon)
+    appointments = list(Appointment.objects.values_list("id", "recurring_id", "deleted_at"))
+
+    out = restore_series(gone.id)
+
+    assert (out.id, out.is_active, out.customer_id, out.staff_id) == (gone.id, True, salon.lucia.id, salon.ana.id)
+    back = Recurring.objects.get(pk=gone.id)
+    assert (back.deleted_at, back.is_active) == (None, True)
+    # It books nothing by itself: what it had booked is still its own, and its next dates wait for «Book».
+    assert list(Appointment.objects.values_list("id", "recurring_id", "deleted_at")) == appointments
+    assert outbox("appointment.recurring.restored") == [{"id": str(gone.id), "customer_id": str(salon.lucia.id)}]
+    assert [row.id for row in run("appointment.recurring.list", {}).rows] == [gone.id]
+
+
+def test_a_series_already_in_repeating_is_answered_as_it_is_and_nothing_is_written(salon):
+    paused = make_series(salon, is_active=False)
+    before = series_trace()
+
+    assert (restore_series(paused.id).id, restore_series(paused.id).is_active) == (paused.id, False)
+    assert series_trace() == before
+
+
+def test_a_series_whose_customer_the_business_no_longer_has_is_refused(salon):
+    gone = deleted_series(salon)
+    Customer.objects.filter(pk=salon.lucia.id).update(deleted_at=timezone.now())
+
+    series_refused("customer.customer_unavailable", gone.id, NotFound)
+
+
+def test_a_series_whose_professional_no_longer_takes_bookings_is_refused(salon):
+    gone = deleted_series(salon)
+    Member.objects.filter(pk=salon.ana.id).update(is_bookable=False)
+
+    series_refused("appointment.staff_not_bookable", gone.id)
+
+
+def test_a_series_left_without_a_professional_is_refused(salon):
+    gone = deleted_series(salon)
+    Recurring.objects.filter(pk=gone.id).update(staff=None, staff_name="")
+
+    series_refused("appointment.recurring_no_staff", gone.id)
+
+
+def test_a_series_whose_service_is_no_longer_bookable_is_refused(salon):
+    gone = deleted_series(salon)
+    Service.objects.filter(pk=salon.cut.id).update(is_active=False)
+
+    series_refused("appointment.service_not_bookable", gone.id)
+
+
+def test_a_series_the_business_does_not_have_is_not_found(salon):
+    series_refused("appointment.recurring_not_found", uuid.uuid7(), NotFound)
+
+
+def test_restoring_a_series_is_the_platforms_alone(salon):
+    gone = deleted_series(salon)
+
+    with pytest.raises(PermissionDenied):
+        run(RESTORE_SERIES, {"id": str(gone.id)}, role="hub_admin")
+    assert Recurring.objects.get(pk=gone.id).deleted_at is not None
