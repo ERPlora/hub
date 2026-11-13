@@ -691,14 +691,15 @@ plataforma le entrega a los pocos segundos de pasar, fuera de la petición que l
 pausa no recibe lo que pasó mientras lo estaba. Lo que el personal de ERPlora recupera desde una copia aparte del
 negocio (BASE-F114) no arranca ninguna: sus avisos («cliente creado», «cliente recuperado», «cita creada»…) dicen que
 los hizo la recuperación, y lo que vuelve no es nada nuevo para el negocio, así que a nadie se le da otra vez la
-bienvenida ni se le avisa de una cita que ya tenía. Lo que el negocio crea después las arranca como siempre.
+bienvenida ni se le avisa de una cita que ya tenía; tampoco lo que otra app hace con ello (la Bandeja de WhatsApp que
+enlaza otra vez a la ficha su conversación). Lo que el negocio crea después las arranca como siempre.
 Sale: una ejecución (`flow.run.started`, `flow.run.finished` o `flow.run.parked` si espera), en el negocio
 donde pasó el aviso. Un mismo aviso entregado dos veces arranca **una sola** ejecución por automatización.
 Si falla: cada paso que falla para la ejecución con su motivo, visible en Historial; los pasos
 anteriores se quedan hechos. Una automatización que se dispararía a sí misma en cadena se para (ver
 «Para quien lo mantiene»). Un «Solo sigue si…» que ya no se puede leer para la ejecución con «Ya no se
 puede leer este «Solo sigue si…»…».
-Implicados: FLOW-F10, FLOW-F11, FLOW-F15, FLOW-F16, BASE-F114
+Implicados: FLOW-F10, FLOW-F11, FLOW-F15, FLOW-F16, BASE-F114, WHATSAPP_INBOX-F04
 
 ### FLOW-F22 Cuando llega la hora, la automatización arranca
 <!-- origen: old-hub:HUB-F229 old-hub:HUB-F83 old-hub:HUB-F84 -->
@@ -1575,15 +1576,16 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   cadena pasa de **8** automatizaciones (`MAX_CHAIN`), no se ejecuta ningún paso y queda una ejecución
   fallida con `flow.loop_stopped`, visible en Historial. **Límite**: la cadena solo sigue los avisos que
   graba el propio paso; si el aviso pasa antes por la reacción de otra app (que corre como el sistema),
-  los avisos de esa reacción llevan `system` y la cadena empieza de nuevo. Heredarla pide que el relay del
+  los avisos de esa reacción llevan `system` y la cadena empieza de nuevo (hub#1378). Heredarla pide que el relay del
   outbox (`base/relay.py`, de la plataforma) ejecute la reacción de cada app con el actor del aviso que entrega
   (hoy solo se lo pasa a esta app); no se hace desde esta app ni tocando `packages/`.
 - **Lo que trae una recuperación no arranca nada** (hub#1307, BASE-F114): la recuperación desde una copia aparte
   (`base/tenancy/recovery.py`) ejecuta las operaciones de cada app con el actor `copy_recovery:<id>`
   (`base.recovery.actor_of`), y `flow.run.react` no arranca ninguna automatización con un aviso cuyo actor lo es
   (`base.recovery.brought_back`): la cuenta va a `skipped`, sin ejecución ni Historial. El criterio vive en `base/`, no
-  en esta app. Lo mismo que la cadena, solo cubre los avisos que graban las operaciones de la recuperación; los que
-  graba después la reacción de otra app a ellos llevan `system`. Lo prueba `tests/test_recovery.py`.
+  en esta app. Lo que graba la reacción de otra app a uno de esos avisos lleva el mismo actor, y lo que se reacciona a
+  eso también: se lo da el relay (`base/services.py::relay_deliver_next`, hub#1365), así que tampoco arranca nada de
+  segunda mano. Lo prueban `tests/test_recovery.py` y `base/tests/test_relay_brought_back.py`.
 - **Lo que leyeron los pasos** (`outputs`: la ficha de un cliente…) solo se guarda mientras la ejecución
   puede seguir: esperando, o parada por un error durante `RESUME_DAYS` (7) para reanudarla (FLOW-F24);
   al terminar bien, por una condición o cancelada se vacía, y la poda de cada hora vacía la de un fallo de

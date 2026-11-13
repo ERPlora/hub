@@ -3182,7 +3182,9 @@ profesional asignado (`service.assignment.assigned`) por cada profesional que vu
 nueva por cada una que le faltaba, con su aviso de cita creada (`appointment.appointment.created`), y nada más. Cada uno
 de esos avisos dice que lo hizo la recuperación (su autor es `copy_recovery:<id>`, el de la fila de Recuperaciones), así
 que ninguna automatización del negocio arranca con ellos (FLOW-F21), sea de algo creado o de algo recuperado; lo que
-solo pone al día lo del negocio con ellos sigue igual (la Bandeja de WhatsApp enlaza a la ficha su conversación). La
+solo pone al día lo del negocio con ellos sigue igual (la Bandeja de WhatsApp enlaza a la ficha su conversación), y lo
+que graba al hacerlo lleva la misma marca, así que tampoco arranca ninguna, ni de primera ni de segunda mano (la
+conversación enlazada otra vez no arranca «se vincula una conversación de WhatsApp a un cliente»; hub#1365). La
 copia, sin tocar; el aviso `control.copy.recovery_requested` con quién lo pidió.
 Si falla: lo que la restauración no admite lo dice el aviso, negocio a negocio, y ese negocio no se toca: uno que no está
 listo o no tiene base propia, una demo, uno que se está trasladando o restaurando, un clúster abierto a hubs nuevos o con
@@ -3210,9 +3212,9 @@ mantenimiento, hasta que se descongela. Con registros solo del entorno de prueba
 Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
 INVENTORY-F07, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08, SERVICE-F31,
-APPOINTMENT-F01, APPOINTMENT-F11, FLOW-F21; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285,
-hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1356, hub#1373,
-hub#1375, aws#77
+APPOINTMENT-F01, APPOINTMENT-F11, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283,
+hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341,
+hub#1356, hub#1365, hub#1373, hub#1375, aws#77
 
 ## Para quien lo mantiene
 
