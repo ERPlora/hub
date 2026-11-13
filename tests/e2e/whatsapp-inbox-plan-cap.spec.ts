@@ -14,19 +14,16 @@
 // Before that, the month nearly spent: erplora.com's seed sets `a`'s usage to 80 % of its plan's allowance and pushes
 // it; the inbox says how many are left with «Upgrade plan», and so does Settings → This month, as the assistant says
 // its own from 80 % (BASE-F104). Captured in three sizes.
-import { execFileSync } from 'node:child_process';
-import { join, resolve } from 'node:path';
-
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, psql, REPO_DIR, SAAS, shot, shown, upgradeLandsInside } from './helpers';
+import { A, api, capture, login, psql, SAAS, shot, shown, upgradeLandsInside } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
-import { STACK } from './stack';
 import { messageSends } from './whatsapp-graph';
 import {
   cleanUp,
   e2ePhone,
   erploraUsage,
+  inErplora,
   metaGraph,
   metaHandsOver,
   metaNow,
@@ -42,10 +39,6 @@ test.describe.configure({ mode: 'serial' });
 const TASK = 'FIX-HUB-WHATSAPP-INBOX-ZERO-LIMIT-SHOWN-UNLIMITED';
 const NEAR = 'FIX-HUB-WHATSAPP-INBOX-WORKBOOK-KEEPS-SETTLED-DECISIONS-OPEN';
 const SPENT = 'FIX-HUB-WHATSAPP-INBOX-E2E-SEED-TEMPLATES-AND-CAP-UNUSED';
-// The run's erplora.com checkout and database, as whatsapp-helpers.ts finds them.
-const SAAS_DIR = resolve(process.env.E2E_SAAS_DIR || join(REPO_DIR, 'saas'));
-const SAAS_DB = process.env.E2E_SAAS_DB || `saas_e2e_${new URL(SAAS).port || '80'}`;
-
 // In erplora.com: the WhatsApp messages a month of `a`'s plan become WA_LIMIT, and its photo is pushed to this Hub.
 const SET_PLAN = `
 import json, os
@@ -64,18 +57,7 @@ print(json.dumps({"before": before, "delivered": services.sync_hub(hub.id)}))
 `;
 
 function setPlan(limit: number): { before: number; delivered: boolean } {
-  const out = execFileSync('uv', ['run', 'python', 'manage.py', 'shell', '-c', SET_PLAN], {
-    cwd: SAAS_DIR,
-    encoding: 'utf8',
-    env: {
-      ...process.env,
-      DEBUG: 'True',
-      DB_NAME: SAAS_DB,
-      HUB_INTERNAL_URL: `http://127.0.0.1:${STACK.hubPort}`,
-      WA_LIMIT: String(limit),
-    },
-  });
-  return JSON.parse(out.trim().split('\n').at(-1) ?? '{}');
+  return inErplora(['manage.py', 'shell', '-c', SET_PLAN], { WA_LIMIT: String(limit) });
 }
 
 const notIncluded = (page: Page) => shown(page).locator('[data-testid=whatsapp-inbox-cap-reached]');
@@ -173,7 +155,7 @@ test.describe('the month nearly spent', () => {
     cleanUp();
     expect(seedErplora()).toEqual({ delivered: true, hub_error: '' });
     await metaGraph();
-    allowance = Number(psql("select monthly_limit from whatsapp_inbox_channel where host = 'a'"));
+    allowance = Number(psql('select monthly_limit from whatsapp_inbox_channel'));
     expect(allowance, 'a plan with WhatsApp messages').toBeGreaterThan(0);
     // 80 % of the month spent, by erplora.com's count: the first figure that warns.
     used = Math.ceil(allowance * 0.8);
@@ -233,7 +215,7 @@ test.describe('the month spent', () => {
     // erplora.com reaches Meta only through the run's Graph, or the run stops here (whatsapp-helpers.ts).
     await metaGraph();
     // The allowance of `a`'s plan, as erplora.com's photo brought it: this month it is spent whole.
-    allowance = Number(psql("select monthly_limit from whatsapp_inbox_channel where host = 'a'"));
+    allowance = Number(psql('select monthly_limit from whatsapp_inbox_channel'));
     expect(allowance, 'a plan with WhatsApp messages').toBeGreaterThan(0);
     expect(seedErplora({ used: allowance })).toEqual({ delivered: true, hub_error: '' });
   });

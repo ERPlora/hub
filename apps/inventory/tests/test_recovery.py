@@ -601,9 +601,18 @@ def gone_altogether(hub, *product_ids) -> None:
         Product.objects.filter(pk__in=product_ids).delete()
 
 
+CATEGORIES = {
+    "app": "inventory", "label": "Product categories", "restored": 0, "created": 0, "not_created": 0, "reasons": [],
+    "refused": "",
+}
+PRODUCTS = CATEGORIES | {"label": "Products"}
+LINKS = CATEGORIES | {"label": "Product links to categories"}
+
+
 def said(row) -> tuple[str, list[dict]]:
-    """``row``'s status and what each app gave back, by the keys these tests read."""
-    keys = ("app", "restored", "created", "not_created", "reasons", "refused")
+    """``row``'s status and what each thing Inventory gives back gave, its categories, its products and then the links
+    of the products the business kept, by the keys these tests read."""
+    keys = ("app", "label", "restored", "created", "not_created", "reasons", "refused")
     row = fresh(row)
     return row.status, [{key: result[key] for key in keys} for result in row.results]
 
@@ -612,10 +621,7 @@ def asked_again_gives_nothing(recoveries, copy) -> None:
     """``copy`` asked again: nothing comes back twice."""
     again = recoveries.ask(copy, "inventory")
     assert run() == 1
-    assert said(again) == (
-        "done",
-        [{"app": "inventory", "restored": 0, "created": 0, "not_created": 0, "reasons": [], "refused": ""}],
-    )
+    assert said(again) == ("done", [CATEGORIES, PRODUCTS, LINKS])
 
 
 @pytest.mark.usefixtures("no_test_fallback")
@@ -649,11 +655,8 @@ class TestProductsComeBack:
 
         assert run() == 1
 
-        # Created: the category the business deleted, and the product no longer held.
-        assert said(row) == (
-            "done",
-            [{"app": "inventory", "restored": 2, "created": 2, "not_created": 0, "reasons": [], "refused": ""}],
-        )
+        # Created: the category the business deleted, and the product no longer held; each counted apart.
+        assert said(row) == ("done", [CATEGORIES | {"created": 1}, PRODUCTS | {"restored": 2, "created": 1}, LINKS])
         # The deleted ones, the same products, active and on sale again, with the stock their movements left; the one
         # no longer held, created in its category, which came back just before it, with no stock: a count says today's.
         assert live_products(hub) == [
@@ -691,10 +694,11 @@ class TestProductsComeBack:
 
         assert run() == 1
 
-        # Created: the category, the product no longer held, and the link of the one the business kept live.
+        # Created: the category, the product no longer held, and the link of the one the business kept live; each
+        # counted apart.
         assert said(row) == (
             "done",
-            [{"app": "inventory", "restored": 1, "created": 3, "not_created": 0, "reasons": [], "refused": ""}],
+            [CATEGORIES | {"created": 1}, PRODUCTS | {"restored": 1, "created": 1}, LINKS | {"created": 1}],
         )
         with use_hub(hub):
             back = Category.objects.get(name="Desserts", is_deleted=False)
@@ -749,10 +753,7 @@ class TestProductsComeBack:
 
         assert run() == 1
 
-        assert said(row) == (
-            "done",
-            [{"app": "inventory", "restored": 0, "created": 0, "not_created": 0, "reasons": [], "refused": ""}],
-        )
+        assert said(row) == ("done", [CATEGORIES, PRODUCTS, LINKS])
         with use_hub(hub):
             assert dict(Product.objects.filter(sku="COF-1").values_list("pk", "is_deleted")) == {
                 ids["coffee"]: True,
@@ -770,7 +771,10 @@ class TestProductsComeBack:
 
         assert run() == 1
 
-        _, [result] = said(row)
-        assert (result["restored"], result["created"], result["not_created"], result["refused"]) == (0, 0, 2, "")
+        _, [categories, result, links] = said(row)
+        assert (categories, links) == (CATEGORIES, LINKS)
+        assert (result["label"], result["restored"], result["created"], result["not_created"], result["refused"]) == (
+            "Products", 0, 0, 2, ""
+        )
         assert {one["id"] for one in result["reasons"]} == {str(ids["tea"]), str(ids["cake"])}
         assert all(one["reason"].startswith("invalid_field: ") for one in result["reasons"])

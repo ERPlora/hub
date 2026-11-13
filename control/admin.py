@@ -701,8 +701,8 @@ class RestoredCopyAdmin(AsksFirst, base_admin.ReadOnlyAdmin):
 class CopyRecoveryAdmin(base_admin.ReadOnlyAdmin):
     """What the staff asked to bring back into a business from one of its separate copies (BASE-F114): asked
     from Separate copies with «Recover into the business…», done by the worker; read only, for support too. Its
-    results say, app by app, how many came back and how many not; its page says why each did not (by its id in the
-    copy: no personal data), and why an app gave nothing back."""
+    results say, for each thing each app gives back, how many came back and how many not; its page says why each did
+    not (by its id in the copy: no personal data), and why an app gave nothing back."""
 
     # What the staff looks for at a glance, as Separate copies: three columns a phone shows whole (375 px). What was
     # asked, who asked it, when, when it was done and why each record did not come back are on its page.
@@ -752,10 +752,12 @@ class CopyRecoveryAdmin(base_admin.ReadOnlyAdmin):
 
     @staticmethod
     def result_said(result: dict) -> str:
-        """What an app gave back, in words: «Customers: 1 restored, 2 created, 1 not created», or why it gave nothing.
-        A recovery noted before that count existed has no ``restored``."""
+        """What one thing an app gives back gave, in words: «Service categories: 1 restored, 2 created, 1 not created»,
+        or why it gave nothing. Its name is kept as the code writes it and said in the reader's language. A recovery
+        noted before each thing was counted apart has no ``label`` (the app's names, together), and one noted before
+        restores were counted has no ``restored``."""
         what, restored, created, missed, why = (
-            recoverable_names([result["app"]]),
+            gettext(result["label"]) if "label" in result else recoverable_names([result["app"]]),
             result.get("restored", 0),
             result["created"],
             result["not_created"],
