@@ -38,6 +38,7 @@ from live.operations import Operation, atomic, get, operation
 from live.outbox import record_event
 
 from apps.flow import document, events, gateway, http, recipes, vault
+from apps.flow.apps import RUN_ACTOR
 from apps.flow.models import Draft, Flow, FlowRun, Question, Secret
 from apps.flow.queries import (
     ASSISTANT_GONE_KEY,
@@ -162,8 +163,6 @@ FINISHED = (
     FlowRun.Status.CANCELLED,
 )
 
-#: The actor prefix of what a run does (``flow_run:<id>``): the outbox keeps it, the loop guard reads it.
-RUN_ACTOR = "flow_run:"
 #: A call's ``Idempotency-Key`` is ``uuid5(IDEMPOTENCY_NAMESPACE, "<run id>:<step id>")``: the same in every
 #: attempt of a run's step, another in every run.
 IDEMPOTENCY_NAMESPACE = uuid.UUID("0199f6a0-6b1f-7c3e-9a51-3f1b2c4d5e6f")
