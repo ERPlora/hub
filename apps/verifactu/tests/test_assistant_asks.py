@@ -82,7 +82,8 @@ PROBES = [
 #: The probe of going live: «la cuenta» (ERPlora's account) is read as a table's check, so every write of Sales that
 #: takes a check and «activa» turns on goes ahead of it; it is offered, past the first half.
 GO_LIVE = "qa20261108.owner.es.verifactu.config.go_live"
-#: Why that probe is marked: whoever brings the pointer of live with ERPlora/live#76 sees it pass and takes it off.
+#: Why that probe is marked: whoever brings the pointer of live with the fix its reason names sees it pass and takes
+#: it off.
 UNTIL_LIVE_TELLS_THE_ACCOUNT_FROM_A_CHECK = pytest.mark.xfail(
     strict=True, raises=AssertionError, reason="ERPlora/live#76: «la cuenta» of ERPlora is read as a table's check"
 )

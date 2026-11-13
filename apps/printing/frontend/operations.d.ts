@@ -1,7 +1,7 @@
-// Types of the printing app's operations for the SDK (`useLive`, `useCommand`), from apps/printing/schemas.py.
-// Written by hand, as `frontend/sdk-types.d.ts` is for the PoC, until V3 generates them from
-// `/api/openapi.json`. Keep it in step with schemas.py and with `frontend/generated/operations.json`. One
-// input per operation (ninja's parity): no path parameters. Dates are ISO 8601 strings.
+// Types of the printing app's operations for the SDK (`useLive`, `useCommand`), from apps/printing/schemas.py. Written
+// by hand, as `frontend/sdk-types.d.ts` is: nothing generates them from `/api/openapi.json`. Keep it in step with
+// schemas.py and with `frontend/generated/operations.json`. One input per operation (ninja's parity): no path
+// parameters. Dates are ISO 8601 strings.
 import type { Page } from '../../../frontend/sdk-types';
 
 export type SortDir = 'asc' | 'desc';

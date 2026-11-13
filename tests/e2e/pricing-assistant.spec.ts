@@ -1,14 +1,14 @@
-// The assistant's card for a change of a price of Price lists (FIX-HUB-PRICING-PRICE-UPDATE-CARD-IN-THE-BUSINESS-CURRENCY;
-// base's half is hub#445, BASE-F97): «pon el champú a 15 en la lista de dólares» names the price by its id, and the card
-// said it in the business's currency («15,00 €») for a list in dollars. The card reads the price as the person
+// The assistant's card for a change of a price of Price lists (base's half is hub#445, BASE-F97): «pon el champú a 15
+// en la lista de dólares» names the price by its id, and the card must not say it in the business's currency
+// («15,00 €») for a list in dollars. The card reads the price as the person
 // (`pricing.price_item.get`, with its list's currency) and says it in dollars, «15,00 $», with that currency's decimals,
 // as Shopify or Stripe show an amount. End to end with the stack's SaaS gateway and the e2e's provider
 // (assistant-provider.ts, `E2E-ASK <tool> <JSON>`): the SaaS must be seeded with it (README of this folder, «El
 // asistente»). Cancelled, the price stays as it was. What this file creates carries its own prefix (E2EPAS) and goes
 // away; the apps it turns on are turned off again.
-// FIX-HUB-PRICING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS: since hub#416 the card left out every id its schema does not
-// mark, so «pon el gel a 15 en la lista de dólares» or «desactiva la regla de verano» said no list, no product and no
-// rule. Now each record is named as the Price lists screens show it, read as the person, never by its id.
+// The card names every record the write touches, as the Price lists screens show it and read as the person, never by
+// its id: «pon el gel a 15 en la lista de dólares» or «desactiva la regla de verano» say the list, the product and the
+// rule, also the ids its schema does not mark (hub#416).
 // flow: pricing-assistant-price-currency
 // flow: pricing-assistant-card-references
 // flow: PRICING-F07 PRICING-F08 PRICING-F12 BASE-F97
@@ -16,6 +16,7 @@ import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { sentCard } from './assistant-card-helpers';
 import { type Provider, startProvider } from './assistant-provider';
 import { A, api, capture, compactBar, login, psql, REPO_DIR, shown, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
 import { createProduct, post, stamp } from './pricing-helpers';
@@ -126,25 +127,6 @@ async function ask(page: Page, text: string): Promise<void> {
   await box(page).fill(text);
   await box(page).press('Enter');
   await expect(answers(page)).toHaveCount(before + 1);
-}
-
-type SentCard = { fields: { name: string; kind: string; value: unknown; money?: unknown }[] };
-
-/** The card of the confirm frame of a turn's answer (`text/event-stream`: one `data: <JSON>` per frame), if any. */
-function confirmedCard(stream: string): SentCard | undefined {
-  const frames = stream
-    .split('\n')
-    .filter((line) => line.startsWith('data:'))
-    .map((line) => JSON.parse(line.slice(5)) as { type: string; card?: SentCard });
-  return frames.find((frame) => frame.type === 'confirm')?.card;
-}
-
-/** The card the server sends for the person to confirm, as it arrives: the answer of the turn that carries it. */
-async function sentCard(page: Page): Promise<SentCard> {
-  const answer = await page.waitForResponse(
-    async (response) => response.url().endsWith('/api/assistant/turn') && confirmedCard(await response.text()) !== undefined,
-  );
-  return confirmedCard(await answer.text())!;
 }
 
 /** The owner, in Spanish, with the shampoo at 12,00 $ in a list in dollars, made through the apps' own API. */

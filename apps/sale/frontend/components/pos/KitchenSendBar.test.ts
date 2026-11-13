@@ -30,7 +30,7 @@ describe('KitchenSendBar', () => {
     expect(s.find('pos-kitchen-rush').attributes('aria-pressed')).toBe('false');
   });
 
-  it('the flame answers every tap, on and off and on again (kitchen#88)', async () => {
+  it('the flame answers every tap, on and off and on again', async () => {
     const s = await setup();
     const pressed = () => s.find('pos-kitchen-rush').attributes('aria-pressed');
     for (const expected of ['true', 'false', 'true', 'false']) {

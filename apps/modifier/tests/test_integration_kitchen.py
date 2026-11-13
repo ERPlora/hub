@@ -7,8 +7,8 @@ fires the round (``sale.order.fired``); one tick of the worker's real loop hands
 is called by hand, and what Modifiers changes afterwards —an option renamed or deleted— never rewrites what the
 cook already has. A round fired in hub B is heard in B only.
 
-Traps of the old product: hub#1156 (the paper lost the options that the row had) and hub#1138 (the options
-went chained in the note and, with several, the indent was lost: here a list, one line each).
+Traps of the old product: the paper lost the options that the row had, and the options
+went chained in the note and, with several, the indent was lost; here a list, one line each.
 """
 
 import pytest

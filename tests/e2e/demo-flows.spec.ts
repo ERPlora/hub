@@ -238,7 +238,7 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
  *  `MAX_BACKOFF_MS` of `@erplora/ui/sdk`), with the 150 ms of its resubscribe debounce and room for the reopen. */
 const LIVE_REOPEN_MS = 45_000;
 
-// CLOSE-DEMO: more items than one page of `demo.item.list` holds (100, `ItemListIn.limit`). On a phone «Load more»
+// More items than one page of `demo.item.list` holds (100, `ItemListIn.limit`). On a phone «Load more»
 // grows the window only within those 100 (three in a row at 25 per page), and past them the list pages instead, so
 // the oldest row is reached without «The items could not be loaded» (the second «Load more» at 50 per page asked for
 // 150 rows and the server refused it with a 422).

@@ -1,11 +1,11 @@
 // PAYMENT-F02 «Registrar un pago»: «New payment» asks for the old panel's Method (only the active ones),
 // Date (today), Amount (as a person writes it), Beneficiary and Concept, plus the Beneficiary IBAN and
 // the Supplier invoice the old screen left to the API, with «Record payment». The three states of the
-// methods read are told apart (the old payments#24): still loading, could not be read (Retry), none
+// methods read are told apart: still loading, could not be read (Retry), none
 // yet (go to Methods). An amount that is not one, or is 0, is refused under the field without asking
-// the server; the server's refusals go under their field (the old pm#513: inside the form). The amount is typed
+// the server; the server's refusals go under their field (inside the form). The amount is typed
 // in the business's currency, with its decimals, and the field says which («Amount (PLN)»); the payment is
-// recorded in it by the server (the old payments#35), never in a euro fixed in the screen.
+// recorded in it by the server, never in a euro fixed in the screen.
 import { InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -112,7 +112,7 @@ describe('PaymentFormModal', () => {
     expect(s.wrapper.emitted('created')).toEqual([[CREATED]]);
   });
 
-  it('the same form sent again carries the same attempt key; the next «New payment» makes a new one (payments#8)', async () => {
+  it('the same form sent again carries the same attempt key; the next «New payment» makes a new one', async () => {
     const s = await setup();
     await s.result(METHODS, page([BANK]));
     s.answer(503, { error: { code: 'unavailable', message: 'Try again in a moment.' } });
@@ -199,7 +199,7 @@ describe('PaymentFormModal', () => {
     expect(s.save().textContent).toContain('Registrar pago');
   });
 
-  describe('in the business’s currency (the old payments#35)', () => {
+  describe('in the business’s currency', () => {
     it('a business in Poland: «Amount (PLN)», «12,50 zł» is 1250 grosze and the server records it in złoty', async () => {
       const s = await setup('en', business(POLISH));
       await s.result(METHODS, page([BANK]));

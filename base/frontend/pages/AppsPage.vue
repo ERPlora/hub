@@ -1,22 +1,22 @@
 <script setup lang="ts">
-// Apps (BASE-G67…G74; the old hub's AppsPage): the business's apps over the live `base.app.list`, which the SaaS's
+// Apps: the business's apps over the live `base.app.list`, which the SaaS's
 // photo re-runs (a paid app bought on erplora.com turns up without reloading). Three tabs in the address, the old
 // hub's: «My apps» (`/apps`, the apps on, each with «Open»), «Add apps» (`#all`, the whole catalogue with what it
 // does, its price and what comes with it) and «Paid» (`#paid`, only what is bought apart). «Paid» and the price are
-// there only while some app is sold apart: with every app in every plan (PLAN §32) none is. There is no amount here:
+// there only while some app is sold apart: with every app in every plan none is. There is no amount here:
 // a paid app without its right says it needs a subscription and, for whoever runs the business and only on the web,
 // links to erplora.com's Store, where it is bought (never inside the Hub: the stores refuse an app that sells).
-// Whoever runs the business turns an app on or off (PLAN-HUB §9; BASE-F18, F19, F23–F25): «Turn on» asks first when
+// Whoever runs the business turns an app on or off: «Turn on» asks first when
 // it brings others it needs, naming them; «Turn off» always asks, naming what goes with it, and one another app on
 // needs says which to turn off first. A refusal (another app needs it, the app's own reason, any other failure) is a
 // notice that stays until it is closed or the next change: its reason is often a long sentence of what to do first,
-// which a toast took away before it could be read (hub#2594). The counter says how many apps are on, as «My apps»
+// which a toast took away before it could be read. The counter says how many apps are on, as «My apps»
 // lists them, and how many of the plan's the business chose (`max_apps`; what came along or was born on does not
 // count, hub#1286); at the limit, the notice with «Upgrade plan» (erplora.com's plans,
 // only on the web). The menu of this screen is read again after each change; the other screens of the business
 // follow the live list (AppsFollower). «Upgrade plan» is the platform's PlanUpgradeLink, with the pass (BASE-F11), and the Store's link
-// by `openExternalLink` (gh:hub#439: the installed app opens nothing on a `_blank` link). In a business with its own database an app turned on
-// for the first time gets its tables first when its template lacked them (S3): the answer says «creating», the toast
+// by `openExternalLink` (the installed app opens nothing on a `_blank` link). In a business with its own database an app turned on
+// for the first time gets its tables first when its template lacked them: the answer says «creating», the toast
 // «Turning on…» and its row «Turning on…» until the live list says it is on; one that could not be set up says so with
 // «Retry» (`base.app.retry`); both can be turned off. What the server would always refuse is never offered (hub#618,
 // hub#694): the list says it beforehand (`refusal`), the row has no button and, for whoever runs the business, says why;
@@ -83,7 +83,7 @@ const planUrl = computed(() => (isWeb.value && mayManage.value ? (data.value?.pl
 const pending = ref<string | null>(null);
 /** The plan's limit the last «Turn on» hit; cleared by the next change. */
 const limitHit = ref<number | null>(null);
-/** Why the last change was refused; on screen until it is closed or the next change (hub#2594). */
+/** Why the last change was refused; on screen until it is closed or the next change. */
 const refusal = ref<string | null>(null);
 
 /** The apps turned on, as «My apps» lists them (those born on and those brought along included), and, against the
@@ -96,7 +96,7 @@ const counter = computed(() => {
   return t('base.appsPage.counter.limited', { on, n: on, chosen: answer.enabled, max: answer.max_apps });
 });
 
-/** Some app is sold apart (none is while every app comes with every plan, PLAN §32): only then «Paid» and «Price». */
+/** Some app is sold apart (none is while every app comes with every plan): only then «Paid» and «Price». */
 const paid = computed(() => sellsApart(apps.value));
 
 const tabs = computed<ShellTab[]>(() => [
@@ -288,7 +288,7 @@ async function change(kind: 'enable' | 'disable' | 'retry', app: AppRow): Promis
     const answer = await COMMANDS[kind].run({ app: app.id });
     const along = answer.along.map((other) => other.name);
     const on = kind !== 'disable';
-    // «creating» (S3): its tables are being made; its row says when it is on (the live list).
+    // «creating»: its tables are being made; its row says when it is on (the live list).
     const done = answer.state === 'creating' ? 'base.appsPage.turningOn' : on ? 'base.appsPage.turnedOn' : 'base.appsPage.turnedOff';
     const said = [t(done, { app: app.name })];
     if (along.length) said.push(t(on ? 'base.appsPage.alsoOn' : 'base.appsPage.alsoOff', { apps: listOf(along) }));

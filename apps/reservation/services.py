@@ -6,7 +6,7 @@ Each one is one transaction with its events in the outbox; a refusal writes noth
 - **The gate** (engine.py) is asked under a lock: every write that books (take, change, convert) first
   locks the book's settings row, so the reservations of a business go one after the other and two of them
   on the last place of a slot, or on the same table and time, leave one.
-- **Tables, in the same transaction** (phase 1 has no relay): a reservation confirmed, cancelled, not shown
+- **Tables, in the same transaction**: a reservation confirmed, cancelled, not shown
   or deleted calls ``table.hold.sync_reservation``; a confirmed one changed calls it again with its new
   data, or ``table.hold.move_reservation`` when it loses its table; seating calls ``table.session.open``
   with the session of whoever seats and releases with ``table.hold.release`` a hold that was not yet in its
@@ -193,8 +193,8 @@ STAFF_ONLY = _(
     "The table and the restaurant's internal notes are set by the restaurant: they cannot be changed from the "
     "guest's own booking."
 )
-#: What only the restaurant sets on a booking, never a channel acting for the guest (the old module's
-#: ``STAFF_ONLY_UPDATE_FIELDS``, plus booking a full slot anyway).
+#: What only the restaurant sets on a booking, never a channel acting for the guest, booking a full slot anyway
+#: included.
 STAFF_ONLY_FIELDS = ("table_id", "table", "zone", "no_table", "internal_notes", "overbook")
 
 

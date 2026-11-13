@@ -1,7 +1,7 @@
-// «Manage on erplora.com» at the foot of the side menu, right below «Upgrade plan» (BASE-F11; gh:hub#364, gh:hub#1400):
+// «Manage on erplora.com» at the foot of the side menu, right below «Upgrade plan» (BASE-F11):
 // this business on erplora.com's panel, where `base/spa.py` embeds its address (`hub-home`'s `manage_url`: whoever may
 // open the panel, with their account, never a PIN session). It does not sell, so the installed app offers it too, in the
-// system browser; its Google Play copy never does (gh:hub#1897), and nothing paints until the app says which copy it is.
+// system browser; its Google Play copy never does, and nothing paints until the app says which copy it is.
 import { applySurface } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

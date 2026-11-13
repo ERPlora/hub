@@ -1,7 +1,7 @@
-// Types of the website app's operations for the SDK (`useLive`, `useCommand`), from apps/website/schemas.py.
-// Written by hand, as `frontend/sdk-types.d.ts` is for the PoC, until V3 generates them from `/api/openapi.json`.
-// Keep it in step with schemas.py and with `frontend/generated/operations.json`. One input per operation (ninja's
-// parity): no path parameters.
+// Types of the website app's operations for the SDK (`useLive`, `useCommand`), from apps/website/schemas.py. Written by
+// hand, as `frontend/sdk-types.d.ts` is: nothing generates them from `/api/openapi.json`. Keep it in step with
+// schemas.py and with `frontend/generated/operations.json`. One input per operation (ninja's parity): no path
+// parameters.
 
 export type WebsiteTemplate = 'classic' | 'modern' | 'minimal' | 'bold';
 export type CatalogSource = 'inventory' | 'service';

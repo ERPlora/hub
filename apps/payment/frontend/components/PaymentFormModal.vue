@@ -1,16 +1,16 @@
 <script setup lang="ts">
 // PAYMENT-F02 «Registrar un pago»: «New payment» with the old panel's Method (the active ones, live),
 // Date (today), Amount, Beneficiary and Concept, plus the Beneficiary IBAN and the Supplier invoice,
-// and «Record payment» (`payment.payment.create`). The methods read has three states, told apart (the
-// old payments#24): loading (the picker waits), could not be read (a notice with Retry), none yet (a
+// and «Record payment» (`payment.payment.create`). The methods read has three states, told apart:
+// loading (the picker waits), could not be read (a notice with Retry), none yet (a
 // notice with «Go to Methods»). The amount is read as a person writes it (`parseMoney`), in the business's currency
-// and with its decimals (the field says which: «Amount (PLN)»); the server records the payment in that currency
-// (the old payments#35). Until the business answers, «Record payment» waits: what was typed is read in its currency
+// and with its decimals (the field says which: «Amount (PLN)»); the server records the payment in that currency.
+// Until the business answers, «Record payment» waits: what was typed is read in its currency
 // then, never guessed (hub#325); if that read fails, the window says so with «Retry» (hub#938). One that is not an
 // amount, or is 0, is refused under the field before asking the server. The server's refusals stay
-// in the form, under their field, with what was typed (the old pm#513). The attempt key is born with
+// in the form, under their field, with what was typed. The attempt key is born with
 // each opening and travels on every send of it: a retry after a lost answer records one payment, never
-// two (the old payments#8); the next «New payment» is another attempt.
+// two; the next «New payment» is another attempt.
 import { FormModal, InlineFeedback, MoneyInput, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';

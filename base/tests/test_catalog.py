@@ -37,7 +37,7 @@ CUT = "## Para quien lo mantiene"
 WORKBOOK = f"""\
 # Workbook — Things (app)
 Prefijo: THING
-Alcance MVP: fase 1
+Alcance MVP: núcleo
 Estado de la app: en construcción
 
 > Manual de usuario y especificación. Ver [los cambios](#cambios-frente-al-producto-actual).

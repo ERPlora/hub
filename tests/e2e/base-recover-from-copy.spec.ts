@@ -1,24 +1,25 @@
 // flow: BASE-F114 (steps 6-11), CUSTOMER-F07, CUSTOMER-F33, CUSTOMER-F06, CUSTOMER-F04, INVENTORY-F01, INVENTORY-F04,
-// INVENTORY-F07, INVENTORY-F34, SERVICE-F01, SERVICE-F07, APPOINTMENT-F11: in the Hub admin, the ERPlora staff choose a
-// separate copy of a business and bring back into it the customers, the products, the services and the appointments it
-// lost since, by their apps' own operations (never a copied row): a card, a product or an appointment the business
-// deleted and still holds comes back the same, with its history (the card with its group), by Customers', Inventory's
-// and Appointments' restore; a card it no longer has at all comes back as a new one with its group (the business's own
-// of that name), its tag (made again: the business deleted it) and its custom field's value; a product category and a
-// service category the business deleted come back as new ones, before what goes in them; and a service as a new one,
-// made by Services' create, into its category. At each size: two cards in a group, the second with a tag and a custom
-// field's value, a product in its own category, a service in its own category and an appointment of another card with
-// its own professional of `a` are made; in Hubs, «Restore to a separate copy…» asks a copy of `a` from a temporary
-// cluster (the stack's own server) and the worker's pass makes it; the first card, the product, the product's category,
-// the service's category and the appointment are deleted in `a`, the second card, the tag and the service are gone from
-// it; then Separate copies › tick the copy › «Recover into the business…» › Customers, Products, Services and
-// Appointments ticked (with whatever else answers) › «Recover»; the worker's pass brings them back; Recoveries says
-// «Customers: 1 restored, 1 created», «Product categories, Products: 1 restored, 1 created», «Services: 2 created» (the
-// category and the service) and «Appointments: 1 restored», and `a` has the same card live again in its group, the
-// second one again in that group with its tag and its value, the same product live again in its category back under a
-// new id, the same appointment (its number, its history ending in «restored») live again, and the service category and
-// the service live again under new ids, the service in that category; in its Agenda, the appointment's
-// «History» ends in «Restored» (APPOINTMENT-F10).
+// INVENTORY-F07, INVENTORY-F34, SERVICE-F01, SERVICE-F07, SERVICE-F31, APPOINTMENT-F11: in the Hub admin, the ERPlora
+// staff choose a separate copy of a business and bring back into it the customers, the products, the services and the
+// appointments it lost since, by their apps' own operations (never a copied row): a card, a product or an appointment
+// the business deleted and still holds comes back the same, with its history (the card with its group), by Customers',
+// Inventory's and Appointments' restore; a card it no longer has at all comes back as a new one with its group (the
+// business's own of that name), its tag (made again: the business deleted it) and its custom field's value; a product
+// category and a service category the business deleted come back as new ones, before what goes in them; and a service
+// as a new one, made by Services' create, into its category, and assigned by Services' assign to the professional who
+// performed it, with her own minutes and price. At each size: two cards in a group, the second with a tag and a custom
+// field's value, a product in its own category, a service in its own category, performed by a professional of Staff,
+// and an appointment of another card with its own professional of `a` are made; in Hubs, «Restore to a separate copy…»
+// asks a copy of `a` from a temporary cluster (the stack's own server) and the worker's pass makes it; the first card,
+// the product, the product's category, the service's category and the appointment are deleted in `a`, the second card,
+// the tag and the service are gone from it; then Separate copies › tick the copy › «Recover into the business…» ›
+// Customers, Products, Services and Appointments ticked (with whatever else answers) › «Recover»; the worker's pass
+// brings them back; Recoveries says «Customers: 1 restored, 1 created», «Product categories, Products: 1 restored, 1
+// created», «Services: 2 created» (the category and the service) and «Appointments: 1 restored», and `a` has the same
+// card live again in its group, the second one again in that group with its tag and its value, the same product live
+// again in its category back under a new id, the same appointment (its number, its history ending in «restored») live
+// again, and the service category and the service live again under new ids, the service in that category and performed
+// by that professional again; in its Agenda, the appointment's «History» ends in «Restored» (APPOINTMENT-F10).
 // The stack's worker serves databases only (no moves' thread), so the spec plays its passes, as the specs play the
 // relay.
 import { spawnSync } from 'node:child_process';
@@ -108,7 +109,7 @@ function aMondayAt(hhmm: string): string {
  *  own (no category: the spec's category is deleted); its id. */
 function anAppointment(label: string): string {
   const customer = aCard(`Booked ${label} ${RUN}`, `booked-${label}-${RUN}@example.com`);
-  const staff = inA('staff.member.create', { first_name: 'Recovered', last_name: `${label} ${RUN}` });
+  const staff = inA('staff.member.create', { first_name: 'Booked', last_name: `${label} ${RUN}` });
   const service = inA('service.service.create', {
     name: `Cut ${label} ${RUN}`,
     price: 2000,
@@ -210,6 +211,8 @@ for (const { label, viewport } of SIZES) {
     const product = aProduct(name, sku, shelf);
     const category = inA('service.category.create', { name, color: '#cc0066' });
     const service = aService(name, category);
+    const professional = inA('staff.member.create', { first_name: 'Recovered', last_name: `${label} ${RUN}` });
+    inA('service.assignment.assign', { service_id: service, member_id: professional, custom_duration: 50, custom_price: 2800 });
     const appointment = anAppointment(label);
     const number = psql(`select number from appointment_appointment where id = '${appointment}'`);
     const hubId = psql("select id from base_hub where slug = 'a'");
@@ -245,7 +248,9 @@ for (const { label, viewport } of SIZES) {
     psql(`delete from customer_customer where id = '${goneCard}'`);
     inA('customer.tag.delete', { id: tag });
     expect(psql(`select count(*) from customer_customertag where name = '${tagName}'`)).toBe('0');
-    // And the service gone from the business altogether: no operation deletes one (it is archived), a lost database does.
+    // And the service gone from the business altogether, who performed it with it: no operation deletes one (it is
+    // archived), a lost database does.
+    psql(`delete from service_assignment where service_id = '${service}'`);
     psql(`delete from service_service where id = '${service}'`);
     expect(psql(`select count(*) from service_service where name = '${name}'`)).toBe('0');
 
@@ -319,6 +324,9 @@ for (const { label, viewport } of SIZES) {
     expect(psql(`select color from service_category where id = '${back}'`)).toBe('#cc0066');
     expect(psql(`select category_id from service_service where name = '${name}'`)).toBe(back);
     expect(psql(`select is_deleted from service_category where id = '${category}'`)).toBe('t');
+    // And performed again by the same professional, with her own minutes and price, by Services' assign.
+    const performer = `select member_id, custom_duration, custom_price, is_active from service_assignment where service_id = (select id from service_service where name = '${name}')`;
+    expect(psql(performer)).toBe(`${professional}|50|2800|t`);
     // And the same appointment on the agenda again, by Appointments' restore: its number, its history ending in
     // «restored», and no new one booked for its card.
     expect(psql(`select number, deleted_at is null from appointment_appointment where id = '${appointment}'`)).toBe(`${number}|t`);

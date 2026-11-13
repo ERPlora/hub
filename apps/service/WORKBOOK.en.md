@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a91bed41109fde983412b3d2b13c851709a17b3a876a338d6c9839c33d1ad26f -->
+<!-- generated from WORKBOOK.md sha256:63f09ecb4c04df29ec49c4c7db6a518a6866f4d2e336fc39dfdf8b1376d034c0 -->
 
 ## What it is for and who it is for
 
@@ -848,7 +848,8 @@ could not be read", with the reason) and offers "Retry"; as soon as it arrives, 
 (hub#946). While the list arrives it shows
 "Loading…"; if it cannot be read, "The professionals could not be loaded." with the reason and
 "Retry", never "Nobody assigned yet".
-Involved: STAFF-F01, SALE-F38
+Involved: STAFF-F01, SALE-F38, BASE-F114 (from a separate copy, a service brought back comes back assigned, by this
+same operation, to whoever performed it and the business still has on its staff)
 
 ### SERVICE-F32 Change or remove a professional from a service
 Status: done

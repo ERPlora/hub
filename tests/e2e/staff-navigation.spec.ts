@@ -5,7 +5,8 @@
 // old module's screens; the page never scrolls sideways.
 import { type Browser, expect, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, login, openApps, psql, shot, shown, topbarApps } from './helpers';
+import { A, api, horizontalOverflow, login, openApps, shot, shown, topbarApps } from './helpers';
+import { staffCleanUp } from './staff-helpers';
 
 const TAG = 'E2E';
 const VIEWPORTS = {
@@ -22,18 +23,7 @@ const PAGES = [
   ['settings', '/staff/settings', 'Ajustes'],
 ] as const;
 
-function cleanup(): void {
-  const members = `select id from staff_member where first_name like '${TAG}%'`;
-  psql(
-    [
-      `delete from staff_timeoff where member_id in (${members})`,
-      `delete from staff_scheduleday where schedule_id in (select id from staff_schedule where member_id in (${members}))`,
-      `delete from staff_schedule where member_id in (${members})`,
-      `delete from staff_member where first_name like '${TAG}%'`,
-      `delete from staff_role where name like '${TAG}%'`,
-    ].join('; '),
-  );
-}
+const cleanup = (): void => staffCleanUp(TAG);
 
 test.beforeAll(cleanup);
 test.afterAll(cleanup);
@@ -54,7 +44,7 @@ test('the «My apps» sheet leads to Personal, the tabbar to every section, and 
   try {
     // A sample record, so every list has something to paint.
     expect((await api(context, A, 'POST', '/staff/members', { first_name: `${TAG} Lola`, last_name: 'Muestra' })).status).toBe(201);
-    // No app in the hub's side menu (PLAN-MIGRATIONS §16): the app is a tile of the sheet, its sections are the tabbar.
+    // No app in the hub's side menu: the app is a tile of the sheet, its sections are the tabbar.
     await expect(page.locator('ion-menu.dash-menu [data-testid=nav-home]')).toBeVisible();
     await expect(page.locator('ion-menu.dash-menu ion-item.nav-item', { hasText: 'Personal' })).toHaveCount(0);
     const sheet = await openApps(page);

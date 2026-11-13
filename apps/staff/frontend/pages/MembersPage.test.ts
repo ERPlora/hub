@@ -418,7 +418,7 @@ describe('MembersPage: my record (STAFF-F08)', () => {
   });
 });
 
-describe('MembersPage: the figures (STAFF-G02, G03, G04)', () => {
+describe('MembersPage: the figures (STAFF-F20, F23)', () => {
   it('shows the old Home panels above the list, for everyone who reads the directory', async () => {
     const s = await setup({ session: EMPLOYEE });
     expect(s.params('staff.member.stats')).toEqual([{}]);

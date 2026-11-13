@@ -58,8 +58,7 @@ describe('AutomationsPage', () => {
     expect(some.wrapper.findComponent(FlowGallery).props('flows')).toEqual([flow('f1')]);
   });
 
-  // FIX-HUB-FLOW-ASSISTANT-STEP-ACTS-ON-ANOTHER-CUSTOMER-WITHOUT-ON-BEHALF-OF: the list of the automations used to
-  // subscribe only once the count arrived, so the stream was closed (net::ERR_ABORTED) and opened again on every visit.
+  // Subscribing to the list only once the count arrived would close the stream (net::ERR_ABORTED) and open it again.
   it('opens one live stream for the whole page: the automations arriving reopen nothing', async () => {
     const m = await setup('/flow/automations', [flow('f1')]);
     await m.reopen();
@@ -111,7 +110,7 @@ describe('AutomationsPage', () => {
   });
 });
 
-describe('AutomationsPage: review 2026-10-15, item 5', () => {
+describe('AutomationsPage: an unreadable catalog and what waits for an answer', () => {
   it('a catalog that could not be read is said, with «Retry»', async () => {
     const m = await mountFlow(AutomationsPage, { answers: { '/api/flow/catalog': [500, { error: { code: 'internal_error', message: 'Internal error' } }] } });
     await m.live();
@@ -214,8 +213,8 @@ describe('AutomationsPage: loading, empty and error of what sits above the galle
 
 describe('AutomationsPage: the ready-made automations the apps bring (FLOW-F33 to F36)', () => {
   it('a fix its app made never waits for the owner: nothing to press above «Your automations»', async () => {
-    // FIX-HUB-FLOW-FACTORY-SAFETY-FIX-WAITS-FOR-THE-OWNERS-UPDATE: its app's condition already counts, so the old
-    // «… starts in more cases than it should» with «Update it» would say what is no longer true.
+    // Its app's condition already counts, so «… starts in more cases than it should» with «Update it» would say what
+    // is no longer true.
     const m = await setup('/flow/automations', [flow('f1')]);
     const installed = { flow_id: 'f1', name: 'My gap', enabled: true, outdated: true, missing_grants: [], repair: { 'input.by_customer': { eq: true } } };
     const gap = {
@@ -231,9 +230,9 @@ describe('AutomationsPage: the ready-made automations the apps bring (FLOW-F33 t
   });
 });
 
-// FIX-HUB-FLOW-AUTOMATIONS-TITLE-CUT-ON-PHONE: on a phone «New automation», icon and words, took the bar and left
-// the title as «A…». There it is its «+» alone, still named «New automation» (Material's top app bar, iOS's
-// navigation bars); from a tablet on, its icon and its words, as before.
+// On a phone «New automation» with its icon and words would take the bar and leave the title as «A…». There it is
+// its «+» alone, still named «New automation» (Material's top app bar, iOS's navigation bars); from a tablet on, its
+// icon and its words.
 describe('AutomationsPage: «New automation» on a phone', () => {
   /** A window whose phone query answers `phone`, and can be resized. */
   function screenOf(phone: boolean) {

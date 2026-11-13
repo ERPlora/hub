@@ -1,5 +1,5 @@
 // flow: WEBSITE-F02, WEBSITE-F10 — the four designs, light and dark, at three widths (one test per flow: website-flows.spec.ts)
-// The website module end to end (apps/website, rounds 2026-10-21 and 2026-10-22, PLAN §29): the owner fills the
+// The website module end to end (apps/website): the owner fills the
 // editor at /website (hero with a cover photo, contact, «About us» typed key by key and then hidden, the footer's
 // line, the «Forest» palette, «Auto» and the «Modern» design) and publishes; a visitor without a session opens `/`
 // and gets the public page with the cover, «Log in», the footer's line, ERPlora's credit and without the hidden section, laid out for a
@@ -300,7 +300,7 @@ test('the owner publishes the website and a visitor sees it on the hub’s addre
       GALLERY.map(async (_label, index) => (await page.getByTestId(`website-gallery-photo-${index}-image`).getAttribute('src')) ?? ''),
     );
 
-    // Regression (Ioan, 2026-10-22): typing key by key in a section opened by hand keeps the section open, the
+    // Regression: typing key by key in a section opened by hand keeps the section open, the
     // cursor in the field and every letter, also across the autosave and its result coming back live.
     await openSection(page, 'about');
     await setToggle(page, 'website-show-about', true);
@@ -317,7 +317,7 @@ test('the owner publishes the website and a visitor sees it on the hub’s addre
     expect(Math.abs((await scrolled(page)) - before), 'the editor did not jump').toBeLessThanOrEqual(2);
     await setToggle(page, 'website-show-about', false);
 
-    // Google reviews (2026-10-22): the business's link on Google Maps, checked by the server; this stack has no key of
+    // Google reviews: the business's link on Google Maps, checked by the server; this stack has no key of
     // Google's, so it says the reviews are not available yet and the page shows no section (asserted in `visit`).
     await openSection(page, 'reviews');
     const status = page.getByTestId('website-reviews-status');

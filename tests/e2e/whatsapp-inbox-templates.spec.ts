@@ -7,13 +7,12 @@
 // What the Hub hands over goes to the run's real erplora.com (WORKBOOK «Contrato con el SaaS», doors 8 and 9), where
 // erplora.com's own test seed gave `a` a number (whatsapp-helpers.ts, `seedErplora`): erplora.com takes it to Meta,
 // which refuses the seed's made-up permission, so each row says it was not accepted, with the reason, and is never
-// shown as registered or deleted at Meta. Each flow's screen in three sizes (APP-WHATSAPP_INBOX-1-<flow>-390|834|1440). What it creates is
+// shown as registered or deleted at Meta. Each flow's screen in three sizes (`…-<flow>-390|834|1440`). What it creates is
 // deleted after the file.
 // First, F27 and F28 as erplora.com itself brings them: its seed keeps `a`'s templates as it does after reading Meta's
 // list (SEED_TEMPLATES: approved, in review, rejected with Meta's reason, and one made in WhatsApp Manager with a photo
 // header and a named variable) and pushes them in `a`'s photo; the Hub shows each with Meta's verdict, and says of the
-// WhatsApp Manager one that it cannot be sent or edited here, never offering it to send
-// (FIX-HUB-WHATSAPP-INBOX-E2E-SEED-TEMPLATES-AND-CAP-UNUSED-<flow>-390|834|1440).
+// WhatsApp Manager one that it cannot be sent or edited here, never offering it to send. Each flow in three sizes.
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, login, psql, shot, shown } from './helpers';
@@ -155,7 +154,7 @@ test('the owner sees Meta’s templates and makes, changes and deletes them from
 
   // F29: «Add template». What Meta would refuse is said under its field; a valid one is kept «Not sent to
   // Meta» and handed to erplora.com, which takes it to Meta: Meta refuses the seed's made-up permission with its
-  // 190, which erplora.com says as `whatsapp.reconnect_needed` (door 8, saas#116), so the row says «Not accepted»
+  // 190, which erplora.com says as `whatsapp.reconnect_needed` (door 8), so the row says «Not accepted»
   // with the Hub's words for it, never Meta's nor «In review».
   await shown(page).locator(`[data-testid=${TABLE}-add]`).click();
   await expect(editor).toBeVisible();

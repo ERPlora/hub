@@ -1,8 +1,8 @@
-"""FIX-HUB-ONLINE_BOOKING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (hub#673): the card of a write of Online booking says
-which booking, services and professional it acts on by their names, read as whoever asks, never by an id, and leaves
-them out when that person may not read them or they are not there. A booking is an appointment of the diary, so it
-goes as the diary says one — its customer, its day, its hour and its professional, as the inbox's «Cancel Lucía's
-booking (…)?» dialog does —; a service and a professional of the page's booking by their names, as the page lists them.
+"""hub#673: the card of a write of Online booking says which booking, services and professional it acts on by their
+names, read as whoever asks, never by an id, and leaves them out when that person may not read them or they are not
+there. A booking is an appointment of the diary, so it goes as the diary says one — its customer, its day, its hour and
+its professional, as the inbox's «Cancel Lucía's booking (…)?» dialog does —; a service and a professional of the page's
+booking by their names, as the page lists them.
 """
 
 import dataclasses

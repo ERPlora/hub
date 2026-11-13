@@ -1,14 +1,15 @@
-// flow: invoice-locale — FIX-HUB-INVOICE-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP: Django joins every app's Spanish
-// catalogue and the first that translates a message wins, so the assistant's card named the issuer's data with
-// customer's words, «NIF/CIF» and «Dirección». Changing the issuer is a dangerous write, whose card lists every datum by
-// its name: it names them as the Issuer screen does, «NIF» and «Domicilio». The owner, in Spanish, asks the assistant
-// (the e2e's provider, `E2E-ASK`: assistant-provider.ts; README «El asistente») to change the issuer's tax ID and
-// address; the card says them so at 390, 834 and 1440, and «Cancel» changes nothing. (A series' «Activa» rides a normal
-// card, a single line of values with no names: apps/invoice/tests/test_i18n.py checks the name the server gives it.)
+// flow: invoice-locale — Django joins every app's Spanish catalogue and the first that translates a message wins, so
+// the assistant's card could name the issuer's data with customer's words, «NIF/CIF» and «Dirección». Changing the
+// issuer is a dangerous write, whose card lists every datum by its name: it names them as the Issuer screen does, «NIF»
+// and «Domicilio». The owner, in Spanish, asks the assistant (the e2e's provider, `E2E-ASK`: assistant-provider.ts;
+// README «El asistente») to change the issuer's tax ID and address; the card says them so at 390, 834 and 1440, and
+// «Cancel» changes nothing. (A series' «Activa» rides a normal card, a single line of values with no names:
+// apps/invoice/tests/test_i18n.py checks the name the server gives it.)
 import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { sentCard, type SentCard } from './assistant-card-helpers';
 import { type Provider, startProvider } from './assistant-provider';
 import { A, capture, compactBar, login, REPO_DIR, shown } from './helpers';
 import { issuerNow } from './invoice-helpers';
@@ -86,25 +87,6 @@ async function cancel(page: Page): Promise<void> {
   await card(page).locator('[data-testid="assistant-confirm-cancel"]').click();
   await expect(card(page)).toBeHidden();
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
-}
-
-type SentCard = { fields: { name: string; label: string; value: unknown }[] };
-
-/** The card of the confirm frame of a turn's answer (`text/event-stream`: one `data: <JSON>` per frame), if any. */
-function confirmedCard(stream: string): SentCard | undefined {
-  const frames = stream
-    .split('\n')
-    .filter((line) => line.startsWith('data:'))
-    .map((line) => JSON.parse(line.slice(5)) as { type: string; card?: SentCard });
-  return frames.find((frame) => frame.type === 'confirm')?.card;
-}
-
-/** The card the server sends for the person to confirm, as it arrives: the answer of the turn that carries it. */
-async function sentCard(page: Page): Promise<SentCard> {
-  const answer = await page.waitForResponse(
-    async (response) => response.url().endsWith('/api/assistant/turn') && confirmedCard(await response.text()) !== undefined,
-  );
-  return confirmedCard(await answer.text())!;
 }
 
 const labelsOf = (sent: SentCard) => Object.fromEntries(sent.fields.map((field) => [field.name, field.label]));

@@ -192,7 +192,7 @@ export function missingApps(cards: readonly FlowTemplate[], catalog: CatalogOut)
 
 /** The automation of the business that is this card: same event and its actions; a card on the clock,
  *  the same name or the same «every day / week / month» with its actions, whatever it was renamed to
- *  or the language it was made in (flows#68). */
+ *  or the language it was made in. */
 export function existingFor(card: FlowTemplate, flows: readonly FlowOut[], p: Phrasing): FlowOut | undefined {
   const name = cardEvent(card);
   const clock = cardTrigger(card);

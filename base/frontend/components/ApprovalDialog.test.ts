@@ -1,8 +1,3 @@
-// «An approval is needed» (BASE-G136; the old hub's HUB_SHELL-F51): what is approved in the app's words, «Who approves
-// it?» with the people who may do it themselves (live `base.approval.approvers`) on the till's faces and PIN pad
-// (APP-BASE-3's `PinDoor`: with one person the pad is already theirs; «Another person» goes back), or their badge at any
-// moment with nothing pressed first. An approval closes the dialog with its
-// pass and says «Approved by <name>»; a refusal stays in the dialog, told from its code; «Cancel» closes it with none.
 import { modalController } from '@ionic/vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

@@ -1,7 +1,3 @@
-// The Hub's empty conversation of the assistant (BASE-G111, G121), in the shared panel's `empty` slot: the sentence —
-// the setup's when the panel was opened from «Finish setting up your business» — and the shortcuts: «What is left to
-// set up?» and one per pending step this person can do (up to four), each asked at once with the setup; if the
-// checklist cannot be read, only the first.
 import { describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, mountBase, subId } from '../__tests__/mount-base';

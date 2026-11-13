@@ -39,12 +39,12 @@ def fixed_scope_words(text: str) -> list[str]:
 
 
 def test_the_words_are_found_across_a_line_break():
-    assert fixed_scope_words("la corre en el ámbito\n  fijo de la fase 1") == ["ámbito fijo"]
+    assert fixed_scope_words("la corre en el ámbito\n  fijo del worker") == ["ámbito fijo"]
 
 
 def test_the_words_are_found_whatever_their_case():
-    assert fixed_scope_words("Ámbito fijo de la fase 1") == ["ámbito fijo"]
-    assert fixed_scope_words("Fixed scope in phase 1") == ["fixed scope"]
+    assert fixed_scope_words("Ámbito fijo del worker") == ["ámbito fijo"]
+    assert fixed_scope_words("Fixed scope of the worker") == ["fixed scope"]
     assert fixed_scope_words("WORKER_SCOPE_SLUG") == ["WORKER_SCOPE_SLUG"]
 
 

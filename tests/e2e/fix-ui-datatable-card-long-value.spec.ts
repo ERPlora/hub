@@ -1,9 +1,8 @@
-// flow: ui:DataTable — FIX-UI-DATATABLE-CARD-LONG-VALUE-CLIP (hub#91, seen by the worker of APP-STAFF):
-// on a phone, where a list becomes cards, a value with no spaces (a 54-character email in Staff ›
-// Members) ran past the right edge of its card and was cut with no «…». No value leaves its card: a
-// word too long for it ends in «…» (the whole value stays in its title and in the record the card
-// opens), as the list cell does at 834 and 1440 px (erplora-old/hub#2717 was that cell, cut mid-word).
-// With ui 8ea0289 the text ran past the card's content box and only ion-card's own clip hid it.
+// flow: ui:DataTable — on a phone, where a list becomes cards, a value with no spaces (a 54-character email in
+// Staff › Members) must not run past the right edge of its card and be cut with no «…» (hub#91). No value leaves its
+// card: a word too long for it ends in «…» (the whole value stays in its title and in the record the card
+// opens), as the list cell does at 834 and 1440 px. The text stays inside the card's content box, not only inside
+// ion-card's own clip.
 import { type Browser, expect, type Locator, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
@@ -89,7 +88,8 @@ for (const vp of VIEWPORTS) {
       await expect(row).toContainText(EMAIL.slice(0, 20));
       await settled(page);
       const table = view.locator('.data-table').first();
-      // The ladder (W-19) settles in a few frames after the last resize; a phone always gets cards.
+      // What the table gives up to fit its box settles in a few frames after the last resize; a phone always
+      // gets cards.
       await expect.poll(() => probe(table, EMAIL).then((seen) => seen !== null)).toBe(true);
       await settled(page);
       const seen = await probe(table, EMAIL);

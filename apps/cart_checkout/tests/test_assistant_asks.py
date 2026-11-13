@@ -1,5 +1,5 @@
-"""What layer 1 of the assistant's QA says of Cart & Checkout (erplora-next docs/plans/2026-10-31-asistente-conocimiento-y-
-qa.md): which tools it offers, to whom, and the requests the real-model QA found unreachable (hub#1100).
+"""What layer 1 of the assistant's QA says of Cart & Checkout: which tools it offers, to whom, and the requests the
+real-model QA found unreachable (hub#1100).
 
 Every ask of every tool of cart_checkout bringing its tool among the first ten, role by role, in English and in Spanish,
 out of the catalogue of a business with every app on and ranked as a turn ranks, is ``base/tests/test_assistant_asks.py``'s
@@ -7,21 +7,22 @@ out of the catalogue of a business with every app on and ranked as a turn ranks,
 """
 
 import json
-import re
-import unicodedata
 from pathlib import Path
 
 import pytest
 from django.conf import settings
 from live import assistant as shared
-from live.context import OperationContext, Scope
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
+from base.tests.test_assistant_asks import (
+    TOP,
+    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
+    comparable,
+    place_of_no_ask,
+)
 
-A = Scope("host", "a")
 #: Cart & Checkout's reads: its carts, their lines and the orders made from them.
 READS = {
     "cart_checkout.cart.list",
@@ -49,18 +50,6 @@ TOOLS = READS | {
 }
 #: The probes of layer 2 (``tests/e2e/qa/assistant-probes.spec.ts``) that hub#1100's QA ran on Cart & Checkout.
 PROBES = Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes"
-
-
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
 
 
 def test_cart_checkout_offers_its_nineteen_tools():
@@ -155,12 +144,6 @@ REPORTED = [
 ]
 
 
-def comparable(text: str) -> str:
-    """``text`` as layer 2 compares a probe with the asks: lower case, without accents, punctuation or extra spaces."""
-    bare = "".join(c for c in unicodedata.normalize("NFD", text) if not unicodedata.combining(c)).lower()
-    return " ".join(re.sub(r"[^\w]+|_", " ", bare).split())
-
-
 def test_the_reported_requests_are_the_owners_probes_of_layer_2():
     """Each phrase above is word for word the owner's probe of its tool, one per tool: the test measures what layer 2
     measures, over every tool of the app."""
@@ -177,11 +160,7 @@ def test_the_reported_requests_are_the_owners_probes_of_layer_2():
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_cart_request_is_offered_its_tool_without_being_its_asks(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, language := "es")
-    assert name in tools  # positive control: the owner holds it, so the model can receive it
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get(language, ())}
-    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
-    assert name in offered, offered
+    assert place_of_no_ask(catalog_of(Membership.Role.OWNER, "es"), name, phrase) is not None
 
 
 #: What the QA's model ran instead of the cart's tool (hub#1100): asked to change the units of a cart's line, it changed
@@ -258,7 +237,5 @@ BY_SYNONYM = [
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), BY_SYNONYM)
 def test_a_cart_named_by_the_shops_words_is_offered_among_the_first_ten(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, language := "es")
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get(language, ())}
-    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
-    assert name in offered[:10], offered.index(name) + 1 if name in offered else offered
+    place = place_of_no_ask(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
+    assert place is not None and place <= TOP, place

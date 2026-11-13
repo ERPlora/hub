@@ -1,8 +1,8 @@
 // Types of the online booking app's operations for the SDK (`useLive`, `useCommand`), from
-// apps/online_booking/schemas.py. Written by hand, as `frontend/sdk-types.d.ts` is for the PoC, until V3
-// generates them from `/api/openapi.json`. Keep it in step with schemas.py and with
-// `frontend/generated/operations.json`. One input per operation (ninja's parity): no path parameters.
-// Times come on the business's clock with their offset (`2030-03-05T10:00:00+01:00`); days are `YYYY-MM-DD`.
+// apps/online_booking/schemas.py. Written by hand, as `frontend/sdk-types.d.ts` is: nothing generates them from
+// `/api/openapi.json`. Keep it in step with schemas.py and with `frontend/generated/operations.json`. One input per
+// operation (ninja's parity): no path parameters. Times come on the business's clock with their offset
+// (`2030-03-05T10:00:00+01:00`); days are `YYYY-MM-DD`.
 import type { Page } from '../../../frontend/sdk-types';
 
 export type SortDir = 'asc' | 'desc';

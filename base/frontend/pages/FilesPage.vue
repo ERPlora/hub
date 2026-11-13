@@ -1,12 +1,8 @@
 <script setup lang="ts">
-// Files (APP-BASE-8; the old hub's FilesPage, HUB_SHELL-F130…F134): the business's files, live (`base.file.list`,
-// re-run after every write of them from any device). Like the old screen: the tree of folders on the left — content of
-// the page, not a menu; on a narrow screen a «Folders» selector —, the open folder's path, its folders and files in a
-// grid or a list, «Space» (used, against the plan's when it has one, else «No limit»), «Search files…» in the open
-// folder. Who runs the business (`can`, from the server) uploads (the button, or by dropping files), makes folders,
-// renames, moves («Move to…», or by dragging onto a folder) and deletes (asked first); everyone opens (the preview) and
-// downloads. The open folder is in the address (`?folder=`). Every refusal reads its own sentence (hub#1776); every
-// notice is a sentence, never a key (hub#2197).
+// The business's files, live: `base.file.list` re-runs after every write from any device. Only whoever runs the
+// business (`can`, from the server) uploads, makes folders, renames, moves and deletes; everyone opens and downloads.
+// The open folder is in the address (`?folder=`). Every refusal reads its own sentence and every notice is a sentence,
+// never a translation key.
 import { EmptyState, FormModal, InlineFeedback, UsageMeter, syncSearchbarInputName, useConfirm } from '@erplora/ui/components';
 import { type ApiError, fetchFile, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, toastError, toastSuccess } from '@erplora/ui/shell';
@@ -132,11 +128,11 @@ function openFolder(path: string): void {
 
 const folderLabel = (path: string) => (path ? nameOf(path) : t('base.files.root'));
 
-// The search box named by its hint, in the person's language: Ionic names its input «search text» (BASE-G152).
+// The search box named by its hint, in the person's language: Ionic names its input «search text» in English.
 const toolbar = useTemplateRef<HTMLElement>('toolbar');
 watch([toolbar, locale], ([root]) => syncSearchbarInputName(root, () => t('base.files.search')), { flush: 'post' });
 
-// ── Upload (BASE-G83) ──
+// ── Upload ──
 const picker = useTemplateRef<HTMLInputElement>('picker');
 const progress = ref<{ done: number; total: number } | null>(null);
 const dropping = ref(false);
@@ -202,7 +198,7 @@ function dropOnManager(event: DragEvent): void {
   void uploadAll(Array.from(event.dataTransfer?.files ?? []));
 }
 
-// ── New folder (BASE-G83) ──
+// ── New folder ──
 const folderOpen = ref(false);
 const folderName = ref('');
 const folderError = computed(() =>
@@ -240,7 +236,7 @@ function act(action: (entry: Entry) => void | Promise<void>): void {
   if (entry) void action(entry);
 }
 
-// ── Open and download (BASE-G84) ──
+// ── Open and download ──
 const previewing = ref<FileItem | null>(null);
 const previewOpen = ref(false);
 
@@ -262,7 +258,7 @@ async function download(item: FileItem): Promise<void> {
   }
 }
 
-// ── Rename and move (BASE-G85) ──
+// ── Rename and move ──
 const renaming = ref<Entry | null>(null);
 const renameOpen = ref(false);
 const renameName = ref('');
@@ -352,7 +348,7 @@ function followTo(path: string): void {
   if (path !== folder.value) openFolder(path);
 }
 
-// ── Delete (BASE-G86) ──
+// ── Delete ──
 async function askDelete(entry: Entry): Promise<void> {
   const yes = await confirm({
     title: t(entry.folder ? 'base.files.deleteDialog.folderTitle' : 'base.files.deleteDialog.fileTitle'),

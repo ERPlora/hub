@@ -467,7 +467,7 @@ const label = (row: AppointmentRow): string =>
   border-right: 1px solid var(--ion-border-color, #e7e2d6);
   overflow: hidden;
 }
-/* A long name takes a second line before it ends in «…» (outfitkit#284); the whole one is its title. */
+/* A long name takes a second line before it ends in «…»; the whole one is its title. */
 .day-grid__name-text {
   display: -webkit-box;
   min-width: 0;

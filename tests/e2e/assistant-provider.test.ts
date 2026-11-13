@@ -129,7 +129,7 @@ describe('answerTo', () => {
     expect(outcome(`${JSON.stringify({ rows: [{ status: 'cancelled' }] })} …(cut)`)).toBe(DONE.en);
   });
 
-  it('a chain: first a read, then a write, then the outcome (BASE-G119)', () => {
+  it('a chain: first a read, then a write, then the outcome', () => {
     const question = user('E2E-CHAIN Mesa 7');
     const asked = (name: string) => ({ role: 'assistant', content: '', tool_calls: [{ function: { name } }] });
     expect(toolOf(answerTo([question]).frames)).toEqual({ name: 'demo__item__list', arguments: '{}' });

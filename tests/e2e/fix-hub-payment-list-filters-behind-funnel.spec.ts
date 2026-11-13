@@ -1,8 +1,6 @@
-// flow: PAYMENT-F06 (lista de Pagos: filtros tras el embudo) — FIX-HUB-PAYMENT-LIST-FILTERS-BEHIND-FUNNEL (seen by the
-// reviewer of FIX-UI-DATATABLE-RANGE-FILTER-LABELS): the old Payments › Payments kept its column filters behind the
-// toolbar's funnel (docs/reference/old-hub/payment-list-{390,834,1440}.png: search, «Columns», page size, views, funnel
-// and «Add», no row of filters open). The new list painted that row open under the toolbar at 834 and 1440. As
-// Invoices, Sales or Customers, on arrival there is only the funnel; it opens the panel inside the table (1440, 834) or
+// flow: PAYMENT-F06 (the Payments list: filters behind the funnel) — Payments › Payments keeps its column filters
+// behind the toolbar's funnel, with no row of filters open under the toolbar. As Invoices, Sales or Customers, on
+// arrival there is only the funnel; it opens the panel inside the table (1440, 834) or
 // the sheet over the list (390) with the same filters (Reference, Date from / to, Beneficiary, Amount from / to,
 // Status), and «Apply» still filters the list by status, by date and by amount in euros.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';

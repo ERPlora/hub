@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// STAFF-G05: the old Home panel «Today's time off» (STAFF-F20) above the time-off list, as Attendance
+// The old Home panel «Today's time off» (STAFF-F20) above the time-off list, as Attendance
 // shows «Clocked in now» above its records, while the Hub's Home has no panels: who has an approved
 // absence covering today in the business's day, whole days first and then by name (the server's order),
 // with its type and, for part of the day, its hours — never the reason. Live (`staff.time_off.today`).

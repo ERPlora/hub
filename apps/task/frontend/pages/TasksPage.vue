@@ -4,7 +4,7 @@
 // «Overdue», amber «Due today»; a closed task is never late), Assignee and Project (hidden) —, the newest
 // first, «Search no. or title…», column filters behind the toolbar funnel, list or cards, 50 a page. «My
 // tasks», only for whoever has a staff record: the live `task.task.mine`, dated first; a task completed
-// from its card stays in its slot, as done, until the person leaves the tab (tasks#45). A row offers
+// from its card stays in its slot, as done, until the person leaves the tab. A row offers
 // Detail, Start and Complete where they apply; Start and Complete confirm with a short notice; the row and
 // Detail open the task's sheet; «+» opens «New task». A refused row action is said above the table.
 import {
@@ -82,7 +82,7 @@ const mine = useLiveList(
   () => mineTable.windows.value,
 );
 mineTable.followResult(mine.data);
-/** tasks#45: the tasks completed from «My tasks» during this visit to the tab. */
+/** The tasks completed from «My tasks» during this visit to the tab. */
 let keptDone = new Map<string, TaskOut>();
 const mineRows = ref<TaskOut[]>([]);
 watch(

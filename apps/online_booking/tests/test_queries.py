@@ -485,7 +485,7 @@ def test_a_link_is_kept_as_its_hash():
 
 
 def test_ties_go_by_id_in_the_lists_own_direction(salon):
-    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
+    """hub#768: a descending list is the ascending one read backwards, ties included, and its
     pages neither repeat nor lose rows."""
     rows = [
         make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, f"{hour:02}:00"), status="pending")

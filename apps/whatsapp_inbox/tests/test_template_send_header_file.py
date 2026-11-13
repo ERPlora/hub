@@ -7,7 +7,7 @@ names it (``Message.header_sample``) and its hand-over to erplora.com (door 5, a
 store with no connection held) carries it in base64, so erplora.com uploads it to the number and sends the template
 with it. A retry carries the same file with the same key. An automation (``message.notify``) sends the same templates
 the inbox fills: one with a file header goes with the file its step «Send a message» chose (FLOW-F32), else with its
-own, and with neither it does not leave. Meta not answering is said as Meta's (gh:hub#2731).
+own, and with neither it does not leave. Meta not answering is said as Meta's.
 """
 
 import base64

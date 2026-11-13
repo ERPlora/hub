@@ -1,32 +1,32 @@
-"""The Hub's worker (CLAUDE.md «Procesos»; aws-next README, «Contrato app ↔ infra»).
+"""The Hub's worker.
 
 ``manage.py run_worker`` runs it in the ``worker`` task, one per deploy. It first registers the
-Hub's modules in the SaaS's registry (round 16, PLAN §21.1.1): without its apps registered there is
-no release, so it does no work before that. Two cases (first production deploy, 2026-10-14):
+Hub's modules in the SaaS's registry: without its apps registered there is
+no release, so it does no work before that. Two cases:
 
 - the SaaS has not migrated the ``shared`` schema yet (``SharedSchemaNotReady``: its tables do not
   exist): transient, so it warns and retries after 5, 10, 20, 40 and then every 60 s, running and
   without working, so ECS sees a stable task; a stop request during the wait exits 0;
-- any other failure, a missing column included (a contract gap, spec §3.5): fatal, 1, and ECS's
+- any other failure, a missing column included (a gap in the contract with the SaaS): fatal, 1, and ECS's
   ``task_failed`` rule reports it.
 
-Then it names, as an error, each ready business still without a database of its own (phase 1's, not cut yet: S5,
-``manage.py cut_shared_hubs``): it never serves one, nor runs it on control. Every tick (5 s), each hub with its own
-database gets its outbox relayed (``base.relay``, round 2026-10-20 of PLAN-HUB: each new event to the reactions of the
+Then it names, as an error, each ready business still without a database of its own (one that shared a database and
+was not cut yet, ``manage.py cut_shared_hubs``): it never serves one, nor runs it on control. Every tick (5 s), each hub
+with its own database gets its outbox relayed (``base.relay``: each new event to the reactions of the
 apps that listen to it, exactly once, in the scope of the hub that recorded it) and the tasks of its apps that are due
-run (``scheduler.run_due``: the VeriFactu queue every minute, VERIFACTU-F20, and every other ``scheduled_tasks`` an
+run (``scheduler.run_due``: the VeriFactu queue every minute, and every other ``scheduled_tasks`` an
 app declares, each claimed with ``SKIP LOCKED``; its schedule written in its database once per process); control's own
 outbox (the registry's and the demos' events, which no app hears) is taken on control. A pass that fails (the database
 went away) is logged and the next tick tries again; a stop request ends the loop at once. What a reaction or a task
 leaves for after its COMMIT that waits on the network (a call to another system) runs off this loop, in
 ``base.outbound``'s threads, so it never holds the next delivery nor the next task; on its way out the worker gives
 what still runs ``OUTBOUND_GRACE_SECONDS`` and drops what waits (their lease sends them again). On the first tick and
-then every ``REAPER_INTERVAL_SECONDS`` it also purges the demo hubs that ended (``base.services.reap_demos``, plan
-2026-10-17 §1.7), whatever the scheduler did: a pass that fails is logged and the next one tries again, and the worker
+then every ``REAPER_INTERVAL_SECONDS`` it also purges the demo hubs that ended (``base.services.reap_demos``),
+whatever the scheduler did: a pass that fails is logged and the next one tries again, and the worker
 never stops for it.
 
-After the hubs with their own database, the apps they turned on whose tables they lack (S3; PLAN-DB §7 and §8,
-``_activations``, also with ``databases_only``): the hubs rung (``hub_due`` come and free: ``base.app.enable`` rings
+After the hubs with their own database, the apps they turned on whose tables they lack (``_activations``, also with
+``databases_only``): the hubs rung (``hub_due`` come and free: ``base.app.enable`` rings
 after its COMMIT, a retry at its time, the sweep), for ``ACTIVATION_PASS_SECONDS`` at most: in each one, what is due
 (``creating``, or ``failed`` past its next try) gets its tables from ``base.tenancy.migrator.ensure_schema(hub, add=…)``
 under the hub's schema lock, and ``base.app.activation_settle`` turns it on (its event, its live notice) or ``failed``
@@ -37,9 +37,9 @@ a migration this code does not know: a deploy rolling) is left to a worker of th
 it. A ring lost is found by the pass over the hubs served (``_hubs``), which looks into each ready one for apps still to
 set up every 10 minutes when it had a visit in the last 7 days, and once a day otherwise.
 
-Then two slow passes of the data (round 2026-10-30 of PLAN-DB, S2b), each in a
-thread of its own (:class:`Background`, one piece at a time, its own connections closed when it ends; PLAN-DB round
-2026-10-31b, C8): the loop starts them and goes on, so a copy of minutes never holds the relay, the tasks, VeriFactu or
+Then two slow passes of the data, each in a
+thread of its own (:class:`Background`, one piece at a time, its own connections closed when it ends): the loop starts
+them and goes on, so a copy of minutes never holds the relay, the tasks, VeriFactu or
 the hubs due. ``_data`` takes one hub with data work due (``base.services.claim_next_data_hub``, under its lease): a reset asked (its database copied by
 ``base.tenancy.dumps``, then, only if the copy was kept, its sections emptied by ``base.hub.reset_apply`` in its
 database), the copy of a business that left (tried again later when it fails), or, past its 90 days, its final copy and
@@ -48,12 +48,12 @@ once it ended (``base.usage``, 00:15 UTC, before the SaaS collects it at 01:15; 
 Neither runs with ``databases_only``. On the way out the worker waits for them :data:`BACKGROUND_GRACE_SECONDS` at most:
 a copy hears the stop, kills ``pg_dump`` and gives its lease back, and its work stays due. A third thread moves the hubs
 asked to move to another cluster and drops the copies they left behind after their days (``_moves``,
-``base.tenancy.move``, round 2026-10-30b of PLAN-DB, decision 3), likewise, and puts the hubs asked to be restored back
+``base.tenancy.move``), likewise, and puts the hubs asked to be restored back
 as they were at a moment, from their copy on a temporary cluster (``base.tenancy.restore``, hub#1198), and makes the
 separate copies of a moment asked, next to the business and without closing it (hub#1213).
 
-The order of a tick (review of hub#471): control's own outbox first; then the hubs with their own database
-(``_hubs``, round 2026-10-30 of PLAN-DB): each one it serves (ready, or a business that left but keeps its database,
+The order of a tick: control's own outbox first; then the hubs with their own database
+(``_hubs``): each one it serves (ready, or a business that left but keeps its database,
 whose records still to send must reach the AEAT), in its own database (``use_hub``) and one at a time, gets its outbox
 relayed, its apps' schedule written there once per process and the tasks due of its active apps run on its own scope
 (``host``, its slug: their live notices go on its channel), for ``HUB_PASS_SECONDS`` at most, the next tick going on
@@ -62,13 +62,13 @@ whose ``hub_due`` has come: their databases made, the demos that ended dropped (
 takes no new hub after ``provision.DUE_PASS_SECONDS``, though a clone it started finishes); a hub made ready in a tick
 has its outbox relayed from the next one. Every pass releases its connections.
 
-Each pass opens its database context (phase 2, S1; plan 2026-10-22): each hub with its own database in its own
+Each pass opens its database context: each hub with its own database in its own
 (``use_hub``), and control's outbox, the reaper and the ``hub_due`` pass on control (``use_control``), where the
-registry and the demos live (the provisioning enters each hub's own database itself). Since S5 there is no shared
+registry and the demos live (the provisioning enters each hub's own database itself). There is no shared
 database: a business without its own is never entered.
 
-Each tick first reads the freeze switch of control, once (``control.queries.active_freeze``; hub#930, PLAN-DB round
-2026-11-04e, «Congelar»: a database upgrade with Blue/Green copies no DDL). While the staff keeps the platform frozen
+Each tick first reads the freeze switch of control, once (``control.queries.active_freeze``: a database upgrade with
+Blue/Green copies no DDL). While the staff keeps the platform frozen
 (``control.freeze.set``, the Hub admin) the tick starts nothing that makes, drops or moves a database or makes a table:
 the apps' tables, the data work (a reset, a business that left and its drop after its days), the moves, the reaper and
 the hubs due wait, each in its own queue, and are done from the first tick after the freeze is lifted. The relay, every
@@ -76,7 +76,7 @@ hub's tasks (VeriFactu's queue among them), the nightly measure and the metrics 
 freeze ends (its lease held: ``control.freeze.get`` counts them). A switch that cannot be read counts as frozen for that
 tick: every pass it holds back reads control first anyway. The change is said once each way.
 
-Its CloudWatch metrics (``base.metrics``, hub#488), only where ``METRICS_ENABLED`` is on, are one more slow pass in a
+Its CloudWatch metrics (``base.metrics``), only where ``METRICS_ENABLED`` is on, are one more slow pass in a
 thread of its own (``Background("metrics")``), started on the first tick and then once a minute of its clock, also with
 ``databases_only``: the registry's (a sign-up still being prepared, the hubs that failed, a demo left to drop) and the
 fiscal backlog. On the way out it shares the others' grace, ending before its next hub.
@@ -137,7 +137,7 @@ OUTBOUND_GRACE_SECONDS = 15
 ACTIVATION_PASS_SECONDS = 10.0
 #: How often the pass over the hubs served (``_hubs``) looks into a hub for apps to set up whose ring was lost (between a
 #: COMMIT and its ring, or ended by another pass): an active one (a visit in the last 7 days) every 10 minutes, any
-#: other once a day (PLAN-DB §8, «barrido de reconciliación»).
+#: other once a day.
 SWEEP_ACTIVE = dt.timedelta(minutes=10)
 SWEEP_ALL = dt.timedelta(days=1)
 ACTIVE_WINDOW = dt.timedelta(days=7)
@@ -161,7 +161,7 @@ def run(
     ``wait(seconds)`` sleeps until the time is up or a stop is requested: ``stop.wait`` unless a
     test replaces it. ``stop`` alone says whether to stop. ``clock()`` is now (a test's fake clock).
     ``databases_only`` (``run_worker --databases-only``, the e2e's worker): only the hubs' databases are made, the
-    tables of the apps they turn on made (S3) and the demos that ended dropped; no task runs and no outbox is relayed,
+    tables of the apps they turn on made and the demos that ended dropped; no task runs and no outbox is relayed,
     which the e2e's specs play themselves.
     """
     wait = stop.wait if wait is None else wait
@@ -239,7 +239,7 @@ def run(
 
 
 class Background:
-    """One slow pass at a time in a thread of its own (PLAN-DB round 2026-10-31b, C8): the data pass, whose copy of a
+    """One slow pass at a time in a thread of its own: the data pass, whose copy of a
     hub's database may take minutes, the nightly measurement and the CloudWatch metrics (``base.metrics``). The loop
     starts it when it is not running and goes on with its tick; a piece that fails is logged and the next tick starts it
     again. Each piece opens its own connections (the thread starts with no database context: the passes enter theirs)
@@ -403,7 +403,7 @@ def _activate_in(hub, now: dt.datetime) -> None:
     code = _code()
     newer = sorted(label for label, target in due.items() if target and (label, target) not in code.nodes)
     # Only what it makes counts: the platform or another app of a later code (a rollback) never holds it back, as the
-    # migrator ignores what it does not know (PLAN-DB §7, «Rollback»).
+    # migrator ignores what it does not know.
     making = set(apps) | activation.needs(apps, activation.module_graph())
     ahead = sorted(
         label
@@ -440,8 +440,7 @@ def _code() -> migrator.CodeMigrations:
 
 
 def _data(now: dt.datetime, stop: threading.Event | None = None) -> None:
-    """The data work of one hub due by ``now``, under its lease (round 2026-10-30 of PLAN-DB, decision 2 and proposal
-    (a)): a reset asked (its database copied, then its sections emptied), the copy of a business that left, or a business
+    """The data work of one hub due by ``now``, under its lease: a reset asked (its database copied, then its sections emptied), the copy of a business that left, or a business
     past its 90 days (``base.tenancy.offboarding``). It runs in
     the worker's data thread (:class:`Background`), one hub at a time: a copy takes a while, and the loop goes on
     meanwhile. A failure is logged and the work stays due (a lease lost is left to its holder); ``stop`` set stops the
@@ -506,8 +505,8 @@ def _usage(now: dt.datetime) -> None:
 
 def _moves(now: dt.datetime, stop: threading.Event | None = None) -> None:
     """Move the hub asked longest ago to its new cluster and drop the copies past their days
-    (``base.tenancy.move.run_due``, round 2026-10-30b of PLAN-DB, decision 3), then restore the hub asked longest ago
-    from its copy (``base.tenancy.restore.run_due``, hub#1198), make the separate copy asked longest ago
+    (``base.tenancy.move.run_due``), then restore the hub asked longest ago
+    from its copy (``base.tenancy.restore.run_due``), make the separate copy asked longest ago
     (``base.tenancy.restore.run_aside_due``, hub#1213) and bring back into its business what a made copy was asked to
     give back (``base.tenancy.recovery.run_due``, hub#1257), on control, in the worker's move thread
     (:class:`Background`); a failure is logged and the next tick tries again. ``stop`` set stops the copy in course and
@@ -625,8 +624,8 @@ def _relay(now: dt.datetime) -> None:
 
 
 def _name_the_businesses_without_a_database() -> None:
-    """Log, as an error, each ready business still without a database of its own (phase 1's, not cut yet): since S5
-    the worker never serves one, nor runs it on control, and its host answers 503 until ``manage.py cut_shared_hubs``
+    """Log, as an error, each ready business still without a database of its own (one that shared a database and was
+    not cut yet): the worker never serves one, nor runs it on control, and its host answers 503 until ``manage.py cut_shared_hubs``
     gives it one. A business that left (``cancelled``) without one is no error: it is made one if it comes back."""
     try:
         with use_control():

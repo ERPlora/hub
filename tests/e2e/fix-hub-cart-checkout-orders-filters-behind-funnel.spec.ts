@@ -1,8 +1,6 @@
-// flow: CART_CHECKOUT-F12 — FIX-HUB-CART-CHECKOUT-ORDERS-FILTERS-BEHIND-FUNNEL (seen by the reviewer of
-// FIX-UI-DATATABLE-RANGE-FILTER-LABELS): in the old hub Cart & Checkout › Orders and › Carts kept their column
-// filters behind the toolbar's funnel, with no open row (docs/reference/old-hub/cart_checkout-{orders,carts}-
-// {390,834,1440}.png), as Invoices and Sales already do here (hub#31). The new one painted the row open under the
-// toolbar (Order, Email, Status, Payment, Total from / to). Now, at 390, 834 and 1440, both lists open with no row;
+// flow: CART_CHECKOUT-F12 — Cart & Checkout › Orders and › Carts keep their column filters behind the toolbar's
+// funnel, with no open row of filters under the toolbar, as Invoices and Sales do (hub#31). At 390, 834 and 1440,
+// both lists open with no row;
 // the funnel opens the panel with the columns, «Apply» filters by Status and by Total, and a Total it cannot read
 // says under its box what the money field says (hub#1196: «This is not an amount. Type a figure, for example 12.50.»,
 // «Esto no es un importe. Escribe una cifra, por ejemplo 12,50.», or the two readings of «1.250») and filters nothing.

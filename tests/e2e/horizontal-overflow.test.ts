@@ -1,17 +1,16 @@
-// flow: e2e-overflow — FIX of the e2e harness (FIX-HUB-E2E-HORIZONTAL-SCROLL-CHECK-BLIND-TO-ION-CONTENT)
+// flow: e2e-overflow — the e2e harness's horizontal scroll check
 // Every «no horizontal scroll» check of the e2e goes through `horizontalOverflow(page)` (helpers.ts), which reads the
 // document and every `ion-content` on screen. A spec that measures the document by hand (`documentElement.scrollWidth`
-// against the window) is blind to a screen cut inside `ion-content`: Ionic pins the `body`, so the document never grows
-// (60 files of the e2e did, and a 1600 px block on a page at 390 passed). No ratchet: no file but helpers.ts measures it.
-// Nor through a name given to the root (`const root = document.documentElement; root.scrollWidth`), nor one `ion-content`
-// by hand (its `getScrollElement()`, `.inner-scroll` or `part="scroll"` and their `scrollWidth`): that copy left out the
-// menu and the sheets (seen by the reviewer of hub#393). Nor its width destructured (`const { scrollWidth } = document.
-// documentElement`), the root found by its selector or a locator (`page.locator('html')`), or a measure split over lines
-// (seen by the reviewer of saas#153). Nor its width destructured from what a `page.evaluate()` gives back, its call on one
-// line or over several (`const { scrollWidth } = await page.evaluate(() => document.documentElement)`, seen by the
-// reviewer of hub#473), also of the root found by a locator whose function gives back its own parameter
-// (`page.locator('html').evaluate((html) => html)`, `page.$eval('body', (el) => el)`). Its vertical scroll (`scrollTop`,
-// `scrollHeight`) stays free.
+// against the window) is blind to a screen cut inside `ion-content`: Ionic pins the `body`, so the document never
+// grows. No file but helpers.ts measures it, in any spelling: through a name given to the root
+// (`const root = document.documentElement; root.scrollWidth`), one `ion-content` by hand (its `getScrollElement()`,
+// `.inner-scroll` or `part="scroll"` and their `scrollWidth`, which leaves out the menu and the sheets), its width
+// destructured (`const { scrollWidth } = document.documentElement`), the root found by its selector or a locator
+// (`page.locator('html')`), a measure split over lines, its width destructured from what a `page.evaluate()` gives
+// back, on one line or over several (`const { scrollWidth } = await page.evaluate(() => document.documentElement)`),
+// or the root found by a locator whose function gives back its own parameter
+// (`page.locator('html').evaluate((html) => html)`, `page.$eval('body', (el) => el)`). Its vertical scroll
+// (`scrollTop`, `scrollHeight`) stays free.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

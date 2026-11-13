@@ -1,12 +1,8 @@
-"""Models of the appointment app: the settings, the day counter of the numbers, the appointments with their
-frozen service lines and their history, the blocked periods, and the repeating series.
-
-Instants are stored with their zone (UTC) and read on the business's clock. An appointment copies what
+"""Instants are stored with their zone (UTC) and read on the business's clock. An appointment copies what
 it was booked with — the customer's name and contact, each service's name, price and length, the
 professional's name — so that changing a card or the catalog later never rewrites what was booked.
 Money is in cents. Deleting an appointment or a series is logical (``deleted_at``): what points at them
-keeps pointing. Phase 1 has no tenancy: every scope shares these tables; phase 2 moves them to each
-hub's database.
+keeps pointing.
 """
 
 from django.db import models

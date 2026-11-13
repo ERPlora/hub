@@ -10,7 +10,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, openApps, psql, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanSales, shots, stamp, zoneWithTable } from './sale-helpers';
+import { addToTill, cleanSales, shots, stamp, tillReady, zoneWithTable } from './sale-helpers';
 
 const RUN = stamp();
 const ZONE = `E2E Tbl ${RUN} Till`;
@@ -64,29 +64,21 @@ test.afterAll(() => {
   cleanInventory();
 });
 
-async function tillReady(page: Page): Promise<void> {
-  await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
-  await shown(page).locator('[data-testid^=pos-product-], [data-testid=pos-grid-empty]').first().waitFor({ state: 'visible' });
-}
-
-/** Adds a product the way a person finds it: the magnifier, its SKU, the result. */
-async function addBySearch(page: Page, product: Product): Promise<void> {
-  await shown(page).locator('[data-testid=pos-search-trigger]').click();
-  const search = page.locator('[data-testid=pos-search]');
-  await search.locator('input').fill(product.sku);
-  await search.locator(`[data-testid=pos-search-${product.id}]`).click();
-}
-
 const lineOf = (page: Page, name: string) => shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: name }).first();
 
-test('SALE-F19: the till seats its check at a table and takes the table off again', async ({ page, context }) => {
+/** The till at a desk's size with the coffee on a new check: the check's id, as the till keeps it. */
+async function coffeeOnACheck(page: Page): Promise<string> {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/sale/pos');
   await tillReady(page);
-  await addBySearch(page, coffee);
+  await addToTill(page, coffee);
   await expect(lineOf(page, coffee.name)).toBeVisible();
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), CURRENT_CHECK_KEY)).not.toBeNull();
-  const orderId = await page.evaluate((key) => localStorage.getItem(key), CURRENT_CHECK_KEY);
+  return (await page.evaluate((key) => localStorage.getItem(key), CURRENT_CHECK_KEY))!;
+}
+
+test('SALE-F19: the till seats its check at a table and takes the table off again', async ({ page, context }) => {
+  const orderId = await coffeeOnACheck(page);
   const till = shown(page);
   const trigger = till.locator('[data-testid=pos-table-trigger]');
   await expect(trigger).toHaveAttribute('title', 'Assign table');
@@ -129,13 +121,7 @@ test('SALE-F19: the till seats its check at a table and takes the table off agai
 });
 
 test('TABLE-F16, SALE-F24: merging the table of the till check from Tables says it was joined, not closed on another device', async ({ page, context }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page, A, '/sale/pos');
-  await tillReady(page);
-  await addBySearch(page, coffee);
-  await expect(lineOf(page, coffee.name)).toBeVisible();
-  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), CURRENT_CHECK_KEY)).not.toBeNull();
-  const absorbed = (await page.evaluate((key) => localStorage.getItem(key), CURRENT_CHECK_KEY))!;
+  const absorbed = await coffeeOnACheck(page);
   const seated = await api<TableCheck>(context, A, 'POST', '/table/sessions/open', { table_id: tableId, order_id: absorbed });
   expect(seated.status, `seat the till's check ${JSON.stringify(seated.data)}`).toBe(201);
 

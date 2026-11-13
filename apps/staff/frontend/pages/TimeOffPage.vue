@@ -5,7 +5,7 @@
 // they apply: «Approve» and «Reject» a pending request and «Cancel» (confirmed) a pending or approved
 // one for whoever manages time off; an employee cancels only their own pending request. «+» registers
 // anyone's (managers) or asks for one's own. «My time off» (`staff.time_off.mine`, with the reason) for
-// whoever has a linked record. Above the list, «Today's time off» (the old Home panel, STAFF-G05). Every
+// whoever has a linked record. Above the list, «Today's time off» (the old Home panel, STAFF-F20). Every
 // change comes back through the stream: nothing here refetches.
 import {
   ConfirmDialog,

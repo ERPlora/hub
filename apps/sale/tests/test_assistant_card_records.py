@@ -1,6 +1,6 @@
-"""FIX-HUB-SALE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (hub#561): the card of a write of Sales says which record it acts
-on by its name, read as whoever asks, never by its id, and left out when that person may not read it. A value of a
-closed list goes by the word its screens give it, in English and in Spanish.
+"""The card of a write of Sales (hub#561) says which record it acts on by its name, read as whoever asks, never by its
+id, and left out when that person may not read it. A value of a closed list goes by the word its screens give it, in
+English and in Spanish.
 
 Sales requires only Taxes and Customers: what Inventory, Services, Menus, Modifiers, Staff and Appointments name reaches
 the card through ``sale.record.get``, which asks each of those apps by its own operation.

@@ -195,6 +195,28 @@ export async function dishForTheTill(browser: Browser, label: string, run: strin
   return dish;
 }
 
+/** The room a spec made (its zones named `<tag>…`, their tables and the seatings on them), and the checks of Sales its
+ *  seating opened (they carry no line nor any sale). */
+export function cleanRoom(tag: string): void {
+  const tables = `select id from table_table where zone_id in (select id from table_zone where name like '${tag}%')`;
+  const sessions = `select id from table_tablesession where table_id in (${tables})`;
+  const orders = psql(`select order_id from table_tablesession where id in (${sessions}) and order_id is not null`)
+    .split('\n')
+    .filter(Boolean)
+    .map((id) => `'${id}'`)
+    .join(', ');
+  psql(
+    [
+      `delete from table_sessionmove where session_id in (${sessions})`,
+      `delete from table_tablesession where id in (${sessions})`,
+      `delete from table_hold where table_id in (${tables})`,
+      ...(orders ? [`delete from sale_order where id in (${orders})`] : []),
+      `delete from table_table where id in (${tables})`,
+      `delete from table_zone where name like '${tag}%'`,
+    ].join('; '),
+  );
+}
+
 /** For a spec that seats a table (SALE-F19, SALE-F20): the zone `zone` and its table `number`, for four, through Tables'
  *  operations, in a context already signed in to hub `a`. Whoever calls it deletes them after the run. */
 export async function zoneWithTable(context: BrowserContext, zone: string, number: string): Promise<{ zoneId: string; tableId: string }> {

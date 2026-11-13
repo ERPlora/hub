@@ -1,4 +1,4 @@
-"""VeriFactu is only for businesses in Spain (VERIFACTU-F01, F13; FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN).
+"""VeriFactu is only for businesses in Spain (VERIFACTU-F01, F13).
 
 RD 1007/2023 and Orden HAC/1177/2024 bind the taxpayers of Spain (the Canary Islands, Ceuta and Melilla included: a
 region of ES, not another country). A business erplora.com registered in another country (``base.Hub.country``, as
@@ -102,9 +102,9 @@ def test_each_hub_reads_its_own_business_s_country(issuer):
 
 
 def test_erploras_own_hub_reads_its_country_from_the_platform_too(db, settings, monkeypatch):
-    # FIX-HUB-VERIFACTU-OWN-SHORTCUT-FOR-PLATFORM-HUB-COUNTRY: ``base.business.get`` answers ERPlora's own hub (hub#329),
-    # so VeriFactu asks it there as anywhere else, never a second source of the same country that drifts in silence if
-    # the platform moves where its hub's country comes from (here, an answer other than ``PLATFORM_ISSUER_COUNTRY``).
+    # ``base.business.get`` answers ERPlora's own hub (hub#329), so VeriFactu asks it there as anywhere else, never a
+    # second source of the same country that drifts in silence if the platform moves where its hub's country comes from
+    # (here, an answer other than ``PLATFORM_ISSUER_COUNTRY``).
     settings.PLATFORM_HUB_SLUG = PLATFORM.key
     settings.PLATFORM_ISSUER_COUNTRY = "ES"
     assert not queries.outside_spain(PLATFORM)
@@ -118,9 +118,8 @@ def test_erploras_own_hub_reads_its_country_from_the_platform_too(db, settings, 
 
 
 def test_a_scope_with_no_registry_row_is_in_spain(db):
-    # FIX-HUB-VERIFACTU-OWN-SHORTCUT-FOR-PLATFORM-HUB-COUNTRY (reviewer): a scope erplora.com never registered (no
-    # ``base.Hub`` row, so ``base.business.get`` answers ``NotFound``) is in ERPlora's market, Spain: ``""``, not a
-    # country of its own, so VeriFactu seals and sends for it as for a demo.
+    # A scope erplora.com never registered (no ``base.Hub`` row, so ``base.business.get`` answers ``NotFound``) is in
+    # ERPlora's market, Spain: ``""``, not a country of its own, so VeriFactu seals and sends for it as for a demo.
     nowhere = Scope("host", "nowhere")
     assert not Hub.objects.filter(slug=nowhere.key).exists()
     assert queries.business_country(nowhere) == ""

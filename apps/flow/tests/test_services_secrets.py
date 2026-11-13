@@ -1,4 +1,4 @@
-"""Secrets that cannot be read again (WORKBOOK FLOW-F26; old hub HUB-F99).
+"""Secrets that cannot be read again (WORKBOOK FLOW-F26).
 
 A secret has a name (upper case, up to 64 characters) and a value, sealed with the server's key; from then
 on only its name is shown: no route, live query, event or log gives the value back. Saving a name again

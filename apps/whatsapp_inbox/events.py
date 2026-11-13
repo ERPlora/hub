@@ -4,10 +4,10 @@ services.py records them in the outbox, in the command's transaction; live.py na
 re-run each live query. They carry ids only, never a number or a text.
 
 Reactions (WORKBOOK «A qué reacciona»): a card created, corrected or recovered from the separate copy claims the
-unlinked conversations of its number (F04), a merged card hands its conversations to the one that stays (F12), a deleted card
-lets them go (another live card of the number may claim them) and an erased card erases them (F11), each through an operation of this app run as the system, in its own
-transaction. The outbox relay (phase 2, in the worker) hands each delivered event to ``react``; the
-operations are idempotent, so a repeated delivery changes nothing.
+unlinked conversations of its number (F04), a merged card hands its conversations to the one that stays (F12), a
+deleted card lets them go (another live card of the number may claim them) and an erased card erases them (F11), each
+through an operation of this app run as the system, in its own transaction. The worker's outbox relay hands each
+delivered event to ``react``; the operations are idempotent, so a repeated delivery changes nothing.
 """
 
 from typing import Any

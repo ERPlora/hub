@@ -53,7 +53,7 @@ describe('HistoryPage', () => {
     await flush();
     await s.reopen();
     expect(s.params(OP)).toEqual([{ search: '0012', action: 'cancelled', limit: 50, offset: 0 }]);
-    // kitchen#113: the box promises what the search finds (the ticket or the notes); the action is the filter.
+    // The box promises what the search finds (the ticket or the notes); the action is the filter.
     expect(prop(s.table(), 'searchPlaceholder')).toBe('Search ticket or notes…');
   });
 
@@ -78,7 +78,7 @@ describe('HistoryPage', () => {
   });
 });
 
-describe('HistoryPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('HistoryPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

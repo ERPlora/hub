@@ -1,8 +1,3 @@
-// Files › the preview (BASE-G84; the old hub's FilePreviewModal, HUB_SHELL-F132): a large viewer inside the hub with
-// the file's name, «Download» and «Close» («Zoom in»/«Zoom out» on images and PDFs). Images, audio and video load
-// from the hub's own address; a PDF, a text, a CSV or a JSON is fetched through the SDK (same origin, the session) and
-// drawn here. Any other type says «No preview» and offers the download. A failure to bring or draw it reads «The file
-// could not be opened», never a blank viewer.
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

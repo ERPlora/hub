@@ -47,7 +47,7 @@ function codeOf(message: string, to: string): string | undefined {
   const normalized = message.replace(/\r\n/g, '\n').replace(/^\n+/, '');
   const split = normalized.indexOf('\n\n');
   if (split < 0) return undefined;
-  // Headers folded over several lines are unfolded first (RFC 822 §3.1.1).
+  // Headers folded over several lines are unfolded first (RFC 822, section 3.1.1).
   const headers = normalized.slice(0, split).replace(/\n[ \t]+/g, ' ').split('\n');
   const header = (name: string): string | undefined =>
     headers.find((line) => line.toLowerCase().startsWith(`${name}:`))?.slice(name.length + 1).trim();

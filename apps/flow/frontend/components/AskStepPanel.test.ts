@@ -1,4 +1,4 @@
-// The form of «Ask someone first» (WORKBOOK FLOW-F28; the old module's flows-f18): the question and its
+// The form of «Ask someone first» (WORKBOOK FLOW-F28): the question and its
 // details (with data inserted), who answers, how long to wait, and what a no and silence do. With «Carry
 // on», it says how to act on the answer afterwards. The server's refusals show by field.
 import { describe, expect, it } from 'vitest';

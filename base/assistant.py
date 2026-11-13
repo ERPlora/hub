@@ -1,8 +1,8 @@
-"""The Hub's assistant (APP-BASE-9; PLAN §30, ronda 2026-10-22b): chat and voice in the Hub against erplora.com's AI
-gateway (``saas`` ``assistant/internal.py``), without the ORM.
+"""The Hub's assistant: chat and voice in the Hub against erplora.com's AI gateway (``saas`` ``assistant/internal.py``),
+without the ORM.
 
-The mechanics that do not depend on the gateway are ``live.assistant``'s, shared with the SaaS's panel
-(docs/plans/2026-10-30-asistente-saas.md §2) and re-exported here; this module gives them the Hub's own:
+The mechanics that do not depend on the gateway are ``live.assistant``'s, shared with the SaaS's panel and re-exported
+here; this module gives them the Hub's own:
 
 - **Its tools** (``catalog``) are the operations of the apps on in this business (``active_apps``: its right and its
   switch) that this person may run, by their ``ai=`` (``live.assistant.is_tool``: an ``AI``; ``INTERNAL``, a «Not an
@@ -17,7 +17,7 @@ The mechanics that do not depend on the gateway are ``live.assistant``'s, shared
   a word in the person's language (``CONFIRM_WORD``) or, over records named by ``ids``, how many. Its preview
   (``preview``) says the amounts of its read in the currency it answers. The yes is for that card (``fingerprint``:
   what it showed and the ids of the records it read, by its marked data and its check): drawn again with the yes, a
-  card that changed runs nothing and is shown anew (hub#1208). A platform action is named by the screen
+  card that changed runs nothing and is shown anew. A platform action is named by the screen
   where the person would do it (``screen``, ``app_name``). An operation may replace the detailed fields with its own
   summary (``ai={"summary": …}``), computed as the person and in their language.
 - **The gateway**: every door is a signed POST (``base.signing``, the secret of every ``/internal`` call) naming this
@@ -220,7 +220,7 @@ SYNONYMS = (
     ("urgente", "urgentes", "urgencia", "prisa", "rush", "urgent"),
     ("enrutado", "enrutados", "enrutar", "enruta", "enrutamiento", "routing", "route", "routes"),
     # the «regla» that sends a product or a family to a station is its routing (``kitchen.routing``): live reads
-    # «regla» as any rule («rule», as Taxes' and Pricing's, ERPlora/live#73), and the QA says it of the routing.
+    # «regla» as any rule («rule», as Taxes' and Pricing's), and the QA says it of the routing.
     ("regla", "routing"),
     ("bump", "como listo", "como listos", "como lista", "como listas", "como hecho", "como hechos", "como hecha",
      "como hechas"),
@@ -229,7 +229,7 @@ SYNONYMS = (
     ("plantilla", "plantillas", "template", "templates"),
     ("mensaje", "mensajes", "message", "messages"),
     # combo: an «opción» or an «elección» of a course is a choice (``combo.option``), as of a modifier group
-    # (``modifier.option``). Until ERPlora/live#61, «ordena» and «orden» also name a device: «ordenador»'s stem.
+    # (``modifier.option``). live still reads «ordena» and «orden» as «ordenador»'s stem, so they also name a device.
     ("opcion", "opciones", "eleccion", "elecciones", "option", "options", "choice", "choices"),
     # modifier: the «predeterminada» option is the one a group brings chosen, its default (``is_default``), as the
     # descriptions say it in English. Never «por defecto»: it is also the default of a shift, a working day or a
@@ -287,8 +287,8 @@ def active_apps(scope: Scope) -> dict[str, LiveAppConfig]:
 
 def catalog(ctx: OperationContext, *, active_labels: Collection[str] | None = None) -> dict[str, Operation]:
     """The tools of ``ctx``'s person: by name, in name order, of the apps on in its business (``active_labels``, else
-    ``active_apps``). A write a manager may approve is theirs too, as its button on the screen is (APP-BASE-5): running
-    it asks for the approval (BASE-G118)."""
+    ``active_apps``). A write a manager may approve is theirs too, as its button on the screen is: running
+    it asks for the approval."""
     tools = shared.catalog(
         ctx,
         active_labels=active_apps(ctx.scope) if active_labels is None else active_labels,
@@ -304,7 +304,7 @@ def relevant(tools: dict[str, Operation], texts: Iterable[str], language: str) -
     return shared.relevant(tools, texts, language, **RANKING)
 
 
-# ── The card of a write in the Hub's words (BASE-G115, G116) ─────────────────────────────────────────────────────
+# ── The card of a write in the Hub's words ───────────────────────────────────────────────────────────────────────
 
 #: The mark of the datum that names the currency of the amounts beside it, at any depth below it: a payment in dollars.
 #: ``True`` on a text, an ISO 4217 code; on a datum that names a record in a currency of its own (a cart, a price list),
@@ -1018,7 +1018,7 @@ def _who_asks(role: str | None, language: str, approvable: Collection[str]) -> s
 
 
 def setup_block(status: dict | None) -> str:
-    """The checklist «Finish setting up your business» as the model reads it (BASE-G121): what is pending, what
+    """The checklist «Finish setting up your business» as the model reads it: what is pending, what
     blocks invoicing, what is done, and what only an administrator can do. ``None``: it could not be read."""
     if status is None:
         return "The checklist of this business could not be read now: do not say the business is set up."
@@ -1043,7 +1043,7 @@ def setup_block(status: dict | None) -> str:
 
 # ── The gateway (erplora.com) ────────────────────────────────────────────────────────────────────────────────────
 
-#: Each failed call to the gateway leaves one line here (saas#167): its door, the business, the HTTP status and the
+#: Each failed call to the gateway leaves one line here: its door, the business, the HTTP status and the
 #: gateway's code, or that it never got there and how. The panel says every failure in a few words of its own, so the
 #: reason lives only in this log. Never what the person said, dictated or was answered.
 logger = logging.getLogger(__name__)
@@ -1130,7 +1130,7 @@ def report(
     scope: Scope, *, message_id: str, reason: str, comment: str, question: str, answer: str, web: bool | None = None
 ) -> dict:
     """Send erplora.com a bad answer of the assistant: ``{sent, duplicate}``. ``web``: whether its turn brought pages of
-    the web (the turn's ``done.web``, kept by the browser), whose text erplora.com then does not mail (saas#287); left
+    the web (the turn's ``done.web``, kept by the browser), whose text erplora.com then does not mail; left
     out when the browser does not know, and erplora.com's safe default decides."""
     payload = {
         "hub": scope.key, "message_id": message_id, "reason": reason, "comment": comment, "question": question,
@@ -1215,7 +1215,7 @@ def prepared_docs(prepared: dict[tuple[str, int], dict | GatewayError]):
 
 async def prepare(request: Any, data: Any) -> dict[tuple[str, int], dict | GatewayError]:
     """What the turn's tools wait on erplora.com for, asked before ``base.assistant.turn`` opens its transaction (up to
-    ``TIMEOUT_SECONDS`` inside it would hold the hub's connection, PLAN §14.2): the documentation searches the model
+    ``TIMEOUT_SECONDS`` inside it would hold the hub's connection): the documentation searches the model
     asked for (``prepare_docs``), for the route to hand them to the turn (``prepared_docs``)."""
     name = tool_name(DOCS_SEARCH)
     if not any(call.name == name for call in data.pending):
@@ -1268,7 +1268,7 @@ async def stream_turn(
     """A turn through the gateway, as the Hub's frames: ``text`` piece by piece, ``usage``, an ``error``, and ``done``
     with what the browser keeps (``append``), the tools the model asked for (``pending``), their ``continuation`` and
     whether the turn brought pages of the web (``web``: the gateway's ``{type: web}``, also before a failure; the
-    browser sends it back with a report of the answer, saas#287). A refusal of the gateway is a lone ``error``; a
+    browser sends it back with a report of the answer). A refusal of the gateway is a lone ``error``; a
     failure half way keeps what was said."""
     payload = {"hub": scope.key, "messages": messages, "instructions": instructions, "tools": tools}
     if continuation:

@@ -1,4 +1,4 @@
-# The registry moves from base to control (phase 2, S1; plan docs/plans/2026-10-22-fase-2-tenencia.md).
+# The registry moves from base to control.
 #
 # ``Hub`` and ``DemoCode`` already exist in the database as ``base_hub`` and ``base_democode`` (base/migrations/0004
 # and 0005): control takes them over in Django's state only, with the same tables, constraint and index, and

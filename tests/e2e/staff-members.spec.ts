@@ -8,26 +8,16 @@
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, EMPLOYEE, hostPage, hubUserIdOf, login, psql, shot, shown } from './helpers';
+import { staffCleanUp } from './staff-helpers';
 import { rowAction } from './service-helpers';
 
 const TAG = 'E2E';
 const PHONE = { width: 390, height: 844 };
 
 /** Removes every record this spec family creates (first names «E2E…», roles «E2E…»). */
-function cleanup(): void {
-  const members = `select id from staff_member where first_name like '${TAG}%'`;
-  psql(
-    [
-      `delete from staff_timeoff where member_id in (${members})`,
-      `delete from staff_scheduleday where schedule_id in (select id from staff_schedule where member_id in (${members}))`,
-      `delete from staff_schedule where member_id in (${members})`,
-      `delete from staff_member where first_name like '${TAG}%'`,
-      `delete from staff_role where name like '${TAG}%'`,
-    ].join('; '),
-  );
-}
+const cleanup = (): void => staffCleanUp(TAG);
 
-// flow: ninguno (spec e2e de Personal) — FIX-HUB-E2E-STAFF-MEMBERS-FRESH-DB
+// flow: none — the e2e spec of Staff.
 test.beforeAll(async ({ browser }) => {
   cleanup();
   // The employee's account exists in the hub only after their first sign-in (the SaaS creates it on the
@@ -178,8 +168,8 @@ test('on a phone (390×844) Staff is cards, with the same actions', async ({ bro
   }
 });
 
-// flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
-test('FIX-DATATABLE-HUB-FILTERS-1: Staff filters by Email behind the funnel, with its count, the panel open at every width', async ({ browser }) => {
+// flow: none — the column filters sit behind the table's funnel.
+test('Staff filters by Email behind the funnel, with its count, the panel open at every width', async ({ browser }) => {
   const stamp = Date.now().toString(36);
   const kept = `${TAG} Ana Fil${stamp}`;
   const other = `${TAG} Bea Fil${stamp}`;

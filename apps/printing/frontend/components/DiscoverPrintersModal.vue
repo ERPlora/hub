@@ -4,7 +4,7 @@
 // each with «Add» (the page opens «New printer» with it filled in) or «Already added». It says why it found
 // nothing: a browser cannot look, the device denied the permission, the app is not linked to this business,
 // the scan failed, or nothing answered, with «Search again» where searching again can help. «Add by its
-// address» is always there: the way in when the scan cannot see the printer (hub#1924).
+// address» is always there: the way in when the scan cannot see the printer.
 import { EmptyState, FormModal, InlineFeedback } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonItem, IonLabel, IonList, IonNote, IonSpinner } from '@ionic/vue';

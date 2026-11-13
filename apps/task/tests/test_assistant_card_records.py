@@ -1,8 +1,7 @@
-"""FIX-HUB-TASK-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (hub#677): the card of a write of Tasks says which task, project
-or person it acts on by its name, read as whoever asks, never by its id, and leaves it out when that person may not read
-it or it is not there. A task goes by its title (what the person says of it: «complete the task clean the store
-room»), a project by its name, as the screens' «Delete» dialog says it, and a person of the team by their full name, as
-Staff names them.
+"""The card of a write of Tasks (hub#677) says which task, project or person it acts on by its name, read as whoever
+asks, never by its id, and leaves it out when that person may not read it or it is not there. A task goes by its title
+(what the person says of it: «complete the task clean the store room»), a project by its name, as the screens' «Delete»
+dialog says it, and a person of the team by their full name, as Staff names them.
 """
 
 import dataclasses

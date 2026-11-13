@@ -56,7 +56,7 @@ function moneyFormat(locale: string, money: Money | undefined, min: number, max:
 }
 
 // Grouped always: Spanish CLDR waits for five digits (minimumGroupingDigits 2) and would paint «1234,56 €»
-// here beside «1.234,56 €» in the other screens (hub#1090).
+// here beside «1.234,56 €» in the other screens.
 /** `cents` (minor units) as `money` in `locale` («€1,234.56», «1.234,56 €», «zł 121.00», «¥12,100»); nothing to
  *  show is «—». */
 export function formatMoney(cents: number | null | undefined, locale: string, money?: Money): string {

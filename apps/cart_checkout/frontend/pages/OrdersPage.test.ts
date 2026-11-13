@@ -1,12 +1,10 @@
 // Cart & Checkout → Orders (WORKBOOK «Pantallas · Pedidos»; CART_CHECKOUT-F09 to F12): the live
-// `cart_checkout.order.list` with the old table's Order, Email, Status, Payment and Total, «Search order or
-// email…», filters per column (the total from / to in the unit the column shows, cart_checkout#26),
-// newest first, 50 a page, list or cards. Each row offers the step it can take — «Mark paid» (Initiated),
-// «Complete» (Paid), «Fail» (Initiated or Paid, with its reason in a form) —, only to whoever may; a
-// failed order shows its reason. No «add»: orders are born from a cart (CART_CHECKOUT-F08). The total
-// paints in the order's own currency (the old screen used the business's), in minor units (the old #9), with the
-// decimals the server counts; the Total filter is typed in the business's currency, its country's (flow
-// cart-checkout-business-currency), never in euros by default.
+// `cart_checkout.order.list` with Order, Email, Status, Payment and Total, «Search order or email…», filters per column
+// (the total from / to in the unit the column shows), newest first, 50 a page, list or cards. Each row offers the step
+// it can take — «Mark paid» (Initiated), «Complete» (Paid), «Fail» (Initiated or Paid, with its reason in a form) —,
+// only to whoever may; a failed order shows its reason. No «add»: orders are born from a cart (CART_CHECKOUT-F08). The
+// total paints in the order's own currency, in minor units, with the decimals the server counts; the Total filter is
+// typed in the business's currency, its country's (flow cart-checkout-business-currency), never in euros by default.
 import { DataTable, type DataTableAction, EmptyState, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
@@ -18,7 +16,6 @@ import {
   CART_KEEPER,
   EMPLOYEE,
   flush,
-  JAPANESE,
   mountCartCheckout,
   type MountOptions,
   page,
@@ -26,6 +23,15 @@ import {
   totalFilter,
 } from '../__tests__/mount-cart-checkout';
 import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
+import {
+  expectNewestFirstInTheApp,
+  itFiltersOnApply,
+  itReadsThePastedTotal,
+  itSaysAnUnreadableTotalInThePanel,
+  itTypesTheTotalInTheBusinessCurrency,
+  tableFunnel,
+  totals,
+} from '../__tests__/list-page-checks';
 import FailOrderModal from '../components/FailOrderModal.vue';
 import OrdersPage from './OrdersPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -85,7 +91,7 @@ async function setup(options: MountOptions = {}) {
 }
 
 describe('OrdersPage', () => {
-  it('while the first page loads, the table paints the loading state and counts nothing (pm#611)', async () => {
+  it('while the first page loads, the table paints the loading state and counts nothing', async () => {
     const s = await setup();
     expect(s.prop('loading')).toBe(true);
     expect(s.find('cart-checkout-orders-loading').exists()).toBe(true);
@@ -95,12 +101,9 @@ describe('OrdersPage', () => {
     expect(s.find('cart-checkout-orders-loading').exists()).toBe(false);
   });
 
-  it('follows the orders newest first, with the old table’s columns and no add', async () => {
+  it('follows the orders newest first, with its columns and no add', async () => {
     const s = await setup();
-    expect(s.list()).toEqual([{ sort: '-created_at', limit: 50, offset: 0 }]);
-    await s.show(page(ROWS));
-    // The topbar names the app, as the old hub's did; the tabbar says which section.
-    expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Cart & Checkout');
+    await expectNewestFirstInTheApp(s, page(ROWS));
     expect(s.prop('searchPlaceholder')).toBe('Search order or email…');
     expect(s.prop('addable')).toBe(false);
     expect(s.prop<Array<{ key: string; label: string }>>('columns').map((c) => [c.key, c.label])).toEqual([
@@ -113,9 +116,9 @@ describe('OrdersPage', () => {
     expect(s.cells(0).slice(0, 5)).toEqual(['OS-20261014-0001', 'ana@example.com', 'Initiated', 'Card', '€31.50']);
     // The number's column holds a whole «OS-AAAAMMDD-NNNN»: it tells one order from the next.
     expect(s.prop<Array<{ key: string; width?: string }>>('columns')[0].width).toBe(NUMBER_WIDTH);
-    // No payment method: a dash, as the old table.
+    // No payment method: a dash.
     expect(s.cells(1)[3]).toBe('—');
-    // The total in the order's own currency (the old screen used the business's).
+    // The total in the order's own currency, never the business's.
     expect(s.cells(3)[4]).toBe('¥1,999');
   });
 
@@ -167,21 +170,7 @@ describe('OrdersPage', () => {
     ]);
   });
 
-  it('the total is typed as an amount, read as it is pasted, and one it cannot read says so under its box (pm#521)', async () => {
-    const s = await setup();
-    await s.result('base.business.get', business());
-    await s.show(page(ROWS));
-    const total = s.prop<Array<{ key: string; filter?: unknown }>>('columns').find((c) => c.key === 'total_amount');
-    expect(total?.filter).toEqual({ type: 'range', amount: true });
-    s.table().vm.$emit('filtersChange', { total_amount_from: '1.250,50', total_amount_to: '1.250' });
-    await flush();
-    // «1.250» is 1.250 € or 1,25 €: it filters nothing and says both, as every amount filter of the Hub (hub#1196).
-    expect(s.list()).toEqual([{ total_amount_min: 125050, sort: '-created_at', limit: 50, offset: 0 }]);
-    expect(s.prop('filterErrors')).toEqual({ total_amount_to: 'This amount can be read in two ways: «1.250» could be €1,250.00 or €1.25. Write the decimals so there is no doubt.' });
-    s.table().vm.$emit('filtersChange', { total_amount_from: '12' });
-    await flush();
-    expect(s.prop('filterErrors')).toEqual({});
-  });
+  itReadsThePastedTotal(setup, page(ROWS));
 
   it('none at all says «No orders.» and how they are born; a search without rows «No results»', async () => {
     const s = await setup();
@@ -266,7 +255,7 @@ describe('OrdersPage', () => {
   });
 });
 
-describe('OrdersPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('OrdersPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
@@ -274,19 +263,10 @@ describe('OrdersPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
 });
 
 // flow: CART_CHECKOUT-F12 — the old Orders kept its column filters behind the toolbar's funnel, with no
-// open row (docs/reference/old-hub/cart_checkout-orders-{390,834,1440}.png), as Invoices and Sales (hub#31).
-describe('OrdersPage: the column filters wait behind the funnel, as the old table (CART_CHECKOUT-F12)', () => {
+// open row, as Invoices and Sales (hub#31).
+describe('OrdersPage: the column filters wait behind the funnel (CART_CHECKOUT-F12)', () => {
   const ID = 'cart-checkout-orders';
-  type Setup = Awaited<ReturnType<typeof setup>>;
-  type Field = HTMLElement & { errorText?: string };
-  const panel = (s: Setup) => s.find(`${ID}-filters-panel`);
-  const field = (s: Setup, name: string) => panel(s).get(`[data-testid="${ID}-filter-${name}"]`).element as Field;
-  const set = (s: Setup, name: string, event: string, value: string) =>
-    field(s, name).dispatchEvent(new CustomEvent(event, { detail: { value } }));
-  async function openFunnel(s: Setup): Promise<void> {
-    await s.find(`${ID}-filters-toggle`).trigger('click');
-    await flush();
-  }
+  const { panel, field, openFunnel } = tableFunnel(ID);
 
   it('opens with no row of filters; the funnel opens a panel with Order, Email, Status, Payment and Total', async () => {
     const s = await setup();
@@ -300,32 +280,19 @@ describe('OrdersPage: the column filters wait behind the funnel, as the old tabl
     );
   });
 
-  it('the panel filters on «Apply», by status and by the total, and the funnel counts them', async () => {
-    const s = await setup();
-    await s.show(page(ROWS));
-    await openFunnel(s);
-    set(s, 'status', 'ionChange', 'paid');
-    set(s, 'total_amount_from', 'ionInput', '12,50');
-    await flush();
-    expect(s.list(), 'the panel edits a draft: nothing is asked before «Apply»').toEqual([{ sort: '-created_at', limit: 50, offset: 0 }]);
-    await panel(s).get(`[data-testid="${ID}-filters-apply"]`).trigger('click');
-    await flush();
-    expect(s.list()).toEqual([{ status: 'paid', total_amount_min: 1250, sort: '-created_at', limit: 50, offset: 0 }]);
-    expect(s.find(`${ID}-filters-count`).text()).toBe('2');
+  itFiltersOnApply(setup, page(ROWS), {
+    id: ID,
+    status: 'paid',
+    end: 'total_amount_from',
+    typed: '12,50',
+    asks: { status: 'paid', total_amount_min: 1250 },
   });
 
-  it('a Total it cannot read filters nothing, marks the funnel and is said under its box in the panel', async () => {
-    const s = await setup();
-    await s.result('base.business.get', business());
-    await s.show(page(ROWS));
-    await openFunnel(s);
-    set(s, 'total_amount_to', 'ionInput', '1.250');
-    await panel(s).get(`[data-testid="${ID}-filters-apply"]`).trigger('click');
-    await flush();
-    expect(s.list()).toEqual([{ sort: '-created_at', limit: 50, offset: 0 }]);
-    expect(s.find(`${ID}-filters-toggle`).attributes('data-invalid')).toBe('true');
-    await openFunnel(s);
-    expect(field(s, 'total_amount_to').errorText).toBe('This amount can be read in two ways: «1.250» could be €1,250.00 or €1.25. Write the decimals so there is no doubt.');
+  itSaysAnUnreadableTotalInThePanel(setup, page(ROWS), {
+    id: ID,
+    end: 'total_amount_to',
+    typed: '1.250',
+    says: 'This amount can be read in two ways: «1.250» could be €1,250.00 or €1.25. Write the decimals so there is no doubt.',
   });
 
   it('says it in Spanish too', async () => {
@@ -341,13 +308,6 @@ describe('OrdersPage: the column filters wait behind the funnel, as the old tabl
 
 describe('OrdersPage: the business’s currency (cart-checkout-business-currency)', () => {
   const BUSINESS = 'base.business.get';
-  const plain = (text: string) => text.replace(/[\u00a0\u202f]/g, ' ');
-  type Setup = Awaited<ReturnType<typeof setup>>;
-  const totals = (s: Setup) => s.rows().map((_, i) => plain(s.cells(i)[4]));
-  const filter = async (s: Setup, filters: Record<string, string>) => {
-    s.table().vm.$emit('filtersChange', filters);
-    await flush();
-  };
 
   it('a business in Poland sees each order in its own currency: a new one in złoty, an older one in euros', async () => {
     const s = await setup({ locale: 'es' });
@@ -362,29 +322,8 @@ describe('OrdersPage: the business’s currency (cart-checkout-business-currency
     expect(totals(s)).toEqual(['1.250,00 Ft']);
   });
 
-  it('the Total filter is typed in the business’s currency: złoty with its symbol, yen without decimals', async () => {
-    const s = await setup();
-    await s.result(BUSINESS, business(POLISH));
-    await filter(s, { total_amount_from: '12,50 zł', total_amount_to: 'PLN 100' });
-    expect(s.list()).toEqual([{ total_amount_min: 1250, total_amount_max: 10000, sort: '-created_at', limit: 50, offset: 0 }]);
+  itTypesTheTotalInTheBusinessCurrency(setup, page(ROWS, 200));
 
-    const yen = await setup();
-    await yen.result(BUSINESS, business(JAPANESE));
-    await filter(yen, { total_amount_from: '12', total_amount_to: '12,5' });
-    expect(yen.list()).toEqual([{ total_amount_min: 12, sort: '-created_at', limit: 50, offset: 0 }]);
-    expect(yen.prop('filterErrors')).toEqual({ total_amount_to: 'This is not an amount. Type a figure, for example 12.' });
-  });
-
-  it('an amount typed before the business answers is read again in its currency when it does, from the first page', async () => {
-    const s = await setup();
-    await s.show(page(ROWS, 200));
-    await filter(s, { total_amount_from: '12' });
-    s.table().vm.$emit('pageChange', 2);
-    await flush();
-    expect(s.list()).toEqual([{ total_amount_min: 1200, sort: '-created_at', limit: 50, offset: 100 }]);
-    await s.result(BUSINESS, business(JAPANESE));
-    expect(s.list()).toEqual([{ total_amount_min: 12, sort: '-created_at', limit: 50, offset: 0 }]);
-  });
 });
 
 describe('OrdersPage: «Total» is read as every amount of the Hub (hub#1196)', () => {

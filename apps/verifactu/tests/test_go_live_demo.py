@@ -70,7 +70,7 @@ def test_a_business_on_the_same_server_goes_live():
 
 @pytest.mark.usefixtures("opened", "ready_route", "demo")
 def test_a_demo_files_in_testing_even_where_the_configuration_says_production():
-    # VERIFACTU-G23 and G25 (SAAS_PUBLIC-F91, HUB-F315): nothing of a demo ever reaches the real AEAT. The
+    # Nothing of a demo ever reaches the real AEAT. The
     # configuration a demo reads may say production (here, a business's that went live on this server, in the same
     # test database): the demo's sale is still sealed in the test environment, never numbered in production.
     run("verifactu.config.go_live", ctx=ctx_for(scope=A))

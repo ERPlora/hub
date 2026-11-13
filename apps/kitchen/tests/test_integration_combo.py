@@ -7,10 +7,10 @@ goes to the station of ITS product (else of its category: KITCHEN-F04), never to
 quantity times the menus ordered and under the menu's header (its kitchen name, else its name), on the
 card and on paper; the menu's note on each of its dishes; the menu's amount counted once.
 
-Traps of the old product: sales#522 and pm#94 (the kitchen got «Menu of the day» without the dishes chosen),
-kitchen#57 (each dish to ITS station, grouped under the menu, as a list and never a paragraph: TouchBistro
-sends the salad to the grill), hub#1156 (the paper lost the menu's header), sales#535 (a menu short of a
-course never reaches the kitchen: Sales refuses it, ``apps/sale/tests/test_integration_combo.py``).
+Traps of the old product: the kitchen got «Menu of the day» without the dishes chosen; each dish goes to ITS
+station, grouped under the menu, as a list and never a paragraph (TouchBistro sends the salad to the grill); the
+paper lost the menu's header; a menu short of a course never reaches the kitchen (Sales refuses it,
+``apps/sale/tests/test_integration_combo.py``).
 """
 
 from decimal import Decimal

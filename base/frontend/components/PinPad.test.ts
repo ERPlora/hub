@@ -1,5 +1,3 @@
-// The PIN pad (BASE-G54, G55, G60, G126): as many circles as the business's PIN has digits, the keypad, and the
-// entry at the last digit, without a button (Clover's, hub#974). Digits from a keyboard too; Backspace erases.
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { mountBase } from '../__tests__/mount-base';

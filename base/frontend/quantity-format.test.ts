@@ -7,7 +7,7 @@
 //   `Intl.NumberFormat`, in the options given to an app's helper, or in a table of options;
 // - a function or constant named `formatQuantity` written in the app: the shared one is imported or re-exported.
 // What a person types is no written quantity: a field shows its figure ungrouped, as typed (QtyStepper; a till's field
-// does not group, PLAN-HUB «lo que se teclea no se agrupa»), and needs only the decimal mark of the language.
+// does not group), and needs only the decimal mark of the language.
 // `packages/ui` is not read: it holds the one formatter.
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';

@@ -47,10 +47,10 @@ import { createHmac } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
-import type { APIRequestContext, Page } from '@playwright/test';
+import { type APIRequestContext, expect, type Page } from '@playwright/test';
 
 import { ARTIFACTS, capture, HUB_DIR, psql, REPO_DIR, SAAS } from './helpers';
-import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
+import { capturedAtSizes, FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { STACK } from './stack';
 import {
   BUSINESS_ID,
@@ -103,7 +103,7 @@ export function system<T = unknown>(op: string, payload: unknown): T {
 /** Python that goes first in a one-shot `manage.py shell` playing the worker's relay (in `a`'s database: the e2e stack's worker relays nothing).
  *  What a reaction hands erplora.com after its COMMIT goes to `base.outbound`'s threads, which in the worker outlive
  *  the tick but here would die with this process (daemon threads) before erplora.com is called: this process makes
- *  those calls at once, as the suite's `conftest.py` does (FIX-HUB-WHATSAPP-INBOX-SLOW-SEND-BLOCKS-RELAY). */
+ *  those calls at once, as the suite's `conftest.py` does. */
 export const OUTBOUND_AT_ONCE = `
 from base import outbound
 class _AtOnce:
@@ -186,7 +186,7 @@ const CHANNEL_BACKUP = 'e2e_backup_whatsapp_channel';
  *  ends its `afterAll` with `restorePhoto` (whatsapp-photo.test.ts says so). Called again before that, it keeps what
  *  it kept first. */
 export function keepPhoto(): void {
-  // Two tables since every hub has its own database (S2a): the photo next to the registry, the channel's row in `a`'s.
+  // Two tables since every hub has its own database: the photo next to the registry, the channel's row in `a`'s.
   psql(
     `set client_min_messages = warning; create table if not exists ${PHOTO_BACKUP} as ` +
       "select h.id, h.state, h.state_version from base_hub h where h.slug = 'a'",
@@ -223,7 +223,7 @@ export function seedErplora(seed: ErploraSeed = {}): { delivered: boolean; hub_e
 
 /** Puts back `a`'s photo as it was at the spec's first `keepPhoto` (or `seedErplora`), its version too, and the row
  *  of its WhatsApp channel (none, if it had none): a spec run after it on the same database finds `a` as it was, never
- *  on erplora.com's Free plan, whose one device ends another device's session (BASE-G57), nor with a channel whose
+ *  on erplora.com's Free plan, whose one device ends another device's session, nor with a channel whose
  *  version stops the photos of an erplora.com made afresh (`whatsapp_inbox.channel.sync` ignores an equal or older
  *  one). It goes last in the `afterAll` of every spec that keeps the photo, after anything else there that pushes a
  *  photo (a seed again, erplora.com's plan put back). With nothing kept since the last one, it changes nothing. */
@@ -391,7 +391,7 @@ export async function metaHandsOver(request: APIRequestContext, body: string): P
 /** Meta's time now, in seconds. */
 export const metaNow = (): string => String(Math.floor(Date.now() / 1000));
 
-/** The screen of `flow` in the three sizes (APP-WHATSAPP_INBOX-1-<flow>-390|834|1440), once it settles and
+/** The screen of `flow` in the three sizes (`…-<flow>-390|834|1440`), once it settles and
  *  nothing scrolls sideways; `ready` waits for what the capture must show. Back to 1280×860 after. */
 export async function flowShots(page: Page, flow: string, ready: (page: Page) => Promise<void> = async () => {}): Promise<void> {
   for (const viewport of FLOW_VIEWPORTS) {
@@ -402,6 +402,21 @@ export async function flowShots(page: Page, flow: string, ready: (page: Page) =>
     await capture(page, `APP-WHATSAPP_INBOX-1-${flow}-${viewport.label}`);
   }
   await page.setViewportSize({ width: 1280, height: 860 });
+}
+
+/** Picks `label` in the `ion-select` `name` of the template's sheet (its popover). */
+export async function chooseInTemplateSheet(page: Page, name: string, label: string): Promise<void> {
+  await page.locator(`ion-modal[data-testid=whatsapp-inbox-template-editor] [data-testid=whatsapp-inbox-template-editor-${name}]`).click();
+  await page.locator('ion-popover.select-popover ion-radio', { hasText: label }).click();
+  await expect(page.locator('ion-popover.select-popover')).toBeHidden();
+}
+
+/** The screen in the three sizes (`<name>-390|834|1440`), with `ready` in sight and settled. */
+export async function settledShots(page: Page, name: string, ready: (page: Page) => Promise<void>): Promise<void> {
+  await capturedAtSizes(page, name, FLOW_VIEWPORTS, async () => {
+    await ready(page);
+    await settled(page);
+  });
 }
 
 export interface ChannelPush {

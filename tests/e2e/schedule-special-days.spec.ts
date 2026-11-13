@@ -111,8 +111,8 @@ test('Special days in the three viewports: no horizontal scroll; cards on a phon
   }
 });
 
-// flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
-test('FIX-DATATABLE-HUB-FILTERS-1: Special days filter by Name behind their own funnel, with its count, the panel open at every width', async ({ page, context }) => {
+// flow: none — the column filters sit behind the table's funnel.
+test('Special days filter by Name behind their own funnel, with its count, the panel open at every width', async ({ page, context }) => {
   const stamp = Date.now().toString(36);
   const kept = `${TAG} Fil${stamp} One`;
   const other = `${TAG} Fil${stamp} Two`;
@@ -127,7 +127,7 @@ test('FIX-DATATABLE-HUB-FILTERS-1: Special days filter by Name behind their own 
     await page.goto(`${A}/schedule/special-days`);
     await listsReady(page);
     await expect(days(other)).toBeVisible();
-    // Two lists, two funnels: each is named after its own list (schedules#58).
+    // Two lists, two funnels: each is named after its own list.
     await expect(shown(page).getByRole('button', { name: /^(Special day filters|Filtros de días especiales)$/ })).toHaveCount(1);
     await expect(shown(page).getByRole('button', { name: /^(Override filters|Filtros de cambios temporales)$/ })).toHaveCount(1);
     const panel = shown(page).locator('[data-testid=schedule-special-days-filters-panel]');

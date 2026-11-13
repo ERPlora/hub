@@ -60,7 +60,7 @@ def _tied_waitlist():
     ],
 )
 def test_ties_go_by_id_in_the_lists_own_direction(operation, tied, column):
-    """hub#768 (the rule of hub#2355, as in Customers): a descending list is the ascending one read backwards, ties
+    """hub#768 (as in Customers): a descending list is the ascending one read backwards, ties
     included, and its pages neither repeat nor lose rows."""
     assert_reads_backwards(listed_with(run, operation, column), sorted(tied()))
 #: Madrid's clocks go back an hour (03:00 summer time is 02:00 again) and forward (02:00 is 03:00).

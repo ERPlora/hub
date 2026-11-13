@@ -1,5 +1,5 @@
 // flow: ui-datatable-cell-no-wrap
-// Inventory → Products in Chrome (FIX-UI-DATATABLE-CELL-NO-WRAP-SQUEEZES-CHIP-BESIDE-BADGE): a product whose tax
+// Inventory → Products in Chrome: a product whose tax
 // category Taxes deactivated («Not configured») and that is also sold out paints the chip and the «Sold out» badge
 // in the same Status cell. Where the row has no room for both, the badge drops under the chip (Shopify, Odoo and
 // Square stack status badges when the column is short of them) instead of squeezing the chip to its corner: the
@@ -24,7 +24,7 @@ const WIDTHS = [
   { label: '1440', width: 1440, height: 900 },
 ];
 
-test('FIX-UI-DATATABLE-CELL-NO-WRAP-SQUEEZES-CHIP-BESIDE-BADGE · ui-datatable-cell-no-wrap: a «Not configured» product that is sold out shows its chip and its «Sold out» badge whole, the badge under the chip when the row has no room', async ({
+test('ui-datatable-cell-no-wrap: a «Not configured» product that is sold out shows its chip and its «Sold out» badge whole, the badge under the chip when the row has no room', async ({
   page,
   context,
 }) => {

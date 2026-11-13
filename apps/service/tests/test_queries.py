@@ -116,7 +116,7 @@ def _tied_packages():
     ],
 )
 def test_ties_read_backwards_in_a_descending_list(operation, schema, tied, column):
-    """hub#768 (the rule of hub#2355, as in Customers): a descending list is the ascending one read backwards, ties
+    """hub#768 (as in Customers): a descending list is the ascending one read backwards, ties
     included, and its pages neither repeat nor lose rows. A live name is unique, so the name settles these ties."""
     assert_reads_backwards(listed_with(run, operation, column, schema=schema), tied())
 
@@ -1217,7 +1217,7 @@ def test_the_movements_show_every_state_of_a_session(tax):
 
 
 def test_the_movements_page_through_sessions_at_the_same_instant_each_once(tax):
-    # services#76 (SERVICE-F19): sessions spent at the same instant (a bulk grant, an import) tie on their
+    # SERVICE-F19: sessions spent at the same instant (a bulk grant, an import) tie on their
     # date; page after page every movement shows exactly once and the total is the whole set's, not the page's.
     cut = make_service("Cut", tax=tax)
     package = make_package("Bono", [cut], max_uses=None)

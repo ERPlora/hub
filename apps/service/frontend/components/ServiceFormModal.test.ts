@@ -278,7 +278,7 @@ describe('ServiceFormModal: in the business currency (service-business-currency)
 });
 
 describe('ServiceFormModal: two rows opened one after the other', () => {
-  it('shows the second one, never what was left of the first (pm#459)', async () => {
+  it('shows the second one, never what was left of the first', async () => {
     const s = await setup(CUT);
     expect(s.field('name').value).toBe('Cut');
     await s.wrapper.setProps({ service: { ...CUT, id: 's2', name: 'Beard', price: 1200, duration_minutes: 15 } });

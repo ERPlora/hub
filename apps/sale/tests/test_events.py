@@ -1,8 +1,8 @@
 """The sale app's events (``sale.<entity>.<fact>``) and its reactions to Customers' merge and to the
 document Invoicing issues for a sale.
 
-There is no outbox relay yet (phase 2 runs it in the worker); a reaction is tested by handing ``react``
-the event as the relay will: its name, its scope and its payload.
+A reaction is tested by handing ``react`` the event as the worker's outbox relay does: its name, its scope and its
+payload.
 """
 
 import re

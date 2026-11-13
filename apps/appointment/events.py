@@ -13,8 +13,8 @@ a voided sale unmarks it (``sale.sale.voided``) and a voided open check frees it
 (``sale.order.voided``); each through an operation of this app run as the
 system, in its own transaction. Archiving a service changes nothing here (the market: Fresha, Phorest,
 TimeTap — what is booked keeps its service; the next dates of a series are skipped with their reason).
-The outbox relay (phase 2, in the worker) hands each delivered event to ``react``; every reaction is
-idempotent, so a repeated delivery changes nothing.
+The worker's outbox relay hands each delivered event to ``react``; every reaction is idempotent, so a
+repeated delivery changes nothing.
 """
 
 from typing import Any

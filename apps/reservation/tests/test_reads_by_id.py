@@ -1,7 +1,7 @@
-"""FIX-HUB-RESERVATION-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS: one record of the book by its id or as a person says it — a
-reservation, a waitlist entry, a slot, a blocked date —, with the words its screen names it by (``label``), in the
-language of whoever asks. The assistant's card names by them what a write of reservation names by its id, never by the
-id; the API reads them too. Each is read with the permission of its list, and each is of the business that asks.
+"""One record of the book by its id or as a person says it — a reservation, a waitlist entry, a slot, a blocked date —,
+with the words its screen names it by (``label``), in the language of whoever asks. The assistant's card names by them
+what a write of reservation names by its id, never by the id; the API reads them too. Each is read with the permission
+of its list, and each is of the business that asks.
 """
 
 import datetime as dt

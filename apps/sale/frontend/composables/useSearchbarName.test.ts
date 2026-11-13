@@ -1,5 +1,5 @@
 // `useSearchbarName`: Ionic 8 names the inner input of an `ion-searchbar` «search text», in English, whatever
-// its hint says (outfitkit#182), so a screen reader never reads «Buscar producto…». Every searchbar of the
+// its hint says, so a screen reader never reads «Buscar producto…». Every searchbar of the
 // app is named by its hint, in the person's language, through `@erplora/ui/components`'
 // `syncSearchbarInputName`: once it is on screen, again when its hint changes (the language, the
 // territory's tax) and when the searchbar is created again.

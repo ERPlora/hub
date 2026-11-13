@@ -1,4 +1,4 @@
-"""Guardrail of the permissions (W11, phase 2; ARCHITECTURE.md §4 «Un solo camino»; Ioan, 2026-10-31).
+"""Guardrail of the permissions: no operation of the Hub is open to every employee by omission.
 
 ``live.operations.Operation`` checks ``ctx.has(op.permission)`` before it runs, and ``OperationContext.has(None)`` is
 ``True``: an ``@operation(..., permission=None)`` runs for anyone with a context on the business (any role, and on a
@@ -55,7 +55,7 @@ CHECKED_INSIDE = "checked inside"
 OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
     "base.access.door": (
         DEVICE_DOOR,
-        "The PIN pad of a trusted shared device, before anyone signs in (BASE-G55): names and initials of who may "
+        "The PIN pad of a trusted shared device, before anyone signs in: names and initials of who may "
         "enter with a PIN there, never an email or an account; anyone else hears it with nobody in it.",
     ),
     "base.demo.code_create": (PLATFORM, "The SaaS asks for the one-time entry code of a demo (/internal)."),
@@ -76,7 +76,7 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
     "base.hub.register": (PLATFORM, "The SaaS registers or renames a business (/internal)."),
     "base.app.activation_settle": (
         PLATFORM,
-        "The worker turns on, or leaves failed, the apps whose tables it made in the business's own database (S3).",
+        "The worker turns on, or leaves failed, the apps whose tables it made in the business's own database.",
     ),
     "base.hub.reset_apply": (
         PLATFORM,
@@ -99,7 +99,7 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
     ),
     "base.hub.cut_finish": (
         PLATFORM,
-        "The last step of the cut of S5 (manage.py cut_shared_hubs): a business of phase 1 gets its own database "
+        "The last step of manage.py cut_shared_hubs: a business that shared control's database gets its own "
         "in control's registry; internal_only refuses anyone else.",
     ),
     "base.usage.list": (
@@ -256,7 +256,7 @@ def test_what_checks_its_permissions_itself_refuses_without_them(name):
 HUB_HOST = "a.localhost:8000"
 PLATFORM_HOST = "hubs.localhost:8000"
 A = Scope("host", "a")
-#: One SaaS account (Ioan's): the platform's admin, and the owner of a business.
+#: One SaaS account that is both the platform's admin and the owner of a business.
 ROOT_AS_STAFF = RedeemedUser(user_id="7", email="root@erplora.com", name="Root", locale="en", role="platform_admin")
 ROOT_AS_OWNER = RedeemedUser(user_id="7", email="root@erplora.com", name="Root", locale="en", role="hub_owner")
 
@@ -333,7 +333,7 @@ def test_the_superuser_s_wildcard_is_the_platform_s_alone():
 
 @pytest.mark.django_db
 def test_a_staff_session_from_before_the_host_rule_holds_nothing_on_a_business_s_host(client):
-    # A session with no host noted (opened before S1's rule) stays valid where it is used until it expires: on a
+    # A session with no host noted (opened before the host rule) stays valid where it is used until it expires: on a
     # business's host the staff copy is one more user without a Membership there.
     staff = get_user_model().objects.create_user("saas-staff:7", is_staff=True, is_superuser=True)
     client.force_login(staff)

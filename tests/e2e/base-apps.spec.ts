@@ -1,16 +1,7 @@
-// Apps and System › «Usage and plan» of the Hub (APP-BASE-4; the old hub's AppsPage and SystemPage,
-// docs/reference/old-hub/apps-*.png, apps-all-*.png, apps-paid-*.png and system-plan-*.png) in the three viewports,
-// as the owner of hub `a`: «My apps» with each app's state and «Open», «Add apps» (`#all`) with its search and
-// neither «Paid» nor «Price» (every app in every plan, PLAN §32: no app of this deployment is sold apart, so an old
-// link to `#paid` opens «Add apps»), and the plan's limits against
-// the people of the business — followed live: the SaaS's photo with a plan moves the screen without a reload. The
-// employee reads the apps too (no notice cuts the list on a phone: gh:hub#2570) and is told that «Usage and plan»
-// is for whoever runs the business. Each flow leaves its capture `APP-BASE-4-<G key>-<width>` once nothing scrolls
-// sideways. A paid app without its right (BASE-G74, BASE-G132, BASE-G134) cannot be reached here: no module of the
-// deployment is premium; the Vitest of AppsPage and AppBlockedPage and base/tests/test_entitlement.py cover it.
+// A paid app without its right cannot be reached here: no module of the deployment is premium; the Vitest of AppsPage
+// and AppBlockedPage and base/tests/test_entitlement.py cover it.
 // The photo is sent the way the SaaS sends it (`PUT /internal/hubs/{id}/state`, signed) and `a`'s photo is put
 // back after the run.
-// flow: BASE-G67 BASE-G68 BASE-G69 BASE-G70 BASE-G81
 import { createHmac } from 'node:crypto';
 
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
@@ -96,16 +87,16 @@ test.describe.configure({ mode: 'serial' });
 for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   const width = Number(label);
 
-  test(`BASE-G67 BASE-G68 BASE-G69 BASE-G70 — Apps at ${width}`, async ({ browser }) => {
+  test(`Apps at ${width}`, async ({ browser }) => {
     const { context, page } = await signedIn(browser, viewport, '/apps');
     // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
     if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-    // A business is born with every app off (PLAN-HUB round 2026-10-27): the demo is turned on first, so «My apps»
+    // A business is born with every app off: the demo is turned on first, so «My apps»
     // has it whatever this run's `a` was left with (`seed_local_hubs` leaves every app on; then this changes nothing).
     await turnOn(context, A, 'demo');
     await page.reload();
 
-    // BASE-G67 — «My apps»: the apps on, the demo among them, each with its state.
+    // «My apps»: the apps on, the demo among them, each with its state.
     await expect(page).toHaveURL(`${A}/apps`);
     await expect(testid(page, 'tab-mine')).toHaveClass(/segment-button-checked/);
     const demo = appRow(page, 'demo');
@@ -113,12 +104,12 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await expect(demo.locator('[data-testid="apps-state"]')).toContainText('Active');
     await snap(page, 'BASE-G67', width);
 
-    // BASE-G68 — «Open» leads to the app's first screen.
+    // «Open» leads to the app's first screen.
     await testid(page, 'apps-row-demo-open').click();
     await expect(page).toHaveURL(`${A}/demo/items`);
     await snap(page, 'BASE-G68', width);
 
-    // BASE-G69 — «Add apps» (`#all`): the whole catalogue and its search; a search with no match says so.
+    // «Add apps» (`#all`): the whole catalogue and its search; a search with no match says so.
     await page.goto(`${A}/apps#all`);
     await expect(testid(page, 'tab-all')).toHaveClass(/segment-button-checked/);
     const search = testid(page, 'apps-search').locator('input');
@@ -131,7 +122,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await search.fill('');
     await expect(appRow(page, 'demo')).toBeVisible();
 
-    // BASE-G70 — every app in every plan (PLAN §32): nothing is sold apart, so there is no «Paid» tab and «Add apps»
+    // Every app in every plan: nothing is sold apart, so there is no «Paid» tab and «Add apps»
     // has no «Price» (it would say «Free» on every row), neither in the table nor in the phone's cards; «Comes with»
     // still names what an app brings (BASE-F19). The demo is «Installed» in the catalogue.
     const labels = shown(page).locator('[role="columnheader"], .data-table__field-label');
@@ -156,7 +147,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await context.close();
   });
 
-  test(`BASE-F40 BASE-G81 — what the plan includes at ${width}, followed live`, async ({ browser }) => {
+  test(`BASE-F40 — what the plan includes at ${width}, followed live`, async ({ browser }) => {
     const { context, page } = await signedIn(browser, viewport, '/system#usage');
     // A photo without a plan: the limits are not known yet, never a made-up figure.
     await pushPhoto();
@@ -194,11 +185,11 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   });
 }
 
-test('BASE-G67 BASE-G81 — the employee reads the apps on a phone, and «Usage and plan» is for whoever runs the business', async ({ browser }) => {
+test('the employee reads the apps on a phone, and «Usage and plan» is for whoever runs the business', async ({ browser }) => {
   const viewport = VIEWPORTS[390];
   const { context, page } = await signedIn(browser, viewport, '/apps', true);
   try {
-    // gh:hub#2570 — nothing above the list cuts it on a phone: the demo's row and «Open» are in view.
+    // Nothing above the list cuts it on a phone: the demo's row and «Open» are in view.
     const demo = appRow(page, 'demo');
     await expect(demo).toBeVisible();
     await expect(testid(page, 'apps-row-demo-open')).toBeInViewport();

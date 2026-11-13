@@ -204,7 +204,7 @@ const SCREENS: { app: string; issue: string; path: string; row: (page: Page) => 
 ];
 
 for (const size of SIZES) {
-  test(`${KEY} at ${size.label}: the seven apps paint a four-digit amount with its thousands grouped`, async ({ browser }) => {
+  test(`at ${size.label}: the seven apps paint a four-digit amount with its thousands grouped`, async ({ browser }) => {
     const { context, page } = await spanishOwner(browser, { width: size.width, height: size.height });
     try {
       for (const screen of SCREENS) {

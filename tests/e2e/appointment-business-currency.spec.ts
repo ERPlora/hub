@@ -80,7 +80,7 @@ test.afterAll(async ({ browser }) => {
   cleanUp();
 });
 
-test(`${KEY}: a business in Poland books and previews its services in złoty, never euros, in 390, 834 and 1440`, async ({ page }) => {
+test(`a business in Poland books and previews its services in złoty, never euros, in 390, 834 and 1440`, async ({ page }) => {
   await registerBusinessIn(original, 'PL');
   await login(page, A, '/appointment/agenda');
   // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
@@ -114,7 +114,7 @@ test(`${KEY}: a business in Poland books and previews its services in złoty, ne
   }
 });
 
-test(`${KEY}: back in Spain the services are booked and previewed in euros`, async ({ page }) => {
+test(`back in Spain the services are booked and previewed in euros`, async ({ page }) => {
   await registerBusinessIn(original, 'ES');
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/appointment/agenda');

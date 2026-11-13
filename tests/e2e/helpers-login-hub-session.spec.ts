@@ -1,10 +1,10 @@
-// flow: ninguno — FIX base (ayudante `login` de los e2e del Hub; visto en hub#179)
-// `login` and the SaaS's brake on jumps (FIX-HUB-E2E-HUB-LOGIN-RATELIMIT-429). Every jump to a hub is counted by the
-// SaaS, 20 per account every 5 minutes (`HUB_LOGIN_RATELIMIT`, ACCOUNTS-F28), and a spec of more than 20 tests, each
-// in a fresh context, fell at the 21st with «429 · Too many attempts» (staff-flows.spec.ts, STAFF-F24). So `login`
-// keeps the hub's session of each account and hub, as a person who comes back to their business: a fresh context
-// starts with it and lands on `next` with no jump. A session that ended (signed out of the hub) sends to the SaaS
-// as before, and the new one is kept; `fresh: true` asks for the jump on purpose.
+// flow: none — the `login` helper of the Hub's e2e (seen in hub#179)
+// `login` and the SaaS's brake on jumps. Every jump to a hub is counted by the SaaS, 20 per account every 5 minutes
+// (`HUB_LOGIN_RATELIMIT`, ACCOUNTS-F28), so a spec of more than 20 tests, each in a fresh context, would fall at the
+// 21st with «429 · Too many attempts». So `login` keeps the hub's session of each account and hub, as a person who
+// comes back to their business: a fresh context starts with it and lands on `next` with no jump. A session that ended
+// (signed out of the hub) sends to the SaaS as before, and the new one is kept; `fresh: true` asks for the jump on
+// purpose.
 import { type Browser, type BrowserContext, expect, test } from '@playwright/test';
 
 import {
@@ -26,8 +26,8 @@ import {
 const PHOTO_BACKUP = 'e2e_backup_session_photo';
 
 // What `login` keeps is an account's session, never a device: with a plan in `a`'s photo (Free covers one device, as
-// a run of the WhatsApp spec leaves it), one account's entry in its context would end another's session in its own
-// (BASE-G57) and the kept session would jump again. So `a` has no plan while this spec runs, and its photo back after.
+// a run of the WhatsApp spec leaves it), one account's entry in its context would end another's session in its own,
+// and the kept session would jump again. So `a` has no plan while this spec runs, and its photo back after.
 test.beforeAll(() => dropPlanFromPhoto(PHOTO_BACKUP));
 
 test.afterAll(() => restorePhotoFrom(PHOTO_BACKUP));
@@ -52,7 +52,7 @@ function jumpsOf(context: BrowserContext): string[] {
 }
 
 /** A fresh context signed in on `origin` as `credentials`: who the hub says it is (its person's id, which is that
- *  business's own since S2a, and the account it names) and the jumps it took. */
+ *  business's own, and the account it names) and the jumps it took. */
 async function entry(
   browser: Browser,
   origin: string,
@@ -150,7 +150,7 @@ test('a context signed in at the SaaS as another account: the session its jump o
     // opens theirs.
     const page = await employee.context.newPage();
     await login(page, B, '/demo/items', OWNER, { fresh: true });
-    // Each business has its own person for the account (S2a): `b`'s names the employee, under `b`'s own id.
+    // Each business has its own person for the account: `b`'s names the employee, under `b`'s own id.
     const there = await api<{ user: { id: string; label: string } | null }>(employee.context, B, 'GET', '/me');
     expect(there.data.user?.label, 'what the SaaS signed in').toBe(employee.label);
   } finally {
@@ -162,11 +162,9 @@ test('a context signed in at the SaaS as another account: the session its jump o
   expect(owner.label, 'the owner enters hub b as the owner').not.toBe(employee.label);
 });
 
-// FIX-HUB-E2E-INVENTORY-TABS-WALK-TIMEOUT-AFTER-OTHERS: `/inventory` is no page, the SPA's router sends it to
-// `/inventory/dashboard` (apps/inventory/frontend/routes.ts). On the jump, `login` saw `next` as the document arrived,
-// before that redirect, and passed; with a kept session it only looked once the shell was up, and waited for an address
-// that never comes until the step's time ran out. So a spec signing in at `/inventory` passed alone and fell after
-// the others (inventory-products.spec.ts). Both ways now look once the shell is up, and say where it landed at once.
+// `/inventory` is no page: the SPA's router sends it to `/inventory/dashboard` (apps/inventory/frontend/routes.ts).
+// Read as the document arrives, before that redirect, `next` looks reached on the jump; read once the shell is up,
+// with a kept session, it never comes. Both ways look once the shell is up, and say at once where they landed.
 test('a `next` the SPA redirects is refused alike on the jump and with a kept session: it says where it landed, at once', async ({
   browser,
 }) => {

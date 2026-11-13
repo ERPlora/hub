@@ -120,7 +120,7 @@ describe('HoursPage', () => {
     const s = await setup();
     await s.show(WEEK);
     // Only what holds while the week is unconfirmed: Appointments (and Online booking through it) refuse outside
-    // it, Reservations does not apply it until it is saved or confirmed (CLOSE-SCHEDULE, hub#172).
+    // it, Reservations does not apply it until it is saved or confirmed (hub#172).
     expect(s.find('schedule-hours-default-week').text()).toContain(
       'These are default opening hours we set up for you. Check they match your business — appointments outside them are refused.',
     );
@@ -162,7 +162,7 @@ describe('HoursPage', () => {
     expect(off.wrapper.findAllComponents(InlineFeedback).map((b) => b.attributes('data-testid'))).toContain('schedule-hours-inactive');
   });
 
-  it('a table that does not load names what failed, then the cause, never the generic text (pm#610)', async () => {
+  it('a table that does not load names what failed, then the cause, never the generic text', async () => {
     const s = await setup({ locale: 'es' });
     s.net.lastStream().push(errorFrame(s.subId(OP), 'boom'));
     await flush();
@@ -182,7 +182,7 @@ describe('HoursPage', () => {
   });
 });
 
-describe('HoursPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('HoursPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

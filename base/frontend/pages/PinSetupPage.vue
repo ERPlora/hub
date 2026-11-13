@@ -1,8 +1,6 @@
 <script setup lang="ts">
-// «Create your PIN» (`/pin/setup`, BASE-G54; the old hub's LoginPage pin step): where the callback sends a person who
-// entered with the account on a till of a business that works by PIN and has none yet. They choose it on the pad
-// (the business's digits), repeat it and go on to where they were going; «Not now» goes on without one (it is chosen
-// later in «My profile» or given in Employees). Someone who already has one is never asked for another.
+// Where the sign-in callback sends a person who entered with their account on a till of a business that works by PIN
+// and has none yet. «Not now» goes on without one: it can be chosen later in «My profile» or given in Employees.
 import { InlineFeedback } from '@erplora/ui/components';
 import { ApiError, useLiveClient } from '@erplora/ui/sdk';
 import { IonContent, IonPage, IonSpinner } from '@ionic/vue';

@@ -1,8 +1,3 @@
-// Settings › Business (BASE-G97, G98, G99; APP-BASE-6): the business as erplora.com registered it — its name, country,
-// time zone (with the time it is there), currency and language — read-only, because erplora.com owns them: an owner or
-// an administrator changes them there («Change on erplora.com», a new tab), the country never once the business is
-// ready, the currency never (it is the country's). A demo has nothing to change. Below, «Fiscal data» opens Invoicing's
-// issuer, or Apps while Invoicing is not on. Loading, and a reading that failed with «Retry», never a blank card.
 import type { SessionMe } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -99,7 +94,7 @@ describe('BusinessPanel', () => {
     expect(m.wrapper.findAll('ion-input, ion-select, input, select')).toHaveLength(0);
   });
 
-  // gh:hub#439: on the tablet's app «Change on erplora.com» did nothing (its webview opens no `_blank`).
+  // The installed app's webview opens nothing on a `_blank` link.
   it('in the installed app «Change on erplora.com» opens the system browser; the Google Play copy has none', async () => {
     const invoke = installedApp('direct');
     const m = await panel();

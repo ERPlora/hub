@@ -37,8 +37,8 @@ MAX_DELAY_SECONDS = 30 * 24 * 3600
 #: The chain is read from the outbox actor (`flow_run:<id>`) of the event that starts a run, so it only
 #: follows the events a step records itself: when a step's event goes through another app's reaction
 #: first (which runs as the system), the events of that reaction carry `system` and the chain starts
-#: again. Inheriting it needs the outbox relay of phase 2 to run each reaction with the actor of the
-#: event it delivers (base/ and the apps' `react`), not this app.
+#: again. Inheriting it would need the outbox relay to run each reaction with the actor of the event it
+#: delivers instead of the system (base/ and the apps' `react`), not this app.
 MAX_CHAIN = 8
 #: The kinds of step this engine runs.
 STEP_KINDS = ("command", "query", "condition", "delay", "http", "ask", "assistant")

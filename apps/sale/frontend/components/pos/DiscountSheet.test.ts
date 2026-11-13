@@ -3,11 +3,11 @@
 // and «Remove». It hands the discount up; the page picks the door (the manager's above the cap) and a
 // refusal is read in the sheet.
 import { describe, expect, it, vi } from 'vitest';
-import { h, ref } from 'vue';
 
-import { click, errorFrame, expectWaitsForTheYen, mountSale, settle } from '../../__tests__/mount-sale';
+import { click, errorFrame, expectWaitsForTheYen, settle } from '../../__tests__/mount-sale';
 import { expectWindowSaysMoneyUnreadable } from '../../../../../base/frontend/__tests__/save-waits-for-money';
 import { plain } from '../../lib/format';
+import { mountDiscountSheet } from './__tests__/discount-sheet';
 import DiscountSheet from './DiscountSheet.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -19,22 +19,7 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 type Options = { business?: null };
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en', options: Options = {}) {
-  const open = ref(true);
-  const m = await mountSale(
-    {
-      setup: () => () =>
-        h(DiscountSheet, {
-          open: open.value,
-          'onUpdate:open': (v: boolean) => (open.value = v),
-          name: null,
-          amount: 0,
-          pending: false,
-          error: null,
-          ...props,
-        }),
-    },
-    { locale, ...options },
-  );
+  const m = await mountDiscountSheet(props, { locale, ...options });
   await m.live();
   await settle();
   const press = async (...keys: string[]) => {
@@ -45,7 +30,7 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
     m.find('pos-discount-mode').element.dispatchEvent(new CustomEvent('ionChange', { detail: { value } }));
     await settle();
   };
-  return { ...m, open, press, sheet, mode };
+  return { ...m, press, sheet, mode };
 }
 
 describe('DiscountSheet: the ticket', () => {

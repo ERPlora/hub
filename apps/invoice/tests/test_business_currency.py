@@ -1,8 +1,8 @@
 """An invoice issued by hand keeps the business's currency (flow business-currency): its country's, as
-``base.business.get`` reads it from this hub's registry (APP-BASE-6), never a euro fixed in the app. A business in
-Poland invoices in zlotys (Odoo, Business Central, Square… issue in the business's own currency); one in Spain, in
-euros, as VeriFactu reads them. The document writes the amounts with the decimals of that currency. What is already
-issued keeps the currency it was issued in."""
+``base.business.get`` reads it from this hub's registry, never a euro fixed in the app. A business in Poland invoices in
+zlotys (Odoo, Business Central, Square… issue in the business's own currency); one in Spain, in euros, as VeriFactu
+reads them. The document writes the amounts with the decimals of that currency. What is already issued keeps the
+currency it was issued in."""
 
 import pytest
 from django.utils import translation
@@ -88,8 +88,8 @@ def test_an_invoice_says_the_decimals_of_its_currency_as_the_server_counts_them(
 
 @pytest.mark.parametrize(("country", "currency"), [("ES", "EUR"), ("PL", "PLN")])
 def test_erploras_own_hub_invoices_in_the_currency_of_its_issuer_s_country(settings, country, currency):
-    # Phase 1's platform hub has no business on erplora.com (no registry row, create_platform_hub): ERPlora's
-    # invoices keep the currency of the country its issuer is set up in, Spain's, rather than failing.
+    # ERPlora's own hub has no business on erplora.com (no registry row, create_platform_hub): its invoices keep the
+    # currency of the country its issuer is set up in, Spain's, rather than failing.
     settings.PLATFORM_HUB_SLUG = "erplora"
     settings.PLATFORM_ISSUER_COUNTRY = country
     platform = ctx_for(scope=Scope("host", "erplora"))
@@ -99,9 +99,9 @@ def test_erploras_own_hub_invoices_in_the_currency_of_its_issuer_s_country(setti
 
 @pytest.mark.parametrize("platform_hub", [False, True], ids=["a-business-s-hub", "erploras-own-hub"])
 def test_a_manual_invoice_asks_base_for_the_business_s_currency(settings, monkeypatch, platform_hub):
-    # FIX-HUB-INVOICE-OWN-COPY-OF-BUSINESS-CURRENCY: invoicing asks the one question every app that charges asks
-    # (``base.operations.business_currency``, BASE-F50), on ERPlora's own hub too, never a copy of its own that drifts
-    # in silence from it (here, an answer other than the one of the business's or the issuer's country).
+    # Invoicing asks the one question every app that charges asks (``base.operations.business_currency``, BASE-F50), on
+    # ERPlora's own hub too, never a copy of its own that drifts in silence from it (here, an answer other than the one
+    # of the business's or the issuer's country).
     settings.PLATFORM_HUB_SLUG = "erplora"
     settings.PLATFORM_ISSUER_COUNTRY = "ES"
     business_in("ES")

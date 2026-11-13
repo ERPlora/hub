@@ -54,7 +54,7 @@ FIGURE_EVENTS = [*PRODUCT_EVENTS, STOCK_CHANGED, CONFIG_UPDATED]
 # The Sales app's events (its WORKBOOK fixes their payload).
 SALE_COMPLETED = "sale.sale.completed"
 SALE_VOIDED = "sale.sale.voided"
-# INVENTORY-F24 (2026-10-14): the units a refund returns go back to the stock.
+# INVENTORY-F24: the units a refund returns go back to the stock.
 SALE_REFUNDED = "sale.sale.refunded"
 
 #: Event of another app → the operation of this app that reacts to it.

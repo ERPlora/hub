@@ -2,7 +2,7 @@
 // A table on the floor plan (WORKBOOK «Plano de sala»; TABLE-F09), at its own box of the plan: its
 // number; its seats («4 pax») or, occupied, the guests and the minutes they have been there («3 pax ·
 // 35 min») and who serves them; a reservation of today on one line (the name cut with «…», the hour
-// never); and its status written with its icon and colour — never the colour alone (tables#64). The
+// never); and its status written with its icon and colour — never the colour alone. The
 // canvas around it owns the pointer and the keys; this only paints. While a transfer or a merge picks
 // its destination, a table that cannot be picked is dimmed and disabled.
 import { HubIcon } from '@erplora/ui/shell';

@@ -1,10 +1,7 @@
 <script setup lang="ts">
-// Settings › Data › Import (BASE-G103–G107; the old hub's ImportPanel): only for who administers the hub. It opens
-// with the last import that did not go in whole, when there is one (its report, «Retry what is missing», «See the
-// templates»); otherwise «Choose what to load»: the catalogue and «Upload from file». Choosing reads the template or
-// the file (`base.blueprint.inspect`, nothing written) → «Review what it brings» → `base.blueprint.import` → its
-// report, which follows the load live: what waited for an app being set up comes in by itself (hub#609). What cannot be
-// read says why and stays on the choice; an import refused stays on the review.
+// Only for whoever administers the hub. It opens with the last import that did not go in whole, when there is one.
+// Choosing a template or a file reads it without writing anything (`base.blueprint.inspect`), then it is reviewed and
+// imported; the report follows the load live, so what waited for an app being set up comes in by itself.
 import { EmptyState, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { HubIcon, useSession } from '@erplora/ui/shell';

@@ -1,9 +1,7 @@
 """Write operations of the printing app: printers, settings, the queue and the device that drains it.
 
-Cases ported from the old module (printing.jobs.create's idempotent key and closed vocabulary, the
-settings' factory values) and from the old hub's queue (crates/runtime/src/print_queue.rs: five
-hand-outs, a 90 s lease, done/failed by the device that took it, retry and discard stamped, nothing
-deleted)."""
+A new job's idempotent key and closed vocabulary, the settings' factory values and the queue's rules: five
+hand-outs, a 90 s lease, done/failed by the device that took it, retry and discard stamped, nothing deleted."""
 
 import dataclasses
 import datetime as dt
@@ -377,8 +375,8 @@ def test_the_system_printer_tests_with_an_a4_page():
 
 
 def test_the_a4_test_page_is_signed_by_the_business_in_the_callers_language():
-    """hub#1735, hub#1803: never «ERPlora Bridge», a product that is gone; the business's name once invoicing
-    knows it (ERPlora until then), in the language of whoever tests."""
+    """Never «ERPlora Bridge», a product that is gone; the business's name once invoicing knows it (ERPlora until then),
+    in the language of whoever tests."""
     printer("Office", kind="system", address="")
     unnamed = PrintJob.objects.get(pk=run("printing.printer.test", {"printer": "Office"}).id).html
     assert "<h1>ERPlora</h1>" in unnamed and "Bridge" not in unnamed
@@ -424,8 +422,8 @@ def test_a_device_takes_the_oldest_job_of_its_printers():
         "",
     )
     sent = PrintJob.objects.get(pk=first.id)
-    # The job names the device by its registration, never by the id it sent (that id is its credential,
-    # hub#2551): whoever sets up printers pairs the device by printing from it, as «Device 1».
+    # The job names the device by its registration, never by the id it sent (that id is its credential):
+    # whoever sets up printers pairs the device by printing from it, as «Device 1».
     assert (sent.status, sent.device, sent.print_device.name, sent.attempts) == ("sent", "Device 1", "Device 1", 1)
     assert sent.leased_until > timezone.now() + dt.timedelta(seconds=80)
     # The device is told how long it has to answer (WORKBOOK «Contrato con la plataforma», claim).
@@ -522,7 +520,7 @@ def test_the_device_confirms_the_paper_once_and_the_document_is_let_go():
 
 def test_a_late_confirmation_of_the_same_device_is_taken_never_printed_twice():
     # A slow printer with copies passes the 90 s; another claim puts the job back in the queue; the paper
-    # did come out: the device's «done» is taken from the queue too (the old hub's rule).
+    # did come out: the device's «done» is taken from the queue too.
     till = printer("Till")
     queued = enqueue().job
     claim(till)
@@ -578,11 +576,10 @@ def test_a_failure_puts_the_job_back_until_five_and_then_it_fails():
     assert failure(queued.id, "late", attempt=5).confirmed is False
 
 
-# ── PRINTING-F18 Only a device the business set up prints (FIX-PRINTING-JOBS-CLAIMED-BY-ANY-DEVICE) ─
-# A session with «print» took the jobs of any printer by naming it, and confirmed or failed them by naming the
-# device that had them (shown in the queue: hub#2551). The device is the one that prints (the old hub's
-# `_print_host`, hub#342): whoever sets up printers registers it with the printers it reaches; then only it,
-# with any session that prints, takes, confirms or fails their jobs.
+# ── PRINTING-F18 Only a device the business set up prints ─
+# A session with «print» must not take the jobs of any printer by naming it, nor confirm or fail them by naming the
+# device that had them (shown in the queue). The device is the one that prints: whoever sets up printers registers it
+# with the printers it reaches; then only it, with any session that prints, takes, confirms or fails their jobs.
 
 EMPLOYEE, MANAGER = "hub_employee", "hub_manager"
 #: The devices' own ids (the SPA's X-Device-Id, the `deviceId` of /ws/print's hello): their credential.
@@ -734,7 +731,7 @@ def test_a_retired_device_takes_nothing_and_printing_from_it_does_not_bring_it_b
 
 
 def test_the_devices_id_never_shows_in_the_queue_nor_in_its_registration():
-    # hub#2551: an employee who read the till's id in the queue could print, confirm and fail as the till.
+    # An employee who read the till's id in the queue could print, confirm and fail as the till.
     till = printer("Till")
     register(till, name="Till")
     queued = enqueue().job
@@ -798,7 +795,7 @@ def test_a_device_set_up_in_a_hub_is_told_on_that_hubs_channel_only():
     assert sorted(scoped) == [("printing.device.registered", "b"), ("printing.device.retired", "b")]
 
 
-# ── The device's presence (base's /ws/print declares it ``print_presence``; the old hub's ``print_hosts::heartbeat``) ──
+# ── The device's presence (base's /ws/print declares it ``print_presence``) ──
 
 
 def seen_at(device_id: str = TILL_ID):
@@ -845,7 +842,7 @@ def test_being_seen_records_no_event_so_a_beat_wakes_no_screen():
 
 
 def test_setting_a_device_up_from_it_is_news_that_it_is_there():
-    # The old hub's «a heartbeat or a re-registration both count as news»: set up from the device in hand, it is there.
+    # A heartbeat or a re-registration both count as news: set up from the device in hand, it is there.
     before = timezone.now()
     device = register(printer("Till"))
     assert before <= seen_at() <= timezone.now()
@@ -997,7 +994,7 @@ def test_only_who_runs_the_business_retries_and_cancels(role):
         run("printing.job.retry", {"job_id": str(queued.id)}, ctx_for(role))
 
 
-# ── The paper's envelope: language and money scale (hub#1159, hub#2129) ─────────────────────────
+# ── The paper's envelope: language and money scale ────────────────────────────────────
 
 
 def test_a_document_without_language_or_scale_takes_the_callers_and_the_currencys():
@@ -1075,7 +1072,7 @@ def test_a_chosen_printer_that_is_inactive_is_passed_over_for_the_first_active_o
     assert (queued.job.printer_id, queued.job.printer_name) == (spare.id, "Spare")
 
 
-# ── PRINTING-F20 How long the queue keeps a job (HUB-F206) ──────────────────────────────────────────
+# ── PRINTING-F20 How long the queue keeps a job ─────────────────────────────────────────────────────
 
 
 def ended(days: int, status: str, **more) -> PrintJob:

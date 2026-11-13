@@ -1,6 +1,3 @@
-// Files › the tree of folders (BASE-G82, BASE-G85; the old hub's ok-file-manager tree): every folder of the business
-// under «Files», the open one marked, a tap opens it, and a file or folder dragged from the list drops on one to move
-// there (only where the person may move, and never onto the folder dragged itself).
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 

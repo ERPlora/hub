@@ -1,32 +1,21 @@
-// A business of the Canary Islands with a category that only has its national VAT (TAX-F11, TAX-F04;
-// FIX-TAX-REGION-NATIONAL-FALLBACK): the owner keeps «Canary Islands (IGIC)» in Taxes → Settings, the category has
-// the national 21 % VAT and no IGIC rule, and the till never charges it at the VAT — as a category without any
-// rule in the peninsula, the cart has no total and «Charge» says why and cannot charge. The refusal is seen at
-// 390×844, 834×1112 and 1440×900 (`FIX-TAX-REGION-NATIONAL-FALLBACK-<width>.png`). What the run makes is deleted
-// after it, and the business goes back to the whole country.
-import { expect, type Page, test } from '@playwright/test';
+// A business of the Canary Islands with a category that only has its national VAT (TAX-F11, TAX-F04): the
+// owner keeps «Canary Islands (IGIC)» in Taxes → Settings, the category has the national 21 % VAT and no IGIC rule,
+// and the till never charges it at the VAT — as a category without any rule in the peninsula, the cart has no total
+// and «Charge» says why and cannot charge. The refusal is seen at 390×844, 834×1112 and 1440×900. What the run makes
+// is deleted after it, and the business goes back to the whole country.
+import { expect, test } from '@playwright/test';
 
-import { A, login, psql, shot, shown } from './helpers';
+import { shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { snapshotSeries } from './invoice-helpers';
-import { cleanSales, drawerOff, newestSaleOf, restoreDrawer, stamp } from './sale-helpers';
-import { cleanUp as cleanTaxes, createRule, FLOW_VIEWPORTS, freshCategory, horizontalOverflow, pickSelect } from './tax-helpers';
+import {  } from './invoice-helpers';
+import { cleanSales, newestSaleOf, restoreDrawer, stamp } from './sale-helpers';
+import { cleanUp as cleanTaxes, createRule, FLOW_VIEWPORTS, freshCategory, horizontalOverflow, pickSelect, regionSaleContext, taxSettingsForm, wholeCountry } from './tax-helpers';
 
 const RUN = stamp();
 let shirt: Product;
 
-/** The business back to the whole country: the other specs of the stack sell at the national VAT. */
-function wholeCountry(): void {
-  psql("update tax_taxsettings set region_code = ''");
-}
-
 test.beforeAll(async ({ browser }) => {
-  snapshotSeries();
-  const context = await browser.newContext({ baseURL: A });
-  const page = await context.newPage();
-  await login(page, A, '/tax/settings');
-  // Cash without a cash session: the drawer's lock is sale-cash-gate.spec.ts's.
-  await drawerOff(context);
+  const context = await regionSaleContext(browser);
   const key = await freshCategory(context, 'novat');
   // Only the national VAT: no IGIC rule for this category.
   await createRule(context, { country_code: 'ES', tax_category_key: key, rate_pct: 21 });
@@ -42,16 +31,10 @@ test.afterAll(() => {
   restoreDrawer();
 });
 
-async function settingsReady(page: Page): Promise<void> {
-  await shown(page).locator('[data-testid=tax-settings-form]').waitFor({ state: 'visible' });
-}
-
-// flow: ninguno — FIX fiscal: en Canarias/Ceuta/Melilla sin regla propia se cobraría el IVA nacional (TAX-F11, TAX-F04)
-test('FIX-TAX-REGION-NATIONAL-FALLBACK: in the Canary Islands a category with only the national VAT is not charged at the VAT, and the till says why', async ({ page, context }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page, A, '/tax/settings');
-  await settingsReady(page);
-  const form = shown(page).locator('[data-testid=tax-settings-form]');
+// flow: TAX-F11, TAX-F04 — in the Canary Islands, Ceuta or Melilla a category without a rule of its own is never
+// charged at the national VAT
+test('in the Canary Islands a category with only the national VAT is not charged at the VAT, and the till says why', async ({ page, context }) => {
+  const form = await taxSettingsForm(page);
   await pickSelect(page, form.locator('[data-testid=tax-settings-region]'), 'Canary Islands (IGIC)');
   await form.locator('[data-testid=tax-settings-save]').click();
   await expect(page.locator('ion-toast').filter({ hasText: 'Tax region saved.' })).toBeVisible();

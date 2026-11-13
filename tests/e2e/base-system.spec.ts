@@ -1,16 +1,7 @@
-// System of the Hub (APP-BASE-7; the old hub's SystemPage, docs/reference/old-hub/system-*.png, system-updates-*.png,
-// system-events-*.png and system-logs-*.png) in the three viewports, as the owner of hub `a`: its five tabs in the
-// address («Usage and plan» by default, also from the old `#resources` and `#plan`; `#backups` lands on Settings › Data),
-// «Usage and plan» with what the business uses and whether to upgrade (BASE-F40), once per colour of its line at the top,
-// Updates with the version running, Failed events — seen from the bell, resent one
-// by one, discarded in the product's dialog with a reason, resent all after a confirmation — and Logs; and the screen's
-// own error reported by itself. The employee has three tabs, no Logs, and is told who may see the failed events. Each
-// flow leaves its capture `APP-BASE-7-<G key>-<width>` once nothing scrolls sideways.
-//
 // The failed events (deliveries the relay gave up on) are written as the relay leaves them, tagged in their payload so
 // the run removes them after; the relay giving up and its live notice are base/tests/test_services_system.py's. One
-// of hub `b` is planted too, in `b`'s own database (S2a): `a` never sees it.
-// flow: BASE-F40 BASE-G87 BASE-G88 BASE-G89 BASE-G90 BASE-G91 BASE-G92 BASE-G93 BASE-G94 BASE-G95
+// of hub `b` is planted too, in `b`'s own database: `a` never sees it.
+// flow: BASE-F40
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { A, EMPLOYEE, horizontalOverflow, hostPage, openBell, psql, shot, shown, untilStill } from './helpers';
@@ -110,10 +101,10 @@ async function signedIn(browser: Browser, viewport: { width: number; height: num
 for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   const width = Number(label);
 
-  test(`BASE-G87 BASE-G88 BASE-G89 BASE-G90 — System and its tabs at ${width}`, async ({ browser }) => {
+  test(`System and its tabs at ${width}`, async ({ browser }) => {
     const { context, page } = await signedIn(browser, viewport, '/system');
     try {
-      // BASE-G87 — «Usage and plan» first, four tabs, each in the address.
+      // «Usage and plan» first, four tabs, each in the address.
       await expect(testid(page, 'tab-usage')).toHaveClass(/segment-button-checked/);
       await expect(shown(page).locator('ion-segment-button[data-testid^="tab-"]')).toHaveCount(4);
 
@@ -131,14 +122,14 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         await expect(testid(page, 'system-usage-info-database')).toBeVisible();
       }
 
-      // BASE-G89 — Updates: the version running and that the hub updates itself.
+      // Updates: the version running and that the hub updates itself.
       await testid(page, 'tab-updates').click();
       await expect(page).toHaveURL(`${A}/system#updates`);
       await expect(testid(page, 'system-release-version')).toContainText('You are on ');
       await expect(testid(page, 'system-updates')).toContainText('This hub updates itself');
       await snap(page, 'BASE-G89', width);
 
-      // BASE-G89 — until the status answers, the tab says it is reading: never an empty tab.
+      // Until the status answers, the tab says it is reading: never an empty tab.
       let release: () => void = () => {};
       const held = new Promise<void>((resolve) => (release = resolve));
       await page.route(/\/api\/live\b/, async (route) => {
@@ -159,7 +150,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(testid(page, 'system-release-version')).toContainText('You are on ');
       await expect(testid(page, 'system-release-loading')).toHaveCount(0);
 
-      // BASE-G90 — Logs: the hub's last events between apps, searchable.
+      // Logs: the hub's last events between apps, searchable.
       plantFailed('a', 'Conflict: Set up the issuer first.');
       await page.goto(`${A}/system#logs`);
       await expect(testid(page, 'tab-logs')).toHaveClass(/segment-button-checked/);
@@ -168,7 +159,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(shown(page).locator('[data-testid="system-log-level"]', { hasText: 'Error' }).first()).toBeVisible();
       await snap(page, 'BASE-G90', width);
 
-      // BASE-G87 — the old `#backups` is no tab any more: Settings › Data.
+      // The old `#backups` is no tab any more: Settings › Data.
       await page.goto(`${A}/system#backups`);
       await expect(page).toHaveURL(`${A}/settings#data`);
     } finally {
@@ -355,13 +346,13 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     });
   });
 
-  test(`BASE-G91 BASE-G92 BASE-G94 BASE-G93 — Failed events at ${width}`, async ({ browser }) => {
+  test(`Failed events at ${width}`, async ({ browser }) => {
     plantFailed('a', 'E2E one: Set up the issuer first.');
     plantFailed('a', 'E2E two: no such sale.');
     plantFailed('b', 'E2E of b: never seen in a.');
     const { context, page } = await signedIn(browser, viewport, '/');
     try {
-      // BASE-G91 — the bell says how many and leads to them (BASE-F10).
+      // The bell says how many and leads to them (BASE-F10).
       await openBell(page);
       const row = page.locator('ion-popover [data-testid="hub-bell-row"]', { hasText: 'Failed events (2)' });
       await expect(row).toBeVisible();
@@ -374,13 +365,13 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(testid(page, 'failed-events-retry-all')).toBeEnabled();
       await snap(page, 'BASE-G91', width);
 
-      // BASE-G92 — resend one: it leaves the list at once, back in the queue.
+      // Resend one: it leaves the list at once, back in the queue.
       await rows(page).filter({ hasText: 'E2E one' }).getByTestId('failed-event-retry').click();
       await expect(rows(page)).toHaveCount(1);
       await expect(rows(page).first()).toContainText('E2E two');
       await snap(page, 'BASE-G92', width);
 
-      // BASE-G94 — discard the other in the product's dialog, with a reason: kept, closed for good.
+      // Discard the other in the product's dialog, with a reason: kept, closed for good.
       await rows(page).first().getByTestId('failed-event-discard').click();
       const dialog = page.locator('[data-testid="failed-event-discard-dialog"]');
       await expect(dialog).toBeVisible();
@@ -397,7 +388,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         ).split('\n'),
       ).toEqual(['discarded|Invoiced by hand.', 'pending|']);
 
-      // BASE-G93 — two more fail; «Resend all» asks, then sends them all back.
+      // Two more fail; «Resend all» asks, then sends them all back.
       plantFailed('a', 'E2E three: printer off.');
       plantFailed('a', 'E2E four: printer off.');
       await page.reload();
@@ -449,7 +440,7 @@ test('BASE-F40 — what a task counted reaches control within its minute, under 
   }
 });
 
-test('BASE-G95 — the screen reports an error nobody caught, by itself', async ({ browser }) => {
+test('the screen reports an error nobody caught, by itself', async ({ browser }) => {
   const { context, page } = await signedIn(browser, VIEWPORTS[1440], '/system');
   try {
     await expect(testid(page, 'tab-usage')).toBeVisible();
@@ -463,7 +454,7 @@ test('BASE-G95 — the screen reports an error nobody caught, by itself', async 
   }
 });
 
-test('BASE-G87 BASE-G91 — the employee has three tabs, and is told who may see the failed events', async ({ browser }) => {
+test('the employee has three tabs, and is told who may see the failed events', async ({ browser }) => {
   const { context, page } = await signedIn(browser, VIEWPORTS[390], '/system', true);
   try {
     await expect(shown(page).locator('ion-segment-button[data-testid^="tab-"]')).toHaveCount(3);

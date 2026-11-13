@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// «Comes with …» (WORKBOOK FLOW-F33, F34, F35; the old module's FLOWS-F05 and F06): the ready-made
+// «Comes with …» (WORKBOOK FLOW-F33, F34, F35): the ready-made
 // automations the apps bring, under the gallery's own cards, one section per app (`flow.recipe.list`,
 // live). A card opens (one at a time) to say what it does and what it may do and why, in its app's words.
 // «Turn it on» builds it on with exactly those permissions (`flow.recipe.enable`); once built it says how it

@@ -10,6 +10,7 @@
 // deleted in Customers, finds it among the vouchers with no customer (F30). What it creates is «E2E Svc …».
 import { expect, type Page, test } from '@playwright/test';
 
+import { voucherWithNoCustomer } from './service-helpers';
 import { A, api, psql, shot, shown } from './helpers';
 import {
   cleanUp,
@@ -288,11 +289,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await expect(movements).toBeHidden();
 
       // SERVICE-F30: Lucía's card deleted in Customers; her voucher shows among the ones with no customer.
-      await post(context, '/customer/customers/delete', { id: lucia.id }, 200);
-      await view.locator('[data-testid=service-packages-orphans-open]').click();
-      const orphans = page.locator('ion-modal[data-testid=service-orphans]');
-      await expect(orphans.locator(`[data-testid=service-orphans-row-${sold.id}]`)).toContainText(`Customer reference: ${lucia.id}`);
-      await expect(orphans.locator(`[data-testid=service-orphans-row-${sold.id}]`)).toContainText('5 sessions left');
+      const orphans = await voucherWithNoCustomer(page, context, lucia.id, sold.id);
       await capture('SERVICE-F30');
       await orphans.locator('[data-testid=service-orphans-close]').click();
       await expect(orphans).toBeHidden();
