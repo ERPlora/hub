@@ -129,7 +129,17 @@ test('rowActionIcon says the row shows the action nowhere, instead of waiting fo
 
 test('rowActionIcon reads an icon the shell never registered as such', async ({ page }) => {
   await page.setContent(bookRow('buttons'));
-  expect(await rowActionIcon(page, 'book', 'r1', 'edit', 'trash-outline')).toEqual({ registered: false, named: false, drawn: true });
+  expect(await rowActionIcon(page, 'book', 'r1', 'edit', 'trash-outline')).toEqual({ registered: false, named: false, drawn: true, visible: true });
+});
+
+test('rowActionIcon reads an icon the page hides, leaves out of the layout or gives no box as not visible', async ({ page }) => {
+  await page.setContent(bookRow('buttons'));
+  for (const hiding of ['visibility: hidden', 'display: none', 'display: inline-block; width: 0; height: 0; overflow: hidden']) {
+    const style = await page.addStyleTag({ content: `[data-testid=book-row-r1-edit] ion-icon { ${hiding} }` });
+    expect(await rowActionIcon(page, 'book', 'r1', 'edit', 'create-outline'), hiding).toEqual({ ...PAINTED, visible: false });
+    await style.evaluate((tag) => (tag as HTMLStyleElement).remove());
+  }
+  expect(await rowActionIcon(page, 'book', 'r1', 'edit', 'create-outline')).toEqual(PAINTED);
 });
 
 test('iconPaint reads an icon that wears no hook of its own, as a tab’s or a tile’s', async ({ page }) => {

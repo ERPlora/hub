@@ -100,15 +100,17 @@ function rowHooks(table: string, id: string, action: string): { hook: string; me
 }
 
 /** What a check of an icon reads of an `ion-icon`: the shell registered `name` (Ionicons' map), the icon names it (its
- *  `name`, or in `icon` the data URL registered for it, which a DataTable action hands) and its SVG is drawn. */
+ *  `name`, or in `icon` the data URL registered for it, which a DataTable action hands), its SVG is drawn and it is
+ *  visible as Playwright's `toBeVisible` reads it (not hidden by CSS, laid out, with a box). */
 export interface IconPaint {
   registered: boolean;
   named: boolean;
   drawn: boolean;
+  visible: boolean;
 }
 
 /** An icon painted as it should be. */
-export const PAINTED: IconPaint = { registered: true, named: true, drawn: true };
+export const PAINTED: IconPaint = { registered: true, named: true, drawn: true, visible: true };
 
 /** What `paintIn` found: the icon's paint, the action only inside a closed «⋮», or nothing on the page. */
 export type IconShown = IconPaint | 'in «⋮»' | 'not shown';
@@ -121,10 +123,12 @@ function paintIn(found: Element[], { name, menu }: { name: string; menu: string 
   const ion = (holder.localName === 'ion-icon' ? holder : holder.querySelector('ion-icon')) as (HTMLElement & { name?: string; icon?: string }) | null;
   const src = (window as unknown as { Ionicons?: { map?: Map<string, string> } }).Ionicons?.map?.get(name);
   const svg = ion?.shadowRoot?.querySelector('.icon-inner svg');
+  const box = ion?.getBoundingClientRect();
   return {
     registered: typeof src === 'string',
     named: ion !== null && (ion.name === name || (src !== undefined && ion.icon === src)),
     drawn: (svg?.childElementCount ?? 0) > 0,
+    visible: (ion?.checkVisibility({ visibilityProperty: true }) ?? false) && (box?.width ?? 0) > 0 && (box?.height ?? 0) > 0,
   };
 }
 

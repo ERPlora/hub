@@ -9,7 +9,7 @@
 //     check) of a task, and «Open» (open) of a project.
 //   - Price Lists: the pricetag of its «My apps» tile.
 // «Painted» = the `ion-icon` names that icon (its `name`, or the data URL the shell registered for it, which a
-// DataTable action hands as its `icon`) and draws a non-empty SVG. What the run creates is deleted.
+// DataTable action hands as its `icon`), draws a non-empty SVG and is visible. What the run creates is deleted.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, openApps, psql, scrolledTo, shot, shown } from './helpers';
