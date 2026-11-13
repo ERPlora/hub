@@ -3065,9 +3065,9 @@ Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte,
 clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías, las citas y
 las citas periódicas; crear y borrar el clúster temporal es el procedimiento «Devolver un negocio a un momento» de
 ERPlora/aws; el grupo, la etiqueta o el campo propio que el negocio borró después de eliminar un cliente que
-vuelve, hub#1356; la imagen de un producto recuperado, hub#1319; los productos que el negocio conserva vivos en una
-categoría de productos que vuelve, hub#1373; la imagen de un servicio recuperado, hub#1319; que Recuperaciones nombre al
-profesional que no vuelve con su servicio, hub#1375)
+vuelve, hub#1356; la imagen de un producto recuperado, hub#1319; que la página «Recuperar en el negocio…» nombre la
+excepción de lo que vuelve a una categoría recuperada, hub#1364; la imagen de un servicio recuperado, hub#1319; que
+Recuperaciones nombre al profesional que no vuelve con su servicio, hub#1375)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
 copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
@@ -3103,9 +3103,10 @@ Pasos:
      nuevo para el negocio: no arranca ninguna de sus automatizaciones, así que a nadie se le da la bienvenida ni se le
      avisa otra vez de una cita que ya tenía (hub#1307).
      Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes**, **Categorías de productos,
-     Productos**, **Categorías de servicios, Servicios** y **Citas**). Pulsa **Recuperar**.
-  10. Sale «1 copia aparte devolverá Clientes, Categorías de productos, Productos, Categorías de servicios, Servicios,
-      Citas a su negocio en unos minutos: Recuperaciones dice cómo fue.». En
+     Productos, Enlaces de productos a categorías**, **Categorías de servicios, Servicios** y **Citas**). Pulsa
+     **Recuperar**.
+  10. Sale «1 copia aparte devolverá Clientes, Categorías de productos, Productos, Enlaces de productos a categorías,
+      Categorías de servicios, Servicios, Citas a su negocio en unos minutos: Recuperaciones dice cómo fue.». En
       Recuperaciones la ve «Pedida» con la copia, qué se pidió y cuándo.
   11. Unos minutos después dice «Hecha» y qué volvió: «Clientes: se restauró 1, se crearon 2» o «Clientes: se crearon 2,
       1 sin crear». Su ficha dice además cuáles no volvieron y por qué (por su identificador en la copia, sin datos
@@ -3118,7 +3119,8 @@ Pasos:
       eliminada que vuelve no le vuelve el grupo, la etiqueta o el campo que el negocio borró después (hub#1356). Nunca
       vuelve una ficha cuyos datos personales se borraron (RGPD) ni una que se unió a otra, ni se repite una que el
       negocio ya volvió a crear (el mismo nombre, teléfono y email). Con Productos, «Categorías de productos,
-      Productos: se restauró 1, se crearon 2» (las categorías y los productos que volvieron, juntos, hub#1355): primero vuelve
+      Productos, Enlaces de productos a categorías: se restauró 1, se crearon 3» (las categorías, los productos y los
+      enlaces que volvieron, juntos, hub#1355): primero vuelve
       cada categoría de productos que el negocio ya no tiene (la eliminó o la perdió), como una nueva, creada como la
       crea la pantalla de Categorías, con su nombre, slug, descripción, icono, color, orden y categoría fiscal; la
       eliminada sigue eliminada (INVENTORY-F07). Una que el negocio conserva, aunque la renombrara, es la misma, y una
@@ -3130,9 +3132,12 @@ Pasos:
       SKU, EAN-13, descripción, tipo, precio, coste, unidades, umbral, control de stock y categoría fiscal, activo o
       desactivado como estaba y en sus categorías: la misma si el negocio aún la tiene, y si no, la que acaba de volver
       o la que el negocio volvió a crear con su nombre; sin stock, que se cuenta (INVENTORY-F14), porque el de la copia es
-      de otro día, y sin su imagen (hub#1319). Los productos que el negocio conserva vivos se quedan como están: los que
-      estaban en una categoría que vuelve siguen sin ella (hub#1373). No vuelve ni se repite uno que el negocio ya volvió
-      a dar de alta (otro vivo con su SKU o su EAN-13). Con Servicios,
+      de otro día, y sin su imagen (hub#1319). No vuelve ni se repite uno que el negocio ya volvió a dar de alta (otro
+      vivo con su SKU o su EAN-13). Al final, los productos que el negocio conserva vivos y estaban en la copia en una
+      categoría que acaba de volver vuelven a ella, sin perder ninguna otra (INVENTORY-F07): es lo único que la
+      recuperación toca de lo que el negocio tiene, y se cuenta aparte, como «Enlaces de productos a categorías». Una
+      categoría que el negocio conserva (aunque le quitara productos) o que volvió a crear a mano no se rellena. Con
+      Servicios,
       «Categorías de servicios, Servicios: se crearon 3» (las categorías y los servicios que volvieron, juntos): primero
       vuelve cada categoría de servicios que el negocio ya no tiene (la eliminó o la perdió), como una nueva, creada como
       la crea la pantalla de Categorías, con su nombre, descripción, icono, color y orden, dentro de su categoría padre si
@@ -3585,6 +3590,12 @@ hub#1341, hub#1356, hub#1365, hub#1373, hub#1375, aws#77
   fallara en él se alimentaría solo). `base/live.py` re-ejecuta `base.failed_event.list`, `base.event.list` y
   `base.bell.counters` con `created`, `retried` y `discarded`; `base.system.status`, con `base.hub.state_applied`. Tests:
   `base/tests/test_services_system.py`, `test_relay.py`, `test_live.py`.
+- Lo que una reacción graba como el sistema al contestar un aviso cuyo autor se pasa (`base.relay.carried`) lleva ese
+  autor, de primera y de segunda mano; lo que graba como alguien propio conserva el suyo. Se pasan el de una
+  recuperación (`copy_recovery:<id>`, BASE-F114) y los que una app declara en `carried_actors` de su `LiveAppConfig`
+  (`<label>:` o `<label>_<nombre>:`; hoy Automatizaciones, para que su guarda de bucles siga una cadena a través de
+  otra app). Una declaración que no es de la propia app (vacía, `system`, la de otra) la rechaza `base.E017` al
+  arrancar y no se usa. Tests: `base/tests/test_relay_carried.py`.
 - Lo que una reacción o una tarea programada deja para después del COMMIT y espera a la red va por
   `base.outbound.after_commit(fn, *args)` (FIX-HUB-BASE-RELAY-BLOCKED-BY-SLOW-REACTION-CALLS): `THREADS` (4) hilos del
   worker en el contexto de BD de la operación que lo pidió (`base.tenancy.context.use_again`), `QUEUED` (1000) en
