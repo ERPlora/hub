@@ -5,14 +5,14 @@
 // starting it, and no spec or helper starts one of its own. And the e2e reads `a`'s WhatsApp channel as the Hub keeps it:
 // the one row of `a`'s own database, whose business column the code leaves empty (hub#1424).
 import { execFileSync } from 'node:child_process';
-import { globSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
 import { type TestInfo, test } from '@playwright/test';
 import ts from 'typescript';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 
+import { E2E_DIR, helpersAndSpecs } from './e2e-sources';
 import { WORKER_START_TIMEOUT_MS } from './global-setup';
 import { STACK } from './stack';
 import { inErplora } from './whatsapp-helpers';
@@ -90,12 +90,6 @@ describe('inErplora, a cold Python process of erplora.com', () => {
     });
   });
 });
-
-const E2E_DIR = dirname(fileURLToPath(import.meta.url));
-
-/** The e2e's helpers and specs, in its subfolders too: not Vitest's own tests nor what a run leaves (dot folders). */
-const helpersAndSpecs = (): string[] =>
-  globSync('**/*.ts', { cwd: E2E_DIR, exclude: (name) => name === 'node_modules' || name.startsWith('.') || name.endsWith('.test.ts') });
 
 const STARTS_A_PROCESS = new Set(['execFileSync', 'execSync', 'spawnSync', 'spawn', 'execFile', 'exec']);
 
