@@ -1,7 +1,8 @@
 """Code is read by people who have never seen the project's planning documents.
 
 Comments, docstrings, test names and messages have to make sense on their own, so the code never points at a plan
-section, a dated planning round or a delivery slice. Markdown files are left out: they are where the plans live.
+section, a dated planning round, a delivery slice or phase, a task id, a dated plan or spec, or who asked for a change
+and when. Markdown files are left out: they are where the plans live.
 """
 
 import re
@@ -22,9 +23,24 @@ INTERNAL_REFERENCE = re.compile(
             r"(Plan|PLAN)(-[A-Z]+)?(\.md)? ?" + SECTION_SIGN,
             r"[Rr](onda|ound) [0-9]{4}-[0-9]{2}",
             r"[Tt]ajada S?[0-9]",
+            r"([Pp]hase|[Ff]ase) [0-9]",
+            # The word boundary keeps an invoice series' number template (PREFIX-YYYY-NNNNNN) out of the task ids.
+            r"\b(FIX|APP|CLOSE|MIG)-[A-Z0-9]+-[A-Z0-9-]+",
+            r"BASE-G[0-9]+",
+            r"([Pp]lan|[Ss]pec) 20[0-9]{2}-[0-9]{2}",
+            r"docs/(plans|superpowers)/",
+            r"Ioan('s [a-z]+)?,? \(?20[0-9]{2}-[0-9]{2}",
+            r"\(Ioan[,)]",
         )
     )
 )
+
+# The end-to-end specs name their captures after the task that added them, and renaming those string literals would
+# orphan the evidence already taken. There only comments and test titles are read.
+E2E_DIR = "tests/e2e/"
+E2E_SCRIPT_SUFFIXES = frozenset({".ts", ".js", ".mjs"})
+COMMENT_OR_STRING = re.compile(r"""//.*|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`""")
+TEST_TITLE_OPENER = re.compile(r"\b(?:test|it|describe)(?:\.\w+)*\(\s*$")
 
 CODE_SUFFIXES = frozenset(
     {
@@ -69,12 +85,28 @@ def code_files() -> list[str]:
     return [path for path in paths if is_code(path) and (REPO / path).is_file()]
 
 
+def without_string_literals(line: str) -> str:
+    """The line with its string literals emptied, except a test's title; comments stay whole."""
+    if line.lstrip().startswith(("//", "/*", "*")):
+        return line
+
+    def keep_comment_and_title(match: re.Match) -> str:
+        token = match.group(0)
+        if token.startswith("//") or TEST_TITLE_OPENER.search(line[: match.start()]):
+            return token
+        return '""'
+
+    return COMMENT_OR_STRING.sub(keep_comment_and_title, line)
+
+
 def internal_references(paths, root: Path = REPO) -> list[str]:
     found = []
     for path in paths:
+        e2e_script = path.startswith(E2E_DIR) and Path(path).suffix in E2E_SCRIPT_SUFFIXES
         text = (root / path).read_text(encoding="utf-8", errors="replace")
         for number, line in enumerate(text.splitlines(), 1):
-            if INTERNAL_REFERENCE.search(line):
+            read = without_string_literals(line) if e2e_script else line
+            if INTERNAL_REFERENCE.search(read):
                 found.append(f"{path}:{number}: {line.strip()}")
     return found
 
@@ -128,6 +160,23 @@ def test_documents_and_data_are_left_out(path):
         "ronda " + "2026-11-10f",
         "tajada " + "S3",
         "Tajada " + "4",
+        "register the apps, then wait (phase" + " 1)",
+        "Phase" + " 2 of the tenancy",
+        "Alcance MVP: fase" + " 1",
+        "the tabs (FIX" + "-LAUNCH-TABS)",
+        "await capture(page, 'APP" + "-BASE-9-panel')",
+        "the second flow of APP" + "-INVOICE-3",
+        "CLOSE" + "-ACCOUNTS-F06",
+        "MIG" + "-HUB-12",
+        "the sparkles of the Hub (BASE" + "-G132)",
+        "Plan" + " 2026-10-22, decision 3",
+        "spec" + " 2026-10-11",
+        "docs" + "/plans/2026-10-22-fase-2-tenencia.md",
+        "docs" + "/superpowers/specs/2026-10-10-knowledge.md",
+        "// Regression (Ioan" + ", 2026-10-22): every keystroke re-rendered the form",
+        "# Ioan" + " (2026-10-22): the copyright line is the platform's credit",
+        "# Ioan" + "'s redesign (2026-10-22): the header invites to write",
+        "the old Hub's `retention.rs`, Ioan" + " 2026-08-10",
     ],
 )
 def test_the_scan_catches_each_kind_of_reference(text):
@@ -142,10 +191,45 @@ def test_the_scan_catches_each_kind_of_reference(text):
         "Section 5 of the AEAT schema",
         "the second round 2 of retries",
         "fixed by hub#781",
+        "New number template; empty = PREFIX-YYYY-NNNNNN.",
+        "BASE-F12: a flow of the Hub's WORKBOOK",
+        "the subscription schedule's next phase",
+        "the plan's price for 2026",
+        "docs/api/openapi.json",
+        "under Ioan's supervision",
     ],
 )
 def test_the_scan_leaves_ordinary_text_alone(text):
     assert not INTERNAL_REFERENCE.search(text)
+
+
+def test_an_end_to_end_spec_keeps_its_capture_keys_but_not_its_comments(tmp_path):
+    spec = tmp_path / "tests" / "e2e" / "some.spec.ts"
+    spec.parent.mkdir(parents=True)
+    lines = (
+        "// The flows of the people (@TASK) at three sizes",
+        "const KEY = '@FIX';",
+        'const atEverySize = captureAtEverySize("@TASK");',
+        "await capture(page, `@TASK-${key}-${vp.label}`);",
+        " * a capture `@TASK-<key>-<size>` stays for the eye",
+        "test('@FIX: the panel opens', async ({ page }) => {",
+        "test.describe(`@TASK review`, () => {",
+        "await go('http://localhost/'); // the @PHASE page",
+        "await shot('a'); // it's @FIX, isn't it",
+    )
+    text = "\n".join(lines).replace("@TASK", "APP" + "-BASE-9").replace("@FIX", "FIX" + "-HUB-SOME-KEY")
+    spec.write_text(text.replace("@PHASE", "fase" + " 2") + "\n", encoding="utf-8")
+    found = internal_references(["tests/e2e/some.spec.ts"], root=tmp_path)
+    assert [line.split(":")[1] for line in found] == ["1", "5", "6", "7", "8", "9"]
+
+
+def test_outside_the_end_to_end_specs_a_string_literal_is_read_too(tmp_path):
+    (tmp_path / "base").mkdir()
+    (tmp_path / "base" / "keys.ts").write_text("const KEY = 'FIX" + "-HUB-SOME-KEY';\n", encoding="utf-8")
+    (tmp_path / "tests" / "e2e").mkdir(parents=True)
+    (tmp_path / "tests" / "e2e" / "seed.py").write_text('"""The seed (APP' + '-BASE-2)."""\n', encoding="utf-8")
+    found = internal_references(["base/keys.ts", "tests/e2e/seed.py"], root=tmp_path)
+    assert [line.split(":")[0] for line in found] == ["base/keys.ts", "tests/e2e/seed.py"]
 
 
 def test_a_patch_comment_that_points_at_a_plan_is_caught(tmp_path):

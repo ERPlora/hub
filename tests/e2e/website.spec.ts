@@ -300,7 +300,7 @@ test('the owner publishes the website and a visitor sees it on the hub’s addre
       GALLERY.map(async (_label, index) => (await page.getByTestId(`website-gallery-photo-${index}-image`).getAttribute('src')) ?? ''),
     );
 
-    // Regression (Ioan, 2026-10-22): typing key by key in a section opened by hand keeps the section open, the
+    // Regression: typing key by key in a section opened by hand keeps the section open, the
     // cursor in the field and every letter, also across the autosave and its result coming back live.
     await openSection(page, 'about');
     await setToggle(page, 'website-show-about', true);
