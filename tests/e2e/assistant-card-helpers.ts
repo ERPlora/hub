@@ -4,8 +4,8 @@
 // specs of the card that still carry their own copy move to it when they are touched (hub#837).
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { type Provider, startProvider } from './assistant-provider';
-import { answers, box, card, emptyMonth, saasSql, send } from './assistant-real';
+import { DONE, type Provider, startProvider } from './assistant-provider';
+import { answers, box, card, emptyMonth, panel, saasSql, send } from './assistant-real';
 import { A, login, turnOffTurnedOn, turnOnMissing } from './helpers';
 import { STACK } from './stack';
 
@@ -115,4 +115,13 @@ export async function datumOf(
 export async function cancel(page: Page): Promise<void> {
   await card(page).locator('[data-testid="assistant-confirm-cancel"]').click();
   await expect(card(page)).toBeHidden();
+}
+
+/** The word typed in the card that asks for it and the card confirmed: the assistant says it is done. */
+export async function confirmedWithTheWord(page: Page): Promise<void> {
+  await card(page).locator('[data-testid="assistant-confirm-input"] input').fill('confirm');
+  await expect(card(page).locator('[data-testid="assistant-confirm-submit"] button')).toBeEnabled();
+  await card(page).locator('[data-testid="assistant-confirm-submit"]').click();
+  await expect(card(page)).toBeHidden();
+  await expect(panel(page).locator('[data-testid="assistant-bubble-assistant"]').last()).toContainText(DONE.en);
 }

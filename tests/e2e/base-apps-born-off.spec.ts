@@ -16,7 +16,7 @@
 // flow: BASE-F31 VERIFACTU-F01
 import { expect, type Page, test } from '@playwright/test';
 
-import { bounceTasks } from './app-rows-helpers';
+import { appRowsCopy, bounceTasks } from './app-rows-helpers';
 import {
   A,
   api,
@@ -38,7 +38,7 @@ const VIEWPORTS = {
 } as const;
 
 /** The copy the run keeps of `a`'s rows (every app on), put back after each test. */
-const ROWS = 'e2e_base_apps_born_off_rows';
+const appRows = appRowsCopy('e2e_base_apps_born_off_rows');
 const TEMPLATE = 'restaurant.en';
 
 interface App {
@@ -64,11 +64,7 @@ test.describe.configure({ mode: 'serial' });
 test.beforeAll(() => {
   const kept = Number(psql("select count(*) from base_appactivation where host = 'a' and state = 'on'"));
   if (!kept) throw new Error("`a` has no app on: run `manage.py seed_local_hubs` on this run's database first.");
-  psql(`drop table if exists ${ROWS}; create table ${ROWS} as select * from base_appactivation where host = 'a'`);
-});
-
-test.afterAll(() => {
-  psql(`drop table if exists ${ROWS}`);
+  appRows.keep();
 });
 
 for (const [label, viewport] of Object.entries(VIEWPORTS)) {
@@ -155,7 +151,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         expect(undone.status, 'the load is undone').toBe(200);
       }
       // `a` back to every app on; a change through Apps forgets what the Hub keeps of its apps off for a minute.
-      psql(`delete from base_appactivation where host = 'a'; insert into base_appactivation select * from ${ROWS}`);
+      appRows.putBack();
       await bounceTasks(context, 'disable', 'enable');
       await context.close();
     }
@@ -226,7 +222,7 @@ for (const [label, viewport] of Object.entries(SPAIN_VIEWPORTS)) {
         const undone = await api(context, A, 'POST', '/settings/data/imports/undo', { id: loadId });
         expect(undone.status, 'the load is undone').toBe(200);
       }
-      psql(`delete from base_appactivation where host = 'a'; insert into base_appactivation select * from ${ROWS}`);
+      appRows.putBack();
       await bounceTasks(context, 'disable', 'enable');
       await registerBusinessIn(registration, registration.country);
       await context.close();

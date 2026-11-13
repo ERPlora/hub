@@ -20,7 +20,8 @@ import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { CANNOT_RECTIFY, DONE, NOT_DONE, type Provider, startProvider } from './assistant-provider';
+import { CANNOT_RECTIFY, NOT_DONE, type Provider, startProvider } from './assistant-provider';
+import { confirmedWithTheWord } from './assistant-card-helpers';
 import { A, api, capture, compactBar, login, psql, registerBusinessIn, registrationOf, REPO_DIR, shot, shown, untilStill } from './helpers';
 import { cleanInvoices, ensureIssuer, type InvoiceOut, invoiceOf, issuedIds, snapshotSeries } from './invoice-helpers';
 import { stamp } from './sale-helpers';
@@ -230,10 +231,7 @@ test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: 
   // Asked again, the word typed: the rectifying invoice the preview said is issued, as the person.
   await ask(page, asked(invoice.number));
   await expect(card(page)).toBeVisible({ timeout: 30_000 });
-  await card(page).locator('[data-testid="assistant-confirm-input"] input').fill('confirm');
-  await expect(submit).toBeEnabled();
-  await decide(page, 'submit');
-  await expect(lastAnswer(page)).toContainText(DONE.en);
+  await confirmedWithTheWord(page);
   await expect(receipts(page).last()).toHaveText('Done: Rectify in Invoicing');
   const after = await invoiceOf(context, invoice.id);
   expect(after.status).toBe('cancelled');

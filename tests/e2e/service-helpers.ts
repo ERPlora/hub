@@ -165,3 +165,14 @@ export function cleanUp(): void {
     ].join('; '),
   );
 }
+
+/** The customer `customerId` deleted in Customers: her voucher `voucherId` shows among the ones with no customer, with
+ *  her reference and its 5 sessions left. That sheet, open. */
+export async function voucherWithNoCustomer(page: Page, context: BrowserContext, customerId: string, voucherId: string): Promise<Locator> {
+  await post(context, '/customer/customers/delete', { id: customerId }, 200);
+  await shown(page).locator('[data-testid=service-packages-orphans-open]').click();
+  const orphans = page.locator('ion-modal[data-testid=service-orphans]');
+  await expect(orphans.locator(`[data-testid=service-orphans-row-${voucherId}]`)).toContainText(`Customer reference: ${customerId}`);
+  await expect(orphans.locator(`[data-testid=service-orphans-row-${voucherId}]`)).toContainText('5 sessions left');
+  return orphans;
+}
