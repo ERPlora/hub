@@ -392,7 +392,7 @@ def calls_to_action(html: str) -> list[tuple[str, str, str]]:
 
 @pytest.mark.parametrize("template", TEMPLATES)
 def test_the_hero_offers_two_pills_whatsapp_or_contact_and_find_us(template):
-    # Ioan's redesign (2026-10-22): the header invites to write (WhatsApp, else the contact section) and to come.
+    # The header invites to write (WhatsApp, else the contact section) and to come.
     ctas = calls_to_action(render(template))
     assert [(href, label) for _classes, href, label in ctas] == [
         ("https://wa.me/34600123456", "Chat on WhatsApp"),
@@ -733,7 +733,7 @@ def test_the_footer_shows_its_line_only_when_the_owner_wrote_one(template):
 @pytest.mark.parametrize("template", TEMPLATES)
 @pytest.mark.parametrize("name", ["Pepe's Bistro", ""])
 def test_the_footer_signs_with_erploras_credit_and_link_never_the_business_name(template, name):
-    # Ioan (2026-10-22): the copyright line is the platform's credit, the same on every hub's site, linked to
+    # The copyright line is the platform's credit, the same on every hub's site, linked to
     # erplora.com and not editable by the owner; the business's name and legal line stay in their own place.
     footer = footer_of(render(template, content=full_content(topbar={"name": name})))
     lines = re.findall(r"<(p|div|small|span)\b[^>]*>((?:(?!</\1>).)*©(?:(?!</\1>).)*)</\1>", footer, re.S)

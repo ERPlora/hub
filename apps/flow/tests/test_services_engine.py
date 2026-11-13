@@ -675,7 +675,7 @@ def test_a_condition_it_cannot_read_stops_the_run_with_its_reason(clock):
     assert Task.objects.count() == 0
 
 
-# The history keeps 90 days (FLOW-F16, hub#699; the old Hub's `retention.rs`, Ioan 2026-08-10): a
+# The history keeps 90 days (FLOW-F16, hub#699; the old Hub's `retention.rs`): a
 # finished run older than that is deleted, in bounded passes, counted; live work is never touched.
 
 

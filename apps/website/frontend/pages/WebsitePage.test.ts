@@ -171,7 +171,7 @@ describe('WebsitePage', () => {
   });
 
   it('a section opened by hand stays open, with its field and what is typed, while typing and when the save comes back', async () => {
-    // Regression (Ioan, 2026-10-22): every keystroke re-rendered the form, Vue set the accordion group's `value` back
+    // Regression: every keystroke re-rendered the form, Vue set the accordion group's `value` back
     // to the sections open at first, and the one being typed in folded: the field lost the focus and the page jumped.
     const s = await setup();
     await s.show();
