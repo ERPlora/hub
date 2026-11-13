@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e9456c70913fe79ed39e8ede8c3f1da945cd1d0693a08ceacb5d491d03e85d82 -->
+<!-- generated from WORKBOOK.md sha256:b7a9463bc35a076169989ed76f052962dd0d568c129cc02e2145752b5e15a36f -->
 
 ## What it is for and who it is for
 
@@ -192,7 +192,8 @@ With the window as it opened, Back closes it without asking (BASE-F05); the curr
 | PRICING-F11 | Edit a rule | done |
 | PRICING-F12 | Deactivate or reactivate a rule | done |
 | PRICING-F13 | Look up the price of a line | done |
-| PRICING-F14 | When a product, a category or a group is deleted, or a service changes | done |
+| PRICING-F14 | When a product is deleted or comes back, a category or a group is deleted, or a service changes | done |
+| PRICING-F15 | Recover the price list prices from a separate copy | done |
 
 ### PRICING-F01 See the price lists
 Status: done (server and screen)
@@ -433,7 +434,7 @@ list), a specific price list that does not exist, is deactivated or is not valid
 quantity that is not greater than 0.
 Involved: Inventory, Services, Customers, Sales
 
-### PRICING-F14 When a product, a category or a group is deleted, or a service changes
+### PRICING-F14 When a product is deleted or comes back, a category or a group is deleted, or a service changes
 Status: done (it has no screen: the app does it by itself, a few seconds after the other app's change)
 Actor: system
 Screen: none
@@ -445,13 +446,44 @@ Steps:
    deactivated (a group's discount never comes to apply to everybody).
 4. Services changes a service (`service.service.updated`): Price Lists copies its new name into its
    prices and its rules.
+5. ERPlora's staff recover from a separate copy a product the business deleted and still holds
+   (`inventory.product.restored`, INVENTORY-F34): Price Lists switches back on that product's rules it
+   deactivated when it was deleted. Its prices were removed: they come back with Price Lists' recovery (PRICING-F15).
 In: the notice.
 Out: `pricing.price_item.removed`, `pricing.rule.deactivated`, `pricing.price_list.updated` or
-`pricing.price_item.updated` and `pricing.rule.updated`. Repeating the notice changes nothing.
+`pricing.price_item.updated` and `pricing.rule.updated`; with a product that comes back, `pricing.rule.activated`.
+Repeating the notice changes nothing.
 If it fails: it retries by itself, further apart each time (up to an hour between attempts), and after eight attempts it is
 given up and noted down. Meanwhile, a deleted product or category no longer shows in the prices
-and a deleted group applies to nobody (it is checked when reading).
-Involved: Inventory, Customers, Services
+and a deleted group applies to nobody (it is checked when reading). With a product that comes back, a rule the business
+deactivated or changed by hand while it was deleted, or whose group no longer exists, stays as it is; if the product was
+deleted again before the notice arrives, none is switched on.
+Involved: Inventory, Customers, Services, INVENTORY-F34, PRICING-F15
+
+### PRICING-F15 Recover the price list prices from a separate copy
+Status: done
+Actor: ERPlora's staff who run the platform, when a business asks for it (BASE-F114)
+Screen: none of Price Lists: in the Hubs admin, Separate copies › "Recover into the business…", with **Price list
+prices** ticked (it is, like everything that can be brought back)
+Steps:
+1. The staff recover from a separate copy with **Price list prices** ticked. Price Lists always goes after
+   Inventory, in whatever order it is asked: a deleted product that comes back is already live when its prices are
+   put.
+2. Each price of the copy (of a product live in it or of a service) that the business no longer has comes back to its
+   price list, with its price and its "from quantity", put as the price list's detail puts it (PRICING-F07).
+3. Recoveries counts it apart: "Price list prices: 2 created".
+In: the separate copy and what the business has today.
+Out: a price for each one that was missing, with its price-put notice (`pricing.price_item.added`) made by the
+recovery, so no automation starts (FLOW-F21); nothing else.
+If it fails: a price whose place (the same price list, the same product or service and the same "from quantity") the
+business has taken again, at whatever price, is not repeated: the business's own stays, and asking again puts nothing
+twice. A price the business removed by hand after the copy comes back too, like everything the business no longer has
+(BASE-F114). What the price list's detail does not accept today does not come back and Recoveries says why: a
+deactivated price list ("pricing.price_list_unavailable: …"), a product that stays deleted (Products was not recovered,
+or the business already made another one with its SKU: "not_found: …"), a service that is gone or Services turned off.
+A product the business no longer had at all comes back as a new one, with another identifier (INVENTORY-F01), and its
+prices in the copy do not come back with it (hub#1442).
+Involved: BASE-F114, INVENTORY-F34, PRICING-F07, PRICING-F14
 
 ## Services: what goes in and what comes out
 
@@ -484,7 +516,7 @@ by their id, their name, their phone or their email. If a name fits several, it 
 | Chooses or takes off the general price list | manage | F04 | `pricing.price_list.set_default` |
 | Deactivates a price list | manage | F05 | `pricing.price_list.deactivate` |
 | Reactivates a price list | manage | F05 | `pricing.price_list.activate` |
-| Puts the price of a product or a service in a price list | manage | F07 | `pricing.price_item.add` |
+| Puts the price of a product or a service in a price list | manage | F07, F15 | `pricing.price_item.add` |
 | Changes a price | manage | F08 | `pricing.price_item.update` |
 | Removes a price | manage | F08 | `pricing.price_item.remove` |
 | Creates a rule | manage | F10 | `pricing.rule.create` |
@@ -492,6 +524,7 @@ by their id, their name, their phone or their email. If a name fits several, it 
 | Deactivates a rule | manage | F12 | `pricing.rule.deactivate` |
 | Reactivates a rule | manage | F12 | `pricing.rule.activate` |
 | Forgets a deleted product | only the platform | F14 | `pricing.catalog.forget_product` |
+| Switches back on the rules of a recovered product | only the platform | F14 | `pricing.catalog.recall_product` |
 | Forgets a deleted category | only the platform | F14 | `pricing.catalog.forget_category` |
 | Forgets a deleted customer group | only the platform | F14 | `pricing.catalog.forget_group` |
 | Copies a service's new name | only the platform | F14 | `pricing.catalog.refresh_service` |
@@ -508,12 +541,12 @@ deactivating and the rules, only from the Hub or the assistant.
 | Price list changed | Edit with some change, or its group deleted | `id` | `pricing.price_list.updated` |
 | General price list changed | Choose it or take it off | `id`, `is_default`, `previous_id` | `pricing.price_list.default_changed` |
 | Price list deactivated / reactivated | Deactivate / activate | `id` | `pricing.price_list.deactivated`, `…activated` |
-| Price put | Add | `id`, `price_list_id`, `product_id` or `service_id`, `min_quantity`, `price` | `pricing.price_item.added` |
+| Price put | Add, or recover it from a separate copy | `id`, `price_list_id`, `product_id` or `service_id`, `min_quantity`, `price` | `pricing.price_item.added` |
 | Price changed | Edit, or a service's new name | `id` (or `service_id`) | `pricing.price_item.updated` |
 | Price removed | Remove, or the product deleted | `id`, `price_list_id` | `pricing.price_item.removed` |
 | New rule | Create | `id`, `code` | `pricing.rule.created` |
 | Rule changed | Edit, or a service's new name | `id` | `pricing.rule.updated` |
-| Rule deactivated / reactivated | Deactivate / activate, or its product, category or group deleted | `id` | `pricing.rule.deactivated`, `…activated` |
+| Rule deactivated / reactivated | Deactivate / activate, or its product, category or group deleted (reactivated: its product recovered) | `id` | `pricing.rule.deactivated`, `…activated` |
 
 No app listens to them except **Automations**, which can start an automation with any
 of them (FLOW-F21). Its steps can also look up price lists, prices, rules and the price of a
@@ -522,8 +555,8 @@ put or change a price and create, change or reactivate a rule.
 
 ### What it reacts to and what it needs from other apps
 - **Inventory** (`requires`): the prices and the rules point at its products and categories; Price Lists reads
-  their name, SKU, unit, step and catalog price. It reacts to `inventory.product.deleted` and
-  `inventory.category.deleted` (F14).
+  their name, SKU, unit, step and catalog price. It reacts to `inventory.product.deleted`,
+  `inventory.product.restored` and `inventory.category.deleted` (F14).
 - **Customers** (`requires`): a price list or a rule can belong to a group; the price of a line reads the
   customer's active groups (a deactivated group stops giving its prices and its rules). If Customers
   **deletes** a group (`customer.group.deleted`), its price lists are left without a group and its rules are
@@ -531,7 +564,8 @@ put or change a price and create, change or reactivate a rule.
 - **Services** (not a requirement): a price or a rule of a service keeps its id and a copy of its
   name; the service is checked and its catalog price is read with `service.service.get`, with the session
   of whoever asks. It reacts to `service.service.updated` (F14).
-- From the platform: the business's time zone (the "today" of the dates).
+- From the platform: the business's time zone (the "today" of the dates) and the recovery from a separate copy
+  (BASE-F114), to which Price Lists says which prices it gives back (F15).
 
 ### Contract with Sales
 Sales does **not** require Price Lists and Price Lists does not touch Sales. What is asked of Sales (this app does not do it):
