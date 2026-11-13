@@ -339,7 +339,7 @@ test('«Ask the assistant» on the setup card opens it on the setup; a shortcut 
   expect(sent.setup).toBe(true);
   expect(sent.messages.at(-1)).toEqual({ role: 'user', content: 'What is left to set up?' });
   await expect(lastAnswer(page)).toContainText(GREETING.en);
-  // The setup's instructions went to the model with the checklist read again by the Hub (hub#373).
+  // The setup's instructions went to the model with the checklist read again by the Hub.
   const instructions = JSON.stringify(provider.seen.filter((s) => s.path === '/v1/chat/completions').at(-1)?.body);
   expect(instructions).toContain('checklist');
 });

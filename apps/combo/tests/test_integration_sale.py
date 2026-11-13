@@ -117,7 +117,7 @@ def lines_of(sale) -> list[tuple]:
 
 
 def test_combo_f08_the_till_charges_the_closed_price_plus_every_supplement_also_the_repeated_one(day_menu):
-    """hub#1219: a menu with supplements is charged; each pick of a repeated choice adds its supplement."""
+    """A menu with supplements is charged; each pick of a repeated choice adds its supplement."""
     order = open_check()
     (line,) = add_menu(order, picks(day_menu, "SAL", "STK", "WAT", "COF", "COF"), quantity="2").lines
     # 13,50 + 2,00 (steak) + 2 × 0,50 (two coffees), per menu; the dishes in the order of the courses.

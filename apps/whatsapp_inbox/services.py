@@ -153,7 +153,7 @@ WINDOW_CLOSED = _(
 SAAS_UNCONFIGURED = _(
     "This server cannot reach erplora.com, so nothing can be sent from it."
 )
-#: A plan that includes no WhatsApp messages (0, ADR-0474): no month brings any, so not «until next month».
+#: A plan that includes no WhatsApp messages (0): no month brings any, so not «until next month».
 NO_PLAN_MESSAGES = _("Your plan does not include WhatsApp messages: nothing can be sent until you upgrade the plan.")
 NOT_RETRYABLE = _("This message cannot be sent again: write a new one.")
 TEMPLATE_NOT_FOUND = _("There is no template called “%(name)s”.")

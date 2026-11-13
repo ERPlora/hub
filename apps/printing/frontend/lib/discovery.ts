@@ -2,7 +2,7 @@
 // sweep of port 9100, the computer's print queues, the paired Bluetooth printers — with its command
 // `erplora_discover_printers` (ERPlora/app, through Tauri's global bridge, `withGlobalTauri`). Its answer
 // is the outcome of `crates/peripherals/src/discovery.rs`: the printers found, or the permission the
-// device denied (so an empty list always means «nothing found», hub#338/#1773); a refusal is a bare
+// device denied (so an empty list always means «nothing found»); a refusal is a bare
 // string. Each printer becomes the draft of «New printer»: the person still names it and gives it a role.
 import type { PaperWidth, PrinterKind } from '../operations';
 

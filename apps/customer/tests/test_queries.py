@@ -267,7 +267,7 @@ def _tied_purchases():
     ],
 )
 def test_ties_go_by_id_in_the_lists_own_direction(operation, tied, column):
-    """hub#684 (the rule of hub#2355, as in Sales, Cash register, Inventory and Tasks): a descending list is
+    """hub#684 (as in Sales, Cash register, Inventory and Tasks): a descending list is
     the ascending one read backwards, ties included, and its pages neither repeat nor lose rows."""
     ids, filters, schema = tied()
     by_id = sorted(ids)

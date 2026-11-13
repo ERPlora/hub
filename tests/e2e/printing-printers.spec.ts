@@ -96,7 +96,7 @@ test('PRINTING-F03, F05, F01: the owner adds a network printer and sends it a te
   await rowAction(page, 'printing-printers', till.id, 'test');
   await expect.poll(async () => (await api<{ total: number }>(context, A, 'GET', `/printing/jobs?printer_id=${till.id}`)).data.total).toBe(1);
   // The summary is live: the receipt role now has a job waiting, and its card names the printer it prints
-  // on (hub#1527) — the one the server says, the default or else the first active receipt printer.
+  // on — the one the server says, the default or else the first active receipt printer.
   const receipt = shown(page).locator('[data-testid=printing-summary-card-receipt]');
   await expect(receipt).toContainText(/Waiting: \d+|En cola: \d+/);
   const on = await printsOn(context, 'receipt');

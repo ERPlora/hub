@@ -3,7 +3,7 @@
 // preflight (`* { margin: 0 }`) is a document rule, and a document rule beats the `::slotted(ion-icon[slot=start])`
 // margin Ionic gives an icon inside `ion-button`, so every `ion-button` with a `HubIcon slot="start"` would lose it
 // (the DataTable puts its own back). Measured in the page at 390×844, 834×1112 and
-// 1440×900 (the shell pins Ionic's ios mode, ADR-0143; md has the same rule): from the icon's right edge to the
+// 1440×900 (the shell pins Ionic's ios mode; md has the same rule): from the icon's right edge to the
 // label's first letter, Ionic's 0.3em of the icon, and the same gap from the spinner while the confirmation runs.
 // Only the gap comes back: the outer side (`margin-inline-start`) stays `0px`, or every SaaS button that sets only
 // its own gap would pull its icon into the padding. What the run creates is deleted.

@@ -69,7 +69,7 @@ const lines = computed(() =>
     child: !!line.parent_line_id || isDishPart(line),
     head:
       isDishPart(line) && (index === 0 || menuOf(props.sale.lines[index - 1]) !== menuOf(line)) ? line.combo_name : '',
-    // A menu in one line prints each of its dishes on a line of its own under it (hub#1165).
+    // A menu in one line prints each of its dishes on a line of its own under it.
     dishes: line.combo_id && !isDishPart(line) ? line.components.map(dishLabel) : [],
     options: line.modifiers.join(', '),
     detail: `${quantityWithUnit(line.quantity, line.unit, locale.value)} × ${money(line.unit_price)}`,

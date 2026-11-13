@@ -7,7 +7,7 @@
 //   - PRICING-F03: «Edit» opens «Editing price list — <name>» with what it has; the row shows the change;
 //   - PRICING-F04: «Make general» asks first; the row says «General»;
 //   - PRICING-F05: «Deactivate» asks first; the list waits under «Inactive» until «Activate»;
-//   - PRICING-F06: the list's detail with its prices and the catalog's, thousands grouped (hub#1090);
+//   - PRICING-F06: the list's detail with its prices and the catalog's, thousands grouped;
 //   - PRICING-F07: «+» puts an Inventory product's price from a quantity;
 //   - PRICING-F08: «Edit» changes a price; «Remove» asks first and the price goes;
 //   - PRICING-F09: the rules, each type with its value (an amount rule never says 0);
@@ -245,7 +245,7 @@ test('PRICING-F06: the detail shows the list and its prices beside the catalog�
   }
   await page.setViewportSize(DESKTOP);
   const dryerRow = row(page, ITEMS, `${TAG} Dryer ${s}`);
-  // Thousands grouped from four digits on (hub#1090).
+  // Thousands grouped from four digits on.
   await expect(dryerRow).toContainText('€1,234.56');
   await expect(dryerRow).toContainText('€1,500.00');
   await expect(row(page, ITEMS, `${TAG} Comb ${s}`)).toContainText('€2.50');

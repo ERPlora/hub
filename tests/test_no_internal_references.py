@@ -3,7 +3,8 @@
 Comments, docstrings, test names and messages have to make sense on their own, so the code never points at a plan
 section, a dated planning round, a delivery slice or phase, a task id, a dated plan or spec, or who asked for a change
 and when. Their prose does not cite the codes of an internal audit or review, an issue of another of the project's
-repositories or a piece of work by its label either: the reader has not seen them, so the reason is written out.
+repositories, a piece of work by its label or a numbered decision of the old product either, nor does it tell the code's
+history by its dates: the reader has not seen them, so the reason or the fact that holds today is written out.
 Markdown files are left out: they are where the plans live.
 """
 
@@ -31,7 +32,7 @@ INTERNAL_REFERENCE = re.compile(
             r"[Tt]ajada S?[0-9]",
             r"([Pp]hase|[Ff]ase) [0-9]",
             # The word boundary keeps an invoice series' number template (PREFIX-YYYY-NNNNNN) out of the task ids.
-            r"\b(FIX|APP|CLOSE|MIG)-[A-Z0-9]+-[A-Z0-9-]+",
+            r"\b(FIX|APP|CLOSE|MIG)-[A-Z0-9_]+-[A-Z0-9_-]+",
             r"BASE-G[0-9]+",
             r"([Pp]lan|[Ss]pec) 20[0-9]{2}-[0-9]{2}",
             r"docs/(plans|superpowers)/",
@@ -109,7 +110,40 @@ OTHER_REPO_ISSUE = re.compile(
 # are data, not work.
 WORK_LABEL = re.compile(r"(?<![\w./-])(?:W[0-9]{1,2}|V(?!8\b)[0-9]{1,2})(?![\w-])")
 
-PROSE_ONLY_SCANS = (AUDIT_CODE, OTHER_REPO_ISSUE, WORK_LABEL)
+# A decision of the old product's architecture records, by its number: the record is not in this repository, so the
+# prose keeps the decision and drops the number. Four digits after the dash, as the records were numbered; a hotel's
+# average daily rate («ADR 120») is not one.
+OLD_DECISION = re.compile(r"\bADR-[0-9]{4}\b")
+
+PROSE_ONLY_SCANS = (AUDIT_CODE, OTHER_REPO_ISSUE, WORK_LABEL, OLD_DECISION)
+
+# The code's history told by its date: a day alone in brackets, or a day after «until», «before», «since» or «as of»
+# with no word before them (they open a sentence, an aside or the line), so a rule «valid until» a day stays. The prose
+# says what holds today instead. A day that shows a format (after «ISO», «8601» or «YYYY-MM-DD») is not history, and
+# neither is one the file's code uses: that is the test's data, written as text or as year, month and day (JavaScript
+# counts the months from 0).
+DATED_HISTORY = re.compile(
+    r"(?<!ISO )(?<!8601 )(?<!YYYY-MM-DD )\((?P<day>20[0-9]{2}-[0-9]{2}-[0-9]{2})\)"
+    r"|(?:^|[^\w\s])\s*(?:[Uu]ntil|[Bb]efore|[Ss]ince|[Aa]s of) (?P<when>20[0-9]{2}-[0-9]{2}(?:-[0-9]{2})?)\b"
+)
+
+
+def uses_the_date(day: str, text: str, prose: dict[int, str]) -> bool:
+    if text.count(day) > sum(line.count(day) for line in prose.values()):
+        return True
+    parts = [int(part) for part in day.split("-")]
+    if len(parts) < 3:
+        return False
+    year, month, date = parts
+    return any(re.search(rf"\b{year},\s*0?{number},\s*0?{date}\b", text) for number in (month, month - 1))
+
+
+def tells_dated_history(line: str, text: str, prose: dict[int, str]) -> bool:
+    return any(
+        not uses_the_date(match.group("day") or match.group("when"), text, prose)
+        for match in DATED_HISTORY.finditer(line)
+    )
+
 
 PATCH_SUFFIX = ".patch"
 DOCKERFILE = "Dockerfile"
@@ -285,6 +319,7 @@ def internal_references(paths, root: Path = REPO) -> list[str]:
                 INTERNAL_REFERENCE.search(read)
                 or names_a_slice(path, read)
                 or any(scan.search(prose.get(number, "")) for scan in PROSE_ONLY_SCANS)
+                or tells_dated_history(prose.get(number, ""), text, prose)
             ):
                 found.append(f"{path}:{number}: {line.strip()}")
     return found
@@ -351,6 +386,9 @@ def test_documents_and_data_are_left_out(path):
         "the second flow of APP" + "-INVOICE-3",
         "CLOSE" + "-ACCOUNTS-F06",
         "MIG" + "-HUB-12",
+        "Cash register's hooks of the Home (FIX" + "-CASH_REGISTER-SETUP-HOOKS)",
+        "Captures: `APP" + "-CART_CHECKOUT-CART_CHECKOUT-F12-employee-<width>`",
+        "each flow's screen (APP" + "-WHATSAPP_INBOX-1-<flow>-390)",
         "the sparkles of the Hub (BASE" + "-G132)",
         "Plan" + " 2026-10-22, decision 3",
         "spec" + " 2026-10-11",
@@ -376,6 +414,7 @@ def test_the_scan_catches_each_kind_of_reference(text):
         "fixed by hub#781",
         "New number template; empty = PREFIX-YYYY-NNNNNN.",
         "BASE-F12: a flow of the Hub's WORKBOOK",
+        "CASH_REGISTER-F01 and WHATSAPP_INBOX-F13: flows of the apps' WORKBOOKs",
         "the subscription schedule's next phase",
         "the plan's price for 2026",
         "docs/api/openapi.json",
@@ -797,3 +836,115 @@ def test_another_repositorys_issue_and_a_work_label_are_caught_in_a_spec_but_not
     )
     spec.write_text("\n".join(lines) + "\n", encoding="utf-8")
     assert found_lines(internal_references(["tests/e2e/some.spec.ts"], root=tmp_path)) == [1, 3, 4, 7]
+
+
+def test_a_task_id_with_an_underscore_is_caught_in_a_spec_comment_but_not_in_its_capture_key(tmp_path):
+    spec = tmp_path / "tests" / "e2e" / "some.spec.ts"
+    spec.parent.mkdir(parents=True)
+    task = "FIX" + "-CASH_REGISTER-SETUP-HOOKS"
+    lines = (
+        f"// Cash register's hooks of the Home ({task}).",
+        f"const KEY = '{task}';",
+        f"await capture(page, `{task}-CASH_REGISTER-F01-${{vp.label}}`);",
+        "test('CASH_REGISTER-F01: the cash panel opens', async ({ page }) => {});",
+    )
+    spec.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    assert found_lines(internal_references(["tests/e2e/some.spec.ts"], root=tmp_path)) == [1]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "0 = the plan includes none (ADR" + "-0474; there is no «unlimited»)",
+        "The order the till spends vouchers in (the old module's tie-break, ADR" + "-0386).",
+        "# ADR" + "-0183 (old SaaS, fiscal/desglose.py): N1/N2 carry no rate",
+        "the shell pins Ionic's ios mode, ADR" + "-0143; md has the same rule",
+    ],
+)
+def test_the_scan_catches_a_numbered_decision_of_the_old_product(text):
+    assert OLD_DECISION.search(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "the hotel's average daily rate (ADR) of 120 € a night",
+        "ADR 120 and an occupancy of 80 %",
+        "the ADRs of the old product are not in this repository",
+        "fixed by hub#781",
+        "RD 1619/2012: the rectification of a simplified invoice is simplified",
+        "a ticket F2 or its rectification (R5); the keys S1, S2 and E1",
+    ],
+)
+def test_the_scan_leaves_rates_rulings_and_fiscal_keys_alone(text):
+    assert not OLD_DECISION.search(text)
+
+
+def test_a_numbered_decision_is_caught_in_prose_but_not_in_a_string(tmp_path):
+    (tmp_path / "apps" / "sale").mkdir(parents=True)
+    lines = (
+        '"""Vouchers are spent oldest first (ADR' + '-0386)."""',
+        'RECORD = "ADR' + '-0386"',
+        "# 0 = none (ADR" + "-0474).",
+    )
+    (tmp_path / "apps" / "sale" / "vouchers.py").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    assert found_lines(internal_references(["apps/sale/vouchers.py"], root=tmp_path)) == [1, 3]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "# Never a silent success: a write-off that would lower nothing says so (2026" + "-10-14).",
+        "INVENTORY-F24 (2026" + "-10-14): the units a refund returns go back to the stock.",
+        "// assistant» is (until 2026" + "-10-28 this test proved it was not): these are all the steps",
+        "# FLOW-F37 (was refused while the Hub had no assistant: the test above, before 2026" + "-10-28)",
+        "// `pnpm typecheck` type-checks the e2e suite too. Until 2026" + "-10-17 the root left it out",
+        "# Empty: the hub is the Host's first label wherever it is (before 2026" + "-10-14).",
+        "As of 2026" + "-11-01 every business has its own database",
+        "the worker waits for the shared schema; since 2026" + "-10-14 it never starts without it",
+    ],
+)
+def test_the_scan_catches_history_told_by_its_date(text):
+    assert tells_dated_history(text, text, {1: text})
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "a rule valid until 2026-12-31 is still open",
+        "the voucher expires before 2027-01-01",
+        "«Set end date» 2026-05-31 on the first, then the new rate from 2026-06-01 goes through",
+        "PT · general 25 % from 2027-01-01, on top of the 23 % with no end",
+        "# Generated by Django 6.1.2 on 2026-10-14 13:30",
+        "13:00 in Madrid (11:00 UTC, summer time) on 2026-10-14: the tests' «now»",
+        "Spain goes back an hour on 2026-10-25: 09:00 stays 09:00, local.",
+        "a day travels as ISO (2026-10-14), never in the person's format",
+        "the day as ISO 8601 (2026-10-14) in the payload",
+        "a date is written YYYY-MM-DD (2026-10-14) in the file's name",
+        "RD 1619/2012: the rectification of a simplified invoice is simplified",
+        "fixed by hub#781",
+        "the keys S1 and E1 since the first record",
+    ],
+)
+def test_the_scan_leaves_dates_of_data_rules_and_formats_alone(text):
+    assert not tells_dated_history(text, text, {1: text})
+
+
+def test_a_dated_aside_is_history_unless_the_files_code_uses_that_day(tmp_path):
+    (tmp_path / "apps" / "sale" / "tests").mkdir(parents=True)
+    (tmp_path / "apps" / "sale" / "frontend").mkdir(parents=True)
+    (tmp_path / "tests" / "e2e").mkdir(parents=True)
+    period = "# The last day of the period (2026" + "-10-31) is counted.\n"
+    files = {
+        "apps/sale/tests/test_period.py": period + "DAY = date(2026, 10, 31)\n",
+        "apps/sale/tests/test_text.py": period + 'DAY = "2026' + '-10-31"\n',
+        "apps/sale/frontend/period.test.ts": period.replace("#", "//") + "const day = new Date(2026, 9, 31);\n",
+        "tests/e2e/period.spec.ts": period.replace("#", "//") + "await page.fill('#to', '2026" + "-10-31');\n",
+        "apps/sale/tests/test_history.py": period.replace("The last day of the period", "Said so")
+        + "DAY = date(2026, 11, 30)\n",
+        "apps/sale/tests/test_said.py": '"""Said in words (2026' + '-10-31), not in a code."""\n',
+    }
+    for path, text in files.items():
+        (tmp_path / path).write_text(text, encoding="utf-8")
+    found = internal_references(sorted(files), root=tmp_path)
+    assert [line.split(":")[0] for line in found] == ["apps/sale/tests/test_history.py", "apps/sale/tests/test_said.py"]

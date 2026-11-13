@@ -317,7 +317,7 @@ test('the owner publishes the website and a visitor sees it on the hub’s addre
     expect(Math.abs((await scrolled(page)) - before), 'the editor did not jump').toBeLessThanOrEqual(2);
     await setToggle(page, 'website-show-about', false);
 
-    // Google reviews (2026-10-22): the business's link on Google Maps, checked by the server; this stack has no key of
+    // Google reviews: the business's link on Google Maps, checked by the server; this stack has no key of
     // Google's, so it says the reviews are not available yet and the page shows no section (asserted in `visit`).
     await openSection(page, 'reviews');
     const status = page.getByTestId('website-reviews-status');

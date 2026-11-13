@@ -107,7 +107,7 @@ describe('ResetPanel', () => {
     expect(m.sent.filter((call) => call.url.endsWith('/reset')).map((call) => call.body)).toEqual([{ dry_run: true }, { dry_run: true }]);
   });
 
-  it('a refused undo stays in the dialog with the reason (hub#2720)', async () => {
+  it('a refused undo stays in the dialog with the reason', async () => {
     const m = await panel((sent) =>
       sent.url.endsWith('/undo')
         ? Response.json({ error: { code: 'base.import_undone', message: 'This load was undone already.' } }, { status: 409 })

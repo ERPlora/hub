@@ -293,7 +293,7 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
     expect(near.find('whatsapp-inbox-near-cap').text()).toContain(said);
   });
 
-  it('a plan without WhatsApp messages says so above the list, «Upgrade plan» for whoever configures (ADR-0474: 0 = none)', async () => {
+  it('a plan without WhatsApp messages says so above the list, «Upgrade plan» for whoever configures (0 = none)', async () => {
     const none = { ...CONNECTED, monthly_limit: 0, monthly_usage: 0, cap_reached: true };
     const s = await setup({}, none);
     const notice = s.find('whatsapp-inbox-cap-reached');

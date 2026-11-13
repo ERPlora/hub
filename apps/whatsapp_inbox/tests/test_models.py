@@ -178,7 +178,7 @@ def test_the_cap_is_the_platform_s_figure_of_this_month():
     assert channel.cap_reached("2026-11") is False
     channel.monthly_usage = 149
     assert channel.cap_reached("2026-10") is False
-    # 0 = the plan includes none (ADR-0474), never «no cap»: tests/test_plan_cap.py.
+    # 0 = the plan includes none, never «no cap»: tests/test_plan_cap.py.
     assert (
         Channel(monthly_limit=0, monthly_usage=0, usage_month="2026-10", synced_at=NOW).cap_reached(
             "2026-10"

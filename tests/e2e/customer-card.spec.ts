@@ -34,7 +34,7 @@ test('a note added in one tab shows live in the other tab\'s activity', async ({
 });
 
 // flow: CUSTOMER-F06 — saving the groups refreshes the card live; that refresh must not untick the tag
-// ticked right after and not saved yet (hub#114: «Save tags» sent none and the card lost it).
+// ticked right after and not saved yet («Save tags» sent none and the card lost it).
 test('a group and a tag made in their lists are assigned on the card; their counts follow', async ({ page, context }) => {
   await login(page, A, '/customer/groups');
   const card = await createCard(context, { name: e2eName('Member') });

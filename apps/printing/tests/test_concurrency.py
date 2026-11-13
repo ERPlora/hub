@@ -69,7 +69,7 @@ def test_a_device_that_prints_twice_at_once_for_the_first_time_is_paired_once():
 
 
 def test_two_devices_at_once_take_two_different_jobs(monkeypatch):
-    """hub#2029: two tills that reach the kitchen's printer never print the same order twice. The race is made
+    """Two tills that reach the kitchen's printer never print the same order twice. The race is made
     certain, not left to the threads' timing: device A has read its job and holds it when device B asks."""
     till = printer("Till")
     for device in ("A", "B"):  # set up as «A» and «B»: the job names its device by that name

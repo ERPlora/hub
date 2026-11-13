@@ -54,7 +54,7 @@ describe('ConditionRows', () => {
     expect(s.emitted().at(-1)).toEqual({ 'input.customer_id': { eq: '' } });
   });
 
-  it('compares with another datum: picked, shown in words as a pill and taken out again (hub#1712)', async () => {
+  it('compares with another datum: picked, shown in words as a pill and taken out again', async () => {
     let asked = 0;
     const s = await setup({ 'input.total': { gte: 10000 } }, async () => {
       asked += 1;

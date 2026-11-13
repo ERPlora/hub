@@ -1,4 +1,4 @@
-"""Resume a run from the step that failed (WORKBOOK FLOW-F24; old hub HUB-F103, hub#952).
+"""Resume a run from the step that failed (WORKBOOK FLOW-F24; old hub HUB-F103).
 
 A run that stopped by an error keeps what its steps left for seven days; within them, once the cause is
 fixed, ``flow.run.retry`` takes it up again at the step that failed, without repeating the steps that

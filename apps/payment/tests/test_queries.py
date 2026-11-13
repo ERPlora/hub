@@ -425,6 +425,6 @@ def _tied_payments():
     ],
 )
 def test_ties_go_by_id_in_the_lists_own_direction(operation, tied, column):
-    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
+    """hub#768: a descending list is the ascending one read backwards, ties included, and its
     pages neither repeat nor lose rows."""
     assert_reads_backwards(listed_with(run, operation, column, schema=get(operation).input), tied())

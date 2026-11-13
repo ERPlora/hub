@@ -277,7 +277,7 @@ def test_a_service_without_a_fixed_price_takes_the_amount_typed_within_its_range
 
 
 def test_the_range_of_a_service_is_said_with_its_thousands_grouped(db):
-    # hub#1090: «1.000,00 € – 2.500,00 €» in Spanish, never «1000.00 € – 2500.00 €».
+    # «1.000,00 € – 2.500,00 €» in Spanish, never «1000.00 € – 2500.00 €».
     bridal = svc(
         "service.service.create",
         {

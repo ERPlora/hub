@@ -19,7 +19,7 @@ export function greetingSlot(hour: number): GreetingSlot {
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** The business's name; while it has none (or only an account address), a greeting by the hour (hub#366). */
+/** The business's name; while it has none (or only an account address), a greeting by the hour. */
 export function heading(name: string | null | undefined, hour: number): Heading {
   const trimmed = (name ?? '').trim();
   if (trimmed && !EMAIL.test(trimmed)) return { kind: 'business', name: trimmed };
@@ -55,7 +55,7 @@ export interface HubHome {
 
 // ── «Finish setting up your business» ─────────────────────────────────────────────────────────────────────
 
-/** Rows the card shows folded on a desk and on a phone (hub#1197). */
+/** Rows the card shows folded on a desk and on a phone. */
 export const MAX_VISIBLE_ROWS = 5;
 export const PHONE_MAX_VISIBLE_ROWS = 2;
 
@@ -101,7 +101,7 @@ export function checklistView(status: SetupStatus | undefined, options: Checklis
   return { total, done, rows, hidden: items.length - rows.length, complete, empty };
 }
 
-/** The ⛔ steps still pending, while the server counts some: what the blocking strip names (hub#374). */
+/** The ⛔ steps still pending, while the server counts some: what the blocking strip names. */
 export function blockingItems(status: SetupStatus | undefined): SetupItem[] {
   if (!status || status.blocking_pending <= 0) return [];
   return status.items.filter((item) => item.level === 'legal' && item.state === 'pending');

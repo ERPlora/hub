@@ -181,7 +181,7 @@ describe('FlowEditor: a saved automation', () => {
     expect(s.wrapper.findComponent(StepNode).props('open')).toBe(true);
   });
 
-  it('a save the Hub did not answer says so in words, never the technical text (hub#2320)', async () => {
+  it('a save the Hub did not answer says so in words, never the technical text', async () => {
     const s = await setup({ flow: FLOW, initial: fromFlow(FLOW) }, { '/api/flow/flows/update': [502, { detail: 'Bad gateway' }] });
     await click(s.find('flow-editor-save').element);
     await settle();
@@ -331,7 +331,7 @@ describe('FlowEditor: the switch, a run by hand, the permissions and an unreadab
   });
 
   // FLOW-F31: without the WhatsApp inbox in the business, «Send a message» is not offered. FLOW-F37: «Ask the
-  // assistant» is (until 2026-10-28 this test proved it was not, while the Hub had no assistant): these are all the
+  // assistant» is offered: these are all the
   // steps there are.
   it('offers exactly the steps the Hub can run', async () => {
     const s = await setup({ flow: null, initial: emptyDocument() });

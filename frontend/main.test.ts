@@ -513,7 +513,7 @@ describe('main.ts', () => {
   });
 });
 
-describe('import order guards (hub#1060)', () => {
+describe('import order guards', () => {
   it('imports the shell before anything that loads @ionic/vue (the SDK, the generated routes)', () => {
     const source = readFileSync(join(HERE, 'main.ts'), 'utf8');
     const runtimeImports = [...source.matchAll(/^import\s+(?!type\b)[^;]*?from\s+'([^']+)';/gms)].map((m) => m[1]);

@@ -671,7 +671,7 @@ def test_the_opening_hours_are_a_flush_list_with_today_marked(template):
     assert 'aria-current="date"' in rows[0][0] and "bg-primary-subtle" in rows[0][0]
     assert re.search(r'<span class="badge rounded-pill[^"]*">Today</span>', rows[0][1])
     assert "Today" not in rows[1][1]
-    # On a phone the times wrap under the day; a day's name never breaks («Wednesda y», 2026-10-22).
+    # On a phone the times wrap under the day; a day's name never breaks («Wednesda y»).
     assert all("flex-wrap" in attrs for attrs, _body in rows)
     assert re.search(r'<span class="text-nowrap">Monday ', rows[0][1]) and '<span class="text-nowrap">Sunday</span>' in rows[1][1]
     assert "aria-current" not in section_of(render(template, today="tue"), "contact")
@@ -718,7 +718,7 @@ def footer_of(html: str) -> str:
 
 @pytest.mark.parametrize("template", TEMPLATES)
 def test_the_footer_shows_its_line_only_when_the_owner_wrote_one(template):
-    # Regression (2026-10-22): the demo's footer showed a lone «h», which was the owner's text; the line is the text
+    # Regression: the demo's footer showed a lone «h», which was the owner's text; the line is the text
     # as written, in its own element, and with no text there is no line at all (no empty element left behind).
     footer = footer_of(render(template, content=full_content(footer={"text": "Pepe Bistro S.L. · CIF B12345678"})))
     lines = re.findall(r"<(\w+)\b[^>]*\bdata-ep-footer-text\b[^>]*>([^<]*)</\1>", footer)

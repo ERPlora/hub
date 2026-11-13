@@ -49,7 +49,7 @@ export const moneyOf = (sale: { currency: string; currency_decimals: number }): 
   sale.currency ? { currency: sale.currency, decimals: sale.currency_decimals } : undefined;
 
 // Grouped always: Spanish CLDR waits for five digits (minimumGroupingDigits 2) and would paint «1234,56 €»
-// here beside «1.234,56 €» in the other screens (hub#1090).
+// here beside «1.234,56 €» in the other screens.
 function moneyOptions({ currency, decimals }: Money): Intl.NumberFormatOptions {
   const digits = { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: 'always' } as const;
   return { style: 'currency', currency, currencyDisplay: 'narrowSymbol', ...digits };

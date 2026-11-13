@@ -83,7 +83,7 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         const row = rowOf(page, 'cart-checkout-carts', secondId);
         await expect(row).toContainText('bea@example.com');
         await expect(row).toContainText('2.5');
-        // Four-digit totals are grouped (hub#1090).
+        // Four-digit totals are grouped.
         await expect(row).toContainText('€1,236.06');
 
         // A piece of the first one's code finds only it.
