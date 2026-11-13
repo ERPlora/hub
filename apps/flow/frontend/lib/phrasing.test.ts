@@ -44,7 +44,7 @@ const CATALOG = {
 } as CatalogOut;
 
 describe('events and actions in words', () => {
-  it('every event and action of the Hub today has its phrase in Spanish, never English words (flows#41)', () => {
+  it('every event and action of the Hub today has its phrase in Spanish, never English words', () => {
     const p = phrasing('es');
     expect(eventLabel('cart_checkout.cart.abandoned', CATALOG, p)).toBe('se abandona un carrito');
     expect(eventLabel('kitchen.ticket.ready', CATALOG, p)).toBe('una comanda está lista');
@@ -92,7 +92,7 @@ describe('events and actions in words', () => {
     expect(fieldLabel('some_new_field', phrasing())).toBe('Some new field');
   });
 
-  it('the data the Hub offers today are named in Spanish with the screen in Spanish (flows#164)', () => {
+  it('the data the Hub offers today are named in Spanish with the screen in Spanish', () => {
     const p = phrasing('es');
     expect(fieldLabel('customer_phone', p)).toBe('Teléfono del cliente');
     expect(fieldLabel('sale_number', p)).toBe('Número de venta');
@@ -183,7 +183,7 @@ describe('steps', () => {
     expect(describeClause({ path: 'input.party_size', op: 'in', value: [6, 8] }, [], CATALOG, p)).toBe('Party size one of 6, 8');
   });
 
-  it('a comparison with another datum names that datum, never its path (hub#1712)', () => {
+  it('a comparison with another datum names that datum, never its path', () => {
     const clause = describeClause({ path: 'input.total', op: 'eq', value: 'input.customer_id' }, [], CATALOG, p);
     expect(clause).toContain('Customer');
     expect(clause).not.toContain('input.');
@@ -335,7 +335,7 @@ describe('«Ask the assistant» in words (FLOW-F37, F38)', () => {
   });
 
   it('says a tool was not used because a datum the step fixes was empty, naming the datum', () => {
-    // FIX-HUB-FLOW-ASSISTANT-STEP-ACTS-ON-ANOTHER-CUSTOMER-WITHOUT-ON-BEHALF-OF: nothing half done, and visible.
+    // Nothing half done, and visible.
     const empty = entry({ outcome: 'assistant_pinned_empty', operation: 'reservation.reservation.cancel', fields: ['on_behalf_of'] });
     expect(describeLog(empty, [step], null, en)).toBe(
       'The assistant tried «Cancel a reservation», but «On behalf of the customer», fixed by this step, was empty: it was not done.',

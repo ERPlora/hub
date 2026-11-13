@@ -1,8 +1,7 @@
 """The tools a turn offers for what the owner asks (``live.assistant.relevant`` over the Hub's real catalogue).
 
-The QA battery of the assistant with the real model (2026-10-31, docs/plans/2026-10-31-qa-asistente.md of
-erplora-next, block B) found the model answering «I do not have the tool…» for B28, B30 and B32: the owner holds
-those operations, but the turn never offered them, because the words asked («empleado», «vendí», «activa la app»)
+The assistant's QA with the real model found it answering «I do not have the tool…» to the questions below: the owner
+holds those operations, but the turn never offered them, because the words asked («empleado», «vendí», «activa la app»)
 shared none with the tool's own. Business ``a`` has every module on (``base.activation.every_on``): the largest
 catalogue an owner can have, a restaurant's (sale, staff, customer, inventory, cash register, tables, reservations…)
 included, so a tool found here is found in any business with fewer apps on.
@@ -37,13 +36,13 @@ def offered(ctx: OperationContext, *asked: str) -> list[str]:
 @pytest.mark.parametrize(
     ("language", "asked", "expected"),
     [
-        # B30: «No tengo la herramienta para crear empleados desde aquí».
+        # It answered «No tengo la herramienta para crear empleados desde aquí».
         ("es", "Da de alta al empleado «Luis QA» como cajero", "staff.member.create"),
         ("en", "Add the employee «Luis QA» as a cashier", "staff.member.create"),
-        # B32: «No tengo acceso a los datos de ventas desde aquí».
+        # It answered «No tengo acceso a los datos de ventas desde aquí».
         ("es", "¿Qué vendí hoy?", "sale.sale.today"),
         ("en", "What did I sell today?", "sale.sale.today"),
-        # B28: «Desde aquí no puedo activar apps directamente».
+        # It answered «Desde aquí no puedo activar apps directamente».
         ("es", "Activa la app de clientes", "base.app.enable"),
         ("en", "Turn on the customers app", "base.app.enable"),
     ],
@@ -54,9 +53,9 @@ def test_the_tool_that_does_what_the_owner_asks_is_offered(owner, language, aske
     assert expected in offered(ctx, asked)
 
 
-#: What the review of live#18 asked besides the battery: each question with the tool that obviously does it. The Hub
-#: has no tool that invites someone (that is done on erplora.com): «invita a…» gets the people of the business, which
-#: says how each one gets in, and the documentation search.
+#: Everyday questions, each with the tool that obviously does it. The Hub has no tool that invites someone (that is done
+#: on erplora.com): «invita a…» gets the people of the business, which says how each one gets in, and the documentation
+#: search.
 EVERYDAY = [
     ("es", "cobra la mesa 4", {"sale.sale.complete"}),
     ("es", "¿cuántos clientes tengo?", {"customer.customer.list", "customer.customer.stats"}),

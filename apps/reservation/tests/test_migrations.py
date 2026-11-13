@@ -2,7 +2,7 @@
 
 Before it, a reservation or a waitlist entry whose card was chosen kept the phone as typed («600 111 222»), so the
 inbox, which looks for exactly the international number, told nobody (RESERVATION-F19). The migration reads every
-kept phone with Customers' rules in the business's country (Spain in phase 1) and writes it in E.164; what is not a
+kept phone with Customers' rules in Spain, the country of every business it met, and writes it in E.164; what is not a
 valid number of its country (a short number, letters, an extension) stays as it is, never guessed. Backwards it
 changes nothing: the typed form is not known any more, and E.164 is what every reader already accepts.
 

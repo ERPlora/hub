@@ -1,5 +1,5 @@
 """The inbox's reactions to Customers, end to end through the worker's real outbox relay (WHATSAPP_INBOX-F04,
-F11, F12, F37; ``base/relay.py``, which delivers in phase 1 since hub#105).
+F11, F12, F37; ``base/relay.py``).
 
 Customers' own operations write the cards and record their events; the worker's loop takes them and runs the
 inbox's reaction as the system, once. Nothing is called by hand: before the tick nothing has changed, after it

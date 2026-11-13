@@ -1,5 +1,5 @@
-"""``manage.py cut_shared_hubs``: the cut of S5, each business of phase 1 given its own database
-(``base.tenancy.cut``; runbook ``docs/runbooks/cut-shared-hubs.md``).
+"""``manage.py cut_shared_hubs``: each business still on control's shared database given its own one
+(``base.tenancy.cut``).
 
 Each business still on control's database (``db_name`` empty) is named with its mode: ``--copy-all <slug>`` (one,
 once: every row control's tables of the hubs' apps hold goes into it), ``--recreate <slug>`` (its database from its

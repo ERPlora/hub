@@ -1,12 +1,10 @@
 // The Sales, Kitchen and Tables specs open the till's cart through `openTillCart` (sale-helpers.ts), never by reading the cart
 // button themselves. The till lays itself out for the window a frame after a resize, so `if (await fab.isVisible())
-// await fab.click()` straight after `setViewportSize` read the previous size's button: at 834 after 390 it tapped the
-// phone's button on its way out and waited for it until the test's 3 minutes ran out (rv-hub-292; seven specs carried
-// the copy), and at 390 after 1440 it found no button yet, left the drawer shut and «Send RUSH (1)» out of view
-// (kitchen-pos.spec.ts, FIX-HUB-KITCHEN-E2E-KITCHEN-SEND-OUT-OF-VIEW-AT-390); «Choose table» in table-flows.spec.ts read
-// it the same way (FIX-HUB-KITCHEN-TABLE-E2E-READS-CART-FAB-BEFORE-TILL-SETTLES). The helper waits until the till's phone
+// await fab.click()` straight after `setViewportSize` reads the previous size's button: at 834 after 390 it taps the
+// phone's button on its way out and waits for it until the test's time runs out, and at 390 after 1440 it finds no
+// button yet and leaves the drawer shut, with «Send RUSH (1)» out of view. The helper waits until the till's phone
 // layout agrees with the window, by the till's own rule, which has to stay the one `PosPage.vue` applies.
-// flow: ninguno — FIX tests/e2e
+// flow: none — the e2e harness
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

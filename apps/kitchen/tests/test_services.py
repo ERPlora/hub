@@ -632,7 +632,7 @@ def test_reprinting_a_ticket_that_went_to_paper_prints_a_copy_every_time(clock, 
 
 
 def test_printing_a_ticket_that_never_went_to_paper_prints_it_as_the_first_sheet(clock, product):
-    # F09: a round fired by Sales alone (phase 1) never printed: «Reprint» prints it, not as a copy.
+    # F09: a round only Sales fired was never printed: «Reprint» prints it, not as a copy.
     _, lines = fired_round(product, "Burger")
     run("kitchen.ticket.reprint", {"ticket_id": str(lines[0].id)})
     run("kitchen.ticket.reprint", {"ticket_id": str(lines[0].id)})

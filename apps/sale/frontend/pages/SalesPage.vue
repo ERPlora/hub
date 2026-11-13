@@ -158,7 +158,7 @@ const refundable = (row: SaleRow): boolean => row.status === 'completed' && (row
 
 const reprinting = shallowRef<string | null>(null);
 
-// «Issue now»: the documents Invoicing could not issue in the write (phase 1 has no relay to do it).
+// «Issue now»: the documents Invoicing could not issue in the write.
 const issuing = useCommand('sale.sale.issue_documents');
 const issuingId = shallowRef<string | null>(null);
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The apps of the business followed on every screen (PLAN-HUB §9; BASE-F22), mounted once per signed-in person beside
+// The apps of the business followed on every screen, mounted once per signed-in person beside
 // the pane (BackgroundChrome): the live `base.app.list`, re-run when an app is turned on or off — here or on another
 // device — and when erplora.com's photo changes the rights. The menu is the session's, which is no live query: when
 // an app's state changes, base reads the session again (`sessionChanged`, frontend/main.ts), and a screen of an app

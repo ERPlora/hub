@@ -124,7 +124,7 @@ describe('TasksPage · All', () => {
     ]);
   });
 
-  it('keeps the filters behind the toolbar funnel, as the old table did, until it is pressed', async () => {
+  it('keeps the filters behind the toolbar funnel until it is pressed', async () => {
     const s = await setup();
     await s.show(page(ROWS));
     expect(s.prop('filterable')).toBe(true);
@@ -145,7 +145,7 @@ describe('TasksPage · All', () => {
     expect(s.params(ALL)).toEqual([{ search: 'store', sort: '-priority', limit: 50, offset: 0 }]);
   });
 
-  it("wears the old module's icons: «Details» opens, «Start» plays, «Complete» double-checks; the checkbox on cards and the empty list", async () => {
+  it('wears its icons: «Details» opens, «Start» plays, «Complete» double-checks; the checkbox on cards and the empty list', async () => {
     const s = await setup();
     await s.show(page(ROWS));
     expect(s.prop<Array<{ id: string; icon?: string }>>('actions').map((a) => [a.id, a.icon])).toEqual([
@@ -254,7 +254,7 @@ describe('TasksPage · Spanish', () => {
   });
 });
 
-describe('TasksPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('TasksPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

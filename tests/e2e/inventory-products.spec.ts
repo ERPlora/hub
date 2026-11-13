@@ -7,7 +7,7 @@
 //     catalog says it cannot be sold, and saving it with that category is refused; picking another
 //     one in the form fixes it; its «Not configured» chip keeps its icon in sight and its text whole while the
 //     row has room, or ending in «…» with the whole text as its title, at 390, 834, 1280 and 1440, in English and
-//     in Spanish (FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED, hub#530);
+//     in Spanish;
 //   - INVENTORY-F11: the export downloads the filtered catalog with the headers the import reads;
 //   - `/inventory` lands on the dashboard and the tabs walk the five sections; screenshots of every page in three
 //     viewports;
@@ -259,8 +259,8 @@ const CHIP_VIEWPORTS = [
   { label: '1440', width: 1440, height: 900, roomy: true },
 ];
 
-// flow: INVENTORY-F05 (chip «Sin configurar» de Productos)
-test('INVENTORY-F05 · FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED: the «Not configured» chip keeps its icon in sight and reads those words, whole or ending in «…», at every width', async ({
+// flow: INVENTORY-F05 (the «Not configured» chip of Products)
+test('INVENTORY-F05: the «Not configured» chip keeps its icon in sight and reads those words, whole or ending in «…», at every width', async ({
   page,
   context,
   browser,
@@ -415,7 +415,7 @@ test('INVENTORY-F11: the export downloads what the search finds, with the header
 
 test('the tabs walk the five sections, each on its address; screenshots of every page in three viewports', async ({ page }) => {
   // `/inventory` is no page: the SPA's router sends it to the dashboard. `login` lands on a page (it timed out here
-  // with a session kept by the tests above, FIX-HUB-E2E-INVENTORY-TABS-WALK-TIMEOUT-AFTER-OTHERS), so the walk signs
+  // with a session kept by the tests above), so the walk signs
   // in on another tab and then asks for `/inventory`, as a person who types it.
   await login(page, A, '/inventory/settings');
   await page.goto(`${A}/inventory`);
@@ -439,8 +439,8 @@ test('the tabs walk the five sections, each on its address; screenshots of every
   expect(shots).toHaveLength(15);
 });
 
-// flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
-test('FIX-DATATABLE-HUB-FILTERS-2A: Products filter by price in euros behind the funnel, with its count; an amount it cannot read is said under it', async ({ page, context }) => {
+// flow: none — the column filters sit behind the table's funnel.
+test('Products filter by price in euros behind the funnel, with its count; an amount it cannot read is said under it', async ({ page, context }) => {
   const run = stamp();
   await login(page, A, '/inventory/products');
   // 2,20 € and 15,00 €: «Price from 10» is ten euros (inventory#115), never ten cents.

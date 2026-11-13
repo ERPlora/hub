@@ -1,6 +1,5 @@
-// «Recent AEAT events», VeriFactu's panel of the Home (FIX-VERIFACTU-SETUP-HOOKS; the old module's
-// `erp-verifactu-events-widget`): the latest events of `verifactu.stats.events_recent`, followed live, each with its
-// moment, its type in the reader's language — never its code (gh:verifactu#139) — and the sentence the server
+// «Recent AEAT events», VeriFactu's panel of the Home: the latest events of `verifactu.stats.events_recent`, followed
+// live, each with its moment, its type in the reader's language — never its code — and the sentence the server
 // composes; its states of loading, nothing yet and failure. The panel's frame (title, icon) is base's WidgetPanel.
 import { formatDateTime } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';

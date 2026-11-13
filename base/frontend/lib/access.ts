@@ -1,8 +1,6 @@
-// The way in's browser rules (APP-BASE-3): entering with a PIN or a badge (BASE-G55, G56, G60: Django's `/auth/pin`
-// and `/auth/badge`, which open a session, so they are not operations), the badge reader's burst (G56: a USB reader
-// types like a keyboard, ten times faster than a person; the old hub's `badge-scanner.ts`), the lock of a till nobody
-// touches (G59; its `idle-logout.ts`), the session's way in that `base/spa.py` embeds (`hub-home.access`), a `next`
-// that never leaves the hub, and the «Now serving {name}» note that crosses the reload of «Switch user».
+// The way in's browser rules. Entering with a PIN or a badge goes through Django's `/auth/pin` and `/auth/badge`, not
+// operations, because they open a session. A USB badge reader types like a keyboard, ten times faster than a person,
+// which is how its burst is told apart from typing.
 import { ApiError, parseErrorEnvelope, readCookie, readSpaConfig } from '@erplora/ui/sdk';
 
 import { readJsonBlock } from './home';
@@ -58,7 +56,7 @@ export function safeNext(raw: unknown): string {
 }
 
 /** `next` with the fragment of the Access page's own address (`/login?next=/settings#data`): the browser keeps a
- * link's fragment over the jump to `/login`, and the person goes back to the tab it named (BASE-G52). A `next` that
+ * link's fragment over the jump to `/login`, and the person goes back to the tab it named. A `next` that
  * names its own fragment keeps it. */
 export function nextWithHash(next: string, hash: string): string {
   return hash && !next.includes('#') ? `${next}${hash}` : next;
@@ -209,7 +207,7 @@ export function replaceWith(url: string): void {
 // ── What the session says of the person, read again ──────────────────────────────────────────────────────────────
 
 /** Dispatched on the window when what the session says of the person changed (their name, saved in «My profile»):
- *  the entry point owns the session the shell paints, so it reads `base.session.me` again (BASE-G125). */
+ *  the entry point owns the session the shell paints, so it reads `base.session.me` again. */
 export const SESSION_CHANGED = 'erplora:base-session-changed';
 
 export function sessionChanged(target: EventTarget = window): void {
@@ -245,9 +243,9 @@ interface Appearance {
   ui_scale: number;
 }
 
-/** What the session's way in asks of the mounted shell: the idle lock of a till that always asks (BASE-G59), the
- *  person's own appearance (BASE-G125) and, after «Switch user», «Now serving {name}» with the appearance of whoever
- *  left forgotten (gh:hub#2506). Returns the function that disarms the lock. */
+/** What the session's way in asks of the mounted shell: the idle lock of a till that always asks, the person's own
+ *  appearance and, after «Switch user», «Now serving {name}» with the appearance of whoever left forgotten. Returns
+ *  the function that disarms the lock. */
 export function startWayIn(doc: Document, deps: WayInDeps): () => void {
   const access = readAccess(doc);
   const stop = access.idle_minutes ? createIdleLock(access.idle_minutes, deps.logout, deps.target) : () => undefined;

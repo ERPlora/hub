@@ -1,8 +1,3 @@
-// «Devices» of Settings › General (BASE-G63…G66; the old hub's DevicesCard): the devices someone entered this hub on,
-// named by the business or by what they are, with the one in hand marked, how it asks, when it was used and who entered
-// last; «Name it», «Remove this device» (a question with its consequence, the own one ends the session) and «Remove the
-// devices unused for 30 days». Never the device's identifier. Settings mounts it only for who runs the hub; a failure
-// is never an empty list.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';

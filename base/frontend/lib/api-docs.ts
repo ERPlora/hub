@@ -1,7 +1,5 @@
-// The API's documentation as the page reads it (BASE-G150, G04): the OpenAPI document of what this business's apps
-// publish (`base.api_doc.get`) cut into one section per app, by its name, each with its routes in path order — method,
-// path, what it does, its parameters and the schema of its body — and the name of the file a person downloads to
-// import it elsewhere (Postman, an integration's own tools).
+// The OpenAPI document of what this business's apps publish (`base.api_doc.get`), cut into one section per app for the
+// API documentation page, and the name of the file a person downloads to import it elsewhere (Postman, for example).
 
 export interface ApiDocApp {
   id: string;

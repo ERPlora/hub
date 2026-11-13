@@ -28,8 +28,8 @@ from base.tenancy.context import use_control
 
 class Command(BaseCommand):
     help = (
-        "List the prefixes of the hub file store whose hub is purged or no longer in the registry (what the purges "
-        "before hub#781 left); --delete deletes them. Never a hub that is not gone, nor shared/."
+        "List the prefixes of the hub file store whose hub is purged or no longer in the registry (left by purges "
+        "that did not yet delete a hub's files); --delete deletes them. Never a hub that is not gone, nor shared/."
     )
 
     def add_arguments(self, parser):

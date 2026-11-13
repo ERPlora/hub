@@ -1,4 +1,4 @@
-// flow: BILLING-G54 (the SaaS's BILLING-F16, «Impago del plan: reintentos, suspensión y vuelta»)
+// flow: the SaaS's BILLING-F16 («Impago del plan: reintentos, suspensión y vuelta»)
 // A business whose plan stays unpaid past its grace is suspended by the SaaS, which says so in the photo it pushes
 // (`state.status = "suspended"`). The Hub then answers 402 on every page and call of that host, with a session or
 // without: a page that says why and takes the person to ERPlora (where the invoice is paid), the API the envelope
@@ -43,7 +43,7 @@ async function expectSuspendedPage(page: Page): Promise<void> {
   await expect(page.getByRole('link', { name: 'Go to ERPlora' })).toHaveAttribute('href', `${SAAS}/launch`);
 }
 
-test('BILLING-G54: a business suspended for an unpaid invoice answers 402 until it is paid, page and API', async ({
+test('BILLING-F16: a business suspended for an unpaid invoice answers 402 until it is paid, page and API', async ({
   browser,
 }) => {
   const before = photoStatus();
@@ -92,7 +92,7 @@ test('BILLING-G54: a business suspended for an unpaid invoice answers 402 until 
   }
 });
 
-test('BILLING-G54: an app already open when the business is suspended shows the 402 page at its next click, once', async ({
+test('BILLING-F16: an app already open when the business is suspended shows the 402 page at its next click, once', async ({
   browser,
 }) => {
   const before = photoStatus();
@@ -128,7 +128,7 @@ test('BILLING-G54: an app already open when the business is suspended shows the 
   }
 });
 
-test('BILLING-G54: an app left open when the business is suspended leaves for the 402 page at its live stream\'s next run', async ({
+test('BILLING-F16: an app left open when the business is suspended leaves for the 402 page at its live stream\'s next run', async ({
   browser,
 }) => {
   const before = photoStatus();

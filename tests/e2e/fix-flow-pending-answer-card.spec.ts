@@ -1,5 +1,5 @@
-// The data of the assistant's change in «Waiting for your answer» (FIX-HUB-FLOW-PENDING-ANSWER-CARD-SHOWS-RAW-VALUES),
-// end to end with its real dependencies: the Hub of this stack, its SaaS's gateway and, behind it, the e2e's provider
+// The data of the assistant's change in «Waiting for your answer», end to end with its real dependencies: the Hub of
+// this stack, its SaaS's gateway and, behind it, the e2e's provider
 // (assistant-provider.ts; the SaaS seeded with it, README «El asistente»). An automation that asks first, granted
 // «Book an appointment», runs; the worker asks the assistant (`workerAsks`), which wants to book one: its question waits
 // in the inbox with each datum as the chat's card says it (BASE-F97 step 2) — the services by their names (one sent by

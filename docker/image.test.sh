@@ -73,7 +73,7 @@ assert os.path.isfile(root / \"admin\" / \"css\" / \"base.css\")
 "'
 check "the modules' documentation images are collected under catalog/<id>/img/" \
   'in_image sh -c "test -f staticfiles/catalog/demo/img/items-list.png && ! test -e staticfiles/catalog/demo/WORKBOOK.md"'
-# Round 16 (spec §4.3): the build already ran it; the image carries what it needs (icons, WORKBOOKs, catalogues).
+# The build already ran it; the image carries what it needs (icons, WORKBOOKs, catalogues).
 check "register_apps --check passes without any database" \
   'docker run --rm --read-only --tmpfs /tmp "${PROD_ENV[@]}" "$image" python manage.py register_apps --check > /dev/null'
 check "the release is fixed in the image: APP_VERSION and APP_RELEASED_AT" '

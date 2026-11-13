@@ -1,7 +1,3 @@
-// «Import report» (BASE-G106) and the last one that did not go in whole (BASE-G107): how it went, app by app and part
-// by part in words — «Applied», «You had it already», «Applied in part», «Failed» with what went wrong, an app off —,
-// what was left out on purpose, «Retry what is missing» when it can (or why it cannot), «See the templates» and «Go
-// to Home». A status this screen does not know is painted as «Failed» with its own text, never as a success.
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { load, waitingLoad } from '../../__tests__/data-fixtures';

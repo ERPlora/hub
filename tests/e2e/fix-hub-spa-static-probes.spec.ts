@@ -1,11 +1,11 @@
-// A probe for a file on a hub's host (FIX-HUB-SPA-STATIC-PROBES-SET-CSRF-COOKIE, seen by APP-WEBSITE, hub#183): a
-// crawler's /robots.txt and a browser's /favicon.ico got the SPA with a 200 and a `csrftoken` cookie, so the website's
-// «no cookies» broke and a crawler read HTML as the hub's robots.txt. A path that names a file and has no URL of its
-// own is now a plain 404 with no cookie, whatever it accepts; a deep link of the SPA still opens the shell and sets
+// A probe for a file on a hub's host (hub#183), such as a crawler's /robots.txt or a browser's /favicon.ico: a path
+// that names a file and has no URL of its own is a plain 404 with no cookie, whatever it accepts. Answered with the SPA,
+// a 200 and a `csrftoken` cookie, it would break the website's «no cookies» and give a crawler HTML as the hub's
+// robots.txt. A deep link of the SPA still opens the shell and sets
 // the cookie its first write sends back: an item is saved through «New item» → «Save». With /favicon.ico a 404, the
-// shell declares the old hub's icons (the tab's and the home screen's), static files of the Hub's own origin, with
-// no CSP complaint. The list in three sizes (FIX-HUB-SPA-STATIC-PROBES-SET-CSRF-COOKIE-390|834|1440).
-// flow: ninguno — respuesta de la SPA de `base` a una ruta sin URL propia (sondeos de ficheros: `/robots.txt`, `/favicon.ico`)
+// shell declares its icons (the tab's and the home screen's), static files of the Hub's own origin, with
+// no CSP complaint. The list in three sizes.
+// flow: none — what `base`'s SPA answers to a path with no URL of its own (file probes: `/robots.txt`, `/favicon.ico`)
 import { expect, test } from '@playwright/test';
 
 import { A, createViaPage, login, row, shot, topbarApps, uniqueName } from './helpers';

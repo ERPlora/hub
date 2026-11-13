@@ -2,13 +2,11 @@
 // Price Lists in the business's currency: its country's, as erplora.com registered it (`PUT /internal/hubs/{id}`,
 // signed the way the SaaS sends it), never a fixed euro. Hub `a` moves to Poland: «New price list» proposes PLN and
 // the list is created in złoty (its Currency column says PLN); its detail reads its price and the catalog's in złoty
-// and no «€», in 390, 834 and 1440 (captures `FIX-HUB-PRICING-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY-<width>`), and it
-// can be made general. Back in Spain «New price list» proposes EUR, the zloty list keeps its złoty (nothing stored is
-// rewritten) and the catalog price reads in euros (`…-es-1440`). Editing an amount-per-unit rule in złoty (PRICING-F11)
-// shows its amount in złoty and «Save» keeps it (captures `FIX-HUB-PRICING-MONEY-FIELD-OPENED-BEFORE-THE-BUSINESS-ANSWERS-
-// <width>`; the business answering after the dialog opened is the race `RuleFormModal.test.ts` proves). The server
-// prices a line (PRICING-F13) in złoty, the currency Pricing asks `base` for (captures `FIX-HUB-PRICING-OWN-COPY-OF-
-// BUSINESS-CURRENCY-<width>`). What the run creates is deleted after it and `a`'s registration put back, also when a
+// and no «€», in 390, 834 and 1440, and it can be made general. Back in Spain «New price list» proposes EUR, the zloty
+// list keeps its złoty (nothing stored is rewritten) and the catalog price reads in euros. Editing an amount-per-unit
+// rule in złoty (PRICING-F11) shows its amount in złoty and «Save» keeps it (the business answering after the dialog
+// opened is the race `RuleFormModal.test.ts` proves). The server prices a line (PRICING-F13) in złoty, the currency
+// Pricing asks `base` for. What the run creates is deleted after it and `a`'s registration put back, also when a
 // test fails.
 import { expect, type Page, test } from '@playwright/test';
 
@@ -94,7 +92,7 @@ test.afterAll(async () => {
   cleanUp();
 });
 
-test(`${KEY}: pricing-business-currency in Poland «New price list» proposes PLN and the list is created in złoty`, async ({ page }) => {
+test(`pricing-business-currency in Poland «New price list» proposes PLN and the list is created in złoty`, async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/pricing/lists');
   await ready(page, 'pricing-lists');
@@ -117,7 +115,7 @@ test(`${KEY}: pricing-business-currency in Poland «New price list» proposes PL
   }
 });
 
-test(`${KEY}: pricing-business-currency in Poland a price list's detail reads its prices in złoty and no euro in 390, 834 and 1440`, async ({
+test(`pricing-business-currency in Poland a price list's detail reads its prices in złoty and no euro in 390, 834 and 1440`, async ({
   page,
   context,
 }) => {
@@ -143,7 +141,7 @@ test(`${KEY}: pricing-business-currency in Poland a price list's detail reads it
   await expect(shown(page).locator('[data-testid=pricing-detail-default]')).toBeVisible();
 });
 
-test(`${LINE_KEY}: PRICING-F13 in Poland the server prices a line in złoty, the currency base answers`, async ({
+test(`PRICING-F13 in Poland the server prices a line in złoty, the currency base answers`, async ({
   page,
   context,
 }) => {
@@ -175,7 +173,7 @@ test(`${LINE_KEY}: PRICING-F13 in Poland the server prices a line in złoty, the
   }
 });
 
-test(`${RULE_KEY}: PRICING-F11 editing an amount-per-unit rule in złoty shows it in złoty and «Save» keeps it`, async ({ page }) => {
+test(`PRICING-F11 editing an amount-per-unit rule in złoty shows it in złoty and «Save» keeps it`, async ({ page }) => {
   // flow: PRICING-F11
   await login(page, A, '/pricing/lists');
   const code = `${CODE}R`;
@@ -202,7 +200,7 @@ test(`${RULE_KEY}: PRICING-F11 editing an amount-per-unit rule in złoty shows i
   await expect(row(page, 'pricing-rules', code)).toContainText(ZLOTY_PER_UNIT);
 });
 
-test(`${KEY}: pricing-business-currency back in Spain «New price list» proposes EUR and the zloty list keeps its złoty`, async ({
+test(`pricing-business-currency back in Spain «New price list» proposes EUR and the zloty list keeps its złoty`, async ({
   page,
 }) => {
   await registerBusinessIn(original, 'ES');

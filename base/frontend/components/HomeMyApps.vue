@@ -1,8 +1,7 @@
 <script setup lang="ts">
-// «My apps» on the Home (BASE-G165, hub#367): the launcher goes first and is the only card that works with
-// no data. Same list as the topbar's «My apps» (`useMyApps`, from `base.session.me`), the most opened in this
-// browser first. «Add apps» goes last, to Apps, once the router has that screen (an entry that leads to the
-// 404 is worse than none). On a phone with six apps or more: the first four and «View all apps».
+// The Home's launcher, the only card that works with no data: the topbar's «My apps», the most opened in this browser
+// first. «Add apps» shows only once the router has that screen, because an entry that leads to the 404 is worse than
+// none.
 import { EmptyState, InlineFeedback } from '@erplora/ui/components';
 import { HubIcon, useMyApps, useSession } from '@erplora/ui/shell';
 import { IonBadge, IonSkeletonText } from '@ionic/vue';
@@ -162,7 +161,7 @@ function opened(id: string): void {
 </template>
 
 <style scoped>
-/* The old hub's launcher: flat tiles, icon over name, as many per row as fit (three on a phone). */
+/* Flat tiles, icon over name, as many per row as fit (three on a phone). */
 .my-apps-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));

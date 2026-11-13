@@ -34,7 +34,7 @@ const AHEAD = 3;
 const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `saas_e2e_${STACK.hubPort + 1}`);
 const SAAS_DIR = resolve(process.env.E2E_SAAS_DIR || join(REPO_DIR, 'saas'));
 
-/** The business's day `days` from today (Madrid in phase 1) and its weekday, Monday 0. */
+/** The business's day `days` from today (Madrid, hub `a`'s zone) and its weekday, Monday 0. */
 function madridDay(days: number): { date: string; weekday: number } {
   const date = new Date(Date.now() + days * 86_400_000).toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
   return { date, weekday: (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7 };

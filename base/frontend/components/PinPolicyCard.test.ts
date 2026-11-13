@@ -1,7 +1,3 @@
-// «PIN pad» of Settings › General (BASE-G151, G62): whether the business asks who is at the till, when it asks again
-// (after 1, 5, 10, 15 or 30 idle minutes, or until signing out) and how many digits a PIN has. Each control saves on
-// its own, at once, only its own key, and the card paints what the Hub confirms. Off and on again is the factory
-// choice (per shift), never the minutes of before.
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';

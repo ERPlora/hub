@@ -1,9 +1,8 @@
-// flow: e2e-overflow — FIX of the e2e harness (FIX-HUB-E2E-HORIZONTAL-SCROLL-CHECK-BLIND-TO-ION-CONTENT)
-// The «no horizontal scroll» check of the specs read the document alone (how wide it is, against the window). Ionic pins the `body` to the window and every screen scrolls inside its `ion-content`, so a screen that runs
-// past the right edge is cut there and the document never grows: with a 1600 px block on the modifier groups at 390,
-// the check read 0 and the spec passed with the bar cut in its own capture (seen by the reviewer of hub#386).
-// `horizontalOverflow(page)` (helpers.ts) is the one measure now: the document and every `ion-content` on screen. The
-// checks here put a block wider than any window in each box the helper has to read and expect to see it.
+// flow: e2e-overflow — the e2e harness's horizontal scroll check (seen in hub#386)
+// Reading the document alone (how wide it is, against the window) misses horizontal scroll: Ionic pins the `body` to
+// the window and every screen scrolls inside its `ion-content`, so a screen that runs past the right edge is cut there
+// and the document never grows. `horizontalOverflow(page)` (helpers.ts) measures the document and every `ion-content`
+// on screen. The checks here put a block wider than any window in each box the helper has to read and expect to see it.
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, capture, horizontalOverflow, listReady, login, settled, shown } from './helpers';

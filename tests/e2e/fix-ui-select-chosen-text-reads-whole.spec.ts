@@ -1,8 +1,8 @@
 // hub#829 — what an outlined dropdown has chosen reads whole with the field closed, on as many lines as it takes. Ionic
-// keeps the select's `text` part on one line ending in «…»: at 320 the printer of each role in Printing › Settings cut
-// «The first active one of this role» (15 px in English, 17 in Spanish), the agenda's status filter cut «Todos los
-// estados» at 375 and the issuer's country its longest names. The rule is the shared theme's (@erplora/ui, polish.css,
-// ui#98), for every outlined select. Each field is measured against its own box with every option it offers set in
+// keeps the select's `text` part on one line ending in «…», which would cut at 320 the printer of each role in
+// Printing › Settings («The first active one of this role», 15 px in English, 17 in Spanish), at 375 the agenda's
+// status filter «Todos los estados» and the issuer's country its longest names. The rule is the shared theme's
+// (@erplora/ui, polish.css), for every outlined select. Each field is measured against its own box with every option it offers set in
 // turn: the text against its box (`scrollWidth`, `scrollHeight`), the painted text against the field and its floating
 // label; never a capture. In Chrome, against hub `a`, in English and in Spanish, at 320 (the narrowest phone still in
 // use), 375, a tablet and a desktop. Nothing is saved: an option is set on the field, never chosen in its list, and the

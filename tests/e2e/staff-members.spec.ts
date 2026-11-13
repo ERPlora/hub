@@ -27,7 +27,7 @@ function cleanup(): void {
   );
 }
 
-// flow: ninguno (spec e2e de Personal) — FIX-HUB-E2E-STAFF-MEMBERS-FRESH-DB
+// flow: none — the e2e spec of Staff.
 test.beforeAll(async ({ browser }) => {
   cleanup();
   // The employee's account exists in the hub only after their first sign-in (the SaaS creates it on the
@@ -178,8 +178,8 @@ test('on a phone (390×844) Staff is cards, with the same actions', async ({ bro
   }
 });
 
-// flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
-test('FIX-DATATABLE-HUB-FILTERS-1: Staff filters by Email behind the funnel, with its count, the panel open at every width', async ({ browser }) => {
+// flow: none — the column filters sit behind the table's funnel.
+test('Staff filters by Email behind the funnel, with its count, the panel open at every width', async ({ browser }) => {
   const stamp = Date.now().toString(36);
   const kept = `${TAG} Ana Fil${stamp}`;
   const other = `${TAG} Bea Fil${stamp}`;

@@ -1,10 +1,10 @@
-// flow: combo-e2e-wait — FIX of the Menus specs' wait (FIX-HUB-COMBO-E2E-WAIT-BLIND-TO-SHADOW-ROOTS)
+// flow: combo-e2e-wait — the Menus specs' wait
 // Before a capture or a measurement, the Menus specs (combo-*.spec.ts) wait with the harness's one wait,
 // `untilStill(page)` (helpers.ts), which asks every open shadow root too, and `painted(page)` for a frame. Their own
 // wait asked the document alone for its animations, blind to Ionic's overlays (`combo-settled.spec.ts` shows it let
 // the till's menu sheet pass for still), or only waited two frames. Swapping one back would leave every spec green:
 // this keeps them from coming back in the Menus files, and no fixed sleep (`waitForTimeout(`) takes their place. The
-// same rule for every spec of the e2e is FIX-HUB-E2E-OWN-ANIMATION-WAIT-UNGUARDED's (hub:base).
+// same rule for every spec of the e2e is own-animation-waits.test.ts's.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -1,11 +1,10 @@
-// The dangerous card of the assistant calls each datum by the title its app wrote for it
-// (FIX-HUB-BASE-ASSISTANT-DANGER-CARD-CALLS-THE-RECORD-BY-ITS-FIELD-NAME, BASE-F97 step 2 and BASE-F98): transferring
-// a check (TABLE-F15, dangerous) said «Registro: 5 (Terraza)», the card's own word for a datum named `id`, where
-// Tables titles it «Cuenta». End to end with the stack's SaaS gateway and the e2e's provider (assistant-provider.ts,
+// The dangerous card of the assistant calls each datum by the title its app wrote for it (BASE-F97 step 2 and
+// BASE-F98): transferring a check (TABLE-F15, dangerous) must not say «Registro: 5 (Terraza)», the card's own word for
+// a datum named `id`, where Tables titles it «Cuenta». End to end with the stack's SaaS gateway and the e2e's provider (assistant-provider.ts,
 // `E2E-ASK <tool> <JSON>`): the SaaS must be seeded with it (README of this folder, «El asistente»). The owner asks,
 // in Spanish, to transfer the check of table 5 of the terrace to table 2 of the dining room: the card says «Cuenta» and
 // «Mesa de destino», never «Registro»; and to remove a device of the platform (BASE-F98), named «Barra» in Settings ›
-// Devices: the card says «Dispositivo: Barra», as every dangerous write of the platform now titles the record it acts on.
+// Devices: the card says «Dispositivo: Barra», as every dangerous write of the platform titles the record it acts on.
 // Cancelled, nothing changes. What this file creates carries `E2EDcl` and goes away; the apps it turns on are turned off
 // again, and the device gets its name back.
 // flow: base-assistant-danger-card-labels

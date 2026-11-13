@@ -1,6 +1,6 @@
 """Read operations of base: the session's ``me``, the registry's row of a hub (``base.hub.get``), a demo's status
 (``base.demo.get``) and the Home's three live queries (``base.setup.status``, ``base.widget.list``,
-``base.bell.counters``; their rules are ``base.home``'s); and Settings › Data's reads (APP-BASE-2): the catalogue of
+``base.bell.counters``; their rules are ``base.home``'s); and Settings › Data's reads: the catalogue of
 templates, what a blueprint brings, the export, the loads and the apps' data (their rules are ``base.blueprint``'s)."""
 
 import base64
@@ -176,7 +176,7 @@ def _session_state(label: str, blocked: frozenset[str], creating: frozenset[str]
 
 
 def _demo_hub(ctx: OperationContext) -> Hub | None:
-    """The demo's hub of this scope (its end, plan 2026-10-17, §1.6, and the reference app it shows), or ``None``
+    """The demo's hub of this scope (its end, and the reference app it shows), or ``None``
     on a business's hub."""
     if ctx.scope.kind != "host":
         return None
@@ -194,7 +194,7 @@ def _user(actor: Any, person: HubUser | None = None) -> dict[str, str] | None:
         return {"id": str(actor), "label": str(actor)}
     # The person of the business's database (base.HubUser), whose id every app's record names, so a screen tells
     # «mine» by it; without one there yet (the platform's host), the session's user. Named as in this hub: its «My
-    # profile» name, else its account's (APP-BASE-3).
+    # profile» name, else its account's.
     return {"id": str(actor.pk if person is None else person.pk), "label": person_label(actor)}
 
 
@@ -238,7 +238,7 @@ def demo_get(ctx: OperationContext, data: DemoSlugIn) -> dict[str, Any]:
     return {"slug": hub.slug, "status": hub.status, "expires_at": hub.expires_at}
 
 
-# --- The Home (PLAN-HUB round 2026-10-21) -----------------------------------------------------------------------
+# --- The Home ---------------------------------------------------------------------------------------------------
 
 
 @operation(
@@ -415,14 +415,14 @@ def bell_counters(ctx: OperationContext, data: BellCountersIn) -> dict:
     ai=INTERNAL,
 )
 def notice_list(ctx: OperationContext, data: NoticeListIn) -> dict:
-    """The device's notices (PLAN-HUB round 2026-10-23): the rows the modules on tell, with their texts filled in."""
+    """The device's notices: the rows the modules on tell, with their texts filled in."""
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         modules = home.home_modules(active_apps(ctx.scope), demo_hub=bool(hub and hub.is_demo))
         return {"notices": home.device_notices(ctx, modules), "sources": home.notice_sources(ctx, modules)}
 
 
-# ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────────
+# ── Apps ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def app_off_refusal(
@@ -455,19 +455,19 @@ def app_off_refusal(
 # Not an assistant tool: the Apps screen's own read; the assistant knows the apps by its catalogue.
 @operation("base.app.list", kind="query", permission=VIEW_HOME, input=AppListIn, output=AppListOut, ai=INTERNAL)
 def app_list(ctx: OperationContext, data: AppListIn) -> dict:
-    """The Apps screen: every module the scope shows, from its own config in this process (PLAN §20.4.1; never the
+    """The Apps screen: every module the scope shows, from its own config in this process (never the
     SaaS's catalog), with where its right comes from and its state (``base.entitlement``: ``blocked`` without it;
     else ``on`` or ``off`` as the business turned it, ``base.activation``), whether the business chose it, the first
     screen this person may open, what it needs (it comes along with it) and the apps on that need it (they go off
-    first), and why turning it on or off would be refused (hub#618, hub#694: the screen never offers what is always
-    refused); and the plan's limit of chosen apps against the chosen ones on (PLAN-HUB §9), erplora.com's Store and its
+    first), and why turning it on or off would be refused (the screen never offers what is always
+    refused); and the plan's limit of chosen apps against the chosen ones on, erplora.com's Store and its
     plans of this business.
 
     Read again when an app's state changes (its live notice, in every process with the list open: AppsFollower on every
     screen), it first forgets what this process kept of the business's apps (``base.activation.forget``): a change the
-    worker made in another process (S3) never reaches a cache of the process's own (local development, without
+    worker made in another process never reaches a cache of the process's own (local development, without
     Valkey), and the session read right after it (the menu) is then current. Transitional: it goes once every process
-    hears ``cache_inval '<hex>:apps'`` itself (PLAN-DB §7; FIX-HUB-CACHE-INVAL-APPS-LISTEN)."""
+    hears ``cache_inval '<hex>:apps'`` itself."""
     activation.forget(ctx.scope.key)
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     demo = bool(hub and hub.is_demo)
@@ -628,7 +628,7 @@ def app_activations(host: str) -> dict[str, activation.Activation]:
 
 
 def activations_due(host: str, now: dt.datetime) -> dict[str, str]:
-    """The apps of ``host``'s business whose tables the worker makes now (S3), with the last migration the code that
+    """The apps of ``host``'s business whose tables the worker makes now, with the last migration the code that
     asked named (``target``): ``creating`` unless put off (a schema held, a newer code's request), or ``failed`` once
     its next try came."""
     due = Q(state=activation.CREATING) & (Q(next_attempt_at__isnull=True) | Q(next_attempt_at__lte=now)) | Q(
@@ -654,7 +654,7 @@ def activation_next_at(host: str) -> dt.datetime | None:
 
 
 def activations_stuck(host: str, now: dt.datetime) -> int:
-    """How many apps of ``host``'s business are stuck turning on (hub#610; PLAN-DB §7): ``creating`` since it was asked
+    """How many apps of ``host``'s business are stuck turning on: ``creating`` since it was asked
     for more than ``activation.STUCK_AFTER`` before ``now`` (``changed_at``: a schema held or a newer code's request
     puts it off without moving it), or ``failed``, at once: an error the business already sees, and each retry moves its
     ``changed_at``. Only the apps this code knows."""
@@ -675,7 +675,7 @@ def _first_screen(ctx: OperationContext, config: Any) -> str | None:
 #: From here on what a plan includes is close to its limit: for the files, the same number as erplora.com's panel
 #: (``STORAGE_WARNING_PERCENT``), so both say the same of the same figure.
 NEAR_PERCENT = 80
-#: Who counts as active now, among all the tasks; a window of activity, not presence (PLAN-HUB §66).
+#: Who counts as active now, among all the tasks; a window of activity, not presence.
 ACTIVE_NOW = dt.timedelta(minutes=5)
 #: The days the requests with no room are told for: today and the 6 before it.
 BUSY_WINDOW_DAYS = 7
@@ -713,10 +713,10 @@ BUSY_WINDOW_DAYS = 7
     ),
 )
 def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
-    """What «Usage and plan» of System says (BASE-F40): the limits of the plan the SaaS's last photo carries (``plan``:
+    """What «Usage and plan» of System says: the limits of the plan the SaaS's last photo carries (``plan``:
     ``max_users``, ``max_devices``, ``max_apps``; 0 = no limit) against the people of the business (its active members, the
-    ones the SaaS counts), the devices in use (those with a session open on this hub: the ones the cap of BASE-G57 keeps,
-    APP-BASE-3) and the apps it chose; what the last night measured (``database``, ``files``, the 30 days of ``activity``);
+    ones the SaaS counts), the devices in use (those with a session open on this hub: the ones the cap on devices keeps)
+    and the apps it chose; what the last night measured (``database``, ``files``, the 30 days of ``activity``);
     what is counted during the day (``base.meter``: ``connections``, ``requests``, who is active now), as control has it
     plus what this process has not written yet; and what its apps say their plan includes (``meters``). The assistant's
     messages wait on erplora.com, so the screen asks ``base.assistant.usage`` apart. Memory and CPU cannot be attributed
@@ -774,8 +774,8 @@ def _last_night(hub: Hub | None) -> HubUsageDaily | None:
 
 
 def _database_usage(hub: Hub | None, last: HubUsageDaily | None) -> dict:
-    """The size of the business's own database the last night measured (``base.usage``, BASE-F40); none while it shares
-    control's (PLAN-DB §14.14: never control's size)."""
+    """The size of the business's own database the last night measured (``base.usage``); none while it shares
+    control's, whose size is never shown."""
     if hub is None or not hub.db_name:
         return {"available": False, "bytes": None, "day": None}
     return {"available": True, "bytes": last.db_bytes if last else None, "day": last.day if last else None}
@@ -946,7 +946,7 @@ def _limit(plan: dict, field: str) -> int | None:
     return plan[field] or None
 
 
-# ── Data: blueprints, imports and reset (APP-BASE-2) ──
+# ── Data: blueprints, imports and reset ───────────────
 #: The loads Settings › Data lists: the latest ones.
 IMPORTS_SHOWN = 50
 
@@ -977,7 +977,7 @@ IMPORTS_SHOWN = 50
     ),
 )
 def blueprint_list(ctx: OperationContext, data: BlueprintListIn) -> dict:
-    """The seeds by vertical (BASE-G103): the hub's country first, then the person's language, then the hub's vertical."""
+    """The seeds by vertical: the hub's country first, then the person's language, then the hub's vertical."""
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         country, vertical = (hub.country, hub.vertical) if hub else ("", "")
@@ -1014,7 +1014,7 @@ def blueprint_list(ctx: OperationContext, data: BlueprintListIn) -> dict:
     ),
 )
 def blueprint_export(ctx: OperationContext, data: BlueprintExportIn) -> dict:
-    """The file of the apps and datasets chosen (BASE-G101, BASE-G102), in base64 for the screen to save."""
+    """The file of the apps and datasets chosen, in base64 for the screen to save."""
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         on = blueprint.active_apps(ctx.scope)
@@ -1060,7 +1060,7 @@ def blueprint_export(ctx: OperationContext, data: BlueprintExportIn) -> dict:
         }
 
 
-# ── The copies of the business's data (round 2026-10-30 of PLAN-DB, decision 2, proposals (k), (l)) ───────────────
+# ── The copies of the business's data ─────────────────────────────────────────────────────────────────────────────
 
 
 def _dumps_unavailable() -> OperationError:
@@ -1121,9 +1121,9 @@ def gets_copies(hub: Hub) -> bool:
     ),
 )
 def hub_dumps(ctx: OperationContext, data: HubDumpsIn) -> dict:
-    """Settings › Data's «Copies» (BASE-F37): the copies of the business's own database, without their links
+    """Settings › Data's «Copies»: the copies of the business's own database, without their links
     (``base.hub.dump_link`` gives one on each click), and how its last reset went (``base.services``, «The reset of a
-    business»). While the business shares its database with others, nothing (PLAN-DB §14.14)."""
+    business»). While the business shares its database with others, nothing."""
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         if hub is None or not hub.db_name:
@@ -1181,7 +1181,7 @@ def hub_dump_list(ctx: OperationContext, data: HubGetIn) -> dict:
     if not gets_copies(hub):
         return {"available": False, "dumps": []}
     if not dumps.configured():
-        # No bucket: this Hub can make no copy, so «none yet» would promise one (PLAN-SAAS §24: a failure, not «none»).
+        # No bucket: this Hub can make no copy, so «none yet» would promise one; it is a failure, not «none».
         raise _dumps_unavailable()
     rows = list(_kept_dumps(hub))
     try:
@@ -1218,7 +1218,7 @@ def hub_dump_list(ctx: OperationContext, data: HubGetIn) -> dict:
     ),
 )
 def import_list(ctx: OperationContext, data: ImportListIn) -> dict:
-    """The loads, newest first; the last one, when it did not go in whole and stands, is shown first (BASE-G107)."""
+    """The loads, newest first; the last one, when it did not go in whole and stands, is shown first."""
     loads = list(ImportBatch.objects.order_by("-created_at", "-id")[:IMPORTS_SHOWN])
     latest = loads[0] if loads else None
     unfinished = latest if latest and latest.status != ImportBatch.Status.COMPLETE and latest.undone_at is None else None
@@ -1243,7 +1243,7 @@ def import_list(ctx: OperationContext, data: ImportListIn) -> dict:
     ),
 )
 def import_detail(ctx: OperationContext, data: ImportIdIn) -> dict:
-    """One load of Settings › Data (BASE-G107), as its row."""
+    """One load of Settings › Data, as its row."""
     load = ImportBatch.objects.filter(pk=data.id).first()
     if load is None:
         raise NotFound(gettext("This load is not there any more."))
@@ -1267,7 +1267,7 @@ def import_detail(ctx: OperationContext, data: ImportIdIn) -> dict:
     ),
 )
 def dataset_list(ctx: OperationContext, data: DatasetListIn) -> dict:
-    """Every app on (BASE-G102), with its datasets and their rows: what an export can take."""
+    """Every app on, with its datasets and their rows: what an export can take."""
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         on = blueprint.active_apps(ctx.scope)
@@ -1288,7 +1288,7 @@ def dataset_list(ctx: OperationContext, data: DatasetListIn) -> dict:
         return {"apps": sorted(apps, key=lambda app: app["label"])}
 
 
-# ── Business settings and the hub's context (APP-BASE-6) ──
+# ── Business settings and the hub's context ───────────────
 
 
 @operation(
@@ -1318,12 +1318,12 @@ def dataset_list(ctx: OperationContext, data: DatasetListIn) -> dict:
     ),
 )
 def business_get(ctx: OperationContext, data: BusinessIn) -> dict:
-    """Settings › Business (BASE-G97…G99) and what the old ``/api/hub/context`` gave (BASE-G43): the business as the
+    """Settings › Business and what the old ``/api/hub/context`` gave: the business as the
     SaaS registered it, from the registry of this scope, never another's. The currency is its country's
     (``base.business``); a demo has no business on erplora.com, hence no address to change it, and the deployment's
-    zone and language until the SaaS says otherwise. ERPlora's own hub (PLAN-SAAS §4) is ERPlora itself, the issuer of
-    its invoices: its legal name and country from ``PLATFORM_ISSUER_*``, row or not (phase 1 has none,
-    ``create_platform_hub``), so its currency is the one its invoices and its apps charge in; nothing of it is changed
+    zone and language until the SaaS says otherwise. ERPlora's own hub is ERPlora itself, the issuer of
+    its invoices: its legal name and country from ``PLATFORM_ISSUER_*``, row or not (``create_platform_hub`` makes
+    it), so its currency is the one its invoices and its apps charge in; nothing of it is changed
     on erplora.com. Every app asks for that currency through ``base.operations.business_currency``."""
     if is_platform_hub(ctx.scope):
         return _business(
@@ -1369,9 +1369,9 @@ def _business(
     }
 
 
-# ── System (APP-BASE-7) ────────────────────────────────────────────────────────────────────────────────────────
-# The old hub's ``GET /api/system`` (its status and its log) and ``/api/hub/events/dead`` (the failed events), for who
-# runs the business only (hub#2519: an error may carry a customer's tax id and name). One hub never sees another's.
+# ── System ─────────────────────────────────────────────────────────────────────────────────────────────────────
+# The hub's status, its log and the failed events, for who runs the business only (an error may carry a customer's
+# tax id and name). One hub never sees another's.
 
 #: How many of the last events between apps System › Logs shows: the old hub's.
 EVENT_LOG_SIZE = 50
@@ -1399,7 +1399,7 @@ FAILED_EVENT_ERROR_LENGTH = 300
 )
 def system_status(ctx: OperationContext, data: SystemStatusIn) -> dict:
     """The release (``base.system``: the commit, short) and its date, never made up, and where the business's data
-    lives (``Hub.db_name`` empty: phase 1's shared database)."""
+    lives (``Hub.db_name`` empty: a database shared with other businesses)."""
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     return {
         "version": system.version(settings.APP_VERSION),
@@ -1577,7 +1577,7 @@ def _failed_event(delivery: EventDelivery, on: frozenset[str]) -> dict:
     }
 
 
-# ── The way in: devices, PIN, badge, the business's dial and the person's profile (APP-BASE-3) ───────────────────
+# ── The way in: devices, PIN, badge, the business's dial and the person's profile ────────────────────────────────
 
 
 def access_settings() -> AccessSettings:
@@ -1599,8 +1599,8 @@ def person_label(user) -> str:
 
 
 def face_name(user) -> str:
-    """How ``user`` shows on the grid of a till (BASE-G55, G60), seen by anyone at it: their name, never an email (the
-    SaaS names an account without a name by its address: then the part before the «@»; gh:hub#2536)."""
+    """How ``user`` shows on the grid of a till, seen by anyone at it: their name, never an email (the
+    SaaS names an account without a name by its address: then the part before the «@»)."""
     label = person_label(user)
     return label.split("@", 1)[0] if "@" in label else label
 
@@ -1669,10 +1669,10 @@ def pin_door_open(request: HttpRequest, slug: str) -> bool:
     },
 )
 def access_door(ctx: OperationContext, data: AccessDoorIn) -> dict[str, Any]:
-    """The way in of the browser that asks (BASE-G55): on a shared device of the hub of a business that asks, the
+    """The way in of the browser that asks: on a shared device of the hub of a business that asks, the
     people of this hub with a PIN, by name and initials (never their email nor account) and the PIN's length.
 
-    The grid reaches only whom the PIN would let in (the old Hub's HUB-F133): anyone else, and an address that tried
+    The grid reaches only whom the PIN would let in: anyone else, and an address that tried
     too many wrong PINs (with how long it still waits), hears the same answer with nobody in it."""
     return _door(ctx)
 
@@ -1689,7 +1689,7 @@ def access_door(ctx: OperationContext, data: AccessDoorIn) -> dict[str, Any]:
     },
 )
 def access_faces(ctx: OperationContext, data: AccessDoorIn) -> dict[str, Any]:
-    """The door's grid for a session: «Switch user» (BASE-G60), live, so a new PIN shows up and a person removed
+    """The door's grid for a session: «Switch user», live, so a new PIN shows up and a person removed
     leaves without reloading the till."""
     return _door(ctx)
 
@@ -1710,7 +1710,7 @@ def _door(ctx: OperationContext) -> dict[str, Any]:
         "pin_length": settings.pin_length,
         "people": faces,
         "wait": wait,
-        # BASE-G57's «Upgrade plan» to a browser nobody is signed in on: erplora.com's plans, never this hub's id.
+        # «Upgrade plan» to a browser nobody is signed in on: erplora.com's plans, never this hub's id.
         "plan_url": saas_url(f"{SAAS_PANEL_PATH}/store/plans"),
     }
 
@@ -1752,7 +1752,7 @@ def has_pin(user) -> bool:
     ),
 )
 def device_current(ctx: OperationContext, data: DeviceCurrentIn) -> dict[str, Any]:
-    """«This device» of Settings › General (BASE-G72): the mode of the browser that asks, and whether the hub knows it
+    """«This device» of Settings › General: the mode of the browser that asks, and whether the hub knows it
     (someone entered with an account from it). An unknown one reads as shared, the strict mode."""
     device = device_of(ctx.request)
     if device is None:
@@ -1782,8 +1782,7 @@ def device_current(ctx: OperationContext, data: DeviceCurrentIn) -> dict[str, An
     ),
 )
 def device_list(ctx: OperationContext, data: DeviceListIn) -> dict[str, Any]:
-    """«Devices» of Settings › General (BASE-G63): never a device's token, which is its proof. Phase 1 lists the rows
-    of the shared table (every scope's), as every hub model does until each hub has its database."""
+    """«Devices» of Settings › General: never a device's token, which is its proof."""
     rows = _device_rows(ctx, list(TrustedDevice.objects.order_by("-last_entry_at")))
     return {"devices": rows, "unused": sum(row["unused"] for row in rows)}
 
@@ -1808,7 +1807,7 @@ def device_list(ctx: OperationContext, data: DeviceListIn) -> dict[str, Any]:
     ),
 )
 def device_detail(ctx: OperationContext, data: DeviceByIdIn) -> dict[str, Any]:
-    """One device of «Devices» (BASE-G63), as its row: what the assistant's card names a device by."""
+    """One device of «Devices», as its row: what the assistant's card names a device by."""
     device = TrustedDevice.objects.filter(pk=data.id).first()
     if device is None:
         raise NotFound(gettext("That device is no longer registered here. Refresh the list."))
@@ -1848,7 +1847,7 @@ def _unused(device: TrustedDevice, here: TrustedDevice | None, now) -> bool:
 
 
 def unused_devices(here: TrustedDevice | None):
-    """The devices «Remove the unused» removes (BASE-G66): nobody entered on them in 30 days, never the one in hand."""
+    """The devices «Remove the unused» removes: nobody entered on them in 30 days, never the one in hand."""
     old = TrustedDevice.objects.filter(last_entry_at__lt=timezone.now() - access.UNUSED_AFTER)
     return old.exclude(pk=here.pk) if here is not None else old
 
@@ -1879,7 +1878,7 @@ def unused_devices(here: TrustedDevice | None):
     ),
 )
 def access_settings_get(ctx: OperationContext, data: AccessSettingsIn) -> dict[str, Any]:
-    """The «PIN pad» card of Settings › General (BASE-G62, G151): what the Hub confirmed, for everyone of the hub."""
+    """The «PIN pad» card of Settings › General: what the Hub confirmed, for everyone of the hub."""
     row = access_settings()
     return {
         "pin_policy": row.pin_policy,
@@ -1904,7 +1903,7 @@ def access_settings_get(ctx: OperationContext, data: AccessSettingsIn) -> dict[s
     ),
 )
 def profile_get(ctx: OperationContext, data: ProfileIn) -> dict[str, Any]:
-    """«My profile» (BASE-G125): always the profile of whoever asks; without a row, the account's name."""
+    """«My profile»: always the profile of whoever asks; without a row, the account's name."""
     user = signed_in(ctx)
     profile = Profile.objects.filter(username=user.get_username()).first()
     role = Membership.objects.filter(user=user, host=ctx.scope.key).values_list("role", flat=True).first() or ""
@@ -1935,7 +1934,7 @@ def avatar_url(ctx: OperationContext, name: str) -> str:
 
 
 def appearance_of(user) -> dict[str, str | int]:
-    """The appearance a person chose in «My profile» (BASE-G125), for the shell to paint on any device they enter;
+    """The appearance a person chose in «My profile», for the shell to paint on any device they enter;
     empty mode and palette, the business's."""
     chosen = Profile.objects.filter(username=user.get_username()).values("theme_mode", "palette", "ui_scale").first()
     if chosen:
@@ -1945,8 +1944,8 @@ def appearance_of(user) -> dict[str, str | int]:
 
 def shell_access(request: HttpRequest, slug: str) -> dict[str, Any]:
     """What the shell needs of this session's way in (``hub-home``'s ``access``, ``base.spa``): how it was opened,
-    whether «Switch user» is offered (BASE-G60: a shared device of the hub of a business that asks, with somebody on
-    its grid) and, when the business always asks on such a device, after how many idle minutes it locks (BASE-G59)."""
+    whether «Switch user» is offered (a shared device of the hub of a business that asks, with somebody on
+    its grid) and, when the business always asks on such a device, after how many idle minutes it locks."""
     credential = (
         SessionOwner.objects.filter(session_id=request.session.session_key).values_list("credential", flat=True).first()
         or SessionOwner.Credential.ACCOUNT
@@ -1961,7 +1960,7 @@ def shell_access(request: HttpRequest, slug: str) -> dict[str, Any]:
     }
 
 
-# ── People and permissions: people, roles (APP-BASE-5) ──────────────────────────────────────────────────────────────
+# ── People and permissions: people, roles ───────────────────────────────────────────────────────────────────────────
 
 
 def people_of(slug: str) -> list[dict[str, Any]]:
@@ -2098,7 +2097,7 @@ def signed_in_role(ctx: OperationContext) -> str:
 
 
 def person_detail_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str, Any]:
-    """A person's page (BASE-G10): what the hub keeps of their way in and what who asks may change of it."""
+    """A person's page: what the hub keeps of their way in and what who asks may change of it."""
     actor, actor_role = signed_in_username(ctx), signed_in_role(ctx)
     credential = person["credential"]
 
@@ -2134,7 +2133,7 @@ def person_detail_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str
     ),
 )
 def person_list(ctx: OperationContext, data: PersonListIn) -> dict:
-    """Employees › Personal (BASE-G11, G142, G138): every person once, owner first, with the plan's places."""
+    """Employees › Personal: every person once, owner first, with the plan's places."""
     found = people_of(ctx.scope.key)
     return {"people": [person_out(ctx, person) for person in found], "seats": seats_of(ctx.scope.key, len(found))}
 
@@ -2157,7 +2156,7 @@ def person_list(ctx: OperationContext, data: PersonListIn) -> dict:
     ),
 )
 def person_detail(ctx: OperationContext, data: PersonIn) -> dict:
-    """A person's page (BASE-G10), for who runs the business."""
+    """A person's page, for who runs the business."""
     return person_detail_out(ctx, person_of(ctx, data.person))
 
 
@@ -2179,7 +2178,7 @@ def person_detail(ctx: OperationContext, data: PersonIn) -> dict:
     ),
 )
 def role_list(ctx: OperationContext, data: RoleListIn) -> dict:
-    """Employees › Roles (BASE-G143): erplora.com's four, from the top, with their people and permissions."""
+    """Employees › Roles: erplora.com's four, from the top, with their people and permissions."""
     found = people_of(ctx.scope.key)
     configs = all_live_app_configs()
     everything = {permission for config in configs for permission in config.permissions}
@@ -2200,7 +2199,7 @@ def role_list(ctx: OperationContext, data: RoleListIn) -> dict:
         }
 
 
-# ── People and permissions: the business's API keys (APP-BASE-5) ───────────────────────────────────────────────────
+# ── People and permissions: the business's API keys ────────────────────────────────────────────────────────────────
 
 
 def api_key_out(key: ApiKey) -> dict[str, Any]:
@@ -2265,8 +2264,8 @@ def api_apps(ctx: OperationContext) -> list[dict[str, Any]]:
     ),
 )
 def api_key_list(ctx: OperationContext, data: ApiKeyListIn) -> dict:
-    """Employees › API keys (BASE-G149, G05): every key, the newest first, and the apps a key per app may reach. While
-    the business shares phase 1's database with others, none is available (``base.services.has_own_database``)."""
+    """Employees › API keys: every key, the newest first, and the apps a key per app may reach. While
+    the business shares its database with others, none is available (``base.services.has_own_database``)."""
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     available = bool(hub is not None and hub.db_name)
     keys = [api_key_out(key) for key in ApiKey.objects.all()] if available else []
@@ -2291,7 +2290,7 @@ def api_key_list(ctx: OperationContext, data: ApiKeyListIn) -> dict:
     ),
 )
 def api_key_detail(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
-    """One key of Employees › API keys; none while the business shares phase 1's database (``api_key_list``)."""
+    """One key of Employees › API keys; none while the business shares its database (``api_key_list``)."""
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     key = ApiKey.objects.filter(pk=data.id).first() if hub is not None and hub.db_name else None
     if key is None:
@@ -2299,7 +2298,7 @@ def api_key_detail(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
     return api_key_out(key)
 
 
-# ── People and permissions: a manager's approval (APP-BASE-5) ──────────────────────────────────────────────────────
+# ── People and permissions: a manager's approval ───────────────────────────────────────────────────────────────────
 from base import approvals as approval_rules  # noqa: E402
 from base.models import Approval  # noqa: E402
 from base.schemas import ApprovalExportIn, ApprovalExportOut, ApprovalListIn, ApprovalListOut, ApproversIn, ApproversOut  # noqa: E402
@@ -2353,7 +2352,7 @@ def approval_action(operation: str, figures: dict | None = None, currency: str |
     ),
 )
 def approval_list(ctx: OperationContext, data: ApprovalListIn) -> dict:
-    """Employees › Approvals (BASE-G145): the record of approvals, read only."""
+    """Employees › Approvals: the record of approvals, read only."""
     rows = list(Approval.objects.order_by("-created_at", "-id")[:APPROVALS_SHOWN])
     currency = approval_rules.currency_of(ctx.scope) if any(row.figures for row in rows) else None
     return {
@@ -2477,7 +2476,7 @@ def approval_export(ctx: OperationContext, data: ApprovalExportIn) -> dict:
     },
 )
 def approval_approvers(ctx: OperationContext, data: ApproversIn) -> dict:
-    """«Who approves it?» (BASE-G136): the people of the business with a PIN who may do the action themselves, by name;
+    """«Who approves it?»: the people of the business with a PIN who may do the action themselves, by name;
     nobody for an action no app names."""
     found = approval_rules.approvable(data.operation)
     pin_length = access.pin_length_or_default(access_settings().pin_length)
@@ -2493,7 +2492,7 @@ def approval_approvers(ctx: OperationContext, data: ApproversIn) -> dict:
 
 
 
-# ── People and permissions: the API's documentation (APP-BASE-5) ───────────────────────────────────────────────────
+# ── People and permissions: the API's documentation ────────────────────────────────────────────────────────────────
 from base import api_docs  # noqa: E402
 from base.models import ApiSettings  # noqa: E402
 from base.schemas import ApiDocIn, ApiDocOut, ApiDocSettingsIn, ApiDocSettingsOut  # noqa: E402
@@ -2521,7 +2520,7 @@ def api_docs_enabled() -> bool:
     ),
 )
 def api_doc_settings(ctx: OperationContext, data: ApiDocSettingsIn) -> dict:
-    """«Show the API documentation» in Settings › General (BASE-G100); off without a row."""
+    """«Show the API documentation» in Settings › General; off without a row."""
     return {"docs_enabled": api_docs_enabled(), "can_change": ctx.has(ADMINISTER_HUB)}
 
 
@@ -2537,7 +2536,7 @@ def api_doc_settings(ctx: OperationContext, data: ApiDocSettingsIn) -> dict:
     },
 )
 def api_doc_get(ctx: OperationContext, data: ApiDocIn) -> dict:
-    """The API's documentation (BASE-G150, G48): what the apps this business has publish; not given while hidden."""
+    """The API's documentation: what the apps this business has publish; not given while hidden."""
     if not api_docs_enabled():
         raise Conflict(gettext("The API documentation is hidden in this business."), code="base.api_docs_hidden")
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
@@ -2549,9 +2548,9 @@ def api_doc_get(ctx: OperationContext, data: ApiDocIn) -> dict:
     }
 
 
-# ── Files (APP-BASE-8) ─────────────────────────────────────────────────────────────────────────────────────────
-# The old hub's Files (``GET /api/media``, ``/raw``; HUB_SHELL-F130, F132): the business's files in the hub file store
-# (``base.files``), on the hub of the request only. Everyone of the hub sees and opens them.
+# ── Files ──────────────────────────────────────────────────────────────────────────────────────────────────────
+# The business's files in the hub file store (``base.files``), on the hub of the request only. Everyone of the hub
+# sees and opens them.
 VIEW_FILES = "base.view_files"
 UPLOAD_FILES = "base.upload_files"
 DELETE_FILES = "base.delete_files"
@@ -2590,7 +2589,7 @@ def refuse_past_the_plans_space(ctx: OperationContext, store: Storage, size: int
     ),
 )
 def file_list(ctx: OperationContext, data: FileListIn) -> dict:
-    """BASE-G82: the tree, the folder's files, the space used and what this person may do with them."""
+    """The tree, the folder's files, the space used and what this person may do with them."""
     with translation.override(ctx.language):
         listing = files.listing(storages["hub_files"], hub_id(ctx.scope), data.folder)
     used = listing.pop("used_bytes")
@@ -2628,12 +2627,12 @@ def file_list(ctx: OperationContext, data: FileListIn) -> dict:
     ),
 )
 def file_read(ctx: OperationContext, data: FileReadIn) -> dict:
-    """BASE-G84: the file, described; ``base.api`` streams its bytes to the person who asked."""
+    """The file, described; ``base.api`` streams its bytes to the person who asked."""
     with translation.override(ctx.language):
         return files.describe(storages["hub_files"], hub_id(ctx.scope), data.path)
 
 
-# ── Assistant (APP-BASE-9) ──────────────────────────────────────────────────────────────────────────────────────
+# ── Assistant ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 from live.errors import OperationError  # noqa: E402 - the assistant's block keeps its imports with it
 
@@ -2654,7 +2653,7 @@ from base.schemas import AssistantUsageIn, AssistantUsageOut, DocsSearchIn, Docs
     database=False,
 )
 def assistant_usage(ctx: OperationContext, data: AssistantUsageIn) -> dict:
-    """This month's messages of the assistant as erplora.com counts them (BASE-G122): used, of how many, and when
+    """This month's messages of the assistant as erplora.com counts them: used, of how many, and when
     they come back. What cannot be read is an error, never a number made up."""
     try:
         usage = assistant.usage(ctx.scope)
@@ -2720,7 +2719,7 @@ def docs_search(ctx: OperationContext, data: DocsSearchIn) -> DocsSearchOut:
     )
 
 
-# ── Locations (round 2026-10-24b, multi-location) ──────────────────────────────────────────────────────────────────
+# ── Locations ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
 from base.models import Location  # noqa: E402
 from base.schemas import LocationListIn, LocationListOut  # noqa: E402
@@ -2755,7 +2754,7 @@ def location_list(ctx: OperationContext, data: LocationListIn) -> dict:
     }
 
 
-# ── The shared image library (round 2026-10-30, base.image_catalog) ────────────────────────────────────────────────
+# ── The shared image library (base.image_catalog) ──────────────────────────────────────────────────────────────────
 
 from base import image_catalog  # noqa: E402
 from base.schemas import CatalogImageOut, CatalogImagePage, CatalogImageRefIn, CatalogImageSearchIn  # noqa: E402

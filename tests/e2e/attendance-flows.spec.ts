@@ -103,7 +103,7 @@ for (const vp of VIEWPORTS) {
       await expect(view.locator('[data-testid=attendance-clock-message]')).toContainText('Clocked in at');
       await expect(view.locator('[data-testid=attendance-clock-status]')).toContainText('Clocked in since');
       await expect(view.locator('[data-testid=attendance-clock-timer]')).toBeVisible();
-      // attendance#18: the open day reads «Open», as Records names it.
+      // The open day reads «Open», as Records names it.
       await expect(view.locator('[data-testid=attendance-clock-recent-row]').first()).toContainText('Open');
       await snap(page, 'F01', vp.label);
 
@@ -211,7 +211,7 @@ for (const vp of VIEWPORTS) {
           expect(wrapped, `the status of ${id} on one line at ${vp.label}`).toBeLessThanOrEqual(0);
           expect(spill, `the status of ${id} clear of the row's actions at ${vp.label}`).toBeLessThanOrEqual(0);
         }
-        // attendance#14: no header runs into the next one.
+        // No header runs into the next one.
         const heads = await view.locator('[role=columnheader] > span:first-child').evaluateAll((spans) =>
           spans.map((span) => ({ text: span.textContent?.trim() ?? '', box: span.getBoundingClientRect().toJSON() as DOMRect })).filter((head) => head.text),
         );

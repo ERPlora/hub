@@ -1,16 +1,16 @@
 <script setup lang="ts">
-// Apps (BASE-G67…G74; the old hub's AppsPage): the business's apps over the live `base.app.list`, which the SaaS's
+// Apps: the business's apps over the live `base.app.list`, which the SaaS's
 // photo re-runs (a paid app bought on erplora.com turns up without reloading). Three tabs in the address, the old
 // hub's: «My apps» (`/apps`, the apps on, each with «Open»), «Add apps» (`#all`, the whole catalogue with what it
 // does, its price and what comes with it) and «Paid» (`#paid`, only what is bought apart). «Paid» and the price are
-// there only while some app is sold apart: with every app in every plan (PLAN §32) none is. There is no amount here:
+// there only while some app is sold apart: with every app in every plan none is. There is no amount here:
 // a paid app without its right says it needs a subscription and, for whoever runs the business and only on the web,
 // links to erplora.com's Store, where it is bought (never inside the Hub: the stores refuse an app that sells).
-// Whoever runs the business turns an app on or off (PLAN-HUB §9; BASE-F18, F19, F23–F25): «Turn on» asks first when
+// Whoever runs the business turns an app on or off: «Turn on» asks first when
 // it brings others it needs, naming them; «Turn off» always asks, naming what goes with it, and one another app on
 // needs says which to turn off first. A refusal (another app needs it, the app's own reason, any other failure) is a
 // notice that stays until it is closed or the next change: its reason is often a long sentence of what to do first,
-// which a toast took away before it could be read (hub#2594). The counter says how many apps are on, as «My apps»
+// which a toast took away before it could be read. The counter says how many apps are on, as «My apps»
 // lists them, and how many of the plan's the business chose (`max_apps`; what came along or was born on does not
 // count, hub#1286); at the limit, the notice with «Upgrade plan» (erplora.com's plans,
 // only on the web). The menu of this screen is read again after each change; the other screens of the business
@@ -96,7 +96,7 @@ const counter = computed(() => {
   return t('base.appsPage.counter.limited', { on, n: on, chosen: answer.enabled, max: answer.max_apps });
 });
 
-/** Some app is sold apart (none is while every app comes with every plan, PLAN §32): only then «Paid» and «Price». */
+/** Some app is sold apart (none is while every app comes with every plan): only then «Paid» and «Price». */
 const paid = computed(() => sellsApart(apps.value));
 
 const tabs = computed<ShellTab[]>(() => [

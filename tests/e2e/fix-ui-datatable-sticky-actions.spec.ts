@@ -1,11 +1,9 @@
-// flow: ui:DataTable — FIX-UI-DATATABLE-STICKY-ACTIONS-OVERLAP (hub#94, mutant M6 of attendance-flows):
-// the pinned row actions («⋮») never cover the last column of a list. A list that offers cards gives
-// up, in this order, its `low` columns, its row actions and then the list itself (W-19): it never stays
+// flow: ui:DataTable — the pinned row actions («⋮») never cover the last column of a list (hub#94). A list
+// that offers cards gives up, in this order, its `low` columns, its row actions and then the list itself: it never stays
 // a list scrolled sideways under «⋮». Only a list WITHOUT cards may scroll inside its box, and then it
 // says so (`.data-table__scroll--overflow`, the shadow of the pinned edge).
 // The list is Time clock › Records with every column picked back in the column chooser, as a person
-// does: at 834px it does not fit even folded. With ui 7cfc81c it stayed a list with «Location» under
-// «⋮» (the folded «Actions» header was written without a render, and the ladder waited for one).
+// does: at 834px it does not fit even folded, so it becomes cards instead of a list with «Location» under «⋮».
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';

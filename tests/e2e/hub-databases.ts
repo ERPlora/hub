@@ -1,14 +1,14 @@
-// Where a spec's SQL goes (helpers.ts `psql`) since every hub has its own database (round 2026-10-30 of PLAN-DB, S2a;
-// `seed_local_hubs` gives `a` and `b` theirs once every app can live in one). Control's tables — the registry
+// Where a spec's SQL goes (helpers.ts `psql`) now that every hub has its own database (`seed_local_hubs` gives `a`
+// and `b` theirs once every app can live in one). Control's tables — the registry
 // (`base_hub`, `base_democode`, `control_*`), Django's users and sessions (`auth_*`, `django_*`) and the memberships
-// and session owners of phase 1 (`base_membership`, `base_sessionowner`) — live in the stack's control database
+// and session owners (`base_membership`, `base_sessionowner`) — live in the stack's control database
 // (`DB_NAME`); every other table in the hub's own, read from the registry once per hub (`db_name`; empty: it still
 // shares control's). Each statement of a spec's SQL runs where its tables live, the ones in a row on one database
 // together; a spec's own scratch tables (`e2e…`) go where they were made, and SQL that names no table (`pg_notify`)
 // runs on control's, where live's notices are heard. No statement crosses two databases, so one that names tables of
 // both is refused, saying how to split it.
 
-/** Control's tables: the registry, Django's own and phase 1's memberships and session owners (base/tenancy/inventory.py). */
+/** Control's tables: the registry, Django's own and the memberships and session owners (base/tenancy/inventory.py). */
 const CONTROL_TABLE = /^(?:auth_\w+|django_\w+|control_\w+|base_hub|base_democode|base_membership|base_sessionowner)$/;
 /** A spec's own scratch table (`e2e_…`, `"e2e-…"`): a copy kept while it runs, next to what it copies. */
 const SCRATCH_TABLE = /^e2e/;

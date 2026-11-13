@@ -150,8 +150,8 @@ describe('AgendaPage', () => {
     expect(s.wrapper.findComponent(WeekBoard).props('days')).toHaveLength(7);
   });
 
-  // appointments#323: when the agenda's rows cannot load, «By professional» says so with «Retry» instead of
-  // hiding the day's appointments without a word.
+  // When the agenda's rows cannot load, «By professional» says so with «Retry» instead of hiding the day's appointments
+  // without a word.
   it('«By professional» whose rows cannot load says so and retries', async () => {
     const s = await setup();
     s.toolbar().vm.$emit('update:view', 'staff');
@@ -230,7 +230,7 @@ describe('AgendaPage', () => {
   });
 });
 
-describe('AgendaPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('AgendaPage: the list fills the page', () => {
   it('the appointments list, the default view: AppPage `fill` and its DataTable `fill`, only stacks between them', async () => {
     const s = await setup();
     expect(s.wrapper.findComponent(AppointmentList).exists()).toBe(true);

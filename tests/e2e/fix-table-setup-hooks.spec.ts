@@ -1,10 +1,9 @@
 // flow: TABLE-F02 TABLE-F01
-// Tables' hook of the Home (FIX-TABLE-SETUP-HOOKS; the old module's own `setup` item «Tus mesas», tables#24; the old
-// hub's dashboard in docs/reference/old-hub/dashboard-*.png), as the owner of hub `a` reads it in Spanish: «Tus mesas»
+// Tables' hook of the Home (its `setup` item «Tus mesas»), as the owner of hub `a` reads it in Spanish: «Tus mesas»
 // pending and «Recomendado» in «Termina de configurar tu negocio» while no table of the room is in use, its
 // «Configurar» leading to Tables → Tables, where the first table is added in its zone; then «Hecho», and back to
-// pending without a reload when that table is switched off. In each of the three sizes, the capture
-// `FIX-TABLE-SETUP-HOOKS-<width>` with the step pending in sight. The tables the hub already had in use are switched
+// pending without a reload when that table is switched off. In each of the three sizes, a capture with the step
+// pending in sight. The tables the hub already had in use are switched
 // off for the run and back on after it; the run's own zones are «E2E Tsh …», deleted with their tables before and after.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 

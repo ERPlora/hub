@@ -1,5 +1,5 @@
-"""What layer 1 of the assistant's QA says of Website (erplora-next docs/plans/2026-10-31-asistente-conocimiento-y-qa.md):
-which tools it offers, to whom, and the requests the real-model QA found unreachable (hub#1093).
+"""What the assistant offers of Website: which tools, to whom, and the requests the real-model QA found unreachable
+(hub#1093).
 
 Every ask of every tool of website bringing its tool among the first ten, role by role, in English and in Spanish, out
 of the catalogue of a business with every app on and ranked as a turn ranks, is ``base/tests/test_assistant_asks.py``'s
@@ -68,9 +68,9 @@ def test_only_who_runs_the_business_is_offered_the_websites_changes(catalog_of):
 
 
 #: The requests of hub#1093's QA as the owner said them (``tests/e2e/qa/probes/owner-es-website-2026-11-08.json``), and
-#: nothing of the tools' ``asks``: before Website said its asks, neither the save nor the taking offline was among the
-#: tools a turn offers (``MAX_TOOLS``), so the model answered it had no tool. The reads and the publication, which the
-#: QA found reachable, stay so. Their words stay the person's, never the asks'
+#: nothing of the tools' ``asks``: without Website's asks, neither the save nor the taking offline would be among the
+#: tools a turn offers (``MAX_TOOLS``), and the model would answer it has no tool. The reads and the publication, which
+#: the QA found reachable, stay so. Their words stay the person's, never the asks'
 #: (``test_no_ask_copies_a_qa_probe_or_names_a_qa_record``).
 REPORTED = [
     (

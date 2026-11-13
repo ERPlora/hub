@@ -1,8 +1,6 @@
 <script setup lang="ts">
-// «Choose what to load» (BASE-G103; the old hub's ImportPanel catalogue): ONE live read of `base.blueprint.list` — the
-// hub's country first, then the person's language — painted in the DataTable as cards (or a list: its switch), with
-// «Search templates» over the name, the description and the apps it brings. Language and country by name («España»,
-// not «ES»). «Use template» emits the template; the page reads it (`busy` spins its button meanwhile).
+// The templates come already ordered by the server: the hub's country first, then the person's language. «Use
+// template» only emits the template; the page reads it, and `busy` spins its button meanwhile.
 import { DataTable, type DataTableAction, type DataTableActionEvent, type DataTableColumn } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { computed, ref } from 'vue';

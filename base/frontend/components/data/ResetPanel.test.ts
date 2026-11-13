@@ -1,10 +1,10 @@
-// Settings › Data › Reset (BASE-G108, BASE-G109): only for who administers the hub. «Undo an import»: one row per
+// Settings › Data › Reset: only for who administers the hub. «Undo an import»: one row per
 // import that can be undone, confirmed without typing, then what was removed per app; a refusal shows in the dialog
-// (hub#2720: the old screen said nothing). «Reset the business»: the plan per section, what never goes, and — when
+// (the old screen said nothing). «Reset the business»: the plan per section, what never goes, and — when
 // the business has its own database — the sections ticked and, after typing its name, asked: the worker copies the
-// business's data first and only then empties them (round 2026-10-30 of PLAN-DB, decision 2), and the live
+// business's data first and only then empties them, and the live
 // `base.hub.dumps` tells each step (copying, emptying, done with what went, or failed with nothing emptied and «Try
-// again»), with the copies below (DumpsCard); in phase 1 (shared database) the screen says why it cannot instead of
+// again»), with the copies below (DumpsCard); on a shared database the screen says why it cannot instead of
 // offering the red button.
 import { ConfirmDialog } from '@erplora/ui/components';
 import { afterEach, describe, expect, it } from 'vitest';

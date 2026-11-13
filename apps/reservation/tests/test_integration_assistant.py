@@ -1,7 +1,7 @@
-"""The assistant's card for a write of reservation (FIX-HUB-RESERVATION-ASSISTANT-CARD-FIELDS-IN-ENGLISH; base's half is
-hub#258): in Spanish, every datum it sends by the name the Reservations screens give it, never by the title pydantic
-makes up from the field («Absorbed Id», «No Table», «Overbook»). The card is base's (``base.assistant.card``); the names
-are reservation's: the titles of its schemas and the ``verbose_name`` of its models, with their Spanish in its catalog."""
+"""The assistant's card for a write of reservation (base's half is hub#258): in Spanish, every datum it sends by the
+name the Reservations screens give it, never by the title pydantic makes up from the field («Absorbed Id», «No Table»,
+«Overbook»). The card is base's (``base.assistant.card``); the names are reservation's: the titles of its schemas and
+the ``verbose_name`` of its models, with their Spanish in its catalog."""
 
 import datetime as dt
 import json
@@ -128,8 +128,8 @@ def test_the_card_names_where_a_reservation_came_from_and_the_email_rule_as_rese
 @pytest.mark.django_db
 def test_the_card_names_the_customer_a_channel_acts_for():
     """WhatsApp changing or cancelling the guest's own reservation: on behalf of her customer card, said by its name.
-    (Since hub#416 a card leaves out a record it cannot name — a datum that is no id of any card, or an automation's
-    card, which reads nothing —, so the card is asked as the person who confirms, about a card that exists.)"""
+    (A card leaves out a record it cannot name — a datum that is no id of any card, or an automation's card, which
+    reads nothing —, so the card is asked as the person who confirms, about a card that exists.)"""
     ana = make_customer("Ana García")
     for name in ("reservation.reservation.cancel", "reservation.reservation.update"):
         for language, label in (("es", "En nombre del cliente"), ("en", "On behalf of the customer")):
@@ -137,10 +137,10 @@ def test_the_card_names_the_customer_a_channel_acts_for():
             assert said(card) == [(label, "Ana García")], (name, language)
 
 
-# ── Each record a write names by its id, as its screen names it (FIX-HUB-RESERVATION-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS) ──
-# Since hub#416 the card leaves out every id its schema does not mark with the read that names its record (before, the
-# UUID showed). Reservation marks each one with a read by id of its own or of the app it requires (Customers, Tables),
-# run as the person who confirms: a record they may not read, or of another business, is left out — never by its id.
+# ── Each record a write names by its id, as its screen names it ──
+# The card leaves out every id its schema does not mark with the read that names its record (hub#416). Reservation
+# marks each one with a read by id of its own or of the app it requires (Customers, Tables), run as the person who
+# confirms: a record they may not read, or of another business, is left out — never by its id.
 
 #: Thursday 15 October 2026 at 21:00 as each language writes a day and a time on the card (base's CLDR words).
 WHEN = {"es": "15 oct 2026 · 21:00", "en": "Oct 15, 2026 · 9:00 PM"}

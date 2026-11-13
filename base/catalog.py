@@ -1,17 +1,16 @@
-"""The Hub's modules, registered as products in the SaaS's ``shared`` schema (round 16, PLAN §21; spec §4).
+"""The Hub's modules, registered as products in the SaaS's ``shared`` schema.
 
 Each module (``kind = "app"``) is one row of ``shared.app`` and up to two of ``shared.app_doc``,
 written by ``register_apps`` from what the code already says: the ``LiveAppConfig`` metadata in
 English and its Spanish catalogue, the icon baked in ``frontend/generated/app-icons.json`` and the
 customer's part of ``WORKBOOK.md`` (Spanish) and of ``WORKBOOK.en.md`` (its versioned translation).
 
-- ``user_part`` cuts the customer's part of a WORKBOOK (§4.1), without its HTML comments
-  (PLAN-MIGRATIONS §5).
-- ``build_registry`` reads it all without a database or the network (§4.2): ``register_apps
+- ``user_part`` cuts the customer's part of a WORKBOOK, without its HTML comments.
+- ``build_registry`` reads it all without a database or the network: ``register_apps
   --check`` and the image's build run it; every problem is gathered, naming the app and the field.
-- ``register_apps`` writes the registry in one transaction on the ``shared`` alias (§4.2).
-- ``AppImagesFinder`` publishes ``apps/<id>/docs/img/`` as ``static/catalog/<id>/img/`` (§4.4).
-- ``known_verticals`` and ``template_apps`` derive PLAN §15.2's ``HUB_TEMPLATE_APPS`` (§4.7).
+- ``register_apps`` writes the registry in one transaction on the ``shared`` alias.
+- ``AppImagesFinder`` publishes ``apps/<id>/docs/img/`` as ``static/catalog/<id>/img/``.
+- ``known_verticals`` and ``template_apps`` derive each vertical's template apps.
 
 This module is the only one that imports ``shared.models`` and names the ``shared`` alias: the
 explicit exception to «only ``services.py`` and ``queries.py`` touch the ORM», as
@@ -53,20 +52,20 @@ WORKBOOK = "WORKBOOK.md"
 WORKBOOK_EN = "WORKBOOK.en.md"
 #: The line that ends the customer's part of a WORKBOOK; compared exactly, outside code blocks.
 MAINTAINERS_HEADING = "## Para quien lo mantiene"
-#: The images of a module's documentation, linked relatively from its WORKBOOK (spec decision 10).
+#: The images of a module's documentation, linked relatively from its WORKBOOK.
 IMAGES_DIR = PurePosixPath("docs/img")
 #: What ``_image_files`` reports of a file under ``docs/img/`` that is not published.
 SYMLINK, OTHER_FORMAT = "symlink", "other_format"
 #: Where the finder publishes them: ``/static/catalog/<id>/img/<file>``.
 STATIC_PREFIX = "catalog"
-#: ``{"<icon>": "<svg>"}``, versioned and written by ``pnpm gen:app-icons`` (§4.6).
+#: ``{"<icon>": "<svg>"}``, versioned and written by ``pnpm gen:app-icons``.
 APP_ICONS = PurePosixPath("frontend/generated/app-icons.json")
 SPANISH_CATALOG = PurePosixPath("locale/es/LC_MESSAGES/django.mo")
 #: Column lengths of ``shared.app`` the texts must fit in (``live.shared_catalog``).
 TEXT_LIMITS = {"verbose_name": 80, "summary": 120}
 
 _HEADER_FORMAT = "<!-- generated from WORKBOOK.md sha256:{} -->"
-#: What prints that first line for an app, in its Hub's checkout (PLAN-MIGRATIONS §24-D).
+#: What prints that first line for an app, in its Hub's checkout.
 _HEADER_COMMAND = (
     'uv run python manage.py shell --no-imports -c "from django.apps import apps; from base import catalog; '
     "print(catalog.en_header(catalog.source_hash(catalog.workbook_translation(apps.get_app_config('{}')).source)))\""
@@ -94,7 +93,7 @@ class SharedSchemaNotReady(CatalogError):
     """The SaaS has not created the ``shared`` tables yet (its first ``migrate``): wait, not a contract gap.
 
     The worker waits for them (``base.worker``); a table that exists without a column the mirror
-    writes is a ``CatalogError`` instead, fatal (spec §3.5).
+    writes is a ``CatalogError`` instead, fatal.
     """
 
     def __init__(self, tables: list[str]):
@@ -161,7 +160,7 @@ def _uncommented_lines(text: str) -> Iterator[tuple[str, bool]]:
     """Each line of ``text`` without its HTML comments, and whether it is in a fenced code block.
 
     The ``<!-- origen: … -->`` and ``<!-- código: … -->`` of a WORKBOOK tie it to ``MIGRATION.md``
-    and to its sources, never reaching ``shared.app_doc`` nor the assistant (PLAN-MIGRATIONS §5);
+    and to its sources, never reaching ``shared.app_doc`` nor the assistant;
     in a code block they are text, and a heading or a fence in a comment is not one. A line that
     was only a comment goes, and so do the blank lines it would double. Lazy: what ``user_part``
     never reads (the maintainers' part) is never checked. Raises ``WorkbookError`` when a comment
@@ -281,7 +280,7 @@ def en_header(digest: str) -> str:
 def translate_by_hand(label: str) -> str:
     """How to bring app ``label``'s stale ``WORKBOOK.en.md`` up to date, for the errors that find it.
 
-    By hand: ERPlora uses no ``ANTHROPIC_API_KEY`` (PLAN-MIGRATIONS §24-D), so no error sends to
+    By hand: ERPlora uses no ``ANTHROPIC_API_KEY``, so no error sends to
     ``translate_workbooks`` without ``--check``, which calls the Claude API. The header the command
     prints (``en_header`` of the current Spanish part) is what makes the translation current.
     """
@@ -346,7 +345,7 @@ def stale_translations(configs: Iterable | None = None) -> list[str]:
     return stale
 
 
-# ── The registry (§4.2) ────────────────────────────────────────────────────────────────────────
+# ── The registry ───────────────────────────────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True)
@@ -589,13 +588,13 @@ def catalog_modules(configs: Iterable | None = None) -> list:
     ]
 
 
-# ── Static files: the documentation's images (§4.4) ────────────────────────────────────────────
+# ── Static files: the documentation's images ───────────────────────────────────────────────────
 
 
 class AppImagesFinder(BaseFinder):
     """Publishes each module's ``docs/img/**`` as ``catalog/<id>/img/**``, nothing else.
 
-    Only the extensions of spec decision 10 (``svg`` can carry script and would be served from the
+    Only ``live.markdown.IMAGE_EXTENSIONS`` (never ``svg``, which can carry script and would be served from the
     Hub admin's origin); never a ``WORKBOOK*.md``, code, a hidden file, a symbolic link (nor
     anything through one) or anything outside ``docs/img/``. ``collectstatic`` copies them to
     ``STATIC_ROOT`` (no hash: the path is stable) and ``runserver`` serves them at once.
@@ -649,11 +648,11 @@ class AppImagesFinder(BaseFinder):
         return found
 
 
-# ── Verticals (§4.7) ───────────────────────────────────────────────────────────────────────────
+# ── Verticals ──────────────────────────────────────────────────────────────────────────────────
 
 
 def known_verticals(configs: Iterable | None = None) -> list[str]:
-    """Every vertical some module belongs to, sorted: the ones ``/internal`` accepts (PLAN §15.2)."""
+    """Every vertical some module belongs to, sorted: the ones ``/internal`` accepts."""
     return sorted(
         {
             vertical
@@ -664,7 +663,7 @@ def known_verticals(configs: Iterable | None = None) -> list[str]:
 
 
 def template_apps(vertical: str, configs: Iterable | None = None) -> list[str]:
-    """PLAN §15.2's ``HUB_TEMPLATE_APPS[vertical]``: the modules of that vertical, closed by ``requires``.
+    """The template apps of ``vertical``: the modules of that vertical, closed by ``requires``.
 
     A module lists a vertical only when every hub of it turns the module on at sign-up (in doubt,
     out); raises ``ValueError`` for a vertical no module lists.
@@ -684,7 +683,7 @@ def template_apps(vertical: str, configs: Iterable | None = None) -> list[str]:
     return sorted(closed)
 
 
-# ── The write: register_apps (§4.2) ────────────────────────────────────────────────────────────
+# ── The write: register_apps ───────────────────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True)
@@ -743,8 +742,8 @@ def register_apps(
 ) -> RegisterResult:
     """Write the registry (default: ``build_registry()``) into ``shared``, in one transaction.
 
-    Never overwrites what a newer release registered unless ``force`` (the deliberate rollback of
-    spec §4.3), never deletes (a retired app is unlisted, a retired translation left empty) and
+    Never overwrites what a newer release registered unless ``force`` (a deliberate
+    rollback), never deletes (a retired app is unlisted, a retired translation left empty) and
     leaves nothing written when anything fails: the error is logged and raised. Tables the SaaS has
     not created yet raise ``SharedSchemaNotReady`` without logging: the worker waits for them.
     """
@@ -808,7 +807,7 @@ def _schema_and_table(db_table: str) -> tuple[str, str]:
 
 
 def _check_tables(cursor) -> None:
-    """Both tables of the mirror exist and this role may use them (spec §3.3 and §4.3).
+    """Both tables of the mirror exist and this role may use them.
 
     Missing, the SaaS has not migrated ``shared`` yet: ``SharedSchemaNotReady``, which the worker
     waits for. Present without the grants of ``bootstrap_databases``: a fatal ``CatalogError``
@@ -858,7 +857,7 @@ def _check_tables(cursor) -> None:
 
 
 def _check_columns(cursor) -> None:
-    """Every column of the mirror exists in the database (spec §3.5); one more there is no error."""
+    """Every column of the mirror exists in the database; one more there is no error."""
     tables = {model: _schema_and_table(model._meta.db_table) for model in (App, AppDoc)}
     cursor.execute(
         "SELECT table_schema, table_name, column_name FROM information_schema.columns "

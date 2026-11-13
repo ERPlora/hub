@@ -1,8 +1,8 @@
-"""``manage.py shell`` opens a database context (phase 2, S1; plan 2026-10-22).
+"""``manage.py shell`` opens a database context.
 
 Without a context a hub's model fails (``HubContextMissing``), so the shell runs on control (the registry, the
 platform's outbox) or, with ``--hub <slug>``, in that hub's database (the e2e's ``manage.py shell -c`` helpers relay a
-hub's outbox there). Since S5 there is no shared database: a business without its own is refused.
+hub's outbox there). There is no shared database: a business without its own is refused.
 """
 
 import contextvars

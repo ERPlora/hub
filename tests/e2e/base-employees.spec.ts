@@ -1,16 +1,6 @@
-// Employees and the API's documentation (APP-BASE-5; the old hub's EmployeesPage, docs/reference/old-hub/employees-*.png
-// and settings-permissions-*.png) in the three viewports, as the owner of hub `a`: «Staff» with the plan's places and how
-// each person gets in, «Roles», «API keys» (hub `a` has its own database since S2a: «New key» and the way to the
-// documentation; one that shares control's says «Not available yet»: ApiKeysPanel.test.ts) and «Approvals» (nobody
-// approved anything yet); a person's page, giving and taking away a badge
-// (one per run: phase 1 keeps every hub's badges in one table); the API's documentation, hidden, shown from Settings ›
-// General and read; and the employee, who has no «API keys» nor «Approvals» and whose `#apikeys` opens «Staff». Each
-// flow leaves its capture `APP-BASE-5-<G key>-<width>` once nothing scrolls sideways.
-//
-// «An approval is needed» (BASE-G136) has no screen of its own: it opens over an app's when the app asks for it, and no
-// app does yet; its dialog is ApprovalDialog.test.ts's and the server's base/tests/test_approvals.py's.
-// flow: BASE-G138 BASE-G139 BASE-G140 BASE-G142 BASE-G143 BASE-G144 BASE-G145 BASE-G146 BASE-G149 BASE-G150 BASE-G100
-// BASE-G10 BASE-G11 BASE-G02 BASE-G04 BASE-G05 BASE-F85
+// «An approval is needed» has no screen of its own: it opens over an app's screen when the app asks for it; its dialog
+// is ApprovalDialog.test.ts's and the server's base/tests/test_approvals.py's.
+// flow: BASE-F85
 import { readFileSync } from 'node:fs';
 
 import { type Browser, expect, type Page, test } from '@playwright/test';
@@ -88,7 +78,7 @@ async function tab(page: Page, id: string): Promise<void> {
 for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   const width = Number(label);
 
-  test(`BASE-G11 BASE-G138 BASE-G142 BASE-G143 BASE-G144 — Employees, its people and its roles at ${width}`, async ({ browser }) => {
+  test(`Employees, its people and its roles at ${width}`, async ({ browser }) => {
     const { context, page } = await signedIn(browser, viewport, '/employees');
     const problems = await collectProblems(page);
     await expect(page.getByRole('heading', { name: 'Employees' }).first()).toBeVisible();
@@ -113,10 +103,10 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await context.close();
   });
 
-  test(`BASE-G146 BASE-G149 BASE-G145 — API keys and Approvals at ${width}`, async ({ browser }) => {
+  test(`API keys and Approvals at ${width}`, async ({ browser }) => {
     const { context, page } = await signedIn(browser, viewport, '/employees#apikeys');
     const problems = await collectProblems(page);
-    // Hub `a` has its own database (round 2026-10-30 of PLAN-DB, S2a): its keys can be made, and the way to the
+    // Hub `a` has its own database: its keys can be made, and the way to the
     // documentation. None is made here: the business stays as the other specs find it.
     await expect(testid(page, 'api-keys-new')).toBeVisible();
     await expect(testid(page, 'api-keys-unavailable')).toHaveCount(0);
@@ -141,7 +131,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await context.close();
   });
 
-  test(`BASE-G100 BASE-G150 — the API's documentation, hidden, shown and read at ${width}`, async ({ browser }) => {
+  test(`the API's documentation, hidden, shown and read at ${width}`, async ({ browser }) => {
     hideTheDocs();
     const { context, page } = await signedIn(browser, viewport, '/api-docs');
     const problems = await collectProblems(page);
@@ -167,7 +157,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await testid(page, 'api-docs-open').click();
     await expect(page).toHaveURL(/\/api-docs$/);
     await expect(shown(page).locator('[data-testid="api-docs-section"]').first()).toBeVisible();
-    // `a` has its own database (S2a): its keys can be made, so no «coming soon» (a shared one says it: ApiDocsPage.test.ts).
+    // `a` has its own database: its keys can be made, so no «coming soon» (a shared one says it: ApiDocsPage.test.ts).
     await expect(testid(page, 'api-docs-keys-soon')).toHaveCount(0);
     const route = shown(page).locator('[data-testid="api-docs-route"]').first();
     await route.locator('summary').click();
@@ -177,7 +167,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await context.close();
   });
 
-  test(`BASE-G11 — the employee has no API keys nor Approvals at ${width}`, async ({ browser }) => {
+  test(`the employee has no API keys nor Approvals at ${width}`, async ({ browser }) => {
     // The documentation hidden, whatever the test before left: then «API» is not in the employee's menu either.
     hideTheDocs();
     const { context, page } = await signedIn(browser, viewport, '/employees#apikeys', true);
@@ -188,7 +178,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await expect(testid(page, 'tab-apikeys')).toHaveCount(0);
     await expect(testid(page, 'tab-approvals')).toHaveCount(0);
     await snap(page, 'BASE-G11-employee', width);
-    // FIX-UI-SIDEBAR-SYSTEM-VISIBLE-TO-EMPLOYEE: the menu never offers what the employee cannot open (System is for
+    // The menu never offers what the employee cannot open (System is for
     // whoever runs the business; Square and Toast hide it the same).
     await expect.poll(() => menuIds(page)).toEqual(['nav-home', 'nav-employees', 'nav-files', 'nav-apps', 'nav-settings']);
     await snapMenu(page, 'FIX-SIDEBAR-employee', width);
@@ -197,12 +187,11 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   });
 }
 
-// A person's page with a badge and without it (BASE-G10, G139, G140): one badge per run, given and taken away once on the
-// phone (where its form is tightest), and the page seen with it and without it at the three sizes, its field and buttons
-// usable at each one (a trial click: Playwright's checks of a real one, nothing sent). Every badge given
-// counts against who gives it, the accepted ones too (`BADGE_CHANGE_LIMIT`, 30 an hour, gh:hub#2560), as a PIN chosen
-// does: the approvals' specs choose theirs once per run, in `beforeAll`. A badge per size spent three per run, and the
-// eleventh run within the hour fell with «Too many badges tried» (rv-332).
+// One badge per run, given and taken away once on the phone (where its form is tightest), and the page seen with it and
+// without it at the three sizes, its field and buttons usable at each one. Every badge given counts against who gives
+// it, the accepted ones too (`BADGE_CHANGE_LIMIT`, 30 an hour), as a PIN chosen does: the approvals' specs choose theirs
+// once per run, in `beforeAll`. A badge per size would spend three per run, and the eleventh run within the hour would
+// fail with «Too many badges tried».
 /** The badge's field takes a number and `buttons` take a click at this size, without spending a badge: a trial click runs
  *  every check of a real one (shown, still, enabled, nothing over it) and sends nothing. */
 async function badgeFormUsable(page: Page, ...buttons: string[]): Promise<void> {
@@ -212,7 +201,7 @@ async function badgeFormUsable(page: Page, ...buttons: string[]): Promise<void> 
   for (const id of buttons) await testid(page, id).click({ trial: true, timeout: 5_000 });
 }
 
-test("BASE-G10 BASE-G139 BASE-G140 — a person's page, a badge given and taken away once, seen at 390, 834 and 1440", async ({
+test("a person's page, a badge given and taken away once, seen at 390, 834 and 1440", async ({
   browser,
 }) => {
   // The employee enters once, so the business has them (a fresh e2e database has only who entered).

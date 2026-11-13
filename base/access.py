@@ -1,4 +1,4 @@
-"""The rules of the way in to a hub (APP-BASE-3): the PIN, the badge, the device and how long a session lasts.
+"""The rules of the way in to a hub: the PIN, the badge, the device and how long a session lasts.
 
 No ORM (like ``base.home``): the writes are ``base.services``' and the reads ``base.queries``'. These are the old Hub's
 rules (``crates/runtime/src/pin_policy.rs``, ``hub_users.rs``, ``identity.rs`` at 9dd38215), which follow Square,
@@ -183,7 +183,7 @@ def set_device_cookie(response, token: str, *, secure: bool) -> None:
     )
 
 
-# ── The brakes on whoever tries PINs (the old Hub's HUB-F135) ────────────────────────────────────────────────────
+# ── The brakes on whoever tries PINs ─────────────────────────────────────────────────────────────────────────────
 # ``base.throttle.AttemptLimit``s, counted in the cache (Valkey in AWS) and keyed by the hub's slug first.
 
 #: Wrong PINs (or badges) for one person (or card): 5 within 5 minutes; a right one starts the count again.

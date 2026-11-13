@@ -2,10 +2,10 @@
 copy of the templates Meta approved (WORKBOOK «Para quien lo mantiene → Modelo»).
 
 Each business has these tables in its own database; only the live notifications are per scope. A conversation is live
-while ``erased_at`` is empty; erased (WHATSAPP_INBOX-F10, F11) it keeps no personal data and frees its number. Who a conversation is with,
-who sent a message from the Hub and who wrote a note hang from the person in the business's own database
-(``base.HubUser``), never from control's user (tenancy W10): the columns ``*_hub_user_id`` are new, the old ones wait
-empty for a later deploy to drop them (``migrations/0010_hub_users``).
+while ``erased_at`` is empty; erased (WHATSAPP_INBOX-F10, F11) it keeps no personal data and frees its number. Who a
+conversation is with, who sent a message from the Hub and who wrote a note hang from the person in the business's own
+database (``base.HubUser``), never from control's user: the columns ``*_hub_user_id`` are new, the old ones wait empty
+for a later deploy to drop them (``migrations/0010_hub_users``).
 """
 
 import datetime as dt
@@ -36,8 +36,7 @@ class Channel(UUIDModel):
     """The business's WhatsApp number as erplora.com reports it: one row per business, written only by what the SaaS
     says (its photo, and its answer when the Hub connects or disconnects the number).
 
-    Each business keeps one row in its own database, and the database holds it to one whatever business column phase 1
-    left on it (``migrations/0013``).
+    Each business keeps one row in its own database, which refuses a second one.
     """
 
     class Status(models.TextChoices):
@@ -511,8 +510,7 @@ class Template(UUIDModel):
         verbose_name_plural = _("templates")
         ordering = ["name", "language", "id"]
         constraints = [
-            # One live template per name and language, whatever business column phase 1 left on it: one deleted here
-            # frees them.
+            # One live template per name and language: one deleted here frees them.
             models.UniqueConstraint(
                 fields=["name", "language"],
                 condition=Q(deleted_at__isnull=True),

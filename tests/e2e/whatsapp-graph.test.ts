@@ -1,8 +1,8 @@
 // @vitest-environment node
 // The run's Meta Graph (whatsapp-graph.ts): the only Meta of the WhatsApp e2e, alive for the whole run, and the check
-// that refuses a run whose erplora.com does not go through it (FIX-HUB-WHATSAPP-E2E-STACK-RECIPE-MISSING-META-ENV):
-// before, an erplora.com started without HTTPS_PROXY called the real graph.facebook.com with the e2e's made-up
-// credentials (8 calls in one pass of the inbox), and one started with it failed the specs whose Graph had gone.
+// that refuses a run whose erplora.com does not go through it: an erplora.com started without HTTPS_PROXY would call
+// the real graph.facebook.com with the e2e's made-up credentials, and one started with it fails the specs whose Graph
+// has gone.
 // flow: WHATSAPP_INBOX-F01
 import { execFile, execFileSync } from 'node:child_process';
 import { closeSync, existsSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -165,10 +165,9 @@ describe('erploraEnv', () => {
   });
 });
 
-// The command erplora.com is started with (FIX-HUB-E2E-SAAS-ASSISTANT-502-BEFORE-META-CA-EXISTS): an erplora.com started
-// with SSL_CERT_FILE naming an authority that is not there yet (the Graph makes one only when the first WhatsApp spec
-// starts it) fails every outgoing call, even a plain http one: its assistant answered the Hub 502 and the assistant
-// specs fell without saying why.
+// The command erplora.com is started with: an erplora.com started with SSL_CERT_FILE naming an authority that is not
+// there yet (the Graph makes one only when the first WhatsApp spec starts it) fails every outgoing call, even a plain
+// http one, so its assistant answers the Hub 502 and the assistant specs fall without saying why.
 describe('runCli', () => {
   const artifacts = mkdtempSync(join(tmpdir(), 'meta-graph-cli-'));
   const ca = join(artifacts, 'meta-graph-8240', 'ca.pem');

@@ -731,7 +731,7 @@ DEMO_READY_AIM_SECONDS = 5.0
 
 
 @pytest.mark.parametrize("databases_only", [True, False], ids=["e2e-worker", "worker"])
-def test_with_its_own_tick_it_takes_a_new_demo_within_plan_dbs_five_seconds(monkeypatch, calls, due, databases_only):
+def test_with_its_own_tick_it_takes_a_new_demo_within_five_seconds(monkeypatch, calls, due, databases_only):
     """hub#1061: demo.spec.ts gave a demo 15 s (the worker's 5 s tick plus the 5 s a demo aims at, with room for a
     loaded machine) and dropped that clock: what it held of the tick is this fact, measured on the waits the loop asks
     for, never on the wall clock. ``run_worker`` passes no tick (``test_run_worker.py``), so this is the tick of

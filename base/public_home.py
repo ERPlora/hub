@@ -1,4 +1,4 @@
-"""A hub's public website on ``/`` (round 2026-10-21): what ``base`` knows of the ``website`` module.
+"""A hub's public website on ``/``: what ``base`` knows of the ``website`` module.
 
 On a hub's host, ``/`` is the SPA's route. A visitor without a session who loads it (GET or HEAD) gets the hub's
 published website instead of the jump to the SaaS's login, with no cookie at all; staff still enter by the page's

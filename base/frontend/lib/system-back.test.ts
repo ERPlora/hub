@@ -13,7 +13,7 @@
 //      `ion-menu`; then the mounted app, through the cancelable `erplora:back` (`preventDefault()` = "I closed one");
 //   2. `installSystemBackButton`, with nothing open: on a detail view the screen's own Back (the topbar's: history
 //      inside the app, else its `backHref`); on the root of an app, Home, with history behind or not (a screen of an
-//      app has no Back, PLAN-MIGRATIONS §16); on Home, out of the app (`leave_app`), as the system Back would;
+//      app has no Back); on Home, out of the app (`leave_app`), as the system Back would;
 //   3. it never cancels a navigation (rv-2042), and outside the installed app it registers nothing and never throws;
 //   4. the listener goes when the page goes (Tauri keeps listeners across page loads) or when the shell lets go.
 import { afterEach, describe, expect, it, vi } from 'vitest';

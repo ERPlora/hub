@@ -65,7 +65,7 @@ describe('PackagesPage', () => {
     expect(s.wrapper.text()).not.toContain('€');
   });
 
-  it('a voucher with no discount says «—», never «-0 %» or «€0.00» (services#166)', async () => {
+  it('a voucher with no discount says «—», never «-0 %» or «€0.00»', async () => {
     const s = await setup();
     await s.show(page([pkg({ discount_percent_bp: 0 }), pkg({ id: 'p3', name: 'Bono uñas', discount_type: 'fixed', discount_percent_bp: 0, discount_amount: 0 })]));
     expect([s.cells(0)[1], s.cells(1)[1]]).toEqual(['—', '—']);
@@ -76,7 +76,7 @@ describe('PackagesPage', () => {
     expect(s.prop('filterable')).toBe(true);
   });
 
-  it("wears the old module's gift on its cards and its empty list", async () => {
+  it('wears the gift on its cards and its empty list', async () => {
     const s = await setup();
     await s.show(page(ROWS));
     expect(s.prop<() => string>('cardIcon')()).toBe('gift-outline');
@@ -168,7 +168,7 @@ describe('PackagesPage', () => {
   });
 });
 
-describe('PackagesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('PackagesPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

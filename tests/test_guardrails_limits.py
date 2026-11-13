@@ -1,5 +1,5 @@
-"""Guardrail 12 of the tenancy (plan 2026-10-22-fase-2-tenencia §2; PLAN-DB §5 «Límite por plan»): every transaction
-on a hub's alias holds a place of its hub's limiter in this process and carries its plan's ``statement_timeout``.
+"""Guardrail of the tenancy's limit per plan: every transaction on a hub's alias holds a place of its hub's limiter
+in this process and carries its plan's ``statement_timeout``.
 
 With two hubs with a database of their own (``hub_a``, ``hub_b``) and no plan in their photo (Free: one transaction at
 once per process, 5 s): a second transaction at once in A waits the bounded time and answers 503 ``base.hub_busy``, or

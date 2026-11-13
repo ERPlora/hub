@@ -1,5 +1,5 @@
-// A business signed up on erplora.com is born with Taxes on, with its country's taxes, and never with VeriFactu
-// (hub#997, PLAN-HUB round 2026-11-07), end to end against this run's stack: a fresh owner signs up on the SaaS's
+// A business signed up on erplora.com is born with Taxes on, with its country's taxes, and never with VeriFactu,
+// end to end against this run's stack: a fresh owner signs up on the SaaS's
 // screens and creates the business through its API as the panel does; the SaaS registers it in this Hub, the worker
 // makes its database, and the owner comes in through the SaaS:
 //   - a business of Spain, in 375x667, 820x1180 and 1440x900: Apps › «My apps» has Taxes, «Active» and «Mandatory in Spain», not

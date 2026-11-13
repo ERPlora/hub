@@ -7,9 +7,8 @@
 // WhatsApp id again is `created: false` and adds nothing; an unsigned call is 401 and adds nothing; the echo of the
 // owner's reply from the phone shows in the thread, and Meta's «read» (`POST …/status`) marks it «Read». The first door
 // is called before anything else asked which apps are on (a fresh runserver: the cache of the apps off is cold) and on
-// 127.0.0.1, a host that opens no database context: it answers 200, never 500
-// (FIX-HUB-BASE-INTERNAL-WHATSAPP-DOORS-500-ON-COLD-ACTIVATION-CACHE). The final screen in three sizes
-// (`${SHOTS}-390|834|1440`). What it creates is deleted after the file.
+// 127.0.0.1, a host that opens no database context: it answers 200, never 500.
+// The final screen in three sizes. What it creates is deleted after the file.
 import { createHmac } from 'node:crypto';
 
 import { expect, type Page, test } from '@playwright/test';

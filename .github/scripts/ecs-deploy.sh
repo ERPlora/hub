@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Deploys an image tag of the hub to one environment, in that environment's ECS cluster
-# (erplora-<environment>; PLAN-AWS §6), touching only its hub task families and services:
+# (erplora-<environment>), touching only its hub task families and services:
 #   prod: cluster erplora-prod, families erplora-prod-{hub,worker,hub-migrate}, services hub and
 #         worker, image erplora/hub;
 #   pre:  cluster erplora-pre, families erplora-pre-{hub,worker,hub-migrate}, services hub-pre and

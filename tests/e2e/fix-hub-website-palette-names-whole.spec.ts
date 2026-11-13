@@ -1,11 +1,10 @@
 // flow: WEBSITE-F02
-// — On a phone, in Spanish, «Colores» of Página web split the name of the palette «Medianoche» in the middle of the
-// word (hub#993): the eight palette cards went three to a row down to 360 px, so at 375 a card left its name 81 px
-// and the word, too long for it, was broken over two lines. The owner of hub `a` opens Página web in Spanish and in
+// On a phone, in Spanish, «Colores» of Página web must not split the name of the palette «Medianoche» in the middle of
+// the word (hub#993): with three of the eight palette cards to a row at 375 px, a card leaves its name 81 px, too
+// narrow for that word. The owner of hub `a` opens Página web in Spanish and in
 // English at 375, 820 and 1440 px: every palette's name is read whole, each word on one line (a name parts between
 // words, never inside one), and inside its card, with no sideways scroll. The cards go three to a row on a tablet and a
-// computer, as before, and two on that phone. Each language and width leaves its capture
-// `FIX-HUB-WEBSITE-PALETTE-NAMES-WHOLE-<lang>-<width>`. Nothing is saved.
+// computer, and two on that phone. Each language and width leaves its capture. Nothing is saved.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 

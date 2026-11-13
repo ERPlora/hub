@@ -1,4 +1,4 @@
-// flow: VERIFACTU-F01 (with VERIFACTU-F13, F17 and F19; FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN)
+// flow: VERIFACTU-F01 (with VERIFACTU-F13, F17 and F19)
 // VeriFactu is only for businesses in Spain. erplora.com registers `a`'s business in Poland (`PUT /internal/hubs/{id}`,
 // signed the way the SaaS sends it): with VeriFactu on, an invoice is issued without a record («unavailable») and its
 // detail shows no «VeriFactu receipt»; a ticket sealed while the business was in Spain stays unsent, its invoice shows

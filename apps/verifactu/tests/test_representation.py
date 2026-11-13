@@ -1,11 +1,10 @@
 """The client of the SaaS's review of the signed authorisation (Anexo I of Convenio 17; VERIFACTU-F05, F06).
 
-The contract (plan 2026-10-15, «Contrato SaaS ↔ Hub», point 2): ``POST {SAAS_INTERNAL_URL}/internal/hubs/{id}/representation``
-with the business's documents in base64 → ``201 {status, version, submitted_at}``; its refusals in the single envelope
-``{"error": {"code", "message", "fields"?}}``; ``GET /internal/representation/model`` → the blank model, a PDF. Both
-signed like every ``/internal`` call, v1 and v2. ``respx`` stands in for the SaaS here; the cases are the old Hub's
-(``crates/server/src/representation_grant.rs``: the documents reach the SaaS untouched, the optional ones are left out
-when there are none, a refusal never quotes the documents it was carrying).
+The contract: ``POST {SAAS_INTERNAL_URL}/internal/hubs/{id}/representation`` with the business's documents in base64
+→ ``201 {status, version, submitted_at}``; its refusals in the single envelope ``{"error": {"code", "message",
+"fields"?}}``; ``GET /internal/representation/model`` → the blank model, a PDF. Both signed like every ``/internal``
+call, v1 and v2. ``respx`` stands in for the SaaS here: the documents reach the SaaS untouched, the optional ones are
+left out when there are none, and a refusal never quotes the documents it was carrying.
 """
 
 import datetime as dt
@@ -426,7 +425,7 @@ def test_a_model_still_refused_is_unreachable(answer, asked):
     assert route.call_count == asked
 
 
-# The rules the Hub checks before anything crosses the network (the old Hub's ``validate``, with the contract's 5 MB).
+# The rules the Hub checks before anything crosses the network, with the contract's 5 MB.
 
 
 @pytest.mark.parametrize(

@@ -1,8 +1,8 @@
 """Django admin of base: only on the platform host (``hubs.erplora.com``, locally ``hubs.localhost:8000``), for the staff.
 
-Every other host answers 404 to ``/admin/`` (``base.middleware``, round 13, PLAN §18.1).
+Every other host answers 404 to ``/admin/`` (``base.middleware``).
 
-The deep link ``/admin/hub/<slug>/`` (round 13, PLAN §18.1), where «Open in the Hub admin» of the
+The deep link ``/admin/hub/<slug>/``, where «Open in the Hub admin» of the
 SaaS admin lands, chooses the hub the admin works on: it is kept in the session and every admin
 page shows it in a banner (``templates/admin/base_site.html`` through :func:`admin_hub_context`).
 """
@@ -48,7 +48,7 @@ class MembershipAdmin(admin.ModelAdmin):
 
 @admin.register(Hub)
 class HubAdmin(ReadOnlyAdmin):
-    """The registry of hubs (plan 2026-10-17, §1.1), read only: the SaaS writes it (``PUT /internal/hubs/{id}``)
+    """The registry of hubs, read only: the SaaS writes it (``PUT /internal/hubs/{id}``)
     and the worker purges the demos; nothing here adds, changes or deletes a row by hand. «Expire now» ends the
     chosen demos at once through ``base.demo.expire``, for the platform's admins (superusers) only."""
 
@@ -121,7 +121,7 @@ class TaskScheduleAdmin(admin.ModelAdmin):
 
 @admin.register(Location)
 class LocationAdmin(admin.ModelAdmin):
-    """The business's locations (round 2026-10-24b): no screen of the Hub shows them yet. Which one is the default is
+    """The business's locations: no screen of the Hub shows them yet. Which one is the default is
     read only (every hub's database is born with «Main» as its default, ``base/migrations/0015``), the default stays
     active and is never deleted, so a hub always has one; another place is added, renamed, turned off or deleted."""
 
@@ -143,9 +143,9 @@ class LocationAdmin(admin.ModelAdmin):
 
 @admin.register(AppActivation)
 class AppActivationAdmin(ReadOnlyAdmin):
-    """Which apps each business turned on or off, and which it chose (PLAN-HUB §9), as they are: read only. Turning
+    """Which apps each business turned on or off, and which it chose, as they are: read only. Turning
     one on or off is ``base.app.enable``/``base.app.disable`` (the apps it needs, the plan's limit, the event), never a
-    row edited by hand; a business without rows has every app off (``base.activation``, round 2026-10-27)."""
+    row edited by hand; a business without rows has every app off (``base.activation``)."""
 
     list_display = ("host", "app", "state", "chosen", "changed_at")
     list_filter = ("state", "chosen")
@@ -156,8 +156,8 @@ def open_hub(request: HttpRequest, slug: str) -> HttpResponseRedirect:
     """Choose ``slug`` (a business's or a demo's) for this admin session and go to the admin's index; 404 if it is no
     hub's slug.
 
-    Routed behind ``admin.site.admin_view`` (staff only). Phase 2 plugs the hub-DB selector here
-    (``use_hub`` over ``hub_<hex>``, PLAN §17).
+    Routed behind ``admin.site.admin_view`` (staff only). ``base.middleware`` then opens the chosen hub's database for
+    every admin page of the session.
     """
     try:
         # A demo (``demo-<8 hex>``) is a hub of the registry too.

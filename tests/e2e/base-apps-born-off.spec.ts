@@ -1,19 +1,19 @@
-// A hub without rows of its apps has every app off (PLAN-HUB round 2026-10-27; a business signs up with Taxes on since
-// hub#997: base-sign-up-taxes-on.spec.ts) and «Start with a business like yours» on the
-// Home turns on the apps of the template it uses, then loads its catalogue (BASE-G131; `base.blueprint.import`), in the
+// A hub without rows of its apps has every app off (a business signs up with Taxes on:
+// base-sign-up-taxes-on.spec.ts) and «Start with a business like yours» on the
+// Home turns on the apps of the template it uses, then loads its catalogue (`base.blueprint.import`), in the
 // three viewports, as the owner of hub `a` put back to how a business is born:
 //   - Apps says nothing is on: «My apps» is empty with its notice, and an app of the catalogue is «Off» in «Add apps»;
 //   - the Home offers the card; «Use this one» on the restaurant ends in «Your apps and your catalogue are ready», and
 //     the Home's «My apps» has the apps it turned on without a reload;
 //   - the template's apps are on (its roots chosen, what they need along), «Active» in «My apps», and its products
 //     and tables are in, through the apps' own lists.
-// `a` is emptied of what a template brings first (phase 1: `a` and `b` share those rows), and after each test the load
+// `a` is emptied of what a template brings first, and after each test the load
 // is undone and `a` gets back its rows with every app on (the ones `seed_local_hubs` wrote, as every other spec finds
-// it). Each step leaves its capture `APPS-BORN-OFF-<step>-<width>`.
-// And in a business of Spain (hub#998, PLAN-HUB round 2026-11-07), at 375, 768 and 1440: Settings › Data › «Use
+// it). Each step leaves a capture at each width.
+// And in a business of Spain, at 375, 768 and 1440: Settings › Data › «Use
 // template» reviews the restaurant's without VeriFactu (Invoicing and Kitchen «turn on»), the load goes in whole and
-// VeriFactu stays «Off» in Apps with nothing refusing it, for its owner to turn on (captures `APPS-BORN-OFF-spain-…`).
-// flow: BASE-G131 BASE-G67 BASE-F31 VERIFACTU-F01
+// VeriFactu stays «Off» in Apps with nothing refusing it, for its owner to turn on.
+// flow: BASE-F31 VERIFACTU-F01
 import { expect, type Page, test } from '@playwright/test';
 
 import { bounceTasks } from './app-rows-helpers';
@@ -74,7 +74,7 @@ test.afterAll(() => {
 for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   const width = Number(label);
 
-  test(`BASE-G131 — a business born with every app off starts from a template at ${width}`, async ({ browser }) => {
+  test(`a business born with every app off starts from a template at ${width}`, async ({ browser }) => {
     test.setTimeout(240_000);
     const { context, page } = await hostPage(browser, A, { viewport, next: '/' });
     let loadId = '';
@@ -88,7 +88,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       expect(born.status).toBe(200);
       expect(born.data.apps.filter((app) => app.state !== 'off')).toEqual([]);
 
-      // BASE-G67 — Apps: nothing in «My apps»; in «Add apps», an app of the catalogue is «Off».
+      // Apps: nothing in «My apps»; in «Add apps», an app of the catalogue is «Off».
       await page.goto(`${A}/apps`);
       await expect(testid(page, 'tab-mine')).toHaveClass(/segment-button-checked/);
       await expect(testid(page, 'apps-empty')).toContainText('You have no apps yet.');
@@ -102,7 +102,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(appRow(page, 'inventory').locator('[data-testid="apps-state"]')).toContainText('Off');
       await snap(page, 'all-off', width);
 
-      // BASE-G131 — the Home offers the card; «Use this one» turns on the template's apps, then loads it.
+      // The Home offers the card; «Use this one» turns on the template's apps, then loads it.
       await page.goto(`${A}/`);
       const card = testid(page, 'blueprint-card');
       await expect(card).toBeVisible();

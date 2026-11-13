@@ -1,4 +1,4 @@
-// «Fiscal document pending» (SALE-F29; INVOICE-F06 in phase 1, which has no relay): Invoicing could not
+// «Fiscal document pending» (SALE-F29; INVOICE-F06): Invoicing could not
 // issue a document of the sale in its own write (no issuer yet, no permission…). The notice says so and,
 // to whoever may charge, offers «Issue now» (`sale.sale.issue_documents`); a refusal says why, worded by
 // the server, and the notice stays. Once issued, the live sale drops the notice by itself.

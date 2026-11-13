@@ -1,7 +1,3 @@
-// A person's page (BASE-G10, G139, G140; the old hub's EmployeeFormPage, «Edit user»): for who runs the business, what
-// the hub keeps of a person's way in, live — their details (changed on erplora.com), their PIN (since when; «Remove the
-// PIN», asked first) and their badge (a reader's burst fills the field; «Save badge», «Remove the badge»). What this
-// administrator may not change (the owner's, one's own badge) is said instead of offered; a refusal by its code.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, installedApp, leaveInstalledApp, mountBase, subId, tap } from '../__tests__/mount-base';
@@ -93,7 +89,7 @@ describe('PersonPage', () => {
     expect(m.wrapper.get('[data-testid="person-badge"]').text()).toContain('Sin placa.');
   });
 
-  // gh:hub#439: the installed app opens nothing on a `_blank` link; the system browser does.
+  // The installed app opens nothing on a `_blank` link; the system browser does.
   it('in the installed app «Open on erplora.com» opens the system browser; the Google Play copy has none', async () => {
     const invoke = installedApp('direct');
     const m = await open();
@@ -113,7 +109,7 @@ describe('PersonPage', () => {
     expect(play.wrapper.find('[data-testid="person-open-saas"]').exists()).toBe(false);
   });
 
-  it('«Remove the PIN» asks first, then the PIN goes (BASE-G139)', async () => {
+  it('«Remove the PIN» asks first, then the PIN goes', async () => {
     const m = await open({ onApi: () => Response.json(detail({ ways: { account: true, pin: false, badge: false }, pin_set_at: null })), locale: 'es' });
     await m.result(m.call, 'base.person.detail', detail());
     await m.wrapper.get('[data-testid="person-pin-remove"]').trigger('click');
@@ -132,7 +128,7 @@ describe('PersonPage', () => {
     expect(m.wrapper.get('[data-testid="person-pin"]').text()).toContain('the person chooses it in “My profile”');
   });
 
-  it('a reader’s burst fills the badge, and «Save badge» gives it (BASE-G140)', async () => {
+  it('a reader’s burst fills the badge, and «Save badge» gives it', async () => {
     const m = await open({
       onApi: () => Response.json(detail({ ways: { account: true, pin: true, badge: true }, badge_set_at: '2026-10-24T09:00:00Z' })),
     });

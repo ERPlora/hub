@@ -12,7 +12,7 @@ export const VIEWPORTS = [
   { label: '1440', width: 1440, height: 900 },
 ];
 
-/** The default week of migration 0002, unconfirmed (hub `a`'s, shared with `b` in phase 1). */
+/** The default week of migration 0002, unconfirmed (hub `a`'s). */
 export const DEFAULT_WEEK = [
   'delete from schedule_weekdayinterval',
   'delete from schedule_weekday',

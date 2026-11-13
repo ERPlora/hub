@@ -1,8 +1,7 @@
-"""FIX-HUB-INVENTORY-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (hub#526): the card of a write of Inventory says which
-product or category it acts on by its name, read as whoever asks, never by its id, and leaves it out when that person
-may not read it or it is not there. A product goes by its name and a category by its name, as the screens' «Delete»
-dialogs and the forms' «Editing product — Vino tinto» say them; the datum that names one by its id is titled with the
-screens' word for it («Producto», «Categoría»), never «Registro».
+"""hub#526: the card of a write of Inventory says which product or category it acts on by its name, read as whoever
+asks, never by its id, and leaves it out when that person may not read it or it is not there. A product goes by its name
+and a category by its name, as the screens' «Delete» dialogs and the forms' «Editing product — Vino tinto» say them; the
+datum that names one by its id is titled with the screens' word for it («Producto», «Categoría»), never «Registro».
 """
 
 import dataclasses

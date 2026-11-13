@@ -1,7 +1,7 @@
 // flow: FLOW-F01 FLOW-F02 FLOW-F03 FLOW-F04 FLOW-F05 FLOW-F06 FLOW-F07 FLOW-F08 FLOW-F09 FLOW-F10 FLOW-F11 FLOW-F12 FLOW-F13 FLOW-F14 FLOW-F15 FLOW-F16 FLOW-F18 FLOW-F19
 // Every flow of Automations with a screen (apps/flow/WORKBOOK.md), end to end in each of the three sizes,
-// as the owner and against the real Tasks app, with one screenshot per flow and size
-// (`APP-FLOW-1-<flow>-<width>`). The guide (F08) and a link to a card (F05, an unknown one opens nothing)
+// as the owner and against the real Tasks app, with one screenshot per flow and size.
+// The guide (F08) and a link to a card (F05, an unknown one opens nothing)
 // come first; a card of the gallery is used (F04), back by the same link lands on it again, and it is
 // allowed and withdrawn (F12). One automation is built from scratch (F09): «Something happens» (which the
 // worker's relay starts on its own, F21) finds an event by its technical name, then a weekly schedule keeps its day
@@ -83,15 +83,15 @@ for (const viewport of VIEWPORTS) {
       await noHorizontalScroll(page, viewport.label);
       await snap('FLOW-F01');
 
-      // FLOW-F08: the guide, with what it cannot do yet (pm#134, flows#16).
+      // FLOW-F08: the guide, with what it cannot do yet.
       await shown(page).locator('[data-testid=flow-gallery-guide]').click();
       await page.waitForURL(/\/flow\/guide$/);
       for (const part of ['what', 'first', 'permissions', 'worked', 'limits']) {
         await expect(shown(page).locator(`[data-testid=flow-guide-section-${part}]`)).toBeVisible();
       }
-      // flow: FLOW-F08 — the same limits as GuidePage.test.ts (FIX-HUB-E2E-FLOW-GUIDE-LIMITS-TEXT-STALE): a customer
+      // flow: FLOW-F08 — the same limits as GuidePage.test.ts: a customer
       // is messaged by WhatsApp only. What it already does (starting on its own when something happens, FLOW-F21;
-      // sending a WhatsApp, FLOW-F31; asking the assistant, FLOW-F37) is no limit any more.
+      // sending a WhatsApp, FLOW-F31; asking the assistant, FLOW-F37) is not listed as a limit.
       const limits = shown(page).locator('[data-testid=flow-guide-section-limits]');
       await expect(limits).not.toContainText('Asking the assistant');
       await expect(limits).toContainText('Messages to a customer go by WhatsApp only, not by email.');
@@ -102,7 +102,7 @@ for (const viewport of VIEWPORTS) {
       await shown(page).locator('[data-testid=flow-guide-back]').click();
       await page.waitForURL(/\/flow\/automations$/);
 
-      // FLOW-F05: a link to a card that does not exist opens nothing (flows#115); a real one, its card.
+      // FLOW-F05: a link to a card that does not exist opens nothing; a real one, its card.
       await page.goto(`${A}/flow/automations?template=nothing`);
       await expect(shown(page).locator('[data-testid=flow-gallery]')).toBeVisible();
       await expect(shown(page).locator('[data-testid^=flow-card-panel-]')).toHaveCount(0);
@@ -111,8 +111,8 @@ for (const viewport of VIEWPORTS) {
       await expect(welcome).toBeInViewport();
       await snap('FLOW-F05');
 
-      // FLOW-F04: what the card does and asks, in words (flows#114); on a wide screen the cards share the
-      // row (flows#40); «Use this one» opens the new one, paused, on its Permissions.
+      // FLOW-F04: what the card does and asks, in words; on a wide screen the cards share the
+      // row; «Use this one» opens the new one, paused, on its Permissions.
       await expect(welcome).toContainText('Create a task');
       await expect(welcome).not.toContainText('task.task.create');
       if (viewport.width >= 1440) {
@@ -125,7 +125,7 @@ for (const viewport of VIEWPORTS) {
       await page.waitForURL(/\/flow\/automations\/[0-9a-f-]+\?tab=permissions$/);
       const cardFlow = idFromUrl(page);
       fromCards.push(cardFlow);
-      // flows#58: back by the same link, with the editor open, lands on the card, now «See it» first.
+      // Back by the same link, with the editor open, lands on the card, now «See it» first.
       await page.goBack();
       await page.waitForURL(/\/flow\/automations\?template=welcome$/);
       await expect(shown(page).locator('[data-testid=flow-card-panel-welcome]')).toBeVisible();
@@ -146,8 +146,7 @@ for (const viewport of VIEWPORTS) {
       await snap('FLOW-F12');
 
       // FLOW-F09, F10: from scratch. «Something happens» (no «not on its own yet» notice: FLOW-F21) finds an
-      // event by its technical name (flows#50); a weekly schedule keeps its day when the time changes
-      // (flows#77).
+      // event by its technical name; a weekly schedule keeps its day when the time changes.
       await page.goto(`${A}/flow/automations/new`);
       const editor = shown(page);
       await expect(editor.locator('[data-testid=flow-editor-nosteps]')).toBeVisible();
@@ -170,7 +169,7 @@ for (const viewport of VIEWPORTS) {
       await snap('FLOW-F10');
 
       // FLOW-F11: a task with its title; a condition that compares a datum with another one, as a pill
-      // (hub#1712), whose «one of» hint leaves «Data» and «Is» where they were (flows#121); a wait, removed.
+      // whose «one of» hint leaves «Data» and «Is» where they were; a wait, removed.
       await editor.locator('[data-testid=flow-editor-add-command]').click();
       await pick(page, 'flow-step-action-s1', 'task', 'Create a task');
       await editor.locator('[data-testid=flow-step-param-s1-title-text-0]').fill(title);
@@ -213,7 +212,7 @@ for (const viewport of VIEWPORTS) {
       await noHorizontalScroll(page, viewport.label);
       await snap('FLOW-F13');
 
-      // FLOW-F14: allowed, on and saved; the four tabs whole on a phone too (flows#142).
+      // FLOW-F14: allowed, on and saved; the four tabs whole on a phone too.
       await shown(page).locator('[data-testid=flow-editor-tab-permissions]').click();
       await shown(page).locator('[data-testid=flow-perm-grantall]').click();
       await expect(shown(page).locator('[data-testid="flow-perm-granted-task.task.create"]')).toBeVisible();
@@ -335,7 +334,7 @@ for (const viewport of VIEWPORTS) {
   });
 }
 
-// flow: FLOW-F10 FLOW-F11 · FIX-FLOW-PAYMENT-LABELS-NOT-PAGOS-TERMS — in Spanish, what Payments sends and does is
+// flow: FLOW-F10 FLOW-F11 — in Spanish, what Payments sends and does is
 // said in Payments' own words (its «Métodos» tab, «Cancelar pago»): «método de pago» and «se cancela un pago». «Forma
 // de pago» stays Sales' word, so a trigger or a step of each app is told apart. Nothing is saved.
 const PAYMENT_EVENTS: Array<[string, string]> = [
@@ -464,7 +463,7 @@ for (const viewport of VIEWPORTS) {
   });
 }
 
-// flow: FLOW-F10 FLOW-F11 · FIX-FLOW-SALE-SECTION-WORD — in Spanish, what the «Secciones» tab of Sales lists is a «sección»
+// flow: FLOW-F10 FLOW-F11 — in Spanish, what the «Secciones» tab of Sales lists is a «sección»
 // here too: in what starts an automation, in what a step does and in the datum it asks for, never a «departamento».
 // Nothing is saved. Each width leaves its capture of the steps' list.
 const SALE_SECTION_EVENTS: Array<[string, string]> = [
@@ -548,7 +547,7 @@ for (const viewport of VIEWPORTS) {
   });
 }
 
-// flow: FLOW-F11 · FIX-HUB-FLOW-EDITOR-FIELD-LABELS-ENGLISH — in Spanish, what a read of an appointment leaves is named in
+// flow: FLOW-F11 — in Spanish, what a read of an appointment leaves is named in
 // Spanish in «Dato» and in «¿Qué dato?» («Fecha de inicio, en texto»: the day Appointments leaves ready to say), never by
 // its internal name made readable («Start date label»). Nothing is saved.
 for (const viewport of VIEWPORTS) {
@@ -602,7 +601,7 @@ for (const viewport of VIEWPORTS) {
   });
 }
 
-// flow: FLOW-F11 · FIX-HUB-FLOW-EDITOR-FIELD-LABELS-ENGLISH — the editor's name, at its head next to «En pausa», is read whole or
+// flow: FLOW-F11 — the editor's name, at its head next to «En pausa», is read whole or
 // ends in «…», never cut mid-letter («Automatización sin nombr»): empty (its placeholder) and with a long name, in `ios` and
 // `md`, and the pill stays on the screen. Nothing is saved.
 const LONG_NAME = 'Recordar la cita del día siguiente a cada cliente por WhatsApp con su hora, su profesional y cómo cambiarla';

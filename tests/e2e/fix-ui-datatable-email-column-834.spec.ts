@@ -1,10 +1,9 @@
-// flow: UI DataTable anchos de columna — FIX-UI-DATATABLE-EMAIL-COLUMN-834 (seen by the reviewer of APP-CART_CHECKOUT,
-// hub#110): at 834×1112, in Cart & Checkout › Orders, the Email column cut «ana@example.c…» while the row had room to
-// spare (Payment almost empty, a gap before Total). Every column without its own width took the same share of the row
-// (`minmax(5.5rem, 1fr)`), whatever it holds: a long email got what «—» got. As in the market (Shopify, Odoo, Square)
+// flow: UI DataTable column widths — at 834×1112, in Cart & Checkout › Orders, the Email column must not cut
+// «ana@example.c…» while the row has room to spare (hub#110), as it does when every column without its own width
+// takes the same share of the row (`minmax(5.5rem, 1fr)`) whatever it holds. As in the market (Shopify, Odoo, Square)
 // a column fits its content and only a table really out of room cuts with «…»: the widest text gives up first, the
-// short columns keep theirs, and the ladder of W-19 (low columns out, actions folded, cards) is the one of before
-// (erplora-old/hub#2717 was the same cut in Staff, at 820px). The header still lines up with its cells.
+// short columns keep theirs, and the narrowing steps (low columns out, actions folded, cards) do not change. The
+// header still lines up with its cells.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { cleanUp, code, orderFrom, signedIn, VIEWPORTS } from './cart-checkout-helpers';

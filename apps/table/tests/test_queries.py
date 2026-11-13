@@ -2,10 +2,9 @@
 its checks, its block and its holds), the checks of the room with what Sales charged, the waiters, the
 setup status and the settings.
 
-Cases from the old module's tests: floor.postgres (natural order, who serves and since when, guests
-visible), zones.postgres (occupancy per zone), sessions.postgres (the zone of a check, one check by id),
-session_paid_total.postgres (what a check charged, a voided sale does not count), setup_status.postgres
-(one table configures the floor, occupancy never unconfigures it) and settings.postgres.
+The floor (natural order, who serves and since when, guests visible), the zones (occupancy per zone), the
+checks (the zone of a check, one check by id), what a check charged (a voided sale does not count), the setup
+status (one table configures the floor, occupancy never unconfigures it) and the settings.
 """
 
 import datetime as dt
@@ -140,7 +139,7 @@ def test_a_table_nobody_sits_at_is_available_with_its_seats():
 
 
 def test_an_occupied_table_says_who_sits_since_when_and_who_serves():
-    # floor.postgres: the plan projects who serves and since when (tables#74, #64) and the guests (#32).
+    # The plan projects who serves and since when, and the guests.
     table = make_table("4", zone=make_zone())
     session = make_session(table, guests_count=3, minutes_ago=35, waiter_name="Luis")
     row = table_row(table)
@@ -150,7 +149,7 @@ def test_an_occupied_table_says_who_sits_since_when_and_who_serves():
 
 
 def test_a_table_whose_check_sales_already_ended_is_free_again():
-    # Phase 1 has no relay: what Sales did is read on every read (charged whole, or voided).
+    # What Sales did is read on every read (charged whole, or voided), before any relay delivers it.
     table = make_table("4", zone=make_zone())
     order = open_check("Table 4")
     make_session(table, order_id=order.id)
@@ -289,8 +288,7 @@ NATURAL_ORDER = [
 
 @pytest.mark.parametrize("expected", NATURAL_ORDER)
 def test_the_tables_come_in_natural_order(expected):
-    # The old module's shared corpus (tests/natural-order-corpus.json, tables#68): every run of digits
-    # is a number wherever it sits; the rest is text.
+    # Every run of digits is a number wherever it sits; the rest is text.
     zone = make_zone()
     for number in random.Random(7).sample(expected, len(expected)):
         make_table(number, zone=zone)
@@ -339,7 +337,7 @@ def test_a_table_is_named_by_its_number_and_its_zone_when_the_number_repeats():
 
 
 def test_a_check_carries_its_table_zone_and_waiter():
-    # sessions.postgres: the checks carry their zone (tables#3 b).
+    # The checks carry their zone.
     zone = make_zone("Terrace")
     session = make_session(
         make_table("7", zone=zone), waiter_id="12", waiter_name="Luis"
@@ -425,7 +423,7 @@ def test_the_newest_checks_come_first():
 def test_a_check_says_what_its_sales_check_charged_and_a_voided_sale_does_not_count(
     product,
 ):
-    # session_paid_total.postgres: what each check charged (tables#96); a voided sale no longer counts.
+    # What each check charged; a voided sale does not count.
     coffee = product()
     table = make_table("4", zone=make_zone())
     order = open_check("Table 4")
@@ -637,6 +635,6 @@ def _tied_table_sessions():
     ],
 )
 def test_ties_go_by_id_in_the_lists_own_direction(operation, tied, column):
-    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
+    """hub#768: a descending list is the ascending one read backwards, ties included, and its
     pages neither repeat nor lose rows."""
     assert_reads_backwards(listed_with(run, operation, column), sorted(tied()))

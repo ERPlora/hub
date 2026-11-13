@@ -1,10 +1,9 @@
 // flow: SCHEDULE-F03 SCHEDULE-F02
-// Schedules' hook of the Home (FIX-SCHEDULE-SETUP-HOOKS; the old module's own `setup` item «Confirma tu horario»,
-// schedules#42; the old hub's dashboard in docs/reference/old-hub/dashboard-*.png), as the owner of hub `a` reads it in
+// Schedules' hook of the Home (its `setup` item «Confirma tu horario»), as the owner of hub `a` reads it in
 // Spanish: «Confirma tu horario» pending and «Recomendado» in «Termina de configurar tu negocio» while the week is the
 // default one, its «Configurar» leading to Schedules → Hours, where «Sí, este es mi horario» confirms it; then «Hecho»,
 // and, with the default week back, «Hecho» again without a reload when a day of it is saved elsewhere. In each of the
-// three sizes, the capture `FIX-SCHEDULE-SETUP-HOOKS-<width>` with the step pending in sight. The week and the settings
+// three sizes, a capture with the step pending in sight. The week and the settings
 // the hub had before the file are put back after it (`afterAll`).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 

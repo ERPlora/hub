@@ -1,9 +1,9 @@
-// The action of the assistant's change in «Waiting for your answer» (FIX-HUB-FLOW-PENDING-ANSWER-CARD-DOES-NOT-SAY-THE-ACTION),
-// end to end with its real dependencies: the Hub of this stack, its SaaS's gateway and, behind it, the e2e's provider
+// The action of the assistant's change in «Waiting for your answer», end to end with its real dependencies: the Hub of
+// this stack, its SaaS's gateway and, behind it, the e2e's provider
 // (assistant-provider.ts; the SaaS seeded with it, README «El asistente»). A real reservation is booked; an automation
 // that asks first, granted «Cancel a reservation», runs, and the worker asks the assistant (`workerAsks`), which wants
-// to cancel it. Its card was titled «The assistant wants to change something in «Reservations»» and never said
-// CANCEL: now, right under its title, it says «Cancel a reservation» to whoever reads it in English and «Anular una
+// to cancel it. Its card, titled «The assistant wants to change something in «Reservations»», says right under its
+// title «Cancel a reservation» to whoever reads it in English and «Anular una
 // reserva», under «El asistente quiere cambiar algo en «Reservas»», to whoever reads it in Spanish. A no cancels nothing,
 // and the History says what was refused by its action too («Cancelada: … contestó que no a «Anular una reserva».»), in
 // the language of whoever reads it, never «… a «El asistente quiere cambiar algo en «Reservas»»».
@@ -34,7 +34,7 @@ function saasSql(sql: string): string {
   return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, { cwd: REPO_DIR, encoding: 'utf8' }).trim();
 }
 
-/** The business's day `days` from now (Madrid in phase 1) and its weekday, Monday 0. */
+/** The business's day `days` from now (hub `a` is in Madrid) and its weekday, Monday 0. */
 function madridDay(days: number): { date: string; weekday: number } {
   const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date(Date.now() + days * 86_400_000));
   return { date, weekday: (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7 };
