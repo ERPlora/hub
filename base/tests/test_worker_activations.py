@@ -573,9 +573,11 @@ def test_an_app_asked_by_a_code_that_is_gone_fails_as_code_behind_after_ten_minu
     run_pass_at(now)
     assert row(a).state == CREATING  # a newer worker may still be coming: put off
 
+    later = now + dt.timedelta(minutes=2)  # past its wait of a minute
     with use_hub(fresh(a)):
-        AppActivation.objects.filter(host=a.slug, app=APP).update(changed_at=now - dt.timedelta(minutes=10))
-    run_pass_at(now + dt.timedelta(minutes=2))  # past its wait of a minute
+        # Asked for exactly ten minutes before the clock the pass stands at, so a longer threshold leaves it waiting.
+        AppActivation.objects.filter(host=a.slug, app=APP).update(changed_at=later - dt.timedelta(minutes=10))
+    run_pass_at(later)
 
     failed = row(a)
     assert (failed.state, failed.attempts) == (FAILED, 1)
