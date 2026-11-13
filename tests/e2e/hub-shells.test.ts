@@ -1,6 +1,6 @@
 // flow: hub-e2e-tenancy — hub#593: reservation-whatsapp.spec.ts played the worker's relay with a `manage.py shell` that
 // named no business, so it looked for the event in control's database and every viewport fell with
-// `OutboxEvent.DoesNotExist`, for a reason that was not the flow. Since each business has its own database (S2a), a
+// `OutboxEvent.DoesNotExist`, for a reason that was not the flow. Since each business has its own database, a
 // shell without `--hub` works on control (base/management/commands/shell.py): this keeps that from being an oversight.
 // A call without `--hub` has to be listed here with what it works on, exactly as many times as the file makes it.
 import { readdirSync, readFileSync } from 'node:fs';

@@ -2,7 +2,7 @@
 the hub it belongs to, never on the worker's fixed scope (``WORKER_SCOPE_SLUG``, the platform hub in production).
 
 In a hub with its own database the worker runs its tasks in that database and on its scope (``base.worker._hubs``,
-review of hub#471 C1; S3): a schedule of Flows firing at its time, or the carts Cart and checkout expires
+review of hub#471 C1): a schedule of Flows firing at its time, or the carts Cart and checkout expires
 (CART_CHECKOUT-F07), is told to that hub's live queries and to no other's (its History or its list of carts open on a
 screen re-runs without reloading). Real databases: the session's ``hub_a`` and ``hub_b``, committed
 (``transaction=True``).

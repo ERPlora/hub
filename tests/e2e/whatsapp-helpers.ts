@@ -186,7 +186,7 @@ const CHANNEL_BACKUP = 'e2e_backup_whatsapp_channel';
  *  ends its `afterAll` with `restorePhoto` (whatsapp-photo.test.ts says so). Called again before that, it keeps what
  *  it kept first. */
 export function keepPhoto(): void {
-  // Two tables since every hub has its own database (S2a): the photo next to the registry, the channel's row in `a`'s.
+  // Two tables since every hub has its own database: the photo next to the registry, the channel's row in `a`'s.
   psql(
     `set client_min_messages = warning; create table if not exists ${PHOTO_BACKUP} as ` +
       "select h.id, h.state, h.state_version from base_hub h where h.slug = 'a'",

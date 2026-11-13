@@ -1,4 +1,4 @@
-"""``hub_files``: the hub's file store (PLAN-HUB block 7), S3 in AWS and the disk locally.
+"""``hub_files``: the hub's file store, S3 in AWS and the disk locally.
 
 Terraform hands the Hub's task ``AWS_STORAGE_BUCKET_NAME`` (``erplora-prod-hubs``, ``erplora-pre-hubs``) and
 ``AWS_REGION`` (``aws/stacks/prod/apps.tf``), and the task role holds Get/Put/Delete on that bucket: no keys. The

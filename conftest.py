@@ -203,7 +203,7 @@ def legacy_fallback():
     test database (``base/tenancy/tests/legacy.py``).
 
     In production a hub's model or operation without ``use_hub`` fails (``HubContextMissing``) and a business without
-    its own database is not served (S5). The suite's older tests call operations and the ORM directly, in their own
+    its own database is not served. The suite's older tests call operations and the ORM directly, in their own
     threads too, for the local hubs ``a`` and ``b`` (``db_name=""``): here they fall back on control's test database,
     which also holds the tables of the hubs' apps (``LegacyTablesRouter``). The tenancy's own tests turn it off
     (``no_test_fallback``) and so do the ones of every way in (requests, the live executor, the print socket,
@@ -219,7 +219,7 @@ def legacy_fallback():
 
 @pytest.fixture(autouse=True)
 def legacy_worker(request, monkeypatch):
-    """The worker's loop serves only the hubs with their own database (S5). A test written before the tenancy that runs
+    """The worker's loop serves only the hubs with their own database. A test written before the tenancy that runs
     it on its businesses (on control's test database) gets a pass of its own instead of the one over control's outbox:
     their tasks and their events' relay (``base/tenancy/tests/legacy.py``, ``worker_pass``). Not for a test that runs as
     production (``no_test_fallback``) nor for the worker's own (``production_worker``)."""

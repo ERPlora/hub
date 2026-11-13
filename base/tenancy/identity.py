@@ -46,7 +46,7 @@ def verify(alias: str, hub_id: uuid.UUID) -> None:
 
 
 def write(alias: str, hub_id: uuid.UUID) -> None:
-    """Write the identity of the database behind ``alias``, made for the hub ``hub_id`` (its provisioning; S2)."""
+    """Write the identity of the database behind ``alias``, made for the hub ``hub_id`` (its provisioning)."""
     with connections[alias].cursor() as cursor:
         cursor.execute(
             f"INSERT INTO {IDENTITY_TABLE} (hub_id) VALUES (%s) ON CONFLICT DO NOTHING",

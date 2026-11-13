@@ -520,7 +520,7 @@ def test_a_hub_is_behind_when_an_app_it_has_is_not_at_the_codes_leaf():
 
 
 def test_a_hub_without_an_app_it_never_turned_on_is_not_behind():
-    """S3: an app's tables are made the first time its hub turns it on (``base.app.enable`` → the worker's
+    """An app's tables are made the first time its hub turns it on (``base.app.enable`` → the worker's
     ``ensure_schema``), never by ``migrate_hubs``: a hub with its own database that lacks one is up to date."""
     leaf = leaves()
     every = {label: leaf[label] for label in (*PLATFORM, *migrator.portable_apps())}

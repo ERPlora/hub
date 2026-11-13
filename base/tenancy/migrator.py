@@ -388,7 +388,7 @@ def is_behind(hub, code: CodeMigrations | None = None) -> bool:
     """Whether ``hub``'s database may lack a migration of this code, as control knows it (``Hub.schema_apps``).
 
     Behind: marked so, or the platform or any app it has not at the code's leaf (never confirmed counts). An app it
-    never turned on is not behind: its tables are made the first time it is (S3, ``base.app.enable`` → the worker's
+    never turned on is not behind: its tables are made the first time it is (``base.app.enable`` → the worker's
     :func:`ensure_schema`), never here. A label or a migration the code does not have (a later code's, after a rollback:
     the database is ahead) is not behind. Opens no database.
     """
@@ -805,7 +805,7 @@ def _migrate_hub_in_thread(hub) -> str | None:
 
 def _migrate_hub(hub) -> str | None:
     """``ensure_schema(hub)``: the platform and the apps its database has, at the leaf (never an app it never turned
-    on, S3); tried again on a lock timeout; ``None`` if done, else why it was left behind."""
+    on); tried again on a lock timeout; ``None`` if done, else why it was left behind."""
     attempt = 1
     while True:
         try:
