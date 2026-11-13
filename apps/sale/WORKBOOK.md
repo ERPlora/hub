@@ -849,10 +849,11 @@ Pasos:
    con ellas, detrás de las líneas, y «Cobrar» sigue a la vista. Lo mismo en la columna lateral de una pantalla igual
    de baja, como una tableta de 1024×600 con la franja (hub#787).
    En la columna lateral, si la cabecera, las pestañas y «Enviar comanda» no dejan sitio a una línea entera (una
-   tableta apaisada de 1024×600 o un portátil de 1280×560 sin la franja; una tableta de 1024×700 o 1024×768, o un
-   portátil de 1280×720, con ella), la columna se desplaza entera, en las dos pestañas, como el cajón del móvil, con
-   «Enviar comanda» fija abajo: se sube una línea y se lee entera sobre la barra. Donde la línea cabe, la cabecera y
-   las pestañas se quedan quietas y solo se desplazan las líneas (hub#820).
+   tableta apaisada de 1024×600 o 1024×700, o un portátil de 1280×560, sin la franja; una tableta de 1024×700 o
+   1024×768, o un portátil de 1280×720 o 1280×800, con ella), la columna se desplaza entera, en las dos pestañas,
+   como el cajón del móvil, con «Enviar comanda» fija abajo: se sube una línea y se lee entera sobre la barra. Donde
+   la línea cabe, la cabecera y las pestañas se quedan quietas y solo se desplazan las líneas (hub#820). En
+   cualquier tamaño, las dos pestañas se ven y se tocan enteras (hub#1435).
 3. Al pulsar «Cobrar» con algo pendiente, se envía primero a cocina y después se abre el cobro: nadie paga
    un plato que no se va a preparar. El aviso de la comanda también sale arriba, para poder tocar el teclado
    del cobro (SALE-F01) desde el primer momento. Si el envío falla, no se abre el cobro y se dice por qué.
