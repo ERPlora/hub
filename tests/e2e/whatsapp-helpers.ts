@@ -391,7 +391,7 @@ export async function metaHandsOver(request: APIRequestContext, body: string): P
 /** Meta's time now, in seconds. */
 export const metaNow = (): string => String(Math.floor(Date.now() / 1000));
 
-/** The screen of `flow` in the three sizes (APP-WHATSAPP_INBOX-1-<flow>-390|834|1440), once it settles and
+/** The screen of `flow` in the three sizes (`…-<flow>-390|834|1440`), once it settles and
  *  nothing scrolls sideways; `ready` waits for what the capture must show. Back to 1280×860 after. */
 export async function flowShots(page: Page, flow: string, ready: (page: Page) => Promise<void> = async () => {}): Promise<void> {
   for (const viewport of FLOW_VIEWPORTS) {

@@ -118,7 +118,7 @@ describe('SettingsCard', () => {
 
   it('the auto-close hour sits outside the list items, so its outline label is never cut', async () => {
     // An ion-item clips what pokes out of it: the md outline's stacked label, which sits on the top border, lost its
-    // upper half («Hora del cierre automático», FIX-CASH_REGISTER-SETUP-HOOKS). Printing's settings do the same.
+    // upper half («Hora del cierre automático»). Printing's settings do the same.
     const s = await setup();
     await s.result(OP, FACTORY);
     const hour = s.field('auto_close_time');

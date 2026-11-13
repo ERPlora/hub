@@ -1,5 +1,5 @@
 // @vitest-environment node
-// `pnpm typecheck` (package.json; CI runs it) type-checks the e2e suite too. Until 2026-10-17 the root
+// `pnpm typecheck` (package.json; CI runs it) type-checks the e2e suite too. Once the root
 // tsconfig.json left tests/e2e/ out, so a type error in a spec or a helper passed CI unseen. These tests read
 // the projects the script checks (one per chained `vue-tsc` run) and prove they hold every .ts of this
 // folder and report an error planted in a helper and in a spec.

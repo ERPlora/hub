@@ -1543,7 +1543,7 @@ _LAST = dt.datetime.max.replace(tzinfo=dt.UTC)
 
 
 def _tender_rank(grant: Grant, state: Balance) -> tuple:
-    """The order the till spends vouchers in (the old module's tie-break, ADR-0386)."""
+    """The order the till spends vouchers in (the old module's tie-break)."""
     return (
         state.max_uses is None,
         state.expires_at or _LAST,

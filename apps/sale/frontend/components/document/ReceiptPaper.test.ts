@@ -146,7 +146,7 @@ describe('ReceiptPaper', () => {
     expect(s.all('sale-receipt-line')).toEqual(['Corte 1 × 25,00 € Ya pagado · Bono 5 cortes 0,00 €']);
   });
 
-  it('prints a menu with each of its dishes on a line of its own under it (SALE-F12, hub#1165)', async () => {
+  it('prints a menu with each of its dishes on a line of its own under it (SALE-F12)', async () => {
     const sale = saleOut();
     const dish = (product_name: string, quantity = 1) => ({ product_id: product_name, product_name, quantity });
     const menu = {

@@ -366,7 +366,7 @@ def test_the_internal_saas_url_comes_from_the_environment(load_settings):
 
 def test_a_burst_of_pooled_connections_is_given_back_within_minutes(load_settings):
     # psycopg_pool closes one connection above min_size per max_idle, 600 s by default: a scanner
-    # burst on *.erplora.com (60 requests/s, 2026-10-18) left the idle hub web holding its 8 control
+    # burst on *.erplora.com (60 requests/s) left the idle hub web holding its 8 control
     # connections for over an hour. With 60 s it is back to one within 7 minutes; that one stays
     # open for the next request.
     pool = load_settings(**DEVELOPMENT_ENV)["DATABASES"]["default"]["OPTIONS"]["pool"]
@@ -559,7 +559,7 @@ def test_hub_base_domain_comes_from_the_environment(load_settings):
     # pre: <slug>.pre.erplora.com and hubs.pre.erplora.com; written in any case, with dots around.
     loaded = load_settings(**PRODUCTION_ENV, HUB_BASE_DOMAIN=".Pre.Erplora.com.")
     assert loaded["HUB_BASE_DOMAIN"] == "pre.erplora.com"
-    # Empty: no base domain, the hub is the Host's first label wherever it is (before 2026-10-14).
+    # Empty: no base domain, the hub is the Host's first label wherever it is.
     assert load_settings(**PRODUCTION_ENV, HUB_BASE_DOMAIN="")["HUB_BASE_DOMAIN"] == ""
 
 

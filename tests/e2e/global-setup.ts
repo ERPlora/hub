@@ -8,7 +8,7 @@
 // hubs `a` and `b` are ready in the registry (`seed_local_hubs --check`; without them every host is a 404), and last
 // that the stack's SaaS has the demo accounts the specs sign in with (`demo_seed` of the SaaS; one select on its
 // database, `STACK.saasDatabase`): on its fresh e2e database it has none, and every login failed on «The email address
-// and/or password you specified are not correct.» after 30 s (2026-10-28). The command it offers is erplora.com's
+// and/or password you specified are not correct.» after 30 s. The command it offers is erplora.com's
 // WhatsApp seed with this Hub's ids of `a` and `b`, never `demo_seed` alone, whose own ids that seed refuses.
 // Before all that it refuses more than one worker: `--workers=N` overrides `workers: 1` of playwright.config.ts, and
 // specs running at once on the one stack delete each other's data (2026-10-23: the agenda spec timed out).

@@ -11,7 +11,7 @@
 // --check` (the hub databases), which apply nothing, and aborts naming what is
 // pending and the command that applies it, `uv run python manage.py migrate && uv run python manage.py
 // migrate_hubs` from this checkout. It never migrates them (sessions share them): without it, a database
-// behind the code failed the specs with «not valid JSON» (2026-10-16).
+// behind the code failed the specs with «not valid JSON».
 //
 // Each run writes into its own folder, `.artifacts/test-results/<PW_RUN_ID>/` (traces, failure
 // screenshots and `results.json`, the JSON report), so a run never wipes another's evidence:

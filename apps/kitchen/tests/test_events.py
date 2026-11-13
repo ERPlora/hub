@@ -261,7 +261,7 @@ def test_a_printed_round_whose_check_is_deleted_in_the_till_prints_its_cancel_sl
 
 
 def test_a_line_voided_in_the_till_strikes_its_dish_and_prints_its_slip_through_the_relay(relay, clock, product):
-    """KITCHEN-F29 (hub#2640): the tick brings the voided line; its dish is struck with the reason, the rest of the
+    """KITCHEN-F29: the tick brings the voided line; its dish is struck with the reason, the rest of the
     round cooks on, and the station that had it on paper gets its void slip."""
     order = open_check("Table 4")
     add_line(order.id, product("Burger"))

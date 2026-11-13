@@ -1,4 +1,4 @@
-"""The «Call another system» step (WORKBOOK FLOW-F27; old hub HUB-F94, module flows-f16; hub#2659, hub#2675).
+"""The «Call another system» step (WORKBOOK FLOW-F27; old hub HUB-F94, module flows-f16).
 
 The other system is a real local HTTPS server (``local_https``). A step calls only an address whose origin
 the owner granted (``http:https://host``); the request that parks the run answers at once, and the worker

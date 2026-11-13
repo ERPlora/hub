@@ -1,9 +1,9 @@
 // flow: WHATSAPP_INBOX-F09
-// The WhatsApp inbox's counter of the bell (FIX-WHATSAPP_INBOX-SETUP-HOOKS; the old module's `bell`,
-// hub#1678; the old hub's bell, docs/reference/old-hub/notifications-*.png): on the Home of hub `a`, as its owner reads
+// The WhatsApp inbox's counter of the bell (the old module's `bell`,
+// the old hub's bell, docs/reference/old-hub/notifications-*.png): on the Home of hub `a`, as its owner reads
 // it in Spanish, a customer writes on WhatsApp and the bell's badge counts her without a reload; opened, the row
 // «Clientes de WhatsApp esperando respuesta (N)» leads to the inbox, where the owner answers her from the composer, and
-// the badge goes down by itself. In each of the three sizes, leaving the capture `FIX-WHATSAPP_INBOX-SETUP-HOOKS-<width>`
+// the badge goes down by itself. In each of the three sizes, leaving the capture `<KEY>-<width>`
 // with the bell open. erplora.com's pushes (the customer's message, the number connected) run as its doors do
 // (whatsapp-helpers.ts); nothing seeds erplora.com, so `a`'s photo stays as it was. What it creates (`e2e.` numbers and
 // names, the number's row) is removed before and after.

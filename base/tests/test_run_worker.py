@@ -4,7 +4,7 @@ SIGTERM (ECS stopping the task) and SIGINT (Ctrl-C) only ask ``base.worker.run``
 with its code, 0 within the 30 s of ECS's ``stopTimeout``. In-process, the test's own handlers stand
 guard, so a command that forgot to install or restore its own never stops pytest; then a real
 process, against this suite's databases, from the start line to SIGTERM, also when it starts before
-the SaaS has migrated the ``shared`` schema (the first deploy, 2026-10-14): it waits, running, and
+the SaaS has migrated the ``shared`` schema (as on the first deploy): it waits, running, and
 registers once the tables exist.
 """
 
@@ -304,7 +304,7 @@ def test_the_real_process_registers_the_apps_and_exits_0_on_sigterm():
 @pytest.mark.django_db(transaction=True, databases=["default", "shared"])
 @pytest.mark.usefixtures("shared_schema")
 def test_the_real_process_waits_running_until_the_saas_migrates_then_registers():
-    # The first deploy (2026-10-14): the worker started before saas-migrate created shared's tables.
+    # As on the first deploy: the worker started before saas-migrate created shared's tables.
     with connections["shared"].cursor() as cursor:
         cursor.execute('DROP TABLE "shared"."app_doc"')
         cursor.execute('DROP TABLE "shared"."app"')

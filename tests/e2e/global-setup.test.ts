@@ -1,4 +1,4 @@
-// The e2e's start (global-setup.ts) refuses local databases with unapplied migrations: on 2026-10-16 the
+// The e2e's start (global-setup.ts) refuses local databases with unapplied migrations: once the
 // local `hub` lacked verifactu.0003–0005 and the specs failed with «not valid JSON» (the `post` helper got
 // Django's HTML error page), a red that never said its cause. The check never applies anything: the
 // database is shared with other sessions.
@@ -439,7 +439,7 @@ describe('psqlOn', () => {
 
 // flow: none — the Hub's e2e harness (`tests/e2e/global-setup.ts`): a shared stack takes no `--workers` above 1.
 // `--workers=N` on the command line overrides `workers: 1` of playwright.config.ts, and Playwright hands globalSetup the
-// resolved count (`--workers=2` → 2, `50%` → half the cores). On 2026-10-23 `--workers=2` ran two specs at once on the one
+// resolved count (`--workers=2` → 2, `50%` → half the cores). Once `--workers=2` ran two specs at once on the one
 // stack: appointment-employee.spec.ts deleted `E2E Apt%`, the rows appointment-agenda.spec.ts was using, and the agenda
 // spent its 180 s waiting for them. The run stops before any check touches a database.
 describe('globalSetup', () => {

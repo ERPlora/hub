@@ -54,7 +54,7 @@ describe('the tabs of Apps', () => {
     expect(appsOfTab(APPS, 'paid').map((row) => row.id)).toEqual(['customer', 'invoice', 'stock']);
   });
 
-  it('a free app never shows under «Paid» (hub#2655: «Free» in the paid tab)', () => {
+  it('a free app never shows under «Paid»', () => {
     expect(appsOfTab([TAX, app('sale')], 'paid')).toEqual([]);
   });
 

@@ -220,7 +220,7 @@ test('INVENTORY-F19: the settings save and say so', async ({ page, context }) =>
     await expect(field).not.toHaveClass(/ion-invalid/);
     await expect(field.locator('.error-text')).toBeHidden();
     await threshold.blur();
-    // hub#2224: on a phone the threshold keeps a field's width, never one letter per line.
+    // On a phone the threshold keeps a field's width, never one letter per line.
     await page.setViewportSize({ width: 390, height: 844 });
     expect((await threshold.boundingBox())!.width).toBeGreaterThan(200);
     await shootFlow(page, 'INVENTORY-F19');

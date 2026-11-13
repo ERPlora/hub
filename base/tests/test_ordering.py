@@ -1,4 +1,4 @@
-"""The order of a list that sorts both ways (``base/ordering.py``, the rule of hub#2355)."""
+"""The order of a list that sorts both ways (``base/ordering.py``)."""
 
 from django.db.models import F
 from django.db.models.functions import Lower

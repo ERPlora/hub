@@ -1,8 +1,8 @@
 """WHATSAPP_INBOX-F09 on the Home's bell and on the device (PLAN-HUB rounds 2026-10-21 and 2026-10-23): base's
 ``base.bell.counters`` shows «WhatsApp customers waiting for an answer» while an open conversation's last message is
 the customer's, and leads to the inbox; at zero it is not shown. ``base.notice.list`` tells the device of each
-customer left waiting (hub#2303), and whoever reads the inbox hears it, so the installed app asks to notify for a
-business that only uses WhatsApp (hub#2306). Every change of the number records an event the counter is refreshed on,
+customer left waiting, and whoever reads the inbox hears it, so the installed app asks to notify for a
+business that only uses WhatsApp. Every change of the number records an event the counter is refreshed on,
 and a message in hub B re-runs the bell on B's channel only.
 
 base, Customers and the inbox run for real: the counter and the notice come from WhatsappInboxConfig through base's
@@ -153,7 +153,7 @@ def test_every_event_it_is_refreshed_on_changes_the_number():
     assert set(awaiting_reply().refresh_on) == set(CHANGES)
 
 
-# ── The device's notices (hub#2303, hub#2306) ────────────────────────────────────────────────────────────────────
+# ── The device's notices ─────────────────────────────────────────────────────────────────────────────────────────
 
 
 def notices(ctx=None) -> list[dict]:
@@ -195,7 +195,7 @@ def test_once_answered_it_is_no_longer_told():
 
 @pytest.mark.django_db
 def test_whoever_reads_the_inbox_hears_it_so_the_app_asks_to_notify():
-    """hub#2306: a business that only uses WhatsApp is asked to let the app notify (base asks where ``sources`` names
+    """A business that only uses WhatsApp is asked to let the app notify (base asks where ``sources`` names
     some notice); whoever cannot read the inbox neither hears it nor is asked for it."""
     assert "whatsapp_inbox.awaiting_reply" in sources(ctx_for("hub_employee"))
     assert sources(only("whatsapp_inbox.view")) == ["whatsapp_inbox.awaiting_reply"]

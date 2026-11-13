@@ -100,7 +100,7 @@ def test_a_receipt_printer_alone_is_not_enough_the_device_that_prints_it_ticks_i
 
 @pytest.mark.django_db
 def test_the_manager_who_sets_printers_up_is_told_and_the_employee_is_not():
-    # Recommended, never ⛔: who cannot set a printer up is not told (base's rule; hub#435 is for the wall only).
+    # Recommended, never ⛔: who cannot set a printer up is not told (base's rule; only a pending ⛔ is told to all).
     assert step(ctx_for("hub_manager"))["state"] == "pending"
     assert step(ctx_for("hub_employee")) is None
 

@@ -83,7 +83,7 @@ const planUrl = computed(() => (isWeb.value && mayManage.value ? (data.value?.pl
 const pending = ref<string | null>(null);
 /** The plan's limit the last «Turn on» hit; cleared by the next change. */
 const limitHit = ref<number | null>(null);
-/** Why the last change was refused; on screen until it is closed or the next change (hub#2594). */
+/** Why the last change was refused; on screen until it is closed or the next change. */
 const refusal = ref<string | null>(null);
 
 /** The apps turned on, as «My apps» lists them (those born on and those brought along included), and, against the

@@ -167,7 +167,7 @@ def test_refusals_come_in_the_envelope_with_their_field(admin_client):
 
 @pytest.mark.django_db
 def test_a_refusal_comes_in_the_request_s_language_under_its_field(admin_client):
-    """hub#1570 (PRICING-F10, also F02 and F05): a business refusal reaches a Spanish caller in Spanish, the
+    """PRICING-F10, also F02 and F05: a business refusal reaches a Spanish caller in Spanish, the
     message and its field alike."""
     make_list("VIP")
     duplicate = post(admin_client, "/pricing/price_lists", {"code": "vip", "name": "Otra"}, HTTP_ACCEPT_LANGUAGE="es")

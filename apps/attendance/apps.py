@@ -66,7 +66,7 @@ class AttendanceConfig(LiveAppConfig):
         ),
     ]
     # The Home's panel «Clocked in now» (ATTENDANCE-F11), on the count of what Records lists, in every business.
-    # A KPI says its name once, in its title (hub#1105).
+    # A KPI says its name once, in its title.
     widgets = [
         Widget(
             key="clocked_in_now",

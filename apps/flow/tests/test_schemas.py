@@ -226,7 +226,7 @@ def test_a_step_reads_only_what_an_earlier_step_left():
 
 
 def test_a_condition_compares_only_with_data_it_already_has():
-    # hub#1712: the second datum of a comparison is a reference like any other.
+    # The second datum of a comparison is a reference like any other.
     later = [
         {"id": "s1", "kind": "condition", "when": {"input.total": {"gt": "steps.s2.total"}}},
         COMMAND | {"id": "s2"},
@@ -377,7 +377,7 @@ ASSISTANT = {"id": "s1", "kind": "assistant", "prompt": "Answer {{input.name}} w
 
 
 def test_an_assistant_step_keeps_its_task_its_tools_how_it_changes_things_and_its_rounds():
-    # FLOW-F37 (was refused while the Hub had no assistant: the test above, before 2026-10-28): «Ask the assistant»
+    # FLOW-F37: «Ask the assistant»
     # is a step; by default a change it wants waits for a person (old module's policy) and it has 6 rounds.
     kept = schemas.CreateIn.model_validate({"steps": [ASSISTANT | {"tools": ["task.task.list", "task.task.create"]}]})
     step = kept.steps[0]

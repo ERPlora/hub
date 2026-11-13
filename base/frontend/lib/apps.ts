@@ -35,7 +35,7 @@ export function isWanted(app: AppRow): boolean {
 }
 
 /** The rows of a tab: the apps the business turned on (on, or being set up), every app, or the paid ones (never a free
- *  one: hub#2655). */
+ *  one). */
 export function appsOfTab(apps: readonly AppRow[], tab: AppsTab): AppRow[] {
   if (tab === 'mine') return apps.filter(isWanted);
   if (tab === 'paid') return apps.filter((app) => app.premium);

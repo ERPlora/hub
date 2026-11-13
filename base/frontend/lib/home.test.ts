@@ -162,7 +162,7 @@ describe('checklistView', () => {
     const items = [item('base.apps'), item('base.team'), item('x.ours', { state: 'unavailable' })];
     const view = checklistView(status(items), { alreadyOnScreen: ['base.apps', 'x.ours'] });
     expect(view.rows.map((i) => i.key)).toEqual(['base.team', 'x.ours']);
-    // Expanded means «everything left to do»: nothing is deduplicated there (hub#487).
+    // Expanded means «everything left to do»: nothing is deduplicated there.
     const all = checklistView(status(items), { alreadyOnScreen: ['base.apps'], expanded: true });
     expect(all.rows.map((i) => i.key)).toEqual(['base.apps', 'base.team', 'x.ours']);
     expect(all.hidden).toBe(0);

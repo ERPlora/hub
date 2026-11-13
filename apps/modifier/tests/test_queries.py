@@ -163,7 +163,7 @@ def test_each_read_by_id_asks_to_see_the_modifiers(read):
 
 
 def test_tied_groups_follow_the_list_s_direction():
-    """hub#2355: groups tied on the sorted column come by name in the list's own direction, never always
+    """Groups tied on the sorted column come by name in the list's own direction, never always
     ascending; a descending list is the ascending one read backwards, ties included."""
     # Created out of name order, so that the name tie-break is not the id one (names are unique).
     for name in ("Beta", "Gamma", "Alpha"):
@@ -207,7 +207,7 @@ def test_the_options_of_a_group_or_all_with_their_tax_category_in_the_readers_la
 
 
 def test_tied_options_follow_the_list_s_direction():
-    """hub#2355: options tied on the sorted column come by name, then by id, in the list's own direction;
+    """Options tied on the sorted column come by name, then by id, in the list's own direction;
     the whole catalog by its groups too, so «-sort_order» is «sort_order» read backwards."""
     group("Sauces")
     group("Extras")

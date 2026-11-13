@@ -104,7 +104,7 @@ class CashRegisterConfig(LiveAppConfig):
     # CASH_REGISTER-F12: the open session's expected cash, to whoever may see it on a blind count (F07), and the
     # differences of the last eight closed sessions, to whoever reads the sessions.
     widgets = [
-        # A KPI says its name once, in its title (hub#1105); money is in the hub's currency.
+        # A KPI says its name once, in its title; money is in the hub's currency.
         Widget(
             key="current_session",
             title=_("Cash register (current session)"),

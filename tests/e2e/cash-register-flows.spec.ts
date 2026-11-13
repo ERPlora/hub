@@ -35,7 +35,7 @@ async function flowShots(page: Page, flow: string, ready: (page: Page) => Promis
     await page.setViewportSize({ width: size.width, height: size.height });
     await ready(page);
     // A new size relays the shell out (menu, tabs): one page header on screen once it settled, never a
-    // second copy of the page under the first (hub#1987 saw one on Android).
+    // second copy of the page under the first (as seen on Android).
     await expect
       .poll(() =>
         page.evaluate(

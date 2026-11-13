@@ -1,5 +1,5 @@
 // BASE-F05 — Android's Back button on the installed app (ported from the old hub's
-// `apps/web/src/router/back-closes-overlay.ts` and its test, origin/develop).
+// `apps/web/src/router/back-closes-overlay.ts` and its test).
 //
 // On the installed app Tauri's Android activity turns the system Back into `webView.goBack()` — but ONLY while nobody
 // listens to its `back-button` event. Nobody in the Hub did: an app opened cold (a link, a reload) CLOSED the app on

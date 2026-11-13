@@ -290,7 +290,7 @@ def test_the_sort_and_the_pages(person, clock):
 
 
 def test_ties_go_by_id_in_the_lists_own_direction(person, clock):
-    """hub#684 (the rule of hub#2355, as in Sales, Cash register, Inventory and Tasks): a descending list is
+    """hub#684 (as in Sales, Cash register, Inventory and Tasks): a descending list is
     the ascending one read backwards, ties included, and its pages neither repeat nor lose rows. Same person,
     day, status and (empty) clock-out: only the id tells these days apart."""
     clock(NOW)

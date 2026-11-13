@@ -3,7 +3,7 @@ the printer, made here at the door so a document that would come out wrong is re
 (WORKBOOK «Contrato con la plataforma»).
 
 The bytes are the app's (``crates/peripherals/src/escpos.rs`` of ERPlora/app, ``erplora_print``): the
-document travels structured, never rendered on the server (hub#501). This file holds no ORM.
+document travels structured, never rendered on the server. This file holds no ORM.
 """
 
 import json

@@ -60,7 +60,7 @@ test('390 / 834 / 1440: the way to the menu, the ⠿ apps and no Back in the top
     await customersReady(page);
     await page.waitForTimeout(400);
 
-    // hub#690: on a phone (ios) the icons covered the title.
+    // On a phone (ios) the icons covered the title.
     const title = (await bar.title.boundingBox())!;
     const boxes = { menu: (await menuDoor.boundingBox())!, apps: (await bar.apps.boundingBox())! };
     results[vp.label] = { title, ...boxes };

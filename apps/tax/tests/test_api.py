@@ -323,7 +323,7 @@ def test_a_calculation_without_a_rule_is_a_409(admin_client):
 def test_rules_that_cannot_be_read_are_an_internal_error_never_a_missing_app(
     admin_client,
 ):
-    # hub#1102, hub#2410: an outage reading the rules stops the calculation with the plain «Internal
+    # An outage reading the rules stops the calculation with the plain «Internal
     # error» of every route (in the reader's language), never «this app is not active» nor the
     # internal text of the failure, and never a guessed rate.
     from django.db import connection

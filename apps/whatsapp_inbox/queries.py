@@ -137,7 +137,7 @@ _TEMPLATE_REASONS = {
 
 #: What a phone typed in the search box may hold besides digits.
 _PHONE_TEXT = re.compile(r"^[\d\s+().\-/]+$")
-#: erplora.com's plans (its Store), where the owner upgrades for more WhatsApp messages (ADR-0474: no packs).
+#: erplora.com's plans (its Store), where the owner upgrades for more WhatsApp messages (no packs).
 PLANS_PATH = f"{SAAS_PANEL_PATH}/store/plans"
 
 

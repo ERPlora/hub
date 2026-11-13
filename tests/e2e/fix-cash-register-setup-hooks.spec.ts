@@ -1,11 +1,11 @@
 // flow: CASH_REGISTER-F01 CASH_REGISTER-F12
-// Cash register's hooks of the Home (FIX-CASH_REGISTER-SETUP-HOOKS; the old module's `setup` and `widgets`, the old
+// Cash register's hooks of the Home (the old module's `setup` and `widgets`, the old
 // hub's dashboard in docs/reference/old-hub/dashboard-*.png), as the owner of hub `a` reads them in Spanish: «Tu caja»
 // pending and «Recomendado» in «Termina de configurar tu negocio» while the drawer runs on its factory values, done
 // without a reload once the settings are saved (also as they came, from the «Configurar» it leads to);
 // «Caja (sesión actual)» on the board by default with the open session's expected cash as the server gives it, which
 // moves with a cash movement; «Descuadres recientes» to add, with a bar per closed session; and an employee, who counts
-// blind, never gets the expected cash panel. Captures `FIX-CASH_REGISTER-SETUP-HOOKS-CASH_REGISTER-F01-<width>` (the
+// blind, never gets the expected cash panel. Captures `<KEY>-CASH_REGISTER-F01-<width>` (the
 // step) and `…-CASH_REGISTER-F12-<width>` (the two panels).
 // The hub's settings row is parked for the run and put back after it; the sessions this file opens (`E2E …` notes)
 // are deleted after it, with their movements and counts. A shift an earlier run left open is closed first (one drawer

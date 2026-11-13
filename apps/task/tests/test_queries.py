@@ -279,7 +279,7 @@ def test_pages():
 
 
 def test_ties_in_the_sorted_column_come_by_id_so_a_touched_row_keeps_its_place_and_pages_add_up():
-    """hub#2352: sorting by a column with repeated values, the row you touched jumped and paging
+    """Sorting by a column with repeated values, the row you touched jumped and paging
     repeated or lost rows. Same priority, status and (empty) due date: the id settles every tie, in
     the list's own direction (the next test)."""
     tied = [make_task(f"Tie {n}") for n in range(6)]
@@ -299,7 +299,7 @@ def test_ties_in_the_sorted_column_come_by_id_so_a_touched_row_keeps_its_place_a
 
 
 def test_ties_go_by_id_in_the_lists_own_direction():
-    """hub#2355 (the old product's rule, 2026-09-28; Sales, Cash register and Inventory follow it): a
+    """As in Sales, Cash register and Inventory (the old product's rule): a
     descending list settles its ties by id descending, an ascending one ascending — never always ascending."""
     by_id = sorted(make_task(f"Tie {n}").id for n in range(4))
 
@@ -313,7 +313,7 @@ def test_ties_go_by_id_in_the_lists_own_direction():
 
 
 def test_tied_projects_go_by_id_in_the_lists_own_direction():
-    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
+    """hub#768: a descending list is the ascending one read backwards, ties included, and its
     pages neither repeat nor lose rows."""
     by_id = sorted(make_project(f"Tie {n}").id for n in range(4))
     assert_reads_backwards(listed_with(run, "task.project.list", "is_active"), by_id)

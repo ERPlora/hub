@@ -116,7 +116,7 @@ def _tied_packages():
     ],
 )
 def test_ties_read_backwards_in_a_descending_list(operation, schema, tied, column):
-    """hub#768 (the rule of hub#2355, as in Customers): a descending list is the ascending one read backwards, ties
+    """hub#768 (as in Customers): a descending list is the ascending one read backwards, ties
     included, and its pages neither repeat nor lose rows. A live name is unique, so the name settles these ties."""
     assert_reads_backwards(listed_with(run, operation, column, schema=schema), tied())
 

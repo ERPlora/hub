@@ -7,7 +7,7 @@ A port of the old Hub's ``crates/runtime/src/scheduler.rs``. Every ``LiveAppConf
   (``system_context``), never as a person;
 - ``cron`` has five fields (minute, hour, day of the month, month, day of the week) and is read in
   UTC, whatever the business's zone: a programmer writes it months before anybody knows where the
-  hub is (hub#731);
+  hub is;
 - ``catch_up`` is ``"collapse"``: the times missed while the worker was stopped run once, then the
   task goes on from the next time after now.
 

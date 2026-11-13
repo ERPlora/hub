@@ -114,7 +114,7 @@ def test_an_employee_reads_and_a_role_without_tax_does_not(no_seed):
         run("tax.category.list", CategoryListIn(), role="nobody")
 
 
-# Money: whole cents, exact decimals, half up (ADR-0123 of the current product)
+# Money: whole cents, exact decimals, half up
 
 
 @pytest.mark.parametrize(
@@ -928,7 +928,7 @@ def _tied_rules():
     ],
 )
 def test_ties_read_backwards_in_a_descending_list(no_seed, operation, schema, tied, column):
-    """hub#768 (the rule of hub#2355, as in Customers): a descending list is the ascending one read backwards, ties
+    """hub#768 (as in Customers): a descending list is the ascending one read backwards, ties
     included, and its pages neither repeat nor lose rows. Each list breaks a tie by its natural key, then the id."""
     listed = listed_with(run, operation, column, schema=schema, by_dir=True)
     assert_reads_backwards(listed, tied())
@@ -1099,7 +1099,7 @@ def test_the_seeded_business_sells_in_spain():
 
 
 def test_only_tax_resolves_a_rule():
-    # hub#295: the rule of a line was resolved in three places and one charged what another declared.
+    # The rule of a line was resolved in three places and one charged what another declared.
     # Sales and Invoicing call resolve_tax / calculate_tax; no other app looks rules up by itself (a
     # frozen rule read back by its id is not a lookup).
     import re
