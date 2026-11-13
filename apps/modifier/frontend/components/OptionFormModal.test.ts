@@ -54,6 +54,16 @@ async function setup(option: OptionOut | null = null, locale: 'en' | 'es' = 'en'
   return { ...m, field, save, tax };
 }
 
+const TOO_MANY_DEFAULTS = 'This group has more options chosen by default than its maximum.';
+
+/** «Mustard», switched on as chosen by default, is created, and the server refuses it under `fields`. */
+async function createADefaultTooMany(s: Awaited<ReturnType<typeof setup>>, fields: Record<string, string> = { is_default: TOO_MANY_DEFAULTS }) {
+  s.answer(409, { error: { code: 'modifier.too_many_defaults', message: TOO_MANY_DEFAULTS, fields } });
+  await ionValue(s.field('name'), 'Mustard', 'ionInput');
+  await ionChecked(s.field('is_default'), true);
+  await click(s.save());
+}
+
 describe('OptionFormModal: New option', () => {
   it('asks for name, kitchen name, supplement, own tax category, default and order', async () => {
     const s = await setup();
@@ -124,12 +134,25 @@ describe('OptionFormModal: New option', () => {
   });
   it('more defaults than the group’s maximum is said under «Chosen by default»', async () => {
     const s = await setup();
-    const message = 'This group has more options chosen by default than its maximum.';
-    s.answer(409, { error: { code: 'modifier.too_many_defaults', message, fields: { is_default: message } } });
-    await ionValue(s.field('name'), 'Mustard', 'ionInput');
-    await ionChecked(s.field('is_default'), true);
-    await click(s.save());
-    expect(s.inDoc('modifier-option-form-is_default-error')?.textContent).toContain(message);
+    await createADefaultTooMany(s);
+    expect(s.inDoc('modifier-option-form-is_default-error')?.textContent).toContain(TOO_MANY_DEFAULTS);
+  });
+
+  it('switching «Chosen by default» off takes its refusal away at once, before saving again (hub#1437)', async () => {
+    const s = await setup();
+    await createADefaultTooMany(s);
+    expect(s.inDoc('modifier-option-form-is_default-error')).not.toBeNull();
+    await ionChecked(s.field('is_default'), false);
+    expect(s.inDoc('modifier-option-form-is_default-error')).toBeNull();
+    expect(s.sent()).toHaveLength(1);
+  });
+
+  it('switching «Chosen by default» takes only its own refusal away: the name’s stays', async () => {
+    const s = await setup();
+    const taken = 'There is already an option with this name in the group.';
+    await createADefaultTooMany(s, { name: taken, is_default: TOO_MANY_DEFAULTS });
+    await ionChecked(s.field('is_default'), false);
+    expect([s.field('name').errorText, s.inDoc('modifier-option-form-is_default-error')]).toEqual([taken, null]);
   });
 });
 

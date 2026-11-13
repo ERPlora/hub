@@ -215,6 +215,7 @@ const canDismiss = useUnsavedFormOnOpen(
         />
         <ion-toggle
           data-testid="modifier-option-form-is_default"
+          name="is_default"
           :checked="form.isDefault"
           label-placement="end"
           justify="start"

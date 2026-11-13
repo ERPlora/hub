@@ -21,6 +21,7 @@ from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 
 from base.images import MAX_UPLOAD_BASE64
+from base.recovery import RecoveredOut
 from base.schemas import CatalogImageOut, exactly_one, names
 
 T = TypeVar("T")
@@ -767,6 +768,10 @@ class ServiceRecoverIn(ServiceIn):
     assignments: list[AssignmentOfCopyIn] = Field(
         [], max_length=MAX_PERFORMERS, description="Who performed it in the copy."
     )
+
+
+class ServiceRecoveredOut(ServiceOut, RecoveredOut):
+    """A service made again from a separate copy, and who of those who performed it there it came back without."""
 
 
 class AssignmentOut(Schema):

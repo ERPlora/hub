@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:33f187a165d9a24ad3588ff217656887eac67fcb2086265474793b706ef99d5a -->
+<!-- generated from WORKBOOK.md sha256:dbe682f8d4fde8e9cc9f0915a0d7d281c1e1fccbfd09233d04394e1dae8bdfd4 -->
 
 ## What it is for and who it is for
 
@@ -2937,9 +2937,8 @@ appointments, the repeating appointments and the price list prices; making and d
 procedure "Devolver un negocio a un momento" of ERPlora/aws; the group, tag or own field the business deleted after
 deleting a customer who comes back, hub#1356; the image of a product deleted before deleting left it, hub#1431; the page
 "Recover into the business…" naming the exception of what goes back into a recovered category, hub#1364; the image of a
-service brought back, hub#1429; Recoveries naming the professional who does not come back with their service, hub#1375;
-the modifier groups and the menu options of a product that comes back, hub#1343; the price list prices of a product that
-comes back as a new one, hub#1442)
+service brought back, hub#1429; the modifier groups and the menu options of a product that comes back, hub#1343; the
+price list prices of a product that comes back as a new one, hub#1442)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -2986,7 +2985,9 @@ Steps:
       was asked and when.
   11. A few minutes later it says "Done" and what came back, each thing apart and by its name: "Customers: 1
       restored, 2 created" or "Customers: 2 created, 1 not created". Its page also says which did not come back and why (by their identifier in the copy,
-      without personal data). A customer the business deleted and still holds comes back THE SAME card, with their
+      without personal data). If one came back without something it had, its count says so ("Services: 2 created, 1
+      with notes") and its page, under "notes", what it lacks and why, by its identifier in the copy. A customer the
+      business deleted and still holds comes back THE SAME card, with their
       purchases and what was spent, their consents, notes and activity, their groups, tags and own fields and their
       linked orders (CUSTOMER-F33). One the business no longer has comes back as a new card, created as the Customers
       screen creates it, with their name, contact, tax ID, address, dates, source, stage, channel and notes, and with their
@@ -3026,7 +3027,9 @@ Steps:
       business still has on its staff, each with their own minutes and price, assigned as Services assigns them
       (SERVICE-F31): as their main service if the business has not given them another since, and switched off if it
       was. Someone Staff terminated, or the business no longer has, is not assigned, because they can no longer be
-      booked (Recoveries does not name them yet, hub#1375). Without its image (hub#1429). An archived one is still in
+      booked, and Recoveries says so in the service's notes ("service.member_terminated: came back without the
+      professional <their identifier>: terminated in Staff", or "…: no longer in Staff"). Without its image
+      (hub#1429). An archived one is still in
       the business and does not come
       back (it is restored in Services), nor does one the copy had archived, and one the business has already made again
       (another with the same name in the same category, not itself one of the copy's; each counts for one only, so two

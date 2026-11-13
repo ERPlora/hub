@@ -3067,9 +3067,8 @@ las citas periódicas y los precios de tarifa; crear y borrar el clúster tempor
 a un momento» de ERPlora/aws; el grupo, la etiqueta o el campo propio que el negocio borró después de eliminar un cliente que
 vuelve, hub#1356; la imagen de un producto eliminado antes de que eliminar se la dejara, hub#1431; que la página
 «Recuperar en el negocio…» nombre la excepción de lo que vuelve a una categoría recuperada, hub#1364; la imagen de un
-servicio recuperado, hub#1429; que Recuperaciones nombre al profesional que no vuelve con su servicio, hub#1375; los
-grupos de suplementos y las opciones de menú de un producto que vuelve, hub#1343; los precios de tarifa de un producto
-que vuelve como uno nuevo, hub#1442)
+servicio recuperado, hub#1429; los grupos de suplementos y las opciones de menú de un producto que vuelve, hub#1343;
+los precios de tarifa de un producto que vuelve como uno nuevo, hub#1442)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
 copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
@@ -3114,7 +3113,9 @@ Pasos:
       Recuperaciones la ve «Pedida» con la copia, qué se pidió y cuándo.
   11. Unos minutos después dice «Hecha» y qué volvió, cada cosa aparte y con su nombre: «Clientes: se restauró 1, se
       crearon 2» o «Clientes: se crearon 2, 1 sin crear». Su ficha dice además cuáles no volvieron y por qué (por su identificador en la copia, sin datos
-      personales). Un cliente que el negocio eliminó y aún guarda vuelve LA MISMA ficha, con sus compras y lo gastado, sus
+      personales). Si uno volvió sin algo de lo que tenía, su cuenta lo dice («Servicios: se crearon 2, 1 con notas») y
+      su ficha, en «notas», qué le falta y por qué, por su identificador en la copia. Un cliente que el negocio eliminó y
+      aún guarda vuelve LA MISMA ficha, con sus compras y lo gastado, sus
       consentimientos, notas y actividad, sus grupos, etiquetas y campos propios y sus pedidos enlazados (CUSTOMER-F33).
       Uno que el negocio ya no tiene vuelve como ficha nueva, creada como la crea la pantalla de Clientes, con su nombre,
       contacto, NIF, dirección, fechas, origen, etapa, canal y notas, y con sus grupos, etiquetas y campos propios: el
@@ -3156,8 +3157,9 @@ Pasos:
       y si no, la que acaba de volver o la que el negocio volvió a crear con su nombre; y con los profesionales que lo
       hacían y el negocio sigue teniendo de alta, cada uno con sus minutos y su precio propios, asignados como los asigna
       Servicios (SERVICE-F31): como su servicio principal si el negocio no le ha dado otro desde entonces, y apagado si lo
-      estaba. A quien Personal dio de baja, o el negocio ya no tiene, no se le asigna, porque ya no se le puede reservar
-      (Recuperaciones aún no lo nombra, hub#1375). Sin su imagen (hub#1429). Uno archivado sigue
+      estaba. A quien Personal dio de baja, o el negocio ya no tiene, no se le asigna, porque ya no se le puede reservar,
+      y Recuperaciones lo dice en las notas del servicio («service.member_terminated: volvió sin el profesional <su
+      identificador>: dado de baja en Personal», o «…: ya no está en Personal»). Sin su imagen (hub#1429). Uno archivado sigue
       en el negocio y no vuelve (se restaura en Servicios), tampoco uno que la copia tenía archivado, y no se repite uno
       que el negocio ya volvió a crear (otro con el mismo nombre en la misma categoría, que no sea ya uno de la copia; cada
       uno vale por uno solo, así que dos servicios con el mismo nombre vuelven los dos). Pedirlo otra vez no crea nada
