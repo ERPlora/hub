@@ -54,17 +54,21 @@ describe('the Sales, Kitchen and Tables specs and the till’s cart', () => {
 
 // Every tile of the till's grid (product, service, menu, «Open price») is PosItemTile.vue, an Ionic button: a spec that
 // looked for the grid's `button` children found none and stayed red while the menus still went first (hub#1363).
-let gridScan: Promise<[name: string, text: string][]> | undefined;
+let e2eScan: Promise<[name: string, text: string][]> | undefined;
 
-/** The specs and helpers of the e2e that read the till's grid, with their text: the e2e's files read once, off the
- *  worker's thread. */
-function gridReaders(): Promise<[name: string, text: string][]> {
-  gridScan ??= (async () => {
+/** The specs and helpers of the e2e with their text, read once, off the worker's thread. */
+function e2eFiles(): Promise<[name: string, text: string][]> {
+  e2eScan ??= (async () => {
     const names = readdirSync(E2E_DIR).filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'));
     const texts = await readTexts(names.map((name) => join(E2E_DIR, name)));
-    return names.map((name, index): [string, string] => [name, texts[index]]).filter(([, text]) => /pos-grid|tillGrid\(|expectFirstTile\(/.test(text));
+    return names.map((name, index): [string, string] => [name, texts[index]]);
   })();
-  return gridScan;
+  return e2eScan;
+}
+
+/** The specs and helpers of the e2e that read the till's grid, with their text. */
+async function gridReaders(): Promise<[name: string, text: string][]> {
+  return (await e2eFiles()).filter(([, text]) => /pos-grid|tillGrid\(|expectFirstTile\(/.test(text));
 }
 
 /** The lines of `source` that look for a tile of the grid as a native button. */
@@ -92,5 +96,37 @@ describe('the till’s grid in the e2e', () => {
     const root = /<template>\s*<([\w-]+)\b[^>]*?\sclass="([\w-]+)"/.exec(read(POS_ITEM_TILE));
     expect(root?.slice(1)).toEqual(['ion-button', 'pos-tile']);
     expect(read(join(E2E_DIR, 'sale-helpers.ts'))).toContain(`const TILL_TILE = ':scope > ${root?.[1]}.${root?.[2]}';`);
+  });
+});
+
+// A tile's photo is read as the person sees it, by its item's name (`tilePhotoLoaded`), and its initials by
+// ItemImage.vue's own mark. A spec that read them through a style class of the tile went red on a restyle while the till
+// still showed every photo, and as the e2e does not run on every change, it stopped watching the photo unnoticed.
+
+/** The lines of `source` that read a tile's photo or initials through a style class of the tile. */
+function pictureByStyleClass(source: string): string[] {
+  return source
+    .split('\n')
+    .filter((line) => /\.pos-[\w-]+__[\w-]+\s+img\b|photoLoaded\([^\n]*['"`]\.pos-[\w-]+__|\.locator\(\s*['"`]\.pos-[\w-]+__thumb\b/.test(line));
+}
+
+describe('the photo of a till tile in the e2e', () => {
+  it('there are specs that read a tile’s photo to look at, a product’s, a service’s and a menu’s', async () => {
+    const readers = (await e2eFiles()).filter(([, text]) => /\btilePhotoLoaded\(/.test(text)).map(([name]) => name);
+    expect(readers).toEqual(expect.arrayContaining(['inventory-photo.spec.ts', 'service-photo.spec.ts', 'combo-photo.spec.ts']));
+  }, NO_CLOCK);
+
+  it('no spec reads a tile’s photo or initials through a style class of the tile: they call tilePhotoLoaded', async () => {
+    const offenders = (await e2eFiles()).flatMap(([name, text]) => pictureByStyleClass(text).map((line) => `${name}: ${line.trim()}`));
+    expect(offenders).toEqual([]);
+  }, NO_CLOCK);
+
+  it('the check reads a copy of the old pattern as one', () => {
+    expect(pictureByStyleClass("    await expect(tile.locator('.pos-menu__thumb img')).toHaveAttribute('src', LIBRARY_URL);")).toHaveLength(1);
+    expect(pictureByStyleClass("    expect(await photoLoaded(tile(page, own).locator('.pos-tile__thumb'))).toBe(512);")).toHaveLength(1);
+    expect(pictureByStyleClass("    const initials = tile(page, toast).locator('.pos-tile__thumb');")).toHaveLength(1);
+    // The tile's layout is measured by its classes on purpose (sale-pos-tile-layout.spec.ts).
+    expect(pictureByStyleClass("        thumb: rect('.pos-tile__thumb'),")).toEqual([]);
+    expect(pictureByStyleClass('    const photo = tile.getByAltText(daily.name, { exact: true });')).toEqual([]);
   });
 });
