@@ -96,14 +96,16 @@ useNativeAriaDisabled(() => tile.value?.$el);
 </template>
 
 <style scoped>
+/* In a grid that scrolls (a catalogue longer than the screen) a row is only as tall as the smallest its tiles may be.
+   With `min-height: auto` and nothing clipped on the tile itself, that smallest is the tile's whole content, never a
+   fixed height (Ionic's own is 3.1em). Its native button keeps the rounded clip. */
 .pos-tile {
   display: flex;
   flex-direction: column;
   height: auto;
-  min-height: 8.4rem;
+  min-height: auto;
   margin: 0;
   padding: 0;
-  overflow: hidden;
   font: inherit;
   text-align: left;
   text-transform: none;
@@ -133,11 +135,14 @@ useNativeAriaDisabled(() => tile.value?.$el);
   text-align: left;
 }
 
+/* A tile in a row with a taller one fills the row: its photo stays at the top and its price at the bottom, in line with
+   the tiles beside it, instead of the button centring its content. */
 .pos-tile__content {
   display: flex;
   flex: 1;
   flex-direction: column;
   align-items: stretch;
+  align-self: stretch;
   width: 100%;
   min-width: 0;
 }
@@ -234,6 +239,7 @@ useNativeAriaDisabled(() => tile.value?.$el);
   display: grid;
   flex: 1;
   grid-template-columns: minmax(0, 1fr) auto;
+  align-content: space-between;
   align-items: end;
   gap: 0.2rem 0.4rem;
   width: 100%;
@@ -297,20 +303,12 @@ useNativeAriaDisabled(() => tile.value?.$el);
 }
 
 @media (max-width: 820px) {
-  .pos-tile {
-    min-height: 8rem;
-  }
-
   .pos-tile__price {
     font-size: 0.82rem;
   }
 }
 
 @media (max-width: 340px) {
-  .pos-tile {
-    min-height: 7.7rem;
-  }
-
   .pos-tile__thumb {
     height: 4.5rem;
   }
