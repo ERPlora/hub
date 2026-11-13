@@ -171,7 +171,7 @@ describe('turning an app on or off', () => {
   });
 });
 
-describe('an app whose tables the business’s database is still getting (S3)', () => {
+describe('an app whose tables the business’s database is still getting', () => {
   // flow is being set up; website could not be; sale (being set up) needs customer, which came along with it.
   const FLOW = app('flow', { name: 'Flows', state: 'creating', path: null });
   const WEBSITE = app('website', { name: 'Website', state: 'failed', path: null });

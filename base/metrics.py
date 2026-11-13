@@ -116,7 +116,7 @@ class HubReadings(ABC):
     (``use_hub``), never in one query across them.
 
     The hubs :meth:`hubs` gives (``base.services.hubs_to_serve``: ready, or a business that left whose records must
-    still reach the tax authority; never one without its own database, since S5 there is no shared one) are read in
+    still reach the tax authority; never one without its own database: there is no shared one) are read in
     turn for ``budget`` seconds a pass; each one's last reading is kept until it is read again, and forgotten when it is
     no longer read. A hub that cannot be read (busy: a warning; any other failure: an error with its trace) keeps its
     last reading (:meth:`unreadable` says what it is without one). A stop request ends the pass before the next hub.

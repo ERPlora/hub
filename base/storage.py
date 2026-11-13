@@ -1,4 +1,4 @@
-"""The hub's file store, ``STORAGES["hub_files"]`` (PLAN-HUB block 7): what the modules keep as files.
+"""The hub's file store, ``STORAGES["hub_files"]``: what the modules keep as files.
 
 In AWS it is the Hub's S3 bucket, the one Terraform names in ``AWS_STORAGE_BUCKET_NAME`` (``erplora-prod-hubs``,
 ``erplora-pre-hubs``; ``aws/stacks/prod/apps.tf``) in ``AWS_REGION``, with the task role's credentials (no keys).

@@ -210,7 +210,7 @@ def production_control(django_db_blocker):
 
 @pytest.mark.django_db
 def test_controls_database_as_production_migrates_it_holds_exactly_controls_tables(production_control):
-    # The outbox is contextual: the registry's own events (base.hub.*, the demos) stay in control's after S5 too.
+    # The outbox is contextual: the registry's own events (base.hub.*, the demos) stay in control's.
     expected = tables_of(inventory.CONTROL, inventory.CONTEXTUAL, *SHARED_MODE_EXTRA) | {MIGRATIONS_TABLE}
 
     assert production_control == expected, {

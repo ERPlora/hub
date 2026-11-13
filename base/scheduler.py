@@ -20,8 +20,7 @@ declaration the engine could not run, at ``manage.py check`` and before every co
 
 Every hub has its own schedule in its own database: the worker's pass over the hubs (``base.worker``) writes it once
 per process and runs, under ``use_hub(hub)``, the tasks of its active apps on its own scope (review of hub#471, C1).
-Since S5 there is no shared database whose tasks ran on one fixed scope; without a ``scope`` (the suite's tests
-written before the tenancy) they run on ``settings.WORKER_SCOPE_SLUG``'s.
+Without a ``scope`` (the suite's tests written before the tenancy) they run on ``settings.WORKER_SCOPE_SLUG``'s.
 """
 
 import datetime as dt

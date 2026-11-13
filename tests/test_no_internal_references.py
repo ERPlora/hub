@@ -21,6 +21,7 @@ INTERNAL_REFERENCE = re.compile(
         (
             SECTION_SIGN + r" ?[0-9]",
             r"(Plan|PLAN)(-[A-Z]+)?(\.md)? ?" + SECTION_SIGN,
+            r"(Plan|PLAN)(-[A-Z]+)?(\.md)? block [0-9]",
             r"[Rr](onda|ound) [0-9]{4}-[0-9]{2}",
             r"[Tt]ajada S?[0-9]",
             r"([Pp]hase|[Ff]ase) [0-9]",
@@ -34,6 +35,31 @@ INTERNAL_REFERENCE = re.compile(
         )
     )
 )
+
+# A delivery slice's label: alone in brackets, opening or closing a bracketed aside, after «since», «after» or
+# «before», or as a span. The lowercase word or backtick after an opening label keeps data such as a tuple whose first
+# item is the S3 backend, or a table named «S1» next to «Terrace A», out of it.
+SLICE_LABEL = re.compile(
+    r"\(S[0-9][a-z]?\)"
+    r"|\(S[0-9][a-z]?[,;:] [a-z`]"
+    r"|[,;] S[0-9][a-z]?\)"
+    r"|\b([Ss]ince|[Aa]fter|[Bb]efore) S[0-9][a-z]?\b"
+    r"|\bS[0-9][a-z]?[–-]S[0-9]"
+)
+SLICE_NAME = re.compile(r"S[0-9][a-z]?")
+
+# In the invoicing apps S1 and S2 are the tax authority's kinds of subject operation: data, not slices.
+TAX_KEY_DIRS = ("apps/invoice/", "apps/verifactu/")
+TAX_KEYS = frozenset({"S1", "S2"})
+
+
+def names_a_slice(path: str, line: str) -> bool:
+    for match in SLICE_LABEL.finditer(line):
+        tax_keys = path.startswith(TAX_KEY_DIRS) and set(SLICE_NAME.findall(match.group())) <= TAX_KEYS
+        if not tax_keys:
+            return True
+    return False
+
 
 # The end-to-end specs name their captures after the task that added them, and renaming those string literals would
 # orphan the evidence already taken. There only comments and test titles are read.
@@ -106,7 +132,7 @@ def internal_references(paths, root: Path = REPO) -> list[str]:
         text = (root / path).read_text(encoding="utf-8", errors="replace")
         for number, line in enumerate(text.splitlines(), 1):
             read = without_string_literals(line) if e2e_script else line
-            if INTERNAL_REFERENCE.search(read):
+            if INTERNAL_REFERENCE.search(read) or names_a_slice(path, read):
                 found.append(f"{path}:{number}: {line.strip()}")
     return found
 
@@ -154,6 +180,7 @@ def test_documents_and_data_are_left_out(path):
         "Voice and video calls (Plan " + SECTION_SIGN + "66)",
         "see PLAN-HUB " + SECTION_SIGN + "84",
         "PLAN.md" + SECTION_SIGN + "5",
+        "the hub's file store (PLAN-HUB " + "block 7)",
         "the limits of " + SECTION_SIGN + "14.2",
         "register_apps --check (round 16, spec " + SECTION_SIGN + "4.3)",
         "The website's theme (round " + "2026-10-22)",
@@ -197,10 +224,69 @@ def test_the_scan_catches_each_kind_of_reference(text):
         "the plan's price for 2026",
         "docs/api/openapi.json",
         "under Ioan's supervision",
+        "the Plan block of the checkout",
     ],
 )
 def test_the_scan_leaves_ordinary_text_alone(text):
     assert not INTERNAL_REFERENCE.search(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "an app whose tables are still being made (S" + "3)",
+        "A copy of the business's data (S" + "2b): none is ever made",
+        "made, or making them failed (S" + "3, ``base.activation``)",
+        "the reset (S" + "2b, the worker's emptying of a reset)",
+        "a hub's model lives in its own database (S" + "5: there is no shared one)",
+        "the size of the business's database (BASE-F40, S" + "2b)",
+        "the review of hub#471 C1; S" + "3)",
+        "never one without its own database, since S" + "5 there is no shared one",
+        "Since S" + "5 there is no shared database",
+        "the registry's events stay in control's after S" + "5 too",
+        "a session opened before S" + "1's rule",
+        "the tenancy's slices S" + "1–S" + "7",
+        "S" + "2a-S" + "3 of the tenancy",
+    ],
+)
+def test_the_scan_catches_a_slice_label(text):
+    assert names_a_slice("base/services.py", text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        '(S3, {"bucket_name": "erplora-hubs-pre"}),',
+        'description="Its number or name (S1, Terrace A); empty = the first free number of the zone."',
+        '["Barra 2 Bis", "S1", "S2", "S10", "Terraza A"]',
+        "await snap(page, 'S3-on', width);",
+        "S3 in AWS and the disk locally",
+        "On S3, ``ListObjectsV2`` pages of a thousand keys",
+        "S3's conditional write: written only if nobody has the key",
+        "since 2026 every business keeps its own copies",
+    ],
+)
+def test_the_scan_leaves_data_named_like_a_slice_alone(text):
+    assert not names_a_slice("base/services.py", text)
+
+
+def test_the_tax_authoritys_operation_keys_are_not_slices_in_the_invoicing_apps():
+    subject = "a domestic sale is subject (S" + "1) at its rate"
+    assert not names_a_slice("apps/invoice/platform.py", subject)
+    assert not names_a_slice("apps/verifactu/xml.py", "the kinds of subject operation (S" + "1, S" + "2)")
+    assert names_a_slice("base/services.py", subject)
+    activation = "making them failed (S" + "3, ``base.activation``)"
+    assert names_a_slice("apps/verifactu/tests/test_app_disable.py", activation)
+
+
+def test_a_slice_label_is_named_by_file_and_line_but_a_tax_key_is_not(tmp_path):
+    for folder in ("base", "apps/invoice"):
+        (tmp_path / folder).mkdir(parents=True)
+    label = '"""Never in production (S' + '5)."""'
+    (tmp_path / "base" / "context.py").write_text(label + "\n", encoding="utf-8")
+    (tmp_path / "apps" / "invoice" / "platform.py").write_text("# subject (S" + "1) at its rate\n", encoding="utf-8")
+    found = internal_references(["base/context.py", "apps/invoice/platform.py"], root=tmp_path)
+    assert found == [f"base/context.py:1: {label}"]
 
 
 def test_an_end_to_end_spec_keeps_its_capture_keys_but_not_its_comments(tmp_path):

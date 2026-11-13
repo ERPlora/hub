@@ -71,7 +71,8 @@ KEY_TIME = "%Y%m%dT%H%M%SZ"
 DEFAULT_REGION = "eu-west-1"
 #: The lines of ``pg_dump``'s own complaint kept in a failure.
 ERROR_LINES = 3
-#: The kind of control's own copy: made before the cut of S5 (``base.tenancy.cut``), under ``<control>/``.
+#: The kind of control's own copy, made before the businesses moved to databases of their own (``base.tenancy.cut``),
+#: under ``<control>/``.
 CUT = "cut"
 
 

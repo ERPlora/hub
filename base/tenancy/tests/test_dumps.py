@@ -261,7 +261,7 @@ def test_a_stopped_copy_kills_pg_dump_at_once_even_while_it_waits_on_a_lock(hub_
     assert objects(moto_s3, dumps_bucket) == {}
 
 
-# ── Control's own copy, before the cut of S5 ──────────────────────────────────────────────────────────────────────
+# ── Control's own copy, before the businesses moved out ───────────────────────────────────────────────────────────
 
 
 def test_control_is_copied_to_a_key_of_its_own_and_no_hub_s_copy_is_noted(hub_databases, dumps_bucket, moto_s3, tmp_path):

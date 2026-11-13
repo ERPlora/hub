@@ -76,7 +76,7 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
     "base.hub.register": (PLATFORM, "The SaaS registers or renames a business (/internal)."),
     "base.app.activation_settle": (
         PLATFORM,
-        "The worker turns on, or leaves failed, the apps whose tables it made in the business's own database (S3).",
+        "The worker turns on, or leaves failed, the apps whose tables it made in the business's own database.",
     ),
     "base.hub.reset_apply": (
         PLATFORM,
@@ -333,7 +333,7 @@ def test_the_superuser_s_wildcard_is_the_platform_s_alone():
 
 @pytest.mark.django_db
 def test_a_staff_session_from_before_the_host_rule_holds_nothing_on_a_business_s_host(client):
-    # A session with no host noted (opened before S1's rule) stays valid where it is used until it expires: on a
+    # A session with no host noted (opened before the host rule) stays valid where it is used until it expires: on a
     # business's host the staff copy is one more user without a Membership there.
     staff = get_user_model().objects.create_user("saas-staff:7", is_staff=True, is_superuser=True)
     client.force_login(staff)

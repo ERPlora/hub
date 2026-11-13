@@ -387,9 +387,10 @@ def test_the_aeat_query_on_the_platform_hub_presents_the_platform_hub(platform_p
 
 
 def test_a_wait_for_the_link_left_before_the_cut_is_no_longer_told_but_still_reads_in_the_queue(db):
-    # A pass before S5 could leave ``hub_unregistered`` on a business's record (its id from erplora.com had not come
-    # yet). Nothing waits for that link any more, so the record does not say it waits for it; the queue still reads
-    # the stored wait in words, never as a bare code, until the next pass replaces it.
+    # A pass made while businesses still shared one database could leave ``hub_unregistered`` on a business's record
+    # (its id from erplora.com had not come yet). Nothing waits for that link any more, so the record does not say it
+    # waits for it; the queue still reads the stored wait in words, never as a bare code, until the next pass
+    # replaces it.
     ctx = ctx_for()
     run("invoice.issuer.update", ISSUER, ctx)
     record = sealed(ctx)

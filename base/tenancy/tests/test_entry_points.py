@@ -380,7 +380,7 @@ async def asgi_post(async_client, host: str, path: str, data: dict):
 @pytest.mark.parametrize("own_database", [False, True], ids=["without", "own"])
 async def test_an_asgi_request_runs_in_its_hub_too(async_client, hub_a, own_database):
     """Daphne runs the middleware asynchronously (``HubDatabaseMiddleware.__acall__``): the same context, and the same
-    503 for a business without its own database (S5)."""
+    503 for a business without its own database."""
     from asgiref.sync import sync_to_async
 
     slug = hub_a.slug if own_database else "a"
