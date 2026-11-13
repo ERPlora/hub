@@ -829,8 +829,9 @@ class TestWhatARecordCameBackWithout:
     ):
         hub, (ana, luis, marta) = recoveries.business(every_app_on, ANA, LUIS, MARTA)
         copy = recoveries.copy_of(hub)
-        run_in(hub, "customer.customer.delete", id=ana)
+        # Ana deleted and still held, Luis and Marta gone: only Ana and Luis come back without something.
         gone(hub, luis, marta)
+        run_in(hub, "customer.customer.delete", id=ana)
         came_back_without(
             monkeypatch,
             "customer.customer.restore",
