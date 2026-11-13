@@ -614,9 +614,9 @@ def count_to_confirm(ctx: OperationContext, data: NoIn) -> dict:
     }
 
 
-# ── What the team is told as it happens (G01) ────────────────────────────────────────────────
+# ── What the team is told as it happens (APPOINTMENT-F28) ────────────────────────────────────
 
-#: How far back the notices go when nobody says (old-hub:HUB_SHELL-F66 told each one as it came).
+#: How far back the notices go when nobody says.
 NOTICES_WINDOW = dt.timedelta(hours=24)
 
 

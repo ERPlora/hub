@@ -64,7 +64,7 @@ test('Settings › Business and Printing, and a change made on erplora.com', asy
   await changeLanguage(owner, business, 'es');
   const page = await owner.context.newPage();
   await login(page, origin, '/', owner.credentials);
-  // A business is born with every app off but Taxes (PLAN-HUB rounds 2026-10-27 and 2026-11-07): the ones these screens
+  // A business is born with every app off but Taxes: the ones these screens
   // open, and the Home's sales;
   // the page reads its session again, whose menu has them now.
   await turnOn(owner.context, origin, 'sale', 'invoice', 'printing');

@@ -1,5 +1,5 @@
-"""Sales asks Printing for its paper by name (PRINTING-F07, F08, F09, F13; SALE-F21, F29; PLAN-HUB «El cobro y la
-comanda llaman a la cola dentro de su propia transacción»): the receipt at checkout inside the charge's own
+"""Sales asks Printing for its paper by name (PRINTING-F07, F08, F09, F13; SALE-F21, F29): the receipt at checkout
+inside the charge's own
 transaction, a reprint marked as a copy and the bill of a check. No mocks: Inventory owns the products,
 Invoicing numbers the ticket and VeriFactu seals it, Printing queues the paper. Without Printing on, without a
 printer that takes the paper or with a fiscal document still pending, nothing is queued and the screen prints

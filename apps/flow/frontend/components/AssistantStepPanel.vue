@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The form of «Ask the assistant» (WORKBOOK FLOW-F37; old hub HUB-F95): what it is asked, with data inserted (filled
+// The form of «Ask the assistant» (WORKBOOK FLOW-F37): what it is asked, with data inserted (filled
 // in when it runs); the reads and actions it may use — only those the assistant can use, each one a permission of the
 // automation (FLOW-F12) —; the data a tool always gets, fixed by the automation, that the assistant never sees nor
 // changes («On behalf of the customer» = their card); whether a change waits for a yes in «Waiting for your answer»

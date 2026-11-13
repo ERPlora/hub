@@ -122,7 +122,7 @@ test.afterAll(async ({ browser }) => {
   cleanInvoices();
 });
 
-test(`${KEY}: VERIFACTU-F01 a business in Poland issues its invoices without a VeriFactu record or receipt, in 390, 834 and 1440`, async ({ page, context }) => {
+test(`VERIFACTU-F01: a business in Poland issues its invoices without a VeriFactu record or receipt, in 390, 834 and 1440`, async ({ page, context }) => {
   // A ticket sealed while the business was in Spain: its record waits («Pendiente»).
   await registerIn('ES');
   await login(page, A, '/invoice/invoices');
@@ -185,7 +185,7 @@ test(`${KEY}: VERIFACTU-F01 a business in Poland issues its invoices without a V
   }
 });
 
-test(`${KEY}: VERIFACTU-F13 back in Spain an invoice is sealed and shows its VeriFactu receipt`, async ({ page, context }) => {
+test(`VERIFACTU-F13: back in Spain an invoice is sealed and shows its VeriFactu receipt`, async ({ page, context }) => {
   await registerIn('ES');
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/invoice/invoices');

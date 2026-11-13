@@ -228,7 +228,7 @@ def test_every_input_field_says_what_it_is():
 
 
 def test_the_unconfirmed_reservations_are_released_every_quarter_of_an_hour():
-    # RESERVATIONS-F13: the phase-2 worker runs it on every hub as the system (cron in UTC).
+    # RESERVATION-F13: the worker runs it on every hub as the system (cron in UTC).
     assert reservation().scheduled_tasks == [
         {
             "name": "release_unconfirmed_reservations",

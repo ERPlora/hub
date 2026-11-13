@@ -2,7 +2,7 @@
 intervals is checked, which rule governs a day, the spans of a day and «is it open?».
 
 Cases from the old module's handler tests (``handler/src/lib.rs``)
-and its WORKFLOW (SCHEDULES-F02, F04, F05, F10, F11). 2026-08-17 is a Monday.
+and its WORKFLOW (SCHEDULE-F02, F04, F05, F10, F11). 2026-08-17 is a Monday.
 """
 
 import datetime as dt
@@ -144,7 +144,7 @@ def test_at_most_twelve_intervals_a_day():
     assert refused.value.code == "too_many"
 
 
-# ── rule_for: which rule governs a day (SCHEDULES-F10 precedence) ──────────────────────────────
+# ── rule_for: which rule governs a day (SCHEDULE-F10 precedence) ───────────────────────────────
 
 
 def test_nothing_configured_is_no_rule():
@@ -283,7 +283,7 @@ def test_a_closed_day_and_a_day_without_rule_have_no_span():
     assert spans_of(rule_for(calendar, d("2026-08-23")), d("2026-08-23")) == []
 
 
-# ── is_open (SCHEDULES-F10) ────────────────────────────────────────────────────────────────────
+# ── is_open (SCHEDULE-F10) ─────────────────────────────────────────────────────────────────────
 
 SPLIT_MONDAY = weekly(
     (0, False, [iv("09:00", "14:00"), iv("16:00", "20:00")]),

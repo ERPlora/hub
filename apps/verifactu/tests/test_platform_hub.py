@@ -242,7 +242,7 @@ def test_a_business_typing_erploras_tax_id_still_needs_its_approved_authorisatio
     # The Hub's side: ERPlora's tax ID typed as an ordinary business's issuer is no exemption. Only
     # ERPlora's own hub files ERPlora's records without an authorisation: anywhere else, once the authorisation is
     # revoked, a new sale in production is refused before anything is numbered (the gateway would refuse it too, and
-    # the sale would be charged with no way to the AEAT, HUB-F313).
+    # the sale would be charged with no way to the AEAT).
     settings.ERPLORA_ENVIRONMENT = "prod"
     settings.VERIFACTU_PRODUCTION_ENABLED = True
     settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"

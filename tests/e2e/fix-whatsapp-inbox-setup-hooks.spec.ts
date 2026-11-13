@@ -1,6 +1,6 @@
 // flow: WHATSAPP_INBOX-F09
 // The WhatsApp inbox's counter of the bell (the old module's `bell`,
-// the old hub's bell, docs/reference/old-hub/notifications-*.png): on the Home of hub `a`, as its owner reads
+// the old hub's bell): on the Home of hub `a`, as its owner reads
 // it in Spanish, a customer writes on WhatsApp and the bell's badge counts her without a reload; opened, the row
 // «Clientes de WhatsApp esperando respuesta (N)» leads to the inbox, where the owner answers her from the composer, and
 // the badge goes down by itself. In each of the three sizes, leaving the capture `<KEY>-<width>`
@@ -84,7 +84,7 @@ async function badgeSays(page: Page, total: number): Promise<void> {
 }
 
 FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
-  test(`${KEY} WHATSAPP_INBOX-F09 la campana cuenta «${LABEL}»: a customer writing counts live, leads to the inbox and goes once answered — ${label}`, async ({
+  test(`WHATSAPP_INBOX-F09: the bell counts «${LABEL}»: a customer writing counts live, leads to the inbox and goes once answered — ${label}`, async ({
     browser,
   }) => {
     // erplora.com says the number is connected (each test again: a refused delivery may change it).

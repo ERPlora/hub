@@ -143,7 +143,7 @@ async function badgeSays(page: Page, total: number, options = {}): Promise<void>
 }
 
 FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
-  test(`${KEY} PRINTING-F01 «Nadie está imprimiendo «Recibo»» with the device off, by the clock — ${label}`, async ({ browser }) => {
+  test(`PRINTING-F01: «Nadie está imprimiendo «Recibo»» with the device off, by the clock — ${label}`, async ({ browser }) => {
     const device = `${TAG} device ${RUN} ${label}`;
     let job = '';
     // The device set up from itself is there; a receipt queued on its printer is its: nothing rings.

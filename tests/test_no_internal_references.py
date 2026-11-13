@@ -3,12 +3,15 @@
 Comments, docstrings, test names and messages have to make sense on their own, so the code never points at a plan
 section, a dated planning round, a delivery slice or phase, a task id, a dated plan or spec, or who asked for a change
 and when. Their prose does not cite the codes of an internal audit or review, an issue of another of the project's
-repositories, a piece of work by its label or a numbered decision of the old product either, nor does it tell the code's
-history by its dates: the reader has not seen them, so the reason or the fact that holds today is written out.
+repositories, a piece of work by its label, a numbered decision or a flow of the old product or an entry of the
+migration's register either, nor does it tell the code's history by its dates or how the work was done: the reader has
+not seen them, so the reason or the fact that holds today is written out. A test title is read with the constants it
+interpolates written out.
 Markdown files are left out: they are where the plans live.
 """
 
 import ast
+import functools
 import io
 import re
 import subprocess
@@ -28,7 +31,7 @@ INTERNAL_REFERENCE = re.compile(
             SECTION_SIGN + r" ?[0-9]",
             r"(Plan|PLAN)(-[A-Z]+)?(\.md)? ?" + SECTION_SIGN,
             r"(Plan|PLAN)(-[A-Z]+)?(\.md)? block [0-9]",
-            r"[Rr](onda|ound) [0-9]{4}-[0-9]{2}",
+            r"[Rr](ondas?|ounds?) [0-9]{4}-[0-9]{2}",
             r"[Tt]ajada S?[0-9]",
             r"([Pp]hase|[Ff]ase) [0-9]",
             # The word boundary keeps an invoice series' number template (PREFIX-YYYY-NNNNNN) out of the task ids.
@@ -73,6 +76,21 @@ E2E_DIR = "tests/e2e/"
 E2E_SCRIPT_SUFFIXES = frozenset({".ts", ".js", ".mjs"})
 COMMENT_OR_STRING = re.compile(r"""//.*|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`""")
 TEST_TITLE_OPENER = re.compile(r"\b(?:test|it|describe)(?:\.\w+)*\(\s*$")
+# A test title that interpolates a constant (``${KEY}``) reads as if the constant's text were written in it.
+SCRIPT_CONSTANT = re.compile(
+    r"""^\s*(?:export\s+)?const\s+(?P<name>[A-Z][A-Z0-9_]*)\s*=\s*(?P<quote>['"`])(?P<value>[^'"`$\\\n]*)(?P=quote)""",
+    re.MULTILINE,
+)
+INTERPOLATED_CONSTANT = re.compile(r"\$\{(?P<name>[A-Z][A-Z0-9_]*)\}")
+
+
+def script_constants(text: str) -> dict[str, str]:
+    return {match.group("name"): match.group("value") for match in SCRIPT_CONSTANT.finditer(text)}
+
+
+def with_constants_written_out(title: str, constants: dict[str, str]) -> str:
+    return INTERPOLATED_CONSTANT.sub(lambda match: constants.get(match.group("name"), match.group(0)), title)
+
 
 # The codes of an internal audit or review: a finding's letter and number, a delivery lot, a review's numbered
 # findings, points or items, a review named by its date, the lettered finding of a pull request's review, and the
@@ -115,7 +133,59 @@ WORK_LABEL = re.compile(r"(?<![\w./-])(?:W[0-9]{1,2}|V(?!8\b)[0-9]{1,2})(?![\w-]
 # average daily rate («ADR 120») is not one.
 OLD_DECISION = re.compile(r"\bADR-[0-9]{4}\b")
 
-PROSE_ONLY_SCANS = (AUDIT_CODE, OTHER_REPO_ISSUE, WORK_LABEL, OLD_DECISION)
+# An entry of the migration's register of what the old product did and the new one still lacked, named by an app's
+# prefix, a G and a number: the register is not in this repository, so the prose names the behaviour.
+MIGRATION_GAP = re.compile(r"(?<![\w-])[A-Z][A-Z0-9_]*-G[0-9]+\b")
+
+# A note on how the work was done that the reader cannot follow: the tracking file, a task named by its id alone (a
+# close, a fix or an app's task with a single word after the dash), the market survey's skill, a measure told by its day
+# and the old product's screenshots, which are not in this repository. A capture key's template, whose task id goes on
+# with a dash, names a file and stays.
+PROCESS_NOTE = re.compile(
+    r"\bTODO\.md\b"
+    r"|(?<![\w-])(?:APP|FIX|CLOSE|MIG)-[A-Z][A-Z0-9_]*\b(?!-)"
+    r"|\bmarket-decision\b"
+    r"|\b[Mm]easured (?:on )?20[0-9]{2}-[0-9]{2}"
+    r"|\bdocs/reference/"
+)
+
+# A planning document named in prose, the Hub's or the database's: the reader has not seen it, so the rule it fixed is
+# written out. A capture key that only contains the word goes on after a dash and stays.
+PLAN_DOCUMENT = re.compile(r"(?<![\w-])PLAN(?:-[A-Z]+|\.md)\b")
+
+PROSE_ONLY_SCANS = (AUDIT_CODE, OTHER_REPO_ISSUE, WORK_LABEL, OLD_DECISION, MIGRATION_GAP, PROCESS_NOTE, PLAN_DOCUMENT)
+
+# A flow is named by its id when a WORKBOOK defines it: this repository's (``### SALE-F01 …``), the SaaS's or the native
+# app's, which live in their own repositories and are listed here by their prefixes. Any other flow id is the old
+# product's, which the reader cannot look up, so the prose says what the flow does instead. The old modules wrote theirs
+# in lower case and the old Hub's were quoted after ``old-hub`` and a colon.
+WORKBOOK_FLOW_HEADING = re.compile(r"^### (?P<prefix>[A-Z][A-Z0-9_]*)-F[0-9]+\b", re.MULTILINE)
+SAAS_AND_APP_FLOW_PREFIXES = frozenset(
+    {"ACCOUNTS", "APPS", "ASSISTANT", "BILLING", "FISCAL", "HUBS", "PUBLIC", "WHATSAPP", "HUB_APP", "HUB_PERIPHERALS"}
+)
+FLOW_ID = re.compile(r"(?<![\w-])(?P<prefix>[A-Z][A-Z0-9_]*)-F[0-9]+\b|(?<![\w-])[a-z][a-z_]+-f[0-9]+\b|\bold-hub:")
+
+
+@functools.cache
+def workbook_flow_prefixes() -> frozenset[str]:
+    listing = subprocess.run(
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "*WORKBOOK.md"],
+        cwd=REPO,
+        check=True,
+        capture_output=True,
+    ).stdout
+    paths = [path for path in listing.decode().split("\0") if path]
+    return frozenset(
+        match.group("prefix")
+        for path in paths
+        for match in WORKBOOK_FLOW_HEADING.finditer((REPO / path).read_text(encoding="utf-8"))
+    )
+
+
+def names_an_old_flow(text: str) -> bool:
+    known = workbook_flow_prefixes() | SAAS_AND_APP_FLOW_PREFIXES
+    return any(match.group("prefix") not in known for match in FLOW_ID.finditer(text))
+
 
 # The code's history told by its date: a day alone in brackets, or a day after «until», «before», «since» or «as of»
 # with no word before them (they open a sentence, an aside or the line), so a rule «valid until» a day stays. The prose
@@ -264,6 +334,7 @@ def marked_prose(kind: str, text: str) -> dict[int, str]:
         )
     )
     patch = kind == PATCH_SUFFIX
+    constants = script_constants(text) if script else {}
     prose = {}
     closer = None
     title_next = False
@@ -299,7 +370,7 @@ def marked_prose(kind: str, text: str) -> dict[int, str]:
             elif script:
                 before = line[: match.start()]
                 if TEST_TITLE_OPENER.search(before) or (title_next and not before.strip()):
-                    pieces.append(token)
+                    pieces.append(with_constants_written_out(token, constants))
             position = match.end()
         title_next = script and closer is None and bool(TEST_TITLE_OPENER.search(line))
         if pieces:
@@ -315,11 +386,14 @@ def internal_references(paths, root: Path = REPO) -> list[str]:
         prose = prose_lines(path, text)
         for number, line in enumerate(text.splitlines(), 1):
             read = without_string_literals(line) if e2e_script else line
+            said = prose.get(number, "")
             if (
                 INTERNAL_REFERENCE.search(read)
+                or INTERNAL_REFERENCE.search(said)
                 or names_a_slice(path, read)
-                or any(scan.search(prose.get(number, "")) for scan in PROSE_ONLY_SCANS)
-                or tells_dated_history(prose.get(number, ""), text, prose)
+                or any(scan.search(said) for scan in PROSE_ONLY_SCANS)
+                or names_an_old_flow(said)
+                or tells_dated_history(said, text, prose)
             ):
                 found.append(f"{path}:{number}: {line.strip()}")
     return found
@@ -331,8 +405,8 @@ def test_code_never_points_at_internal_plans():
     assert expected <= set(paths), "git ls-files listed no code"
     found = internal_references(paths)
     assert not found, (
-        "Code that points at internal plans, rounds, slices, audits, other repositories' issues or work labels:\n"
-        + "\n".join(found)
+        "Code that points at internal plans, rounds, slices, audits, other repositories' issues, work labels, the old"
+        " product's flows, the migration's register or notes on how the work was done:\n" + "\n".join(found)
     )
 
 
@@ -376,6 +450,9 @@ def test_documents_and_data_are_left_out(path):
         "register_apps --check (round 16, spec " + SECTION_SIGN + "4.3)",
         "The website's theme (round " + "2026-10-22)",
         "ronda " + "2026-11-10f",
+        "on the Home's bell (PLAN-HUB rounds " + "2026-10-21 and 2026-10-23)",
+        "the public website's stylesheet (apps/website, rounds " + "2026-10-22)",
+        "rondas " + "2026-10-27 y 2026-11-07",
         "tajada " + "S3",
         "Tajada " + "4",
         "register the apps, then wait (phase" + " 1)",
@@ -948,3 +1025,177 @@ def test_a_dated_aside_is_history_unless_the_files_code_uses_that_day(tmp_path):
         (tmp_path / path).write_text(text, encoding="utf-8")
     found = internal_references(sorted(files), root=tmp_path)
     assert [line.split(":")[0] for line in found] == ["apps/sale/tests/test_history.py", "apps/sale/tests/test_said.py"]
+
+
+def test_the_flows_that_stay_are_the_ones_the_workbooks_define():
+    prefixes = workbook_flow_prefixes()
+    assert {"BASE", "SALE", "CASH_REGISTER", "WHATSAPP_INBOX", "VERIFACTU"} <= prefixes
+    assert not {"HUB", "HUB_SHELL", "APPOINTMENTS", "SCHEDULES"} & prefixes
+    for prefix in prefixes | SAAS_AND_APP_FLOW_PREFIXES:
+        assert not names_an_old_flow(f"the flow {prefix}-F01 of its WORKBOOK"), prefix
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "The outbound call of a step (WORKBOOK FLOW-F27; the old hub's HUB" + "-F94).",
+        "How far back the notices go (old-hub" + ":HUB_SHELL-F66 told each one as it came).",
+        "the manager override (HUB_SHELL" + "-F51; Square and Toast)",
+        "The form of «Call another system» (WORKBOOK FLOW-F27; the old module's flows" + "-f16)",
+        "the cases of its WORKFLOW (APPOINTMENTS" + "-F02, F13, F14)",
+        "nothing of a demo reaches the AEAT (SAAS_PUBLIC" + "-F91)",
+        "flow: SALE-F28 (REC_PELUQUERIA" + "-F15): the reproduction of hub#685",
+        "the ready-made recipes (WORKBOOK FLOW-F33; the old module's FLOWS" + "-F05 and F06)",
+        "the retention of the old Hub (old-hub" + ":crates/runtime/src/retention.rs)",
+    ],
+)
+def test_the_scan_catches_a_flow_of_the_old_product(text):
+    assert names_an_old_flow(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "BASE-F12: a flow of the Hub's WORKBOOK",
+        "CASH_REGISTER-F01 and WHATSAPP_INBOX-F13: flows of the apps' WORKBOOKs",
+        "A business's own domain (HUBS-F17 of the SaaS) answers here",
+        "the business suspended for an unpaid invoice (BILLING-F16 of the SaaS)",
+        "the app's `save_download` (HUB_APP-F30), which writes them to the person's Downloads",
+        "the capture `APP" + "-CART_CHECKOUT-CART_CHECKOUT-F12-employee-<width>`",
+        "BASE-F114-RECOVER-1440, the capture of a recovery",
+        "a hex digit, [0-9a-f], and the colour #a-f0",
+        "the Wi-Fi network of the shop",
+        "the capture `E2E-HUB-F94-<width>` and the file `e2e-flows-f16.png` name files",
+    ],
+)
+def test_the_scan_leaves_the_living_flows_and_other_text_alone(text):
+    assert not names_an_old_flow(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "with the period «7 days», what was sold each day (SALE" + "-G01)",
+        "STAFF" + "-G02, G03, G04: the old Home panels «Active staff» and «On leave today»",
+        "the figures (STAFF" + "-G02–G04)",
+        "# APPOINTMENT" + "-G01 — what the hub tells the team as it happens",
+        "VERIFACTU" + "-G23 and G25: nothing of a demo ever reaches the real AEAT",
+    ],
+)
+def test_the_scan_catches_an_entry_of_the_migrations_register(text):
+    assert MIGRATION_GAP.search(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "SALE-F28 charges the ticket",
+        "the phone falls back to 4G when the Wi-Fi drops",
+        "a 5G modem",
+        "the glass G2 of the bar",
+        "fixed by hub#781",
+        "the capture `E2E-SALE-G01-390` names a file",
+    ],
+)
+def test_the_scan_leaves_flows_and_ordinary_text_alone_when_looking_for_the_register(text):
+    assert not MIGRATION_GAP.search(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "every name fits (TODO" + ".md, hub#188, hub#204)",
+        "The three sizes every flow of the app is seen at (brief APP" + "-CUSTOMER): a phone, a tablet and a desk.",
+        "Reservations does not apply it until it is saved (CLOSE" + "-SCHEDULE, hub#172).",
+        "CLOSE" + "-DEMO: more items than one page holds",
+        "VeriFactu flow by flow (APP" + "-VERIFACTU; apps/verifactu/WORKBOOK.md)",
+        "in the unit its price is for (market" + "-decision 2026-10-15: Odoo, Business Central)",
+        "reaches the server (measured " + "2026-10-15 on the second pick of a course)",
+        "the open row (docs/" + "reference/old-hub/cart_checkout-carts-390.png)",
+    ],
+)
+def test_the_scan_catches_a_note_on_how_the_work_was_done(text):
+    assert PROCESS_NOTE.search(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "one screenshot per flow and size (`APP-APPOINTMENT-<flow>-<width>`)",
+        "saves `.artifacts/APP-TAX-<key>-<width>.png`",
+        "`E2E-CLOSE-CASH <cents>`: closes the drawer as CASH_REGISTER-F09 asks",
+        "One screenshot per size (`FLOW-APP-OFF-<width>`)",
+        "a brief flash of the toast",
+        "the fix to the till's rounding",
+        "the day is measured in the business's zone",
+        "docs/api/openapi.json and docs/research/",
+        "the TODO list of the person",
+    ],
+)
+def test_the_scan_leaves_capture_keys_and_ordinary_text_alone_when_looking_for_process_notes(text):
+    assert not PROCESS_NOTE.search(text)
+
+
+def test_an_old_flow_a_register_entry_and_a_process_note_are_caught_in_prose_but_not_in_data(tmp_path):
+    (tmp_path / "apps" / "flow").mkdir(parents=True)
+    lines = (
+        '"""The outbound call (WORKBOOK FLOW-F27; old hub HUB' + '-F94)."""',
+        'ORIGIN = "<!-- origen: old-hub' + ':HUB-F212 -->"',
+        "# The figures of the Home (STAFF" + "-G02).",
+        'KEY = "STAFF' + '-G02"',
+        "# Every name fits (TODO" + ".md).",
+        "# A business's own domain (HUBS-F17 of the SaaS), FLOW-F27 and SALE-F28.",
+    )
+    (tmp_path / "apps" / "flow" / "http.py").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    assert found_lines(internal_references(["apps/flow/http.py"], root=tmp_path)) == [1, 3, 5]
+
+
+def test_an_end_to_end_title_reads_the_constant_it_interpolates(tmp_path):
+    spec = tmp_path / "tests" / "e2e" / "some.spec.ts"
+    spec.parent.mkdir(parents=True)
+    task = "FIX" + "-HUB-SOME-KEY"
+    lines = (
+        f"const KEY = '{task}';",
+        "const ENTRIES = 21;",
+        "const PLACE = 'Terrace A';",
+        "test(`${KEY}: the panel opens`, async ({ page }) => {",
+        "  await capture(page, `${KEY}-${size.label}`);",
+        "});",
+        "test(`${ENTRIES} entries at ${PLACE}: one jump at most`, async () => {});",
+        "test(`at ${size.label}: the panel opens`, async () => {});",
+        "test.describe(`${KEY} at three sizes`, () => {});",
+        "test(",
+        "  `${KEY}: the panel closes`,",
+        "  async () => {},",
+        ");",
+        "/** The screen in the three sizes (`${KEY}-<size>`). */",
+    )
+    spec.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    assert found_lines(internal_references(["tests/e2e/some.spec.ts"], root=tmp_path)) == [4, 9, 11]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Sales asks Printing for its paper by name (PRINTING-F07; PLAN-HUB «El cobro y la impresión»)",
+        "as the hub databases are named (``hub_<hex>``, PLAN-DB)",
+        "nothing activates a hub's (PLAN-HUB), so an hour read on it is an hour",
+        "the rule of PLAN.md on the order of the work",
+        "as a till's quantity field does (PLAN-SAAS: what is typed is not grouped)",
+    ],
+)
+def test_the_scan_catches_a_planning_document_named_in_prose(text):
+    assert PLAN_DOCUMENT.search(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "the right's source is PLAN, PURCHASE or FREE",
+        "the capture `FIX" + "-HUB-BASE-PLAN-SPACE-CHECK-<width>` names a file",
+        "the plan's price for 2026",
+        "Plan the refund before the payment",
+    ],
+)
+def test_the_scan_leaves_the_word_plan_alone_when_it_names_no_document(text):
+    assert not PLAN_DOCUMENT.search(text)

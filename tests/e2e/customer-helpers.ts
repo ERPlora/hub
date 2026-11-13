@@ -87,7 +87,7 @@ export function cleanUp(): void {
   createdIds.clear();
 }
 
-/** The three sizes every flow of the app is seen at (brief APP-CUSTOMER): a phone, a tablet and a desk. */
+/** The three sizes every flow of the app is seen at: a phone, a tablet and a desk. */
 export const FLOW_VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
   { label: '834', width: 834, height: 1112 },

@@ -339,7 +339,7 @@ def test_the_upcoming_live_appointments_of_a_service_are_counted_with_the_first_
     )
 
 
-# APPOINTMENT-G01 (old-hub:HUB_SHELL-F66) — what the hub tells the team as it happens: a booking or a
+# APPOINTMENT-F28 — what the hub tells the team as it happens: a booking or a
 # cancellation the customer made herself (WhatsApp, the online booking), newest first, with what the notice says
 # (who, which services, the day and the hour ready to say, with whom). One given or cancelled at the front desk is
 # not told (who did it knows); an employee hears only her own agenda's; nothing older than the window.

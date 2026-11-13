@@ -1,4 +1,4 @@
-// flow: STAFF-G01
+// flow: STAFF-F23
 // Staff's «Empleados por rol» on the Home with each role's own colour: the owner of hub
 // `a`, in Spanish, adds the panel from «Personalizar panel»; two roles of colours of their own and a third without one,
 // each with Active people: each bar's fill is its role's colour, and the role without one keeps the panel's. base paints
@@ -97,7 +97,7 @@ async function fills(page: Page): Promise<{ name: string; fill: string; wanted: 
 }
 
 for (const viewport of VIEWPORTS) {
-  test(`STAFF-G01: «Empleados por rol» paints each bar in its role's colour, and the panel's without one, at ${viewport.label}`, async ({ browser }) => {
+  test(`STAFF-F23: «Empleados por rol» paints each bar in its role's colour, and the panel's without one, at ${viewport.label}`, async ({ browser }) => {
     const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
     try {
       const page = await context.newPage();

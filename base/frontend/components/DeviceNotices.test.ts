@@ -1,4 +1,4 @@
-// The device's notices (APPOINTMENT-F28, the old hub's HUB_SHELL-F66): base follows `base.notice.list` live — the rows
+// The device's notices (APPOINTMENT-F28): base follows `base.notice.list` live — the rows
 // the modules on tell, with their texts filled in — and the shell tells each new one once with the installed app's
 // system notice (`erplora_notify`); a browser has the bell. It paints nothing.
 import { ANDROID_NOTIFICATIONS, applySurface, KEEP_LISTENING_COMMAND, PRIMER_ANSWERED_KEY, TOLD_KEY } from '@erplora/ui/shell';

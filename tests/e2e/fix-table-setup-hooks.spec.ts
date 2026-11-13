@@ -66,7 +66,7 @@ async function newZone(context: BrowserContext, name: string): Promise<string> {
   return created.data.id;
 }
 
-test(`${KEY} TABLE-F02: «Tus mesas» pending without tables, it leads to Tables, the first one ticks it and switched off it is pending again`, async ({
+test(`TABLE-F02: «Tus mesas» pending without tables, it leads to Tables, the first one ticks it and switched off it is pending again`, async ({
   browser,
 }) => {
   const { context, page, streams } = await spanishOwner(browser, { width: 1440, height: 900 });
@@ -125,7 +125,7 @@ test(`${KEY} TABLE-F02: «Tus mesas» pending without tables, it leads to Tables
 });
 
 for (const size of VIEWPORTS) {
-  test(`${KEY} TABLE-F02 at ${size.label}: «Tus mesas» pending in sight, then done without a reload once a table is added`, async ({
+  test(`TABLE-F02 at ${size.label}: «Tus mesas» pending in sight, then done without a reload once a table is added`, async ({
     browser,
   }) => {
     const { context, page, streams } = await spanishOwner(browser, { width: size.width, height: size.height });

@@ -3,7 +3,7 @@ payments (record with their reference of the day, approve, send, complete, cance
 
 The cases come from the old module's WORKFLOW and tests, with its silent no-ops turned into refusals:
 a step from the wrong state, or a payment from a method that does not exist or is deactivated, says
-why, changes nothing, spends no number and records no event (PAYMENTS-F02 to F05 «parcial»).
+why, changes nothing, spends no number and records no event (PAYMENT-F02 to F05).
 """
 
 import datetime as dt

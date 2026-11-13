@@ -1,4 +1,4 @@
-"""«Only if…» and «if it fails, carry on» on each step (WORKBOOK FLOW-F25; old hub HUB-F97).
+"""«Only if…» and «if it fails, carry on» on each step (WORKBOOK FLOW-F25).
 
 Any step but «Only continue if…» may carry ``run_if``: when it does not hold the step is skipped, says so
 in the history and the run goes on (later steps read ``steps.<id>.skipped``). An action or a read may

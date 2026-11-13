@@ -1,5 +1,5 @@
 // flow: FLOW-F32 FLOW-F31
-// «Put a photo, a video or a PDF at the top of a WhatsApp» (apps/flow/WORKBOOK.md FLOW-F32; the old hub's HUB-F112),
+// «Put a photo, a video or a PDF at the top of a WhatsApp» (apps/flow/WORKBOOK.md FLOW-F32),
 // end to end as the owner of hub `a`, in each of the three sizes, against the real apps and the run's REAL erplora.com
 // (only Meta is played: whatsapp-helpers.ts). A template made in WhatsApp Manager with a photo at the top (no file of
 // its own in the Hub) is offered in «Send a message»: chosen, the step asks for the photo and says what WhatsApp takes;
