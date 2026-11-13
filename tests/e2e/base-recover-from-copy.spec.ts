@@ -17,7 +17,8 @@
 // Customers, Products, Services and Appointments ticked (with whatever else answers) › «Recover»; the worker's pass
 // brings them back; Recoveries says how each thing came back, apart: «Customers: 1 restored, 1 created», «Product
 // categories: 1 created; Products: 1 restored; Product links to categories: 1 created» (the kept product's link),
-// «Service categories: 1 created; Services: 1 created» and «Appointments: 1 restored»; and `a` has the same card live
+// «Service categories: 1 created; Services: 1 created» and «Appointments: 1 restored; Repeating appointments: 0
+// created» (its series did not change); and `a` has the same card live
 // again in its group, the second one again in that group with its tag and its value, the same product live again in
 // its category back under a new id, the kept product in it again, the same appointment (its number, its history
 // ending in «restored») live again, and the service category and the service live again under new ids, the service in
@@ -293,7 +294,7 @@ for (const { label, viewport } of SIZES) {
       'Product categories: 1 created; Products: 1 restored; Product links to categories: 1 created',
     );
     await expect(recovered).toContainText('Service categories: 1 created; Services: 1 created');
-    await expect(recovered).toContainText('Appointments: 1 restored');
+    await expect(recovered).toContainText('Appointments: 1 restored; Repeating appointments: 0 created');
     await capture(page, `${KEY}-${label}-4-recoveries`, { fullPage: true });
     await recovered.locator('a').first().click();
     await expect(page.locator('.field-what .readonly')).toHaveText(/^(.+, )?Customers, (.+, )?Products, (.+, )?Services(, .+)?$/);

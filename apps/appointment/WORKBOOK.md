@@ -449,7 +449,9 @@ Entra: la clienta, los servicios y el profesional (Clientes, Servicios y Persona
 Citas.
 Sale: la serie activa, sus citas y el aviso `appointment.recurring.created`.
 Si falla: el motivo en el panel; si la serie se creó y alguna fecha no cupo, se listan con su motivo.
-Implicados: SERVICE-F33
+Implicados: SERVICE-F33, BASE-F114 (el personal de ERPlora recupera desde una copia aparte la serie que el negocio ya no
+tiene con esta misma creación, después de sus citas: no reserva ninguna fecha que ya tenga cita; una borrada vuelve la
+misma, APPOINTMENT-F15)
 
 ### APPOINTMENT-F13 Reservar las citas de una serie
 <!-- origen: fi:modules/appointments#command-appointments-recurring-materialize-handler-wasm old:appointments/workflow/periodicas.md#appointments-f13 -->
@@ -514,8 +516,16 @@ Pasos:
    conservan.
 Entra: una serie.
 Sale: `appointment.recurring.updated` o `appointment.recurring.deleted`.
-Si falla: «No se ha podido cambiar el estado de la cita periódica.» y la serie sigue como estaba.
-Implicados: ninguno
+Si falla: «No se ha podido cambiar el estado de la cita periódica.» y la serie sigue como estaba. Una serie borrada por
+error la recupera el personal de ERPlora desde una copia aparte del negocio (BASE-F114) si en la copia seguía
+reservando (activa, con su profesional y sin terminar): vuelve LA MISMA a **Periódicas**, activa, con su clienta, sus
+servicios, su profesional, su repetición y las citas que ya había reservado, con el aviso
+`appointment.recurring.restored`. No reserva nada por sí sola: sus fechas siguientes se reservan con **Reservar citas**
+(APPOINTMENT-F13), que salta las que ya tienen cita. Solo vuelve si hoy se podría crear (APPOINTMENT-F12): si su clienta
+ya no está en el negocio, o su profesional o uno de sus servicios ya no se reservan, no vuelve y Recuperaciones dice por
+qué. Una que el negocio volvió a crear (la misma clienta, que se repite igual el mismo día a la misma hora) se queda como
+está. La que el negocio ya no tiene se crea de nuevo como en APPOINTMENT-F12.
+Implicados: BASE-F114
 
 ### APPOINTMENT-F16 Bloquear tiempo en la agenda
 <!-- origen: fi:modules/appointments#command-appointments-blocked_times-create fi:modules/appointments#command-appointments-blocked_times-delete fi:modules/appointments#query-appointments-blocked_times-list old:appointments/workflow/canales.md#appointments-f16 -->
@@ -820,6 +830,7 @@ confirmación antes de hacerlas.
 | `appointment.appointment.reassigned` | Fusión de fichas | La ficha que queda y la absorbida |
 | `appointment.blocked_time.created`, `.deleted` | Bloqueos | El bloqueo |
 | `appointment.recurring.created`, `.updated`, `.deleted` | Series | La serie |
+| `appointment.recurring.restored` | Una serie borrada vuelve a Periódicas (recuperar desde una copia aparte) | La serie y su clienta |
 | `appointment.settings.updated` | Guardar ajustes con algún cambio | Nada |
 
 Los avisos llevan identificadores, nunca notas ni motivos (pueden llevar datos de salud).

@@ -3062,9 +3062,9 @@ Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, A
 ### BASE-F114 Devolver un negocio a un momento pasado desde el admin de Hubs
 <!-- origen: nuevo (aws#77; PLAN-DB §13 «Restaurar un hub»: los planes de pago prometen volver a cualquier momento de los últimos 14 días) gh:hub#1198 -->
 Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte, y recuperar desde la copia aparte los
-clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías y las citas;
-crear y borrar el clúster temporal es el procedimiento «Devolver un negocio a un momento» de ERPlora/aws; las citas
-periódicas, hub#1327; el grupo, la etiqueta o el campo propio que el negocio borró después de eliminar un cliente que
+clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías, las citas y
+las citas periódicas; crear y borrar el clúster temporal es el procedimiento «Devolver un negocio a un momento» de
+ERPlora/aws; el grupo, la etiqueta o el campo propio que el negocio borró después de eliminar un cliente que
 vuelve, hub#1356; la imagen de un producto eliminado antes de que eliminar se la dejara, hub#1431; que la página
 «Recuperar en el negocio…» nombre la excepción de lo que vuelve a una categoría recuperada, hub#1364; la imagen de un
 servicio recuperado, hub#1429; que Recuperaciones nombre al profesional que no vuelve con su servicio, hub#1375)
@@ -3103,10 +3103,11 @@ Pasos:
      nuevo para el negocio: no arranca ninguna de sus automatizaciones, así que a nadie se le da la bienvenida ni se le
      avisa otra vez de una cita que ya tenía (hub#1307).
      Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes**, **Categorías de productos,
-     Productos, Enlaces de productos a categorías**, **Categorías de servicios, Servicios** y **Citas**). Pulsa
-     **Recuperar**.
+     Productos, Enlaces de productos a categorías**, **Categorías de servicios, Servicios** y **Citas, Citas
+     periódicas**). Pulsa **Recuperar**.
   10. Sale «1 copia aparte devolverá Clientes, Categorías de productos, Productos, Enlaces de productos a categorías,
-      Categorías de servicios, Servicios, Citas a su negocio en unos minutos: Recuperaciones dice cómo fue.». En
+      Categorías de servicios, Servicios, Citas, Citas periódicas a su negocio en unos minutos: Recuperaciones dice cómo
+      fue.». En
       Recuperaciones la ve «Pedida» con la copia, qué se pidió y cuándo.
   11. Unos minutos después dice «Hecha» y qué volvió, cada cosa aparte y con su nombre: «Clientes: se restauró 1, se
       crearon 2» o «Clientes: se crearon 2, 1 sin crear». Su ficha dice además cuáles no volvieron y por qué (por su identificador en la copia, sin datos
@@ -3158,6 +3159,8 @@ Pasos:
       que el negocio ya volvió a crear (otro con el mismo nombre en la misma categoría, que no sea ya uno de la copia; cada
       uno vale por uno solo, así que dos servicios con el mismo nombre vuelven los dos). Pedirlo otra vez no crea nada
       dos veces.
+      Con Citas, «Citas: se restauró 1; Citas periódicas: se restauró 1» (las citas y las citas periódicas que
+      volvieron, cada una con su cuenta).
       Las citas van siempre después de los clientes y los servicios, se pidan en el orden que se pidan, para que cada
       una encuentre a su clienta y sus servicios. Vuelve cada cita que aún no ha llegado y seguía reservada (pendiente o
       confirmada, sin cobrar). Una que el negocio borró y aún guarda vuelve LA MISMA y cuenta como restaurada, tal como
@@ -3172,6 +3175,15 @@ Pasos:
       («appointment.slot_taken: …», «service.service_not_found: …»); una borrada que no vuelve por eso no se crea de
       nuevo. Las que ya pasaron no vuelven, y tampoco una que el negocio tiene (aunque la cancelara) o que volvió a
       reservar (la misma clienta a la misma hora, o su serie en esa fecha).
+      Detrás de las citas van sus citas periódicas, las que en la copia seguían reservando (activas, con su profesional y
+      sin terminar). Una que el negocio borró y aún guarda vuelve LA MISMA a Periódicas y cuenta como restaurada: activa,
+      con su clienta, sus servicios, su profesional, su repetición y las citas que ya había reservado (APPOINTMENT-F15).
+      No reserva nada por sí sola, así que nada se reserva dos veces: sus fechas siguientes las reserva «Reservar citas»,
+      que salta las que ya tienen cita. Una que el negocio ya no tiene se crea de nuevo como la crea Periódicas
+      (APPOINTMENT-F12), para la ficha de su clienta y sus servicios en el negocio como las citas, y reserva solo las
+      fechas de su ventana que aún caben: ninguna en la que ya volvió una cita. Si su clienta ya no está o su profesional
+      o uno de sus servicios ya no se reservan, no vuelve y su motivo lo dice; una que el negocio volvió a crear (la
+      misma clienta, que se repite igual el mismo día a la misma hora) se queda como está.
 Entra: los negocios elegidos, el clúster temporal con su copia y el momento; para recuperar, la copia aparte hecha y qué
 recuperar.
 Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso
@@ -3190,8 +3202,11 @@ producto nuevo por cada producto que ya no tenía, con su aviso de producto crea
 categoría de servicios nueva por cada una que le faltaba, con su aviso de categoría creada (`service.category.created`),
 un servicio nuevo por cada uno que ya no tenía, con su aviso de servicio creado (`service.service.created`) y uno de
 profesional asignado (`service.assignment.assigned`) por cada profesional que vuelve con él, cada cita borrada que aún
-guardaba, viva otra vez con su aviso de cita recuperada (`appointment.appointment.restored`), y una cita nueva por cada
-una que ya no tenía, con su aviso de cita creada (`appointment.appointment.created`), y nada más. Cada uno
+guardaba, viva otra vez con su aviso de cita recuperada (`appointment.appointment.restored`), una cita nueva por cada
+una que ya no tenía, con su aviso de cita creada (`appointment.appointment.created`), cada cita periódica borrada que
+aún guardaba, activa otra vez con su aviso de serie recuperada (`appointment.recurring.restored`), y una cita periódica
+nueva por cada una que ya no tenía, con su aviso de serie creada (`appointment.recurring.created`) y el de cada cita que
+reserva, y nada más. Cada uno
 de esos avisos dice que lo hizo la recuperación (su autor es `copy_recovery:<id>`, el de la fila de Recuperaciones), así
 que ninguna automatización del negocio arranca con ellos (FLOW-F21), sea de algo creado o de algo recuperado; lo que
 solo pone al día lo del negocio con ellos sigue igual (la Bandeja de WhatsApp enlaza a la ficha su conversación), y lo
@@ -3225,9 +3240,10 @@ mantenimiento, hasta que se descongela. Con registros solo del entorno de prueba
 Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
 INVENTORY-F07, INVENTORY-F30, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08,
-SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213,
-hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323,
-hub#1326, hub#1327, hub#1341, hub#1355, hub#1356, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, aws#77
+SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, FLOW-F21,
+WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319,
+hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1355, hub#1356, hub#1365, hub#1373, hub#1375,
+hub#1429, hub#1431, aws#77
 
 ## Para quien lo mantiene
 
