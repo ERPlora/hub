@@ -348,14 +348,15 @@ def test_the_app_declares_what_it_gives_back_its_appointments_first_then_its_ser
     does, and a series created anew books none of the dates its appointments came back on (hub#1327)."""
     appointments, series = apps.get_app_config("appointment").recoverable_from_copy()
 
-    assert (appointments.read, appointments.missing, appointments.create, appointments.deleted, appointments.restore) == (
+    declared = [(one.read, one.missing, one.create, one.deleted, one.restore) for one in (appointments, series)]
+    assert declared[0] == (
         queries.appointments_in_copy,
         queries.appointments_not_in_business,
         "appointment.appointment.create",
         queries.appointments_deleted_in_business,
         "appointment.appointment.restore",
     )
-    assert (series.read, series.missing, series.create, series.deleted, series.restore) == (
+    assert declared[1] == (
         queries.series_in_copy,
         queries.series_not_in_business,
         "appointment.recurring.create",

@@ -131,9 +131,9 @@ class AppointmentConfig(LiveAppConfig):
 
         Then its series still booking (``queries.series_in_copy``), after the appointments so that none of their dates
         is booked twice: each the business holds deleted comes back the same, active, with the appointments it had
-        booked and booking nothing by itself (``queries.series_deleted_in_business``, ``appointment.recurring.restore``),
-        and each it no longer has is created by ``appointment.recurring.create``, Repeating's own
-        (``queries.series_not_in_business``); one made again since stays as it is."""
+        booked and booking nothing by itself (``queries.series_deleted_in_business``,
+        ``appointment.recurring.restore``), and each it no longer has is created by ``appointment.recurring.create``,
+        Repeating's own (``queries.series_not_in_business``); one made again since stays as it is."""
         from apps.appointment import queries  # the models are not loaded yet when this module is
         from base.recovery import Recoverable
 

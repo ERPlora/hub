@@ -1560,7 +1560,9 @@ def _as_created_here(one: dict, customer: UUID, services: dict[UUID, UUID]) -> d
     ``customer``, the business's card of hers, and each of its services the business's (``services``, from
     ``services_in_business``) or, without one, the copy's, which the create refuses with why."""
     create = {key: value for key, value in one.items() if key not in ("id", "customer_card", "services_in_copy")}
-    create["services"] = [{"service_id": services.get(line["service_id"], line["service_id"])} for line in one["services"]]
+    create["services"] = [
+        {"service_id": services.get(line["service_id"], line["service_id"])} for line in one["services"]
+    ]
     return {"id": one["id"], "customer_id": customer} | create
 
 
@@ -1614,10 +1616,14 @@ def series_in_copy(conn) -> list[dict]:
     ]
 
 
+#: What makes two series of a customer the same one: they repeat the same way, on the same day, at the same time.
+SAME_RULE = ("frequency", "day_of_week", "time")
+
+
 def _made_again(customer: UUID, rule: dict) -> bool:
-    """Whether the business holds a live series of ``customer`` that repeats as ``rule`` says, on its day and at its
-    time: the same series made again since, by hand or brought back already, whoever does it."""
-    same = {field: rule[field] for field in ("frequency", "day_of_week", "time")}
+    """Whether the business holds a live series of ``customer`` with ``rule``'s ``SAME_RULE``: the same series made
+    again since, by hand or brought back already, whoever does it."""
+    same = {field: rule[field] for field in SAME_RULE}
     return Recurring.objects.filter(deleted_at__isnull=True, customer_id=customer, **same).exists()
 
 
@@ -1627,12 +1633,9 @@ def series_deleted_in_business(series: list[dict]) -> list[dict]:
     same by its id, whatever the copy says of it; never one made again since, as the business holds it (that one
     stays)."""
     held = Recurring.objects.filter(pk__in=[one["id"] for one in series], deleted_at__isnull=False)
-    deleted = {row["id"]: row for row in held.values("id", "customer_id", "frequency", "day_of_week", "time")}
-    return [
-        one
-        for one in series
-        if one["id"] in deleted and not _made_again(deleted[one["id"]]["customer_id"], deleted[one["id"]])
-    ]
+    rows = held.values("id", "customer_id", *SAME_RULE)
+    back = {row["id"] for row in rows if not _made_again(row["customer_id"], row)}
+    return [one for one in series if one["id"] in back]
 
 
 def series_not_in_business(series: list[dict]) -> list[dict]:
