@@ -21,6 +21,17 @@ const POS_ITEM_TILE = resolve(E2E_DIR, '..', '..', 'apps', 'sale', 'frontend', '
 const read = (path: string): string => readFileSync(path, 'utf8');
 const tillSpecs = (): string[] => readdirSync(E2E_DIR).filter((name) => /^(sale|kitchen|table)-.*\.spec\.ts$/.test(name));
 
+/** Each line of `files` that `reads` finds, after its file's name. */
+function offenders(files: [name: string, text: string][], reads: (source: string) => string[]): string[] {
+  return files.flatMap(([name, text]) => reads(text).map((line) => `${name}: ${line.trim()}`));
+}
+
+/** `reads` finds each of `copies` as one copy of the old pattern, and none of `others`. */
+function expectReadsAsOne(reads: (source: string) => string[], copies: string[], others: string[]): void {
+  for (const copy of copies) expect(reads(copy), copy).toHaveLength(1);
+  for (const other of others) expect(reads(other), other).toEqual([]);
+}
+
 /** The lines of `source` that decide on the cart button by reading its visibility. */
 function fabVisibilityReads(source: string): string[] {
   return source.split('\n').filter((line) => /\bfab\.isVisible\(\)|pos-cart-fab[^\n]*\.isVisible\(\)/.test(line));
@@ -32,14 +43,18 @@ describe('the Sales, Kitchen and Tables specs and the till’s cart', () => {
   });
 
   it('no Sales, Kitchen or Tables spec decides on the cart button’s visibility: they call openTillCart', () => {
-    const offenders = tillSpecs().flatMap((name) => fabVisibilityReads(read(join(E2E_DIR, name))).map((line) => `${name}: ${line.trim()}`));
-    expect(offenders).toEqual([]);
+    expect(offenders(tillSpecs().map((name) => [name, read(join(E2E_DIR, name))]), fabVisibilityReads)).toEqual([]);
   });
 
   it('the check reads a copy of the old pattern as one', () => {
-    expect(fabVisibilityReads("  const fab = page.locator('[data-testid=pos-cart-fab]');\n  if (await fab.isVisible()) await fab.click();")).toHaveLength(1);
-    expect(fabVisibilityReads("if (await page.locator('[data-testid=pos-cart-fab]').isVisible()) {")).toHaveLength(1);
-    expect(fabVisibilityReads("await expect(shown(page).locator('[data-testid=pos-cart-fab]')).toBeVisible();")).toEqual([]);
+    expectReadsAsOne(
+      fabVisibilityReads,
+      [
+        "  const fab = page.locator('[data-testid=pos-cart-fab]');\n  if (await fab.isVisible()) await fab.click();",
+        "if (await page.locator('[data-testid=pos-cart-fab]').isVisible()) {",
+      ],
+      ["await expect(shown(page).locator('[data-testid=pos-cart-fab]')).toBeVisible();"],
+    );
   });
 
   it('openTillCart’s phone rule is the till’s own (PosPage.vue: PHONE, NARROW_TILL)', () => {
@@ -82,14 +97,18 @@ describe('the till’s grid in the e2e', () => {
   }, NO_CLOCK);
 
   it('no spec looks for a tile of the grid as a native button: they call expectFirstTile', async () => {
-    const offenders = (await gridReaders()).flatMap(([name, text]) => nativeTileReads(text).map((line) => `${name}: ${line.trim()}`));
-    expect(offenders).toEqual([]);
+    expect(offenders(await gridReaders(), nativeTileReads)).toEqual([]);
   }, NO_CLOCK);
 
   it('the check reads a copy of the old pattern as one', () => {
-    expect(nativeTileReads("  await expect(grid.locator(':scope > button').first()).toHaveAttribute('data-testid', /^pos-menu-/);")).toHaveLength(1);
-    expect(nativeTileReads("  await expect(shown(page).locator('.pos-grid > button').first()).toHaveAttribute('data-testid', id);")).toHaveLength(1);
-    expect(nativeTileReads("  const keypad = sheet.locator('[data-testid=sale-checkout-keypad] > button');")).toEqual([]);
+    expectReadsAsOne(
+      nativeTileReads,
+      [
+        "  await expect(grid.locator(':scope > button').first()).toHaveAttribute('data-testid', /^pos-menu-/);",
+        "  await expect(shown(page).locator('.pos-grid > button').first()).toHaveAttribute('data-testid', id);",
+      ],
+      ["  const keypad = sheet.locator('[data-testid=sale-checkout-keypad] > button');"],
+    );
   });
 
   it('expectFirstTile looks for the tile the till paints: PosItemTile.vue’s root', () => {
@@ -117,16 +136,22 @@ describe('the photo of a till tile in the e2e', () => {
   }, NO_CLOCK);
 
   it('no spec reads a tile’s photo or initials through a style class of the tile: they call tilePhotoLoaded', async () => {
-    const offenders = (await e2eFiles()).flatMap(([name, text]) => pictureByStyleClass(text).map((line) => `${name}: ${line.trim()}`));
-    expect(offenders).toEqual([]);
+    expect(offenders(await e2eFiles(), pictureByStyleClass)).toEqual([]);
   }, NO_CLOCK);
 
   it('the check reads a copy of the old pattern as one', () => {
-    expect(pictureByStyleClass("    await expect(tile.locator('.pos-menu__thumb img')).toHaveAttribute('src', LIBRARY_URL);")).toHaveLength(1);
-    expect(pictureByStyleClass("    expect(await photoLoaded(tile(page, own).locator('.pos-tile__thumb'))).toBe(512);")).toHaveLength(1);
-    expect(pictureByStyleClass("    const initials = tile(page, toast).locator('.pos-tile__thumb');")).toHaveLength(1);
-    // The tile's layout is measured by its classes on purpose (sale-pos-tile-layout.spec.ts).
-    expect(pictureByStyleClass("        thumb: rect('.pos-tile__thumb'),")).toEqual([]);
-    expect(pictureByStyleClass('    const photo = tile.getByAltText(daily.name, { exact: true });')).toEqual([]);
+    expectReadsAsOne(
+      pictureByStyleClass,
+      [
+        "    await expect(tile.locator('.pos-menu__thumb img')).toHaveAttribute('src', LIBRARY_URL);",
+        "    expect(await photoLoaded(tile(page, own).locator('.pos-tile__thumb'))).toBe(512);",
+        "    const initials = tile(page, toast).locator('.pos-tile__thumb');",
+      ],
+      [
+        // The tile's layout is measured by its classes on purpose (sale-pos-tile-layout.spec.ts).
+        "        thumb: rect('.pos-tile__thumb'),",
+        '    const photo = tile.getByAltText(daily.name, { exact: true });',
+      ],
+    );
   });
 });
