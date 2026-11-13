@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e00e84b559e6c52b61f4253a3a51adad8b65f25e1ec772687975cc0618dfaa41 -->
+<!-- generated from WORKBOOK.md sha256:ba8402f0abae83218c788a0d06860d68cb13da1ca9cf46164d21a1139f6bbd40 -->
 
 ## What it is for and who it is for
 
@@ -986,8 +986,10 @@ Out: the item with its library image. The business does not keep a copy of the i
 is, so it does not use space of its plan. Inventory tells of the change (`inventory.product.updated`) and
 the till shows it without reloading (INVENTORY-F32). Choosing another one replaces it; if the previous
 one was an own photo (INVENTORY-F31), it is deleted from the business's folder. "Remove photo" leaves the
-item with its initials. The candidates come from `inventory.product.suggest_image`, the search is
-`base.catalog_image.search` and the photo is set or removed by `inventory.product.set_image`.
+item with its initials. Deleting the item leaves it its library image (only an own photo is deleted), and if the
+ERPlora staff recover it from a separate copy it comes back with the one it had (INVENTORY-F34, BASE-F114). The
+candidates come from `inventory.product.suggest_image`, the search is `base.catalog_image.search` and the photo is set
+or removed by `inventory.product.set_image`.
 If it fails: if the library does not answer, "The image library could not be loaded." with "Retry", and
 the product can still be saved without a photo. No results: "No image matches your search. Try another
 word or upload a photo.". The assistant that finds no candidates says so and proposes uploading a photo
@@ -996,7 +998,7 @@ from the card. An image the library no longer has is refused when the photo is s
 another one." with "Retry", and the item keeps the photo it had (through the assistant or the API
 nothing is saved). Whoever cannot change products does not see "Photo", and the app also refuses it
 through the assistant or the API.
-Involved: INVENTORY-F01, INVENTORY-F02, INVENTORY-F32, BASE-F93
+Involved: INVENTORY-F01, INVENTORY-F02, INVENTORY-F32, INVENTORY-F34, BASE-F93, BASE-F114
 
 ### INVENTORY-F31 Upload the item's own photo
 Status: done
@@ -1084,7 +1086,8 @@ Steps:
    (BASE-F114, steps 6 to 11).
 3. Each product the business deleted and still holds comes back to **Products**, to the till and to the sale
    catalog: THE SAME product, with its SKU, its EAN-13, its categories that are still live and the one that comes back
-   with the recovery if the business deleted it afterwards (INVENTORY-F07), its tax category and its stock, and in **Movements** its whole history (initial, receptions, sales, counts and write-offs) is still its own.
+   with the recovery if the business deleted it afterwards (INVENTORY-F07), its tax category, its stock and its image
+   of the library, and in **Movements** its whole history (initial, receptions, sales, counts and write-offs) is still its own.
    It comes back active and on sale, as unarchiving does in Odoo or Square: if it was deactivated or marked as sold
    out before it was deleted, that is done again by hand (INVENTORY-F03, INVENTORY-F29). Recoveries counts it among
    the restored Products.
@@ -1093,11 +1096,13 @@ Out: the product live again, active and on sale, with none of its other data cha
 notice (`inventory.product.restored`), with the product as it comes back.
 If it fails: it does not come back if the business has already made another product with its SKU or its EAN-13 since
 it deleted it: the one it made stays, and the recovery neither counts nor creates it. A product the business no longer
-has at all is created again (INVENTORY-F01), with no stock. On a live product it does not fail: it answers well and
-announces again. Its photo does not come back: its own was erased when it was deleted (INVENTORY-F31) and the library
-one was taken off it (hub#1319). What the other apps hung from it (its prices in the price lists, its modifier groups,
-its options in the menus) was erased when it was deleted and does not come back with it yet (hub#1343).
-Involved: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29,
+has at all is created again (INVENTORY-F01), with no stock, with the image of the library it had in the copy. On a
+live product it does not fail: it answers well and announces again. Its own photo does not come back: it was erased
+when it was deleted (INVENTORY-F31). The image of the library does, because deleting leaves it; one deleted before
+deleting left it comes back without it (hub#1431). What the other apps hung from it (its prices in the price lists,
+its modifier groups, its options in the menus) was erased when it was deleted and does not come back with it yet
+(hub#1343).
+Involved: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29, INVENTORY-F30,
 PRICING-F14, MODIFIER-F09, COMBO-F13
 
 ## What the verticals share

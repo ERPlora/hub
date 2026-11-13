@@ -3065,9 +3065,9 @@ Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte,
 clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías y las citas;
 crear y borrar el clúster temporal es el procedimiento «Devolver un negocio a un momento» de ERPlora/aws; las citas
 periódicas, hub#1327; el grupo, la etiqueta o el campo propio que el negocio borró después de eliminar un cliente que
-vuelve, hub#1356; la imagen de un producto recuperado, hub#1319; que la página «Recuperar en el negocio…» nombre la
-excepción de lo que vuelve a una categoría recuperada, hub#1364; la imagen de un servicio recuperado, hub#1319; que
-Recuperaciones nombre al profesional que no vuelve con su servicio, hub#1375)
+vuelve, hub#1356; la imagen de un producto eliminado antes de que eliminar se la dejara, hub#1431; que la página
+«Recuperar en el negocio…» nombre la excepción de lo que vuelve a una categoría recuperada, hub#1364; la imagen de un
+servicio recuperado, hub#1429; que Recuperaciones nombre al profesional que no vuelve con su servicio, hub#1375)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
 copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
@@ -3127,12 +3127,14 @@ Pasos:
       que ya volvió a crear (otra viva con su nombre, sin distinguir mayúsculas ni espacios, que no sea ya una de la
       copia; la más antigua si hay dos) no se repite: se usa la suya, tal como está. Después, un producto que el negocio
       eliminó y aún guarda vuelve EL MISMO y cuenta como restaurado, con su stock, sus categorías que siguen vivas, la que
-      acaba de volver si la tenía en la copia, y en Movimientos su historial entero, activo y a la venta (INVENTORY-F34).
+      acaba de volver si la tenía en la copia, su imagen de la librería y en Movimientos su historial entero, activo y a
+      la venta (INVENTORY-F34).
       Uno que el negocio ya no tiene vuelve como uno nuevo, creado como lo crea la pantalla de Productos, con su nombre,
       SKU, EAN-13, descripción, tipo, precio, coste, unidades, umbral, control de stock y categoría fiscal, activo o
       desactivado como estaba y en sus categorías: la misma si el negocio aún la tiene, y si no, la que acaba de volver
       o la que el negocio volvió a crear con su nombre; sin stock, que se cuenta (INVENTORY-F14), porque el de la copia es
-      de otro día, y sin su imagen (hub#1319). No vuelve ni se repite uno que el negocio ya volvió a dar de alta (otro
+      de otro día, y con la imagen de la librería que tenía (una que la librería ya no tiene, no; una foto propia,
+      nunca, porque se borró con el producto). No vuelve ni se repite uno que el negocio ya volvió a dar de alta (otro
       vivo con su SKU o su EAN-13). Al final, los productos que el negocio conserva vivos y estaban en la copia en una
       categoría que acaba de volver vuelven a ella, sin perder ninguna otra (INVENTORY-F07): es lo único que la
       recuperación toca de lo que el negocio tiene, y se cuenta aparte, como «Enlaces de productos a categorías». Una
@@ -3150,7 +3152,7 @@ Pasos:
       hacían y el negocio sigue teniendo de alta, cada uno con sus minutos y su precio propios, asignados como los asigna
       Servicios (SERVICE-F31): como su servicio principal si el negocio no le ha dado otro desde entonces, y apagado si lo
       estaba. A quien Personal dio de baja, o el negocio ya no tiene, no se le asigna, porque ya no se le puede reservar
-      (Recuperaciones aún no lo nombra, hub#1375). Sin su imagen (hub#1319). Uno archivado sigue
+      (Recuperaciones aún no lo nombra, hub#1375). Sin su imagen (hub#1429). Uno archivado sigue
       en el negocio y no vuelve (se restaura en Servicios), tampoco uno que la copia tenía archivado, y no se repite uno
       que el negocio ya volvió a crear (otro con el mismo nombre en la misma categoría, que no sea ya uno de la copia; cada
       uno vale por uno solo, así que dos servicios con el mismo nombre vuelven los dos). Pedirlo otra vez no crea nada
@@ -3220,10 +3222,10 @@ mantenimiento, hasta que se descongela. Con registros solo del entorno de prueba
 (VERIFACTU-F28). El personal de soporte ve la lista, Copias aparte y Recuperaciones, pero no las acciones.
 Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
-INVENTORY-F07, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08, SERVICE-F31,
-APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282,
-hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327,
-hub#1341, hub#1356, hub#1365, hub#1373, hub#1375, aws#77
+INVENTORY-F07, INVENTORY-F30, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08,
+SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213,
+hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323,
+hub#1326, hub#1327, hub#1341, hub#1356, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, aws#77
 
 ## Para quien lo mantiene
 
