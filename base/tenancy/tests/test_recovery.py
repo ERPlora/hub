@@ -977,7 +977,7 @@ def test_the_apps_that_answer_and_never_one_whose_records_reach_the_tax_authorit
     answering = {config.label for config in all_live_app_configs() if hasattr(config, recovery.HOOK)}
     fiscal = {config.label for config in all_live_app_configs() if hasattr(config, "fiscal_record_states")}
 
-    assert answering == {"customer", "inventory", "service", "appointment"}
+    assert answering == {"customer", "inventory", "pricing", "service", "appointment"}
     assert not answering & fiscal
     assert set(recovery.recoverable_apps()) == answering
 

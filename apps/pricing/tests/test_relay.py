@@ -132,6 +132,30 @@ def test_a_product_deleted_in_inventory_leaves_every_list_and_switches_off_its_r
     assert [row.id for row in page.rows] == [kept.id]
 
 
+def test_a_product_back_from_the_separate_copy_gets_its_rules_on_again_through_the_relay(tick):
+    from live.context import system_context
+
+    shampoo = make_product("Shampoo", "SH-1")
+    make_rule("SH10", applies_to="product", product=shampoo)
+    make_rule("SHOFF", applies_to="product", product=shampoo, is_active=False)
+    run("inventory.product.delete", {"id": str(shampoo.id)})
+    tick()
+    assert rule_active("SH10") is False
+    # What the recovery from a separate copy runs (INVENTORY-F34): the same product, live again.
+    restore = get("inventory.product.restore")
+    restore(system_context(A), restore.input.model_validate({"id": str(shampoo.id)}))
+    assert rule_active("SH10") is False
+
+    tick()
+
+    assert delivery_to_pricing("inventory.product.restored") == ("delivered", 1)
+    # The one its deletion switched off is on again; the one that was off before stays off.
+    assert (rule_active("SH10"), rule_active("SHOFF")) == (True, False)
+    assert notices("pricing.rule.activated") == [{"id": str(DiscountRule.objects.get(code="SH10").id)}]
+    tick()
+    assert len(notices("pricing.rule.activated")) == 1
+
+
 # ── Inventory deletes a category ──────────────────────────────────────────────────────────────────
 
 
