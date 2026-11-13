@@ -15,7 +15,7 @@ import { createHmac } from 'node:crypto';
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown, untilStill } from './helpers';
-import { cleanInvoices, ensureIssuer, issuedIds, issuerNow, type IssuerOut, restoreIssuer, snapshotSeries } from './invoice-helpers';
+import { ensureIssuer, issuedIds, issuerBackAndInvoicesGone, issuerNow, type IssuerOut, snapshotSeries } from './invoice-helpers';
 import { STACK } from './stack';
 
 const KEY = 'FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN';
@@ -113,13 +113,7 @@ test.beforeAll(async ({ browser }) => {
 
 test.afterAll(async ({ browser }) => {
   if (original) await registerIn(original.country);
-  if (issuer) {
-    const context = await browser.newContext({ baseURL: A });
-    await login(await context.newPage(), A, '/invoice/invoices');
-    await restoreIssuer(context, issuer);
-    await context.close();
-  }
-  cleanInvoices();
+  await issuerBackAndInvoicesGone(browser, issuer);
 });
 
 test(`VERIFACTU-F01: a business in Poland issues its invoices without a VeriFactu record or receipt, in 390, 834 and 1440`, async ({ page, context }) => {
