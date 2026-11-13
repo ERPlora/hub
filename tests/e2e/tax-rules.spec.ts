@@ -11,7 +11,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, shot, shown, THREE_SIZES_TALL_TABLET as VIEWPORTS } from './helpers';
 import { noHorizontalScroll } from './service-helpers';
-import { cleanUp, freshCategory, type Rule, rulesOf } from './tax-helpers';
+import { cleanUp, freshCategory, pickSelect as pick, type Rule, rulesOf } from './tax-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 // What this file made goes after it: categories are never deleted by the app (tax-helpers.ts).
@@ -24,15 +24,6 @@ async function choose(page: Page, field: Locator, testid: string, text: string, 
   await input.fill(text);
   await page.locator(`[data-testid="${testid}-option-${value}"]`).click();
   await expect(page.locator(`[data-testid="${testid}-option-${value}"]`)).toHaveCount(0);
-}
-
-/** Opens an `ion-select` and picks the option whose text is `text` (popover interface). */
-async function pick(page: Page, select: Locator, text: string | RegExp): Promise<void> {
-  await select.click();
-  const popover = page.locator('ion-popover').last();
-  await popover.waitFor({ state: 'visible' });
-  await popover.locator('ion-radio, ion-item').filter({ hasText: text }).first().click();
-  await expect(popover).toBeHidden();
 }
 
 const rows = (page: Page) => shown(page).locator('[data-testid=tax-rules-row]');
