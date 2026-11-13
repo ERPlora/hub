@@ -572,6 +572,7 @@ def deliver_once(error: Exception, at: dt.datetime) -> EventDelivery:
         at,
         deliver=deliver,
         listeners=lambda _: [],
+        carried=relay.carried,
         max_depth=relay.MAX_EVENT_DEPTH,
         max_attempts=relay.MAX_ATTEMPTS,
         backoff=relay.backoff,
