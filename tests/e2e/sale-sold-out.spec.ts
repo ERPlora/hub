@@ -9,7 +9,20 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanSales, drawerOff, expectTakes, linesOf, openTillCart, restoreDrawer, saleByKey, stamp, tillIsPhone } from './sale-helpers';
+import {
+  type Box,
+  cleanSales,
+  drawerOff,
+  expectTakes,
+  linesOf,
+  openTillCart,
+  restoreDrawer,
+  saleByKey,
+  stamp,
+  TILL_TILE,
+  tillGrid,
+  tillIsPhone,
+} from './sale-helpers';
 
 const RUN = stamp();
 let croquettes: Product;
@@ -178,4 +191,94 @@ test('SALE-F07 (hub#442): the sold-out notice goes on its own once the article i
   await tillReady(page);
   await expect(tile(page, bravas)).toHaveClass(/pos-tile--sold-out/);
   await expect(shown(page).locator('[data-testid=pos-tap-notice]')).toHaveCount(0);
+});
+
+/** One tile of the grid on screen: its frames (the tile and its native button, both of which clip what does not fit; the
+ *  button's content goes through its slot, so a sweep of the page does not see the cut), its photo and its texts. */
+interface TileParts {
+  id: string;
+  frames: Box[];
+  photo: Box | null;
+  texts: Record<string, Box | null>;
+}
+
+/** Every tile of `grid` (run in the page, `tillGrid(page).evaluate(tilesOf, TILL_TILE)`). */
+function tilesOf(grid: Element, selector: string): TileParts[] {
+  const box = (node: Element | null | undefined): Box | null => {
+    if (!node) return null;
+    const r = node.getBoundingClientRect();
+    return { top: r.top, bottom: r.bottom, left: r.left, right: r.right };
+  };
+  return [...grid.querySelectorAll(selector)].map((tile) => ({
+    id: tile.getAttribute('data-testid') ?? '',
+    frames: [box(tile)!, box(tile.shadowRoot?.querySelector('button'))!],
+    photo: box(tile.querySelector('.pos-tile__thumb')),
+    texts: Object.fromEntries(['name', 'badge', 'price'].map((part) => [part, box(tile.querySelector(`.pos-tile__${part}`))])),
+  }));
+}
+
+/** How far apart the highest and the lowest of `values` are. */
+const spread = (values: number[]): number => Math.max(...values) - Math.min(...values);
+
+const TILE_SIZES = [
+  { label: '375', width: 375, height: 667 },
+  { label: '820', width: 820, height: 1180 },
+  { label: '1440', width: 1440, height: 900 },
+] as const;
+
+// Last in the file: the articles it adds stay until the file's cleanup.
+test.describe('SALE-F07 (hub#1366): a catalogue longer than the screen', () => {
+  // More tiles than fit in the grid at any of the sizes, as a real catalogue: the grid scrolls and has no room to spare.
+  test.beforeAll(async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: A });
+    const page = await context.newPage();
+    await login(page, A, '/sale/pos');
+    for (let n = 1; n <= 24; n++) {
+      await createProduct(context, { name: `E2E Filler ${RUN} ${n}`, sku: `E2E-SO-F${n}-${RUN}`, price: 300, tax_category_key: 'restaurant.food' });
+    }
+    await context.close();
+  });
+
+  for (const size of TILE_SIZES) {
+    test(`a sold-out tile shows its name, «Sold out» and its price whole at ${size.label}, lined up with the tiles beside it`, async ({ page }) => {
+      await page.setViewportSize({ width: size.width, height: size.height });
+      await login(page, A, '/sale/pos');
+      await tillReady(page);
+      await expect(tile(page, croquettes).locator('.pos-tile__badge')).toBeVisible();
+      // The cut only shows in a grid with no room to spare: in one that does not scroll, a fixed-height tile passes too.
+      const scrolls = await tillGrid(page).evaluate((grid) => grid.scrollHeight > grid.clientHeight);
+      expect(scrolls, `the grid scrolls at ${size.label}: the catalogue is longer than the screen`).toBe(true);
+      const tiles = await tillGrid(page).evaluate(tilesOf, TILL_TILE);
+      const soldOut = tiles.find((each) => each.id === `pos-product-${croquettes.id}`);
+      expect(soldOut?.texts.badge, `${croquettes.name} in the grid with its «Sold out»`).toBeTruthy();
+
+      for (const each of tiles) {
+        for (const [part, text] of Object.entries(each.texts)) {
+          if (!text) continue;
+          for (const frame of each.frames) {
+            const where = `${each.id} at ${size.label}: its ${part} ${JSON.stringify(text)} inside its tile ${JSON.stringify(frame)}`;
+            expect.soft(text.top, where).toBeGreaterThanOrEqual(frame.top - 0.5);
+            expect.soft(text.bottom, where).toBeLessThanOrEqual(frame.bottom + 0.5);
+            expect.soft(text.left, where).toBeGreaterThanOrEqual(frame.left - 0.5);
+            expect.soft(text.right, where).toBeLessThanOrEqual(frame.right + 0.5);
+          }
+        }
+      }
+
+      // A row is as tall as its tallest tile; the others in it keep their photo at the top, their name under it and
+      // their price at the bottom, on the same lines as the sold-out tile's.
+      const rows = new Map<number, TileParts[]>();
+      for (const each of tiles) rows.set(Math.round(each.frames[0].top), [...(rows.get(Math.round(each.frames[0].top)) ?? []), each]);
+      expect(rows.get(Math.round(soldOut!.frames[0].top))!.length, `the sold-out tile has others beside it at ${size.label}`).toBeGreaterThan(1);
+      for (const [top, row] of rows) {
+        const ids = row.map((each) => each.id).join(', ');
+        for (const each of row) {
+          expect.soft(Math.abs(each.photo!.top - each.frames[1].top), `${each.id} at ${size.label}: its photo at the top of its tile`).toBeLessThanOrEqual(1);
+        }
+        expect.soft(spread(row.map((each) => each.texts.name!.top)), `the row at ${top} (${ids}): names on one line`).toBeLessThanOrEqual(1);
+        expect.soft(spread(row.map((each) => each.texts.price!.bottom)), `the row at ${top} (${ids}): prices on one line`).toBeLessThanOrEqual(1);
+      }
+      await capture(page, `HUB-1366-sold-out-tile-${size.label}`);
+    });
+  }
 });
