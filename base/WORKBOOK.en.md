@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e8b9ce598239ac84079bff76ee574026210a628168d1509707548677fa21bdb6 -->
+<!-- generated from WORKBOOK.md sha256:f03cab73224d442a43109239a66d805b1b73731b213761e7173e232b85ce3b78 -->
 
 ## What it is for and who it is for
 
@@ -2935,9 +2935,9 @@ Status: done (the action and the restore, in its place or to a separate copy, an
 the customers that were lost, the deleted ones as they were, the products, the services with their categories and the
 appointments; making and deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of
 ERPlora/aws; repeating appointments, hub#1327; the group, tag or own field the business deleted after deleting a
-customer who comes back, hub#1356; the image of a product brought back, hub#1319; the products the business keeps live
-in a product category that comes back, hub#1373; the image of a service brought back, hub#1319; Recoveries naming the
-professional who does not come back with their service, hub#1375)
+customer who comes back, hub#1356; the image of a product brought back, hub#1319; the page "Recover into the
+business…" naming the exception of what goes back into a recovered category, hub#1364; the image of a service brought
+back, hub#1319; Recoveries naming the professional who does not come back with their service, hub#1375)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -2974,10 +2974,11 @@ Steps:
      as it is; that records for the tax authority are never brought back and that the business stays open. And that
      what comes back is nothing new to the business: it starts none of its automations, so nobody is welcomed or told
      again of a booking they already had (hub#1307). Below, "What to bring back", with what can be brought ticked
-     (today, **Customers**, **Product categories, Products**, **Service categories, Services** and **Appointments**).
-     They press **Recover**.
-  10. "1 separate copy will give back Customers, Product categories, Products, Service categories, Services,
-      Appointments into its business within a few minutes: Recoveries says how it went." appears. In Recoveries they
+     (today, **Customers**, **Product categories, Products, Product links to categories**, **Service categories,
+     Services** and **Appointments**). They press **Recover**.
+  10. "1 separate copy will give back Customers, Product categories, Products, Product links to categories, Service
+      categories, Services, Appointments into its business within a few minutes: Recoveries says how it went." appears.
+      In Recoveries they
       see it "Asked" with the copy, what
       was asked and when.
   11. A few minutes later it says "Done" and what came back: "Customers: 1 restored, 2 created" or "Customers: 2
@@ -2991,8 +2992,8 @@ Steps:
       does not come back. A deleted card that comes back does not get back the group, tag or field the business deleted
       afterwards (hub#1356). A card whose personal data was erased (GDPR) or one merged into another never
       comes back, and one the business has already made again (the same name, phone and email) is not repeated. With
-      Products, "Product categories, Products: 1 restored, 2 created" (the categories and the products that came back,
-      together, hub#1355): first each product category the business no longer has (it deleted or lost it) comes back as a new one,
+      Products, "Product categories, Products, Product links to categories: 1 restored, 3 created" (the categories, the
+      products and the links that came back, together, hub#1355): first each product category the business no longer has (it deleted or lost it) comes back as a new one,
       created as the Categories screen creates it, with its name, slug, description, icon, colour, order and tax
       category; the deleted one stays deleted (INVENTORY-F07). One the business keeps, even renamed, is the same one, and
       one it has already made again (another live one with its name, case and spaces aside, that is not already one of
@@ -3003,10 +3004,12 @@ Steps:
       with its name, SKU, EAN-13, description, type, price, cost, units, threshold, stock control and tax category, active
       or inactive as it was and in its categories: the same one if the business still has it, and otherwise the one that
       just came back or the one the business made again with its name; with no stock, which is counted (INVENTORY-F14),
-      because the copy's is another day's, and without its image (hub#1319). The products the business keeps live stay
-      as they are: those that were in a category that comes back stay without it (hub#1373). One the business has
-      already created again (another live one with its SKU or its
-      EAN-13) neither comes back nor is repeated. With Services, "Service categories, Services: 3 created" (the categories
+      because the copy's is another day's, and without its image (hub#1319). One the business has already created again
+      (another live one with its SKU or its EAN-13) neither comes back nor is repeated. Last, the products the business
+      keeps live that were, in the copy, in a category that has just come back go back into it, without losing any other
+      (INVENTORY-F07): it is the only thing the recovery touches of what the business has, and it is counted apart, as
+      "Product links to categories". A category the business keeps (even with products taken out of it) or made again by
+      hand is not filled. With Services, "Service categories, Services: 3 created" (the categories
       and the services that came back, together): first each service category the business no longer has (it deleted or
       lost it) comes back as a new one, created as the Categories screen creates it, with its name, description, icon,
       colour and order, inside its parent category if the business has it or it comes back too (otherwise at the root);

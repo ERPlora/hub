@@ -453,11 +453,14 @@ Entra: la categoría elegida.
 Sale: la categoría queda eliminada y todos sus productos, activos o no, desvinculados en el mismo
 paso; los productos siguen. El TPV deja de agruparlos bajo ella.
 Una categoría eliminada por error la recupera el personal de ERPlora desde una copia aparte (BASE-F114): vuelve como
-una nueva, con su nombre, slug, descripción, icono, color, orden y categoría fiscal, antes que los productos, y en ella
-los productos que vuelven con la recuperación: los que el negocio eliminó y aún guarda (los mismos, INVENTORY-F34) y
-los que ya no tiene (creados de nuevo). Una categoría que el negocio conserva, aunque la haya renombrado, es la misma y
-no se repite; tampoco una que volvió a crear con su nombre (sin distinguir mayúsculas ni espacios): se usa la suya, tal
-como está. Los productos que el negocio conserva vivos se quedan como están, sin ella (hub#1373).
+una nueva, con su nombre, slug, descripción, icono, color, orden y categoría fiscal, antes que los productos, y con lo
+que tenía dentro en la copia: los productos que el negocio eliminó y aún guarda (los mismos, INVENTORY-F34), los que ya
+no tiene (creados de nuevo) y, al final, los que el negocio conserva vivos, que vuelven a ella sin perder ninguna otra
+categoría. Recuperaciones cuenta aparte esos enlaces («Enlaces de productos a categorías»). Una categoría que el negocio
+conserva, aunque la haya renombrado o le haya quitado productos, es la misma: no se repite ni se rellena; tampoco una
+que volvió a crear con su nombre (sin distinguir mayúsculas ni espacios): se usa la suya, tal como está, y solo entran
+en ella los productos que se crean de nuevo. Un producto eliminado que vuelve (INVENTORY-F34) no entra en la que el
+negocio rehízo a mano.
 Si falla: «No se pudo eliminar la categoría» (o el motivo) encima de la tabla.
 Implicados: KITCHEN-F04, SALE-F01, BASE-F114, INVENTORY-F34
 
@@ -1224,7 +1227,7 @@ puede ver, o lo que ya no existe, no sale.
 | Marca un producto como agotado o lo vuelve a poner a la venta | cambiar productos | un clic | F29 | `inventory.product.set_sold_out` |
 | Pone la foto de un producto, de la librería, o se la quita | cambiar productos | un clic | F30 | `inventory.product.set_image` |
 | Sube la foto propia de un producto (JPG, PNG o WebP de hasta 2 MB; se guarda en WebP de 512 × 512) | cambiar productos | no es del asistente: el archivo se elige en la ficha | F31 | `inventory.product.upload_image` |
-| Añade un producto a una categoría | cambiar productos | un clic | F08 | `inventory.product_category.add` |
+| Añade un producto a una categoría (también la plataforma, al recuperar desde una copia aparte una categoría eliminada con los productos que el negocio conserva) | cambiar productos | un clic | F08, F07 | `inventory.product_category.add` |
 | Quita un producto de una categoría | cambiar productos | un clic | F08 | `inventory.product_category.remove` |
 | Crea una categoría | crear categorías | un clic | F06 | `inventory.category.create` |
 | Crea muchas categorías de una vez, con informe por fila | crear categorías | un clic | F10 | `inventory.category.bulk_create` |
@@ -1313,12 +1316,12 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   `test_ties_go_by_id_in_the_lists_own_direction` y `test_an_export_settles_its_ties_the_way_the_list_does`, por lista.
 
 - **Recuperar desde una copia aparte** (BASE-F114): `apps.py` responde a la plataforma (`recoverable_from_copy`,
-  `base.recovery.Recoverable`) con dos declaraciones, por este orden, leídas de la copia por SQL sobre los nombres de los
+  `base.recovery.Recoverable`) con tres declaraciones, por este orden, leídas de la copia por SQL sobre los nombres de los
   modelos (la copia no es un negocio y no tiene alias). Primero las categorías vivas de la copia
   (`queries.categories_in_copy`, con sus productos vivos en `product_ids`): cada una que el negocio no tiene
   (`queries.categories_not_in_business`) se crea por `inventory.category.recover` (permiso `inventory.system`, sin
   ruta; el alta de la pantalla más, en el mismo paso, el enlace de los productos de la copia que el negocio guarda
-  eliminados y se pueden restaurar, para que vuelvan dentro; los vivos se quedan como están, hub#1373). Una categoría
+  eliminados y se pueden restaurar, para que vuelvan dentro). Una categoría
   de la copia es la del negocio por su id mientras siga viva (aunque se renombrara); si no, una viva con su nombre
   (`_same_name`) que no sea ninguna de la copia, cada una por una sola, la más antigua por la más antigua
   (`_categories_held`). Después los productos vivos de la copia (`queries.products_in_copy`, con todas las categorías
@@ -1329,7 +1332,13 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   eliminado, ni otro vivo con su SKU o su EAN-13) se crean, cada uno por `inventory.product.create` con la clave de su
   categoría fiscal y sus categorías aquí por la misma regla (`_categories_held`: la misma, o la que acaba de volver o
   el negocio volvió a crear con su nombre), activo o no como estaba (`ProductIn.is_active`), sin stock (el saldo de la
-  copia es de otro día) y sin imagen (hub#1319). Lee desde `0001_initial`; una migración que quite o renombre una
+  copia es de otro día) y sin imagen (hub#1319). Al final, los enlaces vivos de la copia (`queries.product_links_in_copy`:
+  producto y categoría vivos allí, con el id del enlace y `copy_categories`): cada uno que le falta a una categoría que
+  trajo una recuperación (`queries.product_links_not_in_business`: la de la copia ya no está viva aquí y la que ocupa su
+  sitio por `_categories_held` la creó una recuperación, `created_by` según `base.recovery.brought_back`; el producto
+  sigue vivo aquí y fuera de ella) se crea por la operación de la pantalla, `inventory.product_category.add`, que añade
+  sin quitar ninguna otra categoría. Va aparte, con su propia cuenta, porque toca lo que el negocio tiene. Una categoría
+  rehecha a mano (`created_by` de una persona) o conservada no se rellena. Lee desde `0001_initial`; una migración que quite o renombre una
   columna que lee cambia también la lectura y su `reads_since`. Tests: `tests/test_recovery.py`, de punta a punta
   incluido, y el contrato de `base/tenancy/tests/test_recovery.py`.
 
