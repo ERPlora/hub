@@ -52,8 +52,8 @@ REPORTED = (
 #: tools of the apps that say their asks later may climb past it before the model loses it.
 WITH_ROOM = 20
 PROBES_DIR = Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes"
-#: Every probe of layer 2 of Menus and combos, the owner's and the employee's real phrases of the QA (2026-11-08), and
-#: the owner's of the day a restaurant gets ready to sell (2026-11-09).
+#: Every probe of layer 2 of Menus and combos, the owner's and the employee's real phrases from QA, and
+#: the owner's of the day a restaurant gets ready to sell.
 PROBES = [
     probe
     for path in sorted(PROBES_DIR.glob("*.json"))

@@ -7,28 +7,13 @@
 // Everything created here is named «E2E…» and removed after the run (and before, if a run died half-way).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, hubUserIdOf, login, psql, shot, shown } from './helpers';
+import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, hubUserIdOf, login, psql, shot, shown, THREE_SIZES as VIEWPORTS } from './helpers';
+import { staffCleanUp } from './staff-helpers';
 import { rowAction } from './service-helpers';
 
 const TAG = 'E2E';
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-] as const;
 
-function cleanup(): void {
-  const members = `select id from staff_member where first_name like '${TAG}%'`;
-  psql(
-    [
-      `delete from staff_timeoff where member_id in (${members})`,
-      `delete from staff_scheduleday where schedule_id in (select id from staff_schedule where member_id in (${members}))`,
-      `delete from staff_schedule where member_id in (${members})`,
-      `delete from staff_member where first_name like '${TAG}%'`,
-      `delete from staff_role where name like '${TAG}%'`,
-    ].join('; '),
-  );
-}
+const cleanup = (): void => staffCleanUp(TAG);
 
 test.beforeAll(async ({ browser }) => {
   cleanup();
@@ -399,8 +384,8 @@ test('STAFF-F19: «Cancel» on an approved absence asks first; confirmed, it is 
   }
 });
 
-// flow: STAFF-F20, STAFF-G05 — «today» is the business's day
-test('STAFF-F20 and G05: «Today’s time off» above Time Off lists who is away today, live', async ({ browser }) => {
+// flow: STAFF-F20 — «today» is the business's day
+test('STAFF-F20: «Today’s time off» above Time Off lists who is away today, live', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/time-off');
   try {
     const card = shown(page).locator('[data-testid=staff-away-today]');
@@ -490,8 +475,8 @@ test('STAFF-F22: Settings saves the default working day, and a new schedule prop
 /** The value a figure above the staff list shows. */
 const figure = (page: Page, id: string): Locator => shown(page).locator(`[data-testid=staff-figures-${id}] .staff-figure__value`);
 
-// flow: STAFF-F23, STAFF-G02, STAFF-G03, STAFF-G04
-test('STAFF-F23 and G02–G04: the figures above Staff follow a new person, an absence and a request live', async ({ browser }) => {
+// flow: STAFF-F23
+test('STAFF-F23: the figures above Staff follow a new person, an absence and a request live', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/members');
   try {
     await expect(figure(page, 'active')).toHaveText(/^\d+$/);
@@ -519,8 +504,8 @@ test('STAFF-F23 and G02–G04: the figures above Staff follow a new person, an a
   }
 });
 
-// flow: STAFF-G01
-test('STAFF-G01: «Members» in Roles counts the Active people of each role', async ({ browser }) => {
+// flow: STAFF-F23
+test('STAFF-F23: «Members» in Roles counts the Active people of each role', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/roles');
   try {
     const role = await api<{ id: string; name: string }>(context, A, 'POST', '/staff/roles', { name: `${TAG} Barber ${stamp()}` });

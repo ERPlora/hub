@@ -30,6 +30,7 @@ from base.schemas import AppChangeIn, AppChangeOut
 from base.tenancy import inventory
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
+from base.tests.routes import assert_bound
 
 A = Scope("host", "a")
 B = Scope("host", "b")
@@ -1337,13 +1338,7 @@ def test_without_the_cache_the_gate_reads_the_rows(monkeypatch, caplog):
 
 @pytest.mark.parametrize(("path", "operation"), [("/apps/enable", "base.app.enable"), ("/apps/disable", "base.app.disable")])
 def test_the_routes_are_bound_to_their_commands(path, operation, db):
-    from django.urls import resolve
-
-    from base.api import router
-
-    [route] = router.path_operations[path].operations
-    assert (route.methods, route.operation_id) == (["POST"], operation)
-    assert resolve(f"/api{path}").url_name
+    assert_bound("POST", path, operation)
 
 
 @pytest.mark.django_db

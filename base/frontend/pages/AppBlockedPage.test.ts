@@ -122,7 +122,7 @@ describe('AppBlockedPage', () => {
     expect(m.router.currentRoute.value.fullPath).toBe('/apps#all');
   });
 
-  it('an app being set up (S3) says so, and offers to open it once it is on, live', async () => {
+  it('an app being set up says so, and offers to open it once it is on, live', async () => {
     const m = await open();
     const creating = app('stock', { name: 'Stock', premium: false, right: 'free', state: 'creating', chosen: true });
     await m.result(m.call, 'base.app.list', { ...LIST, apps: [creating] });

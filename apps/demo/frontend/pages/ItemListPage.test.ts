@@ -380,7 +380,7 @@ describe('ItemListPage: the figures above the table (managers only)', () => {
   });
 });
 
-// PoC issue E: on a phone «Load more» must ADD the next rows below the ones shown. The page keeps one
+// On a phone «Load more» must ADD the next rows below the ones shown. The page keeps one
 // live window from the first row (a bigger `limit`, `offset` 0), so every row on screen stays live.
 describe('ItemListPage on a phone: «Load more» grows the live window', () => {
   type MediaListener = (e: { matches: boolean }) => void;

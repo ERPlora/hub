@@ -1,6 +1,6 @@
 // Entry of the hub SPA (`LIVE["spa"]["entry"]`): app routes and catalogues → shell, live client, session
 // (`base.session.me`, a plain query: embedded by `base/spa.py`, else `GET /api/me`), mount.
-// 🔴 Import order (hub#1060): the shell barrel goes first so its boot hooks wrap `customElements.define`
+// 🔴 Import order: the shell barrel goes first so its boot hooks wrap `customElements.define`
 // before anything loads `@ionic/vue` (the SDK does). Vite hoists eager globs above everything, so an
 // app's `routes.ts` only imports types; its pages load with `() => import(…)`. Guards: main.test.ts.
 import {

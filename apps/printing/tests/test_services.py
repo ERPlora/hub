@@ -994,7 +994,7 @@ def test_only_who_runs_the_business_retries_and_cancels(role):
         run("printing.job.retry", {"job_id": str(queued.id)}, ctx_for(role))
 
 
-# ── The paper's envelope: language and money scale (hub#1159) ─────────────────────────
+# ── The paper's envelope: language and money scale ────────────────────────────────────
 
 
 def test_a_document_without_language_or_scale_takes_the_callers_and_the_currencys():
@@ -1072,7 +1072,7 @@ def test_a_chosen_printer_that_is_inactive_is_passed_over_for_the_first_active_o
     assert (queued.job.printer_id, queued.job.printer_name) == (spare.id, "Spare")
 
 
-# ── PRINTING-F20 How long the queue keeps a job (HUB-F206) ──────────────────────────────────────────
+# ── PRINTING-F20 How long the queue keeps a job ─────────────────────────────────────────────────────
 
 
 def ended(days: int, status: str, **more) -> PrintJob:

@@ -50,7 +50,7 @@ class Channel(UUIDModel):
     # The business's own number (E.164) and the name WhatsApp shows for it.
     phone_number = models.CharField(_("phone number"), max_length=16, blank=True)
     display_name = models.CharField(_("display name"), max_length=200, blank=True)
-    # The plan's monthly allowance of messages sent (0 = the plan includes none, ADR-0474; there is no
+    # The plan's monthly allowance of messages sent (0 = the plan includes none; there is no
     # «unlimited») and what is spent, with the month (``YYYY-MM``) the figure counts: another month's figure
     # counts as nothing spent.
     monthly_limit = models.PositiveIntegerField(_("monthly limit"), default=0)

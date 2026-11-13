@@ -150,7 +150,7 @@ test('a context signed in at the SaaS as another account: the session its jump o
     // opens theirs.
     const page = await employee.context.newPage();
     await login(page, B, '/demo/items', OWNER, { fresh: true });
-    // Each business has its own person for the account (S2a): `b`'s names the employee, under `b`'s own id.
+    // Each business has its own person for the account: `b`'s names the employee, under `b`'s own id.
     const there = await api<{ user: { id: string; label: string } | null }>(employee.context, B, 'GET', '/me');
     expect(there.data.user?.label, 'what the SaaS signed in').toBe(employee.label);
   } finally {

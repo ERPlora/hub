@@ -29,13 +29,27 @@ import { turnOffRecorded, turnOnRecording } from './apps-turned-on';
 import { api } from './hub-api';
 import { hubDatabases, plan } from './hub-databases';
 import { mailDirFrom, readMailCode } from './mail';
-import { isConnectionRefused, withRetry } from './retry';
+import { withRetry } from './retry';
 import { STACK } from './stack';
 
 // The hub's API (setup and evidence), which every spec takes from here.
 export { api };
 
 export const A = STACK.hub('a');
+
+/** The three sizes with the taller tablet, 834×1194. */
+export const THREE_SIZES_TALL_TABLET = [
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1194 },
+  { label: '1440', width: 1440, height: 900 },
+] as const;
+
+/** The three sizes the e2e looks at a screen in: a phone, a tablet and a desk. */
+export const THREE_SIZES = [
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1112 },
+  { label: '1440', width: 1440, height: 900 },
+] as const;
 export const B = STACK.hub('b');
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -318,10 +332,14 @@ export const EMPLOYEE: Credentials = { email: 'employee@example.com', password: 
 export const MAIL_DIR = mailDirFrom(process.env, REPO_DIR);
 /** Slack between our clock and the mail file's modification time, in ms. */
 export const MAIL_CLOCK_SLACK = 50;
-/** What each step of `login` at the SaaS waits outside a test, or in one with no time limit, in ms. */
-const LOGIN_STEP_DEFAULT = 30_000;
-/** What `login` waits for the hub's shell outside a test, or in one with no time limit, in ms: the config's test time. */
-const LOGIN_SHELL_DEFAULT = 180_000;
+/** What each wait of `login` lasts outside a test, or in one with no time limit, in ms: the config's test time. */
+const LOGIN_DEFAULT = 180_000;
+/** Where the SaaS's sign-in form posts the account (allauth.headless). */
+export const SAAS_SIGN_IN = `${SAAS}/_allauth/browser/v1/auth/login`;
+/** Where the SaaS's code form posts the code it mailed (allauth.headless). */
+export const SAAS_CODE = `${SAAS}/_allauth/browser/v1/auth/code/confirm`;
+/** The SaaS's page that says why it refused a sign-in or a jump to a hub (`?code=not_a_member`, `too_many`…): nothing goes on from there by itself. */
+const SAAS_REFUSED = '/login/error';
 
 /** The running test's (or hook's) time limit, in ms; 0 outside a test or hook, as with no limit. */
 function runningTimeout(): number {
@@ -334,24 +352,15 @@ function runningTimeout(): number {
 }
 
 /**
- * How long each step of `login` at the SaaS waits, in ms: a sixth of the running test's time, so 30 s under the
- * config's 180 s and longer for a spec that gives itself more (`test.slow()`, `test.setTimeout`). The login's steps
- * follow each other, so the test still has time for itself after a slow one.
+ * How long each wait of `login` lasts, in ms: the running test's whole time (`LOGIN_DEFAULT` outside a test or in one
+ * with no limit), never a share of it. Every step comes as fast as the machine runs: on a loaded one the SPA took more
+ * than a sixth of the config's 180 s to mount the hub's shell (hub#1342), and the SaaS as long to answer the sign-in or
+ * the code (hub#1370), with nothing wrong. What says a step is not coming fails at once instead (`watchTrip`,
+ * `shellOrSaas`, `alongTheTrip`); a step that never comes, without any of that, runs into the test's own limit, which
+ * then names its wait.
  */
-function loginStepTimeout(): number {
-  const timeout = runningTimeout();
-  return timeout > 0 ? Math.round(timeout / 6) : LOGIN_STEP_DEFAULT;
-}
-
-/**
- * How long `login` waits for the hub's shell, in ms: the running test's whole time (`LOGIN_SHELL_DEFAULT` outside a
- * test or in one with no limit), never a step's share of it. The shell comes as fast as the machine runs: on a loaded
- * one the SPA took more than a sixth of the config's 180 s to mount it, with nothing wrong (hub#1342). What says it is
- * not coming fails at once instead (`watchHub`, `shellOrSaas`); a shell that never comes, without any of that, runs
- * into the test's own limit, which then names this wait.
- */
-function shellTimeout(): number {
-  return runningTimeout() || LOGIN_SHELL_DEFAULT;
+function loginTimeout(): number {
+  return runningTimeout() || LOGIN_DEFAULT;
 }
 
 /**
@@ -423,11 +432,14 @@ async function hubSessionOf(context: BrowserContext, origin: string): Promise<Co
  * it follows it and, back in the hub, goes on to `next` if the jump landed elsewhere (the launcher's lands on `/`).
  * Any other error of `page.goto` fails it as before.
  *
- * Each step at the SaaS waits `loginStepTimeout()` and a step that does not come fails at once, saying which and how
- * long it waited. The hub's shell is waited for as long as the test has (`shellTimeout`), on the way in and at the end:
- * a loaded machine may take any of it to mount the SPA. What says it is not coming fails at once, saying why: on the
- * hub, the page threw, one of its scripts did not load or its document answered an error (`watchHub`), or the page
- * went to an address that is neither this hub nor the SaaS (`shellOrSaas`).
+ * Every step is waited for as long as the test has (`loginTimeout`): the hub's shell, on the way in and at the end,
+ * and each step at the SaaS (its sign-in page or the way back, its answer to the sign-in, its code form, its answer to
+ * the code, the way back to the hub); a loaded machine may take any of it. What says a step is not coming fails at once,
+ * saying why: on the hub, the page threw; on the hub or the SaaS, one of its scripts did not load or its document
+ * answered an error (`watchTrip`); the page went to an address that is neither this hub nor the SaaS (`shellOrSaas`,
+ * `alongTheTrip`); the SaaS sent the page to its error page, refusing the sign-in or the jump (`alongTheTrip`); the SaaS
+ * turned down or failed the sign-in or the code, or one of them got no answer at all; the SaaS asked for the code
+ * without a mail with it (`signInWithCode`).
  *
  * runserver or the SaaS restarting (another session saved a `.py` file) refuses the connection for
  * a moment: the trip through the SaaS then starts again once, a second later (`withRetry`). From
@@ -443,7 +455,7 @@ export async function login(
   options: { fresh?: boolean } = {},
 ): Promise<void> {
   const target = `${origin}${next}`;
-  const wait = loginStepTimeout();
+  const timeout = loginTimeout();
   const context = page.context();
   const account = credentials.email.toLowerCase();
   const kept = saasSessions.get(account);
@@ -457,30 +469,38 @@ export async function login(
   // within `page.goto` (the gate sends to the SaaS before the page's load).
   const before = await hubSession();
   let signedIn = false;
-  const hub = watchHub(page, origin);
+  const trip = watchTrip(page, origin);
   try {
     await withRetry(
       async () => {
-        hub.restart();
+        trip.restart();
         const jumped = await goneOrJumped(page, target, origin);
-        const where = await shellOrSaas(page, origin, hub, { orSaas: true });
+        const where = await shellOrSaas(page, origin, trip, { orSaas: true });
         if (where === 'saas') {
-          const form = page.getByTestId('login-form');
-          const step = await Promise.race([
-            form.waitFor({ state: 'visible', timeout: wait }).then(() => 'form' as const, () => null),
-            page.waitForURL((url) => url.origin === origin, { timeout: wait }).then(() => 'back' as const, () => null),
-          ]);
-          if (step === null) {
-            throw new Error(`login on ${origin}: the SaaS showed neither its sign-in form nor the hub within ${wait} ms`);
-          }
-          if (step === 'form') {
-            await signInWithCode(page, origin, target, credentials, wait);
-            signedIn = true;
+          const neither = `the SaaS showed neither its sign-in form nor the hub within ${timeout} ms`;
+          // Its sign-in page (`/launch`) or already the hub, one wait at a time: a wait that lost a race would stay
+          // pending for the rest of the test, and might be the one Playwright names when the test's time runs out.
+          const inHub = (url: URL): boolean => url.origin === origin;
+          const atSignIn = (url: URL): boolean => url.origin === SAAS && url.pathname === '/launch';
+          await alongTheTrip(page, origin, trip, page.waitForURL((url) => inHub(url) || atSignIn(url), { timeout }), {
+            timedOut: () => neither,
+          });
+          if (!inHub(new URL(page.url()))) {
+            const step = await alongTheTrip(page, origin, trip, page.getByTestId('login-form').waitFor({ state: 'visible', timeout }), {
+              back: inHub,
+              timedOut: () => neither,
+            });
+            if (step !== 'back') {
+              await signInWithCode(page, origin, credentials, trip, timeout);
+              signedIn = true;
+            }
           }
           // Back from the SaaS: the hub's callback sends to `next`. In the hub already, the shell is up and the
           // address final (checked below): waiting for `next` there waited for an address that might never come.
           // The jump that cut `page.goto` short sends to its own `next`: back in the hub is all it gives.
-          await page.waitForURL(jumped ? (url) => url.origin === origin : target, { timeout: wait });
+          await alongTheTrip(page, origin, trip, page.waitForURL(jumped ? inHub : target, { timeout }), {
+            timedOut: () => `back from the SaaS, ${jumped ? 'the hub' : target} did not come within ${timeout} ms (at ${page.url()})`,
+          });
         }
         // In with the session that jump opened, wherever it landed: on to `next`.
         if (jumped && !sameAddress(page.url(), target)) await page.goto(target);
@@ -490,9 +510,9 @@ export async function login(
           console.warn(`login on ${origin}: ${String(error).split('\n')[0]}; trying once more in 1 s`),
       },
     );
-    await shellOrSaas(page, origin, hub);
+    await shellOrSaas(page, origin, trip);
   } finally {
-    hub.stop();
+    trip.stop();
   }
   if (signedIn) saasSessions.set(account, await context.cookies(SAAS));
   const opened = await hubSession();
@@ -549,8 +569,8 @@ const reloadsItself = (response: PageResponse): boolean => {
   return headers['retry-after'] !== undefined && (headers['content-type'] ?? '').startsWith('text/html');
 };
 
-/** What `watchHub` gives `login`: the first sign it saw that the hub's shell is not coming. */
-interface HubWatch {
+/** What `watchTrip` gives `login`: the first sign it saw that the trip will not get to the hub's shell. */
+interface TripWatch {
   /** Rejects with that sign, at once if it came already; never settles while none comes. */
   failed(): Promise<never>;
   /** Forgets the sign seen so far: another try of the trip starts over. */
@@ -559,40 +579,52 @@ interface HubWatch {
   stop(): void;
 }
 
+/** The site of the trip `url` is on: the hub at `origin`, the SaaS, or neither. */
+function siteOf(url: string, origin: string): 'hub' | 'saas' | undefined {
+  const where = URL.canParse(url) ? new URL(url).origin : '';
+  if (where === origin) return 'hub';
+  return where === SAAS ? 'saas' : undefined;
+}
+
 /**
- * Listens to `page` for what says the hub at `origin` will not mount its shell, while `login` runs: on the hub, the
- * page threw (`pageerror`: its boot died), one of its scripts did not load (it failed, or was answered with an error:
- * the SPA never starts), or its document was answered with an error that does not reload by itself (a 500, the 503 of a
- * busy hub; not `reloadsItself`). What happens on the SaaS is not the hub's, nor a script the page drops itself as it
- * navigates away (`ABORTED`).
+ * Listens to `page` for what says the login on the hub at `origin` will not get to its shell, while `login` runs. On the
+ * hub: the page threw (`pageerror`: its boot died), one of its scripts did not load (it failed, or was answered with an
+ * error: the SPA never starts), or its document was answered with an error that does not reload by itself (a 500, the
+ * 503 of a busy hub; not `reloadsItself`). On the SaaS: its document was answered with an error, or one of its scripts
+ * failed on the network (its SPA never starts either). Not an error the SaaS's page throws, nor a script of the SaaS
+ * answered with an error (its dev server answers 504 to a dependency it has just optimized again, and the page reloads
+ * by itself), nor, anywhere, a script the page drops itself as it navigates away (`ABORTED`).
  */
-function watchHub(page: Page, origin: string): HubWatch {
+function watchTrip(page: Page, origin: string): TripWatch {
   let seen: Error | undefined;
   let tell: ((error: Error) => void) | undefined;
-  const saw = (why: string): void => {
+  const saw = (why: string, site: 'hub' | 'saas'): void => {
     if (seen) return;
-    seen = new Error(`login on ${origin}: ${why}, so the hub's shell will not show up`);
+    const so = site === 'hub' ? "so the hub's shell will not show up" : 'so the SaaS will not send the page back to the hub';
+    seen = new Error(`login on ${origin}: ${why}, ${so}`);
     tell?.(seen);
   };
-  const onHub = (): boolean => URL.canParse(page.url()) && new URL(page.url()).origin === origin;
+  const at = () => siteOf(page.url(), origin);
   const threw = (error: Error): void => {
-    if (onHub()) saw(`the page threw «${error.message}» at ${page.url()}`);
+    if (at() === 'hub') saw(`the page threw «${error.message}» at ${page.url()}`, 'hub');
   };
   const answered = (response: PageResponse): void => {
     const request = response.request();
     if (response.status() < 400) return;
     if (request.isNavigationRequest()) {
-      if (request.frame() === page.mainFrame() && new URL(response.url()).origin === origin && !reloadsItself(response)) {
-        saw(`the hub answered ${response.status()} to ${response.url()}`);
+      const site = siteOf(response.url(), origin);
+      if (request.frame() === page.mainFrame() && site !== undefined && !reloadsItself(response)) {
+        saw(`the ${site === 'hub' ? 'hub' : 'SaaS'} answered ${response.status()} to ${response.url()}`, site);
       }
-    } else if (request.resourceType() === 'script' && onHub()) {
-      saw(`a script of ${page.url()} was answered ${response.status()} (${response.url()})`);
+    } else if (request.resourceType() === 'script' && at() === 'hub') {
+      saw(`a script of ${page.url()} was answered ${response.status()} (${response.url()})`, 'hub');
     }
   };
   const dropped = (request: PageRequest): void => {
     const failure = request.failure()?.errorText;
-    if (request.resourceType() !== 'script' || failure === undefined || failure === ABORTED || !onHub()) return;
-    saw(`a script of ${page.url()} did not load, ${failure} (${request.url()})`);
+    const site = at();
+    if (request.resourceType() !== 'script' || failure === undefined || failure === ABORTED || site === undefined) return;
+    saw(`a script of ${page.url()} did not load, ${failure} (${request.url()})`, site);
   };
   page.on('pageerror', threw);
   page.on('response', answered);
@@ -618,36 +650,29 @@ function watchHub(page: Page, origin: string): HubWatch {
 /** Playwright's error for a wait that ran out of time. */
 const isTimeout = (error: unknown): boolean => error instanceof Error && error.name === 'TimeoutError';
 
-/** A wait that ran out of time is no answer of its own, so it never settles then; any other failure is thrown. */
-const unlessTimedOut = (error: unknown): Promise<never> => {
-  if (isTimeout(error)) return new Promise<never>(() => undefined);
-  throw error;
-};
-
 /**
  * Waits for the hub at `origin` to mount its shell in `page` (`topbarApps` attached): `'hub'`. With `orSaas`, the
- * SaaS is an answer too, once its page has loaded (`'saas'`: the hub's gate sent the page there to sign in). It waits
- * as long as the test has (`shellTimeout`), and fails at once on what says the shell is not coming: what `hub` saw, or
+ * SaaS is an answer too, as soon as the page is there (`'saas'`: the hub's gate sent it there to sign in). It waits
+ * as long as the test has (`loginTimeout`), and fails at once on what says the shell is not coming: what `trip` saw, or
  * the page at an address that is neither this hub nor, with `orSaas`, the SaaS (Chrome's error page among them).
  *
- * Where the page goes is followed by listening (`framenavigated`), and only on the SaaS does it wait for its page to
- * load: while the page is in the hub, the shell's is the one wait of Playwright's pending, so when the test's time runs
- * out first it is the one Playwright names (it names a pending `page.waitForURL` before a locator's wait).
+ * Where the page goes is followed by listening (`framenavigated`), never by another wait of Playwright's: the shell's
+ * is the one pending, so when the test's time runs out first it is the one Playwright names (it names a pending
+ * `page.waitForURL` before a locator's wait).
  */
 async function shellOrSaas(
   page: Page,
   origin: string,
-  hub: HubWatch,
+  trip: TripWatch,
   options: { orSaas?: boolean } = {},
 ): Promise<'hub' | 'saas'> {
-  const timeout = shellTimeout();
-  const originOf = (url: string): string => (URL.canParse(url) ? new URL(url).origin : '');
+  const timeout = loginTimeout();
   let went: (url: string) => void = () => undefined;
-  const onSaas = new Promise<void>((resolve, reject) => {
+  const onSaas = new Promise<'saas'>((resolve, reject) => {
     went = (url) => {
-      const where = originOf(url);
-      if (options.orSaas && where === SAAS) resolve();
-      else if (where !== origin) {
+      const site = siteOf(url, origin);
+      if (options.orSaas && site === 'saas') resolve('saas');
+      else if (site !== 'hub') {
         reject(new Error(`login on ${origin}: the page went to ${url}, which is not this hub, so its shell will not show up`));
       }
     };
@@ -658,9 +683,6 @@ async function shellOrSaas(
   page.on('framenavigated', followed);
   went(page.url());
   try {
-    const saas = onSaas.then(() =>
-      page.waitForURL((url) => url.origin === SAAS, { timeout }).then(() => 'saas' as const, unlessTimedOut),
-    );
     const shell = topbarApps(page)
       .waitFor({ state: 'attached', timeout })
       .then(
@@ -671,48 +693,149 @@ async function shellOrSaas(
           throw new Error(`login on ${origin}: ${what} showed up within ${timeout} ms (at ${page.url()})`);
         },
       );
-    return await Promise.race([hub.failed(), saas, shell]);
+    return await Promise.race([trip.failed(), onSaas, shell]);
   } finally {
     page.off('framenavigated', followed);
   }
 }
 
+/** What a step of the trip through the SaaS needs besides its wait (`alongTheTrip`). */
+interface Along {
+  /** What it fails with when its wait runs out of its own time (outside a test, or in one with no limit). */
+  timedOut: () => string;
+  /** Rejects with what says the step is not coming. */
+  refused?: Promise<never>;
+}
+
 /**
- * The SaaS's sign-in form (`/launch`) and then, when the SaaS asks for it, the code it mailed
- * (`/verify-email`); done once the browser is on its way back to the hub. A step that does not come within
- * `wait` ms fails with the step's name, the wait and what the page said; a refused connection keeps its own
- * error, so that `login` tries again. Still on `/verify-email` after the code: rejected when the page says so,
- * else a SaaS that has not answered the code yet.
+ * One step of the trip through the SaaS: `step`, the one wait of Playwright's pending while it runs, so that when the
+ * test's time runs out first it is the one Playwright names; with `back`, the page arriving at an address `back` takes
+ * ends it too (`'back'`). It waits as long as `step` does, and fails at once on what says the step is not coming: what
+ * `trip` saw, `refused`, the page at an address that is neither this hub nor the SaaS (Chrome's error page among
+ * them), or the page on the SaaS's own error page (`SAAS_REFUSED`), where it refused the sign-in or the jump.
+ */
+async function alongTheTrip<T>(page: Page, origin: string, trip: TripWatch, step: Promise<T>, options: Along): Promise<T>;
+async function alongTheTrip<T>(
+  page: Page,
+  origin: string,
+  trip: TripWatch,
+  step: Promise<T>,
+  options: Along & { back: (url: URL) => boolean },
+): Promise<T | 'back'>;
+async function alongTheTrip<T>(
+  page: Page,
+  origin: string,
+  trip: TripWatch,
+  step: Promise<T>,
+  options: Along & { back?: (url: URL) => boolean },
+): Promise<T | 'back'> {
+  let leave = (): void => undefined;
+  const moved = new Promise<'back'>((resolve, reject) => {
+    const went = (url: string): void => {
+      if (URL.canParse(url) && options.back?.(new URL(url))) resolve('back');
+      else if (siteOf(url, origin) === undefined) {
+        reject(new Error(`login on ${origin}: the page went to ${url}, which is neither this hub nor the SaaS, so the login will not get back`));
+      } else if (siteOf(url, origin) === 'saas' && new URL(url).pathname === SAAS_REFUSED) {
+        reject(new Error(`login on ${origin}: the SaaS stopped the login on its error page ${url}`));
+      }
+    };
+    const followed = (frame: Frame): void => {
+      if (frame === page.mainFrame()) went(frame.url());
+    };
+    page.on('framenavigated', followed);
+    leave = () => page.off('framenavigated', followed);
+    went(page.url());
+  });
+  const waited = step.catch((error: unknown) => {
+    throw isTimeout(error) ? new Error(`login on ${origin}: ${options.timedOut()}`) : error;
+  });
+  try {
+    return await Promise.race([waited, moved, trip.failed(), ...(options.refused ? [options.refused] : [])]);
+  } finally {
+    leave();
+  }
+}
+
+/**
+ * The SaaS's answer to what the page posts to `url` from now on, taken before the post goes: `answered` is Playwright's
+ * wait for it, and `dropped` rejects with `unanswered(failure)` when the post gets no answer at all (its request failed:
+ * the SaaS dropped the connection or refused it). Neither is left unhandled when the login fails before waiting on them.
+ */
+function answerTo(page: Page, url: string, timeout: number, unanswered: (failure: string) => Error) {
+  const posted = (request: PageRequest): boolean => request.method() === 'POST' && request.url() === url;
+  const answered = page.waitForResponse((response) => posted(response.request()), { timeout });
+  let stop = (): void => undefined;
+  const dropped = new Promise<never>((_, reject) => {
+    const failed = (request: PageRequest): void => {
+      if (posted(request)) reject(unanswered(request.failure()?.errorText ?? 'no answer'));
+    };
+    page.on('requestfailed', failed);
+    stop = () => page.off('requestfailed', failed);
+  });
+  answered.catch(() => undefined);
+  dropped.catch(() => undefined);
+  return { answered, dropped, stop };
+}
+
+/** What the SaaS said in its answer (allauth's `errors`), as `: «…»` for an error message; nothing if it said nothing. */
+async function saidIn(response: PageResponse): Promise<string> {
+  const body: unknown = await response.json().catch(() => undefined);
+  const errors = (body as { errors?: { message?: unknown }[] } | undefined)?.errors ?? [];
+  const text = errors
+    .map((error) => (typeof error.message === 'string' ? error.message.trim() : ''))
+    .filter(Boolean)
+    .join(' / ');
+  return text ? `: «${text}»` : '';
+}
+
+/**
+ * The SaaS's sign-in form (`/launch`) and then, when the SaaS asks for it, the code it mailed (`/verify-email`); done
+ * once the SaaS has taken the code, or signed in without one. Each step goes on the SaaS's own answer. To the sign-in,
+ * a 401 asks for the code (allauth: the mailed code pending) and a 2xx signs in; to the code, a 2xx takes it. Any other
+ * answer fails at once with what the SaaS said: a 4xx is the SaaS turning it down («code rejected» for the code), a 5xx
+ * the SaaS failing on it. A post that gets no answer at all (dropped, refused) fails at once too, as the network error it
+ * is, which `login` tries again; one still waiting when the test's time runs out is the wait Playwright names. The mail
+ * with the code is read once, when the code form shows: the SaaS writes it before it answers the sign-in.
  */
 async function signInWithCode(
   page: Page,
   origin: string,
-  target: string,
   credentials: Credentials,
-  wait: number,
+  trip: TripWatch,
+  timeout: number,
 ): Promise<void> {
   const form = page.getByTestId('login-form');
   await form.getByTestId('login-email').locator('input').fill(credentials.email);
   await form.getByTestId('login-password').locator('input').fill(credentials.password);
   // Taken before the submit: the mail is written while the SaaS answers it.
   const since = Date.now() - MAIL_CLOCK_SLACK;
-  await form.getByTestId('login-submit').click();
+  const signIn = answerTo(page, SAAS_SIGN_IN, timeout, (failure) => new Error(`login on ${origin}: the SaaS did not answer the sign-in (${failure})`));
+  let signedIn: PageResponse;
+  try {
+    await form.getByTestId('login-submit').click();
+    signedIn = await alongTheTrip(page, origin, trip, signIn.answered, {
+      refused: signIn.dropped,
+      timedOut: () => `sign-in form sent, but the SaaS did not answer it within ${timeout} ms`,
+    });
+  } finally {
+    signIn.stop();
+  }
+  const status = signedIn.status();
+  if (status >= 500) throw new Error(`login on ${origin}: the SaaS failed on the sign-in, it answered ${status}${await saidIn(signedIn)}`);
+  if (status >= 400 && status !== 401) {
+    throw new Error(`login on ${origin}: the SaaS turned the sign-in down, it answered ${status}${await saidIn(signedIn)}`);
+  }
+  if (status !== 401) return;
 
   const codeForm = page.getByTestId('verify-email-form');
-  const backHome = (url: URL) => url.origin === origin || url.pathname.startsWith('/hub-login');
-  const step = await Promise.race([
-    codeForm.waitFor({ state: 'visible', timeout: wait }).then(() => 'code' as const, () => null),
-    page.waitForURL(backHome, { timeout: wait }).then(() => 'back' as const, () => null),
-  ]);
-  if (step === null) {
+  await alongTheTrip(page, origin, trip, codeForm.waitFor({ state: 'visible', timeout }), {
+    timedOut: () => `the SaaS asked for the code, but /verify-email did not come within ${timeout} ms (at ${page.url()})`,
+  });
+  // The SaaS mails the code before it answers the sign-in: not there now, it never will be.
+  const code = await readMailCode({ dir: MAIL_DIR, to: credentials.email, since, timeout: 0 }).catch((error: unknown) => {
     throw new Error(
-      `login on ${origin}: sign-in form sent, but neither /verify-email nor the hub came within ${wait} ms${await saidBy(page)}`,
+      `login on ${origin}: mail not found, though the SaaS asked for the code it mails before answering the sign-in: ${error instanceof Error ? error.message : String(error)}`,
     );
-  }
-  if (step === 'back') return;
-
-  const code = await readMailCode({ dir: MAIL_DIR, to: credentials.email, since, timeout: wait }).catch((error: unknown) => {
-    throw new Error(`login on ${origin}: mail not found: ${error instanceof Error ? error.message : String(error)}`);
   });
   // `CodeField` is one input today; six one-digit inputs would take a digit each.
   const inputs = codeForm.locator('input:not([type=hidden])');
@@ -722,31 +845,24 @@ async function signInWithCode(
   } else {
     await inputs.first().fill(code);
   }
-  await codeForm.getByTestId('verify-email-submit').click();
+  const which = () => `(code ${code} for ${credentials.email}, at ${page.url()})`;
+  const taken = answerTo(page, SAAS_CODE, timeout, (failure) => new Error(`login on ${origin}: the SaaS did not answer the code (${failure}) ${which()}`));
+  let answer: PageResponse;
   try {
-    await page.waitForURL(target, { timeout: wait });
-  } catch (error) {
-    if (isConnectionRefused(error)) throw error;
-    const said = await saidBy(page);
-    const where =
-      new URL(page.url()).pathname !== '/verify-email'
-        ? `next not reached within ${wait} ms`
-        : said
-          ? 'code rejected'
-          : `the SaaS did not answer the code within ${wait} ms`;
-    throw new Error(`login on ${origin}: ${where} (code ${code} for ${credentials.email}, at ${page.url()})${said}`);
+    await codeForm.getByTestId('verify-email-submit').click();
+    answer = await alongTheTrip(page, origin, trip, taken.answered, {
+      refused: taken.dropped,
+      timedOut: () => `the SaaS did not answer the code within ${timeout} ms ${which()}`,
+    });
+  } finally {
+    taken.stop();
   }
-}
-
-/** The alert the page shows, if any, as `: «…»` for an error message. */
-async function saidBy(page: Page): Promise<string> {
-  // Only decorates an error already being thrown: a page that is gone or navigating adds nothing.
-  const alerts = await page
-    .locator('[role=alert]:visible')
-    .allInnerTexts()
-    .catch(() => []);
-  const text = alerts.map((alert) => alert.trim()).filter(Boolean).join(' / ');
-  return text ? `: «${text}»` : '';
+  if (answer.status() >= 500) {
+    throw new Error(`login on ${origin}: the SaaS failed on the code, it answered ${answer.status()} ${which()}${await saidIn(answer)}`);
+  }
+  if (answer.status() >= 400) {
+    throw new Error(`login on ${origin}: code rejected, the SaaS answered ${answer.status()} ${which()}${await saidIn(answer)}`);
+  }
 }
 
 /**
@@ -963,6 +1079,20 @@ export const compactBar = (page: Page): boolean => (page.viewportSize()?.width ?
 /** The bell's count on the screen on view: on the bell, or on a phone's «More options», which carries it. */
 export const bellBadge = (page: Page): Locator =>
   shown(page).locator(compactBar(page) ? '[data-testid=topbar-chrome-more-badge]' : '[data-testid=hub-bell] [data-testid=hub-bell-badge]');
+
+/** The bell's count says `total`, or shows nothing when it is 0. */
+export async function badgeSays(page: Page, total: number, options: { timeout?: number } = {}): Promise<void> {
+  if (total > 0) await expect(bellBadge(page)).toHaveText(String(total), options);
+  else await expect(bellBadge(page)).toHaveCount(0, options);
+}
+
+/** The page still, with nothing past its right edge at the size `label`, then captured as `name`. */
+export async function capturedFitting(page: Page, name: string, label: string): Promise<void> {
+  await untilStill(page);
+  const overflow = await horizontalOverflow(page);
+  expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
+  await capture(page, name);
+}
 
 /**
  * Opens the bell's list (BASE-F10) and resolves once it is presented: the bell itself, or on a phone its row in «More
@@ -1198,6 +1328,19 @@ export function psql(sql: string, hub = 'a'): string {
     .map((run) => psqlOn(run.database, run.sql))
     .filter(Boolean)
     .join('\n');
+}
+
+/**
+ * The username of whoever is signed in on `context`. Not by email: a hub database kept from a stack whose SaaS was
+ * created again holds an older account with the same email (a new SaaS, new users), and the email names both.
+ */
+export async function usernameOf(context: BrowserContext): Promise<string> {
+  const me = await api<{ user: { id: string } | null }>(context, A, 'GET', '/me');
+  expect(me.status, 'GET /api/me').toBe(200);
+  const id = me.data.user?.id ?? '';
+  expect(id, 'the person signed in').not.toBe('');
+  // `/api/me` names the person of the business's database (base.HubUser), whose username is the session's.
+  return psql(`SELECT username FROM base_hubuser WHERE id = '${id}'`);
 }
 
 /** The usernames of every account of `email` (control's ``auth_user``), quoted for the `in (…)` of a statement on a

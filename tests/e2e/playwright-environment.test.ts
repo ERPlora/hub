@@ -3,7 +3,7 @@
 // source-map-support takes a global `window` with an `XMLHttpRequest` for a browser: loaded in happy-dom (the
 // config's default, vite.config.ts), it fetched its own files by synchronous XHR from happy-dom's
 // http://localhost:3000, and every request crashed a Node child process (`ECONNREFUSED 127.0.0.1:3000`) behind a
-// green run (playwright.config.test.ts, 3 of 3 runs on 2026-10-19; the SaaS fixed the same in saas#46).
+// green run (playwright.config.test.ts; the SaaS has the same fix).
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -47,7 +47,7 @@ interface ModuleImports {
 
 /**
  * Each module's imports, read once per run (see `readImports`). The ~700 test files share their pages, components and
- * helpers: walking each test's imports from the disk again read 12,766 files for 1,474 modules (2026-10-21), and on a
+ * helpers: walking each test's imports from the disk again read 12,766 files for 1,474 modules, and on a
  * loaded machine that took this test past Vitest's 5 s.
  */
 const importsByPath = new Map<string, ModuleImports>();
@@ -106,7 +106,7 @@ describe('the tests that load Playwright', () => {
   });
 
   // Reads every module the tests load from the disk, so its time is the machine's: with several test runs on one
-  // machine (load 20–40) and every opened file scanned, it took up to 9.4 s reading each module once (2026-10-21),
+  // machine (load 20–40) and every opened file scanned, it took up to 9.4 s reading each module once,
   // against Vitest's 5 s. Read ahead without holding the worker, as long as the machine makes it (hub#1315).
   it("give every test file that loads Playwright Node's environment", async () => {
     const loading = (await playwrightLoaders((await testFiles()).map((file) => join(HUB_DIR, file)))).map((file) => relative(HUB_DIR, file));

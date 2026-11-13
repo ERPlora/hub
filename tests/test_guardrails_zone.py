@@ -1,5 +1,5 @@
 """Guardrail of the business's clock (hub#687): ``base.business.business_zone`` is the one reading of a business's time
-zone. Django's current zone is the deployment's: nothing activates a hub's (PLAN-HUB), so an hour read on it is an hour
+zone. Django's current zone is the deployment's: nothing activates a hub's, so an hour read on it is an hour
 of another clock for a business in another zone, and a second reading drifts from the first (the card said 9:00, the
 agenda 10:00). A reading on the deployment's clock can only leave this list, never join it. A screen is the same: it
 reads the zone the server gives it (``useBusinessZone``, the ``timezone`` of its app's settings), never one written by

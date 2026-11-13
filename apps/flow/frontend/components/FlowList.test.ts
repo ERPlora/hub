@@ -106,7 +106,7 @@ describe('FlowList', () => {
     expect(s.find('flow-list-count').text()).toBe('Showing 2 of 2');
   });
 
-  it('each switch says which automation it turns on or off (flows#140)', async () => {
+  it('each switch says which automation it turns on or off', async () => {
     const s = await setup();
     expect(s.find('flow-list-toggle-f1').attributes('aria-label')).toBe('Turn «Flow f1» on or off');
   });

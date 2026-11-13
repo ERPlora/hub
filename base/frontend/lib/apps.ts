@@ -26,7 +26,7 @@ export function sellsApart(apps: readonly AppRow[]): boolean {
 }
 
 /** The states of an app the business turned on: on, or its tables still being made in the business's own database
- *  (`creating`) or failed to be (`failed`, tried again): the server's «wanted» (`base.activation`, S3). */
+ *  (`creating`) or failed to be (`failed`, tried again): the server's «wanted» (`base.activation`). */
 const WANTED: ReadonlySet<AppRow['state']> = new Set(['on', 'creating', 'failed']);
 
 /** The business turned it on: on, or on its way. */
@@ -35,7 +35,7 @@ export function isWanted(app: AppRow): boolean {
 }
 
 /** The rows of a tab: the apps the business turned on (on, or being set up), every app, or the paid ones (never a free
- *  one: hub#2655). */
+ *  one). */
 export function appsOfTab(apps: readonly AppRow[], tab: AppsTab): AppRow[] {
   if (tab === 'mine') return apps.filter(isWanted);
   if (tab === 'paid') return apps.filter((app) => app.premium);

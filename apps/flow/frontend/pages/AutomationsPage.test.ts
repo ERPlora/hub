@@ -110,7 +110,7 @@ describe('AutomationsPage', () => {
   });
 });
 
-describe('AutomationsPage: review 2026-10-15, item 5', () => {
+describe('AutomationsPage: an unreadable catalog and what waits for an answer', () => {
   it('a catalog that could not be read is said, with «Retry»', async () => {
     const m = await mountFlow(AutomationsPage, { answers: { '/api/flow/catalog': [500, { error: { code: 'internal_error', message: 'Internal error' } }] } });
     await m.live();

@@ -7,14 +7,8 @@ import { join } from 'node:path';
 import { type Locator, type Page, expect, test } from '@playwright/test';
 
 import { customersReady } from './customer-helpers';
-import { A, createItem, HUB_DIR, listReady, login, openApps, record, shot, shown, topbarApps, uniqueName } from './helpers';
+import { A, createItem, HUB_DIR, listReady, login, openApps, record, shot, shown, THREE_SIZES as VIEWPORTS, topbarApps, uniqueName } from './helpers';
 import { insideTheApp, leftTheApp, pressBack } from './system-back-helpers';
-
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-] as const;
 
 type Box = { x: number; y: number; width: number; height: number };
 
@@ -60,7 +54,7 @@ test('390 / 834 / 1440: the way to the menu, the ⠿ apps and no Back in the top
     await customersReady(page);
     await page.waitForTimeout(400);
 
-    // hub#690: on a phone (ios) the icons covered the title.
+    // On a phone (ios) the icons covered the title.
     const title = (await bar.title.boundingBox())!;
     const boxes = { menu: (await menuDoor.boundingBox())!, apps: (await bar.apps.boundingBox())! };
     results[vp.label] = { title, ...boxes };

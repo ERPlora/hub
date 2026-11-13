@@ -138,7 +138,7 @@ def test_a_project_needs_code_and_name_and_a_hex_colour():
     assert "color" in errors(ProjectIn, code="c", name="n", color="red; background:url(x)")
     assert "name" in errors(ProjectPatchIn, project="c", name=" ")
     assert errors(ProjectPatchIn, name="n") == {"project": "value_error"}
-    # tasks#43: an edit never changes the code, the project's key.
+    # An edit never changes the code, the project's key.
     assert "code" in errors(ProjectPatchIn, project="c", code="other")
 
 

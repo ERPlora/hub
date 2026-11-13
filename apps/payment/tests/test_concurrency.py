@@ -1,7 +1,7 @@
 """Several people at once on the same day, the same payment or the same name: real sessions in threads,
 real row locks (WORKBOOK «Cómo está hecho»).
 
-The old module proved 30 creations at once without a repeated reference (payments#1/#2); here the
+The old module proved 30 creations at once without a repeated reference; here the
 counter's row is raised with ``UPDATE … RETURNING`` in each payment's transaction. Whoever comes first
 wins a step; the other one waits for it and is refused with the real reason.
 """
@@ -153,7 +153,7 @@ def test_completing_and_cancelling_at_once_never_leave_both():
 
 
 def test_the_same_attempt_twice_at_once_records_one_payment():
-    # A double tap or a retry racing the first send (payments#8): neither sees the other's payment yet,
+    # A double tap or a retry racing the first send: neither sees the other's payment yet,
     # the second one waits for the first and then answers that one, without a second number or notice.
     # Both look for the key before either can take the method's lock (a session holds it until both
     # wait): the second one's attempt must collide with the first's row and give its number back.

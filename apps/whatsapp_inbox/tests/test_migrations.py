@@ -197,8 +197,7 @@ def test_the_templates_with_a_file_header_the_hub_now_sends_are_marked_and_back_
 
 GUARDS_WITHOUT_HOST = [(APP, "0013_guards_without_host")]
 #: The unique guards of each table, other than its key and the save key (``submit_key``), as Postgres writes what each
-#: covers: before hub#1132 they name the business column phase 1 left; after it, the database holds one of each without
-#: it.
+#: covers: before ``0013`` they name the old business column; after it, they do without it.
 GUARDS_WITH_HOST = {
     "whatsapp_inbox_channel": {"whatsapp_inbox_channel_one_per_host": "(host)"},
     "whatsapp_inbox_template": {
@@ -229,7 +228,8 @@ def unique_guards(table: str) -> dict[str, str]:
 
 
 def keep_business(table: str, host: str) -> None:
-    """Every row of ``table`` with ``host`` as its business, as phase 1 left them (the models no longer name it)."""
+    """Every row of ``table`` with ``host`` as its business, as the shared tables left them (the models no longer
+    name it)."""
     with connection.cursor() as cursor:
         cursor.execute(f'UPDATE "{table}" SET host = %s', [host])
 
@@ -247,7 +247,7 @@ def test_the_guards_stop_naming_the_business_and_come_back_with_it():
         new = migrate(GUARDS_WITHOUT_HOST)
         assert {table: unique_guards(table) for table in GUARDS_WITHOUT_HOSTS} == GUARDS_WITHOUT_HOSTS
         for _model, table, column in HOST_COLUMNS:
-            assert column in columns(table)  # the columns go in a later deploy (hub#1132, layer 2)
+            assert column in columns(table)  # a later deploy drops them
         assert new.get_model(APP, "Channel").objects.count() == 1
         assert new.get_model(APP, "Template").objects.count() == 1
 

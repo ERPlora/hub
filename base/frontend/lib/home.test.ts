@@ -1,7 +1,8 @@
 import * as components from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { SetupItem, SetupStatus, WidgetDef } from '../operations';
+import { setupItem as item, setupStatus as status, widget } from '../__tests__/home-fixtures';
+import type { WidgetDef } from '../operations';
 import {
   activeWidgetKeys,
   blockingItems,
@@ -18,51 +19,6 @@ import {
   saleStatus,
   widgetView,
 } from './home';
-
-function item(key: string, fields: Partial<SetupItem> = {}): SetupItem {
-  return {
-    key,
-    app: key.split('.')[0],
-    state: 'pending',
-    level: 'functional',
-    required: true,
-    actionable: true,
-    title: key,
-    description: '',
-    icon: 'ion:settings-outline',
-    route: `/${key}`,
-    order: 50,
-    ...fields,
-  };
-}
-
-function status(items: SetupItem[], fields: Partial<SetupStatus> = {}): SetupStatus {
-  const pending = items.filter((i) => i.state === 'pending').length;
-  const unavailable = items.filter((i) => i.state === 'unavailable').length;
-  const blocking = items.filter((i) => i.state === 'pending' && i.level === 'legal').length;
-  return { total: items.length, pending, unavailable, blocking_pending: blocking, items, ...fields };
-}
-
-function widget(key: string, fields: Partial<WidgetDef> = {}): WidgetDef {
-  return {
-    key,
-    app: key.split('.')[0],
-    title: key,
-    icon: '',
-    category: 'Demo',
-    size: 'md',
-    default: false,
-    kind: 'kpi',
-    operation: 'demo.item.stats',
-    params: {},
-    map: { value: 'open' },
-    options: {},
-    component: null,
-    refresh_on: [],
-    live: true,
-    ...fields,
-  };
-}
 
 describe('heading', () => {
   it('greets by the hour while the business has no name: morning before 12, afternoon before 20, evening after', () => {
@@ -162,7 +118,7 @@ describe('checklistView', () => {
     const items = [item('base.apps'), item('base.team'), item('x.ours', { state: 'unavailable' })];
     const view = checklistView(status(items), { alreadyOnScreen: ['base.apps', 'x.ours'] });
     expect(view.rows.map((i) => i.key)).toEqual(['base.team', 'x.ours']);
-    // Expanded means «everything left to do»: nothing is deduplicated there (hub#487).
+    // Expanded means «everything left to do»: nothing is deduplicated there.
     const all = checklistView(status(items), { alreadyOnScreen: ['base.apps'], expanded: true });
     expect(all.rows.map((i) => i.key)).toEqual(['base.apps', 'base.team', 'x.ours']);
     expect(all.hidden).toBe(0);
@@ -354,7 +310,7 @@ describe('a value the row does not have (BASE-F06): «—», never a made-up 0',
 
 // BASE-F06 — a bar-list with negatives (Cash register's «Recent discrepancies»: a drawer 0,40 € short and one 5,50 €
 // over) painted the shortfall as long as the biggest bar: its share was -0.0727, a width the browser drops (the old
-// hub's outfitkit#244 drew none at all). The bar measures the size of the value against the biggest size; as a report
+// hub's OutfitKit drew none at all). The bar measures the size of the value against the biggest size; as a report
 // says it (Excel, QuickBooks, Square), only a negative figure is marked — red, with its sign in the text («-0,40 €») —
 // and every other bar keeps the panel's colour: a surplus is a discrepancy too, and a product with 1 left beside one
 // at -1 is still low on stock (rv-hub-264), so neither is ever painted as «good».

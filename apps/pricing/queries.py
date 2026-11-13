@@ -660,8 +660,8 @@ def rule_discount(rule: DiscountRule, line_amount: int, measure: Fraction) -> in
     """What ``rule`` takes off a line of ``line_amount`` cents, between 0 and the line.
 
     Its quantities (amount per unit, buy and free, tiers, minimum) count ``measure``: the line's quantity
-    in the unit its price is for (market-decision 2026-10-15: Odoo, Business Central, Dynamics 365
-    Commerce), so «0,50 € per unit» is per kg of a coffee sold in grams; free units are rounded down.
+    in the unit its price is for (as Odoo, Business Central and Dynamics 365
+    Commerce count it), so «0,50 € per unit» is per kg of a coffee sold in grams; free units are rounded down.
     """
     if rule.min_quantity is not None and measure < Fraction(rule.min_quantity):
         return 0

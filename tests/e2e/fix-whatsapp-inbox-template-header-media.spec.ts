@@ -16,11 +16,11 @@
 // here (`erploraForgetsTemplates`) before and after: its copy would come back to the next run as a row without file.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, login, psql, shown } from './helpers';
-import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
+import { A, login, psql, shown } from './helpers';
+import {  } from './service-helpers';
 import { photo } from './website-helpers';
 import { BUSINESS_ID, CODE, type GraphThread, HEADER_HANDLE, MEDIA_ID, META_APP, NUMBER_ID, TEMPLATE_ID, UPLOAD_SESSION, WABA_ID } from './whatsapp-graph';
-import { cleanUp, e2ePhone, erploraForgetsTemplates, meta, metaGraph, receive, restorePhoto, seedErplora, system } from './whatsapp-helpers';
+import { chooseInTemplateSheet as choose, cleanUp, e2ePhone, erploraForgetsTemplates, meta, metaGraph, receive, restorePhoto, seedErplora, settledShots as shots, system } from './whatsapp-helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -66,25 +66,6 @@ const panel = (page: Page) => shown(page).locator('[data-testid=whatsapp-inbox-d
 const sender = (page: Page) => page.locator('ion-modal[data-testid=whatsapp-inbox-template-form]');
 /** The width of a photo the browser decoded (0 until then, or if it could not). */
 const loadedWidth = (image: Locator) => image.evaluate((img: HTMLImageElement) => (img.complete ? img.naturalWidth : 0));
-
-/** Picks `label` in an `ion-select` of the sheet (its popover). */
-async function choose(page: Page, name: string, label: string): Promise<void> {
-  await field(page, name).click();
-  await page.locator('ion-popover.select-popover ion-radio', { hasText: label }).click();
-  await expect(page.locator('ion-popover.select-popover')).toBeHidden();
-}
-
-/** The screen in the three sizes (`<name>-390|834|1440`), with `ready` in sight. */
-async function shots(page: Page, name: string, ready: (page: Page) => Promise<void>): Promise<void> {
-  for (const viewport of FLOW_VIEWPORTS) {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await ready(page);
-    await settled(page);
-    await noHorizontalScroll(page, `${name} ${viewport.label}`);
-    await capture(page, `${name}-${viewport.label}`);
-  }
-  await page.setViewportSize({ width: 1280, height: 860 });
-}
 
 test('WHATSAPP_INBOX-F29, F33: a template with a photo header is kept with its file, reaches Meta’s review with it and, approved, is sent with it', async ({ page, request }) => {
   const name = `${MADE_HERE}${Date.now().toString(36)}`;

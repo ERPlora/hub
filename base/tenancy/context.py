@@ -115,7 +115,7 @@ def use_admin_without_a_business() -> AbstractContextManager[DatabaseContext]:
 
 
 def serves_hubs_without_database() -> bool:
-    """Whether a business without a database of its own is entered and served: never in production (S5), only under
+    """Whether a business without a database of its own is entered and served: never in production, only under
     the suite's fallback (``_test_fallback``), where the tests written before the tenancy keep their businesses."""
     return _test_fallback is not None
 

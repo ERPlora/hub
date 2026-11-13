@@ -131,7 +131,7 @@ async function step(context: BrowserContext, id: string, ...steps: Array<'approv
   }
 }
 
-// flow: PAYMENT-F01 · gh:payments#6 — methods are created from the screen; a twin name is refused under Name
+// flow: PAYMENT-F01 — methods are created from the screen; a twin name is refused under Name
 test('PAYMENT-F01: «New method» creates an Active method that «New payment» offers; a twin name is refused under Name', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/payment/methods');
   try {
@@ -176,7 +176,7 @@ test('PAYMENT-F01: «New method» creates an Active method that «New payment» 
   }
 });
 
-// flow: PAYMENT-F02 · gh:payments#8, gh:pm#513, gh:pm#521 — the amount as typed, refusals under their field, one payment per attempt
+// flow: PAYMENT-F02 — the amount as typed, refusals under their field, one payment per attempt
 test('PAYMENT-F02: «New payment» records a Draft with its reference; a bad IBAN is refused under its field; the same attempt records one payment', async ({
   browser,
 }) => {
@@ -308,7 +308,7 @@ test('PAYMENT-F05: «Cancel payment» asks the reason and the row shows it under
   }
 });
 
-// flow: PAYMENT-F06 · gh:payments#21, gh:payments#29 — a piece of the reference finds it; the date filters from / to
+// flow: PAYMENT-F06 — a piece of the reference finds it; the date filters from / to
 test('PAYMENT-F06: the search finds a payment by a piece of its reference and the Date filters from one day to another', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/payment/payments');
   try {
@@ -361,7 +361,7 @@ test('PAYMENT-F06: an employee sees the payments and the methods, with no New pa
   }
 });
 
-// flow: PAYMENT-F08 · gh:pm#155 — the row opens «Editing method — {name}»; deactivated, it leaves «New payment»
+// flow: PAYMENT-F08 — the row opens «Editing method — {name}»; deactivated, it leaves «New payment»
 test('PAYMENT-F08: a row opens «Editing method — {name}» with the whole account; a rename shows on its payments; Deactivate and Activate', async ({
   browser,
 }) => {

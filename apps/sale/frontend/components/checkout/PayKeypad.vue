@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The keypad of the charge sheet (the old `.numpad`): three columns, 1…9, the decimal separator, 0 and
 // C. It only sends the key pressed ('.' for the separator, whatever the page language shows); what the
-// keys build is the tender's (lib/checkout/tender.ts). No quick amounts: removed on purpose (2026-07-19). A currency
+// keys build is the tender's (lib/checkout/tender.ts). No quick amounts, on purpose. A currency
 // without decimals (the yen; flow business-currency) has the separator off, as the till's own keypad (PosNumpad).
 import { decimalMark } from '@erplora/ui/components';
 import { computed } from 'vue';

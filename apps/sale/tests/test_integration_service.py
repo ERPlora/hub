@@ -277,7 +277,7 @@ def test_a_service_without_a_fixed_price_takes_the_amount_typed_within_its_range
 
 
 def test_the_range_of_a_service_is_said_with_its_thousands_grouped(db):
-    # hub#1090: «1.000,00 € – 2.500,00 €» in Spanish, never «1000.00 € – 2500.00 €».
+    # «1.000,00 € – 2.500,00 €» in Spanish, never «1000.00 € – 2500.00 €».
     bridal = svc(
         "service.service.create",
         {
@@ -973,7 +973,7 @@ def by_staff(**params):
 
 
 def test_a_session_counts_for_who_does_it_though_the_line_charged_nothing(haircut, lucia):
-    # flow: SALE-F28 (REC_PELUQUERIA-F15): the reproduction of hub#685, gross_total 0 and nothing else to read.
+    # flow: SALE-F28: the reproduction of hub#685, gross_total 0 and nothing else to read.
     ana = uuid7()
     sale = spend_session(voucher_of_100(lucia, haircut), haircut, lucia, "value-0001", staff=ana)
     assert (sale.total, SaleLine.objects.get(sale=sale.id).voucher_value) == (0, 3333)

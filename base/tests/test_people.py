@@ -26,6 +26,7 @@ from base import access, services
 from base import people as people_rules
 from base.permissions import permissions_for
 from base.models import AccessSettings, Credential, Hub, Membership
+from base.tests.routes import bound_routes, spa_routes
 from base.tests.test_access_pin import a_device, door
 
 pytestmark = pytest.mark.django_db
@@ -421,14 +422,12 @@ PEOPLE_ROUTES = {
 class TestTheRoutes:
     """The SPA calls each operation by its name: the hand-written map names the route ``base/api.py`` binds."""
 
-    def test_the_spas_route_map_names_every_route_of_people_and_roles(self, settings):
-        from base.tests.test_access_routes import bound_routes
+    def test_the_spas_route_map_names_every_route_of_people_and_roles(self):
+        from base.api import router
 
-        assert PEOPLE_ROUTES <= bound_routes()
-        spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
+        assert PEOPLE_ROUTES <= bound_routes(router)
         mine = {op for _, _, op in PEOPLE_ROUTES}
-        named = {(route["method"].upper(), route["path"].removeprefix("/api"), op) for op, route in spa.items() if op in mine}
-        assert named == PEOPLE_ROUTES
+        assert {route for route in spa_routes("base.") if route[2] in mine} == PEOPLE_ROUTES
 
     @pytest.mark.parametrize("name", sorted(op for _, _, op in PEOPLE_ROUTES))
     def test_each_tells_the_assistant_what_it_does(self, name):

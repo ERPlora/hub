@@ -138,6 +138,9 @@ ACCEPTED = {
     # An app's tables made when it is turned on: the state's check is widened, dropped and added again in one
     # migration with ``creating`` and ``failed``; ``on`` and ``off``, all the code of before writes, still pass it.
     ("base", "0022_app_activation_creating", "AddConstraint", "appactivation.base_appactivation_state"),
+    # The actions a line of an appointment's history may say are widened, dropped and added again in one migration
+    # with ``restored``; every action the code of before writes still passes it.
+    ("appointment", "0004_history_restored", "AddConstraint", "history.appointment_history_action"),
     # The WhatsApp inbox's two unique guards without the business column, the step after the one that took that column
     # out of the state (#1133): since then the code of before writes every channel and template with an empty host, so
     # the old guards on it already held what it writes to one channel row and one live template per name and language,

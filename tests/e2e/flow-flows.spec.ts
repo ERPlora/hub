@@ -246,7 +246,7 @@ for (const viewport of VIEWPORTS) {
       expect(tasks.data.rows.map((row) => row.title)).toEqual([title]);
 
       // FLOW-F19, F18: two drafts of the assistant; one discarded, the other reviewed, saved, allowed, on
-      // and run (flows#12).
+      // and run.
       const draftDefinition = {
         trigger: { kind: 'manual' },
         steps: [{ id: 's1', kind: 'command', operation: 'task.task.create', params: { title: draftTitle } }],
@@ -295,7 +295,7 @@ for (const viewport of VIEWPORTS) {
       await noHorizontalScroll(page, viewport.label);
       await snap('FLOW-F02');
 
-      // FLOW-F03: the switch of a row has its name (flows#140); several, in bulk.
+      // FLOW-F03: the switch of a row has its name; several, in bulk.
       const named = shown(page).getByRole('switch', { name: `Turn «${name}» on or off` });
       await named.click();
       await expect(row).toContainText('Paused');

@@ -7,6 +7,7 @@ import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 import { type Component, defineComponent } from 'vue';
 
+import { askToDelete, confirmDeletion } from '../../../../base/frontend/__tests__/table-delete';
 import type { GroupOut } from '../operations';
 import { EMPLOYEE, errorFrame, flush, type MountOptions, mountModifier, page } from '../__tests__/mount-modifier';
 import GroupFormModal from '../components/GroupFormModal.vue';
@@ -165,20 +166,14 @@ describe('GroupsPage', () => {
 
   it('deletes after its confirmation, saying what goes with the group', async () => {
     const s = await setup();
-    await s.show(page(ROWS));
-    s.table().vm.$emit('action', { actionId: 'delete', row: ROWS[0] });
-    await flush();
-    const dialog = s.wrapper.findComponent(ConfirmDialog);
+    const dialog = await askToDelete(s, page(ROWS), ROWS[0]);
     expect([dialog.props('title'), dialog.props('message'), dialog.props('consequences'), dialog.props('confirmLabel')]).toEqual([
       'Delete group',
       'Doneness — the group disappears with its options and stops being asked in the till. What was already ordered keeps it.',
       ['3 options will be deleted with it.', 'It will stop applying to 2 products or categories.'],
       'Delete',
     ]);
-    s.answer(200, { id: 'g1' });
-    dialog.vm.$emit('confirm');
-    await flush();
-    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/modifier/groups/delete', query: {}, body: { id: 'g1' } }]);
+    expect(await confirmDeletion(s, dialog, 'g1')).toEqual([{ method: 'POST', path: '/api/modifier/groups/delete', query: {}, body: { id: 'g1' } }]);
   });
 
   // hub#1147: one option or link is said in the singular and several in the plural, never «option(s)».

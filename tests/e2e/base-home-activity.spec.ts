@@ -235,7 +235,7 @@ test('BASE-F09 — the toolbar of «Activity» is one row from 820 to 1440, as i
       expect(control.right, `${control.name} inside the bar at ${vp.label}`).toBeLessThanOrEqual(bar.right + 0.5);
     }
     if (vp.label === '390') continue; // On a phone the search takes its own line (the old hub's too).
-    // docs/reference/old-hub/dashboard-activity-834.png: search, columns, rows per page, list/cards and the
+    // As in the old hub: search, columns, rows per page, list/cards and the
     // funnel on one line. Every control shares the search's line.
     const search = controls.find((c) => c.name === 'data-table__search');
     expect(search, `the search at ${vp.label}`).toBeDefined();

@@ -1,4 +1,4 @@
-// The countries a tax rule may be set for (TAX-F04, taxes#41): a country is CHOSEN, never typed, so
+// The countries a tax rule may be set for (TAX-F04): a country is CHOSEN, never typed, so
 // a code no business can hold («ZZ») never becomes a rule that matches nothing.
 //
 // The codes are the server's: `apps/tax/schemas.py` accepts the 249 officially assigned ISO 3166-1

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0d9588a9991a77bbeda157d8c6eb1452402b5896cacac09620ffec973830550c -->
+<!-- generated from WORKBOOK.md sha256:afbf56a1243772f269ea19ea780d66da1b3457f487f8ef465f7387701d630a85 -->
 
 ## What it is for and who it is for
 
@@ -2936,8 +2936,8 @@ the customers that were lost, the deleted ones as they were, the products, the s
 appointments; making and deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of
 ERPlora/aws; repeating appointments, hub#1327; the group, tag or own field the business deleted after deleting a
 customer who comes back, hub#1356; the image of a product brought back, hub#1319; the products the business keeps live
-in a product category that comes back, hub#1373; the image of a service brought back, hub#1319; its professionals,
-hub#1322)
+in a product category that comes back, hub#1373; the image of a service brought back, hub#1319; Recoveries naming the
+professional who does not come back with their service, hub#1375)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -3015,22 +3015,30 @@ Steps:
       comes back as a new one, on offer, created as the Services screen creates it, with its name, pricing, prices, cost,
       duration, buffers, capacity, descriptions, booking settings, order, featured flag, SKU, barcode and notes, its tax
       category and its category: the same one if the business still has it, and otherwise the one that has just come
-      back or the one the business created again with its name; without its image (hub#1319) or its professionals
-      (hub#1322). An archived one is still in the business and does not come
+      back or the one the business created again with its name; and with the professionals who performed it and the
+      business still has on its staff, each with their own minutes and price, assigned as Services assigns them
+      (SERVICE-F31): as their main service if the business has not given them another since, and switched off if it
+      was. Someone Staff terminated, or the business no longer has, is not assigned, because they can no longer be
+      booked (Recoveries does not name them yet, hub#1375). Without its image (hub#1319). An archived one is still in
+      the business and does not come
       back (it is restored in Services), nor does one the copy had archived, and one the business has already made again
       (another with the same name in the same category, not itself one of the copy's; each counts for one only, so two
       services with the same name both come back) is not repeated. Asking again creates nothing twice.
       Appointments always go after customers and services, whatever the order they are asked in, so each finds its
       customer and its services. Each appointment that has not come yet and was still booked (pending or confirmed, not
-      charged) comes back, booked as the agenda books it: for its customer's card in the business (the same one, the one
-      it was merged into or the one made again), with its services in the business as Services matches them (the same
-      one or, if it is gone, the one made again by hand or just brought back by Services: the same name in the same
-      category, the oldest if there are two), its professional, its time, its minutes and its notes; as a new
-      appointment, with another number and without its history (hub#1326). It is never booked over another: one whose
-      time is already taken, no longer fits the business's or the professional's hours or is blocked, or whose customer,
-      service or professional is no longer there, does not come back and its reason says why ("appointment.slot_taken:
-      …", "service.service_not_found: …"). Those gone by do not come back, nor one the business has (even if it
-      cancelled it) or booked again (the same customer at the same time).
+      charged) comes back. One the business deleted and still holds comes back THE SAME and counts as restored, as it
+      was when it was deleted: with its number, its customer, its services, its professional, its time, its notes, its
+      series and its history, which adds "Restored" (APPOINTMENT-F11). One the business no longer has comes back booked
+      as the agenda books it: for its customer's card in the business (the same one, the one it was merged into or the
+      one made again), with its services in the business as Services matches them (the same one or, if it is gone, the
+      one made again by hand or just brought back by Services: the same name in the same category, the oldest if there
+      are two), its professional, its time, its minutes and its notes; as a new appointment, with another number and
+      without its history. It is never booked over another: one whose time is already taken, no longer fits the
+      business's or the professional's hours or is blocked, or whose customer, service or professional is no longer
+      there, does not come back and its reason says why ("appointment.slot_taken: …", "service.service_not_found: …");
+      a deleted one that does not come back for that is not created anew. Those gone by do not come back, nor one the
+      business has (even if it cancelled it) or booked again (the same customer at the same time, or its series on that
+      date).
 In: the chosen businesses, the temporary cluster with their copy and the moment; to recover, the made separate copy and
 what to bring back.
 Out: the business's database as it was at that moment; the one it had, kept 7 days on its server; the notice
@@ -3047,11 +3055,15 @@ each deleted product that comes back in it (`inventory.product.categorized`), ea
 product it still held, live again with its product-recovered notice (`inventory.product.restored`), a new product for
 each product it no longer had, with its product-created notice (`inventory.product.created`), a new service category
 for each one it lacked, with its category-created notice (`service.category.created`), a new service for each one it
-no longer had, with its service-created notice (`service.service.created`), and a new appointment for each one it
-lacked, with its appointment-created notice (`appointment.appointment.created`), and nothing else. Each of those notices
-says the recovery did it (its actor is `copy_recovery:<id>`, that of the row in Recoveries), so no automation of the
-business starts on them (FLOW-F21), whether of something created or of something recovered; what only brings the
-business's own data up to date with them goes on the same (the WhatsApp Inbox links its conversation to the card). The
+no longer had, with its service-created notice (`service.service.created`) and a professional-assigned notice
+(`service.assignment.assigned`) for each professional who comes back with it, each deleted appointment it still held,
+live again with its appointment-recovered notice (`appointment.appointment.restored`), and a new appointment for each
+one it no longer had, with its appointment-created notice (`appointment.appointment.created`), and nothing else. Each of
+those notices says the recovery did it (its actor is `copy_recovery:<id>`, that of the row in Recoveries), so no
+automation of the business starts on them (FLOW-F21), whether of something created or of something recovered; what only
+brings the business's own data up to date with them goes on the same (the WhatsApp Inbox links its conversation to the
+card), and what it records in doing so carries the same mark, so none starts from it either, first or second hand (the
+conversation linked again does not start "a WhatsApp conversation is linked to a customer"; hub#1365). The
 copy, untouched; the notice `control.copy.recovery_requested` with who asked for it.
 If it fails: what the restore does not accept is said in the notice, business by business, and that business is not
 touched: one that is not ready or has no database of its own, a demo, one being moved or restored, a cluster open to new
@@ -3080,6 +3092,7 @@ is unfrozen. With records from the test environment only, the chain is recovered
 support staff see the list, Separate copies and Recoveries, but not the actions.
 Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
-INVENTORY-F07, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08, APPOINTMENT-F01,
-APPOINTMENT-F11, FLOW-F21; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1307,
-hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1356, hub#1373, aws#77
+INVENTORY-F07, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08, SERVICE-F31,
+APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282,
+hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327,
+hub#1341, hub#1356, hub#1365, hub#1373, hub#1375, aws#77

@@ -7,7 +7,9 @@
 // deleted after the file (`afterAll`).
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, login, psql, shot, shown } from './helpers';
+import { A, api, login, shot, shown, THREE_SIZES as FILTER_VIEWPORTS, THREE_SIZES_TALL_TABLET as VIEWPORTS } from './helpers';
+import { noHorizontalScroll } from './service-helpers';
+import { cleanUp } from './tax-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 const SEED = [
@@ -24,39 +26,8 @@ const SEED = [
   'service.health',
 ];
 
-/** Categories are never deleted by the app: what this file made goes with the database's own hand
- *  (the hub `a`'s), components first, then rules, aliases and the categories. */
-const CLEANUP = [
-  "delete from tax_taxalias where category_id in (select id from tax_taxcategory where key like 'e2e.%')",
-  "delete from tax_taxrule where parent_id is not null and category_id in (select id from tax_taxcategory where key like 'e2e.%')",
-  "delete from tax_taxrule where category_id in (select id from tax_taxcategory where key like 'e2e.%')",
-  "delete from tax_taxcategory where key like 'e2e.%'",
-].join('; ');
-
-test.afterAll(() => {
-  psql(CLEANUP);
-});
-
-/** No horizontal scroll: the page is not wider than the window (polled while the layout settles). */
-async function noHorizontalScroll(page: Page, label: string): Promise<void> {
-  await expect
-    .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${label}` })
-    .toBeLessThanOrEqual(0);
-}
-
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1194 },
-  { label: '1440', width: 1440, height: 900 },
-];
-
-/** The widths of the filter panel's screenshots: a phone (the panel is a sheet), a tablet and a desk
- *  (two columns), as the SaaS panel's `VIEWPORTS`. */
-const FILTER_VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
+// What this file made goes after it: categories are never deleted by the app (tax-helpers.ts).
+test.afterAll(cleanUp);
 
 /** Waits for the categories list to paint its first result (rows or the empty state). */
 async function listReady(page: Page): Promise<void> {

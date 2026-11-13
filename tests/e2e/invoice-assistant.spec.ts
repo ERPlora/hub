@@ -20,7 +20,8 @@ import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { CANNOT_RECTIFY, DONE, NOT_DONE, type Provider, startProvider } from './assistant-provider';
+import { CANNOT_RECTIFY, NOT_DONE, type Provider, startProvider } from './assistant-provider';
+import { confirmedWithTheWord, type SentCard, sentCard } from './assistant-card-helpers';
 import { A, api, capture, compactBar, login, psql, registerBusinessIn, registrationOf, REPO_DIR, shot, shown, untilStill } from './helpers';
 import { cleanInvoices, ensureIssuer, type InvoiceOut, invoiceOf, issuedIds, snapshotSeries } from './invoice-helpers';
 import { stamp } from './sale-helpers';
@@ -230,10 +231,7 @@ test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: 
   // Asked again, the word typed: the rectifying invoice the preview said is issued, as the person.
   await ask(page, asked(invoice.number));
   await expect(card(page)).toBeVisible({ timeout: 30_000 });
-  await card(page).locator('[data-testid="assistant-confirm-input"] input').fill('confirm');
-  await expect(submit).toBeEnabled();
-  await decide(page, 'submit');
-  await expect(lastAnswer(page)).toContainText(DONE.en);
+  await confirmedWithTheWord(page);
   await expect(receipts(page).last()).toHaveText('Done: Rectify in Invoicing');
   const after = await invoiceOf(context, invoice.id);
   expect(after.status).toBe('cancelled');
@@ -453,25 +451,6 @@ test('INVOICE-F08 — asked to rectify a rectifying invoice, the assistant says 
 const CARD_KEY = 'FIX-HUB-INVOICE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';
 /** An id as a schema's `format: uuid` takes it: never on a card. */
 const AN_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-
-type SentCard = { fields: { name: string; label: string; value: unknown }[] };
-
-/** The card of the confirm frame of a turn's answer (`text/event-stream`: one `data: <JSON>` per frame), if any. */
-function confirmedCard(stream: string): SentCard | undefined {
-  const frames = stream
-    .split('\n')
-    .filter((line) => line.startsWith('data:'))
-    .map((line) => JSON.parse(line.slice(5)) as { type: string; card?: SentCard });
-  return frames.find((frame) => frame.type === 'confirm')?.card;
-}
-
-/** The card the server sends for the person to confirm, as it arrives: the answer of the turn that carries it. */
-async function sentCard(page: Page): Promise<SentCard> {
-  const answer = await page.waitForResponse(
-    async (response) => response.url().endsWith('/api/assistant/turn') && confirmedCard(await response.text()) !== undefined,
-  );
-  return confirmedCard(await answer.text())!;
-}
 
 const saidBy = (sent: SentCard) => Object.fromEntries(sent.fields.map((field) => [field.name, [field.label, field.value]]));
 

@@ -1,6 +1,6 @@
 // flow: hub-e2e-tenancy — hub#593: reservation-whatsapp.spec.ts played the worker's relay with a `manage.py shell` that
 // named no business, so it looked for the event in control's database and every viewport fell with
-// `OutboxEvent.DoesNotExist`, for a reason that was not the flow. Since each business has its own database (S2a), a
+// `OutboxEvent.DoesNotExist`, for a reason that was not the flow. Since each business has its own database, a
 // shell without `--hub` works on control (base/management/commands/shell.py): this keeps that from being an oversight.
 // A call without `--hub` has to be listed here with what it works on, exactly as many times as the file makes it.
 import { readdirSync, readFileSync } from 'node:fs';
@@ -13,15 +13,15 @@ const E2E_DIR = dirname(fileURLToPath(import.meta.url));
 
 /** The calls that rightly name no business: the SaaS's own shell has none, and control's registry lives in no hub. */
 const WITHOUT_A_HUB: Record<string, { calls: number; on: string }> = {
+  'admin-list-helpers.ts': {
+    calls: 1,
+    on: "control's registry: the rows a spec of the platform's admin lists (separate copies, recoveries) and its staff member's session",
+  },
   'assistant-battery.ts': { calls: 2, on: "the SaaS's providers and accounts" },
   'assistant-probes.ts': { calls: 1, on: "the SaaS's accounts" },
   'base-recover-from-copy.spec.ts': {
     calls: 1,
     on: "control's registry: the separate copy, the staff member's session and the worker's recovery pass (its cards, products and services, with --hub a)",
-  },
-  'base-recoveries-long-result.spec.ts': {
-    calls: 1,
-    on: "control's registry: a separate copy of a with its failed recovery, and the staff member's session",
   },
   'fix-hub-csp-whatsapp-media-gate.spec.ts': { calls: 1, on: "control's registry of hubs" },
   'whatsapp-inbox-offered-options.spec.ts': { calls: 1, on: "the SaaS's WhatsApp number" },

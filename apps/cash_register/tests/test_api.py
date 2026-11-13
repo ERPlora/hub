@@ -10,6 +10,7 @@ import pytest
 from live.ninja import ensure_api_parity
 
 from apps.cash_register.api import router
+from base.tests.routes import spa_routes
 from config.api import api
 
 ROUTES = {
@@ -72,15 +73,7 @@ def test_the_api_keeps_parity():
 
 
 def test_the_spas_route_map_names_every_cash_register_route():
-    from django.conf import settings
-
-    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
-    mine = {
-        (route["method"].upper(), route["path"].removeprefix("/api"), op)
-        for op, route in spa.items()
-        if op.startswith("cash_register.")
-    }
-    assert mine == ROUTES
+    assert spa_routes("cash_register.") == ROUTES
 
 
 def test_every_operation_has_a_route_and_is_open_to_api_keys():

@@ -1,5 +1,5 @@
 """Each WhatsApp record lives only in its business's own database (hub#1053), which keeps one channel row and one
-live template per name and language whatever business column phase 1 left on its rows (hub#1132)."""
+live template per name and language whatever old business column its rows kept."""
 
 import uuid
 
@@ -138,8 +138,8 @@ def test_a_card_recovered_in_one_business_claims_only_its_own_conversation(hub_a
 
 
 def keep_business(row, host: str) -> None:
-    """Writes ``host`` on ``row`` in the database of the hub in use, as phase 1 left its rows: the business column
-    the models no longer name (hub#1053) but each database still keeps until hub#1132 drops it."""
+    """Writes ``host`` on ``row`` in the database of the hub in use, as the shared tables left their rows: the business
+    column the models no longer name but each database still keeps."""
     with connections[current_alias()].cursor() as cursor:
         cursor.execute(f'UPDATE "{row._meta.db_table}" SET host = %s WHERE id = %s', [host, row.pk])
 

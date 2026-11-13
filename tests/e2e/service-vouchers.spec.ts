@@ -8,7 +8,7 @@
 import { expect, test } from '@playwright/test';
 
 import { A, api, shot, shown } from './helpers';
-import { cleanUp, filterBy, named, ownerPage, pick, post, rowAction, VIEWPORTS } from './service-helpers';
+import { cleanUp, filterBy, named, ownerPage, pick, post, rowAction, VIEWPORTS, voucherWithNoCustomer } from './service-helpers';
 
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
@@ -78,11 +78,7 @@ test('Vouchers: create, sold, adjusted, voided, movements, orphans and delete; s
     await movements.locator('[data-testid=service-movements-close]').click();
 
     // The card deleted in Customers: the voucher goes to «Vouchers with no customer».
-    await post(context, '/customer/customers/delete', { id: lucia.id }, 200);
-    await view.locator('[data-testid=service-packages-orphans-open]').click();
-    const orphans = page.locator('ion-modal[data-testid=service-orphans]');
-    await expect(orphans.locator(`[data-testid=service-orphans-row-${sold.id}]`)).toContainText(`Customer reference: ${lucia.id}`);
-    await expect(orphans.locator(`[data-testid=service-orphans-row-${sold.id}]`)).toContainText('5 sessions left');
+    const orphans = await voucherWithNoCustomer(page, context, lucia.id, sold.id);
     await page.screenshot({ path: shot('service-orphans-desktop') });
     await orphans.locator('[data-testid=service-orphans-close]').click();
 

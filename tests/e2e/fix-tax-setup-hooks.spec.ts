@@ -6,9 +6,10 @@
 // with the step pending in sight. The rules the hub already had in force are deactivated
 // for the run and active again after it; the run's own hang from «e2e.» categories, deleted by `cleanUp()` before and
 // after.
-import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { A, api, capture, login, psql, shown } from './helpers';
+import { A, api, capture, psql, shown } from './helpers';
+import { setupStep, spanishOwnerOnTheSetupCard as spanishOwner, streamsQuiet } from './home-helpers';
 import { cleanUp, createRule, FLOW_VIEWPORTS, freshCategory, horizontalOverflow, pickCombo } from './tax-helpers';
 
 test.describe.configure({ mode: 'serial' });
@@ -37,53 +38,15 @@ test.afterAll(() => {
   }
 });
 
-/**
- * The owner on `a` in Spanish (the Hub's language cookie, as the sign-in sets it from the account), on the Home, with
- * the instant of every `/api/live` the page opens: a new stream brings every result again, so a step that changes
- * without one came over the stream already open, re-run by its events.
- */
-async function spanishOwner(
-  browser: Browser,
-  viewport: { width: number; height: number },
-): Promise<{ context: BrowserContext; page: Page; streams: number[] }> {
-  const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
-  const page = await context.newPage();
-  const streams: number[] = [];
-  page.on('request', (request) => {
-    if (request.url().includes('/api/live')) streams.push(Date.now());
-  });
-  await login(page, A, '/');
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.goto(`${A}/`);
-  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-  await expect(card(page)).toHaveAttribute('aria-busy', 'false');
-  // The owner's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
-  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-  return { context, page, streams };
-}
-
 /** How long the SDK keeps a subscription nobody reads any more (`RELEASE_GRACE_MS` of `@erplora/ui/sdk`, 2 s), plus a
  *  margin: back from Rules, the rule form's own query leaves the stream that late, and the stream opens again then. */
 const RELEASED = 2_500;
 
+const { row: step, pill, configure, unfolded, inSight, backDone } = setupStep(STEP);
+
 /** Waits until the page has opened no `/api/live` for longer than a subscription takes to be released: every
  *  subscription of the screen is declared and every one of the screen left behind is gone. */
-async function settled(streams: number[]): Promise<void> {
-  await expect.poll(() => Date.now() - (streams.at(-1) ?? 0), { timeout: 15_000 }).toBeGreaterThan(RELEASED);
-}
-
-const card = (page: Page): Locator => shown(page).locator('[data-testid="setup-card"]');
-const step = (page: Page): Locator => card(page).locator(`[data-testid="setup-row"][data-key="${STEP}"]`);
-const pill = (page: Page): Locator => step(page).locator('[data-testid="setup-pill"]');
-const configure = (page: Page): Locator => step(page).locator(`[data-testid="setup-configure-${STEP}"]`);
-
-/** «Ver todo»: a step below a more important pending one, or a done one, may be folded. */
-async function unfolded(page: Page): Promise<void> {
-  await expect(card(page)).toHaveAttribute('aria-busy', 'false');
-  const toggle = card(page).locator('[data-testid="setup-toggle"]');
-  if ((await toggle.count()) && (await toggle.textContent())?.trim() === 'Ver todo') await toggle.click();
-  await expect(step(page)).toBeVisible();
-}
+const settled = (streams: number[]): Promise<void> => streamsQuiet(streams, RELEASED);
 
 /** Deactivates (TAX-F08) or restores (TAX-F08) a rule by the API as the owner. */
 async function inForce(context: BrowserContext, id: string, action: 'deactivate' | 'activate'): Promise<void> {
@@ -91,7 +54,7 @@ async function inForce(context: BrowserContext, id: string, action: 'deactivate'
   expect(changed.status, JSON.stringify(changed.data)).toBe(200);
 }
 
-test(`${KEY} TAX-F17: «Tus impuestos» pending with no rate in force, it leads to Rules, the first rule ticks it, deactivated it is pending again and restored done`, async ({
+test(`TAX-F17: «Tus impuestos» pending with no rate in force, it leads to Rules, the first rule ticks it, deactivated it is pending again and restored done`, async ({
   browser,
 }) => {
   const { context, page, streams } = await spanishOwner(browser, { width: 1440, height: 900 });
@@ -127,11 +90,7 @@ test(`${KEY} TAX-F17: «Tus impuestos» pending with no rate in force, it leads 
     expect(ruleId, 'the rule was created active').toMatch(/^[0-9a-f-]{36}$/);
 
     // Back on the Home: done, with nothing left to configure.
-    await page.goBack();
-    await expect(page).toHaveURL(`${A}/`);
-    await unfolded(page);
-    await expect(pill(page)).toHaveText('Hecho');
-    await expect(configure(page)).toHaveCount(0);
+    await backDone(page);
 
     // Deactivated, no rate applies: pending again without a reload, over the stream already open; restored, done.
     await settled(streams);
@@ -149,14 +108,12 @@ test(`${KEY} TAX-F17: «Tus impuestos» pending with no rate in force, it leads 
 });
 
 for (const size of FLOW_VIEWPORTS) {
-  test(`${KEY} TAX-F17 at ${size.label}: «Tus impuestos» pending in sight, then done without a reload once a rule is created`, async ({
+  test(`TAX-F17 at ${size.label}: «Tus impuestos» pending in sight, then done without a reload once a rule is created`, async ({
     browser,
   }) => {
     const { context, page, streams } = await spanishOwner(browser, { width: size.width, height: size.height });
     try {
-      await unfolded(page);
-      await expect(pill(page)).toHaveText('Importante');
-      await step(page).evaluate((element) => element.scrollIntoView({ block: 'center' }));
+      await inSight(page, 'Importante');
       await expect.poll(() => horizontalOverflow(page), `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
       await capture(page, `${KEY}-${size.label}`);
 

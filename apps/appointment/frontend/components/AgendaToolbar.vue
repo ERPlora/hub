@@ -3,7 +3,7 @@
 // in a week, the week), «Filter by status», «N to confirm» when customers' bookings wait (a tap filters the
 // pending ones), the «List · By professional · Repeating» switch (icons only on a phone) and, for the
 // first two, «Day · Week». A device on another zone than the business is told the agenda shows the
-// business's clock. One or two rows, as the old agenda (appointments#93, #206, #243): on a phone, ‹ the day's
+// business's clock. One or two rows, as the old agenda: on a phone, ‹ the day's
 // field › and «Today», then the filter and the switches; the long date only where it fits.
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonLabel, IonSegment, IonSegmentButton, IonSelect, IonSelectOption } from '@ionic/vue';

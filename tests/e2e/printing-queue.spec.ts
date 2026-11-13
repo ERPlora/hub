@@ -239,7 +239,7 @@ test('PRINTING-F12: the label asked from the product sheet waits in the Â«LabelÂ
   page,
   context,
 }) => {
-  // flow: PRINTING-F12 (INVENTORY-F25 asks for it; printing#62: the warning of a label with no printer shows)
+  // flow: PRINTING-F12 (INVENTORY-F25 asks for it: the warning of a label with no printer shows)
   await login(page, A, '/inventory/products');
   try {
     await switchOffLabelPrinters(context);

@@ -340,7 +340,7 @@ describe('ProductFormModal: editing', () => {
   });
 
   describe('the business answers after the form opened (flow INVENTORY-F02)', () => {
-    /** What the money field says in yen, with its example in yen (ui#140). */
+    /** What the money field says in yen, with its example in yen. */
     const NOT_AMOUNT_IN_YEN = 'This is not an amount. Type a figure, for example 12.';
 
     it('a new product: the name and SKU typed before keep, and «Save» lights up once its tax category is chosen', async () => {

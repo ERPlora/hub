@@ -1,33 +1,19 @@
 import { IonProgressBar } from '@ionic/vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { setupItem, setupStatus } from '../__tests__/home-fixtures';
 import type { SetupItem, SetupStatus } from '../operations';
 import { errorFrame, flush, memoryStorage, mountBase, subId } from '../__tests__/mount-base';
 import { createAssistant, installAssistant } from '@erplora/ui/components';
 import SetupChecklist from './SetupChecklist.vue';
 
+/** A step titled «Title <key>», described and routed by its key. */
 function item(key: string, fields: Partial<SetupItem> = {}): SetupItem {
-  return {
-    key,
-    app: key.split('.')[0],
-    state: 'pending',
-    level: 'functional',
-    required: true,
-    actionable: true,
-    title: `Title ${key}`,
-    description: `About ${key}`,
-    icon: 'ion:settings-outline',
-    route: `/${key.replace('.', '/')}`,
-    order: 50,
-    ...fields,
-  };
+  return setupItem(key, { title: `Title ${key}`, description: `About ${key}`, route: `/${key.replace('.', '/')}`, ...fields });
 }
 
 function status(items: SetupItem[]): SetupStatus {
-  const pending = items.filter((i) => i.state === 'pending').length;
-  const unavailable = items.filter((i) => i.state === 'unavailable').length;
-  const blocking = items.filter((i) => i.state === 'pending' && i.level === 'legal').length;
-  return { total: items.length, pending, unavailable, blocking_pending: blocking, items };
+  return setupStatus(items);
 }
 
 async function setup(options: { routes?: string[]; locale?: 'en' | 'es' } = {}) {

@@ -158,7 +158,7 @@ describe('SeriesFormModal: Edit repeating appointment', () => {
     ]);
   });
 
-  // appointments#211: closing the panel while what it reaches is still loading closes it for good; the answer
+  // Closing the panel while what it reaches is still loading closes it for good; the answer
   // that arrives afterwards opens nothing.
   it('closed while it loads, it stays closed when the answer arrives', async () => {
     const s = await setup({ series: SERIES, fromDate: '2026-11-02' });

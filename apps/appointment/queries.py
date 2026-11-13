@@ -614,9 +614,9 @@ def count_to_confirm(ctx: OperationContext, data: NoIn) -> dict:
     }
 
 
-# ── What the team is told as it happens (G01) ────────────────────────────────────────────────
+# ── What the team is told as it happens (APPOINTMENT-F28) ────────────────────────────────────
 
-#: How far back the notices go when nobody says (old-hub:HUB_SHELL-F66 told each one as it came).
+#: How far back the notices go when nobody says.
 NOTICES_WINDOW = dt.timedelta(hours=24)
 
 
@@ -1505,12 +1505,30 @@ def _card_of(card: dict | None, row: dict) -> dict:
     return {field: card[field] for field in ("id", "name", "phone", "email")}
 
 
+def appointments_deleted_in_business(appointments: list[dict]) -> list[dict]:
+    """hub#1326: the appointments of a separate copy (``appointments_in_copy``) the business still holds deleted
+    (APPOINTMENT-F11), in their order, for ``appointment.appointment.restore``: the same appointment back, with its
+    number, its history and its series. The same by its id, whatever the copy says of it. Never one booked again since,
+    as the business holds it: a live one of its customer at its moment, or of its series on its date (that one
+    stays)."""
+    live = Appointment.objects.filter(deleted_at__isnull=True)
+    again = live.filter(customer_id=OuterRef("customer_id"), start=OuterRef("start"))
+    rebooked = live.filter(recurring_id=OuterRef("recurring_id"), occurrence_date=OuterRef("occurrence_date"))
+    held = set(
+        Appointment.objects.filter(pk__in=[one["id"] for one in appointments], deleted_at__isnull=False)
+        .exclude(Exists(again))
+        .exclude(Exists(rebooked))
+        .values_list("pk", flat=True)
+    )
+    return [one for one in appointments if one["id"] in held]
+
+
 def appointments_not_in_business(appointments: list[dict]) -> list[dict]:
     """hub#1284: the appointments of a separate copy (``appointments_in_copy``) the business lacks, in their order, each
     as ``appointment.appointment.create`` takes it here, with its ``id`` there. Not lacking: one the business holds,
-    whatever became of it since (moved, cancelled, done: it stays as it is), and one booked again, by hand or brought
-    back already (a live appointment of the same customer at the same moment). Lacking: one deleted from the agenda
-    (APPOINTMENT-F11) or gone altogether.
+    live or deleted, whatever became of it since (moved, cancelled, done: it stays as it is; a deleted one comes back the
+    same, ``appointments_deleted_in_business``, hub#1326), and one booked again, by hand or brought back already (a live
+    appointment of the same customer at the same moment). Lacking: one gone altogether.
 
     Its customer is the business's card of hers by Customers' own rule (``card_in_business``: the same card, the one it
     was merged into or the one made again); without one, the copy's, which the create refuses with why: an appointment
@@ -1519,11 +1537,7 @@ def appointments_not_in_business(appointments: list[dict]) -> list[dict]:
     hand or brought back by Services first, the apps going in the order of their ``requires``); without one, the
     copy's, which the create refuses with why. Its professional, by her id (one who leaves keeps hers): the create
     refuses one not bookable any more, as it refuses a moment that does not fit the agenda now."""
-    held = set(
-        Appointment.objects.filter(pk__in=[one["id"] for one in appointments], deleted_at__isnull=True).values_list(
-            "pk", flat=True
-        )
-    )
+    held = set(Appointment.objects.filter(pk__in=[one["id"] for one in appointments]).values_list("pk", flat=True))
     # The same list in each (``appointments_in_copy``): every service of the copy, matched once.
     services = services_in_business(appointments[0]["services_in_copy"]) if appointments else {}
     lacking = []

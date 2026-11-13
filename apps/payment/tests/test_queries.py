@@ -2,7 +2,7 @@
 the methods.
 
 The filter cases come from the old module's tests: typing a piece of the reference (its last digits,
-its date) finds the payment (payments#21, `text_filters_narrow_by_fragment`), the beneficiary narrows
+its date) finds the payment (`text_filters_narrow_by_fragment`), the beneficiary narrows
 by fragment too, and every filter box the screen paints has its filter in the query's input
 (`filter_boxes_match_the_manifest`).
 """
@@ -425,6 +425,6 @@ def _tied_payments():
     ],
 )
 def test_ties_go_by_id_in_the_lists_own_direction(operation, tied, column):
-    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
+    """hub#768: a descending list is the ascending one read backwards, ties included, and its
     pages neither repeat nor lose rows."""
     assert_reads_backwards(listed_with(run, operation, column, schema=get(operation).input), tied())

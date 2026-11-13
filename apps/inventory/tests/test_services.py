@@ -1512,7 +1512,7 @@ def test_selling_without_stock_lets_the_balance_go_negative():
 @pytest.mark.parametrize("kind", ["untracked", "business_off"])
 def test_a_write_off_of_an_article_without_stock_control_is_refused_and_says_why(kind):
     # The screen offers it only to articles that track stock; by the assistant or the API a write-off
-    # that would do nothing is not a silent success either (2026-10-14).
+    # that would do nothing is not a silent success either.
     if kind == "business_off":
         configure(track_stock=False)
     created = create(initial_stock="5", track_stock=False if kind == "untracked" else None)

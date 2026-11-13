@@ -1,4 +1,4 @@
-// flow: STAFF-G01
+// flow: STAFF-F23
 // Staff's «Empleados por rol» on the Home with each role's own colour: the owner of hub
 // `a`, in Spanish, adds the panel from «Personalizar panel»; two roles of colours of their own and a third without one,
 // each with Active people: each bar's fill is its role's colour, and the role without one keeps the panel's. base paints
@@ -7,7 +7,8 @@
 // Everything this file creates is named «E2E-ROLECOLOR …» and removed after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, login, psql, shot, shown, untilStill } from './helpers';
+import { A, api, capturedFitting, login, psql, shown } from './helpers';
+import { panelAdded, spanishContext, spanishHome } from './home-helpers';
 import { VIEWPORTS } from './inventory-helpers';
 import { stamp } from './sale-helpers';
 
@@ -97,14 +98,11 @@ async function fills(page: Page): Promise<{ name: string; fill: string; wanted: 
 }
 
 for (const viewport of VIEWPORTS) {
-  test(`STAFF-G01: «Empleados por rol» paints each bar in its role's colour, and the panel's without one, at ${viewport.label}`, async ({ browser }) => {
-    const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
+  test(`STAFF-F23: «Empleados por rol» paints each bar in its role's colour, and the panel's without one, at ${viewport.label}`, async ({ browser }) => {
+    const context = await spanishContext(browser, viewport);
     try {
       const page = await context.newPage();
-      await login(page, A, '/');
-      await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-      await page.goto(`${A}/`);
-      await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+      await spanishHome(page);
 
       // The server gives each row its role's colour ("" for none), and ours are among the panel's ten.
       const rows = await byRole(context);
@@ -115,14 +113,7 @@ for (const viewport of VIEWPORTS) {
         ).toMatchObject({ member_count: role.people, color: role.color });
       }
 
-      await shown(page).locator('[data-testid="widgets-customize"]').click();
-      const picker = page.locator('ion-modal[data-testid="widgets-picker"]:not(.overlay-hidden)');
-      await expect(picker).toContainText('Personal');
-      await picker.locator(`[data-testid="widgets-add-${BY_ROLE}"]`).click();
-      await picker.locator('[data-testid="widgets-close"]').click();
-      await expect(picker).toHaveCount(0);
-
-      const panel = shown(page).locator(`[data-testid="widget-board"] [data-testid="widget"][data-key="${BY_ROLE}"]`);
+      const panel = await panelAdded(page, BY_ROLE, (picker) => expect(picker).toContainText('Personal'));
       await expect(panel.locator('[data-testid="widget-title"]')).toHaveText('Empleados por rol');
       await expect(panel).toHaveAttribute('aria-busy', 'false');
       await expect(panel.locator('[data-testid="widget-error"]')).toHaveCount(0);
@@ -138,10 +129,7 @@ for (const viewport of VIEWPORTS) {
       if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 
       await panel.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-      await untilStill(page);
-      const overflow = await horizontalOverflow(page);
-      expect(overflow, `no sideways scroll at ${viewport.label}`).toBeLessThanOrEqual(0);
-      await page.screenshot({ path: shot(`${KEY}-${viewport.label}`) });
+      await capturedFitting(page, `${KEY}-${viewport.label}`, viewport.label);
     } finally {
       await context.close();
     }

@@ -127,7 +127,7 @@ test('Special days filter by Name behind their own funnel, with its count, the p
     await page.goto(`${A}/schedule/special-days`);
     await listsReady(page);
     await expect(days(other)).toBeVisible();
-    // Two lists, two funnels: each is named after its own list (schedules#58).
+    // Two lists, two funnels: each is named after its own list.
     await expect(shown(page).getByRole('button', { name: /^(Special day filters|Filtros de días especiales)$/ })).toHaveCount(1);
     await expect(shown(page).getByRole('button', { name: /^(Override filters|Filtros de cambios temporales)$/ })).toHaveCount(1);
     const panel = shown(page).locator('[data-testid=schedule-special-days-filters-panel]');

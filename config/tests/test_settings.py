@@ -366,7 +366,7 @@ def test_the_internal_saas_url_comes_from_the_environment(load_settings):
 
 def test_a_burst_of_pooled_connections_is_given_back_within_minutes(load_settings):
     # psycopg_pool closes one connection above min_size per max_idle, 600 s by default: a scanner
-    # burst on *.erplora.com (60 requests/s, 2026-10-18) left the idle hub web holding its 8 control
+    # burst on *.erplora.com (60 requests/s) left the idle hub web holding its 8 control
     # connections for over an hour. With 60 s it is back to one within 7 minutes; that one stays
     # open for the next request.
     pool = load_settings(**DEVELOPMENT_ENV)["DATABASES"]["default"]["OPTIONS"]["pool"]
@@ -559,7 +559,7 @@ def test_hub_base_domain_comes_from_the_environment(load_settings):
     # pre: <slug>.pre.erplora.com and hubs.pre.erplora.com; written in any case, with dots around.
     loaded = load_settings(**PRODUCTION_ENV, HUB_BASE_DOMAIN=".Pre.Erplora.com.")
     assert loaded["HUB_BASE_DOMAIN"] == "pre.erplora.com"
-    # Empty: no base domain, the hub is the Host's first label wherever it is (before 2026-10-14).
+    # Empty: no base domain, the hub is the Host's first label wherever it is.
     assert load_settings(**PRODUCTION_ENV, HUB_BASE_DOMAIN="")["HUB_BASE_DOMAIN"] == ""
 
 
@@ -1027,7 +1027,7 @@ def names_the_suite_derives(databases: dict) -> list[str]:
     ["test_hub_next", "test_hub_sup", "t" * 19, "t" * 20, LONG_TEST_DB_NAME, "t" * 63, "ñ" * 10, "ñ" * 40, "t" * 100],
 )
 def test_every_database_the_suite_derives_from_any_test_db_name_fits_in_postgres(load_settings, requested):
-    """A worker never counts characters: whatever TEST_DB_NAME it sets, every name fits (TODO.md, hub#188, hub#204)."""
+    """A worker never counts characters: whatever TEST_DB_NAME it sets, every name fits (hub#188, hub#204)."""
     from base.tenancy import names
 
     databases = load_settings(**DEVELOPMENT_ENV, TEST_DB_NAME=requested)["DATABASES"]

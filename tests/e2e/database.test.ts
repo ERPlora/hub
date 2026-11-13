@@ -1,5 +1,5 @@
 // The e2e database of a stack beside the shared one (database.ts): `node tests/e2e/database.ts` creates it
-// when missing and migrates it, `--drop` deletes it. On 2026-10-16 two stacks (8030 and 8040) shared the
+// when missing and migrates it, `--drop` deletes it. Two stacks (8030 and 8040) once shared the
 // default `hub` and the cash sale of one fell into the other's open shift; each stack now runs on its own
 // e2e database, and these commands never touch any other (`hub`, `saas`, the templates…). Preparing it also leaves
 // the checkout's .env the keys that seal the test certificates and the automations' secrets (fernet-keys.ts).

@@ -744,6 +744,31 @@ class MemberReleaseIn(In):
     id: UUID = Field(description="The professional who left.")
 
 
+#: The most professionals a service of a separate copy comes back with.
+MAX_PERFORMERS = 500
+
+
+class AssignmentOfCopyIn(In):
+    """A professional who performed a service in a separate copy of the business, as the copy held it."""
+
+    member_id: UUID = Field(description="The professional (Staff), by id: the same in the copy and in the business.")
+    custom_duration: Minutes | None = Field(None, description="Their own duration in minutes; none = the service's.")
+    custom_price: Cents | None = Field(
+        None, description="Their own price in cents (minor units of the business's currency); none = the service's."
+    )
+    is_primary: bool = Field(False, description="Whether it was their main service.")
+    is_active: bool = Field(True, description="Whether the assignment was switched on.")
+
+
+class ServiceRecoverIn(ServiceIn):
+    """A service of a separate copy the business no longer has: what ``service.service.create`` takes and who performed
+    it there (the business makes its own ids)."""
+
+    assignments: list[AssignmentOfCopyIn] = Field(
+        [], max_length=MAX_PERFORMERS, description="Who performed it in the copy."
+    )
+
+
 class AssignmentOut(Schema):
     id: UUID
     service_id: UUID

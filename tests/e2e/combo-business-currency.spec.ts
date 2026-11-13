@@ -122,7 +122,7 @@ test.afterAll(async () => {
   cleanUp();
 });
 
-test(`${KEY}: combo-business-currency a business in Poland reads and types the closed price and the supplements of a menu in złoty in 390, 834 and 1440`, async ({
+test(`a business in Poland reads and types the closed price and the supplements of a menu in złoty in 390, 834 and 1440`, async ({
   page,
   context,
 }) => {
@@ -187,7 +187,7 @@ test(`${KEY}: combo-business-currency a business in Poland reads and types the c
   await expect(shown(page).locator(`[data-testid=combo-menus-row][data-id="${menuId}"]`)).toContainText(zloty('14[.,]50'));
 });
 
-test(`${KEY}: combo-business-currency back in Spain the closed price and the supplements of a menu are in euros`, async ({ page }) => {
+test(`back in Spain the closed price and the supplements of a menu are in euros`, async ({ page }) => {
   await registerBusinessIn(original, 'ES');
   await page.setViewportSize({ width: 1440, height: 900 });
   const row = await menuRow(page);

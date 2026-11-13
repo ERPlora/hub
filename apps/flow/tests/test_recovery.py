@@ -2,7 +2,8 @@
 
 A card the business lost and the staff brings back from one of its separate copies is no new customer: the
 automations that wait for «customer created» (a welcome, a task) start nothing for it, nor those that wait for
-«customer restored» for the one that comes back the same. A card the business makes afterwards still starts them.
+«customer restored» for the one that comes back the same, nor those that wait for what another app does with it (the
+WhatsApp inbox linking her conversation to her card again). A card the business makes afterwards still starts them.
 
 Real databases, as the recovery runs (``base.tenancy.tests.test_recovery``): the business's own and its copy; the
 worker's relay (``base.relay``) hands every event over, as it does in each business every tick.
@@ -10,10 +11,14 @@ worker's relay (``base.relay``) hands every event over, as it does in each busin
 
 import pytest
 from django.utils import timezone
+from live.context import Scope
+from live.models import OutboxEvent
 
 from apps.flow.models import Flow, FlowRun
 from apps.flow.tests.conftest import make_flow
+from apps.whatsapp_inbox.tests.conftest import receive
 from base import relay
+from base.recovery import actor_of
 from base.tenancy.context import use_hub
 from base.tenancy.tests.test_recovery import ANA, LUIS, MARTA, Recoveries, gone, run, run_in
 
@@ -126,3 +131,56 @@ class TestWhatARecoveryBringsBack:
         relayed(hub)
 
         assert runs(hub) == [("Welcome", "customer.customer.created")]
+
+
+class TestWhatTheAppsDoWithWhatComesBack:
+    """What another app records when it reacts to what a recovery brought back came back too: the WhatsApp inbox
+    linking Ana's conversation to her card again is nothing new to the business (hub#1365)."""
+
+    def a_business_whose_customer_wrote(self, recoveries, every_app_on):
+        """A business with Ana, who wrote on WhatsApp, an automation of a conversation linked to a card made after it,
+        and a copy of the business; since the copy, Ana deleted, which let her conversation go."""
+        hub, (ana,) = recoveries.business(every_app_on, ANA)
+        with use_hub(hub):
+            receive("wamid.1", "34600111222", Scope("host", hub.slug))
+        relayed(hub)
+        copy = recoveries.copy_of(hub)
+        run_in(hub, "customer.customer.delete", id=ana)
+        for _ in range(3):
+            relayed(hub)
+        with use_hub(hub):
+            make_flow("Linked", trigger_event="whatsapp_inbox.conversation.customer_linked")
+        return hub, copy
+
+    def test_the_conversation_linked_again_to_a_card_brought_back_starts_no_automation(
+        self, recoveries, every_app_on
+    ):
+        hub, copy = self.a_business_whose_customer_wrote(recoveries, every_app_on)
+        asked = recoveries.ask(copy)
+
+        assert run() == 1
+        for _ in range(3):
+            relayed(hub)
+
+        with use_hub(hub):
+            from apps.whatsapp_inbox.models import Conversation
+
+            assert Conversation.objects.get().customer_id is not None
+            linked = OutboxEvent.objects.filter(name="whatsapp_inbox.conversation.customer_linked").latest("created_at")
+        assert linked.actor == actor_of(asked.pk)
+        assert runs(hub) == []
+
+    def test_a_conversation_linked_to_a_card_the_business_makes_still_starts_it(self, recoveries, every_app_on):
+        hub, copy = self.a_business_whose_customer_wrote(recoveries, every_app_on)
+        recoveries.ask(copy)
+        assert run() == 1
+        for _ in range(3):
+            relayed(hub)
+
+        with use_hub(hub):
+            receive("wamid.2", "34600555666", Scope("host", hub.slug))
+        run_in(hub, "customer.customer.create", **MARTA)
+        for _ in range(3):
+            relayed(hub)
+
+        assert runs(hub) == [("Linked", "whatsapp_inbox.conversation.customer_linked")]

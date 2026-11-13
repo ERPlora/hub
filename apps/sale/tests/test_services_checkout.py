@@ -282,7 +282,7 @@ def plain(text: str) -> str:
 
 
 def test_the_cash_limit_is_said_with_its_thousands_grouped(catalog):
-    # hub#1090: «1.000,00 €» in Spanish and «€1,000.00» in English, as every screen paints money; never
+    # «1.000,00 €» in Spanish and «€1,000.00» in English, as every screen paints money; never
     # «1000.00 €» (no thousands and the English decimal point in a Spanish sentence).
     gold = [{"product": "GLD", "quantity": "2"}]
     for language, amount in (("es", "1.000,00 €"), ("en", "€1,000.00")):

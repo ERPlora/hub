@@ -580,7 +580,7 @@ def test_the_move_is_an_internal_command_of_control():
 
 
 class TestCancelAMove:
-    """``control.hub.move_cancel`` asks the worker to undo a move, started or not (reviews of W8, rounds 2 and 3): the hub
+    """``control.hub.move_cancel`` asks the worker to undo a move, started or not: the hub
     is marked (``move_undo_asked_at``); no note of a copy is made nor taken, so an older copy of the same hub is never
     taken for its data. The worker puts the hub back on its origin on its next pass (``base.tenancy.move``)."""
 

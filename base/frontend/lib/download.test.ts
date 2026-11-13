@@ -1,4 +1,4 @@
-// A file the page holds, saved where the person will find it (hub#1041; the old hub's `save-download.ts`, hub#480):
+// A file the page holds, saved where the person will find it (hub#1041; the old hub's `save-download.ts`):
 // in a browser, its downloads through a temporary link; inside the installed app, whose webview does nothing with
 // that link (Android's has no download listener at all), the app's `save_download` (ERPlora/app HUB_APP-F30), which
 // writes it to Downloads and answers where — said on screen, because inside the app nothing else says the file

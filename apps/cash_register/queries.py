@@ -70,7 +70,7 @@ NO_DENOMINATIONS = _(
 )
 
 #: The notes and coins of the till count, per currency, largest first (face value in major units): the
-#: eighteen of the product (cash_register#111, #113). Only what circulates today; a currency that is not
+#: eighteen of the product. Only what circulates today; a currency that is not
 #: here has no breakdown and its count is a total.
 DENOMINATIONS: dict[str, dict[str, list[str]]] = {
     "EUR": {

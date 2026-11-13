@@ -1154,14 +1154,14 @@ OWN_DATABASE_OPERATIONS: dict[str, tuple[dict, int, str]] = {
     "base.api_key.revoke": ({"id": ANY_KEY}, 409, "base.api_keys_unavailable"),
     "base.api_key.detail": ({"id": ANY_KEY}, 404, "not_found"),
     "base.hub.reset": ({"dry_run": False, "apps": ["sale"], "confirm": "a"}, 409, "base.reset_shared_database"),
-    # A copy of the business's data (S2b): none is ever made in a business that shares its database.
+    # A copy of the business's data: none is ever made in a business that shares its database.
     "base.hub.dump_link": ({"id": ANY_KEY}, 404, "not_found"),
-    # An app's tables made when it is turned on (S3): only a hub with its own database ever waits for them, so there is
+    # An app's tables made when it is turned on: only a hub with its own database ever waits for them, so there is
     # nothing to try again.
     "base.app.retry": ({"app": "printing"}, 409, "base.app_not_failed"),
 }
-#: ``base.hub.reset_apply`` (S2b, the worker's emptying of a reset) and ``base.app.activation_settle`` (S3, the worker's
-#: step after making an app's tables) are not above: they are the platform's alone, refused to anyone else before
+#: ``base.hub.reset_apply`` (the worker's emptying of a reset) and ``base.app.activation_settle`` (the worker's step
+#: after making an app's tables) are not above: they are the platform's alone, refused to anyone else before
 #: anything is read (review of hub#490), and to the platform itself on a business without its own database
 #: (base/tests/test_worker_data.py::test_the_emptying_is_never_run_on_a_shared_database,
 #: base/tests/test_app_activation_tables.py).
@@ -1169,9 +1169,9 @@ OWN_DATABASE_OPERATIONS: dict[str, tuple[dict, int, str]] = {
 #: yet» (the screen's notice; an error would paint its load failure) and holds nothing of the feature's.
 OWN_DATABASE_READS: dict[str, tuple[dict, dict]] = {
     "base.api_key.list": ({}, {"available": False, "keys": []}),
-    # Settings › Data's «Copies» and the last reset (S2b).
+    # Settings › Data's «Copies» and the last reset.
     "base.hub.dumps": ({}, {"available": False, "reset": None, "dumps": []}),
-    # System's size of the business's database (BASE-F40, S2b): «Usage and plan» reads the same answer, whose people
+    # System's size of the business's database (BASE-F40): «Usage and plan» reads the same answer, whose people
     # and devices are control's (Membership, SessionOwner) and stay for every business.
     "base.plan.usage": ({}, {"database": {"available": False, "bytes": None, "day": None}}),
 }
@@ -1180,7 +1180,7 @@ OWN_DATABASE_READS: dict[str, tuple[dict, dict]] = {
 SHARED_MODE_READS: dict[str, str] = {
     "base_appactivation": (
         "what is on is read before any operation runs; a business without its own database exists only under the "
-        "suite's fallback since S5 (base/tenancy/tests/legacy.py), where decision (i) still turns its apps on at once."
+        "suite's fallback (base/tenancy/tests/legacy.py), where its apps are still turned on at once."
     ),
 }
 
@@ -1229,7 +1229,7 @@ def test_the_own_database_checks_see_what_they_must():
 
 def test_the_operations_that_need_the_own_database_are_the_base_s_doors():
     """Their files are where the ORM is (``services.py``/``queries.py``), which ``test_nothing_runs_on_a_shared_database
-    _any_more`` keeps off any shared database: since S5 there is none."""
+    _any_more`` keeps off any shared database: there is none."""
     defined = {name: _defined_in(name) for name in [*OWN_DATABASE_OPERATIONS, *OWN_DATABASE_READS]}
 
     assert set(defined.values()) <= {"base/services.py", "base/queries.py"}, defined

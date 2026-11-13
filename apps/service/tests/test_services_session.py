@@ -460,7 +460,7 @@ def test_the_hourly_task_marks_the_holds_past_their_deadline(cut, lucia):
         lapsed.hold_until,
     )
     assert alive.status == "held"
-    # hub#2681: one notice per session the task marks, saying which session of which voucher (WORKBOOK
+    # One notice per session the task marks, saying which session of which voucher (WORKBOOK
     # «Lo que avisa»), so whatever follows it knows what changed; a pass that marks nothing says nothing.
     assert events("service.session.expired") == [
         {"id": str(lapsed.id), "grant_id": str(grant.id)}

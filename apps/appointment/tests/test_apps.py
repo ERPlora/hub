@@ -6,7 +6,9 @@ from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import BellCounter, Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import BellCounter, Category, LiveAppConfig, Nav, module_configs
+
+from base.tests.roles import grants_by_role
 
 PERMISSIONS = [
     "appointment.view_appointment",
@@ -79,13 +81,13 @@ def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
 
 
 def test_what_each_role_gets():
-    config = appointment()
-    for role in ("hub_owner", "hub_admin"):
-        assert permissions_for_role([config], role) == set(PERMISSIONS), role
-    assert (
-        permissions_for_role([config], "hub_manager") == set(PERMISSIONS) - ADMIN_ONLY
-    )
-    assert permissions_for_role([config], "hub_employee") == EMPLOYEE
+    everything = set(PERMISSIONS)
+    assert grants_by_role(appointment()) == {
+        "hub_owner": everything,
+        "hub_admin": everything,
+        "hub_manager": everything - ADMIN_ONLY,
+        "hub_employee": EMPLOYEE,
+    }
 
 
 def test_navigation_is_a_single_entry_with_a_registered_icon():
@@ -163,10 +165,10 @@ def test_it_tells_the_device_of_the_customers_own_bookings_and_cancellations():
 # ── The Home's hooks ────────────────────────────────────────────────────────────────────────────────
 
 #: What changes how many upcoming bookings wait for confirmation in the agenda the person sees: one is booked
-#: pending; it is confirmed, started, completed (charged at the till), cancelled or deleted; it moves (to the past
-#: or to another professional) or its professional leaves. Never a no-show (only once its start is past, when it
-#: no longer counts), an edit of its notes or phone, a charge that leaves it as it was, nor a card merged into
-#: another (same professional, time and state).
+#: pending; it is confirmed, started, completed (charged at the till), cancelled, deleted or restored; it moves (to
+#: the past or to another professional) or its professional leaves. Never a no-show (only once its start is past,
+#: when it no longer counts), an edit of its notes or phone, a charge that leaves it as it was, nor a card merged
+#: into another (same professional, time and state).
 TO_CONFIRM = [
     "appointment.appointment.created",
     "appointment.appointment.confirmed",
@@ -176,6 +178,7 @@ TO_CONFIRM = [
     "appointment.appointment.rescheduled",
     "appointment.appointment.unassigned",
     "appointment.appointment.deleted",
+    "appointment.appointment.restored",
 ]
 
 

@@ -8,13 +8,13 @@ reaches it.
 import json
 
 import pytest
-from django.conf import settings
 from live.models import OutboxEvent
 from live.ninja import ensure_api_parity
 
 from apps.flow.api import router
 from apps.flow.models import Flow
 from apps.task.models import Task
+from base.tests.routes import spa_routes
 from config.api import api
 
 from .conftest import TASK_STEP, make_draft, make_flow
@@ -106,15 +106,7 @@ def test_the_openapi_describes_the_flow_routes(client):
 
 
 def test_the_spas_route_map_names_every_flow_route():
-    spa = json.loads(
-        (settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text()
-    )
-    mine = {
-        (route["method"].upper(), route["path"].removeprefix("/api"), op)
-        for op, route in spa.items()
-        if op.startswith("flow.")
-    }
-    assert mine == ROUTES
+    assert spa_routes("flow.") == ROUTES
 
 
 # Who may

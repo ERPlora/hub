@@ -204,7 +204,7 @@ def for_its_business(seen: list):
 def test_a_job_for_another_hub_never_reaches_its_database(hub_a, hub_b, pool, monkeypatch):
     """A hub's database holds only its own rows. A job it says is for another hub stays in its database, sees only its
     rows and the other's operation is refused; one for the platform runs on control. No job ever reaches another hub's
-    database (since S5 there is no shared database to hand it to)."""
+    database (there is no shared database to hand it to)."""
     monkeypatch.setattr(context, "_test_fallback", None)
     monkeypatch.setattr(outbound, "_pool", pool(threads=1))
     seen: list = []

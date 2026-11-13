@@ -97,6 +97,19 @@ export async function expectTakes(button: Locator, takes: boolean): Promise<void
   else await expect(native).toHaveAttribute('aria-disabled', 'true');
 }
 
+/** A tile of the till's grid, a child of it: `PosItemTile.vue`, an Ionic button for products, services and menus alike. */
+const TILL_TILE = ':scope > ion-button.pos-tile';
+
+/** The till's grid on screen. «Services» keeps its own grid in the page, hidden while «All» is chosen. */
+export const tillGrid = (page: Page): Locator => shown(page).locator('.pos-grid').filter({ visible: true });
+
+/** That one grid of the till is on screen and its first tile is `testid`'s (COMBO-F07, SALE-F12: the menus go first). */
+export async function expectFirstTile(page: Page, testid: string | RegExp): Promise<void> {
+  const grid = tillGrid(page);
+  await expect(grid, 'one grid of the till on screen').toHaveCount(1);
+  await expect(grid.locator(TILL_TILE).first()).toHaveAttribute('data-testid', testid);
+}
+
 /** The lines of the check on screen that sell `product`. */
 export const linesOf = (page: Page, product: { name: string }): Locator =>
   shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name });
@@ -193,6 +206,28 @@ export async function dishForTheTill(browser: Browser, label: string, run: strin
   const dish = await createProduct(context, { name: `E2E ${label} Dish ${run}`, sku: `E2E-${label}-${run}`, price: 700, tax_category_key: 'restaurant.food' });
   await context.close();
   return dish;
+}
+
+/** The room a spec made (its zones named `<tag>…`, their tables and the seatings on them), and the checks of Sales its
+ *  seating opened (they carry no line nor any sale). */
+export function cleanRoom(tag: string): void {
+  const tables = `select id from table_table where zone_id in (select id from table_zone where name like '${tag}%')`;
+  const sessions = `select id from table_tablesession where table_id in (${tables})`;
+  const orders = psql(`select order_id from table_tablesession where id in (${sessions}) and order_id is not null`)
+    .split('\n')
+    .filter(Boolean)
+    .map((id) => `'${id}'`)
+    .join(', ');
+  psql(
+    [
+      `delete from table_sessionmove where session_id in (${sessions})`,
+      `delete from table_tablesession where id in (${sessions})`,
+      `delete from table_hold where table_id in (${tables})`,
+      ...(orders ? [`delete from sale_order where id in (${orders})`] : []),
+      `delete from table_table where id in (${tables})`,
+      `delete from table_zone where name like '${tag}%'`,
+    ].join('; '),
+  );
 }
 
 /** For a spec that seats a table (SALE-F19, SALE-F20): the zone `zone` and its table `number`, for four, through Tables'

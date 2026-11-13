@@ -289,7 +289,7 @@ def test_the_homes_panels_are_the_expected_cash_and_the_last_differences():
 
 
 def test_a_kpi_says_its_name_once():
-    # hub#1105: a KPI with options.label and an icon painted its header twice.
+    # A KPI with options.label and an icon painted its header twice.
     for panel in config().widgets:
         if panel.kind == "kpi":
             assert not {"label", "icon"} & set(panel.options), panel.key

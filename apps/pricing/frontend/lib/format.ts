@@ -43,7 +43,7 @@ function numberFormat(locale: string, key: string, options: Intl.NumberFormatOpt
 }
 
 /** Minor units in `money`, in `locale` («12,50 zł», «€12.50», «¥2,450»; «—» while it is unknown), with the
- *  thousands grouped from four digits on in every language (Spanish CLDR waits for five: hub#1090). */
+ *  thousands grouped from four digits on in every language (Spanish CLDR waits for five). */
 export function formatMoney(cents: number, locale: string, money?: Money): string {
   return writeMoney(cents, locale, money);
 }

@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
+import { clockIn } from './attendance-helpers';
 import { A, api, type Credentials, EMPLOYEE, login, psql, shot, shown } from './helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { rowAction } from './service-helpers';
@@ -99,10 +100,7 @@ for (const vp of VIEWPORTS) {
       await expect(view.locator('[data-testid=attendance-clock-greeting]')).toHaveText(`Hello, ${name} Clock`);
       await expect(view.locator('[data-testid=attendance-clock-status]')).toHaveText('You are clocked out');
       await expect(view.locator('[data-testid=attendance-clock-empty]')).toBeVisible();
-      await view.locator('[data-testid=attendance-clock-in]').click();
-      await expect(view.locator('[data-testid=attendance-clock-message]')).toContainText('Clocked in at');
-      await expect(view.locator('[data-testid=attendance-clock-status]')).toContainText('Clocked in since');
-      await expect(view.locator('[data-testid=attendance-clock-timer]')).toBeVisible();
+      await clockIn(view);
       // The open day reads «Open», as Records names it.
       await expect(view.locator('[data-testid=attendance-clock-recent-row]').first()).toContainText('Open');
       await snap(page, 'F01', vp.label);

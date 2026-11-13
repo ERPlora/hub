@@ -33,7 +33,7 @@ function numberFormat(locale: string, key: string, options: Intl.NumberFormatOpt
 const missing = (value: unknown) => value === null || value === undefined || value === '' || Number.isNaN(Number(value));
 
 // Grouped always: Spanish CLDR waits for five digits (minimumGroupingDigits 2) and would paint «1234,56 €»
-// here beside «1.234,56 €» in the other screens (hub#1090).
+// here beside «1.234,56 €» in the other screens.
 /** `cents` as euros in `locale` («€1,234.56», «1.234,56 €», «-12,10 €»); nothing to show is «—». */
 export function formatMoney(cents: number | null | undefined, locale: string): string {
   if (missing(cents)) return '—';

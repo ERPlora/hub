@@ -10,7 +10,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import type { SpecialDayOut } from '../operations';
-import { EMPLOYEE, errorFrame, flush, type MountOptions, mountSchedule, page, settle } from '../__tests__/mount-schedule';
+import { errorFrame, flush, type MountOptions, mountSchedule, page, settle } from '../__tests__/mount-schedule';
+import { itNamesTheListThatDoesNotLoad, itOnlyReadsForAnEmployee } from '../__tests__/list-checks';
 import SpecialDayFormModal from './SpecialDayFormModal.vue';
 import SpecialDaysList from './SpecialDaysList.vue';
 
@@ -188,27 +189,15 @@ describe('SpecialDaysList', () => {
     expect(s.find('schedule-special-days-error').text()).toContain('That special day does not exist in this business.');
   });
 
-  it('an employee only reads', async () => {
-    const s = await setup({ session: EMPLOYEE });
-    await s.show(page(ROWS));
-    expect([s.prop('addable'), s.prop('rowClickable'), s.prop('actions')]).toEqual([false, false, []]);
-  });
+  itOnlyReadsForAnEmployee(setup, page(ROWS));
+
+  itNamesTheListThatDoesNotLoad(setup, OP, 'No se han podido cargar los días especiales.');
 
   it('a failure that is not a block is the table’s, with «Retry»', async () => {
     const s = await setup();
     s.net.lastStream().push(errorFrame(s.subId(OP), 'boom'));
     await flush();
     expect(s.prop('error')).toBe('msg boom');
-  });
-
-  it('a list that does not load names itself, then the cause, never the generic text', async () => {
-    const s = await setup({ locale: 'es' });
-    s.net.lastStream().push(errorFrame(s.subId(OP), 'boom'));
-    await flush();
-    const box = s.wrapper.find('.data-table__error');
-    expect(box.find('.data-table__error-title').text()).toBe('No se han podido cargar los días especiales.');
-    expect(box.find('.data-table__error-reason').text()).toBe('msg boom');
-    expect(box.text()).not.toContain('No se han podido cargar los datos');
   });
 
   it('speaks Spanish', async () => {

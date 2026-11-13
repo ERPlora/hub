@@ -6,20 +6,17 @@ of the catalogue of a business with every app on and ranked as a turn ranks, is 
 (printing is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over its asks.
 """
 
-import re
-import unicodedata
 
 import pytest
-from live import assistant as shared
-from live.context import OperationContext, Scope
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
-from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import assert_its_asks_bring
+from base.tests.test_assistant_asks import (
+    assert_its_asks_bring,
+    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
+    place_of_no_ask,
+)
 
-A = Scope("host", "a")
 #: What only who runs the business does: an employee's assistant is never offered the printers' settings.
 NOT_THE_EMPLOYEES = {
     "printing.printer.create",
@@ -28,27 +25,6 @@ NOT_THE_EMPLOYEES = {
     "printing.device.register",
     "printing.device.retire",
 }
-#: The first ten places a turn offers, the bound of the QA (``base/tests/test_assistant_asks.py``).
-TOP = 10
-
-
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(
-            scope=A,
-            actor=user.username,
-            permissions=permissions_for(user, A),
-            language=language,
-        )
-        return assistant.catalog(ctx)
-
-    return of
-
-
 def test_printing_offers_at_least_20_tools():
     """Printing's tools are at least 20 (``AI``, never ``INTERNAL``): a silent drop of tools fails."""
     tools = {
@@ -95,20 +71,10 @@ REPORTED = [
 ]
 
 
-def comparable(text: str) -> str:
-    """``text`` as layer 2 compares a probe with the asks: lower case, without accents, punctuation or extra spaces."""
-    bare = "".join(c for c in unicodedata.normalize("NFD", text) if not unicodedata.combining(c)).lower()
-    return " ".join(re.sub(r"[^\w]+|_", " ", bare).split())
-
-
 @pytest.mark.django_db
 @pytest.mark.parametrize(("role", "name", "phrase"), REPORTED)
 def test_the_reported_printing_requests_are_offered_their_tool_without_being_its_asks(catalog_of, role, name, phrase):
-    tools = catalog_of(role, language := "es")
-    assert name in tools  # positive control: the role holds it, so the model can receive it
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get(language, ())}
-    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
-    assert name in offered, offered
+    assert place_of_no_ask(catalog_of(role, "es"), name, phrase) is not None
 
 
 #: A device that prints, retired in words that are no ask nor probe and that only its tool's asks bring among the first

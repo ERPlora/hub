@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The installed app's Back button (BASE-F05, gh:hub#1906): taken beside the pane (`chrome.background`) while a person
+// The installed app's Back button (BASE-F05): taken beside the pane (`chrome.background`) while a person
 // is signed in, and let go when they sign out. A press closes what is open on top, else goes up: a detail view's own
 // Back, Home from the root of an app (the way the menu's «Home» goes), out of the app from Home (`lib/system-back.ts`).
 // Only inside the installed app; in a browser nothing is registered. It paints nothing.

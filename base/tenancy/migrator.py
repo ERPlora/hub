@@ -115,9 +115,8 @@ class UnknownApp(LookupError):
 
 
 class AppNotPortable(ValueError):
-    """An app whose tables reference a model of control's database: no hub's database can hold them. None since
-    tenancy W10 (the people of a business are its own, ``base.HubUser``); ``tests/test_guardrails.py`` «(h)» keeps it
-    so."""
+    """An app whose tables reference a model of control's database: no hub's database can hold them. None: the
+    people of a business are its own (``base.HubUser``), and ``tests/test_guardrails.py`` «(h)» keeps it so."""
 
     code = "app_not_portable"
 
@@ -164,7 +163,7 @@ class ClusterTarget:
 @dataclass(frozen=True)
 class Template:
     """A template every new hub is cloned from: its database, its apps and, for a vertical's, the template it is
-    cloned from when missing and its vertical's apps it cannot hold (``portable_apps``: none since tenancy W10)."""
+    cloned from when missing and its vertical's apps it cannot hold (``portable_apps``: none today)."""
 
     db_name: str
     apps: tuple[str, ...]
@@ -299,7 +298,7 @@ def _hub_classes(model) -> bool:
 def portable_apps() -> tuple[str, ...]:
     """The hub apps whose tables reference only a hub's own, and whose migrations need no other app's.
 
-    Every hub app since tenancy W10: staff, attendance, task and whatsapp_inbox hang a person from the business's own
+    Every hub app: staff, attendance, task and whatsapp_inbox hang a person from the business's own
     ``base.HubUser``, not from control's user. An app that linked a model of control's again (and what depends on it)
     would be left out of every template and refused by ``add=``; ``tests/test_guardrails.py`` «(h)» stops it first.
     """
@@ -388,7 +387,7 @@ def is_behind(hub, code: CodeMigrations | None = None) -> bool:
     """Whether ``hub``'s database may lack a migration of this code, as control knows it (``Hub.schema_apps``).
 
     Behind: marked so, or the platform or any app it has not at the code's leaf (never confirmed counts). An app it
-    never turned on is not behind: its tables are made the first time it is (S3, ``base.app.enable`` → the worker's
+    never turned on is not behind: its tables are made the first time it is (``base.app.enable`` → the worker's
     :func:`ensure_schema`), never here. A label or a migration the code does not have (a later code's, after a rollback:
     the database is ahead) is not behind. Opens no database.
     """
@@ -805,7 +804,7 @@ def _migrate_hub_in_thread(hub) -> str | None:
 
 def _migrate_hub(hub) -> str | None:
     """``ensure_schema(hub)``: the platform and the apps its database has, at the leaf (never an app it never turned
-    on, S3); tried again on a lock timeout; ``None`` if done, else why it was left behind."""
+    on); tried again on a lock timeout; ``None`` if done, else why it was left behind."""
     attempt = 1
     while True:
         try:

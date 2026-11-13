@@ -1,9 +1,9 @@
-// The form of «Send a message» (WORKBOOK FLOW-F31; the old module's flows-f15): to whom — a datum, the customer's
+// The form of «Send a message» (WORKBOOK FLOW-F31): to whom — a datum, the customer's
 // exact international number —, the message sent as it is within the customer's 24 hours, and the approved
 // template (with a value for each of its blanks) WhatsApp lets through after them. The templates are the
 // business's approved ones the inbox can fill, read live from the WhatsApp inbox, with their loading, empty and
-// error states. A template with a photo, a video or a document at the top goes with a file (FLOW-F32; the old hub's
-// HUB-F112): its own, or the one chosen in the step, kept at once in the business's files.
+// error states. A template with a photo, a video or a document at the top goes with a file (FLOW-F32):
+// its own, or the one chosen in the step, kept at once in the business's files.
 import { describe, expect, it } from 'vitest';
 
 import type { Step } from '../operations';

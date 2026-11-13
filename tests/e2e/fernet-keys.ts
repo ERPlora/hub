@@ -1,9 +1,9 @@
 // The Fernet keys an e2e stack's runserver seals with (config/settings.py): `FISCAL_CERTIFICATE_KEY`, a business's own
 // VeriFactu certificate, and `FLOW_SECRETS_KEY`, the secrets of the automations. Without the first the Hub refuses
 // every upload (409 verifactu.certificate_storage_unavailable), and «Mi certificado» of verifactu-config.spec.ts failed
-// on every stack whose .env lacked it (2026-10-19); without the second the «Secrets» box of «Call another system» says
+// on every stack whose .env lacked it; without the second the «Secrets» box of «Call another system» says
 // the server cannot keep secrets instead of showing its fields, and FLOW-F26 of flow-steps.spec.ts timed out on every
-// such stack (2026-10-24). Django reads each from the environment or else from the checkout's .env (python-decouple),
+// such stack. Django reads each from the environment or else from the checkout's .env (python-decouple),
 // so `database.ts`, which the recipe runs before runserver, leaves them there: generated for this checkout when the
 // .env has none, or has it empty as .env.example ships it; never a fixed key. A key already in the .env or in the
 // environment is kept as it is. They only seal the test certificates and secrets the specs make and remove.

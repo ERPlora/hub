@@ -126,7 +126,7 @@ const columns = computed<DataTableColumn<CartOut>[]>(() => [
     sortable: true,
     align: 'right',
     format: (_, row) => formatMoney(row.total_amount, locale.value, recordMoney(row)),
-    // Typed as an amount (pm#521): a text box with the decimal keyboard, so «1.250,50» can be pasted.
+    // Typed as an amount: a text box with the decimal keyboard, so «1.250,50» can be pasted.
     filter: { type: 'range', amount: true },
   },
 ]);

@@ -15,7 +15,8 @@ import { spawnSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, horizontalOverflow, HUB_DIR, login, painted, psql, shown, untilStill } from './helpers';
+import { A, api, capture, HUB_DIR, login, painted, psql, shown, untilStill } from './helpers';
+import { capturedAtSizes } from './service-helpers';
 
 const TAG = 'E2E Combo';
 const STAMP = Date.now().toString(36).toUpperCase();
@@ -119,7 +120,7 @@ const loadedAt = (page: Page): Promise<number> => page.evaluate(() => performanc
  *  wait until no list of a previous pick is still closing, click the field, wait for its list, type,
  *  choose. Reopening a Combo while its previous popover is still animating out loses the typing: the
  *  late `didDismiss` of the old presentation closes the new one and reverts the text, and no search
- *  reaches the server (measured 2026-10-15 on the second pick of a course; reported for
+ *  reaches the server (seen on the second pick of a course; reported for
  *  `@erplora/ui`'s Combo). The dev server is shared with other sessions: a search cut by its restart
  *  shows the list's own «Retry», which is pressed; a page Vite reloaded is picked again; anything else
  *  fails at once. */
@@ -157,13 +158,6 @@ async function fill(page: Page, testid: string, value: string): Promise<void> {
   await input.blur();
 }
 
-/** No horizontal scroll: the page is not wider than the window (polled while the layout settles). */
-async function noHorizontalScroll(page: Page, label: string): Promise<void> {
-  await expect
-    .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${label}` })
-    .toBeLessThanOrEqual(0);
-}
-
 /** Nothing inside `selector` reaches past the window's right edge (clipped content is not a scroll):
  *  the hooks of whatever does, with how far, so a failure says which element it is. */
 async function nothingPastTheEdge(page: Page, selector: string, label: string): Promise<void> {
@@ -186,16 +180,12 @@ async function nothingPastTheEdge(page: Page, selector: string, label: string): 
 }
 
 async function shoot(page: Page, name: string, inside?: string): Promise<void> {
-  for (const viewport of VIEWPORTS) {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+  await capturedAtSizes(page, name, VIEWPORTS, async (viewport) => {
     // The page laid out at its new size, then nothing moving: Ionic's sheets and notices animate in their shadow roots.
     await painted(page);
     await untilStill(page);
-    await noHorizontalScroll(page, `${name} ${viewport.label}`);
     if (inside) await nothingPastTheEdge(page, inside, `${name} ${viewport.label}`);
-    await capture(page, `${name}-${viewport.label}`);
-  }
-  await page.setViewportSize({ width: 1280, height: 860 });
+  });
 }
 
 /** Whether the dialog's title and its «Cancel» overlap. */

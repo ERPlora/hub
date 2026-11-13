@@ -8,24 +8,14 @@
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, EMPLOYEE, hostPage, hubUserIdOf, login, psql, shot, shown } from './helpers';
+import { staffCleanUp } from './staff-helpers';
 import { rowAction } from './service-helpers';
 
 const TAG = 'E2E';
 const PHONE = { width: 390, height: 844 };
 
 /** Removes every record this spec family creates (first names «E2E…», roles «E2E…»). */
-function cleanup(): void {
-  const members = `select id from staff_member where first_name like '${TAG}%'`;
-  psql(
-    [
-      `delete from staff_timeoff where member_id in (${members})`,
-      `delete from staff_scheduleday where schedule_id in (select id from staff_schedule where member_id in (${members}))`,
-      `delete from staff_schedule where member_id in (${members})`,
-      `delete from staff_member where first_name like '${TAG}%'`,
-      `delete from staff_role where name like '${TAG}%'`,
-    ].join('; '),
-  );
-}
+const cleanup = (): void => staffCleanUp(TAG);
 
 // flow: none — the e2e spec of Staff.
 test.beforeAll(async ({ browser }) => {

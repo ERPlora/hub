@@ -1,4 +1,4 @@
-// STAFF-G05 (the old Home panel «Today's time off», STAFF-F20): above the time-off list while the Hub's
+// The old Home panel «Today's time off» (STAFF-F20): above the time-off list while the Hub's
 // Home has no panels — who has an approved absence covering today (the business's day), whole days first
 // and then by name, with its type and, for part of the day, its hours; never the reason. Followed live
 // from `staff.time_off.today`.

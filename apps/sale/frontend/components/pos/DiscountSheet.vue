@@ -53,7 +53,7 @@ watch(typed, (now, before) => {
 
 const value = computed(() => typed.value.replace(/\.$/, '') || '0');
 const shown = computed(() => (mode.value === 'percent' ? formatPercent(value.value, locale.value) : figure.value));
-/** The amount button's sign: the business's currency («€», «zł»; gh:sales#380), «¤» until the business answers. */
+/** The amount button's sign: the business's currency («€», «zł»), «¤» until the business answers. */
 const currency = computed(() => currencySign(locale.value, business.value) || '¤');
 const ready = computed(() => (mode.value === 'percent' ? Number(value.value) > 0 : cents.value > 0));
 const title = computed(() => (ticket.value ? t('sale.pos.discountTicket') : t('sale.pos.discountLineOf', { name: props.name })));
