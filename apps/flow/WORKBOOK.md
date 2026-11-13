@@ -697,8 +697,9 @@ Sale: una ejecución (`flow.run.started`, `flow.run.finished` o `flow.run.parked
 donde pasó el aviso. Un mismo aviso entregado dos veces arranca **una sola** ejecución por automatización.
 Si falla: cada paso que falla para la ejecución con su motivo, visible en Historial; los pasos
 anteriores se quedan hechos. Una automatización que se dispararía a sí misma en cadena se para (ver
-«Para quien lo mantiene»). Un «Solo sigue si…» que ya no se puede leer para la ejecución con «Ya no se
-puede leer este «Solo sigue si…»…».
+«Para quien lo mantiene»), también cuando la cadena pasa por otra app: la Bandeja de WhatsApp que enlaza la
+conversación de su número a la ficha que creó una automatización no hace que la siguiente empiece de cero. Un
+«Solo sigue si…» que ya no se puede leer para la ejecución con «Ya no se puede leer este «Solo sigue si…»…».
 Implicados: FLOW-F10, FLOW-F11, FLOW-F15, FLOW-F16, BASE-F114, WHATSAPP_INBOX-F04
 
 ### FLOW-F22 Cuando llega la hora, la automatización arranca
@@ -1574,11 +1575,13 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Sin cadenas infinitas**: un aviso hecho por un paso lleva el actor `flow_run:<id>`; la ejecución que
   arranca hereda su cadena. Si la automatización ya está en la cadena (se dispararía a sí misma) o la
   cadena pasa de **8** automatizaciones (`MAX_CHAIN`), no se ejecuta ningún paso y queda una ejecución
-  fallida con `flow.loop_stopped`, visible en Historial. **Límite**: la cadena solo sigue los avisos que
-  graba el propio paso; si el aviso pasa antes por la reacción de otra app (que corre como el sistema),
-  los avisos de esa reacción llevan `system` y la cadena empieza de nuevo (hub#1378). Heredarla pide que el relay del
-  outbox (`base/relay.py`, de la plataforma) ejecute la reacción de cada app con el actor del aviso que entrega
-  (hoy solo se lo pasa a esta app); no se hace desde esta app ni tocando `packages/`.
+  fallida con `flow.loop_stopped`, visible en Historial. La cadena sigue también a través de otra app (hub#1378):
+  la app declara `carried_actors = [RUN_ACTOR]` en su `LiveAppConfig` (`apps.py`, donde vive `RUN_ACTOR`), y el relay
+  de la plataforma (`base.relay.carried`) le da `flow_run:<id>` a lo que la reacción de otra app graba como el sistema
+  al contestar un aviso de la ejecución, de primera y de segunda mano (la Bandeja enlaza la conversación a la ficha que
+  creó un paso: su `whatsapp_inbox.conversation.customer_linked` lleva la marca de esa ejecución). Lo que graba un paso
+  de otra ejecución conserva su propio actor, así que la cadena crece de una automatización en una. Lo prueba
+  `tests/test_chain_through_other_apps.py`, con las apps y el relay de verdad.
 - **Lo que trae una recuperación no arranca nada** (hub#1307, BASE-F114): la recuperación desde una copia aparte
   (`base/tenancy/recovery.py`) ejecuta las operaciones de cada app con el actor `copy_recovery:<id>`
   (`base.recovery.actor_of`), y `flow.run.react` no arranca ninguna automatización con un aviso cuyo actor lo es
