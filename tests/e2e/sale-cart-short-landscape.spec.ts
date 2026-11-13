@@ -110,6 +110,26 @@ async function keepsItsLayout(cart: Locator, where: string): Promise<void> {
   expect.soft(layout.columnScrolls, `the heading and the tabs stay in place at ${where}`).toBe(false);
 }
 
+/** Both tabs whole across the check: their strip keeps inside the column, which never scrolls sideways (hub#1435: the
+ *  strip was as wide as the column plus its margin, and «Current order» lost 8 px past the edge). */
+async function tabsAcross(cart: Locator, where: string): Promise<void> {
+  const seen = await cart.evaluate((el) => {
+    const column = el.querySelector('.pos-cart__scroll') as HTMLElement;
+    const left = column.getBoundingClientRect().left;
+    const tabs = [...el.querySelectorAll('[data-testid=pos-cart-tab-check], [data-testid=pos-cart-tab-round]')].map((tab) => {
+      const r = tab.getBoundingClientRect();
+      return { id: tab.getAttribute('data-testid') ?? '', left: r.left, right: r.right };
+    });
+    return { left, right: left + column.clientWidth, sideways: column.scrollWidth - column.clientWidth, tabs };
+  });
+  expect(seen.tabs.length, `both tabs at ${where}`).toBe(2);
+  expect.soft(seen.sideways, `the check does not scroll sideways at ${where}`).toBeLessThanOrEqual(0);
+  for (const tab of seen.tabs) {
+    expect.soft(tab.left, `«${tab.id}» inside the check at ${where}`).toBeGreaterThanOrEqual(seen.left - 0.5);
+    expect.soft(tab.right, `«${tab.id}» inside the check at ${where}`).toBeLessThanOrEqual(seen.right + 0.5);
+  }
+}
+
 async function readsALine(page: Page, size: Size, lang: string): Promise<void> {
   const where = `${lang} ${size.label} ${size.strip ? 'with-strip' : 'no-strip'}`;
   await page.setViewportSize({ width: size.width, height: size.height });
@@ -126,6 +146,7 @@ async function readsALine(page: Page, size: Size, lang: string): Promise<void> {
   await expect(round, `«Current order» at ${where}`).toHaveAttribute('aria-selected', 'true');
   await settled(page);
   await scrolledToTop(cart);
+  await tabsAcross(cart, `${where}, «Current order»`);
   const send = cart.locator('[data-testid=pos-kitchen-send]');
   const column = size.kind !== 'drawer';
   if (column) await expectWhole(send, 'Send order', `${where}, «Current order» as it opens`);

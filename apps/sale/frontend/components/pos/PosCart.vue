@@ -294,9 +294,11 @@ function park(): void {
   }
 }
 /* Ionic's segment clips what overflows it, so as a flex item it would give way to the lines down to its padding: 8 px,
-   with both tabs cut away under them (hub#1435). */
+   with both tabs cut away under them; and it is as wide as the column, so its margin pushed «Current order» past the
+   edge (hub#1435). */
 .pos-cart__tabs {
   flex: none;
+  width: auto;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.25rem;
