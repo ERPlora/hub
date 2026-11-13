@@ -338,6 +338,8 @@ const LOGIN_DEFAULT = 180_000;
 export const SAAS_SIGN_IN = `${SAAS}/_allauth/browser/v1/auth/login`;
 /** Where the SaaS's code form posts the code it mailed (allauth.headless). */
 export const SAAS_CODE = `${SAAS}/_allauth/browser/v1/auth/code/confirm`;
+/** The SaaS's page that says why it refused a sign-in or a jump to a hub (`?code=not_a_member`, `too_many`…): nothing goes on from there by itself. */
+const SAAS_REFUSED = '/login/error';
 
 /** The running test's (or hook's) time limit, in ms; 0 outside a test or hook, as with no limit. */
 function runningTimeout(): number {
@@ -435,8 +437,9 @@ async function hubSessionOf(context: BrowserContext, origin: string): Promise<Co
  * the code, the way back to the hub); a loaded machine may take any of it. What says a step is not coming fails at once,
  * saying why: on the hub, the page threw; on the hub or the SaaS, one of its scripts did not load or its document
  * answered an error (`watchTrip`); the page went to an address that is neither this hub nor the SaaS (`shellOrSaas`,
- * `alongTheTrip`); the SaaS turned down or failed the sign-in or the code, or one of them got no answer at all; the SaaS
- * asked for the code without a mail with it (`signInWithCode`).
+ * `alongTheTrip`); the SaaS sent the page to its error page, refusing the sign-in or the jump (`alongTheTrip`); the SaaS
+ * turned down or failed the sign-in or the code, or one of them got no answer at all; the SaaS asked for the code
+ * without a mail with it (`signInWithCode`).
  *
  * runserver or the SaaS restarting (another session saved a `.py` file) refuses the connection for
  * a moment: the trip through the SaaS then starts again once, a second later (`withRetry`). From
@@ -708,8 +711,8 @@ interface Along {
  * One step of the trip through the SaaS: `step`, the one wait of Playwright's pending while it runs, so that when the
  * test's time runs out first it is the one Playwright names; with `back`, the page arriving at an address `back` takes
  * ends it too (`'back'`). It waits as long as `step` does, and fails at once on what says the step is not coming: what
- * `trip` saw, `refused`, or the page at an address that is neither this hub nor the SaaS (Chrome's error page among
- * them).
+ * `trip` saw, `refused`, the page at an address that is neither this hub nor the SaaS (Chrome's error page among
+ * them), or the page on the SaaS's own error page (`SAAS_REFUSED`), where it refused the sign-in or the jump.
  */
 async function alongTheTrip<T>(page: Page, origin: string, trip: TripWatch, step: Promise<T>, options: Along): Promise<T>;
 async function alongTheTrip<T>(
@@ -732,6 +735,8 @@ async function alongTheTrip<T>(
       if (URL.canParse(url) && options.back?.(new URL(url))) resolve('back');
       else if (siteOf(url, origin) === undefined) {
         reject(new Error(`login on ${origin}: the page went to ${url}, which is neither this hub nor the SaaS, so the login will not get back`));
+      } else if (siteOf(url, origin) === 'saas' && new URL(url).pathname === SAAS_REFUSED) {
+        reject(new Error(`login on ${origin}: the SaaS stopped the login on its error page ${url}`));
       }
     };
     const followed = (frame: Frame): void => {

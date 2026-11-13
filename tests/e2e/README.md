@@ -61,6 +61,8 @@ no va a llegar cae en el acto y dice por qué:
 - en el SaaS, su documento contesta un error o un script suyo falla en la red (un error que lanza su página no cuenta,
   ni un script al que su Vite contesta un error mientras reoptimiza y recarga la página);
 - la página se va a una dirección que no es este hub ni el SaaS (la página de error de Chrome, por ejemplo);
+- el SaaS manda la página a su página de error (`/login/error?code=…`: `not_a_member`, `too_many`, `invalid_hub`…),
+  donde rechaza el inicio de sesión o el salto al hub y de donde no sale sola;
 - la **respuesta del propio SaaS**: al inicio de sesión, un 401 pide el código y un 2xx entra; al código, un 2xx lo
   acepta. Un 4xx es el SaaS rechazándolo y un 5xx el SaaS fallando, con lo que dijo (`errors` de allauth): «code
   rejected, the SaaS answered 400 (…): «Incorrect code.»» solo sale cuando el SaaS contesta que el código no vale, nunca

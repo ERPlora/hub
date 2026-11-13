@@ -495,6 +495,8 @@ const launch = `${SAAS}/launch?next=%2Fhub-login%2F`;
 const verifyEmail = `${SAAS}/verify-email?next=%2Fhub-login%2F`;
 /** The SaaS's `/hub-login/` once the account is signed in there: it posts its one-time code back to the hub. */
 const handBack = `${SAAS}/hub-login/?hub=bar&next=%2Fdemo%2Fitems&state=s`;
+/** The SaaS's page that says why it refused a sign-in or a jump to a hub: nothing goes on from there by itself. */
+const refusedJump = (code: string): string => `${SAAS}/login/error?code=${code}`;
 /** The code the fake SaaS mails at each sign-in. */
 const MAILED = '424242';
 
@@ -596,6 +598,21 @@ describe('login, when the SaaS says one of its steps is not coming', () => {
     ['it asks for the code without having mailed it', signingIn({}, { 'sign-in': { to: 'sign-in', status: 401 } }, 'code answer'), 'mail not found'],
     ['it fails on the code', signingIn({}, { code: { to: 'code', status: 500 } }, 'way back'), 'the SaaS failed on the code, it answered 500'],
     ['its page answers an error (a 500 on its /launch)', [{ url: launch, status: 500 }], `the SaaS answered 500 to ${launch}`],
+    [
+      'its page answers an error once it has taken the code (a 500 on its /hub-login/ on the way back)',
+      [...signingIn({}, {}, 'way back'), { url: handBack, status: 500 }],
+      `the SaaS answered 500 to ${handBack}`,
+    ],
+    [
+      'it refuses the jump on its error page (the account is not a member of this hub)',
+      [{ url: handBack, for: 1_000 }, { url: refusedJump('not_a_member') }],
+      `the SaaS stopped the login on its error page ${refusedJump('not_a_member')}`,
+    ],
+    [
+      'it refuses the jump on its error page once it has taken the code (too many jumps of the account)',
+      [...signingIn({}, {}, 'way back'), { url: refusedJump('too_many') }],
+      `the SaaS stopped the login on its error page ${refusedJump('too_many')}`,
+    ],
     [
       'the page leaves the SaaS for an address that is neither it nor the hub (Chrome’s error page)',
       [{ url: launch, for: 1_000 }, { url: 'chrome-error://chromewebdata/' }],
