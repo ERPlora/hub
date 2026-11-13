@@ -10,7 +10,7 @@
 // way in into the PIN pad: base-access.spec.ts), and everything this file creates goes with it (`afterAll`).
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, usernamesOf } from './helpers';
+import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, usernameOf, usernamesOf } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
@@ -39,19 +39,6 @@ let cashier: { context: BrowserContext; page: Page };
 let started = '';
 let ownerName = '';
 const tickets = new Map<string, SaleOut>();
-
-/**
- * The username of whoever is signed in on `context`. Not by email: a hub database kept from a stack whose SaaS was
- * created again holds an older account with the same email (a new SaaS, new users), and the email names both.
- */
-async function usernameOf(context: BrowserContext): Promise<string> {
-  const me = await api<{ user: { id: string } | null }>(context, A, 'GET', '/me');
-  expect(me.status, 'GET /api/me').toBe(200);
-  const id = me.data.user?.id ?? '';
-  expect(id, 'the person signed in').not.toBe('');
-  // `/api/me` names the person of the business's database (base.HubUser), whose username is the session's.
-  return psql(`SELECT username FROM base_hubuser WHERE id = '${id}'`);
-}
 
 /** Every account of `email` (their usernames, read from control's): the cleanup leaves none of them with what this file made. */
 const accountsOf = (email: string): string => usernamesOf(email);

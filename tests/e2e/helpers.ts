@@ -1228,6 +1228,19 @@ export function psql(sql: string, hub = 'a'): string {
     .join('\n');
 }
 
+/**
+ * The username of whoever is signed in on `context`. Not by email: a hub database kept from a stack whose SaaS was
+ * created again holds an older account with the same email (a new SaaS, new users), and the email names both.
+ */
+export async function usernameOf(context: BrowserContext): Promise<string> {
+  const me = await api<{ user: { id: string } | null }>(context, A, 'GET', '/me');
+  expect(me.status, 'GET /api/me').toBe(200);
+  const id = me.data.user?.id ?? '';
+  expect(id, 'the person signed in').not.toBe('');
+  // `/api/me` names the person of the business's database (base.HubUser), whose username is the session's.
+  return psql(`SELECT username FROM base_hubuser WHERE id = '${id}'`);
+}
+
 /** The usernames of every account of `email` (control's ``auth_user``), quoted for the `in (…)` of a statement on a
  * hub's tables, which cannot read control's; `null` when it has none, which matches nothing. */
 export function usernamesOf(email: string): string {
