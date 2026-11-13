@@ -7,12 +7,12 @@ transaction.
 import json
 
 import pytest
-from django.conf import settings
 from django.utils import translation
 from live.ninja import ensure_api_parity
 
 from apps.schedule.api import router
 from apps.schedule.models import SpecialDay
+from base.tests.routes import spa_routes
 from config.api import api
 
 from .conftest import make_override, make_special_day
@@ -308,10 +308,7 @@ def test_settings_is_open_and_hours_over_http(admin_client):
 
 
 def test_the_spas_route_map_names_every_schedule_route():
-    # frontend/generated/operations.json: the op → route map the SDK's client uses (written by hand).
-    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
-    mine = {(route["method"].upper(), route["path"].removeprefix("/api"), op) for op, route in spa.items() if op.startswith("schedule.")}
-    assert mine == ROUTES
+    assert spa_routes("schedule.") == ROUTES
 
 
 @pytest.mark.django_db

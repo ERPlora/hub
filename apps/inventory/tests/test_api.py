@@ -9,12 +9,12 @@ import json
 import uuid
 
 import pytest
-from django.conf import settings
 from live.ninja import ensure_api_parity
 
 from apps.inventory.api import router
 from apps.inventory.tests.test_product_image import IMAGE_ROUTES
 from apps.tax.models import TaxCategory
+from base.tests.routes import spa_routes
 from config.api import api
 
 ROUTES = {
@@ -110,15 +110,7 @@ def test_the_api_keeps_parity():
 
 
 def test_the_spas_route_map_names_every_inventory_route():
-    # frontend/generated/operations.json: the op → route map the SDK's client uses (written by hand);
-    # a route missing there is an operation the screens cannot call.
-    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
-    mine = {
-        (route["method"].upper(), route["path"].removeprefix("/api"), op)
-        for op, route in spa.items()
-        if op.startswith("inventory.")
-    }
-    assert mine == ROUTES
+    assert spa_routes("inventory.") == ROUTES
 
 
 # Authentication and permissions

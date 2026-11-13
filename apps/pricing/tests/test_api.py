@@ -7,10 +7,10 @@ transaction.
 import json
 
 import pytest
-from django.conf import settings
 from live.ninja import ensure_api_parity
 
 from apps.pricing.api import router
+from base.tests.routes import spa_routes
 from config.api import api
 
 from .conftest import make_group, make_list, make_product, make_rule
@@ -89,14 +89,7 @@ def test_the_openapi_describes_the_pricing_routes(client):
 
 
 def test_the_spas_route_map_names_every_pricing_route():
-    # frontend/generated/operations.json: the op → route map the SDK's client uses (written by hand).
-    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
-    mine = {
-        (route["method"].upper(), route["path"].removeprefix("/api"), op)
-        for op, route in spa.items()
-        if op.startswith("pricing.")
-    }
-    assert mine == ROUTES
+    assert spa_routes("pricing.") == ROUTES
 
 
 # Authentication and permissions

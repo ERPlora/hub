@@ -7,10 +7,10 @@ transaction. A pick travels in the query string of ``resolve`` as a JSON object 
 import json
 
 import pytest
-from django.conf import settings
 from live.ninja import ensure_api_parity
 
 from apps.combo.api import router
+from base.tests.routes import spa_routes
 from config.api import api
 
 from .conftest import FOOD, make_combo, make_group, make_option, make_product
@@ -88,16 +88,7 @@ def test_the_openapi_describes_the_combo_routes(client):
 
 
 def test_the_spas_route_map_names_every_combo_route():
-    # frontend/generated/operations.json: the op → route map the SDK's client uses (written by hand).
-    spa = json.loads(
-        (settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text()
-    )
-    mine = {
-        (route["method"].upper(), route["path"].removeprefix("/api"), op)
-        for op, route in spa.items()
-        if op.startswith("combo.")
-    }
-    assert mine == ROUTES
+    assert spa_routes("combo.") == ROUTES
 
 
 # Authentication and permissions
