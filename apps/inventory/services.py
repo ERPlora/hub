@@ -501,13 +501,11 @@ def _library_image(ctx: OperationContext, image: str) -> str:
     its own, deleted with the product (INVENTORY-F31). While the library cannot be read it comes back as the copy had
     it: the product is never left out for it, the library never renames an image, and the screens show the initials of
     one they cannot load."""
-    if images.kind_of(image) != images.CATALOG:
-        return ""
     try:
         images.check(ctx, image)
-    except InvalidPayload:
+    except InvalidPayload:  # a photo of its own, or one the library no longer has
         return ""
-    except OperationError:  # 503 base.image_library_unavailable
+    except OperationError:  # the library cannot be read now (503 base.image_library_unavailable)
         return image
     return image
 
