@@ -25,6 +25,7 @@ from base.tenancy import context
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tenancy.tests.legacy import use_legacy
+from base.tests.routes import bound_routes, spa_routes
 
 HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 
@@ -315,11 +316,9 @@ KEY_ROUTES = {
 }
 
 
-def test_the_spas_route_map_names_every_route_of_the_keys(settings):
-    from base.tests.test_access_routes import bound_routes
+def test_the_spas_route_map_names_every_route_of_the_keys():
+    from base.api import router
 
-    assert KEY_ROUTES <= bound_routes()
-    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
+    assert KEY_ROUTES <= bound_routes(router)
     mine = {op for _, _, op in KEY_ROUTES}
-    named = {(route["method"].upper(), route["path"].removeprefix("/api"), op) for op, route in spa.items() if op in mine}
-    assert named == KEY_ROUTES
+    assert {route for route in spa_routes("base.") if route[2] in mine} == KEY_ROUTES
