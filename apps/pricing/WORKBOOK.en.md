@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b7a9463bc35a076169989ed76f052962dd0d568c129cc02e2145752b5e15a36f -->
+<!-- generated from WORKBOOK.md sha256:0c9540c8e6a00c6badcf183b4e965883fc387471782581f4d485e46a0ac8e150 -->
 
 ## What it is for and who it is for
 
@@ -475,9 +475,9 @@ Steps:
 In: the separate copy and what the business has today.
 Out: a price for each one that was missing, with its price-put notice (`pricing.price_item.added`) made by the
 recovery, so no automation starts (FLOW-F21); nothing else.
-If it fails: a price whose place (the same price list, the same product or service and the same "from quantity") the
-business has taken again, at whatever price, is not repeated: the business's own stays, and asking again puts nothing
-twice. A price the business removed by hand after the copy comes back too, like everything the business no longer has
+If it fails: a price the business still has, even if it changed its amount or its "from quantity", stays as it is, and
+one whose place (the same price list, the same product or service and the same "from quantity") the business has taken
+again, at whatever price, is not repeated: the business's own stays, and asking again puts nothing twice. A price the business removed by hand after the copy comes back too, like everything the business no longer has
 (BASE-F114). What the price list's detail does not accept today does not come back and Recoveries says why: a
 deactivated price list ("pricing.price_list_unavailable: …"), a product that stays deleted (Products was not recovered,
 or the business already made another one with its SKU: "not_found: …"), a service that is gone or Services turned off.

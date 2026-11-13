@@ -498,9 +498,9 @@ Pasos:
 Entra: la copia aparte y lo que el negocio tiene hoy.
 Sale: un precio por cada uno que faltaba, con su aviso de precio puesto (`pricing.price_item.added`) hecho por la
 recuperación, así que no arranca ninguna automatización (FLOW-F21); nada más.
-Si falla: no se repite un precio cuyo sitio (la misma tarifa, el mismo producto o servicio y la misma «desde
-cantidad») el negocio ya volvió a ocupar, al precio que sea: se queda el suyo, y pedirlo otra vez no pone nada dos
-veces. Un precio que el negocio quitó a mano después de la copia también vuelve, como todo lo que el negocio ya no
+Si falla: un precio que el negocio aún tiene, aunque le cambiara el importe o la «desde cantidad», se queda como está, y
+no se repite uno cuyo sitio (la misma tarifa, el mismo producto o servicio y la misma «desde cantidad») el negocio ya
+volvió a ocupar, al precio que sea: se queda el suyo, y pedirlo otra vez no pone nada dos veces. Un precio que el negocio quitó a mano después de la copia también vuelve, como todo lo que el negocio ya no
 tiene (BASE-F114). Lo que el detalle de la tarifa no acepta hoy no vuelve y Recuperaciones dice por qué: una tarifa
 desactivada («pricing.price_list_unavailable: …»), un producto que sigue eliminado (no se recuperó Productos, o el
 negocio ya hizo otro con su SKU: «not_found: …»), un servicio que ya no está o Servicios apagada. Un producto que el

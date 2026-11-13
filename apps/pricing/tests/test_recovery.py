@@ -81,8 +81,8 @@ def test_lacking_is_a_price_the_business_no_longer_has_in_a_place_it_left_free()
     vip, bulk = make_list("VIP"), make_list("BULK")
     shampoo = make_product("Shampoo", "SH-1")
     haircut = make_service("Haircut")
-    # Still in the business, the same price: nothing lacks.
-    held = make_item(vip, shampoo, price=900)
+    # Still in the business, from another quantity since: it is the business's, nothing lacks.
+    held = make_item(vip, shampoo, price=900, min_quantity="3")
     still = a_price_of_the_copy(vip, product=shampoo, price=900) | {"id": held.id}
     # Its place taken again by the business, at another price: the business's stays, never a second one.
     make_item(bulk, shampoo, price=850, min_quantity="10.000")
