@@ -67,7 +67,6 @@
   "fix-hub-money-4-digits.spec.ts": 3,
   "fix-hub-payment-list-filters-behind-funnel.spec.ts": 2,
   "fix-hub-spa-static-probes.spec.ts": 1,
-  "fix-hub-staff-role-bars-role-color.spec.ts": 1,
   "fix-hub-verifactu-on-for-a-business-outside-spain.spec.ts": 6,
   "fix-hub-verifactu-retire-live-paid.spec.ts": 1,
   "fix-inventory-setup-hooks.spec.ts": 2,

@@ -1,8 +1,9 @@
 // «Finish setting up your business» carries the demo's example because a development server shows it.
 // flow: BASE-F02 BASE-F01 BASE-F03 BASE-F05 BASE-F06 BASE-F07 BASE-F08 BASE-F09 BASE-F10 BASE-F11
-import { expect, type Page, test } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, bellBadge, clearItems, horizontalOverflow, hostPage, login, openBell, psql, shot, shown, uniqueName, untilStill } from './helpers';
+import { panelAdded, spanishContext, spanishHome } from './home-helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -173,12 +174,40 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     });
     await page.reload();
     // The panel's figure only comes through a stream that carries the panel: by then any reopening has happened.
-    const panel = testid(page, 'widget-board').locator('[data-testid="widget"][data-key="demo.open_items"]');
-    await expect(panel.locator('[data-testid="widget-value"]')).toHaveText(/\d/);
-    expect(cut).toEqual([]);
-    expect(opened).toHaveLength(1);
+    await panelOnOneStream(page, cut, opened);
     await context.close();
   });
+}
+
+/** The owner on the Home in Spanish at `viewport` with «Descuadres recientes» (`key`) added to the board and read: the
+ *  context and page, the panel, and its bar of the session numbered `number`. The context is closed if it fails. */
+async function recentPanelInSpanish(
+  browser: Browser,
+  viewport: { width: number; height: number },
+  key: string,
+): Promise<{ context: BrowserContext; page: Page; panel: Locator; bar: (number: string) => Locator }> {
+  const context = await spanishContext(browser, viewport);
+  try {
+    const page = await context.newPage();
+    await spanishHome(page);
+    const panel = await panelAdded(page, key);
+    await expect(panel.locator('[data-testid="widget-title"]')).toHaveText('Descuadres recientes');
+    await expect(panel).toHaveAttribute('aria-busy', 'false');
+    const bar = (number: string) =>
+      panel.locator('[data-testid="widget-bar"]').filter({ has: page.locator('.widget-bar-label').getByText(number, { exact: true }) });
+    return { context, page, panel, bar };
+  } catch (error) {
+    await context.close();
+    throw error;
+  }
+}
+
+/** The panel's figure came, over the one `/api/live` the page opened, which was never cut. */
+async function panelOnOneStream(page: Page, cut: string[], opened: unknown[]): Promise<void> {
+  const panel = testid(page, 'widget-board').locator('[data-testid="widget"][data-key="demo.open_items"]');
+  await expect(panel.locator('[data-testid="widget-value"]')).toHaveText(/\d/);
+  expect(cut).toEqual([]);
+  expect(opened).toHaveLength(1);
 }
 
 /** The operations an `/api/live` address subscribes to (`?s=`, base64url JSON: `encodeSubscriptions` of @erplora/ui). */
@@ -222,10 +251,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     });
     await page.goto(`${A}/`);
     await withChrome;
-    const panel = testid(page, 'widget-board').locator('[data-testid="widget"][data-key="demo.open_items"]');
-    await expect(panel.locator('[data-testid="widget-value"]')).toHaveText(/\d/);
-    expect(cut).toEqual([]);
-    expect(opened).toHaveLength(1);
+    await panelOnOneStream(page, cut, opened);
     await context.close();
   });
 }
@@ -313,25 +339,8 @@ test.describe('BASE-F06 — a panel row without its value', () => {
 
   for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     test(`BASE-F06 — «Descuadres recientes» says «—» for a session closed without a count, never «0,00 €», at ${label}`, async ({ browser }) => {
-      const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
+      const { context, page, panel, bar } = await recentPanelInSpanish(browser, viewport, RECENT);
       try {
-        const page = await context.newPage();
-        await login(page, A, '/');
-        await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-        await page.goto(`${A}/`);
-        await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-
-        await testid(page, 'widgets-customize').click();
-        const picker = page.locator('ion-modal[data-testid="widgets-picker"]:not(.overlay-hidden)');
-        await picker.locator(`[data-testid="widgets-add-${RECENT}"]`).click();
-        await picker.locator('[data-testid="widgets-close"]').click();
-        await expect(picker).toHaveCount(0);
-
-        const panel = testid(page, 'widget-board').locator(`[data-testid="widget"][data-key="${RECENT}"]`);
-        await expect(panel.locator('[data-testid="widget-title"]')).toHaveText('Descuadres recientes');
-        await expect(panel).toHaveAttribute('aria-busy', 'false');
-        const bar = (number: string) =>
-          panel.locator('[data-testid="widget-bar"]').filter({ has: page.locator('.widget-bar-label').getByText(number, { exact: true }) });
         await expect(bar(numbers.uncounted).locator('.widget-bar-text')).toHaveText('—');
         await expect(bar(numbers.uncounted).locator('.widget-bar-track')).toHaveCount(0);
         await expect(bar(numbers.counted).locator('.widget-bar-text')).toHaveText(zero);
@@ -438,25 +447,8 @@ test.describe('BASE-F06 — a bar-list with negatives', () => {
 
   for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     test(`BASE-F06 — «Descuadres recientes» measures each bar by its size, only the shortfall red, at ${label}`, async ({ browser }) => {
-      const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
+      const { context, page, panel, bar } = await recentPanelInSpanish(browser, viewport, RECENT);
       try {
-        const page = await context.newPage();
-        await login(page, A, '/');
-        await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-        await page.goto(`${A}/`);
-        await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-
-        await testid(page, 'widgets-customize').click();
-        const picker = page.locator('ion-modal[data-testid="widgets-picker"]:not(.overlay-hidden)');
-        await picker.locator(`[data-testid="widgets-add-${RECENT}"]`).click();
-        await picker.locator('[data-testid="widgets-close"]').click();
-        await expect(picker).toHaveCount(0);
-
-        const panel = testid(page, 'widget-board').locator(`[data-testid="widget"][data-key="${RECENT}"]`);
-        await expect(panel.locator('[data-testid="widget-title"]')).toHaveText('Descuadres recientes');
-        await expect(panel).toHaveAttribute('aria-busy', 'false');
-        const bar = (number: string) =>
-          panel.locator('[data-testid="widget-bar"]').filter({ has: page.locator('.widget-bar-label').getByText(number, { exact: true }) });
         const short = bar(numbers.short);
         const over = bar(numbers.over);
         // The sign is written, never only painted.
@@ -586,10 +578,7 @@ test.describe('BASE-F06 — a bar-list with the colour of its row', () => {
       try {
         await context.addInitScript(([key, keys]) => localStorage.setItem(key, keys), ['dashboard-hub', JSON.stringify([BY_ROLE])]);
         const page = await context.newPage();
-        await login(page, A, '/');
-        await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-        await page.goto(`${A}/`);
-        await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+        await spanishHome(page);
 
         const panel = testid(page, 'widget-board').locator(`[data-testid="widget"][data-key="${BY_ROLE}"]`);
         await expect(panel.locator('[data-testid="widget-title"]')).toHaveText('Empleados por rol');

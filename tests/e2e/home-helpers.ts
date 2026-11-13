@@ -26,6 +26,31 @@ export const myAppsShown = (page: Page): Promise<void> => expect(shown(page).loc
 /** The Home is painted once its widget board shows. */
 export const boardShown = (page: Page): Promise<void> => expect(shown(page).locator('[data-testid="widget-board"]')).toBeVisible();
 
+/** A context of the Hub at `viewport`, with the browser in Spanish. */
+export const spanishContext = (browser: Browser, viewport: { width: number; height: number }): Promise<BrowserContext> =>
+  browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
+
+/** On `page`, a person of `a` (the owner unless `who`) signed in on the Home in Spanish: the Hub's language cookie, as the
+ *  sign-in sets it from the account. */
+export async function spanishHome(page: Page, who: Credentials = OWNER): Promise<void> {
+  await login(page, A, '/', who);
+  await page.context().addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.goto(`${A}/`);
+  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+}
+
+/** The panel `key` added to the Home's board from «Personalizar panel» (`open`, when given, checks the picker open), the
+ *  picker closed after: the panel. */
+export async function panelAdded(page: Page, key: string, open?: (picker: Locator) => Promise<void>): Promise<Locator> {
+  await shown(page).locator('[data-testid="widgets-customize"]').click();
+  const picker = page.locator('ion-modal[data-testid="widgets-picker"]:not(.overlay-hidden)');
+  if (open) await open(picker);
+  await picker.locator(`[data-testid="widgets-add-${key}"]`).click();
+  await picker.locator('[data-testid="widgets-close"]').click();
+  await expect(picker).toHaveCount(0);
+  return boardWidget(page, key);
+}
+
 /** Who visits the Home and how it is laid out. */
 export interface HomeVisit {
   /** The owner unless said. */
@@ -44,7 +69,7 @@ export async function spanishOnTheHome(
   ready: (page: Page) => Promise<void>,
   visit: HomeVisit = {},
 ): Promise<{ context: BrowserContext; page: Page; streams: number[] }> {
-  const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
+  const context = await spanishContext(browser, viewport);
   const { board } = visit;
   if (board) await context.addInitScript(([key, panels]) => localStorage.setItem(key, panels), [board.key, JSON.stringify(board.panels)]);
   const page = await context.newPage();
@@ -52,10 +77,7 @@ export async function spanishOnTheHome(
   page.on('request', (request) => {
     if (request.url().includes('/api/live')) streams.push(Date.now());
   });
-  await login(page, A, '/', visit.who ?? OWNER);
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.goto(`${A}/`);
-  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+  await spanishHome(page, visit.who);
   await ready(page);
   if ((visit.sweep ?? true) && process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   return { context, page, streams };
