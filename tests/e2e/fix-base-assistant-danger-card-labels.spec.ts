@@ -9,10 +9,10 @@
 // again, and the device gets its name back.
 // flow: base-assistant-danger-card-labels
 // flow: BASE-F97 BASE-F98 TABLE-F15
-import { expect, type Locator, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
-import { ask, cardSpec, ownerIn } from './assistant-card-helpers';
-import { card, openPanel, panel } from './assistant-real';
+import { ask, cancelledAtTheDesk, cardSpec, ownerIn, thisDeviceNamed } from './assistant-card-helpers';
+import { card, openPanel } from './assistant-real';
 import { A, api, capture, exposeMovingInPage, untilStill } from './helpers';
 import { cleanRoom } from './sale-helpers';
 
@@ -34,7 +34,6 @@ type Check = { id: string; label: string; table_id: string | null; status: strin
 // The room this file made goes away before each test and after the last, with the checks its seating opened.
 cardSpec(NEEDED, () => cleanRoom(TAG));
 
-const lastAnswer = (page: Page): Locator => panel(page).locator('[data-testid="assistant-bubble-assistant"]').last();
 
 /** The dangerous card ready for its capture, as base-assistant.spec.ts waits for it: «Confirmación» focused, its
  *  label floated and nothing moving on the page, the label's move included, two frames apart. */
@@ -86,10 +85,7 @@ test('base-assistant-danger-card-labels — in Spanish transferring a check call
     expect(await confirmationSettled(page), `${KEY}-check-${vp.label} caught before it settled`).toBe(true);
     await capture(page, `${KEY}-check-${vp.label}`);
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await card(page).locator('[data-testid="assistant-confirm-cancel"]').click();
-  await expect(card(page)).toBeHidden();
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await cancelledAtTheDesk(page);
   const after = await api<Check>(context, A, 'GET', `/table/sessions/detail?id=${seated.data.id}`);
   expect([after.data.table_id, after.data.status]).toEqual([five.id, 'open']);
   // The session, for ui-clip-sweep.sh over the screen behind the card (its pages are behind the login).
@@ -99,17 +95,8 @@ test('base-assistant-danger-card-labels — in Spanish transferring a check call
 
 test('base-assistant-danger-card-labels — in Spanish removing a device calls it «Dispositivo», the title the platform gives it, never «Registro»', async ({ browser }) => {
   const [context, page] = await ownerIn(browser, 'es');
-  type Device = { id: string; name: string; current: boolean };
-  const listed = await api<{ devices: Device[] }>(context, A, 'GET', '/devices');
-  expect(listed.status, JSON.stringify(listed.data)).toBe(200);
-  const device = listed.data.devices.find((row) => row.current) ?? listed.data.devices[0];
-  expect(device, JSON.stringify(listed.data.devices)).toBeDefined();
   // Named as the business names it in Settings › Devices, and given its name back at the end.
-  const rename = async (name: string) => {
-    const renamed = await api(context, A, 'POST', '/devices/rename', { id: device!.id, name });
-    expect(renamed.status, JSON.stringify(renamed.data)).toBe(200);
-  };
-  await rename('Barra');
+  const { device, stays } = await thisDeviceNamed(context, 'Barra');
   await page.setViewportSize({ width: 1440, height: 900 });
   await openPanel(page);
   await ask(page, `E2E-ASK base__device__remove ${JSON.stringify({ id: device!.id })}`);
@@ -123,12 +110,7 @@ test('base-assistant-danger-card-labels — in Spanish removing a device calls i
     expect(await confirmationSettled(page), `${KEY}-${vp.label} caught before it settled`).toBe(true);
     await capture(page, `${KEY}-${vp.label}`);
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await card(page).locator('[data-testid="assistant-confirm-cancel"]').click();
-  await expect(card(page)).toBeHidden();
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
-  const after = await api<{ devices: Device[] }>(context, A, 'GET', '/devices');
-  expect(after.data.devices.map((row) => row.id)).toContain(device!.id);
-  await rename(device!.name);
+  await cancelledAtTheDesk(page);
+  await stays();
   await context.close();
 });

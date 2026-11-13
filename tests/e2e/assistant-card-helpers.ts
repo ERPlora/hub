@@ -6,7 +6,7 @@ import { type Browser, type BrowserContext, expect, type Page, test } from '@pla
 
 import { DONE, type Provider, startProvider } from './assistant-provider';
 import { answers, box, card, emptyMonth, panel, saasSql, send } from './assistant-real';
-import { A, login, turnOffTurnedOn, turnOnMissing } from './helpers';
+import { A, api, login, turnOffTurnedOn, turnOnMissing } from './helpers';
 import { STACK } from './stack';
 
 /** An id as a schema's `format: uuid` takes it: never on a card. */
@@ -72,7 +72,7 @@ export async function ask(page: Page, text: string): Promise<void> {
 
 /** A card as the server sends it: each datum by its label and in words, a list `named` when the screen says its items
  *  (live.assistant.NAMED). */
-export type SentCard = { fields: { name: string; label: string; value: unknown; named?: boolean }[] };
+export type SentCard = { fields: { name: string; label: string; kind: string; value: unknown; named?: boolean; money?: unknown }[] };
 
 /** The card of the confirm frame of a turn's answer (`text/event-stream`: one `data: <JSON>` per frame), if any. */
 export function confirmedCard(stream: string): SentCard | undefined {
@@ -81,6 +81,15 @@ export function confirmedCard(stream: string): SentCard | undefined {
     .filter((line) => line.startsWith('data:'))
     .map((line) => JSON.parse(line.slice(5)) as { type: string; card?: SentCard });
   return frames.find((frame) => frame.type === 'confirm')?.card;
+}
+
+/** The card the server sends for the person to confirm, as it arrives: the answer of the turn that carries it (a first
+ *  turn may only ask for the tool). */
+export async function sentCard(page: Page): Promise<SentCard> {
+  const answer = await page.waitForResponse(
+    async (response) => response.url().endsWith('/api/assistant/turn') && confirmedCard(await response.text()) !== undefined,
+  );
+  return confirmedCard(await answer.text())!;
 }
 
 /** Asks for the write `tool` and returns what its card sends, never saying an id on the way. */
@@ -124,4 +133,36 @@ export async function confirmedWithTheWord(page: Page): Promise<void> {
   await card(page).locator('[data-testid="assistant-confirm-submit"]').click();
   await expect(card(page)).toBeHidden();
   await expect(panel(page).locator('[data-testid="assistant-bubble-assistant"]').last()).toContainText(DONE.en);
+}
+
+/** A device of `a`, as Settings › Devices lists it. */
+export type Device = { id: string; name: string; agent: string; current: boolean };
+
+/** The device `id` named `name`, as the business names it in Settings › Devices. */
+async function renameDevice(context: BrowserContext, id: string, name: string): Promise<void> {
+  const renamed = await api(context, A, 'POST', '/devices/rename', { id, name });
+  expect(renamed.status, JSON.stringify(renamed.data)).toBe(200);
+}
+
+/** The device of this session (or the first one) named `name`, as the business names it in Settings › Devices;
+ *  `stays` checks it is still among the devices and gives it its name back. */
+export async function thisDeviceNamed(context: BrowserContext, name: string): Promise<{ device: Device; stays: () => Promise<void> }> {
+  const listed = await api<{ devices: Device[] }>(context, A, 'GET', '/devices');
+  expect(listed.status, JSON.stringify(listed.data)).toBe(200);
+  const device = listed.data.devices.find((row) => row.current) ?? listed.data.devices[0];
+  expect(device, JSON.stringify(listed.data.devices)).toBeDefined();
+  await renameDevice(context, device.id, name);
+  const stays = async (): Promise<void> => {
+    const after = await api<{ devices: Device[] }>(context, A, 'GET', '/devices');
+    expect(after.data.devices.map((row) => row.id)).toContain(device.id);
+    await renameDevice(context, device.id, device.name);
+  };
+  return { device, stays };
+}
+
+/** Back at a desk's size, the card cancelled: the assistant says, in Spanish, that it did not do it. */
+export async function cancelledAtTheDesk(page: Page): Promise<void> {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await cancel(page);
+  await expect(panel(page).locator('[data-testid="assistant-bubble-assistant"]').last()).toContainText('No lo he hecho.');
 }

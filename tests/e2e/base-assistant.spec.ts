@@ -5,33 +5,19 @@
 // folder, «El asistente»): `assistant_seed.py gateway http://127.0.0.1:<E2E_AI_PROVIDER_PORT>/v1`.
 // The month's messages of the business `a` are set on the SaaS's database before each test (`spend`), so a run never
 // spends the plan's allowance and the 80 % and the spent month can be seen.
-import { execSync } from 'node:child_process';
+import {  } from 'node:child_process';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { CLAIM_ANSWER, DICTATION, DONE, GREETING, NOT_DONE, type Provider, startProvider, STEPS_SAID } from './assistant-provider';
-import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, REPO_DIR, shot, shown, turnOffTurnedOn, turnOnMissing, untilStill, upgradeLandsInside } from './helpers';
+import { ownerIn, sentCard, thisDeviceNamed } from './assistant-card-helpers';
+import { CLAIM_ANSWER, DICTATION, DONE, GREETING, NOT_DONE, type Provider, STEPS_SAID } from './assistant-provider';
+import { saasSql } from './assistant-real';
+import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, shot, shown, THREE_SIZES as VIEWPORTS, turnOffTurnedOn, turnOnMissing, untilStill, upgradeLandsInside } from './helpers';
 import { cleanPricing, CODE as PRICING_CODE, createProduct, post, TAG as PRICING_TAG } from './pricing-helpers';
-import { STACK } from './stack';
-
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
-
-const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
-/** The SaaS's database of this stack (README «Varias ejecuciones a la vez»: `saas_e2e_<Hub port + 1>`). */
-const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `saas_e2e_${STACK.hubPort + 1}`);
+import { seededProvider } from './provider-helpers';
+import {  } from './stack';
 
 let provider: Provider;
-
-function saasSql(sql: string): string {
-  return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, {
-    cwd: REPO_DIR,
-    encoding: 'utf8',
-  }).trim();
-}
 
 /** This month's messages of the business `a` on erplora.com. */
 function spend(messages: number): void {
@@ -47,9 +33,7 @@ function spend(messages: number): void {
 }
 
 test.beforeAll(async () => {
-  provider = await startProvider(PROVIDER_PORT);
-  const seeded = saasSql("select base_url from assistant_aiprovider where slug = 'e2e-local'");
-  expect(seeded, `the SaaS ${SAAS_DB} is not seeded with this provider: README «El asistente»`).toBe(provider.url);
+  provider = await seededProvider();
 });
 
 test.afterAll(async () => {
@@ -102,12 +86,23 @@ async function openPanel(page: Page): Promise<void> {
   await expect(box(page)).toBeVisible();
 }
 
-/** The panel open on the home at a computer's size, with the app in Spanish: where a card's words are looked at. */
-async function openPanelInSpanish(page: Page): Promise<void> {
-  await page.context().addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+/** The panel open on the home at a computer's size. */
+async function openPanelAtTheDesk(page: Page): Promise<void> {
   await page.setViewportSize({ width: 1440, height: 900 });
   await home(page);
   await openPanel(page);
+}
+
+/** The owner signed in, with the panel open on the home at a computer's size. */
+async function panelAtTheDesk(page: Page): Promise<void> {
+  await login(page, A, '/');
+  await openPanelAtTheDesk(page);
+}
+
+/** The panel open on the home at a computer's size, with the app in Spanish: where a card's words are looked at. */
+async function openPanelInSpanish(page: Page): Promise<void> {
+  await page.context().addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await openPanelAtTheDesk(page);
 }
 
 /** Writes `text` and sends it with Enter; resolves when the turn has ended (the composer offers «Send» again). */
@@ -119,6 +114,32 @@ async function ask(page: Page, text: string, options: { settle?: boolean } = {})
   await box(page).press('Enter');
   await expect(answers(page)).toHaveCount(before + 1);
   if (options.settle ?? true) await expect(panel(page).locator('[data-testid="assistant-send"]')).toBeVisible({ timeout: 30_000 });
+}
+
+/** The words the record at `path` is named by, as its read by id answers them in the person's language: `<name> · …`,
+ *  with no date as the database keeps it. */
+async function labelRead(context: BrowserContext, path: string, name: string): Promise<string> {
+  const read = await api<{ label: string }>(context, A, 'GET', path);
+  expect(read.status, JSON.stringify(read.data)).toBe(200);
+  const label = read.data.label;
+  expect(label.startsWith(`${name} · `), label).toBe(true);
+  expect(label, label).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+  return label;
+}
+
+/** Asks for what needs the person's say (`text`): its card comes up, while the turn may still run. */
+async function askForACard(page: Page, text: string): Promise<void> {
+  await ask(page, text, { settle: false });
+  await expect(card(page)).toBeVisible();
+}
+
+/** The last answer captured at each size, as `<key>-<size>`. */
+async function lastAnswerAtEachSize(page: Page, key: string): Promise<void> {
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(lastAnswer(page)).toBeVisible();
+    await capture(page, `${key}-${vp.label}`);
+  }
 }
 
 /** The panel as a person sees it at each size; `settled`, when given, must hold at the very moment of each capture. */
@@ -298,11 +319,7 @@ test('hub-e2e-capture — capture() keeps the panel open after a turn at 390, 83
   await openPanel(page);
   await ask(page, 'Hola');
   await expect(lastAnswer(page)).toHaveText(GREETING.en);
-  for (const vp of VIEWPORTS) {
-    await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(lastAnswer(page)).toBeVisible();
-    await capture(page, `${KEY}-${vp.label}`);
-  }
+  await lastAnswerAtEachSize(page, KEY);
 });
 
 // hub#742, hub#1121: on a phone the panel opens from «More options», and while Ionic dismisses that menu its focus trap
@@ -345,10 +362,7 @@ test('«Ask the assistant» on the setup card opens it on the setup; a shortcut 
 });
 
 test('a question and its answer: written as it comes, with its format; «Stop» keeps what came; «Go to Settings» opens it and closes the panel', async ({ page }) => {
-  await login(page, A, '/');
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
+  await panelAtTheDesk(page);
   await ask(page, 'Hola');
   await expect(panel(page).locator('[data-testid="assistant-bubble-user"]').last()).toHaveText('Hola');
   await expect(lastAnswer(page)).toHaveText(GREETING.en);
@@ -383,13 +397,9 @@ test('a question and its answer: written as it comes, with its format; «Stop» 
 });
 
 test('a write waits on its card: «Run it» runs it as the person; «Cancel» runs nothing', async ({ page, context }) => {
-  await login(page, A, '/');
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
+  await panelAtTheDesk(page);
   const name = `Mesa asistente ${Date.now().toString(36)}`;
-  await ask(page, `E2E-CREATE ${name}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await askForACard(page, `E2E-CREATE ${name}`);
   await expect(card(page)).toContainText('Run this action?');
   await expect(card(page)).toContainText(`Create in Demo: ${name}`);
   await shots(page, 'BASE-G115', () => expect(card(page)).toBeVisible());
@@ -401,8 +411,7 @@ test('a write waits on its card: «Run it» runs it as the person; «Cancel» ru
   expect(made.data.rows.map((row) => row.name)).toEqual([name]);
 
   const other = `${name} no`;
-  await ask(page, `E2E-CREATE ${other}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await askForACard(page, `E2E-CREATE ${other}`);
   await decide(page, 'cancel');
   await expect(lastAnswer(page)).toContainText(NOT_DONE.en);
   await expect(panel(page).locator('[data-testid="assistant-receipt"]').last()).toContainText('Not done, cancelled: Create in Demo');
@@ -411,13 +420,9 @@ test('a write waits on its card: «Run it» runs it as the person; «Cancel» ru
 });
 
 test('several things in a row: the read runs by itself, the write waits on its card', async ({ page, context }) => {
-  await login(page, A, '/');
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
+  await panelAtTheDesk(page);
   const name = `Mesa cadena ${Date.now().toString(36)}`;
-  await ask(page, `E2E-CHAIN ${name}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await askForACard(page, `E2E-CHAIN ${name}`);
   await expect(card(page)).toContainText(`Create in Demo: ${name}`);
   await decide(page, 'submit');
   await expect(lastAnswer(page)).toContainText(DONE.en);
@@ -432,33 +437,22 @@ test('several things in a row: the read runs by itself, the write waits on its c
 // flow: BASE-F101 (asking for several things in a row)
 test('BASE-F101 — several things in a row: what each round says is its own paragraph of the one bubble, never glued to the previous one', async ({ page }) => {
   const KEY = 'FIX-HUB-BASE-ASSISTANT-ROUNDS-TEXT-RUN-TOGETHER';
-  await login(page, A, '/');
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
-  await ask(page, `E2E-STEPS Mesa pasos ${Date.now().toString(36)}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await panelAtTheDesk(page);
+  await askForACard(page, `E2E-STEPS Mesa pasos ${Date.now().toString(36)}`);
   await decide(page, 'cancel');
   await expect(panel(page).locator('[data-testid="assistant-send"]')).toBeVisible({ timeout: 30_000 });
   // Three rounds (before the read, before the write, after the card), one bubble, one paragraph each.
   await expect(answers(page)).toHaveCount(1);
   await expect(lastAnswer(page).locator('.assistant-md > p')).toHaveText([...STEPS_SAID.en, NOT_DONE.en]);
-  for (const vp of VIEWPORTS) {
-    await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(lastAnswer(page)).toBeVisible();
-    await capture(page, `${KEY}-${vp.label}`);
-  }
+  await lastAnswerAtEachSize(page, KEY);
   if (process.env.E2E_SAVE_STORAGE_STATE) await page.context().storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 });
 
 test('a dangerous write lists its data and runs only after typing the word', async ({ page, context }) => {
   await login(page, A, '/');
   const item = await api<{ id: string }>(context, A, 'POST', '/demo/items', { name: `Para borrar ${Date.now().toString(36)}` });
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
-  await ask(page, `E2E-DELETE ${item.data.id}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await openPanelAtTheDesk(page);
+  await askForACard(page, `E2E-DELETE ${item.data.id}`);
   await expect(card(page)).toContainText('Delete in Demo. Check each datum before going on.');
   // A record is never shown by its id; Demo marks no read that names it.
   await expect(card(page)).not.toContainText(item.data.id);
@@ -493,11 +487,8 @@ test('BASE-F97 BASE-F98 — in Spanish the card names every datum in Spanish, al
   await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
   const before = await api<Record<string, unknown>>(context, A, 'GET', '/access/settings');
   expect(before.status, JSON.stringify(before.data)).toBe(200);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
-  await ask(page, 'E2E-ASK base__access__settings_update {"pin_inactivity_minutes":10,"pin_length":6}', { settle: false });
-  await expect(card(page)).toBeVisible();
+  await openPanelAtTheDesk(page);
+  await askForACard(page, 'E2E-ASK base__access__settings_update {"pin_inactivity_minutes":10,"pin_length":6}');
   await expect(card(page)).toContainText('¿Ejecutar esta acción?');
   await expect(card(page)).not.toContainText('Pin Length');
   await expect(card(page)).not.toContainText('Pin Inactivity Minutes');
@@ -528,8 +519,7 @@ test('assistant-card — in Spanish an object datum (a WhatsApp template) is sai
     template: { name: 'cita_recordatorio', language: 'es', variables: ['Ana', '10:00'] },
     client_message_id: '0192f5a0-0000-7000-8000-000000000001',
   };
-  await ask(page, `E2E-ASK whatsapp_inbox__message__send ${JSON.stringify(send)}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await askForACard(page, `E2E-ASK whatsapp_inbox__message__send ${JSON.stringify(send)}`);
   await expect(card(page)).toContainText('Enviar en Bandeja de WhatsApp. Revisa cada dato antes de seguir.');
   for (const inner of ['name:', 'language:', 'variables:']) await expect(card(page)).not.toContainText(inner);
   for (const vp of VIEWPORTS) {
@@ -554,8 +544,7 @@ test('base-assistant-card-attempt-keys — in Spanish a print leaves its key out
   const print = { job_key: jobKey, document_type: 'barcode_label', document: { product_name: product, barcode: '8412345678905', price: 1.5 } };
   const jobs = async () =>
     (await api<{ rows: { reference: string }[] }>(context, A, 'GET', `/printing/jobs?search=${encodeURIComponent(product)}`)).data.rows;
-  await ask(page, `E2E-ASK printing__job__create ${JSON.stringify(print)}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await askForACard(page, `E2E-ASK printing__job__create ${JSON.stringify(print)}`);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     // The document by the queue's word for it, never as the model sent it.
@@ -570,8 +559,7 @@ test('base-assistant-card-attempt-keys — in Spanish a print leaves its key out
   await expect(lastAnswer(page)).toHaveText('Hecho.');
   expect(await jobs()).toHaveLength(1);
   // The same print again, with its key: a retry. Its card leaves the key out again, and it adds no second job.
-  await ask(page, `E2E-ASK printing__job__create ${JSON.stringify(print)}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await askForACard(page, `E2E-ASK printing__job__create ${JSON.stringify(print)}`);
   await expect(card(page)).not.toContainText(jobKey);
   await decide(page, 'submit');
   await expect(receipt(page)).toHaveText('Hecho: Crear en Impresión');
@@ -604,8 +592,7 @@ test('whatsapp_inbox-assistant-card — in Spanish a template names its header f
     template: { name: 'carta_del_dia', language: 'es', header_sample: kept.data.id },
     client_message_id: messageKey,
   };
-  await ask(page, `E2E-ASK whatsapp_inbox__message__send ${JSON.stringify(send)}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await askForACard(page, `E2E-ASK whatsapp_inbox__message__send ${JSON.stringify(send)}`);
   await expect(card(page)).toContainText('Enviar en Bandeja de WhatsApp. Revisa cada dato antes de seguir.');
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
@@ -626,8 +613,7 @@ test('base-assistant-money-mark — in Spanish a payment says its amount in the 
   const { context, page, turnedOn } = await signedInWith(browser, ['payment']);
   await openPanelInSpanish(page);
   const payment = { method: 'Caja', payment_date: '2026-11-02', amount: 1500, beneficiary_name: 'Cafés del Sur' };
-  await ask(page, `E2E-ASK payment__payment__create ${JSON.stringify(payment)}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await askForACard(page, `E2E-ASK payment__payment__create ${JSON.stringify(payment)}`);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 15,00\s€/);
@@ -646,8 +632,7 @@ test('base-assistant-money-mark — in Spanish a payment in another currency say
   const { context, page, turnedOn } = await signedInWith(browser, ['payment']);
   await openPanelInSpanish(page);
   const payment = { method: 'Caja', payment_date: '2026-11-02', amount: 1500, beneficiary_name: 'Cafés del Sur', currency: 'USD' };
-  await ask(page, `E2E-ASK payment__payment__create ${JSON.stringify(payment)}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await askForACard(page, `E2E-ASK payment__payment__create ${JSON.stringify(payment)}`);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 15,00\s\$/);
@@ -662,26 +647,6 @@ test('base-assistant-money-mark — in Spanish a payment in another currency say
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
   await leave(context, turnedOn);
 });
-
-type SentCard = { fields: { name: string; kind: string; value: unknown; money?: unknown }[] };
-
-/** The card of the confirm frame of a turn's answer (`text/event-stream`: one `data: <JSON>` per frame), if any. */
-function confirmedCard(stream: string): SentCard | undefined {
-  const frames = stream
-    .split('\n')
-    .filter((line) => line.startsWith('data:'))
-    .map((line) => JSON.parse(line.slice(5)) as { type: string; card?: SentCard });
-  return frames.find((frame) => frame.type === 'confirm')?.card;
-}
-
-/** The card the server sends for the person to confirm, as it arrives: the answer of the turn that carries it (the
- *  first one only asks for the tool). */
-async function sentCard(page: Page): Promise<SentCard> {
-  const answer = await page.waitForResponse(
-    async (response) => response.url().endsWith('/api/assistant/turn') && confirmedCard(await response.text()) !== undefined,
-  );
-  return confirmedCard(await answer.text())!;
-}
 
 // flow: base-assistant-money-mark (BASE-F97)
 // The same PR: a price set on a price list in dollars said «15,00 €»: the write names the list, not its currency. The
@@ -701,8 +666,7 @@ test('base-assistant-money-mark — in Spanish a price set on a list in another 
   await openPanelInSpanish(page);
   const price = { product, price_list: `${PRICING_CODE}USD`, price: 1500 };
   const sent = sentCard(page);
-  await ask(page, `E2E-ASK pricing__price_item__add ${JSON.stringify(price)}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await askForACard(page, `E2E-ASK pricing__price_item__add ${JSON.stringify(price)}`);
   expect((await sent).fields.find((field) => field.name === 'price')).toMatchObject({
     kind: 'money',
     value: 1500,
@@ -743,8 +707,7 @@ test('base-assistant-money-mark — in Spanish an amount inside a datum and one 
     payments: [{ method: 'Efectivo', amount: 1350 }],
   };
   const sent = sentCard(page);
-  await ask(page, `E2E-ASK sale__sale__complete ${JSON.stringify(sale)}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await askForACard(page, `E2E-ASK sale__sale__complete ${JSON.stringify(sale)}`);
   const fields = (await sent).fields;
   expect(fields.map((field) => field.name)).not.toContain('idempotency_key');
   const top = fields.find((field) => field.name === 'discount_amount');
@@ -776,8 +739,7 @@ const [CUSTOMER_ID, SERVICE_ID, MEMBER_ID] = [
  *  `CUSTOMER_ID` and `MEMBER_ID`, and checks at each size that its card says `line` and none of `never`, saved as `key`. */
 async function bookingCardSays(page: Page, services: unknown[], line: string, never: readonly string[], key: string): Promise<void> {
   const booking = { customer_id: CUSTOMER_ID, services, staff_id: MEMBER_ID, start: '2026-11-02T10:00:00+01:00', source: 'counter' };
-  await ask(page, `E2E-ASK appointment__appointment__create ${JSON.stringify(booking)}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await askForACard(page, `E2E-ASK appointment__appointment__create ${JSON.stringify(booking)}`);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText(line);
@@ -818,27 +780,12 @@ test('assistant-card — in Spanish a booking whose service comes by its name sa
 // base/tests. Cancelled: the device stays.
 test('assistant-card — in Spanish removing a device names it as Settings › Devices does, never by its id', async ({ browser }) => {
   const KEY = 'FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES-device';
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await login(page, A, '/');
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  type Device = { id: string; name: string; agent: string; current: boolean };
-  const listed = await api<{ devices: Device[] }>(context, A, 'GET', '/devices');
-  expect(listed.status, JSON.stringify(listed.data)).toBe(200);
-  const device = listed.data.devices.find((row) => row.current) ?? listed.data.devices[0];
-  expect(device, JSON.stringify(listed.data.devices)).toBeDefined();
+  const [context, page] = await ownerIn(browser, 'es');
   // Named as the business names it in Settings › Devices (headless Chromium says no browser it knows, so it has nothing
   // else to be said by), and given its name back at the end.
-  const rename = async (name: string) => {
-    const renamed = await api(context, A, 'POST', '/devices/rename', { id: device!.id, name });
-    expect(renamed.status, JSON.stringify(renamed.data)).toBe(200);
-  };
-  await rename('Barra');
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
-  await ask(page, `E2E-ASK base__device__remove {"id":"${device!.id}"}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  const { device, stays } = await thisDeviceNamed(context, 'Barra');
+  await openPanelAtTheDesk(page);
+  await askForACard(page, `E2E-ASK base__device__remove {"id":"${device!.id}"}`);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText('Quitar en Ajustes. Revisa cada dato antes de seguir.');
@@ -848,9 +795,7 @@ test('assistant-card — in Spanish removing a device names it as Settings › D
     await captureConfirmation(page, `${KEY}-${vp.label}`);
   }
   await cancelAtComputerSize(page);
-  const after = await api<{ devices: Device[] }>(context, A, 'GET', '/devices');
-  expect(after.data.devices.map((row) => row.id)).toContain(device!.id);
-  await rename(device!.name);
+  await stays();
   await context.close();
 });
 
@@ -894,21 +839,14 @@ test('RESERVATION-F06 — booking a table, the card names the customer; moving a
   });
   // The words the book names it by, as its read by id answers them in the person's language («Ana García 1234 · 6 nov
   // 2026 · 21:30»): what the card must say of it.
-  const read = await api<{ label: string }>(context, A, 'GET', `/reservation/reservations/detail?id=${booked.id}`);
-  expect(read.status, JSON.stringify(read.data)).toBe(200);
-  const label = read.data.label;
-  expect(label.startsWith(`${name} · `), label).toBe(true);
-  expect(label, label).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+  const label = await labelRead(context, `/reservation/reservations/detail?id=${booked.id}`, name);
   const ids = [customer.id, table.id, booked.id];
 
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
+  await openPanelAtTheDesk(page);
   // Booking: for whom (the customer's card by its name), the day and the time; the table goes among its data, with its
   // zone (hub#550).
   const booking = { customer_id: customer.id, date, time: '21:30:00', party_size: 2, table_id: table.id, source: 'in_person' };
-  await ask(page, `E2E-ASK reservation__reservation__create ${JSON.stringify(booking)}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await askForACard(page, `E2E-ASK reservation__reservation__create ${JSON.stringify(booking)}`);
   await expect(card(page)).toContainText(`Crear en Reservas: ${label}`);
   for (const raw of [date, 'in_person', ...ids]) await expect(card(page)).not.toContainText(raw);
   for (const vp of VIEWPORTS) {
@@ -920,8 +858,7 @@ test('RESERVATION-F06 — booking a table, the card names the customer; moving a
 
   // Moving it to table 7: which reservation, as the book's dialog says it, and the new table with its zone, as Tables
   // names it («7 (E2E Card …)»: the number repeats across zones, hub#550).
-  await ask(page, `E2E-ASK reservation__reservation__update ${JSON.stringify({ id: booked.id, table_id: table.id })}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await askForACard(page, `E2E-ASK reservation__reservation__update ${JSON.stringify({ id: booked.id, table_id: table.id })}`);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText(`Cambiar en Reservas: ${label} · 7 (E2E Card ${stamp})`);
@@ -976,18 +913,11 @@ test('FLOW-F03 — pausing an automation, the card names it; resuming a run, its
   expect(ran.status, JSON.stringify(ran.data)).toBe(200);
   expect(ran.data.status).toBe('failed');
   // The words the History names the run by, as its read by id answers them in the person's language: what the card says.
-  const read = await api<{ label: string }>(context, A, 'GET', `/flow/runs/detail?id=${ran.data.id}`);
-  expect(read.status, JSON.stringify(read.data)).toBe(200);
-  const label = read.data.label;
-  expect(label.startsWith(`${name} · `), label).toBe(true);
-  expect(label, label).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+  const label = await labelRead(context, `/flow/runs/detail?id=${ran.data.id}`, name);
 
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
+  await openPanelAtTheDesk(page);
   // Pausing it: which automation, by its name.
-  await ask(page, `E2E-ASK flow__flow__set_enabled ${JSON.stringify({ id: flow.id, enabled: false })}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await askForACard(page, `E2E-ASK flow__flow__set_enabled ${JSON.stringify({ id: flow.id, enabled: false })}`);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText('Cambiar en Automatizaciones. Revisa cada dato antes de seguir.');
@@ -999,8 +929,7 @@ test('FLOW-F03 — pausing an automation, the card names it; resuming a run, its
   await cancelAtComputerSize(page);
 
   // Resuming the run: which one, as the History says it, with its automation in front.
-  await ask(page, `E2E-ASK flow__run__retry ${JSON.stringify({ id: ran.data.id })}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await askForACard(page, `E2E-ASK flow__run__retry ${JSON.stringify({ id: ran.data.id })}`);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText('Reintentar en Automatizaciones. Revisa cada dato antes de seguir.');
@@ -1036,11 +965,8 @@ test('BASE-F98 — a dangerous card shows what will happen, as its app reads it 
   expect(people.status, JSON.stringify(people.data)).toBe(200);
   const employee = people.data.people.find((person) => person.email === EMPLOYEE.email);
   expect(employee, JSON.stringify(people.data.people)).toBeDefined();
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
-  await ask(page, `E2E-ASK base__person__pin_remove {"person":"${employee!.id}"}`, { settle: false });
-  await expect(card(page)).toBeVisible();
+  await openPanelAtTheDesk(page);
+  await askForACard(page, `E2E-ASK base__person__pin_remove {"person":"${employee!.id}"}`);
   const preview = card(page).locator('[data-testid="assistant-confirm-preview"]');
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
@@ -1063,10 +989,7 @@ test('BASE-F98 — a dangerous card shows what will happen, as its app reads it 
 });
 
 test('an answer that says it changed something nothing changed is flagged, outside the answer', async ({ page }) => {
-  await login(page, A, '/');
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
+  await panelAtTheDesk(page);
   await ask(page, 'E2E-CLAIM crea la mesa 9');
   await expect(lastAnswer(page)).toHaveText(CLAIM_ANSWER.en);
   await expect(panel(page).locator('[data-testid="assistant-notice-claimed_change"]')).toContainText(
@@ -1076,10 +999,7 @@ test('an answer that says it changed something nothing changed is flagged, outsi
 });
 
 test('the conversation stays in the tab across reloads, «New conversation» empties it, and signing out forgets it', async ({ page }) => {
-  await login(page, A, '/');
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
+  await panelAtTheDesk(page);
   await ask(page, 'Hola');
   await page.reload();
   await expect(panel(page).locator('[data-testid="assistant-bubble-user"]')).toHaveText(['Hola']);
@@ -1106,9 +1026,7 @@ test('the conversation stays in the tab across reloads, «New conversation» emp
 test('from 80 % the foot says what is left and each answer moves it; a spent month says so in the answer and in the foot, with «Upgrade plan» to the owner and who to ask to an employee', async ({ page, browser }) => {
   await login(page, A, '/');
   spend(25);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
+  await openPanelAtTheDesk(page);
   const foot = panel(page).locator('[data-testid="assistant-usage"]');
   await expect(foot).toHaveText(/^You have 5 of 30 messages left this month\. They renew on \S+ 1\.$/);
   await shots(page, 'BASE-G122');
@@ -1163,10 +1081,7 @@ test('with a plan without the assistant the foot says so, and its «Upgrade plan
 });
 
 test('«Report a problem» sends the answer with its question and a reason', async ({ page }) => {
-  await login(page, A, '/');
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
+  await panelAtTheDesk(page);
   await ask(page, 'Hola');
   await panel(page).locator('[data-testid="assistant-report"]').last().click();
   const dialog = page.locator('ion-modal[data-testid="assistant-report-dialog"]');
@@ -1188,10 +1103,7 @@ test('«Report a problem» sends the answer with its question and a reason', asy
 });
 
 test('without connection the foot says so; a cut or a service down says so in the answer, with «Try again»', async ({ page, context }) => {
-  await login(page, A, '/');
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
+  await panelAtTheDesk(page);
   await context.setOffline(true);
   await expect(panel(page).locator('[data-testid="assistant-offline"]')).toHaveText('No connection: you can write, and send when it is back.');
   await box(page).fill('Hola');
@@ -1218,9 +1130,7 @@ test('without connection the foot says so; a cut or a service down says so in th
 
 test('what the assistant can do is what the person can: a write the employee may not make is refused', async ({ browser, context }) => {
   const page = await freshPage(browser);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
+  await openPanelAtTheDesk(page);
   const name = `Mesa empleado ${Date.now().toString(36)}`;
   await ask(page, `E2E-CREATE ${name}`);
   await expect(card(page)).toBeHidden();

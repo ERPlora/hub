@@ -21,7 +21,7 @@ import { execSync } from 'node:child_process';
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { CANNOT_RECTIFY, NOT_DONE, type Provider, startProvider } from './assistant-provider';
-import { confirmedWithTheWord } from './assistant-card-helpers';
+import { confirmedWithTheWord, type SentCard, sentCard } from './assistant-card-helpers';
 import { A, api, capture, compactBar, login, psql, registerBusinessIn, registrationOf, REPO_DIR, shot, shown, untilStill } from './helpers';
 import { cleanInvoices, ensureIssuer, type InvoiceOut, invoiceOf, issuedIds, snapshotSeries } from './invoice-helpers';
 import { stamp } from './sale-helpers';
@@ -451,25 +451,6 @@ test('INVOICE-F08 — asked to rectify a rectifying invoice, the assistant says 
 const CARD_KEY = 'FIX-HUB-INVOICE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';
 /** An id as a schema's `format: uuid` takes it: never on a card. */
 const AN_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-
-type SentCard = { fields: { name: string; label: string; value: unknown }[] };
-
-/** The card of the confirm frame of a turn's answer (`text/event-stream`: one `data: <JSON>` per frame), if any. */
-function confirmedCard(stream: string): SentCard | undefined {
-  const frames = stream
-    .split('\n')
-    .filter((line) => line.startsWith('data:'))
-    .map((line) => JSON.parse(line.slice(5)) as { type: string; card?: SentCard });
-  return frames.find((frame) => frame.type === 'confirm')?.card;
-}
-
-/** The card the server sends for the person to confirm, as it arrives: the answer of the turn that carries it. */
-async function sentCard(page: Page): Promise<SentCard> {
-  const answer = await page.waitForResponse(
-    async (response) => response.url().endsWith('/api/assistant/turn') && confirmedCard(await response.text()) !== undefined,
-  );
-  return confirmedCard(await answer.text())!;
-}
 
 const saidBy = (sent: SentCard) => Object.fromEntries(sent.fields.map((field) => [field.name, [field.label, field.value]]));
 

@@ -36,6 +36,13 @@ import { STACK } from './stack';
 export { api };
 
 export const A = STACK.hub('a');
+
+/** The three sizes the e2e looks at a screen in: a phone, a tablet and a desk. */
+export const THREE_SIZES = [
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1112 },
+  { label: '1440', width: 1440, height: 900 },
+] as const;
 export const B = STACK.hub('b');
 
 const HERE = dirname(fileURLToPath(import.meta.url));

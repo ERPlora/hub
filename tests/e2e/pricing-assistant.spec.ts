@@ -16,6 +16,7 @@ import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { sentCard } from './assistant-card-helpers';
 import { type Provider, startProvider } from './assistant-provider';
 import { A, api, capture, compactBar, login, psql, REPO_DIR, shown, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
 import { createProduct, post, stamp } from './pricing-helpers';
@@ -126,25 +127,6 @@ async function ask(page: Page, text: string): Promise<void> {
   await box(page).fill(text);
   await box(page).press('Enter');
   await expect(answers(page)).toHaveCount(before + 1);
-}
-
-type SentCard = { fields: { name: string; kind: string; value: unknown; money?: unknown }[] };
-
-/** The card of the confirm frame of a turn's answer (`text/event-stream`: one `data: <JSON>` per frame), if any. */
-function confirmedCard(stream: string): SentCard | undefined {
-  const frames = stream
-    .split('\n')
-    .filter((line) => line.startsWith('data:'))
-    .map((line) => JSON.parse(line.slice(5)) as { type: string; card?: SentCard });
-  return frames.find((frame) => frame.type === 'confirm')?.card;
-}
-
-/** The card the server sends for the person to confirm, as it arrives: the answer of the turn that carries it. */
-async function sentCard(page: Page): Promise<SentCard> {
-  const answer = await page.waitForResponse(
-    async (response) => response.url().endsWith('/api/assistant/turn') && confirmedCard(await response.text()) !== undefined,
-  );
-  return confirmedCard(await answer.text())!;
 }
 
 /** The owner, in Spanish, with the shampoo at 12,00 $ in a list in dollars, made through the apps' own API. */
