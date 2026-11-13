@@ -1,8 +1,7 @@
 """The tools a turn offers for what the owner asks (``live.assistant.relevant`` over the Hub's real catalogue).
 
-The QA battery of the assistant with the real model (2026-10-31, docs/plans/2026-10-31-qa-asistente.md of
-erplora-next, block B) found the model answering «I do not have the tool…» for B28, B30 and B32: the owner holds
-those operations, but the turn never offered them, because the words asked («empleado», «vendí», «activa la app»)
+The assistant's QA with the real model found it answering «I do not have the tool…» to the questions below: the owner
+holds those operations, but the turn never offered them, because the words asked («empleado», «vendí», «activa la app»)
 shared none with the tool's own. Business ``a`` has every module on (``base.activation.every_on``): the largest
 catalogue an owner can have, a restaurant's (sale, staff, customer, inventory, cash register, tables, reservations…)
 included, so a tool found here is found in any business with fewer apps on.
@@ -37,13 +36,13 @@ def offered(ctx: OperationContext, *asked: str) -> list[str]:
 @pytest.mark.parametrize(
     ("language", "asked", "expected"),
     [
-        # B30: «No tengo la herramienta para crear empleados desde aquí».
+        # It answered «No tengo la herramienta para crear empleados desde aquí».
         ("es", "Da de alta al empleado «Luis QA» como cajero", "staff.member.create"),
         ("en", "Add the employee «Luis QA» as a cashier", "staff.member.create"),
-        # B32: «No tengo acceso a los datos de ventas desde aquí».
+        # It answered «No tengo acceso a los datos de ventas desde aquí».
         ("es", "¿Qué vendí hoy?", "sale.sale.today"),
         ("en", "What did I sell today?", "sale.sale.today"),
-        # B28: «Desde aquí no puedo activar apps directamente».
+        # It answered «Desde aquí no puedo activar apps directamente».
         ("es", "Activa la app de clientes", "base.app.enable"),
         ("en", "Turn on the customers app", "base.app.enable"),
     ],
@@ -54,9 +53,9 @@ def test_the_tool_that_does_what_the_owner_asks_is_offered(owner, language, aske
     assert expected in offered(ctx, asked)
 
 
-#: What the review of live#18 asked besides the battery: each question with the tool that obviously does it. The Hub
-#: has no tool that invites someone (that is done on erplora.com): «invita a…» gets the people of the business, which
-#: says how each one gets in, and the documentation search.
+#: Everyday questions, each with the tool that obviously does it. The Hub has no tool that invites someone (that is done
+#: on erplora.com): «invita a…» gets the people of the business, which says how each one gets in, and the documentation
+#: search.
 EVERYDAY = [
     ("es", "cobra la mesa 4", {"sale.sale.complete"}),
     ("es", "¿cuántos clientes tengo?", {"customer.customer.list", "customer.customer.stats"}),
@@ -85,8 +84,8 @@ def test_an_everyday_request_is_offered_the_tool_that_does_it(owner, language, a
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_the_people_of_a_reservation_never_bring_the_staffs_tools(owner):
-    """«personas» is not «Personal» (the staff app in Spanish): before live#18's review, «reserva una mesa para 4
-    personas» filled the turn with 11 tools of staff and left the reservation's own at 16."""
+    """«personas» is not «Personal» (the staff app in Spanish): before live offered the tool of what is asked,
+    «reserva una mesa para 4 personas» filled the turn with 11 tools of staff and left the reservation's own at 16."""
     got = offered(owner("es"), "reserva una mesa para 4 personas")
     assert got.index("reservation.reservation.create") == len(assistant.ALWAYS)  # first after what is always at hand
     assert sum(name.startswith("staff.") for name in got) <= 1, [name for name in got if name.startswith("staff.")]
@@ -140,13 +139,13 @@ HUB_WORDS = [
 @pytest.mark.parametrize(("language", "asked", "expected"), HUB_WORDS)
 def test_the_hubs_own_words_bring_the_tool_they_mean_among_the_first_ten(owner, language, asked, expected):
     """Before the Hub said what its words mean, these came at 11 to 31, or not at all: «cuenta» shared no word with an
-    order and «ticket» brought the kitchen's tickets (live#22 leaves those meanings to each project)."""
+    order and «ticket» brought the kitchen's tickets (live leaves those meanings to each project)."""
     ctx = owner(language)
     assert expected in assistant.catalog(ctx)  # the owner holds it: only the selection can leave it out
     assert expected in offered(ctx, asked)[:10]
 
 
-#: «retira» and «anota» are the verbs they are (ERPlora/live#64), in phrases no tool says as its asks: «retira» takes
+#: «retira» and «anota» are the verbs they are, in phrases no tool says as its asks: «retira» takes
 #: something out (deletes, removes, retires or withdraws it, as the thing named says) and «anota» writes in what exists
 #: or adds to it. None is a probe of layer 2 of its tool with other names: each shares two stems at most with one
 #: (``live.assistant.stems``), so this test and the probes' do not fix the same sentence twice.
@@ -162,8 +161,8 @@ RETIRA_AND_ANOTA = [
 @pytest.mark.parametrize(("language", "asked", "expected"), RETIRA_AND_ANOTA)
 def test_retira_and_anota_bring_the_tool_they_mean_among_the_first_ten(owner, language, asked, expected):
     """Before the Hub read live with «anota» and «retira» among its verbs, they asked for no action and the tool came
-    only by the thing named: these came 14th to 23rd. A pointer of ``packages/live`` back to before ERPlora/live#66
-    fails here."""
+    only by the thing named: these came 14th to 23rd. A pointer of ``packages/live`` back to before live read «anota»
+    and «retira» as editing and removing fails here."""
     ctx = owner(language)
     assert expected in assistant.catalog(ctx)  # the owner holds it: only the selection can leave it out
     assert expected in offered(ctx, asked)[:10]

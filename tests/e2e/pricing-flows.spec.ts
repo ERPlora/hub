@@ -1,16 +1,16 @@
 // Price Lists, flow by flow, in Chrome against the real Inventory and Customers apps (apps/pricing/WORKBOOK.md),
-// each flow with its screenshots `APP-PRICING-<flow>-<390|834|1440>`:
-//   - PRICING-F01: the lists, searched; «Inactive» shows the deactivated one (pm#254); both sections have their
-//     title (pricing#48) and, on a phone, a card says the list's name once (pricing#47);
+// each flow with its screenshots at 390, 834 and 1440:
+//   - PRICING-F01: the lists, searched; «Inactive» shows the deactivated one; both sections have their
+//     title and, on a phone, a card says the list's name once;
 //   - PRICING-F02: «+» creates a list; on a phone, a repeated code is said under «Code», in sight, and nothing
-//     is created (pm#478, pricing#46);
+//     is created;
 //   - PRICING-F03: «Edit» opens «Editing price list — <name>» with what it has; the row shows the change;
 //   - PRICING-F04: «Make general» asks first; the row says «General»;
 //   - PRICING-F05: «Deactivate» asks first; the list waits under «Inactive» until «Activate»;
-//   - PRICING-F06: the list's detail with its prices and the catalog's, thousands grouped (hub#1090);
+//   - PRICING-F06: the list's detail with its prices and the catalog's, thousands grouped;
 //   - PRICING-F07: «+» puts an Inventory product's price from a quantity;
 //   - PRICING-F08: «Edit» changes a price; «Remove» asks first and the price goes;
-//   - PRICING-F09: the rules, each type with its value (pricing#28: an amount rule never says 0);
+//   - PRICING-F09: the rules, each type with its value (an amount rule never says 0);
 //   - PRICING-F10: «+» creates an amount-per-unit rule on every product;
 //   - PRICING-F11: «Edit» opens «Editing rule — <name>»; the row shows the new priority;
 //   - PRICING-F12: «Deactivate» asks first; the rule waits under «Inactive» until «Activate».
@@ -83,7 +83,7 @@ test('PRICING-F01: the lists, searched and filtered by status, on every screen s
   const summer = await newList(page, s, 'SUMMER', { valid_from: '2026-07-01', valid_until: '2026-08-31' });
   await post(page.context(), '/pricing/price_lists/deactivate', { id: summer.id }, 200);
   await ready(page, LISTS);
-  // Both sections have their title (pricing#48).
+  // Both sections have their title.
   await expect(shown(page).locator('h2', { hasText: /^Price lists$/ })).toBeVisible();
   await expect(shown(page).locator('h2', { hasText: /^Discount rules$/ })).toBeVisible();
 
@@ -93,7 +93,7 @@ test('PRICING-F01: the lists, searched and filtered by status, on every screen s
   await expect(row(page, LISTS, wholesale.code)).toContainText('Active');
   await shootFlow(page, 'PRICING-F01');
 
-  // «Inactive» shows the deactivated one, and only it (pm#254); «All», both.
+  // «Inactive» shows the deactivated one, and only it; «All», both.
   await filterStatus(page, LISTS, 'Inactive');
   await expect(row(page, LISTS, summer.code)).toBeVisible();
   await expect(row(page, LISTS, summer.code)).toContainText('Inactive');
@@ -103,7 +103,7 @@ test('PRICING-F01: the lists, searched and filtered by status, on every screen s
   await expect(row(page, LISTS, wholesale.code)).toBeVisible();
   await expect(row(page, LISTS, summer.code)).toBeVisible();
 
-  // On a phone, the lists are cards that say their name once (pricing#47).
+  // On a phone, the lists are cards that say their name once.
   await page.setViewportSize({ width: 390, height: 844 });
   const card = row(page, LISTS, wholesale.code);
   await expect(card).toBeVisible();
@@ -130,7 +130,7 @@ test('PRICING-F02: a new list, and a repeated code said under Code in sight on a
   await expect(created).toContainText(name);
   await expect(created).toContainText('Active');
 
-  // On a phone, the same code in another case is refused under «Code», where it can be read (pm#478, pricing#46).
+  // On a phone, the same code in another case is refused under «Code», where it can be read.
   await page.setViewportSize({ width: 390, height: 844 });
   await shown(page).locator(`[data-testid=${LISTS}-add]`).click();
   await fill(page, 'pricing-list-form-code', code.toLowerCase());
@@ -141,7 +141,7 @@ test('PRICING-F02: a new list, and a repeated code said under Code in sight on a
   );
   await expect(refusal).toBeInViewport();
   await expect(page.locator('[data-testid=pricing-list-form-submit]')).toBeInViewport();
-  // The refused field keeps its label and outline, marked in red (pricing#43).
+  // The refused field keeps its label and outline, marked in red.
   await expect(page.locator('[data-testid=pricing-list-form-code]')).toHaveClass(/ion-invalid/);
   await page.screenshot({ path: shot('APP-PRICING-PRICING-F02-refused-390') });
   // «Cancel» asks before losing the refused list (BASE-F05): the person discards it.
@@ -245,7 +245,7 @@ test('PRICING-F06: the detail shows the list and its prices beside the catalog�
   }
   await page.setViewportSize(DESKTOP);
   const dryerRow = row(page, ITEMS, `${TAG} Dryer ${s}`);
-  // Thousands grouped from four digits on (hub#1090).
+  // Thousands grouped from four digits on.
   await expect(dryerRow).toContainText('€1,234.56');
   await expect(dryerRow).toContainText('€1,500.00');
   await expect(row(page, ITEMS, `${TAG} Comb ${s}`)).toContainText('€2.50');
@@ -337,7 +337,7 @@ test('PRICING-F09: the rules, each type with its value', async ({ page }) => {
   await search(page, RULES, `${CODE}${s}`);
   await expect(row(page, RULES, percent.code)).toContainText('10%');
   await expect(row(page, RULES, percent.code)).toContainText('Everything');
-  // An amount rule says its amount, never 0 (pricing#28).
+  // An amount rule says its amount, never 0.
   await expect(row(page, RULES, amount.code)).toContainText('€0.50 per unit');
   await expect(row(page, RULES, amount.code)).toContainText('All products');
   await expect(row(page, RULES, buyGet.code)).toContainText('Buy 2, get 1');

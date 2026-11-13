@@ -1,11 +1,11 @@
-// flow: combo-business-currency (FIX-HUB-COMBO-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY; apps/combo/WORKBOOK.md «Antes de empezar»)
+// flow: combo-business-currency (apps/combo/WORKBOOK.md «Antes de empezar»)
 // Menus paints and reads the closed price and the supplements in the business's currency: its country's, as
 // erplora.com registered it (`PUT /internal/hubs/{id}`, signed the way the SaaS sends it), never a fixed euro. Hub `a`
 // moves to Poland: Menus lists the run's menu in złoty and its builder shows the closed price and the hake's supplement
-// in złoty, with no «€», in 390, 834 and 1440 (captures `FIX-HUB-COMBO-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY-<width>`);
+// in złoty, with no «€», in 390, 834 and 1440;
 // editing the hake names the field «Supplement (PLN)» and «2,50 zł» is saved as 250 grosze, and «Edit details» names the
 // field «Closed price (PLN)» and «14,50» is saved as 1450 (both read back through the API). Back in Spain the same menu
-// reads in euros and the field says EUR (`…-es-1440`). What the run creates is deleted after it and `a`'s registration
+// reads in euros and the field says EUR. What the run creates is deleted after it and `a`'s registration
 // put back, also when a test fails.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
@@ -115,7 +115,7 @@ test.afterAll(async () => {
   cleanUp();
 });
 
-test(`${KEY}: combo-business-currency a business in Poland reads and types the closed price and the supplements of a menu in złoty in 390, 834 and 1440`, async ({
+test(`a business in Poland reads and types the closed price and the supplements of a menu in złoty in 390, 834 and 1440`, async ({
   page,
   context,
 }) => {
@@ -180,7 +180,7 @@ test(`${KEY}: combo-business-currency a business in Poland reads and types the c
   await expect(shown(page).locator(`[data-testid=combo-menus-row][data-id="${menuId}"]`)).toContainText(zloty('14[.,]50'));
 });
 
-test(`${KEY}: combo-business-currency back in Spain the closed price and the supplements of a menu are in euros`, async ({ page }) => {
+test(`back in Spain the closed price and the supplements of a menu are in euros`, async ({ page }) => {
   await registerBusinessIn(original, 'ES');
   await page.setViewportSize({ width: 1440, height: 900 });
   const row = await menuRow(page);

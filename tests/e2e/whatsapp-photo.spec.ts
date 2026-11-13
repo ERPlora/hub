@@ -2,8 +2,7 @@
 // `seedErplora` has erplora.com push its photo of `a`, which brings erplora.com's plan (Free: one device), and
 // `restorePhoto` puts back the photo `a` had before the spec's first seed, its version too, so that no spec seeding
 // erplora.com leaves `a` on the Free plan to the specs run after it on the same database (a spec signed in on two
-// devices loses one session to the device cap, BASE-G57: website-flows.spec.ts, WEBSITE-F11, 401;
-// FIX-HUB-E2E-WHATSAPP-INBOX-CONNECT-LEAVES-FREE-PLAN). What the photo applies on its way in goes back with it: the
+// devices loses one session to the device cap, with a 401). What the photo applies on its way in goes back with it: the
 // row of `a`'s WhatsApp channel, whose version the next photo must exceed (`whatsapp_inbox.channel.sync` ignores an
 // equal or older one), so a row left by a seed would make a later run's erplora.com, on a database made afresh, push
 // photos the channel never takes. whatsapp-photo.test.ts makes every spec that seeds call it last in its `afterAll`.

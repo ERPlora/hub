@@ -1,7 +1,7 @@
-"""The registry in control (PLAN-DB §2; plan 2026-10-22-fase-2-tenencia §3, S1).
+"""The registry in control.
 
 ``Hub`` and ``DemoCode`` moved from ``base`` to ``control`` keeping their tables (``base_hub``, ``base_democode``);
-``Hub`` gains where its data lives (``db_name``: empty while it shares control's database, phase 1 until S5), its
+``Hub`` gains where its data lives (``db_name``: empty while it shares control's database, until its cut), its
 schema (``schema_state``, ``schema_apps``), its ``cluster`` and ``is_platform``. ``Cluster`` and ``HubDue`` are new.
 """
 
@@ -100,8 +100,8 @@ def test_a_hub_is_due_once_keyed_by_the_hub():
 
 
 def test_a_hub_is_prepared_in_steps_and_ends_in_steps():
-    """PLAN-DB §6: ``requested → creating → migrating → seeding → ready``, ``failed`` to retry; the way out of a
-    business (``archiving``, ``dropping``) is declared for S2b."""
+    """``requested → creating → migrating → seeding → ready``, ``failed`` to retry; the way out of a business
+    (``archiving``, ``dropping``) is declared too."""
     assert [Hub.Status(value) for value in ("creating", "migrating", "seeding", "archiving", "dropping")] == [
         Hub.Status.CREATING,
         Hub.Status.MIGRATING,
@@ -196,7 +196,7 @@ def test_its_words_are_translated():
         assert str(Hub._meta.get_field("next_attempt_at").verbose_name) == "próximo intento"
 
 
-# ── The copies of a hub's data and its nightly use (round 2026-10-30 of PLAN-DB, S2b) ────────────────────────────────
+# ── The copies of a hub's data and its nightly use ───────────────────────────────────────────────────────────────────
 
 
 def test_a_dump_is_kept_by_its_key_newest_first():
@@ -305,7 +305,7 @@ def test_the_copies_and_the_use_are_in_spanish():
         assert str(Hub._meta.get_field("reset_sections").verbose_name) == "restablecimiento"
 
 
-# ── A hub's move to another cluster (round 2026-10-30b of PLAN-DB, decision 3; tranche S7) ──────────────────────────
+# ── A hub's move to another cluster ──────────────────────────────────────────────────────────────────────────────────
 
 
 def test_a_hub_is_moving_while_it_names_where_and_its_cluster_cannot_go_meanwhile():
@@ -380,7 +380,7 @@ def test_a_moves_note_keeps_the_origins_schema_record_and_a_hub_says_when_its_mo
 
 def test_a_separate_copy_is_named_by_its_hub_and_its_moment_never_its_long_database_name():
     """What its admin page heads with (and its breadcrumbs): words a phone can wrap, never the 40-odd characters of
-    ``<control>_copy_<hex>`` in one piece (hub#1213)."""
+    ``<control>_copy_<hex>`` in one piece."""
     from control.models import RestoredCopy
 
     hub = Hub.objects.create(slug="bistro-aurora", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")

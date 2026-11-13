@@ -1,8 +1,3 @@
-// Employees › API keys (BASE-G146…G149, G03, G05; the old hub's ApiKeysPanel): the live `base.api_key.list` — each key
-// with the start of its token, what it may do, its state, when it was made and last used and its pace —, «New API
-// key» (name, pace, what it may do: all, read, write or per app with the apps that publish their API), its token shown
-// once with «Copy», «Rotate» and «Revoke» (both asked first, with their consequence). A business that cannot have keys
-// yet is told so; a list that cannot be read is never «no keys».
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';

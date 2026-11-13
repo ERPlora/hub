@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// «Waiting for your answer» (WORKBOOK FLOW-F29; the old module's flows-f24; `flow.question.list`, live): every
+// «Waiting for your answer» (WORKBOOK FLOW-F29; `flow.question.list`, live): every
 // question an automation asked and waits on that this person may answer — their role's, or all of them for
 // whoever runs the business —, the soonest to expire first. Each card says the question as it was asked,
 // who it was asked of, what silence and a no do, and takes an optional note and «Approve» or «No»; it leaves

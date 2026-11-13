@@ -1,8 +1,8 @@
-"""A business's own domain (HUBS-F17, PLAN-SAAS §37 point 2): what the Hub does with a host outside ``ALLOWED_HOSTS``.
+"""A business's own domain: what the Hub does with a host outside ``ALLOWED_HOSTS``.
 
 The SaaS names the domain in the photo (``custom_domain``, ``PUT /internal/hubs/{id}/state``), and the Hub never asks
-for it on a request. A host it does not know is what it always was, 400 from ``CommonMiddleware``, and costs no read:
-since the ALB's last rule the scanners reach the Hub. A host it knows opens the business's public website, its images
+for it on a request. A host it does not know gets a 400 from ``CommonMiddleware`` and costs no read, because the
+ALB's last rule lets the scanners reach the Hub. A host it knows opens the business's public website, its images
 and the activation's probe, and nothing else: no app, no ``/api``, no login, no ``/internal``. The page itself, with a
 published site, is in ``apps/website/tests/test_custom_domain.py``.
 """

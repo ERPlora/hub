@@ -1,7 +1,6 @@
-"""Schedules on the Home (PLAN-HUB round 2026-10-21; FIX-SCHEDULE-SETUP-HOOKS): base's own query brings the old
-module's item «Confirm your opening hours» (module.json `setup`, schedules#42), recommended, pending while the week is
-still the default one migration 0002 planted, to whoever changes the hours, leading to the week. Confirming the week
-or saving a day of it (even as closed) ticks it and records the event it is refreshed on; a change in hub B re-runs
+"""Schedules on the Home: base's own query brings the step «Confirm your opening hours», recommended, pending while the
+week is still the default one migration 0002 planted, to whoever changes the hours, leading to the week. Confirming the
+week or saving a day of it (even as closed) ticks it and records the event it is refreshed on; a change in hub B re-runs
 B's Home only; with Schedules off the Home does not ask.
 
 base and schedule run for real: the step comes from ScheduleConfig through base's own query, as the person.
@@ -95,7 +94,7 @@ def test_confirming_the_week_ticks_it():
 
 @pytest.mark.django_db
 def test_saving_a_day_ticks_it_even_as_closed():
-    # schedules#42: «We do not open on Mondays» is a decision about the business, not the absence of one.
+    # «We do not open on Mondays» is a decision about the business, not the absence of one.
     run("schedule.week.set_day", {"weekday": 0, "is_closed": True})
     assert step()["state"] == "done"
 

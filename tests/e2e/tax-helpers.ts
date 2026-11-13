@@ -2,10 +2,12 @@
 // screenshot of each, the cleanup of what a run made (categories are never deleted by the app), the
 // API setup of a fresh category and its rules, and the pickers of the tax screens (a Combo and an
 // `ion-select` popover). A row action is service-helpers.ts's `rowAction`, on the table `tax-<section>`.
-import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
 import { countryRulesCleanup } from './country-rules';
-import { A, api, capture, horizontalOverflow, psql, shown } from './helpers';
+import { A, api, capture, horizontalOverflow, login, psql, shown } from './helpers';
+import { snapshotSeries } from './invoice-helpers';
+import { drawerOff } from './sale-helpers';
 
 /** 390×844, 834×1112 and 1440×900: a phone, a tablet and a desk. */
 export const FLOW_VIEWPORTS = [
@@ -112,4 +114,33 @@ export async function pickSelect(page: Page, select: Locator, text: string | Reg
   await popover.waitFor({ state: 'visible' });
   await popover.locator('ion-radio, ion-item').filter({ hasText: text }).first().click();
   await expect(popover).toBeHidden();
+}
+
+/** The business back to the whole country: the other specs of the stack sell at the national VAT. */
+export function wholeCountry(): void {
+  psql("update tax_taxsettings set region_code = ''");
+}
+
+/** The tax settings painted: their form on screen. */
+export async function taxSettingsReady(page: Page): Promise<void> {
+  await shown(page).locator('[data-testid=tax-settings-form]').waitFor({ state: 'visible' });
+}
+
+/** The owner on the tax settings at a desk's size: their form, painted. */
+export async function taxSettingsForm(page: Page): Promise<Locator> {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page, A, '/tax/settings');
+  await taxSettingsReady(page);
+  return shown(page).locator('[data-testid=tax-settings-form]');
+}
+
+/** The owner's context for a spec that sells in a tax region: the invoice numbering kept to give back, and the drawer off
+ *  (cash without a cash session: the drawer's lock is sale-cash-gate.spec.ts's). */
+export async function regionSaleContext(browser: Browser): Promise<BrowserContext> {
+  snapshotSeries();
+  const context = await browser.newContext({ baseURL: A });
+  const page = await context.newPage();
+  await login(page, A, '/tax/settings');
+  await drawerOff(context);
+  return context;
 }

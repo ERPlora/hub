@@ -1,4 +1,4 @@
-"""Login through the SaaS (PLAN-SAAS §2.1, §3.1 steps 4–6): the Hub has no login of its own.
+"""Login through the SaaS: the Hub has no login of its own.
 
 Without a session, a browser jumps to the SaaS's ``/hub-login/?hub=<slug>&next=<path>&state=<state>``
 (:func:`login_redirect`). The SaaS answers with a form that POSTs a one-time code and that ``state``,
@@ -7,7 +7,7 @@ as it got it, to ``/auth/callback``, and the Hub redeems the code server-side (:
 (``base.signing.signed_headers``, key ``INTERNAL_SHARED_SECRET``), the scheme of Stripe's webhook
 signatures. The HTTP call is :func:`post`, which tests replace.
 
-The ``state`` (OAuth 2.0, RFC 6749 §10.12) binds the login to the browser that started it: the jump
+The ``state`` (OAuth 2.0, RFC 6749 section 10.12) binds the login to the browser that started it: the jump
 leaves it in the cookie ``hub_login_state`` (signed, 600 s, only for ``/auth/callback``), and the
 callback redeems no code whose ``state`` is not that one (:func:`state_matches`). Without it, a code
 stolen from someone else, posted from this browser, would open their session here (login CSRF).
@@ -16,14 +16,14 @@ Two URLs of the SaaS: ``SAAS_URL`` (:func:`saas_url`) is where the browser goes;
 call goes to ``SAAS_INTERNAL_URL`` (:func:`saas_internal_url`), the private name in production,
 because the ALB answers 404 to ``/internal`` from outside.
 
-The staff's jump to the Hub admin (round 13, PLAN §18.1) is the same exchange, with its ``state``,
+The staff's jump to the Hub admin is the same exchange, with its ``state``,
 and the audience ``hub-admin``: the SaaS admin's button opens the platform host's
 ``/auth/login?hub=<slug>&next=/admin/hub/<slug>/``, which jumps to ``/hub-login/?hub=<slug>&audience=hub-admin&…``;
 the code lands on the platform host's ``/auth/callback`` and answers a platform role
 (``platform_admin``, ``platform_support``), never a customer's. Without a hub the staff go to the
 SaaS admin's Hubs page (:func:`admin_hubs_url`), where they choose one.
 
-A demo hub (``demo-<8 hex>``, plan 2026-10-17 §1.6) has no account behind it: its jump goes to the SaaS's
+A demo hub (``demo-<8 hex>``) has no account behind it: its jump goes to the SaaS's
 ``/demo/enter/?hub=<slug>&next=<path>&state=<state>`` instead (:func:`demo_login_redirect`), with the same ``state``
 cookie, and the SaaS posts back a code that the Hub made itself for the browser that owns the demo
 (``base.demo.code_create``), redeemed here without calling the SaaS. A failed entry goes back to the SaaS's demo
@@ -62,7 +62,7 @@ DEMO_CODE_TTL_SECONDS = 60
 DEMO_ENTER_PATH = "/demo/enter/"
 DEMO_DOOR_PATH = "/demo/"
 #: erplora.com's panel (its businesses, Store, Billing, Account, «Report a problem»): every page of it lives under this
-#: prefix (saas#123, FIX-SAAS-PANEL-UNDER-DASHBOARD-PREFIX); the launcher, the sign-in and the demo stay at the root.
+#: prefix; the launcher, the sign-in and the demo stay at the root.
 SAAS_PANEL_PATH = "/dashboard"
 
 #: The ``state`` of this browser's jump to the SaaS's login, signed; only the callback reads it.
@@ -214,7 +214,7 @@ def _state_samesite() -> str:
 
 
 def admin_hubs_url(error: str | None = None) -> str:
-    """The SaaS admin's Hubs page: the Hub admin has no login of its own (PLAN §18.1)."""
+    """The SaaS admin's Hubs page: the Hub admin has no login of its own."""
     query = f"?{urlencode({'error': error})}" if error is not None else ""
     return f"{saas_url(ADMIN_HUBS_PATH)}{query}"
 

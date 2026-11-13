@@ -1,4 +1,4 @@
-"""Guardrail 10, «caché y avisos tras el COMMIT» (PLAN-DB §14.7; plan 2026-10-22-fase-2-tenencia §2.10).
+"""The cache is forgotten, and anybody told, only after the COMMIT.
 
 A write of a datum the cache keeps forgets its key after its COMMIT, and only then is anybody told; a rollback leaves
 the key as it was and tells nobody. The real case: turning an app off (``base.app.disable``) forgets the business's

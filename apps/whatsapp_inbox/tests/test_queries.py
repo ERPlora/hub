@@ -130,7 +130,7 @@ def test_sorting_by_any_column_keeps_a_stable_order(three):
 
 
 def test_an_empty_value_goes_last_whichever_way_it_is_sorted(three, make_user):
-    """gh:hub#2099: sorting by a column some rows leave empty never puts the empty ones first."""
+    """Sorting by a column some rows leave empty never puts the empty ones first."""
     luis = make_user("luis")
     run("whatsapp_inbox.conversation.assign", {"id": str(three["Bea"].id), "assignee_id": str(luis.person.id)})
     assert listed({"sort": "assigned_to", "dir": "desc"})[0] == "+34600222222"
@@ -295,7 +295,7 @@ def test_notes_say_who_may_delete_them(three, make_user):
 
 
 def test_the_notes_ask_who_the_caller_is_once_however_many_there_are(three, make_user, django_assert_num_queries):
-    # W10: the caller is a person of the business's database (base.HubUser); reading them per note was one more query
+    # The caller is a person of the business's database (base.HubUser); reading them per note was one more query
     # per row of the page.
     luis = make_user("luis", first_name="Luis")
     as_luis = ctx_for("hub_employee", actor=luis)
@@ -498,7 +498,7 @@ def test_the_notices_are_whoever_may_read_the_inbox(three):
 
 
 def test_ties_go_by_id_in_the_lists_own_direction():
-    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
+    """hub#768: a descending list is the ascending one read backwards, ties included, and its
     pages neither repeat nor lose rows."""
     by_id = sorted(Conversation.objects.create(phone=f"+3460011122{n}").id for n in range(4))
     assert_reads_backwards(listed_with(run, "whatsapp_inbox.conversation.list", "status", by_dir=True), by_id)

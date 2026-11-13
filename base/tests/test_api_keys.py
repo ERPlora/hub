@@ -1,11 +1,11 @@
-"""BASE-G146…G149, G03, G05, G25 and G37: the business's API keys (``erpk_live``), in Employees › API keys.
+"""The business's API keys (``erpk_live``), in Employees › API keys.
 
 Who runs the business creates a key with a name, a pace (requests a minute) and what it may do — everything, read only,
 write only, or per app, read and write — and sees its token once; the hub keeps only its digest. The key reaches only
 the operations its apps publish (``expose_api``), of the apps this business has, with the same checks as anyone; it is
 rotated (a new token, the old one stops at once) and revoked (at once, for good). A key lives in its hub's own
-database: a key of one business never opens another (PLAN-HUB §3, «API keys»). While a business still shares phase 1's
-database with others that frontier cannot be kept, so there its keys are «not available yet» and no token gets in.
+database: a key of one business never opens another. A business without its own database cannot keep that frontier,
+so there its keys are «not available yet» and no token gets in.
 """
 
 import hashlib
@@ -25,6 +25,7 @@ from base.tenancy import context
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tenancy.tests.legacy import use_legacy
+from base.tests.routes import bound_routes, spa_routes
 
 HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 
@@ -92,8 +93,8 @@ TAX_CATEGORIES = "/tax/categories"
 
 
 class TestNotYetAvailable:
-    """A business still on control's database (phase 1's, not cut: S5) is not served at all: its door answers 503 before
-    any key is read, made or accepted (the operations' own refusals, for the suite's fallback, are guardrail (g) of
+    """A business without its own database is not served at all: its door answers 503 before any key is read, made or
+    accepted (the operations' own refusals, for the suite's fallback, are guardrail (g) of
     ``tests/test_guardrails.py``)."""
 
     @pytest.mark.django_db
@@ -112,7 +113,7 @@ class TestNotYetAvailable:
 
     @pytest.mark.django_db
     def test_not_even_one_that_is_in_control_s_tables(self, client):
-        """A key row phase 1 left in control's tables (by hand, or by a business before its cut) is nobody's."""
+        """A key row left in control's tables (by hand, or by a business before it got its own database) is nobody's."""
         token = api_keys.new_token()
         with use_legacy():
             ApiKey.objects.create(name="Planted", prefix=token[: api_keys.PREFIX_LENGTH], token_digest=api_keys.digest(token), mode="full")
@@ -122,7 +123,7 @@ class TestNotYetAvailable:
 
 @HUB_DB
 class TestCreate:
-    """BASE-G146: the token once; the hub keeps its digest and its beginning."""
+    """The token once; the hub keeps its digest and its beginning."""
 
     def test_the_token_is_shown_once_and_kept_as_its_digest(self, admin_on_a, hub_a):
         answer = create(admin_on_a, hub_a)
@@ -186,7 +187,7 @@ class TestCreate:
 
 @HUB_DB
 class TestUse:
-    """BASE-G25, G37: a key reaches what its apps publish, read or write as it says, and nothing else."""
+    """A key reaches what its apps publish, read or write as it says, and nothing else."""
 
     def test_a_read_key_reads_and_does_not_write(self, admin_on_a, client, hub_a):
         token = create(admin_on_a, hub_a, mode="read")["token"]
@@ -246,7 +247,7 @@ class TestUse:
         assert get(client, host(hub_a), CARTS, **bearer(token)).status_code == 200
 
     def test_a_key_of_one_business_never_opens_another(self, admin_on_a, client, hub_a, hub_b):
-        """The frontier is the database: the key of A does not exist in B's (PLAN-HUB §3)."""
+        """The frontier is the database: the key of A does not exist in B's."""
         token = create(admin_on_a, hub_a)["token"]
         client.logout()
         assert get(client, host(hub_a), CARTS, **bearer(token)).status_code == 200
@@ -257,7 +258,7 @@ class TestUse:
 
 @HUB_DB
 class TestRotateAndRevoke:
-    """BASE-G147, G148: a new token and the old one stops at once; a revoked key stops for good."""
+    """A new token and the old one stops at once; a revoked key stops for good."""
 
     def test_rotating_gives_a_new_token_and_the_old_one_stops(self, admin_on_a, hub_a):
         client = Client()
@@ -290,7 +291,7 @@ class TestRotateAndRevoke:
 
 @HUB_DB
 class TestTheList:
-    """BASE-G149: each key, what it may do, its pace, its last use; and the apps a key per app can reach."""
+    """Each key, what it may do, its pace, its last use; and the apps a key per app can reach."""
 
     def test_each_key_and_what_it_may_do(self, admin_on_a, hub_a):
         create(admin_on_a, hub_a, name="Read", mode="read", rate_per_minute=30)
@@ -315,11 +316,9 @@ KEY_ROUTES = {
 }
 
 
-def test_the_spas_route_map_names_every_route_of_the_keys(settings):
-    from base.tests.test_access_routes import bound_routes
+def test_the_spas_route_map_names_every_route_of_the_keys():
+    from base.api import router
 
-    assert KEY_ROUTES <= bound_routes()
-    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
+    assert KEY_ROUTES <= bound_routes(router)
     mine = {op for _, _, op in KEY_ROUTES}
-    named = {(route["method"].upper(), route["path"].removeprefix("/api"), op) for op, route in spa.items() if op in mine}
-    assert named == KEY_ROUTES
+    assert {route for route in spa_routes("base.") if route[2] in mine} == KEY_ROUTES

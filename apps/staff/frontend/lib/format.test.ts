@@ -94,7 +94,7 @@ describe('moneyText and centsFromText (the hourly-rate field)', () => {
     expect(centsFromText('-3')).toBe(-300);
   });
 
-  // gh:staff#64: the rate was read and written on the euro's scale whatever the business's currency.
+  // The rate was read and written on the euro's scale whatever the business's currency.
   it('reads and writes with the decimals of the business\'s currency: in yen «1500» is 1500, not 150000', () => {
     expect(moneyText(1500, 'es', YEN)).toBe('1500');
     expect(moneyText(1500, 'en', YEN)).toBe('1500');

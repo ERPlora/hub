@@ -7,28 +7,13 @@
 // Everything created here is named «E2E…» and removed after the run (and before, if a run died half-way).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, hubUserIdOf, login, psql, shot, shown } from './helpers';
+import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, hubUserIdOf, login, psql, shot, shown, THREE_SIZES as VIEWPORTS } from './helpers';
+import { staffCleanUp } from './staff-helpers';
 import { rowAction } from './service-helpers';
 
 const TAG = 'E2E';
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-] as const;
 
-function cleanup(): void {
-  const members = `select id from staff_member where first_name like '${TAG}%'`;
-  psql(
-    [
-      `delete from staff_timeoff where member_id in (${members})`,
-      `delete from staff_scheduleday where schedule_id in (select id from staff_schedule where member_id in (${members}))`,
-      `delete from staff_schedule where member_id in (${members})`,
-      `delete from staff_member where first_name like '${TAG}%'`,
-      `delete from staff_role where name like '${TAG}%'`,
-    ].join('; '),
-  );
-}
+const cleanup = (): void => staffCleanUp(TAG);
 
 test.beforeAll(async ({ browser }) => {
   cleanup();
@@ -109,7 +94,7 @@ async function pickMember(page: Page, field: string, text: string, name: string)
   await expect(page.locator(`[data-testid^=${field}-option-]`)).toHaveCount(0);
 }
 
-// flow: STAFF-F01 · gh:pm#478, gh:staff#72 — a refused save is told under its field and in sight, also on a phone
+// flow: STAFF-F01 — a refused save is told under its field and in sight, also on a phone
 test('STAFF-F01: «+» adds a professional born Active; a refused email is told under its field at every width', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/members');
   try {
@@ -134,7 +119,7 @@ test('STAFF-F01: «+» adds a professional born Active; a refused email is told 
   }
 });
 
-// flow: STAFF-F02 · gh:staff#38 — editing says «Edit · {name}», never «New»
+// flow: STAFF-F02 — editing says «Edit · {name}», never «New»
 test('STAFF-F02: a row opens «Edit · {name}» with the record; the saved change shows in the list', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/members');
   try {
@@ -154,7 +139,7 @@ test('STAFF-F02: a row opens «Edit · {name}» with the record; the saved chang
   }
 });
 
-// flow: STAFF-F03 · gh:staff#10, gh:staff#55 — the record hangs from one account of this business
+// flow: STAFF-F03 — the record hangs from one account of this business
 test('STAFF-F03: «Hub user» links the record to an account of the business, searched on the server', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/members');
   try {
@@ -189,7 +174,7 @@ test('STAFF-F03: «Hub user» links the record to an account of the business, se
   }
 });
 
-// flow: STAFF-F04 · gh:pm#254 — a retired role stays listed and marked
+// flow: STAFF-F04 — a retired role stays listed and marked
 test('STAFF-F04: «+» in Roles creates a role that is listed with 0 members', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/roles');
   try {
@@ -208,7 +193,7 @@ test('STAFF-F04: «+» in Roles creates a role that is listed with 0 members', a
   }
 });
 
-// flow: STAFF-F05 · gh:hub#2162 — the confirmation is styled, in sight and takes the first tap
+// flow: STAFF-F05 — the confirmation is styled, in sight and takes the first tap
 test('STAFF-F05: «Deactivate» asks first; confirmed, the row is Inactive', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/members');
   try {
@@ -227,7 +212,7 @@ test('STAFF-F05: «Deactivate» asks first; confirmed, the row is Inactive', asy
   }
 });
 
-// flow: STAFF-F06 · gh:hub#2162 — the termination dialog is styled, in sight and takes the first tap
+// flow: STAFF-F06 — the termination dialog is styled, in sight and takes the first tap
 test('STAFF-F06: «Terminate» asks the last day and the reason; confirmed, the person leaves the list', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/members');
   try {
@@ -246,7 +231,7 @@ test('STAFF-F06: «Terminate» asks the last day and the reason; confirmed, the 
   }
 });
 
-// flow: STAFF-F08 · gh:staff#19 — the employee has a door to their own record and their own time off
+// flow: STAFF-F08 — the employee has a door to their own record and their own time off
 test('STAFF-F08: «My record» shows the employee their own record with their own rate', async ({ browser }) => {
   const owner = await signedIn(browser, '/staff/members');
   const mine = await member(owner.context, { first_name: `${TAG} Eva`, user_id: employeeUser(), hourly_rate: 1450 });
@@ -275,7 +260,7 @@ async function openSchedules(page: Page, who: Member): Promise<void> {
   await expect(shown(page).locator('[data-testid=staff-schedules-member] input')).toHaveValue(who.full_name);
 }
 
-// flow: STAFF-F13 · gh:staff#86 — the week reads in 24 h. With the working day of Settings as proposed
+// flow: STAFF-F13 — the week reads in 24 h. With the working day of Settings as proposed
 // (STAFF-F22 puts it back as it was): 09:00–18:00 with its hour of break in the middle.
 test('STAFF-F13: «+» in Schedules creates the proposed week, Monday to Friday 09:00–18:00 with a break 13:00–14:00', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/schedules');
@@ -321,7 +306,7 @@ test('STAFF-F14: a schedule row opens its week; a day switched off is «Off» on
   }
 });
 
-// flow: STAFF-F15 · gh:hub#2162 — deleting asks in a styled dialog that takes the first tap
+// flow: STAFF-F15 — deleting asks in a styled dialog that takes the first tap
 test('STAFF-F15: «Activate / deactivate» switches a schedule at once; «Delete» asks first', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/schedules');
   try {
@@ -342,7 +327,7 @@ test('STAFF-F15: «Activate / deactivate» switches a schedule at once; «Delete
   }
 });
 
-// flow: STAFF-F17 · gh:staff#36, gh:staff#37 — time off is registered from the screen, its words translated
+// flow: STAFF-F17 — time off is registered from the screen, its words translated
 test('STAFF-F17: «+» in Time Off registers someone’s absence, Pending', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/time-off');
   try {
@@ -381,7 +366,7 @@ test('STAFF-F18: «Approve» on a pending request turns its row Approved', async
   }
 });
 
-// flow: STAFF-F19 · gh:pm#629 — an approved absence can be cancelled, after a confirmation
+// flow: STAFF-F19 — an approved absence can be cancelled, after a confirmation
 test('STAFF-F19: «Cancel» on an approved absence asks first; confirmed, it is Cancelled', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/time-off');
   try {
@@ -399,8 +384,8 @@ test('STAFF-F19: «Cancel» on an approved absence asks first; confirmed, it is 
   }
 });
 
-// flow: STAFF-F20, STAFF-G05 · gh:staff#58 — «today» is the business's day
-test('STAFF-F20 and G05: «Today’s time off» above Time Off lists who is away today, live', async ({ browser }) => {
+// flow: STAFF-F20 — «today» is the business's day
+test('STAFF-F20: «Today’s time off» above Time Off lists who is away today, live', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/time-off');
   try {
     const card = shown(page).locator('[data-testid=staff-away-today]');
@@ -416,7 +401,7 @@ test('STAFF-F20 and G05: «Today’s time off» above Time Off lists who is away
   }
 });
 
-// flow: STAFF-F21 · gh:staff#64 — the rate is whole cents, painted as money
+// flow: STAFF-F21 — the rate is whole cents, painted as money
 test('STAFF-F21: the owner sees each professional’s rate in «Rate/h»', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/members');
   try {
@@ -439,8 +424,8 @@ interface WorkingDay {
   default_break_duration: number;
 }
 
-// flow: STAFF-F22 · gh:hub#2541 — a read that fails offers «Retry», never values to save (Vitest).
-// FIX-STAFF-SETTINGS-ORPHANS: Settings is the default working day, and a new schedule proposes it.
+// flow: STAFF-F22 — a read that fails offers «Retry», never values to save (Vitest).
+// Settings is the default working day, and a new schedule proposes it.
 test('STAFF-F22: Settings saves the default working day, and a new schedule proposes it', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/settings');
   const before = await api<WorkingDay>(context, A, 'GET', '/staff/settings');
@@ -490,8 +475,8 @@ test('STAFF-F22: Settings saves the default working day, and a new schedule prop
 /** The value a figure above the staff list shows. */
 const figure = (page: Page, id: string): Locator => shown(page).locator(`[data-testid=staff-figures-${id}] .staff-figure__value`);
 
-// flow: STAFF-F23, STAFF-G02, STAFF-G03, STAFF-G04
-test('STAFF-F23 and G02–G04: the figures above Staff follow a new person, an absence and a request live', async ({ browser }) => {
+// flow: STAFF-F23
+test('STAFF-F23: the figures above Staff follow a new person, an absence and a request live', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/members');
   try {
     await expect(figure(page, 'active')).toHaveText(/^\d+$/);
@@ -519,8 +504,8 @@ test('STAFF-F23 and G02–G04: the figures above Staff follow a new person, an a
   }
 });
 
-// flow: STAFF-G01
-test('STAFF-G01: «Members» in Roles counts the Active people of each role', async ({ browser }) => {
+// flow: STAFF-F23
+test('STAFF-F23: «Members» in Roles counts the Active people of each role', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/staff/roles');
   try {
     const role = await api<{ id: string; name: string }>(context, A, 'POST', '/staff/roles', { name: `${TAG} Barber ${stamp()}` });
@@ -536,7 +521,7 @@ test('STAFF-G01: «Members» in Roles counts the Active people of each role', as
   }
 });
 
-// flow: STAFF-F24 · gh:staff#3 — the employee asks; the request waits for an answer
+// flow: STAFF-F24 — the employee asks; the request waits for an answer
 test('STAFF-F24: the employee asks for their own time off from «+», without choosing a member', async ({ browser }) => {
   const owner = await signedIn(browser, '/staff/members');
   const mine = await member(owner.context, { first_name: `${TAG} Eva`, user_id: employeeUser() });

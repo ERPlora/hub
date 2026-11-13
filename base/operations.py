@@ -1,4 +1,4 @@
-"""Context builder of hub-next phase 1 (``settings.LIVE["context_builder"]``).
+"""The Hub's context builder (``settings.LIVE["context_builder"]``).
 
 Scope = the one label of the Host in front of ``settings.HUB_BASE_DOMAIN`` (``a.localhost`` → ``a``,
 ``acme.erplora.com`` → ``acme``) when it is a hub's slug (``live.slugs``); any other host (a reserved
@@ -7,7 +7,7 @@ as pre's ``acme.pre.erplora.com`` on prod's Hub) is no hub and raises ``Http404`
 ``/api/live`` and ``/auth/callback`` answer 404. prod and pre share one ALB, whose wildcard
 ``*.erplora.com`` also matches ``*.pre.erplora.com``: the base domain keeps each Hub on its own hosts.
 An empty ``HUB_BASE_DOMAIN`` takes the Host's first label wherever it is. The platform host
-(``settings.PLATFORM_HOST_LABEL`` on the base domain, ``hubs.erplora.com``: the Hub admin, PLAN §18.1)
+(``settings.PLATFORM_HOST_LABEL`` on the base domain, ``hubs.erplora.com``: the Hub admin)
 is no hub either; :func:`is_platform_host` tells it apart so ``base.middleware`` serves it the admin.
 Actor = the session's user; permissions from ``base.permissions``. :func:`hub_id`, :func:`is_demo_hub` and
 :func:`is_platform_hub` are what the apps ask about a hub's registry (``base.registry``; a module never reads it), and
@@ -15,8 +15,8 @@ Actor = the session's user; permissions from ``base.permissions``. :func:`hub_id
 (``base.business.get``, read as the platform; :func:`current_business_country` for the business at work). An app
 runs another app's operation with :func:`call`, and says with :func:`allow_idle_wait` that its transaction waits for
 an answer from outside.
-This is the only piece phase 2 replaces (scope = ``use_hub``): from S1, :meth:`HubContextBuilder.enter` gives a live
-re-run its hub's database (the request's own is ``base.middleware.HubDatabaseMiddleware``'s).
+:meth:`HubContextBuilder.enter` gives a live re-run its hub's database (``use_hub``); the request's own is
+``base.middleware.HubDatabaseMiddleware``'s.
 """
 
 import dataclasses
@@ -71,7 +71,7 @@ def is_platform_host(request: HttpRequest) -> bool:
 
 
 def hub_id(scope: Scope) -> uuid.UUID:
-    """The id of ``scope``'s hub: the registry's ``Hub.id`` (the SaaS's UUIDv7; ``control.Hub.id`` in phase 2), the
+    """The id of ``scope``'s hub: the registry's ``Hub.id`` (the SaaS's UUIDv7), the
     one that names what a module keeps for its hub outside the database (``hub-<id>/`` in ``storages["hub_files"]``).
     A scope that is no hub's host, or a slug without a row, has none: ``NotFound``."""
     found = registry.hub_id(scope.key) if scope.kind == "host" else None
@@ -81,15 +81,14 @@ def hub_id(scope: Scope) -> uuid.UUID:
 
 
 def is_demo_hub(scope: Scope) -> bool:
-    """Whether ``scope``'s hub is an ephemeral demo (PLAN-SAAS §3.5, pinned to the AEAT's test environment): the
-    registry's ``is_demo`` (``base.Hub`` in phase 1, plan 2026-10-17 §1.2; ``control.Hub`` in phase 2). A scope that
-    is no hub's host, or a slug without a row, is no demo."""
+    """Whether ``scope``'s hub is an ephemeral demo (pinned to the AEAT's test environment): the registry's
+    ``is_demo``. A scope that is no hub's host, or a slug without a row, is no demo."""
     return scope.kind == "host" and registry.is_demo(scope.key)
 
 
 def is_platform_hub(scope: Scope) -> bool:
-    """Whether ``scope``'s hub is ERPlora's own, the one that issues ERPlora's invoices (PLAN-SAAS §4;
-    ``control.Hub.is_platform`` in phase 2). Phase 1 names it by its reserved slug, ``PLATFORM_HUB_SLUG``."""
+    """Whether ``scope``'s hub is ERPlora's own, the one that issues ERPlora's invoices: the hub of the reserved slug
+    ``PLATFORM_HUB_SLUG``."""
     return scope.key == settings.PLATFORM_HUB_SLUG
 
 
@@ -222,7 +221,7 @@ class HubContextBuilder:
         scope = self.resolver.resolve(request)
         caller = getattr(request, "auth", None)
         if isinstance(caller, KeyCaller):
-            # APP-BASE-5: a business's API key opened this published operation (``base.api_keys``): the key acts,
+            # A business's API key opened this published operation (``base.api_keys``): the key acts,
             # with that operation's permission and nothing more.
             return OperationContext(
                 scope=scope,
@@ -238,7 +237,7 @@ class HubContextBuilder:
         permissions = permissions_for(actor, scope)
         approved = getattr(request, "approved", None)
         if isinstance(approved, Approved):
-            # APP-BASE-5: a manager approved this very request (``base.approvals``): its one permission more. What that
+            # A manager approved this very request (``base.approvals``): its one permission more. What that
             # command asks of other apps on the way goes with it through ``call`` (``approvals.consequence_context``).
             permissions = frozenset(permissions) | {approved.permission}
         return OperationContext(
@@ -250,8 +249,8 @@ class HubContextBuilder:
         )
 
     def enter(self, ctx: OperationContext) -> AbstractContextManager:
-        """The database a live re-run of ``ctx`` works on, in the executor's thread (live's ``ContextBuilder.enter``;
-        phase 2, S1): ``use_hub`` of its hub, read again from the registry. A hub that stopped serving the app, or
+        """The database a live re-run of ``ctx`` works on, in the executor's thread (live's ``ContextBuilder.enter``):
+        ``use_hub`` of its hub, read again from the registry. A hub that stopped serving the app, or
         whose database is not its own, ends the stream (``HostClosed``); a scope that is no hub's enters nothing."""
         if ctx.scope.kind != HUB_SCOPE_KIND:
             return nullcontext()

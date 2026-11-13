@@ -4,9 +4,9 @@ the waiters, the setup status and the settings.
 A table's status is computed here, never stored: **occupied** when it has a live check (open, with its
 check of Sales still open or without one), else **blocked** when it is out of service, else
 **reserved** when a live hold is already within its window (from ``RESERVED_LEAD`` before it starts
-until it ends), else **available**. Phase 1 has no relay of events: a check of Sales charged in full
-or voided is read here, so the plan and the list of checks are right on every read (WORKBOOK «Para
-quien lo mantiene»). services.py reuses the same helpers inside its own transaction.
+until it ends), else **available**. A check of Sales charged in full or voided is read here, so the plan
+and the list of checks are right on every read, before the relay delivers what Sales did (WORKBOOK
+«Para quien lo mantiene»). services.py reuses the same helpers inside its own transaction.
 
 Every list pages (``limit`` ≤ 100) with ``id`` as the last tie-break. The ``find_*`` helpers resolve
 how a person names a record (assistant, voice): by id, else an exact name or number, else the only one
@@ -169,7 +169,7 @@ def reserving_holds(now: dt.datetime):
 def natural_key(expression) -> Func:
     """``number`` with every run of digits left-padded to 12, so text order is natural order.
 
-    ``Barra 2 Bis`` → ``Barra 000000000002 Bis`` (the old module's ``number_sort``, tables#68)."""
+    ``Barra 2 Bis`` → ``Barra 000000000002 Bis``."""
     padded = Func(
         expression,
         Value("([0-9]+)"),

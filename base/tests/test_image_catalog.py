@@ -1,4 +1,4 @@
-"""The shared image library (round 2026-10-30, «blueprints con imágenes»): ``base.image_catalog``.
+"""The shared image library: ``base.image_catalog``.
 
 ERPlora/blueprints publishes ``img/<folder>/<name>.webp`` and ``img/catalog.json`` once for every hub: in AWS under
 ``shared/catalog/`` of the hubs' bucket, locally in the checkout beside this repo (``CATALOG_DIR``). The manifest names
@@ -17,7 +17,6 @@ import pytest
 from botocore.exceptions import ClientError
 from django.core.files.base import ContentFile
 from django.core.files.storage import InMemoryStorage, storages
-from django.urls import resolve
 from live.assistant import description
 from live.context import OperationContext, Scope
 from live.errors import NotFound, OperationError, PermissionDenied
@@ -26,6 +25,7 @@ from PIL import Image as PILImage
 
 from base import image_catalog
 from base.schemas import CatalogImageRefIn, CatalogImageSearchIn
+from base.tests.routes import assert_bound
 
 A = Scope("host", "a")
 HOME = "base.view_home"
@@ -36,7 +36,7 @@ CATALOG_IMAGE_ROUTES = {
     ("GET", "/catalog/images/detail", "base.catalog_image.get"),
 }
 
-#: A small library as ERPlora/blueprints writes its manifest (the real one has 491 images).
+#: A small library as ERPlora/blueprints writes its manifest (the real one has hundreds of images).
 IMAGES = [
     {
         "name": "cafe_con_leche",
@@ -437,12 +437,8 @@ def test_get_does_not_find_what_the_library_does_not_have(image_library, referen
 
 
 def test_both_are_bound_to_their_routes():
-    from base.api import router
-
     for method, path, name in CATALOG_IMAGE_ROUTES:
-        [route] = router.path_operations[path].operations
-        assert (route.methods, route.operation_id) == ([method], name)
-        assert resolve(f"/api{path}").url_name
+        assert_bound(method, path, name)
 
 
 @pytest.mark.django_db

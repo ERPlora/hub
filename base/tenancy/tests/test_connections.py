@@ -1,10 +1,10 @@
-"""Hot registration of a hub's alias (PLAN-DB §4 and §5; plan 2026-10-22-fase-2-tenencia §4, step 4).
+"""Hot registration of a hub's alias.
 
 A hub's alias is copied from the static ``hub_template`` alias (PgBouncer in transaction mode: no pool,
 ``CONN_MAX_AGE`` 0, no server-side cursors, no prepared statements) with the hub's database as ``NAME``, and swapped
 in as a new ``connections.settings`` dict under a lock: the dict other threads are reading is never changed in place.
 A hub without a database of its own (``db_name=""``) stays on ``default``; a template is never a hub's database, and
-working in a hub leaves no connection open to the template it was cloned from (PLAN-DB §14.6).
+working in a hub leaves no connection open to the template it was cloned from.
 """
 
 import threading
@@ -237,7 +237,7 @@ def test_working_in_a_hub_leaves_no_connection_open_to_its_template(hub_a, hub_d
 @pytest.mark.django_db(transaction=True)
 def test_a_thread_of_the_worker_closes_every_connection_it_opened_when_its_piece_ends():
     """The worker's slow passes run in threads of their own (base.worker.Background): each piece leaves no connection
-    of its thread open, control's included (review of round 3: one helper of the tenancy, not django.db in the worker)."""
+    of its thread open, control's included: one helper of the tenancy closes them, not django.db in the worker."""
     left_open: list[bool] = []
 
     def piece() -> None:

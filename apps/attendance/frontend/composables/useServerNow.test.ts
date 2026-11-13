@@ -1,5 +1,5 @@
 /* eslint-disable vue/one-component-per-file -- one throwaway host component per case */
-// `useServerNow(asOf, ms)`: the page's clock on the SERVER's time (review of 2026-10-15, finding 8). The
+// `useServerNow(asOf, ms)`: the page's clock on the SERVER's time. The
 // figures come «as of» the server's instant; a device whose clock is off would make the timer and the
 // totals jump. The gap is measured when each result arrives (`as_of` against the device's clock) and the
 // ticking clock runs with it.

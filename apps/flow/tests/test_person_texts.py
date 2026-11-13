@@ -1,11 +1,9 @@
-"""The data an automation inserts (``{{…}}``) in a text a person reads (FIX-HUB-FLOW-PENDING-ANSWER-CARD-SHOWS-RAW-VALUES;
-FLOW-F28, F29, F31): the question of «Ask someone first» and the WhatsApp of «Send a message» said each one as the
-code keeps it — «true», «2026-11-02T10:00:00+01:00», an amount in cents («12050») —, so «Waiting for your answer»
-asked «Refund Ana? Paid: true» and a customer could get «Your total: 12050». In a text for a person each datum is said
-as the assistant's card says it (BASE-F97): a yes or no as «Yes»/«No», a day and a time as the automation's language
-writes them at the business's hour, and an amount the schema of the step that left it marks as money (``"money": true``)
-in the currency that step answers, else the business's. What goes to a machine — another action's data, a call to
-another system, a condition — keeps each datum as it is.
+"""The data an automation inserts (``{{…}}``) in a text a person reads (FLOW-F28, F29, F31): the question of «Ask
+someone first» and the WhatsApp of «Send a message». In a text for a person each datum is said as the assistant's card
+says it (BASE-F97): a yes or no as «Yes»/«No», a day and a time as the automation's language writes them at the
+business's hour, and an amount the schema of the step that left it marks as money (``"money": true``) in the currency
+that step answers, else the business's. What goes to a machine — another action's data, a call to another system, a
+condition — keeps each datum as it is.
 
 An event declares no schema: a number it brings is said as it is, never guessed as money. Nor are a description's words
 («in cents») nor a name in ``_cents``: only the mark says an amount (hub#498, as the assistant's card, BASE-F97).

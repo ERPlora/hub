@@ -1,7 +1,7 @@
-// The page's colour mode (round 2026-10-22): the owner chooses light, dark or auto (`theme.mode`). The server writes
-// it in `data-ep-mode` and paints auto light (`data-bs-theme="light"`), which is what a visitor without JS sees; for
-// auto, this sets Bootstrap's `data-bs-theme` from the device's `prefers-color-scheme` and follows it while the page is
-// open. It runs from the public bundle (no inline script under the page's CSP), also inside the editor's preview.
+// The page's colour mode: the owner chooses light, dark or auto (`theme.mode`). The server writes it in `data-ep-mode`
+// and paints auto light (`data-bs-theme="light"`), which is what a visitor without JS sees; for auto, this sets
+// Bootstrap's `data-bs-theme` from the device's `prefers-color-scheme` and follows it while the page is open. It runs
+// from the public bundle (no inline script under the page's CSP), also inside the editor's preview.
 const DARK = '(prefers-color-scheme: dark)';
 
 type MatchMedia = (query: string) => Pick<MediaQueryList, 'matches'> & {

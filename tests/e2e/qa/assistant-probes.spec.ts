@@ -1,5 +1,4 @@
-// Layer 2 of the assistant's QA with the REAL model (docs plan 2026-10-31 of erplora-next, the assistant's knowledge
-// and QA, §1.5): the PROBES of qa/probes/*.json (or `QA_PROBES`: comma-separated files or folders), one test each. A
+// Layer 2 of the assistant's QA, with the REAL model: the PROBES of qa/probes/*.json (or `QA_PROBES`: comma-separated files or folders), one test each. A
 // probe is a new natural phrase a QA agent wrote for one tool, as a person of one role types it in one language; the
 // test signs in as that role (owner and employee of the SaaS's demo seed, a manager and an admin seeded here), asks it
 // in a new conversation of the real chat and checks what went over the wire: the read ran, the write's card showed

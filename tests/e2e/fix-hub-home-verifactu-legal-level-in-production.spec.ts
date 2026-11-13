@@ -1,9 +1,10 @@
-// flow: «Termina de configurar tu negocio» y la franja bloqueante del Inicio (BASE-F01, BASE-F04) con el paso de VeriFactu (VERIFACTU-F08)
-// FIX-HUB-HOME-VERIFACTU-LEGAL-LEVEL-IN-PRODUCTION: a hub in production whose way to the AEAT broke (ERPlora's signed
+// flow: «Termina de configurar tu negocio» and the Home's blocking strip (BASE-F01, BASE-F04) with VeriFactu's step
+// (VERIFACTU-F08)
+// A hub in production whose way to the AEAT broke (ERPlora's signed
 // authorisation revoked) has every new sale refused, so its Home says so. «Configura VeriFactu» is «Necesario para
 // facturar» in «Termina de configurar tu negocio», and the strip «Todavía no puedes facturar» names it over the other
 // screens: to the owner with «Configurar», to the employee with «An administrator has to set this up.». In testing the
-// same hub stays «Importante» with no strip: it sells without a way (gh:hub#1726).
+// same hub stays «Importante» with no strip: it sells without a way.
 // Production is the configuration's environment, set in the database for the run: no local server opens real filing
 // and nothing is sent (the sale is refused before any record is made). The photo is sent the way the SaaS sends it
 // (`PUT /internal/hubs/{id}/state`, signed); what the run changes in VeriFactu's configuration and in `a`'s photo is
@@ -136,7 +137,7 @@ test('BASE-F04 VERIFACTU-F08: in production the employee is told too, in English
   }
 });
 
-test('BASE-F01 gh:hub#1726: in testing the same revoked authorisation stays «Importante», out of the strip', async ({ browser }) => {
+test('BASE-F01: in testing the same revoked authorisation stays «Importante», out of the strip', async ({ browser }) => {
   await revokedIn('testing');
   const { context, page } = await onHome(browser, { width: 1440, height: 900 });
   try {
@@ -145,7 +146,7 @@ test('BASE-F01 gh:hub#1726: in testing the same revoked authorisation stays «Im
     await expect(row(page).locator('[data-testid="setup-pill"]')).toHaveText('Importante');
     await page.goto(`${A}/#actividad`);
     await expect(shown(page).locator('[data-testid="home-activity-loading"]')).toHaveCount(0);
-    // The business's tax details may be a wall of their own while the hub has no issuer (FIX-INVOICE-SETUP-HOOKS);
+    // The business's tax details may be a wall of their own while the hub has no issuer;
     // VeriFactu's step in testing never is: nothing else is in the strip.
     await expect(strip(page).locator('[data-testid="blocking-item"]').filter({ hasNotText: 'Los datos de tu negocio' })).toHaveCount(0);
   } finally {

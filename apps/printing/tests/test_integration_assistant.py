@@ -1,7 +1,7 @@
-"""The assistant's card for a write of printing (FIX-HUB-PRINTING-ASSISTANT-CARD-FIELDS-IN-ENGLISH; base's half is
-hub#258): in Spanish, every datum it sends by the name the Printing screens give it, never by the title pydantic makes
-up from the field («Job Id», «Attempt», «Source Ref»). The card is base's (``base.assistant.card``); the names are
-printing's: the titles of its schemas and the ``verbose_name`` of its models, with their Spanish in its catalog."""
+"""The assistant's card for a write of printing (base's half is hub#258): in Spanish, every datum it sends by the name
+the Printing screens give it, never by the title pydantic makes up from the field («Job Id», «Attempt», «Source Ref»).
+The card is base's (``base.assistant.card``); the names are printing's: the titles of its schemas and the
+``verbose_name`` of its models, with their Spanish in its catalog."""
 
 import json
 import uuid
@@ -104,8 +104,8 @@ def test_the_card_names_the_money_the_print_at_checkout_and_the_document_of_a_ne
 
 
 def test_the_card_says_a_printer_is_active_as_the_printers_screen_does():
-    """«Activa», the Printers screen's word for a printer that takes jobs, never auth's «Activo» for the same English
-    (FIX-HUB-PRINTING-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP)."""
+    """«Activa», the Printers screen's word for a printer that takes jobs, never auth's «Activo» for the same
+    English."""
     for name in ("printing.printer.create", "printing.printer.update"):
         op = get(name)
         arguments = dict.fromkeys(op.input.model_json_schema()["properties"], "x")
@@ -113,12 +113,11 @@ def test_the_card_says_a_printer_is_active_as_the_printers_screen_does():
         assert said["is_active"] == SCREENS["printers"]["columns"]["active"] == "Activa", name
 
 
-# ── The record a write names by its id, by its name (FIX-HUB-PRINTING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS; base's half
-# is hub#416) ──
-# Since hub#416 the card leaves out an id its schema does not mark: «reintenta el ticket T-000123», «retira la tablet del
-# mostrador» or «prueba la impresora de la caja» said no job, no device and no printer, and a new job said its document
-# as the model sent it («kitchen_order»). Now each record is named as the Printing screens show it: a printer and a
-# device by their names, a job as the queue titles it («Recibo T-000123»), and a document by the queue's word for it.
+# ── The record a write names by its id, by its name (base's half is hub#416) ──
+# The card leaves out an id its schema does not mark, so without these names «reintenta el ticket T-000123» would say
+# no job and a new job its document as the model sent it («kitchen_order»). Each record is named as the Printing screens
+# show it: a printer and a device by their names, a job as the queue titles it («Recibo T-000123»), and a document by
+# the queue's word for it.
 # Read as whoever asks, in the hub they ask in: never by the id, and left out when nobody, or somebody who may not see
 # the printers, is behind the request.
 

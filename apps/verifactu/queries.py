@@ -108,9 +108,9 @@ def business_country(scope: Scope | None) -> str:
 
 
 def outside_spain(scope: Scope | None) -> bool:
-    """Whether ``scope``'s business was registered in a country other than Spain: VeriFactu is not for it, so nothing
-    of it is sealed nor sent, as if the app were off (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN). One without
-    a country is in ERPlora's market, Spain: base's one reading of it (``base.business.country_or_market``, hub#682)."""
+    """Whether ``scope``'s business was registered in a country other than Spain: VeriFactu is not for it, so nothing of
+    it is sealed nor sent, as if the app were off. One without a country is in ERPlora's market, Spain: base's one
+    reading of it (``base.business.country_or_market``)."""
     return country_or_market(business_country(scope)) != SPAIN
 
 
@@ -155,19 +155,19 @@ def issuer_configured() -> bool:
 
 def production_open() -> bool:
     """Whether this server lets a business go live (VERIFACTU-F08): only the ``prod`` deployment, and only once ERPlora
-    opens it there (``VERIFACTU_PRODUCTION_ENABLED``, under Ioan's supervision); ``pre`` always files in testing."""
+    opens it there (``VERIFACTU_PRODUCTION_ENABLED``, a supervised step); ``pre`` always files in testing."""
     return settings.ERPLORA_ENVIRONMENT == "prod" and bool(
         settings.VERIFACTU_PRODUCTION_ENABLED
     )
 
 
 def effective_environment(ctx: OperationContext, config: Config) -> str:
-    """The AEAT environment a new record of this business files in: ERPlora's own hub (PLAN-SAAS §4), its
-    deployment's (``prod``: production; ``pre``: testing), whatever its switch says, but production only once ERPlora
-    opens it on the server (``production_open``, working-rules §15: its own invoices skip no lock); once live there, it
-    stays in production while the server is closed, its records waiting (``production_closed``), so its real invoices
-    never move to the test chain. A demo, always testing (HUB-F315), whatever its configuration says: it never goes
-    live (``go_live_forbidden``). Any other business, its configuration's."""
+    """The AEAT environment a new record of this business files in: ERPlora's own hub, its deployment's (``prod``:
+    production; ``pre``: testing), whatever its switch says, but production only once ERPlora opens it on the server
+    (``production_open``: its own invoices skip no lock); once live there, it stays in production while the server is
+    closed, its records waiting (``production_closed``), so its real invoices never move to the test chain. A demo,
+    always testing, whatever its configuration says: it never goes live (``go_live_forbidden``). Any other
+    business, its configuration's."""
     if platform.is_demo_hub(ctx.scope):
         return Environment.TESTING
     if platform.is_platform_hub(ctx.scope):
@@ -222,7 +222,7 @@ def _route_sending_problem(config: Config, environment: str, scope: Scope | None
     """What the chosen route itself lacks to carry a record to the AEAT of ``environment``: the own route, its valid
     certificate (as in the old Hub) and, in production, one this server can open; ERPlora's route in production,
     the approved signed authorisation, but for ERPlora's own records on ERPlora's own hub (``scope``; ``None``, no
-    hub's, never is: saas#2524, a business typing ERPlora's tax ID is no exemption)."""
+    hub's, never is: a business typing ERPlora's tax ID is no exemption)."""
     production = environment == Environment.PRODUCTION
     if config.route == Config.Route.OWN:
         if not certificate_valid():
@@ -237,7 +237,7 @@ def _route_sending_problem(config: Config, environment: str, scope: Scope | None
         and platform.is_platform_hub(scope)
         and issuer_identity()[0] == settings.PLATFORM_ISSUER_TAX_ID
     ):
-        # ERPlora's seal presents ERPlora's own records: it represents nobody (its own hub, PLAN-SAAS §4).
+        # ERPlora's seal presents ERPlora's own records on its own hub: it represents nobody.
         return ""
     if config.representation_status != Config.Representation.APPROVED:
         return "representation_not_approved"
@@ -246,7 +246,7 @@ def _route_sending_problem(config: Config, environment: str, scope: Scope | None
 
 def _server_problem(environment: str) -> str:
     """What this server lacks to carry anything to the AEAT of production: ERPlora's gateway, and the opening of real
-    filing (``production_open``, working-rules §15). Testing lacks nothing here (its waits are ``blockers``')."""
+    filing (``production_open``). Testing lacks nothing here (its waits are ``blockers``')."""
     if environment != Environment.PRODUCTION:
         return ""
     if not gateway.configured():
@@ -258,9 +258,8 @@ def _server_problem(environment: str) -> str:
 
 def presenter(scope: Scope) -> str:
     """Who ERPlora's gateway is told presents the records of ``scope`` (its ``hub``): ``scope``'s business by its
-    slug (saas#29), whatever tax ID a record bears. Every business runs its pass in its own database, and since the S5
-    cut (hub#602) ERPlora's own hub's (``PLATFORM_HUB_SLUG``) holds ERPlora's records alone, so it presents ERPlora's
-    own and nobody else's (hub#1130)."""
+    slug, whatever tax ID a record bears. Every business runs its pass in its own database, and ERPlora's own hub's
+    (``PLATFORM_HUB_SLUG``) holds ERPlora's records alone, so it presents ERPlora's own and nobody else's."""
     return scope.key
 
 
@@ -268,8 +267,7 @@ def route_problem(config: Config, environment: str, scope: Scope | None) -> str:
     """Why nothing can be carried to the AEAT of ``environment`` now (a wait code), or ``""`` (VERIFACTU-F04, F08):
     the route's own lack first, then the server's in production (no gateway, closed). It keeps the queue waiting
     before the gateway is ever called and, in production, refuses every new sale (``verifactu.record.create``) and
-    going live. No plan gates it (PLAN §30, round 2026-10-22b: VeriFactu on Free; ERPlora's route needs its
-    approved authorisation alone)."""
+    going live. No subscription plan gates it: ERPlora's route needs its approved authorisation alone."""
     return _route_sending_problem(config, environment, scope) or _server_problem(environment)
 
 
@@ -474,7 +472,7 @@ def corrections_of(record) -> QuerySet:
 
 def with_corrections(queryset: QuerySet) -> QuerySet:
     """Each record with ``corrected_by``, the id of the record that corrects it, in the same SELECT: no query per
-    row of a list (hub#857)."""
+    row of a list."""
     return queryset.annotate(corrected_by=Subquery(corrections_of(OuterRef("pk"))))
 
 
@@ -924,13 +922,13 @@ def compliance_summary(ctx: OperationContext, data: NoInput) -> ComplianceSummar
 
 #: This app's label: what ``base.activation`` names its state by.
 VERIFACTU = "verifactu"
-#: Why VeriFactu never goes off once on, in Spain (VERIFACTU-F32, FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON).
+#: Why VeriFactu never goes off once on, in Spain (VERIFACTU-F32).
 NEVER_OFF = _("VeriFactu can't be turned off once it's on: the law requires your invoices to keep reaching the AEAT.")
 
 
 def enable_refusal(ctx: OperationContext) -> str | None:
     """VERIFACTU-F01: why the app may not go on, in ``ctx``'s language, or ``None``: outside Spain it would seal and send
-    nothing (``outside_spain``), so it does not go on (hub#694). One already on stays as it is, and goes off when asked.
+    nothing (``outside_spain``), so it does not go on. One already on stays as it is, and goes off when asked.
     A business without a country (a demo) is in Spain."""
     if not outside_spain(ctx.scope):
         return None
@@ -942,7 +940,7 @@ def disable_refusal(ctx: OperationContext) -> str | None:
     """VERIFACTU-F32: why the app may not go off, in ``ctx``'s language, or ``None``. In Spain, never once on: from
     then on the business's invoices reach the AEAT, VERI*FACTU binds it at least to the end of the natural year
     (RD 1007/2023, Orden HAC/1177/2024) and ERPlora keeps no other way of recording them, so whatever its queue holds
-    the answer is the same (FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON). A business without a country (a demo) is in Spain.
+    the answer is the same. A business without a country (a demo) is in Spain.
     One that never got on (its tables being made, or making them failed: ``base.activation``) sealed nothing, so
     nothing binds it yet. Outside Spain no record is ever sent, so turning it off stops nothing: never refused (the
     records are kept). Both are read in the hub of the active context, inside ``base.app.disable``'s transaction."""
@@ -953,7 +951,7 @@ def disable_refusal(ctx: OperationContext) -> str | None:
 
 
 def oldest_unsent_at() -> dt.datetime | None:
-    """hub#488: since when the oldest production record not in the AEAT yet (``Record.UNSENT``: pending, its retry
+    """Since when the oldest production record not in the AEAT yet (``Record.UNSENT``: pending, its retry
     waiting included, or sent without an answer) waits, or ``None``: the platform's ``OldestPendingAgeSeconds``, read
     in the database of the active context. A record of the AEAT's test environment files nothing, so it never counts;
     what the AEAT answered is out of the queue."""
@@ -1300,7 +1298,7 @@ def keeps_fiscal_documents() -> bool:
 
 
 def record_states(conn) -> dict:
-    """hub#1205: what each production record says of its life at the AEAT (its status, when it was sent, when it last
+    """What each production record says of its life at the AEAT (its status, when it was sent, when it last
     changed), by id, in the database of ``conn``; nothing where the app was never set up. ``conn`` is a direct
     connection (``fiscal_record_states`` on this app's config: the platform's restore reads the business's database and
     its copy, both closed to the app, and the copy has no alias), so it is read by its own SQL over the model's names,

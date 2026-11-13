@@ -104,7 +104,7 @@ def test_the_pages_are_the_generic_page():
         assert list(page.model_fields) == ["rows", "total", "limit", "offset"]
 
 
-# Jurisdiction (taxes#41): a closed ISO list, and a real region of that same country
+# Jurisdiction: a closed ISO list, and a real region of that same country
 
 
 def test_the_country_list_is_the_249_assigned_iso_codes():
@@ -203,7 +203,7 @@ def test_valid_rates(rate):
     ["subject_reverse", "exempt", "not_subject", "not_subject_location"],
 )
 def test_a_class_that_charges_no_tax_carries_no_rate(operation_class):
-    # taxes#59: the till would charge it and the invoice would refuse to seal the sale.
+    # The till would charge it and the invoice would refuse to seal the sale.
     with translation.override("en"):
         assert message(RuleIn, **{**RULE, "operation_class": operation_class}) == (
             "This operation charges no tax: its rate must be 0 %."
@@ -494,7 +494,7 @@ def test_calculate_in():
         CalculateIn, amount="10.5", tax_category_key="product.generic"
     ) == {"amount"}
     assert invalid_fields(CalculateIn, amount=100) == {"tax_category_key"}
-    # The caller never brings its own rules (sales#21): there is no field for them.
+    # The caller never brings its own rules: there is no field for them.
     assert "rules" not in CalculateIn.model_fields
 
 

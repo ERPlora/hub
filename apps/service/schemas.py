@@ -36,7 +36,7 @@ MAX_LINES = 255
 MAX_MINUTES = 1440
 
 SAY_WHICH_SERVICE = _("Say which service: its id, or its name.")
-# Its own context: said as its siblings are («su id o su nombre»), not as Inventory says it (hub#662).
+# Its own context: said as its siblings are («su id o su nombre»), not as Inventory says it.
 SAY_WHICH_CATEGORY = pgettext_lazy("service", "Say which category: its id, or its name.")
 SAY_WHICH_PACKAGE = _("Say which package: its id, or its name.")
 SAY_WHICH_MEMBER = _("Say which professional: their id, or their name.")
@@ -70,7 +70,7 @@ VOUCHER_SESSIONS = gettext_noop("Voucher sessions")
 # name; who does what by the service and the professional; a voucher sold and its sessions by the package, the owner and
 # the day it was sold or the service of the session, as two vouchers of one package may be told apart. The sale and its
 # line, the appointment, the line of an open check and the refund or the void that gives sessions back are of apps
-# Services does not require: its own read names them by theirs (``service.record.get``, hub#756), the sale by its
+# Services does not require: its own read names them by theirs (``service.record.get``), the sale by its
 # number, a line by what it charges, the appointment as Appointments' cards say it and a refund or a void by its sale.
 A_SERVICE = names("service.service.get")
 A_CATEGORY = names("service.category.get")
@@ -220,7 +220,7 @@ class ServiceRefIn(In):
         return self
 
 
-# The service's image (SERVICE-F34, F35; round 2026-10-30, base.images): one of the shared library or a photo of its own.
+# The service's image (SERVICE-F34, F35; base.images): one of the shared library or a photo of its own.
 
 #: An image a write sets: the assistant's card names it by its title in the library, never by its reference.
 AN_IMAGE = names("base.catalog_image.get", by="reference", name=("title",))
@@ -742,6 +742,31 @@ class MemberReleaseIn(In):
     """The payload of ``staff.member.terminated``."""
 
     id: UUID = Field(description="The professional who left.")
+
+
+#: The most professionals a service of a separate copy comes back with.
+MAX_PERFORMERS = 500
+
+
+class AssignmentOfCopyIn(In):
+    """A professional who performed a service in a separate copy of the business, as the copy held it."""
+
+    member_id: UUID = Field(description="The professional (Staff), by id: the same in the copy and in the business.")
+    custom_duration: Minutes | None = Field(None, description="Their own duration in minutes; none = the service's.")
+    custom_price: Cents | None = Field(
+        None, description="Their own price in cents (minor units of the business's currency); none = the service's."
+    )
+    is_primary: bool = Field(False, description="Whether it was their main service.")
+    is_active: bool = Field(True, description="Whether the assignment was switched on.")
+
+
+class ServiceRecoverIn(ServiceIn):
+    """A service of a separate copy the business no longer has: what ``service.service.create`` takes and who performed
+    it there (the business makes its own ids)."""
+
+    assignments: list[AssignmentOfCopyIn] = Field(
+        [], max_length=MAX_PERFORMERS, description="Who performed it in the copy."
+    )
 
 
 class AssignmentOut(Schema):

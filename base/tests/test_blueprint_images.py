@@ -1,4 +1,4 @@
-"""Images in a blueprint (INVENTORY-F33; round 2026-10-30): ``base.blueprint`` with ``base.images``.
+"""Images in a blueprint (INVENTORY-F33): ``base.blueprint`` with ``base.images``.
 
 A product's or a service's image of the shared library travels as its reference (``catalog:<folder>/<name>``): the
 library is the same for every hub. A photo of its own travels inside the ``.blueprint.zip``, at ``media/<its name>``,
@@ -193,7 +193,7 @@ def test_loading_the_file_in_another_business_copies_each_photo_under_a_new_name
     reference, kept = photo_of(ctx)
     data = blueprint.export_data(ctx, {"inventory": ["inventory.product"]}, purpose="template")
     media = blueprint.export_media(ctx, data)
-    # Phase 1 keeps every hub's products in one table: another SKU, so B's load creates its own product.
+    # Both hubs share the suite's one test database: another SKU, so B's load creates its own product.
     data["inventory.product"][0]["sku"] = "B-CAF-03"
     content = blueprint.write_zip(bundle(data["inventory.product"], media))
     other = person(B)
@@ -256,7 +256,7 @@ def test_a_service_travels_with_its_image(ctx, library):
 
     data = blueprint.export_data(ctx, {"service": ["service.service"]}, purpose="template")
     assert data["service.service"][0]["image"] == "catalog:beauty_hair/corte_senora"
-    # Phase 1 keeps every hub's services in one table: another name, so B's load creates its own service.
+    # Both hubs share the suite's one test database: another name, so B's load creates its own service.
     data["service.service"][0]["name"] = "Corte de señora (B)"
     other = person(B)
 

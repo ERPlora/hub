@@ -1,5 +1,5 @@
 """The Hub admin's site (``base.admin_site``): without a business chosen it works on control and shows only control's
-models; a hub's model lives in a business's own database (S5: there is no shared one), so its pages appear once one
+models; a hub's model lives in a business's own database (there is no shared one), so its pages appear once one
 is chosen (``/admin/hub/<slug>/``)."""
 
 import pytest

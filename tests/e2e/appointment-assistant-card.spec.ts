@@ -19,7 +19,7 @@ import { post } from './service-helpers';
 const TAG = 'E2E Tarjeta cita';
 const DAY = aMonday();
 
-/** What the card calls each record, how a weekly series repeats and how many records one appointment is (ui#117: the
+/** What the card calls each record, how a weekly series repeats and how many records one appointment is (the
  *  singular, never «1 registros»), by the language of the card. */
 const WORDS = {
   es: { appointments: 'Citas', series: 'Cita periódica', block: 'Bloqueo', professional: 'Profesional', weekly: 'Cada semana · Lunes', oneRecord: 'Afecta a 1 registro.' },

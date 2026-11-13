@@ -5,12 +5,12 @@ the test's transaction."""
 import json
 
 import pytest
-from django.conf import settings
 from django.test import Client
 from live.ninja import ensure_api_parity
 
 from apps.printing.api import router
 from apps.printing.tests.conftest import RECEIPT
+from base.tests.routes import spa_routes
 from config.api import api
 
 ROUTES = {
@@ -95,10 +95,7 @@ def test_every_operation_has_a_route_and_is_open_to_api_keys():
 
 
 def test_the_spas_route_map_names_every_printing_route():
-    # frontend/generated/operations.json: the op → route map the SDK's client uses (hand-written until V3).
-    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
-    mine = {(route["method"].upper(), route["path"].removeprefix("/api"), op) for op, route in spa.items() if op.startswith("printing.")}
-    assert mine == ROUTES
+    assert spa_routes("printing.") == ROUTES
 
 
 @pytest.mark.django_db
@@ -180,8 +177,7 @@ def session_of(make_user, username, role):
 
 @pytest.mark.django_db
 def test_an_employee_takes_no_job_until_a_manager_sets_up_the_device(make_user):
-    # FIX-PRINTING-JOBS-CLAIMED-BY-ANY-DEVICE: POST /api/printing/jobs/claim with an employee's session handed
-    # the job of any printer it named.
+    # POST /api/printing/jobs/claim with an employee's session never hands over the job of whatever printer it names.
     manager = session_of(make_user, "mar", "hub_manager")
     employee = session_of(make_user, "ana", "hub_employee")
     till = post(manager, "/printing/printers", {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"}).json()

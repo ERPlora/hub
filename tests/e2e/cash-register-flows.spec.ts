@@ -35,7 +35,7 @@ async function flowShots(page: Page, flow: string, ready: (page: Page) => Promis
     await page.setViewportSize({ width: size.width, height: size.height });
     await ready(page);
     // A new size relays the shell out (menu, tabs): one page header on screen once it settled, never a
-    // second copy of the page under the first (hub#1987 saw one on Android).
+    // second copy of the page under the first (as seen on Android).
     await expect
       .poll(() =>
         page.evaluate(
@@ -223,7 +223,7 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three si
   await closeLeftOpen(context);
   await sessionsReady(page);
 
-  // F03: «Open session», with a finger-sized button (cash_register#12).
+  // F03: «Open session», with a finger-sized button.
   const openButton = shown(page).locator('[data-testid=cash-register-new-session]');
   expect((await openButton.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await openButton.click();
@@ -263,7 +263,7 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three si
   await movement.locator('[data-testid=cash-register-movement-cancel]').click();
   await expect(movement).toBeHidden();
 
-  // F06: the count by notes and coins (cash_register#114: no face value cut on the phone).
+  // F06: the count by notes and coins (no face value cut on the phone).
   await shown(page).locator(`[data-testid=cash-register-sessions-row-${session.id}-count]`).first().click();
   const count = dialog(page, 'cash-register-count');
   await expect(count).toBeVisible();
@@ -278,7 +278,7 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three si
   await discardChanges(page);
   await expect(count).toBeHidden();
 
-  // F09: the close, with the expected and the difference while typing (cash_register#83, #90).
+  // F09: the close, with the expected and the difference while typing.
   await shown(page).locator(`[data-testid=cash-register-sessions-row-${session.id}-close]`).first().click();
   const close = dialog(page, 'cash-register-close');
   await expect(close).toBeVisible();
@@ -494,7 +494,7 @@ test('CASH_REGISTER-F12: the drawer’s figures above the sessions, short in red
   await flowShots(page, 'CASH_REGISTER-F12', async (p) => {
     await expect(shown(p).locator('[data-testid=cash-register-figures]')).toBeVisible();
   });
-  // On a tablet the amount stays on one line and the card titles are whole (outfitkit#246, #248).
+  // On a tablet the amount stays on one line and the card titles are whole.
   await page.setViewportSize({ width: 834, height: 1112 });
   const amount = figures.locator('[data-testid=cash-register-figures-expected]');
   // One line is about 1.2–1.5 times the font size; two lines pass twice it.

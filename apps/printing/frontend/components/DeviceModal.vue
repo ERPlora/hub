@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// «Print from this device» / «Edit device» (PRINTING-F18; the old hub's print host, hub#342): the device's name
+// «Print from this device» / «Edit device» (PRINTING-F18; the old hub's print host): the device's name
 // and the active printers it reaches, one check each. A new one is the device the page runs on (the SDK names it
 // to the server with X-Device-Id; its id is never shown); an edited one is any device of the list. «Save» says
 // so; what is missing is said before anything is sent, and a refusal at its field in the server's words.

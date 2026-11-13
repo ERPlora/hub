@@ -1,13 +1,11 @@
-"""System's queries (APP-BASE-7; the old hub's ``GET /api/system`` and ``/api/hub/events/dead``): the status of the hub
-(``base.system.status``), its log of events between apps (``base.event.list``) and the events the relay gave up on
-(``base.failed_event.list``). All three are for who runs the business (hub#2519: the errors may carry a customer's
-tax id and name), and a hub never sees another's.
+"""System's queries: the status of the hub (``base.system.status``), its log of events between apps
+(``base.event.list``) and the events the relay gave up on (``base.failed_event.list``). All three are for who runs the
+business (the errors may carry a customer's tax id and name), and a hub never sees another's.
 """
 
 import datetime as dt
 
 import pytest
-from django.urls import resolve
 from django.utils import timezone
 from live.assistant import description
 from live.context import OperationContext, Scope
@@ -16,6 +14,7 @@ from live.models import OutboxEvent
 from live.operations import get
 
 from base.models import EventDelivery, Hub
+from base.tests.routes import assert_bound
 
 pytestmark = pytest.mark.django_db
 
@@ -62,7 +61,7 @@ def test_each_query_is_for_who_runs_the_business_and_told_to_the_assistant(name)
         run(name, "base.view_home")
 
 
-# ── base.system.status (BASE-G45, G88, G89) ──────────────────────────────────────────────────────────────
+# ── base.system.status ───────────────────────────────────────────────────────────────────────────────────
 
 
 def test_the_status_says_the_release_and_where_the_data_lives(settings):
@@ -72,7 +71,7 @@ def test_the_status_says_the_release_and_where_the_data_lives(settings):
     assert run("base.system.status", ADMIN) == {
         "version": "4da2a10",
         "released_at": "2026-10-23T18:50:00Z",
-        # Phase 1: every business on the one shared database (``db_name`` empty).
+        # The suite's business on the one shared database (``db_name`` empty).
         "shared_database": True,
     }
 
@@ -94,11 +93,11 @@ def test_without_a_release_it_runs_the_development_build_and_never_makes_up_a_da
 
 
 def test_the_status_carries_no_error_text(settings):
-    """hub#2566: the old history sent the verbatim error of a rollback to any session; nothing like it travels now."""
+    """No error text travels with the status: the verbatim error of a rollback could reach any session."""
     assert set(run("base.system.status", ADMIN)) == {"version", "released_at", "shared_database"}
 
 
-# ── base.event.list: the log of events between apps (BASE-G90) ──────────────────────────────────────────────
+# ── base.event.list: the log of events between apps ─────────────────────────────────────────────────────────
 
 
 def test_the_log_is_this_hubs_newest_first_with_a_level_and_what_happened():
@@ -169,7 +168,7 @@ def test_an_event_of_an_app_that_is_gone_keeps_its_label():
     assert (entry["app"], entry["app_name"], entry["detail"]) == ("oldapp", "oldapp", "Delivered to oldapp.")
 
 
-# ── base.failed_event.list: what the relay gave up on (BASE-G91) ───────────────────────────────────────────
+# ── base.failed_event.list: what the relay gave up on ──────────────────────────────────────────────────────
 
 
 def test_the_failed_events_of_this_hub_newest_first_with_what_failed():
@@ -203,7 +202,7 @@ def test_the_failed_events_of_this_hub_newest_first_with_what_failed():
 
 def test_one_failed_event_is_read_by_its_id_as_the_list_shows_it_and_only_this_hubs():
     """``base.failed_event.detail``, what names a failed event on the assistant's card: this hub's and still failed;
-    another hub's (phase 1 shares the table) or one resent meanwhile is not there."""
+    another hub's (the suite's businesses share the table) or one resent meanwhile is not there."""
     mine = delivery(event())
     assert run("base.failed_event.detail", ADMIN, id=str(mine.id)) == run("base.failed_event.list", ADMIN)["items"][0]
     for other in (delivery(event(B)), delivery(event(), status=EventDelivery.Status.PENDING)):
@@ -255,16 +254,12 @@ def test_the_page_is_bounded(data):
     ],
 )
 def test_the_routes_are_bound_to_their_queries(path, operation):
-    from base.api import router
-
-    [route] = router.path_operations[path].operations
-    assert (route.methods, route.operation_id) == (["GET"], operation)
-    assert resolve(f"/api{path}").url_name
+    assert_bound("GET", path, operation)
 
 
 @pytest.mark.parametrize("path", ["/api/system/status", "/api/system/events", "/api/system/failed-events"])
 def test_a_cashier_is_refused_and_an_owner_is_answered(client, make_user, path):
-    """hub#2519: a cashier asked the old hub for System and read the errors of the events, with customers' data."""
+    """A cashier never reads System: the errors of the events may carry customers' data."""
     client.force_login(make_user("eva", host="a", role="hub_employee"))
     refused = client.get(path, HTTP_HOST="a.localhost:8000")
     assert (refused.status_code, refused.json()["error"]["code"]) == (403, "permission_denied")

@@ -1,4 +1,4 @@
-// flow: BASE-F05 (base/WORKBOOK.md, «Abrir una app desde «Mis apps»», «Si falla»; gh:hub#438)
+// flow: BASE-F05 (base/WORKBOOK.md, «Abrir una app desde «Mis apps»», «Si falla»)
 // After a deploy the open tab still knows the old names of the screens' files, and the new image no longer serves
 // them: a tap on a screen not opened yet in that tab did nothing and said nothing until the app was restarted. Here
 // the server stops serving one screen's file once, as after a deploy, and the tap must open it anyway, in a fresh
@@ -54,7 +54,7 @@ async function homeOf(browser: Browser, size: (typeof SIZES)[number]) {
 const sameDocument = (page: Page) =>
   page.evaluate(() => (window as unknown as { tabBeforeTheTap?: true }).tabBeforeTheTap === true);
 
-test('BASE-F05 · gh:hub#438: after a deploy, «Add apps» on Home opens Apps in a fresh document instead of doing nothing', async ({
+test('BASE-F05: after a deploy, «Add apps» on Home opens Apps in a fresh document instead of doing nothing', async ({
   browser,
 }) => {
   const { context, page } = await homeOf(browser, SIZES[0]);
@@ -70,7 +70,7 @@ test('BASE-F05 · gh:hub#438: after a deploy, «Add apps» on Home opens Apps in
   }
 });
 
-test('BASE-F05 · gh:hub#438: after a deploy, «Employees» in the side menu opens in a fresh document instead of doing nothing', async ({
+test('BASE-F05: after a deploy, «Employees» in the side menu opens in a fresh document instead of doing nothing', async ({
   browser,
 }) => {
   const { context, page } = await homeOf(browser, SIZES[0]);
@@ -87,7 +87,7 @@ test('BASE-F05 · gh:hub#438: after a deploy, «Employees» in the side menu ope
 });
 
 for (const size of SIZES) {
-  test(`BASE-F05 · gh:hub#438: offline, a screen that cannot load keeps Home and says so, and «Retry» opens it, at ${size.width}x${size.height}`, async ({
+  test(`BASE-F05: offline, a screen that cannot load keeps Home and says so, and «Retry» opens it, at ${size.width}x${size.height}`, async ({
     browser,
   }) => {
     const { context, page } = await homeOf(browser, size);

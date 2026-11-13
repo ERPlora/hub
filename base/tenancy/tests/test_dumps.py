@@ -1,4 +1,4 @@
-"""A hub's database copied to the dumps bucket (round 2026-10-30 of PLAN-DB, decision 2 and proposals (f), (k), (m)).
+"""A hub's database copied to the dumps bucket.
 
 ``dump_hub`` runs ``pg_dump -Fc --no-owner --no-acl`` on the hub's own database as the migrator, on a direct connection
 to its writer (never PgBouncer), with its password in the subprocess's environment only; uploads it to
@@ -222,7 +222,7 @@ def test_the_link_downloads_the_copy_as_a_file_named_after_the_business(hub_a, d
 
 
 def test_a_copy_is_stopped_when_the_worker_stops_and_nothing_is_kept(hub_a, dumps_bucket, moto_s3):
-    """The worker on its way out (PLAN-DB round 2026-10-31b, C8): pg_dump is killed and the work stays due."""
+    """The worker on its way out: pg_dump is killed and the work stays due."""
     with pytest.raises(dumps.DumpStopped):
         dumps.dump_hub(hub_a, kind=HubDump.Kind.RESET, now=AT, cancelled=lambda: True)
 
@@ -232,7 +232,7 @@ def test_a_copy_is_stopped_when_the_worker_stops_and_nothing_is_kept(hub_a, dump
 
 
 def test_a_stopped_copy_kills_pg_dump_at_once_even_while_it_waits_on_a_lock(hub_a, dumps_bucket, moto_s3):
-    """pg_dump waiting on a table someone else locked (review of round 3): the stop is heard and pg_dump killed at
+    """pg_dump waiting on a table someone else locked: the stop is heard and pg_dump killed at
     once; without the kill the call would wait for the lock (released here after 8 s)."""
     import threading
     import time
@@ -261,7 +261,7 @@ def test_a_stopped_copy_kills_pg_dump_at_once_even_while_it_waits_on_a_lock(hub_
     assert objects(moto_s3, dumps_bucket) == {}
 
 
-# ── Control's own copy, before the cut of S5 ──────────────────────────────────────────────────────────────────────
+# ── Control's own copy, before the businesses moved out ───────────────────────────────────────────────────────────
 
 
 def test_control_is_copied_to_a_key_of_its_own_and_no_hub_s_copy_is_noted(hub_databases, dumps_bucket, moto_s3, tmp_path):

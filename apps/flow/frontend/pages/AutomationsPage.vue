@@ -11,9 +11,8 @@
 // Until the questions, the drafts and the list have their first answer, «Loading…» above the gallery: with the
 // business slow, the gallery alone looked as if there were none (hub#950). A list that could not be read shows,
 // with its message and «Retry».
-// On a phone «New automation» is its «+» alone, named by `aria-label`: with its words it took the bar and
-// left the title as «A…» (FIX-HUB-FLOW-AUTOMATIONS-TITLE-CUT-ON-PHONE; Material's top app bar, iOS's navigation
-// bars). From a tablet on, its icon and its words.
+// On a phone «New automation» is its «+» alone, named by `aria-label`, so the title keeps its room (Material's top
+// app bar, iOS's navigation bars). From a tablet on, its icon and its words.
 import { useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';

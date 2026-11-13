@@ -1,5 +1,4 @@
-"""A hub's database put back as it was at a moment, from a copy on a temporary cluster (hub#1198; PLAN-DB §13
-«Restaurar un hub»).
+"""A hub's database put back as it was at a moment, from a copy on a temporary cluster.
 
 The move's shape (``base.tenancy.move``, whose steps it uses) with its origin and destination the other way round: the
 copy comes from a cluster made for it (a point-in-time restore of the hub's own, registered in the Hub admin closed to
@@ -39,7 +38,7 @@ to control, the hub ready with the reason in ``last_error`` (``restore_<step>: <
 leaves the hub restoring, closed, and says why; the next pass undoes it again, never taking it forward. The kept copies
 are dropped after ``move.MOVED_COPY_DAYS`` by the moves' pass (``move.drop_old_copies``), with their rows.
 
-**Aside** (hub#1213, layer 1; BASE-F114): the same copy, made next to the business instead of in its place, for a
+**Aside** (BASE-F114): the same copy, made next to the business instead of in its place, for a
 business the fiscal guard would refuse (its production VeriFactu records after the moment are at the tax authority) or
 whose staff only wants back what it lost. The Hub admin asks (``control.hub.restore_aside``: a ``RestoredCopy`` row,
 ``<control>_copy_<its hex>``); the worker makes it here (:func:`run_aside_due`, in the moves' thread), one a pass, under
@@ -195,7 +194,7 @@ def _back(hub, kept_name: str, roles, ours, *, reason: str) -> None:
     logger.info("base.tenancy.restore.undone hub=%s: %s", hub.slug, reason)
 
 
-# ── Aside: a separate copy, the business untouched (hub#1213) ───────────────────────────────────────────────────────
+# ── Aside: a separate copy, the business untouched ───────────────────────────────────────────────────────────────────
 
 
 def run_aside_due(

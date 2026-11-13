@@ -33,6 +33,7 @@ from apps.inventory.schemas import (
     CategoryIn,
     CategoryOut,
     CategoryPatchIn,
+    CategoryRecoverIn,
     CategoryRefIn,
     ConfigOut,
     ConfigPatchIn,
@@ -963,6 +964,70 @@ def test_an_employee_cannot_touch_categories():
     )
 
 
+# inventory.category.recover (INVENTORY-F07, INVENTORY-F34)
+
+
+def recover_category(ctx=None, **data):
+    op = get("inventory.category.recover")
+    return op(ctx or system_context(A), op.input.model_validate(data))
+
+
+def test_recover_creates_the_category_as_its_screen_does_with_its_deleted_products_back_in_it():
+    cake = create("Cake", "CAK-1")
+    brownie = create("Brownie", "BRO-1")
+    run("inventory.product.delete", ProductRefIn(id=cake.id))
+    clear_outbox()
+
+    back = recover_category(
+        name="Desserts", color="#cc0066", tax_category_key=TAX, product_ids=[str(brownie.id), str(cake.id)]
+    )
+
+    assert (back.name, back.slug, back.color, back.tax_category_key) == ("Desserts", "desserts", "#cc0066", TAX)
+    made = Category.objects.get(pk=back.id)
+    assert (made.created_by, made.updated_by) == ("system", "system")
+    # Only the deleted one goes back in, so it comes back inside it when restored; the live one stays as it is.
+    assert list(ProductCategory.objects.filter(category=made).values_list("product_id", flat=True)) == [cake.id]
+    assert outbox() == [
+        (events.CATEGORY_CREATED, {"id": str(back.id), "name": "Desserts"}),
+        (events.PRODUCT_CATEGORIZED, {"product_id": str(cake.id), "category_id": str(back.id)}),
+    ]
+    restore(cake.id)
+    assert list(Product.objects.get(pk=cake.id).categories.values_list("name", flat=True)) == ["Desserts"]
+
+
+def test_recover_without_products_is_the_screens_create():
+    back = recover_category(name="Wines", product_ids=[str(uuid.uuid7())])
+
+    assert (back.name, back.slug, back.product_count) == ("Wines", "wines", 0)
+    assert not ProductCategory.objects.exists()
+    assert outbox() == [(events.CATEGORY_CREATED, {"id": str(back.id), "name": "Wines"})]
+
+
+def test_recover_with_a_tax_category_no_longer_active_is_refused():
+    TaxCategory.objects.filter(key=TAX).update(is_active=False)
+
+    error = refused(InvalidPayload, lambda: recover_category(name="Desserts", tax_category_key=TAX))
+
+    assert list(error.fields) == ["tax_category_key"]
+    assert not Category.objects.exists()
+
+
+def test_recover_is_the_platforms_without_a_route():
+    op = get("inventory.category.recover")
+    assert (op.kind, op.permission, op.input, op.output, op.expose_api, op.repeatable) == (
+        "command",
+        "inventory.system",
+        CategoryRecoverIn,
+        CategoryOut,
+        False,
+        True,
+    )
+    assert op.ai["risk"] == "normal" and op.ai["description"]
+    # Not a permission of any role: the owner holds every permission inventory declares, not this one.
+    refused(PermissionDenied, lambda: recover_category(ctx_for("hub_owner"), name="Desserts"))
+    assert not Category.objects.exists()
+
+
 # inventory.category.bulk_create (INVENTORY-F10)
 
 
@@ -1447,7 +1512,7 @@ def test_selling_without_stock_lets_the_balance_go_negative():
 @pytest.mark.parametrize("kind", ["untracked", "business_off"])
 def test_a_write_off_of_an_article_without_stock_control_is_refused_and_says_why(kind):
     # The screen offers it only to articles that track stock; by the assistant or the API a write-off
-    # that would do nothing is not a silent success either (2026-10-14).
+    # that would do nothing is not a silent success either.
     if kind == "business_off":
         configure(track_stock=False)
     created = create(initial_stock="5", track_stock=False if kind == "untracked" else None)

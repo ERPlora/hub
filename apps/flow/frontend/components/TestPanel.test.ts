@@ -95,7 +95,7 @@ describe('TestPanel', () => {
   });
 });
 
-describe('TestPanel: review 2026-10-15, item 1', () => {
+describe('TestPanel: what each kind of step would do', () => {
   it('an action that needs a person is said to be no automation’s', async () => {
     const step = { ...ANSWER.steps[2], outcome: 'high_risk' as const, operation: 'sale.order.void' };
     const m = await setup([200, { ...ANSWER, steps: [step] }]);
@@ -154,8 +154,8 @@ describe('TestPanel: review 2026-10-15, item 1', () => {
     expect(text).not.toContain('Hours');
   });
 
-  // FIX-HUB-FLOW-ASSISTANT-STEP-ACTS-ON-ANOTHER-CUSTOMER-WITHOUT-ON-BEHALF-OF (FLOW-F37): the data a step fixes, each
-  // with the value it would have, and the tool that would not be used because one would be empty.
+  // FLOW-F37: the data a step fixes, each with the value it would have, and the tool that would not be used because
+  // one would be empty.
   it('an assistant step says each fixed datum with its value, and which tool would not be used', async () => {
     const CANCEL = 'reservation.reservation.cancel';
     const UPDATE = 'reservation.reservation.update';

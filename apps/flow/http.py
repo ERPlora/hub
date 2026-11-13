@@ -1,4 +1,4 @@
-"""The outbound call of a «Call another system» step (WORKBOOK FLOW-F27; the old hub's HUB-F94).
+"""The outbound call of a «Call another system» step (WORKBOOK FLOW-F27).
 
 Only ``https`` with a plain host (no user and password in the address). Before connecting, the host is
 resolved ONCE and every address it gives is checked: none may be inside the business or the cloud (private

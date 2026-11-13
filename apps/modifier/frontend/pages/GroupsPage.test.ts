@@ -1,5 +1,5 @@
 // Modifiers (WORKBOOK «Pantallas · Suplementos»; MODIFIER-F01 to F03): the live `modifier.group.list` in a
-// server-side DataTable with the old screen's columns — Name (sorted and filtered), «On the kitchen ticket»
+// server-side DataTable with its columns — Name (sorted and filtered), «On the kitchen ticket»
 // (the name when empty), Choice (the rule) and Order — plus Options and «Applies to»; «Search…», by order
 // then name, 50 a page. «New group» and Edit (whoever may manage) open the form; Delete asks first, saying
 // what goes with it; a row opens the group's sheet, to everyone. Empty: «No modifier groups yet.».
@@ -7,6 +7,7 @@ import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 import { type Component, defineComponent } from 'vue';
 
+import { askToDelete, confirmDeletion } from '../../../../base/frontend/__tests__/table-delete';
 import type { GroupOut } from '../operations';
 import { EMPLOYEE, errorFrame, flush, type MountOptions, mountModifier, page } from '../__tests__/mount-modifier';
 import GroupFormModal from '../components/GroupFormModal.vue';
@@ -67,7 +68,7 @@ describe('GroupsPage', () => {
       ['sort_order', 'Order'],
     ]);
     expect(s.cells(0).slice(0, 6)).toEqual(['Doneness', 'POINT', 'Required (min. 1) · max. 1', '3', '2', '1']);
-    // An empty kitchen name is the name (Toast's rule, as the old screen).
+    // An empty kitchen name is the name (Toast's rule).
     expect(s.cells(1).slice(0, 3)).toEqual(['Sauces', 'Sauces', 'Optional · max. 3 · repeats']);
   });
 
@@ -85,7 +86,6 @@ describe('GroupsPage', () => {
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No results');
   });
 
-  // pm#611: while the first groups are on their way the table says «Loading…», never empty nor «0 groups».
   it('while the first result is on its way it says «Loading…», not that there are none', async () => {
     const s = await setup();
     expect(s.find('modifier-groups-loading').exists()).toBe(true);
@@ -96,7 +96,6 @@ describe('GroupsPage', () => {
     expect(s.find('modifier-groups-loading').exists()).toBe(false);
   });
 
-  // pm#533 and hub#2328: a list that cannot load says so and offers «Retry», never «No … yet» nor «0 groups».
   it('a list that could not load says so with «Retry», not that there are none; Retry asks again', async () => {
     const s = await setup();
     s.net.lastStream().push(errorFrame(s.subId(OP), 'boom'));
@@ -167,20 +166,14 @@ describe('GroupsPage', () => {
 
   it('deletes after its confirmation, saying what goes with the group', async () => {
     const s = await setup();
-    await s.show(page(ROWS));
-    s.table().vm.$emit('action', { actionId: 'delete', row: ROWS[0] });
-    await flush();
-    const dialog = s.wrapper.findComponent(ConfirmDialog);
+    const dialog = await askToDelete(s, page(ROWS), ROWS[0]);
     expect([dialog.props('title'), dialog.props('message'), dialog.props('consequences'), dialog.props('confirmLabel')]).toEqual([
       'Delete group',
       'Doneness — the group disappears with its options and stops being asked in the till. What was already ordered keeps it.',
       ['3 options will be deleted with it.', 'It will stop applying to 2 products or categories.'],
       'Delete',
     ]);
-    s.answer(200, { id: 'g1' });
-    dialog.vm.$emit('confirm');
-    await flush();
-    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/modifier/groups/delete', query: {}, body: { id: 'g1' } }]);
+    expect(await confirmDeletion(s, dialog, 'g1')).toEqual([{ method: 'POST', path: '/api/modifier/groups/delete', query: {}, body: { id: 'g1' } }]);
   });
 
   // hub#1147: one option or link is said in the singular and several in the plural, never «option(s)».
@@ -220,7 +213,7 @@ describe('GroupsPage', () => {
   });
 });
 
-describe('GroupsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('GroupsPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

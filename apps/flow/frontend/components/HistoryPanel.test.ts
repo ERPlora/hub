@@ -70,7 +70,7 @@ describe('HistoryPanel', () => {
     expect(m.find('flow-history-empty').text()).toBe('It has not run yet.');
   });
 
-  it('a history that could not be read says the screen\'s sentence when the server did not word it (hub#2320)', async () => {
+  it('a history that could not be read says the screen\'s sentence when the server did not word it', async () => {
     const m = await mountFlow(HistoryPanel, { props: { flowId: 'f1', steps: STEPS, catalog: CATALOG } });
     const call = await m.live();
     call.push(errorFrame(m.subId(OP, { flow_id: 'f1' }), 'internal_error'));

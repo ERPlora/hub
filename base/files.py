@@ -1,4 +1,4 @@
-"""The business's files (APP-BASE-8; the old hub's Files, ``media.rs`` and the SaaS's S3 media manager, ADR-0047).
+"""The business's files.
 
 What the Files screen keeps lives in the hub file store (``storages["hub_files"]``, ``base.storage``: S3 in AWS, the
 disk locally) under the hub's prefix, in a folder of its own: ``hub-<hex>/files/<path>``. The modules keep theirs
@@ -8,7 +8,7 @@ session and the permission of who asks.
 
 A *name* is one segment (no ``/``, ``\\``, control character, lone dot, or the folder marker) of 255 UTF-8 bytes at
 most; a *path* is a chain of names, ``""`` being the root. Both are checked before the store sees them, so no key
-ever leaves its hub's folder (an S3 key folds ``..``: saas#972). Object stores have no folders: an empty one is kept
+ever leaves its hub's folder (an S3 key folds ``..``). Object stores have no folders: an empty one is kept
 by its marker (``<folder>/.keep``), and renaming or moving copies every key and then deletes the old ones. Writing
 never overwrites in silence: an upload takes «name (1).ext» when «name.ext» is taken (Google Drive, Dropbox), and a
 new folder, a rename or a move onto a taken name is refused. Programs (Gmail's blocked list) are never kept.
@@ -91,7 +91,7 @@ HUB_PREFIX = re.compile(r"hub-([0-9a-f]{32})")
 Preview = Literal["image", "pdf", "text", "table", "json", "audio", "video", ""]
 #: The type a file is served with and how the screen shows it, by extension. Our own table, not ``mimetypes``: the
 #: slim image of production has no ``/etc/mime.types``. Markup and scripts are served as their source, as plain text
-#: (a browser never runs them, saas#968); an SVG may carry script and is never shown; what is not here is bytes.
+#: (a browser never runs them); an SVG may carry script and is never shown; what is not here is bytes.
 SERVED: dict[str, tuple[str, Preview]] = {
     **{ext: (f"image/{kind}", "image") for ext, kind in (
         ("jpg", "jpeg"), ("jpeg", "jpeg"), ("png", "png"), ("gif", "gif"), ("webp", "webp"), ("bmp", "bmp"),
@@ -297,7 +297,7 @@ def _refuse_program(name: str) -> None:
         raise InvalidPayload(message, code="base.file_type_refused", fields={"name": message})
 
 
-# ── Listing (BASE-G82) ───────────────────────────────────────────────────────────────────────────────────────
+# ── Listing ──────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def listing(store: Storage, hub: uuid.UUID, folder: str) -> dict:
@@ -475,7 +475,7 @@ def _tree(folders: set[str], parent: str) -> list[dict]:
     return [{"path": path, "name": posixpath.basename(path), "children": _tree(folders, path)} for path in children]
 
 
-# ── Upload and new folder (BASE-G83) ─────────────────────────────────────────────────────────────────────────
+# ── Upload and new folder ────────────────────────────────────────────────────────────────────────────────────
 
 
 def upload(
@@ -573,7 +573,7 @@ def create_folder(store: Storage, hub: uuid.UUID, parent: str, name: str) -> dic
     return {"path": path, "name": name}
 
 
-# ── Read (BASE-G84) ──────────────────────────────────────────────────────────────────────────────────────────
+# ── Read ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def describe(store: Storage, hub: uuid.UUID, path: str) -> dict:
@@ -609,7 +609,7 @@ def file_response(store: Storage, hub: uuid.UUID, described: dict, *, inline: bo
     return response
 
 
-# ── Rename and move (BASE-G85) ───────────────────────────────────────────────────────────────────────────────
+# ── Rename and move ──────────────────────────────────────────────────────────────────────────────────────────
 
 
 def rename(store: Storage, hub: uuid.UUID, path: str, name: str) -> dict:
@@ -702,7 +702,7 @@ def _prune(store: Storage, key: str) -> None:
     store.delete(key)
 
 
-# ── Delete (BASE-G86) ────────────────────────────────────────────────────────────────────────────────────────
+# ── Delete ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def delete(store: Storage, hub: uuid.UUID, path: str) -> dict:
@@ -723,7 +723,7 @@ def delete(store: Storage, hub: uuid.UUID, path: str) -> dict:
     return {"path": path, "folder": kind == "folder"}
 
 
-# ── A hub that is gone (PLAN-DB §6 «Baja», step 4) ───────────────────────────────────────────────────────────────
+# ── A hub that is gone ───────────────────────────────────────────────────────────────────────────────────────────
 
 
 class HubFilesNotDeleted(Exception):

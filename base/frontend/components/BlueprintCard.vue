@@ -1,8 +1,7 @@
 <script setup lang="ts">
-// «Start with a business like yours» on the Home (BASE-G131, BASE-F02; PLAN-HUB round 2026-10-21, the old hub's
-// BlueprintHeroCard): to who administers the hub, while the business has nothing a template brings (`empty` of
-// `base.blueprint.list`, live; a business is born with every app off, round 2026-10-27, and with nothing on it is
-// empty), up to four templates, one per kind of business, in the catalogue's order with «Use this one», «See all
+// «Start with a business like yours» on the Home: to who administers the hub, while the business has nothing a
+// template brings (`empty` of `base.blueprint.list`, live; a business is born with every app off, and with nothing on
+// it is empty), up to four templates, one per kind of business, in the catalogue's order with «Use this one», «See all
 // templates» (Settings › Data) and «Not now», remembered on this device. «Use this one» turns on the template's apps
 // and loads it in one go (`base.blueprint.import`, never people nor fiscal data) and tells how it went in the card:
 // ready, still waiting for an app being set up (`BlueprintCardPending`: its data comes by itself, hub#609), not all of
@@ -22,7 +21,7 @@ import type { ImportRow, Template } from '../operations';
 import BlueprintCardPending from './BlueprintCardPending.vue';
 import '../home.css';
 
-/** «Not now» on this device (the old hub forgot it on reload: a defect of HUB_SHELL-F26). */
+/** «Not now» on this device, kept across reloads. */
 const DISMISSED_KEY = 'hub-blueprint-card-dismissed';
 const DATA_PAGE = '/settings#data';
 

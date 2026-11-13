@@ -139,7 +139,7 @@ describe('ItemDetailPage: the item, live', () => {
     expect(s.banner('demo-detail-error').props('heading')).toBe('This app is not active in this business');
   });
 
-  it('has no OutfitKit tag left in any state (PLAN §16.11)', () => {
+  it('has no OutfitKit tag left in any state', () => {
     expect(source).not.toMatch(/<ok[-]/);
   });
 

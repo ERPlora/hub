@@ -74,7 +74,7 @@ describe('ReservationFormModal: New reservation', () => {
     expect(s.submit().disabled).toBe(true);
   });
 
-  it('draws every field with its box: outlined in md mode, never a bare line (reservations#71, pm#479)', async () => {
+  it('draws every field with its box: outlined in md mode, never a bare line', async () => {
     const s = await setup();
     const controls = ['guest_name', 'guest_phone', 'guest_email', 'date', 'time', 'party_size', 'duration_minutes', 'notes', 'internal_notes'];
     const drawn = (name: string) => s.field(name) as Control & { fill?: string; mode?: string };

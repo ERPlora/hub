@@ -77,7 +77,7 @@ def local_hubs(request):
     every app on (``base.activation.every_on``), as the developer's database has them after ``seed_local_hubs``.
 
     The host gate (``base.middleware``) answers 404 to a slug without a row, so a test on ``a.localhost`` needs it.
-    A hub is born with every app off (round 2026-10-27): a test of a new hub creates its own row, and one about how a
+    A hub is born with every app off: a test of a new hub creates its own row, and one about how a
     hub is born clears ``a``'s rows. A test without the database gets nothing (and a test without it that asks
     ``a.localhost`` for a hub's page fails: it must say ``django_db``).
     """
@@ -94,7 +94,8 @@ def local_hubs(request):
 
 def _every_app_on(slug):
     """Write down every app on in the business ``slug``, its roots chosen, unless it has rows already: what the
-    migration ``base.0017`` left every hub of before round 2026-10-27, and ``seed_local_hubs`` the local ones."""
+    migration ``base.0017`` left every hub that existed before apps were born off, and ``seed_local_hubs`` the
+    local ones."""
     from base import activation
     from base.models import AppActivation
 
@@ -108,8 +109,8 @@ def _every_app_on(slug):
 
 @pytest.fixture
 def every_app_on():
-    """``every_app_on(slug)``: a business the test creates, with every app on as a hub of before round 2026-10-27
-    (a new one is born with every app off). Writes the rows, no event: it was so before the test."""
+    """``every_app_on(slug)``: a business the test creates, with every app on, as a hub that existed before apps
+    were born off (a new one is born with every app off). Writes the rows, no event: it was so before the test."""
     return _every_app_on
 
 
@@ -169,7 +170,7 @@ def outbound_pool(request, monkeypatch):
 class _NoSlowPasses:
     """``base.worker.Background`` in the tests: the worker's loop starts no slow pass. They run in threads of their own,
     on their own connections, so in a test they would commit outside its transaction (a nightly ``UsageRun`` the relay's
-    tests left broke the next tests, W8 2026-10-31). Their own tests call ``worker._data``/``_usage`` directly."""
+    tests left broke the next tests). Their own tests call ``worker._data``/``_usage`` directly."""
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -193,7 +194,7 @@ def worker_slow_passes(request, monkeypatch):
         monkeypatch.setattr(worker, "Background", _NoSlowPasses)
 
 
-# ── Phase 2's tenancy (plan docs/plans/2026-10-22-fase-2-tenencia.md, S1) ─────────────────────────────────────────
+# ── The tenancy: a control database and one database per hub ───────────────────────────────────────────────────────
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -202,7 +203,7 @@ def legacy_fallback():
     test database (``base/tenancy/tests/legacy.py``).
 
     In production a hub's model or operation without ``use_hub`` fails (``HubContextMissing``) and a business without
-    its own database is not served (S5). The suite's older tests call operations and the ORM directly, in their own
+    its own database is not served. The suite's older tests call operations and the ORM directly, in their own
     threads too, for the local hubs ``a`` and ``b`` (``db_name=""``): here they fall back on control's test database,
     which also holds the tables of the hubs' apps (``LegacyTablesRouter``). The tenancy's own tests turn it off
     (``no_test_fallback``) and so do the ones of every way in (requests, the live executor, the print socket,
@@ -218,7 +219,7 @@ def legacy_fallback():
 
 @pytest.fixture(autouse=True)
 def legacy_worker(request, monkeypatch):
-    """The worker's loop serves only the hubs with their own database (S5). A test written before the tenancy that runs
+    """The worker's loop serves only the hubs with their own database. A test written before the tenancy that runs
     it on its businesses (on control's test database) gets a pass of its own instead of the one over control's outbox:
     their tasks and their events' relay (``base/tenancy/tests/legacy.py``, ``worker_pass``). Not for a test that runs as
     production (``no_test_fallback``) nor for the worker's own (``production_worker``)."""
@@ -306,7 +307,7 @@ def _hub_with_its_database(request, hub_id, slug, db_name):
 
 @pytest.fixture
 def hub_a(request, hub_databases):
-    """The hub ``tenant-a``, ready, with its own database (``hub_databases.a``): what a hub of phase 2 is."""
+    """The hub ``tenant-a``, ready, with its own database (``hub_databases.a``), as every hub is."""
     from base.tenancy.tests import hubs
 
     yield from _hub_with_its_database(request, hubs.HUB_A_ID, "tenant-a", hub_databases.a)

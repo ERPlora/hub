@@ -7,34 +7,21 @@
 // asks first and empties the list. Everything this spec creates is named «E2E …» and removed after it.
 import { type Browser, expect, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, psql, shot, shown } from './helpers';
+import { signedIn } from './flow-helpers';
+import { staffCleanUp } from './staff-helpers';
 import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 const TAG = 'E2E';
 
-function cleanup(): void {
-  const members = `select id from staff_member where first_name like '${TAG}%'`;
-  psql(
-    [
-      `delete from staff_timeoff where member_id in (${members})`,
-      `delete from staff_scheduleday where schedule_id in (select id from staff_schedule where member_id in (${members}))`,
-      `delete from staff_schedule where member_id in (${members})`,
-      `delete from staff_member where first_name like '${TAG}%'`,
-      `delete from staff_role where name like '${TAG}%'`,
-    ].join('; '),
-  );
-}
+const cleanup = (): void => staffCleanUp(TAG);
 
 test.beforeAll(cleanup);
 test.afterAll(cleanup);
 
-async function ownerPage(browser: Browser, next: string) {
-  const context = await browser.newContext({ baseURL: A, viewport: { width: 1280, height: 860 }, locale: 'en-US' });
-  const page = await context.newPage();
-  await login(page, A, next);
-  return { context, page };
-}
+/** The owner on `next` at a desk's size, in English. */
+const ownerPage = (browser: Browser, next: string) => signedIn(browser, next, { width: 1280, height: 860 });
 
 test('Roles: create, a duplicate refused in the form, retire from Edit (still listed, marked)', async ({ browser }) => {
   const name = `${TAG} Colourist ${Date.now().toString(36)}`;

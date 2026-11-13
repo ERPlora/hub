@@ -106,8 +106,8 @@ def test_a_full_course_takes_no_one_more_whatever_arrives_together():
     assert sorted(course.options.values_list("sort_order", flat=True))[-2:] == [38, 39]
 
 
-# Edits and reorders against writes of the same menu: a 409 or a success, never a raw database error
-# (review 3). Each case repeats, so a race that only bites now and then still shows.
+# Edits and reorders against writes of the same menu: a 409 or a success, never a raw database error.
+# Each case repeats, so a race that only bites now and then still shows.
 
 
 def unexpected(results) -> list:

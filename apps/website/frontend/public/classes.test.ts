@@ -1,4 +1,4 @@
-// The public pages are Bootstrap 5.3 (Ioan, 2026-10-22): every class in the website's Django templates
+// The public pages are Bootstrap 5.3: every class in the website's Django templates
 // (`apps/website/templates/website/**`) and in the catalog the bundle rebuilds is one of Bootstrap's own, read from
 // the installed `bootstrap.css`, or a `ws-*` hook; no class is computed (`{{ … }}`), but for what a design passes a
 // component it includes (`{% include … with login_class="btn …" %}`, read here where it is written), so this scan sees

@@ -1,9 +1,9 @@
-// Shared steps of the browser PoC (plan §8): the real login per host (Hub → SaaS → /auth/callback),
+// Shared steps of the browser specs: the real login per host (Hub → SaaS → /auth/callback),
 // the demo's API for setup, the list's readiness, the measurements file and the control of the dev
 // server (runserver + Vite).
 //
 // The local hubs `a` and `b` answer only once they are rows of the registry (`base.Hub`): without them every
-// host is a 404 (plan 2026-10-17, §1.3). `manage.py seed_local_hubs` (DEBUG only, idempotent) adds them;
+// host is a 404. `manage.py seed_local_hubs` (DEBUG only, idempotent) adds them;
 // `database.ts` runs it on an e2e database and `global-setup.ts` checks it (`seed_local_hubs --check`) before
 // the first spec. The shared `hub` database needs it once, by hand.
 import { execSync, spawn } from 'node:child_process';
@@ -36,6 +36,20 @@ import { STACK } from './stack';
 export { api };
 
 export const A = STACK.hub('a');
+
+/** The three sizes with the taller tablet, 834×1194. */
+export const THREE_SIZES_TALL_TABLET = [
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1194 },
+  { label: '1440', width: 1440, height: 900 },
+] as const;
+
+/** The three sizes the e2e looks at a screen in: a phone, a tablet and a desk. */
+export const THREE_SIZES = [
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1112 },
+  { label: '1440', width: 1440, height: 900 },
+] as const;
 export const B = STACK.hub('b');
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -310,9 +324,9 @@ export interface Credentials {
   email: string;
   password: string;
 }
-/** The PoC's customer account in the SaaS (`saas … demo_seed`): owner of hubs `a` and `b`. */
+/** The demo customer account in the SaaS (`saas … demo_seed`): owner of hubs `a` and `b`. */
 export const OWNER: Credentials = { email: 'owner@example.com', password: 'owner' };
-/** The PoC's employee in the SaaS (`demo_seed`): `hub_employee` of `a` and `b`, views Demo only. */
+/** The demo employee in the SaaS (`demo_seed`): `hub_employee` of `a` and `b`, views Demo only. */
 export const EMPLOYEE: Credentials = { email: 'employee@example.com', password: 'employee' };
 /** Where the local SaaS writes its mails (Django's file backend): `saas/.mail` beside the Hub, or `E2E_MAIL_DIR`. */
 export const MAIL_DIR = mailDirFrom(process.env, REPO_DIR);
@@ -845,7 +859,7 @@ const TEMPLATE_DATA = [
 
 /**
  * Takes away every row a template brings from the business at `origin`, through the apps' operations (their apps
- * on), until the server says the business is empty (phase 1: `a` and `b` share these rows).
+ * on), until the server says the business is empty.
  */
 export async function emptyOfTemplateData(context: BrowserContext, origin: string): Promise<void> {
   for (let pass = 0; pass < 5; pass += 1) {
@@ -863,15 +877,15 @@ export async function emptyOfTemplateData(context: BrowserContext, origin: strin
   throw new Error('the business could not be emptied of what a template brings');
 }
 
-/** How long the run's worker may take to make an app's tables in a business's own database (S3): its tick, the
+/** How long the run's worker may take to make an app's tables in a business's own database: its tick, the
  *  migrations of the app and what it needs, and its settle. */
 export const APP_SET_UP_MS = 60_000;
 
 /**
  * Turns on `apps` in the business at `origin`, as the person of `context` who runs it, through Apps' own command
- * (`POST /api/apps/enable`, `base.app.enable`): a business is born with every app off (PLAN-HUB round 2026-10-27).
- * One already on changes nothing. In a business whose own database lacks an app's tables (a demo, a new business:
- * S3) the answer is 202 «creating» and the run's worker makes them: it waits until `base.app.list` says it is on.
+ * (`POST /api/apps/enable`, `base.app.enable`): a business is born with every app off.
+ * One already on changes nothing. In a business whose own database lacks an app's tables (a demo, a new business)
+ * the answer is 202 «creating» and the run's worker makes them: it waits until `base.app.list` says it is on.
  */
 export async function turnOn(context: BrowserContext, origin: string, ...apps: string[]): Promise<void> {
   for (const app of apps) {
@@ -915,7 +929,7 @@ export async function turnOffTurnedOn(context: BrowserContext, origin: string, t
   });
 }
 
-/** Deletes every demo item (phase 1: `a` and `b` share them), through the API. */
+/** Deletes every demo item, through the API. */
 export async function clearItems(context: BrowserContext, origin: string): Promise<number> {
   let deleted = 0;
   for (;;) {
@@ -941,7 +955,7 @@ export const shown = (page: Page): Locator =>
   page.locator(`.ion-page:not(.ion-page-hidden):not(:is(${OVERLAYS}) *)`).last();
 
 /**
- * The ⠿ «My apps» button of the hub's topbar (its sidebar, PLAN-MIGRATIONS §16): there once the
+ * The ⠿ «My apps» button of the hub's topbar (its sidebar): there once the
  * authenticated shell is painted (every page of the stack has its own; the first one is enough).
  */
 export const topbarApps = (page: Page): Locator => page.locator('[data-testid=topbar-apps]').first();
@@ -963,6 +977,20 @@ export const compactBar = (page: Page): boolean => (page.viewportSize()?.width ?
 /** The bell's count on the screen on view: on the bell, or on a phone's «More options», which carries it. */
 export const bellBadge = (page: Page): Locator =>
   shown(page).locator(compactBar(page) ? '[data-testid=topbar-chrome-more-badge]' : '[data-testid=hub-bell] [data-testid=hub-bell-badge]');
+
+/** The bell's count says `total`, or shows nothing when it is 0. */
+export async function badgeSays(page: Page, total: number, options: { timeout?: number } = {}): Promise<void> {
+  if (total > 0) await expect(bellBadge(page)).toHaveText(String(total), options);
+  else await expect(bellBadge(page)).toHaveCount(0, options);
+}
+
+/** The page still, with nothing past its right edge at the size `label`, then captured as `name`. */
+export async function capturedFitting(page: Page, name: string, label: string): Promise<void> {
+  await untilStill(page);
+  const overflow = await horizontalOverflow(page);
+  expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
+  await capture(page, name);
+}
 
 /**
  * Opens the bell's list (BASE-F10) and resolves once it is presented: the bell itself, or on a phone its row in «More
@@ -1191,13 +1219,26 @@ function scratchTableOf(table: string, hub: string): string | undefined {
 }
 
 /** `sql` where its tables live (`hub-databases.ts`): each statement on control's tables in the stack's control
- * database, on any other in `hub`'s own (`a` unless the spec names another; round 2026-10-30 of PLAN-DB, S2a), the
+ * database, on any other in `hub`'s own (`a` unless the spec names another), the
  * ones in a row on one database in one call; what they print, in order. A statement that names both is refused. */
 export function psql(sql: string, hub = 'a'): string {
   return plan(sql, hub, STACK.database, hubDatabase, scratchTables, (table) => scratchTableOf(table, hub))
     .map((run) => psqlOn(run.database, run.sql))
     .filter(Boolean)
     .join('\n');
+}
+
+/**
+ * The username of whoever is signed in on `context`. Not by email: a hub database kept from a stack whose SaaS was
+ * created again holds an older account with the same email (a new SaaS, new users), and the email names both.
+ */
+export async function usernameOf(context: BrowserContext): Promise<string> {
+  const me = await api<{ user: { id: string } | null }>(context, A, 'GET', '/me');
+  expect(me.status, 'GET /api/me').toBe(200);
+  const id = me.data.user?.id ?? '';
+  expect(id, 'the person signed in').not.toBe('');
+  // `/api/me` names the person of the business's database (base.HubUser), whose username is the session's.
+  return psql(`SELECT username FROM base_hubuser WHERE id = '${id}'`);
 }
 
 /** The usernames of every account of `email` (control's ``auth_user``), quoted for the `in (…)` of a statement on a
@@ -1215,7 +1256,7 @@ export function hubUserIdOf(email: string, hub = 'a'): string {
 /** Takes the plan out of `a`'s photo while a spec runs, keeping the photo in its scratch table `backup` (next to the
  * registry) for `restorePhotoFrom`: for a spec that signs in from more than one browser. With a plan in the photo
  * (erplora.com's Free covers one device, as its seed or a run of the WhatsApp specs can leave it), every entry from
- * another browser ends the sessions of the others on `a` (BASE-G57), and the next request of the first gets a 401. */
+ * another browser ends the sessions of the others on `a`, and the next request of the first gets a 401. */
 export function dropPlanFromPhoto(backup: string): void {
   psql(`drop table if exists ${backup}; create table ${backup} as select id, state from base_hub where slug = 'a'`);
   psql("update base_hub set state = state - 'plan' where slug = 'a'");

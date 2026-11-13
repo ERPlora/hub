@@ -1,12 +1,11 @@
 // Shared steps of the Invoicing browser specs (apps/invoice/WORKBOOK.md): the issuer set up through the
 // app's API (setup, never the check itself), the delivery of a Sales event to Invoicing as the outbox relay
-// will in phase 2 (the event's real payload, read from the outbox, posted to the operation the reaction
-// runs), and the cleanup every invoice spec runs in its `afterAll` BEFORE Sales' (a document keeps its sale).
-// What a run creates is found by its sales (`E2E-INV-…` products), its names (`e2e …`), its series
-// (`E2E…` codes) or the ids it recorded.
-import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
+// does it (the event's real payload, read from the outbox, posted to the operation the reaction runs), and the cleanup
+// every invoice spec runs in its `afterAll` BEFORE Sales' (a document keeps its sale). What a run creates is found by
+// its sales (`E2E-INV-…` products), its names (`e2e …`), its series (`E2E…` codes) or the ids it recorded.
+import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, capture, psql } from './helpers';
+import { A, api, capture, login, psql } from './helpers';
 
 /** The three sizes of a flow's evidence (the migration's: 390×844, 834×1112, 1440×900). */
 export const FLOW_VIEWPORTS = [
@@ -139,7 +138,7 @@ const REACTION_ROUTES: Record<string, string> = {
   'sale.sale.voided': '/invoice/invoices/rectify_from_void',
 };
 
-/** Hands the newest `name` event of `saleId` to Invoicing, as the relay will: its real payload, read from
+/** Hands the newest `name` event of `saleId` to Invoicing, as the relay does: its real payload, read from
  *  the outbox, to the operation that reacts to it. Returns the document it issued. */
 export async function deliver(context: BrowserContext, name: keyof typeof REACTION_ROUTES & string, saleId: string): Promise<InvoiceOut> {
   const payload = psql(
@@ -212,4 +211,15 @@ export function cleanInvoices(): void {
   setUpIssuer = false;
   seriesBefore = null;
   hadVerifactuConfig = true;
+}
+
+/** After a spec: the issuer it found (if it read one) put back as the owner, and the invoices of the run taken away. */
+export async function issuerBackAndInvoicesGone(browser: Browser, issuer: IssuerOut | undefined): Promise<void> {
+  if (issuer) {
+    const context = await browser.newContext({ baseURL: A });
+    await login(await context.newPage(), A, '/invoice/invoices');
+    await restoreIssuer(context, issuer);
+    await context.close();
+  }
+  cleanInvoices();
 }

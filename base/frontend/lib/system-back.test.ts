@@ -1,5 +1,5 @@
-// BASE-F05 · gh:hub#1906 — Android's Back button on the installed app (ported from the old hub's
-// `apps/web/src/router/back-closes-overlay.ts` and its test, origin/develop).
+// BASE-F05 — Android's Back button on the installed app (ported from the old hub's
+// `apps/web/src/router/back-closes-overlay.ts` and its test).
 //
 // On the installed app Tauri's Android activity turns the system Back into `webView.goBack()` — but ONLY while nobody
 // listens to its `back-button` event. Nobody in the Hub did: an app opened cold (a link, a reload) CLOSED the app on
@@ -13,7 +13,7 @@
 //      `ion-menu`; then the mounted app, through the cancelable `erplora:back` (`preventDefault()` = "I closed one");
 //   2. `installSystemBackButton`, with nothing open: on a detail view the screen's own Back (the topbar's: history
 //      inside the app, else its `backHref`); on the root of an app, Home, with history behind or not (a screen of an
-//      app has no Back, PLAN-MIGRATIONS §16); on Home, out of the app (`leave_app`), as the system Back would;
+//      app has no Back); on Home, out of the app (`leave_app`), as the system Back would;
 //   3. it never cancels a navigation (rv-2042), and outside the installed app it registers nothing and never throws;
 //   4. the listener goes when the page goes (Tauri keeps listeners across page loads) or when the shell lets go.
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -72,7 +72,7 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-describe('gh:hub#1906 — closeTopmostLayer', () => {
+describe('closeTopmostLayer', () => {
   it('dismisses a presented Ionic modal', async () => {
     const modal = presentOverlay('ion-modal');
 
@@ -307,7 +307,7 @@ function fakeTauri(opts: { refuses?: boolean; leaveApp?: () => Promise<unknown> 
   return { win, state, addPluginListener, invoke };
 }
 
-describe('gh:hub#1906 — installSystemBackButton (the Android button)', () => {
+describe('installSystemBackButton (the Android button)', () => {
   function setup(opts: { outcome?: BackOutcome; back?: HTMLElement | null; home?: boolean; leaveApp?: () => Promise<unknown> } = {}) {
     const tauri = fakeTauri({ leaveApp: opts.leaveApp });
     const closeTop = vi.fn(async () => opts.outcome ?? 'none');
@@ -453,7 +453,7 @@ describe('gh:hub#1906 — installSystemBackButton (the Android button)', () => {
 // The layers end to end on the real document and window (`window.__TAURI__` as the installed app puts it), every
 // default in place: what is open is closed first, and only an empty screen moves. The shell's barrel registers Ionic's
 // elements, which park an inline overlay hidden once they upgrade: each screen is arranged right before the press.
-describe('gh:hub#1906 — a press on the real document, layer by layer', () => {
+describe('a press on the real document, layer by layer', () => {
   type TauriWindow = { __TAURI__?: unknown };
   let release: (() => void) | null = null;
 

@@ -1,5 +1,5 @@
-// The country of the card (CUSTOMER-F01, F04) on the real stack: the shared Combo (the product's
-// `ok-combo`, customers#72). Typing part of its name filters the list under the field; the card keeps
+// The country of the card (CUSTOMER-F01, F04) on the real stack: the shared Combo. Typing part of its
+// name filters the list under the field; the card keeps
 // the two-letter code. Clearing the field, with the mouse or with the keyboard, leaves the card
 // without a country. The list is seen open at 390×844, 834×1112 and 1440×900.
 import { expect, type Locator, type Page, test } from '@playwright/test';

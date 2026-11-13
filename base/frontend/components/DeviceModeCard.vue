@@ -1,9 +1,7 @@
 <script setup lang="ts">
-// «This device» (Settings › General, BASE-G72; the old hub's DeviceModeCard): whether the device in hand is shared (the
-// PIN pad, a session per shift) or personal (the session stays open, never a PIN). It comes live
-// (`base.device.current`); the mark moves only when the Hub confirms (`base.device.mode_set`), and the choices wait
-// while it saves. Only an administrator changes it. A browser that is not a device of the business yet (it never
-// entered here with an account) says how to become one, instead of the Hub's refusal.
+// Settings › General: whether the device in hand is shared (PIN pad, a session per shift) or personal (the session
+// stays open). The mark moves only once the Hub confirms the change. A browser that never entered with an account is
+// not a device of the business yet, so it is told how to become one instead of showing the Hub's refusal.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';

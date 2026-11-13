@@ -1,15 +1,14 @@
-// flow: service-business-currency (FIX-HUB-SERVICE-PRICE-STORED-IN-HUNDREDTHS-WHATEVER-THE-CURRENCY and
-// FIX-HUB-SERVICE-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY; apps/service/WORKBOOK.md «Antes de empezar»)
+// flow: service-business-currency (apps/service/WORKBOOK.md «Antes de empezar»)
 // Services writes, saves and paints its amounts in the business's currency: its country's, as erplora.com registered
 // it (`PUT /internal/hubs/{id}`, signed the way the SaaS sends it), in that currency's minor units — the unit Sales
 // charges —, never in hundredths of a fixed euro. Hub `a` moves to Japan: «New service» names the field «Price (JPY)»,
 // «1500» is saved as 1500 yen (read back through the API). With only Spain's factory rules there is no rule for the
-// service in Japan: the till's foot says why it cannot value the check, never an unexplained «—» (hub#1069), in 390, 834
-// and 1440; once a Japanese rule exists the notice clears by itself and the till charges it at ¥1,500, never ¥150,000,
-// in 390, 834 and 1440. In Poland the run's service and voucher read in złoty in the list (captures
-// `FIX-HUB-SERVICE-PRICE-STORED-IN-HUNDREDTHS-WHATEVER-THE-CURRENCY-<width>`), the form names «Price (PLN)» and its two
-// readings of «1.250» are in złoty, and «Packages» shows the voucher's closed price in złoty. Back in Spain, euros
-// (`…-es-1440`). What the run creates is deleted after it and `a`'s registration put back, also when a test fails.
+// service in Japan: the till's foot says why it cannot value the check, never an unexplained «—» (hub#1069), in 390,
+// 834 and 1440; once a Japanese rule exists the notice clears by itself and the till charges it at ¥1,500, never
+// ¥150,000, in 390, 834 and 1440. In Poland the run's service and voucher read in złoty in the list, the form names
+// «Price (PLN)» and its two readings of «1.250» are in złoty, and «Packages» shows the voucher's closed price in złoty.
+// Back in Spain, euros. What the run creates is deleted after it and `a`'s registration put back, also when a test
+// fails.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, hostPage, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
@@ -102,7 +101,7 @@ test.afterAll(async () => {
   dropCountryRules('JP');
 });
 
-test(`${KEY}: service-business-currency a business in Japan saves «1500» as 1500 yen and the till charges ¥1,500 in 390, 834 and 1440`, async ({
+test(`service-business-currency a business in Japan saves «1500» as 1500 yen and the till charges ¥1,500 in 390, 834 and 1440`, async ({
   page,
   context,
 }) => {
@@ -178,7 +177,7 @@ test(`${KEY}: service-business-currency a business in Japan saves «1500» as 15
   }
 });
 
-test(`${KEY}: service-business-currency a business in Poland reads its services and vouchers in złoty in 390, 834 and 1440`, async ({ page }) => {
+test(`service-business-currency a business in Poland reads its services and vouchers in złoty in 390, 834 and 1440`, async ({ page }) => {
   await registerBusinessIn(original, 'PL');
   const row = await serviceRow(page, color.id, color.name);
   // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
@@ -224,7 +223,7 @@ test(`${KEY}: service-business-currency a business in Poland reads its services 
   }
 });
 
-test(`${KEY}: service-business-currency back in Spain the services and vouchers are in euros`, async ({ page }) => {
+test(`service-business-currency back in Spain the services and vouchers are in euros`, async ({ page }) => {
   await registerBusinessIn(original, 'ES');
   await page.setViewportSize({ width: 1440, height: 900 });
   const row = await serviceRow(page, color.id, color.name);

@@ -1,14 +1,12 @@
-// The tax figure of Sales → Sales (SALE-F28 with TAX-F11; FIX-SALE-KPI-TAX-LABEL-REGION and the round
-// 2026-10-17 of PLAN-HUB): the figure is named by the tax the period's sales were DECLARED with, never by the
-// territory kept today. Without sales in the period it is named by the business territory's, as Taxes
-// publishes it (`tax.settings.get`), and a change of territory renames it on the open screen (live). In the
-// Canary Islands, with an IGIC 7 % rule on the generic goods, a sale charged at the till is declared IGIC 7 %
-// and the figure says «IGIC», never «VAT»; back to the whole country it still says «IGIC» (what those sales
-// declared), and once a sale at the peninsula's VAT joins the period it says «Taxes» by itself (live). The
-// figures are seen at 390×844, 834×1112 and 1440×900 (`FIX-SALE-KPI-TAX-LABEL-REGION-<width>.png`). What the
-// run makes is deleted before and after it (the «Today» period holds no sale but this spec's: its own e2e
-// database), and the business goes back to the whole country.
-// flow: ninguno — FIX de SALE-F28 (cifras de ventas): la cifra de impuestos dice el impuesto declarado, no el territorio de hoy
+// The tax figure of Sales → Sales (SALE-F28 with TAX-F11): the figure is named by the tax the period's sales were
+// DECLARED with, never by the territory kept today. Without sales in the period it is named by the business
+// territory's, as Taxes publishes it (`tax.settings.get`), and a change of territory renames it on the open screen
+// (live). In the Canary Islands, with an IGIC 7 % rule on the generic goods, a sale charged at the till is declared
+// IGIC 7 % and the figure says «IGIC», never «VAT»; back to the whole country it still says «IGIC» (what those sales
+// declared), and once a sale at the peninsula's VAT joins the period it says «Taxes» by itself (live). The figures are
+// seen at 390×844, 834×1112 and 1440×900. What the run makes is deleted before and after it (the «Today» period holds
+// no sale but this spec's: its own e2e database), and the business goes back to the whole country.
+// flow: SALE-F28 — the tax figure names the tax that was declared, not today's territory
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';

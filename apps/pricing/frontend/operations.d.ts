@@ -1,9 +1,8 @@
 // Types of the pricing app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from
-// apps/pricing/schemas.py. Written by hand, as the other apps', until V3 generates them from
-// `/api/openapi.json`. Keep it in step with schemas.py (tests/test_queries.py compares the prices and RuleOut) and
-// `frontend/generated/operations.json`.
-// One input per operation (ninja's parity): no path parameters, an id travels in the input.
-// On the wire: money in whole cents; quantities and percents are decimals as JSON strings («10.000»,
+// apps/pricing/schemas.py. Written by hand, as the other apps' are: nothing generates them from `/api/openapi.json`.
+// Keep it in step with schemas.py (tests/test_queries.py compares the prices and RuleOut) and
+// `frontend/generated/operations.json`. One input per operation (ninja's parity): no path parameters, an id travels in
+// the input. On the wire: money in whole cents; quantities and percents are decimals as JSON strings («10.000»,
 // «12.50»); dates ISO `YYYY-MM-DD`, moments ISO 8601.
 import type { Page } from '../../../frontend/sdk-types';
 

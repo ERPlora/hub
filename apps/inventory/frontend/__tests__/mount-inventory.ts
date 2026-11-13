@@ -1,41 +1,17 @@
-// Test helper of the inventory's pages and components: the SDK's live harness (fake clock, fake
-// network serving the stream and the API) on the hub's generated op → route map, the shell's i18n
-// with the inventory catalogues merged in, a session and a memory router. Pages are mounted as the
-// shell would. Tests that open a dialog mock `@ionic/vue`'s IonModal with `IonModalStub` (an overlay
-// only presents itself in a real browser).
-import { createShellI18n, provideSession, type SessionMe } from '@erplora/ui/shell';
-import { ApiError, LIVE_CLIENT_KEY, type LiveClient, type OpName } from '@erplora/ui/sdk';
-import { fillHappyDomGaps } from '@erplora/ui/testing';
-import { mount } from '@vue/test-utils';
-import { type Component, createApp, type Ref, ref } from 'vue';
-import { createMemoryHistory, createRouter } from 'vue-router';
+// Test helper of the inventory's pages and components: `mountInShell` with its catalogues over base's, the dashboard,
+// its people and the hub's business; the API's answers and the catalogue's rows its tests share. Tests that open a
+// dialog mock `@ionic/vue`'s IonModal with `IonModalStub` (an overlay only presents itself in a real browser).
+import type { SessionMe } from '@erplora/ui/shell';
+import { ApiError, type LiveClient, type OpName } from '@erplora/ui/sdk';
+import type { Component, Ref } from 'vue';
 
-// The hub does not depend on ionicons itself: its registry is global (`window.Ionicons`), so the
-// copy @erplora/ui installs registers the shell's icons as `createShell` does at boot (an icon that
-// is not registered makes ion-icon try a URL and log «Invalid URL» in happy-dom).
-import { addIcons } from '../../../../packages/ui/node_modules/ionicons';
-import { ION_ICONS } from '../../../../packages/ui/src/shell/icons';
-
-import {
-  createTestClient,
-  flush,
-  resultFrame,
-  type ApiCall,
-  type StreamCall,
-} from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+import type { ApiCall, StreamCall } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+import { flush, mountInShell, overBase, page, resultFrame } from '../../../../base/frontend/__tests__/mount-in-shell';
+import { business } from '../../../../base/frontend/__tests__/business';
 import type { Business } from '../../../../base/frontend/operations';
-import baseEn from '../../../../base/frontend/locale/en.json';
-import baseEs from '../../../../base/frontend/locale/es.json';
-import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 
-// happy-dom made to behave as a browser where Ionic's runtime reaches it, by each helper: the hub setup
-// (vitest.setup.ts) only unmounts what a test left mounted and fails one that leaves a real timer armed.
-fillHappyDomGaps();
-addIcons(ION_ICONS);
-
-export { BYE, errorFrame, flush, HELLO, resultFrame } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
 export type { ApiCall, StreamCall };
 
 const ALL = [
@@ -74,24 +50,7 @@ export const EMPLOYEE: SessionMe = {
 
 /** The business of the hub (`base.business.get`): one in Spain, in euros, unless a test says another
  *  (flow business-currency: the money of every screen is the business's). */
-export function business(fields: Partial<Business> = {}): Business {
-  return {
-    name: 'Bar Pepe',
-    country: 'ES',
-    country_name: 'Spain',
-    timezone: 'Europe/Madrid',
-    language: 'es',
-    language_name: 'Spanish',
-    currency: 'EUR',
-    currency_label: 'EUR · Euro',
-    currency_decimals: 2,
-    demo: false,
-    settings_url: 'https://erplora.com/hubs/bar-pepe/settings',
-    ...fields,
-  };
-}
-
-export const POLISH: Partial<Business> = { country: 'PL', country_name: 'Poland', currency: 'PLN', currency_label: 'PLN · Polish Zloty' };
+export { business, POLISH } from '../../../../base/frontend/__tests__/business';
 
 export interface MountOptions {
   props?: Record<string, unknown>;
@@ -125,9 +84,6 @@ export const refusal = (status: number, code: string, message: string, fields?: 
 /** The `ApiError` a refusal becomes. */
 export const apiError = (status: number, code: string, message: string, fields?: Record<string, string>): ApiError =>
   new ApiError(status, code, message, fields);
-
-/** A page of a list. */
-export const page = <T>(rows: T[], total = rows.length, limit = 50, offset = 0) => ({ rows, total, limit, offset });
 
 /** The tax categories Taxes seeds (`tax.category.list` rows). */
 export const TAX_CATEGORIES = page([
@@ -241,45 +197,24 @@ export function category(overrides: Record<string, unknown> = {}) {
 }
 
 export async function mountInventory(component: Component, options: MountOptions = {}) {
-  const harness = createTestClient({ routes: OPERATION_ROUTES });
-  if (options.api) harness.net.onApi(options.api);
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [{ path: '/:path(.*)*', component: { template: '<div />' } }],
-  });
-  await router.push(options.path ?? '/inventory/dashboard');
-  await router.isReady();
-  // The session is provided app-wide, as createShell does.
-  const app = createApp({});
-  provideSession(options.sessionRef ?? ref(options.session ?? MANAGER), ref('live'), { app });
-  const wrapper = mount(component, {
-    props: options.props,
-    attachTo: options.attach ? document.body : undefined,
-    global: {
-      plugins: [router, createShellI18n({ locale: options.locale ?? 'en', messages: { en: { ...baseEn, ...en }, es: { ...baseEs, ...es } } })],
-      provide: { ...app._context.provides, [LIVE_CLIENT_KEY as symbol]: harness.client },
-      stubs: options.stubs,
-    },
-  });
-  /** Opens the stream and answers the business, if a piece follows it; returns the call to push frames into. */
-  const live = async (): Promise<StreamCall> => {
-    const call = await harness.goLive();
-    const answer = options.business === undefined ? business() : options.business;
-    if (answer && harness.client.stream.subscriptions('base.business.get').length) await result(call, 'base.business.get', answer);
-    return call;
-  };
+  const mounted = await mountInShell(
+    component,
+    { ...options, session: options.sessionRef ?? options.session, attachTo: options.attach ? document.body : undefined },
+    { path: '/inventory/dashboard', session: MANAGER, messages: overBase(en, es), business: business() },
+  );
+  const { client, net } = mounted;
   /** Pushes a result for the `index`-th subscription of `op` and lets Vue render it. */
   async function result(call: StreamCall, op: OpName, data: unknown, rev = 1, index = 0): Promise<void> {
-    call.push(resultFrame(subId(harness.client, op, index), data, rev));
+    call.push(resultFrame(subId(client, op, index), data, rev));
     await flush();
   }
-  /** The live params of every subscription of `op`. */
-  const params = (op: OpName): unknown[] => harness.client.stream.subscriptions(op).map((s) => s.params);
   /** API calls made so far to `path` (without the query string). */
-  const calls = (path: string): ApiCall[] => harness.net.api.filter((call) => call.url.split('?')[0] === path);
+  const calls = (path: string): ApiCall[] => net.api.filter((call) => call.url.split('?')[0] === path);
   /** The JSON body of an API call. */
   const body = (call: ApiCall): unknown => JSON.parse(String(call.init.body));
   /** The query of an API call. */
   const query = (call: ApiCall): Record<string, string> => Object.fromEntries(new URL(call.url, 'http://a.localhost').searchParams);
-  return { ...harness, router, wrapper, live, result, params, calls, body, query };
+  return { ...mounted, result, calls, body, query };
 }
+
+export * from '../../../../base/frontend/__tests__/mount-in-shell';

@@ -3,10 +3,10 @@
 services.py records them in the outbox, in the command's transaction; live.py names the ones that
 re-run each live query. Each event carries only what the WORKBOOK's «Lo que avisa» lists.
 
-Reactions: a paid sale lowers the stock, a voided one restores it and a refund puts its returned units
-back, each through an operation of this app run as the system, in its own transaction. The worker's outbox
-relay (``base/relay.py``) hands each delivered event to ``react``; the operations are idempotent per sale
-(per refund for a refund), so a repeated delivery changes nothing. ``sale`` does not require ``inventory`` (PLAN §20.5): this is the only link.
+Reactions: a paid sale lowers the stock, a voided one restores it and a refund puts its returned units back, each
+through an operation of this app run as the system, in its own transaction. The worker's outbox relay
+(``base/relay.py``) hands each delivered event to ``react``; the operations are idempotent per sale (per refund for a
+refund), so a repeated delivery changes nothing. ``sale`` does not require ``inventory``: this is the only link.
 """
 
 from typing import Any
@@ -54,7 +54,7 @@ FIGURE_EVENTS = [*PRODUCT_EVENTS, STOCK_CHANGED, CONFIG_UPDATED]
 # The Sales app's events (its WORKBOOK fixes their payload).
 SALE_COMPLETED = "sale.sale.completed"
 SALE_VOIDED = "sale.sale.voided"
-# INVENTORY-F24 (2026-10-14): the units a refund returns go back to the stock.
+# INVENTORY-F24: the units a refund returns go back to the stock.
 SALE_REFUNDED = "sale.sale.refunded"
 
 #: Event of another app → the operation of this app that reacts to it.

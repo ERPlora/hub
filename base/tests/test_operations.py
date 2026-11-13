@@ -1,4 +1,4 @@
-"""The context builder of hub-next phase 1: scope = first label of the Host, permissions by Membership."""
+"""The context builder: scope = first label of the Host, permissions by Membership."""
 
 import dataclasses
 
@@ -87,7 +87,7 @@ def test_the_platform_host_follows_the_setting(settings):
     assert not is_platform_host(request_for("hubs.localhost"))
 
 
-# ── HUB_BASE_DOMAIN: a hub is one label on the base domain (plan 2026-10-14-entorno-pre, H-2) ──
+# ── HUB_BASE_DOMAIN: a hub is one label on the base domain ─────────────────────────────────────
 # prod (erplora.com) and pre (pre.erplora.com) share one ALB, whose wildcard *.erplora.com also matches
 # x.pre.erplora.com: the Hub of one environment never serves a host of the other.
 
@@ -171,7 +171,6 @@ def test_the_platform_host_is_hubs_of_the_base_domain_only(base_domain, domain, 
 
 
 def test_without_a_base_domain_the_hub_is_the_first_label_anywhere(base_domain):
-    # HUB_BASE_DOMAIN="": the behaviour before 2026-10-14.
     base_domain("")
     assert HostScopeResolver().resolve(request_for("acme.pre.erplora.com")) == Scope("host", "acme")
     assert is_platform_host(request_for("hubs.pre.erplora.com"))
@@ -266,8 +265,7 @@ def test_refresh_of_an_anonymous_context():
 
 @pytest.mark.django_db
 def test_a_demo_hub_is_the_registry_s_word():
-    # A demo (PLAN-SAAS §3.5) is an ephemeral hub with ``is_demo`` in the registry (``base.Hub`` in phase 1, plan
-    # 2026-10-17 §1.2; ``control.Hub`` in phase 2). Apps ask here, never there.
+    # A demo is an ephemeral hub with ``is_demo`` in the registry. Apps ask here, never there.
     from base.models import Hub
 
     Hub.objects.create(slug="demo-0000beef", status="ready", is_demo=True)
@@ -280,7 +278,7 @@ def test_a_demo_hub_is_the_registry_s_word():
 @pytest.mark.django_db
 def test_a_hub_s_id_is_the_registry_s_word():
     # The id names what a module keeps for its hub outside the database (``hub-<id>/`` in the hub file store): the
-    # registry's ``Hub.id`` (``base.Hub`` in phase 1, ``control.Hub`` in phase 2). Apps ask here, never there.
+    # registry's ``Hub.id``. Apps ask here, never there.
     from base.models import Hub
 
     acme = Hub.objects.create(slug="acme", status="ready")
@@ -303,8 +301,8 @@ def test_a_scope_without_a_hub_has_no_id(scope):
 
 
 def test_erploras_own_hub_is_the_one_of_its_slug(settings):
-    # ERPlora's own hub issues ERPlora's invoices (PLAN-SAAS §4). Phase 1 names it by its reserved slug
-    # (PLATFORM_HUB_SLUG); phase 2 by ``control.Hub.is_platform``. Apps ask here, never there.
+    # ERPlora's own hub issues ERPlora's invoices; it is named by its reserved slug (PLATFORM_HUB_SLUG). Apps ask
+    # here, never there.
     settings.PLATFORM_HUB_SLUG = "erplora"
 
     assert is_platform_hub(Scope("host", "erplora")) is True

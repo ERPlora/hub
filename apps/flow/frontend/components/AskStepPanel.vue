@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The form of «Ask someone first» (WORKBOOK FLOW-F28; the old module's flows-f18): the question and its
+// The form of «Ask someone first» (WORKBOOK FLOW-F28): the question and its
 // details, with data inserted (filled in when it is asked); who answers it — whoever runs the business by
 // default, or the managers or the employees, and whoever runs the business always can —; how long to
 // wait, from an hour to thirty days; and what a no and silence do. With «Carry on», the next steps can

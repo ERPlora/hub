@@ -7,11 +7,12 @@ from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs
 from live.operations import registry
 
 from apps.service import events as E
 from base import home
+from base.tests.roles import grants_by_role
 
 PERMISSIONS = [
     "service.view_service",
@@ -103,13 +104,13 @@ def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
 
 
 def test_what_each_role_gets():
-    config = service()
-    for role in ("hub_owner", "hub_admin"):
-        assert permissions_for_role([config], role) == set(PERMISSIONS), role
-    assert (
-        permissions_for_role([config], "hub_manager") == set(PERMISSIONS) - ADMIN_ONLY
-    )
-    assert permissions_for_role([config], "hub_employee") == EMPLOYEE
+    everything = set(PERMISSIONS)
+    assert grants_by_role(service()) == {
+        "hub_owner": everything,
+        "hub_admin": everything,
+        "hub_manager": everything - ADMIN_ONLY,
+        "hub_employee": EMPLOYEE,
+    }
 
 
 def test_navigation_is_the_three_tabs_of_the_old_module_with_registered_icons():
@@ -124,24 +125,26 @@ def test_navigation_is_the_three_tabs_of_the_old_module_with_registered_icons():
     ]
 
 
-#: What only names a record on the assistant's card: no tool (``INTERNAL``).
-CARD_ONLY = {"service.record.get"}
+#: What only names a record on the assistant's card, and what only the recovery from a separate copy runs (a service
+#: made again with who performed it): no tool (``INTERNAL``).
+NO_TOOL = {"service.record.get", "service.service.recover"}
 
 
 def test_every_operation_is_a_tool_of_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: the operation's
     # permission is its only door. A command says its risk; a read has none. A tool says what a
     # person types to ask for it, in both languages (live.E020: Services is listed in
-    # LIVE_ASSISTANT_ASKS_REQUIRED, hub#1104).
+    # LIVE_ASSISTANT_ASKS_REQUIRED).
     from live.operations import AI, INTERNAL, MIN_ASKS, registry
 
     operations = [op for name, op in registry.items() if name.startswith("service.")]
     # 45 + the service's image (SERVICE-F34, F35): set_image, upload_image, suggest_image
-    # + what the assistant's card names by its id (hub#676): assignment.get, grant.get, session.get
-    # + what it names of Sales and Appointments (hub#756): record.get, which is no tool.
-    assert len(operations) == 52
+    # + what the assistant's card names by its id: assignment.get, grant.get, session.get
+    # + what it names of Sales and Appointments: record.get, which is no tool
+    # + a service made again from a separate copy with who performed it: service.recover, no tool either.
+    assert len(operations) == 53
     for op in operations:
-        if op.name in CARD_ONLY:
+        if op.name in NO_TOOL:
             assert op.ai is INTERNAL, op.name
             continue
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
@@ -181,9 +184,8 @@ def test_the_holds_nobody_charged_expire_every_hour_as_the_system():
     assert get("service.session.expire").permission == "service.system"
 
 
-# The Home's hook (PLAN-HUB round 2026-10-21; FIX-SERVICE-SETUP-HOOKS): the old module's own item «Your service
-# catalogue» (module.json `setup`, services#26), which reads the catalog's status. The old module declared no panel and
-# no bell row.
+# The Home's step «Your service catalogue», which reads the catalog's status. The old module declared no panel and no
+# bell row.
 
 
 def test_the_homes_step_is_your_service_catalogue_done_once_one_service_can_be_charged():

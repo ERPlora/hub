@@ -1,4 +1,4 @@
-"""base.auth: the SaaS's login URL and redeeming its one-time code (PLAN-SAAS §2.1, §3.1 step 6)."""
+"""base.auth: the SaaS's login URL and redeeming its one-time code."""
 
 import hashlib
 import hmac
@@ -48,7 +48,7 @@ class TestLoginUrl:
 
 
 class TestDemoLogin:
-    """A demo's jump (plan 2026-10-17, §1.6 step 2): to the SaaS's ``/demo/enter/``, with the same ``state`` cookie."""
+    """A demo's jump: to the SaaS's ``/demo/enter/``, with the same ``state`` cookie."""
 
     def test_the_enter_url_carries_the_demo_a_readable_next_and_the_state(self):
         url = auth.demo_enter_url("demo-0000beef", "/demo/items?q=1", state="s1")
@@ -87,7 +87,7 @@ class TestDemoLogin:
 
 class TestAdminHubsUrl:
     def test_is_the_hubs_page_of_the_saas_admin(self):
-        # Where the staff start (PLAN §18.1, point 6): every hub with «Open in the Hub admin».
+        # Where the staff start: every hub with «Open in the Hub admin».
         assert auth.admin_hubs_url() == "http://localhost:8001/admin/accounts/hubs/"
 
     def test_carries_the_error(self, settings):
@@ -143,7 +143,7 @@ class TestRedeemCode:
         "role",
         [
             "owner", "admin", "manager", "employee", "superuser", "support", "superhero", "hub_", None, ["hub_admin"],
-            # A platform role never opens a customer's session (round 13: only with the hub-admin audience).
+            # A platform role never opens a customer's session (only with the hub-admin audience).
             "platform_admin", "platform_support",
         ],
     )  # fmt: skip
@@ -191,7 +191,7 @@ class TestRedeemCode:
 
 
 class TestRedeemCodeForTheHubAdmin:
-    """Audience ``hub-admin``: the staff's jump from the SaaS admin to hubs.erplora.com (PLAN §18.1)."""
+    """Audience ``hub-admin``: the staff's jump from the SaaS admin to hubs.erplora.com."""
 
     @pytest.mark.parametrize("role", ["platform_admin", "platform_support"])
     def test_sends_the_audience_and_keeps_the_platform_role(self, fake_saas, role):
@@ -224,7 +224,7 @@ class TestRedeemCodeForTheHubAdmin:
         assert fake.calls == []
 
 
-# In production the ALB answers 404 to /internal/* (aws-next/stacks/shared/alb.tf): the Hub reaches the
+# In production the ALB answers 404 to /internal/* (stacks/shared/alb.tf of ERPlora/aws): the Hub reaches the
 # SaaS's /internal over the private name (SAAS_INTERNAL_URL), the browser over the public one (SAAS_URL).
 PUBLIC = "https://erplora.com"
 INTERNAL = "http://saas.erplora.internal:8000"

@@ -12,7 +12,7 @@ class CustomerConfig(LiveAppConfig):
     icon = "ion:people-outline"
     category = Category.PEOPLE
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The public store's texts, which register_apps writes to shared.app.
     summary = _(
         "Your customers' file: contact and tax details, notes, groups, consent and what they bought."
     )
@@ -39,9 +39,8 @@ class CustomerConfig(LiveAppConfig):
         "customer.erase",
         "customer.record_activity",
     ]
-    # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The old
-    # «cashier» role is gone: its rights at the counter (view, create, edit, notes, consent, link
-    # the order) are the employee's.
+    # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The rights at
+    # the counter (view, create, edit, notes, consent, link the order) are the employee's.
     role_permissions = {
         "hub_owner": ["customer.*"],
         "hub_admin": ["customer.*"],
@@ -56,9 +55,9 @@ class CustomerConfig(LiveAppConfig):
         "hub_employee": ["customer.view", "customer.manage"],
     }
     # What a manager approves on the spot with their PIN on the employee's own device (BASE-F84), in the words the
-    # dialog «An approval is needed» says. The old customers module's rule: what the manager holds, another profile does
-    # with a manager's approval; what is the administrator's only (delete cards, groups and tags, erase personal data)
-    # never; export is a read, never approved. ``customer.activity.add`` is left out: no screen asks for it.
+    # dialog «An approval is needed» says. What the manager holds, another profile does with a manager's approval;
+    # what is the administrator's only (delete cards, groups and tags, erase personal data) never; export is a read,
+    # never approved. ``customer.activity.add`` is left out: no screen asks for it.
     approvals = {
         "customer.customer.merge": _("Merge two customer cards"),
         "customer.group.create": _("Create a customer group"),
@@ -93,16 +92,17 @@ class CustomerConfig(LiveAppConfig):
     ]
 
     def fiscal_documents_kept(self) -> bool:
-        """hub#599: the platform asks (``base.tenancy.offboarding``) before it drops the database of a business that
-        left: The card sales of its customers (a manual entry has no sale behind it) here are documents nothing archives yet (PLAN-DB §6), so the database stays."""
+        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left:
+        the card sales of its customers (a manual entry has no sale behind it) are documents nothing archives yet, so
+        the database stays."""
         from apps.customer import queries  # the models are not loaded yet when this module is
 
         return queries.keeps_fiscal_documents()
 
     def recoverable_from_copy(self) -> list:
-        """hub#1257: the platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when
-        the staff recovers from it (BASE-F114): of the copy's live cards (``queries.cards_in_copy``), each the business
-        still holds deleted comes back the same, with all that hangs from it (``queries.cards_deleted_in_business``,
+        """The platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when the staff
+        recovers from it: of the copy's live cards (``queries.cards_in_copy``), each the business still holds deleted
+        comes back the same, with all that hangs from it (``queries.cards_deleted_in_business``,
         ``customer.customer.restore``, CUSTOMER-F33), and each it no longer has is made again by
         ``customer.customer.recover`` (``queries.cards_not_in_business``): as ``customer.customer.create``, the till's
         and the card's own, makes it, with its groups, tags and custom field values there

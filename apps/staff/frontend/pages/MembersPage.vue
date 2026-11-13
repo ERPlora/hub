@@ -5,7 +5,7 @@
 // member…», sort by any column, the old column filters behind the table's funnel, 50 a page. «+» opens «New»; a row or «Edit»
 // opens «Edit · {name}»; «Deactivate» (confirmed) and «Terminate» (its dialog) for the owner and the
 // admin. «My record» opens one's own record. Above the list, the figures of the old Home panels
-// (STAFF-G02–G04). Nothing here refetches: changes come through the stream.
+// (STAFF-F20, F23). Nothing here refetches: changes come through the stream.
 import {
   ConfirmDialog,
   type DataTableAction,

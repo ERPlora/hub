@@ -1,4 +1,4 @@
-// flow: SALE-F28 (SALE-G01) — with the period «7 days», what was sold each of those business days, today last
+// flow: SALE-F28 — with the period «7 days», what was sold each of those business days, today last
 // (`sale.sale.last_7_days`, live): the old Home's «Last 7 days» panel, inside Sales. A day without sales says
 // 0,00 €; a failure says so.
 import { describe, expect, it } from 'vitest';

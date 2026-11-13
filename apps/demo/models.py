@@ -1,9 +1,3 @@
-"""Models of the demo app: an item with a status and a note, and its lines.
-
-Phase 1 has no tenancy: every scope (``a``, ``b``) shares these tables; only the live
-notifications are per scope. Phase 2 moves them to each hub's database.
-"""
-
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from live.models import UUIDModel

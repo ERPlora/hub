@@ -1,15 +1,15 @@
 // flow: STAFF-F20 STAFF-F23
-// Staff's panels of the Home (FIX-STAFF-SETUP-HOOKS; the old module's `widgets`, the old hub's dashboard in
-// docs/reference/old-hub/dashboard-*.png), as the owner of hub `a` reads them in Spanish: «Plantilla activa», «Ausentes
+// Staff's panels of the Home (its `widgets`), as the owner of hub `a` reads them in Spanish: «Plantilla activa», «Ausentes
 // hoy» and «Ausencias de hoy» on the board by default with the figures and the list the server gives, which follow a
 // new record and an approved time off of today without a reload; «Ausencias pendientes» and «Empleados por rol» to add
 // from «Personalizar panel», grouped under «Personal», with the server's figure and a bar per role; and the employee,
-// who sees the team and the time off (STAFF-F20 is everyone's), reads the same panels. Captures
-// `FIX-STAFF-SETUP-HOOKS-<width>` (the board), `…-STAFF-F20-<width>` (who is away) and `…-STAFF-F23-<width>` (the
-// figures and the roles). Everything this file creates is named «E2E-HOOKS …» and removed after it; it parks nothing.
+// who sees the team and the time off (STAFF-F20 is everyone's), reads the same panels. Captures of the board, of who
+// is away and of the figures and the roles. Everything this file creates is named «E2E-HOOKS …» and removed after it;
+// it parks nothing.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, OWNER, psql, shot, shown, untilStill } from './helpers';
+import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, OWNER, shot, shown, untilStill } from './helpers';
+import { staffCleanUp } from './staff-helpers';
 import { VIEWPORTS } from './inventory-helpers';
 import { stamp } from './sale-helpers';
 
@@ -42,18 +42,7 @@ interface RoleRow {
 
 test.describe.configure({ mode: 'serial' });
 
-function cleanup(): void {
-  const members = `select id from staff_member where first_name like '${TAG}%'`;
-  psql(
-    [
-      `delete from staff_timeoff where member_id in (${members})`,
-      `delete from staff_scheduleday where schedule_id in (select id from staff_schedule where member_id in (${members}))`,
-      `delete from staff_schedule where member_id in (${members})`,
-      `delete from staff_member where first_name like '${TAG}%'`,
-      `delete from staff_role where name like '${TAG}%'`,
-    ].join('; '),
-  );
-}
+const cleanup = (): void => staffCleanUp(TAG);
 
 /** A civil day `days` away from this machine's today; ±1 covers the business's today whatever its time zone. */
 function day(days: number): string {

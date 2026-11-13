@@ -1,9 +1,9 @@
-// VeriFactu never goes off once on, in Spain (FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON), in the three viewports, as the
+// VeriFactu never goes off once on, in Spain, in the three viewports, as the
 // owner of hub `a`: with VeriFactu on and no record left to send to the AEAT, Apps offers no «Desactivar» and says the
 // legal reason on its row (hub#618), Invoicing's row says VeriFactu needs it and why, never «turn VeriFactu off first»
 // (hub#619), in Spanish and in English for a Hub in English; the server refuses it all the same when asked directly,
 // and VeriFactu stays «Activa», with both rows untouched and both apps still in the topbar's «My apps». Each viewport
-// leaves its capture `FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON-<width>` (in Spanish) and `…-en-<width>`. Nothing is written:
+// leaves its capture in Spanish and in English. Nothing is written:
 // a refusal changes no row, so there is nothing to put back.
 // flow: VERIFACTU-F32 BASE-F25
 import { expect, type Page, test } from '@playwright/test';

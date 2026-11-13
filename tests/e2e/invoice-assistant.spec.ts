@@ -1,26 +1,27 @@
-// Rectifying an invoice by asking the assistant (INVOICE-F08; PLAN §30, the second of the «Cinco acciones de IA
-// pulidas»: the rectifying invoice, with the new invoice in preview before its confirmation), end to end with its real
+// Rectifying an invoice by asking the assistant (INVOICE-F08: the rectifying invoice, with the new invoice in preview
+// before its confirmation), end to end with its real
 // dependencies: the Hub of this stack, its SaaS's gateway (`/internal/assistant/*`) and the e2e's provider
 // (assistant-provider.ts, its marker `E2E-RECTIFY <number> … porque <reason>`), which reads the rectification's preview,
 // says it and asks to rectify the invoice it named. The SaaS must be seeded with that provider (README «El asistente»).
 // The owner, with an invoice issued, asks «rectifica la factura <number> porque el precio estaba mal»: the preview comes
 // first (the original, the type, the reason, the next number of the series, the amounts in negative), then the dangerous
-// card, which carries it too in «What will happen» (the type, the next number, the amounts in negative as money:
-// FIX-HUB-INVOICE-ASSISTANT-RECTIFY-CARD-WITHOUT-PREVIEW, through base's preview, BASE-F98); «Cancel» issues nothing and
+// card, which carries it too in «What will happen» (the type, the next number, the amounts in negative as money,
+// through base's preview, BASE-F98); «Cancel» issues nothing and
 // the original stays issued, typing the word issues it and «Invoices» shows the original cancelled and the new
 // rectifying one dated today. Asked to rectify a rectifying invoice, the assistant says why and offers no card.
 // Nothing reaches VeriFactu's tax agency: issuing seals the record locally (no transmission in this stack).
 // What this file creates is deleted after it (its invoices, their records, the numbering as found).
 // flow: INVOICE-F08
-// flow: BASE-F97 (the card and its receipt name the action: «Rectify in Invoicing», «Rectificar en Facturación»;
-// FIX-HUB-BASE-ASSISTANT-CARD-RECTIFY-SAYS-DO-THIS-IN-INVOICING, it said «Do this»)
-// flow: invoice-assistant-card (FIX-HUB-INVOICE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS: the card names the invoice, the
+// flow: BASE-F97 (the card and its receipt name the action: «Rectify in Invoicing», «Rectificar en Facturación»,
+// never «Do this»)
+// flow: invoice-assistant-card (the card names the invoice, the
 // series and the customer a write names by its id, and the kind of a foreign recipient's document, never raw)
 import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { CANNOT_RECTIFY, DONE, NOT_DONE, type Provider, startProvider } from './assistant-provider';
+import { CANNOT_RECTIFY, NOT_DONE, type Provider, startProvider } from './assistant-provider';
+import { confirmedWithTheWord, type SentCard, sentCard } from './assistant-card-helpers';
 import { A, api, capture, compactBar, login, psql, registerBusinessIn, registrationOf, REPO_DIR, shot, shown, untilStill } from './helpers';
 import { cleanInvoices, ensureIssuer, type InvoiceOut, invoiceOf, issuedIds, snapshotSeries } from './invoice-helpers';
 import { stamp } from './sale-helpers';
@@ -230,10 +231,7 @@ test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: 
   // Asked again, the word typed: the rectifying invoice the preview said is issued, as the person.
   await ask(page, asked(invoice.number));
   await expect(card(page)).toBeVisible({ timeout: 30_000 });
-  await card(page).locator('[data-testid="assistant-confirm-input"] input').fill('confirm');
-  await expect(submit).toBeEnabled();
-  await decide(page, 'submit');
-  await expect(lastAnswer(page)).toContainText(DONE.en);
+  await confirmedWithTheWord(page);
   await expect(receipts(page).last()).toHaveText('Done: Rectify in Invoicing');
   const after = await invoiceOf(context, invoice.id);
   expect(after.status).toBe('cancelled');
@@ -266,7 +264,7 @@ test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: 
   if (process.env.E2E_SAVE_STORAGE_STATE) await page.context().storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 });
 
-// FIX-HUB-BASE-ASSISTANT-CARD-RECTIFY-SAYS-DO-THIS-IN-INVOICING: in Spanish the card said «Hacer esto en Facturación»
+// In Spanish the card once said «Hacer esto en Facturación»
 // (a closed list of 24 verbs); now it names the action, and so does the receipt. Cancelled: nothing is issued.
 test('BASE-F97 — in Spanish the card and the receipt of rectifying say «Rectificar en Facturación», never «Hacer esto»', async ({ browser }) => {
   const FIX = 'FIX-HUB-BASE-ASSISTANT-CARD-RECTIFY-SAYS-DO-THIS-IN-INVOICING';
@@ -300,7 +298,7 @@ test('BASE-F97 — in Spanish the card and the receipt of rectifying say «Recti
   await context.close();
 });
 
-// FIX-HUB-INVOICE-ASSISTANT-RECTIFY-CARD-WITHOUT-PREVIEW: the card of rectifying listed only what it sends (the number
+// The card of rectifying once listed only what it sends (the number
 // and the reason), never the rectifying invoice it issues. Through base's preview (BASE-F98) its «Lo que va a pasar»
 // shows the type, the next number of the RECT series (read, never taken) and the base, the tax and the total in
 // negative, as money. «Cancelar» issues nothing and takes no number; the word issues exactly the number it said.
@@ -356,7 +354,7 @@ test('INVOICE-F08 — in Spanish the rectification card shows what will happen: 
   await context.close();
 });
 
-// FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: an invoice issued in euros, rectified once
+// An invoice issued in euros, rectified once
 // erplora.com had registered the business in Poland, showed «Total: -121,00 zł» in «What will happen»: the card
 // painted every amount in the business's currency. Each amount of the preview is now in the one its read answers (the
 // invoice's, which keeps the one it was issued in), in English and in Spanish; «Cancel» issues nothing. Asked first in
@@ -444,7 +442,7 @@ test('INVOICE-F08 — asked to rectify a rectifying invoice, the assistant says 
   await page.screenshot({ path: shot(`${KEY}-refused-1440`) });
 });
 
-// FIX-HUB-INVOICE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS: since hub#416 the card left out every id its schema does not
+// The card once left out every id its schema does not
 // mark, and said a closed list's value as sent: «hazle una factura a Talleres en la serie de facturas, con su NIF-IVA»
 // said no customer and no series, and «Tipo de documento del cliente: 02»; «marca como pagada esa factura» said no
 // invoice. Now each record is named as the Facturas screens show it — the customer by the name on their card, the
@@ -453,25 +451,6 @@ test('INVOICE-F08 — asked to rectify a rectifying invoice, the assistant says 
 const CARD_KEY = 'FIX-HUB-INVOICE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';
 /** An id as a schema's `format: uuid` takes it: never on a card. */
 const AN_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-
-type SentCard = { fields: { name: string; label: string; value: unknown }[] };
-
-/** The card of the confirm frame of a turn's answer (`text/event-stream`: one `data: <JSON>` per frame), if any. */
-function confirmedCard(stream: string): SentCard | undefined {
-  const frames = stream
-    .split('\n')
-    .filter((line) => line.startsWith('data:'))
-    .map((line) => JSON.parse(line.slice(5)) as { type: string; card?: SentCard });
-  return frames.find((frame) => frame.type === 'confirm')?.card;
-}
-
-/** The card the server sends for the person to confirm, as it arrives: the answer of the turn that carries it. */
-async function sentCard(page: Page): Promise<SentCard> {
-  const answer = await page.waitForResponse(
-    async (response) => response.url().endsWith('/api/assistant/turn') && confirmedCard(await response.text()) !== undefined,
-  );
-  return confirmedCard(await answer.text())!;
-}
 
 const saidBy = (sent: SentCard) => Object.fromEntries(sent.fields.map((field) => [field.name, [field.label, field.value]]));
 

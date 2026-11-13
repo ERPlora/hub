@@ -1,6 +1,6 @@
-"""The contract of S5: the hubs' apps' tables left in control's database get ``<table>_shared_20261101``.
+"""The contract step after the cut: the hubs' apps' tables left in control's database get ``<table>_shared_20261101``.
 
-Since the cut (PLAN-DB, round 2026-11-01c) no business uses them, yet nothing tells their rows from live data. The
+Since the cut no business uses them, yet nothing tells their rows from live data. The
 migration ``control/0007`` renames them, never dropping one. What decides which tables are left over is the routers
 and the inventory, so the suite's control database, whose ``LegacyTablesRouter`` keeps those tables on purpose, stays
 as it is with no test-only branch in the migration: the tests here ask for production's routers themselves.
@@ -32,8 +32,8 @@ from control.models import Hub
 
 MIGRATION = "0007_hub_tables_renamed_shared"
 BEFORE = "0006_hub_activity"
-#: The tables control's migrations after ``MIGRATION`` make, which the deploy makes too (0010: the freeze switch,
-#: hub#930; 0012: the separate copies, hub#1213; 0013: the recoveries from them, hub#1257).
+#: The tables control's migrations after ``MIGRATION`` make, which the deploy makes too (0010: the freeze switch;
+#: 0012: the separate copies; 0013: the recoveries from them).
 LATER_TABLES = {"control_freeze", "control_restoredcopy", "control_copyrecovery"}
 SUFFIX = "_shared_20261101"
 LEGACY_ROUTER = "base.tenancy.tests.legacy.LegacyTablesRouter"
@@ -280,7 +280,7 @@ def test_stepping_back_from_a_run_that_stopped_halfway_returns_what_it_had_renam
     migration().rename(connection, [("printing_printer", shared("printing_printer"))])
     module = migration()
     real = module.left_behind
-    # A table of an app that came after S5: on this database under neither name.
+    # A table of an app that came after the cut: on this database under neither name.
     monkeypatch.setattr(module, "left_behind", lambda alias: [*real(alias), "a_table_this_database_never_had"])
 
     backwards()
@@ -346,7 +346,8 @@ def test_who_does_not_stop_it(after_the_cut, fields):
 
 
 def test_with_nothing_left_over_a_business_without_its_database_stops_no_deploy(db, production_routers, monkeypatch):
-    # A database made after S5 holds none of the tables the inventory names: there is nothing to rename under anyone.
+    # A database made after the cut holds none of the tables the inventory names: there is nothing to rename under
+    # anyone.
     assert Hub.objects.filter(db_name="", is_demo=False, status=Hub.Status.READY).exists()
     monkeypatch.setattr(migration(), "left_behind", lambda alias: ["a_table_this_database_never_had"])
 
@@ -410,7 +411,7 @@ def test_each_table_commits_alone_so_a_stuck_one_keeps_the_rest_and_the_next_run
         ddl.close()
 
 
-# ── The deploy: ``manage.py migrate`` with production's settings on a control database as S5 left it ──────────────
+# ── The deploy: ``manage.py migrate`` with production's settings on a control database as the cut left it ─────────
 
 
 def _manage(database: str, settings_module: str, *args: str) -> subprocess.CompletedProcess:

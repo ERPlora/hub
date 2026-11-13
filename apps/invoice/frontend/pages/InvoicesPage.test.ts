@@ -8,7 +8,19 @@ import { AppPage } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { answerIssuer, business, BYE, EMPLOYEE, errorFrame, flush, MANAGER, type MountOptions, mountInvoice, POLISH, redNotices, said } from '../__tests__/mount-invoice';
+import {
+  answerIssuer,
+  business,
+  BYE,
+  EMPLOYEE,
+  errorFrame,
+  flush,
+  MANAGER,
+  type MountOptions,
+  mountInvoice,
+  POLISH,
+} from '../__tests__/mount-invoice';
+import { expectAnAdministratorToSetUpTheIssuer, expectIssuerSaidNoMore, expectIssuerToSetUp } from '../__tests__/issuer-notice';
 import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import InvoiceCreateModal from '../components/InvoiceCreateModal.vue';
 import RectifyModal from '../components/RectifyModal.vue';
@@ -148,7 +160,6 @@ describe('InvoicesPage: the live list', () => {
     expect(s.params()).toEqual([{ total_amount_from: 1250, sort: 'issued_at', dir: 'desc', limit: 50, offset: 0 }]);
   });
 
-  // flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
   it('filters behind the table funnel: total, status, date and type on their columns, then series and source', async () => {
     const s = await setup();
     await s.show(PAGE);
@@ -348,13 +359,9 @@ describe('InvoicesPage: the states of the screen', () => {
     const s = await setup({ platformNotice: true, locale: 'es' });
     await answerIssuer(s, false, { locale: 'es' });
     await s.show(PAGE);
-    expect(said(s.wrapper.text(), 'Todavía no puedes facturar')).toBe(1);
-    expect(redNotices(s)).toBe(1);
-    expect(said(s.wrapper.text(), 'Los datos de tu negocio')).toBe(1);
-    const setUp = s.wrapper.findAll('ion-button').filter((b) => b.text() === 'Configurar');
-    expect(setUp).toHaveLength(1);
+    const setUp = expectIssuerToSetUp(s);
     expect(s.rows()).toHaveLength(3);
-    await setUp[0].trigger('click');
+    await setUp.trigger('click');
     await flush();
     expect(s.router.currentRoute.value.path).toBe('/invoice/issuer');
   });
@@ -363,18 +370,14 @@ describe('InvoicesPage: the states of the screen', () => {
     const s = await setup({ platformNotice: true, locale: 'es' });
     await answerIssuer(s, false, { locale: 'es' });
     await answerIssuer(s, true, { locale: 'es', rev: 2 });
-    expect(said(s.wrapper.text(), 'Todavía no puedes facturar')).toBe(0);
-    expect(redNotices(s)).toBe(0);
+    expectIssuerSaidNoMore(s);
   });
 
-  it('to whoever may not change the issuer, says once that an administrator has to, with no «Configurar» (gh:hub#435)', async () => {
+  it('to whoever may not change the issuer, says once that an administrator has to, with no «Configurar»', async () => {
     for (const session of [EMPLOYEE, MANAGER]) {
       const s = await setup({ platformNotice: true, locale: 'es', session });
       await answerIssuer(s, false, { locale: 'es', actionable: false });
-      expect(said(s.wrapper.text(), 'Todavía no puedes facturar')).toBe(1);
-      expect(redNotices(s)).toBe(1);
-      expect(said(s.wrapper.text(), 'Esto lo tiene que configurar un administrador.')).toBe(1);
-      expect(s.wrapper.findAll('ion-button').filter((b) => b.text() === 'Configurar')).toHaveLength(0);
+      expectAnAdministratorToSetUpTheIssuer(s);
     }
   });
 
@@ -432,14 +435,14 @@ describe('InvoicesPage: the rest', () => {
   });
 });
 
-describe('InvoicesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('InvoicesPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });
 
-describe('InvoicesPage: «Total» is read as every amount of the Hub (hub#1196)', () => {
+describe('InvoicesPage: «Total» is read as every amount of the Hub', () => {
   itReadsAmountFiltersAsTheHub({
     ends: ['total_amount_from', 'total_amount_to'],
     params: ['total_amount_from', 'total_amount_to'],

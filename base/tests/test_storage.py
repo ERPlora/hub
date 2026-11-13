@@ -1,4 +1,4 @@
-"""``hub_files``: the hub's file store (PLAN-HUB block 7), S3 in AWS and the disk locally.
+"""``hub_files``: the hub's file store, S3 in AWS and the disk locally.
 
 Terraform hands the Hub's task ``AWS_STORAGE_BUCKET_NAME`` (``erplora-prod-hubs``, ``erplora-pre-hubs``) and
 ``AWS_REGION`` (``aws/stacks/prod/apps.tf``), and the task role holds Get/Put/Delete on that bucket: no keys. The
@@ -69,7 +69,7 @@ HUB_ID = uuid.UUID("0199c4b0-0000-7000-8000-00000000abcd")
 
 
 def test_a_hub_s_files_live_under_its_own_prefix():
-    # The id's hex, as the hub databases are named (``hub_<hex>``, PLAN-DB): one prefix per hub, never shared.
+    # The id's hex, as the hub databases are named (``hub_<hex>``): one prefix per hub, never shared.
     assert hub_prefix(HUB_ID) == "hub-0199c4b000007000800000000000abcd"
 
 

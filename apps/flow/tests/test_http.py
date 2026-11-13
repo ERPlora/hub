@@ -1,4 +1,4 @@
-"""The outbound call of «Call another system» (WORKBOOK FLOW-F27; old hub HUB-F94), against a real local
+"""The outbound call of «Call another system» (WORKBOOK FLOW-F27), against a real local
 HTTPS server (``local_https``: a certificate made here for ``localhost`` and ``127.0.0.1``), never a patched
 client.
 

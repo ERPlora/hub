@@ -1,6 +1,6 @@
 // Printing's piece beside the pane (PRINTING-F18, F13): inside the installed app, the device set up to print here keeps
 // the hub's `/ws/print` open for the active printers of its registration («This device» of Printing → Devices), followed
-// live — set up, changed or retired from any device —, and a drawer that does not open says so on screen (hub#2724). In
+// live — set up, changed or retired from any device —, and a drawer that does not open says so on screen. In
 // a browser it reads nothing and opens nothing. A fake socket and a fake app bridge stand in; the e2e drives the real
 // channel.
 import { toastError } from '@erplora/ui/shell';

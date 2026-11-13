@@ -19,7 +19,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import AppInactive, Conflict, InvalidPayload, NotFound
-from live.operations import UnknownOperation, atomic, operation
+from live.operations import INTERNAL, UnknownOperation, atomic, operation
 from live.outbox import record_event
 
 from apps.customer.models import Customer
@@ -100,6 +100,7 @@ from apps.service.schemas import (
     ServiceImageUploadIn,
     ServiceOut,
     ServicePatchIn,
+    ServiceRecoverIn,
     ServiceRefIn,
     ServicesOut,
     SessionOut,
@@ -112,7 +113,7 @@ from apps.service.schemas import (
     VoidIn,
 )
 from apps.staff.models import Member
-from apps.staff.queries import resolve_member
+from apps.staff.queries import live_members, resolve_member
 from apps.tax.models import TaxCategory
 from apps.tax.queries import held_categories
 from base import images
@@ -531,7 +532,7 @@ def restore_service(ctx: OperationContext, data: ServiceRefIn) -> dict:
     return load_service(service.id, ctx.scope)
 
 
-# ── The service's image (SERVICE-F34, F35; round 2026-10-30, base.images) ─────────────────────────────────────
+# ── The service's image (SERVICE-F34, F35; base.images) ───────────────────────────────────────────────────────
 
 #: Where a service's own photos are kept under its hub's prefix: the folder ``members_media`` serves (apps.py).
 PHOTOS = "service/services/"
@@ -1019,6 +1020,46 @@ def release_member(ctx: OperationContext, data: MemberReleaseIn) -> dict:
         assignment.delete()
         record_event(ctx, events.ASSIGNMENT_REMOVED, payload)
     return {"removed": len(assignments)}
+
+
+# Not an assistant tool and no route: its one door is the recovery from a separate copy (BASE-F114), for a service the
+# business no longer has at all.
+@operation(
+    "service.service.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=ServiceRecoverIn,
+    output=ServiceOut,
+    ai=INTERNAL,
+)
+def recover_service(ctx: OperationContext, data: ServiceRecoverIn) -> dict:
+    """A service of a separate copy the business no longer has, made again with who performed it there, all
+    or nothing, each by the operation its screen uses: the service by ``service.service.create``; each professional the
+    business still has by ``service.assignment.assign`` (SERVICE-F31), with their own minutes and price. One who left
+    (terminated) or whom the business no longer has is not assigned: Staff no longer books them. It is their main
+    service only if the business gave them none since (the business's choice stays), and it comes back switched off,
+    by ``service.assignment.update``, if it was."""
+    made = create_service(ctx, ServiceIn.model_validate(data.model_dump(include=set(ServiceIn.model_fields))))
+    asked = [one.member_id for one in data.assignments]
+    staying = set(live_members().filter(pk__in=asked).values_list("pk", flat=True))
+    with_main = set(
+        Assignment.objects.filter(member_id__in=asked, is_primary=True).values_list("member_id", flat=True)
+    )
+    for one in [one for one in data.assignments if one.member_id in staying]:
+        assigned = assign(
+            ctx,
+            AssignIn(
+                service_id=made.id,
+                member_id=one.member_id,
+                custom_duration=one.custom_duration,
+                custom_price=one.custom_price,
+                is_primary=one.is_primary and one.member_id not in with_main,
+            ),
+        )
+        if not one.is_active:
+            update_assignment(ctx, AssignmentPatchIn(id=assigned.id, is_active=False))
+    return load_service(made.id, ctx.scope)
 
 
 # ── Packages (SERVICE-F12, F13) ───────────────────────────────────────────────────────────────
@@ -1728,7 +1769,7 @@ def settle_sessions(ctx: OperationContext, data: SettleIn) -> dict:
 )
 def expire_holds(ctx: OperationContext, data: NoIn) -> dict:
     # Locked in id order, as every other step of a session takes them; one notice per session, saying which
-    # session of which voucher (hub#2681), and none when nothing lapsed.
+    # session of which voucher, and none when nothing lapsed.
     lapsed = list(
         Redemption.objects.select_for_update()
         .filter(status=HELD, hold_until__lte=timezone.now())

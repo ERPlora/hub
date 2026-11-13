@@ -1,10 +1,6 @@
 <script setup lang="ts">
-// Employees › Approvals (BASE-G145; the old hub's HUB_SHELL-F93), for who runs the business: the live record of each
-// action that needed a manager's PIN or badge (`base.approval.list`), read only — nobody edits or deletes a row. When,
-// what in the app's words (the old hub showed the command's technical name), who approved it, who asked, how and
-// whether it was used; search by person or action, filter by day, action, how and whether it was used (the old hub
-// filtered by dates, action and level), «Export CSV» of what the search and the filters keep, and on a phone a card each.
-// Empty, nobody had to approve anything yet; a record that cannot be read says so with «Retry».
+// Employees › Approvals: the read-only record of each action that needed a manager's PIN or badge. Each action is named
+// in its app's words, never by the command's technical name.
 import {
   DataTable,
   type DataTableColumn,

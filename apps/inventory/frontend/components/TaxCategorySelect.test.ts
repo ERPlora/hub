@@ -67,7 +67,7 @@ describe('TaxCategorySelect', () => {
     expect(s.searches().at(-1)).toEqual({ limit: '100', sort: 'display_name', search: 'alco' });
   });
 
-  it("offers a factory category by the name Taxes translates for the reader, never the stored one (taxes#38)", async () => {
+  it("offers a factory category by the name Taxes translates for the reader, never the stored one", async () => {
     const [generic] = TAX_CATEGORIES.rows;
     const s = await setup({}, { api: () => ok(page([{ ...generic, display_name: 'Producto — general' }])) });
     expect(await s.offers()).toEqual([['product.generic', 'Producto — general · 21%']]);

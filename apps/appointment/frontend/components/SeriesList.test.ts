@@ -90,7 +90,7 @@ describe('SeriesList', () => {
     expect(s.find('appointment-series-outcome').text()).toContain('Tuesday, December 8, 2026: Closed.');
   });
 
-  // APPOINTMENT-F14 · appointments#256, #293, #220: saving an edit says to whom the appointments go, only what
+  // APPOINTMENT-F14: saving an edit says to whom the appointments go, only what
   // happened, and each one that kept its time with its date as the reader reads dates.
   it('after «Edit series» says who the appointments go to and what kept its time', async () => {
     const s = await setup();

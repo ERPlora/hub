@@ -5,7 +5,7 @@
 // Assign to me and Unassign; Edit and Delete; the subtasks with Open (Back and the trail of numbers
 // above) and «Add subtask»; the comments, newest first, signed and dated, and «Comment». The task, its
 // subtasks and its comments are followed live. A box empties as soon as what it sent is accepted (only
-// if nothing new was typed meanwhile, tasks#44); a refusal stays inside the sheet, with the text kept.
+// if nothing new was typed meanwhile); a refusal stays inside the sheet, with the text kept.
 import { Combo, type ComboOption, ConfirmDialog, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';

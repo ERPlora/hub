@@ -67,7 +67,7 @@ const columns = computed<DataTableColumn<Row>[]>(() => [
     key: 'created_at',
     label: t('inventory.movements.columns.date'),
     sortable: true,
-    // The short date keeps the time of day on a tablet (inventory#130, #139).
+    // The short date keeps the time of day on a tablet.
     width: 'minmax(8.5rem,1fr)',
     format: (value) => formatShortDateTime(String(value), locale.value),
   },
@@ -92,7 +92,7 @@ const columns = computed<DataTableColumn<Row>[]>(() => [
   },
   { key: 'reason', label: t('inventory.movements.columns.reason'), priority: 'low', width: 'minmax(3.25rem,1fr)' },
   // INVENTORY-F16: a sale reads as the number on its ticket or invoice (the server's label), never as its id.
-  // Wide enough for a whole ticket number (TICKET-2026-000001), and kept on a tablet: the reason folds first (inventory#144).
+  // Wide enough for a whole ticket number (TICKET-2026-000001), and kept on a tablet: the reason folds first.
   { key: 'reference_label', label: t('inventory.movements.columns.reference'), width: 'minmax(8.5rem,1.5fr)' },
 ]);
 </script>

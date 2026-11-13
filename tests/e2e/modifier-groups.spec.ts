@@ -5,7 +5,7 @@
 // defaults is refused under Maximum) and deletes it after a confirmation that says what goes with it, adds, edits and
 // deletes the options of its sheet (F04: a supplement, a discount with the ± key, a soft drink with its own tax
 // category), and applies it to a product found by its SKU and to a category, then stops applying it (F05). Each screen
-// in 390×844, 834×1112 and 1440×900 (`APP-MODIFIER-MODIFIER-Fnn-<w>`). Its data are named `E2E Mod …` / `E2E-MOD-…`
+// in 390×844, 834×1112 and 1440×900. Its data are named `E2E Mod …` / `E2E-MOD-…`
 // and `afterAll` deletes exactly them.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 

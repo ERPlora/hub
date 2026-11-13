@@ -1,13 +1,13 @@
 <script setup lang="ts">
-// The till's «Speak» key (WORKBOOK «Vender»; PLAN §30 point 4, PLAN-HUB §8 round 2026-10-22b): the assistant opened by
-// dictating. Only to whoever may use the assistant (it answers to whoever sees the Home, as its topbar button) on a
-// device that records; offline it stays, greyed (the strip does not move when the network blinks), and a tap says why.
-// A tap records («Listening…»: the key turns «Stop»), the next one stops; erplora.com transcribes, the words land in
-// the assistant's box after what was written and its panel opens: the person sees what was understood and sends it,
-// and a write still asks its card. Nothing is sent by itself. A refused microphone, an empty or too long dictation and
-// a failure are a toast. The dictation is the shared assistant's (`useDictation` of @erplora/ui, PLAN-HUB §18: one
-// recording per tap, two minutes, 2 MB, the words into the box and the panel open, the recording thrown away on
-// leaving); the key says each reason with its own text and keeps the offline guard the dictation does not have.
+// The till's «Speak» key (WORKBOOK «Vender»): the assistant opened by dictating. Only to whoever may use the assistant
+// (it answers to whoever sees the Home, as its topbar button) on a device that records; offline it stays, greyed (the
+// strip does not move when the network blinks), and a tap says why. A tap records («Listening…»: the key turns «Stop»),
+// the next one stops; erplora.com transcribes, the words land in the assistant's box after what was written and its
+// panel opens: the person sees what was understood and sends it, and a write still asks its card. Nothing is sent by
+// itself. A refused microphone, an empty or too long dictation and a failure are a toast. The dictation is the shared
+// assistant's (`useDictation` of @erplora/ui: one recording per tap, two minutes, 2 MB, the words into the box and the
+// panel open, the recording thrown away on leaving); the key says each reason with its own text and keeps the offline
+// guard the dictation does not have.
 import { ASSISTANT_ICONS, browserVoice, type DictationProblem, useDictation, type VoiceEnv } from '@erplora/ui/components';
 import { toast, useSession } from '@erplora/ui/shell';
 import { IonButton, IonIcon, IonSpinner } from '@ionic/vue';

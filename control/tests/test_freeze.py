@@ -1,4 +1,4 @@
-"""The freeze switch of control (hub#930; PLAN-DB round 2026-11-04e, «Congelar»).
+"""The freeze switch of control.
 
 While a database upgrade runs with Blue/Green nothing may change a schema (logical replication copies no DDL): ERPlora's
 staff freezes the platform with ``control.freeze.set`` (the Hub admin, ``hubs.erplora.com/admin``) and lifts it the same
@@ -71,7 +71,7 @@ class TestGet:
         assert queries.freeze_get(support_ctx, FreezeGetIn()).working == 1
 
     def test_it_counts_the_separate_copies_the_worker_still_makes_under_their_own_lease(self, support_ctx):
-        # A separate copy (hub#1213) makes a database without the hub's lease: the upgrade waits for it too.
+        # A separate copy makes a database without the hub's lease: the upgrade waits for it too.
         from control.models import RestoredCopy
 
         now = timezone.now()

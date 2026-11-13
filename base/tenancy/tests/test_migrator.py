@@ -1,5 +1,4 @@
-"""``ensure_schema`` and the templates: the only code that changes a hub's schema (PLAN-DB §7; plan
-2026-10-22-fase-2-tenencia, S3; PLAN-DB round 2026-10-30, proposals (g) and (h)).
+"""``ensure_schema`` and the templates: the only code that changes a hub's schema.
 
 A test that migrates makes a database of its own, empty and named as one of this session's control database's
 (``base.tenancy.names``), and drops it after; the session's hubs A and B (``hubs.py``) are only read. The migrator
@@ -99,8 +98,8 @@ def test_the_platform_is_what_every_hubs_database_has():
 
 
 def test_every_hub_app_lives_in_a_hubs_database_now_that_its_people_are_its_own():
-    """Tenancy W10: the apps that linked control's user (PLAN-DB round 2026-10-22 «Tests») hang from ``base.HubUser``
-    now, so every hub app, and what waited for them (service, appointment, online_booking), fits a hub's database."""
+    """The apps that linked control's user hang from ``base.HubUser`` now, so every hub app, and what waited for them
+    (service, appointment, online_booking), fits a hub's database."""
     portable = set(migrator.portable_apps())
 
     assert {"staff", "attendance", "task", "whatsapp_inbox", "service", "appointment", "online_booking"} <= portable
@@ -108,9 +107,9 @@ def test_every_hub_app_lives_in_a_hubs_database_now_that_its_people_are_its_own(
 
 
 def test_the_templates_are_the_platforms_and_one_per_vertical_cloned_from_it():
-    """Proposal (h): ``hub_template_<vertical>`` = ``hub_template`` + the tables of ``template_apps(vertical)``; every
-    template also carries every portable app's (``portable_apps``, review of hub#471 in pre, kept in S3: a sign-up is
-    the clone alone, never ~60 s of migrations on Fargate)."""
+    """``hub_template_<vertical>`` = ``hub_template`` + the tables of ``template_apps(vertical)``; every template also
+    carries every portable app's (``portable_apps``), so a sign-up is the clone alone, never ~60 s of migrations on
+    Fargate."""
     platform, *verticals = migrator.templates()
     portable = set(migrator.portable_apps())
     every = portable
@@ -125,7 +124,7 @@ def test_the_templates_are_the_platforms_and_one_per_vertical_cloned_from_it():
         assert template.source == platform.db_name
         assert set(template.apps) == set(PLATFORM) | every | (wanted & portable)
         assert set(template.left_out) == wanted - portable
-        # Since tenancy W10 a vertical's template holds its whole list: a hair salon is born with its staff.
+        # A vertical's template holds its whole list: a hair salon is born with its staff.
         assert template.left_out == ()
 
 
@@ -176,7 +175,7 @@ def test_the_open_clusters_and_the_closed_ones_with_hubs_are_migrated_through_th
 
 
 def test_without_the_migrators_credentials_it_refuses_never_falling_back_to_defaults(settings, monkeypatch):
-    """The web's and the worker's ``default`` is ``hub_app``: the migrator never runs as it (review of hub#469)."""
+    """The web's and the worker's ``default`` is ``hub_app``: the migrator never runs as it."""
     settings.DEBUG = False
     monkeypatch.setenv("DB_MIGRATOR_USER", "")
     monkeypatch.setenv("DB_MIGRATOR_PASSWORD", "")
@@ -294,7 +293,7 @@ def test_add_creates_only_that_app_and_what_it_requires(new_database, make_hub):
 
 
 def test_ensure_schema_beats_once_per_app_it_migrates(new_database, make_hub):
-    """Review of round 4 (4): a long migration renews its caller's lease between apps (the worker's ``hub_due``), so
+    """A long migration renews its caller's lease between apps (the worker's ``hub_due``), so
     two workers of a deploy never take the same hub while it is being made."""
     hub = make_hub(new_database)
     beats = []
@@ -305,7 +304,7 @@ def test_ensure_schema_beats_once_per_app_it_migrates(new_database, make_hub):
 
 
 def test_an_app_the_hubs_database_has_is_brought_to_the_leaf_even_if_control_never_learnt_it(new_database, make_hub):
-    """«Si discrepan, manda el django_migrations de la BD del hub» (PLAN-DB §7)."""
+    """When control and the hub's database disagree, the hub's own ``django_migrations`` wins."""
     hub = make_hub(new_database)
     migrator.ensure_schema(hub)
     migrate_to(new_database, ("tax", "0001_initial"))  # created by an older code; control knows only the platform
@@ -319,7 +318,7 @@ def test_an_app_the_hubs_database_has_is_brought_to_the_leaf_even_if_control_nev
 
 
 def test_an_app_the_code_no_longer_knows_stays_in_schema_apps(new_database, make_hub):
-    """A rollback ignores the labels it does not know and forgets nothing (PLAN-DB §7, «Rollback»)."""
+    """A rollback ignores the labels it does not know and forgets nothing."""
     hub = make_hub(new_database, schema_apps={"gone": "0009_later"})
 
     migrator.ensure_schema(hub)
@@ -331,7 +330,7 @@ def test_an_app_the_code_no_longer_knows_stays_in_schema_apps(new_database, make
 def test_a_database_control_s_row_does_not_name_yet_never_changes_that_row(new_database, make_hub):
     """Control's row learns what a database has only once it names that database: a cut migrates a business's database
     before its last step names it (``base.hub.cut_finish`` records its schema then, in one transaction), so a cut that
-    breaks before leaves the row as it was (hub#612). The hub in hand learns it all the same: the last step reads it."""
+    breaks before leaves the row as it was. The hub in hand learns it all the same: the last step reads it."""
     hub = make_hub("", schema_state=Hub.SchemaState.BEHIND, schema_apps={"gone": "0009_later"})
     hub.db_name = new_database  # in hand only, as a cut holds it until its last step
     leaf = leaves()
@@ -345,7 +344,7 @@ def test_a_database_control_s_row_does_not_name_yet_never_changes_that_row(new_d
 
 
 def test_add_creates_the_people_apps_and_what_waited_for_them(new_database, make_hub):
-    # Tenancy W10: an appointment hangs from a staff record, and a staff record from the business's own person.
+    # An appointment hangs from a staff record, and a staff record from the business's own person.
     hub = make_hub(new_database)
 
     migrator.ensure_schema(hub, add=["appointment"])
@@ -375,8 +374,8 @@ def test_add_refuses_an_app_the_code_does_not_have(new_database, make_hub):
     assert hubs.table_names(new_database) == set()
 
 
-def test_the_migrator_runs_with_plan_db_session_limits(new_database, monkeypatch, make_hub):
-    """PLAN-DB §7, «Conexión»: lock_timeout 5 s, statement_timeout and idle_in_transaction 5 min."""
+def test_the_migrator_runs_with_its_session_limits(new_database, monkeypatch, make_hub):
+    """lock_timeout 5 s, statement_timeout and idle_in_transaction 5 min."""
     hub = make_hub(new_database)
     seen = {}
     real = migrator.migrate_apps
@@ -507,7 +506,7 @@ def test_ensure_schema_of_a_never_opens_bs_database(hub_databases, make_hub, ope
 
 def test_a_hub_is_behind_when_an_app_it_has_is_not_at_the_codes_leaf():
     leaf = leaves()
-    # Until S3 a hub with its own database has every portable app (round 2026-10-31 of the S2a review): current is all.
+    # A hub with its own database has every portable app: current is all of them.
     current = {label: leaf[label] for label in (*PLATFORM, *migrator.portable_apps())}
 
     assert not migrator.is_behind(Hub(schema_apps=current))
@@ -521,7 +520,7 @@ def test_a_hub_is_behind_when_an_app_it_has_is_not_at_the_codes_leaf():
 
 
 def test_a_hub_without_an_app_it_never_turned_on_is_not_behind():
-    """S3: an app's tables are made the first time its hub turns it on (``base.app.enable`` → the worker's
+    """An app's tables are made the first time its hub turns it on (``base.app.enable`` → the worker's
     ``ensure_schema``), never by ``migrate_hubs``: a hub with its own database that lacks one is up to date."""
     leaf = leaves()
     every = {label: leaf[label] for label in (*PLATFORM, *migrator.portable_apps())}
@@ -564,8 +563,8 @@ def platform_and_vertical(template_name, apps=("tax",)) -> tuple[migrator.Templa
 
 
 def test_a_missing_platform_template_is_refused_naming_its_server(template_name, make_cluster):
-    """Only db-bootstrap makes a platform's template, with its roles, grants and default privileges (ruling of the
-    review of hub#469): a plain one would let every role of the cluster in, and stay so."""
+    """Only db-bootstrap makes a platform's template, with its roles, grants and default privileges: a plain one would
+    let every role of the cluster in, and stay so."""
     template = migrator.Template(db_name=template_name(), apps=PLATFORM)
     cluster = make_cluster("second")
     on_cluster = migrator.cluster_target(cluster)
@@ -587,7 +586,7 @@ def test_a_verticals_template_is_cloned_from_the_platforms_with_every_app_off(te
 
     assert applied and all(name.split(".")[0] not in PLATFORM for name in applied)  # the platform came cloned
     assert hubs.table_names(vertical.db_name) == tables_of(vertical.apps)
-    assert rows(vertical.db_name, AppActivation._meta.db_table) == 0  # proposal (h): everything off
+    assert rows(vertical.db_name, AppActivation._meta.db_table) == 0  # a template has every app off
     hubs.assert_nobody_on(platform.db_name)  # nobody connected: both clonable
     hubs.assert_nobody_on(vertical.db_name)
 
@@ -627,7 +626,7 @@ def test_a_verticals_template_made_open_before_is_closed_on_the_next_run(templat
 
 
 def test_a_clone_waits_for_whoever_holds_its_source_a_bounded_number_of_times(template_name, monkeypatch):
-    """55006 («source database … is being accessed by other users», PLAN-DB §6): PostgreSQL itself waits 5 s."""
+    """55006 («source database … is being accessed by other users»): PostgreSQL itself waits 5 s."""
     platform, vertical = platform_and_vertical(template_name)
     monkeypatch.setattr(migrator, "CLONE_RETRY_DELAY", 0.2)
     holder = psycopg.connect(**(bootstrap_conninfo() | {"dbname": platform.db_name}), autocommit=True)
@@ -735,7 +734,7 @@ def test_the_migrator_leaves_no_alias_of_its_own_registered(template_name, new_d
 
 
 def test_the_migrator_never_drops_anything():
-    """Tables are never deleted, and a template is brought up to date, never rebuilt (plan 2026-10-30, W2b)."""
+    """Tables are never deleted, and a template is brought up to date, never rebuilt."""
     root = Path(__file__).resolve().parents[3]
     for path in ("base/tenancy/migrator.py", "base/management/commands/migrate_hubs.py"):
         assert re.search(r"\bDROP\b", (root / path).read_text()) is None, path

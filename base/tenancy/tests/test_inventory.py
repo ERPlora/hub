@@ -1,12 +1,12 @@
-"""Inventory of the databases (PLAN-DB §14.1; plan 2026-10-22-fase-2-tenencia §2.1 and §4, step 2).
+"""Inventory of the databases.
 
 Every model the Hub installs, and every model its migrations ever created, belongs to one database class, from an
-explicit list: ``control`` (the registry, Django's admin, auth, contenttypes and sessions, and phase 1's
+explicit list: ``control`` (the registry, Django's admin, auth, contenttypes and sessions, and
 ``Membership`` and ``SessionOwner``), ``hub`` (``base``, ``live`` and every module of ``apps/``), ``contextual`` (the outbox and its
 deliveries: in the database of the context, control's for the registry's events) or ``shared`` (the SaaS's schema).
 A model nobody classified fails here and in the router, never lands anywhere by default. Own models have a UUIDv7
 key. Once migrated, each database holds exactly its classes' tables and ``django_migrations``: control's, its own and
-the outbox (since S5, nothing of a hub's: ``SHARED_MODE_EXTRA`` is empty); a hub's, those of its apps. The suite's
+the outbox (nothing of a hub's: ``SHARED_MODE_EXTRA`` is empty); a hub's, those of its apps. The suite's
 control test database also holds the hubs' tables, for its tests written before the tenancy only
 (``base/tenancy/tests/legacy.py``): what production's ``migrate`` makes is checked on a database of its own.
 """
@@ -23,8 +23,8 @@ from base.tenancy import inventory
 
 #: Own models whose key is no UUIDv7, each with its reason.
 KEY_EXCEPTIONS = {
-    "shared.app": "round 16 (PLAN §21): its id is the app's label, the name shared by the catalog and the SaaS.",
-    "control.hubdue": "keyed by its hub (PLAN-DB §8: hub_id is the key), one row per hub.",
+    "shared.app": "its id is the app's label, the name shared by the catalog and the SaaS.",
+    "control.hubdue": "keyed by its hub (hub_id is the key), one row per hub.",
     "base.hubidentity": "its one row is the hub's id, which the SaaS made (a UUIDv7 it does not mint).",
 }
 OWN_APPS = ("control", "base", "live", "shared")
@@ -39,7 +39,7 @@ def test_every_installed_model_has_a_database_class(model):
     assert inventory.classify(model) in inventory.CLASSES
 
 
-def test_the_classes_are_the_plans():
+def test_each_model_is_classified_in_its_expected_database():
     from django.contrib.admin.models import LogEntry
     from django.contrib.auth.models import Permission, User
     from django.contrib.contenttypes.models import ContentType
@@ -148,10 +148,10 @@ def test_own_models_have_a_uuid7_key(model):
     assert key.default is uuid.uuid7
 
 
-# ── After migrating: each database holds exactly its tables (PLAN-DB §14.1) ──────────────────────────────────────────
+# ── After migrating: each database holds exactly its tables ──────────────────────────────────────────────────────────
 
-#: Database classes whose tables control's database also holds while phase 1's hubs share it (``db_name=""``), each
-#: with its reason. Empty since S5 (``base.tenancy.cut``: every business has its own database): a hub's table that
+#: Database classes whose tables control's database would also hold while hubs share it (``db_name=""``), each
+#: with its reason. Empty (``base.tenancy.cut``: every business has its own database): a hub's table that
 #: production's ``migrate`` makes in control fails the equality below.
 SHARED_MODE_EXTRA: dict[str, str] = {}
 #: Django's own bookkeeping, in every database it migrates.
@@ -167,7 +167,7 @@ def tables_of(*classes: str) -> set[str]:
     }
 
 
-def test_since_s5_control_shares_its_database_with_no_hub():
+def test_control_shares_its_database_with_no_hub():
     assert SHARED_MODE_EXTRA == {}
 
 
@@ -210,7 +210,7 @@ def production_control(django_db_blocker):
 
 @pytest.mark.django_db
 def test_controls_database_as_production_migrates_it_holds_exactly_controls_tables(production_control):
-    # The outbox is contextual: the registry's own events (base.hub.*, the demos) stay in control's after S5 too.
+    # The outbox is contextual: the registry's own events (base.hub.*, the demos) stay in control's.
     expected = tables_of(inventory.CONTROL, inventory.CONTEXTUAL, *SHARED_MODE_EXTRA) | {MIGRATIONS_TABLE}
 
     assert production_control == expected, {

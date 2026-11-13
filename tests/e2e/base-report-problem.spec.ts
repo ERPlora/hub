@@ -1,4 +1,4 @@
-// BASE-F108 · «Report a problem» from the user menu, without leaving the hub (FIX-HUB-BASE-REPORT-PROBLEM-MODAL), as a
+// BASE-F108 · «Report a problem» from the user menu, without leaving the hub, as a
 // person sees it at 390, 834 and 1440, against the stack's SaaS with no mocks: the user menu's entry opens the dialog of
 // `@erplora/ui` in the hub (no new tab, the address does not move), «Send report» waits for both fields, and the report
 // reaches erplora.com, which mails its support mailbox «Reply-To» the account, with «From: Hub» and this business

@@ -1,6 +1,6 @@
 // flow: HUB_SHELL icons
-// Services, Tasks and Price Lists wear the icons of the old modules (FIX-UI-SHELL-ICONS-SERVICE-TASK), now that
-// the shell registers them (@erplora/ui `ION_ICONS`): an icon the shell does not know paints an empty box, so
+// Services, Tasks and Price Lists wear their own icons, which the shell registers (@erplora/ui `ION_ICONS`): an icon
+// the shell does not know paints an empty box, so
 // each one is checked painted in the page at 390×844, 834×1112 and 1440×900, as the owner of hub `a`:
 //   - Services: the briefcase of its tab and its «My apps» tile, the gift of «Packages», the archive box of
 //     «Archive», and the star of «Main service» in «Professionals who do it» — filled on the main one, empty

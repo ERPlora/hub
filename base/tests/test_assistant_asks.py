@@ -1,4 +1,4 @@
-"""Layer 1 of the assistant's QA (docs plan 2026-10-31, the assistant's knowledge and QA, §1.4): deterministic, with no
+"""Layer 1 of the assistant's QA: deterministic, with no
 model and no network, in every pull request.
 
 Every tool of an app listed in ``LIVE_ASSISTANT_ASKS_REQUIRED`` says what a person types to ask for it (its ``asks``,
@@ -57,7 +57,7 @@ _found: dict[tuple[str, tuple[str, ...]], list[Miss]] = {}
 
 
 class AsksBacklog(UserWarning):
-    """The tools of the apps not yet listed that say no asks, per app: the backlog of the fleet, never a failure."""
+    """The tools of the apps not yet listed that say no asks, per app: a backlog, never a failure."""
 
 
 class AsksReach(UserWarning):
@@ -197,7 +197,7 @@ def assert_reported_are_owner_probes(reported: Iterable[tuple[str, str]]) -> Non
 
 
 def test_no_ask_copies_a_qa_probe_or_names_a_qa_record():
-    """The probes measure that the selection generalises (docs plan 2026-10-31 §1.5): a probe written into its tool's
+    """The probes measure that the selection generalises: a probe written into its tool's
     asks ranks its own words and layer 2 skips it as a copy, and a record of the QA's data («Documentos QA/nota-qa.txt»,
     «Ordenador de oficina QA») is no phrase a business says: its «QA» scores for every probe that names one."""
     phrases = probe_phrases()
@@ -430,7 +430,7 @@ REPORTED = [
         "base.device.remove",
         "he perdido el primer dispositivo de la lista; cierra su acceso y obliga a entrar de nuevo con una cuenta",
     ),
-    # «pon al … el nombre» renames even with what it names in between (ERPlora/live#47): 43rd of 40 before, now 4th.
+    # «pon al … el nombre» renames even with what it names in between.
     ("base.device.rename", "pon al dispositivo que estoy usando ahora el nombre «Ordenador de oficina QA»"),
     (
         "base.person.badge_remove",

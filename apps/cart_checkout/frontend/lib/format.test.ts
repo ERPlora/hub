@@ -37,7 +37,7 @@ describe('formatMoney', () => {
     expect(formatMoney(123456, 'en')).toBe('—');
   });
 
-  it('groups the thousands of a four-digit amount too, so a column of totals lines up (hub#1090)', () => {
+  it('groups the thousands of a four-digit amount too, so a column of totals lines up', () => {
     // Spanish CLDR leaves 1234,56 ungrouped (minimumGroupingDigits = 2); Odoo, Business Central and
     // the old hub's fix group it, as 12.345,60 is.
     expect(nbsp(formatMoney(123456, 'es', EUR))).toBe('1.234,56 €');

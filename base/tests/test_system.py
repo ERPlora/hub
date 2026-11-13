@@ -1,4 +1,4 @@
-"""base.system: what System's operations share and touches no database (APP-BASE-7)."""
+"""base.system: what System's operations share and touches no database."""
 
 import datetime as dt
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The form of «Call another system» (WORKBOOK FLOW-F27; the old module's flows-f16): the method, the
+// The form of «Call another system» (WORKBOOK FLOW-F27): the method, the
 // address — saying which permission the step will ask for, the origin written by hand —, the headers,
 // what it sends and how long it waits. Every value is text with data, secrets or the call's no-repeat key
 // inserted (`{{…}}`); a datum alone is inserted as text too, since a call only sends text. Below, the

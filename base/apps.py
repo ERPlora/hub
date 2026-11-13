@@ -1,7 +1,7 @@
-"""The platform app of hub-next (Odoo's ``base``): session, permissions and the SPA.
+"""The Hub's platform app (Odoo's ``base``): session, permissions and the SPA.
 
-A LiveAppConfig of kind "platform" (round 15, PLAN §20): always on, never turned on or off by a
-hub, so it declares no module fields (no requires, category, premium or menu of its own).
+A LiveAppConfig of kind "platform": always on, never turned on or off by a hub, so it declares no module fields (no
+requires, category, premium or menu of its own).
 """
 
 from django.utils.translation import gettext_lazy as _
@@ -14,11 +14,10 @@ class BaseConfig(LiveAppConfig):
     kind = "platform"
     verbose_name = _("Base")
     default_auto_field = "django.db.models.BigAutoField"
-    # The Home (PLAN-HUB round 2026-10-21): everyone of the hub sees it; whoever runs the hub (the old hub's
-    # ``hub.administer``) is told its platform steps and the failed events.
-    # Files (APP-BASE-8): everyone sees and opens them; who runs the hub uploads, renames and deletes (the old hub's).
-    # «Manage on erplora.com» at the menu's foot (BASE-F11, gh:hub#364): the owner, an administrator and a manager open
-    # this business on erplora.com's panel; a manager does not administer the hub, so it is a permission of its own.
+    # Everyone of the hub sees the Home; whoever runs the hub is also told its platform steps and the failed events.
+    # Everyone sees and opens the files; whoever runs the hub uploads, renames and deletes them.
+    # «Manage on erplora.com» at the menu's foot: the owner, an administrator and a manager open this business on
+    # erplora.com's panel; a manager does not administer the hub, so it is a permission of its own.
     permissions = [
         "base.view_home",
         "base.administer_hub",

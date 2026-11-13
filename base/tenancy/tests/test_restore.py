@@ -1,5 +1,4 @@
-"""A hub's database put back as it was at a moment, from a copy on a temporary cluster (hub#1198; PLAN-DB §13
-«Restaurar un hub»).
+"""A hub's database put back as it was at a moment, from a copy on a temporary cluster.
 
 ``control.hub.restore`` asks; the worker restores (``base.tenancy.restore.run_due``), under the hub's lease, one hub at
 a time, with the move's own steps (``base.tenancy.move``) and its origin and destination the other way round:

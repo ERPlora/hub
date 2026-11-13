@@ -294,7 +294,7 @@ test('Agenda: book with a free time, an overlap refused, the grid and the week, 
   }
 });
 
-// flow: CUSTOMER-F25 · gh:appointments#306, #318 — the old picker only searched, so a new customer meant
+// flow: CUSTOMER-F25 — the old picker only searched, so a new customer meant
 // leaving the agenda for Customers and coming back.
 test('CUSTOMER-F25: a new customer from «New appointment» without leaving the agenda; what was chosen stays', async ({ browser }) => {
   const { context, page } = await ownerPage(browser, '/appointment/agenda');

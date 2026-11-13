@@ -1,5 +1,5 @@
-// «Your printer», Printing's card in System › «Usage and plan» (hub#683; the old hub's of «Resources», HUB_SHELL-F137 and
-// F138): base mounts it while Printing is on, for everybody with Printing. It says who prints, leads to Printing with
+// «Your printer», Printing's card in System › «Usage and plan» (hub#683):
+// base mounts it while Printing is on, for everybody with Printing. It says who prints, leads to Printing with
 // «Set up printing» and, in a browser, says where to get the ERPlora app for Windows, Linux or Android (erplora.com's
 // doors, `hub-home.app_downloads`), each opening outside the hub. Inside the installed app, no download: it would be the
 // app offering itself. Whether the printer answers now is not said: Printing has no such read yet (hub#683's own issue).

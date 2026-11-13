@@ -68,8 +68,8 @@ def test_issuing_seals_its_registration_record_in_the_same_commit(issuer):
     [(None, "vat", "01"), ("ES-CN", "igic", "03"), ("ES-CE", "ipsi", "02"), ("ES-ML", "ipsi", "02")],
 )
 def test_a_typed_rate_is_declared_with_the_tax_of_the_business_territory(issuer, region, tax, code):
-    # TAX-F11 (pm#629 VF-17): a line without a tax category takes the tax family of the business's territory;
-    # a Canary business's typed 7 % is IGIC (Impuesto 03), never VAT (01). Nothing is sent to the AEAT here.
+    # TAX-F11: a line without a tax category takes the tax family of the business's territory; a Canary business's typed
+    # 7 % is IGIC (Impuesto 03), never VAT (01). Nothing is sent to the AEAT here.
     run("tax.settings.update", {"region_code": region})
     invoice = run("invoice.invoice.create", {"lines": [{**LINE, "tax_rate": "7"}], **RECIPIENT})
     assert [(entry.tax, entry.rate, entry.quota) for entry in invoice.tax_breakdown] == [
@@ -123,8 +123,8 @@ def test_a_refusal_for_who_issues_is_not_swallowed_either(issuer):
 
 
 def test_in_production_without_a_way_to_the_aeat_nothing_is_issued(issuer, settings):
-    # Working-rules §15: in production nothing is charged that can never reach the AEAT. VeriFactu refuses to
-    # seal with its route's own code; the document is undone and the series gives its number back.
+    # In production nothing is charged that can never reach the AEAT. VeriFactu refuses to seal with its route's own
+    # code; the document is undone and the series gives its number back.
     settings.VERIFACTU_PRODUCTION_ENABLED = True
     settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
     system = system_context(A)

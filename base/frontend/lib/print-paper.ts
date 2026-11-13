@@ -1,4 +1,4 @@
-// A paper printed inside the installed app (hub#455; ERPlora/app hub#2006, hub#2008): the app's webview prints
+// A paper printed inside the installed app (hub#455): the app's webview prints
 // nothing on `window.print()`, so the paper goes to the app's own print screen — the `print_document` command, which
 // takes a whole HTML document and opens the system's print dialog with it (a printer or «Save as PDF»: Android's
 // PrintManager, the desktop's print window). In a browser nothing changes: the caller opens the browser's dialog.

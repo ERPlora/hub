@@ -1,4 +1,4 @@
-"""A hub's database moved to another cluster (round 2026-10-30b of PLAN-DB, decision 3; tranche S7, part 1).
+"""A hub's database moved to another cluster.
 
 The Hub admin asks (``control.hub.move``: ``Hub.moving_to``; its host answers 503 «maintenance» from then on,
 ``base.registry``); the worker moves it here (:func:`run_due`, in its own thread), one hub at a time, under the hub's
@@ -43,7 +43,7 @@ the same way.
 The copies are dropped after :data:`MOVED_COPY_DAYS` (:func:`drop_old_copies`, in the same pass), with their rows;
 one that cannot be dropped now is tried again on the next pass. A restore's kept copies go the same way.
 
-Its steps are a restore's too (``base.tenancy.restore``, hub#1198): the same move with its origin and destination the
+Its steps are a restore's too (``base.tenancy.restore``): the same move with its origin and destination the
 other way round, the copy coming from a temporary cluster and the hub staying on its own.
 
 Every name is validated by ``base.tenancy.names`` and reaches SQL as ``sql.Identifier``; control is written through
@@ -402,7 +402,7 @@ def _clone_emptied(hub, cluster, roles: bootstrap.Names, template: str | None = 
     """``hub``'s database on ``cluster`` made anew: whatever has its name there dropped, cloned from the template of its
     vertical there (``template``, found when not given) and the template's tables taken out. The caller makes sure
     what has that name is never the hub's data. ``aside``: a separate copy of the hub of that name made instead
-    (``base.tenancy.restore``, hub#1213), granted to none of the app's roles."""
+    (``base.tenancy.restore``), granted to none of the app's roles."""
     if template is None:
         try:
             template = provision.template_for(hub)

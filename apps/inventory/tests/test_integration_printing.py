@@ -115,7 +115,7 @@ def test_inventory_f25_the_price_is_in_units_of_the_currency_never_in_cents(sham
     out = run("inventory.product.print_label", {"id": str(shampoo.id)})
 
     document = PrintJob.objects.get(pk=out.job_id).document
-    # 5 cents: 0.05 €, and the printer is told to paint two decimals (inventory#101).
+    # 5 cents: 0.05 €, and the printer is told to paint two decimals.
     assert (Decimal(str(document["price"])), document["decimals"]) == (Decimal("0.05"), 2)
 
 

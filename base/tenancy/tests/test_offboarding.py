@@ -1,4 +1,4 @@
-"""A business that left, once its 90 days are over (PLAN-DB §6 «Baja», proposal (a) of round 2026-10-30; hub#599).
+"""A business that left, once its 90 days are over.
 
 The worker's data pass takes the business from ``cancelled`` through ``archiving`` (its final copy) and ``dropping``
 (``DROP DATABASE … WITH (FORCE)``, that one only) to ``purged``, the row left as a tombstone. These tests make real
@@ -137,7 +137,7 @@ def test_a_business_past_its_90_days_is_copied_dropped_and_purged_and_one_within
 
 
 # ── A business with fiscal documents keeps its database ────────────────────────────────────────────────────────────
-# PLAN-DB §6 archives them for 6 years before the drop, and that archive does not exist yet.
+# They must be archived for 6 years before the drop, and that archive does not exist yet.
 
 DAY = dt.date(2026, 10, 14)
 
@@ -490,8 +490,8 @@ def test_a_drop_that_fails_keeps_its_copy_is_tried_again_and_the_pass_over_hub_d
     with caplog.at_level(logging.INFO, logger="base.tenancy.provision"):
         provision.run_due(now + dt.timedelta(days=1))
 
-    # Its own row, state and log, never how many the pass worked on: control holds whatever else its process has
-    # (hub#1332). The pass logs every business it works on, by id or slug, even one it then leaves as it was.
+    # Its own row, state and log, never how many the pass worked on: control holds whatever else its process has.
+    # The pass logs every business it works on, by id or slug, even one it then leaves as it was.
     def state(row: Hub) -> tuple:
         return (row.status, row.attempts, row.last_error, row.next_attempt_at, row.updated_at)
 
@@ -636,7 +636,7 @@ def test_a_business_whose_database_was_never_finished_goes_without_copy_or_gate(
     assert not HubDump.objects.filter(hub__in=[never.pk, empty.pk]).exists()
 
 
-# ── Its files: step 4 of PLAN-DB §6 «Baja», right after the drop (hub#613) ─────────────────────────────────────────
+# ── Its files, right after the drop ────────────────────────────────────────────────────────────────────────────────
 
 def test_a_business_past_its_90_days_goes_with_its_files_and_every_other_keeps_theirs(
     business, dumps_bucket, hub_files_bucket, moto_s3
@@ -681,7 +681,7 @@ def test_a_store_that_fails_leaves_it_dropping_noted_and_tried_again_never_purge
     assert failed.last_error.startswith("files_purge_failed: ")
     assert failed.attempts == 1
     assert failed.next_attempt_at > now
-    assert failed.db_name not in databases(), "PLAN-DB §6: the database went first"
+    assert failed.db_name not in databases(), "the database went first"
     assert "files_purge_failed" in caplog.text
 
     run_pass(now)

@@ -1,4 +1,4 @@
-"""The worker's CloudWatch metrics (hub#488; PLAN-AWS §8; PLAN-DB §6 and §8).
+"""The worker's CloudWatch metrics (hub#488).
 
 Once a minute, in a thread of its own (the worker's tick never waits for it), the worker measures and publishes:
 
@@ -8,7 +8,7 @@ Once a minute, in a thread of its own (the worker's tick never waits for it), th
 - ``ERPlora/Fiscal``: ``OldestPendingAgeSeconds``, since when the oldest production record waits to reach the tax
   authority, asked to every app that keeps such a queue (``fiscal_pending_since`` on its ``LiveAppConfig``: VeriFactu)
   in each hub with its own database where the app is on, a time budget per pass and the hubs in turn, each one's last
-  reading kept. Since S5 there is no shared database: a business still without its own is never read.
+  reading kept. There is no shared database: a business still without its own is never read.
 
 Every value carries the ``Environment`` dimension (prod, pre). A measure that fails is logged and missing from that
 pass (its alarm treats missing data as breaching); CloudWatch refusing a namespace is logged and never stops the
@@ -127,8 +127,8 @@ def test_with_no_record_to_send_anywhere_the_backlog_is_zero(hub_a, hub_b):
 @hub_db
 @pytest.mark.usefixtures("no_test_fallback")
 def test_a_business_still_without_its_own_database_is_never_read(hub_a, hub_b, caplog):
-    """Since S5 there is no shared database to read: a business the cut has not reached yet answers 503 and keeps no
-    records anywhere the worker reads; were it read, its failure would wait since then and page (``_failed``)."""
+    """There is no shared database to read: a business still without its own answers 503 and keeps no records
+    anywhere the worker reads; were it read, its failure would wait since then and page (``_failed``)."""
     now = timezone.now()
     with use_control():
         Hub.objects.create(slug="not-cut-yet", status=Hub.Status.READY)
@@ -251,7 +251,7 @@ def test_a_hub_that_cannot_be_read_keeps_its_last_reading_and_is_logged(hub_a, h
 def test_a_busy_free_hub_never_read_waits_since_its_first_failure_and_pages_once_that_ages(
     hub_a, hub_b, monkeypatch, caplog
 ):
-    """Review of hub#598: a Free hub (one place of its database in this process) whose place is taken, with a
+    """hub#598: a Free hub (one place of its database in this process) whose place is taken, with a
     production record waiting for 20 minutes, read by a backlog just made (a worker restarted): nothing read yet is no
     «nothing to send». It waits since the first failure, so the alarm pages once that is older than 5 minutes; read at
     last, the real reading replaces it. Busy is the plan's limit doing its work: said as a warning, without a trace."""
@@ -363,7 +363,7 @@ def test_every_app_that_keeps_a_fiscal_queue_is_asked_and_the_oldest_answer_wins
     assert metrics.fiscal_pending_since({"sale"}) is None
 
 
-# ── The apps stuck turning on (hub#610; PLAN-DB §7) ─────────────────────────────────────────────────────────────────
+# ── The apps stuck turning on (hub#610) ─────────────────────────────────────────────────────────────────────────────
 
 
 def waiting(hub: Hub, app: str, state: str, since: dt.datetime) -> None:

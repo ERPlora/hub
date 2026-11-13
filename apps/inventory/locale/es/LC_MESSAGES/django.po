@@ -321,6 +321,9 @@ msgstr "Slug"
 msgid "Products"
 msgstr "Productos"
 
+msgid "Product categories"
+msgstr "Categorías de productos"
+
 msgid "Yes"
 msgstr "Sí"
 

@@ -6,11 +6,10 @@
 // until a label printer is added and its device takes it (PRINTING-F12, INVENTORY-F25).
 // Screenshots of both pages, and of each flow, in the three viewports. What is made here is deleted, and the
 // settings put back, after it.
-// FIX-HUB-E2E-PRINTING-QUEUE-CLAIM-LEAKS-ACROSS-RUNS: on a database other runs used, the job goes to this run's
-// printer by its id (a kitchen printer the settings still name, left by a run cut short, took it), the claims get
-// past the older jobs waiting for any kitchen printer, each test finds or makes this run's kitchen printer (a
-// failure restarts the worker with a new `RUN`), and the cleanup also runs before, so a run whose `afterAll` never
-// ran leaves the next one clean.
+// On a database other runs used, the job goes to this run's printer by its id (a kitchen printer the settings still
+// name, left by a run cut short, took it), the claims get past the older jobs waiting for any kitchen printer, each
+// test finds or makes this run's kitchen printer (a failure restarts the worker with a new `RUN`), and the cleanup also
+// runs before, so a run whose `afterAll` never ran leaves the next one clean.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, login, psql, shot, shown } from './helpers';
@@ -135,7 +134,7 @@ async function titleOffset(card: Locator): Promise<number> {
   return Math.round(title.y - box.y);
 }
 
-/** This task's screenshots (`FIX-PRINTING-F12-INVENTORY-ALREADY-ASKS-<390|834|1440>`), each once `ready` says the page is painted. */
+/** The label flow's screenshots at 390, 834 and 1440, each once `ready` says the page is painted. */
 async function taskShots(page: Page, ready: (page: Page) => Promise<void>): Promise<void> {
   for (const viewport of FLOW_VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
@@ -240,7 +239,7 @@ test('PRINTING-F12: the label asked from the product sheet waits in the Â«LabelÂ
   page,
   context,
 }) => {
-  // flow: PRINTING-F12 (INVENTORY-F25 asks for it; printing#62: the warning of a label with no printer shows)
+  // flow: PRINTING-F12 (INVENTORY-F25 asks for it: the warning of a label with no printer shows)
   await login(page, A, '/inventory/products');
   try {
     await switchOffLabelPrinters(context);
@@ -280,8 +279,8 @@ test('PRINTING-F12: the label asked from the product sheet waits in the Â«LabelÂ
       await expect(shown(p).locator('[data-testid=printing-summary-card-label]')).toContainText(/(Waiting, no printer|En cola, sin impresora)/);
     });
 
-    // A label printer arrives: the card names it and, until a device set up here reaches it, says nobody prints it
-    // (FIX-PRINTING-SETUP-HOOKS); the device next to it, set up by printing from it, takes the label and the card
+    // A label printer arrives: the card names it and, until a device set up here reaches it, says nobody prints it;
+    // the device next to it, set up by printing from it, takes the label and the card
     // turns ready.
     const labels = await api<{ id: string }>(context, A, 'POST', '/printing/printers', {
       name: `e2e Labels ${RUN}`,

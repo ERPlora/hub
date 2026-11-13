@@ -11,6 +11,7 @@ import type { Component } from 'vue';
 
 import type { TaskOut } from '../operations';
 import { EMPLOYEE, flush, ionValue, mountTask, type MountOptions, page } from '../__tests__/mount-task';
+import { itKeepsTheFiltersBehindTheFunnel } from '../__tests__/filters-funnel';
 import { task } from '../__tests__/task';
 import TaskFormModal from '../components/TaskFormModal.vue';
 import TaskSheet from '../components/TaskSheet.vue';
@@ -124,16 +125,7 @@ describe('TasksPage · All', () => {
     ]);
   });
 
-  it('keeps the filters behind the toolbar funnel, as the old table did, until it is pressed', async () => {
-    const s = await setup();
-    await s.show(page(ROWS));
-    expect(s.prop('filterable')).toBe(true);
-    expect(s.wrapper.find('[data-testid="task-tasks-filters-toggle"]').exists()).toBe(true);
-    expect(s.wrapper.find('[data-testid="task-tasks-filter-priority"]').exists()).toBe(false);
-    await s.wrapper.find('[data-testid="task-tasks-filters-toggle"]').trigger('click');
-    await flush();
-    expect(s.wrapper.find('[data-testid="task-tasks-filters-panel"] [data-testid="task-tasks-filter-priority"]').exists()).toBe(true);
-  });
+  itKeepsTheFiltersBehindTheFunnel(setup, page(ROWS), 'task-tasks', 'priority');
 
   it('sorts and searches on the server; no task at all says «No tasks.»', async () => {
     const s = await setup();
@@ -145,7 +137,7 @@ describe('TasksPage · All', () => {
     expect(s.params(ALL)).toEqual([{ search: 'store', sort: '-priority', limit: 50, offset: 0 }]);
   });
 
-  it("wears the old module's icons: «Details» opens, «Start» plays, «Complete» double-checks; the checkbox on cards and the empty list", async () => {
+  it('wears its icons: «Details» opens, «Start» plays, «Complete» double-checks; the checkbox on cards and the empty list', async () => {
     const s = await setup();
     await s.show(page(ROWS));
     expect(s.prop<Array<{ id: string; icon?: string }>>('actions').map((a) => [a.id, a.icon])).toEqual([
@@ -254,7 +246,7 @@ describe('TasksPage · Spanish', () => {
   });
 });
 
-describe('TasksPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('TasksPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

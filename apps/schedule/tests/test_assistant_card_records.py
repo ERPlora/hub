@@ -1,7 +1,7 @@
-"""FIX-HUB-SCHEDULE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (hub#675): the card of a write of Schedules says which special
-day or temporary change it acts on by its name, read as whoever asks, never by its id, and leaves it out when that
-person may not read it or it is not there. A special day goes by its name and a temporary change by its reason, as the
-screens' own «Delete» dialog says them («It will delete “Christmas”»).
+"""The card of a write of Schedules (hub#675) says which special day or temporary change it acts on by its name, read as
+whoever asks, never by its id, and leaves it out when that person may not read it or it is not there. A special day goes
+by its name and a temporary change by its reason, as the screens' own «Delete» dialog says them («It will delete
+“Christmas”»).
 """
 
 import dataclasses

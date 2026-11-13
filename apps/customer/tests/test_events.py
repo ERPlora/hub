@@ -1,8 +1,6 @@
-"""The customer app's events (``customer.<entity>.<fact>``, recorded by services.py) and its reactions.
-
-The reactions are tested with the Sales app's REAL events: a sale is paid, voided and refunded through
-the sale's own operations and its outbox payload is handed to ``events.react``, as the relay will
-(phase 2). The sale app is imported here only, in the tests: Customers does not depend on it.
+"""The reactions are tested with the Sales app's REAL events: a sale is paid, voided and refunded through the sale's own
+operations and its outbox payload is handed to ``events.react``, as the relay does. The sale app is imported here only,
+in the tests: Customers does not depend on it.
 """
 
 import pytest

@@ -14,7 +14,7 @@
 //     loaded, ERPlora's seal again when switched off;
 //   - VERIFACTU-F08: Settings lists what keeps the business from going live, the authorisation in review among it,
 //     from the SaaS's photo (`PUT /internal/hubs/{id}/state`, signed as the SaaS signs it), and drops it once approved;
-//     no plan option is ever among them (PLAN §30, round 2026-10-22b: VeriFactu on Free).
+//     no plan option is ever among them (VeriFactu is on every plan, Free included).
 // Each flow leaves its evidence in the three sizes of the migration (`APP-VERIFACTU-<flow>-390|834|1440`).
 // The photo is the SaaS's, sent here the way the SaaS sends it, to `a`'s row of the registry (`base_hub`). What the
 // run changes in VeriFactu's configuration, the own certificate and that row's photo is put back after it (or

@@ -1,9 +1,9 @@
 """A connection handed back with a session setting changed is found and discarded (``config/testing.py``).
 
 The control database's pool hands a connection out again as its last user left it: a test's
-``SET lock_timeout = '300ms'`` (FIX-FLOW-DETAIL-RACE) reached inventory's and staff's lock waits in
-the tests after it and failed them in the deploy of e0a2e79. The autouse fixture of ``conftest.py``
-fails the test that leaves one, and discards it so that the next test starts clean.
+``SET lock_timeout = '300ms'`` reaches inventory's and staff's lock waits in the tests after it and
+fails them. The autouse fixture of ``conftest.py`` fails the test that leaves one, and discards it so
+that the next test starts clean.
 
 A connection that keeps its own ``ensure_connection`` is found and removed too: what ``monkeypatch``'s undo leaves when
 a test patched the connection rather than its class, which hides pytest-django's block from every later test of the

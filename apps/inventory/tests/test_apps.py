@@ -67,8 +67,8 @@ def test_inventory_requires_tax_for_the_fiscal_category_of_each_product():
 
 
 def test_inventory_is_in_the_store_and_in_the_restaurant_template():
-    # Round 16 (PLAN §21): the public store's texts. The restaurant's menu is this catalog; the hair
-    # salon's template (PLAN-HUB §7, block 4) does not carry it, a salon turns it on by hand.
+    # The app store's texts. The restaurant's menu is this catalog; the hair salon's template does not carry it, a
+    # salon turns it on by hand.
     config = inventory()
     assert 0 < len(str(config.summary)) <= 120
     assert str(config.description)
@@ -99,7 +99,7 @@ def test_navigation_opens_the_inventory_with_an_iconify_icon():
     assert entry.icon == "ion:cube-outline"
 
 
-#: The reads that only name a record on the assistant's card (hub#526): no tool, no route.
+#: The reads that only name a record on the assistant's card: no tool, no route.
 CARD_ONLY = {"inventory.category.get"}
 
 
@@ -108,8 +108,9 @@ def test_every_operation_is_a_tool_of_the_assistant():
     # permission is its only door. A command says its risk; a read has none.
     operations = [op for name, op in registry.items() if name.startswith("inventory.")]
     # 31 + the product's image (INVENTORY-F30, F31): set_image, upload_image, suggest_image; + the category the
-    # assistant's card names (hub#526); + the restore of a deleted product, the platform's alone (INVENTORY-F34).
-    assert len(operations) == 36
+    # assistant's card names; + the restore of a deleted product and the recovery of a deleted category, the
+    # platform's alone (INVENTORY-F34, INVENTORY-F07).
+    assert len(operations) == 37
     for op in operations:
         if op.name in CARD_ONLY:
             assert op.ai is INTERNAL and op.expose_api is False, op.name
@@ -123,8 +124,7 @@ def test_every_operation_is_a_tool_of_the_assistant():
             assert op.ai["risk"] in {"normal", "high"}, op.name
 
 
-# The Home's hooks (PLAN-HUB round 2026-10-21; FIX-INVENTORY-SETUP-HOOKS): the old module's module.json `setup` and
-# `widgets` (it had no `bell`), on the queries the Panel already reads (INVENTORY-F17, INVENTORY-F28).
+# The Home's hooks, on the queries the Panel already reads (INVENTORY-F17, INVENTORY-F28).
 
 PRODUCT_EVENTS = [E.PRODUCT_CREATED, E.PRODUCT_UPDATED, E.PRODUCT_DELETED, E.PRODUCT_RESTORED]
 
@@ -163,7 +163,7 @@ def test_the_homes_step_is_your_catalog_done_with_one_active_product():
 
 
 def test_the_step_speaks_the_language_of_whoever_reads_it():
-    """gh:hub#868: the old checklist said «Your catalog» in English to a Spanish reader."""
+    """A Spanish reader never reads «Your catalog» in English."""
     (step,) = inventory().setup
     with translation.override("en"):
         english = (str(step.title), str(step.description))
@@ -186,7 +186,7 @@ PANELS = ["low_stock_count", "value", "in_stock", "low_stock_products"]
 
 def test_the_homes_panels_are_the_old_modules_four():
     """Low-stock count, stock value and the lowest-stock products on by default, products in stock to turn on, each on
-    the Panel's own queries (gh:hub#1100: what the old module marked off stays off)."""
+    the Panel's own queries: what the old module marked off stays off."""
     panels = inventory().widgets
     assert all(isinstance(panel, Widget) for panel in panels)
     assert [
@@ -254,7 +254,7 @@ def test_the_homes_panels_are_the_old_modules_four():
         ),
     ]
     # Every business with Inventory on (the old panels named every sector that sells stock), grouped under the app's
-    # own name in «Customize panel» (gh:inventory#126: never a literal category).
+    # own name in «Customize panel», never a literal category.
     assert all(not panel.verticals and not panel.category for panel in panels)
     for panel in panels:
         fields = registry[panel.operation].output.model_fields
@@ -264,15 +264,15 @@ def test_the_homes_panels_are_the_old_modules_four():
 
 
 def test_a_kpi_says_its_name_once():
-    # gh:hub#1105: the old KPIs painted their header twice (the title and options.label with its icon).
+    # Never the header twice (the title and options.label with its icon).
     for panel in inventory().widgets:
         if panel.kind == "kpi":
             assert not {"label", "icon"} & set(panel.options), panel.key
 
 
 def test_a_money_panel_pins_no_currency_nor_locale():
-    """gh:inventory#123 / gh:hub#2391: the stock value is in the hub's currency and the reader's language; a panel
-    that fixed EUR and es-ES painted every business in euros, Spanish style."""
+    """The stock value is in the hub's currency and the reader's language; a panel that fixed EUR and es-ES painted
+    every business in euros, Spanish style."""
     money = [
         panel
         for panel in inventory().widgets

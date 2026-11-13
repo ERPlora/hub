@@ -317,7 +317,7 @@ def test_a_card_that_is_gone_cannot_be_updated():
         run("customer.customer.update", CustomerPatchIn(id=gone.id, name="Back"))
 
 
-# Custom field values on the update (customers#13)
+# Custom field values on the update
 
 
 @pytest.fixture
@@ -544,7 +544,7 @@ def test_import_creates_the_good_rows_and_skips_the_bad_ones_with_their_reason()
         "import",
         "active",
     )
-    # A country named in English or Spanish is read as its code, as the screen does (customers#72).
+    # A country named in English or Spanish is read as its code, as the screen does.
     assert (dora.country, dora.lifecycle_stage) == ("ES", "active")
     assert (eva.source, eva.lifecycle_stage, eva.birthday) == (
         "referral",
@@ -608,7 +608,7 @@ def test_import_takes_back_the_apostrophe_the_export_puts_in_front_of_a_formula(
 
 @pytest.mark.django_db
 def test_importing_the_same_file_again_creates_nothing_new():
-    """services#152, customers#15: a file imported twice (or a row repeated in it) does not duplicate."""
+    """A file imported twice (or a row repeated in it) does not duplicate."""
     rows = [
         {"name": "Ana", "phone": "600 111 222", "email": "ana@example.com"},
         # Her daughter: the same phone, another person (CUSTOMER-F12): she is created.
@@ -947,7 +947,7 @@ def test_recover_reuses_the_active_one_of_a_name_over_one_deactivated():
 
 @pytest.mark.django_db
 def test_recover_reuses_the_oldest_of_a_name_when_the_business_has_none_active():
-    """Deactivating a group frees its name (customers#94), so the business may hold several deactivated ones of a name:
+    """Deactivating a group frees its name, so the business may hold several deactivated ones of a name:
     the card goes to the one made first, always the same, whatever order the database gives them in."""
     first = CustomerGroup.objects.create(name="VIP", is_active=False)
     CustomerGroup.objects.create(name="vip", is_active=False)

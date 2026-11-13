@@ -1,5 +1,5 @@
-// Closing the drawer by asking the assistant (CASH_REGISTER-F09; PLAN §30, the first of the «Cinco acciones de IA
-// pulidas»: the cash count, with its summary before and its confirmation), end to end with its real dependencies: the
+// Closing the drawer by asking the assistant (CASH_REGISTER-F09: the cash count, with its summary before and its
+// confirmation), end to end with its real dependencies: the
 // Hub of this stack, its SaaS's gateway (`/internal/assistant/*`) and the e2e's provider (assistant-provider.ts, its
 // marker `E2E-CLOSE-CASH <cents>`), which reads the close's summary, says it and asks for the close of that session.
 // The SaaS must be seeded with that provider (README of this folder, «El asistente»).
@@ -7,15 +7,13 @@
 // first (session, counted, expected, difference), then the dangerous card; «Cancel» leaves the shift open, typing the
 // word closes it and «Caja» shows it closed with its three amounts. The dangerous card carries, in «What will happen»,
 // what closing gives: the session's number, its drawer, the expected cash and the difference, as money in the business's
-// currency (FIX-HUB-CASH_REGISTER-ASSISTANT-CLOSE-CARD-WITHOUT-PREVIEW, through base's preview, BASE-F98), the
-// difference with its sign as «Cash register» writes it, in English and in Spanish («+€137.90», «+137,90 €»: over at a
-// glance; FIX-HUB-BASE-ASSISTANT-CARD-POSITIVE-DIFFERENCE-WITHOUT-SIGN, BASE-F97). A cashier with the blind count on
-// gets the summary and the card without the expected nor the difference, and the model never received them.
-// A write that names its session or its drawer by its id (FIX-HUB-CASH_REGISTER-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS; base's
-// half is hub#416): the card says the session by its number and the drawer by its name, as the screens do, never by
-// the id the model sent (and, since hub#416, never left out for whoever may read them) — a count of the open shift and
-// the renaming of a drawer, in Spanish, cancelled: nothing changes. The count's card says «Registrar arqueo», as «Caja»
-// does, never «Añadir» (FIX-HUB-BASE-ASSISTANT-CARD-SAYS-REMOVE-FOR-EMPTYING-A-CART, BASE-F97).
+// currency (through base's preview, BASE-F98), the difference with its sign as «Cash register» writes it, in English
+// and in Spanish («+€137.90», «+137,90 €»: over at a glance; BASE-F97). A cashier with the blind count on gets the
+// summary and the card without the expected nor the difference, and the model never received them.
+// A write that names its session or its drawer by its id: the card says the session by its number and the drawer by its
+// name, as the screens do, never by the id the model sent (and never leaves them out for whoever may read them) — a
+// count of the open shift and the renaming of a drawer, in Spanish, cancelled: nothing changes. The count's card says
+// «Registrar arqueo», as «Caja» does, never «Añadir» (BASE-F97).
 // What this file creates is deleted after it (its sessions, its drawer, its sale and its product); the settings go back.
 // flow: cash-register-assistant-card
 // flow: CASH_REGISTER-F09
@@ -26,7 +24,8 @@ import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { DONE, NOT_DONE, type Provider, startProvider } from './assistant-provider';
+import { NOT_DONE, type Provider, startProvider } from './assistant-provider';
+import { confirmedWithTheWord } from './assistant-card-helpers';
 import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, psql, REPO_DIR, shot, shown, untilStill } from './helpers';
 import { createProduct, type Product } from './inventory-helpers';
 import { cleanDocumentsOf, stamp } from './sale-helpers';
@@ -320,10 +319,7 @@ test('CASH_REGISTER-F09 — «close the drawer with 250 € counted»: the summa
   await ask(page, 'E2E-CLOSE-CASH 25000 cierra la caja con 250 € contados');
   await expect(card(page)).toBeVisible({ timeout: 30_000 });
   await expect(previewBlock(page).locator('li')).toHaveText(willHappen);
-  await card(page).locator('[data-testid="assistant-confirm-input"] input').fill('confirm');
-  await expect(submit).toBeEnabled();
-  await decide(page, 'submit');
-  await expect(lastAnswer(page)).toContainText(DONE.en);
+  await confirmedWithTheWord(page);
   await expect(receipts(page).last()).toContainText('Done: Close in Cash register');
   const closed = await detailOf(context, shift.id);
   expect([closed.status, closed.expected_balance, closed.closing_balance, closed.difference]).toEqual([
@@ -416,7 +412,7 @@ test('CASH_REGISTER-F07 — with the blind count on, a cashier asking to close g
   await boss.context.close();
 });
 
-// ── The record a write names by its id, by its name (FIX-HUB-CASH_REGISTER-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS) ──
+// ── The record a write names by its id, by its name ──
 
 /** The dangerous card ready for its capture: «Confirmación» focused, its label floated, then one frame for the label's
  *  move to start, so `untilStill` waits for it (base-assistant.spec.ts). */

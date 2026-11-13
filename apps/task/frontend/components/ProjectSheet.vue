@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// TASK-F13 «Abrir y cambiar un proyecto» and TASK-F14 «Borrar un proyecto» (tasks#43): the project's
+// TASK-F13 «Abrir y cambiar un proyecto» and TASK-F14 «Borrar un proyecto»: the project's
 // name with its colour, Active or Inactive and its code; for whoever manages projects, Name and Color
 // editable with Save (only what this person changed, so another person's save meanwhile is never
 // overwritten; an untouched field follows the live project), Deactivate / Activate (which never sends

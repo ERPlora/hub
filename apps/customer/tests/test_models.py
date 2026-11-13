@@ -155,7 +155,7 @@ def test_a_group_name_is_unique_among_the_active_ones_whatever_its_case():
 
 
 def test_an_inactive_group_frees_its_name():
-    # As in the product (customers#94): an inactive group is in no picker, so it holds no name.
+    # As in the product: an inactive group is in no picker, so it holds no name.
     CustomerGroup.objects.create(name="VIP", is_active=False)
     CustomerGroup.objects.create(name="vip")
     assert CustomerGroup.objects.count() == 2

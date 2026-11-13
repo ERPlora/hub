@@ -1,10 +1,10 @@
-"""FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES (BASE-F97, step 2): the card of a write the assistant wants to run said
-each datum as the model sent it — «Starts at: 2026-11-02T10:00:00+01:00», «Booked through: whatsapp», «Professional:
-<uuid>» — where the person reads a day and a time, a channel and a person. Its schema says what each datum is, at any
-depth: a moment (``format: date-time``, ``date``, ``time``) is said as the person's language writes it, in the
-business's zone; a value of a closed list (``enum``) by the label its app's models give it; a record named by its id
-(``format: uuid``, or a datum its schema marks ``refers``) by the read that mark names, run as the person — otherwise
-it is left out, never shown by its id.
+"""How the card of a write the assistant wants to run says each datum (BASE-F97, step 2): never as the model sent it
+(«Starts at: 2026-11-02T10:00:00+01:00», «Booked through: whatsapp», «Professional: <uuid>») but as the person reads a
+day and a time, a channel and a person. Its schema says what each datum is, at any depth: a moment (``format:
+date-time``, ``date``, ``time``) is said as the person's language writes it, in the business's zone; a value of a
+closed list (``enum``) by the label its app's models give it; a record named by its id (``format: uuid``, or a datum
+its schema marks ``refers``) by the read that mark names, run as the person — otherwise it is left out, never shown by
+its id.
 """
 
 import dataclasses
@@ -519,7 +519,7 @@ def test_the_ratchet_reads_a_closed_list_by_the_field_its_mark_names_as_the_card
     assert unnamed(MARKED)[1] == ["odd", "elsewhere"]
 
 
-# ── A datum the screen knows by its name, titled by its app (FIX-HUB-BASE-ASSISTANT-DANGER-CARD-CALLS-THE-RECORD-BY-ITS-FIELD-NAME) ──
+# ── A datum the screen knows by its name, titled by its app ───────────────────────────────────────────────────────────
 
 #: What the card of a dangerous write calls a datum it knows by its name (``FIELDS`` of the shared assistant's
 #: ``card.ts`` and its catalogue, @erplora/ui) when its app gives it no title of its own, in Spanish.
@@ -1112,7 +1112,7 @@ def test_a_preview_says_a_moment_as_the_person_reads_it_too(monkeypatch):
     assert [(field["name"], field["value"]) for field in fields] == [("name", "Item 7"), ("since", "2 nov 2026, 10:00")]
 
 
-# ── An attempt key: never on the card, always in the write (FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-ATTEMPT-KEYS) ───────────
+# ── An attempt key: never on the card, always in the write ────────────────────────────────────────────────────────────
 
 #: A key of the caller's attempt (idempotency), as a model sends it: born once, the same on every retry, so a retry
 #: never charges, sends or prints twice. Nobody can judge it: «Clave del intento: charge-0192f5a0-retry-7».
@@ -1322,7 +1322,7 @@ def test_an_attempt_key_is_marked_only_on_a_text():
     assert [f"{name}:{path}" for name, op in sorted(registry.items()) for path in misplaced_marks(op)] == []
 
 
-# ── An amount, known by the mark of its schema (FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS) ─────────
+# ── An amount, known by the mark of its schema ────────────────────────────────────────────────────────────────────────
 
 #: The mark of an amount: a whole number in the minor unit of its currency (``json_schema_extra={"money": True}``).
 MONEY = {"money": True}
@@ -1418,7 +1418,7 @@ class NamedCentsIn(Schema):
 def test_a_name_in_cents_alone_makes_no_amount_its_mark_does():
     """hub#917: a whole number named ``…_cents`` was money by its name while its schema carried no mark, so a new
     datum named so that is no amount would reach the card as money in the business's currency. Only the mark says an
-    amount now (PLAN-HUB §50), on top and inside an object or a list: the rest stays as sent."""
+    amount, on top and inside an object or a list: the rest stays as sent."""
     Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "country": "ES"})
     arguments = {"total_cents": 1500, "line": {"text": "Café", "unit_cents": 150}, "lines": [{"text": "Té", "unit_cents": 1200}]}
     card = assistant.card(priced(NamedCentsIn), arguments, "es", ctx=ctx(language="es"))

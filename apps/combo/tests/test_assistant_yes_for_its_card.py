@@ -130,7 +130,7 @@ def test_the_yes_runs_nothing_when_another_menu_fits_the_name_better_before_it(w
 @pytest.mark.parametrize("write", WRITES)
 def test_a_name_two_menus_fit_draws_no_card_and_the_model_hears_it(write):
     """«vegano» fits «Menú vegano» and «Menú vegano sin gluten»: no card that would act on either; the model hears
-    ``combo.combo_ambiguous`` and asks the person which one (BASE-G115: the data are checked before any card)."""
+    ``combo.combo_ambiguous`` and asks the person which one (the data are checked before any card)."""
     combo = vegan_menu()
     make_combo("Menú vegano sin gluten")
 
@@ -287,7 +287,7 @@ def test_a_write_on_a_course_or_a_choice_says_the_menu_it_belongs_to_as_it_finds
 @pytest.mark.parametrize("write", COURSE_OR_CHOICE_WRITES)
 def test_a_name_two_courses_or_choices_fit_draws_no_card_and_the_model_hears_it(write):
     """«postres» fits «Postres caseros» and «Postres de temporada» («flan», two flans): no card that would act on
-    either; the model hears which ones and asks the person (BASE-G115: the data are checked before any card)."""
+    either; the model hears which ones and asks the person (the data are checked before any card)."""
     combo = vegan_desserts()
     datum, _ = BY_NAME[write]
     another(datum, combo, ALSO[datum])

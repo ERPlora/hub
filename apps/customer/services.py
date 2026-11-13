@@ -204,7 +204,7 @@ def _save_named(instance, message, code: str) -> None:
         raise Conflict(message, code=code, fields={"name": message}) from None
 
 
-# ── Custom field values (customers#13) ──────────────────────────────────────────────────────────
+# ── Custom field values ─────────────────────────────────────────────────────────────────────────
 
 
 def _field_problem(field: CustomField, value: str) -> tuple[str, str, str] | None:
@@ -1016,7 +1016,7 @@ def add_activity(ctx: OperationContext, data: ActivityIn) -> Activity:
     return entry
 
 
-# ── Consent (customers#10) ──────────────────────────────────────────────────────────────────────
+# ── Consent ─────────────────────────────────────────────────────────────────────────────────────
 
 
 def _contact_point(customer: Customer, channel: str) -> str:

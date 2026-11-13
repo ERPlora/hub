@@ -1,5 +1,5 @@
-"""What layer 1 of the assistant's QA does not say of Customers (erplora-next docs/plans/2026-10-31-asistente-
-conocimiento-y-qa.md): how many tools it offers, and what an employee is never offered.
+"""What layer 1 of the assistant's QA does not say of Customers: how many tools it offers, and what an employee is never
+offered.
 
 Every ask of every tool of customer bringing its tool among the first ten, role by role, in English and in Spanish, out
 of the catalogue of a business with every app on and ranked as a turn ranks, is ``base/tests/test_assistant_asks.py``'s

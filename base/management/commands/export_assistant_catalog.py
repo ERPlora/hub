@@ -1,6 +1,6 @@
 """``manage.py export_assistant_catalog --role <owner|admin|manager|employee> --language <en|es> [--apps a,b]``: the
-assistant's tools a role holds, as JSON (``live.assistant_qa.export_catalog``), for layer 2 of the assistant's QA (docs
-plan 2026-10-31, the assistant's knowledge and QA, §1.5): the QA with the real model reads it to write its own phrases
+assistant's tools a role holds, as JSON (``live.assistant_qa.export_catalog``), for the assistant's QA with the
+real model: the QA reads it to write its own phrases
 and to check which tool the model calls, which card a write shows and what the role is refused.
 
 It names no business: the catalogue is a member's of a business with every app on (the e2e business ``a``), as a

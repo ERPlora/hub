@@ -2,8 +2,7 @@
 purchase history the sale's real events write on its card.
 
 The sale's real event (``sale.sale.completed`` / ``voided`` / ``refunded``, as recorded in the outbox)
-is handed to Customers' real reaction (``apps.customer.events.react``), as the outbox relay will in
-phase 2.
+is handed to Customers' real reaction (``apps.customer.events.react``), as the worker's outbox relay does.
 """
 
 import pytest

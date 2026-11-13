@@ -1,9 +1,9 @@
-"""``manage.py cut_shared_hubs``: the cut of S5, every business still on control's database given its own.
+"""``manage.py cut_shared_hubs``: every business still on control's database given its own.
 
-Phase 1 kept every business in control's database (``Hub.db_name`` empty). The cut gives each one, by name, a mode:
-``--copy-all`` (its database, cloned from its template, with every row control's tables of the hubs' apps hold copied
-into it: in production those tables hold one business's data in practice; only once, for one hub), ``--recreate`` (its
-database from its template, seeded from the SaaS's photo, nothing copied) or ``--skip`` (a cancelled business, left
+Before the cut, every business lived in control's database (``Hub.db_name`` empty). The cut gives each one, by name, a
+mode: ``--copy-all`` (its database, cloned from its template, with every row control's tables of the hubs' apps hold
+copied into it: in production those tables hold one business's data in practice; only once, for one hub), ``--recreate``
+(its database from its template, seeded from the SaaS's photo, nothing copied) or ``--skip`` (a cancelled business, left
 without one). ``--dry-run`` says what each would get. Before the first cut, a copy of control goes to the dumps bucket
 (``<control>/<time>-cut.dump``), refused without one unless ``--no-dump``. While a business is cut its host answers 503;
 a business already with its own database is left alone, and a cut that broke is done again from the start.
@@ -64,8 +64,8 @@ def photo(*members: uuid.UUID) -> dict:
 
 @pytest.fixture
 def phase_one(django_db_blocker, hub_databases):
-    """Businesses of phase 1 (``db_name=""``) and rows of their apps in control's tables, committed; deleted after the
-    test with every database the cut made and every event it recorded."""
+    """Businesses still on control's database (``db_name=""``) and rows of their apps in control's tables,
+    committed; deleted after the test with every database the cut made and every event it recorded."""
     started = timezone.now()
     made: list[Hub] = []
     control = tenancy_connections.control_name()
@@ -88,7 +88,7 @@ def phase_one(django_db_blocker, hub_databases):
 
     def rows_of(slug: str) -> SimpleNamespace:
         """A printer reached by a device (a many-to-many row with a serial key), a person, the apps' rows and two
-        events: one of ``slug`` and one of another business; all in control's tables, as phase 1 kept them."""
+        events: one of ``slug`` and one of another business; all in control's tables, as before the cut."""
         with use_legacy():
             printer = Printer.objects.create(name=f"Bar {slug}", **PRINTER)
             device = PrintDevice.objects.create(name=f"Till {slug}")
@@ -261,7 +261,7 @@ def test_control_s_rows_are_copied_only_once_into_one_business(phase_one):
     assert fresh(second).db_name == ""
 
 
-# ── After the contract of S5 (``control/0007``): control no longer holds the hubs' tables under their names ─────────
+# ── After the contract migration (``control/0007``): control no longer holds the hubs' tables under their names ─────
 
 
 @pytest.fixture
@@ -622,7 +622,7 @@ def test_a_cut_renews_its_lease_around_every_long_step(phase_one, monkeypatch):
 
 
 def test_two_copy_alls_at_once_into_two_businesses_leave_one(phase_one, monkeypatch):
-    """Two runs at once, each for another business: the last steps take the businesses of phase 1 in one order, so the
+    """Two runs at once, each for another business: the last steps take the businesses still to cut in one order, so the
     second waits for the first and finds control's rows gone to it."""
     import threading
 

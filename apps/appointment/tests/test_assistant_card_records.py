@@ -1,9 +1,9 @@
-"""FIX-HUB-APPOINTMENT-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (hub#635): the card of a write of Appointments says which
+"""hub#635: the card of a write of Appointments says which
 record it acts on by its name, read as whoever asks, never by an id, and leaves it out when that person may not read it
 or it is not there. A professional goes by their name, an appointment by its customer, day, hour and professional (as
 the Agenda tells one from another), a repeating appointment as the series list titles one («Lucía Pérez · Every week ·
 Monday · 10:00») and a blocked period by its title, its day and its professional, each under the word its list calls
-one. Before, every one of them was left out (hub#416) and a bulk delete said «Ids» with nothing in it.
+one.
 """
 
 import dataclasses

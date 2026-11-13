@@ -1,5 +1,5 @@
 // `pnpm gen:app-icons` (scripts/app-icons.mjs) bakes the `icon` of every module's apps.py into
-// frontend/generated/app-icons.json (round 16, spec §4.6): `register_apps` copies each one into
+// frontend/generated/app-icons.json: `register_apps` copies each one into
 // `shared.app.icon_svg`, which the SaaS paints inline after cleaning it with nh3. It is versioned,
 // not a build output: register_apps needs it locally without building the frontend, and in the
 // image's Python stage, which has no node_modules. The sources are the shell's own icon packages,

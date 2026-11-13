@@ -1,5 +1,4 @@
-"""Turning on, off, restoring and repairing the factory recipes the apps bring (WORKBOOK FLOW-F33 to F36;
-the old Hub's HUB-F105 to F107 and its ``flow_template_activation_route.rs`` tests).
+"""Turning on, off, restoring and repairing the factory recipes the apps bring (WORKBOOK FLOW-F33 to F36).
 
 - **On** (``flow.recipe.enable``): the first time it builds the automation in the language of whoever turns
   it on, with **exactly** the permissions the recipe asks for — never more, whatever that person may do —

@@ -1,5 +1,4 @@
-// The QA battery of the Hub's assistant with the real model and the real documentation index
-// (docs/plans/2026-10-31-qa-asistente.md of erplora-next, block B and C35 to C37): its items, how a streamed turn of
+// The QA battery of the Hub's assistant with the real model and the real documentation index: its items, how a streamed turn of
 // `/api/assistant/turn` is read, the automatic verdict of each item, the report and the seed of the real providers on
 // the stack's SaaS. Pure, so Vitest proves it (assistant-battery.test.ts); qa/assistant-battery.spec.ts drives Chrome
 // with it, only with QA_REAL_PROVIDER=1 (never in CI: it spends real tokens). An answer's wording is never judged
@@ -71,7 +70,7 @@ export interface Outcome {
   /** The record checked through the Hub's API after a write (or its absence, after a cancel). */
   record?: { checked: string; ok: boolean };
   /** The month's messages read from the Hub's API around one question (C35), and the panel's foot around the next one,
-   *  asked with the month at 80 % (the foot only shows from there: BASE-G122). */
+   *  asked with the month at 80 % (the foot only shows from there). */
   usage?: { before: number; after: number; footBefore: string; footAfter: string };
   screenshot: string;
 }

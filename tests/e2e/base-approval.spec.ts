@@ -1,5 +1,5 @@
 // flow: BASE-F84
-// FIX-HUB-BASE-APPROVAL-KEYPAD-CUT-ON-TABLET-DESKTOP (base/WORKBOOK.md BASE-F84): «An approval is needed» shows its
+// «An approval is needed» shows its
 // whole PIN pad, the four rows with the 0 and erase, without scrolling, at a phone, a low phone, a tablet and a desk
 // (Square's and Toast's manager override: the dialog fits its pad), in Spanish, whose texts are the longest. Opened
 // from a real app that asks for it: the cashier
@@ -10,7 +10,7 @@
 // way in into the PIN pad: base-access.spec.ts), and everything this file creates goes with it (`afterAll`).
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, usernamesOf } from './helpers';
+import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, usernameOf, usernamesOf } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
@@ -40,19 +40,6 @@ let cashier: { context: BrowserContext; page: Page };
 let started = '';
 let ownerName = '';
 const tickets = new Map<string, SaleOut>();
-
-/**
- * The username of whoever is signed in on `context`. Not by email: a hub database kept from a stack whose SaaS was
- * created again holds an older account with the same email (a new SaaS, new users), and the email names both.
- */
-async function usernameOf(context: BrowserContext): Promise<string> {
-  const me = await api<{ user: { id: string } | null }>(context, A, 'GET', '/me');
-  expect(me.status, 'GET /api/me').toBe(200);
-  const id = me.data.user?.id ?? '';
-  expect(id, 'the person signed in').not.toBe('');
-  // `/api/me` names the person of the business's database (base.HubUser, W10), whose username is the session's.
-  return psql(`SELECT username FROM base_hubuser WHERE id = '${id}'`);
-}
 
 /** Every account of `email` (their usernames, read from control's): the cleanup leaves none of them with what this file made. */
 const accountsOf = (email: string): string => usernamesOf(email);
@@ -233,8 +220,8 @@ test('BASE-F84: on a screen too short for the whole pad, the dialog stays on scr
 });
 
 test('BASE-F84: a wrong PIN says those details do not approve it, in the dialog, and the till stays where it was', async () => {
-  // The Hub answers the wrong PIN with a 401 (`base.approval_refused`): the dialog says so, the page is not reloaded
-  // (the SDK took every 401 for a session that ended, FIX-SAAS-PANEL-UNDER-DASHBOARD-PREFIX).
+  // The Hub answers the wrong PIN with a 401 (`base.approval_refused`): the dialog says so and the page is not
+  // reloaded, as it would be if the SDK took that 401 for a session that ended.
   const { page } = cashier;
   const sale = tickets.get(WRONG)!;
   const spentBefore = spentVoids();

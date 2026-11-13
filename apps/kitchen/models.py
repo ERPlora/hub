@@ -1,17 +1,13 @@
-"""Models of the kitchen app: the stations and the routing of products and categories to them, the
-kitchen settings, the number of the day, the tickets (a round of a check of Sales, or one made by hand)
-with their dishes, and the kitchen's history.
+"""A ticket of a round points at its check of Sales by ``order_id`` and each dish at its line by ``sale_line_id``:
+opaque references, no foreign key between apps (like Tables). The id of a round's ticket is the id of its first line,
+and the id of each dish the id of its line (UUIDv7 that Sales made; each dish of a menu, one derived from it:
+``queries.dish_id``): a round the kitchen has not saved yet and the saved one share their ids. What was sent stays as it
+was sent: the station, its destination and its printer, the options chosen and the menu's header are frozen on each
+dish. Stations and tickets are deleted logically.
 
-A ticket of a round points at its check of Sales by ``order_id`` and each dish at its line by
-``sale_line_id``: opaque references, no foreign key between apps (like Tables). The id of a round's
-ticket is the id of its first line, and the id of each dish the id of its line (UUIDv7 that Sales made;
-each dish of a menu, one derived from it: ``queries.dish_id``): a round the kitchen has not saved yet and
-the saved one share their ids. What was sent stays as it was sent: the station, its destination and its
-printer, the options chosen and the menu's header are frozen on each dish. Stations and tickets are deleted logically. Phase 1 has no tenancy: every scope shares these
-tables; phase 2 moves them to each hub's database.
-
-A label an app loaded before this one says in English too, but in Spanish with other words, goes through ``pgettext_lazy``
-with the ``kitchen`` context (``kitchen station`` where a station's word is not a ticket's), so Spanish says the kitchen's word, not that app's (hub#659).
+A label an app loaded before this one says in English too, but in Spanish with other words, goes through
+``pgettext_lazy`` with the ``kitchen`` context (``kitchen station`` where a station's word is not a ticket's), so
+Spanish says the kitchen's word, not that app's (hub#659).
 """
 
 from django.db import models
