@@ -1,21 +1,20 @@
-// flow: none — the `login` helper of the Hub's e2e (seen in hub#107)
+// flow: none — the `login` helper of the Hub's e2e (seen in hub#107 and hub#1370)
 // `login` on a loaded machine. The SaaS's answer to the mailed code (`POST …/auth/code/confirm`) slows down with every
 // open session of the account, which allauth's user sessions walk at each sign-in, and a login that signs in again
 // leaves one more. So an account signs in to the SaaS once per worker and later logins reuse that SaaS session, as
 // a person signed in at erplora.com: the SaaS skips its form and its code and only hands the hub its one-time code. A
-// SaaS session that ended (a spec signed out there) falls back to the real sign-in, whose session is reused next. And a
-// SaaS slow to answer the code is said as such, with the time waited: «code rejected» is only what the SaaS itself
-// says, and then it does say it. Every login here is about the trip through the SaaS, so it asks for the jump (`fresh:
-// true`): without it, `login` would reuse the hub's session it keeps and never reach the SaaS.
-import { type BrowserContext, expect, type Route, test } from '@playwright/test';
+// SaaS session that ended (a spec signed out there) falls back to the real sign-in, whose session is reused next.
+// A SaaS slow at a step, however slow, is waited for: its answer here comes later than a step of the login used to
+// wait (a sixth of the test's time) on purpose, and the test itself never waits. «code rejected» is only what the SaaS
+// answers, and a code that gets no answer says so, whatever the page shows. Every login here is about the trip through
+// the SaaS, so it asks for the jump (`fresh: true`): without it, `login` would reuse the hub's session it keeps and
+// never reach the SaaS.
+import { type Browser, type BrowserContext, expect, type Route, test } from '@playwright/test';
 
-import { A, hostPage, listReady, login, OWNER, SAAS, shot, topbarApps } from './helpers';
+import { A, hostPage, listReady, login, OWNER, SAAS, SAAS_CODE as CODE, SAAS_SIGN_IN as SIGN_IN, shot, topbarApps } from './helpers';
 
 /** What `login` is given here: the trip through the SaaS, even with a session of the hub kept. */
 const JUMP = { fresh: true };
-
-const SIGN_IN = `${SAAS}/_allauth/browser/v1/auth/login`;
-const CODE = `${SAAS}/_allauth/browser/v1/auth/code/confirm`;
 
 const VIEWPORTS = [
   { label: '1440', width: 1440, height: 900 },
@@ -44,11 +43,42 @@ async function holdCodes(context: BrowserContext): Promise<{ held: Route[]; rele
   return { held, release };
 }
 
+/**
+ * A SaaS slower than a step of the login used to wait for it (a sixth of the test's time): what the page posts to `url`
+ * reaches the SaaS that much later and a little more. `late` is that delay; `took`, how long each post was held.
+ */
+async function answerLate(context: BrowserContext, url: string): Promise<{ late: number; took: number[] }> {
+  const late = test.info().timeout / 6 + 5_000;
+  const took: number[] = [];
+  await context.route(url, async (route) => {
+    const since = Date.now();
+    await new Promise((resolve) => setTimeout(resolve, late));
+    took.push(Date.now() - since);
+    // The context may be gone by then, its page with it.
+    await route.continue().catch(() => undefined);
+  });
+  return { late, took };
+}
+
 /** «Sign out» at erplora.com in that context (allauth.headless): its SaaS session ends. */
 async function signOutOfSaas(context: BrowserContext): Promise<void> {
   const csrf = (await context.cookies(SAAS)).find((cookie) => cookie.name === 'csrftoken')?.value ?? '';
   const res = await context.request.delete(`${SAAS}/_allauth/browser/v1/auth/session`, { headers: { 'X-CSRFToken': csrf } });
   expect(res.status(), 'signed out of the SaaS (allauth answers 401: nobody signed in)').toBe(401);
+}
+
+/** What a login of the owner through the SaaS ends in, in `context`: «signed in», or the error it threw, as text. */
+const failureOf = async (context: BrowserContext): Promise<string> =>
+  login(await context.newPage(), A, '/demo/items', OWNER, JUMP).then(
+    () => 'signed in',
+    (error: unknown) => String(error),
+  );
+
+/** A login of the owner whose SaaS session then ends: the next login signs in with the SaaS's form and its code. */
+async function endSaasSession(browser: Browser): Promise<void> {
+  const first = await hostPage(browser, A);
+  await signOutOfSaas(first.context);
+  await first.context.close();
 }
 
 test('a second login of the account reuses its SaaS session: no sign-in and no code to wait for', async ({ browser }) => {
@@ -76,9 +106,7 @@ test('a second login of the account reuses its SaaS session: no sign-in and no c
 });
 
 test('its SaaS session ended, the next login signs in for real and the one after reuses the new session', async ({ browser }) => {
-  const first = await hostPage(browser, A);
-  await signOutOfSaas(first.context);
-  await first.context.close();
+  await endSaasSession(browser);
 
   const again = await browser.newContext({ baseURL: A });
   const signInsAgain = signInsOf(again);
@@ -93,37 +121,66 @@ test('its SaaS session ended, the next login signs in for real and the one after
   await after.close();
 });
 
-test('a SaaS slow to answer the code: the login says it waited for the answer and how long, not «code rejected»', async ({
-  browser,
-}) => {
-  // The login's waits are a sixth of the test's time: 15 s here, 30 s under the config's 180 s.
+test('a SaaS slow to answer the code: the login waits for its answer, longer than a step had, and signs in', async ({ browser }) => {
   test.setTimeout(90_000);
-  const first = await hostPage(browser, A);
-  // Its SaaS session ended, the next login signs in with the form and the code.
-  await signOutOfSaas(first.context);
-  await first.context.close();
+  await endSaasSession(browser);
 
   const context = await browser.newContext({ baseURL: A });
-  const codes = await holdCodes(context);
+  const codes = await answerLate(context, CODE);
   try {
-    const failure = await login(await context.newPage(), A, '/demo/items', OWNER, JUMP).then(
-      () => 'signed in',
-      (error: unknown) => String(error),
-    );
-    expect(codes.held, 'the code was sent').toHaveLength(1);
-    expect(failure).toContain('the SaaS did not answer the code within 15000 ms');
-    expect(failure).not.toContain('code rejected');
+    const page = await context.newPage();
+    await login(page, A, '/demo/items', OWNER, JUMP);
+    await expect(topbarApps(page)).toBeAttached();
+    expect(codes.took, 'the code reached the SaaS once, later than a step had').toEqual([expect.any(Number)]);
+    expect(codes.took[0]).toBeGreaterThanOrEqual(codes.late);
   } finally {
-    await codes.release();
     await context.close();
   }
 });
 
-test('a code the SaaS turns down: the login says «code rejected» and what the SaaS said', async ({ browser }) => {
+test('a SaaS slow to answer the sign-in: the login waits for its code form and signs in', async ({ browser }) => {
   test.setTimeout(90_000);
-  const first = await hostPage(browser, A);
-  await signOutOfSaas(first.context);
-  await first.context.close();
+  await endSaasSession(browser);
+
+  const context = await browser.newContext({ baseURL: A });
+  const signIns = await answerLate(context, SIGN_IN);
+  try {
+    const page = await context.newPage();
+    await login(page, A, '/demo/items', OWNER, JUMP);
+    await expect(topbarApps(page)).toBeAttached();
+    expect(signIns.took, 'the sign-in reached the SaaS once, later than a step had').toEqual([expect.any(Number)]);
+    expect(signIns.took[0]).toBeGreaterThanOrEqual(signIns.late);
+  } finally {
+    await context.close();
+  }
+});
+
+test('a code that gets no answer (its connection reset): the login says the SaaS did not answer it, not «code rejected»', async ({
+  browser,
+}) => {
+  test.setTimeout(90_000);
+  await endSaasSession(browser);
+
+  const context = await browser.newContext({ baseURL: A });
+  // Every code sent is dropped on its way: the SaaS's page then says it could not sign in, which the SaaS never said.
+  const dropped: string[] = [];
+  await context.route(CODE, async (route) => {
+    dropped.push(route.request().url());
+    await route.abort('connectionreset');
+  });
+  try {
+    const failure = await failureOf(context);
+    expect(dropped.length, 'codes sent').toBeGreaterThanOrEqual(1);
+    expect(failure).toMatch(/: the SaaS did not answer the code \(net::ERR_CONNECTION_RESET\) \(code \d{6} for owner@example\.com, at .+\)/);
+    expect(failure).not.toContain('code rejected');
+  } finally {
+    await context.close();
+  }
+});
+
+test('a code the SaaS turns down: the login says «code rejected», what the SaaS answered and what it said', async ({ browser }) => {
+  test.setTimeout(90_000);
+  await endSaasSession(browser);
 
   const context = await browser.newContext({ baseURL: A });
   // The mailed code goes out as another one: the SaaS itself refuses it (400) and says why under the field.
@@ -135,12 +192,9 @@ test('a code the SaaS turns down: the login says «code rejected» and what the 
     await route.fulfill({ response });
   });
   try {
-    const failure = await login(await context.newPage(), A, '/demo/items', OWNER, JUMP).then(
-      () => 'signed in',
-      (error: unknown) => String(error),
-    );
+    const failure = await failureOf(context);
     expect(answers, 'the SaaS answered the code').toEqual([400]);
-    expect(failure).toMatch(/: code rejected \(code \d{6} for owner@example\.com, at .+\): «.+»$/);
+    expect(failure).toMatch(/: code rejected, the SaaS answered 400 \(code \d{6} for owner@example\.com, at .+\): «.+»$/);
     expect(failure).not.toContain('did not answer');
   } finally {
     await context.close();
