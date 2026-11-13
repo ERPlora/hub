@@ -439,6 +439,43 @@ def test_a_run_of_a_series_while_the_hub_admin_deletes_it_finds_it_gone(
     assert not Appointment.objects.exists()
 
 
+def test_a_deleted_date_of_a_series_restored_while_the_series_books_its_dates_is_booked_once(salon):
+    """The restore takes the series first, as every write does: a run of it waits, then finds the date booked."""
+    series = make_series(salon, max_occurrences=1)
+    run("appointment.recurring.materialize", {"id": str(series.id)})
+    [deleted] = Appointment.objects.filter(recurring=series)
+    run("appointment.appointment.delete", {"id": str(deleted.id)})
+    book = lambda: run("appointment.recurring.materialize", {"id": str(series.id)})  # noqa: E731
+    restore = get("appointment.appointment.restore")
+    with meanwhile(locks("appointment_recurring"), book) as outcomes:
+        restore(system_context(A), restore.input.model_validate({"id": str(deleted.id)}))
+    [outcome] = outcomes
+    assert not isinstance(outcome, Exception), outcome
+    assert (outcome.booked, outcome.already_booked) == (0, 1)
+    live = Appointment.objects.filter(recurring=series, deleted_at__isnull=True)
+    assert list(live.values_list("pk", flat=True)) == [deleted.pk]
+
+
+def test_a_deleted_appointment_restored_twice_at_once_comes_back_once(salon):
+    """The restore holds the appointment's row while it judges and writes: a second restore of it waits, then finds
+    it on the agenda and answers it as it is, with nothing written."""
+    deleted = make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"))
+    run("appointment.appointment.delete", {"id": str(deleted.id)})
+    restore = get("appointment.appointment.restore")
+    asked = restore.input.model_validate({"id": str(deleted.id)})
+    again = lambda: restore(system_context(A), asked)  # noqa: E731
+    its_row = lambda sql: locks("appointment_appointment")(sql) and "appointment_recurring" not in sql  # noqa: E731
+    with meanwhile(its_row, again) as outcomes:
+        restore(system_context(A), asked)
+    [outcome] = outcomes
+    assert not isinstance(outcome, Exception), outcome
+    assert Appointment.objects.get(pk=deleted.pk).deleted_at is None
+    assert list(deleted.history.order_by("at", "id").values_list("action", flat=True)) == [
+        "deleted",
+        "restored",
+    ]
+
+
 def test_the_agenda_and_the_hub_admin_deleting_the_same_appointments_never_wait_in_a_circle(
     salon, hub_staff
 ):
