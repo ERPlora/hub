@@ -57,6 +57,7 @@ def delivered(now) -> None:
             now,
             deliver=deliver,
             listeners=listeners,
+            carried=relay.carried,
             max_depth=relay.MAX_EVENT_DEPTH,
             max_attempts=relay.MAX_ATTEMPTS,
             backoff=relay.backoff,

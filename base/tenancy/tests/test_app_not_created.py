@@ -25,7 +25,7 @@ from live.operations import atomic, get
 
 from apps.printing.models import Printer, PrintJob
 from apps.tax.models import TaxCategory
-from base import activation, services
+from base import activation, relay, services
 from base.activation import ON
 from base.middleware import HubDatabaseMiddleware
 from base.models import AppActivation, EventDelivery, HubUser, TaskSchedule
@@ -316,6 +316,7 @@ def test_a_reaction_that_touches_it_fails_as_a_refusal_of_the_business_and_is_tr
             now,
             deliver=lambda app_label, event: PrintJob.objects.count(),
             listeners=lambda event: [],
+            carried=relay.carried,
             max_depth=3,
             max_attempts=3,
             backoff=lambda attempts: dt.timedelta(seconds=2),

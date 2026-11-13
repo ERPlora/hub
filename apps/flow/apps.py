@@ -8,6 +8,9 @@ condition that ends it quietly when not met, and waits.
 from django.utils.translation import gettext_lazy as _
 from live.meta import Category, LiveAppConfig, Nav
 
+#: The actor prefix of what a run does (``flow_run:<id>``): the outbox keeps it, the loop guard reads it.
+RUN_ACTOR = "flow_run:"
+
 
 class FlowConfig(LiveAppConfig):
     name = "apps.flow"
@@ -35,6 +38,9 @@ class FlowConfig(LiveAppConfig):
     # Other apps' actions and reads are called by their operation's name, never by their models: an
     # automation that names an app that is off fails with its reason, visible in its history.
     requires = []
+    # What another app's reaction records in answer to a run's work keeps the run's actor (base.relay passes it on), so
+    # the loop guard follows a chain through that app too (FLOW-F21).
+    carried_actors = [RUN_ACTOR]
     default_auto_field = "django.db.models.BigAutoField"
     # Viewing, managing, and answering what an automation asks (FLOW-F29): what is asked of employees,
     # and what is asked of managers.
