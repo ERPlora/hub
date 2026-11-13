@@ -23,9 +23,6 @@ const HUB_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
  *  property of the field, not an attribute on a wrapper's div, so a name this guard sees there fixes nothing until
  *  the component declares it; the window's own test (`itTellsTheCorrectedFieldApart`) is what proves it. */
 const STILL_UNNAMED: Record<string, number> = {
-  'apps/combo/frontend/components/MenuFormModal.vue': 5,
-  'apps/modifier/frontend/components/GroupFormModal.vue': 5,
-  'apps/modifier/frontend/components/OptionFormModal.vue': 5,
   'apps/service/frontend/components/CategoryFormModal.vue': 3,
   'apps/service/frontend/components/GrantAdjustModal.vue': 3,
   'apps/service/frontend/components/GrantVoidModal.vue': 1,

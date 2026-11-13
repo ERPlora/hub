@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d345511f8257816188ee6767a36a891f98f4f80596f2fac9f68e82abe0f3f385 -->
+<!-- generated from WORKBOOK.md sha256:d53bba385c1c8874a9a3b314e16d93525362f08ee5f9d424eed61800ba8eb1ad -->
 
 ## What it is for and who it is for
 
@@ -169,7 +169,8 @@ In: what the person types.
 Out: the group (announces: group created). It creates no options or links.
 If it fails: an empty name or one of more than 255 characters, a minimum or maximum outside 0–50 or a
 maximum below the minimum show under their field; a name another group already has, "There is already
-a group with that name." under the Name. What was typed stays.
+a group with that name." under the Name. The reason of a field goes as soon as that field is corrected, even if
+another one says the same (hub#888). What was typed stays.
 Involved: none
 
 ### MODIFIER-F03 Change or delete a group
@@ -218,7 +219,8 @@ are not marked red as "This is not an amount", and as soon as the currency arriv
 reason) and offers "Retry", which asks for it again; as soon as it arrives, the button lights up (hub#938). An
 empty name or one repeated in the group, a supplement that is not an amount, a tax
 category that does not exist in Taxes or more default options than the maximum show next to their
-field. An option with its own tax category is charged on a separate line, which cannot be worth zero or
+field; the one of the name, the kitchen ticket name, the supplement, the tax category or the order goes as soon as
+that field is corrected, even if another one says the same (hub#888). An option with its own tax category is charged on a separate line, which cannot be worth zero or
 less: "An option with its own tax category is billed on a line of its own: its supplement must be more
 than zero.". A group holds up to 100 options. Through the assistant, when changing or removing an option, a group
 said by its name that fits several or none brings up no card, and if before the "yes" another group fits better what

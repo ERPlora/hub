@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5156cefc65d1e688dec8d60e2cd20fcf4fee3be0bda6b99f53d69fa546545308 -->
+<!-- generated from WORKBOOK.md sha256:33f187a165d9a24ad3588ff217656887eac67fcb2086265474793b706ef99d5a -->
 
 ## What it is for and who it is for
 
@@ -2933,13 +2933,13 @@ Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APP
 ### BASE-F114 Put a business back as it was at a past moment from the Hub admin
 Status: done (the action and the restore, in its place or to a separate copy, and getting back from the separate copy
 the customers that were lost, the deleted ones as they were, the products, the services with their categories, the
-appointments and the price list prices; making and deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of
-ERPlora/aws; repeating appointments, hub#1327; the group, tag or own field the business deleted after deleting a
-customer who comes back, hub#1356; the image of a product deleted before deleting left it, hub#1431; the page
+appointments, the repeating appointments and the price list prices; making and deleting the temporary cluster is the
+procedure "Devolver un negocio a un momento" of ERPlora/aws; the group, tag or own field the business deleted after
+deleting a customer who comes back, hub#1356; the image of a product deleted before deleting left it, hub#1431; the page
 "Recover into the business…" naming the exception of what goes back into a recovered category, hub#1364; the image of a
-service brought back, hub#1429; Recoveries naming the professional who does not come back with their service, hub#1375; the
-modifier groups and the menu options of a product that comes back, hub#1343; the price list prices of a product that comes
-back as a new one, hub#1442)
+service brought back, hub#1429; Recoveries naming the professional who does not come back with their service, hub#1375;
+the modifier groups and the menu options of a product that comes back, hub#1343; the price list prices of a product that
+comes back as a new one, hub#1442)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -2977,10 +2977,10 @@ Steps:
      what comes back is nothing new to the business: it starts none of its automations, so nobody is welcomed or told
      again of a booking they already had (hub#1307). Below, "What to bring back", with what can be brought ticked
      (today, **Customers**, **Product categories, Products, Product links to categories**, **Service categories,
-     Services**, **Appointments** and **Price list prices**). They press **Recover**.
+     Services**, **Appointments, Repeating appointments** and **Price list prices**). They press **Recover**.
   10. "1 separate copy will give back Customers, Product categories, Products, Product links to categories, Service
-      categories, Services, Appointments, Price list prices into its business within a few minutes: Recoveries says how
-      it went." appears.
+      categories, Services, Appointments, Repeating appointments, Price list prices into its business within a few
+      minutes: Recoveries says how it went." appears.
       In Recoveries they
       see it "Asked" with the copy, what
       was asked and when.
@@ -3031,6 +3031,8 @@ Steps:
       back (it is restored in Services), nor does one the copy had archived, and one the business has already made again
       (another with the same name in the same category, not itself one of the copy's; each counts for one only, so two
       services with the same name both come back) is not repeated. Asking again creates nothing twice.
+      With Appointments, "Appointments: 1 restored; Repeating appointments: 1 restored" (the appointments and the
+      repeating appointments that came back, each with its count).
       Appointments always go after customers and services, whatever the order they are asked in, so each finds its
       customer and its services. Each appointment that has not come yet and was still booked (pending or confirmed, not
       charged) comes back. One the business deleted and still holds comes back THE SAME and counts as restored, as it
@@ -3046,6 +3048,16 @@ Steps:
       a deleted one that does not come back for that is not created anew. Those gone by do not come back, nor one the
       business has (even if it cancelled it) or booked again (the same customer at the same time, or its series on that
       date).
+      After the appointments go their repeating appointments, those that in the copy were still booking (active, with
+      their professional and not ended). One the business deleted and still holds comes back THE SAME to Repeating and
+      counts as restored: active, with its customer, its services, its professional, its repetition and the appointments
+      it had already booked (APPOINTMENT-F15). It books nothing by itself, so nothing is booked twice: its next dates are
+      booked by "Book appointments", which skips those that already have an appointment. One the business no longer has
+      is created again as Repeating creates it (APPOINTMENT-F12), for its customer's card and its services in the
+      business as the appointments are, and books only the dates of its window that still fit: none on which an
+      appointment already came back. If its customer is gone or its professional or one of its services can no longer be
+      booked, it does not come back and its reason says why; one the business created again (the same customer,
+      repeating the same way on the same day at the same time) stays as it is.
       The price list prices always go after the products: "Price list prices: 2 created". Each price of the copy the
       business no longer has comes back to its price list, with its price and its "from quantity", put as the price
       list's detail puts it, so a deleted product that comes back gets its prices back in the price lists it was in
@@ -3071,9 +3083,12 @@ each product it no longer had, with its product-created notice (`inventory.produ
 for each one it lacked, with its category-created notice (`service.category.created`), a new service for each one it
 no longer had, with its service-created notice (`service.service.created`) and a professional-assigned notice
 (`service.assignment.assigned`) for each professional who comes back with it, each deleted appointment it still held,
-live again with its appointment-recovered notice (`appointment.appointment.restored`), and a new appointment for each
-one it no longer had, with its appointment-created notice (`appointment.appointment.created`), and a price list price
-for each one it lacked, with its price-put notice (`pricing.price_item.added`), and nothing else. Each of
+live again with its appointment-recovered notice (`appointment.appointment.restored`), a new appointment for each one
+it no longer had, with its appointment-created notice (`appointment.appointment.created`), each deleted repeating
+appointment it still held, active again with its series-recovered notice (`appointment.recurring.restored`), a new
+repeating appointment for each one it no longer had, with its series-created notice (`appointment.recurring.created`)
+and that of each appointment it books, and a price list price for each one it lacked, with its price-put notice
+(`pricing.price_item.added`), and nothing else. Each of
 those notices says the recovery did it (its actor is `copy_recovery:<id>`, that of the row in Recoveries), so no
 automation of the business starts on them (FLOW-F21), whether of something created or of something recovered; what only
 brings the business's own data up to date with them goes on the same (the WhatsApp Inbox links its conversation to the
@@ -3109,8 +3124,7 @@ support staff see the list, Separate copies and Recoveries, but not the actions.
 Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
 INVENTORY-F07, INVENTORY-F30, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08,
-SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, PRICING-F07, PRICING-F14, PRICING-F15, FLOW-F21,
-WHATSAPP_INBOX-F04; hub#1198, hub#1213,
-hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323,
-hub#1326, hub#1327, hub#1341, hub#1343, hub#1355, hub#1356, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1442,
-aws#77
+SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, PRICING-F07,
+PRICING-F14, PRICING-F15, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284,
+hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1343,
+hub#1355, hub#1356, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1442, aws#77

@@ -204,7 +204,7 @@ campo: «El menú necesita un nombre.», «Un menú que se consume en el local
 necesita su propio tipo de IVA: sin él no se puede facturar.», «Este importe no puede ser
 negativo.» (para abaratar una opción, se le pone un suplemento negativo: COMBO-F06), «Esto no es un importe. Escribe
 una cifra, por ejemplo 12,50.» (también con el símbolo de otra moneda: «13,50 €» en un negocio de
-Polonia) y el de las dos lecturas posibles de un importe («1.250»), que cita lo escrito. Un tipo de IVA que no existe en Impuestos: «Ese tipo de IVA no existe en Impuestos.». Sin
+Polonia) y el de las dos lecturas posibles de un importe («1.250»), que cita lo escrito. Un tipo de IVA que no existe en Impuestos: «Ese tipo de IVA no existe en Impuestos.». El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888). Sin
 permiso de gestión no hay botón +.
 Implicados: TAX-F01
 

@@ -501,6 +501,8 @@ APPOINTMENTS = {
     "reasons": [],
     "refused": "",
 }
+#: What Appointments gives back after its appointments, its series (hub#1327): none in these tests of appointments.
+SERIES = APPOINTMENTS | {"label": "Repeating appointments"}
 
 
 def a_monday_at(hhmm: str) -> str:
@@ -580,7 +582,8 @@ def gone_from_the_agenda(hub: Hub, *appointments) -> None:
 def the_one_not_booked(asked: CopyRecovery) -> dict:
     """Why the only appointment of ``asked`` that did not come back did not, the others having come back the same: a
     deleted one the restore refuses is never booked anew."""
-    [appointments] = fresh(asked).results
+    [appointments, series] = fresh(asked).results
+    assert series == SERIES
     assert (appointments["restored"], appointments["created"], appointments["not_created"], appointments["refused"]) == (
         1,
         0,
@@ -626,7 +629,7 @@ class TestAppointmentsComeBack:
         )
         done = fresh(asked)
         assert (done.status, done.last_error) == ("done", "")
-        assert done.results == [APPOINTMENTS | {"restored": 1, "created": 1}]
+        assert done.results == [APPOINTMENTS | {"restored": 1, "created": 1}, SERIES]
 
     def test_asked_again_nothing_is_booked_twice(self, recoveries, every_app_on):
         salon = Salon(recoveries, every_app_on, ANA)
@@ -638,7 +641,7 @@ class TestAppointmentsComeBack:
         assert run() == 1
 
         assert len(salon.live()) == 1
-        assert fresh(again).results == [APPOINTMENTS]
+        assert fresh(again).results == [APPOINTMENTS, SERIES]
 
     def test_one_gone_by_in_the_copy_does_not_come_back(self, recoveries, every_app_on):
         salon = Salon(recoveries, every_app_on, ANA)
@@ -652,7 +655,7 @@ class TestAppointmentsComeBack:
         run()
 
         assert salon.live() == []
-        assert fresh(asked).results == [APPOINTMENTS]
+        assert fresh(asked).results == [APPOINTMENTS, SERIES]
 
     def test_its_customer_lost_too_comes_back_first_whatever_the_order_they_are_asked_in(self, recoveries, every_app_on):
         salon = Salon(recoveries, every_app_on, ANA)
@@ -665,8 +668,8 @@ class TestAppointmentsComeBack:
 
         [(name, *_rest)] = salon.live()
         assert name == "Ana López"
-        assert [result["app"] for result in fresh(asked).results] == ["customer", "appointment"]
-        assert fresh(asked).results[1] == APPOINTMENTS | {"restored": 1}
+        assert [result["app"] for result in fresh(asked).results] == ["customer", "appointment", "appointment"]
+        assert fresh(asked).results[1:] == [APPOINTMENTS | {"restored": 1}, SERIES]
 
     def test_one_whose_time_was_taken_since_is_never_booked_over_and_says_why_and_the_others_come_back(
         self, recoveries, every_app_on

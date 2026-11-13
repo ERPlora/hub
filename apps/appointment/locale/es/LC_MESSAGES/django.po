@@ -189,6 +189,9 @@ msgstr "cita periódica"
 msgid "repeating appointments"
 msgstr "citas periódicas"
 
+msgid "Repeating appointments"
+msgstr "Citas periódicas"
+
 msgid "series"
 msgstr "serie"
 
