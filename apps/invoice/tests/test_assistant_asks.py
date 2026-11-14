@@ -19,8 +19,9 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import assert_its_asks_bring, assert_offered_with_room
+from base.tests.test_assistant_asks import assert_offered_with_room
 from base.tests.test_assistant_asks import assert_reported_are_owner_probes, offered_place, offered_to, without_its_asks
+from base.tests.test_assistant_asks import english_words_test, own_words_test, said_in_spanish_too_test
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: Invoicing's assistant tools: its reads (invoices, their A4 page and what a sale or a refund has, a manual line's
@@ -295,12 +296,24 @@ def test_each_tool_of_invoicing_has_its_own_words_in_each_language():
     )
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(
-    ("language", "name", "phrase"), OWN_WORDS, ids=[f"{name}-{language}" for language, name, _ in OWN_WORDS]
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(
+    OWN_WORDS, ids=[f"{name}-{language}" for language, name, _ in OWN_WORDS]
 )
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, language, name, phrase):
-    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, language), name, phrase, language)
+
+
+#: What the owner says in English in words of their own for the three tools of Invoicing whose English words above
+#: their English asks do not lift (the Spanish asks say the same), neither an ask nor a probe of layer 2: here they
+#: do (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("invoice.invoice.get", "who's FACT-2025-000412 made out to?"),
+    ("invoice.invoice.line_defaults", "if I type glasses by hand, which rate do they get today?"),
+    ("invoice.series.peek_next", "which comes after in FACT, without using it?"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+#: The tools whose English asks say nothing their Spanish asks or description do not: no English phrase depends
+#: on them, so what sees them change is that they keep saying nothing else.
+SAID_IN_SPANISH_TOO = ["invoice.invoice.print", "invoice.series.update"]
+test_the_english_asks_that_say_nothing_new_keep_saying_nothing_new = said_in_spanish_too_test(SAID_IN_SPANISH_TOO)
 
 
 #: The tools of Sales whose asks speak of an invoice, by language: printing a sale's copy and what a sale issues by

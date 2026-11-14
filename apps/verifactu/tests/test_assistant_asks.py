@@ -23,8 +23,8 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import assert_its_asks_bring, assert_offered_with_room, comparable, offered_to
-from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import assert_offered_with_room, comparable, offered_to
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test, probe_phrases
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: The requests of the real-model QA (``tests/e2e/qa/probes/owner-es-verifactu-2026-11-08.json``), as the owner said
@@ -242,10 +242,46 @@ def test_going_live_is_offered_although_the_account_is_read_as_a_check(catalog_o
     assert_offered_with_room(tools, probe["tool"], probe["phrase"], room=shared.MAX_TOOLS)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+
+
+#: What the owner says in English in words of their own for each tool of VeriFactu that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("verifactu.aeat.query", "refresh what they hold of ours for October"),
+    ("verifactu.aeat_record.list", "per the last pull, what do they have on file for us?"),
+    ("verifactu.certificate.remove", "what we uploaded of our own to sign with has to go"),
+    ("verifactu.chain.recover_from_aeat", "we restored the backup: rebuild it from their last entry"),
+    ("verifactu.chain.recover_manual", "we used another tool before: carry on from the previous one"),
+    ("verifactu.chain.status", "what sequence are we on and what's the current fingerprint?"),
+    ("verifactu.chain.validate", "the accountant fears it's broken somewhere, verify every link"),
+    ("verifactu.config.back_to_testing", "put us in the test environment again until the accountant signs off"),
+    ("verifactu.config.get", "which route do we file through, and are we still in testing?"),
+    ("verifactu.config.go_live", "we're done testing, start filing for real with the AEAT"),
+    ("verifactu.config.update", "let them do the filing on our behalf"),
+    ("verifactu.contingency.list", "anything queued up for the AEAT this morning?"),
+    ("verifactu.contingency.process", "send whatever is due in the queue now"),
+    ("verifactu.contingency.retry", "that stuck one, push it out sooner on the next round"),
+    ("verifactu.diagnostic.last", "did our connection pass yesterday?"),
+    ("verifactu.diagnostic.run", "test whether we can reach the tax office, without filing anything"),
+    ("verifactu.event.list", "the auditor wants the serious warnings noted down this week"),
+    ("verifactu.record.by_invoice", "what QR does F-2026-0031 carry? I need to reprint it"),
+    ("verifactu.record.cancel", "we should never have issued Amaia's, it was a mistake"),
+    ("verifactu.record.correct", "fix the one that was accepted with a warning"),
+    ("verifactu.record.create", "F-2026-0031 is missing its QR, make it"),
+    ("verifactu.record.get", "give me entry 31 and why it was not taken"),
+    ("verifactu.record.list", "list October's registrations"),
+    ("verifactu.record.reconcile", "does the AEAT hold that unanswered filing of ours?"),
+    ("verifactu.record.transmit", "file number 31 with the tax office right now"),
+    ("verifactu.representation.model", "give me the form filled in with our details"),
+    ("verifactu.stats.compliance_summary", "is anything still not with the AEAT?"),
+    ("verifactu.stats.contingency_summary", "sum up the queue: how many wait and how many are due?"),
+    ("verifactu.stats.events_recent", "what has happened lately, fiscally speaking?"),
+    ("verifactu.stats.records_by_status", "break them down: accepted, rejected and queued"),
+    ("verifactu.test_invoice.create", "run the one-euro trial while we're still in testing"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_each_tool_has_its_own_english_words = english_coverage_test("verifactu", OWN_WORDS_EN)
 
 
 def test_every_tool_of_verifactu_has_a_phrase_of_its_own():

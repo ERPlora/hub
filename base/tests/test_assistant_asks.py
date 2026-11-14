@@ -272,25 +272,211 @@ def asks_by_tool(label: str | None = None) -> dict[str, tuple[str, ...]]:
     }
 
 
-def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
-    """``tools`` with tool ``name`` saying no asks (its description and name stay): where a phrase would bring it
-    without them, so an app's test shows that its asks, and not only its name, bring a person's own words."""
+def without_its_asks(tools: dict[str, Operation], name: str, language: str | None = None) -> dict[str, Operation]:
+    """``tools`` with tool ``name`` saying no asks in ``language``, or in any language without one (its description and
+    name stay): where a phrase would bring it without them, so an app's test shows that its asks, and not only its
+    name, bring a person's own words."""
     op = tools[name]
-    return {**tools, name: dataclasses.replace(op, ai=dataclasses.replace(op.ai_spec(), asks={}))}
+    kept = {said: asks for said, asks in shared.asks_of(op).items() if language is not None and said != language}
+    return {**tools, name: dataclasses.replace(op, ai=dataclasses.replace(op.ai_spec(), asks=kept))}
+
+
+def nobodys_words(tools: dict[str, Operation], phrase: str, language: str = "es") -> bool:
+    """Whether ``phrase`` is no probe of layer 2 and no ask in ``language`` of any tool of ``tools``: it measures the
+    words, never a copy."""
+    asks = {comparable(ask) for op in tools.values() for ask in shared.asks_of(op).get(language, ())}
+    return comparable(phrase) not in probe_phrases() and comparable(phrase) not in asks
+
+
+def assert_own_words(tools: dict[str, Operation], name: str, phrase: str, language: str) -> None:
+    """That ``phrase`` is a person's own words for tool ``name``: no probe of layer 2, no ask of any tool, and no ask
+    of ``name`` in any language but for a word."""
+    assert name in tools  # positive control: the person holds the tool, so its place is known
+    assert nobodys_words(tools, phrase, language), "it is a probe of layer 2 or an ask"
+    said = [ask for asks in shared.asks_of(tools[name]).values() for ask in asks if alike(ask, phrase)]
+    assert not said, ("it is an ask but for a word at most", said)
 
 
 def assert_its_asks_bring(tools: dict[str, Operation], name: str, phrase: str, language: str) -> None:
-    """That ``phrase``, in a person's own words (no probe of layer 2, no ask of tool ``name`` nor one but for a word),
-    brings ``name`` among the first ``TOP`` by its asks: with them it is there, ``without_its_asks`` it is not. The
-    test of an app that calls it for each of its tools sees any change to their asks (hub#1135, hub#1165)."""
-    assert name in tools  # positive control: the person holds the tool, so its place is known
-    assert comparable(phrase) not in probe_phrases(), "it is a probe of layer 2"
-    said = [ask for asks in shared.asks_of(tools[name]).values() for ask in asks if alike(ask, phrase)]
-    assert not said, ("it is an ask but for a word at most", said)
+    """That ``phrase``, in a person's own words (``assert_own_words``), brings ``name`` among the first ``TOP`` by its
+    asks: with them it is there, ``without_its_asks`` in any language it is not. The test of an app that calls it for
+    each of its tools sees any change to their asks (hub#1135, hub#1165)."""
+    assert_own_words(tools, name, phrase, language)
     offered = offered_to(tools, phrase, language)
     assert name in offered[:TOP], ("its asks do not bring it", place_in(offered, name), offered[:TOP])
     unasked = offered_to(without_its_asks(tools, name), phrase, language)
     assert name not in unasked[:TOP], ("it comes without its asks", place_in(unasked, name))
+
+
+def assert_its_asks_lift(tools: dict[str, Operation], name: str, phrase: str, language: str) -> None:
+    """That ``phrase``, in a person's own words in ``language`` (``assert_own_words``), brings ``name`` among the first
+    ``TOP``, and higher than it would without its asks in ``language`` (those in other languages kept). In English a
+    tool's name and description, written in English too, bring many phrases on their own, and its Spanish asks say
+    the same things: what its English asks add is the lift, so English asks overwritten or emptied fail here."""
+    assert_own_words(tools, name, phrase, language)
+    place = offered_place(tools, name, phrase, language)
+    assert place is not None and place <= TOP, ("its asks do not bring it", place)
+    unasked = offered_place(without_its_asks(tools, name, language), name, phrase, language)
+    assert unasked is None or unasked > place, ("its asks in this language do not lift it", place, unasked)
+
+
+def said_only_in_english(op: Operation) -> list[str]:
+    """The words of ``op``'s English asks that nothing else of it says: no Spanish ask, nor its description or name,
+    names what they name (``base.assistant.SYNONYMS`` included). Where there are none, no English phrase depends on
+    its English asks, so no ranking can see them change; filler written over them is such a word."""
+    asks = shared.asks_of(op)
+    name = op.name.replace(".", " ").replace("_", " ")
+    elsewhere = shared.stems(" ".join([*asks.get("es", ()), shared.description(op), name]))
+    words = [word for ask in asks.get("en", ()) for word in re.findall(r"[\w'’-]+", ask)]
+    return list(
+        dict.fromkeys(
+            word
+            for word in words
+            if (concepts := shared.asked([word], assistant.SYNONYMS).concepts)
+            and all(concept.isdisjoint(elsewhere) for concept in concepts)
+        )
+    )
+
+
+# ── The tests each app declares the same way: built here, assigned there ─────────────────────────────────────────
+# An app assigns what these return to the name of its test (``test_… = own_words_test(OWN_WORDS, "es")``): pytest
+# collects the test in the app's module, under that name and with the same ids, and takes the app's ``catalog_of``.
+
+OWNER = Membership.Role.OWNER
+
+
+def own_words_test(cases: list, language: str | None = None, *, ids: list[str] | None = None) -> Callable:
+    """The test that each phrase of ``cases``, a person's own words for a tool of the app, brings it to the owner by its
+    asks (``assert_its_asks_bring``): ``(name, phrase)`` said in ``language``, or ``(language, name, phrase)``."""
+    if language is None:
+
+        @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+        @pytest.mark.parametrize(("language", "name", "phrase"), cases, ids=ids)
+        def said_in_its_language(catalog_of, language, name, phrase):
+            assert_its_asks_bring(catalog_of(OWNER, language), name, phrase, language)
+
+        return said_in_its_language
+
+    @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+    @pytest.mark.parametrize(("name", "phrase"), cases, ids=ids)
+    def said_in_one_language(catalog_of, name, phrase):
+        assert_its_asks_bring(catalog_of(OWNER, language), name, phrase, language)
+
+    return said_in_one_language
+
+
+def english_words_test(cases: list) -> Callable:
+    """The test that each ``(name, phrase)`` of ``cases``, a person's own words in English for a tool of the app, is
+    lifted by the tool's English asks for the owner (``assert_its_asks_lift``)."""
+
+    @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+    @pytest.mark.parametrize(("name", "phrase"), cases)
+    def lifted(catalog_of, name, phrase):
+        assert_its_asks_lift(catalog_of(OWNER, "en"), name, phrase, "en")
+
+    return lifted
+
+
+def english_coverage_test(label: str, cases: list, also: Iterable[str] = ()) -> Callable:
+    """The test that each tool of app ``label`` has a person's own words in English once: a ``(name, phrase)`` of
+    ``cases``, or one of ``also`` (the app's English words written elsewhere). A tool added later without them would
+    let its English asks change unseen."""
+
+    def covered():
+        tools = sorted(name for name, op in registry.items() if op.app_label == label and assistant.is_tool(op))
+        assert sorted([name for name, _ in cases] + list(also)) == tools
+
+    return covered
+
+
+def said_in_spanish_too_test(names: Iterable[str]) -> Callable:
+    """The test that the English asks of each tool of ``names`` say nothing its Spanish asks, description or name do
+    not (``said_only_in_english``): no English phrase depends on them, so this is what sees them change."""
+
+    @pytest.mark.parametrize("name", sorted(names))
+    def said_in_spanish_too(name):
+        assert said_only_in_english(registry[name]) == []
+
+    return said_in_spanish_too
+
+
+def reported_test(reported: list) -> Callable:
+    """The test that each ``(name, phrase)`` of ``reported``, the owner's request of the real-model QA in Spanish, is
+    offered its existing operation (``assert_offered_with_room``)."""
+
+    @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+    @pytest.mark.parametrize(("name", "phrase"), reported)
+    def offered(catalog_of, name, phrase):
+        assert_offered_with_room(catalog_of(OWNER, "es"), name, phrase)
+
+    return offered
+
+
+def probes_test(probes: list[dict], label: str) -> Callable:
+    """The test that each probe of layer 2 of app ``label`` in ``probes``, the owner's in Spanish, is offered its tool
+    without being one of its asks (``assert_offered_with_room``): a tool that a new ask elsewhere pushes out of the
+    first half of the ones a turn offers fails here before the real-model QA sees it."""
+
+    @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+    @pytest.mark.parametrize("probe", probes, ids=[probe["id"] for probe in probes])
+    def offered(catalog_of, probe):
+        assert (probe["app"], probe["role"], probe["language"]) == (label, "owner", "es")
+        assert_offered_with_room(catalog_of(OWNER, probe["language"]), probe["tool"], probe["phrase"])
+
+    return offered
+
+
+def by_group_test(cases: list) -> Callable:
+    """The test that each ``(name, phrase, word)`` of ``cases``, a request in Spanish, brings its tool among the first
+    ``TOP`` by the group of ``base.assistant.SYNONYMS`` that says ``word``, and not without that group."""
+
+    @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+    @pytest.mark.parametrize(("name", "phrase", "word"), cases)
+    def by_its_group(catalog_of, name, phrase, word):
+        tools = catalog_of(OWNER, "es")
+        assert comparable(phrase) not in probe_phrases()
+        assert_offered_with_room(tools, name, phrase, room=TOP)
+        without = tuple(group for group in assistant.SYNONYMS if word not in group)
+        assert len(without) == len(assistant.SYNONYMS) - 1  # positive control: exactly its group is left out
+        assert name not in offered_to(tools, phrase, synonyms=without)[:TOP]
+
+    return by_its_group
+
+
+#: A person's own words in English for ``verifactu.chain.validate``, and what its English asks become when someone
+#: overwrites them with filler: the positive control of ``assert_its_asks_lift``.
+LIFTED = ("verifactu.chain.validate", "the accountant fears it's broken somewhere, verify every link")
+FILLER = ("zzqxfillera", "zzqxfillerb")
+
+
+def with_asks(tools: dict[str, Operation], name: str, language: str, asks: tuple[str, ...]) -> dict[str, Operation]:
+    """``tools`` with tool ``name`` saying ``asks`` in ``language`` and the rest of its asks as they are."""
+    op = tools[name]
+    said = {**shared.asks_of(op), language: asks}
+    return {**tools, name: dataclasses.replace(op, ai=dataclasses.replace(op.ai_spec(), asks=said))}
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+def test_english_asks_overwritten_with_filler_no_longer_lift_their_tool(context_of):
+    """The English asks of a tool, overwritten with filler while its Spanish ones stay, leave a person's English words
+    where the tool's name, description and Spanish asks put them: ``assert_its_asks_lift`` fails, as an app's test of
+    its English phrases does (hub#1216: before it, only its Spanish asks were measured)."""
+    name, phrase = LIFTED
+    tools = assistant.catalog(context_of(Membership.Role.OWNER, "en"))
+    assert_its_asks_lift(tools, name, phrase, "en")
+    with pytest.raises(AssertionError):
+        assert_its_asks_lift(with_asks(tools, name, "en", FILLER), name, phrase, "en")
+    assert shared.asks_of(without_its_asks(tools, name, "en")[name]) == {"es": shared.asks_of(tools[name])["es"]}
+
+
+def test_a_word_only_the_english_asks_say_is_found():
+    """``said_only_in_english``: the English asks of ``invoice.invoice.print`` say what its Spanish asks and its
+    description already do, so filler written over them is a word nothing else of the tool says."""
+    op = registry["invoice.invoice.print"]
+    assert said_only_in_english(op) == []
+    asks = {**shared.asks_of(op), "en": FILLER}
+    overwritten = dataclasses.replace(op, ai=dataclasses.replace(op.ai_spec(), asks=asks))
+    assert said_only_in_english(overwritten) == list(FILLER)
 
 
 def near_copies(asks: dict[str, tuple[str, ...]], probes: Iterable[dict]) -> list[tuple[str, str, str]]:

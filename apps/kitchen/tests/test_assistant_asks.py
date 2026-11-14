@@ -12,18 +12,18 @@ a station the routing, a dish marked «como listo» or «como hecho» is bumped 
 preparación» recalled.
 """
 
-import dataclasses
 import json
 from pathlib import Path
 
 import pytest
 from django.conf import settings
 from live import assistant as shared
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, offered_place, probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, nobodys_words, own_words_test
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: What only who runs the kitchen holds (``KitchenConfig.role_permissions``): cancelling or deleting a ticket, the
@@ -140,18 +140,6 @@ OWN_WORDS = [
 ROOM = 2
 
 
-def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
-    """``tools`` with ``name`` saying no asks: how a turn ranks it by its name, its description and the Hub's words."""
-    op = tools[name]
-    return {**tools, name: dataclasses.replace(op, ai={key: value for key, value in op.ai.items() if key != "asks"})}
-
-
-def nobodys_words(tools: dict[str, Operation], phrase: str, language: str) -> bool:
-    """Whether ``phrase`` is no probe of layer 2 and no ask of any tool: it measures the words, never a copy."""
-    asks = {comparable(ask) for op in tools.values() for ask in shared.asks_of(op).get(language, ())}
-    return comparable(phrase) not in probe_phrases() and comparable(phrase) not in asks
-
-
 def test_kitchen_offers_at_least_29_tools():
     """Kitchen's tools are at least 29 (``AI``, never ``INTERNAL``): a silent drop of tools fails."""
     tools = {name for name, op in registry.items() if op.app_label == "kitchen" and assistant.is_tool(op)}
@@ -205,17 +193,44 @@ def test_the_kitchens_own_words_bring_the_tool_they_mean_among_the_first_ten(cat
     assert_offered_with_room(tools, name, phrase, "es", room=TOP)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("language", "name", "phrase"), OWN_WORDS, ids=[name for _, name, _ in OWN_WORDS])
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, language, name, phrase):
-    tools = catalog_of(ROLES["owner"], language)
-    assert nobodys_words(tools, phrase, language)
-    assert_offered_with_room(tools, name, phrase, language, room=TOP)
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(
+    OWN_WORDS, ids=[name for _, name, _ in OWN_WORDS]
+)
 
-    before = without_its_asks(tools, name)
-    assert not shared.asks_of(before[name])  # positive control: the tool is ranked without its asks
-    unasked = offered_place(before, name, phrase, language)
-    assert unasked is None or unasked > TOP, unasked
+
+#: What the owner says in English in words of their own for each tool of Kitchen that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("kitchen.item.bump", "the croquettes for number 3 are done"),
+    ("kitchen.item.recall", "number 4's steak isn't done after all"),
+    ("kitchen.log.list", "who voided number 15 yesterday?"),
+    ("kitchen.routing.clear", "stop sending desserts anywhere"),
+    ("kitchen.routing.list", "where do drinks and desserts go?"),
+    ("kitchen.routing.set", "drinks should come out at the Bar"),
+    ("kitchen.settings.get", "at what minute does it turn amber?"),
+    ("kitchen.settings.update", "make it go red sooner"),
+    ("kitchen.station.create", "we need a pastry one that prints on paper"),
+    ("kitchen.station.delete", "the old pastry one can go"),
+    ("kitchen.station.update", "the desserts one should be screen only"),
+    ("kitchen.ticket.all_day", "how many burgers do we still have to make?"),
+    ("kitchen.ticket.board", "what's left to cook right now?"),
+    ("kitchen.ticket.by_order", "has table 6's check sent any rounds?"),
+    ("kitchen.ticket.cancel", "don't make number 9, they've left"),
+    ("kitchen.ticket.create", "remake number 5's salad by hand"),
+    ("kitchen.ticket.delete", "the crew meal I made by hand: get rid of it"),
+    ("kitchen.ticket.list", "tell me the ones that got cancelled this morning"),
+    ("kitchen.ticket.notices", "anything just come in a moment ago?"),
+    ("kitchen.ticket.ready", "everything on number 9 can go to the pass"),
+    ("kitchen.ticket.recall", "number 3 isn't finished, bring it back from the pass"),
+    ("kitchen.ticket.receive", "take in the round table 6 just sent"),
+    ("kitchen.ticket.reprint", "the paper jammed, print number 9 again"),
+    ("kitchen.ticket.send", "fire what's left on table 6"),
+    ("kitchen.ticket.serve", "number 9 has left the pass, it's gone out"),
+    ("kitchen.ticket.set_rush", "number 9 has to go first, they're in a hurry"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+ENGLISH_ABOVE = [name for language, name, _ in OWN_WORDS if language == "en"]
+test_each_tool_has_its_own_english_words = english_coverage_test("kitchen", OWN_WORDS_EN, ENGLISH_ABOVE)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role

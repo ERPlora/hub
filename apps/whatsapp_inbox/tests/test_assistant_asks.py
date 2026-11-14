@@ -14,9 +14,9 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import PROBES, TOP, assert_its_asks_bring, assert_offered_with_room
-from base.tests.test_assistant_asks import assert_reported_are_owner_probes, comparable, offered_place, offered_to
-from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import PROBES, TOP, assert_offered_with_room
+from base.tests.test_assistant_asks import assert_reported_are_owner_probes, offered_place
+from base.tests.test_assistant_asks import by_group_test, english_coverage_test, english_words_test, own_words_test
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: The requests of hub#1108's QA (``owner.es.whatsapp_inbox.*`` of ``owner-es-whatsapp_inbox-2026-11-08.json``), as the
@@ -128,15 +128,7 @@ def test_the_hub_reads_plantilla_and_mensaje_as_the_inboxs_template_and_message(
         assert not any(wanted in concept for concept in shared.asked([phrase]).concepts), phrase
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase", "word"), BY_GROUP)
-def test_a_request_in_spanish_brings_its_tool_among_the_first_ten_by_the_inboxs_groups(catalog_of, name, phrase, word):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    assert comparable(phrase) not in probe_phrases()
-    assert_offered_with_room(tools, name, phrase, room=TOP)
-    without = tuple(group for group in assistant.SYNONYMS if word not in group)
-    # positive control: the group is what brings it
-    assert name not in offered_to(tools, phrase, synonyms=without)[:TOP]
+test_a_request_in_spanish_brings_its_tool_among_the_first_ten_by_the_inboxs_groups = by_group_test(BY_GROUP)
 
 
 
@@ -173,10 +165,47 @@ def test_every_tool_of_the_inbox_has_its_own_words():
     assert sorted(named) == sorted(tools), sorted(set(named) ^ tools)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_the_owners_own_words_reach_each_tool_of_the_inbox_by_its_asks(catalog_of, name, phrase):
-    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
+test_the_owners_own_words_reach_each_tool_of_the_inbox_by_its_asks = own_words_test(OWN_WORDS, "es")
+
+
+#: What the owner says in English in words of their own for each tool of the WhatsApp inbox that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("whatsapp_inbox.agent.list", "who among us answers WhatsApp today?"),
+    ("whatsapp_inbox.channel.connect", "Meta gave me 482913, finish the link"),
+    ("whatsapp_inbox.channel.disconnect", "we're pausing WhatsApp in the Hub for now, unlink it"),
+    ("whatsapp_inbox.channel.get", "how much of the allowance is left?"),
+    ("whatsapp_inbox.channel.prepare", "are we ready to hook WhatsApp up? what's missing?"),
+    ("whatsapp_inbox.conversation.assign", "unassign Marcos's"),
+    ("whatsapp_inbox.conversation.by_phone", "has +44 7700 900123 written to us?"),
+    ("whatsapp_inbox.conversation.count_awaiting_reply", "how many are we still owing an answer?"),
+    ("whatsapp_inbox.conversation.detail", "can I still write freely to Marcos?"),
+    ("whatsapp_inbox.conversation.erase", "she asked us to erase her messages"),
+    ("whatsapp_inbox.conversation.flag", "the bot didn't get Elena, someone needs to look"),
+    ("whatsapp_inbox.conversation.link_customer", "put Marcos's chat on his card"),
+    ("whatsapp_inbox.conversation.list", "which ones are closed in the inbox?"),
+    ("whatsapp_inbox.conversation.mark_read", "I've seen Marcos's chat, clear it"),
+    ("whatsapp_inbox.conversation.notices", "who's written to us and what did they say?"),
+    ("whatsapp_inbox.conversation.set_status", "reopen the chat with Marcos"),
+    ("whatsapp_inbox.conversation.summary", "how's the inbox doing today?"),
+    ("whatsapp_inbox.message.get", "when did that one from Marcos arrive?"),
+    ("whatsapp_inbox.message.list", "show me the thread with Marcos"),
+    ("whatsapp_inbox.message.notify", "let Jorge know his appointment has moved"),
+    ("whatsapp_inbox.message.retry", "resend what got stuck"),
+    ("whatsapp_inbox.message.send", "write to Marcos: see you tomorrow at 5"),
+    ("whatsapp_inbox.note.add", "write down on Jorge's chat that he's allergic to seafood"),
+    ("whatsapp_inbox.note.delete", "take off what I left about Jorge in his chat"),
+    ("whatsapp_inbox.note.list", "did anyone leave anything on Marcos's chat?"),
+    ("whatsapp_inbox.template.create", "make one to remind people of their visit"),
+    ("whatsapp_inbox.template.delete", "get rid of the old promo one"),
+    ("whatsapp_inbox.template.list", "has the welcome one been approved yet?"),
+    ("whatsapp_inbox.template.retry", "sending the birthday one to Meta failed, send it again"),
+    ("whatsapp_inbox.template.update", "the welcome one's footer should say «see you soon»"),
+    ("whatsapp_inbox.template_sample.detail", "what file did I upload as header?"),
+    ("whatsapp_inbox.template_sample.upload", "use this video at the top of the message"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_each_tool_has_its_own_english_words = english_coverage_test("whatsapp_inbox", OWN_WORDS_EN)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
