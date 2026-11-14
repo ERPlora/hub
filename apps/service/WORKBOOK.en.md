@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5e154a7cf3c5be73543f803b3c1c0e51122499bef3fffe42b692c1aca0bb62be -->
+<!-- generated from WORKBOOK.md sha256:5d10b802c249d378396587b25f8aae5b8a914069eb2ffb30fdb83a6e1b7044cd -->
 
 ## What it is for and who it is for
 
@@ -246,7 +246,7 @@ not an amount. Type a figure, for example 12.50.", also with another currency's 
 business in Poland), one that reads two ways or a negative one; a deleted
 category ("That category is not available: it does not exist in this business or it has been
 deleted."); a tax category that does not exist or is deactivated ("That tax category does not exist in
-Taxes or is deactivated."); with no tax category at all, the notice of Taxes. What was typed is kept.
+Taxes or is deactivated."); with no tax category at all, the notice of Taxes. What was typed is kept. The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888).
 Involved: TAX-F01, BASE-F01, BASE-F114 (the ERPlora staff get back from a separate copy the services that were lost,
 each by this same creation)
 
@@ -352,7 +352,7 @@ If it fails: a name another live category already has (ignoring case and extra s
 field: "There is already a category with that name. Pick another name.". A category cannot be its own
 parent nor hang from one of its children: "A category cannot hang from itself or from one of its
 subcategories.". A deleted parent: "That parent category is not available: it does not exist in this
-business or it has been deleted.".
+business or it has been deleted.". The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888).
 Involved: SERVICE-F01, SERVICE-F08, BASE-F114 (the ERPlora staff recover from a separate copy the categories the
 business no longer has, each by this same creation)
 
@@ -446,7 +446,8 @@ uses up one of its "Uses".
 If it fails: with no service at all, "Add at least one service: a package with no lines cannot be
 redeemed."; a repeated service, an archived one or one that does not exist; an unreadable or negative
 amount, below its field; a name another live voucher already has, "There is already a package with that
-name. Pick another name.". "Create package" (and "Save changes" when editing it, SERVICE-F13) is grey while
+name. Pick another name.". The reason of a field goes as soon as that field is corrected, even if another one says
+the same, and the one of the lines as a whole (a repeated service), below them, as soon as a line is changed, added or removed (hub#888). "Create package" (and "Save changes" when editing it, SERVICE-F13) is grey while
 the business has not yet said its currency, because the closed price and the discount are read in it
 (without it, "1500" yen would be saved as 150,000); until then, leaving the closed price or the discount keeps it as
 typed, without inventing decimals for it or judging it: "¥9500" or "7,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
@@ -566,7 +567,7 @@ used-up voucher. The sessions already delivered keep their value; the ones left 
 price (SERVICE-F24).
 If it fails: "Say why this voucher is being adjusted…", "Add or remove at least one session, or add at
 least one day.", "You cannot take away more sessions than the customer has left.", "That voucher has no
-session limit…", "That voucher never expires…" or "That voucher was already voided.".
+session limit…", "That voucher never expires…" or "That voucher was already voided.". The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888).
 Involved: SERVICE-F16, SERVICE-F20
 
 ### SERVICE-F19 See a voucher's movements

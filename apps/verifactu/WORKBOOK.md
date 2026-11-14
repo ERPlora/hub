@@ -642,7 +642,12 @@ Pasos:
    errores», rojo «Rechazado»; y su entorno, para no confundir pruebas con producción.
 Entra: los registros.
 Sale: nada; es consulta.
-Si falla: el mensaje con «Reintentar».
+Si falla: el mensaje con «Reintentar». El total se lee como en cualquier campo de importe del Hub y como en las
+demás listas (hub#1247: «1.000,50», «1,000.50», «2 500» y «12,50 €» filtran); uno que no se puede leer lo dice
+bajo su campo con las palabras del campo de importe («Esto no es un importe. Escribe una cifra, por ejemplo
+12,50.», «Este importe no puede ser negativo.» o, con «1.000» en euros, «Este importe se puede leer de dos
+maneras…»), y una fecha final anterior a la inicial, «La fecha final no puede ser anterior a la inicial.»; ninguno
+de los dos filtra.
 Implicados: INVOICE-F16
 
 ### VERIFACTU-F17 Ver el detalle de un registro y por qué espera

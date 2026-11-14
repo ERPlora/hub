@@ -11,6 +11,7 @@ import {
   expectSaveWaitsForMoney,
   expectWindowSaysMoneyUnreadable,
 } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { business, click, ionValue, JAPANESE, type MountOptions, mountService, POLISH, settle } from '../__tests__/mount-service';
 import { PACKAGE, pkg } from '../__tests__/package';
 import PackageFormModal from './PackageFormModal.vue';
@@ -154,6 +155,90 @@ describe('PackageFormModal: New package', () => {
     await settle();
     await click(s.save());
     expect(s.field('name').errorText).toBe(message);
+  });
+});
+
+describe('PackageFormModal: fields refused with the same words (hub#888)', () => {
+  // Name, the discount, Closed price, Validity, Uses and a line's service (the picker) and Sessions each paint a refusal
+  // under their own key; a line's are named after its place in what was sent.
+  const FIELD_OF: Record<string, string> = {
+    discount_percent_bp: 'discount_percent',
+    'items.0.service_id': 'line-service-0',
+    'items.0.sessions': 'line-sessions-0',
+  };
+  async function filled(locale: 'en' | 'es', refusal: unknown, discount: (s: Awaited<ReturnType<typeof setup>>) => Promise<void>) {
+    const s = await setup(null, locale);
+    await ionValue(s.field('name'), 'Bono', 'ionInput');
+    await discount(s);
+    s.lines()[0].vm.$emit('update:modelValue', { id: 's1', label: 'Cut' });
+    await settle();
+    s.answer(422, refusal);
+    return { field: (key: string) => s.field(FIELD_OF[key] ?? key), send: () => click(s.save()), settle };
+  }
+
+  itTellsTheCorrectedFieldApart(
+    ['name', 'discount_percent_bp', 'fixed_price', 'validity_days', 'max_uses', 'items.0.service_id', 'items.0.sessions'],
+    (locale, refusal) => filled(locale, refusal, (s) => ionValue(s.field('discount_percent'), '5', 'ionInput')),
+    'fixed_price',
+  );
+
+  describe('with a fixed discount', () => {
+    itTellsTheCorrectedFieldApart(['discount_amount', 'fixed_price', 'max_uses'], (locale, refusal) =>
+      filled(locale, refusal, async (s) => {
+        await ionValue(s.field('discount_type'), 'fixed', 'ionChange');
+        await ionValue(s.field('discount_amount'), '5', 'ionInput');
+      }),
+    );
+  });
+});
+
+// The server refuses the lines as a whole (a service twice) on the line under them, not under one line: any change the
+// person makes to the lines takes that line away at once, and only that line (hub#888).
+describe('PackageFormModal: a refusal of the lines as a whole', () => {
+  const REPEATED = 'A service is repeated in the lines: each service goes once.';
+  const NAME_TAKEN = 'There is already a package with that name. Pick another name.';
+
+  async function refusedLines(fields: Record<string, string> = { items: REPEATED }) {
+    const s = await setup();
+    await ionValue(s.field('name'), 'Bono', 'ionInput');
+    s.lines()[0].vm.$emit('update:modelValue', { id: 's1', label: 'Cut' });
+    await click(s.field('add-line'));
+    s.lines()[1].vm.$emit('update:modelValue', { id: 's1', label: 'Cut' });
+    await settle();
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields } });
+    await click(s.save());
+    const said = () => s.inDoc('service-package-form-no-lines')?.textContent ?? '';
+    return { ...s, said };
+  }
+
+  const CHANGES: [string, (s: Awaited<ReturnType<typeof refusedLines>>) => Promise<void>][] = [
+    ['choosing a line’s service', async (s) => {
+      s.lines()[1].vm.$emit('update:modelValue', { id: 's2', label: 'Colour' });
+      await settle();
+    }],
+    ['typing a line’s sessions', (s) => ionValue(s.field('line-sessions-1'), '3', 'ionInput')],
+    ['removing a line', (s) => click(s.field('remove-line-1'))],
+    ['adding a line', (s) => click(s.field('add-line'))],
+  ];
+
+  it.each(CHANGES)('%s takes it away before saving again', async (_, change) => {
+    const s = await refusedLines();
+    expect(s.said()).toContain(REPEATED);
+    await change(s);
+    expect(s.said()).not.toContain(REPEATED);
+    expect(s.sent()).toHaveLength(1);
+  });
+
+  it('the lines are one group, named as their heading says', async () => {
+    const s = await setup();
+    const group = s.inDoc('service-package-form-add-line')?.closest('fieldset');
+    expect([group?.getAttribute('name'), group?.getAttribute('aria-label')]).toEqual(['items', 'Services included']);
+  });
+
+  it('a change to the lines leaves another field’s refusal under it', async () => {
+    const s = await refusedLines({ name: NAME_TAKEN, items: REPEATED });
+    await ionValue(s.field('line-sessions-1'), '3', 'ionInput');
+    expect([s.field('name').errorText, s.said().includes(REPEATED)]).toEqual([NAME_TAKEN, false]);
   });
 });
 

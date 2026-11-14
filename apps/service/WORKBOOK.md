@@ -260,7 +260,7 @@ Si falla: dentro del formulario, cada motivo debajo de su campo: un importe que 
 «22,50 €» en un negocio de Polonia), uno que se lee de dos maneras o uno negativo; una categoría eliminada («Esa categoría no está disponible: no existe en este negocio o se
 ha eliminado.»); una categoría fiscal que no existe o está desactivada («Esa categoría fiscal no
 existe en Impuestos o está desactivada.»); sin ninguna categoría fiscal, el aviso de Impuestos. Lo
-tecleado se conserva.
+tecleado se conserva. El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888).
 Implicados: TAX-F01, BASE-F01, BASE-F114 (el personal de ERPlora recupera desde una copia aparte los servicios que se
 perdieron, cada uno por esta misma alta)
 
@@ -370,7 +370,7 @@ Si falla: un nombre que ya tiene otra categoría viva (sin distinguir mayúscula
 sale debajo del campo: «Ya hay una categoría con ese nombre. Elige otro nombre.». Una categoría no
 puede ser su propio padre ni colgar de una de sus hijas: «Una categoría no puede colgar de sí misma
 ni de una de sus subcategorías.». Un padre eliminado: «Esa categoría padre no está disponible: no
-existe en este negocio o se ha eliminado.».
+existe en este negocio o se ha eliminado.». El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888).
 Implicados: SERVICE-F01, SERVICE-F08, BASE-F114 (el personal de ERPlora recupera desde una copia aparte las categorías
 que el negocio ya no tiene, cada una por esta misma alta)
 
@@ -468,7 +468,8 @@ líneas consume uno de sus «Usos».
 Si falla: sin ningún servicio, «Añade al menos un servicio: un paquete sin líneas no se puede
 canjear.»; un servicio repetido, archivado o que no existe; un importe ilegible o negativo, debajo de
 su campo; un nombre que ya tiene otro bono vivo, «Ya hay un paquete con ese nombre. Elige otro
-nombre.». «Crear paquete» (y «Guardar cambios» al editarlo, SERVICE-F13) está en gris mientras el negocio
+nombre.». El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo, y el
+de las líneas en conjunto (un servicio repetido), debajo de ellas, en cuanto se cambia, se añade o se quita una línea (hub#888). «Crear paquete» (y «Guardar cambios» al editarlo, SERVICE-F13) está en gris mientras el negocio
 no haya dicho todavía su moneda, porque el precio cerrado y el descuento se leen en ella (sin ella,
 «1500» yenes se guardaría como 150 000); hasta entonces, salir del precio cerrado o del descuento lo deja como se
 escribió, sin inventarle decimales ni juzgarlo: «¥9500» o «7,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
@@ -592,7 +593,7 @@ o agotado. Las sesiones ya entregadas conservan su valor; las que quedan se repa
 precio (SERVICE-F24).
 Si falla: «Indica por qué se ajusta este bono…», «Añade o quita al menos una sesión, o añade al menos
 un día.», «No puedes quitar más sesiones de las que le quedan al cliente.», «Ese bono no tiene límite
-de sesiones…», «Ese bono no caduca…» o «Ese bono ya estaba anulado.».
+de sesiones…», «Ese bono no caduca…» o «Ese bono ya estaba anulado.». El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888).
 Implicados: SERVICE-F16, SERVICE-F20
 
 ### SERVICE-F19 Ver los movimientos de un bono

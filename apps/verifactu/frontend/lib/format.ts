@@ -1,8 +1,11 @@
 // Numbers and days of the VeriFactu screens: the server keeps money in signed cents, quantities and rates as
-// decimal strings and days as `YYYY-MM-DD`; a person reads them in the page's language and types euros.
+// decimal strings and days as `YYYY-MM-DD`; a person reads them in the page's language.
 // Until `@erplora/ui/components/format` has money and number formatters (UI-REQUESTS.md), this is the one
-// place the app turns them into text (`Intl`) and euros into cents. No screen of the app writes a quantity: where
+// place the app turns them into text (`Intl`). An amount typed in a filter is read by the platform, as every amount
+// filter of the Hub (`filterCents`, `amountFilterErrors`). No screen of the app writes a quantity: where
 // one is shown, it is the platform's `formatQuantity` of `@erplora/ui/components` (hub#974).
+export type { Money } from '../../../../base/frontend/lib/home';
+export { amountFilterErrors, filterCents, useBusinessMoney } from '../../../../base/frontend/lib/money';
 
 const CURRENCY = 'EUR';
 const FALLBACK_LOCALE = 'en';
@@ -77,16 +80,6 @@ export function formatDate(value: string | null | undefined, locale: string): st
     }
   });
   return format.format(day);
-}
-
-const AMOUNT = /^\d+(?:[.,]\d{1,2})?$/;
-
-/** Euros as typed («12,5», «12.50», 7) → whole cents; blank, negative or not an amount → `undefined`. */
-export function centsFromEuros(value: string | number | null | undefined): number | undefined {
-  if (value === null || value === undefined) return undefined;
-  const text = String(value).trim();
-  if (!text || !AMOUNT.test(text)) return undefined;
-  return Math.round(Number(text.replace(',', '.')) * 100);
 }
 
 /** The text with Intl's no-break spaces as plain ones (what a test or a search compares). */
