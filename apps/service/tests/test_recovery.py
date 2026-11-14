@@ -30,10 +30,15 @@ from live.operations import get
 from apps.service import queries
 from apps.service.models import Assignment, Category, Service
 from apps.service.schemas import CategoryRecoverIn, ServiceRecoverIn
-from apps.service.services import MEMBER_TERMINATED_LEFT, SERVICE_MOVED_LEFT
+from apps.service.services import (
+    MEMBER_TERMINATED_LEFT,
+    SERVICE_CHANGED_LEFT,
+    SERVICE_MOVED_LEFT,
+    SUBCATEGORY_CHANGED_LEFT,
+)
 from apps.staff.models import Member
 from apps.tax.models import TaxCategory
-from base.recovery import actor_of
+from base.recovery import actor_of, giving_back
 from base.tenancy.context import use_hub
 from base.tenancy.tests.test_recovery import Recoveries, fields_held_since, fresh, run, run_in
 from base.tests.test_image_catalog import image_library  # noqa: F401 - the library fixture
@@ -981,6 +986,80 @@ def test_what_the_business_touched_after_the_category_came_back_stays_as_it_is()
     ]
 
 
+def test_what_the_business_changed_while_the_recovery_that_brought_its_category_back_runs_goes_for_its_link_to_say_why():
+    tax = make_tax("test.service", "Service — test")
+    gone = make_category("Color", is_deleted=True, deleted_at=timezone.now())
+    cut, gloss = make_service("Cut", tax=tax), make_service("Gloss", tax=tax)
+    kids, toning = make_category("Kids"), make_category("Toning")
+    recovery = a_recovery()
+    back = brought_back("Color", recovery)
+    # Changed by hand while the same recovery goes on, without a category or at the root still.
+    gloss.notes = "Ask about the shade"
+    gloss.save()
+    toning.icon = "ion:color-palette-outline"
+    toning.save()
+    in_copy = [
+        a_category_of_the_copy(gone, service_ids=[cut.pk, gloss.pk]),
+        a_category_of_the_copy(kids, parent_id=gone.pk),
+        a_category_of_the_copy(toning, parent_id=gone.pk),
+    ]
+
+    with giving_back(recovery):
+        services = queries.service_links_not_in_business(in_copy)
+        subcategories = queries.subcategory_links_not_in_business(in_copy)
+    # Another recovery at work, asked again: what the business touched since stays out, and nothing says otherwise.
+    with giving_back(a_recovery()):
+        services_again = queries.service_links_not_in_business(in_copy)
+        subcategories_again = queries.subcategory_links_not_in_business(in_copy)
+
+    assert services == [{"id": one.pk, "service_id": one.pk, "category_id": back.pk} for one in (cut, gloss)]
+    assert subcategories == [
+        {"id": one.pk, "category_id": one.pk, "parent_id": back.pk, "stands_for": gone.pk} for one in (kids, toning)
+    ]
+    assert services_again == services[:1]
+    assert subcategories_again == subcategories[:1]
+
+
+def test_one_the_business_changed_after_its_category_came_back_stays_as_it_is_and_says_why():
+    tax = make_tax("test.service", "Service — test")
+    gloss, toning = make_service("Gloss", tax=tax), make_category("Toning")
+    recovery = a_recovery()
+    [service], [subcategory] = links_of(recovery, services=[gloss], subcategories=[toning])
+    # Changed by hand once the category was back, neither moved.
+    Service.objects.filter(pk=gloss.pk).update(price=3600, updated_at=timezone.now())
+    Category.objects.filter(pk=toning.pk).update(icon="ion:color-palette-outline", updated_at=timezone.now())
+
+    with pytest.raises(Conflict) as changed:
+        create(service, "service.service.return_to_category", recovery)
+    with pytest.raises(Conflict) as changed_too:
+        create(subcategory, "service.category.return_to_parent", recovery)
+
+    assert (changed.value.code, changed_too.value.code) == ("service.service_changed", "service.subcategory_changed")
+    assert str(gloss.pk) in changed.value.message and str(toning.pk) in changed_too.value.message
+    assert Service.objects.get(pk=gloss.pk).category_id is None
+    assert Category.objects.get(pk=toning.pk).parent_id is None
+
+
+def test_why_one_the_business_changed_stays_out_is_said_in_the_language_it_is_put_back_in():
+    tax = make_tax("test.service", "Service — test")
+    gloss, toning = make_service("Gloss", tax=tax), make_category("Toning")
+    recovery = a_recovery()
+    [service], [subcategory] = links_of(recovery, services=[gloss], subcategories=[toning])
+    Service.objects.filter(pk=gloss.pk).update(price=3600, updated_at=timezone.now())
+    Category.objects.filter(pk=toning.pk).update(icon="ion:color-palette-outline", updated_at=timezone.now())
+
+    with translation.override("es"):
+        with pytest.raises(Conflict) as changed:
+            create(service, "service.service.return_to_category", recovery)
+        with pytest.raises(Conflict) as changed_too:
+            create(subcategory, "service.category.return_to_parent", recovery)
+        spanish = (SERVICE_CHANGED_LEFT % {"service": gloss.pk}, SUBCATEGORY_CHANGED_LEFT % {"category": toning.pk})
+
+    assert (changed.value.message, changed_too.value.message) == spanish
+    assert changed.value.message != SERVICE_CHANGED_LEFT % {"service": gloss.pk}
+    assert changed_too.value.message != SUBCATEGORY_CHANGED_LEFT % {"category": toning.pk}
+
+
 def links_of(recovery: str, *, services=(), subcategories=()) -> tuple[list[dict], list[dict]]:
     """The links of a deleted Color with ``services`` and ``subcategories`` inside, read once ``recovery`` brought it
     back: each at the root still, untouched since."""
@@ -1451,6 +1530,50 @@ class TestServicesComeBack:
             ("Gloss", "Color"),
             ("Highlights", "Color"),
         ]
+
+    def test_what_the_business_changed_without_moving_while_its_category_came_back_stays_and_recoveries_says_so(
+        self, recoveries, every_app_on, monkeypatch
+    ):
+        hub, ids, color, copy = self.a_full_category(recoveries, every_app_on)
+        run_in(hub, "service.category.delete", id=color)
+        read_services = queries.services_not_in_business
+
+        def changed_while_the_services_come_back(services):
+            # The business, once the category is back: Gloss gets a new price and Toning an icon, neither moved.
+            gloss = Service.objects.get(pk=ids["gloss"])
+            gloss.price = 3600
+            gloss.save()
+            toning = Category.objects.get(pk=ids["toning"])
+            toning.icon = "ion:color-palette-outline"
+            toning.save()
+            return read_services(services)
+
+        monkeypatch.setattr(queries, "services_not_in_business", changed_while_the_services_come_back)
+
+        results = recovered(recoveries, copy)
+
+        service_reasons, subcategory_reasons = results[2]["reasons"], results[3]["reasons"]
+        assert results == [
+            CATEGORIES | {"created": 1},
+            SERVICES,
+            SERVICE_LINKS | {"created": 2, "not_created": 1, "reasons": service_reasons},
+            SUBCATEGORY_LINKS | {"not_created": 1, "reasons": subcategory_reasons},
+        ]
+        assert [(one["id"], one["reason"].split(":")[0]) for one in service_reasons] == [
+            (str(ids["gloss"]), "service.service_changed")
+        ]
+        assert [(one["id"], one["reason"].split(":")[0]) for one in subcategory_reasons] == [
+            (str(ids["toning"]), "service.subcategory_changed")
+        ]
+        assert str(ids["gloss"]) in service_reasons[0]["reason"]
+        assert str(ids["toning"]) in subcategory_reasons[0]["reason"]
+        # Each stays as the business left it; what it did not touch went back.
+        assert [one for one in in_categories(hub) if one[0] in {"Balayage", "Gloss", "Highlights"}] == [
+            ("Balayage", "Color"),
+            ("Gloss", None),
+            ("Highlights", "Color"),
+        ]
+        assert [one for one in live_categories(hub) if one[0] == "Toning"] == [("Toning", None, "", 0)]
 
     def test_asked_again_a_category_brought_back_is_the_businesss_and_is_not_filled_again(
         self, recoveries, every_app_on

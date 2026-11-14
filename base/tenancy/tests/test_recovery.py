@@ -764,6 +764,19 @@ class TestEachThingAnAppGivesBack:
         assert fresh(asked).results == [CUSTOMERS | {"created": 1}, GROUPS | {"created": 1}]
         assert live_groups(hub) == ["VIP"]
 
+    def test_what_an_app_reads_while_it_gives_back_knows_the_recovery_at_work_and_nothing_outside_one(
+        self, recoveries, every_app_on, monkeypatch
+    ):
+        seen = []
+        groups_given_back_too(monkeypatch, missing=lambda records: seen.append(base_recovery.at_work()) or [])
+        hub, _ = recoveries.business(every_app_on, ANA)
+        asked = recoveries.ask(recoveries.copy_of(hub))
+
+        assert run() == 1
+
+        assert seen == [base_recovery.actor_of(asked.pk)]
+        assert base_recovery.at_work() is None
+
     def test_what_an_app_refuses_for_all_ends_its_part_and_what_was_left_of_it_says_why(
         self, recoveries, every_app_on, monkeypatch
     ):

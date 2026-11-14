@@ -159,6 +159,9 @@ SUBCATEGORY_MOVED_LEFT = _("came back without the subcategory %(category)s: move
 SUBCATEGORY_LOOP_LEFT = _(
     "came back without the subcategory %(category)s: it would hang from one of its own subcategories"
 )
+#: Why one the business changed since the category came back, even without moving it, stays as it left it.
+SERVICE_CHANGED_LEFT = _("came back without the service %(service)s: changed by the business meanwhile")
+SUBCATEGORY_CHANGED_LEFT = _("came back without the subcategory %(category)s: changed by the business meanwhile")
 #: Why nothing the business kept goes back into a category a recovery brought back before this one.
 CATEGORY_BROUGHT_EARLIER = _(
     "the category %(category)s came back in an earlier recovery: what goes in it is the business's to decide"
@@ -864,6 +867,8 @@ def return_service_to_category(ctx: OperationContext, data: ServiceLinkIn) -> di
     service = find_service(data.service_id, None, lock=True)
     if service.category_id is not None:
         raise Conflict(str(SERVICE_MOVED_LEFT % {"service": service.pk}), code="service.service_moved")
+    if service.updated_at > category.created_at:
+        raise Conflict(str(SERVICE_CHANGED_LEFT % {"service": service.pk}), code="service.service_changed")
     _apply(service, {"category_id": category.id}, ctx)
     service.save()
     record_event(ctx, events.SERVICE_UPDATED, {"id": str(service.id)})
@@ -892,6 +897,8 @@ def return_subcategory_to_parent(ctx: OperationContext, data: SubcategoryLinkIn)
         raise Conflict(str(SUBCATEGORY_MOVED_LEFT % {"category": child.pk}), code="service.subcategory_moved")
     if parent_problem(child.pk, parent.pk, parent_of):
         raise Conflict(str(SUBCATEGORY_LOOP_LEFT % {"category": child.pk}), code="service.subcategory_loop")
+    if child.updated_at > parent.created_at:
+        raise Conflict(str(SUBCATEGORY_CHANGED_LEFT % {"category": child.pk}), code="service.subcategory_changed")
     _apply(child, {"parent_id": parent.id}, ctx)
     child.save()
     record_event(ctx, events.CATEGORY_UPDATED, {"id": str(child.id)})
