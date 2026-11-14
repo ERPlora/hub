@@ -1,5 +1,6 @@
 // flow: BASE-F114 (steps 6-11), CUSTOMER-F07, CUSTOMER-F33, CUSTOMER-F06, CUSTOMER-F04, INVENTORY-F01, INVENTORY-F04,
-// INVENTORY-F07, INVENTORY-F08, INVENTORY-F34, SERVICE-F01, SERVICE-F07, SERVICE-F08, SERVICE-F31, APPOINTMENT-F11: in the Hub
+// INVENTORY-F07, INVENTORY-F08, INVENTORY-F34, SERVICE-F01, SERVICE-F07, SERVICE-F08, SERVICE-F31, APPOINTMENT-F11,
+// PRICING-F14, PRICING-F15: in the Hub
 // admin, the ERPlora staff choose a separate copy of a business and bring back into it the customers, the products, the
 // services and the appointments it lost since, by their apps' own operations (never a copied row): a card, a product or
 // an appointment the business deleted and still holds comes back the same, with its history (the card with its group),
@@ -10,23 +11,24 @@
 // with the service the business kept without a category put back in it by Services, never the one it moved since,
 // which Recoveries names with why; and a service as a new
 // one, made by Services' create, into its category, and assigned by Services' assign to the professional who performed
-// it, with her own minutes and price, never to the one Staff terminated since, whom Recoveries names with why. At each
-// size: two cards in a group, the second with a tag and a custom field's
-// value, two products in their own category, a service in its own category, performed by two professionals of Staff, and
-// an appointment of another card with its own professional of `a` are made; in Hubs, «Restore to a separate copy…»
+// it, with her own minutes and price, never to the one Staff terminated since, whom Recoveries names with why; the
+// deleted product's price in a price list comes back too, put again by Price Lists' add. At each size: two cards in a
+// group, the second with a tag and a custom field's value, two products in their own category, the first priced in a
+// price list of its own, a service in its own category, performed by two professionals of Staff, and an appointment of
+// another card with its own professional of `a` are made; in Hubs, «Restore to a separate copy…»
 // asks a copy of `a` from a temporary cluster (the stack's own server) and the worker's pass makes it; the first card,
-// the first product, the products' category, the service's category and the appointment are deleted in `a`, the second
-// professional is terminated, the second
+// the first product (its price taken away, as the relay hands its deletion to Price Lists), the products' category, the
+// service's category and the appointment are deleted in `a`, the second professional is terminated, the second
 // card, the tag and the service are gone from it; then Separate copies › tick the copy › «Recover into the business…» ›
 // Customers, Products, Services and Appointments ticked (with whatever else answers) › «Recover»; the worker's pass
 // brings them back; Recoveries says how each thing came back, apart: «Customers: 1 restored, 1 created», «Product
 // categories: 1 created; Products: 1 restored; Product links to categories: 1 created» (the kept product's link),
 // «Service categories: 1 created, 1 with notes; Services: 1 created, 1 with notes» and «Appointments: 1 restored;
-// Repeating appointments: 0 created» (its series did not change), and its page notes that the service category came
-// back without the service moved since and the service without the terminated professional, and why; and `a` has the
-// same card live
+// Repeating appointments: 0 created» (its series did not change) and «Price list prices: 1 created», and its page notes
+// that the service category came back without the service moved since and the service without the terminated
+// professional, and why; and `a` has the same card live
 // again in its group, the second one again in that group with its tag and its value, the same product live again in
-// its category back under a new id, the kept product in it again, the same appointment (its number, its history
+// its category back under a new id with its price in its price list, the kept product in it again, the same appointment (its number, its history
 // ending in «restored») live again, and the service category and the service live again under new ids, the service in
 // that category and performed by that professional again; in its Agenda, the appointment's «History» ends in
 // «Restored» (APPOINTMENT-F10).
@@ -219,6 +221,8 @@ for (const { label, viewport } of SIZES) {
     const sku = `REC-${label}-${RUN}`;
     const shelf = inA('inventory.category.create', { name, color: '#33aa66' });
     const product = aProduct(name, sku, shelf);
+    const priceList = inA('pricing.price_list.create', { code: `REC-${label}-${RUN}`, name });
+    inA('pricing.price_item.add', { price_list_id: priceList, product_id: product, price: 900 });
     // Kept live by the business: deleting the category takes it out of it.
     const kept = aProduct(`Kept ${label} ${RUN}`, `KEPT-${label}-${RUN}`, shelf);
     const category = inA('service.category.create', { name, color: '#cc0066' });
@@ -253,6 +257,7 @@ for (const { label, viewport } of SIZES) {
     // Lost since: the card, the product, the product's category and the service's category deleted in the business.
     inA('customer.customer.delete', { id: card });
     inA('inventory.product.delete', { id: product });
+    inA('pricing.catalog.forget_product', { id: product });
     inA('inventory.category.delete', { id: shelf });
     inA('service.category.delete', { id: category });
     const elsewhere = inA('service.category.create', { name: `Elsewhere ${label} ${RUN}` });
@@ -261,6 +266,7 @@ for (const { label, viewport } of SIZES) {
     inA('staff.member.terminate', { id: leaving });
     expect(psql(`select count(*) from customer_customer where email = '${email}' and deleted_at is null`)).toBe('0');
     expect(psql(`select count(*) from inventory_product where sku = '${sku}' and not is_deleted`)).toBe('0');
+    expect(psql(`select count(*) from pricing_priceitem where product_id = '${product}'`)).toBe('0');
     expect(psql(`select count(*) from inventory_productcategory where product_id = '${kept}'`)).toBe('0');
     // The second card gone from the business altogether, with what hung from it (a lost database, or the Hub admin's
     // «Delete»), and the tag deleted by Customers' own operation.
@@ -288,6 +294,7 @@ for (const { label, viewport } of SIZES) {
     await expect(page.locator('input[name="apps"][value="inventory"]')).toBeChecked();
     await expect(page.locator('input[name="apps"][value="service"]')).toBeChecked();
     await expect(page.locator('input[name="apps"][value="appointment"]')).toBeChecked();
+    await expect(page.locator('input[name="apps"][value="pricing"]')).toBeChecked();
     await expect(page.getByText('nothing is ever copied', { exact: false })).toBeVisible();
     await expect(page.getByText('comes back as it was, with its history', { exact: false })).toBeVisible();
     // The one thing it touches of what the business has.
@@ -314,6 +321,7 @@ for (const { label, viewport } of SIZES) {
     // terminated: each counted, and said on its page.
     await expect(recovered).toContainText('Service categories: 1 created, 1 with notes; Services: 1 created, 1 with notes');
     await expect(recovered).toContainText('Appointments: 1 restored; Repeating appointments: 0 created');
+    await expect(recovered).toContainText('Price list prices: 1 created');
     await capture(page, `${KEY}-${label}-4-recoveries`, { fullPage: true });
     await recovered.locator('a').first().click();
     await expect(page.locator('.field-what .readonly')).toHaveText(/^(.+, )?Customers, (.+, )?Products, (.+, )?Services(, .+)?$/);
@@ -340,6 +348,8 @@ for (const { label, viewport } of SIZES) {
     // And the same product is live again, by Inventory's restore, and no new one was made.
     expect(psql(`select id from inventory_product where sku = '${sku}' and not is_deleted`)).toBe(product);
     expect(psql(`select count(*) from inventory_product where sku = '${sku}'`)).toBe('1');
+    // With its price in its price list again, put by Price Lists' add after Inventory brought the product back.
+    expect(psql(`select price from pricing_priceitem where product_id = '${product}' and price_list_id = '${priceList}'`)).toBe('900');
     // In its category, back before it: a new one, made by Categories' create, with its colour; the deleted one stays
     // deleted.
     const shelfBack = psql(`select id from inventory_category where name = '${name}' and not is_deleted`);
@@ -371,11 +381,16 @@ for (const { label, viewport } of SIZES) {
     expect(psql(`select count(*) from appointment_appointment where customer_name = 'Booked ${label} ${RUN}'`)).toBe('1');
     await context.close();
 
-    // In the business's Agenda, its «History» keeps its lines and ends in «Restored» (APPOINTMENT-F10).
+    // In the business's Agenda, its «History» keeps its lines and ends in «Restored» (APPOINTMENT-F10). The system booked
+    // and deleted it and the recovery brought it back: each line says the platform did it, never its internal mark.
     const agenda = await ownerPage(browser, `/appointment/agenda?date=${aMondayAt('10:00').slice(0, 10)}`, viewport);
     await rowAction(agenda.page, 'appointment-list', appointment, 'history');
     const history = agenda.page.locator('ion-modal[data-testid=appointment-history-modal]');
-    await expect(history.locator('[data-testid=appointment-history-entry]')).toHaveText([/^Booked/, /^Deleted/, /^Restored/]);
+    await expect(history.locator('[data-testid=appointment-history-entry]')).toHaveText([
+      /^Booked.* · Done by the platform$/,
+      /^Deleted.* · Done by the platform$/,
+      /^Restored.* · Done by the platform$/,
+    ]);
     await capture(agenda.page, `${KEY}-${label}-6-history`);
     await agenda.context.close();
   });

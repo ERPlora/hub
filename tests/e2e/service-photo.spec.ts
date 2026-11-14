@@ -12,7 +12,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, shown } from './helpers';
 import { dialog, PHOTO_PNG, photoLoaded, VIEWPORTS } from './inventory-helpers';
-import { drawerOff, restoreDrawer } from './sale-helpers';
+import { drawerOff, restoreDrawer, tilePhotoLoaded } from './sale-helpers';
 import { cleanUp, named, post, rowAction } from './service-helpers';
 
 interface Service {
@@ -99,8 +99,7 @@ test('SERVICE-F34: a library image, Hair and Beauty first, is the service’s ph
   await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
   await shown(page).locator('[data-testid=pos-category-services]').click();
   const tile = shown(page).locator(`[data-testid=pos-service-${highlights.id}]`);
-  await expect(tile.locator('.pos-tile__thumb img')).toHaveAttribute('src', LIBRARY_URL);
-  expect(await photoLoaded(tile.locator('.pos-tile__thumb'))).toBe(512);
+  expect(await tilePhotoLoaded(tile, highlights.name, LIBRARY_URL)).toBe(512);
 });
 
 test('SERVICE-F35: a photo of its own goes up with «Save changes» and comes back as a 512 × 512 WebP', async ({ page }) => {

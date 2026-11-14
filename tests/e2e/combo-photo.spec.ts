@@ -11,7 +11,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, psql, shown } from './helpers';
 import { cleanInventory, createProduct, dialog, PHOTO_PNG, photoLoaded, stamp, VIEWPORTS } from './inventory-helpers';
-import { drawerOff, restoreDrawer } from './sale-helpers';
+import { drawerOff, restoreDrawer, tilePhotoLoaded } from './sale-helpers';
 import { rowAction } from './service-helpers';
 
 interface Menu {
@@ -116,10 +116,7 @@ test('COMBO-F14: a library image is the menu’s photo in the list and on its ti
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     const tile = shown(page).locator(`[data-testid=pos-menu-${daily.id}]`);
     await tile.scrollIntoViewIfNeeded();
-    // The tile's photo as the till shows it, named after its menu: no style class of the tile, which a restyle renames.
-    const photo = tile.getByAltText(daily.name, { exact: true });
-    await expect(photo).toHaveAttribute('src', LIBRARY_URL);
-    expect(await photoLoaded(photo.locator('xpath=..'))).toBe(512);
+    expect(await tilePhotoLoaded(tile, daily.name, LIBRARY_URL)).toBe(512);
     await capture(page, `APP-COMBO-F14-${viewport.label}`);
   }
 });

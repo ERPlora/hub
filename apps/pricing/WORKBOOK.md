@@ -202,7 +202,8 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | PRICING-F11 | Editar una regla | hecho |
 | PRICING-F12 | Desactivar o reactivar una regla | hecho |
 | PRICING-F13 | Consultar el precio de una línea | hecho |
-| PRICING-F14 | Cuando se borra un producto, una categoría o un grupo, o cambia un servicio | hecho |
+| PRICING-F14 | Cuando se borra o vuelve un producto, se borra una categoría o un grupo, o cambia un servicio | hecho |
+| PRICING-F15 | Recuperar los precios de tarifa desde una copia aparte | hecho |
 
 ### PRICING-F01 Ver las tarifas
 <!-- origen: fi:modules/pricing#navigation-lists-erp-pricing-lists fi:modules/pricing#permission-pricing-view_pricing-manage_pricing-apply_pricing fi:modules/pricing#query-pricing-price_lists-list-expose_api old:pricing/WORKFLOW.md#pricing-f01 -->
@@ -454,7 +455,7 @@ lista), una tarifa concreta que no existe, está desactivada o no está vigente 
 cantidad que no es mayor que 0.
 Implicados: Inventario, Servicios, Clientes, Ventas
 
-### PRICING-F14 Cuando se borra un producto, una categoría o un grupo, o cambia un servicio
+### PRICING-F14 Cuando se borra o vuelve un producto, se borra una categoría o un grupo, o cambia un servicio
 <!-- origen: nuevo (lo piden los borrados y cambios de Inventario, Clientes y Servicios sobre lo que señala una tarifa o una regla) -->
 Estado: hecho (no tiene pantalla: lo hace la app sola, unos segundos después del cambio de la otra)
 Actor: sistema
@@ -467,13 +468,45 @@ Pasos:
    desactivan (nunca pasa a valer para todos un descuento de un grupo).
 4. Servicios cambia un servicio (`service.service.updated`): Tarifas copia su nombre nuevo en sus
    precios y sus reglas.
+5. El personal de ERPlora recupera desde una copia aparte un producto que el negocio eliminó y aún guarda
+   (`inventory.product.restored`, INVENTORY-F34): Tarifas vuelve a activar las reglas de ese producto que
+   desactivó al borrarlo. Sus precios se borraron: vuelven con la recuperación de Tarifas (PRICING-F15).
 Entra: el aviso.
 Sale: `pricing.price_item.removed`, `pricing.rule.deactivated`, `pricing.price_list.updated` o
-`pricing.price_item.updated` y `pricing.rule.updated`. Repetir el aviso no cambia nada.
+`pricing.price_item.updated` y `pricing.rule.updated`; con un producto que vuelve, `pricing.rule.activated`.
+Repetir el aviso no cambia nada.
 Si falla: se reintenta solo, cada vez más espaciado (hasta una hora entre intentos), y tras ocho intentos se
 da por perdido y queda anotado. Mientras tanto, un producto o una categoría borrados ya no salen en los precios
-y un grupo borrado no vale para nadie (se mira al leer).
-Implicados: Inventario, Clientes, Servicios
+y un grupo borrado no vale para nadie (se mira al leer). Con un producto que vuelve, una regla que el negocio
+desactivó o cambió a mano mientras estaba borrado, o cuyo grupo ya no existe, se queda como está; si el producto se
+volvió a borrar antes de que llegue el aviso, no se activa ninguna.
+Implicados: Inventario, Clientes, Servicios, INVENTORY-F34, PRICING-F15
+
+### PRICING-F15 Recuperar los precios de tarifa desde una copia aparte
+<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus precios de tarifa) gh:hub#1343 -->
+Estado: hecho
+Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide (BASE-F114)
+Pantalla: ninguna de Tarifas: en el admin de Hubs, Copias aparte › «Recuperar en el negocio…», con **Precios de
+tarifa** marcado (lo está, como todo lo que se puede traer)
+Pasos:
+1. El personal recupera desde una copia aparte con **Precios de tarifa** marcado. Tarifas va siempre después de
+   Inventario, se pida en el orden que se pida: un producto eliminado que vuelve ya está vivo cuando se ponen sus
+   precios.
+2. Cada precio de la copia (de un producto vivo en ella o de un servicio) que el negocio ya no tiene vuelve a su
+   tarifa, con su precio y su «desde cantidad», puesto como lo pone el detalle de la tarifa (PRICING-F07).
+3. Recuperaciones lo cuenta aparte: «Precios de tarifa: se crearon 2».
+Entra: la copia aparte y lo que el negocio tiene hoy.
+Sale: un precio por cada uno que faltaba, con su aviso de precio puesto (`pricing.price_item.added`) hecho por la
+recuperación, así que no arranca ninguna automatización (FLOW-F21); nada más.
+Si falla: un precio que el negocio aún tiene, aunque le cambiara el importe o la «desde cantidad», se queda como está, y
+no se repite uno cuyo sitio (la misma tarifa, el mismo producto o servicio y la misma «desde cantidad») el negocio ya
+volvió a ocupar, al precio que sea: se queda el suyo, y pedirlo otra vez no pone nada dos veces. Un precio que el negocio quitó a mano después de la copia también vuelve, como todo lo que el negocio ya no
+tiene (BASE-F114). Lo que el detalle de la tarifa no acepta hoy no vuelve y Recuperaciones dice por qué: una tarifa
+desactivada («pricing.price_list_unavailable: …»), un producto que sigue eliminado (no se recuperó Productos, o el
+negocio ya hizo otro con su SKU: «not_found: …»), un servicio que ya no está o Servicios apagada. Un producto que el
+negocio ya no tenía en absoluto vuelve como uno nuevo, con otro identificador (INVENTORY-F01), y sus precios de la copia
+no vuelven con él (hub#1442).
+Implicados: BASE-F114, INVENTORY-F34, PRICING-F07, PRICING-F14
 
 ## Servicios: lo que entra y lo que sale
 
@@ -506,7 +539,7 @@ por su id, su nombre, su teléfono o su correo. Si un nombre vale para varios, s
 | Elige o quita la tarifa general | gestionar | F04 | `pricing.price_list.set_default` |
 | Desactiva una tarifa | gestionar | F05 | `pricing.price_list.deactivate` |
 | Reactiva una tarifa | gestionar | F05 | `pricing.price_list.activate` |
-| Pone el precio de un producto o un servicio en una tarifa | gestionar | F07 | `pricing.price_item.add` |
+| Pone el precio de un producto o un servicio en una tarifa | gestionar | F07, F15 | `pricing.price_item.add` |
 | Cambia un precio | gestionar | F08 | `pricing.price_item.update` |
 | Quita un precio | gestionar | F08 | `pricing.price_item.remove` |
 | Crea una regla | gestionar | F10 | `pricing.rule.create` |
@@ -514,6 +547,7 @@ por su id, su nombre, su teléfono o su correo. Si un nombre vale para varios, s
 | Desactiva una regla | gestionar | F12 | `pricing.rule.deactivate` |
 | Reactiva una regla | gestionar | F12 | `pricing.rule.activate` |
 | Olvida un producto borrado | solo la plataforma | F14 | `pricing.catalog.forget_product` |
+| Vuelve a activar las reglas de un producto recuperado | solo la plataforma | F14 | `pricing.catalog.recall_product` |
 | Olvida una categoría borrada | solo la plataforma | F14 | `pricing.catalog.forget_category` |
 | Olvida un grupo de clientes borrado | solo la plataforma | F14 | `pricing.catalog.forget_group` |
 | Copia el nombre nuevo de un servicio | solo la plataforma | F14 | `pricing.catalog.refresh_service` |
@@ -530,12 +564,12 @@ desactivar y las reglas, solo desde el Hub o el asistente.
 | Tarifa cambiada | Editar con algún cambio, o su grupo borrado | `id` | `pricing.price_list.updated` |
 | Tarifa general cambiada | Elegirla o quitarla | `id`, `is_default`, `previous_id` | `pricing.price_list.default_changed` |
 | Tarifa desactivada / reactivada | Desactivar / activar | `id` | `pricing.price_list.deactivated`, `…activated` |
-| Precio puesto | Añadir | `id`, `price_list_id`, `product_id` o `service_id`, `min_quantity`, `price` | `pricing.price_item.added` |
+| Precio puesto | Añadir, o recuperarlo desde una copia aparte | `id`, `price_list_id`, `product_id` o `service_id`, `min_quantity`, `price` | `pricing.price_item.added` |
 | Precio cambiado | Editar, o el nombre nuevo de un servicio | `id` (o `service_id`) | `pricing.price_item.updated` |
 | Precio quitado | Quitar, o el producto borrado | `id`, `price_list_id` | `pricing.price_item.removed` |
 | Regla nueva | Crear | `id`, `code` | `pricing.rule.created` |
 | Regla cambiada | Editar, o el nombre nuevo de un servicio | `id` | `pricing.rule.updated` |
-| Regla desactivada / reactivada | Desactivar / activar, o su producto, categoría o grupo borrados | `id` | `pricing.rule.deactivated`, `…activated` |
+| Regla desactivada / reactivada | Desactivar / activar, o su producto, categoría o grupo borrados (reactivada: su producto recuperado) | `id` | `pricing.rule.deactivated`, `…activated` |
 
 Ninguna app los escucha salvo **Automatizaciones**, que puede arrancar una automatización con cualquiera
 de ellos (FLOW-F21). Sus pasos también pueden consultar tarifas, precios, reglas y el precio de una
@@ -544,8 +578,8 @@ poner o cambiar un precio y crear, cambiar o reactivar una regla.
 
 ### A qué reacciona y lo que necesita de otras apps
 - **Inventario** (`requires`): los precios y las reglas apuntan a sus productos y categorías; Tarifas lee
-  su nombre, SKU, unidad, escalón y precio de ficha. Reacciona a `inventory.product.deleted` y
-  `inventory.category.deleted` (F14).
+  su nombre, SKU, unidad, escalón y precio de ficha. Reacciona a `inventory.product.deleted`,
+  `inventory.product.restored` y `inventory.category.deleted` (F14).
 - **Clientes** (`requires`): una tarifa o una regla puede ser de un grupo; el precio de una línea lee los
   grupos activos del cliente (un grupo desactivado deja de dar sus precios y sus reglas). Si Clientes
   **borra** un grupo (`customer.group.deleted`), sus tarifas se quedan sin grupo y sus reglas se
@@ -553,7 +587,8 @@ poner o cambiar un precio y crear, cambiar o reactivar una regla.
 - **Servicios** (no es requisito): un precio o una regla de un servicio guarda su id y una copia de su
   nombre; el servicio se comprueba y su precio de ficha se lee con `service.service.get`, con la sesión
   de quien pide. Reacciona a `service.service.updated` (F14).
-- De la plataforma: la zona horaria del negocio (el «hoy» de las fechas).
+- De la plataforma: la zona horaria del negocio (el «hoy» de las fechas) y la recuperación desde una copia aparte
+  (BASE-F114), a la que Tarifas dice qué precios devuelve (F15).
 
 ### Contrato con Ventas
 Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas (no lo hace esta app):
@@ -680,6 +715,14 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
 - Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD (desde el corte S5,
   hub#602): los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
   en la misma BD de test (`base/tenancy/tests/legacy.py`, hasta hub#611).
+- **Desde una copia aparte** (BASE-F114, F15): `recoverable_from_copy` de `apps.py` declara una sola cosa, «Price
+  list prices». `queries.prices_in_copy` lee con su propio SQL los `PriceItem` de la copia que cuentan allí (de un
+  servicio o de un producto no borrado, como `live_items`) y `queries.prices_not_in_business` deja los que el negocio no
+  tiene ni por id ni por sitio (tarifa, producto o servicio y `min_quantity`, el índice único); la plataforma los crea
+  con `pricing.price_item.add` como la recuperación (`copy_recovery:<id>`). Las reglas no van por la copia: el borrado
+  solo las apaga, y `pricing.catalog.recall_product` (la reacción a `inventory.product.restored`) enciende las del
+  producto que siguen apagadas con el `updated_by` de la plataforma, el mismo con el que `forget_product` las apagó.
+  Las lee con `select_for_update`: un cambio a mano a la vez espera a que acabe (`tests/test_concurrency.py`).
 - **Orden de las tablas** (`base.ordering.list_order`, nota vigente del producto actual del 2026-09-28, hub#2355, como Ventas,
   Caja, Inventario y Tareas): la columna elegida y después el desempate, todo en la dirección de la lista y
   con los vacíos al final en las dos; `desc` es `asc` leído al revés, empates incluidos. Tarifas y reglas

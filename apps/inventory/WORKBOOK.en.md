@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ba8402f0abae83218c788a0d06860d68cb13da1ca9cf46164d21a1139f6bbd40 -->
+<!-- generated from WORKBOOK.md sha256:e401b7c902280a03558a3d4d6d739fe15f315e056b542601ff8b48b3b041743b -->
 
 ## What it is for and who it is for
 
@@ -1099,11 +1099,12 @@ it deleted it: the one it made stays, and the recovery neither counts nor create
 has at all is created again (INVENTORY-F01), with no stock, with the image of the library it had in the copy. On a
 live product it does not fail: it answers well and announces again. Its own photo does not come back: it was erased
 when it was deleted (INVENTORY-F31). The image of the library does, because deleting leaves it; one deleted before
-deleting left it comes back without it (hub#1431). What the other apps hung from it (its prices in the price lists,
-its modifier groups, its options in the menus) was erased when it was deleted and does not come back with it yet
+deleting left it comes back without it (hub#1431). Its discount rules in Price Lists are switched back on by
+themselves (PRICING-F14) and its prices in the price lists come back if Price Lists is recovered too (PRICING-F15).
+Its modifier groups and its options in the menus were erased when it was deleted and do not come back with it yet
 (hub#1343).
 Involved: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29, INVENTORY-F30,
-PRICING-F14, MODIFIER-F09, COMBO-F13
+PRICING-F14, PRICING-F15, MODIFIER-F09, COMBO-F13
 
 ## What the verticals share
 

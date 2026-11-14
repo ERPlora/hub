@@ -126,6 +126,12 @@ def carried(actor: str) -> bool:
     )
 
 
+def by_platform(actor: str) -> bool:
+    """Whether ``actor``, as an app keeps who did something, is no one but the platform: no one, the system
+    (``live.context.system_context``) or an actor that is passed on (``carried``). A person and an API key are named."""
+    return not actor or actor == "system" or carried(actor)
+
+
 @checks.register("base")
 def check_carried_actors(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
     """``base.E017``: an app declares in ``carried_actors`` a list of prefixes of its own actors: each its label and
