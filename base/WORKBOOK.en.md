@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4c3dcffe65718079ee7caefc510f9aec4a8b3c82269084bf51008f4ad46dfb90 -->
+<!-- generated from WORKBOOK.md sha256:fe7b49f163afb656eb15a84d9ad6b70f49712f9d8d35f0c83df3401bf0ef6fff -->
 
 ## What it is for and who it is for
 
@@ -2933,10 +2933,11 @@ Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APP
 ### BASE-F114 Put a business back as it was at a past moment from the Hub admin
 Status: done (the action and the restore, in its place or to a separate copy, and getting back from the separate copy
 the customers that were lost, the deleted ones as they were, the products, the services with their categories, the
-appointments and the repeating appointments; making and deleting the temporary cluster is the procedure "Devolver un
-negocio a un momento" of ERPlora/aws; the image of a product deleted before deleting left it, hub#1431; the page "Recover into the
-business…" naming the exception of what goes back into a recovered category, hub#1364; the image of a service brought
-back, hub#1429)
+appointments, the repeating appointments and the price list prices; making and deleting the temporary cluster is the
+procedure "Devolver un negocio a un momento" of ERPlora/aws; the image of a product deleted before deleting left it, hub#1431; the page
+"Recover into the business…" naming the exception of what goes back into a recovered category, hub#1364; the image of a
+service brought back, hub#1429; the modifier groups and the menu options of a product that comes back, hub#1343; the
+price list prices of a product that comes back as a new one, hub#1442)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -2974,10 +2975,10 @@ Steps:
      what comes back is nothing new to the business: it starts none of its automations, so nobody is welcomed or told
      again of a booking they already had (hub#1307). Below, "What to bring back", with what can be brought ticked
      (today, **Customers**, **Product categories, Products, Product links to categories**, **Service categories,
-     Services** and **Appointments, Repeating appointments**). They press **Recover**.
+     Services**, **Appointments, Repeating appointments** and **Price list prices**). They press **Recover**.
   10. "1 separate copy will give back Customers, Product categories, Products, Product links to categories, Service
-      categories, Services, Appointments, Repeating appointments into its business within a few minutes: Recoveries
-      says how it went." appears.
+      categories, Services, Appointments, Repeating appointments, Price list prices into its business within a few
+      minutes: Recoveries says how it went." appears.
       In Recoveries they
       see it "Asked" with the copy, what
       was asked and when.
@@ -3061,6 +3062,13 @@ Steps:
       appointment already came back. If its customer is gone or its professional or one of its services can no longer be
       booked, it does not come back and its reason says why; one the business created again (the same customer,
       repeating the same way on the same day at the same time) stays as it is.
+      The price list prices always go after the products: "Price list prices: 2 created". Each price of the copy the
+      business no longer has comes back to its price list, with its price and its "from quantity", put as the price
+      list's detail puts it, so a deleted product that comes back gets its prices back in the price lists it was in
+      (PRICING-F15). One whose place (the same price list, the same product or service and the same "from quantity")
+      the business has taken again is not repeated: the business's own stays. One the price list does not accept today
+      (deactivated, or its product still deleted) does not come back and its reason says so. The product's discount
+      rules, which deleting it only switched off, are switched back on by themselves with it (PRICING-F14).
 In: the chosen businesses, the temporary cluster with their copy and the moment; to recover, the made separate copy and
 what to bring back.
 Out: the business's database as it was at that moment; the one it had, kept 7 days on its server; the notice
@@ -3081,13 +3089,14 @@ no longer had, with its service-created notice (`service.service.created`) and a
 (`service.assignment.assigned`) for each professional who comes back with it, each deleted appointment it still held,
 live again with its appointment-recovered notice (`appointment.appointment.restored`), a new appointment for each one
 it no longer had, with its appointment-created notice (`appointment.appointment.created`), each deleted repeating
-appointment it still held, active again with its series-recovered notice (`appointment.recurring.restored`), and a new
+appointment it still held, active again with its series-recovered notice (`appointment.recurring.restored`), a new
 repeating appointment for each one it no longer had, with its series-created notice (`appointment.recurring.created`)
-and that of each appointment it books, and nothing else. Each of
+and that of each appointment it books, and a price list price for each one it lacked, with its price-put notice
+(`pricing.price_item.added`), and nothing else. Each of
 those notices says the recovery did it (its actor is `copy_recovery:<id>`, that of the row in Recoveries), so no
 automation of the business starts on them (FLOW-F21), whether of something created or of something recovered; what only
 brings the business's own data up to date with them goes on the same (the WhatsApp Inbox links its conversation to the
-card), and what it records in doing so carries the same mark, so none starts from it either, first or second hand (the
+card; Price Lists switches back on the rules of the product that comes back, `pricing.rule.activated`), and what it records in doing so carries the same mark, so none starts from it either, first or second hand (the
 conversation linked again does not start "a WhatsApp conversation is linked to a customer"; hub#1365). The
 copy, untouched; the notice `control.copy.recovery_requested` with who asked for it.
 If it fails: what the restore does not accept is said in the notice, business by business, and that business is not
@@ -3120,7 +3129,7 @@ support staff see the list, Separate copies and Recoveries, but not the actions.
 Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
 INVENTORY-F07, INVENTORY-F30, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08,
-SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, FLOW-F21,
-WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319,
-hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1355, hub#1356, hub#1365, hub#1373, hub#1375,
-hub#1429, hub#1431, aws#77
+SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, PRICING-F07,
+PRICING-F14, PRICING-F15, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284,
+hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1343,
+hub#1355, hub#1356, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1442, aws#77

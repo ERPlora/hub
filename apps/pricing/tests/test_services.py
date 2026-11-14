@@ -431,6 +431,63 @@ def test_a_deleted_product_leaves_no_price_and_switches_its_rules_off_once():
     assert (again.items, again.rules) == (0, 0)
 
 
+def deleted(product, is_deleted: bool = True) -> None:
+    """``product`` deleted in Inventory (or back, the same one, from the separate copy: INVENTORY-F34)."""
+    type(product).objects.filter(pk=product.pk).update(is_deleted=is_deleted)
+
+
+def test_a_restored_product_switches_back_on_only_the_rules_its_deletion_switched_off():
+    product = make_product("Shampoo", "SH-1")
+    other = make_product("Gel", "GE")
+    gone = make_rule("PROD", applies_to="product", product=product)
+    by_hand = make_rule("HAND", applies_to="product", product=product)
+    touched = make_rule("EDIT", applies_to="product", product=product)
+    make_rule("OTHER", applies_to="product", product=other)
+    run("pricing.rule.deactivate", {"id": str(by_hand.id)})
+    deleted(product)
+    deleted(other)
+    react("pricing.catalog.forget_product", {"id": str(product.id)})
+    react("pricing.catalog.forget_product", {"id": str(other.id)})
+    # Off since, the business renamed it: it stays as the business left it.
+    run("pricing.rule.update", {"id": str(touched.id), "name": "Renamed"})
+    OutboxEvent.objects.all().delete()
+    deleted(product, False)
+
+    answer = react("pricing.catalog.recall_product", {"id": str(product.id), "sku": "SH-1", "name": "Shampoo"})
+
+    assert (answer.lists, answer.items, answer.rules) == (0, 0, 1)
+    assert dict(DiscountRule.objects.values_list("code", "is_active")) == {
+        "PROD": True,
+        "HAND": False,
+        "EDIT": False,
+        "OTHER": False,
+    }
+    assert DiscountRule.objects.get(pk=gone.pk).updated_by == "system"
+    assert events("pricing.rule.activated") == [{"id": str(gone.id)}]
+    assert events("pricing.rule.deactivated") == []
+    again = react("pricing.catalog.recall_product", {"id": str(product.id)})
+    assert again.rules == 0 and len(events("pricing.rule.activated")) == 1
+
+
+def test_a_product_deleted_again_or_a_group_gone_leaves_its_rules_off():
+    product = make_product()
+    group = make_group("VIP")
+    plain = make_rule("PROD", applies_to="product", product=product)
+    vip = make_rule("VIP", applies_to="product", product=product, customer_group_id=group.id)
+    deleted(product)
+    react("pricing.catalog.forget_product", {"id": str(product.id)})
+    # The event of its restore reaches Tarifas after the product was deleted again: nothing to switch on.
+    assert react("pricing.catalog.recall_product", {"id": str(product.id)}).rules == 0
+    group.delete()
+    deleted(product, False)
+
+    # A rule of a group Customers deleted would apply to nobody: it stays off, the others come back.
+    assert react("pricing.catalog.recall_product", {"id": str(product.id)}).rules == 1
+    plain.refresh_from_db()
+    vip.refresh_from_db()
+    assert (plain.is_active, vip.is_active) == (True, False)
+
+
 def test_a_deleted_category_switches_its_rules_off():
     category = make_category("Colour")
     rule = make_rule("CAT", applies_to="category", category=category)
@@ -467,9 +524,10 @@ def test_a_renamed_service_is_renamed_in_its_prices_and_rules():
     assert react("pricing.catalog.refresh_service", {"id": str(haircut.id)}).items == 0
 
 
-def test_a_reaction_is_no_person_s():
+@pytest.mark.parametrize("name", ["pricing.catalog.forget_product", "pricing.catalog.recall_product"])
+def test_a_reaction_is_no_person_s(name):
     product = make_product()
-    refused(PermissionDenied, "pricing.catalog.forget_product", {"id": str(product.id)})
+    refused(PermissionDenied, name, {"id": str(product.id)})
 
 
 # Notifications: after the COMMIT, on the channel of the command's scope only

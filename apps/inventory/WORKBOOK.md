@@ -1161,11 +1161,12 @@ Si falla: no vuelve si el negocio ya hizo otro producto con su SKU o su EAN-13 d
 hizo, y la recuperación no lo cuenta ni lo crea. Un producto que el negocio ya no tiene en absoluto se crea de nuevo
 (INVENTORY-F01), sin stock, con la imagen de la librería que tenía en la copia. Sobre un producto vivo no falla:
 responde bien y vuelve a avisar. Su foto propia no vuelve: se borró al eliminarlo (INVENTORY-F31). La imagen de la
-librería sí, porque eliminar se la deja; uno eliminado antes de que se la dejara vuelve sin ella (hub#1431). Lo que
-las demás apps le colgaban (sus precios en las tarifas, sus grupos de suplementos, sus opciones en los menús) se borró
-al eliminarlo y todavía no vuelve con él (hub#1343).
+librería sí, porque eliminar se la deja; uno eliminado antes de que se la dejara vuelve sin ella (hub#1431). Sus
+reglas de descuento de Tarifas se vuelven a activar solas (PRICING-F14) y sus precios en las tarifas vuelven si se
+recupera también Tarifas (PRICING-F15). Sus grupos de suplementos y sus opciones en los menús se borraron al
+eliminarlo y todavía no vuelven con él (hub#1343).
 Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29, INVENTORY-F30,
-PRICING-F14, MODIFIER-F09, COMBO-F13
+PRICING-F14, PRICING-F15, MODIFIER-F09, COMBO-F13
 
 ## Qué comparten los verticales
 

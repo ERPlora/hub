@@ -57,9 +57,10 @@ def test_every_event_is_app_entity_fact_in_the_past_and_listed_once():
     assert events.PRICE_LIST_EVENTS + events.PRICE_ITEM_EVENTS + events.RULE_EVENTS == events.ALL
 
 
-def test_it_reacts_to_what_deletes_or_renames_what_it_points_at():
+def test_it_reacts_to_what_deletes_restores_or_renames_what_it_points_at():
     assert events.REACTIONS == {
         "inventory.product.deleted": "pricing.catalog.forget_product",
+        "inventory.product.restored": "pricing.catalog.recall_product",
         "inventory.category.deleted": "pricing.catalog.forget_category",
         "customer.group.deleted": "pricing.catalog.forget_group",
         "service.service.updated": "pricing.catalog.refresh_service",

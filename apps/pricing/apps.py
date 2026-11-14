@@ -44,3 +44,20 @@ class PricingConfig(LiveAppConfig):
     navigation = [
         Nav("lists", _("Price Lists"), "ion:pricetag", "/pricing/lists"),
     ]
+
+    def recoverable_from_copy(self) -> list:
+        """What a separate copy of the business gives back when ERPlora's staff recovers from it (BASE-F114): each price
+        the business no longer has, put back by ``pricing.price_item.add``, the list detail's own, where the business
+        has not priced that place again. It goes after Inventory, so a deleted product is back before its prices."""
+        from apps.pricing import queries  # the models are not loaded yet when this module is
+        from base.recovery import Recoverable
+
+        return [
+            Recoverable(
+                label=_("Price list prices"),
+                reads_since="0001_initial",
+                read=queries.prices_in_copy,
+                missing=queries.prices_not_in_business,
+                create="pricing.price_item.add",
+            )
+        ]

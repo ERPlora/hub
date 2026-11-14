@@ -15,16 +15,17 @@ from apps.pricing.events import (
     PRICE_ITEM_REMOVED,
     PRICE_LIST_EVENTS,
     PRODUCT_DELETED,
+    PRODUCT_RESTORED,
     PRODUCT_UPDATED,
     RULE_EVENTS,
 )
 
 GROUP = [GROUP_UPDATED, GROUP_DELETED]
-PRODUCT = [PRODUCT_UPDATED, PRODUCT_DELETED]
+PRODUCT = [PRODUCT_UPDATED, PRODUCT_DELETED, PRODUCT_RESTORED]
 CATEGORY = [CATEGORY_UPDATED, CATEGORY_DELETED]
 
-# A list row names its group and counts its live prices (a deleted product's no longer count).
-LIST_ROW = [*PRICE_LIST_EVENTS, PRICE_ITEM_ADDED, PRICE_ITEM_REMOVED, *GROUP, PRODUCT_DELETED]
+# A list row names its group and counts its live prices (a deleted product's no longer count, a restored one's again).
+LIST_ROW = [*PRICE_LIST_EVENTS, PRICE_ITEM_ADDED, PRICE_ITEM_REMOVED, *GROUP, PRODUCT_DELETED, PRODUCT_RESTORED]
 live("pricing.price_list.list", on=LIST_ROW)
 live("pricing.price_list.get", on=LIST_ROW)
 # A price row shows its list's code and its product's name, SKU, unit and catalog price.
