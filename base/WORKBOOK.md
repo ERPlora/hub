@@ -3064,8 +3064,7 @@ Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, A
 Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte, y recuperar desde la copia aparte los
 clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías, las citas,
 las citas periódicas y los precios de tarifa; crear y borrar el clúster temporal es el procedimiento «Devolver un negocio
-a un momento» de ERPlora/aws; el grupo, la etiqueta o el campo propio que el negocio borró después de eliminar un cliente que
-vuelve, hub#1356; la imagen de un producto eliminado antes de que eliminar se la dejara, hub#1431; que la página
+a un momento» de ERPlora/aws; la imagen de un producto eliminado antes de que eliminar se la dejara, hub#1431; que la página
 «Recuperar en el negocio…» nombre la excepción de lo que vuelve a una categoría recuperada, hub#1364; la imagen de un
 servicio recuperado, hub#1429; los grupos de suplementos y las opciones de menú de un producto que vuelve, hub#1343;
 los precios de tarifa de un producto que vuelve como uno nuevo, hub#1442)
@@ -3121,8 +3120,10 @@ Pasos:
       contacto, NIF, dirección, fechas, origen, etapa, canal y notas, y con sus grupos, etiquetas y campos propios: el
       grupo, la etiqueta o el campo que el negocio tiene con ese nombre es ese, sin hacer otro, y el que ya no tiene se
       vuelve a crear como estaba (hub#1285); un valor de un campo que el negocio desactivó no vuelve. A una ficha
-      eliminada que vuelve no le vuelve el grupo, la etiqueta o el campo que el negocio borró después (hub#1356). Nunca
-      vuelve una ficha cuyos datos personales se borraron (RGPD) ni una que se unió a otra, ni se repite una que el
+      eliminada que vuelve le vuelven también el grupo, la etiqueta o el campo propio que el negocio borró después, igual
+      que a la ficha nueva (hub#1356); lo que el negocio aún tiene se queda como está, aunque la sacara de un grupo o le
+      quitara un valor antes de eliminarla, y un valor que ya tiene en un campo que el negocio volvió a crear se queda.
+      Nunca vuelve una ficha cuyos datos personales se borraron (RGPD) ni una que se unió a otra, ni se repite una que el
       negocio ya volvió a crear (el mismo nombre, teléfono y email). Con Productos, «Categorías de productos: se
       creó 1; Productos: se restauró 1, se creó 1; Enlaces de productos a categorías: se creó 1» (las categorías, los
       productos y los enlaces que volvieron, cada uno con su cuenta): primero vuelve
@@ -3203,8 +3204,8 @@ Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 
 tal como estaba, sin tocarlo; una base aparte en su clúster con los datos de ese momento, cerrada a la aplicación y
 guardada 7 días; el aviso `control.hub.restore_aside_requested` con quién lo pidió. Al recuperar: en el negocio, cada ficha
 eliminada que aún guardaba, viva otra vez con su aviso de ficha recuperada (`customer.customer.restored`), una ficha
-nueva por cada cliente que ya no tenía, con su aviso de ficha creada (`customer.customer.created`) y los de sus grupos y
-etiquetas puestos (`customer.customer.groups_changed`, `customer.customer.tags_changed`), cada grupo, etiqueta o campo
+nueva por cada cliente que ya no tenía, con su aviso de ficha creada (`customer.customer.created`), y en las dos los de
+sus grupos y etiquetas puestos (`customer.customer.groups_changed`, `customer.customer.tags_changed`), cada grupo, etiqueta o campo
 propio que le faltaba hecho otra vez, con su aviso (`customer.group.created`, `customer.tag.created`,
 `customer.field.created`, y `customer.group.updated` o `customer.tag.updated` si estaba desactivado), una categoría de
 productos nueva por cada una que le faltaba, con su aviso de categoría creada (`inventory.category.created`) y el de cada
@@ -3246,7 +3247,8 @@ operación de crear no acepta hoy (un teléfono que ya no vale, un valor de un c
 ya no tiene activa, un servicio cuya categoría fiscal se desactivó (`service.tax_category_unknown`), una hora ocupada,
 una clienta que ya no está, un servicio que el negocio ya no tiene ni volvió a crear) se cuenta «sin crear» con su
 motivo, y lo demás vuelve; también una ficha eliminada que
-entretanto se unió a otra o se borró («customer.customer_unavailable: …»). Si la copia ya no está,
+entretanto se unió a otra o se borró («customer.customer_unavailable: …»), o con un valor que el campo que el negocio
+volvió a crear ya no admite, que sigue eliminada («customer.field_invalid_option: …»). Si la copia ya no está,
 la recuperación dice «No se pudo hacer» y por qué («recover_copy_unreadable: …»). Mientras el negocio se traslada o se
 restaura, la recuperación espera sin hacer nada. Con la plataforma congelada para una subida de la base de datos, la restauración espera, con el negocio en
 mantenimiento, hasta que se descongela. Con registros solo del entorno de pruebas, después se recupera la cadena
@@ -4202,12 +4204,14 @@ hub#1355, hub#1356, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1442, 
   dice cada app con el gancho `recoverable_from_copy` de su `LiveAppConfig` (una lista de `base.recovery.Recoverable`:
   `label`, `reads_since`, `read(conn)` por SQL sobre los nombres del modelo en su `queries.py`, `missing(records)` en su
   `queries.py` y `create`, la operación que crea cada uno; y, los dos o ninguno, `deleted(records)` en su `queries.py` y
-  `restore`, la operación que devuelve lo que el negocio guarda eliminado, por su `id`, hub#1306); `base/` no nombra
-  ninguna. Primero vuelve lo eliminado y después se crea lo que falta, con las operaciones de la app, en el contexto del
+  `restore`, la operación que devuelve lo que el negocio guarda eliminado, hub#1306, que recibe del registro leído lo
+  que declara su entrada: el `id` y, si quiere devolverle lo que el negocio le quitó después, lo demás que nombre,
+  hub#1356; las de Citas e Inventario solo declaran el `id`); `base/` no nombra ninguna. Primero vuelve lo eliminado y después se crea lo que falta, con las operaciones de la app, en el contexto del
   sistema y en el idioma del personal, dentro de `use_hub`; un `InvalidPayload` o un `NotFound` es de ese registro y los
   demás siguen, cualquier otro rechazo para la app. Clientes responde con `recoverable_cards_in_copy`,
-  `cards_deleted_in_business` con `customer.customer.restore` y `cards_not_in_business` (con `has_live_twin`, la regla de
-  la importación) con `customer.customer.recover`, que rehace la ficha con sus grupos, etiquetas y campos (hub#1285). Ninguna app cuyos
+  `cards_deleted_in_business` con `customer.customer.restore`, que le devuelve lo que el negocio borró después
+  (hub#1356), y `cards_not_in_business` (con `has_live_twin`, la regla de la importación) con
+  `customer.customer.recover`, que rehace la ficha con sus grupos, etiquetas y campos (hub#1285). Ninguna app cuyos
   registros llegan a Hacienda responde (contrato en `test_recovery.py`). Tests: `base/tenancy/tests/test_recovery.py`
   (dos BD reales: la copia y el negocio), `apps/customer/tests/test_recovery.py`, `control/tests/test_services.py::TestRecover`,
   `control/tests/test_admin.py::TestRecoverIntoTheBusiness` y `tests/e2e/base-recover-from-copy.spec.ts`.

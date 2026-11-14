@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3c4bcbca058dfc22585a0c2bf2c2086cd6bff45c8d7106b2fba8a3c7860ef93c -->
+<!-- generated from WORKBOOK.md sha256:963f98a1e5f74527d27850d1bd9f5f60054660761f15cee04bacb37132349b6d -->
 
 ## What it is for and who it is for
 
@@ -892,9 +892,17 @@ Steps:
    card, with its purchases and what was spent, its consents, its notes and its activity, its health data, its
    groups, tags and custom fields and its linked orders. Recoveries counts it as restored ("Customers: 1
    restored").
-In: the deleted card, by its identifier.
+4. If after deleting it the business deleted one of its groups, tags or custom fields, the card also comes back with
+   it, as a card the business no longer has comes back: the one with the same name if the business made it again and,
+   if not, one made again as it was in the copy, with the operations of the Groups, Tags and Fields screens
+   (CUSTOMER-F06, CUSTOMER-F04, CUSTOMER-F29).
+In: the deleted card, by its identifier, and its groups, tags and custom field values in the copy, each with its
+identifier there.
 Out: the card live again, none of its details changed, and the card-recovered notice
-(`customer.customer.restored`).
+(`customer.customer.restored`); and, if it lacked something that hung from it, each group, tag or field made again with
+its notice (`customer.group.created`, `customer.tag.created`, `customer.field.created`, and `customer.group.updated` or
+`customer.tag.updated` if it was deactivated) and those of its groups and tags set (`customer.customer.groups_changed`,
+`customer.customer.tags_changed`).
 If it fails: a card merged into another (CUSTOMER-F13) or with its personal data erased (CUSTOMER-F16) never comes
 back: its history lives on in the other card, or its data no longer exists ("This customer is no longer
 available."). Nor does it come back if the business has already created the same person again (the same name, phone
@@ -902,8 +910,10 @@ and email, CUSTOMER-F12): the one it made stays. A card the business no longer h
 (CUSTOMER-F01), with its groups, tags and custom fields from the copy: the group, tag or field the business has with
 that name is that one, without making another, and one it no longer has is made again as it was (CUSTOMER-F06,
 CUSTOMER-F04, CUSTOMER-F29); a value of a field the business deactivated does not come back, and one its field no
-longer accepts leaves the whole card out with its reason. A deleted card that comes back does not get back the group,
-tag or field the business deleted afterwards (hub#1356). On a live card it does not fail: it answers fine and
+longer accepts leaves the whole card out with its reason. For a deleted card that comes back, what the business still
+has stays as it is, even if it took the card out of a group or removed a value before deleting it; a value it already
+has in a field the business made again stays, one of a field the business deactivated does not come back, and one its
+field no longer accepts leaves it deleted, with its reason (hub#1356). On a live card it does not fail: it answers fine and
 notifies again. What was charged in its name
 while it was deleted does not add up (CUSTOMER-F20).
 Involved: BASE-F114, CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06, CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16,

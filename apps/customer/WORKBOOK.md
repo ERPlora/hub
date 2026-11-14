@@ -938,9 +938,17 @@ Pasos:
    ficha, con sus compras y lo gastado, sus consentimientos, sus notas y su actividad, sus datos de salud, sus
    grupos, etiquetas y campos propios y sus pedidos enlazados. Recuperaciones la cuenta como restaurada
    («Clientes: se restauró 1»).
-Entra: la ficha eliminada, por su identificador.
+4. Si después de eliminarla el negocio borró uno de sus grupos, etiquetas o campos propios, la ficha vuelve también
+   con él, como vuelve una ficha que el negocio ya no tiene: el del mismo nombre si el negocio lo volvió a crear y, si
+   no, uno hecho otra vez como estaba en la copia, con las operaciones de las pantallas de Grupos, Etiquetas y Campos
+   (CUSTOMER-F06, CUSTOMER-F04, CUSTOMER-F29).
+Entra: la ficha eliminada, por su identificador, y sus grupos, etiquetas y valores de campos propios en la copia, cada
+uno con su identificador allí.
 Sale: la ficha viva otra vez, sin cambiar ninguno de sus datos, y el aviso de ficha recuperada
-(`customer.customer.restored`).
+(`customer.customer.restored`); y, si le faltaba algo de lo que colgaba de ella, cada grupo, etiqueta o campo hecho otra
+vez con su aviso (`customer.group.created`, `customer.tag.created`, `customer.field.created`, y `customer.group.updated`
+o `customer.tag.updated` si estaba desactivado) y los de sus grupos y etiquetas puestos
+(`customer.customer.groups_changed`, `customer.customer.tags_changed`).
 Si falla: una ficha unida a otra (CUSTOMER-F13) o con los datos personales borrados (CUSTOMER-F16) no vuelve nunca:
 su historia sigue en la otra ficha, o sus datos ya no existen («Este cliente ya no está disponible.»). Tampoco vuelve
 si el negocio ya creó otra vez a la misma persona (el mismo nombre, teléfono y email, CUSTOMER-F12): se queda la que
@@ -948,7 +956,9 @@ hizo. Una ficha que el negocio ya no tiene en absoluto se crea de nuevo (CUSTOME
 campos propios de la copia: el grupo, la etiqueta o el campo que el negocio tiene con ese nombre es ese, sin hacer
 otro, y el que ya no tiene se vuelve a crear como estaba (CUSTOMER-F06, CUSTOMER-F04, CUSTOMER-F29); un valor de un
 campo que el negocio desactivó no vuelve, y uno que su campo ya no admite deja fuera la ficha entera con su motivo.
-Una ficha eliminada que vuelve no recupera el grupo, la etiqueta o el campo que el negocio borró después (hub#1356).
+A una ficha eliminada que vuelve, lo que el negocio aún tiene se le queda como está, aunque la sacara de un grupo o le
+quitara un valor antes de eliminarla; un valor que ya tiene en un campo que el negocio volvió a crear se queda, uno de un
+campo que el negocio desactivó no vuelve, y uno que su campo ya no admite la deja eliminada, con su motivo (hub#1356).
 Sobre una ficha viva no falla: responde bien y vuelve a avisar. Lo que se cobró a su nombre mientras estuvo eliminada no se suma
 (CUSTOMER-F20).
 Implicados: BASE-F114, CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06, CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16,
@@ -1160,8 +1170,12 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   (`_validated_field_values`) sin pedir los obligatorios, como el alta del TPV. Es UNA operación por ficha y no pasos
   del gancho detrás de la ficha porque la plataforma suma en «se crearon N» cada operación que acaba bien y porque,
   hecha la ficha, una creada por la recuperación no se distingue de una que el negocio rehízo a mano, que se queda
-  como está. Lo que el negocio borró después de eliminar una ficha no vuelve con ella: `restore` solo recibe el `id`
-  (hub#1356). `customer.customer.restore` y `customer.customer.recover` no tienen ruta ni son herramientas del
+  como está. A una ficha eliminada, `customer.customer.restore` le devuelve lo que el negocio borró después (hub#1356):
+  la plataforma le da del registro de la copia lo que declara su entrada (`CustomerRestoreIn`: el `id` y los grupos,
+  etiquetas y valores, cada uno con su id en la copia), `queries.lost_since_copy` deja lo que el negocio ya no tiene
+  por ese id y `_hang_from_copy`, el mismo camino que `recover`, lo cuelga otra vez de la ficha, sin quitarle nada ni
+  pisar un valor que ya tenga; todo dentro del bloqueo de la ficha (`tests/test_concurrency.py`, una supresión de
+  datos que llega a la vez espera y no deja la ficha viva). `customer.customer.restore` y `customer.customer.recover` no tienen ruta ni son herramientas del
   asistente (`ai=INTERNAL`) y su permiso, `customer.restore`, no lo declara ninguna app: solo lo tiene el sistema.
   Lee desde `0001_initial`; una migración que quite o renombre una de sus columnas, de las fichas, los grupos, las
   etiquetas o los campos, cambia también `recoverable_cards_in_copy` y su `reads_since`. Tests:

@@ -28,7 +28,9 @@ from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs
 from live.models import OutboxEvent
 from live.operations import get as get_operation
+from ninja import Schema
 from psycopg import sql
+from pydantic import ConfigDict
 
 from base import recovery as base_recovery
 from base import services
@@ -883,6 +885,48 @@ class TestWhatARecordCameBackWithout:
         run()
 
         assert fresh(asked).results == [CUSTOMERS | {"created": 1}]
+
+
+def restore_given(monkeypatch, takes: type[Schema]) -> list[dict]:
+    """Customers' restore declares the input ``takes``: each input it is given, in the list returned, and the card
+    brought back as its own restore brings it back."""
+    op = get_operation("customer.customer.restore")
+    real, plain = op.fn, op.input
+    given = []
+
+    def keeping_what_it_takes(ctx, data):
+        given.append(data.model_dump())
+        return real(ctx, plain.model_validate({"id": data.id}))
+
+    monkeypatch.setattr(op, "fn", keeping_what_it_takes)
+    monkeypatch.setattr(op, "input", takes)
+    return given
+
+
+class TestWhatARestoreTakes:
+    """A restore takes, of the record as the copy holds it, what its input declares: its id, as every restore of an
+    app takes it, and whatever else it names to give back to the record what the business lost of it since (a group
+    it deleted, hub#1356). An input that refuses a field it does not declare is never given one."""
+
+    def test_a_restore_takes_of_the_record_what_its_input_declares_and_nothing_else(
+        self, recoveries, every_app_on, monkeypatch
+    ):
+        class TakesItsCity(Schema):
+            model_config = ConfigDict(extra="forbid")
+
+            id: uuid.UUID
+            city: str = ""
+
+        given = restore_given(monkeypatch, TakesItsCity)
+        hub, (ana,) = recoveries.business(every_app_on, ANA)
+        copy = recoveries.copy_of(hub)
+        run_in(hub, "customer.customer.delete", id=ana)
+        asked = recoveries.ask(copy)
+
+        run()
+
+        assert fresh(asked).results == [CUSTOMERS | {"restored": 1}]
+        assert given == [{"id": ana, "city": "Madrid"}]
 
 
 class TestTheCopyIsOnlyRead:

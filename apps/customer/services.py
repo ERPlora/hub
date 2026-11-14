@@ -52,6 +52,7 @@ from apps.customer.queries import (
     health_consent,
     load_detail,
     load_health,
+    lost_since_copy,
     named,
 )
 from apps.customer.schemas import (
@@ -66,6 +67,7 @@ from apps.customer.schemas import (
     CustomerPatchIn,
     CustomerRecoverIn,
     CustomerRefIn,
+    CustomerRestoreIn,
     DeletedOut,
     EraseIn,
     ErasedOut,
@@ -74,7 +76,9 @@ from apps.customer.schemas import (
     FieldRefIn,
     FieldRow,
     FieldValueIn,
+    FieldValueOfCopyIn,
     GroupIn,
+    GroupOfCopyIn,
     GroupPatchIn,
     GroupRefIn,
     GroupRow,
@@ -98,6 +102,7 @@ from apps.customer.schemas import (
     SetGroupsIn,
     SetTagsIn,
     TagIn,
+    TagOfCopyIn,
     TagPatchIn,
     TagRefIn,
     TagRow,
@@ -660,14 +665,18 @@ def delete_customer(ctx: OperationContext, data: CustomerRefIn) -> dict:
     kind="command",
     repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.restore",
-    input=CustomerRefIn,
+    input=CustomerRestoreIn,
     output=CustomerDetailOut,
     ai=INTERNAL,
 )
-def restore_customer(ctx: OperationContext, data: CustomerRefIn) -> dict:
+def restore_customer(ctx: OperationContext, data: CustomerRestoreIn) -> dict:
     """CUSTOMER-F33: a deleted card back in every list, the same card with all that hangs from it (deleting keeps it,
     CUSTOMER-F07). Merged into another or erased it never comes back: its history lives on in the other card, or its
-    personal data is gone. Repeating it on a card already back answers well and announces again, as deleting does."""
+    personal data is gone. Repeating it on a card already back answers well and announces again, as deleting does.
+
+    hub#1356: what hung from it in the separate copy it comes back from and the business deleted since (``data``, each
+    by its id there) hangs from it again, as from a card made again from the copy (``_hang_from_copy``); what the
+    business still has stays as it is, the card in it or not."""
     customer = find_customer(ctx, data.id, data.customer, lock=True, live=False)
     if customer.merged_into_id is not None or customer.erased_at is not None:
         raise NotFound(CUSTOMER_UNAVAILABLE, code=CUSTOMER_UNAVAILABLE_CODE)
@@ -676,6 +685,13 @@ def restore_customer(ctx: OperationContext, data: CustomerRefIn) -> dict:
         customer.is_active = True
         customer.save(update_fields=["deleted_at", "is_active", "updated_at"])
     record_event(ctx, events.CUSTOMER_RESTORED, {"id": str(customer.id)})
+    _hang_from_copy(
+        ctx,
+        customer,
+        groups=lost_since_copy(CustomerGroup, data.groups),
+        tags=lost_since_copy(CustomerTag, data.tags),
+        field_values=lost_since_copy(CustomField, data.field_values),
+    )
     return load_detail(customer)
 
 
@@ -691,40 +707,61 @@ def restore_customer(ctx: OperationContext, data: CustomerRefIn) -> dict:
     ai=INTERNAL,
 )
 def recover_customer(ctx: OperationContext, data: CustomerRecoverIn) -> dict:
-    """hub#1285: a card of a separate copy the business no longer has, made again with what hung from it there, each by
-    the operation its screen uses, all or nothing: the card by ``customer.customer.create``; its groups and tags by
-    ``set_groups`` and ``set_tags``, each the business's own of that name (``queries.named``) or, if it has none, made
-    again as the copy had it by the Groups or Tags screen's create (and deactivated if it was); its values of the custom
-    fields as the card's screen checks them (CUSTOMER-F04), each field the business's own of that name or one made again
-    by the Fields screen's create. A value of a field the business deactivated does not come back (it shows on no card);
-    one its field no longer takes keeps the whole card out, with why; a required field it has no value of does not,
-    as the till makes a card without one (CUSTOMER-F01)."""
+    """hub#1285: a card of a separate copy the business no longer has, made again by ``customer.customer.create`` with
+    what hung from it there (``_hang_from_copy``), all or nothing."""
     made = create_customer(ctx, CustomerIn.model_validate(data.model_dump(include=set(CustomerIn.model_fields))))
-    for group in data.groups:
-        if named(CustomerGroup, group.name) is None:
-            again = create_group(ctx, GroupIn.model_validate(group.model_dump(exclude={"is_active"})))
-            if not group.is_active:
-                update_group(ctx, GroupPatchIn(id=again.id, is_active=False))
-    if data.groups:
-        set_groups(ctx, SetGroupsIn(id=made.id, groups=[group.name for group in data.groups]))
-    for tag in data.tags:
-        if named(CustomerTag, tag.name) is None:
-            again = create_tag(ctx, TagIn.model_validate(tag.model_dump(exclude={"is_active"})))
-            if not tag.is_active:
-                update_tag(ctx, TagPatchIn(id=again.id, is_active=False))
-    if data.tags:
-        set_tags(ctx, SetTagsIn(id=made.id, tags=[tag.name for tag in data.tags]))
     customer = Customer.objects.get(pk=made.id)
+    _hang_from_copy(ctx, customer, groups=data.groups, tags=data.tags, field_values=data.field_values)
+    return load_detail(customer)
+
+
+def _hang_from_copy(
+    ctx: OperationContext,
+    customer: Customer,
+    *,
+    groups: list[GroupOfCopyIn],
+    tags: list[TagOfCopyIn],
+    field_values: list[FieldValueOfCopyIn],
+) -> None:
+    """What hung from ``customer`` in a separate copy hung from it again, each by the operation its screen uses: the
+    card put in its groups and tags besides those it is in (``set_groups``, ``set_tags``), each the business's own of
+    that name (``queries.named``, the active one first) or, if it has none, made again as the copy had it by the Groups
+    or Tags screen's create (and deactivated if it was); its values of the custom fields as the card's screen checks
+    them (CUSTOMER-F04), each field the business's own of that name or one made again by the Fields screen's create. A
+    value of a field the business deactivated does not come back (it shows on no card), nor one of a field the card
+    holds a value of already; one its field no longer takes refuses it all, with why; a required field it has no value
+    of does not, as the till makes a card without one (CUSTOMER-F01)."""
+    for relation, items in (("groups", groups), ("tags", tags)):
+        if items:
+            _join_named(ctx, customer, relation, items)
+    held = set(customer.field_values.values_list("field_id", flat=True))
     values = []
-    for value in data.field_values:
+    for value in field_values:
         field = named(CustomField, value.name) or create_field(
-            ctx, FieldIn.model_validate(value.model_dump(exclude={"value"}))
+            ctx, FieldIn.model_validate(value.model_dump(exclude={"id", "value"}))
         )
-        if field.is_active:
+        if field.is_active and field.id not in held:
             values.append(FieldValueIn(field_id=field.id, value=value.value))
     if values:
         _apply_field_values(customer, _validated_field_values(customer, values, required=False))
-    return load_detail(customer)
+
+
+def _join_named(ctx: OperationContext, customer: Customer, relation: str, items: list) -> None:
+    """``customer`` put by its screen's operation in the groups or tags (``relation``) named as ``items`` of the copy,
+    besides those it is in (see ``_hang_from_copy``)."""
+    model, create, update, put, ids_field = {
+        "groups": (CustomerGroup, create_group, update_group, set_groups, "group_ids"),
+        "tags": (CustomerTag, create_tag, update_tag, set_tags, "tag_ids"),
+    }[relation]
+    wanted = set(getattr(customer, relation).values_list("id", flat=True))
+    for item in items:
+        found = named(model, item.name)
+        if found is None:
+            found = create(ctx, create.input.model_validate(item.model_dump(exclude={"id", "is_active"})))
+            if not item.is_active:
+                update(ctx, update.input(id=found.id, is_active=False))
+        wanted.add(found.id)
+    put(ctx, put.input(id=customer.id, **{ids_field: sorted(wanted)}))
 
 
 @operation(
