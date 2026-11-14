@@ -220,7 +220,7 @@ def certificate_valid(now: dt.datetime | None = None) -> bool:
 
 def _route_sending_problem(config: Config, environment: str, scope: Scope | None) -> str:  # noqa: PLR0911
     """What the chosen route itself lacks to carry a record to the AEAT of ``environment``: the own route, its valid
-    certificate (as in the old Hub) and, in production, one this server can open; ERPlora's route in production,
+    certificate and, in production, one this server can open; ERPlora's route in production,
     the approved signed authorisation, but for ERPlora's own records on ERPlora's own hub (``scope``; ``None``, no
     hub's, never is: a business typing ERPlora's tax ID is no exemption)."""
     production = environment == Environment.PRODUCTION
@@ -281,7 +281,7 @@ def issue_problem(config: Config, scope: Scope | None) -> str:
 def live_problems(config: Config, scope: Scope) -> list[str]:
     """Everything that keeps this business from going live now (VERIFACTU-F08), as codes; empty when it can, in
     ``go_live``'s order: the server (closed, no gateway), a demo, the route, the account. Invoicing's issuer is told
-    apart. A demo never goes live, as in the old Hub; whether it is one, the platform says
+    apart. A demo never goes live; whether it is one, the platform says
     (``base.operations.is_demo_hub``). Outside Spain, that alone: nothing else would ever let it."""
     if outside_spain(scope):
         return [OUTSIDE_SPAIN]

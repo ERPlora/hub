@@ -228,7 +228,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 
 | ID | Flujo | Estado |
 |---|---|---|
-| VERIFACTU-F01 | Activar VeriFactu | hecho — encender la app en el Hub es activarla, en ese negocio; fuera de España, Apps no la ofrece y el hub la niega (`can_enable`, hub#694), y una ya encendida no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) |
+| VERIFACTU-F01 | Activar VeriFactu | hecho — encender la app en el Hub es activarla, en ese negocio; fuera de España, Apps no la ofrece y el hub la niega (`can_enable`, hub#694), y una ya encendida no registra ni envía nada |
 | VERIFACTU-F02 | Subir el certificado propio del negocio | hecho — en el Hub; cifrado en la BD del hub con `FISCAL_CERTIFICATE_KEY` |
 | VERIFACTU-F03 | Quitar el certificado propio | hecho — en el Hub |
 | VERIFACTU-F04 | Elegir quién remite: mi certificado o ERPlora | hecho |
@@ -257,12 +257,12 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 | VERIFACTU-F29 | Continuar la cadena de otra aplicación (migración) | hecho |
 | VERIFACTU-F30 | Anular un registro enviado por error | hecho |
 | VERIFACTU-F31 | Vigilar los envíos desde las pantallas | hecho — también desde los cuatro paneles del Inicio |
-| VERIFACTU-F32 | Impedir apagar la app una vez encendida | hecho — `can_disable` de VeriFactu y 409 `base.app_vetoed` de `base.app.disable` (hub#267); en España no se apaga nunca (FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON) |
+| VERIFACTU-F32 | Impedir apagar la app una vez encendida | hecho — `can_disable` de VeriFactu y 409 `base.app_vetoed` de `base.app.disable` (hub#267); en España no se apaga nunca |
 | VERIFACTU-F34 | Renovar el certificado propio | hecho — en el Hub (subir el renovado sustituye al anterior) |
 | VERIFACTU-F35 | Preguntar a la AEAT si ya tiene un registro de la cola | hecho — en la ficha del registro, en el admin del Hub y por la API |
 
 ### VERIFACTU-F01 Activar VeriFactu
-Estado: hecho — encender la app en el Hub es activarla, en ese negocio; fuera de España, Apps no la ofrece y el hub la niega (`can_enable`, hub#694), una ya encendida no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) y el Inicio no le pide «Configura VeriFactu» (hub#682); ninguna plantilla la enciende, tampoco en España: la activa el dueño (hub#998)
+Estado: hecho — encender la app en el Hub es activarla, en ese negocio; fuera de España, Apps no la ofrece y el hub la niega (`can_enable`, hub#694), una ya encendida no registra ni envía nada y el Inicio no le pide «Configura VeriFactu» (hub#682); ninguna plantilla la enciende, tampoco en España: la activa el dueño (hub#998)
 Actor: administrador
 Pantalla: Hub: Apps
 Pasos:
@@ -864,8 +864,7 @@ Implicados: ninguno
 
 ### VERIFACTU-F32 Impedir apagar la app una vez encendida
 Estado: hecho — la plataforma pregunta al apagar (`base.app.disable`, hub#256) y VeriFactu responde con su
-`can_disable` (hub#267, FIX-BASE-APP-TURN-OFF-VETO); en España, una vez encendida, no se apaga nunca
-(FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON), y Apps no ofrece «Desactivar» (hub#618)
+`can_disable` (hub#267); en España, una vez encendida, no se apaga nunca, y Apps no ofrece «Desactivar» (hub#618)
 Actor: sistema
 Pantalla: Hub: Apps
 Pasos:
@@ -1109,8 +1108,9 @@ estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase l
   para el alta, y
   `IDEmisorFacturaAnulada=…&NumSerieFacturaAnulada=…&FechaExpedicionFacturaAnulada=…&Huella=…&FechaHoraHusoGenRegistro=…`
   para la anulación. Importes en euros con dos decimales y punto (los céntimos se dividen en el límite), fecha
-  `DD-MM-AAAA`, marca de tiempo con segundos enteros y huso (`2026-09-22T19:58:55+02:00`, hora de Madrid en la
-  fase 1). Vectores: los tres casos oficiales de la AEAT (un alta, la siguiente y una anulación encadenadas) y
+  `DD-MM-AAAA`, marca de tiempo con segundos enteros y huso (`2026-09-22T19:58:55+02:00`), a la hora de Madrid del
+  despliegue (`settings.TIME_ZONE`), no a la de la zona del negocio (hub#772). Vectores: los tres casos oficiales de
+  la AEAT (un alta, la siguiente y una anulación encadenadas) y
   las huellas de los 19 envíos reales aceptados por la preproducción (`tests/fixtures/*_sent_*.xml`).
 - **Cadena** por `(NIF del emisor, entorno)`: la fila `Chain` guarda la secuencia, la huella, el número, la
   fecha y el NIF del último registro. Sellar bloquea esa fila (`select_for_update`) en la transacción del
@@ -1143,8 +1143,8 @@ estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase l
   importa la firma `xmldsig-core-schema.xsd`), los tres en local y en modo `sandbox` (nunca red). Se valida el
   sobre de un solo registro **al sellar, siempre** (si no pasa, no hay registro ni número: uno inválido pararía
   su cadena para siempre) y cada sobre **antes de enviarlo**. El XML del registro se construye, se valida y se
-  congela **al sellar** (el `SistemaInformatico` no espera a nada de la cuenta); uno guardado sin XML (sellado
-  antes de T2b) lo construye su primer envío. Si aun así un sobre no pasa al enviarse, la
+  congela **al sellar** (el `SistemaInformatico` no espera a nada de la cuenta); uno guardado sin XML lo construye
+  su primer envío. Si aun así un sobre no pasa al enviarse, la
   cadena espera con `xml_invalid` y el evento crítico se anota **una vez**, no en cada pasada. La consulta
   (`ConsultaFactuSistemaFacturacion`) se valida contra `xsd/ConsultaLR.xsd` antes de salir.
   Procedencia de los esquemas: `SuministroLR.xsd` y `SuministroInformacion.xsd` del motor actual (los últimos
@@ -1154,7 +1154,7 @@ estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase l
   `NombreSistemaInformatico` ERPlora Hub, `IdSistemaInformatico` EC, `TipoUsoPosibleSoloVerifactu` S y
   `TipoUsoPosibleMultiOT` S, los de la declaración responsable v1 firmada (`saas/public/declaracion/v1` de `ERPlora/saas`);
   `Version` = `APP_VERSION` (el commit de la imagen; `dev` en local), `NumeroInstalacion` = el identificador
-  del negocio (el ámbito; en la fase 2, el id del hub) e `IndicadorMultiplesOT` **S siempre** (`MULTIPLE_OT`):
+  del negocio (la clave de su ámbito, el `slug` del hub) e `IndicadorMultiplesOT` **S siempre** (`MULTIPLE_OT`):
   ERPlora es una plataforma para muchos negocios, un sistema multi-obligado por definición, así que no depende de
   la cuenta.
 
@@ -1234,7 +1234,7 @@ estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase l
     forma.
   - `/internal/verifactu/probe` con `{"hub", "nif", "environment", "route", "certificate"?}` → `200 {"ready":
     bool, "detail"}`, sin presentar nada.
-- **La foto** (`PUT /internal/hubs/{id}/state`, contrato acordado con el SaaS el 2026-10-15): `{"hub_id",
+- **La foto** (`PUT /internal/hubs/{id}/state`, contrato con el SaaS): `{"hub_id",
   "slug", "version", "status": "active"|"past_due"|"suspended", …, "verifactu": {"representation": {"status":
   "none"|"submitted"|"approved"|"returned"|"revoked", "updated_at": ISO|null, "reason"}}}`. `live_paid` no es
   del contrato: si llega, se acepta y no se lee, y su columna (`Config.live_paid`) no se lee ni se escribe (su
@@ -1247,8 +1247,7 @@ estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase l
   ninguno de los dos, `200 {"applied": false}`. Una `version` menor o igual que la guardada se ignora. «Validado»
   = `representation.status == "approved"`, en todos los planes. `own_certificate` y `multiple_taxpayers` no viajan (`null` = sin cambio): el
   certificado propio se sube en el Hub. La ruta de la foto le dice al Hub su id en
-  ERPlora (`Config.hub_id`, sin variable de entorno `HUB_ID`): adonde se envía el otorgamiento (en la fase 2, del
-  registro de control). Cada cambio de
+  ERPlora (`Config.hub_id`, sin variable de entorno `HUB_ID`): adonde se envía el otorgamiento. Cada cambio de
   estado del otorgamiento deja su paso en el registro de auditoría («Sus pasos» de Configuración).
 - **Otorgamiento de representación** (VERIFACTU-F05, F06; `representation.py`): `POST
   /internal/hubs/{id}/representation` con `{"taxpayer_tax_id", "taxpayer_name", "signer_tax_id", "signer_name",
@@ -1339,7 +1338,7 @@ estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase l
 ### Administrador de Django
 
 Solo para el staff de la plataforma (`hubs.erplora.com/admin`, con el hub elegido en `/admin/hub/<slug>/`), **al
-servicio del soporte**. Criterio de Ioan (2026-10-15): «un registro no enviado no es un registro registrado; no se
+servicio del soporte**. El criterio: «un registro no enviado no es un registro registrado; no se
 trata de borrar una venta, se trata de poder arreglar si hay un problema de envío, poder reenviar y cosas que se
 necesitan para el soporte». Por eso:
 
@@ -1424,7 +1423,7 @@ necesitan para el soporte». Por eso:
     persona arregla su causa; por eso queda como evento crítico.
 14. **Un rechazo de VeriFactu deshace la emisión** (contrato con Facturación): reintentarlo fallaría igual;
     solo un error pasajero de la base de datos deja el documento «pendiente» para la reacción.
-15. **VeriFactu solo vale en España** (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN, 2026-10-27): el RD
+15. **VeriFactu solo vale en España**: el RD
     1007/2023 y la Orden HAC/1177/2024 obligan a quien tributa en España (Canarias, Ceuta y Melilla son regiones de
     ES). Un negocio con otro país en su cuenta (`base.Hub.country`, que lee `base.business.get`) se comporta como con
     la app apagada (`queries.outside_spain`, `refuse_outside_spain` → `AppInactive`): sus facturas salen
@@ -1432,13 +1431,13 @@ necesitan para el soporte». Por eso:
     `outside_spain`), la factura no pinta recibo (`by_invoice` vacío) y el veto de apagar no lo atrapa
     (`disable_refusal` → `None`). Sin país (una demo), es España. El hub propio de ERPlora lee su país como los demás,
     de `base.business.get`, que para él contesta el de su emisor (`PLATFORM_ISSUER_COUNTRY`, hub#329): VeriFactu no
-    guarda otra fuente del mismo dato (FIX-HUB-VERIFACTU-OWN-SHORTCUT-FOR-PLATFORM-HUB-COUNTRY). Lo sellado antes en
+    guarda otra fuente del mismo dato. Lo sellado antes en
     un negocio de fuera no se borra (los registros fiscales nunca se borran): se queda sin enviar, con su motivo. **Apps**
     no la ofrece encendible fuera de España: `can_enable(self, ctx) -> str | None` en `LiveAppConfig`, como
     `can_disable`, que respetan `base.app.enable`, `base.app.retry` y `base.app.list` (hub#694). Un fichero que la
     trae pasa por `base.app.enable`: VeriFactu se queda fuera, con su motivo, y lo demás carga (ninguna plantilla del
     catálogo la trae, decisión 17). Una ya encendida se queda como está y no hace nada.
-16. **Una vez encendida, VeriFactu no se apaga en España** (FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON): `disable_refusal`
+16. **Una vez encendida, VeriFactu no se apaga en España**: `disable_refusal`
     contesta siempre `NEVER_OFF`, salvo fuera de España (decisión 15) o si nunca llegó a `on` (`creating` o `failed`: no ha
     sellado nada, y el negocio no se queda atado a una activación que falló); sin país (una demo), es España. La
     AEAT obliga a seguir con VERI*FACTU al menos hasta el fin del año natural (FAQ de su sede). El mercado se parte: la
@@ -1473,7 +1472,7 @@ Lo demás del bloque fiscal está en PLAN-HUB §8, «Bloque fiscal: lo que queda
 - **Contracción de `hub_unregistered` como espera** (hub#1130): ninguna pasada pone ya ese motivo, así que «Aún no
   está en la AEAT» no lo dice. El texto de su motivo en `WAIT_REASONS` («ERPlora todavía no ha vinculado este
   negocio con su cuenta en este servidor») se queda para leer el `Record.wait_reason` que guardaron pasadas
-  anteriores al corte S5: lo enseñan la cola (`last_error`) y el filtro del admin hasta que una pasada posterior lo
+  anteriores: lo enseñan la cola (`last_error`) y el filtro del admin hasta que una pasada posterior lo
   envía o le pone otro motivo. Se retira cuando ninguna BD de negocio guarde un registro con `wait_reason =
   "hub_unregistered"`. El código `verifactu.hub_unregistered` del otorgamiento (sin `Config.hub_id` o con el 404 del
   SaaS, VERIFACTU-F08) sigue vivo.

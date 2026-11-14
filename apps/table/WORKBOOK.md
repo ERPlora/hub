@@ -1010,7 +1010,7 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
   descripción manda preguntar antes: la tarjeta es la confirmación, y el «Ask first.» que llevaban
   cerrar, pasar, juntar y borrar una cuenta hacía que el asistente preguntara en el chat sin sacarla
   (hub#1140; lo guarda `tests/test_guardrails_assistant.py` para todo el Hub).
-- **En persona** (`ai.in_person`, revisión 2026-10-30): sentar, volver a sentar, dividir y enlazar una
+- **En persona** (`ai.in_person`): sentar, volver a sentar, dividir y enlazar una
   cuenta (`table.session.open`, `.restore`, `.split` y `.link_order`). Automatizaciones no las ofrece ni
   las concede, y un paso que se hubiera colado se rechaza al correr (`flow.high_risk`, FLOW-F12): las
   cuatro abren o retitulan la cuenta en Ventas con la sesión de quien actúa (`sale.add_sale`), y un paso

@@ -395,7 +395,10 @@ El resto de hechos (confirmada, cancelada, completada, no presentada, borrada) s
   `appointment.availability.slots` y `customer.customer.create`. El interruptor de un servicio en Ajustes
   lo guarda la página con `service.service.update`, con el permiso de quien lo toca.
 - Modelos (UUIDv7, sin `hub_id`): `Settings` (una fila; sin ella, los de fábrica) y `Booking` (una por cita
-  reservada desde la página: la cita, el hash del enlace y la huella del visitante).
+  reservada desde la página: la cita, el hash del enlace y la huella del visitante). Cada negocio tiene su propia
+  BD, así que la fila única de `Settings` (y las `Booking`) es la de ese negocio; solo el respaldo de los tests
+  escritos antes de la tenencia (`base/tenancy/tests/legacy.py`) guarda `a` y `b` en la misma BD y les hace
+  compartirla.
 - **Operaciones públicas**: permiso `online_booking.public` (contrato arriba). Para lo que piden a otras
   apps usan `delegated(ctx)`: el mismo contexto con los permisos justos de Citas, Clientes, Servicios,
   Horarios y Personal (como `appointment.queries.reader`), y como actor «online booking» cuando no hay
@@ -416,7 +419,7 @@ El resto de hechos (confirmada, cancelada, completada, no presentada, borrada) s
   próximas por móvil de los Ajustes (409; 3 de fábrica); se cuentan sobre `Booking` y las citas, en la
   transacción de la reserva.
 - **Reloj**: el de Citas (`apps.appointment.queries.now`, `business_zone`); los tests lo fijan.
-- Las reacciones (`events.py`) las entrega el relay del outbox del worker (`base/relay.py`, ya en la fase 1);
+- Las reacciones (`events.py`) las entrega el relay del outbox del worker (`base/relay.py`);
   `tests/test_relay.py` las prueba de punta a punta con el bucle real del worker y el aviso real de Clientes.
   Sus dos avisos no los escucha ninguna app salvo Automatizaciones, que se apunta a todos (`"*"` en
   `apps/flow/events.py`); lo que hace con ellos es de FLOW-F21, que sigue `parcial`.
@@ -431,8 +434,8 @@ El resto de hechos (confirmada, cancelada, completada, no presentada, borrada) s
 
 ### Contrato con la página pública (para `base`)
 
-La página sin sesión (`/p/<slug>/book`, plantillas de Django en el dominio de la web pública, pendiente del
-bloque de la web pública) **no es de esta app**: la sirve `base`. Esta app le da las operaciones:
+La página sin sesión (`/p/<slug>/book` en el host del hub, plantillas de Django, pendiente del bloque de la web
+pública) **no es de esta app**: la sirve `base`. Esta app le da las operaciones:
 
 | Qué | Operación | Entrada → salida |
 |---|---|---|
@@ -443,7 +446,7 @@ bloque de la web pública) **no es de esta app**: la sirve `base`. Esta app le d
 | Ver la reserva | `online_booking.public.booking` | `token` → número, estado, hora, servicios, profesional, si puede cancelar y hasta cuándo (nunca el nombre de la ficha) |
 | Cancelar | `online_booking.public.cancel` | `token`, motivo → la reserva cancelada |
 
-Cómo las expone la plataforma (fase 2, bloque 7 «puerta pública `/p/`»):
+Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
 
 - **Contexto**: `base` llama a la operación en el propio proceso, sin ruta ninja anónima, con
   `OperationContext(scope=<hub del Host>, actor=None, permissions={"online_booking.public"}, request=<la
@@ -495,16 +498,6 @@ Cómo las expone la plataforma (fase 2, bloque 7 «puerta pública `/p/`»):
   por no presentarse**, **lista de espera** y **calendario externo**: fuera del MVP.
 - **Margen entre citas**: los márgenes
   antes y después de cada servicio son de Servicios y Citas aún no los aplica.
-
-## Contradicciones señaladas (no resueltas aquí)
-
-- **Dónde vive la página pública**: el encargo y este documento la ponen en `/p/<slug>/book` del host del hub;
-  `CLAUDE.md` («Frontend y admin») dice «Web/carta pública por hub (pendiente): plantillas en un dominio
-  aparte». Lo decide el bloque de la web pública; el contrato de operaciones vale para los dos.
-- **Una fila de `Settings` por BD**: cada negocio tiene su propia BD, así que la
-  fila única de `Settings` (y las `Booking`) es la de ese negocio. Solo el respaldo de los tests escritos antes de
-  la tenencia (`base/tenancy/tests/legacy.py`) guarda `a` y `b` en la misma BD y les hace
-  compartirla.
 
 ## Lo que NO hace, a propósito
 
