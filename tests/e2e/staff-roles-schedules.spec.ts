@@ -3,8 +3,9 @@
 // stays listed, marked «Retired». Schedules: for a member picked by searching the server, «+» proposes
 // Monday to Friday with the default working day of Settings (as proposed: 09:00–18:00, break 13:00–14:00;
 // STAFF-F22) and «Create schedule» lists it as the default one with its
-// hours; a day ending before it starts is refused under that day (422); editing drops Friday; «Delete»
-// asks first and empties the list. Everything this spec creates is named «E2E …» and removed after it.
+// hours; a day ending before it starts is refused under that day (422), and its reason goes as soon as that
+// day is changed, while another refused day keeps its own; editing drops Friday; «Delete» asks first and
+// empties the list. Everything this spec creates is named «E2E …» and removed after it.
 import { type Browser, expect, test } from '@playwright/test';
 
 import { A, api, psql, shot, shown } from './helpers';
@@ -91,7 +92,8 @@ test('Schedules: a week without working days is refused on top of it, and the li
   }
 });
 
-test('Schedules: the default week, a day refused under its row, edit, delete', async ({ browser }) => {
+test('Schedules: the default week, a day refused under its row and corrected on its own, edit, delete', async ({ browser }) => {
+  // flow: STAFF-F13, STAFF-F14 (hub#1460)
   const stamp = Date.now().toString(36);
   const { context, page } = await ownerPage(browser, '/staff/schedules');
   try {
@@ -109,14 +111,28 @@ test('Schedules: the default week, a day refused under its row, edit, delete', a
     await expect(view.locator('[data-testid=staff-schedules-empty]')).toContainText('This member has no schedules yet.');
 
     // «+»: Monday to Friday 09:00–18:00 with a break 13:00–14:00 (the working day of Settings as proposed);
-    // a Monday ending before it starts is refused under Monday.
+    // a Monday and a Tuesday ending before they start are refused, each under its own day. Correcting one takes
+    // its reason away before saving again, typing an hour or unticking it, and leaves the other's (hub#1460).
     await view.locator('[data-testid=staff-schedules-add]').click();
     await expect(page.locator('[data-testid=staff-schedule-form-day-5-off]')).toHaveText('Off');
     await page.locator('[data-testid=staff-schedule-form-day-0-end] input').fill('08:00');
+    await page.locator('[data-testid=staff-schedule-form-day-1-end] input').fill('08:00');
     await page.locator('[data-testid=staff-schedule-form-submit]').click();
-    await expect(page.locator('[data-testid=staff-schedule-form-day-0-error]')).toContainText('The start time must be before the end time.');
+    const order = 'The start time must be before the end time.';
+    const monday = page.locator('[data-testid=staff-schedule-form-day-0-error]');
+    const tuesday = page.locator('[data-testid=staff-schedule-form-day-1-error]');
+    await expect(monday).toContainText(order);
+    await expect(tuesday).toContainText(order);
     await page.screenshot({ path: shot('staff-schedules-422') });
     await page.locator('[data-testid=staff-schedule-form-day-0-end] input').fill('18:00');
+    await expect(monday).toBeHidden();
+    await expect(tuesday).toContainText(order);
+    await shoot(page, 'APP-STAFF-STAFF-F13-day-corrected', { width: 1280, height: 860 });
+    const tuesdayWorks = page.locator('[data-testid=staff-schedule-form-day-1-working]');
+    await tuesdayWorks.click();
+    await expect(tuesday).toBeHidden();
+    await tuesdayWorks.click();
+    await page.locator('[data-testid=staff-schedule-form-day-1-end] input').fill('18:00');
     await page.locator('[data-testid=staff-schedule-form-submit]').click();
     const row = view.locator('[data-testid=staff-schedules-row]').first();
     await expect(row).toContainText('Yes');

@@ -10,8 +10,10 @@
 // (`<p v-if="fieldErrors.tiers">`, `{{ fieldErrors.customer }}`) needs a control named after its key too, or FormModal
 // never hears it corrected and the line stays until the next save: the field it is about (`name="is_default"` on the
 // toggle) or the group's `<fieldset ref="tiersGroup" name="tiers">`, whose ref goes to `useGroupChange('tiersGroup')`
-// (a fieldset says no change of its own). The files still waiting are listed below with how many they leave unnamed;
-// the number only goes down, and a fixed file leaves the list.
+// (a fieldset says no change of its own). Nor does such a window read the refusal it hands FormModal raw in its script
+// (`error.value?.fields`): what it paints from there is the server's word as it came, which no correction takes away;
+// it reshapes the refusal before handing it over, if it must, and paints `fieldErrors`. The files still waiting are
+// listed below with how many they leave unnamed; the number only goes down, and a fixed file leaves the list.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -207,13 +209,21 @@ function vueImports(script: string): Record<string, string> {
   return found;
 }
 
-/** A source's template tree, the components it imports and the groups it voices, or nothing when it has no template. */
-function read(source: string): { nodes: TemplateNode[]; imports: Record<string, string>; voiced: Set<string> } | undefined {
+/** A script block of a source: its text and the line of the file it starts on. */
+interface Script {
+  content: string;
+  line: number;
+}
+
+/** A source's template tree, its scripts, the components it imports and the groups it voices, or nothing when it has
+ *  no template. */
+function read(source: string): { nodes: TemplateNode[]; scripts: Script[]; imports: Record<string, string>; voiced: Set<string> } | undefined {
   const { descriptor } = parse(source);
   const ast = descriptor.template?.ast as unknown as { children: TemplateNode[] } | undefined;
   if (!ast) return undefined;
-  const script = `${descriptor.script?.content ?? ''}\n${descriptor.scriptSetup?.content ?? ''}`;
-  return { nodes: ast.children, imports: vueImports(script), voiced: voicedGroups(script) };
+  const scripts = [descriptor.script, descriptor.scriptSetup].flatMap((block) => (block ? [{ content: block.content, line: block.loc.start.line }] : []));
+  const script = scripts.map((block) => block.content).join('\n');
+  return { nodes: ast.children, scripts, imports: vueImports(script), voiced: voicedGroups(script) };
 }
 
 /** Where a window's refusal goes: the name its fields read it by (`fieldErrors`), the nodes that read it and the refs of
@@ -222,6 +232,8 @@ interface Reach {
   refusal: string;
   nodes: readonly TemplateNode[];
   voiced?: ReadonlySet<string>;
+  /** What the window hands FormModal as its refusal (`:error="error"`), when this is a window's own slot. */
+  error?: string;
 }
 
 /** The default slot of each FormModal in `nodes` that takes its `fieldErrors`, under the name it gives them. */
@@ -237,11 +249,12 @@ function windows(nodes: readonly TemplateNode[]): Reach[] {
   };
   walk(nodes, (element) => {
     if (element.tag !== 'FormModal' && element.tag !== 'form-modal') return;
+    const error = bound(element, 'error');
     const own = slotOf(element);
-    if (own) found.push(own);
+    if (own) found.push({ ...own, error });
     for (const child of element.children) {
       const slot = isElement(child) && child.tag === 'template' ? slotOf(child) : undefined;
-      if (slot) found.push(slot);
+      if (slot) found.push({ ...slot, error });
     }
   });
   return found;
@@ -284,12 +297,31 @@ function unnamedFields(file: string, reach: Reach, imports: Record<string, strin
   return found;
 }
 
-/** Every field without its name in the windows of the file at `path`. */
+/** Where the scripts read raw the fields of the refusal a window hands FormModal: of what its `:error` names, or of a
+ *  command's own `error`, as `<file>:<line>: …`. */
+function rawReads(file: string, error: string, scripts: readonly Script[]): string[] {
+  const names = [...new Set(error.match(/[A-Za-z_$][\w$]*/g) ?? [])].filter((name) => !['null', 'undefined', 'true', 'false'].includes(name));
+  const raw = new RegExp(`(?<![\\w$.])(?:${[...names, '[\\w$]+\\.error'].join('|')})(?:\\.value)?\\??\\.fields\\b`, 'g');
+  return scripts.flatMap(({ content, line }) =>
+    content.split('\n').flatMap((text, at) =>
+      [...text.matchAll(raw)].map(
+        ([read]) => `${file}:${line + at}: reads ${read} raw: FormModal never takes away what is painted from it, paint fieldErrors of its slot`,
+      ),
+    ),
+  );
+}
+
+/** Every field without its name in the windows of the file at `path`, and every read of their refusal raw. */
 function scan(path: string, readFile: Reader): string[] {
   const source = readFile(path);
   const template = source ? read(source) : undefined;
   if (!template) return [];
-  return windows(template.nodes).flatMap((reach) => unnamedFields(path, { ...reach, voiced: template.voiced }, template.imports, readFile));
+  const reaches = windows(template.nodes);
+  const errors = [...new Set(reaches.flatMap((reach) => (reach.error ? [reach.error] : [])))];
+  return [
+    ...reaches.flatMap((reach) => unnamedFields(path, { ...reach, voiced: template.voiced }, template.imports, readFile)),
+    ...errors.flatMap((error) => rawReads(path, error, template.scripts)),
+  ];
 }
 
 // ── The hub's sources ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -445,6 +477,28 @@ describe('guardrail: every field of a FormModal window that paints its refusal c
     expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': windowWith(group(' ref="tiersGroup"'), voiced) })).toEqual([]);
   });
 
+  it('sees a window that takes fieldErrors yet reads the refusal it hands FormModal raw in its script (hub#1460)', () => {
+    const script = [
+      'const error = computed(() => (schedule ? update.error.value : creation.error.value));',
+      'const errorsByDay = computed(() => dayErrors(error.value?.fields ?? {}, sent.value));',
+      "const nameError = computed(() => creation.error.value?.fields?.name ?? '');",
+      'const fields = computed(() => action.value?.fields ?? []);',
+    ].join('\n');
+    const fields = '<p v-if="errorsByDay[day]">{{ errorsByDay[day] }}</p>';
+    const source = windowWith(fields, script).replace('<FormModal ', '<FormModal :error="error" ');
+    expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': source })).toEqual([
+      'apps/x/frontend/components/XFormModal.vue:3: reads error.value?.fields raw: FormModal never takes away what is painted from it, paint fieldErrors of its slot',
+      'apps/x/frontend/components/XFormModal.vue:4: reads creation.error.value?.fields raw: FormModal never takes away what is painted from it, paint fieldErrors of its slot',
+    ]);
+  });
+
+  it('lets through a window that hands FormModal its refusal reshaped and paints fieldErrors of its slot, and another object’s refusal', () => {
+    const script = ['const refusal = computed(() => refusalByDay(error.value));', 'const steps = computed(() => wizard.refusal.fields);'].join('\n');
+    const fields = '<p v-if="fieldErrors[`days.${i}`]">{{ fieldErrors[`days.${i}`] }}</p>';
+    const source = windowWith(fields, script).replace('<FormModal ', '<FormModal :error="refusal" ');
+    expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': source })).toEqual([]);
+  });
+
   it('sees a refusal painted apart in the component the window hands it to, under the prop’s name', () => {
     const files = {
       'apps/x/frontend/components/XFormModal.vue': windowWith('<WeekEditor v-model="week" :errors="fieldErrors" />', "import WeekEditor from './WeekEditor.vue';"),
@@ -528,6 +582,10 @@ describe('the hub’s FormModal windows name the fields they paint the refusal o
   it('no file leaves more fields unnamed than the list says: a new field carries name="<k>"', () => {
     const over = new Set(offTheList(unnamedByFile(), STILL_UNNAMED).over);
     expect(unnamedInTheHub().filter((field) => over.has(fileOf(field)))).toEqual([]);
+  });
+
+  it('no window that takes fieldErrors paints a refusal its script reads raw: what it paints from there stays (hub#1460)', () => {
+    expect(everyUnnamedInTheHub().filter((field) => / raw: /.test(field))).toEqual([]);
   });
 
   it('the list only goes down: a file that names more of its fields lowers its number, a fixed one leaves', () => {
