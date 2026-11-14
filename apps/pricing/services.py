@@ -806,6 +806,14 @@ def update_rule(ctx: OperationContext, data: RulePatchIn) -> dict:
     return rule_row(rule, platform.business_currency(ctx.scope))
 
 
+def _group_held(rule: DiscountRule) -> bool:
+    """Whether ``rule`` may be on as for its group: none, or one Customers still has. A deleted group's rule would apply
+    to nobody, or, without the group, to everybody. Held when it is there, so its deletion waits for the rule to be on
+    (and switches it off after)."""
+    group = rule.customer_group_id
+    return group is None or bool(held(CustomerGroup.objects.filter(pk=group)))
+
+
 def _switch_rule(ctx: OperationContext, data: RuleRefIn, active: bool) -> dict:
     rule = find_rule(data.id, data.rule, lock=True)
     if rule.is_active == active:
@@ -815,10 +823,7 @@ def _switch_rule(ctx: OperationContext, data: RuleRefIn, active: bool) -> dict:
             else (RULE_ALREADY_INACTIVE, "pricing.rule_already_inactive")
         )
         raise Conflict(str(message), code=code)
-    group = rule.customer_group_id
-    if active and group is not None and not held(CustomerGroup.objects.filter(pk=group)):
-        # Its group was deleted in Customers: it would apply to nobody, or, without the group, to everybody.
-        # Held when it is there, so its deletion waits for the rule to be on (and switches it off after).
+    if active and not _group_held(rule):
         raise Conflict(str(RULE_GROUP_DELETED), code="pricing.rule_group_deleted")
     rule.is_active = active
     rule.updated_by = _actor(ctx)
@@ -917,6 +922,38 @@ def forget_product(ctx: OperationContext, data: CatalogEventIn) -> dict:
         item.delete()
     rules = _switch_off(ctx, DiscountRule.objects.filter(product_id=data.id))
     return {"lists": 0, "items": len(items), "rules": rules}
+
+
+@operation(
+    "pricing.catalog.recall_product",
+    kind="command",
+    permission="pricing.system",
+    input=CatalogEventIn,
+    output=CatalogOut,
+    ai={
+        "description": "Platform reaction to inventory.product.restored: switch back on the product's rules that its "
+        "deletion switched off.",
+        "risk": "normal",
+    },
+)
+def recall_product(ctx: OperationContext, data: CatalogEventIn) -> dict:
+    if not Product.objects.filter(pk=data.id, is_deleted=False).exists():
+        # Deleted again before this reached the app: its deletion's own reaction comes next.
+        return {"lists": 0, "items": 0, "rules": 0}
+    # The platform runs every reaction as the same actor, forget_product's included: a rule the business switched off
+    # or touched since carries its own, and is left as the business left it.
+    switched_off = DiscountRule.objects.select_for_update().filter(
+        product_id=data.id, is_active=False, updated_by=_actor(ctx)
+    )
+    count = 0
+    for rule in switched_off:
+        if not _group_held(rule):
+            continue
+        rule.is_active = True
+        rule.save(update_fields=["is_active", "updated_at"])
+        record_event(ctx, events.RULE_ACTIVATED, {"id": str(rule.id)})
+        count += 1
+    return {"lists": 0, "items": 0, "rules": count}
 
 
 @operation(

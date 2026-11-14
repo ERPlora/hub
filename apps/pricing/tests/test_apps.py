@@ -33,12 +33,14 @@ COMMANDS = {
     "pricing.rule.deactivate",
     "pricing.rule.activate",
     "pricing.catalog.forget_product",
+    "pricing.catalog.recall_product",
     "pricing.catalog.forget_category",
     "pricing.catalog.forget_group",
     "pricing.catalog.refresh_service",
 }
 SYSTEM = {
     "pricing.catalog.forget_product",
+    "pricing.catalog.recall_product",
     "pricing.catalog.forget_category",
     "pricing.catalog.forget_group",
     "pricing.catalog.refresh_service",
