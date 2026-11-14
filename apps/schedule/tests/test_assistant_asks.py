@@ -8,19 +8,18 @@ of the catalogue of a business with every app on and ranked as a turn ranks, is 
 copies a probe of layer 2.
 """
 
-import dataclasses
 import json
 from pathlib import Path
 
 import pytest
 from django.conf import settings
-from live import assistant as shared
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, offered_place, place_of_no_ask
+from base.tests.test_assistant_asks import assert_offered_with_room, comparable, offered_place, place_of_no_ask
 from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: What changes the business's opening hours (``schedule.add``, ``schedule.change``, ``schedule.delete``,
@@ -100,12 +99,6 @@ OWN_WORDS = [
     ("schedule.settings.update", "quiero que el calendario arranque en domingo"),
 ]
 
-def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
-    """``tools`` with ``name`` saying no asks: how a turn ranked it by its name and description alone."""
-    op = tools[name]
-    return {**tools, name: dataclasses.replace(op, ai={key: value for key, value in op.ai.items() if key != "asks"})}
-
-
 def test_schedules_is_listed_so_layer_1_sweeps_every_ask_of_it():
     """Schedules is in ``LIVE_ASSISTANT_ASKS_REQUIRED``: ``base/tests/test_assistant_asks.py`` ranks each of its asks
     for every role and language, and ``live.E020`` requires them of each of its tools."""
@@ -164,14 +157,28 @@ def test_every_probe_of_schedules_offers_its_tool_without_being_one_of_its_asks(
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, probe["language"]), probe["tool"], probe["phrase"])
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    assert comparable(phrase) not in probe_phrases()
-    assert_offered_with_room(tools, name, phrase, room=TOP)
-    before = without_its_asks(tools, name)
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
 
-    assert not shared.asks_of(before[name])  # positive control: the tool is ranked without its asks
-    unasked = offered_place(before, name, phrase)
-    assert unasked is None or unasked > TOP, unasked
+
+#: What the owner says in English in words of their own for each tool of Schedules that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("schedule.business.is_open", "do we have the shop open at this hour?"),
+    ("schedule.hours.for_range", "what times are we open every day in the first half of December?"),
+    ("schedule.override.create", "we're shutting the first half of August for the holidays"),
+    ("schedule.override.delete", "drop the August closure, this year we don't stop"),
+    ("schedule.override.list", "have we planned any closure for the summer?"),
+    ("schedule.override.update", "the August holidays end on the 20th in the end"),
+    ("schedule.settings.get", "which time zone are we in?"),
+    ("schedule.settings.update", "make Monday the first day"),
+    ("schedule.special_day.bulk_create", "put in all the national holidays for 2027 at once"),
+    ("schedule.special_day.create", "the 15th of August we stay closed, it's the town's fair"),
+    ("schedule.special_day.delete", "we'll open as usual on the town's fair day after all"),
+    ("schedule.special_day.list", "what holidays do I have marked on the calendar?"),
+    ("schedule.special_day.update", "we'll open on Epiphany morning after all"),
+    ("schedule.week.confirm", "the default opening is fine as it is, without changes"),
+    ("schedule.week.get", "usually, which days are we shut, Monday to Sunday?"),
+    ("schedule.week.set_day", "make the usual Saturday 9 to 13"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_each_tool_has_its_own_english_words = english_coverage_test("schedule", OWN_WORDS_EN)

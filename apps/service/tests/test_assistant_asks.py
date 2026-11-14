@@ -20,9 +20,11 @@ from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import assert_its_asks_bring, assert_offered_with_room
+from base.tests.test_assistant_asks import assert_offered_with_room
 from base.tests.test_assistant_asks import assert_reported_are_owner_probes, comparable, offered_place, offered_to
 from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test, probes_test
+from base.tests.test_assistant_asks import reported_test
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 PROBES_DIR = Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes"
@@ -200,22 +202,12 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     assert_reported_are_owner_probes(REPORTED)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), REPORTED)
-def test_the_reported_service_request_offers_its_existing_operation(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    assert_offered_with_room(tools, name, phrase)
+test_the_reported_service_request_offers_its_existing_operation = reported_test(REPORTED)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
-def test_every_probe_of_services_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
-    """The owner's forty-six phrases of layer 2, the ones the model answered right too: a tool of Services that a new
-    ask elsewhere pushes out of the ones a turn offers fails here before the real-model QA sees it."""
-    assert (probe["app"], probe["role"], probe["language"]) == ("service", "owner", "es")
-    tools = catalog_of(Membership.Role.OWNER, probe["language"])
-    name, phrase = probe["tool"], probe["phrase"]
-    assert_offered_with_room(tools, name, phrase)
+#: The owner's forty-six phrases of layer 2, the ones the model answered right too: a tool of Services that a new ask
+#: elsewhere pushes out of the ones a turn offers fails here before the real-model QA sees it.
+test_every_probe_of_services_offers_its_tool_without_being_one_of_its_asks = probes_test(PROBES, "service")
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -233,10 +225,61 @@ def test_the_close_probes_are_probes_of_services():
     assert FIRST_TEN <= {probe["tool"] for probe in PROBES}  # positive control: no name of the list is mistyped
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_owners_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
+test_a_request_in_the_owners_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+
+
+#: What the owner says in English in words of their own for each tool of Services that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("service.assignment.assign", "Sonia will do colour too now, at 50 euros"),
+    ("service.assignment.eligible", "anyone able to do a pedicure, and at what price?"),
+    ("service.assignment.get", "what time and price does Raquel have for the beard trim?"),
+    ("service.assignment.list", "what does Sonia do in the salon?"),
+    ("service.assignment.remove", "take Sonia off colour"),
+    ("service.assignment.update", "Sonia's main one should be the pedicure now"),
+    ("service.catalog.status", "how is the catalogue doing, can everything be charged yet?"),
+    ("service.category.create", "we need a Colour category among the services"),
+    ("service.category.delete", "drop the nails one; what's in it can stay without"),
+    ("service.category.get", "what's under the nails one?"),
+    ("service.category.list", "how are our services split up?"),
+    ("service.category.update", "Nails should go inside Hair"),
+    ("service.grant.adjust", "give Pilar two more weeks on hers"),
+    ("service.grant.adjust_check", "could Marta's get a later expiry?"),
+    ("service.grant.create", "Inés is taking the five-massage one"),
+    ("service.grant.get", "details of Marta's, with its balance"),
+    ("service.grant.list", "what has Inés bought?"),
+    ("service.grant.list_orphans", "any left whose customer was erased?"),
+    ("service.grant.redeem", "mark one of Pilar's massage sessions as spent"),
+    ("service.grant.redeem_check", "what stops Pilar's from being used?"),
+    ("service.grant.tender_options", "what can Pilar use to pay for her massage?"),
+    ("service.grant.void", "Pilar's was sold by mistake"),
+    ("service.grant.void_check", "too late to undo Pilar's?"),
+    ("service.movement.list", "what happened with the laser one?"),
+    ("service.package.create", "five massages for 180 euros, valid a year"),
+    ("service.package.delete", "we'll stop selling the massage pack"),
+    ("service.package.get", "details of the massage pack, please"),
+    ("service.package.list", "which ones do we offer to choose from?"),
+    ("service.package.update", "the massage one goes up to 230 euros"),
+    ("service.service.archive", "we don't offer the perm any longer"),
+    ("service.service.bulk_create", "create all of these at once: brows, lashes and nails"),
+    ("service.service.create", "add a men's haircut at 14 euros"),
+    ("service.service.get", "how long does the manicure take?"),
+    ("service.service.list", "which services do we offer today?"),
+    ("service.service.list_for_sale", "what's for sale right now?"),
+    ("service.service.restore", "we're doing beard trims again, bring them back"),
+    ("service.service.set_image", "put the second one on the beard trim"),
+    ("service.service.suggest_image", "suggest a drawing for the beard trim"),
+    ("service.service.update", "the manicure now costs 30 euros"),
+    ("service.session.get", "Marta's session: still held, or what happened?"),
+    ("service.session.hold", "keep one of Marta's sessions for her colour"),
+    ("service.session.release", "free the one held for Marta's manicure"),
+    ("service.session.return", "the laser sale was refunded, put the sessions back"),
+    ("service.session.settle", "we just charged the sale, deliver whatever is held"),
+    ("service.settings.get", "how much buffer do we leave by default?"),
+    ("service.settings.update", "I want fifteen minutes between them by default"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_each_tool_has_its_own_english_words = english_coverage_test("service", OWN_WORDS_EN)
 
 
 def test_every_tool_of_services_has_its_own_words():

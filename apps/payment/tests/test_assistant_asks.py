@@ -20,8 +20,9 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, assert_offered_with_room, comparable, offered_to
+from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, offered_to
 from base.tests.test_assistant_asks import place_in, probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: Every write of Payments: an employee only looks (``payment.view_payment``), and none of them is a write a manager
@@ -232,7 +233,26 @@ def test_each_tool_of_payments_has_its_own_words():
     )
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("language", "name", "phrase"), OWN_WORDS, ids=[name for _, name, _ in OWN_WORDS])
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, language, name, phrase):
-    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, language), name, phrase, language)
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(
+    OWN_WORDS, ids=[name for _, name, _ in OWN_WORDS]
+)
+
+
+#: What the owner says in English in words of their own for each tool of Payments that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("payment.method.create", "we'll send outgoing payments from BBVA too"),
+    ("payment.method.get", "I need the whole Santander reference for a supplier"),
+    ("payment.method.list", "where do our supplier payments leave from?"),
+    ("payment.method.update", "rename the Unicaja account to Main"),
+    ("payment.payment.approve", "give the Iberdrola draft the go-ahead"),
+    ("payment.payment.cancel", "we gave him cash, call off the transfer"),
+    ("payment.payment.get", "show me everything on the Endesa one"),
+    ("payment.payment.list", "what hasn't gone out yet?"),
+    ("payment.payment.mark_completed", "Iberdrola says the money has arrived"),
+    ("payment.payment.mark_sent", "the Iberdrola money has gone out from the bank"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+#: The English words of ``OWN_WORDS`` that its English asks lift already; the others have their own above.
+ENGLISH_ABOVE = [name for language, name, _ in OWN_WORDS if language == "en" and name not in dict(OWN_WORDS_EN)]
+test_each_tool_has_its_own_english_words = english_coverage_test("payment", OWN_WORDS_EN, ENGLISH_ABOVE)

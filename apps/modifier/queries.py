@@ -19,7 +19,13 @@ from live.operations import operation
 from psycopg import sql
 
 from apps.inventory.models import Product, ProductCategory, Unit
-from apps.inventory.queries import find_category, find_product, products_standing_for
+from apps.inventory.queries import (
+    categories_standing_for,
+    category_names_in_copy,
+    find_category,
+    find_product,
+    products_standing_for,
+)
 from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
 from apps.modifier.schemas import (
     CategoryRefIn,
@@ -674,13 +680,34 @@ def resolve_selection(ctx: OperationContext, data: ResolveIn) -> dict:
 #: ``modifier.link.attach`` takes and its product's SKU there, each a column since ``0001_initial``.
 LINK_FIELDS = ("id", "group_id", "product_id", "sku")
 
+#: What a group hung from a category in a separate copy is read with: its link's id there and what
+#: ``modifier.link.attach`` takes, each a column since ``0001_initial``.
+CATEGORY_LINK_FIELDS = ("id", "group_id", "category_id")
+
 
 def links_in_copy(conn) -> list[dict]:
     """Each group hung from a product in a separate copy of the business, of a product Inventory had not deleted there
-    (a category's groups are not a product's), with what ``LINK_FIELDS`` names; nothing where the app's table is not
-    there. ``conn`` is the copy's direct, read-only connection: it is read by its own SQL over the models' names, never
-    the ORM."""
-    link, product = ModifierLink._meta, Product._meta
+    (a category's groups are ``category_links_in_copy``), with what ``LINK_FIELDS`` names; nothing where the app's table
+    is not there. ``conn`` is the copy's direct, read-only connection."""
+    return [dict(zip(LINK_FIELDS, row, strict=True)) for row in _links_in_copy(conn, "product", also=("sku",))]
+
+
+def category_links_in_copy(conn) -> list[dict]:
+    """Each group hung from a category in a separate copy of the business, of a category Inventory had not deleted
+    there, with what ``CATEGORY_LINK_FIELDS`` names and the copy's live categories by name (``copy_categories``, to pair
+    its category with the business's); nothing where the app's table is not there. ``conn`` is the copy's direct,
+    read-only connection."""
+    rows = _links_in_copy(conn, "category")
+    named = category_names_in_copy(conn)
+    return [dict(zip(CATEGORY_LINK_FIELDS, row, strict=True)) | {"copy_categories": named} for row in rows]
+
+
+def _links_in_copy(conn, target: str, also: tuple[str, ...] = ()) -> list[tuple]:
+    """The copy's links to a live ``target`` of Inventory (``"product"`` or ``"category"``), by id: each one's id, group
+    and target there, and the target's columns ``also``; none where the app's table is not there. It is read by its own
+    SQL over the models' names, never the ORM: the copy is no business."""
+    link = ModifierLink._meta
+    model = link.get_field(target).related_model._meta
     if conn.execute("SELECT to_regclass(%s)", [link.db_table]).fetchone()[0] is None:
         return []
 
@@ -688,39 +715,55 @@ def links_in_copy(conn) -> list[dict]:
         return sql.Identifier(meta.get_field(field).column)
 
     read = sql.SQL(
-        "SELECT {columns} FROM {links} l JOIN {products} p ON p.{product_pk} = l.{product_id}"
-        " WHERE NOT p.{deleted} ORDER BY l.{link_pk}"
+        "SELECT {columns} FROM {links} l JOIN {targets} t ON t.{target_pk} = l.{target_id}"
+        " WHERE NOT t.{deleted} ORDER BY l.{link_pk}"
     ).format(
         columns=sql.SQL(", ").join(
             [
-                *(sql.SQL("l.{}").format(column(link, field)) for field in ("id", "group", "product")),
-                sql.SQL("p.{}").format(column(product, "sku")),
+                *(sql.SQL("l.{}").format(column(link, field)) for field in ("id", "group", target)),
+                *(sql.SQL("t.{}").format(column(model, field)) for field in also),
             ]
         ),
         links=sql.Identifier(link.db_table),
-        products=sql.Identifier(product.db_table),
-        product_pk=column(product, "id"),
-        product_id=column(link, "product"),
-        deleted=column(product, "is_deleted"),
+        targets=sql.Identifier(model.db_table),
+        target_pk=column(model, "id"),
+        target_id=column(link, target),
+        deleted=column(model, "is_deleted"),
         link_pk=column(link, "id"),
     )
-    return [dict(zip(LINK_FIELDS, row, strict=True)) for row in conn.execute(read)]
+    return conn.execute(read).fetchall()
 
 
 def links_not_in_business(links: list[dict]) -> list[dict]:
     """The groups hung from a product in a separate copy (``links_in_copy``) the business no longer hangs there, in
     their order, each as ``modifier.link.attach`` takes it with its ``id`` there. Its product is the business's that
     stands for the copy's (Inventory's ``products_standing_for``): the same while live, else the one a recovery made
-    again with its SKU. Not lacking: one whose group the business hangs from that product, the same link or one hung
-    again: it stays as the business has it. A link never changes its group nor its product, so the one the business
-    still holds is always in its place."""
+    again with its SKU."""
+    return _not_hung(links, "product", products_standing_for({one["product_id"]: one["sku"] for one in links}))
+
+
+def category_links_not_in_business(links: list[dict]) -> list[dict]:
+    """The groups hung from a category in a separate copy (``category_links_in_copy``) the business no longer hangs
+    there, in their order, each as ``modifier.link.attach`` takes it with its ``id`` there. Its category is the
+    business's that stands for the copy's (Inventory's ``categories_standing_for``): the same while live, else the one a
+    recovery brought back with its name."""
+    if not links:
+        return []
+    return _not_hung(links, "category", categories_standing_for(links[0]["copy_categories"]))
+
+
+def _not_hung(links: list[dict], target: str, here: dict) -> list[dict]:
+    """Of the copy's ``links`` to a ``target``, those whose group the business does not hang from the ``target`` that
+    stands for the copy's (``here``, ``{id there: id here}``; the copy's own id when none does, which the attach then
+    refuses as not found). Not lacking: the same link or one the business hung again, which stays as the business has
+    it. A link never changes its group nor its target, so the one the business still holds is always in its place."""
+    key = f"{target}_id"
     taken = set(
-        ModifierLink.objects.filter(group_id__in={one["group_id"] for one in links}).values_list("group_id", "product_id")
+        ModifierLink.objects.filter(group_id__in={one["group_id"] for one in links}).values_list("group_id", key)
     )
-    here = products_standing_for({one["product_id"]: one["sku"] for one in links})
     lacking = []
     for one in links:
-        product = here.get(one["product_id"], one["product_id"])
-        if (one["group_id"], product) not in taken:
-            lacking.append({"id": one["id"], "group_id": one["group_id"], "product_id": product})
+        at = here.get(one[key], one[key])
+        if (one["group_id"], at) not in taken:
+            lacking.append({"id": one["id"], "group_id": one["group_id"], key: at})
     return lacking
