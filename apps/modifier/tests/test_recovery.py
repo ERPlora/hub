@@ -29,7 +29,7 @@ from apps.modifier import queries
 from apps.modifier.models import ModifierLink
 from base.recovery import actor_of
 from base.tenancy.context import use_hub
-from base.tenancy.tests.test_recovery import Recoveries, fresh, run, run_in
+from base.tenancy.tests.test_recovery import Recoveries, fields_held_since, fresh, run, run_in
 
 from .conftest import make_category, make_product
 from .conftest import run as run_here
@@ -151,6 +151,10 @@ def test_the_app_declares_its_groups_of_products_hung_again_by_the_group_sheets_
         "",
     )
     assert (str(links.label), links.reads_since) == ("Modifier groups of products", "0001_initial")
+    # A copy that far back holds what the read takes: the link's columns, and of its product, those of Inventory's
+    # migration that one depends on.
+    assert {"id", "group", "product"} <= fields_held_since("modifier", "modifierlink", links.reads_since)
+    assert {"sku", "is_deleted"} <= fields_held_since("inventory", "product", "0001_initial")
 
 
 # ── End to end: the business's own database and its copy ────────────────────────────────────────────────────────────
