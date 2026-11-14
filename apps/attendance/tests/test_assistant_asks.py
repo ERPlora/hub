@@ -18,8 +18,10 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, assert_offered_with_room
+from base.tests.test_assistant_asks import TOP
 from base.tests.test_assistant_asks import assert_reported_are_owner_probes, offered_place
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test, probes_test
+from base.tests.test_assistant_asks import reported_test
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 #: What only who sees, corrects or sets up the team's time clock holds (``attendance.view_all``,
 #: ``attendance.correct``, ``attendance.manage_settings``): an employee clocks and reads their own days, never these.
@@ -102,28 +104,41 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     assert_reported_are_owner_probes(REPORTED)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), REPORTED)
-def test_the_reported_attendance_request_offers_its_existing_operation(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    assert_offered_with_room(tools, name, phrase)
+test_the_reported_attendance_request_offers_its_existing_operation = reported_test(REPORTED)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
-def test_every_probe_of_the_time_clock_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
-    """The owner's eighteen phrases of layer 2, the ones the model answered right too: a tool of Time clock that a new
-    ask elsewhere pushes out of the first half of the ones a turn offers fails here before the real-model QA sees it."""
-    assert (probe["app"], probe["role"], probe["language"]) == ("attendance", "owner", "es")
-    tools = catalog_of(Membership.Role.OWNER, probe["language"])
-    name, phrase = probe["tool"], probe["phrase"]
-    assert_offered_with_room(tools, name, phrase)
+#: The owner's eighteen phrases of layer 2, the ones the model answered right too: a tool of Time clock that a new ask
+#: elsewhere pushes out of the first half of the ones a turn offers fails here before the real-model QA sees it.
+test_every_probe_of_the_time_clock_offers_its_tool_without_being_one_of_its_asks = probes_test(PROBES, "attendance")
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+
+
+#: What the owner says in English in words of their own for each tool of Time clock that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("attendance.break.end", "I'm back from lunch"),
+    ("attendance.break.start", "put me on lunch"),
+    ("attendance.correction.list", "who changed Marisa's day and why?"),
+    ("attendance.person.detail", "has Marisa left the business?"),
+    ("attendance.person.list", "whose days can I see?"),
+    ("attendance.presence.count", "how many have I got clocked in at this hour?"),
+    ("attendance.presence.list", "who's still working, and since when?"),
+    ("attendance.record.clock_in", "Javier has just arrived"),
+    ("attendance.record.clock_out", "I'm leaving now, end my day"),
+    ("attendance.record.close_for_terminated", "I just let Marisa go and her day is still open"),
+    ("attendance.record.correct", "Marisa left at 6 on Monday, fix her day"),
+    ("attendance.record.current", "my day so far: how long have I worked?"),
+    ("attendance.record.detail", "show me Marisa's Monday with its breaks"),
+    ("attendance.record.export", "the labour people want October's days"),
+    ("attendance.record.list", "which days did Javier clock in during October?"),
+    ("attendance.record.review_stale", "look for days left open too long and flag them"),
+    ("attendance.settings.get", "how big is the radius we allow for clocking in?"),
+    ("attendance.settings.update", "ask for the location when people use their own phone"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_each_tool_has_its_own_english_words = english_coverage_test("attendance", OWN_WORDS_EN)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role

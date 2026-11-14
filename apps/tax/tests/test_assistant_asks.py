@@ -15,8 +15,9 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import assert_its_asks_bring, assert_offered_with_room, comparable, offered_to
+from base.tests.test_assistant_asks import assert_offered_with_room, comparable, offered_to
 from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: Taxes' assistant tools: its reads (the calculator, categories, rules, aliases and the business's tax region) and
@@ -156,7 +157,30 @@ def test_every_tool_of_taxes_has_its_own_words():
     assert {name for name, _ in OWN_WORDS} == TOOLS
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+
+
+#: What the owner says in English in words of their own for each tool of Taxes that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("tax.alias.create", "teach it that «menú diario» means food"),
+    ("tax.alias.list", "what words does it know from a spreadsheet?"),
+    ("tax.alias.resolve", "what would «reduced 10» mean?"),
+    ("tax.category.create", "make one for footwear, called Footwear, with its VAT"),
+    ("tax.category.get", "what's the Spanish name of the food one?"),
+    ("tax.category.list", "which VAT can a product have today?"),
+    ("tax.rate.calculate", "a 60 € book: work out its VAT at the reduced rate"),
+    ("tax.rule.activate", "bring the 10 % on books back"),
+    ("tax.rule.bulk_create", "several at once: books 4, food 10, general 21"),
+    ("tax.rule.countries", "which countries are the taxes set up for?"),
+    ("tax.rule.create", "bread is 4 % in Spain from January"),
+    ("tax.rule.deactivate", "put the footwear VAT on hold for a while"),
+    ("tax.rule.end", "footwear's rate stops in July: give it its last day"),
+    ("tax.rule.list", "which ones apply in Spain?"),
+    ("tax.rule.parent_candidates", "for books, what can it hang under?"),
+    ("tax.rule.status", "does the till have what it needs to start selling?"),
+    ("tax.settings.get", "which territory do we operate in?"),
+    ("tax.settings.update", "go back to the national one, nothing special"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_each_tool_has_its_own_english_words = english_coverage_test("tax", OWN_WORDS_EN)

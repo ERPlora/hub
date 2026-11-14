@@ -285,6 +285,7 @@ const HOURS = [
   font-weight: 600;
 }
 .staff-week__day {
+  container-type: inline-size;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -298,14 +299,23 @@ const HOURS = [
   min-width: 8.5rem;
   font-weight: 600;
 }
+/* The four hours go two by two in columns: start · «to» · end · «break», then the break's start · «to» · end. The
+   fields share what the words leave instead of a fixed width, so «Inicio descanso» reads whole. */
 .staff-week__hours {
-  display: flex;
-  flex-wrap: wrap;
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
 }
-.staff-week__time {
-  width: 7.5rem;
+/* On a narrow phone «break» takes a line of its own between the two pairs, so the fields keep room for their hour. */
+@container (max-width: 21rem) {
+  .staff-week__hours {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+  .staff-week__hours > .staff-week__sep:nth-child(4) {
+    grid-column: 1 / -1;
+  }
 }
 .staff-week__sep {
   color: var(--ion-color-medium-shade, #5f5f5f);

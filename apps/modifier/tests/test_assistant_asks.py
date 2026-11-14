@@ -19,8 +19,9 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, assert_offered_with_room, comparable
+from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable
 from base.tests.test_assistant_asks import offered_place, probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 OWNER, ADMIN, MANAGER, EMPLOYEE = (
@@ -162,10 +163,32 @@ def test_the_probes_of_modifiers_are_read():
     assert len(PROBES) == 23  # the owner's seventeen, one per tool, and six of the employee's
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_its_asks_bring(catalog_of(OWNER, "es"), name, phrase, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+
+
+#: What the owner says in English in words of their own for each tool of Modifiers that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("modifier.category.get", "where is Sandwiches? I want to hang add-ons on it"),
+    ("modifier.group.create", "we need one for doneness, one choice only"),
+    ("modifier.group.delete", "Doneness is not needed, delete all of it"),
+    ("modifier.group.for_target", "what will the till ask if I ring up a steak sandwich?"),
+    ("modifier.group.get", "what's the most that can be picked in Doneness?"),
+    ("modifier.group.list", "what add-ons can go with the dishes?"),
+    ("modifier.group.update", "up to three can be picked in Extras now"),
+    ("modifier.link.attach", "with the sirloin, always ask about doneness"),
+    ("modifier.link.detach", "the sirloin doesn't need Extras anymore, unlink it"),
+    ("modifier.link.get", "do the fries carry Extras?"),
+    ("modifier.link.list", "which dishes come with Sauces?"),
+    ("modifier.option.create", "Extras is missing double bacon, add it at one euro"),
+    ("modifier.option.delete", "drop barbecue sauce, we don't have it"),
+    ("modifier.option.get", "where does Gluten free hang and how much does it add?"),
+    ("modifier.option.list", "what's in Sauces and what does each cost?"),
+    ("modifier.option.update", "extra cheese now costs one fifty, change it"),
+    ("modifier.selection.resolve", "if I add double cheese to the pizza, how much more is it?"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_each_tool_has_its_own_english_words = english_coverage_test("modifier", OWN_WORDS_EN)
 
 
 def test_the_hub_reads_predeterminada_as_the_default():

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3556af30c872f2e24a668f748e9ba8cbaf66a5d3605dda700a653525fcfa9a06 -->
+<!-- generated from WORKBOOK.md sha256:5e90de1a5b983df7cb6a23bc9307171f1cc1188603b6bb16c137872dca217e64 -->
 
 ## What it is for and who it is for
 
@@ -2933,11 +2933,11 @@ Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APP
 ### BASE-F114 Put a business back as it was at a past moment from the Hub admin
 Status: done (the action and the restore, in its place or to a separate copy, and getting back from the separate copy
 the customers that were lost, the deleted ones as they were, the products, the services with their categories, the
-appointments, the repeating appointments, the price list prices and the modifier groups and the menu choices of the
-products; making and deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws;
-the price list prices of a service that comes back as a new one, hub#1459; the modifier groups of a category that comes
-back, hub#1456; a deleted modifier group, hub#1458; the menu choices of a product that comes back as a new one,
-hub#1473; a removed menu or course, hub#1474)
+appointments, the repeating appointments, the price list prices, the modifier groups of the categories and of the
+products and the menu choices of the products; making and deleting the temporary cluster is the procedure "Devolver un
+negocio a un momento" of ERPlora/aws; the price list prices of a service that comes back as a new one, hub#1459; a
+deleted modifier group, hub#1458; the menu choices of a product that comes back as a new one, hub#1473; a removed menu
+or course, hub#1474)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -2978,12 +2978,12 @@ Steps:
      again of a booking they already had (hub#1307). Below, "What to bring back", with what can be brought ticked
      (today, **Customers**, **Product categories, Products, Product links to categories**, **Service categories,
      Services, Service links to categories, Subcategory links to categories**, **Appointments, Repeating
-     appointments**, **Price list prices**, **Menu choices of products** and **Modifier groups of products**).
-     They press **Recover**.
+     appointments**, **Price list prices**, **Menu choices of products** and **Modifier groups of categories, Modifier
+     groups of products**). They press **Recover**.
   10. "1 separate copy will give back Customers, Product categories, Products, Product links to categories, Service
       categories, Services, Service links to categories, Subcategory links to categories, Appointments, Repeating
-      appointments, Price list prices, Menu choices of products, Modifier groups of products into its
-      business within a few minutes: Recoveries says how it went." appears.
+      appointments, Price list prices, Menu choices of products, Modifier groups of categories, Modifier groups of
+      products into its business within a few minutes: Recoveries says how it went." appears.
       In Recoveries they
       see it "Asked" with the copy, what
       was asked and when.
@@ -3094,7 +3094,12 @@ Steps:
       one, asks again at the till for its sauces, its doneness or its extras (MODIFIER-F10). One whose group the
       business has linked to that product again is not repeated: the business's own stays. One the group's sheet does
       not accept today (its product still deleted, or the business already made another one by hand with its SKU, or it
-      deleted the group) does not come back and its reason says so.
+      deleted the group) does not come back and its reason says so. Just before them go, counted apart, the modifier
+      groups of the categories: "Modifier groups of categories: 2 created". Each group that in the copy hung from a
+      category live there and that the business no longer has linked to it is linked again the same way: to the same
+      category if the business kept it, or to the one the recovery brought back for it with its name, so its products
+      ask for it again at the till. A category still deleted, or one the business made again by hand, stays without
+      it, and its reason says so.
       The menu choices of the products go after the products too: "Menu choices of products: 2 created". Each choice
       that in the copy offered a product live there and that the business no longer has is added again to its course,
       as the menu builder adds it, with its supplement and, if it was sold out, sold out, so a deleted product that comes
@@ -3128,8 +3133,8 @@ it no longer had, with its appointment-created notice (`appointment.appointment.
 appointment it still held, active again with its series-recovered notice (`appointment.recurring.restored`), a new
 repeating appointment for each one it no longer had, with its series-created notice (`appointment.recurring.created`)
 and that of each appointment it books, a price list price for each one it lacked, with its price-put notice
-(`pricing.price_item.added`), a modifier group linked to a product for each one it lacked, with its link-made notice
-(`modifier.link.attached`), and a menu choice for each one it lacked, with its new-choice notice
+(`pricing.price_item.added`), a modifier group linked to a category or a product for each one it lacked, with its
+link-made notice (`modifier.link.attached`), and a menu choice for each one it lacked, with its new-choice notice
 (`combo.option.created`), and nothing else. Each of
 those notices says the recovery did it (its actor is `copy_recovery:<id>`, that of the row in Recoveries), so no
 automation of the business starts on them (FLOW-F21), whether of something created or of something recovered; what only

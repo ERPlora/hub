@@ -6,8 +6,8 @@
 // hours; a day ending before it starts is refused under that day (422), and its reason goes as soon as that
 // day is changed, while another refused day keeps its own; editing drops Friday; «Delete» asks first and
 // empties the list. In English and in Spanish, from a phone to a desk, every day's name reads whole, on one line
-// and in one column, whether the day is worked or off. Everything this spec creates is named «E2E …» and removed
-// after it.
+// and in one column, whether the day is worked or off, and so do the labels and the hours of a working day.
+// Everything this spec creates is named «E2E …» and removed after it.
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, psql, shot, shown } from './helpers';
@@ -27,8 +27,11 @@ test.afterAll(cleanup);
 /** The owner on `next` at a desk's size, in English. */
 const ownerPage = (browser: Browser, next: string) => signedIn(browser, next, { width: 1280, height: 860 });
 
-/** The sizes the week of a schedule is read at: a small and a common phone, a tablet upright and a desk. */
+/** The sizes the week of a schedule is read at: the narrowest phone, a common Android one, a small and a common iPhone, a
+ *  tablet upright and a desk. */
 const WEEK_SIZES = [
+  { width: 320, height: 640 },
+  { width: 360, height: 740 },
   { width: 375, height: 667 },
   { width: 390, height: 844 },
   { width: 768, height: 1024 },
@@ -36,12 +39,13 @@ const WEEK_SIZES = [
   { width: 1440, height: 900 },
 ] as const;
 
-/** What is wrong with how the schedule window lays out each day's name: on more than one line, cut short, running
- *  under what follows it (its hours or «Off», which go beside the name or, without room, below it), or the days off
- *  not starting their «Off» at the same place (the names are one column, as wide as the longest). Empty when the
- *  week reads right. */
-async function weekNamesProblems(page: Page): Promise<string[]> {
+/** What is wrong with how the schedule window lays out each day: its name on more than one line, cut short or running
+ *  under what follows it (its hours or «Off», which go beside the name or, without room, below it); the days off not
+ *  starting their «Off» at the same place (the names are one column, as wide as the longest); or the label or the hour
+ *  of a time field cut short. Empty when the week reads right. */
+async function weekProblems(page: Page): Promise<string[]> {
   return page.locator('ion-modal[data-testid=staff-schedule-form] .staff-week').evaluate((week) => {
+    const cut = (element: Element): boolean => element.scrollWidth > element.clientWidth + 1;
     const problems = [...week.querySelectorAll('.staff-week__day')].flatMap((row) => {
       const box = row.querySelector('ion-checkbox') as HTMLElement;
       const name = (box.textContent ?? '').trim();
@@ -53,8 +57,21 @@ async function weekNamesProblems(page: Page): Promise<string[]> {
       const next = row.querySelector('.staff-week__hours, .staff-week__sep')!.getBoundingClientRect();
       const found: string[] = [];
       if (lines !== 1) found.push(`«${name}» on ${lines} lines`);
-      if (label.scrollWidth > label.clientWidth + 1) found.push(`«${name}» cut short`);
+      if (cut(label)) found.push(`«${name}» cut short`);
       if (next.left < whole.right - 1 && next.top < whole.bottom - 1) found.push(`«${name}» runs under what follows it`);
+      for (const time of row.querySelectorAll('.staff-week__time')) {
+        const title = time.querySelector('.label-text')!;
+        const said = `${name}, «${(title.textContent ?? '').trim()}»`;
+        if (cut(title)) found.push(`${said} cut short`);
+        // A time input clips its hour without any overflow to read, so a copy at its own width says what it needs.
+        const hour = time.querySelector('input')!;
+        const probe = hour.cloneNode() as HTMLInputElement;
+        probe.style.cssText = 'position: absolute; visibility: hidden; width: auto; min-width: 0; max-width: none;';
+        hour.after(probe);
+        const needs = probe.getBoundingClientRect().width;
+        probe.remove();
+        if (needs > hour.getBoundingClientRect().width + 1) found.push(`${said}: its hour cut short`);
+      }
       return found;
     });
     const offs = new Set([...week.querySelectorAll('[data-testid$="-off"]')].map((off) => Math.round(off.getBoundingClientRect().left)));
@@ -191,8 +208,8 @@ test('Schedules: the default week, a day refused under its row and corrected on 
 });
 
 for (const language of ['en', 'es'] as const) {
-  test(`Schedules: in ${language}, every day's name reads whole, on one line and in one column, worked or off, from a phone to a desk`, async ({ browser }) => {
-    // flow: STAFF-F13, STAFF-F14 (hub#1461)
+  test(`Schedules: in ${language}, every day's name reads whole, on one line and in one column, worked or off, and so does each label and hour of a working day, from a phone to a desk`, async ({ browser }) => {
+    // flow: STAFF-F13, STAFF-F14 (hub#1461, hub#1478)
     const stamp = Date.now().toString(36);
     const { context, page } = await ownerPage(browser, '/staff/schedules');
     try {
@@ -217,7 +234,7 @@ for (const language of ['en', 'es'] as const) {
           const where = `${week} week at ${size.width}x${size.height}`;
           await page.setViewportSize(size);
           await capture(page, `APP-STAFF-STAFF-F13-day-names-${language}-${week}-${size.width}x${size.height}`);
-          expect.soft(await weekNamesProblems(page), where).toEqual([]);
+          expect.soft(await weekProblems(page), where).toEqual([]);
         }
       }
     } finally {

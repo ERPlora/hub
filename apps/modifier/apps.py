@@ -47,12 +47,20 @@ class ModifierConfig(LiveAppConfig):
 
     def recoverable_from_copy(self) -> list:
         """What a separate copy of the business gives back when ERPlora's staff recovers from it (BASE-F114): each group
-        hung from a product that the business no longer hangs there, hung again by ``modifier.link.attach``, the group
-        sheet's own. It goes after Inventory, so a deleted product is back before its groups."""
+        hung from a category, then each hung from a product, that the business no longer hangs there, hung again by
+        ``modifier.link.attach``, the group sheet's own, each counted apart. It goes after Inventory, so a deleted
+        category or product is back before its groups."""
         from apps.modifier import queries  # the models are not loaded yet when this module is
         from base.recovery import Recoverable
 
         return [
+            Recoverable(
+                label=_("Modifier groups of categories"),
+                reads_since="0001_initial",
+                read=queries.category_links_in_copy,
+                missing=queries.category_links_not_in_business,
+                create="modifier.link.attach",
+            ),
             Recoverable(
                 label=_("Modifier groups of products"),
                 reads_since="0001_initial",
