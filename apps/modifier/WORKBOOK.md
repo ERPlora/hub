@@ -349,36 +349,44 @@ Si falla: repetir el aviso no cambia nada; el borrado de un negocio nunca suelta
 de ERPlora recupera después el producto desde una copia aparte, sus grupos vuelven con él (MODIFIER-F10).
 Implicados: INVENTORY-F04, INVENTORY-F07, INVENTORY-F34, MODIFIER-F10
 
-### MODIFIER-F10 Recuperar los grupos de suplementos de un producto desde una copia aparte
-<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus grupos de suplementos) gh:hub#1343 gh:hub#1457 -->
+### MODIFIER-F10 Recuperar los grupos de suplementos de un producto o de una categoría desde una copia aparte
+<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus grupos de suplementos) gh:hub#1343 gh:hub#1457 gh:hub#1456 -->
 Estado: hecho
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide (BASE-F114)
 Pantalla: ninguna de Suplementos: en el admin de Hubs, Copias aparte › «Recuperar en el negocio…», con **Grupos de
-suplementos de productos** marcado (lo está, como todo lo que se puede traer)
+suplementos de categorías, Grupos de suplementos de productos** marcado (lo está, como todo lo que se puede traer)
 Pasos:
-1. El personal recupera desde una copia aparte con **Grupos de suplementos de productos** marcado. Suplementos va
-   siempre después de Inventario, se pida en el orden que se pida: un producto eliminado que vuelve ya está vivo cuando
-   se le enganchan sus grupos.
+1. El personal recupera desde una copia aparte con **Grupos de suplementos de categorías, Grupos de suplementos de
+   productos** marcado. Suplementos va siempre después de Inventario, se pida en el orden que se pida: una categoría o
+   un producto eliminados que vuelven ya están vivos cuando se les enganchan sus grupos.
 2. Cada grupo que en la copia colgaba de un producto vivo en ella y que el negocio ya no tiene enganchado a ese producto
    se vuelve a enganchar, como lo engancha la hoja del grupo (MODIFIER-F05): el producto vuelve a preguntar en el TPV
    sus salsas, su punto o sus extras. Un producto que el negocio ya no tenía en absoluto vuelve como uno nuevo, con
    otro identificador (INVENTORY-F01): sus grupos se enganchan a ese, el que la recuperación hizo con su SKU.
-3. Recuperaciones lo cuenta aparte: «Grupos de suplementos de productos: se crearon 2».
+3. Antes, igual, cada grupo que en la copia colgaba de una categoría viva en ella y que el negocio ya no tiene
+   enganchado a esa categoría: todos los productos de la categoría vuelven a preguntarlo. Una categoría eliminada
+   vuelve siempre como una nueva, con otro identificador (INVENTORY-F07): sus grupos se enganchan a esa, la que la
+   recuperación trajo con su nombre.
+4. Recuperaciones cuenta aparte cada cosa: «Grupos de suplementos de categorías: se crearon 2» y «Grupos de suplementos
+   de productos: se crearon 2».
 Entra: la copia aparte y lo que el negocio tiene hoy.
 Sale: un enganche por cada uno que faltaba, con su aviso de enganche hecho (`modifier.link.attached`) hecho por la
 recuperación, así que no arranca ninguna automatización (FLOW-F21); nada más. Las pantallas abiertas de Suplementos,
-el TPV y el reparto de Cocina ven al momento el producto que vuelve, como vieron que se eliminaba.
+el TPV y el reparto de Cocina ven al momento el producto que vuelve, como vieron que se eliminaba; las de Suplementos y
+el TPV, también cada grupo que vuelve a colgar de una categoría o de un producto.
 Si falla: un enganche que el negocio aún tiene se queda como está, y no se repite uno cuyo grupo el negocio ya volvió a
-enganchar a ese producto: se queda el suyo, y pedirlo otra vez no engancha nada dos veces. Un grupo que el negocio soltó
+enganchar a ese producto o a esa categoría: se queda el suyo, y pedirlo otra vez no engancha nada dos veces. Un grupo que el negocio soltó
 a mano de un producto después de la copia también vuelve, como todo lo que el negocio ya no tiene (BASE-F114). Lo que la
 hoja del grupo no acepta hoy no vuelve y Recuperaciones dice por qué, por el identificador del enganche en la copia: un
 producto que sigue eliminado o que el negocio ya no tiene (no se recuperó Productos, o el negocio ya hizo otro a mano
 con su SKU, que se queda con los grupos que él le enganchó) o un grupo que el negocio borró después («not_found: …»); un
 grupo borrado no se recupera desde la copia (hub#1458). El producto que hizo una recuperación se reconoce por su SKU la
 hiciera esta u otra anterior: pedida otra vez desde una copia anterior, le vuelve a enganchar los grupos que el negocio
-le soltó después, como a todo lo que ya no tiene. Los grupos enganchados a una categoría no vuelven: tampoco a una
-categoría recuperada (hub#1456).
-Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
+le soltó después, como a todo lo que ya no tiene. Con las categorías es igual: una que sigue eliminada (no se recuperó
+Productos) o que el negocio ya volvió a crear a mano con su nombre, que se queda con los grupos que él le enganchó, no
+recibe ninguno y Recuperaciones dice por qué («not_found: …»); la que trajo una recuperación se reconoce por su nombre,
+la trajera esta u otra anterior.
+Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F07, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
 
 ## Servicios: lo que entra y lo que sale
 
@@ -540,14 +548,21 @@ cajero del producto actual es un empleado.
   `inventory.category.deleted` → `modifier.link.drop_category`; como sistema (`modifier.system`, que
   ningún papel tiene), sin ruta, idempotentes. A `inventory.product.restored` no reacciona: lo que el borrado soltó
   vuelve desde la copia aparte (F10); `live.py` solo repinta con él.
-- **Desde una copia aparte** (BASE-F114, F10): `recoverable_from_copy` de `apps.py` declara una sola cosa, «Modifier
-  groups of products». `queries.links_in_copy` lee con su propio SQL los `ModifierLink` de la copia que cuelgan de un
-  producto no borrado allí (los de una categoría no, hub#1456), con el SKU del producto allí, y
+- **Desde una copia aparte** (BASE-F114, F10): `recoverable_from_copy` de `apps.py` declara dos cosas, «Modifier
+  groups of categories» y después «Modifier groups of products», cada una contada aparte.
+  `queries.category_links_in_copy` lee los `ModifierLink` de la copia que cuelgan de una categoría no borrada allí, con
+  las categorías vivas de la copia por su nombre (`apps.inventory.queries.category_names_in_copy`), y
+  `queries.category_links_not_in_business` pone cada uno en la categoría que hace de ella en el negocio
+  (`apps.inventory.queries.categories_standing_for`, la misma pareja que los enlaces de productos a categorías de
+  Inventario: la misma mientras vive; si no, la viva con su nombre que trajo una recuperación; una hecha a mano no
+  recibe nada). `queries.links_in_copy` lee con su propio SQL los `ModifierLink` de la copia que cuelgan de un
+  producto no borrado allí, con el SKU del producto allí, y
   `queries.links_not_in_business` pone cada uno en el producto que hace de él en el negocio
   (`apps.inventory.queries.products_standing_for`, la misma pareja que Tarifas: el mismo mientras vive; si no, el vivo
   con su SKU que hizo una recuperación, `base.recovery.brought_back`; uno hecho a mano con su SKU no recibe nada) y deja
-  los que el negocio no tiene en su sitio (grupo y producto, el índice único `modifier_link_product_unique`; un
-  enganche nunca cambia de grupo ni de producto, así que el mismo enganche ya está en el suyo); la plataforma los crea
+  los que el negocio no tiene en su sitio (grupo y producto, el índice único `modifier_link_product_unique`; grupo y
+  categoría, `modifier_link_category_unique`; un enganche nunca cambia de grupo ni de destino, así que el mismo enganche
+  ya está en el suyo); las dos lecturas comparten `_links_in_copy` y las dos parejas `_not_hung`; la plataforma los crea
   con `modifier.link.attach` como la recuperación (`copy_recovery:<id>`), y lo que `attach` rechaza sale «sin crear»
   con su motivo. Pruebas: `tests/test_recovery.py`.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` al borrar
