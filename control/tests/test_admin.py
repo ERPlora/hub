@@ -1394,19 +1394,23 @@ def test_the_move_speaks_spanish():
         ) % {"count": 2, "cluster": "c2"} == "2 hubs se moverán a c2: cada uno cerrado unos minutos mientras se mueve."
 
 
-def test_the_move_at_night_speaks_spanish(client, root):
-    from django.utils import translation
-    from django.utils.translation import gettext, ngettext
-
+def the_move_page_in_spanish(client) -> str:
+    """The confirmation page of «Move to cluster…» for a ready hub, asked by a browser in Spanish."""
     hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")
     a_cluster(name="cluster-2", host="writer-2.example")
-
-    html = client.post(
+    return client.post(
         HUBS,
         {"action": "move_to_cluster", "_selected_action": [str(hub.pk)]},
         HTTP_HOST=PLATFORM,
         HTTP_ACCEPT_LANGUAGE="es",
     ).content.decode()
+
+
+def test_the_move_at_night_speaks_spanish(client, root):
+    from django.utils import translation
+    from django.utils.translation import gettext, ngettext
+
+    html = the_move_page_in_spanish(client)
 
     assert "En su próxima madrugada, entre las 03:00 y las 05:00 de la hora del negocio" in html
     assert re.search(r'value="now"[^>]*>\s*Ahora</label>', html) and "Cuándo" in html
@@ -1423,15 +1427,7 @@ def test_the_move_at_night_speaks_spanish(client, root):
 
 
 def test_its_confirmation_page_speaks_spanish(client, root):
-    hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")
-    a_cluster(name="cluster-2", host="writer-2.example")
-
-    html = client.post(
-        HUBS,
-        {"action": "move_to_cluster", "_selected_action": [str(hub.pk)]},
-        HTTP_HOST=PLATFORM,
-        HTTP_ACCEPT_LANGUAGE="es",
-    ).content.decode()
+    html = the_move_page_in_spanish(client)
 
     assert "Cada hub elegido se cierra unos minutos" in html and 'value="Moverlos"' in html
 
