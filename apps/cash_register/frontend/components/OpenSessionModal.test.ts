@@ -5,7 +5,8 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, expectWaitsForTheYen, ionValue, mountCash } from '../__tests__/mount-cash-register';
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
+import { click, expectWaitsForTheYen, ionValue, mountCash, settle } from '../__tests__/mount-cash-register';
 import { itReadsAmountsAsTheHub, itReadsWhatWasLeftOnceTheMoneyArrives } from '../__tests__/money-field';
 import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations';
@@ -113,6 +114,58 @@ describe('OpenSessionModal', () => {
     expect(prop(s.inDoc('cash-register-open-balance'), 'label')).toBe('Fondo de apertura');
     expect(s.inDoc('cash-register-open-submit')?.textContent?.trim()).toBe('Abrir sesión');
   });
+});
+
+describe('OpenSessionModal: a refused field, corrected, loses its mark without saving again (hub#1470)', () => {
+  const REQUIRED = 'This business requires an opening float: give the cash the drawer starts with.';
+
+  it('the float the business requires: typing one takes its mark and the notice away, before «Open session» is pressed again', async () => {
+    const s = await setup();
+    s.answer(409, { error: { code: 'cash_register.opening_balance_required', message: REQUIRED, fields: { opening_balance: REQUIRED } } });
+    await s.submit();
+    const balance = () => s.inDoc('cash-register-open-balance');
+    expect(prop(balance(), 'errorText')).toBe(REQUIRED);
+    balance()?.dispatchEvent(new Event('input', { bubbles: true }));
+    await ionValue(balance(), '100', 'ionInput');
+    expect(prop(balance(), 'errorText') ?? '').toBe('');
+    expect(s.inDoc('cash-register-open-error')).toBeNull();
+    expect(s.sent()).toHaveLength(1);
+  });
+
+  const FIELD: Record<string, string> = { register_id: 'register', opening_balance: 'balance', opening_notes: 'notes' };
+
+  it('the drawer and the notes the server refuses are marked as Ionic shows a refusal, and only they', async () => {
+    const s = await setup();
+    await s.result(REGISTERS, page([{ id: 'r1', name: 'Bar', is_active: true }, { id: 'r2', name: 'Terrace', is_active: true }]));
+    const marked = (key: string) => {
+      const field = s.inDoc(`cash-register-open-${FIELD[key]}`);
+      return ['ion-invalid', 'ion-touched'].map((mark) => field?.classList.contains(mark));
+    };
+    s.answer(422, {
+      error: { code: 'invalid_payload', message: 'Check the highlighted details.', fields: { register_id: 'Not this drawer.', opening_notes: 'Too long.' } },
+    });
+    await s.submit();
+    expect(marked('register_id')).toEqual([true, true]);
+    expect(marked('opening_notes')).toEqual([true, true]);
+    s.inDoc('cash-register-open-notes')?.dispatchEvent(new Event('input', { bubbles: true }));
+    await ionValue(s.inDoc('cash-register-open-notes'), 'Morning', 'ionInput');
+    expect(marked('opening_notes')).toEqual([false, false]);
+    expect(marked('register_id')).toEqual([true, true]);
+  });
+
+  itTellsTheCorrectedFieldApart(
+    ['register_id', 'opening_balance', 'opening_notes'],
+    async (locale, refusal) => {
+      const s = await setup({ locale });
+      await s.result(REGISTERS, page([{ id: 'r1', name: 'Bar', is_active: true }, { id: 'r2', name: 'Terrace', is_active: true }]));
+      await ionValue(s.inDoc('cash-register-open-register'), 'r2');
+      await ionValue(s.inDoc('cash-register-open-balance'), '10', 'ionInput');
+      await ionValue(s.inDoc('cash-register-open-notes'), 'Morning', 'ionInput');
+      s.answer(422, refusal);
+      return { field: (key) => s.inDoc(`cash-register-open-${FIELD[key]}`), send: s.submit, settle };
+    },
+    'opening_balance',
+  );
 });
 
 /** The window open with no drawer and «1500» typed as the float, `base.business.get` not answered (hub#921). */

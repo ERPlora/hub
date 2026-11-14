@@ -292,13 +292,11 @@ const HOURS = [
   padding-top: 8px;
   border-top: 1px solid var(--ion-border-color, #e5e3dd);
 }
-/* The day's name is the checkbox label: clickable, and the accessible name of the box. */
+/* The day's name is the checkbox label: clickable, and the accessible name of the box. It keeps its whole width, so
+   it never breaks; the minimum lines up «Off» on every day in English and Spanish. */
 .staff-week__name {
-  width: 7.5rem;
+  min-width: 8.5rem;
   font-weight: 600;
-}
-.staff-week__name::part(label) {
-  white-space: normal;
 }
 .staff-week__hours {
   display: flex;
