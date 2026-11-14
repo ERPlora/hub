@@ -15,7 +15,14 @@ from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import comparable, offered_to, place_of_no_ask, probe_phrases
+from base.tests.test_assistant_asks import (
+    TOP,
+    assert_offered_with_room,
+    comparable,
+    offered_to,
+    place_of_no_ask,
+    probe_phrases,
+)
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 OWNER, EMPLOYEE = Membership.Role.OWNER, Membership.Role.EMPLOYEE
@@ -114,6 +121,18 @@ def test_the_reported_request_is_offered_the_read_it_needs_first(catalog_of, rol
     assert FIRST[name] in tools  # positive control: the role holds the read
     offered = offered_to(tools, phrase)
     assert FIRST[name] in offered, (len(offered), offered[:10])
+
+
+#: Money coming into the drawer said as a business says it, in words that are none of the tool's asks nor a probe:
+#: «entran» with an amount is cash in the till, not goods received (the Hub's delivery-note group also holds «entran»).
+MONEY_IN = [("cash_register.movement.add", "registra que entran 100 € en el turno")]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("name", "phrase"), MONEY_IN)
+def test_money_coming_in_in_the_hubs_words_brings_the_movement_among_the_first_ten(catalog_of, name, phrase):
+    assert comparable(phrase) not in probe_phrases()
+    assert_offered_with_room(catalog_of(OWNER, "es"), name, phrase, room=TOP)
 
 
 #: What makes the model answer in the chat and wait, so the card of a write never comes (hub#1105, hub#1138): a
