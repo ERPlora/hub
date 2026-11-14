@@ -11,6 +11,7 @@ import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonCheckbox, IonInput } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import { useGroupChange } from '../../../../base/frontend/lib/group-change';
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
 import { useT } from '../composables/useT';
@@ -54,6 +55,8 @@ const update = useCommand('staff.schedule.update');
 const pending = computed(() => creation.pending.value || update.pending.value);
 const error = computed(() => (props.schedule ? update.error.value : creation.error.value));
 const errorsByDay = computed(() => dayErrors(error.value?.fields ?? {}, sentDays.value));
+/** A week without working days is refused on top of the week: a change to the week takes it away. */
+const weekChanged = useGroupChange('weekGroup');
 const title = computed(() => (props.schedule ? t('staff.schedules.form.titleEdit', { name: props.schedule.name }) : t('staff.schedules.form.titleNew')));
 
 watch(
@@ -75,6 +78,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 
 function setDay(weekday: number, change: Partial<WeekRow>): void {
   form.value = { ...form.value, week: form.value.week.map((day) => (day.weekday === weekday ? { ...day, ...change } : day)) };
+  weekChanged();
 }
 
 async function save(): Promise<void> {
@@ -172,7 +176,11 @@ const HOURS = [
         >
           {{ $t('staff.schedules.form.isDefault') }}
         </ion-checkbox>
-        <fieldset class="staff-week">
+        <fieldset
+          ref="weekGroup"
+          name="days"
+          class="staff-week"
+        >
           <legend class="staff-week__legend">
             {{ $t('staff.schedules.form.week') }}
           </legend>

@@ -149,6 +149,38 @@ describe('ScheduleFormModal: New (STAFF-F13)', () => {
     expect(s.inDoc('staff-schedule-form-day-0-error')).toBeNull();
     expect(s.inDoc('staff-schedule-form-week-error')?.textContent).toContain('A schedule needs at least one working day with hours.');
   });
+
+  // The week's refusal is a line of its own on top of the week, under no single field: any change the person makes to
+  // the week takes it away at once, and only it (hub#1448).
+  describe('a week without working days: a change to the week takes it away before saving again', () => {
+    const NO_DAYS = 'A schedule needs at least one working day with hours.';
+    const NAME = 'Use another name: this member already has a schedule with it.';
+
+    async function refusedWeek(fields: Record<string, string> = { days: NO_DAYS }) {
+      const s = await setup();
+      s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields } });
+      await click(s.save());
+      return s;
+    }
+
+    it.each([
+      ['ticking a day', (s: Awaited<ReturnType<typeof refusedWeek>>) => ionChecked(s.day(6, 'working'), true)],
+      ['typing a working day’s start', (s: Awaited<ReturnType<typeof refusedWeek>>) => ionValue(s.day(1, 'start'), '08:30', 'ionInput')],
+    ])('%s', async (_, change) => {
+      const s = await refusedWeek();
+      expect(s.inDoc('staff-schedule-form-week-error')?.textContent).toContain(NO_DAYS);
+      await change(s);
+      expect(s.inDoc('staff-schedule-form-week-error')).toBeNull();
+      expect(s.sent()).toHaveLength(1);
+    });
+
+    it('another field’s refusal stays under it', async () => {
+      const s = await refusedWeek({ name: NAME, days: NO_DAYS });
+      await ionChecked(s.day(6, 'working'), true);
+      expect(s.field('name').errorText).toBe(NAME);
+      expect(s.inDoc('staff-schedule-form-week-error')).toBeNull();
+    });
+  });
 });
 
 describe('ScheduleFormModal: Edit · {name} (STAFF-F14)', () => {

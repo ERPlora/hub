@@ -385,7 +385,9 @@ Entra: el formulario.
 Sale: la regla activa y `pricing.rule.created`.
 Si falla: debajo de su campo: «Ya existe una regla con ese código. Elige otro.», un valor que falta o
 fuera de rango para su tipo, tramos repetidos o desordenados, una categoría, un producto o un servicio
-que no existe, «Hasta» antes que «Desde». **Crear** (y **Guardar** al editarla, PRICING-F11) está en gris
+que no existe, «Hasta» antes que «Desde». El de los tramos, que sale debajo de todos ellos, se quita en
+cuanto se cambia cualquier tramo (se escribe en él, se añade o se quita uno), sin volver a guardar
+(hub#1448). **Crear** (y **Guardar** al editarla, PRICING-F11) está en gris
 mientras el negocio no haya dicho todavía su moneda, porque el importe por unidad se lee en ella (sin
 ella, «1500» yenes se guardaría como 150 000); hasta entonces, salir del importe lo deja como se
 escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un
