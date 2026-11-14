@@ -16,7 +16,7 @@ from datetime import UTC, date, datetime, timedelta
 import psycopg
 import pytest
 from django.db import connection, transaction
-from django.utils import timezone
+from django.utils import timezone, translation
 from live.context import system_context
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
@@ -51,6 +51,7 @@ from apps.customer.schemas import (
     CustomerDetailOut,
     CustomerIn,
     CustomerPatchIn,
+    CustomerRecoveredOut,
     CustomerRecoverIn,
     CustomerRestoreIn,
     DeletedOut,
@@ -91,6 +92,9 @@ from apps.customer.schemas import (
 from apps.customer.services import (
     ALREADY_IMPORTED,
     DATE_IN_FUTURE,
+    FIELD_INACTIVE_LEFT,
+    FIELD_OPTION_LEFT,
+    FIELD_TYPE_LEFT,
     HEALTH_TEST_DATE_MISSING,
 )
 
@@ -149,8 +153,8 @@ def invalid(error):
         ("customer.customer.delete", "customer.delete", RefIn, DeletedOut),
         ("customer.customer.merge", "customer.merge", MergeIn, CustomerDetailOut),
         ("customer.customer.erase", "customer.erase", EraseIn, ErasedOut),
-        ("customer.customer.restore", "customer.restore", CustomerRestoreIn, CustomerDetailOut),
-        ("customer.customer.recover", "customer.restore", CustomerRecoverIn, CustomerDetailOut),
+        ("customer.customer.restore", "customer.restore", CustomerRestoreIn, CustomerRecoveredOut),
+        ("customer.customer.recover", "customer.restore", CustomerRecoverIn, CustomerRecoveredOut),
         ("customer.note.add", "customer.manage", NoteIn, ActivityRow),
         ("customer.activity.add", "customer.record_activity", ActivityIn, ActivityRow),
         ("customer.consent.grant", "customer.manage", ConsentGrantIn, ConsentRow),
@@ -824,7 +828,7 @@ def test_restore_brings_the_same_card_back_with_all_that_hangs_from_it_and_annou
 
     back = system("customer.customer.restore", CustomerRestoreIn(id=ana.id))
 
-    assert back.id == ana.id
+    assert (back.id, back.left_out) == (ana.id, [])
     ana.refresh_from_db()
     assert (ana.deleted_at, ana.is_active) == (None, True)
     assert Customer.objects.live().filter(pk=ana.pk).exists()
@@ -939,7 +943,8 @@ def test_restore_gives_back_what_the_business_deleted_since_and_leaves_what_it_h
 @pytest.mark.django_db
 def test_restore_puts_the_card_in_what_the_business_made_again_by_name_and_keeps_its_own_value():
     """A group, tag or field the business deleted and made again by hand is that one (its name, the case aside), never a
-    second one; a value the card holds already in it stays, and a field made again and deactivated takes none."""
+    second one; a value the card holds already in it stays, and a field made again and deactivated takes none: the
+    card comes back without it, and says so. Its own value kept is nothing left out."""
     vip = CustomerGroup.objects.create(name="vip")
     regular = CustomerTag.objects.create(name="REGULAR")
     pet = CustomField.objects.create(name="Pet")
@@ -947,7 +952,7 @@ def test_restore_puts_the_card_in_what_the_business_made_again_by_name_and_keeps
     ana = card("Ana", deleted_at=NOW, is_active=False)
     CustomFieldValue.objects.create(customer=ana, field=pet, value="Max")
 
-    restored_with(
+    back = restored_with(
         ana,
         groups=[{"id": uuid.uuid7(), "name": "VIP"}],
         tags=[{"id": uuid.uuid7(), "name": "Regular"}],
@@ -958,27 +963,33 @@ def test_restore_puts_the_card_in_what_the_business_made_again_by_name_and_keeps
     assert (list(ana.groups.all()), list(ana.tags.all())) == ([vip], [regular])
     assert list(ana.field_values.values_list("field_id", "value")) == [(pet.id, "Max")]
     assert (CustomerGroup.objects.count(), CustomerTag.objects.count(), CustomField.objects.count()) == (1, 1, 2)
+    assert [one.code for one in back.left_out] == ["customer.field_inactive"]
+    assert '"Size"' in back.left_out[0].message
 
 
 @pytest.mark.django_db
-def test_restore_refuses_a_value_its_field_no_longer_takes_and_brings_back_nothing():
-    """As a card made again from the copy: all or nothing, and the card stays deleted, with why."""
+def test_restore_brings_the_card_back_without_a_value_its_field_no_longer_takes_and_says_why():
+    """A field the business made again by hand with other options does not keep the card deleted: it comes back with
+    all else that hung from it, without that value, and the output says which field and why."""
     CustomField.objects.create(name="Size", field_type="select", options=["S", "L"])
     ana = card("Ana", deleted_at=NOW, is_active=False)
-    clear_outbox()
 
-    with pytest.raises(InvalidPayload) as refused:
-        restored_with(
-            ana,
-            tags=[{"id": uuid.uuid7(), "name": "Regular"}],
-            field_values=[
-                {"id": uuid.uuid7(), "name": "Size", "field_type": "select", "options": ["S", "M"], "value": "M"}
-            ],
-        )
+    back = restored_with(
+        ana,
+        tags=[{"id": uuid.uuid7(), "name": "Regular"}],
+        field_values=[
+            {"id": uuid.uuid7(), "name": "Size", "field_type": "select", "options": ["S", "M"], "value": "M"},
+            {"id": uuid.uuid7(), "name": "Pet", "value": "Luna"},
+        ],
+    )
 
-    assert refused.value.code == "customer.field_invalid_option"
-    assert Customer.objects.get(pk=ana.pk).deleted_at == NOW
-    assert (CustomerTag.objects.count(), outbox()) == (0, [])
+    ana.refresh_from_db()
+    assert (ana.deleted_at, ana.is_active) == (None, True)
+    assert list(ana.tags.values_list("name", flat=True)) == ["Regular"]
+    assert list(ana.field_values.values_list("field__name", "value")) == [("Pet", "Luna")]
+    assert list(CustomField.objects.filter(name="Size").values_list("options", flat=True)) == [["S", "L"]]
+    assert [one.code for one in back.left_out] == ["customer.field_invalid_option"]
+    assert '"Size"' in back.left_out[0].message
 
 
 # customer.customer.recover (BASE-F114, the recovery from a separate copy, hub#1285)
@@ -1078,28 +1089,41 @@ def test_recover_without_anything_hanging_makes_the_card_as_its_create_does():
     luis = Customer.objects.get(pk=made.id)
     assert (luis.groups.count(), luis.tags.count(), luis.field_values.count()) == (0, 0, 0)
     assert outbox() == [(events.CUSTOMER_CREATED, {"id": str(luis.id)})]
+    assert made.left_out == []
 
 
 @pytest.mark.django_db
-def test_recover_refuses_a_value_its_field_no_longer_takes_and_makes_nothing():
+def test_recover_makes_the_card_without_a_value_its_field_no_longer_takes_and_says_why():
+    """A value no longer one of its field's options, or no longer of its field's type, does not keep the card out: it
+    is made with all else, without those values, and the output says each field and why, in the copy's order."""
     CustomField.objects.create(name="Size", field_type="select", options=["S", "L"])
+    CustomField.objects.create(name="Shoe", field_type="number")
     clear_outbox()
 
-    with pytest.raises(InvalidPayload) as refused:
-        system(
-            "customer.customer.recover",
-            a_card_of_the_copy(
-                tags=[{"name": "Regular"}],
-                field_values=[{"name": "Size", "field_type": "select", "options": ["S", "M"], "value": "M"}],
-            ),
-        )
+    made = system(
+        "customer.customer.recover",
+        a_card_of_the_copy(
+            tags=[{"name": "Regular"}],
+            field_values=[
+                {"name": "Size", "field_type": "select", "options": ["S", "M"], "value": "M"},
+                {"name": "Pet", "value": "Luna"},
+                {"name": "Shoe", "value": "forty"},
+            ],
+        ),
+    )
 
-    assert refused.value.code == "customer.field_invalid_option"
-    assert (Customer.objects.count(), CustomerTag.objects.count(), outbox()) == (0, 0, [])
+    luis = Customer.objects.get(pk=made.id)
+    assert list(luis.tags.values_list("name", flat=True)) == ["Regular"]
+    assert list(luis.field_values.values_list("field__name", "value")) == [("Pet", "Luna")]
+    assert [one.code for one in made.left_out] == ["customer.field_invalid_option", "customer.field_invalid_number"]
+    assert [one.message for one in made.left_out] == [
+        FIELD_OPTION_LEFT % {"field": "Size"},
+        FIELD_TYPE_LEFT % {"field": "Shoe"},
+    ]
 
 
 @pytest.mark.django_db
-def test_recover_leaves_out_a_value_of_a_field_deactivated_and_never_asks_a_required_one():
+def test_recover_leaves_out_a_value_of_a_field_deactivated_says_why_and_never_asks_a_required_one():
     CustomField.objects.create(name="Pet", is_active=False)
     nickname = CustomField.objects.create(name="Nickname")
     allergies = CustomField.objects.create(name="Allergies", is_required=True)
@@ -1113,6 +1137,21 @@ def test_recover_leaves_out_a_value_of_a_field_deactivated_and_never_asks_a_requ
     assert list(luis.field_values.values_list("field_id", "value")) == [(nickname.id, "Lu")]
     assert CustomField.objects.filter(name="Pet").count() == 1
     assert not CustomFieldValue.objects.filter(field=allergies).exists()
+    # The required field it has no value of is nothing it came back without: the till makes a card so too.
+    assert [one.code for one in made.left_out] == ["customer.field_inactive"]
+    assert '"Pet"' in made.left_out[0].message
+
+
+@pytest.mark.django_db
+def test_what_a_card_came_back_without_is_said_in_the_language_it_is_made_in():
+    CustomField.objects.create(name="Pet", is_active=False)
+
+    with translation.override("es"):
+        [said] = system("customer.customer.recover", a_card_of_the_copy(field_values=[{"name": "Pet", "value": "Luna"}])).left_out
+        spanish = FIELD_INACTIVE_LEFT % {"field": "Pet"}
+
+    assert said.message == spanish
+    assert said.message != FIELD_INACTIVE_LEFT % {"field": "Pet"}
 
 
 @pytest.mark.django_db
