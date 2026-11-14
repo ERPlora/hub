@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f88a13e36d706325113cffee0ff596ad3ce5dda5a72eda72d3fbc0fe381512f2 -->
+<!-- generated from WORKBOOK.md sha256:8e54605f2a7aa362795ece78729103bcc5e793dce3ebabb6f833f6b9c5f1b231 -->
 
 ## What it is for and who it is for
 
@@ -2936,7 +2936,7 @@ the customers that were lost, the deleted ones as they were, the products, the s
 appointments, the repeating appointments and the price list prices; making and deleting the temporary cluster is the
 procedure "Devolver un negocio a un momento" of ERPlora/aws; the image of a product deleted before deleting left it,
 hub#1431; the modifier groups and the menu options of a product that comes back, hub#1343; the
-price list prices of a product that comes back as a new one, hub#1442)
+price list prices of a service that comes back as a new one, hub#1459)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -3073,9 +3073,9 @@ Steps:
       repeating the same way on the same day at the same time) stays as it is.
       The price list prices always go after the products: "Price list prices: 2 created". Each price of the copy the
       business no longer has comes back to its price list, with its price and its "from quantity", put as the price
-      list's detail puts it, so a deleted product that comes back gets its prices back in the price lists it was in
-      (PRICING-F15). One whose place (the same price list, the same product or service and the same "from quantity")
-      the business has taken again is not repeated: the business's own stays. One the price list does not accept today
+      list's detail puts it, so a deleted product that comes back, the same or as a new one, gets its prices back in
+      the price lists it was in (PRICING-F15). One whose place (the same price list, the same product or service and
+      the same "from quantity") the business has taken again is not repeated: the business's own stays. One the price list does not accept today
       (deactivated, or its product still deleted) does not come back and its reason says so. The product's discount
       rules, which deleting it only switched off, are switched back on by themselves with it (PRICING-F14).
 In: the chosen businesses, the temporary cluster with their copy and the moment; to recover, the made separate copy and
@@ -3143,4 +3143,4 @@ INVENTORY-F07, INVENTORY-F30, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F
 SERVICE-F31, SERVICE-F34, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, PRICING-F07,
 PRICING-F14, PRICING-F15, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284,
 hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1343,
-hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1442, aws#77
+hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1442, hub#1459, aws#77
