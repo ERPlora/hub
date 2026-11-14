@@ -279,11 +279,11 @@ def list_printers(ctx: OperationContext, params: PrinterListIn) -> dict:
         "asks": {
             "en": (
                 "tell me about the kitchen printer",
-                "what IP does the Till printer have?",
+                "what network address does the Till printer use?",
             ),
             "es": (
                 "háblame de la impresora de cocina",
-                "¿qué IP tiene la impresora de la caja?",
+                "¿qué dirección de red usa la impresora de la caja?",
                 "¿de qué papel es la impresora Caja 2?",
             ),
         },
@@ -304,12 +304,12 @@ def get_printer(ctx: OperationContext, params: PrinterRefIn) -> dict:
         "asks": {
             "en": (
                 "is the kitchen printer working?",
-                "why is the Till printer not printing?",
+                "why does the Till printer show an error?",
                 "when did the bar printer last print?",
             ),
             "es": (
                 "¿funciona la impresora de cocina?",
-                "¿por qué no imprime la impresora de la caja?",
+                "¿por qué aparece un error en la impresora de la caja?",
                 "¿cuándo imprimió por última vez la de la barra?",
             ),
         },
@@ -464,11 +464,11 @@ def job_label(job: PrintJob, language: str) -> str:
         "asks": {
             "en": (
                 "what happened to the print job of ticket T-000123?",
-                "did ticket T-000123 print?",
+                "has ticket T-000123 been printed yet?",
             ),
             "es": (
                 "¿qué pasó con la impresión del ticket T-000123?",
-                "¿se imprimió el ticket T-000123?",
+                "¿ya salió el ticket T-000123 en papel?",
                 "dime el estado de la impresión de la factura F-000045",
             ),
         },
