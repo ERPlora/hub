@@ -6,8 +6,7 @@
 import { type BrowserContext, expect, test } from '@playwright/test';
 
 import { cardOf, cleanUp, createCard, customersReady, e2eName, FLOW_VIEWPORTS, inputOf, rowNamed, searchList, spanishMobile } from './customer-helpers';
-import { A, api, login, psql, shot, shown } from './helpers';
-import { settled } from './service-helpers';
+import { A, api, capture, login, psql, shot, shown } from './helpers';
 
 test.afterAll(() => cleanUp());
 
@@ -63,8 +62,7 @@ test('the activity names the person who wrote a note and says the platform recor
   for (const [width, height] of [[1440, 900], [820, 1180], [375, 667]]) {
     await page.setViewportSize({ width, height });
     await shown(page).locator('[data-testid=customer-activity]').scrollIntoViewIfNeeded();
-    await settled(page);
-    await page.screenshot({ path: shot(`customer-card-activity-done-by-the-platform-${width}x${height}`) });
+    await capture(page, `customer-card-activity-done-by-the-platform-${width}x${height}`);
   }
 });
 

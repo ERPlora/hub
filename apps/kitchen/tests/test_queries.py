@@ -728,6 +728,18 @@ def test_the_history_says_whether_a_person_or_the_platform_did_it(product, calle
     ]
 
 
+def test_a_person_named_like_a_mark_of_the_platform_is_still_a_person(product, django_user_model):
+    """KITCHEN-F25: whether the platform did it is read from who the entry saved, not from the name shown: someone
+    whose name reads as the system's mark is named, not taken for the platform."""
+    named_system = django_user_model.objects.create_user("saas:78", email="sys@example.com", first_name="system")
+    _, lines = fired_round(product, "Burger", label="Table 4")
+    run("kitchen.ticket.start", {"ticket_id": str(lines[0].id)}, ctx_for(actor=named_system))
+
+    started = run("kitchen.log.list", {}).rows[0]
+
+    assert (started.action, started.actor, started.by_platform) == ("started", "system", False)
+
+
 def test_the_history_needs_its_permission():
     with pytest.raises(PermissionDenied):
         run("kitchen.log.list", {}, ctx_for(permissions={"kitchen.view_ticket"}))
