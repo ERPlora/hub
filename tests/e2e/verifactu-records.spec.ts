@@ -466,34 +466,36 @@ test('Records filter by Date and Total (euros) behind the funnel, with its count
   await expect(count).toHaveCount(0);
   await panel.locator('[data-testid=verifactu-records-filters-close]').click();
   await expect(row).toBeVisible();
+  /** Applies what the panel holds when one of its fields cannot be read: the funnel says so, the list keeps its row,
+   *  and the panel opens again to say why under the field. */
+  const refused = async () => {
+    await panel.locator('[data-testid=verifactu-records-filters-apply]').click();
+    await expect(toggle).toHaveAttribute('data-invalid', 'true');
+    await expect(row).toBeVisible();
+    await toggle.click();
+  };
+  /** Captures the panel with what it says under its fields and clears every filter. */
+  const capturedAndCleared = async (name: string) => {
+    await capture(page, name);
+    await panel.locator('[data-testid=verifactu-records-filters-clear]').click();
+    await expect(count).toHaveCount(0);
+  };
   // A total that is not an amount and a day «until» before its «from»: the funnel says so, each field says why,
   // and neither filters (the «from» day still does).
   await toggle.click();
   await box('total_amount_from').fill('12x');
   await box('issue_date_from').fill(localDay());
   await box('issue_date_to').fill(localDay(-1));
-  await panel.locator('[data-testid=verifactu-records-filters-apply]').click();
-  await expect(toggle).toHaveAttribute('data-invalid', 'true');
-  await expect(row).toBeVisible();
-  await toggle.click();
+  await refused();
   await expect(panel.getByText('This is not an amount. Type a figure, for example 12.50.')).toBeVisible();
   await expect(panel.getByText('The end date cannot be before the start date.')).toBeVisible();
-  await page.waitForTimeout(400);
-  await page.screenshot({ path: shot('FIX-DATATABLE-HUB-FILTERS-2B-verifactu-error') });
-  await panel.locator('[data-testid=verifactu-records-filters-clear]').click();
-  await expect(count).toHaveCount(0);
+  await capturedAndCleared('FIX-DATATABLE-HUB-FILTERS-2B-verifactu-error');
   // «1.000» in euros reads two ways: its longest warning, under the box on a phone, names both and filters nothing.
   await page.setViewportSize({ width: 390, height: 844 });
   await box('total_amount_from').fill('1.000');
-  await panel.locator('[data-testid=verifactu-records-filters-apply]').click();
-  await expect(toggle).toHaveAttribute('data-invalid', 'true');
-  await expect(row).toBeVisible();
-  await toggle.click();
+  await refused();
   await expect(panel.getByText('This amount can be read in two ways: «1.000» could be €1,000.00 or €1.00. Write the decimals so there is no doubt.')).toBeVisible();
-  await page.waitForTimeout(400);
-  await page.screenshot({ path: shot('HUB-1247-verifactu-total-two-readings-390') });
-  await panel.locator('[data-testid=verifactu-records-filters-clear]').click();
-  await expect(count).toHaveCount(0);
+  await capturedAndCleared('HUB-1247-verifactu-total-two-readings-390');
 });
 
 // flow: none — the column filters sit behind the table's funnel.
