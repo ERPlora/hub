@@ -124,6 +124,21 @@ def check(ctx: OperationContext, reference: str, *, field: str = "image") -> Non
             raise _unknown(str(IMAGE_UNKNOWN), field)
 
 
+def from_copy(ctx: OperationContext, reference: str) -> str:
+    """Of the image a row showed in a separate copy of its business, what comes back with it when it is recovered: one
+    of the library, unless the library says it no longer has it; never a photo of its own, which went with the row (a
+    copy is of the database, not of the files). While the library cannot be read it comes back as the copy had it:
+    the row is never left out for it, the library never renames an image, and the screens show the initials of one
+    they cannot load."""
+    try:
+        check(ctx, reference)
+    except InvalidPayload:
+        return ""
+    except OperationError:  # the library cannot be read now (503 base.image_library_unavailable)
+        return reference
+    return reference
+
+
 def _in_library(ctx: OperationContext, reference: str) -> bool:
     from base.queries import image_library
 

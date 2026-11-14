@@ -35,6 +35,7 @@ from apps.staff.models import Member
 from apps.tax.models import TaxCategory
 from base.tenancy.context import use_hub
 from base.tenancy.tests.test_recovery import Recoveries, fresh, run, run_in
+from base.tests.test_image_catalog import image_library  # noqa: F401 - the library fixture
 
 from .conftest import ctx_for, make_category, make_member, make_service, make_tax
 
@@ -109,6 +110,7 @@ def test_the_copy_gives_each_service_with_what_its_create_takes_and_whether_it_w
         "sku": "KER-01",
         "barcode": "8412345678905",
         "notes": "Ask about allergies",
+        "image": "service/services/keratin.webp",
         "category_id": hair.pk,
         "category_name": "Hair",
         "tax_category_id": tax.pk,
@@ -146,6 +148,7 @@ NEW = {
     "sku": "",
     "barcode": "",
     "notes": "",
+    "image": "",
     "category_id": None,
     "category_name": None,
     "tax_category_id": None,
@@ -518,6 +521,52 @@ def test_the_main_service_comes_back_only_for_whom_the_business_set_none_since()
 
     assert performers("Keratin treatment") == [("Ana", None, None, True, True), ("Sonia", None, None, False, True)]
     assert performers("Nails") == [("Ana", None, None, False, True), ("Sonia", None, None, True, True)]
+
+
+# ── Its image (hub#1429): the one of the library it showed in the copy comes back with it ─────────────────────────
+
+LIBRARY_IMAGE = "catalog:hospitality/cafe_solo"
+
+
+def lacking_with_image(image: str) -> dict:
+    tax = make_tax("test.service", "Service — test")
+    [record] = queries.services_not_in_business(
+        [a_service_of_the_copy(name="Keratin treatment", tax_category_id=tax.pk, image=image)]
+    )
+    return record
+
+
+def service_events() -> list[str]:
+    events = OutboxEvent.objects.filter(name__startswith="service.service.").order_by("id")
+    return list(events.values_list("name", flat=True))
+
+
+def test_a_service_made_again_shows_the_image_of_the_library_it_had_set_as_its_screen_sets_it(image_library):  # noqa: F811
+    record = lacking_with_image(LIBRARY_IMAGE)
+
+    made = create(record)
+
+    assert record["image"] == LIBRARY_IMAGE
+    assert (made.image, Service.objects.get(pk=made.id).image) == (LIBRARY_IMAGE, LIBRARY_IMAGE)
+    # As the screen does it: the create, then its image (SERVICE-F34).
+    assert service_events() == ["service.service.created", "service.service.updated"]
+
+
+@pytest.mark.parametrize(
+    "image",
+    [
+        # A copy is of the database, never of the files: the photo went with the service.
+        "file:service/services/0193a1b2c3d47e8f9a0b1c2d3e4f5a6b.webp",
+        # The library no longer has it.
+        "catalog:hospitality/churros",
+        "",
+    ],
+)
+def test_a_service_made_again_without_an_image_of_the_library_is_the_screens_create(image_library, image):  # noqa: F811
+    made = create(lacking_with_image(image))
+
+    assert (made.image, Service.objects.get(pk=made.id).image) == ("", "")
+    assert service_events() == ["service.service.created"]
 
 
 def test_making_a_service_again_with_who_performed_it_is_only_the_systems():
@@ -954,6 +1003,23 @@ class TestServicesComeBack:
             back = Service.objects.exclude(pk=ids["cut"])
             assert not set(back.values_list("pk", flat=True)) & set(ids.values())
             assert back.get(name="Keratin treatment").notes == "Ask about allergies"
+
+    def test_a_lost_service_comes_back_with_the_image_of_the_library_it_had(
+        self, recoveries, every_app_on, image_library  # noqa: F811
+    ):
+        hub, _, ids, _ = self.a_business(recoveries, every_app_on)
+        run_in(hub, "service.service.set_image", id=ids["keratin"], image=LIBRARY_IMAGE)
+        copy = recoveries.copy_of(hub)
+        gone(hub, ids["keratin"], ids["highlights"])
+
+        assert recovered(recoveries, copy) == [CATEGORIES, SERVICES | {"created": 2}]
+
+        with use_hub(hub):
+            assert dict(Service.objects.filter(is_active=True).values_list("name", "image")) == {
+                "Haircut": "",
+                "Highlights": "",
+                "Keratin treatment": LIBRARY_IMAGE,
+            }
 
     def test_asked_again_nothing_is_made_twice_and_what_the_business_has_stays(self, recoveries, every_app_on):
         hub, tax, ids, _ = self.a_business(recoveries, every_app_on)

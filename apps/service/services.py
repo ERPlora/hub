@@ -1097,8 +1097,12 @@ def recover_service(ctx: OperationContext, data: ServiceRecoverIn) -> dict:
     business still has by ``service.assignment.assign`` (SERVICE-F31), with their own minutes and price. One who left
     (terminated) or whom the business no longer has is not assigned: Staff no longer books them, and the output says it
     came back without them, and why (``left_out``). It is their main service only if the business gave them none since
-    (the business's choice stays), and it comes back switched off, by ``service.assignment.update``, if it was."""
+    (the business's choice stays), and it comes back switched off, by ``service.assignment.update``, if it was. Its
+    image of the library comes back as ``service.service.set_image`` sets it (SERVICE-F34); a photo of its own does not
+    (``base.images.from_copy``)."""
     made = create_service(ctx, ServiceIn.model_validate(data.model_dump(include=set(ServiceIn.model_fields))))
+    if image := images.from_copy(ctx, data.image):
+        _change_image(ctx, find_service(made.id, None), image)
     asked = [one.member_id for one in data.assignments]
     staying = set(live_members().filter(pk__in=asked).values_list("pk", flat=True))
     known = set(Member.objects.filter(pk__in=asked).values_list("pk", flat=True))
