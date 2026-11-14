@@ -704,14 +704,14 @@ def links_in_copy(conn) -> list[dict]:
 
 def links_not_in_business(links: list[dict]) -> list[dict]:
     """The groups hung from a product in a separate copy (``links_in_copy``) the business no longer hangs there, in
-    their order, each as ``modifier.link.attach`` takes it with its ``id`` there. Not lacking: one the business still
-    holds, nor one whose group the business hung from that product again: that one stays as the business has it."""
-    held = set(ModifierLink.objects.filter(pk__in=[one["id"] for one in links]).values_list("pk", flat=True))
+    their order, each as ``modifier.link.attach`` takes it with its ``id`` there. Not lacking: one whose group the
+    business hangs from that product, the same link or one hung again: it stays as the business has it. A link never
+    changes its group nor its product, so the one the business still holds is always in its place."""
     taken = set(
         ModifierLink.objects.filter(group_id__in={one["group_id"] for one in links}).values_list("group_id", "product_id")
     )
     return [
         {"id": one["id"], "group_id": one["group_id"], "product_id": one["product_id"]}
         for one in links
-        if one["id"] not in held and (one["group_id"], one["product_id"]) not in taken
+        if (one["group_id"], one["product_id"]) not in taken
     ]

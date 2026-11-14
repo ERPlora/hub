@@ -540,7 +540,8 @@ cajero del producto actual es un empleado.
 - **Desde una copia aparte** (BASE-F114, F10): `recoverable_from_copy` de `apps.py` declara una sola cosa, «Modifier
   groups of products». `queries.links_in_copy` lee con su propio SQL los `ModifierLink` de la copia que cuelgan de un
   producto no borrado allí (los de una categoría no, hub#1456) y `queries.links_not_in_business` deja los que el negocio
-  no tiene ni por id ni por sitio (grupo y producto, el índice único `modifier_link_product_unique`); la plataforma los
+  no tiene en su sitio (grupo y producto, el índice único `modifier_link_product_unique`; un enganche nunca cambia de
+  grupo ni de producto, así que el mismo enganche ya está en el suyo); la plataforma los
   crea con `modifier.link.attach` como la recuperación (`copy_recovery:<id>`), y lo que `attach` rechaza sale «sin
   crear» con su motivo. Pruebas: `tests/test_recovery.py`.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` al borrar
