@@ -885,6 +885,23 @@ class TestFeedingAProgram:
 
         assert len(checks) < 1000, len(checks)
 
+    def test_its_feed_is_closed_at_once_when_the_program_fails(self, tmp_path):
+        closed = []
+
+        def tracked():
+            try:
+                yield from FEED
+            finally:
+                closed.append(True)
+
+        with pytest.raises(move.MoveFailed) as failed:
+            move._run(
+                ["sh", "-c", "exit 3"], "", tmp_path / "err", lambda: None, None, what="sh", feed=tracked(), timeout=30
+            )
+
+        # The failure still holds the run's frame: only closing the feed lets the copy's read from the bucket go now.
+        assert "exit 3" in str(failed.value) and closed == [True]
+
     def test_what_the_feed_raises_stops_the_program_and_reaches_the_caller(self, tmp_path):
         def broken():
             yield FEED[0]
