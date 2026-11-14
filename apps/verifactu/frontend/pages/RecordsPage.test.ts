@@ -9,7 +9,7 @@ import type { Component } from 'vue';
 
 import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import { outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
-import { business } from '../../../../base/frontend/__tests__/business';
+import { business, IN_YEN } from '../../../../base/frontend/__tests__/business';
 import { insideTheInstalledApp } from '../__tests__/system-browser';
 import { errorFrame, flush, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
 import { plain } from '../lib/format';
@@ -292,6 +292,15 @@ describe('RecordsPage: the filters behind the table funnel', () => {
         says: () => s.prop('filterErrors'),
       };
     },
+  });
+
+  it('a total that is no amount of the business\'s money does not narrow the list: «12,5» in yen', async () => {
+    const s = await setup({ business: business(IN_YEN) });
+    await s.show(EMPTY);
+    await s.emit('update:filters', { total_amount_from: '12,5' });
+    await s.reopen();
+    await s.show(EMPTY);
+    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No records yet. Every invoice you issue is sealed and listed here.');
   });
 
   it('a filter the server refuses (422) goes under its filter; the rows stay and no error replaces them', async () => {

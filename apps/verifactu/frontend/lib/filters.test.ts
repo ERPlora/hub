@@ -61,5 +61,6 @@ describe('filters', () => {
     expect(filtersInUse({ status: 'rejected', issue_date_from: '2026-10-01', issue_date_to: '2026-10-14' })).toBe(3);
     expect(filtersInUse({ total_amount_from: 'x' })).toBe(0);
     expect(filtersInUse({ total_amount_from: '1.000', total_amount_to: '1.000,50' }, EUR)).toBe(1);
+    expect(filtersInUse({ total_amount_from: '12,5' }, JPY)).toBe(0);
   });
 });
