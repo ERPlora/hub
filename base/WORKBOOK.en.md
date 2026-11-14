@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:bfcc843a2185b1b17c2ce87e261d21c14bdf6ed31560654b1d4078082fddef1d -->
+<!-- generated from WORKBOOK.md sha256:5e9894f1d59f42227e6f44b037308412ea38ffa06eccc56d9ce71fff6fc64ed5 -->
 
 ## What it is for and who it is for
 
@@ -2934,10 +2934,9 @@ Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APP
 Status: done (the action and the restore, in its place or to a separate copy, and getting back from the separate copy
 the customers that were lost, the deleted ones as they were, the products, the services with their categories, the
 appointments, the repeating appointments, the price list prices and the modifier groups of the products; making and
-deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws; the image of a
-service brought back, hub#1429; the menu options of a product that comes back, hub#1343; the price list prices of a
-service that comes back as a new one, hub#1459; the modifier groups of a category that comes back, hub#1456; a deleted
-modifier group, hub#1458)
+deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws; the menu options
+of a product that comes back, hub#1343; the price list prices of a service that comes back as a new one, hub#1459; the
+modifier groups of a category that comes back, hub#1456; a deleted modifier group, hub#1458)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -3041,8 +3040,9 @@ Steps:
       (SERVICE-F31): as their main service if the business has not given them another since, and switched off if it
       was. Someone Staff terminated, or the business no longer has, is not assigned, because they can no longer be
       booked, and Recoveries says so in the service's notes ("service.member_terminated: came back without the
-      professional <their identifier>: terminated in Staff", or "…: no longer in Staff"). Without its image
-      (hub#1429). An archived one is still in
+      professional <their identifier>: terminated in Staff", or "…: no longer in Staff"). It comes back with the image
+      of the library it had, as Services sets it (SERVICE-F34): not one the library no longer has, and never a photo of
+      its own, because the separate copy is of the database and not of the files. An archived one is still in
       the business and does not come
       back (it is restored in Services), nor does one the copy had archived, and one the business has already made again
       (another with the same name in the same category, not itself one of the copy's; each counts for one only, so two
@@ -3149,7 +3149,7 @@ support staff see the list, Separate copies and Recoveries, but not the actions.
 Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
 INVENTORY-F07, INVENTORY-F30, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08,
-SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, PRICING-F07,
+SERVICE-F31, SERVICE-F34, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, PRICING-F07,
 PRICING-F14, PRICING-F15, MODIFIER-F05, MODIFIER-F10, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257,
 hub#1282, hub#1283, hub#1284,
 hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1343,

@@ -7,10 +7,11 @@ and its operation; the platform (``base.tenancy.recovery``) connects to the copy
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Annotated, Any
 
 import psycopg
 from ninja import Field, Schema
+from pydantic import StringConstraints
 
 #: The hook of a ``LiveAppConfig`` that says what the app gives back from a separate copy.
 HOOK = "recoverable_from_copy"
@@ -82,4 +83,15 @@ class RecoveredOut(Schema):
 
     left_out: list[LeftOut] = Field(
         default_factory=list, description="What the record came back without, each with why."
+    )
+
+
+class ImageInCopyIn(Schema):
+    """Mixed into the input of an operation a recovery runs whose record showed an image in the copy: the platform
+    gives it as ``read`` found it, and the operation keeps what ``base.images.from_copy`` lets come back."""
+
+    image: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] = Field(
+        "",
+        description="The image it showed in the copy: one of the shared library (catalog:<folder>/<name>) comes back "
+        "with it, a photo of its own does not (a copy is of the database, not of the files).",
     )

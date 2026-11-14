@@ -154,7 +154,7 @@ class ServiceConfig(LiveAppConfig):
             ),
             Recoverable(
                 label=self.verbose_name,
-                reads_since="0001_initial",
+                reads_since="0003_service_image",
                 read=queries.recoverable_services_in_copy,
                 missing=queries.services_not_in_business,
                 create="service.service.recover",
