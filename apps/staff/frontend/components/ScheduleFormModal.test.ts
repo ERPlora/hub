@@ -233,12 +233,14 @@ describe('ScheduleFormModal: New (STAFF-F13)', () => {
       expect(reason(s, 2)).toBeNull();
     });
 
-    it('a new try says every reason again', async () => {
+    it('a new try names the days by what it sends', async () => {
       const s = await refusedDays();
       await typeIn(s.day(2, 'end'), '19:00');
-      s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields: { 'days.1.end_time': ORDER } } });
+      // Tuesday left out too: Wednesday is now the first day sent.
+      await ionChecked(s.day(1, 'working'), false);
+      s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields: { 'days.0.end_time': ORDER } } });
       await click(s.save());
-      expect([reason(s, 2), reason(s, 3)]).toEqual([ORDER, null]);
+      expect([reason(s, 1), reason(s, 2), reason(s, 3)]).toEqual([null, ORDER, null]);
     });
   });
 });

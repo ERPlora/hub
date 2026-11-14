@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d968f005cc514ce8e62b1932c3102876f06d1a09f9bdeea34d4bfeed5e37da27 -->
+<!-- generated from WORKBOOK.md sha256:8bac108002eafb674304d0d06de352c2a37812fdc4213f3f703fa8a2ae1a3656 -->
 
 ## What it is for and who it is for
 
@@ -366,7 +366,9 @@ must be before the end time.", "The break needs a start and an end, or neither."
 inside the working hours.", "Each weekday can appear only once.", "The schedule's validity ends before it
 starts."; "That staff member does not exist in this business.". A shift that crosses midnight is not
 accepted. "A schedule needs at least one working day with hours." shows on top of the week and goes away
-as soon as any day changes (ticked, unticked, or an hour typed), without saving again (hub#1448).
+as soon as any day changes (ticked, unticked, or an hour typed), without saving again (hub#1448). A day's
+reason shows under that day and goes away as soon as that day changes (ticked, unticked, or one of its hours
+typed), without saving again; the other days' reasons stay until those days change (hub#1460).
 Involved: none
 
 ### STAFF-F14 Edit a schedule
@@ -380,7 +382,8 @@ Steps:
 In: the schedule and its whole week.
 Out: the changed schedule (`staff.schedule.updated`), with the same "Default" rule and the same rule of
 which schedule rules as when creating it.
-If it fails: the same refusals as when creating, or "That schedule does not exist in this business.".
+If it fails: the same refusals as when creating, which go away the same way when what was refused
+changes, or "That schedule does not exist in this business.".
 Involved: none
 
 ### STAFF-F15 Activate, deactivate or delete a schedule

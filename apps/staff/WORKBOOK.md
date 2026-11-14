@@ -396,7 +396,9 @@ hora de inicio tiene que ser anterior a la de fin.», «El descanso necesita ini
 una vez.», «La vigencia del horario termina antes de empezar.»; «Ese miembro del personal no existe
 en este negocio.». Un turno que cruza la medianoche no se admite. «Un horario necesita al menos un día de
 trabajo con horas.» sale encima de la semana y se quita en cuanto se cambia cualquier día (se marca o se
-desmarca, o se escribe una hora), sin volver a guardar (hub#1448).
+desmarca, o se escribe una hora), sin volver a guardar (hub#1448). El motivo de un día sale debajo de ese día y
+se quita en cuanto se cambia ese día (se marca o se desmarca, o se escribe una de sus horas), sin volver a
+guardar; los de los demás días se quedan hasta que se cambian (hub#1460).
 Implicados: ninguno
 
 ### STAFF-F14 Editar un horario
@@ -412,7 +414,8 @@ Pasos:
 Entra: el horario y su semana completa.
 Sale: el horario cambiado (`staff.schedule.updated`), con la misma regla de «Por defecto» y de qué
 horario manda que al crearlo.
-Si falla: los mismos rechazos que al crear, o «Ese horario no existe en este negocio.».
+Si falla: los mismos rechazos que al crear, que se quitan igual al cambiar lo rechazado, o «Ese horario no
+existe en este negocio.».
 Implicados: ninguno
 
 ### STAFF-F15 Activar, desactivar o eliminar un horario
