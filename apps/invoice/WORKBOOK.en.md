@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5f01078c75f920e72585cc2f39956ca4a73a8e63399e7855c471ff8406f3b76e -->
+<!-- generated from WORKBOOK.md sha256:58e054641a245191ec53e7f54c75037ac5e4ecc1c2a257e869dd046c1c6859a0 -->
 
 ## What it is for and who it is for
 
@@ -206,7 +206,7 @@ rectifying invoice already issued: Back closes its result (BASE-F05).
 | INVOICE-F20 | Give other apps the invoice of a sale | done |
 | INVOICE-F21 | Set up the issuer | done |
 | INVOICE-F22 | Receive the issuer from the ERPlora account | discarded — the ERPlora account does not send the business's tax identity with the hub's data and the platform does not hand it to Invoicing; Invoicing already keeps it when it arrives (hub#501) |
-| INVOICE-F23 | Issue ERPlora's invoices (platform hub) | discarded — the Invoicing part is done and tested, but the platform hub is not set up until it is born with its own database, like every business (hub#502) |
+| INVOICE-F23 | Issue ERPlora's invoices (platform hub) | done |
 
 ### INVOICE-F01 The ticket (simplified invoice) born when charging
 Status: done — Sales asks for it within the same charge
@@ -736,18 +736,22 @@ If it fails: an incomplete issuer or one with an invalid tax ID is refused and t
 Involved: none
 
 ### INVOICE-F23 Issue ERPlora's invoices (platform hub)
-Status: discarded — the Invoicing part is done and tested, but the platform hub is not set up until it is born with its own database, like every business (hub#502)
+Status: done
 Actor: system (the ERPlora account)
 Screen: none (nobody enters the platform hub)
 Steps:
-1. A customer pays their subscription; the ERPlora account numbers its invoice (`ERP-2026-00123`, credit
+1. Before charging real money, the account asks the platform hub whether it is ready: it is with its issuer
+   and VeriFactu and, in production, only while real filing with the AEAT is open on the server
+   (VERIFACTU-F08). Otherwise it answers "not ready" with the reason and the account does not charge. In pre
+   nothing changes: it files in testing and charges with test keys.
+2. A customer pays their subscription; the ERPlora account numbers its invoice (`ERP-2026-00123`, credit
    notes in `ERPR`) and sends it, signed, to ERPlora's platform hub.
-2. Invoicing issues it as it arrives, with the account's number and date (no series of the hub counts for
+3. Invoicing issues it as it arrives, with the account's number and date (no series of the hub counts for
    it), with ERPlora as issuer and that day's payer as recipient, and VeriFactu seals its record in the
    same operation. It answers "issued" with its QR.
-3. The account then asks how it is going: "issued" while the record goes to the AEAT, and "accepted",
+4. The account then asks how it is going: "issued" while the record goes to the AEAT, and "accepted",
    "accepted with errors" or "rejected" when it answers (with its code and its message).
-4. The PDF is the same A4 as in INVOICE-F18 in the payer's language, with the VeriFactu QR ("QR
+5. The PDF is the same A4 as in INVOICE-F18 in the payer's language, with the VeriFactu QR ("QR
    tributario:", "VERI*FACTU") only once the AEAT has accepted it, as in the old account.
 In: the account's invoice: its number, its date, its amounts, how it is taxed, the payer, its lines and,
 in a credit note, the invoice it corrects.
@@ -756,7 +760,9 @@ Out: the invoice, with the account's reference (announces `invoice.invoice.issue
 If it fails: the same invoice again (or two deliveries at once) answers what there already is, without
 writing anything; a credit note of an invoice that did not arrive is refused; above €400 without the
 payer's tax ID it is refused; an invoice that does not follow the contract is refused with its reason; a
-VeriFactu refusal undoes the whole invoice.
+VeriFactu refusal undoes the whole invoice; in production with real filing with the AEAT closed, "not ready":
+"Real filing with the AEAT is closed on this server: ERPlora's invoices would not reach it.", and the account
+does not charge.
 Involved: VERIFACTU-F13
 
 ## Services: what goes in and what comes out
@@ -786,7 +792,7 @@ name, their phone or their email (as in Customers) and a series by its code.
 | The issuer | view | F21, F22 | `invoice.issuer.get` |
 | How an ERPlora invoice is going (by the SaaS's `id`) | only the system | F23 | `invoice.invoice.platform_status` |
 | The A4 of an ERPlora invoice, in its language | only the system | F23 | `invoice.invoice.platform_document` |
-| Whether the platform hub can issue now | only the system | F23 | `invoice.invoice.platform_health` |
+| Whether the platform hub can issue now (in production, only with real filing with the AEAT open) | only the system | F23 | `invoice.invoice.platform_health` |
 
 All of them can be followed live.
 

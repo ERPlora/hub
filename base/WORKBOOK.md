@@ -3064,9 +3064,9 @@ Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, A
 Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte, y recuperar desde la copia aparte los
 clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías, las citas,
 las citas periódicas, los precios de tarifa, los grupos de suplementos que el negocio borró, con sus opciones, los
-grupos de suplementos de las categorías y de los productos y las elecciones de menú de los productos; crear y borrar el
-clúster temporal es el procedimiento «Devolver un negocio a un momento» de ERPlora/aws; una opción quitada de un grupo
-de suplementos que el negocio conserva, hub#1505; un menú o un plato retirado, hub#1474)
+grupos de suplementos de las categorías y de los productos, los menús que el negocio retiró y los platos que quitó de un
+menú y las elecciones de menú de los productos; crear y borrar el clúster temporal es el procedimiento «Devolver un
+negocio a un momento» de ERPlora/aws; una opción quitada de un grupo de suplementos que el negocio conserva, hub#1505)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
 copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
@@ -3106,12 +3106,12 @@ Pasos:
      Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes**, **Categorías de productos,
      Productos, Enlaces de productos a categorías**, **Categorías de servicios, Servicios, Enlaces de servicios a
      categorías, Enlaces de subcategorías a categorías**, **Citas, Citas periódicas**, **Precios de tarifa**,
-     **Elecciones de menú de productos** y **Grupos de suplementos, Grupos de suplementos de categorías, Grupos de
-     suplementos de productos**). Pulsa **Recuperar**.
+     **Menús, Platos de menú, Elecciones de menú de productos** y **Grupos de suplementos, Grupos de suplementos de
+     categorías, Grupos de suplementos de productos**). Pulsa **Recuperar**.
   10. Sale «1 copia aparte devolverá Clientes, Categorías de productos, Productos, Enlaces de productos a categorías,
       Categorías de servicios, Servicios, Enlaces de servicios a categorías, Enlaces de subcategorías a categorías,
-      Citas, Citas periódicas, Precios de tarifa, Elecciones de menú de productos, Grupos de suplementos, Grupos de
-      suplementos de categorías, Grupos de suplementos de productos a su negocio en unos minutos:
+      Citas, Citas periódicas, Precios de tarifa, Menús, Platos de menú, Elecciones de menú de productos, Grupos de
+      suplementos, Grupos de suplementos de categorías, Grupos de suplementos de productos a su negocio en unos minutos:
       Recuperaciones dice cómo
       fue.». En
       Recuperaciones la ve «Pedida» con la copia, qué se pidió y cuándo.
@@ -3247,7 +3247,15 @@ Pasos:
       un producto que vuelve, el mismo o como uno nuevo, sale otra vez en sus menús del TPV (COMBO-F15). No se repite una
       que el negocio aún tiene, aunque le cambiara el producto, ni una cuyo producto el negocio ya volvió a ofrecer en ese
       plato: se queda la suya. Una que el constructor no acepta hoy (su producto sigue eliminado o está desactivado, o el
-      negocio ya hizo otro a mano con su SKU, o retiró el menú o el plato) no vuelve y su motivo lo dice.
+      negocio ya hizo otro a mano con su SKU) no vuelve y su motivo lo dice. Justo antes van, contados aparte, los menús
+      y sus platos: «Menús: se creó 1; Platos de menú: se crearon 2». Cada menú que la copia tiene y el negocio retiró
+      (con sus platos y sus elecciones) se vuelve a crear como lo crea la pantalla de Menús, con su precio, su categoría
+      fiscal y la imagen de la librería que tenía; después, cada plato que su menú ya no tiene (el menú acaba de volver
+      o el negocio quitó el plato) se vuelve a añadir al final del menú como lo añade el constructor, y sus elecciones
+      van a ese plato, así que el menú vuelve a salir en el TPV con sus platos y sus suplementos (COMBO-F15). Uno que el
+      negocio volvió a crear a mano con su nombre (el menú, o el plato en su menú) se queda como está, sin otro igual, y
+      lo que en la copia colgaba de él no vuelve y su motivo lo dice; lo que vuelve se reconoce aunque se renombre, así
+      que pedirlo otra vez no lo repite.
 Entra: los negocios elegidos, el clúster temporal con su copia y el momento; para recuperar, la copia aparte hecha y qué
 recuperar.
 Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso
@@ -3274,8 +3282,9 @@ nueva por cada una que ya no tenía, con su aviso de serie creada (`appointment.
 reserva, un precio de tarifa por cada uno que le faltaba, con su aviso de precio puesto (`pricing.price_item.added`),
 un grupo de suplementos nuevo por cada uno que le faltaba, con su aviso de grupo creado (`modifier.group.created`) y el
 de cada una de sus opciones (`modifier.option.created`), un grupo de suplementos enganchado a una categoría o a un producto por cada uno que le faltaba, con su aviso de enganche
-hecho (`modifier.link.attached`), y una elección de menú por cada una que le faltaba, con su aviso de elección nueva
-(`combo.option.created`), y nada más. Cada uno
+hecho (`modifier.link.attached`), un menú por cada uno que le faltaba, con su aviso de menú nuevo (`combo.combo.created`),
+un plato por cada uno que le faltaba, con su aviso de plato nuevo (`combo.group.created`), y una elección de menú por
+cada una que le faltaba, con su aviso de elección nueva (`combo.option.created`), y nada más. Cada uno
 de esos avisos dice que lo hizo la recuperación (su autor es `copy_recovery:<id>`, el de la fila de Recuperaciones), así
 que ninguna automatización del negocio arranca con ellos (FLOW-F21), sea de algo creado o de algo recuperado; lo que
 solo pone al día lo del negocio con ellos sigue igual (la Bandeja de WhatsApp enlaza a la ficha su conversación;
@@ -3311,7 +3320,7 @@ Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
 INVENTORY-F07, INVENTORY-F30, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08,
 SERVICE-F31, SERVICE-F34, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, PRICING-F07,
-PRICING-F14, PRICING-F15, MODIFIER-F02, MODIFIER-F04, MODIFIER-F05, MODIFIER-F10, COMBO-F06, COMBO-F15, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198,
+PRICING-F14, PRICING-F15, MODIFIER-F02, MODIFIER-F04, MODIFIER-F05, MODIFIER-F10, COMBO-F04, COMBO-F05, COMBO-F06, COMBO-F15, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198,
 hub#1213, hub#1257,
 hub#1282, hub#1283, hub#1284,
 hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1343,
@@ -4242,13 +4251,30 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1505, aws#77
   arriendo del hub (`claim_hub`, el de `HubDue`) y en una transacción sobre su fila bloqueada
   (`control.services.start_scheduled_move`): si en su reloj ya no es de madrugada (el worker estuvo parado, la zona
   cambió) la deja para la siguiente; si una comprobación de `control.hub.move` la rechaza en ese momento (clúster
-  cerrado o lleno, base demasiado grande, en restauración…), la quita y lo dice en `Hub.last_error`
+  cerrado o lleno, base que no está en su servidor, en restauración…), la quita y lo dice en `Hub.last_error`
   (`move_not_started: <código>: …`); si no, pone `moving_to` y el mismo pase la mueve. Cuenta para el hueco del
   clúster destino y lo protege de borrarse. «Cancelar el traslado» la quita mientras no ha empezado
   (`control.hub.scheduled_move_cancelled`), sin cerrar nada. Tests: `control/tests/test_services.py::TestTheNight` y
   `::TestMoveAtNight`, `base/tenancy/tests/test_move.py::TestAMoveAskedForTheNight` (dos BD reales y el arriendo) y
   `control/tests/test_admin.py::TestMoveToCluster` y `::TestCancelTheMove`. El aviso al negocio de que esa noche se
   le traslada no existe todavía (hub#1510).
+- **Un negocio de cualquier tamaño se traslada** (hub#1509, cierra hub#931): la copia pasa por el bucket de volcados
+  (`HUB_DUMPS_BUCKET`), nunca por el disco del worker, así que `control.hub.move` ya no rechaza por tamaño (se fue el
+  tope de 512 MiB y su 409 `control.hub_too_large`; solo comprueba que la base está en su servidor). El negocio está
+  en mantenimiento mientras dura la copia, como antes, y por eso se pide de madrugada. `pg_dump` sube la copia en
+  partes según la hace (`base.tenancy.dumps.stream_to_bucket`, partes de 32 MiB, una en memoria), y la subida solo se
+  completa si `pg_dump` acabó bien: si falla, se para o se pasa de tiempo, se aborta y no queda nada. En el destino,
+  `pg_restore` lee la copia desde el bucket por su entrada (`dumps.stream_from_bucket` en `move._restore_from_bucket`:
+  primero su índice y después la restauración en una transacción, las dos sin fichero). Cada mitad tiene una hora
+  (`move.COPY_TIMEOUT_SECONDS`): de madrugada acaba antes de las 07:00 y una hora da para decenas de GiB; se puede
+  cancelar en cualquier momento. La copia queda en `<hex>/<AAAAMMDDTHHMMSSZ>-move.dump` los 90 días del bucket, sin
+  fila `HubDump` (no es una copia del negocio para descargar; el worker no puede borrar del bucket). Sin bucket no se
+  cierra nada: el traslado acaba con `move_dump_failed` en `Hub.last_error` y el negocio sigue donde estaba. La
+  restauración a un momento y la copia aparte (BASE-F114) siguen copiando por un fichero del worker, con su tope
+  (`control.services.RESTORE_MAX_BYTES`, hub#1524). Tests: `base/tenancy/tests/test_dumps.py` (los `stream`),
+  `base/tenancy/tests/test_move.py::TestTheCopyGoesThroughTheBucket` y `::TestFeedingAProgram` (dos BD reales y el S3
+  de moto), `control/tests/test_services.py::TestMove` y
+  `control/tests/test_admin.py::test_its_confirmation_page_promises_no_refusal_by_size`.
 - **«Restaurar desde una copia…»** (BASE-F114, hub#1198) es `control.admin.HubAdmin.restore_from_a_copy`: su página de
   confirmación (`RestoreFromACopyForm`, la plantilla `action_confirmation.html` que comparte con «Mover a otro
   clúster…») y, por cada hub, `control.hub.restore` con el actor del personal; el admin no comprueba nada que la
