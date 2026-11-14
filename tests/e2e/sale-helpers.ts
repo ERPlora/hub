@@ -8,7 +8,7 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
-import { cleanInventory, createProduct, type Product } from './inventory-helpers';
+import { cleanInventory, createProduct, photoLoaded, type Product } from './inventory-helpers';
 import { cleanInvoices, ensureIssuer, issuedIds, parkIssuer, unparkIssuer } from './invoice-helpers';
 
 export const VIEWPORTS = [
@@ -108,6 +108,16 @@ export async function expectFirstTile(page: Page, testid: string | RegExp): Prom
   const grid = tillGrid(page);
   await expect(grid, 'one grid of the till on screen').toHaveCount(1);
   await expect(grid.locator(TILL_TILE).first()).toHaveAttribute('data-testid', testid);
+}
+
+/**
+ * The width the photo of `tile` loaded at, once it is on screen: the image named after its item `name`, as ItemImage.vue
+ * names it, never a style class of the tile, which a restyle renames. With `src`, it is also that image.
+ */
+export async function tilePhotoLoaded(tile: Locator, name: string, src?: string): Promise<number> {
+  const photo = tile.getByAltText(name, { exact: true });
+  if (src !== undefined) await expect(photo).toHaveAttribute('src', src);
+  return photoLoaded(photo.locator('xpath=..'));
 }
 
 /** The lines of the check on screen that sell `product`. */
