@@ -492,7 +492,6 @@ def test_the_reported_platform_request_offers_its_existing_operation(context_of,
     assert place_of_no_ask(assistant.catalog(context_of(Membership.Role.OWNER, "es")), name, phrase) is not None
 
 
-
 #: A phrase of some tools, each with the tool it asks for: reads and writes, both languages, and words only the Hub's
 #: ``SYNONYMS`` read as it does («cuenta» is a table's check, «ticket» a sale).
 SAMPLE = [

@@ -1818,9 +1818,10 @@ def _category_held(category_id: UUID | None, name: str | None, here: tuple[set[U
     return by_name.get(_same_name(name)) if name is not None else None
 
 
-#: What ``service.service.create`` takes of a service of a separate copy, each a column since ``0001_initial``
-#: (``services_in_copy``): all of it but its category and its tax category, which the business names its own way, and
-#: who performs it, read apart (``recoverable_services_in_copy``). Not its image.
+#: What ``service.service.recover`` takes of a service of a separate copy (``services_in_copy``): its create's, each a
+#: column since ``0001_initial``, and the image it showed, one since ``0003_service_image``, the migration its
+#: declaration names (``reads_since``); not its category and its tax category, which the business names its own way,
+#: nor who performs it, read apart (``recoverable_services_in_copy``).
 COPY_FIELDS = (
     "name",
     "pricing_type",
@@ -1842,18 +1843,19 @@ COPY_FIELDS = (
     "sku",
     "barcode",
     "notes",
+    "image",
 )
 
 
 def services_in_copy(conn) -> list[dict]:
     """hub#1283: each service of a separate copy of the business, on offer or archived (``is_active``), with its ``id``
-    there, what ``service.service.create`` takes and the ids there of its category (``category_id``) and its tax
-    category (``tax_category_id``), by id, and its category's name there (``category_name``, hub#1323: a category
-    brought back is a new one, found by its name); nothing where the app's table is not there. Only one on offer comes
-    back (``services_not_in_business``), but every one is read: a service of the copy is never another one's made again
-    (``services_in_business``). ``conn`` is the copy's direct, read-only connection (``recoverable_from_copy`` on this
-    app's config: the copy is no business and has no alias), so it is read by its own SQL over the model's names, never
-    the ORM."""
+    there, what ``service.service.recover`` takes (``COPY_FIELDS``) and the ids there of its category (``category_id``)
+    and its tax category (``tax_category_id``), by id, and its category's name there (``category_name``, hub#1323: a
+    category brought back is a new one, found by its name); nothing where the app's table is not there. Only one on
+    offer comes back (``services_not_in_business``), but every one is read: a service of the copy is never another one's
+    made again (``services_in_business``). ``conn`` is the copy's direct, read-only connection
+    (``recoverable_from_copy`` on this app's config: the copy is no business and has no alias), so it is read by its
+    own SQL over the model's names, never the ORM."""
     table = Service._meta.db_table
     if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
         return []

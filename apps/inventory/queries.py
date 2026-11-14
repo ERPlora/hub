@@ -1097,8 +1097,9 @@ def _csv(filename, headers, rows) -> dict:
 #: and its tax category, by its key here.
 CATEGORY_FIELDS = ("name", "slug", "description", "icon", "color", "order")
 
-#: What ``inventory.product.recover`` takes of a product of a separate copy, all of its columns since
-#: ``0001_initial`` (``products_in_copy``): its create's and the image it showed. Not its stock (the copy's balance is
+#: What ``inventory.product.recover`` takes of a product of a separate copy (``products_in_copy``): its create's, each
+#: a column since ``0001_initial``, and the image it showed, one since ``0005_product_image``, the migration its
+#: declaration names (``reads_since``). Not its stock (the copy's balance is
 #: another day's: a count says today's, INVENTORY-F14) nor its «sold out» (a day's state).
 PRODUCT_FIELDS = (
     "name",
