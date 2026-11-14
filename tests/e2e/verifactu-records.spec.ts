@@ -13,7 +13,7 @@
 // What this file creates is deleted after it (VeriFactu's rows first: a record keeps its invoice).
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, psql, record as recordMetrics, shot, shown } from './helpers';
+import { A, api, capture, login, psql, record as recordMetrics, saveSessionForTheSweep, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, shots, stamp } from './sale-helpers';
@@ -405,6 +405,7 @@ test('Records filter by Date and Total (euros) behind the funnel, with its count
   context,
 }) => {
   await login(page, A, '/verifactu/records');
+  await saveSessionForTheSweep(context);
   const issued = await ticket(context);
   const view = shown(page);
   const panel = view.locator('[data-testid=verifactu-records-filters-panel]');
@@ -451,7 +452,7 @@ test('Records filter by Date and Total (euros) behind the funnel, with its count
   await panel.locator('[data-testid=verifactu-records-filters-apply]').click();
   await expect(panel).toBeHidden();
   await expect(toggle).not.toHaveAttribute('data-invalid', 'true');
-  await expect(count).toHaveText('2');
+  await expect(count).toHaveText('1');
   await expect(row).toBeVisible();
   // From 1.000,50 € on, its 12,10 € ticket is left out.
   await toggle.click();
@@ -479,6 +480,18 @@ test('Records filter by Date and Total (euros) behind the funnel, with its count
   await expect(panel.getByText('The end date cannot be before the start date.')).toBeVisible();
   await page.waitForTimeout(400);
   await page.screenshot({ path: shot('FIX-DATATABLE-HUB-FILTERS-2B-verifactu-error') });
+  await panel.locator('[data-testid=verifactu-records-filters-clear]').click();
+  await expect(count).toHaveCount(0);
+  // «1.000» in euros reads two ways: its longest warning, under the box on a phone, names both and filters nothing.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await box('total_amount_from').fill('1.000');
+  await panel.locator('[data-testid=verifactu-records-filters-apply]').click();
+  await expect(toggle).toHaveAttribute('data-invalid', 'true');
+  await expect(row).toBeVisible();
+  await toggle.click();
+  await expect(panel.getByText('This amount can be read in two ways: «1.000» could be €1,000.00 or €1.00. Write the decimals so there is no doubt.')).toBeVisible();
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: shot('HUB-1247-verifactu-total-two-readings-390') });
   await panel.locator('[data-testid=verifactu-records-filters-clear]').click();
   await expect(count).toHaveCount(0);
 });
