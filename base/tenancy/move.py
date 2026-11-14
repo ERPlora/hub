@@ -2,10 +2,12 @@
 
 The Hub admin asks (``control.hub.move``: ``Hub.moving_to``; its host answers 503 «maintenance» from then on,
 ``base.registry``); the worker moves it here (:func:`run_due`, in its own thread), one hub at a time, under the hub's
-lease (``hub_due``, provisioning's: :data:`LEASE`, renewed while it copies). Only a database small enough for a copy
-gets here (``control.services.MOVE_MAX_BYTES``); a larger one needs logical replication, which the Hub does not do yet.
-A move asked for the business's night is started by the same pass first (:func:`launch_due`), under the same lease,
-once it is night on the business's own clock; the pass then moves it as any other.
+lease (``hub_due``, provisioning's: :data:`LEASE`, renewed while it copies). A database of any size moves: its copy
+goes through the dumps bucket (``base.tenancy.dumps``), never through a file of the worker, with the business in
+maintenance for as long as it takes (:data:`COPY_TIMEOUT_SECONDS` for each half). Without a bucket nothing is closed and
+the move ends there, with why. A move asked for the business's night is started by the same pass first
+(:func:`launch_due`), under the same lease, once it is night on the business's own clock; the pass then moves it as any
+other.
 
 1. **Closed.** On the origin (its cluster, or the settings' own server), ``CONNECT`` and ``TEMPORARY`` are taken from
    the environment's ``hub_app`` and ``hub_admin`` (``base.tenancy.ops.environment_roles``) and every other session on
@@ -16,11 +18,12 @@ once it is night on the business's own clock; the pass then moves it as any othe
    on that server (an earlier move off it) gives way first. Renaming before the destination is made frees the name on
    the origin's server, so a move between two clusters of one server works as any other (the tests' too): where the
    data is comes from control's note, never from which names a server holds.
-3. **Copied**: ``pg_dump`` of the copy (``base.tenancy.dumps``' own run: the migrator's direct connection), and on the
-   destination a new database cloned from that cluster's template of the hub's vertical
+3. **Copied**: ``pg_dump`` of the copy sent to the dumps bucket as it is made (``dumps.stream_to_bucket``: the
+   migrator's direct connection; ``<hex>/<AAAAMMDDTHHMMSSZ>-move.dump``, kept the bucket's 90 days and listed to
+   nobody), and on the destination a new database cloned from that cluster's template of the hub's vertical
    (``ops.clone_database``: private, open to the app's roles), emptied of the template's tables and filled with
-   ``pg_restore`` in one transaction. The template's extensions stay: the restore leaves them out (on Aurora only the
-   master makes ``vector``).
+   ``pg_restore`` in one transaction, reading the copy from the bucket on its input. The template's extensions stay:
+   the restore leaves them out (on Aurora only the master makes ``vector``).
 4. **Checked**: its identity (``base_hub_identity``) says it is this hub, and its schema is brought to the code's leaf
    (``migrator.ensure_schema``).
 5. **Switched**: control moves the hub to the destination and keeps the copy's row (``MovedCopy``) in one transaction.
@@ -46,7 +49,8 @@ The copies are dropped after :data:`MOVED_COPY_DAYS` (:func:`drop_old_copies`, i
 one that cannot be dropped now is tried again on the next pass. A restore's kept copies go the same way.
 
 Its steps are a restore's too (``base.tenancy.restore``): the same move with its origin and destination the
-other way round, the copy coming from a temporary cluster and the hub staying on its own.
+other way round, the copy coming from a temporary cluster and the hub staying on its own, through a file of the worker
+(:func:`_dump`, :func:`_restore`).
 
 Every name is validated by ``base.tenancy.names`` and reaches SQL as ``sql.Identifier``; control is written through
 ``control.services`` only (its doors to the ORM).
@@ -56,6 +60,7 @@ import copy as copying
 import datetime as dt
 import logging
 import os
+import select
 import socket
 import subprocess
 import tempfile
@@ -81,8 +86,15 @@ logger = logging.getLogger(__name__)
 LEASE = provision.LEASE
 #: How long the copy a hub leaves behind is kept before it is dropped.
 MOVED_COPY_DAYS = 7
-#: How long the restore may run before it is stopped (the dump has its own, ``dumps.DUMP_TIMEOUT_SECONDS``).
+#: How long a restore's copy through a file may run before it is stopped (the dump has its own,
+#: ``dumps.DUMP_TIMEOUT_SECONDS``).
 RESTORE_TIMEOUT_SECONDS = dumps.DUMP_TIMEOUT_SECONDS
+#: How long each half of a move's copy may run before it is stopped: the dump to the bucket, and the restore from it.
+#: The business is closed meanwhile, so a large one is moved at night (from 03:00 to 05:00 on its clock): both halves
+#: end before 07:00, and an hour takes tens of GiB even at 10 MB/s. The move can be cancelled at any time.
+COPY_TIMEOUT_SECONDS = 60 * 60
+#: The kind of a move's copy in the dumps bucket (``<hex>/<AAAAMMDDTHHMMSSZ>-move.dump``).
+MOVE_DUMP_KIND = "move"
 #: How many times the rename waits for a session that came back to the origin before it gives up.
 RENAME_WAITS = (0.5, 1.0)
 #: The entries of a dump the restore leaves out: the destination's template has its extensions already, and the public
@@ -189,13 +201,12 @@ def move_hub(
             _back(**back, ours=ours, reason=reason)
             return
         try:
+            _bucket_named()
             _close_and_rename(hub, copy_name, origin, roles, ours)
-            with tempfile.TemporaryDirectory(prefix="hub-move-") as folder:
-                path = Path(folder) / "move.dump"
-                # Their heartbeat checks the move is still this worker's: a cancel or a lease lost stops them.
-                _dump(copy_name, origin, path, ours, cancelled)
-                _make_destination(hub, target, roles, ours)
-                _restore(path, hub.db_name, target, ours, cancelled)
+            # Their heartbeat checks the move is still this worker's: a cancel or a lease lost stops them.
+            key = _dump_to_bucket(hub, copy_name, origin, ours, cancelled)
+            _make_destination(hub, target, roles, ours)
+            _restore_from_bucket(key, hub.db_name, target, ours, cancelled)
             heartbeat()
             _verify_identity(hub.db_name, target, hub.id)
             _ensure_schema(hub, target, heartbeat)
@@ -395,6 +406,24 @@ def _close_and_rename(hub, copy_name: str, origin, roles: bootstrap.Names, ours)
         raise MoveFailed("move_close_failed", error) from error
 
 
+def _bucket_named() -> None:
+    """Before anything is closed: a move's copy goes through the dumps bucket, so without one nothing moves."""
+    if not dumps.configured():
+        raise MoveFailed("move_dump_failed", "no bucket is named for the copies (HUB_DUMPS_BUCKET)")
+
+
+def _dump_to_bucket(hub, source: str, cluster, heartbeat: Callable[[], None], cancelled=None) -> str:
+    """Step 3, on the origin: ``pg_dump`` of ``source`` sent to the dumps bucket as it is made
+    (``dumps.stream_to_bucket``); its key."""
+    key = dumps.key_for(hub, MOVE_DUMP_KIND, timezone.now())
+    copied = SimpleNamespace(db_name=source, cluster=cluster, slug=source)
+    try:
+        dumps.stream_to_bucket(copied, key, timeout=COPY_TIMEOUT_SECONDS, heartbeat=heartbeat, cancelled=cancelled)
+    except dumps.DumpError as failed:
+        raise MoveFailed("move_dump_failed", failed) from failed
+    return key
+
+
 def _dump(source: str, cluster, path: Path, heartbeat: Callable[[], None], cancelled=None) -> None:
     """Step 3, on the origin: ``pg_dump`` of ``source`` as the migrator (``base.tenancy.dumps``' own run)."""
     copied = SimpleNamespace(db_name=source, cluster=cluster, slug=source)
@@ -487,9 +516,59 @@ def _restore(path: Path, name: str, cluster, heartbeat: Callable[[], None], canc
         listing = subprocess.run([tool, "--list", str(path)], check=True, capture_output=True, text=True).stdout
     except subprocess.CalledProcessError as failed:
         raise MoveFailed("move_restore_failed", f"its copy could not be read: {failed.stderr.strip()}") from failed
-    kept = _kept_entries(listing)
-    entries = path.with_suffix(".list")
-    entries.write_text("\n".join(kept) + "\n", encoding="utf-8")
+    entries = _entries(listing, path.with_suffix(".list"))
+    command, password = _restore_command(tool, name, cluster, entries, str(path))
+    _run(command, password, path.with_suffix(".restore.err"), heartbeat, cancelled, what=f"the restore of {name}")
+
+
+def _restore_from_bucket(key: str, name: str, cluster, heartbeat: Callable[[], None], cancelled=None) -> None:
+    """Step 3, on the destination: ``pg_restore`` of the copy at ``key`` into ``name``, read from the bucket on its
+    input and never written to a file (its listing first, the same way), as :func:`_restore` does with a file."""
+    tool = pg_restore()
+    with tempfile.TemporaryDirectory(prefix="hub-move-") as folder:
+        listing = Path(folder) / "listing"
+        list_command = [tool, "--list", f"--file={listing}"]
+        _run(
+            list_command,
+            "",
+            Path(folder) / "listing.err",
+            heartbeat,
+            cancelled,
+            what=f"the listing of {key}",
+            feed=_from_bucket(key),
+            timeout=COPY_TIMEOUT_SECONDS,
+        )
+        entries = _entries(listing.read_text(encoding="utf-8"), Path(folder) / "entries.list")
+        command, password = _restore_command(tool, name, cluster, entries)
+        _run(
+            command,
+            password,
+            Path(folder) / "restore.err",
+            heartbeat,
+            cancelled,
+            what=f"the restore of {name}",
+            feed=_from_bucket(key),
+            timeout=COPY_TIMEOUT_SECONDS,
+        )
+
+
+def _from_bucket(key: str):
+    """The copy at ``key``, read from the dumps bucket a part at a time (``dumps.stream_from_bucket``)."""
+    try:
+        yield from dumps.stream_from_bucket(key)
+    except dumps.DumpError as failed:
+        raise MoveFailed("move_restore_failed", failed) from failed
+
+
+def _entries(listing: str, path: Path) -> Path:
+    """The entries of ``listing`` the restore keeps (:func:`_kept_entries`), written to ``path`` for ``--use-list``."""
+    path.write_text("\n".join(_kept_entries(listing)) + "\n", encoding="utf-8")
+    return path
+
+
+def _restore_command(tool: str, name: str, cluster, entries: Path, *archive: str) -> tuple[list[str], str]:
+    """``pg_restore`` of the entries in ``entries`` into ``name`` on ``cluster``, as the migrator, in one transaction,
+    from ``archive`` (none: its input); and the password, which goes in its environment only."""
     conninfo = tenancy_connections.migrator_conninfo(name, cluster=cluster)
     password = str(conninfo.pop("password", "") or "")
     dsn = make_conninfo(**{key: str(value) for key, value in conninfo.items() if value not in (None, "")})
@@ -503,9 +582,9 @@ def _restore(path: Path, name: str, cluster, heartbeat: Callable[[], None], canc
         "--single-transaction",
         f"--use-list={entries}",
         f"--dbname={dsn}",
-        str(path),
+        *archive,
     ]
-    _run(command, password, path.with_suffix(".restore.err"), heartbeat, cancelled, what=f"the restore of {name}")
+    return command, password
 
 
 def _kept_entries(listing: str) -> list[str]:
@@ -513,39 +592,107 @@ def _kept_entries(listing: str) -> list[str]:
     return [line for line in listing.splitlines() if not any(entry in f"{line} " for entry in SKIPPED_ENTRIES)]
 
 
-def _run(command: list[str], password: str, errors_path: Path, heartbeat, cancelled, *, what: str) -> None:
-    """Run ``command`` with ``password`` in its environment only, within :data:`RESTORE_TIMEOUT_SECONDS`, its
-    heartbeat every ``dumps.POLL_SECONDS``; a stop kills it."""
+def _run(
+    command: list[str],
+    password: str,
+    errors_path: Path,
+    heartbeat,
+    cancelled,
+    *,
+    what: str,
+    feed=None,
+    timeout: float | None = None,
+) -> None:
+    """Run ``command`` with ``password`` in its environment only, within ``timeout`` (default
+    :data:`RESTORE_TIMEOUT_SECONDS`), its heartbeat every ``dumps.POLL_SECONDS``; a stop kills it. ``feed``: the parts
+    of its input, written to it as it reads them (a program that ends before reading them all just ends)."""
+    timeout = RESTORE_TIMEOUT_SECONDS if timeout is None else timeout
     env = {key: value for key, value in os.environ.items() if not key.startswith("PG")}
     env["PGPASSWORD"] = password
     env["PGGSSENCMODE"] = "disable"
     with open(errors_path, "w+", encoding="utf-8", errors="replace") as complaints:
-        process = subprocess.Popen(command, env=env, stdout=subprocess.DEVNULL, stderr=complaints)
+        process = subprocess.Popen(
+            command, env=env, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=complaints
+        )
+        writing = _Input(process, _nothing() if feed is None else feed)
         started = last_beat = time.monotonic()
         try:
             while True:
                 if cancelled is not None and cancelled():
                     raise MoveStopped(f"{what} was stopped: the worker is stopping.")
-                left = RESTORE_TIMEOUT_SECONDS - (time.monotonic() - started)
+                left = timeout - (time.monotonic() - started)
                 if left <= 0:
-                    raise MoveFailed("move_restore_failed", f"{what} took longer than {RESTORE_TIMEOUT_SECONDS:g} s")
-                try:
-                    process.wait(timeout=min(dumps.POLL_SECONDS, dumps.STOP_CHECK_SECONDS, left))
-                    break
-                except subprocess.TimeoutExpired:
-                    if time.monotonic() - last_beat >= dumps.POLL_SECONDS:
-                        heartbeat()
-                        last_beat = time.monotonic()
+                    raise MoveFailed("move_restore_failed", f"{what} took longer than {timeout:g} s")
+                wait = min(dumps.POLL_SECONDS, dumps.STOP_CHECK_SECONDS, left)
+                if not writing.done:
+                    writing.write(wait)
+                else:
+                    try:
+                        process.wait(timeout=wait)
+                        break
+                    except subprocess.TimeoutExpired:
+                        pass
+                if time.monotonic() - last_beat >= dumps.POLL_SECONDS:
+                    heartbeat()
+                    last_beat = time.monotonic()
         except BaseException:
             process.kill()
             process.wait()
             raise
+        finally:
+            writing.close()
         if process.returncode != 0:
             complaints.seek(0)
             said = " ".join(line.strip() for line in complaints.read().splitlines()[-ERROR_LINES:] if line.strip())
             if password:
                 said = said.replace(password, "***")
             raise MoveFailed("move_restore_failed", f"{what} failed (exit {process.returncode}): {said}")
+
+
+def _nothing():
+    """No input: the program's is closed at once."""
+    yield from ()
+
+
+class _Input:
+    """A program's input written from ``feed``, a part at a time and never waiting longer than asked: the pipe does not
+    block, so the stop, the time limit and the heartbeat of :func:`_run` are heard while the program is slow to read."""
+
+    def __init__(self, process, feed) -> None:
+        self.process = process
+        self.feed = feed
+        self.pending = memoryview(b"")
+        self.done = False
+        os.set_blocking(process.stdin.fileno(), False)
+
+    def write(self, wait: float) -> None:
+        """Write what the program takes within ``wait`` seconds; at the feed's end, or once the program stopped
+        reading (it ended), its input is closed."""
+        if not self.pending:
+            try:
+                self.pending = memoryview(next(self.feed))
+            except StopIteration:
+                self._finish()
+                return
+        _, writable, _ = select.select([], [self.process.stdin], [], wait)
+        if not writable:
+            return
+        try:
+            # Once the pipe is writable it takes some of it at least: what it took is written, the rest waits.
+            self.pending = self.pending[os.write(self.process.stdin.fileno(), self.pending) :]
+        except BrokenPipeError:
+            # The program ended without reading the rest (``pg_restore --list`` reads only the archive's table of
+            # contents): how it ended says whether that was well.
+            self._finish()
+
+    def _finish(self) -> None:
+        self.done = True
+        self.close()
+
+    def close(self) -> None:
+        """The feed and the program's input closed; nothing is buffered on it (it is written with ``os.write``)."""
+        self.feed.close()
+        self.process.stdin.close()
 
 
 def _verify_identity(name: str, cluster, hub_id) -> None:

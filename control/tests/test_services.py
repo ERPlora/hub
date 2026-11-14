@@ -409,7 +409,7 @@ def a_ready_hub(**fields) -> Hub:
 class TestMove:
     """``control.hub.move`` asks the worker to move a ready hub's own database to another cluster (``base.tenancy.move``):
     its host answers 503 «maintenance» from now until the worker is done. Only an open cluster with room takes it, the
-    way a new hub is placed; a database too large for a copy (``MOVE_MAX_BYTES``) waits for logical replication."""
+    way a new hub is placed. Its size stops nothing: the copy goes through the dumps bucket, never the worker's disk."""
 
     a_hub = staticmethod(a_ready_hub)
 
@@ -500,20 +500,20 @@ class TestMove:
 
         assert refused.value.code == "control.hub_is_demo"
 
-    def test_a_database_too_large_for_a_copy_waits_for_logical_replication(self, admin_ctx, monkeypatch):
+    @pytest.mark.parametrize("when", ["now", "at_night"])
+    def test_a_database_of_any_size_is_asked_to_move(self, admin_ctx, monkeypatch, when):
         from control import queries
         from control.schemas import HubMoveIn
 
         new = a_cluster()
         hub = self.a_hub()
-        monkeypatch.setattr(queries, "measure", lambda cluster, names: {names[0]: services.MOVE_MAX_BYTES + 1})
+        monkeypatch.setattr(queries, "measure", lambda cluster, names: {names[0]: 40 * 1024**3})
 
-        with pytest.raises(Conflict) as refused:
-            services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
+        out = services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk, when=when))
 
-        assert refused.value.code == "control.hub_too_large"
         hub.refresh_from_db()
-        assert hub.moving_to_id is None
+        assert new.pk in (out.moving_to, out.scheduled_to)
+        assert new.pk in (hub.moving_to_id, hub.move_scheduled_to_id)
 
     def test_a_database_that_is_not_on_its_server_or_cannot_be_measured_does_not_move(self, admin_ctx, monkeypatch):
         from live.errors import OperationError
@@ -723,9 +723,9 @@ class TestMoveAtNight:
 
         closed, new = a_cluster(is_open=False), a_cluster(name="cluster-2", host="writer-2.example")
         hub = a_ready_hub()
-        monkeypatch.setattr(queries, "measure", lambda cluster, names: {names[0]: services.MOVE_MAX_BYTES + 1})
+        monkeypatch.setattr(queries, "measure", lambda cluster, names: {})
 
-        for cluster, code in ((closed, "control.cluster_closed"), (new, "control.hub_too_large")):
+        for cluster, code in ((closed, "control.cluster_closed"), (new, "control.hub_database_missing")):
             with pytest.raises(Conflict) as refused:
                 services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=cluster.pk, when="at_night"))
             assert refused.value.code == code
@@ -873,7 +873,7 @@ class AskedFromATemporaryCluster:
 
         hub = self.a_hub()
         for sizes, code in (({}, "control.restore_copy_missing"), (None, "control.hub_too_large")):
-            found = sizes if sizes is not None else {hub.db_name: services.MOVE_MAX_BYTES + 1}
+            found = sizes if sizes is not None else {hub.db_name: services.RESTORE_MAX_BYTES + 1}
             monkeypatch.setattr(queries, "measure", lambda cluster, names, found=found: found)
             with pytest.raises(Conflict) as refused:
                 self.ask(admin_ctx, hub, self.temporary(name=f"t-{code}", host=f"{code}.example"))
