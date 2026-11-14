@@ -317,7 +317,7 @@ def sessions_revoke(request: HttpRequest) -> HttpResponse:
 # ── erplora.com's WhatsApp doors (doors 1–3 of the inbox's contract) ───────────────────────────────────────────────
 
 
-def _whatsapp_call(request: HttpRequest, name: str) -> HttpResponse:
+def _whatsapp_call(request: HttpRequest, name: str) -> HttpResponse:  # noqa: PLR0911
     """Runs ``name`` as the system on the business the body names (``hub``), once its host opens and the app is on."""
     body = _body_object(request)
     if body is None:

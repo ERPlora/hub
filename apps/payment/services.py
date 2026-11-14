@@ -461,7 +461,7 @@ def _move(
     return payment_row(payment)
 
 
-def _step(
+def _step(  # noqa: PLR0913
     ctx: OperationContext,
     data: PaymentRefIn,
     *,

@@ -156,7 +156,7 @@ def user_part(text: str) -> str:
     return published
 
 
-def _uncommented_lines(text: str) -> Iterator[tuple[str, bool]]:
+def _uncommented_lines(text: str) -> Iterator[tuple[str, bool]]:  # noqa: C901
     """Each line of ``text`` without its HTML comments, and whether it is in a fenced code block.
 
     The ``<!-- origen: … -->`` and ``<!-- código: … -->`` of a WORKBOOK tie it to ``MIGRATION.md``

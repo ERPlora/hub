@@ -547,7 +547,7 @@ class MembersUnavailable(InvalidPayload):
         return envelope
 
 
-def _named_ids(
+def _named_ids(  # noqa: PLR0913, PLR0917
     model, ids: list[UUID], names: list[str], missing, code: str, field: str
 ) -> set[UUID]:
     """The ids of the groups or tags sent by id or by name, held until the COMMIT; one that does not exist

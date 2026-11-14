@@ -597,7 +597,7 @@ def department_rates(departments: list[Department]) -> dict:
     return current_rates(categories, *business_jurisdiction(), business_today())
 
 
-def _find_named(
+def _find_named(  # noqa: PLR0913
     rows, item_id, said, field: str, *, missing, ambiguous, code: str, lock: bool
 ):
     rows = rows.filter(is_deleted=False)
@@ -1643,7 +1643,7 @@ def operation_total(order: Order | None, closes: bool, valuation: pricing.Valuat
     return charged + rest.total
 
 
-def loose_lines(
+def loose_lines(  # noqa: PLR0913
     ctx: OperationContext,
     lines: list,
     open_lines: list,

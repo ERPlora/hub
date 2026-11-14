@@ -290,7 +290,7 @@ def _id_otro(country: str, kind: str, number: str) -> str:
     )
 
 
-def _recipient_identity(tax_id: str, country: str, id_type: str) -> str:
+def _recipient_identity(tax_id: str, country: str, id_type: str) -> str:  # noqa: PLR0911
     """``NIF`` for a Spanish recipient, ``IDOtro`` for anyone else."""
     compact = _ALPHANUMERIC.sub("", tax_id).upper()
     country = country.strip().upper()
@@ -547,7 +547,7 @@ def _page_key(after: InvoiceRef | None) -> str:
     )
 
 
-def query(
+def query(  # noqa: PLR0913
     *,
     obligado_nif: str,
     obligado_name: str,

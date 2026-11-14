@@ -1348,7 +1348,7 @@ def _locked(product_ids: set[UUID]) -> dict[UUID, Product]:
     return {product.id: product for product in products}
 
 
-def _move(
+def _move(  # noqa: PLR0913
     ctx: OperationContext,
     product: Product,
     movement_type: str,
@@ -1380,7 +1380,7 @@ def _move(
     return movement
 
 
-def _crossing(
+def _crossing(  # noqa: PLR0913, PLR0917
     ctx: OperationContext, product: Product, settings: Settings, previous: Decimal, movement_type: str, reference: str
 ) -> None:
     """INVENTORY-F18: an article with stock control crossing its threshold, down («below») or up («recovered»).
@@ -1466,7 +1466,7 @@ def _refund_result(note: RefundStock, *, applied: bool, movements: int) -> dict:
 # Imports
 
 
-def _check_product_row(
+def _check_product_row(  # noqa: PLR0911, PLR0913, PLR0917
     row, name: str, sku: str, settings: Settings, tax_categories: dict, currency: str
 ) -> dict | str:
     """The fields of a new product from one CSV row (its name and SKU already read, its amounts in the business's

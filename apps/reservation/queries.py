@@ -606,7 +606,7 @@ RESERVATION_SORTS = {
         "default; pages of up to 100."
     },
 )
-def list_reservations(ctx: OperationContext, params: ReservationListIn) -> dict:
+def list_reservations(ctx: OperationContext, params: ReservationListIn) -> dict:  # noqa: C901
     rows = reservations()
     if params.search:
         rows = rows.filter(_guest_matches(params.search))

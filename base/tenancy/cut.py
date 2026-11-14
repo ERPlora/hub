@@ -162,7 +162,7 @@ def copy_order(tables: Iterable[str], points_to: Iterable[tuple[str, str]]) -> l
     return ordered
 
 
-def _strongly_connected(tables: list[str], parents: dict[str, list[str]]) -> list[list[str]]:
+def _strongly_connected(tables: list[str], parents: dict[str, list[str]]) -> list[list[str]]:  # noqa: C901
     """Tarjan's strongly connected components of the graph ``table → its parents``, each sorted."""
     index_of: dict[str, int] = {}
     low: dict[str, int] = {}

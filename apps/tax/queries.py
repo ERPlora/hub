@@ -268,7 +268,7 @@ def resolve_tax(
     return Resolution(root=root, components=_components(root, on))
 
 
-def calculate_tax(
+def calculate_tax(  # noqa: PLR0913
     *,
     amount: int,
     category_key: str,

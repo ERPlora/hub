@@ -218,7 +218,7 @@ def certificate_valid(now: dt.datetime | None = None) -> bool:
     return OwnCertificate.objects.filter(singleton=True, expires_at__gt=now).exists()
 
 
-def _route_sending_problem(config: Config, environment: str, scope: Scope | None) -> str:
+def _route_sending_problem(config: Config, environment: str, scope: Scope | None) -> str:  # noqa: PLR0911
     """What the chosen route itself lacks to carry a record to the AEAT of ``environment``: the own route, its valid
     certificate (as in the old Hub) and, in production, one this server can open; ERPlora's route in production,
     the approved signed authorisation, but for ERPlora's own records on ERPlora's own hub (``scope``; ``None``, no
@@ -628,7 +628,7 @@ SORTS = {
         },
     },
 )
-def list_records(ctx: OperationContext, data: RecordListIn) -> dict:
+def list_records(ctx: OperationContext, data: RecordListIn) -> dict:  # noqa: C901
     queryset = with_corrections(Record.objects.all())
     text = (data.search or "").strip()
     if text.startswith("#") and text[1:].isdigit():

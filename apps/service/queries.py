@@ -187,7 +187,7 @@ def held_rows(rows) -> list:
     return list(rows.order_by("id").select_for_update(no_key=True, of=("self",)))
 
 
-def _resolve(
+def _resolve(  # noqa: PLR0913
     rows,
     item_id,
     said,
@@ -223,7 +223,7 @@ def _resolve(
     return row
 
 
-def find_service(
+def find_service(  # noqa: PLR0913
     service_id: UUID | None,
     said: str | None,
     *,
@@ -278,7 +278,7 @@ def find_category(
     )
 
 
-def find_package(
+def find_package(  # noqa: PLR0913
     package_id: UUID | None,
     said: str | None,
     *,

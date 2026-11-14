@@ -175,6 +175,11 @@ check("each shard runs pytest in parallel (pytest-xdist)", " -n " in " ".join(sh
 check("pytest runs only through pytest-shard.sh", "pytest " not in python_runs.replace(str(shard_step.get("run")), ""))
 lock = (folder.resolve().parent.parent / "uv.lock").read_text()
 check("pytest-split, which pytest-shard.sh runs, is locked in uv.lock", '\nname = "pytest-split"\n' in lock)
+# tests/test_guardrails_size.py compares the size allow list with the one where the branch left origin/main, and fails
+# when origin/main is not there: a shallow checkout has neither that branch nor the history to find the point.
+python_checkout = next((step for step in python_steps if "actions/checkout" in str(step.get("uses", ""))), {})
+check("the python job checks out the whole history, origin/main included (fetch-depth: 0)",
+      (python_checkout.get("with") or {}).get("fetch-depth") == 0)
 check("frontend runs lint, typecheck, Vitest and the build",
       all(f"pnpm {task}" in frontend_runs for task in ("lint", "typecheck", "test", "build")))
 check("scripts runs actionlint, shellcheck and the script tests",

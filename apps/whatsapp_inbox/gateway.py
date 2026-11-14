@@ -268,7 +268,7 @@ def config(*, hub: str) -> Reply:
     return _door(CONFIG_PATH, {"hub": hub})
 
 
-def connect(*, hub: str, code: str, event: str, waba_id: str, phone_number_id: str, business_id: str) -> Reply:
+def connect(*, hub: str, code: str, event: str, waba_id: str, phone_number_id: str, business_id: str) -> Reply:  # noqa: PLR0913
     """Door 11: connect the number Meta's window chose, with what the window gave, as it came."""
     window = {"code": code, "event": event, "waba_id": waba_id, "phone_number_id": phone_number_id, "business_id": business_id}
     return _door(CONNECT_PATH, {"hub": hub, **window})

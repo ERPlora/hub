@@ -478,7 +478,7 @@ def _tree(folders: set[str], parent: str) -> list[dict]:
 # ── Upload and new folder ────────────────────────────────────────────────────────────────────────────────────
 
 
-def upload(
+def upload(  # noqa: PLR0913
     store: Storage, hub: uuid.UUID, folder: str, name: str, content: bytes, *, limit_bytes: int | None = None
 ) -> dict:
     """Keep ``content`` as ``name`` in ``folder``, numbered («name (1).ext») when the name is taken."""

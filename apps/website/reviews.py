@@ -91,7 +91,7 @@ class PlaceRef:
     short_url: str = ""
 
 
-def parse(ref: str) -> PlaceRef:
+def parse(ref: str) -> PlaceRef:  # noqa: C901, PLR0911, PLR0912
     """The place ``ref`` names: a Place ID, a Google Maps link to a place or a Maps share link; ``ValueError`` for
     anything else (a plain name, another site, a map without a place)."""
     ref = ref.strip()

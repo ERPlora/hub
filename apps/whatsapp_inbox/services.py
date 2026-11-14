@@ -410,7 +410,7 @@ def _redelivered(ctx: OperationContext, message: Message, data: ReceiveIn) -> di
         "risk": "normal",
     },
 )
-def receive_message(ctx: OperationContext, data: ReceiveIn) -> dict:
+def receive_message(ctx: OperationContext, data: ReceiveIn) -> dict:  # noqa: C901
     try:
         phone = e164(data.from_, ctx, from_whatsapp=True)
     except InvalidPhone:
@@ -1045,7 +1045,7 @@ def _file_to_send(ctx: OperationContext, template: Template, chosen: UUID | None
     return sample
 
 
-def _queue_message(
+def _queue_message(  # noqa: PLR0913, PLR0917
     ctx: OperationContext,
     conversation: Conversation,
     text: str | None,

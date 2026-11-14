@@ -233,7 +233,7 @@ def read_base64(text: str) -> Bundle:
     return read_zip(content)
 
 
-def read_zip(content: bytes) -> Bundle:
+def read_zip(content: bytes) -> Bundle:  # noqa: C901
     """The blueprint in ``content``, or :class:`BlueprintInvalid` with the reason it cannot be read."""
     if len(content) > MAX_FILE_BYTES:
         raise BlueprintInvalid("too_big")
@@ -294,7 +294,7 @@ def file_name(name: str, language: str) -> str:
     return f"{slugify(name) or 'blueprint'}_{slugify(language) or 'xx'}.blueprint.zip"
 
 
-def manifest(*, name: str, language: str, country: str, purpose: str, created_at: str, vertical: str, apps: list[str],
+def manifest(*, name: str, language: str, country: str, purpose: str, created_at: str, vertical: str, apps: list[str],  # noqa: PLR0913
              version: str = "") -> dict:
     """A manifest of this format."""
     return {
@@ -755,7 +755,7 @@ def _dataset_report(dataset: Dataset, loaded: Loaded, rows: list[dict], *, disca
     }
 
 
-def _app_report(app: str, bundle: Bundle, chosen: set[str] | None, on: frozenset[str], known: set[str],
+def _app_report(app: str, bundle: Bundle, chosen: set[str] | None, on: frozenset[str], known: set[str],  # noqa: PLR0913, PLR0917
                 loads: dict[str, dict], refused: dict[str, str], waiting: set[str]) -> dict:
     report = {"id": app, "label": app_label(app), "status": APPLIED, "reason": "", "datasets": []}
     if chosen is not None and app not in chosen:
@@ -979,7 +979,7 @@ def _created(loaded: Loaded, result: Any) -> str:
     return pk
 
 
-def _create_each(ctx: OperationContext, rows: list[dict], loaded: Loaded, *, name: str, key: Callable[[dict], str],
+def _create_each(ctx: OperationContext, rows: list[dict], loaded: Loaded, *, name: str, key: Callable[[dict], str],  # noqa: PLR0913
                  existing: set[str], build: Callable[[dict], dict], label: Callable[[dict], str],
                  after: Callable[[dict, str], None] | None = None) -> None:
     """Create each row by ``name`` unless its natural ``key`` is already there; a refused row fails alone. ``after``
@@ -1002,7 +1002,7 @@ def _create_each(ctx: OperationContext, rows: list[dict], loaded: Loaded, *, nam
             after(row, pk)
 
 
-def _load_image(ctx: OperationContext, loaded: Loaded, dataset_key: str, pk: str, row: dict, label: str) -> None:
+def _load_image(ctx: OperationContext, loaded: Loaded, dataset_key: str, pk: str, row: dict, label: str) -> None:  # noqa: PLR0913, PLR0917
     """Show on the row just created the image its file names: one of the library through the app's ``set_image``, a
     photo the file carries through its ``upload_image`` (a copy under a new name, within the plan's space). One that
     cannot be set leaves the row without an image, and the report says why (INVENTORY-F33)."""
@@ -1076,7 +1076,7 @@ def _inventory_product_rows(ctx: OperationContext) -> list[dict]:
     ]
 
 
-def _inventory_product_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> None:
+def _inventory_product_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> None:  # noqa: C901, PLR0912
     by_sku: dict[str, dict] = {}
     for start in range(0, len(rows), PAGE):
         chunk = rows[start : start + PAGE]
