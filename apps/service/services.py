@@ -125,7 +125,7 @@ from apps.tax.models import TaxCategory
 from apps.tax.queries import held_categories
 from base import images
 from base.operations import call
-from base.recovery import LeftOut
+from base.recovery import LeftOut, carries_on
 
 TAX_REQUIRED = _("Pick a tax category: without one the service cannot be charged.")
 TAX_UNKNOWN = _("That tax category does not exist in Taxes or is deactivated.")
@@ -842,9 +842,9 @@ def recover_category(ctx: OperationContext, data: CategoryRecoverIn) -> dict:
 
 
 def _brought_back_now(ctx: OperationContext, category: Category) -> Category:
-    """``category``, made again by the recovery that runs (its actor): one an earlier recovery brought back is the
-    business's own, and nothing it kept goes back into it."""
-    if category.created_by != _actor(ctx):
+    """``category``, made again by the recovery that runs or by one it carries on (``base.recovery.carries_on``): one
+    any other recovery brought back is the business's own, and nothing it kept goes back into it."""
+    if category.created_by != _actor(ctx) and not carries_on(category.created_by):
         raise Conflict(str(CATEGORY_BROUGHT_EARLIER % {"category": category.pk}), code="service.category_brought_earlier")
     return category
 

@@ -5,7 +5,7 @@ apps import it and a module never imports the tenancy (``tests/test_guardrails.p
 and its operation; the platform (``base.tenancy.recovery``) connects to the copy and chooses the business's database.
 """
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -32,6 +32,7 @@ def actor_of(recovery_id: object) -> str:
 
 
 _at_work: ContextVar[str | None] = ContextVar("base_recovery_at_work", default=None)
+_carried_on: ContextVar[frozenset[str]] = ContextVar("base_recovery_carried_on", default=frozenset())
 
 
 def at_work() -> str | None:
@@ -41,13 +42,23 @@ def at_work() -> str | None:
     return _at_work.get()
 
 
+def carries_on(actor: str) -> bool:
+    """Whether the recovery at work carries on the one that ran as ``actor``: one of the same copy that failed. Asked
+    again, a recovery finishes what such a one left halfway, so an app takes what it brought back as this one's own;
+    never one that was done, nor one of another copy, nor outside a recovery."""
+    return actor in _carried_on.get()
+
+
 @contextmanager
-def giving_back(actor: str) -> Iterator[None]:
-    """Inside it, the recovery that runs as ``actor`` is the one at work (``at_work``)."""
+def giving_back(actor: str, *, carrying_on: Iterable[str] = ()) -> Iterator[None]:
+    """Inside it, the recovery that runs as ``actor`` is the one at work (``at_work``), and it carries on those that ran
+    as ``carrying_on`` (``carries_on``)."""
     token = _at_work.set(actor)
+    carried = _carried_on.set(frozenset(carrying_on))
     try:
         yield
     finally:
+        _carried_on.reset(carried)
         _at_work.reset(token)
 
 

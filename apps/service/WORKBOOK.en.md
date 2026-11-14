@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:cb7556dddfc0a3236c72e93d3a616738b5317e094f2af3341cf71ed36e26a062 -->
+<!-- generated from WORKBOOK.md sha256:688b67c3424e740ecf6dc41c72e83eaf4e8a4187d9e5931e9e6a8f79dc946b6e -->
 
 ## What it is for and who it is for
 
@@ -375,7 +375,8 @@ category and its subcategories where it hung, which Recoveries counts apart ("Se
 "Subcategory links to categories"). What the business moved since stays where it is, and Recoveries says so in the
 category's notes; what it changed without moving it while the category came back also stays as the business left
 it, and Recoveries counts it "not created" with its reason. If it is asked again, the category is the business's
-already and is not filled: what the business took out of it since stays out)
+already and is not filled: what the business took out of it since stays out; if the recovery that brought it back
+failed halfway, asking for it again from the same copy fills it with what the business keeps untouched)
 
 ### SERVICE-F09 Sell a service at the till
 Status: done (Sales does it, SALE-F38)
