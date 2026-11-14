@@ -43,20 +43,8 @@ from base import services
 from base.tenancy import dumps, identity, move, names, restore
 from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import use_control
-from base.tenancy.tests import hubs
-from base.tenancy.tests.s3 import (  # noqa: F401
-    THROUGH_THE_BUCKET,
-    aws_test_credentials,
-    body,
-    copy_programs,
-    dumps_bucket,
-    how_it_was_copied,
-    lose_each_copy,
-    moto_s3,
-    nothing_kept,
-    objects,
-    stopping_as,
-)
+from base.tenancy.tests import hubs, s3
+from base.tenancy.tests.s3 import aws_test_credentials, dumps_bucket, moto_s3  # noqa: F401
 from control import services as control_services
 from control.models import Cluster, Hub, HubDue, HubDump, MovedCopy
 
@@ -419,7 +407,7 @@ class TestAFailurePutsItsOwnBack:
         assert hub.restoring_from_id is None and hub.last_error.startswith("restore_dump_failed")
         assert marker(hub.db_name) == [AS_THEN, SINCE]
         # The upload of a dump that failed is aborted: nothing of it is kept.
-        assert nothing_kept(moto_s3, dumps_bucket)
+        assert s3.nothing_kept(moto_s3, dumps_bucket)
 
     def test_its_own_database_missing_ends_it_with_why(self, restores):
         hub = restores.hub(source=restores.cluster())
@@ -741,17 +729,17 @@ class TestTheCopyGoesThroughTheBucket:
         self, restores, moto_s3, dumps_bucket, monkeypatch
     ):
         hub = restores.hub(source=restores.cluster())
-        started = copy_programs(monkeypatch)
+        started = s3.copy_programs(monkeypatch)
 
         assert run(restores) == 1
 
         hub = fresh(hub)
         assert (hub.restoring_from_id, hub.last_error) == (None, "") and marker(hub.db_name) == [AS_THEN]
-        [key] = objects(moto_s3, dumps_bucket)
+        [key] = s3.objects(moto_s3, dumps_bucket)
         assert re.fullmatch(rf"{hub.id.hex}/\d{{8}}T\d{{6}}Z-restore\.dump", key)
-        assert body(moto_s3, dumps_bucket, key).startswith(b"PGDMP")
+        assert s3.body(moto_s3, dumps_bucket, key).startswith(b"PGDMP")
         assert not HubDump.objects.exists()
-        assert how_it_was_copied(started) == THROUGH_THE_BUCKET
+        assert s3.how_it_was_copied(started) == s3.THROUGH_THE_BUCKET
 
     def test_a_business_larger_than_a_part_is_restored_whole(self, restores, monkeypatch):
         monkeypatch.setattr(dumps, "STREAM_PART_BYTES", SMALLEST_PART)
@@ -782,14 +770,14 @@ class TestTheCopyGoesThroughTheBucket:
         hub = restores.hub(source=source)
         where, step = (dumps, "_pg_dump_command") if stops_in == "the dump" else (move, "_restore_command")
 
-        run(restores, cancelled=stopping_as(monkeypatch, where, step))
+        run(restores, cancelled=s3.stopping_as(monkeypatch, where, step))
 
         # Not a failure: neither undone nor noted as failed.
         stopped = fresh(hub)
         assert (stopped.restoring_from_id, stopped.last_error) == (source.pk, "")
         if stops_in == "the dump":
             # Before the business was closed: half a copy is never kept, and nothing of the business moved.
-            assert nothing_kept(moto_s3, dumps_bucket)
+            assert s3.nothing_kept(moto_s3, dumps_bucket)
             assert marker(hub.db_name) == [AS_THEN, SINCE] and not MovedCopy.objects.filter(hub=hub).exists()
         else:
             assert marker(kept_copy(stopped).db_name) == [AS_THEN, SINCE]
@@ -827,7 +815,7 @@ class TestTheCopyGoesThroughTheBucket:
         self, restores, moto_s3, dumps_bucket, monkeypatch
     ):
         hub = restores.hub(source=restores.cluster())
-        lose_each_copy(monkeypatch, moto_s3, dumps_bucket)
+        s3.lose_each_copy(monkeypatch, moto_s3, dumps_bucket)
 
         assert run(restores) == 1
 

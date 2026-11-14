@@ -36,19 +36,8 @@ from base import services
 from base.tenancy import bootstrap, dumps, identity, move, names
 from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import use_control
-from base.tenancy.tests import hubs
-from base.tenancy.tests.s3 import (  # noqa: F401
-    THROUGH_THE_BUCKET,
-    aws_test_credentials,
-    body,
-    copy_programs,
-    dumps_bucket,
-    how_it_was_copied,
-    lose_each_copy,
-    moto_s3,
-    objects,
-    stopping_as,
-)
+from base.tenancy.tests import hubs, s3
+from base.tenancy.tests.s3 import aws_test_credentials, body, dumps_bucket, moto_s3, objects  # noqa: F401
 from control.models import Cluster, Hub, HubDue, HubDump, LeftoverDatabase, MovedCopy
 
 pytestmark = pytest.mark.usefixtures("no_test_fallback")
@@ -606,7 +595,7 @@ class TestTheCopyGoesThroughTheBucket:
         self, moves, moto_s3, dumps_bucket, monkeypatch
     ):
         hub = moves.hub(to=moves.cluster())
-        started = copy_programs(monkeypatch)
+        started = s3.copy_programs(monkeypatch)
 
         assert run() == 1
 
@@ -616,7 +605,7 @@ class TestTheCopyGoesThroughTheBucket:
         assert re.fullmatch(rf"{hub.id.hex}/\d{{8}}T\d{{6}}Z-move\.dump", key)
         assert body(moto_s3, dumps_bucket, key).startswith(b"PGDMP")
         assert not HubDump.objects.exists()
-        assert how_it_was_copied(started) == THROUGH_THE_BUCKET
+        assert s3.how_it_was_copied(started) == s3.THROUGH_THE_BUCKET
 
     def test_a_business_larger_than_a_part_moves_whole(self, moves, monkeypatch):
         monkeypatch.setattr(dumps, "STREAM_PART_BYTES", SMALLEST_PART)
@@ -646,7 +635,7 @@ class TestTheCopyGoesThroughTheBucket:
         target = moves.cluster()
         hub = moves.hub(to=target)
 
-        run(cancelled=stopping_as(monkeypatch, dumps, "_pg_dump_command"))
+        run(cancelled=s3.stopping_as(monkeypatch, dumps, "_pg_dump_command"))
 
         # Not a failure: the move is neither undone nor noted as failed, and half a copy is never kept.
         stopped = fresh(hub)
@@ -687,7 +676,7 @@ class TestTheCopyGoesThroughTheBucket:
         self, moves, moto_s3, dumps_bucket, monkeypatch
     ):
         hub = moves.hub(to=moves.cluster())
-        lose_each_copy(monkeypatch, moto_s3, dumps_bucket)
+        s3.lose_each_copy(monkeypatch, moto_s3, dumps_bucket)
 
         assert run() == 1
 

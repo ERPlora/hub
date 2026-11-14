@@ -36,19 +36,8 @@ from base import registry, services
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import dumps, identity, move, names, restore
 from base.tenancy.context import use_control
-from base.tenancy.tests import hubs
-from base.tenancy.tests.s3 import (  # noqa: F401
-    THROUGH_THE_BUCKET,
-    aws_test_credentials,
-    copy_programs,
-    dumps_bucket,
-    how_it_was_copied,
-    lose_each_copy,
-    moto_s3,
-    nothing_kept,
-    objects,
-    stopping_as,
-)
+from base.tenancy.tests import hubs, s3
+from base.tenancy.tests.s3 import aws_test_credentials, dumps_bucket, moto_s3  # noqa: F401
 from base.tenancy.tests.test_restore import AFTER, AS_THEN, SINCE, THEN, Restores, a_record, write
 from control import services as control_services
 from control.models import Cluster, Hub, MovedCopy, RestoredCopy
@@ -379,7 +368,7 @@ class TestAFailureDropsWhatItMade:
         assert fresh(aside).last_error.startswith("restore_aside_dump_failed:")
         assert marker(hub.db_name) == [AS_THEN, SINCE]
         # The upload of a dump that failed is aborted: nothing of it is kept.
-        assert nothing_kept(moto_s3, dumps_bucket)
+        assert s3.nothing_kept(moto_s3, dumps_bucket)
 
     def test_one_left_without_its_temporary_cluster_fails_with_why(self, asides):
         aside = asides.aside(asides.hub(source=None), None)
@@ -399,15 +388,15 @@ class TestTheCopyGoesThroughTheBucket:
         self, asides, moto_s3, dumps_bucket, monkeypatch
     ):
         hub, aside = a_hub_with_its_copy(asides)
-        started = copy_programs(monkeypatch)
+        started = s3.copy_programs(monkeypatch)
 
         assert run(asides) == 1
 
         assert fresh(aside).status == "made" and marker(aside.db_name) == [AS_THEN]
         # Under the business's own prefix, named after its row.
-        [key] = objects(moto_s3, dumps_bucket)
+        [key] = s3.objects(moto_s3, dumps_bucket)
         assert re.fullmatch(rf"{hub.id.hex}/\d{{8}}T\d{{6}}Z-aside-{aside.pk.hex}\.dump", key)
-        assert how_it_was_copied(started) == THROUGH_THE_BUCKET
+        assert s3.how_it_was_copied(started) == s3.THROUGH_THE_BUCKET
 
     def test_two_copies_of_one_business_made_at_once_each_keep_their_own_moment(self, asides, monkeypatch):
         # Each holds its own row's lease, never the hub's: two workers (a deploy's old and new) may make two copies of
@@ -452,12 +441,12 @@ class TestTheCopyGoesThroughTheBucket:
     ):
         hub, aside = a_hub_with_its_copy(asides)
 
-        run(asides, cancelled=stopping_as(monkeypatch, dumps, "_pg_dump_command"))
+        run(asides, cancelled=s3.stopping_as(monkeypatch, dumps, "_pg_dump_command"))
 
         # Not a failure: nothing noted, its lease let go, and half a copy is never kept.
         left = fresh(aside)
         assert (left.status, left.last_error, left.lease_owner) == ("copying", "", "")
-        assert nothing_kept(moto_s3, dumps_bucket) and aside_absent(aside)
+        assert s3.nothing_kept(moto_s3, dumps_bucket) and aside_absent(aside)
 
         assert run(asides) == 1
 
@@ -479,7 +468,7 @@ class TestTheCopyGoesThroughTheBucket:
         self, asides, moto_s3, dumps_bucket, monkeypatch
     ):
         aside = a_hub_with_its_copy(asides)[1]
-        lose_each_copy(monkeypatch, moto_s3, dumps_bucket)
+        s3.lose_each_copy(monkeypatch, moto_s3, dumps_bucket)
 
         assert run(asides) == 1
 
