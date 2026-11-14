@@ -410,7 +410,7 @@ for (const { label, viewport } of SIZES) {
     // And that group, which the business kept, offers again the option it took away, added by Modifiers as it was: its
     // supplement, chosen by default (no other one is) and its place.
     const optionAgain = `select name || '|' || price_delta || '|' || is_default || '|' || sort_order from modifier_modifieroption where group_id = '${sauces}'`;
-    expect(psql(optionAgain)).toBe('Alioli|50|t|1');
+    expect(psql(optionAgain)).toBe('Alioli|50|true|1');
     // And offered again as a main of its menu, with its supplement, by Menus' create after Inventory brought it back:
     // in the course Menus made again for the copy's, in the menu it made again for the one the business withdrew.
     const offeredAgain =
