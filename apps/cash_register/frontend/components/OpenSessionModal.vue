@@ -4,9 +4,10 @@
 // (empty is 0), «Notes». The float is the platform's money field (`MoneyInput`), read with its `parseMoney` as every
 // amount of the Hub (hub#1160): one that cannot be read is said under it and nothing is sent. The
 // server numbers the session and keeps the rules (one open at a time, a float required): its refusal is
-// read inside the window, at its field. «Open session» waits in grey until the business has answered its money (the
-// float is read in it; hub#921), and says so with «Retry» if that read fails (hub#938). Success says «Session opened»
-// and closes; the table and the «Open session» button follow by themselves (live).
+// read inside the window, at its field, until the person corrects that field. «Open session» waits in grey until the
+// business has answered its money (the float is read in it; hub#921), and says so with «Retry» if that read fails
+// (hub#938). Success says «Session opened» and closes; the table and the «Open session» button follow by themselves
+// (live).
 import { FormModal, type FormModalError, MoneyInput, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
@@ -56,7 +57,6 @@ watch(drawers, (now) => {
 });
 
 const error = computed<FormModalError | null>(() => refusal(command.error.value, t('cash_register.open.failed')));
-const balanceError = computed(() => error.value?.fields?.opening_balance);
 const unassigned = computed(() => (props.unassignedCash > 0 ? formatMoney(props.unassignedCash, locale.value, business.value) : ''));
 
 async function confirm(): Promise<void> {
@@ -106,57 +106,66 @@ const canDismiss = useUnsavedFormOnOpen(
     :error="error"
     @submit="confirm"
   >
-    <div class="cash-open">
-      <BusinessMoneyError />
-      <p
-        v-if="unassigned"
-        class="cash-open__hint"
-        data-testid="cash-register-open-unassigned"
-      >
-        {{ $t('cash_register.open.unassigned', { cash: unassigned }) }}
-      </p>
-      <ion-select
-        v-if="drawers.length"
-        data-testid="cash-register-open-register"
-        :label="$t('cash_register.open.register')"
-        label-placement="stacked"
-        fill="outline"
-        mode="md"
-        interface="popover"
-        :value="registerId"
-        @ion-change="registerId = String($event.detail.value ?? '')"
-      >
-        <ion-select-option value="">
-          {{ $t('cash_register.open.noRegister') }}
-        </ion-select-option>
-        <ion-select-option
-          v-for="drawer in drawers"
-          :key="drawer.id"
-          :value="drawer.id"
+    <template #default="{ fieldErrors }">
+      <div class="cash-open">
+        <BusinessMoneyError />
+        <p
+          v-if="unassigned"
+          class="cash-open__hint"
+          data-testid="cash-register-open-unassigned"
         >
-          {{ drawer.name }}
-        </ion-select-option>
-      </ion-select>
-      <MoneyInput
-        v-model="balance"
-        testid="cash-register-open-balance"
-        :label="$t('cash_register.open.balance')"
-        :money="business"
-        :error-text="balanceError"
-        :show-error="tried"
-      />
-      <ion-input
-        data-testid="cash-register-open-notes"
-        :label="$t('cash_register.open.notes')"
-        label-placement="stacked"
-        fill="outline"
-        mode="md"
-        :maxlength="1000"
-        :placeholder="$t('cash_register.open.optional')"
-        :value="notes"
-        @ion-input="notes = String($event.detail.value ?? '')"
-      />
-    </div>
+          {{ $t('cash_register.open.unassigned', { cash: unassigned }) }}
+        </p>
+        <ion-select
+          v-if="drawers.length"
+          data-testid="cash-register-open-register"
+          name="register_id"
+          :label="$t('cash_register.open.register')"
+          label-placement="stacked"
+          fill="outline"
+          mode="md"
+          interface="popover"
+          :value="registerId"
+          :error-text="fieldErrors.register_id"
+          :class="{ 'ion-invalid': !!fieldErrors.register_id, 'ion-touched': !!fieldErrors.register_id }"
+          @ion-change="registerId = String($event.detail.value ?? '')"
+        >
+          <ion-select-option value="">
+            {{ $t('cash_register.open.noRegister') }}
+          </ion-select-option>
+          <ion-select-option
+            v-for="drawer in drawers"
+            :key="drawer.id"
+            :value="drawer.id"
+          >
+            {{ drawer.name }}
+          </ion-select-option>
+        </ion-select>
+        <MoneyInput
+          v-model="balance"
+          testid="cash-register-open-balance"
+          name="opening_balance"
+          :label="$t('cash_register.open.balance')"
+          :money="business"
+          :error-text="fieldErrors.opening_balance"
+          :show-error="tried"
+        />
+        <ion-input
+          data-testid="cash-register-open-notes"
+          name="opening_notes"
+          :label="$t('cash_register.open.notes')"
+          label-placement="stacked"
+          fill="outline"
+          mode="md"
+          :maxlength="1000"
+          :placeholder="$t('cash_register.open.optional')"
+          :value="notes"
+          :error-text="fieldErrors.opening_notes"
+          :class="{ 'ion-invalid': !!fieldErrors.opening_notes, 'ion-touched': !!fieldErrors.opening_notes }"
+          @ion-input="notes = String($event.detail.value ?? '')"
+        />
+      </div>
+    </template>
   </FormModal>
 </template>
 

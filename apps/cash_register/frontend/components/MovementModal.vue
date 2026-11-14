@@ -4,9 +4,9 @@
 // the sign by the type), «Concept». From the screen the movement is always cash. The amount is the platform's money
 // field (`MoneyInput`), read with its `parseMoney` as every amount of the Hub (hub#1160): one that is zero or
 // cannot be read is said under it; the server's refusal (below zero, the session closed on another
-// device) is read in the window. «Register» waits in grey until the business has answered its money (the amount is read
-// in it; hub#921), and says so with «Retry» if that read fails (hub#938). Success says «Cash-in recorded (…)» or
-// «Cash-out recorded (…)».
+// device) is read in the window, and a field it names says it until the person corrects that field. «Register» waits
+// in grey until the business has answered its money (the amount is read in it; hub#921), and says so with «Retry» if
+// that read fails (hub#938). Success says «Cash-in recorded (…)» or «Cash-out recorded (…)».
 import { FormModal, type FormModalError, MoneyInput, parseMoney } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
@@ -55,7 +55,8 @@ watch(amount, () => {
 });
 
 const error = computed<FormModalError | null>(() => refusal(command.error.value, t('cash_register.movement.failed')));
-const amountError = computed(() => error.value?.fields?.amount ?? (zero.value ? t('cash_register.money.zero') : undefined));
+const amountError = (fieldErrors: Readonly<Record<string, string>>): string | undefined =>
+  fieldErrors.amount ?? (zero.value ? t('cash_register.money.zero') : undefined);
 
 async function confirm(): Promise<void> {
   const session = props.session;
@@ -96,44 +97,53 @@ const canDismiss = useUnsavedFormOnOpen('cash-register-movement', () => ({ type:
     :error="error"
     @submit="confirm"
   >
-    <div class="cash-movement">
-      <BusinessMoneyError />
-      <ion-select
-        data-testid="cash-register-movement-type"
-        :label="$t('cash_register.movement.type')"
-        label-placement="stacked"
-        fill="outline"
-        mode="md"
-        interface="popover"
-        :value="type"
-        @ion-change="type = $event.detail.value === 'out' ? 'out' : 'in'"
-      >
-        <ion-select-option value="in">
-          {{ $t('cash_register.types.in') }}
-        </ion-select-option>
-        <ion-select-option value="out">
-          {{ $t('cash_register.types.out') }}
-        </ion-select-option>
-      </ion-select>
-      <MoneyInput
-        v-model="amount"
-        testid="cash-register-movement-amount"
-        :label="$t('cash_register.movement.amount')"
-        :money="business"
-        :error-text="amountError"
-        :show-error="tried"
-      />
-      <ion-input
-        data-testid="cash-register-movement-concept"
-        :label="$t('cash_register.movement.concept')"
-        label-placement="stacked"
-        fill="outline"
-        mode="md"
-        :maxlength="255"
-        :value="concept"
-        @ion-input="concept = String($event.detail.value ?? '')"
-      />
-    </div>
+    <template #default="{ fieldErrors }">
+      <div class="cash-movement">
+        <BusinessMoneyError />
+        <ion-select
+          data-testid="cash-register-movement-type"
+          name="type"
+          :label="$t('cash_register.movement.type')"
+          label-placement="stacked"
+          fill="outline"
+          mode="md"
+          interface="popover"
+          :value="type"
+          :error-text="fieldErrors.type"
+          :class="{ 'ion-invalid': !!fieldErrors.type, 'ion-touched': !!fieldErrors.type }"
+          @ion-change="type = $event.detail.value === 'out' ? 'out' : 'in'"
+        >
+          <ion-select-option value="in">
+            {{ $t('cash_register.types.in') }}
+          </ion-select-option>
+          <ion-select-option value="out">
+            {{ $t('cash_register.types.out') }}
+          </ion-select-option>
+        </ion-select>
+        <MoneyInput
+          v-model="amount"
+          testid="cash-register-movement-amount"
+          name="amount"
+          :label="$t('cash_register.movement.amount')"
+          :money="business"
+          :error-text="amountError(fieldErrors)"
+          :show-error="tried"
+        />
+        <ion-input
+          data-testid="cash-register-movement-concept"
+          name="description"
+          :label="$t('cash_register.movement.concept')"
+          label-placement="stacked"
+          fill="outline"
+          mode="md"
+          :maxlength="255"
+          :value="concept"
+          :error-text="fieldErrors.description"
+          :class="{ 'ion-invalid': !!fieldErrors.description, 'ion-touched': !!fieldErrors.description }"
+          @ion-input="concept = String($event.detail.value ?? '')"
+        />
+      </div>
+    </template>
   </FormModal>
 </template>
 
