@@ -3044,7 +3044,9 @@ Pasos:
       servicios: se creó 1, 1 con notas»), con el porqué en sus notas («service.service_moved: volvió sin el servicio <su
       identificador>: se movió a otra categoría después»). Una que el negocio ya volvió
       a crear (otra viva con su nombre, sin distinguir mayúsculas ni espacios) no se repite: se usa la suya, tal como está,
-      y no se rellena, como tampoco la que trajo una recuperación anterior si se pide otra vez.
+      y no se rellena, como tampoco la que trajo una recuperación anterior si se pide otra vez. Si aquella recuperación
+      falló a medias, pedirla otra vez desde la misma copia termina lo que dejó: lo que el negocio conserva sin tocar
+      desde que volvió la categoría vuelve a ella, contado en sus enlaces.
       Después, cada servicio que el negocio ya no tiene vuelve como uno nuevo, en oferta, creado como lo crea la pantalla
       de Servicios, con su nombre, tarifa, precios, coste, duración, márgenes, capacidad, descripciones, reservas, orden,
       destacado, SKU, código de barras y notas, su categoría fiscal y su categoría: la misma si el negocio aún la tiene,
@@ -3197,7 +3199,7 @@ hub#1213, hub#1257,
 hub#1282, hub#1283, hub#1284,
 hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1343,
 hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1438, hub#1442, hub#1456, hub#1457,
-hub#1458, hub#1459, hub#1473, hub#1474, hub#1505, aws#77
+hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 
 ## Para quien lo mantiene
 
