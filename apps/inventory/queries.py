@@ -1319,6 +1319,19 @@ def products_not_in_business(products: list[dict]) -> list[dict]:
     return [_as_created(one, keys.get(one["tax_category"]), categories) for one in lacking]
 
 
+def products_standing_for(skus: dict[UUID, str]) -> dict[UUID, UUID]:
+    """The business's product that stands for each of a separate copy's products (``{id there: SKU there}``) it no
+    longer holds live, as ``{id there: id here}``: the live one with its SKU, the article's identity, that a recovery
+    made (``brought_back``), as ``products_not_in_business`` has one the business no longer holds at all made again
+    with another id (INVENTORY-F01). One the business made again by hand is its own, set up as it chose: it stands for
+    none. A product still live here is itself, and is not in the result. For the apps whose records hang from a
+    product to give each back to the product it is now."""
+    live = set(Product.objects.filter(pk__in=list(skus), is_deleted=False).values_list("pk", flat=True))
+    wanted = {sku: there for there, sku in skus.items() if there not in live}
+    made = Product.objects.filter(sku__in=list(wanted), is_deleted=False).values_list("sku", "pk", "created_by")
+    return {wanted[sku]: pk for sku, pk, created_by in made if brought_back(created_by)}
+
+
 def _as_created(product: dict, tax_key: str | None, categories: dict[UUID, UUID]) -> dict:
     """``product`` of the copy as ``inventory.product.recover`` takes it in the business, with its ``id`` there."""
     created = {field: product[field] for field in ("id", *PRODUCT_FIELDS)}
