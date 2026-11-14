@@ -393,7 +393,8 @@ categoría y sus subcategorías donde colgaba ella, que Recuperaciones cuenta ap
 categorías», «Enlaces de subcategorías a categorías»). Lo que el negocio movió después se queda donde está, y
 Recuperaciones lo dice en las notas de la categoría; lo que cambió sin moverlo mientras volvía la categoría también se
 queda como lo dejó, y Recuperaciones lo cuenta «sin crear» con su porqué. Si se pide otra vez, la categoría ya es del
-negocio y no se rellena: lo que le quitó después se queda fuera)
+negocio y no se rellena: lo que le quitó después se queda fuera; si la recuperación que la trajo falló a medias,
+pedirla otra vez desde la misma copia la rellena con lo que el negocio conserva sin tocar)
 
 ### SERVICE-F09 Vender un servicio en el TPV
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f09 old:services/workflow/catalogo.md#services-f09 -->
