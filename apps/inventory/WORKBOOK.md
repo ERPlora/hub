@@ -1163,10 +1163,10 @@ hizo, y la recuperación no lo cuenta ni lo crea. Un producto que el negocio ya 
 responde bien y vuelve a avisar. Su foto propia no vuelve: se borró al eliminarlo (INVENTORY-F31). La imagen de la
 librería sí, porque eliminar se la deja; uno eliminado antes de que se la dejara vuelve sin ella (hub#1431). Sus
 reglas de descuento de Tarifas se vuelven a activar solas (PRICING-F14) y sus precios en las tarifas vuelven si se
-recupera también Tarifas (PRICING-F15). Sus grupos de suplementos y sus opciones en los menús se borraron al
-eliminarlo y todavía no vuelven con él (hub#1343).
+recupera también Tarifas (PRICING-F15), y sus grupos de suplementos, si se recupera también Suplementos
+(MODIFIER-F10). Sus opciones en los menús se borraron al eliminarlo y todavía no vuelven con él (hub#1343).
 Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29, INVENTORY-F30,
-PRICING-F14, PRICING-F15, MODIFIER-F09, COMBO-F13
+PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13
 
 ## Qué comparten los verticales
 

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e401b7c902280a03558a3d4d6d739fe15f315e056b542601ff8b48b3b041743b -->
+<!-- generated from WORKBOOK.md sha256:e05de13e91274ad23b7a50ea88788dff716c0da7a7dd57f861b596a99121d972 -->
 
 ## What it is for and who it is for
 
@@ -1100,11 +1100,11 @@ has at all is created again (INVENTORY-F01), with no stock, with the image of th
 live product it does not fail: it answers well and announces again. Its own photo does not come back: it was erased
 when it was deleted (INVENTORY-F31). The image of the library does, because deleting leaves it; one deleted before
 deleting left it comes back without it (hub#1431). Its discount rules in Price Lists are switched back on by
-themselves (PRICING-F14) and its prices in the price lists come back if Price Lists is recovered too (PRICING-F15).
-Its modifier groups and its options in the menus were erased when it was deleted and do not come back with it yet
-(hub#1343).
+themselves (PRICING-F14) and its prices in the price lists come back if Price Lists is recovered too (PRICING-F15),
+and its modifier groups, if Modifiers is recovered too (MODIFIER-F10). Its options in the menus were erased when it was
+deleted and do not come back with it yet (hub#1343).
 Involved: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29, INVENTORY-F30,
-PRICING-F14, PRICING-F15, MODIFIER-F09, COMBO-F13
+PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13
 
 ## What the verticals share
 

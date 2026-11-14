@@ -16,8 +16,9 @@ from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound
 from live.operations import operation
+from psycopg import sql
 
-from apps.inventory.models import ProductCategory, Unit
+from apps.inventory.models import Product, ProductCategory, Unit
 from apps.inventory.queries import find_category, find_product
 from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
 from apps.modifier.schemas import (
@@ -665,3 +666,52 @@ def resolve_selection(ctx: OperationContext, data: ResolveIn) -> dict:
         "own_lines": list(own_lines.values()),
         "kitchen_text": ", ".join(pick["kitchen_name"] for pick in picks),
     }
+
+
+# ── A separate copy of the business (BASE-F114): what Modifiers gives back from it ───────────────────────────────────
+
+#: What a group hung from a product in a separate copy is read with: its link's id there and what
+#: ``modifier.link.attach`` takes, each a column since ``0001_initial``.
+LINK_FIELDS = ("id", "group_id", "product_id")
+
+
+def links_in_copy(conn) -> list[dict]:
+    """Each group hung from a product in a separate copy of the business, of a product Inventory had not deleted there
+    (a category's groups are not a product's), with what ``LINK_FIELDS`` names; nothing where the app's table is not
+    there. ``conn`` is the copy's direct, read-only connection: it is read by its own SQL over the models' names, never
+    the ORM."""
+    link, product = ModifierLink._meta, Product._meta
+    if conn.execute("SELECT to_regclass(%s)", [link.db_table]).fetchone()[0] is None:
+        return []
+
+    def column(meta, field: str) -> sql.Identifier:
+        return sql.Identifier(meta.get_field(field).column)
+
+    read = sql.SQL(
+        "SELECT {columns} FROM {links} l JOIN {products} p ON p.{product_pk} = l.{product_id}"
+        " WHERE NOT p.{deleted} ORDER BY l.{link_pk}"
+    ).format(
+        columns=sql.SQL(", ").join(sql.SQL("l.{}").format(column(link, field)) for field in ("id", "group", "product")),
+        links=sql.Identifier(link.db_table),
+        products=sql.Identifier(product.db_table),
+        product_pk=column(product, "id"),
+        product_id=column(link, "product"),
+        deleted=column(product, "is_deleted"),
+        link_pk=column(link, "id"),
+    )
+    return [dict(zip(LINK_FIELDS, row, strict=True)) for row in conn.execute(read)]
+
+
+def links_not_in_business(links: list[dict]) -> list[dict]:
+    """The groups hung from a product in a separate copy (``links_in_copy``) the business no longer hangs there, in
+    their order, each as ``modifier.link.attach`` takes it with its ``id`` there. Not lacking: one the business still
+    holds, nor one whose group the business hung from that product again: that one stays as the business has it."""
+    held = set(ModifierLink.objects.filter(pk__in=[one["id"] for one in links]).values_list("pk", flat=True))
+    taken = set(
+        ModifierLink.objects.filter(group_id__in={one["group_id"] for one in links}).values_list("group_id", "product_id")
+    )
+    return [
+        {"id": one["id"], "group_id": one["group_id"], "product_id": one["product_id"]}
+        for one in links
+        if one["id"] not in held and (one["group_id"], one["product_id"]) not in taken
+    ]
