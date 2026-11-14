@@ -27,6 +27,7 @@ adds to the SaaS's signed status poll.
 import datetime as dt
 import logging
 from dataclasses import dataclass
+from uuid import UUID
 
 import psycopg
 from django.core.cache import cache
@@ -43,7 +44,7 @@ from base.registry import PREPARING_STATUSES, internal_only
 from base.tenancy.connections import NON_LIBPQ_OPTIONS
 from base.tenancy.credentials import APP, CredentialsUnavailable, credentials_for
 from base.tenancy.ops import MAINTENANCE_DATABASE
-from control.models import Cluster, Freeze, Hub, HubDue, RestoredCopy
+from control.models import Cluster, CopyRecovery, Freeze, Hub, HubDue, RestoredCopy
 from control.schemas import ClusterSizesIn, ClusterSizesOut, FreezeGetIn, FreezeOut
 
 logger = logging.getLogger(__name__)
@@ -196,6 +197,17 @@ def registry_health(now: dt.datetime) -> RegistryHealth:
         ),
     )
     return RegistryHealth(**row)
+
+
+# ── The recoveries from a separate copy ──
+
+
+def failed_recoveries(copy_id: UUID) -> list[UUID]:
+    """The recoveries of the copy ``copy_id`` that failed, a plain read of the worker's (``base.tenancy.recovery``): the
+    next one asked of that copy carries them on (``base.recovery.carries_on``)."""
+    return list(
+        CopyRecovery.objects.filter(copy_id=copy_id, status=CopyRecovery.Status.FAILED).values_list("pk", flat=True)
+    )
 
 
 # ── The freeze switch ──
