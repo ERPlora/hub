@@ -170,9 +170,6 @@ describe('PackageFormModal: fields refused with the same words (hub#888)', () =>
     const s = await setup(null, locale);
     await ionValue(s.field('name'), 'Bono', 'ionInput');
     await discount(s);
-    await ionValue(s.field('fixed_price'), '90', 'ionInput');
-    await ionValue(s.field('validity_days'), '180', 'ionInput');
-    await ionValue(s.field('max_uses'), '5', 'ionInput');
     s.lines()[0].vm.$emit('update:modelValue', { id: 's1', label: 'Cut' });
     await settle();
     s.answer(422, refusal);

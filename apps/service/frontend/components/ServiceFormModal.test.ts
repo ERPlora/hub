@@ -431,10 +431,6 @@ describe('ServiceFormModal: fields refused with the same words (hub#888)', () =>
     const s = await setup(null, locale);
     await s.result('service.settings.get', SETTINGS);
     await ionValue(s.field('name'), 'Haircut', 'ionInput');
-    await ionValue(s.field('price'), '22,50', 'ionInput');
-    await ionValue(s.field('duration'), '30', 'ionInput');
-    s.combo('service-form-category').vm.$emit('update:modelValue', { id: 'c1', label: 'Hair' });
-    await settle();
     s.answer(422, refusal);
     return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.save()), settle };
   }, 'price');
