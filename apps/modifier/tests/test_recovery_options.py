@@ -107,6 +107,18 @@ def test_lacking_is_an_option_a_group_the_business_keeps_no_longer_has():
 
 
 @pytest.mark.django_db
+def test_an_option_another_group_has_by_its_name_is_lacking_all_the_same():
+    sauces, extras = whole.a_group("Sauces"), whole.a_group("Extras")
+    # A name is taken in its own group only.
+    an_option(extras, "Alioli")
+    taken, other = of_the_copy(sauces.id, "Alioli"), of_the_copy(extras.id, "Cheese")
+
+    lacking = queries.options_not_in_business([taken, other])
+
+    assert lacking == [as_recovered(taken, sauces.id), as_recovered(other, extras.id)]
+
+
+@pytest.mark.django_db
 def test_an_option_of_a_group_gone_goes_to_the_one_a_recovery_brought_back_with_its_name():
     back = whole.a_group_brought_back("SAUCES")
     an_option(back, "Ketchup")
