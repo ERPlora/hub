@@ -541,7 +541,7 @@ def service_events() -> list[str]:
     return list(events.values_list("name", flat=True))
 
 
-def test_a_service_made_again_shows_the_image_of_the_library_it_had_set_as_its_screen_sets_it(image_library):  # noqa: F811
+def test_a_service_made_again_shows_its_image_of_the_library_set_as_its_screen_sets_it(image_library):  # noqa: F811
     record = lacking_with_image(LIBRARY_IMAGE)
 
     made = create(record)

@@ -1852,9 +1852,9 @@ def services_in_copy(conn) -> list[dict]:
     and its tax category (``tax_category_id``), by id, and its category's name there (``category_name``, hub#1323: a
     category brought back is a new one, found by its name); nothing where the app's table is not there. Only one on
     offer comes back (``services_not_in_business``), but every one is read: a service of the copy is never another one's
-    made again (``services_in_business``). ``conn`` is the copy's direct, read-only connection (``recoverable_from_copy`` on this
-    app's config: the copy is no business and has no alias), so it is read by its own SQL over the model's names, never
-    the ORM."""
+    made again (``services_in_business``). ``conn`` is the copy's direct, read-only connection
+    (``recoverable_from_copy`` on this app's config: the copy is no business and has no alias), so it is read by its
+    own SQL over the model's names, never the ORM."""
     table = Service._meta.db_table
     if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
         return []
