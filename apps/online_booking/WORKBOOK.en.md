@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1a5d440ba82dcccdbe5bc3f6640aa9d4a0119329226abe2f9a9313018c975d9d -->
+<!-- generated from WORKBOOK.md sha256:e041a30afbb6768130cd241db4f20535fcb99b9f64f2430c76feb67efca48378 -->
 
 ## What it is for and who it is for
 
@@ -52,7 +52,7 @@ the app refuses it even if they try through the API or the assistant.
 
 ### Bookings (inbox)
 A table of 50 rows per page with a search box ("Search no., customer, phone, service…") and filters by
-column behind the filter button of the bar, as in the current product: No., Customer, Service,
+column behind the filter button of the bar: No., Customer, Service,
 Professional, Date (one day) and Status. Columns: **No.** (`APT-…`), **Customer** (with her
 phone), **Service**, **Professional**, **Date**, **Time**, **Status** and **Booked** (when she asked for it).
 Most recent first; sorted by column. List or cards.

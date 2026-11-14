@@ -5,8 +5,7 @@ Estado de la app: no hecha — especificación escrita el 2026-11-14 (hub#562); 
 
 > Manual de usuario y especificación de la app `tip`. Se escribe **antes** que el código: no se programa
 > nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde (servidor y
-> páginas). Es una app nueva, no un porte: el módulo de Ventas del producto actual no tenía propinas. Su
-> ficha funcional es Toast, completada con lo que hacen Square, Lightspeed, SumUp, Odoo, Shopify y los TPV
+> páginas). Su ficha funcional es Toast, completada con lo que hacen Square, Lightspeed, SumUp, Odoo, Shopify y los TPV
 > españoles (Revo, Ágora, Glop); ver «Referencia adoptada».
 
 ## Para qué sirve y para quién

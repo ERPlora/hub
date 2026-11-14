@@ -263,7 +263,7 @@ papel en ningún negocio.
 
 ## Para quien lo mantiene
 
-- Ejemplo de los ganchos del Inicio (PLAN-HUB, ronda 2026-10-21), el que copian los módulos: `DemoConfig`
+- Ejemplo de los ganchos del Inicio, el que copian los módulos: `DemoConfig`
   declara un paso (`setup`: «Crea tu primer elemento», hecho con `total` de `demo.item.stats`), un panel
   (`widgets`: «Elementos abiertos», `kpi` sobre `demo.item.stats`) y un contador de la campana (`bell`:
   «Elementos de demo abiertos», sobre `demo.item.open_count`). Demo no está en la tienda (`listed = False`):
@@ -319,7 +319,7 @@ papel en ningún negocio.
 - La lista nunca pide más de 100 filas (`PAGE_MAX`, el `le=100` de `ItemListIn`): «Cargar más» crece
   hasta ese tope y, con más elementos, el `DataTable` pagina también en el móvil (`maxWindow`).
 - El administrador de Django tiene CRUD sobre los elementos y sus líneas (en línea), como el de las
-  demás apps (PLAN §17, ronda 12, y PLAN-HUB §3.2): es la vía de soporte para reparar una fila, por el
+  demás apps (PLAN §17 y PLAN-HUB §3.2): es la vía de soporte para reparar una fila, por el
   ORM, sin aviso ni las reglas de `services.py` (ni elemento cerrado ni posición siguiente); las
   pantallas, la API y el asistente escriben por las operaciones. Vive solo en `http://hubs.localhost:8000/admin/`
   (en `a.localhost:8000/admin/`, 404) y entra el staff desde la página «Hubs» del admin del SaaS
