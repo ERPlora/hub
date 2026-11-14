@@ -5,11 +5,7 @@ Estado de la app: completa (2026-10-21)
 
 > Manual de usuario y especificación de la app `modifier`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
-> (servidor y páginas). Parte del `WORKFLOW.md` del módulo Modificadores del producto actual
-> (`modules-workspace/modules/modifiers`, `origin/main` `eb43c64`, v0.1.14) y de lo que el TPV viejo
-> hacía con los suplementos (`modules/sales`, `origin/main` `c6cf4af`: `modifier_chain`,
-> `modifier_child_line`, `paper-modifiers`). Los números de flujo se conservan
-> (`MODIFIERS-Fnn` → `MODIFIER-Fnn`) porque Ventas y Cocina los citan.
+> (servidor y páginas).
 
 ## Para qué sirve y para quién
 
@@ -489,8 +485,7 @@ Los grupos, un grupo, las opciones, los enganches y los grupos de un producto se
 | Ver grupos, opciones y enganches; pedir los grupos de un producto y valorar una elección | sí | sí | sí | sí | `modifier.view` |
 | Crear, cambiar y borrar grupos y opciones; enganchar y soltar | sí | sí | sí | no | `modifier.manage` |
 
-Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); el
-cajero del producto actual es un empleado.
+Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
 
 ## Para quien lo mantiene
 
@@ -507,6 +502,8 @@ cajero del producto actual es un empleado.
   `ModifierOption.tax_category` es clave ajena a `tax.TaxCategory` (`PROTECT`: Impuestos no borra
   categorías). Los productos y categorías se buscan con `find_product`/`find_category` de Inventario
   (su `requires`), que ya excluyen lo borrado y dicen 409 `inventory.*_ambiguous` con los candidatos.
+  Las tablas de Suplementos solo existen en un hub que la encendió, y el borrado físico de un producto desde
+  el admin pasa por alto la relación con una tabla que ese hub no tiene (`base/tenancy/deletion.py`).
 - **Unicidad en la base de datos**: nombre del grupo sin mirar mayúsculas (`Lower(name)`), nombre de la
   opción dentro de su grupo, y un enganche por grupo y producto o grupo y categoría. Las operaciones
   comprueban antes y, si dos escrituras chocan a la vez, la segunda recibe el mismo 409 (captura del
@@ -629,7 +626,7 @@ cajero del producto actual es un empleado.
   final por su id), y `A_CATEGORY_BY_NAME` con `modifier.category.get`, el mismo `find_category`. Se dejan sin leer
   junto a `product_id` o `category_id` y, al soltar, también junto al `id` del enganche (hub#1291;
   `UNLESS_OF_A_TARGET`, por la marca con `unless_marked`).
-- **Administrador de Django con CRUD completo** (ronda 12, PLAN §17), solo en `hubs.erplora.com` y para
+- **Administrador de Django con CRUD completo** (PLAN §17), solo en `hubs.erplora.com` y para
   el staff: lo que guarda no pasa por las operaciones ni deja aviso, y no aplica sus reglas propias (las
   opciones por defecto dentro del máximo, las 100 opciones por grupo); la base de datos sí le rechaza
   nombres repetidos, un máximo por debajo del mínimo, una opción con IVA propio que no vale más de cero y
@@ -638,37 +635,18 @@ cajero del producto actual es un empleado.
   - `apps/modifier/tests/test_events.py` (`test_the_reaction_runs_as_the_system_scope_given`) da por bueno que la
     reacción de un ámbito B borre los enganches que creó A: solo pasa bajo el respaldo de los tests, que guarda
     `a` y `b` en la misma BD de test (`base/tenancy/tests/legacy.py`). En producción cada negocio tiene su BD
-    (desde el corte S5, hub#602) y la reacción solo ve los suyos; el test tendrá que decirlo cuando se retire el
+    y la reacción solo ve los suyos; el test tendrá que decirlo cuando se retire el
     respaldo (hub#611).
-  - ~~Las claves ajenas `CASCADE` de `ModifierLink` hacia `inventory.Product` y `inventory.Category`
-    frente a «tablas al activar» (PLAN §15)~~ — **resuelta** por hub#778: las tablas de Suplementos solo
-    existen en un hub que las encendió, y el borrado físico de un producto desde el admin pasa por alto la
-    relación con una tabla que ese hub no tiene (`base/tenancy/deletion.py`).
 
 - **Páginas** (`frontend/`): `pages/GroupsPage.vue` (la tabla, `useLiveList` en ventanas de hasta 100),
   `components/GroupSheet.vue` (la hoja: `modifier.group.get` vivo y dos `useSheetList` de 20 en 20),
   `GroupFormModal`, `OptionFormModal` (con el `MoneyInput` de `@erplora/ui` con signo, `signed`, y el `Combo` de Impuestos),
   `LinkFormModal` (Producto o Categoría, `Combo` sobre las listas de Inventario), `PageNotices`; las
   búsquedas de los `Combo` llaman a las operaciones de Inventario e Impuestos (`lib/pickers.ts`), nunca
-  a sus modelos. Icono: `lucide:sliders-horizontal` (el `options-outline` de antes, pedido en
-  `UI-REQUESTS.md`). Pruebas: Vitest por fichero, `tests/e2e/modifier-groups.spec.ts` (F01 a F05) contra
+  a sus modelos. Icono: `lucide:sliders-horizontal`, mientras `ion:options-outline` espera en
+  `UI-REQUESTS.md`. Pruebas: Vitest por fichero, `tests/e2e/modifier-groups.spec.ts` (F01 a F05) contra
   Inventario e Impuestos reales y `tests/e2e/modifier-till.spec.ts` (F06 a F09) contra Inventario,
   Impuestos, Ventas y Cocina reales, con el relay del outbox corrido como lo corre cada tick.
-
-### Paridad con la pantalla del producto actual
-
-| Producto actual (`erp-modifiers-groups`) | Aquí | Motivo si cambia |
-|---|---|---|
-| Título «Modificadores» y menú de una entrada | «Suplementos», una entrada | El nombre que ya usa Ventas |
-| Formulario de alta encima de la tabla (Nombre, Nombre en la comanda, Mínimo, Máximo, «Añadir») | «Nuevo grupo» abre el formulario con esos campos, más «Se puede repetir» y Orden | El patrón de la plataforma (`DataTable` + `FormModal`, como Impuestos y Servicios); el alta pedía repetir y orden por el asistente |
-| «Guardando…» y botón desactivado sin nombre | El botón Crear con su espera y desactivado sin nombre | — |
-| Fallo del alta bajo el formulario | Dentro del formulario, junto a su campo | — |
-| Columnas Nombre (orden y filtro), En la comanda (o el nombre), Elección (orden), Orden (orden) | Las mismas, más Opciones y «Se aplica a»; Elección se filtra por obligatorio u opcional | Las cuentas dicen si el grupo saldrá en el TPV |
-| Elección «Opcional» / «Obligatorio (mín. N)» « · máx. N» | Igual, más « · se repite» | Repetir ahora funciona |
-| Buscador «Buscar…» (nombre y nombre de comanda), páginas de 50 | Igual | — |
-| Vacío «Todavía no hay grupos de modificadores.», «Cargando…», error con reintento | «Todavía no hay grupos de suplementos.», «Cargando…», error de la tabla con «Reintentar» | El nombre |
-| El formulario sale también al empleado (el servidor pide PIN) | El alta, editar y borrar solo salen a quien gestiona | Lo que no se puede hacer no aparece (regla de las demás apps) |
-| Opciones, enganches, editar y borrar: solo asistente o API | En la hoja del grupo, además del asistente y la API | MODIFIER-F03 a F05 en pantalla |
 
 ### Contrato con Ventas
 
@@ -723,8 +701,7 @@ Suplementos encendida y el permiso de verla (hub#1121); el empleado lo tiene, y 
    `modifiers` (ver «Contrato con Cocina»).
 8. **Dividir y juntar cuentas** mueven la línea con su copia congelada; no se vuelve a valorar.
 
-Casos cubiertos, del TPV viejo (`modifier_chain`, `modifier_child_line`): la hamburguesa con queso cobra
-8,00 + 1,00 € y no 8,00 € (sales#148); lo que vale la cuenta y lo que cobra la caja son el mismo número; la
+Casos cubiertos: la hamburguesa con queso cobra 8,00 + 1,00 € y no 8,00 €; lo que vale la cuenta y lo que cobra la caja son el mismo número; la
 opción con otro IVA sale en línea hija y base + cuota cuadran en las dos; una opción sin categoría propia
 sigue siendo una sola línea (`apps/sale/tests/test_integration_modifier.py`); el descuento, el repetido, el
 plato a peso y el IVA de cada suplemento al céntimo, tres platos con queso y refresco: 27,15 € al 10 %
@@ -740,32 +717,6 @@ del worker la entrega a Cocina (`kitchen.ticket.receive`), que guarda en el plat
 comanda y la pinta debajo del nombre: en la pantalla separada por «, » y en el papel una por renglón
 (hub#1156, hub#1138). Renombrar o borrar la opción, o su grupo, después de pedirla no cambia lo que lee
 cocina (`tests/test_integration_kitchen.py`).
-
-### Cambios frente al producto actual
-
-1. **Pantalla completa**: opciones, enganches, edición y borrado se hacen en la pantalla (la hoja del
-   grupo), además de por el asistente y la API; antes solo el alta del grupo tenía pantalla.
-2. **Cambiar no reescribe lo que no se manda**: antes, un cambio sin un campo lo devolvía a su valor de
-   fábrica (mínimo 0, suplemento 0…).
-3. **El servidor hace cumplir las reglas** (mínimo, máximo, repetición y que la opción sea de un grupo
-   del artículo) al valorar, y la valoración es la puerta del precio. Antes solo la hoja del TPV las
-   miraba y la API dejaba pasar cualquier cosa.
-4. **Un grupo enganchado al producto y a su categoría sale una vez**, y cuentan **todas** las categorías
-   del artículo, no solo la primera.
-5. **Se puede repetir** funciona (antes el campo existía y nadie lo leía) y hay **opción por defecto**.
-6. **Máximo por debajo del mínimo** se rechaza; nombres de grupo únicos en el negocio y de opción
-   únicos en su grupo; una opción con categoría fiscal propia tiene que valer más de cero (antes fallaba
-   al cobrar).
-7. **Cambiar, borrar o soltar algo que no existe** responde 404 y no avisa (antes respondía bien y
-   avisaba igual).
-8. **Los enganches apuntan a productos y categorías de Inventario** con clave ajena (antes, una
-   referencia opaca que aceptaba cualquier texto), y se sueltan solos al borrarse lo enganchado.
-9. **Nombre**: «Suplementos» en español, el que ya usaba Ventas («Ponle precio en Suplementos»); en
-   inglés, «Modifiers». El permiso del empleado sigue siendo solo de consulta, y el botón de alta solo
-   sale a quien puede crear.
-10. **El catálogo completo de opciones** (`modifiers.options.all`, sin paginar) se sustituye por
-    `modifier.selection.resolve`, que valora solo lo elegido; la lista de opciones pagina como todas.
-11. **Paginación de la hoja**: de 20 en 20 con «Cargar más».
 
 ### Lo que NO hace, a propósito
 
