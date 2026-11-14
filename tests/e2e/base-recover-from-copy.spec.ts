@@ -8,8 +8,8 @@
 // group (the business's own of that name), its tag (made again: the business deleted it) and its custom field's value;
 // a product category and a service category the business deleted come back as new ones, before what goes in them, the
 // product category with the product the business kept live put back in it by Inventory's link, the service category
-// with the service the business kept without a category put back in it by Services, never the one it moved since,
-// which Recoveries names with why; and a service as a new
+// with the service the business kept without a category and the subcategory it kept at the root put back in it by
+// Services' links, never the service it moved since, which Recoveries names with why; and a service as a new
 // one, made by Services' create, into its category, and assigned by Services' assign to the professional who performed
 // it, with her own minutes and price, never to the one Staff terminated since, whom Recoveries names with why; the
 // deleted product's price in a price list comes back too, put again by Price Lists' add, the modifier group it asked
@@ -17,9 +17,9 @@
 // and its choice in a menu, offered again by Menus' create with its supplement.
 // At each size: two cards in a group, the second with a tag and a custom field's value, two products in their own
 // category asking for a modifier group of its own, the first priced in a price list of its own, asking for a modifier
-// group of its own and offered as a main in a menu of its own, a service in its own category, performed by two
-// professionals of Staff, and an appointment of
-// another card with its own professional of `a` are made; in Hubs, «Restore to a separate copy…»
+// group of its own and offered as a main in a menu of its own, a service in its own category with a subcategory,
+// performed by two professionals of Staff, and an appointment of another card with its own professional of `a` are
+// made; in Hubs, «Restore to a separate copy…»
 // asks a copy of `a` from a temporary cluster (the stack's own server) and the worker's pass makes it; the first card,
 // the first product (its price, its group and its choice taken away, as the relay hands its deletion to Price Lists,
 // Modifiers and Menus),
@@ -29,11 +29,12 @@
 // Customers, Products, Services and Appointments ticked (with whatever else answers) › «Recover»; the worker's pass
 // brings them back; Recoveries says how each thing came back, apart: «Customers: 1 restored, 1 created», «Product
 // categories: 1 created; Products: 1 restored; Product links to categories: 1 created» (the kept product's link),
-// «Service categories: 1 created, 1 with notes; Services: 1 created, 1 with notes» and «Appointments: 1 restored;
-// Repeating appointments: 0 created» (its series did not change), «Price list prices: 1 created», «Menu choices of
-// products: 1 created» and «Modifier groups of categories: 1 created; Modifier groups of products: 1 created», and its
-// page notes that the service category came back without the service moved since and
-// the service without the terminated professional, and why; and `a` has the same card live
+// «Service categories: 1 created, 1 with notes; Services: 1 created, 1 with notes; Service links to categories:
+// 1 created; Subcategory links to categories: 1 created» (the kept service and subcategory) and «Appointments: 1
+// restored; Repeating appointments: 0 created» (its series did not change), «Price list prices: 1 created», «Menu
+// choices of products: 1 created» and «Modifier groups of categories: 1 created; Modifier groups of products: 1
+// created», and its page notes that the service category came back without the service moved since and the service
+// without the terminated professional, and why; and `a` has the same card live
 // again in its group, the second one again in that group with its tag and its value, the same product live again in
 // its category back under a new id with its price in its price list, asking for its group and offered in its menu, the
 // category asking for its own group, the kept product in it
@@ -246,6 +247,8 @@ for (const { label, viewport } of SIZES) {
     // Kept by the business: deleting the category leaves them without one; the second it moves to another one.
     const keptService = aService(`Kept ${label} ${RUN}`, category);
     const movedService = aService(`Moved ${label} ${RUN}`, category);
+    // And a subcategory of it, which deleting the category moves up to the root.
+    const keptSubcategory = inA('service.category.create', { name: `Under ${label} ${RUN}`, parent_id: category });
     const professional = inA('staff.member.create', { first_name: 'Recovered', last_name: `${label} ${RUN}` });
     inA('service.assignment.assign', { service_id: service, member_id: professional, custom_duration: 50, custom_price: 2800 });
     // And one who performed it too and leaves the business before it comes back.
@@ -343,7 +346,10 @@ for (const { label, viewport } of SIZES) {
     );
     // The service category came back without the service moved since, and the service without the professional Staff
     // terminated: each counted, and said on its page.
-    await expect(recovered).toContainText('Service categories: 1 created, 1 with notes; Services: 1 created, 1 with notes');
+    await expect(recovered).toContainText(
+      'Service categories: 1 created, 1 with notes; Services: 1 created, 1 with notes; ' +
+        'Service links to categories: 1 created; Subcategory links to categories: 1 created',
+    );
     await expect(recovered).toContainText('Appointments: 1 restored; Repeating appointments: 0 created');
     await expect(recovered).toContainText('Price list prices: 1 created');
     await expect(recovered).toContainText('Menu choices of products: 1 created');
@@ -403,6 +409,8 @@ for (const { label, viewport } of SIZES) {
     // The service the business kept, the same one, back in it; the one it moved since stays where it put it.
     expect(psql(`select category_id from service_service where id = '${keptService}'`)).toBe(back);
     expect(psql(`select category_id from service_service where id = '${movedService}'`)).toBe(elsewhere);
+    // And the subcategory it kept at the root, the same one, hanging from it again.
+    expect(psql(`select parent_id from service_category where id = '${keptSubcategory}'`)).toBe(back);
     // And performed again by the same professional, with her own minutes and price, by Services' assign.
     const performer = `select member_id, custom_duration, custom_price, is_active from service_assignment where service_id = (select id from service_service where name = '${name}')`;
     expect(psql(performer)).toBe(`${professional}|50|2800|t`);

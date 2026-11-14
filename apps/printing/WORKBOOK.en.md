@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fc726544e719f3b7091b1c7378f2389ba0cc090e14e522f593ae61e459a6ded4 -->
+<!-- generated from WORKBOOK.md sha256:6ab7b974b29cd032f31303b703b4568ac94fac2171c91f12ede8f384b0512d64 -->
 
 ## What it is for and who it is for
 
@@ -286,7 +286,8 @@ If it fails: the field marked with the reason: "There is already a printer with 
 network name (for example 192.168.1.100).", "The port goes from 1 to 65535.", "Type the MAC
 as AA:BB:CC:DD:EE:FF.", "Type the print queue's name as the system gives it (no
 spaces, slashes or #).", "The system printer prints A4 pages: give it the Receipt role.". Without
-a name, "Give the printer a name.".
+a name, "Give the printer a name.". Each notice shows under its field and goes as soon as that field changes,
+without tapping "Save" again; another field's stays until its own changes (hub#1470).
 Involved: PRINTING-F04, PRINTING-F05
 
 ### PRINTING-F04 Assign what comes out of each printer
@@ -594,8 +595,9 @@ for jobs of a printer the device does not have is refused ("This device does not
 Confirming twice is one confirmation. A late confirmation from the same device (a slow printer with
 copies goes past the 90 s and the job had already gone back to the queue) is accepted: the paper came out and it is not printed
 again. A confirmation or a failure from another device, or from a hand-out that is not its own, is refused and changes
-nothing. Setting up without a name or without active printers warns in its field, and it is only set up from the
-device itself. The queue and the list name each device by its name, never by its identifier: with it
+nothing. Setting up without a name or without active printers warns in its field, and the notice goes as soon as
+that field changes (the name is typed, a printer is ticked), without tapping "Save" again; the other's stays until
+its own changes (hub#1470). It is only set up from the device itself. The queue and the list name each device by its name, never by its identifier: with it
 anybody could pretend to be the till.
 Involved: PRINTING-F05, PRINTING-F07, PRINTING-F14
 
