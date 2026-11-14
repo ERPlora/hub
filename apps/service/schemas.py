@@ -768,10 +768,27 @@ class ServiceRecoverIn(ServiceIn, ImageInCopyIn):
     assignments: list[AssignmentOfCopyIn] = Field(
         [], max_length=MAX_PERFORMERS, description="Who performed it in the copy."
     )
+    stands_for: UUID = Field(description="The service of the copy it is made again for, by its id there.")
 
 
 class ServiceRecoveredOut(ServiceOut, RecoveredOut):
     """A service made again from a separate copy, and who of those who performed it there it came back without."""
+
+
+#: The most services of a separate copy another app asks about at once.
+MAX_STANDING_FOR = 10_000
+
+
+class StandingForIn(In):
+    """Services of a separate copy of the business, by their ids there."""
+
+    ids: list[UUID] = Field(max_length=MAX_STANDING_FOR, description="The services of the copy, by their ids there.")
+
+
+class StandingForOut(Schema):
+    """The business's service that stands for each of them it no longer holds."""
+
+    standing_for: dict[UUID, UUID] = Field(description="By the id in the copy, the id of the service here.")
 
 
 #: The most services or subcategories a category of a separate copy takes back.

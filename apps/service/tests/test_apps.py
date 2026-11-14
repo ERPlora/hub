@@ -126,14 +126,15 @@ def test_navigation_is_the_three_tabs_of_the_old_module_with_registered_icons():
 
 
 #: What only names a record on the assistant's card, and what only the recovery from a separate copy runs (a service
-#: made again with who performed it, what the business kept put back into a category brought back): no tool
-#: (``INTERNAL``).
+#: made again with who performed it, what the business kept put back into a category brought back, which service
+#: stands for one of the copy's): no tool (``INTERNAL``).
 NO_TOOL = {
     "service.record.get",
     "service.service.recover",
     "service.category.recover",
     "service.service.return_to_category",
     "service.category.return_to_parent",
+    "service.service.standing_for",
 }
 
 
@@ -150,8 +151,9 @@ def test_every_operation_is_a_tool_of_the_assistant():
     # + what it names of Sales and Appointments: record.get, which is no tool
     # + a service made again from a separate copy with who performed it: service.recover, no tool either,
     # + and a category made again from it: category.recover, no tool either,
-    # + and what the business kept put back into it: service.return_to_category, category.return_to_parent, neither.
-    assert len(operations) == 56
+    # + and what the business kept put back into it: service.return_to_category, category.return_to_parent, neither,
+    # + and which service stands for one of the copy's, which Price Lists asks: service.standing_for, no tool either.
+    assert len(operations) == 57
     for op in operations:
         if op.name in NO_TOOL:
             assert op.ai is INTERNAL, op.name

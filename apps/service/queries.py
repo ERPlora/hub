@@ -92,6 +92,8 @@ from apps.service.schemas import (
     ServiceRefIn,
     ServiceSalePage,
     SettingsOut,
+    StandingForIn,
+    StandingForOut,
     TenderOptionPage,
     TenderOptionsIn,
     VoidCheckOut,
@@ -106,6 +108,9 @@ from base.queries import business_language, image_library
 from base.recovery import brought_back
 from base.schemas import RecordNameOut
 from base.ordering import list_order_for
+
+#: Run only by the platform (events.py, a recovery): no role holds it, so no person and no API key reaches it.
+SYSTEM = "service.system"
 
 SERVICE_NOT_FOUND = _("That service does not exist in this business.")
 SERVICE_AMBIGUOUS = _("“%(said)s” matches several services: %(names)s. Say which one.")
@@ -1935,21 +1940,52 @@ def services_not_in_business(services: list[dict]) -> list[dict]:
     """The services a separate copy (``recoverable_services_in_copy``) had on offer and the business lacks (not
     in ``services_in_business``), in their order, each as ``service.service.recover`` takes it here, with its ``id``
     there: the key of its tax category (Taxes never deletes one; one turned off since is the create's to refuse, and
-    without one it takes the settings'), its category here (``_category_here``) and who performed it there
-    (``assignments``)."""
+    without one it takes the settings'), its category here (``_category_here``), who performed it there
+    (``assignments``) and which of the copy's it stands for (``stands_for``), which the business keeps."""
     held = services_in_business(services)
     lacking = [one for one in services if one["is_active"] and one["id"] not in held]
     keys = dict(TaxCategory.objects.filter(pk__in={one["tax_category_id"] for one in lacking}).values_list("pk", "key"))
     here = _categories_here()
     created = []
     for one in lacking:
-        record = {field: one[field] for field in ("id", *COPY_FIELDS, "assignments")}
+        record = {field: one[field] for field in ("id", *COPY_FIELDS, "assignments")} | {"stands_for": one["id"]}
         if (category := _category_here(one, here)) is not None:
             record["category_id"] = category
         if (key := keys.get(one["tax_category_id"])) is not None:
             record["tax_category_key"] = key
         created.append(record)
     return created
+
+
+def services_standing_for(ids) -> dict[UUID, UUID]:
+    """The business's service that stands for each of a separate copy's services (``ids``, there) it no longer holds,
+    as ``{id there: id here}``: the one a recovery made again for it (``stands_for``, kept by
+    ``service.service.recover``), on offer or archived since, renamed or not; the oldest if a recovery made it twice.
+    One the business made again by hand is its own, set up as it chose: it stands for none. A service it still holds is
+    itself, and is not in the result. For the apps whose records hang from a service of the copy to give each back to
+    the service it is now."""
+    held = set(Service.objects.filter(pk__in=ids).values_list("pk", flat=True))
+    made = Service.objects.filter(stands_for__in=[one for one in ids if one not in held]).order_by("created_at", "id")
+    standing: dict[UUID, UUID] = {}
+    for there, here in made.values_list("stands_for", "pk"):
+        standing.setdefault(there, here)
+    return standing
+
+
+# Not an assistant tool and no route: what Price Lists, which does not require Services, asks while it gives a separate
+# copy back (BASE-F114, PRICING-F15).
+@operation(
+    "service.service.standing_for",
+    kind="query",
+    permission=SYSTEM,
+    input=StandingForIn,
+    output=StandingForOut,
+    ai=INTERNAL,
+)
+def standing_for(ctx: OperationContext, data: StandingForIn) -> dict:
+    """The business's service that stands for each of a separate copy's it no longer holds
+    (``services_standing_for``)."""
+    return {"standing_for": services_standing_for(data.ids)}
 
 
 def _category_here(service: dict, here: tuple[set[UUID], dict[str, UUID]]) -> UUID | None:

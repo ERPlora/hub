@@ -612,6 +612,10 @@ msgstr "Añade los servicios que vendes, con su precio y su duración."
 msgid "image"
 msgstr "imagen"
 
+#: models.py
+msgid "copy's service it stands for"
+msgstr "servicio de la copia al que sustituye"
+
 #: schemas.py
 msgid "Image"
 msgstr "Imagen"
