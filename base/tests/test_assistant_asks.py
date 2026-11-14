@@ -443,9 +443,13 @@ def by_group_test(cases: list) -> Callable:
     return by_its_group
 
 
-#: A person's own words in English for ``verifactu.chain.validate``, and what its English asks become when someone
-#: overwrites them with filler: the positive control of ``assert_its_asks_lift``.
-LIFTED = ("verifactu.chain.validate", "the accountant fears it's broken somewhere, verify every link")
+#: A person's own words in English for two tools, and what their English asks become when someone overwrites them
+#: with filler: the positive control of ``assert_its_asks_lift``. Without its English asks the first falls out of the
+#: first ten; the second stays among them, only lower.
+LIFTED = [
+    ("verifactu.chain.validate", "the accountant fears it's broken somewhere, verify every link"),
+    ("appointment.recurring.get", "when's the next date of Marisa's weekly one?"),
+]
 FILLER = ("zzqxfillera", "zzqxfillerb")
 
 
@@ -457,11 +461,11 @@ def with_asks(tools: dict[str, Operation], name: str, language: str, asks: tuple
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-def test_english_asks_overwritten_with_filler_no_longer_lift_their_tool(context_of):
+@pytest.mark.parametrize(("name", "phrase"), LIFTED)
+def test_english_asks_overwritten_with_filler_no_longer_lift_their_tool(context_of, name, phrase):
     """The English asks of a tool, overwritten with filler while its Spanish ones stay, leave a person's English words
     where the tool's name, description and Spanish asks put them: ``assert_its_asks_lift`` fails, as an app's test of
     its English phrases does (hub#1216: before it, only its Spanish asks were measured)."""
-    name, phrase = LIFTED
     tools = assistant.catalog(context_of(Membership.Role.OWNER, "en"))
     assert_its_asks_lift(tools, name, phrase, "en")
     with pytest.raises(AssertionError):
