@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1e81617ec46512b89b5a2172625a5c01d5995e4869f646379251d1f758adbe9a -->
+<!-- generated from WORKBOOK.md sha256:0a45e91215fa10923bc0f9ff1325bcbc6c56244ff49257acf79ad45e42fd510f -->
 
 ## What it is for and who it is for
 
@@ -2936,8 +2936,7 @@ the customers that were lost, the deleted ones as they were, the products, the s
 appointments, the repeating appointments, the price list prices and the modifier groups and the menu choices of the
 products; making and deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws;
 the price list prices of a service that comes back as a new one, hub#1459; the modifier groups of a category that comes
-back, hub#1456; a deleted modifier group, hub#1458; the menu choices of a product that comes back as a new one,
-hub#1473; a removed menu or course, hub#1474)
+back, hub#1456; a deleted modifier group, hub#1458; a removed menu or course, hub#1474)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -3091,12 +3090,12 @@ Steps:
       deleted the group) does not come back and its reason says so.
       The menu choices of the products go after the products too: "Menu choices of products: 2 created". Each choice
       that in the copy offered a product live there and that the business no longer has is added again to its course,
-      as the menu builder adds it, with its supplement and, if it was sold out, sold out, so a deleted product that comes
-      back shows again in its menus at the till (COMBO-F15). One the business still has, even if it changed its
-      product, is not repeated, nor one whose product the business has offered in that course again: the business's own
-      stays. One the menu builder does not accept today (its product still deleted or deactivated, or the business
-      removed the menu or the course) does not come back and its reason says so; those of a product that comes back as
-      a new one, not yet either (hub#1473).
+      as the menu builder adds it, with its supplement and, if it was sold out, sold out, so a product that comes back,
+      the same or as a new one, shows again in its menus at the till (COMBO-F15). One the business still has, even if it
+      changed its product, is not repeated, nor one whose product the business has offered in that course again: the
+      business's own stays. One the menu builder does not accept today (its product still deleted or deactivated, or the
+      business already made another one by hand with its SKU, or removed the menu or the course) does not come back and
+      its reason says so.
 In: the chosen businesses, the temporary cluster with their copy and the moment; to recover, the made separate copy and
 what to bring back.
 Out: the business's database as it was at that moment; the one it had, kept 7 days on its server; the notice

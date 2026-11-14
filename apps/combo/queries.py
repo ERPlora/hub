@@ -42,6 +42,7 @@ from apps.combo.schemas import (
     SaleComboPage,
 )
 from apps.inventory.models import Product, ProductCategory, Unit
+from apps.inventory.queries import products_standing_for
 from apps.tax.models import TaxCategory
 from base import images
 from base.queries import business_language, image_library
@@ -882,9 +883,9 @@ def resolve(ctx: OperationContext, data: ResolveIn) -> dict:
 
 # ── A separate copy of the business (BASE-F114): what Menus gives back from it ──────────────────────────────────────
 
-#: What a choice of a separate copy is read with: its id there and what ``combo.option.create`` takes, each a column
-#: since ``0001_initial``.
-OPTION_FIELDS = ("id", "group_id", "product_id", "price_delta", "is_available")
+#: What a choice of a separate copy is read with: its id there, what ``combo.option.create`` takes and its product's SKU
+#: there, each a column since ``0001_initial``.
+OPTION_FIELDS = ("id", "group_id", "product_id", "price_delta", "is_available", "sku")
 
 
 def options_in_copy(conn) -> list[dict]:
@@ -903,8 +904,13 @@ def options_in_copy(conn) -> list[dict]:
         " WHERE NOT p.{deleted} ORDER BY o.{group_id}, o.{order}, o.{option_pk}"
     ).format(
         columns=sql.SQL(", ").join(
-            sql.SQL("o.{}").format(column(option, field))
-            for field in ("id", "group", "product", "price_delta", "is_available")
+            [
+                *(
+                    sql.SQL("o.{}").format(column(option, field))
+                    for field in ("id", "group", "product", "price_delta", "is_available")
+                ),
+                sql.SQL("p.{}").format(column(product, "sku")),
+            ]
         ),
         options=sql.Identifier(option.db_table),
         products=sql.Identifier(product.db_table),
@@ -920,17 +926,29 @@ def options_in_copy(conn) -> list[dict]:
 
 def options_not_in_business(options: list[dict]) -> list[dict]:
     """The choices of a separate copy (``options_in_copy``) the business no longer offers, in their order, each as
-    ``combo.option.create`` takes it with its ``id`` there. Not lacking: one the business still holds, even with another
-    product it was given since, nor one whose product the business offers again in that course: it stays as the
-    business has it."""
+    ``combo.option.create`` takes it with its ``id`` there. Its product is the business's that stands for the copy's
+    (Inventory's ``products_standing_for``): the same while live, else the one a recovery made again with its SKU. Not
+    lacking: one the business still holds, even with another product it was given since, nor one whose product the
+    business offers again in that course: it stays as the business has it."""
     held = set(ChoiceOption.objects.filter(pk__in=[one["id"] for one in options]).values_list("pk", flat=True))
     taken = set(
         ChoiceOption.objects.filter(group_id__in={one["group_id"] for one in options}).values_list(
             "group_id", "product_id"
         )
     )
-    return [
-        {field: one[field] for field in OPTION_FIELDS}
-        for one in options
-        if one["id"] not in held and (one["group_id"], one["product_id"]) not in taken
-    ]
+    here = products_standing_for({one["product_id"]: one["sku"] for one in options})
+    lacking = []
+    for one in options:
+        product = here.get(one["product_id"], one["product_id"])
+        if one["id"] in held or (one["group_id"], product) in taken:
+            continue
+        lacking.append(
+            {
+                "id": one["id"],
+                "group_id": one["group_id"],
+                "product_id": product,
+                "price_delta": one["price_delta"],
+                "is_available": one["is_available"],
+            }
+        )
+    return lacking
