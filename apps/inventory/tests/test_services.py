@@ -738,7 +738,8 @@ def test_one_deleted_without_its_image_gets_back_the_one_of_the_library_the_copy
     "copy",
     [
         "catalog:hospitality/gone_since",  # the library no longer has it
-        f"file:inventory/products/{uuid.uuid7().hex}.webp",  # a photo of its own: deleted with the product
+        # A photo of its own: deleted with the product. A fixed name: every process must collect the same test id.
+        "file:inventory/products/0193a1b2c3d47e8f9a0b1c2d3e4f5a6b.webp",
     ],
 )
 def test_an_image_that_cannot_come_back_leaves_the_product_restored_without_any(copy, image_library):  # noqa: F811
