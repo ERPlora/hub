@@ -212,6 +212,11 @@ class TestAMoveAskedForTheNight:
         hub = self.scheduled(moves, target, now, hour=3, due=-dt.timedelta(minutes=30))
 
         assert run(now) == 0
+        with use_control():
+            assert hub.id not in move.control_services.moves_scheduled_due(now)
+            # Even listed (a pass that read it before it was put off), its locked row says it is not due.
+            assert services.claim_hub(hub.id, now, move.LEASE, owner="a:1") is not None
+            assert move.control_services.start_scheduled_move(hub.id, now, owner="a:1") is False
 
         assert (fresh(hub).moving_to_id, fresh(hub).move_scheduled_to_id) == (None, target.pk)
 
