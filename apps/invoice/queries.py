@@ -12,6 +12,7 @@ import datetime as dt
 from decimal import Decimal
 
 from babel.numbers import format_decimal, format_percent, get_currency_precision
+from django.conf import settings
 from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, Sum, Window
 from django.db.models.functions import Coalesce, Lag
 from django.template.loader import render_to_string
@@ -1236,6 +1237,9 @@ def get_issuer(ctx: OperationContext, params: IssuerGetIn) -> dict:
 PLATFORM_UNKNOWN = _("This ERPlora invoice was never issued here.")
 PLATFORM_ISSUER_MISSING = _("The platform hub has no issuer: run create_platform_hub.")
 PLATFORM_VERIFACTU_MISSING = _("VeriFactu does not answer in the platform hub.")
+PLATFORM_REAL_FILING_CLOSED = _(
+    "Real filing with the AEAT is closed on this server: ERPlora's invoices would not reach it."
+)
 VERIFACTU_BY_INVOICE = "verifactu.record.by_invoice"
 VERIFACTU_RECORD = "verifactu.record.get"
 VERIFACTU_CONFIG = "verifactu.config.get"
@@ -1332,16 +1336,20 @@ def platform_document(ctx: OperationContext, data: PlatformRefIn) -> dict:
     input=PlatformHealthIn,
     output=PlatformHealthOut,
     ai={
-        "description": "System only: whether the platform hub can issue ERPlora's invoices now (its issuer is set and "
-        "VeriFactu answers); what is missing otherwise."
+        "description": "System only: whether the platform hub can issue ERPlora's invoices now (its issuer is set, "
+        "VeriFactu answers and, in prod, real filing with the AEAT is open); what is missing otherwise."
     },
 )
 def platform_health(ctx: OperationContext, data: PlatformHealthIn) -> dict:
     issuer = Issuer.objects.first()
     if issuer is None or not issuer.configured:
         return {"ready": False, "detail": str(PLATFORM_ISSUER_MISSING)}
-    if _ask_verifactu(ctx, VERIFACTU_CONFIG, {}) is None:
+    verifactu = _ask_verifactu(ctx, VERIFACTU_CONFIG, {})
+    if verifactu is None:
         return {"ready": False, "detail": str(PLATFORM_VERIFACTU_MISSING)}
+    # The SaaS charges real money only while this answers ready: in prod, its invoice has to reach the AEAT for real.
+    if settings.ERPLORA_ENVIRONMENT == "prod" and not verifactu.production_open:
+        return {"ready": False, "detail": str(PLATFORM_REAL_FILING_CLOSED)}
     return {"ready": True, "detail": ""}
 
 

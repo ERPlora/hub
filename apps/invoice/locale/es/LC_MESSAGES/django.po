@@ -931,6 +931,14 @@ msgstr "El hub de plataforma no tiene emisor: ejecuta create_platform_hub."
 msgid "VeriFactu does not answer in the platform hub."
 msgstr "VeriFactu no responde en el hub de plataforma."
 
+#: queries.py
+msgid ""
+"Real filing with the AEAT is closed on this server: ERPlora's invoices would "
+"not reach it."
+msgstr ""
+"El envío real a la AEAT está cerrado en este servidor: las facturas de "
+"ERPlora no le llegarían."
+
 msgid "Sale"
 msgstr "Venta"
 
