@@ -2,13 +2,19 @@
 // without saving again, and only its own. «New printer» is refused for its name, address and port with the same words;
 // «Print from this device» for its name and its printers, and ticking another printer takes the printers' notice
 // alone. At 390, 834 and 1440, and once more in Spanish. Saves are refused in the browser, so nothing is created.
-import { type Browser, expect, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, psql, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
+import { A, api, capture, login, psql, shown } from './helpers';
 import { dialog } from './inventory-helpers';
-import { stamp, VIEWPORTS } from './sale-helpers';
-import { expectMarked, expectUnmarked, refuseWithTheSameWords, type SameWordsWindow, testTheMarksGoOneByOne } from './same-words-helpers';
-import { ownerPage } from './service-helpers';
+import { stamp } from './sale-helpers';
+import {
+  expectMarked,
+  expectUnmarked,
+  refuseWithTheSameWords,
+  type SameWordsWindow,
+  testEachSameWordsCase,
+  testTheMarksGoOneByOne,
+} from './same-words-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 const TAG = `E2E1470 ${stamp()}`;
@@ -56,14 +62,6 @@ test.describe('Print from this device', () => {
     psql(`delete from printing_printer where name like '${TAG}%'`);
   });
 
-  /** The owner on Devices at `size`, in English or in Spanish (whose session the visual sweep reads). */
-  async function ownerAt(browser: Browser, size: { width: number; height: number }, language: Language) {
-    if (language === 'en') return ownerPage(browser, '/printing/devices', size);
-    const signed = await signedInSpanish(browser, size, '/printing/devices');
-    await saveSessionForTheSweep(signed.context);
-    return signed;
-  }
-
   async function nameAndPrintersOneByOne(page: Page, language: Language, label: string): Promise<void> {
     const words = SAME_WORDS[language];
     await shown(page).locator('[data-testid=printing-devices-add]').click();
@@ -96,19 +94,9 @@ test.describe('Print from this device', () => {
     expect(psql(`select count(*) from printing_printdevice where name like '${TAG}%'`)).toBe('0');
   }
 
-  const CASES: { language: Language; size: { label: string; width: number; height: number } }[] = [
-    ...VIEWPORTS.map((size) => ({ language: 'en' as const, size })),
-    { language: 'es', size: { label: 'es-1440', width: 1440, height: 900 } },
-  ];
-
-  for (const { language, size } of CASES) {
-    test(`hub#1470 PRINTING-F18 at ${size.label}: the name and the printers refused with the same words lose their marks one by one`, async ({ browser }) => {
-      const { context, page } = await ownerAt(browser, size, language);
-      try {
-        await nameAndPrintersOneByOne(page, language, size.label);
-      } finally {
-        await context.close();
-      }
-    });
-  }
+  testEachSameWordsCase(
+    ({ size }) => `hub#1470 PRINTING-F18 at ${size.label}: the name and the printers refused with the same words lose their marks one by one`,
+    '/printing/devices',
+    (page, { language, size }) => nameAndPrintersOneByOne(page, language, size.label),
+  );
 });
