@@ -1078,12 +1078,16 @@ class TestRecoverIntoTheBusiness:
                 nothing | {"label": "Services", "created": 2, "not_created": 1},
             ],
         )
-        # One noted before each thing was counted apart is said as it was then, the app's names together.
+        # One noted before each thing was counted apart is said as it was then: one count, under the names of all the
+        # app declares, together.
         self.a_recovery(self.made("bistro"), apps=["service"], status="done", results=[nothing | {"created": 3}])
 
         listed = page(client, RECOVERIES)
         assert "Service categories: 1 created; Services: 2 created, 1 not created<" in row_of(listed, ">acme<br>")
-        assert "Service categories, Services: 3 created<" in row_of(listed, ">bistro<br>")
+        assert (
+            "Service categories, Services, Service links to categories, Subcategory links to categories: 3 created<"
+            in row_of(listed, ">bistro<br>")
+        )
 
     def test_what_a_record_came_back_without_is_counted_in_its_result_and_said_on_its_page(self, client, root):
         # A service made again without a professional who performed it in the copy and has left since (SERVICE-F31).

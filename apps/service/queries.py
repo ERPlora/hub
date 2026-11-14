@@ -51,6 +51,7 @@ from apps.service.models import (
     Redemption,
     Service,
     ServiceSettings,
+    parent_problem,
 )
 from apps.service.schemas import (
     AdjustCheckOut,
@@ -102,6 +103,7 @@ from base import images
 from base.business import babel_locale, business_zone
 from base.operations import call
 from base.queries import business_language, image_library
+from base.recovery import brought_back
 from base.schemas import RecordNameOut
 from base.ordering import list_order_for
 
@@ -1955,6 +1957,59 @@ def _category_here(service: dict, here: tuple[set[UUID], dict[str, UUID]]) -> UU
     with its name (brought back just before it by the categories' part, hub#1323, or made again by hand), none
     otherwise (none in the copy, or deleted since and not back, SERVICE-F08)."""
     return _category_held(service["category_id"], service["category_name"], here)
+
+
+def service_links_not_in_business(categories: list[dict]) -> list[dict]:
+    """The services of a separate copy's categories (``categories_in_copy``) that go back into the category a recovery
+    brought back for theirs (``_brought_back_for``), in id order, each as ``service.service.return_to_category`` takes
+    it, with its ``id``: one the business keeps where deleting that category left it, without a category, archived
+    too, and has not touched since the category came back (asked again, what the business did since stays)."""
+    back = _brought_back_for(categories)
+    into = {service: back[one["id"]] for one in categories if one["id"] in back for service in one["service_ids"]}
+    kept = Service.objects.filter(pk__in=into, category__isnull=True).order_by("id").values_list("pk", "updated_at")
+    return [
+        {"id": pk, "service_id": pk, "category_id": into[pk].pk}
+        for pk, updated_at in kept
+        if updated_at <= into[pk].created_at
+    ]
+
+
+def subcategory_links_not_in_business(categories: list[dict]) -> list[dict]:
+    """The subcategories of a separate copy's categories (``categories_in_copy``) that go back into the category a
+    recovery brought back for their parent (``_brought_back_for``), in id order, each as
+    ``service.category.return_to_parent`` takes it, with its ``id`` and the copy's category it hung from
+    (``stands_for``): one the business keeps live where deleting that one left it (``left_by_deleting``), has not
+    touched since the category came back, and that would not hang from one of its own subcategories."""
+    back = _brought_back_for(categories)
+    under = {one["id"]: one["parent_id"] for one in categories if one["parent_id"] in back}
+    parent_of = dict(Category.objects.filter(is_deleted=False).values_list("pk", "parent"))
+    kept = Category.objects.filter(pk__in=under, is_deleted=False).order_by("id")
+    links = []
+    for pk, parent, updated_at in kept.values_list("pk", "parent", "updated_at"):
+        stands_for, into = under[pk], back[under[pk]]
+        if (
+            parent == left_by_deleting(stands_for)
+            and updated_at <= into.created_at
+            and parent_problem(pk, into.pk, parent_of) is None
+        ):
+            links.append({"id": pk, "category_id": pk, "parent_id": into.pk, "stands_for": stands_for})
+    return links
+
+
+def _brought_back_for(categories: list[dict]) -> dict[UUID, Category]:
+    """Each of a separate copy's categories the business no longer has live, with the live one a recovery made again
+    with its name (``base.recovery.brought_back``); none for one it kept, or made again by hand."""
+    ids, by_name = _categories_here()
+    named = {one["id"]: by_name.get(_same_name(one["name"])) for one in categories if one["id"] not in ids}
+    made = Category.objects.filter(pk__in={pk for pk in named.values() if pk is not None})
+    by_recovery = {one.pk: one for one in made.only("pk", "created_by", "created_at") if brought_back(one.created_by)}
+    return {there: by_recovery[here] for there, here in named.items() if here in by_recovery}
+
+
+def left_by_deleting(category_id: UUID | None) -> UUID | None:
+    """Where deleting the category ``category_id`` left what hung from it: the parent its row has now (a deleted one
+    moves up with its siblings, SERVICE-F08), or the root when the business no longer holds it at all."""
+    return Category.objects.filter(pk=category_id).values_list("parent", flat=True).first()
 
 
 def _same_name(name: str) -> str:
