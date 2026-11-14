@@ -17,8 +17,9 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, assert_offered_with_room, comparable
+from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable
 from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: The requests of hub#1107's QA (``tests/e2e/qa/probes/owner-es-online_booking-2026-11-08.json``), as the owner said
@@ -109,10 +110,33 @@ def test_every_probe_of_online_booking_offers_its_tool_without_being_one_of_its_
     assert_offered_with_room(tools, probe["tool"], probe["phrase"], probe["language"])
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+
+
+#: What the owner says in English in words of their own for each tool of Online booking that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("online_booking.booking.cancel", "something came up on Saturday, turn down the one from my link"),
+    ("online_booking.booking.complete", "the one from earlier today is done"),
+    ("online_booking.booking.confirm", "Nerea's came in from my link: tell her yes"),
+    ("online_booking.booking.delete", "the fake one from my link, get rid of it for good"),
+    ("online_booking.booking.get", "Ainhoa is calling about hers on Wednesday, what is it?"),
+    ("online_booking.booking.list", "anything new in the inbox this week?"),
+    ("online_booking.booking.no_show", "no sign of Olga yesterday, she never turned up"),
+    (
+        "online_booking.public.book",
+        "a new customer wants a cut on Thursday at 5, anyone free is fine, mobile 600 111 222",
+    ),
+    ("online_booking.public.booking", "what details does Leire have on her own link?"),
+    ("online_booking.public.cancel", "free up Leire's using her own link"),
+    ("online_booking.public.page", "what do people see when they open my link?"),
+    ("online_booking.public.services", "which treatments do I let people pick on the web?"),
+    ("online_booking.public.slots", "on Tuesday, what times are left for anyone on the web?"),
+    ("online_booking.settings.get", "what do customers have to give before they book themselves?"),
+    ("online_booking.settings.update", "they should see «Hi, lovely» when they book"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_each_tool_has_its_own_english_words = english_coverage_test("online_booking", OWN_WORDS_EN)
 
 
 #: Where booking as the customer sends the model for what it takes (hub#1107: «payload inválido» and

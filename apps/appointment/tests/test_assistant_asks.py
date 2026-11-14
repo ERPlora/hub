@@ -17,8 +17,9 @@ from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, assert_offered_with_room, comparable
-from base.tests.test_assistant_asks import offered_place, offered_to, place_of_no_ask, probe_phrases
+from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable
+from base.tests.test_assistant_asks import offered_place, place_of_no_ask, probe_phrases
+from base.tests.test_assistant_asks import by_group_test, english_coverage_test, english_words_test, own_words_test
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: The requests of hub#1097's QA (``tests/e2e/qa/probes/owner-es-appointment-2026-11-08.json``), as the owner said them,
@@ -162,21 +163,53 @@ def test_the_reported_request_offers_appointments_tool_before_online_bookings_tw
     assert place is not None and (twins is None or place < twins), (place, twins)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase", "word"), BY_GROUP)
-def test_a_request_in_spanish_brings_its_tool_among_the_first_ten_by_appointments_groups(catalog_of, name, phrase, word):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    assert comparable(phrase) not in probe_phrases()
-    assert_offered_with_room(tools, name, phrase, room=TOP)
-    without = tuple(group for group in assistant.SYNONYMS if word not in group)
-    assert len(without) == len(assistant.SYNONYMS) - 1  # positive control: exactly its group is left out
-    assert name not in offered_to(tools, phrase, synonyms=without)[:TOP]
+test_a_request_in_spanish_brings_its_tool_among_the_first_ten_by_appointments_groups = by_group_test(BY_GROUP)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+
+
+#: What the owner says in English in words of their own for each tool of Appointments that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("appointment.agenda.lanes", "show Thursday split per hairdresser"),
+    ("appointment.appointment.bulk_create", "Marisa wants all five sessions at once, every Monday, all or none"),
+    ("appointment.appointment.bulk_delete", "those three of Marisa's, out at once"),
+    ("appointment.appointment.cancel", "Marisa can't make it on Friday, call it off"),
+    ("appointment.appointment.charge", "send Marisa's appointment to checkout"),
+    ("appointment.appointment.complete", "Marisa's colour appointment is finished, mark it"),
+    ("appointment.appointment.confirm", "accept what Marisa asked for on Thursday"),
+    ("appointment.appointment.count_active_for_service", "does anyone still have highlights coming up?"),
+    ("appointment.appointment.count_to_confirm", "how many are left unconfirmed?"),
+    ("appointment.appointment.create", "put Marisa down for a colour on Friday at noon"),
+    ("appointment.appointment.delete", "delete that test from Friday"),
+    ("appointment.appointment.get", "what phone number is on APT-0077?"),
+    ("appointment.appointment.history", "who moved hers? Marisa's, I mean"),
+    ("appointment.appointment.list", "who's coming on Friday?"),
+    ("appointment.appointment.list_for_customer", "has Marisa been here in the past? anything upcoming?"),
+    ("appointment.appointment.mark_no_show", "Marisa never showed up yesterday"),
+    ("appointment.appointment.notices", "anything booked or cancelled by customers themselves lately?"),
+    ("appointment.appointment.reschedule", "push Marisa's Thursday one back an hour"),
+    ("appointment.appointment.start", "Marisa just walked in, get hers going"),
+    ("appointment.appointment.update", "Marisa can't stand ammonia, note it on hers"),
+    ("appointment.availability.check", "is 9:30 on Friday bookable for Marisa?"),
+    ("appointment.availability.slots", "what free times are left on Saturday for a colour?"),
+    ("appointment.blocked_time.create", "nobody should book Inés on Friday afternoon, she has training"),
+    ("appointment.blocked_time.delete", "no need to close Friday afternoon anymore, unblock it"),
+    ("appointment.blocked_time.list", "anything off next month?"),
+    ("appointment.recurring.activate", "resume Marisa's weekly one"),
+    ("appointment.recurring.create", "Marisa will come every Tuesday at 6 pm"),
+    ("appointment.recurring.deactivate", "stop Marisa's weekly one until September"),
+    ("appointment.recurring.delete", "Marisa stops coming every week: remove it, but keep what's booked"),
+    ("appointment.recurring.get", "when's the next date of Marisa's weekly one?"),
+    ("appointment.recurring.list", "which repeating ones are still running?"),
+    ("appointment.recurring.materialize", "fill in what's missing for Marisa's weekly one"),
+    ("appointment.recurring.update", "Marisa will come on Wednesdays instead of Tuesdays from now on"),
+    ("appointment.settings.get", "how much notice do we need for a booking?"),
+    ("appointment.settings.update", "they should book at least two hours ahead, require that"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_each_tool_has_its_own_english_words = english_coverage_test("appointment", OWN_WORDS_EN)
 
 
 def test_every_tool_is_caught_by_a_probe_or_by_words_of_its_own():

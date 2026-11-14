@@ -7,19 +7,19 @@ Every ask of every tool of flow bringing its tool among the first ten, role by r
 asks and the guard that no ask copies a probe of layer 2.
 """
 
-import dataclasses
 import json
 from pathlib import Path
 
 import pytest
 from django.conf import settings
 from live import assistant as shared
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, offered_to, place_of_no_ask
+from base.tests.test_assistant_asks import TOP, comparable, offered_to, place_of_no_ask
 from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, nobodys_words, own_words_test
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: The questions an automation asks a person (FLOW-F29): every role may be asked one, so every role holds these.
@@ -178,20 +178,6 @@ CAUGHT_ABOVE = {
 }
 
 
-def offered_without_its_asks(tools: dict[str, Operation], name: str, phrase: str) -> list[str]:
-    """``offered`` with ``name`` saying no asks: how a turn ranked it by its name, its description and the Hub's words."""
-    op = tools[name]
-    bare = {**tools, name: dataclasses.replace(op, ai={key: value for key, value in op.ai.items() if key != "asks"})}
-    assert not shared.asks_of(bare[name])  # positive control: the tool is ranked without its asks
-    return offered_to(bare, phrase)
-
-
-def is_own_words(tools: dict[str, Operation], phrase: str) -> bool:
-    """Whether ``phrase`` is neither an ask of any tool in Spanish nor a probe of layer 2: words of the person's own."""
-    asks = {comparable(ask) for op in tools.values() for ask in shared.asks_of(op).get("es", ())}
-    return comparable(phrase) not in asks and comparable(phrase) not in probe_phrases()
-
-
 def test_automations_offers_its_thirty_tools():
     """Automations' assistant tools (``AI``, never ``INTERNAL`` nor the engine's «System only»): a silent drop fails."""
     tools = {name for name, op in registry.items() if op.app_label == "flow" and assistant.is_tool(op)}
@@ -280,7 +266,7 @@ def test_each_group_brings_its_tool_among_the_first_ten(catalog_of, member, name
     """What a group of ``SYNONYMS`` is for, measured on what a turn offers and not on how a word reads: without it, the
     request's tool falls past the first ten."""
     tools = catalog_of(Membership.Role.OWNER, "es")
-    assert is_own_words(tools, phrase)
+    assert nobodys_words(tools, phrase)
     group = [group for group in assistant.SYNONYMS if member in group]
     assert len(group) == 1, member  # positive control: the group is the Hub's, and only one
     without = tuple(other for other in assistant.SYNONYMS if other is not group[0])
@@ -301,7 +287,7 @@ NAMED = [
 @pytest.mark.parametrize(("name", "phrase"), NAMED)
 def test_what_waits_for_live_is_offered_when_the_request_names_the_automation(catalog_of, name, phrase):
     tools = catalog_of(Membership.Role.OWNER, "es")
-    assert is_own_words(tools, phrase)
+    assert nobodys_words(tools, phrase)
     assert {name for name, _ in NAMED} == AWAITS_LIVE  # positive control: the same three the probes wait for
     assert name in offered_to(tools, phrase)[:TOP]
 
@@ -315,12 +301,42 @@ def test_the_asks_of_every_tool_are_caught_by_a_request():
     assert len(OWN_WORDS) == len(own)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    assert is_own_words(tools, phrase)
-    assert_offered_with_room(tools, name, phrase, room=TOP)
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
 
-    unasked = offered_without_its_asks(tools, name, phrase)
-    assert name not in unasked[:TOP], unasked.index(name) + 1
+
+#: What the owner says in English in words of their own for each tool of Automations that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("flow.catalog.read", "what can an automation react to?"),
+    ("flow.draft.dismiss", "I don't want the assistant's proposal, drop it"),
+    ("flow.draft.get", "what doubts are left in what you proposed yesterday?"),
+    ("flow.draft.list", "did the assistant leave anything for me to look at?"),
+    ("flow.draft.propose", "whenever a big sale is completed, add a task: automate it"),
+    ("flow.event.sample", "give me a real one: what does the sale event bring?"),
+    ("flow.flow.create", "make a new one that runs every Monday at 8"),
+    ("flow.flow.delete", "the birthday one is no use anymore, get rid of it"),
+    ("flow.flow.detail", "what's the birthday one missing?"),
+    ("flow.flow.duplicate", "make another one just like the birthday one"),
+    ("flow.flow.grant", "give the welcome one what it needs to send messages"),
+    ("flow.flow.list", "which ones are switched on and how did their last run go?"),
+    ("flow.flow.run", "launch the weekly review right away"),
+    ("flow.flow.set_enabled", "turn the birthday one on"),
+    ("flow.flow.status", "do I already have one that listens to completed sales?"),
+    ("flow.flow.test", "try the welcome one, but nothing for real"),
+    ("flow.flow.update", "the birthday one needs other steps"),
+    ("flow.question.answer", "say yes, the customer has already paid"),
+    ("flow.question.get", "what is the birthday one asking me?"),
+    ("flow.question.list", "is anything waiting for my answer?"),
+    ("flow.recipe.disable", "I don't want the ready-made reminder anymore"),
+    ("flow.recipe.enable", "switch on the ready-made one that fills a slot when someone cancels"),
+    ("flow.recipe.list", "which ready-made ones are there for bookings?"),
+    ("flow.recipe.repair", "the old one is outdated: fix its conditions"),
+    ("flow.recipe.restore", "the birthday one: put it back the way the app brings it"),
+    ("flow.run.get", "tell me which step failed this morning"),
+    ("flow.run.list", "how many times has the welcome one failed?"),
+    ("flow.run.retry", "the permission is granted now, resume where it stopped"),
+    ("flow.secret.delete", "the old API one is no good, delete it"),
+    ("flow.secret.list", "which saved names can the automations use now?"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_each_tool_has_its_own_english_words = english_coverage_test("flow", OWN_WORDS_EN)
