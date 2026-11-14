@@ -13,7 +13,7 @@ import { type Browser, expect, type Page, test } from '@playwright/test';
 import { A, api, capture, psql, shot, shown } from './helpers';
 import { signedIn } from './flow-helpers';
 import { shoot } from './inventory-helpers';
-import { staffCleanUp } from './staff-helpers';
+import { pickMember, staffCleanUp } from './staff-helpers';
 import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
@@ -26,14 +26,6 @@ test.afterAll(cleanup);
 
 /** The owner on `next` at a desk's size, in English. */
 const ownerPage = (browser: Browser, next: string) => signedIn(browser, next, { width: 1280, height: 860 });
-
-/** Picks the member called `name` in Schedules by searching the server for `search`. */
-async function pickMember(page: Page, search: string, name: string): Promise<void> {
-  const member = shown(page).locator('[data-testid=staff-schedules-member] input');
-  await member.click();
-  await member.fill(search);
-  await page.locator('[data-testid^=staff-schedules-member-option-]', { hasText: name }).first().click();
-}
 
 /** The sizes the week of a schedule is read at: a small and a common phone, a tablet upright and a desk. */
 const WEEK_SIZES = [
@@ -117,7 +109,7 @@ test('Schedules: a week without working days is refused on top of it, and the li
     const created = await api<{ id: string; full_name: string }>(context, A, 'POST', '/staff/members', { first_name: `${TAG} Iris`, last_name: `Week${stamp}` });
     expect(created.status).toBe(201);
     const view = shown(page);
-    await pickMember(page, `Week${stamp}`, created.data.full_name);
+    await pickMember(page, 'staff-schedules-member', `Week${stamp}`, created.data.full_name);
     await view.locator('[data-testid=staff-schedules-add]').click();
     for (const weekday of [0, 1, 2, 3, 4]) await page.locator(`[data-testid=staff-schedule-form-day-${weekday}-working]`).click();
     await page.locator('[data-testid=staff-schedule-form-submit]').click();
@@ -145,7 +137,7 @@ test('Schedules: the default week, a day refused under its row and corrected on 
     const name = created.data.full_name;
     const view = shown(page);
 
-    await pickMember(page, `Shifts${stamp}`, name);
+    await pickMember(page, 'staff-schedules-member', `Shifts${stamp}`, name);
     await expect(view.locator('[data-testid=staff-schedules-member] input')).toHaveValue(name);
     await expect(view.locator('[data-testid=staff-schedules-empty]')).toContainText('This member has no schedules yet.');
 
@@ -210,7 +202,7 @@ for (const language of ['en', 'es'] as const) {
         await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
         await page.goto(`${A}/staff/schedules`);
       }
-      await pickMember(page, `Days${stamp}`, created.data.full_name);
+      await pickMember(page, 'staff-schedules-member', `Days${stamp}`, created.data.full_name);
       await shown(page).locator('[data-testid=staff-schedules-add]').click();
       // Wednesday and Miércoles are the longest names: proposed, Monday to Friday work and the weekend is off;
       // then every day is ticked or unticked, so each name is read beside its hours and beside «Off».
