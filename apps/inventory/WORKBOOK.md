@@ -1340,8 +1340,9 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   el negocio volvió a crear con su nombre), activo o no como estaba (`ProductIn.is_active`), sin stock (el saldo de la
   copia es de otro día). No es `inventory.product.create` sino `inventory.product.recover` (permiso `inventory.system`,
   sin ruta, `ProductRecoverIn`): el alta de la pantalla y, en el mismo paso, la imagen que tenía en la copia, como la
-  pone la pantalla con `set_image` (`_library_image`: la de la librería, salvo una que la librería dice que ya no
-  tiene; nunca una foto propia; con la librería sin leer, tal como estaba, para no dejar el producto fuera). El
+  pone la pantalla con `set_image` (`base.images.from_copy`, la misma regla que Servicios: la de la librería, salvo una
+  que la librería dice que ya no tiene; nunca una foto propia; con la librería sin leer, tal como estaba, para no dejar
+  el producto fuera). El
   eliminado vuelve con la suya porque `inventory.product.delete` ya no le quita la de la librería, solo la foto propia.
   Al final, los enlaces vivos de la copia (`queries.product_links_in_copy`:
   producto y categoría vivos allí, con el id del enlace y `copy_categories`): cada uno que le falta a una categoría que

@@ -957,7 +957,7 @@ la foto: el formulario dice «El servicio se ha guardado, pero la foto no: Esa i
 librería. Elige otra.» con «Reintentar», y el servicio se queda con la foto que tenía (por el asistente o
 la API no se guarda nada). Quien no puede editar servicios no ve «Foto», y la app lo rechaza también por
 el asistente o la API.
-Implicados: SERVICE-F01, SERVICE-F02, SERVICE-F09, SALE-F38, INVENTORY-F30, INVENTORY-F32
+Implicados: SERVICE-F01, SERVICE-F02, SERVICE-F09, SALE-F38, INVENTORY-F30, INVENTORY-F32, BASE-F114
 
 ### SERVICE-F35 Subir una foto propia del servicio
 <!-- origen: nuevo (decisión de Ioan del 2026-10-30: cada negocio guarda sus fotos en su propia carpeta, convertidas a WebP de 512 × 512 y de hasta 2 MB al subirlas; encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next) -->
@@ -1227,7 +1227,11 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   (`queries.services_not_in_business`), cada uno hecho otra vez por `service.service.recover` (solo el sistema, sin
   ruta ni herramienta del asistente), todo o nada: el servicio, por `service.service.create` con la clave de su
   categoría fiscal y su categoría aquí (`_category_held`): la misma si sigue viva, si no la viva con su nombre en la
-  copia (la que acaba de volver o una hecha a mano), si no ninguna; y cada profesional que lo hacía en la copia y el
+  copia (la que acaba de volver o una hecha a mano), si no ninguna; su imagen de la copia (`ServiceRecoverIn.image`,
+  de `base.recovery.ImageInCopyIn`), puesta como la pone `service.service.set_image` (SERVICE-F34) si
+  `base.images.from_copy` la deja: la de la librería, salvo una que la librería dice que ya no tiene; nunca una foto
+  propia; con la librería sin leer, tal como estaba, para no dejar el servicio fuera (hub#1429); y cada profesional
+  que lo hacía en la copia y el
   negocio sigue teniendo (no dado de baja, por su id: `staff.queries.live_members`), por `service.assignment.assign`
   con sus minutos y su precio propios, principal solo si el negocio no le ha dado otro servicio principal desde
   entonces, y apagado por `service.assignment.update` si lo estaba. Va en la misma operación, y no en una declaración
@@ -1376,7 +1380,6 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   sus sesiones. Le pasa también a los vendidos antes de esa cifra.
 - **Importar servicios desde un fichero**: como en el producto actual, el alta de golpe es del
   asistente y la API.
-- **Lo que no vuelve con un servicio recuperado desde una copia aparte** (BASE-F114): su imagen (hub#1429).
 
 ## Lo que NO hace, a propósito
 
