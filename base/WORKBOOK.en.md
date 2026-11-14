@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1a9e425bea1ed6dfb31262136c711f46e49942a670ed898a6e5276db77994f76 -->
+<!-- generated from WORKBOOK.md sha256:c610032d71a5c98b3e8d1e629c41f8c23c921df41a32ce79d295f30ad576d14d -->
 
 ## What it is for and who it is for
 
@@ -3040,7 +3040,9 @@ Steps:
       ("service.service_moved: came back without the service <its identifier>: moved to another category since"). One
       the business has already created again (another live one with its name, case
       and extra spaces aside) is not repeated: its own is used, as it is, and it is not filled, nor is the one an earlier
-      recovery brought back if it is asked again. Then each service the business no longer has
+      recovery brought back if it is asked again. If that recovery failed halfway, asking for it again from the same
+      copy finishes what it left: what the business keeps untouched since the category came back goes back into it,
+      counted in its links. Then each service the business no longer has
       comes back as a new one, on offer, created as the Services screen creates it, with its name, pricing, prices, cost,
       duration, buffers, capacity, descriptions, booking settings, order, featured flag, SKU, barcode and notes, its tax
       category and its category: the same one if the business still has it, and otherwise the one that has just come
@@ -3189,4 +3191,4 @@ hub#1213, hub#1257,
 hub#1282, hub#1283, hub#1284,
 hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1343,
 hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1438, hub#1442, hub#1456, hub#1457,
-hub#1458, hub#1459, hub#1473, hub#1474, hub#1505, aws#77
+hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77

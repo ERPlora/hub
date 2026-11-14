@@ -777,6 +777,29 @@ class TestEachThingAnAppGivesBack:
         assert seen == [base_recovery.actor_of(asked.pk)]
         assert base_recovery.at_work() is None
 
+    def test_asked_again_it_carries_on_the_ones_of_its_copy_that_failed_and_no_other(
+        self, recoveries, every_app_on, monkeypatch
+    ):
+        hub, _ = recoveries.business(every_app_on, ANA)
+        copy, other_copy = recoveries.copy_of(hub), recoveries.copy_of(hub)
+        failed = recoveries.ask(copy, status=CopyRecovery.Status.FAILED)
+        done = recoveries.ask(copy, status=CopyRecovery.Status.DONE)
+        failed_elsewhere = recoveries.ask(other_copy, status=CopyRecovery.Status.FAILED)
+        asked = recoveries.ask(copy)
+        rows = (failed, done, failed_elsewhere, asked)
+        seen = []
+
+        def carried(records):
+            seen.append([base_recovery.carries_on(base_recovery.actor_of(row.pk)) for row in rows])
+            return []
+
+        groups_given_back_too(monkeypatch, missing=carried)
+
+        assert run() == 1
+
+        assert seen == [[True, False, False, False]]
+        assert [base_recovery.carries_on(base_recovery.actor_of(row.pk)) for row in rows] == [False] * 4
+
     def test_what_an_app_refuses_for_all_ends_its_part_and_what_was_left_of_it_says_why(
         self, recoveries, every_app_on, monkeypatch
     ):
