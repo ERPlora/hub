@@ -299,12 +299,12 @@ def test_lacking_is_a_course_its_menu_no_longer_has():
     # Its name taken in its menu since (the case aside, as the menu builder refuses it): the business's stays.
     make_group(menu, "STARTERS")
     taken = a_course_of_the_copy(menu.id, "Starters")
-    # Lacking in the menu the business holds, with the copy's picks; a name another menu has is no matter.
-    make_group(make_combo("Tasting menu"), "Sides")
+    # Lacking in the menu the business holds, with the copy's picks.
     sides = a_course_of_the_copy(menu.id, "Sides", min_choices=0, max_choices=2, allow_repeat=True)
-    # Lacking in a menu gone, to the one a recovery made again for it.
+    # Lacking in a menu gone, to the one a recovery made again for it; a name another menu has is no matter.
     gone = uuid.uuid7()
     again = make_combo("Kids' menu", stands_for=gone)
+    make_group(again, "Sides")
     drink = a_course_of_the_copy(gone, "Drink")
     # Lacking in a menu gone that nothing made again for it (the business made its own by hand, or it did not come
     # back): with the copy's menu, which the menu builder refuses as not found.
