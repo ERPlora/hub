@@ -24,17 +24,12 @@ import { parse } from 'vue/compiler-sfc';
 /** The root of the hub: the paths below are relative to it. */
 const HUB_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** What is left of the fields without their name, by file: it only goes down. A component around a field (Combo of
- *  @erplora/ui, ServicesField) has to hand its `name` to its ion-input, as Combo does: FormModal reads the `name`
- *  property of the field, not an attribute on a wrapper's div, so a name this guard sees there fixes nothing until
- *  the component declares it; the window's own test (`itTellsTheCorrectedFieldApart`) is what proves it. */
-const STILL_UNNAMED: Record<string, number> = {
-  'apps/service/frontend/components/CategoryFormModal.vue': 3,
-  'apps/service/frontend/components/GrantAdjustModal.vue': 3,
-  'apps/service/frontend/components/GrantVoidModal.vue': 1,
-  'apps/service/frontend/components/PackageFormModal.vue': 9,
-  'apps/service/frontend/components/ServiceFormModal.vue': 6,
-};
+/** What is left of the fields without their name, by file: it only goes down, and nothing is left, so a field without
+ *  its name fails. A component around a field (Combo of @erplora/ui, ServicesField) has to hand its `name` to its
+ *  ion-input, as Combo does: FormModal reads the `name` property of the field, not an attribute on a wrapper's div, so
+ *  a name this guard sees there fixes nothing until the component declares it; the window's own test
+ *  (`itTellsTheCorrectedFieldApart`) is what proves it. */
+const STILL_UNNAMED: Record<string, number> = {};
 
 /** Windows that take away themselves a refusal they paint apart, once the person changes what it is about, rather than
  *  through FormModal hearing a control of its name: by file, those keys. This guard cannot see that; the window's own

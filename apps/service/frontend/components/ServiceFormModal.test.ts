@@ -11,6 +11,7 @@ import {
   expectSaveWaitsForMoney,
   expectWindowSaysMoneyUnreadable,
 } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { ServiceOut, SettingsOut } from '../operations';
 import { business, click, ionValue, JAPANESE, type MountOptions, mountService, page, POLISH, settle } from '../__tests__/mount-service';
 import ServiceFormModal from './ServiceFormModal.vue';
@@ -421,6 +422,22 @@ describe('ServiceFormModal: «Professionals who do it» while the money cannot b
     const assigned = () => m.sent().filter((call) => call.path.startsWith('/api/service/assignments'));
     await expectWindowSaysMoneyUnreadable(m, 'service-professionals-assign', assigned, opens);
   });
+});
+
+describe('ServiceFormModal: fields refused with the same words (hub#888)', () => {
+  // Name, Pricing, Price, Duration, the Category and the Tax category (the pickers) each paint a refusal under their own key.
+  const FIELD_OF: Record<string, string> = { duration_minutes: 'duration', category_id: 'category', tax_category_key: 'tax' };
+  itTellsTheCorrectedFieldApart(['name', 'pricing_type', 'price', 'duration_minutes', 'category_id', 'tax_category_key'], async (locale, refusal) => {
+    const s = await setup(null, locale);
+    await s.result('service.settings.get', SETTINGS);
+    await ionValue(s.field('name'), 'Haircut', 'ionInput');
+    await ionValue(s.field('price'), '22,50', 'ionInput');
+    await ionValue(s.field('duration'), '30', 'ionInput');
+    s.combo('service-form-category').vm.$emit('update:modelValue', { id: 'c1', label: 'Hair' });
+    await settle();
+    s.answer(422, refusal);
+    return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.save()), settle };
+  }, 'price');
 });
 
 describe('ServiceFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
