@@ -28,7 +28,6 @@ keeps it. The bucket is a real S3 server (moto's, ``s3.py``).
 import datetime as dt
 import itertools
 import re
-import subprocess
 import uuid
 
 import psycopg
@@ -46,13 +45,17 @@ from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import use_control
 from base.tenancy.tests import hubs
 from base.tenancy.tests.s3 import (  # noqa: F401
+    THROUGH_THE_BUCKET,
     aws_test_credentials,
     body,
-    client,
+    copy_programs,
     dumps_bucket,
+    how_it_was_copied,
+    lose_each_copy,
     moto_s3,
     nothing_kept,
     objects,
+    stopping_as,
 )
 from control import services as control_services
 from control.models import Cluster, Hub, HubDue, HubDump, MovedCopy
@@ -738,17 +741,9 @@ class TestTheCopyGoesThroughTheBucket:
         self, restores, moto_s3, dumps_bucket, monkeypatch
     ):
         hub = restores.hub(source=restores.cluster())
-        commands = []
-        real = subprocess.Popen
+        started = copy_programs(monkeypatch)
 
-        def watched(command, **kwargs):
-            if command[0].endswith(("pg_dump", "pg_restore")):
-                commands.append((command, kwargs))
-            return real(command, **kwargs)
-
-        with monkeypatch.context() as patched:
-            patched.setattr(subprocess, "Popen", watched)
-            assert run(restores) == 1
+        assert run(restores) == 1
 
         hub = fresh(hub)
         assert (hub.restoring_from_id, hub.last_error) == (None, "") and marker(hub.db_name) == [AS_THEN]
@@ -756,13 +751,7 @@ class TestTheCopyGoesThroughTheBucket:
         assert re.fullmatch(rf"{hub.id.hex}/\d{{8}}T\d{{6}}Z-restore\.dump", key)
         assert body(moto_s3, dumps_bucket, key).startswith(b"PGDMP")
         assert not HubDump.objects.exists()
-        tools = [command[0].rsplit("/", 1)[-1] for command, _ in commands]
-        assert tools == ["pg_dump", "pg_restore", "pg_restore"]  # the dump, its listing and the restore
-        for command, _ in commands:
-            assert not any(part.endswith(".dump") for part in command), command
-        [(_, dumped), *restored] = commands
-        assert dumped["stdout"] == subprocess.PIPE
-        assert all(kwargs["stdin"] == subprocess.PIPE for _, kwargs in restored)
+        assert how_it_was_copied(started) == THROUGH_THE_BUCKET
 
     def test_a_business_larger_than_a_part_is_restored_whole(self, restores, monkeypatch):
         monkeypatch.setattr(dumps, "STREAM_PART_BYTES", SMALLEST_PART)
@@ -791,17 +780,9 @@ class TestTheCopyGoesThroughTheBucket:
     ):
         source = restores.cluster()
         hub = restores.hub(source=source)
-        stopping = {"now": False}
         where, step = (dumps, "_pg_dump_command") if stops_in == "the dump" else (move, "_restore_command")
-        real = getattr(where, step)
 
-        def stops_as_it_starts(*args, **kwargs):
-            stopping["now"] = True
-            return real(*args, **kwargs)
-
-        with monkeypatch.context() as patched:
-            patched.setattr(where, step, stops_as_it_starts)
-            run(restores, cancelled=lambda: stopping["now"])
+        run(restores, cancelled=stopping_as(monkeypatch, where, step))
 
         # Not a failure: neither undone nor noted as failed.
         stopped = fresh(hub)
@@ -846,13 +827,7 @@ class TestTheCopyGoesThroughTheBucket:
         self, restores, moto_s3, dumps_bucket, monkeypatch
     ):
         hub = restores.hub(source=restores.cluster())
-        real = move._restore_from_bucket
-
-        def lost(key, name, cluster, heartbeat, cancelled=None):
-            client(moto_s3).delete_object(Bucket=dumps_bucket, Key=key)
-            return real(key, name, cluster, heartbeat, cancelled)
-
-        monkeypatch.setattr(move, "_restore_from_bucket", lost)
+        lose_each_copy(monkeypatch, moto_s3, dumps_bucket)
 
         assert run(restores) == 1
 

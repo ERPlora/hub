@@ -26,7 +26,6 @@ import datetime as dt
 import ipaddress
 import re
 import socket
-import subprocess
 import uuid
 
 import pytest
@@ -39,12 +38,16 @@ from base.tenancy import dumps, identity, move, names, restore
 from base.tenancy.context import use_control
 from base.tenancy.tests import hubs
 from base.tenancy.tests.s3 import (  # noqa: F401
+    THROUGH_THE_BUCKET,
     aws_test_credentials,
-    client,
+    copy_programs,
     dumps_bucket,
+    how_it_was_copied,
+    lose_each_copy,
     moto_s3,
     nothing_kept,
     objects,
+    stopping_as,
 )
 from base.tenancy.tests.test_restore import AFTER, AS_THEN, SINCE, THEN, Restores, a_record, write
 from control import services as control_services
@@ -396,29 +399,15 @@ class TestTheCopyGoesThroughTheBucket:
         self, asides, moto_s3, dumps_bucket, monkeypatch
     ):
         hub, aside = a_hub_with_its_copy(asides)
-        commands = []
-        real = subprocess.Popen
+        started = copy_programs(monkeypatch)
 
-        def watched(command, **kwargs):
-            if command[0].endswith(("pg_dump", "pg_restore")):
-                commands.append((command, kwargs))
-            return real(command, **kwargs)
-
-        with monkeypatch.context() as patched:
-            patched.setattr(subprocess, "Popen", watched)
-            assert run(asides) == 1
+        assert run(asides) == 1
 
         assert fresh(aside).status == "made" and marker(aside.db_name) == [AS_THEN]
         # Under the business's own prefix, named after its row.
         [key] = objects(moto_s3, dumps_bucket)
         assert re.fullmatch(rf"{hub.id.hex}/\d{{8}}T\d{{6}}Z-aside-{aside.pk.hex}\.dump", key)
-        tools = [command[0].rsplit("/", 1)[-1] for command, _ in commands]
-        assert tools == ["pg_dump", "pg_restore", "pg_restore"]  # the dump, its listing and the restore
-        for command, _ in commands:
-            assert not any(part.endswith(".dump") for part in command), command
-        [(_, dumped), *restored] = commands
-        assert dumped["stdout"] == subprocess.PIPE
-        assert all(kwargs["stdin"] == subprocess.PIPE for _, kwargs in restored)
+        assert how_it_was_copied(started) == THROUGH_THE_BUCKET
 
     def test_two_copies_of_one_business_made_at_once_each_keep_their_own_moment(self, asides, monkeypatch):
         # Each holds its own row's lease, never the hub's: two workers (a deploy's old and new) may make two copies of
@@ -462,16 +451,8 @@ class TestTheCopyGoesThroughTheBucket:
         self, asides, moto_s3, dumps_bucket, monkeypatch
     ):
         hub, aside = a_hub_with_its_copy(asides)
-        stopping = {"now": False}
-        real = dumps._pg_dump_command
 
-        def stops_as_the_dump_starts(*args, **kwargs):
-            stopping["now"] = True
-            return real(*args, **kwargs)
-
-        with monkeypatch.context() as patched:
-            patched.setattr(dumps, "_pg_dump_command", stops_as_the_dump_starts)
-            run(asides, cancelled=lambda: stopping["now"])
+        run(asides, cancelled=stopping_as(monkeypatch, dumps, "_pg_dump_command"))
 
         # Not a failure: nothing noted, its lease let go, and half a copy is never kept.
         left = fresh(aside)
@@ -498,13 +479,7 @@ class TestTheCopyGoesThroughTheBucket:
         self, asides, moto_s3, dumps_bucket, monkeypatch
     ):
         aside = a_hub_with_its_copy(asides)[1]
-        real = move._restore_from_bucket
-
-        def lost(key, name, cluster, heartbeat, cancelled=None):
-            client(moto_s3).delete_object(Bucket=dumps_bucket, Key=key)
-            return real(key, name, cluster, heartbeat, cancelled)
-
-        monkeypatch.setattr(move, "_restore_from_bucket", lost)
+        lose_each_copy(monkeypatch, moto_s3, dumps_bucket)
 
         assert run(asides) == 1
 
