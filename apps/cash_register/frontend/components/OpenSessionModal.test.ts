@@ -133,6 +133,26 @@ describe('OpenSessionModal: a refused field, corrected, loses its mark without s
   });
 
   const FIELD: Record<string, string> = { register_id: 'register', opening_balance: 'balance', opening_notes: 'notes' };
+
+  it('the drawer and the notes the server refuses are marked as Ionic shows a refusal, and only they', async () => {
+    const s = await setup();
+    await s.result(REGISTERS, page([{ id: 'r1', name: 'Bar', is_active: true }, { id: 'r2', name: 'Terrace', is_active: true }]));
+    const marked = (key: string) => {
+      const field = s.inDoc(`cash-register-open-${FIELD[key]}`);
+      return ['ion-invalid', 'ion-touched'].map((mark) => field?.classList.contains(mark));
+    };
+    s.answer(422, {
+      error: { code: 'invalid_payload', message: 'Check the highlighted details.', fields: { register_id: 'Not this drawer.', opening_notes: 'Too long.' } },
+    });
+    await s.submit();
+    expect(marked('register_id')).toEqual([true, true]);
+    expect(marked('opening_notes')).toEqual([true, true]);
+    s.inDoc('cash-register-open-notes')?.dispatchEvent(new Event('input', { bubbles: true }));
+    await ionValue(s.inDoc('cash-register-open-notes'), 'Morning', 'ionInput');
+    expect(marked('opening_notes')).toEqual([false, false]);
+    expect(marked('register_id')).toEqual([true, true]);
+  });
+
   itTellsTheCorrectedFieldApart(
     ['register_id', 'opening_balance', 'opening_notes'],
     async (locale, refusal) => {
