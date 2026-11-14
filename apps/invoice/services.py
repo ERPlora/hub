@@ -974,7 +974,7 @@ def _tell_sales(ctx: OperationContext, invoice: Invoice, written: str) -> None:
     record(as_platform, record.input.model_validate(_issued_notice(invoice)))
 
 
-# ── A full invoice for a ticket (INVOICE-F04, F05) ──────────────────────────────────────────────
+# ── A full invoice for a ticket (INVOICE-F05) ───────────────────────────────────────────────────
 
 
 @operation(

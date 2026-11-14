@@ -2,15 +2,11 @@
 Prefijo: RESERVATION
 Alcance MVP: restaurante
 Estado de la app: completa (2026-10-31)
-Lo que no entra todavía: ver «Lo que queda fuera». La liberación sola de las pendientes (F13) queda descartada
-mientras no avise al momento en cada negocio.
+Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `reservation`. Se escribe **antes** que el código: no
 > se programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
-> (servidor y páginas). Parte del `WORKFLOW.md` del módulo Reservas del producto actual
-> (`modules-workspace/modules/reservations`, `origin/main` `952295e`, v3.0.50). Los números de flujo se
-> conservan (`RESERVATIONS-Fnn` → `RESERVATION-Fnn`). Lo que cambia frente al producto actual lo dice
-> «Cambios frente al producto actual», al final.
+> (servidor y páginas).
 
 ## Para qué sirve y para quién
 
@@ -33,7 +29,7 @@ es **Ventas**) y no es la agenda de citas de una peluquería (eso es **Citas**).
 
 ERPlora no inventa flujos: adopta los que el mercado ya probó (OpenTable, Resy, SevenRooms, Toast
 Tables, Square, Lightspeed, TouchBistro, Tablein, TablesReady, CoverManager, TheFork Manager, Odoo). Las
-dudas abiertas del producto actual se resolvieron así; la investigación, con sus fuentes, está en
+dudas se resolvieron así; la investigación, con sus fuentes, está en
 «Investigación de mercado», al final de este manual.
 
 - **Libro por día y por servicio**, con los **cubiertos** del día y cuánto queda libre en la próxima
@@ -60,8 +56,8 @@ dudas abiertas del producto actual se resolvieron así; la investigación, con s
   apuntó; cuando hay sitio se convierte en reserva con un toque. El mercado separa la cola de la puerta
   (con espera estimada y SMS) de la lista para días llenos; sin mensajería, aquí es una lista para las
   dos cosas (ver «Lo que queda fuera»).
-- **El teléfono es obligatorio de fábrica en la reserva** (duda 7), y siempre el mismo (el producto
-  actual no lo pedía hasta que se guardaba cualquier ajuste); el correo, no. La lista de espera no pide
+- **El teléfono es obligatorio de fábrica en la reserva** (duda 7), y siempre el mismo; el correo,
+  no. La lista de espera no pide
   nada más que el nombre: el teléfono solo sirve para llamar.
 - **Las reglas de reserva son del cliente que reserva solo** (duda 8): comensales mínimos y máximos,
   antelación mínima, días máximos y la franja llena atan a las reservas por internet o por WhatsApp. El
@@ -208,7 +204,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | RESERVATION-F23 | Elegir una mesa libre para la reserva | hecho |
 
 ### RESERVATION-F01 Crear y quitar franjas horarias
-<!-- origen: fi:modules/reservations#command-reservations-timeslots-create-sql-transaccional fi:modules/reservations#command-reservations-timeslots-delete-sql-transaccional fi:modules/reservations#query-reservations-timeslots-list old:reservations/workflow/disponibilidad.md#reservations-f01 qa:modules/reservations/create-reservation wf:whatsapp-mesa#rec_wa_mesa-f04 -->
 Estado: hecho
 Actor: responsable
 Pantalla: Disponibilidad → Franjas horarias
@@ -224,7 +219,6 @@ motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo 
 Implicados: RESERVATION-F05, RESERVATION-F06
 
 ### RESERVATION-F02 Bloquear un día o unas horas
-<!-- origen: qa:modules/reservations/create-reservation wf:whatsapp-mesa#rec_wa_mesa-f04 fi:modules/reservations#command-reservations-blocked_dates-create-sql-transaccional fi:modules/reservations#command-reservations-blocked_dates-delete-sql-transaccional fi:modules/reservations#query-reservations-blocked_dates-list old:reservations/workflow/disponibilidad.md#reservations-f02 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Disponibilidad → Fechas bloqueadas
@@ -241,7 +235,6 @@ cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888).
 Implicados: RESERVATION-F05, RESERVATION-F06
 
 ### RESERVATION-F03 Ajustar las reglas de reserva
-<!-- origen: qa:modules/reservations/create-reservation fi:modules/reservations#command-reservations-settings-upsert-sql-transaccional fi:modules/reservations#query-reservations-settings-get old:reservations/workflow/disponibilidad.md#reservations-f03 qa:verticals/restaurant/05-reservations -->
 Estado: hecho
 Actor: responsable
 Pantalla: Ajustes
@@ -258,7 +251,6 @@ si el siguiente intento también se rechaza. Un rechazo sin campo se queda hasta
 Implicados: RESERVATION-F06, RESERVATION-F13, RESERVATION-F17
 
 ### RESERVATION-F04 Elegir si las reservas se confirman solas
-<!-- origen: fi:modules/reservations#command-reservations-settings-upsert-sql-transaccional old:reservations/workflow/disponibilidad.md#reservations-f04 wf:whatsapp-mesa#rec_wa_mesa-f06 -->
 Estado: hecho
 Actor: responsable
 Pantalla: Ajustes
@@ -273,7 +265,6 @@ del botón y el interruptor vuelve a como estaba.
 Implicados: RESERVATION-F07, TABLE-F25
 
 ### RESERVATION-F05 Consultar cuánto queda libre en un día
-<!-- origen: wf:whatsapp-mesa#rec_wa_mesa-f04 old:reservations/workflow/disponibilidad.md#reservations-f05 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Disponibilidad → Ocupación; Reservas (barra del día)
@@ -289,7 +280,6 @@ sección con «Reintentar».
 Implicados: RESERVATION-F01, RESERVATION-F02, SCHEDULE-F02
 
 ### RESERVATION-F06 Tomar una reserva a mano (teléfono o mostrador)
-<!-- origen: qa:verticals/restaurant/11-races-and-concurrency qa:modules/reservations/create-reservation qa:verticals/restaurant/05-reservations fi:modules/reservations#command-reservations-reservations-create-handler-wasm-create_reservation old:reservations/workflow/reservas.md#reservations-f06 wf:restaurante-dia#rec_restaurante-f04 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Reservas → «Nueva reserva»
@@ -330,7 +320,6 @@ campo, aunque otro diga lo mismo (hub#888).
 Implicados: CUSTOMER-F10, CUSTOMER-F11, SCHEDULE-F02, RESERVATION-F23, TABLE-F25
 
 ### RESERVATION-F07 Confirmar una reserva
-<!-- origen: qa:verticals/restaurant/05-reservations wf:whatsapp-mesa#rec_wa_mesa-f06 wf:restaurante-dia#rec_restaurante-f04 fi:modules/reservations#command-reservations-reservations-set_status-handler-wasm-set_status old:reservations/workflow/reservas.md#reservations-f07 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Reservas (fila → «Confirmar»)
@@ -346,7 +335,6 @@ mesa 5 (Terraza) no se puede reservar: está bloqueada o fuera de servicio.», y
 Implicados: TABLE-F25, RESERVATION-F19
 
 ### RESERVATION-F08 Modificar una reserva (día, hora, comensales, mesa)
-<!-- origen: qa:verticals/restaurant/05-reservations wf:restaurante-dia#rec_restaurante-f04 fi:modules/reservations#command-reservations-reservations-update-sql-transaccional old:reservations/workflow/reservas.md#reservations-f08 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Reservas (fila → «Editar», o tocar la fila)
@@ -371,7 +359,6 @@ notas.».
 Implicados: TABLE-F26, RESERVATION-F06, RESERVATION-F18
 
 ### RESERVATION-F09 Cancelar una reserva
-<!-- origen: qa:verticals/restaurant/05-reservations wf:restaurante-dia#rec_restaurante-f04 fi:modules/reservations#command-reservations-reservations-set_status-handler-wasm-set_status old:reservations/workflow/reservas.md#reservations-f09 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Reservas (fila → «Cancelar»)
@@ -387,7 +374,6 @@ Si falla: desde otro estado: «Esta reserva está sentada: no se puede cancelar.
 Implicados: TABLE-F27, RESERVATION-F18
 
 ### RESERVATION-F10 Marcar que no se presentaron
-<!-- origen: qa:verticals/restaurant/05-reservations wf:restaurante-dia#rec_restaurante-f04 fi:modules/reservations#command-reservations-reservations-set_status-handler-wasm-set_status old:reservations/workflow/reservas.md#reservations-f10 qa:modules/reservations/no-show-and-deposit wf:whatsapp-mesa#rec_wa_mesa-f10 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Reservas (fila → «No presentado»)
@@ -400,7 +386,6 @@ Si falla: desde otro estado: «Esta reserva está sentada: no se puede marcar co
 Implicados: TABLE-F27
 
 ### RESERVATION-F11 Sentar a la reserva
-<!-- origen: fi:modules/reservations#command-reservations-reservations-set_status-handler-wasm-set_status wf:whatsapp-mesa#rec_wa_mesa-f10 old:reservations/workflow/reservas.md#reservations-f11 wf:restaurante-dia#rec_restaurante-f05 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Reservas (fila → «Sentar»)
@@ -425,7 +410,6 @@ hacerlo (se le pueden autorizar confirmar, cambiar, completar y la lista de espe
 Implicados: TABLE-F10, TABLE-F28, FLOW-F12
 
 ### RESERVATION-F12 Completar la reserva
-<!-- origen: fi:modules/reservations#command-reservations-reservations-set_status-handler-wasm-set_status wf:whatsapp-mesa#rec_wa_mesa-f10 old:reservations/workflow/reservas.md#reservations-f12 wf:restaurante-dia#rec_restaurante-f13 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Reservas (fila → «Completar»)
@@ -438,7 +422,6 @@ Si falla: sin sentar antes: «Esta reserva está confirmada: no se puede complet
 Implicados: RESERVATION-F11
 
 ### RESERVATION-F13 Liberar las reservas pendientes que nadie confirmó
-<!-- origen: wf:whatsapp-mesa#rec_wa_mesa-f06 old:reservations/workflow/reservas.md#reservations-f13 -->
 Estado: hecho
 Actor: sistema
 Pantalla: Reservas (la lista del día, abierta: la ve sin recargar)
@@ -457,7 +440,6 @@ Si falla: una pasada que falla no cambia nada y la siguiente lo vuelve a intenta
 Implicados: RESERVATION-F03
 
 ### RESERVATION-F14 Apuntar en la lista de espera
-<!-- origen: qa:verticals/restaurant/05-reservations fi:modules/reservations#command-reservations-waitlist-create-sql-transaccional fi:modules/reservations#query-reservations-waitlist-list old:reservations/workflow/lista-de-espera.md#reservations-f14 qa:modules/reservations/waitlist-and-walk-in wf:whatsapp-mesa#rec_wa_mesa-f05 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Lista de espera → «Añadir cliente»
@@ -475,7 +457,6 @@ un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub
 Implicados: RESERVATION-F16, CUSTOMER-F10
 
 ### RESERVATION-F15 Marcar contactado o quitar de la lista de espera
-<!-- origen: qa:modules/reservations/waitlist-and-walk-in fi:modules/reservations#command-reservations-waitlist-delete-sql-transaccional fi:modules/reservations#command-reservations-waitlist-update-handler-wasm-waitlist_update old:reservations/workflow/lista-de-espera.md#reservations-f15 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Lista de espera (fila → «Contactado», «Quitar»)
@@ -489,7 +470,6 @@ Si falla: una entrada que ya no está: «Esa entrada de la lista de espera no ex
 Implicados: RESERVATION-F14
 
 ### RESERVATION-F16 Convertir una entrada de la lista de espera en reserva
-<!-- origen: qa:verticals/restaurant/05-reservations qa:modules/reservations/waitlist-and-walk-in fi:modules/reservations#command-reservations-waitlist-update-handler-wasm-waitlist_update old:reservations/workflow/lista-de-espera.md#reservations-f16 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Lista de espera (fila → «Convertir»)
@@ -509,7 +489,6 @@ entrada ya se convirtió en reserva.».
 Implicados: RESERVATION-F06, RESERVATION-F14
 
 ### RESERVATION-F17 Reserva que llega por WhatsApp
-<!-- origen: wf:whatsapp-mesa#rec_wa_mesa-f03 qa:verticals/restaurant/05-reservations wf:whatsapp-mesa#rec_wa_mesa-f05 old:reservations/workflow/whatsapp-y-clientes.md#reservations-f17 qa:modules/reservations/whatsapp-reservation -->
 Estado: hecho
 Actor: cliente, propietario, asistente
 Pantalla: Reservas; se activa en Bandeja de WhatsApp → Ajustes y se aprueba en Automatizaciones
@@ -537,7 +516,6 @@ Implicados: CUSTOMER-F10, RESERVATION-F04, RESERVATION-F19, WHATSAPP_INBOX-F15, 
 WHATSAPP_INBOX-F24
 
 ### RESERVATION-F18 Cambiar o anular la reserva por WhatsApp
-<!-- origen: old:reservations/workflow/whatsapp-y-clientes.md#reservations-f18 wf:whatsapp-mesa#rec_wa_mesa-f08 -->
 Estado: hecho
 Actor: cliente, propietario, asistente
 Pantalla: Reservas; se aprueba en Automatizaciones
@@ -562,7 +540,6 @@ como estaba. Con «No» en «Esperan tu respuesta», o si nadie contesta en 72 h
 Implicados: RESERVATION-F08, RESERVATION-F09, RESERVATION-F17, WHATSAPP_INBOX-F25
 
 ### RESERVATION-F19 Avisar por WhatsApp cuando el restaurante confirma
-<!-- origen: old:reservations/workflow/whatsapp-y-clientes.md#reservations-f19 wf:whatsapp-mesa#rec_wa_mesa-f07 -->
 Estado: hecho
 Actor: responsable, cliente
 Pantalla: Reservas
@@ -583,7 +560,6 @@ confirmada; el motivo queda en el historial de la automatización.
 Implicados: RESERVATION-F07, RESERVATION-F17, WHATSAPP_INBOX-F26
 
 ### RESERVATION-F20 Borrar una reserva
-<!-- origen: fi:modules/reservations#command-reservations-reservations-delete-sql-transaccional old:reservations/workflow/reservas.md#reservations-f20 -->
 Estado: hecho
 Actor: administrador, propietario, asistente
 Pantalla: Reservas (fila → «Borrar»)
@@ -598,7 +574,6 @@ en este negocio.».
 Implicados: TABLE-F27
 
 ### RESERVATION-F21 Unir las reservas de dos fichas de cliente
-<!-- origen: old:reservations/workflow/whatsapp-y-clientes.md#reservations-f21 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -613,7 +588,6 @@ Si falla: se reintenta solo; repetirlo no cambia nada.
 Implicados: CUSTOMER-F13
 
 ### RESERVATION-F22 Borrar los datos personales de un cliente (RGPD)
-<!-- origen: old:reservations/workflow/whatsapp-y-clientes.md#reservations-f22 -->
 Estado: hecho
 Actor: sistema
 Pantalla: Reservas, Lista de espera
@@ -632,7 +606,6 @@ Si falla: se reintenta solo; repetirlo no cambia nada.
 Implicados: CUSTOMER-F16, TABLE-F31
 
 ### RESERVATION-F23 Elegir una mesa libre para la reserva
-<!-- origen: nuevo (el producto actual no elegía la mesa en el formulario: solo el asistente asignaba mesa) -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: formulario de reserva → Mesa
@@ -728,9 +701,9 @@ Solo para la plataforma (sin ruta en la API, como sistema): `reservation.custome
 | `reservation.settings.updated` | Guardar las reglas | los campos cambiados |
 | `reservation.customer.reassigned`, `reservation.customer.erased` | Reacciones a Clientes | `id` (y `absorbed_id`) |
 
-`status_changed` y `updated` llevan además el nombre del cliente y su ficha (era la carga con la que
-Mesas iba a pintar la retención); los demás, solo ids y números. Mesas ya no escucha estos avisos: la
-retención la recibe por la llamada de Reservas en la misma transacción (TABLE-F25–F28).
+`status_changed` y `updated` llevan además el nombre del cliente y su ficha; los demás, solo ids y
+números. Mesas no escucha estos avisos: la retención la recibe por la llamada de Reservas en la misma
+transacción (TABLE-F25–F28).
 
 ### A qué reacciona
 
@@ -784,7 +757,7 @@ la que solo se le autorizó reservar.
 
 ## Para quien lo mantiene
 
-- **Orden de las listas** (`base.ordering.list_order_for`; regla hub#2355 del producto viejo): reservas, turnos, días
+- **Orden de las listas** (`base.ordering.list_order_for`): reservas, turnos, días
   bloqueados y lista de espera van por la columna elegida y desempatan por `id`, todo en la dirección de la lista: la
   descendente es la ascendente leída al revés, empates incluidos. Lo fija `test_ties_go_by_id_in_the_lists_own_direction`,
   por lista.
@@ -825,8 +798,7 @@ la que solo se le autorizó reservar.
   la franja llena solo atan a internet y WhatsApp; el personal llena una franja llena con
   `overbook=true`: la negativa (409 `reservation.no_capacity`) lo dice en `fields.overbook`, que es lo
   que leen la pantalla, la API y el asistente para ofrecer «Reservar igualmente». Un cambio que no mueve el día ni la hora no vuelve a mirar el
-  reloj. Cuenta como el producto actual: las
-  reservas no canceladas ni no presentadas de la franja (también sentadas y completadas); una mesa se
+  reloj. La franja cuenta las reservas no canceladas ni no presentadas de la franja (también sentadas y completadas); una mesa se
   pisa con las pendientes, confirmadas y sentadas.
 - **Concurrencia**: toda escritura que reserva (alta, cambio, conversión) bloquea primero la fila de
   `Settings` (`select_for_update`): las reservas de un negocio van en fila, y la puerta se comprueba
@@ -841,9 +813,9 @@ la que solo se le autorizó reservar.
   `reservation_id` (con la sesión de quien sienta: abre la cuenta en Ventas y gasta solo la retención de
   esta reserva, si ya entró en su ventana) y suelta con `table.hold.release` la que aún no había entrado. Las acciones de plataforma
   de Mesas (`table.system`) se llaman con ese único permiso añadido al contexto de quien actúa. Si Mesas
-  rechaza, se deshace todo. Los avisos `status_changed` y `updated` se siguen grabando, pero Mesas ya no
-  reacciona a ellos (2026-10-21, APP-TABLE): entregados después por el relay, re-aplicaban la reserva tal
-  como era (un «confirmada» viejo volvía a retener la mesa de un grupo ya sentado).
+  rechaza, se deshace todo. Los avisos `status_changed` y `updated` se graban, pero Mesas no reacciona a
+  ellos: entregados después por el relay, re-aplicarían la reserva tal como era (un «confirmada» viejo
+  volvería a retener la mesa de un grupo ya sentado).
 - **Sentar con la mesa ya ocupada** solo marca la reserva si su retención se gastó y ninguna otra reserva
   es dueña de la cuenta sentada (`table_session_id`): sentar desde el plano no dice de qué reserva es el
   grupo y Mesas gasta todas las retenciones de la mesa dentro de la hora, así que la retención gastada
@@ -859,9 +831,9 @@ la que solo se le autorizó reservar.
   con la ficha elegida o sin ella (como Citas al editar el teléfono): E.164, el `+` de otro país se
   respeta, y uno inválido es `InvalidPayload` `reservation.phone_invalid` con el `PHONE_INVALID` de
   Clientes en `guest_phone` (texto prestado: vive en el catálogo de Clientes, `test_i18n.BORROWED`). La
-  receta `reservation_confirmed` de WhatsApp busca la conversación por ese número exacto (F19). Las
-  filas anteriores las pasó a E.164 la migración `0002_guest_phone_e164` (reglas de `to_e164` copiadas,
-  país `ES` de la fase 1; lo que no es número válido se queda como estaba).
+  receta `reservation_confirmed` de WhatsApp busca la conversación por ese número exacto (F19). La
+  migración `0002_guest_phone_e164` pasa a E.164 los teléfonos guardados (reglas de `to_e164` copiadas,
+  país `ES`; lo que no es número válido se queda como estaba).
 - **Hora del negocio**: la zona del hub (`base.business.business_zone`). El día y la hora se guardan de
   pared; «ahora» es la hora del negocio. Lo que dura cuenta tiempo real (`engine.Window.of` con la zona,
   instantes en UTC; en `queries.py`, `window_of` y `starts_at`): la estancia (la mesa que pisa la puerta,
@@ -888,7 +860,7 @@ la que solo se le autorizó reservar.
   español en `locale/`: la tarjeta peligrosa lo nombra por lo que es, nunca «Registro». El trinquete de
   `base/tests/test_assistant_card_values.py` no deja entrar uno sin marca ni una escritura peligrosa de la
   plataforma o Reservas sin título.
-- **Administrador de Django con CRUD completo** (ronda 12, PLAN §17): ajustes, franjas, bloqueos,
+- **Administrador de Django con CRUD completo** (PLAN §17): ajustes, franjas, bloqueos,
   reservas y lista de espera; ids y fechas en solo lectura. Lo que guarda no pasa por las operaciones
   ni deja aviso.
 - **Tarea programada**: `release_unconfirmed_reservations` (`reservation.reservation.release_unconfirmed`,
@@ -905,7 +877,7 @@ la que solo se le autorizó reservar.
   por `guest_phone`. Reservas toma la ficha antes que cualquier nombre y aplica la puerta del cliente
   (`engine.GUEST_SOURCES`) a `source="whatsapp"` y a todo `on_behalf_of`. La e2e
   `tests/e2e/reservation-whatsapp.spec.ts` la sigue hasta la pantalla de Reservas.
-- **Relay del outbox** (`base/relay.py`, en el worker desde el 2026-10-21): entrega `customer.customer.merged`
+- **Relay del outbox** (`base/relay.py`, en el worker): entrega `customer.customer.merged`
   y `customer.customer.erased` a `events.REACTIONS` (F21, F22), como sistema en el ámbito del hub que anotó
   el aviso; idempotentes.
 - **Quién juzga un cambio** (F08, F18): `judged_as` pasa a la puerta el origen del personal (`phone`) en
@@ -913,52 +885,13 @@ la que solo se le autorizó reservar.
   que reserva solo cuando llega `on_behalf_of`. Con `on_behalf_of`, `_named` rechaza con 409
   `reservation.customer_mismatch` toda reserva que no sea de esa ficha (también una inexistente o borrada,
   antes que su estado) y `update` rechaza la mesa, las notas internas y `overbook` con 409
-  `reservation.staff_only_field` (el `customer_identity_refusal` y `STAFF_ONLY_UPDATE_FIELDS` del módulo
-  viejo).
-
-### Cambios frente al producto actual
-
-1. **Horario del negocio**: una reserva tiene que empezar con el negocio abierto (Horarios); antes solo
-   contaban las franjas.
-2. **Mesa en pantalla**: el formulario elige la mesa entre las libres a esa hora (antes solo el
-   asistente asignaba mesa) y **una mesa no se reserva dos veces a la misma hora** (antes no se
-   comprobaba).
-3. **Confirmar retiene la mesa también cuando la reserva nace confirmada** y cambiar la hora de una
-   confirmada mueve la retención (antes solo al pulsar «Confirmar» y solo al cambiar la mesa).
-4. **Sentar abre la cuenta de la mesa** en el mismo paso y la retención se gasta (antes eran dos
-   acciones en dos apps).
-5. **Editar, No presentado, Cancelar con motivo y Borrar tienen pantalla** (antes solo el asistente).
-6. **El empleado confirma, sienta, cambia, cancela y lleva la lista de espera** (antes solo el
-   responsable; duda 1).
-7. **Máximo de comensales por franja**, opcional, además del de reservas (duda 2).
-8. **Ajustes tiene pantalla** (antes solo el asistente) y el teléfono es obligatorio de fábrica y
-   siempre (antes no lo era hasta guardar cualquier ajuste).
-9. **La duración por defecto vale para toda reserva** (antes la reserva a mano duraba siempre 120
-   minutos y solo la conversión la usaba).
-10. **Las reglas de reserva (comensales, antelación, días máximos) son para internet y WhatsApp**; el
-    personal reserva desde ya, nunca en una hora pasada (antes también frenaban al personal).
-11. **Bloquear por horas tiene pantalla** (antes solo el día entero).
-12. **Las franjas de un mismo día no se pisan** (antes podían solaparse y contar dos veces).
-13. **Cada motivo de rechazo tiene su texto**, también al cambiar (antes el cambio daba un único «no se
-    pudo»).
-14. **La reserva guarda su origen** (Teléfono, En el local, Lista de espera, WhatsApp, Internet).
-15. **La ficha del cliente la busca o la crea el servidor** (antes la pantalla), así también por el
-    asistente y la API.
-16. **Las fechas y horas se escriben con los campos del navegador**, como Citas (antes, texto en el
-    orden del idioma).
-17. **El personal puede llenar una franja llena a sabiendas**, tras un aviso (antes nunca; duda 8).
-18. **La lista de espera no pide teléfono** (antes la pantalla lo exigía; duda 7).
-19. **El personal cambia la reserva que el cliente hizo solo sin sus reglas** (comensales, antelación,
-    días máximos; y con «Reservar igualmente» en una franja llena): antes el cambio se juzgaba con las
-    reglas del origen de la reserva (duda 8).
-20. **Sentar desde Reservas gasta solo la retención de esa reserva** (TABLE-F28): antes gastaba todas
-    las de la mesa dentro de la hora, y la reserva siguiente de la misma mesa dejaba de verse Reservada.
+  `reservation.staff_only_field`.
+- **Fechas y horas** se escriben con los campos del navegador (`type="date"` y `type="time"`), como en Citas.
 
 ### Lo que NO hace, a propósito
 
 - No cobra depósitos, señales ni cargos por no presentarse.
-- No envía correos, SMS ni recordatorios (los ajustes de correo del producto actual, que no enviaban
-  nada, no se portan).
+- No envía correos, SMS ni recordatorios.
 - No pinta ni ocupa el plano: eso es de Mesas.
 - No es la agenda de citas por profesional (Citas) ni la reserva web.
 - No sincroniza con calendarios externos.
@@ -973,43 +906,6 @@ la que solo se le autorizó reservar.
 - **La cola de la puerta con espera estimada y aviso por SMS** (duda 6): necesita mensajería; la lista de
   espera sirve hoy para la puerta y para otros días, sin avisos.
 - **Franjas que cruzan la medianoche**: una franja termina el mismo día (hasta las 23:59).
-
-### Dudas abiertas
-
-Resueltas en esta versión (por mercado, «Referencia adoptada»): 1, 2, 3, 4, 5, 6, 7, 8 y 9. Sigue fuera
-del MVP: asignación automática y mesas unidas (5). El aviso por WhatsApp (F19) ya sale.
-
-### Paridad con el producto actual
-
-Operaciones (21 commands y 9 queries del `module.json`):
-
-| Producto actual | Aquí | Motivo |
-|---|---|---|
-| `reservations.reservations.list` / `.get` | `reservation.reservation.list` / `.get` | — |
-| `reservations.slots.count_for`, `reservations.day.summary`, `reservations.blocked_dates.on_date` | `reservation.availability.day` | Una sola lectura del día: ocupación, cifras y bloqueos, más el horario |
-| `reservations.timeslots.list` | `reservation.time_slot.list` | — |
-| `reservations.blocked_dates.list` | `reservation.blocked_date.list` | — |
-| `reservations.waitlist.list` | `reservation.waitlist.list` | Orden de llegada estable |
-| `reservations.settings.get` | `reservation.settings.get` | Con la zona horaria |
-| — | `reservation.availability.tables` | Nueva: mesas libres (F23) |
-| `reservations.reservations.create` (+ `_create_gated`) | `reservation.reservation.create` | La puerta en `engine.py` y la transacción |
-| `reservations.reservations.update` (+ `_apply_update`) | `reservation.reservation.update` | Cada rechazo con su motivo |
-| `reservations.reservations.set_status` (+ `_apply_status`) | `.confirm`, `.seat`, `.complete`, `.cancel`, `.no_show` | Una acción por paso: el asistente y su riesgo |
-| `reservations.reservations.delete` | `reservation.reservation.delete` | — |
-| `reservations.reservations.release_unconfirmed` | `reservation.reservation.release_unconfirmed` | — |
-| `reservations.timeslots.create` / `.delete` | `reservation.time_slot.create` / `.delete` | Sin solapes |
-| `reservations.blocked_dates.create` / `.delete` | `reservation.blocked_date.create` / `.delete` | — |
-| `reservations.waitlist.create` / `.delete` | `reservation.waitlist.create` / `.delete` | — |
-| `reservations.waitlist.update` (+ `_waitlist_update`, `_waitlist_promote`) | `reservation.waitlist.update` + `reservation.waitlist.convert` | Convertir es su propia acción |
-| `reservations.settings.upsert`, `reservations.settings.set_auto_confirm` | `reservation.settings.update` | Guarda solo lo que se envía: cubre los dos |
-| `reservations._on_customer_merged` / `_on_customer_anonymized` | `reservation.customer.reassign` / `.erase` | — |
-
-Pantallas: Reservas (barra del día, tabla, alta, acciones), Lista de espera y Disponibilidad
-(Ocupación, Franjas, Fechas bloqueadas), con las mismas columnas, textos, vacíos y errores; se añaden
-Editar, No presentado, Cancelar con motivo, Borrar, la Mesa en el formulario, el máximo de comensales,
-el bloqueo por horas y la pestaña Ajustes. Lo que no se porta: la tabla guardia `reservations__gate`
-(la puerta es Python en la transacción), `time_slot_duration` (no lo usaba nada) y los ajustes de
-correo y recordatorio (no enviaban nada).
 
 ## Investigación de mercado
 
@@ -1046,8 +942,8 @@ de espera); al gerente le quedan configuración y bloqueos; borrar, al administr
 | Zenchef | Stock de comensales por servicio | https://help.zenchef.com/hc/en-gb/articles/4402475918865-How-to-activate-Table-Inventory |
 | Odoo | Capacidad por participantes | https://www.odoo.com/documentation/19.0/applications/productivity/appointments.html |
 
-**Gana:** los dos límites, cerrando con el primero que se alcanza; aquí se conserva el de reservas del
-producto actual y se añade el de comensales, opcional.
+**Gana:** los dos límites, cerrando con el primero que se alcanza; el de comensales es
+opcional.
 
 ### Duda 3 — ¿Sentar la reserva sienta la mesa y abre la cuenta?
 
@@ -1164,6 +1060,6 @@ liberación automática.
 
 **Gana:** una pendiente caduca por el tiempo, no por el día en que cae: siete de nueve la cancelan o la
 liberan al vencer su plazo y ninguna deja fuera las de días anteriores; Square y Tablein no liberan
-ninguna sola. Es lo que ya hacía el producto actual («nunca toca las Confirmadas ni las futuras»).
+ninguna sola.
 **Por qué no «solo las de hoy»:** la reserva de las 23:55 vence pasada la medianoche y se quedaría
 Pendiente para siempre, igual que cualquiera que dejara una noche sin pasada; ningún producto lo hace.

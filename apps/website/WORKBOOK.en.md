@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:468d2d76db2d8220d25bef5c07e65c888e5bfa89f469440831145ae040942b21 -->
+<!-- generated from WORKBOOK.md sha256:30d95211d2fc273353cd8d902529094b1c23370940bfafa10b0c45d0265c77c6 -->
 
 ## What it is for and who it is for
 
@@ -97,7 +97,7 @@ page: your phone or a private window) and, if the page is not online, that the a
 sign-in.
 
 ### The public page
-The chosen template with what is published, at the business's address (modern redesign of 2026-10-22): a sticky see-through top bar with the
+The chosen template with what is published, at the business's address: a sticky see-through top bar with the
 logo, the name, the sections' menu (folded on a phone) and **Log in** (an outline pill); a header with the cover photo
 (or, without one, a soft gradient of the palette, never empty), the title in large type, the tagline and two pills:
 **Chat on WhatsApp** (or **Contact us**, to the contact section, without WhatsApp) and **Find us** (to the address);
@@ -157,7 +157,6 @@ what the owner writes, as written.
 | WEBSITE-F12 | Show the Google reviews | done |
 
 ### WEBSITE-F01 Fill in and save the draft
-<!-- origin: new (an editor of fixed sections with a draft and autosave, like Square Online, Wix, Squarespace and Shopify; PLAN §29) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant, API
 Screen: Website
@@ -178,7 +177,6 @@ business's website: upload it again.».
 Involved: WEBSITE-F02, WEBSITE-F03, WEBSITE-F04, WEBSITE-F11, WEBSITE-F12
 
 ### WEBSITE-F02 Choose the design, the palette and the background
-<!-- origin: new (templates that swap without losing the content and palettes in light and dark, like Squarespace, Wix and Square Online; PLAN §29, extension of 2026-10-22) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant, API
 Screen: Website
@@ -196,7 +194,6 @@ If it fails: a colour written wrong is not saved and the field says so:
 Involved: WEBSITE-F01, WEBSITE-F06
 
 ### WEBSITE-F03 Show or hide a section
-<!-- origin: new (fixed sections that hide instead of being deleted, like Square Online's and Wix's; PLAN §29) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant, API
 Screen: Website
@@ -212,7 +209,6 @@ If it fails: as when saving (WEBSITE-F01); hiding never deletes what was written
 Involved: WEBSITE-F01, WEBSITE-F10
 
 ### WEBSITE-F04 Upload an image
-<!-- origin: new (images in the business's file store, served from its own address; PLAN §29 and PLAN-HUB block 7) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, API
 Screen: Website
@@ -233,7 +229,6 @@ anyway.
 Involved: WEBSITE-F01, WEBSITE-F11
 
 ### WEBSITE-F05 Show the catalog
-<!-- origin: new (the website's catalog comes from the POS's own products and services, as in Square Online and Shopify; PLAN §29) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant, API
 Screen: Website
@@ -257,7 +252,6 @@ error; if the categories cannot be read, «The categories could not be loaded» 
 Involved: INVENTORY-F27, SERVICE-F10, WEBSITE-F07, WEBSITE-F10
 
 ### WEBSITE-F06 See the preview
-<!-- origin: new (a real preview beside the editor and in its own tab on a phone, like Squarespace, Wix and Shopify; PLAN §29) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator
 Screen: Website
@@ -274,7 +268,6 @@ preview**.
 Involved: WEBSITE-F01, WEBSITE-F02, WEBSITE-F05, WEBSITE-F12
 
 ### WEBSITE-F07 Publish
-<!-- origin: new (a draft apart from what is published, behind a confirmation, like Square Online, Wix and Squarespace; PLAN §29) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant, API
 Screen: Website
@@ -291,7 +284,6 @@ If it fails: «The website could not be published» and what is published stays 
 Involved: WEBSITE-F05, WEBSITE-F10, WEBSITE-F12
 
 ### WEBSITE-F08 Take the page offline
-<!-- origin: new (unpublishing without losing anything, like Wix's and Square Online's «Unpublish»; PLAN §29) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant, API
 Screen: Website
@@ -307,7 +299,6 @@ If it fails: «The website could not be taken offline» and the page stays onlin
 Involved: WEBSITE-F07, WEBSITE-F10
 
 ### WEBSITE-F09 Share the address and the QR
-<!-- origin: new (a QR to print and a link to copy, like Square's and Toast's QR; PLAN §29) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, manager, API
 Screen: Share and QR
@@ -324,7 +315,6 @@ If it fails: if it cannot be copied, «The link could not be copied: select it a
 Involved: WEBSITE-F07, WEBSITE-F10, BASE-F112 (inside the app)
 
 ### WEBSITE-F10 Visit the public page
-<!-- origin: new (the business's website at its own address, with «Log in» for the team; PLAN §29, Ioan's decision of 21/10) -->
 Status: done (server, public page and e2e)
 Actor: anyone, without an account
 Screen: The public page
@@ -344,7 +334,6 @@ same page: **Log in** leads to its address on erplora.com and, with no page to s
 Involved: WEBSITE-F07, WEBSITE-F08, WEBSITE-F05, WEBSITE-F11, WEBSITE-F12, BASE-F110, HUBS-F17
 
 ### WEBSITE-F11 Show a photo gallery
-<!-- origin: new (a salon's gallery of its work, like Fresha's, Booksy's and Square Online's; PLAN §29, extension of 2026-10-22) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant (ordering or removing photos already uploaded), API
 Screen: Website
@@ -362,7 +351,6 @@ uploaded to this business's website: upload it again.» under the gallery.
 Involved: WEBSITE-F04, WEBSITE-F10
 
 ### WEBSITE-F12 Show the Google reviews
-<!-- origin: new (the Google Business Profile's rating and reviews with «Write a review», like Fresha, Square Online and Wix; PLAN §29, extension of 2026-10-22) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant (the link), API
 Screen: Website

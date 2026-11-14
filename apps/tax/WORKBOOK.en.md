@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:60ba940d13cb38e41d9cb0bbab193237501e91ed515fda3cbea9692438e9b268 -->
+<!-- generated from WORKBOOK.md sha256:037989c4bfacce5b6f4ce89721e7453638f02196c0543feef22d6788a9669b96 -->
 
 ## What it is for and who it is for
 
@@ -153,8 +153,6 @@ closes the window without saving. With the window as it opened, Back closes it w
 | TAX-F06 | Add an equivalence surcharge to a rate | done |
 | TAX-F07 | Change a rate from a date | done |
 | TAX-F08 | Deactivate and restore a rule | done |
-| TAX-F09 | Repair a rule that charges a rate where it should not | discarded |
-| TAX-F10 | Resolve overlapping rules | discarded |
 | TAX-F11 | Set up a business in the Canary Islands, Ceuta or Melilla | done |
 | TAX-F12 | Create several rules at once | done |
 | TAX-F13 | View the category aliases | done |
@@ -297,7 +295,7 @@ If it fails: an end before the start of the rule: "That rule cannot end before t
 that runs into another active rule of the same slot, the overlap notice. Two consecutive periods (one ends
 on 31/12, the other starts on 1/1) do not overlap. An end in the past leaves a gap without a rate: the sales
 of that category are refused until the next one is created.
-Involved: INVOICE-F01, INVOICE-F04, SALE-F01
+Involved: INVOICE-F01, SALE-F01
 
 ### TAX-F08 Deactivate and restore a rule
 Status: done
@@ -317,33 +315,6 @@ If it fails: a rule that no longer exists: "This tax rule no longer exists."; de
 deactivated or restoring one already active: "That rule is already deactivated." / "That rule is already
 active."; restoring one that now overlaps another active one, the overlap notice.
 Involved: SALE-F01
-
-### TAX-F09 Repair a rule that charges a rate where it should not
-Status: discarded — in the current product it served to fix rules saved before they were forbidden; here no door (screen, API, batch or assistant) lets a rule that charges no tax be created with a %, nor a component with a rate under it, so there is nothing to repair
-Actor: owner, administrator, manager
-Screen: Rules
-Steps:
-1. Whoever saves an exempt, not subject or reverse-charge rule with a % greater than 0 sees the refusal
-   below the % (TAX-F05).
-2. Whoever hangs a component with a rate from a root that charges no tax sees the refusal below the root
-   rule (TAX-F06).
-In: nothing.
-Out: nothing: the incoherent rule never gets saved.
-If it fails: does not apply.
-Involved: none
-
-### TAX-F10 Resolve overlapping rules
-Status: discarded — here no door lets two active rules of the same country, region and category be in force on the same day, not even if two people save at the same time: the overlap is solved before saving, with TAX-F07 or TAX-F08
-Actor: owner, administrator, manager
-Screen: Rules
-Steps:
-1. Whoever saves a rule that would overlap another active one of the same country, region and category sees
-   the refusal in "Valid from" (TAX-F04).
-2. They set an end date on the one in force (TAX-F07) or deactivate it (TAX-F08) and save the new one again.
-In: nothing.
-Out: nothing: the overlap never gets saved.
-If it fails: does not apply.
-Involved: none
 
 ### TAX-F11 Set up a business in the Canary Islands, Ceuta or Melilla
 Status: done
@@ -537,8 +508,8 @@ SALE-F07, SERVICE-F01
 ## Services: what goes in and what comes out
 
 Everything can be asked for through the screens, the assistant (by voice or text, with the person's own
-session) and the API, with the same rules and the same permissions. A business's API key reaches less, the
-same as in the current product: seeing the categories, the rules and the aliases, reading a text as a
+session) and the API, with the same rules and the same permissions. A business's API key reaches less:
+seeing the categories, the rules and the aliases, reading a text as a
 category, and setting an end date on a rule or restoring it. Designed for voice: a
 category is named by its key, by its name (in Spanish or in English) or by an alias ("Restaurant — food",
 "food", `restaurant.food`), and a rule by its id or by its country, region and category ("the VAT one for
@@ -615,5 +586,4 @@ Nothing: Taxes depends on no app and reacts to no notice of others.
 | View categories, rules, aliases and the tax region, and calculate | yes | yes | yes | yes | `tax.view` |
 | Create categories, rules and aliases; set an end date, deactivate and restore rules; change the tax region | yes | yes | yes | no | `tax.manage` |
 
-The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); the
-cashier of the current product is an employee.
+The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).

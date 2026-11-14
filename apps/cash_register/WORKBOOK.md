@@ -5,9 +5,7 @@ Estado de la app: completa (2026-10-21)
 
 > Manual de usuario y especificación de la app `cash_register`. Se escribe **antes** que el código: no
 > se programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
-> verde (servidor y páginas). Parte del `WORKFLOW.md` del módulo Caja del producto actual
-> (`modules-workspace/modules/cash_register`, `origin/main` `9c7a237`, v1.3.75). La app hace lo mismo
-> y se ve igual; los números de flujo se conservan porque otras apps los citan.
+> verde (servidor y páginas).
 
 ## Para qué sirve y para quién
 
@@ -182,7 +180,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | CASH_REGISTER-F18 | Ver las propinas en la caja | común | no hecho |
 
 ### CASH_REGISTER-F01 Configurar cómo funciona la caja
-<!-- origen: fi:modules/cash_register#command-cash_register-settings-update fi:modules/cash_register#events-emitidos-catalogo fi:modules/cash_register#navigation-settings fi:modules/cash_register#permission-role_permissions fi:modules/cash_register#query-cash_register-settings-get old:cash_register/WORKFLOW.md#cash_register-f01 -->
 Estado: hecho
 Vertical: común
 Actor: administrador
@@ -211,7 +208,6 @@ Inicio no le enseña el paso «Tu caja».
 Implicados: CASH_REGISTER-F03, F05, F07, F09, F10
 
 ### CASH_REGISTER-F02 Dar de alta, renombrar y desactivar un cajón
-<!-- origen: fi:modules/cash_register#command-cash_register-registers-create fi:modules/cash_register#query-cash_register-registers-list old:cash_register/WORKFLOW.md#cash_register-f02 -->
 Estado: hecho
 Vertical: común
 Actor: administrador, asistente
@@ -230,7 +226,6 @@ cuanto se escribe en él, sin volver a pulsar «Guardar» (hub#1470).
 Implicados: CASH_REGISTER-F03
 
 ### CASH_REGISTER-F03 Abrir el turno de caja con el fondo inicial
-<!-- origen: fi:modules/cash_register#events-emitidos-catalogo fi:modules/cash_register#command-cash_register-session-open fi:modules/cash_register#query-cash_register-current_session old:cash_register/WORKFLOW.md#cash_register-f03 qa:modules/cash_register/open-register qa:modules/cash_register/shift-change wf:peluqueria-dia#rec_peluqueria-f01 wf:restaurante-dia#rec_restaurante-f01 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable, administrador, asistente
@@ -260,7 +255,6 @@ motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Abrir
 Implicados: CASH_REGISTER-F04, F09
 
 ### CASH_REGISTER-F04 Vender solo con la caja abierta
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f01 wf:restaurante-dia#rec_restaurante-f01 old:cash_register/WORKFLOW.md#cash_register-f04 -->
 Estado: hecho — lo aplica Ventas al cobrar (SALE-F08): pregunta a Caja si la caja está abierta (ver
 «Contrato con Ventas»). Lo que se cobra en efectivo sin turno porque Caja estaba apagada o no
 respondió sale en «Cobros fuera de turno» (F17), sin perder nada.
@@ -279,7 +273,6 @@ aparece en F17.
 Implicados: SALE-F08
 
 ### CASH_REGISTER-F05 Registrar una entrada o una salida de efectivo
-<!-- origen: fi:modules/cash_register#command-cash_register-movement-add fi:modules/cash_register#query-cash_register-movements-list old:cash_register/WORKFLOW.md#cash_register-f05 qa:modules/cash_register/cash-count-and-movements -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable, administrador, asistente
@@ -309,7 +302,6 @@ qué.
 Implicados: ninguno
 
 ### CASH_REGISTER-F06 Contar el cajón por billetes y monedas
-<!-- origen: qa:modules/cash_register/cash-count-and-movements fi:modules/cash_register#command-cash_register-count-add-handler-wasm fi:modules/cash_register#query-cash_register-counts-list old:cash_register/WORKFLOW.md#cash_register-f06 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable, administrador
@@ -334,7 +326,6 @@ dice debajo del campo al salir de él (se lee como en F03) y «Registrar arqueo�
 Implicados: CASH_REGISTER-F09
 
 ### CASH_REGISTER-F07 Contar a ciegas: quién ve el efectivo esperado
-<!-- origen: old:cash_register/WORKFLOW.md#cash_register-f07 -->
 Estado: hecho
 Vertical: común
 Actor: administrador, responsable, empleado
@@ -359,7 +350,6 @@ Si falla: nada propio.
 Implicados: CASH_REGISTER-F09
 
 ### CASH_REGISTER-F08 Revisar lo que queda pendiente antes de cerrar
-<!-- origen: old:cash_register/WORKFLOW.md#cash_register-f08 wf:peluqueria-dia#rec_peluqueria-f16 wf:restaurante-dia#rec_restaurante-f16 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable, administrador
@@ -383,7 +373,6 @@ igual la confirmación; si no, se cierra con un solo clic.
 Implicados: SALE-F17, SALE-F18, KITCHEN-F31, PRINTING-F01
 
 ### CASH_REGISTER-F09 Cerrar el turno: esperado, contado y diferencia
-<!-- origen: fi:modules/cash_register#query-cash_register-current_session qa:modules/cash_register/shift-change wf:peluqueria-dia#rec_peluqueria-f16 wf:restaurante-dia#rec_restaurante-f16 fi:modules/cash_register#command-cash_register-session-close old:cash_register/WORKFLOW.md#cash_register-f09 qa:modules/cash_register/close-register-z-report -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable, administrador, asistente
@@ -431,7 +420,6 @@ real como fondo.
 Implicados: CASH_REGISTER-F06, F07, F08
 
 ### CASH_REGISTER-F10 Cerrar sola la caja olvidada al final del día
-<!-- origen: old:cash_register/WORKFLOW.md#cash_register-f10 -->
 Estado: hecho — el cierre se aplica al abrir la siguiente sesión, y el pase cada 5 minutos lo hace el Hub
 por su cuenta
 Vertical: común
@@ -456,7 +444,6 @@ cierra entonces).» (409 `cash_register.session_auto_close_due`).
 Implicados: CASH_REGISTER-F17
 
 ### CASH_REGISTER-F11 Consultar una sesión y revisar un descuadre
-<!-- origen: fi:modules/cash_register#query-cash_register-movements-list fi:modules/cash_register#query-cash_register-session-summary fi:modules/cash_register#query-cash_register-sessions-list old:cash_register/WORKFLOW.md#cash_register-f11 -->
 Estado: hecho
 Vertical: común
 Actor: responsable, administrador, empleado
@@ -476,7 +463,6 @@ Si falla: «No se pudo cargar el detalle de la sesión» o el error de cada tabl
 Implicados: SALE-F28
 
 ### CASH_REGISTER-F12 Ver la caja en los paneles del inicio
-<!-- origen: fi:modules/cash_register#widget-cash_register-current_session-kpi fi:modules/cash_register#widget-cash_register-recent_sessions-bar-list old:cash_register/WORKFLOW.md#cash_register-f12 -->
 Estado: hecho
 Vertical: común
 Actor: responsable, administrador, empleado
@@ -505,7 +491,6 @@ sesiones cerradas.» (en el Inicio, «Sin datos»).
 Implicados: CASH_REGISTER-F07, F09
 
 ### CASH_REGISTER-F13 Anotar en la caja cada cobro de una venta
-<!-- origen: fi:modules/cash_register#command-cash_register-record_sale-handler-wasm fi:modules/cash_register#event-listen-sale-completed-cash_register-record_sale old:cash_register/WORKFLOW.md#cash_register-f13 -->
 Estado: hecho
 Vertical: común
 Actor: sistema
@@ -527,7 +512,6 @@ Si falla: sin sesión abierta, el cobro no se pierde: sale en F17.
 Implicados: SALE-F01, SALE-F02, SALE-F03, SALE-F15
 
 ### CASH_REGISTER-F14 Compensar en la caja una venta anulada
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 fi:modules/cash_register#command-cash_register-_reverse_sale-interno fi:modules/cash_register#event-listen-sale-voided-cash_register-_reverse_sale old:cash_register/WORKFLOW.md#cash_register-f14 wf:restaurante-dia#rec_restaurante-f15 -->
 Estado: hecho
 Vertical: común
 Actor: sistema
@@ -545,7 +529,6 @@ emitido (SALE-F30).
 Implicados: SALE-F30
 
 ### CASH_REGISTER-F15 Anotar en la caja una devolución
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:restaurante-dia#rec_restaurante-f15 old:cash_register/WORKFLOW.md#cash_register-f15 -->
 Estado: hecho
 Vertical: común
 Actor: sistema
@@ -561,7 +544,6 @@ Si falla: sin sesión abierta, la devolución sale en F17.
 Implicados: SALE-F31
 
 ### CASH_REGISTER-F16 Imprimir el informe de la sesión (X o Z)
-<!-- origen: qa:modules/cash_register/close-register-z-report old-hub:HUB_PERIPHERALS-F13 -->
 Estado: hecho
 Vertical: común
 Actor: responsable, administrador, empleado
@@ -590,7 +572,6 @@ cerrada sí.
 Implicados: CASH_REGISTER-F11, PRINTING-F17
 
 ### CASH_REGISTER-F17 Ver los cobros fuera de turno
-<!-- origen: nuevo (Caja de ERPlora: lo cobrado sin turno no se pierde) -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable, administrador
@@ -612,7 +593,6 @@ Si falla: nada propio.
 Implicados: CASH_REGISTER-F04, F10, F13
 
 ### CASH_REGISTER-F18 Ver las propinas en la caja
-<!-- origen: nuevo (hub#562; SumUp, propinas en el informe X y el Z; Square, informe de turno) -->
 Estado: no hecho — Caja todavía no distingue lo que apunta otra app (hub#1499)
 Vertical: común
 Actor: sistema, empleado, responsable
@@ -751,8 +731,7 @@ Caja estaba apagada o no respondió se ve en CASH_REGISTER-F17.
 | Ver el esperado con el arqueo ciego | sí | sí | sí | no | `cash_register.view_expected_totals` |
 | Ajustes y cajones | sí | sí | no | no | `cash_register.manage_settings` |
 
-Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); el
-cajero del producto actual es un empleado.
+Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
 
 ## Para quien lo mantiene
 
@@ -773,8 +752,8 @@ cajero del producto actual es un empleado.
   (`RefundPayment` de las devoluciones desde la apertura). Al cerrar, esas líneas se copian en
   `Movement` (con su clave de origen, única por tipo: un pago de venta se copia una vez como venta y
   una como anulación; un pago de devolución, una vez) y la sesión cerrada solo lee sus copias: un
-  turno cerrado nunca cambia. Así no depende del relay del outbox (que el worker reparte desde el
-  2026-10-21, `base/relay.py`: Caja no declara `REACTIONS`) y no pierde nada si un aviso no llega.
+  turno cerrado nunca cambia. Así no depende del relay del outbox (que reparte el worker,
+  `base/relay.py`: Caja no declara `REACTIONS`) y no pierde nada si un aviso no llega.
   Si una línea ya está copiada se mira por su origen (`sale_payment_id`,
   `refund_payment_id`, `sale_id`: los índices únicos parciales de `Movement`). Lo que no cayó en ninguna
   sesión (`queries.unassigned_window`: con la caja cerrada, lo de después del corte de una sesión
@@ -824,28 +803,25 @@ cajero del producto actual es un empleado.
   de cada cobro, anulación y devolución sin leer `Sale.currency`, y lo suma y lo pinta en la del negocio, que es la de
   cada venta: el país, y con él la moneda, no cambia desde que el negocio puede vender (`hubs.country_locked` del
   SaaS). Solo una venta de antes de hub#286 en un negocio sin euro guarda `EUR` y
-  sale con el símbolo del negocio. Los billetes y monedas de 18 monedas viven en `queries.DENOMINATIONS` (las mismas
-  del producto actual).
+  sale con el símbolo del negocio. Los billetes y monedas de 18 monedas viven en `queries.DENOMINATIONS`.
   El total de un arqueo lo suma el servidor; un billete o moneda de otra moneda es 422.
 - **Zona horaria**: el corte del cierre automático, la hora que dice su aviso, el día de negocio y el número de sesión
   son del reloj del negocio (`base.business.business_zone`, hub#771).
-- **Inicio** (ronda PLAN-HUB 2026-10-21; FIX-CASH_REGISTER-SETUP-HOOKS): `setup` y `widgets` de `apps.py`, los
-  del `module.json` viejo (sin `bell`). El paso `cash_register.drawer` lee `updated_at` de
+- **Inicio**: `setup` y `widgets` de `apps.py` (sin `bell`). El paso `cash_register.drawer` lee `updated_at` de
   `cash_register.settings.get` (orden 90, no `required`, permiso `cash_register.manage_settings`, refresco por
-  `cash_register.settings.updated`): el viejo pedía `id`, la fila que solo existía al guardar; aquí los de
-  fábrica valen sin fila, así que lo que dice «el negocio ya decidió» es haberlos guardado una vez (Square,
+  `cash_register.settings.updated`): los de fábrica valen sin fila, así que lo que dice «el negocio ya decidió» es haberlos guardado una vez (Square,
   Shopify POS, Toast, Lightspeed, Odoo, Loyverse: la caja se configura encendiéndola y guardando; Business
   Central da por hecha una guía al ejecutarla). Por eso el primer guardado avisa aunque no cambie nada y la
   tarjeta deja «Guardar» encendido mientras `updated_at` está vacío. Los dos paneles leen
   `cash_register.session.list` con `events.SESSION_EVENTS`, las mismas que la re-ejecutan en `live.py`: el
   esperado (`kpi`, `status=open`, `limit` 1, `expected_balance`; `session.current` lo anida y un `kpi` lee
   campos de la primera fila) con `cash_register.view_expected_totals`, y los descuadres (`bar-list`, los
-  mismos parámetros que la tarjeta de **Caja**, `number` y `difference`) con `cash_register.view_session` (el
-  «ver informes» del viejo ya no existe, cambio 14). Ningún panel fija moneda, escala ni idioma
-  (gh:cash_register#121, gh:hub#2387, gh:outfitkit#243) ni categoría (gh:cash_register#123); el `kpi` no repite
-  su nombre en `options.label` (gh:hub#1105), así que «Efectivo esperado en caja» del viejo no se pinta.
-- **Administrador de Django con CRUD completo** (ronda 12, PLAN §17), solo en `hubs.erplora.com`; ids
+  mismos parámetros que la tarjeta de **Caja**, `number` y `difference`) con `cash_register.view_session`. Ningún panel fija moneda, escala, idioma ni categoría; el `kpi` no repite
+  su nombre en `options.label` (gh:hub#1105).
+- **Administrador de Django con CRUD completo** (PLAN §17), solo en `hubs.erplora.com`; ids
   y fechas de solo lectura. Lo que guarda no pasa por las operaciones ni deja aviso.
+- **Quién abrió o cerró** se guarda como lo lee una persona (su nombre o su correo), no como el
+  identificador interno del usuario.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en abrir,
   cerrar, cerrar sola, apuntar y contar; y sus `asks`, 2–3 frases en `en` y `es` como las diría quien
   la usa: Caja está en `LIVE_ASSISTANT_ASKS_REQUIRED`, `live.E020`, hub#1087) y cada campo de
@@ -858,7 +834,7 @@ cajero del producto actual es un empleado.
   `verbose_name` de su campo en el modelo; un dato sin ninguno sale con el nombre técnico y lo para
   `tests/test_integration_assistant.py` (`test_i18n.py` exige el `es` de cada `title`, también el de los
   datos que enseña una vista previa).
-- **El cierre por el asistente** (F09; PLAN §30, la primera de las cinco acciones de IA pulidas): la
+- **El cierre por el asistente** (F09; PLAN §30): la
   descripción de `session.close` le pide leer antes `session.closing_summary` con el mismo contado,
   decir su resumen y cerrar nombrando la sesión por el número que dio (así nunca cierra otra que se
   abriera entre medias). Esa consulta valida como el cierre (sesión abierta y sin pasar su corte;
@@ -875,52 +851,6 @@ cajero del producto actual es un empleado.
   lectura no se puede hacer (recuento obligatorio sin contado: 409) no sale la tarjeta. Cada dato se
   nombra por el `title` de `ClosingSummaryOut` («Sesión», «Cajón», «Esperado en el cajón»; la diferencia,
   por el `verbose_name` del modelo) y los importes, que dicen «in cents», salen como dinero.
-
-### Cambios frente al producto actual
-
-1. **Las líneas de Ventas se leen de Ventas** en vez de escribirse al oír sus avisos: no hace falta el
-   relay ni reintentos, y una anulación o devolución sin caja abierta ya no se pierde ni se rechaza
-   (sale en F17).
-2. **Una venta cobrada sin turno no se pierde en silencio**: Caja la enseña (F17). El bloqueo del cobro
-   en efectivo con la caja cerrada (F04) lo aplica Ventas, preguntando a Caja.
-3. **Los ajustes de fábrica valen desde el principio**; antes no se aplicaba ninguna regla hasta el
-   primer guardado. «URL del POS protegido» desaparece: la ruta del TPV es fija y el bloqueo es de
-   Ventas.
-4. **Dos aperturas o dos cierres a la vez**: solo uno hace algo y el otro recibe su aviso (antes el
-   segundo contestaba bien sin hacer nada).
-5. **El arqueo exige una sesión abierta** (antes solo lo impedía la pantalla).
-6. **El esperado se ve donde se puede, y el ciego es ciego**: el responsable lo ve también en la tabla
-   y en la ventana de cierre con el arqueo ciego (antes solo en el detalle); el empleado ya no ve las
-   líneas de venta ni los totales con los que sumarlo (antes sí).
-7. **El detalle enseña quién abrió y cerró, el cajón y las notas**, y se imprime (informe X y Z).
-8. **Cajones en pantalla**, con nombre obligatorio y sin repetir (antes solo el asistente, sin
-   comprobar nada).
-9. **Movimientos a mano: solo entrada o salida**. Las líneas de venta, devolución y anulación son
-   siempre las de Ventas.
-10. **Una anulación de otro turno sale por cada forma de pago**, también la de tarjeta (sin tocar el
-    esperado), con el tipo «Anulación».
-11. **La revisión del turno mira también las cuentas abiertas de Ventas** (Toast), además de las comandas
-    sin servir de Cocina y la cola de Impresión; las impresiones que fallaron cuentan como pendientes.
-12. **El número de sesión toma el día de negocio** (hora del negocio), no el de UTC.
-13. **El estado «Suspendida» desaparece**: nada llevaba a él.
-14. **Permiso «ver informes» desaparece**: ninguna operación lo pedía (era el del panel «Descuadres
-    recientes», que lee las sesiones: en el Inicio lo tiene quien ve las sesiones).
-15. **El cierre automático cierra a la hora del corte**, con las líneas de antes del corte; las de
-    después van a F17 o a la sesión siguiente.
-16. **Abrir, apuntar, contar y cerrar son ventanas (diálogos)** sobre la tabla, como en el resto de
-    apps de la plataforma (antes, paneles encima de la tabla); el detalle es una página con su flecha de
-    volver. «Movimiento», «Arqueo» y «Cerrar» solo salen en la fila de la sesión abierta (antes salían en
-    todas y una cerrada respondía «La sesión S-… no está abierta»).
-17. **Quién abrió o cerró** se guarda como lo lee una persona (su nombre o su correo), no como el
-    identificador interno del usuario.
-18. **Las cifras de la caja están en Caja y en el Inicio**: la sesión actual y los descuadres recientes salen
-    encima de la tabla de sesiones y, como en el producto actual, en los paneles del Inicio.
-19. **Cerrar la caja pidiéndoselo al asistente enseña antes el resumen** (sesión, contado y, a quien puede
-    verlos, esperado y diferencia, y lo pendiente) y pide escribir la palabra en una confirmación que
-    repite lo que va a pasar; antes el asistente cerraba la sesión abierta con el contado, sin resumen
-    previo.
-20. **«Tu caja» se da por hecho al guardar los ajustes una vez**, también sin cambiar nada: los de fábrica
-    valen desde el principio (cambio 3), así que el paso pide la decisión del negocio, no una fila.
 
 ### Lo que NO hace, a propósito
 
@@ -939,7 +869,3 @@ cajero del producto actual es un empleado.
   consecuencia los pone él) sobre el cierre de F09.
 - No abre el cajón sin venta («no-sale»). El cajón físico lo abre Impresión (PRINTING-F13, al cobrar);
   abrirlo sin venta, con su permiso y su rastro en la sesión, queda fuera de esta versión.
-
-Las tres salidas de esta lista que el mercado sí ofrece (una sesión por cajón, el umbral del descuadre y
-el «no-sale») se decidieron al cerrar la app (2026-10-21) y están en «Fuera por ahora» (`## 6` de
-`archive/migration/MIGRATION.md` de `ERPlora/erplora-next`).

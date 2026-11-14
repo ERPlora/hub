@@ -96,7 +96,6 @@ del formulario.
 | DEMO-F06 | Intentarlo sin permiso | hecho |
 
 ### DEMO-F01 Crear un elemento
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Elementos
@@ -112,7 +111,6 @@ guarda nada.
 Implicados: ninguno
 
 ### DEMO-F02 Editar un elemento
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Ficha del elemento
@@ -131,7 +129,6 @@ borró): «Este elemento ya no existe».
 Implicados: ninguno
 
 ### DEMO-F03 Borrar un elemento
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Ficha del elemento
@@ -146,7 +143,6 @@ Si falla: «Este elemento ya no existe» si otra persona lo borró antes.
 Implicados: ninguno
 
 ### DEMO-F04 Añadir una línea al instante (optimista e idempotente)
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Ficha del elemento
@@ -168,7 +164,6 @@ Si el elemento ya no existe: «Este elemento ya no existe».
 Implicados: ninguno
 
 ### DEMO-F05 Ver el cambio en otra tableta en menos de un segundo
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: cualquiera con permiso de ver
 Pantalla: Elementos y Ficha del elemento
@@ -184,7 +179,6 @@ completos. Lo hecho en `a` no avisa a las pantallas de `b` (ni al revés).
 Implicados: ninguno
 
 ### DEMO-F06 Intentarlo sin permiso
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: empleado
 Pantalla: Elementos y Ficha del elemento
@@ -269,7 +263,7 @@ papel en ningún negocio.
 
 ## Para quien lo mantiene
 
-- Ejemplo de los ganchos del Inicio (PLAN-HUB, ronda 2026-10-21), el que copian los módulos: `DemoConfig`
+- Ejemplo de los ganchos del Inicio, el que copian los módulos: `DemoConfig`
   declara un paso (`setup`: «Crea tu primer elemento», hecho con `total` de `demo.item.stats`), un panel
   (`widgets`: «Elementos abiertos», `kpi` sobre `demo.item.stats`) y un contador de la campana (`bell`:
   «Elementos de demo abiertos», sobre `demo.item.open_count`). Demo no está en la tienda (`listed = False`):
@@ -325,7 +319,7 @@ papel en ningún negocio.
 - La lista nunca pide más de 100 filas (`PAGE_MAX`, el `le=100` de `ItemListIn`): «Cargar más» crece
   hasta ese tope y, con más elementos, el `DataTable` pagina también en el móvil (`maxWindow`).
 - El administrador de Django tiene CRUD sobre los elementos y sus líneas (en línea), como el de las
-  demás apps (PLAN §17, ronda 12, y PLAN-HUB §3.2): es la vía de soporte para reparar una fila, por el
+  demás apps (PLAN §17 y PLAN-HUB §3.2): es la vía de soporte para reparar una fila, por el
   ORM, sin aviso ni las reglas de `services.py` (ni elemento cerrado ni posición siguiente); las
   pantallas, la API y el asistente escriben por las operaciones. Vive solo en `http://hubs.localhost:8000/admin/`
   (en `a.localhost:8000/admin/`, 404) y entra el staff desde la página «Hubs» del admin del SaaS

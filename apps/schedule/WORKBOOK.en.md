@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:747d2f77d52b2494c0fca3e4b8f238b0b7eccd65c4ce326f66ec9b06da1bfe59 -->
+<!-- generated from WORKBOOK.md sha256:6af11c4d4142afa4185f1517ac078cbfc8f61bb1251edc32ffa9d1868f602811 -->
 
 ## What it is for and who it is for
 
@@ -53,10 +53,9 @@ does.
 
 That is why, of what the brief asked to look at, **everything "per person" is covered by Staff**: each
 professional's weekly hours (STAFF-F13 to F15), their time off (STAFF-F17 to F20, F24) and their
-availability (`staff.availability.for_member`, STAFF-F16). The old Schedules module did not have it
-either. Schedules knows nobody in the team and does not depend on Staff.
+availability (`staff.availability.for_member`, STAFF-F16). Schedules knows nobody in the team and does not depend on Staff.
 
-From the current product these are kept (their market comparison was already done and recorded in its code):
+Adopted from the market:
 
 - **Google Business Profile**: several intervals a day, "open 24 hours" as 00:00–00:00 and special hours
   by date.
@@ -70,8 +69,7 @@ And this is decided here (same comparison):
 - **An interval belongs to the day it opens** (Google Business Profile): a Saturday 22:00–02:00 is still
   open on Sunday at 01:00, whether it comes from the week, a special day or a temporary change, even if
   Sunday is a closed day.
-- **A special day and a temporary change can be corrected** (Google, Fresha, Square edit them); there is no
-  longer any need to delete them and create them again.
+- **A special day and a temporary change can be corrected** (Google, Fresha, Square edit them).
 
 ## Before you start
 
@@ -156,10 +154,10 @@ button asks "Discard changes?" when something typed or chosen has not been saved
 | SCHEDULE-F04 | Add a special day | done (server and screen) |
 | SCHEDULE-F05 | Add a temporary change | done (server and screen) |
 | SCHEDULE-F06 | Delete a special day or a temporary change | done (server and screen) |
-| SCHEDULE-F07 | Load several special days at once | done (assistant and API, like the current product) |
+| SCHEDULE-F07 | Load several special days at once | done (assistant and API) |
 | SCHEDULE-F08 | Choose which day the week starts on | done (server and screen) |
 | SCHEDULE-F09 | See the time zone the schedule is read with | done (server and screen) |
-| SCHEDULE-F10 | Ask whether the business is open at a moment | done (assistant and API, like the current product) |
+| SCHEDULE-F10 | Ask whether the business is open at a moment | done (assistant and API) |
 | SCHEDULE-F11 | Give Appointments the hours of some days | done (Appointments and Reservations read it) |
 | SCHEDULE-F12 | Start from a default week when turned on | done (when the tables are created) |
 | SCHEDULE-F13 | Correct a special day or a temporary change | done (server and screen) |
@@ -289,7 +287,7 @@ date it covers." (422).
 Involved: Appointments, Reservations
 
 ### SCHEDULE-F07 Load several special days at once
-Status: done (assistant and API, like the current product)
+Status: done (assistant and API)
 Actor: assistant, API
 Screen: assistant
 Steps:
@@ -335,7 +333,7 @@ If it fails: nothing to fail; the zone always comes from the server.
 Involved: none
 
 ### SCHEDULE-F10 Ask whether the business is open at a moment
-Status: done (assistant and API, like the current product)
+Status: done (assistant and API)
 Actor: assistant, API
 Screen: none
 Steps:

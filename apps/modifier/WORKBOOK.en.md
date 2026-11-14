@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:be79da0804d9447c2f0710f73e9b78aba82bdac9fd5705eeb17175628a50b20f -->
+<!-- generated from WORKBOOK.md sha256:73466ade0191d641920c6c03a377ce430457f474ff249a1a490ad7d298db13ae -->
 
 ## What it is for and who it is for
 
@@ -486,5 +486,4 @@ The groups, a group, the options, the links and the groups of a product can be f
 | See groups, options and links; ask for the groups of a product and price a choice | yes | yes | yes | yes | `modifier.view` |
 | Create, change and delete groups and options; link and unlink | yes | yes | yes | no | `modifier.manage` |
 
-The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); the
-cashier of the current product is an employee.
+The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).

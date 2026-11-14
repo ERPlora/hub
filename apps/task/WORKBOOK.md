@@ -6,9 +6,7 @@ Lo que no entra todavía: ver «Lo que NO hace, a propósito».
 
 > Manual de usuario y especificación de la app `task`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor
-> y páginas). Parte del `WORKFLOW.md` del módulo Tareas del producto actual
-> (`modules-workspace/modules/tasks`, `origin/main` `99f1c53`, v1.0.31). Hace lo mismo, se ve igual y
-> conserva toda su funcionalidad salvo lo que dice «Cambios frente al producto actual», al final.
+> y páginas).
 
 ## Para qué sirve y para quién
 
@@ -36,9 +34,7 @@ almacén para mañana y asígnala a Ana», «¿qué tareas tengo?», «completa 
 
 ## Referencia adoptada
 
-**A quién se asigna una tarea y qué ve el empleado** (skill `market-decision`, 2026-10-14). En el
-producto actual el responsable era una referencia de texto a un usuario del hub, sin vínculo con
-Personal, y todos veían y cambiaban todo.
+**A quién se asigna una tarea y qué ve el empleado** (skill `market-decision`, 2026-10-14).
 
 | Producto | Cómo lo resuelve | Fuente |
 |---|---|---|
@@ -170,7 +166,6 @@ la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin pr
 | TASK-F15 | Cuando alguien deja el equipo | hecho |
 
 ### TASK-F01 Crear una tarea
-<!-- origen: fi:modules/tasks#command-handler-wasm-tasks-tasks-create-create_task old:tasks/WORKFLOW.md#que-hay-hoy -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado, asistente, una automatización con permiso
 Pantalla: Tareas
@@ -193,7 +188,6 @@ está activa en el equipo.» o, por nombre, varias personas o proyectos que enca
 Implicados: Personal (la ficha del responsable)
 
 ### TASK-F02 Ver y buscar las tareas
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#query-tasks-tasks-list -->
 Estado: hecho (servidor y pantalla)
 Actor: todos; el empleado ve solo las suyas
 Pantalla: Tareas → Todas
@@ -209,7 +203,6 @@ Si falla: un filtro que no existe, «422».
 Implicados: Personal (el nombre del responsable)
 
 ### TASK-F03 Ver mis tareas
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#query-tasks-tasks-my -->
 Estado: hecho (servidor y pantalla)
 Actor: quien tiene ficha vinculada a su cuenta, asistente
 Pantalla: Tareas → Mis tareas
@@ -224,7 +217,6 @@ Si falla: nada propio.
 Implicados: Personal (mi ficha)
 
 ### TASK-F04 Abrir una tarea
-<!-- origen: fi:modules/tasks#query-tasks-tasks-get -->
 Estado: hecho (servidor y pantalla)
 Actor: quien la ve
 Pantalla: Tarea (hoja)
@@ -238,7 +230,6 @@ ve); varias tareas que encajan con el título: se dicen cuáles.
 Implicados: ninguno
 
 ### TASK-F05 Iniciar o cambiar el estado
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-handler-wasm-tasks-tasks-update_status-update_status -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla (el empleado, las suyas)
 Pantalla: Tareas (acción **Iniciar**), Tarea (selector **Estado**)
@@ -254,7 +245,6 @@ quien ve todas las tareas pero solo puede cambiar las suyas, «Solo puedes cambi
 Implicados: ninguno
 
 ### TASK-F06 Completar una tarea
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-handler-wasm-tasks-tasks-complete-complete_task -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla
 Pantalla: Tareas (acción **Completar**), Tarea (botón **Completar**)
@@ -270,7 +260,6 @@ se cambia el estado.
 Implicados: ninguno
 
 ### TASK-F07 Asignar, reasignar o desasignar
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-tasks-tasks-assign -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla
 Pantalla: Tarea
@@ -287,7 +276,6 @@ equipo.», «No tienes ficha en Personal: no se te puede asignar.» (asignármel
 Implicados: Personal
 
 ### TASK-F08 Editar una tarea
-<!-- origen: nuevo (el producto actual no editaba una tarea) -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla
 Pantalla: Tarea → **Editar**
@@ -301,7 +289,6 @@ Si falla: los mismos rechazos que al crear.
 Implicados: ninguno
 
 ### TASK-F09 Añadir una subtarea
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#query-tasks-tasks-subtasks -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede crear tareas y ve la madre
 Pantalla: Tarea
@@ -315,7 +302,6 @@ Si falla: el motivo dentro de la hoja; el título tecleado se queda.
 Implicados: ninguno
 
 ### TASK-F10 Comentar una tarea
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-tasks-tasks-add_comment fi:modules/tasks#query-tasks-tasks-comments -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla
 Pantalla: Tarea
@@ -329,7 +315,6 @@ Si falla: texto vacío; «Esa tarea no existe en este negocio.».
 Implicados: ninguno
 
 ### TASK-F11 Borrar una tarea
-<!-- origen: nuevo (el producto actual describía el borrado sin acción) -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente (con confirmación reforzada)
 Pantalla: Tarea → **Borrar**
@@ -344,7 +329,6 @@ nueva (BASE-F97).
 Implicados: ninguno
 
 ### TASK-F12 Crear un proyecto
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-tasks-projects-create -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Proyectos
@@ -359,7 +343,6 @@ Si falla: «Ya hay un proyecto con ese código.» bajo el campo; un color que no
 Implicados: Personal (el dueño)
 
 ### TASK-F13 Abrir y cambiar un proyecto
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#query-tasks-projects-list -->
 Estado: hecho (servidor y pantalla)
 Actor: todos lo abren; lo cambian el propietario, el administrador y el responsable
 Pantalla: Proyecto (hoja)
@@ -375,7 +358,6 @@ vacío no se envía.
 Implicados: ninguno
 
 ### TASK-F14 Borrar un proyecto
-<!-- origen: nuevo (el producto actual no borraba proyectos) -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente (con confirmación reforzada)
 Pantalla: Proyecto → **Borrar**
@@ -390,7 +372,6 @@ nueva (BASE-F97).
 Implicados: ninguno
 
 ### TASK-F15 Cuando alguien deja el equipo
-<!-- origen: nuevo (la baja en Personal, STAFF-F06) -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -526,8 +507,8 @@ cliente o a un compañero).
   del admin del Hub (`lock_members` de Personal y luego lo que la nombra), así que uno espera al otro y
   nunca en círculo. Si la persona ya se borró, la escritura responde «no existe» en su campo, nunca 500.
 - Las listas ordenan por su columna con los vacíos al final y desempatan por `id` en la misma dirección
-  (`base.ordering.list_order_for`; regla del producto actual, hub#2355, como Ventas, Caja e Inventario): la fila tocada no salta
-  y las páginas no repiten ni pierden filas (hub#2352).
+  (`base.ordering.list_order_for`, como Ventas, Caja e Inventario): la fila tocada no salta
+  y las páginas no repiten ni pierden filas.
 - El «hoy» es `business_today` (`base.business.business_zone`, hub#779); las páginas calculan «vencida» y «vence hoy»
   en esa misma zona (`useBusinessZone`), para que la pantalla y el filtro «Vencidas» no se contradigan.
 - Asistente: toda operación declara `ai={"description"…}` (`risk` solo en las acciones; `high` al
@@ -565,7 +546,7 @@ cliente o a un compañero).
   el `project_id` junto a un `project` (`UNLESS` de `tests/test_assistant_yes_for_its_card.py`).
   Tareas no tiene listas cerradas sin etiqueta en sus escrituras: el estado y la prioridad salen con las de sus
   modelos.
-- El admin de Django del Hub tiene **CRUD completo** sobre los cuatro modelos (ronda 12, PLAN §17); una
+- El admin de Django del Hub tiene **CRUD completo** sobre los cuatro modelos (PLAN §17); una
   escritura cruda del admin no deja aviso. En español nombra la tarea en femenino, como la hoja: **Creada por**,
   **Creada el** y **Actualizada el** llevan el contexto `task` (`pgettext_lazy`), porque sin él saldrían el
   «creado por» de Inventario y el masculino del proyecto; el proyecto y el comentario siguen en masculino
@@ -582,12 +563,11 @@ cliente o a un compañero).
 - La hoja de la tarea y la del proyecto son `ion-modal` con sus consultas en vivo; la ruta de
   subtareas abiertas (**Volver**) vive en la hoja.
 - Los selectores de persona y de proyecto buscan en el servidor (`Combo` de `@erplora/ui`).
-- Los iconos son los registrados en la shell: Proyectos ya lleva la carpeta del producto actual
+- Los iconos son los registrados en la shell: Proyectos lleva la carpeta
   (`ion:folder-outline`); los otros cuatro (`checkbox-outline` del módulo y de la pestaña Tareas,
   `open-outline`, `play-circle-outline` y `checkmark-done-outline` de las acciones de fila) esperan en
   `UI-REQUESTS.md` con su sustituto.
-- Las hojas no cambian la URL (como las de Servicios y Personal, y como el panel del producto actual,
-  que tampoco tenía sub-ruta): no hay enlace directo a una tarea ni a un proyecto.
+- Las hojas no cambian la URL (como las de Servicios y Personal): no hay enlace directo a una tarea ni a un proyecto.
 
 ## Lo que NO hace, a propósito
 
@@ -597,32 +577,3 @@ cliente o a un compañero).
 - **No adjunta ficheros**.
 - **No gestiona incidencias de clientes**.
 - **No edita ni borra comentarios**: el hilo es un registro.
-
-## Cambios frente al producto actual
-
-- **El responsable es una ficha de Personal** (`requires = ["staff"]`), no una referencia de texto a
-  un usuario: ver «Referencia adoptada». Lo mismo el dueño de un proyecto. La baja de una persona
-  desasigna sus tareas abiertas (TASK-F15, nuevo).
-- **El empleado ve y cambia las suyas**; el responsable, todas. Antes los tres papeles lo veían y
-  cambiaban todo. Los **proyectos** los crea y cambia el responsable (antes también el empleado).
-- **Autor y creador salen de la sesión**: antes se podían mandar en la petición y firmar como otro.
-- **Nada falla en silencio**: crear con un proyecto o una madre que no existen, completar una tarea
-  cerrada o tocar una que no existe dan su error y no gastan número ni avisan. Antes eran no-ops que
-  a veces avisaban igual.
-- **Editar una tarea** (TASK-F08), **borrar una tarea** (TASK-F11) y **borrar un proyecto** (TASK-F14)
-  son nuevos: el producto actual describía el borrado pero no tenía acción.
-- **Nueva tarea** pide todos los campos (antes solo título y prioridad); la lista tiene la columna
-  **Responsable** y **Proyecto** (oculta).
-- **La fecha límite es un día** (sin hora), en la zona del negocio; antes se guardaba como fecha y hora
-  UTC y la pantalla solo enseñaba el día.
-- **El número** usa el día del negocio, no el día UTC.
-- **El color** de un proyecto es #RRGGBB (antes, cualquier texto, que se pintaba tal cual en el estilo).
-- **Avisos**: `task.*` en vez de `tasks.*`; `task.task.completed` sale siempre que una tarea llega a
-  Hecha; nuevos `task.task.updated`, `task.task.deleted` y `task.project.deleted`.
-- **Nombres de servicio**: `task.task.detail` (antes `tasks.tasks.get`), `task.task.mine` (`…my`),
-  `task.task.set_status` (`…update_status`), `task.comment.list` y `task.comment.add`
-  (`tasks.tasks.comments`, `…add_comment`).
-- Las listas paginan con hasta 100 por página; las subtareas salen en orden de alta.
-- La hoja de la tarea y la del proyecto se abren en un diálogo encima de la lista (antes, un panel
-  dentro de la página) y el alta en un formulario (antes, el panel lateral de la tabla): ver
-  `UI-REQUESTS.md`.
