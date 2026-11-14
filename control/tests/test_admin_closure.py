@@ -218,6 +218,30 @@ class TestRestoreFromACopy:
         )
         assert Hub.objects.get(pk=small.pk).restore_point == AT_MOMENT
 
+    def test_a_hub_the_operation_refuses_does_not_count(self, client, root, sizes, temporary):
+        ready = a_hub(sizes, "bistro", self.MEDIUM)
+        preparing = a_hub(sizes, "acme", SMALL, status=Hub.Status.REQUESTED)
+        asked = {"action": "restore_from_a_copy", "apply": "yes", "cluster": str(temporary.pk), "at": MOMENT}
+
+        html = choose(client, ready, preparing, **asked)
+
+        assert told(html) == (
+            "1 hub will be restored from restore-1 as it was at 2026-11-09 14:30 UTC: closed while it is restored, "
+            "for up to 2 minutes. If it is refused, its page says why under «last error»."
+        )
+
+    def test_several_hubs_in_spanish(self, client, root, sizes, temporary):
+        small, medium = a_hub(sizes, "acme", SMALL), a_hub(sizes, "bistro", self.MEDIUM)
+        asked = {"action": "restore_from_a_copy", "apply": "yes", "cluster": str(temporary.pk), "at": MOMENT}
+
+        html = choose(client, small, medium, language="es", **asked)
+
+        assert told(html) == (
+            "2 hubs se restaurarán desde restore-1 tal como estaban el 2026-11-09 14:30 UTC, uno tras otro: cada uno "
+            "cerrado hasta que acaba su restauración, hasta 3 minutos en total. Si se rechaza alguno, su ficha dice "
+            "por qué en «último error»."
+        )
+
     def test_one_hub_in_spanish(self, client, root, sizes, temporary):
         asked = {"action": "restore_from_a_copy", "apply": "yes", "cluster": str(temporary.pk), "at": MOMENT}
 
