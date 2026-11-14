@@ -707,6 +707,9 @@ def test_a_category_made_again_takes_back_what_the_business_kept_where_its_delet
     assert Category.objects.get(pk=toning.pk).parent_id == made.id
     assert Category.objects.get(pk=pastel.pk).parent_id == hair.pk
     assert Category.objects.get(pk=made.id).created_by == "system"
+    # Who put each one back is written on it, as on any change of the screen.
+    assert set(Service.objects.filter(pk__in=[gloss.pk, perm.pk]).values_list("updated_by", flat=True)) == {"system"}
+    assert Category.objects.get(pk=toning.pk).updated_by == "system"
 
 
 def test_a_lost_category_takes_back_the_subcategories_its_loss_left_at_the_root():
@@ -1056,6 +1059,7 @@ class TestServicesComeBack:
         # Its services left without a category and its subcategory moved up to the root (SERVICE-F08).
         run_in(hub, "service.category.delete", id=color)
         before = created_events(hub, "service.service.updated")
+        moved_before = created_events(hub, "service.category.updated")
 
         # The category made again, nothing else: what was inside it the business still has.
         assert recovered(recoveries, copy) == [CATEGORIES | {"created": 1}, SERVICES]
@@ -1072,6 +1076,7 @@ class TestServicesComeBack:
         with use_hub(hub):
             assert Category.objects.get(name="Toning", is_deleted=False).pk == ids["toning"]
         assert created_events(hub, "service.service.updated") == before + 3
+        assert created_events(hub, "service.category.updated") == moved_before + 1
 
     def test_what_the_business_moved_since_stays_where_it_is_and_recoveries_says_so(self, recoveries, every_app_on):
         hub, ids, color, copy = self.a_full_category(recoveries, every_app_on)
