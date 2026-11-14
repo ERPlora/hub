@@ -4239,13 +4239,30 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1505, aws#77
   arriendo del hub (`claim_hub`, el de `HubDue`) y en una transacción sobre su fila bloqueada
   (`control.services.start_scheduled_move`): si en su reloj ya no es de madrugada (el worker estuvo parado, la zona
   cambió) la deja para la siguiente; si una comprobación de `control.hub.move` la rechaza en ese momento (clúster
-  cerrado o lleno, base demasiado grande, en restauración…), la quita y lo dice en `Hub.last_error`
+  cerrado o lleno, base que no está en su servidor, en restauración…), la quita y lo dice en `Hub.last_error`
   (`move_not_started: <código>: …`); si no, pone `moving_to` y el mismo pase la mueve. Cuenta para el hueco del
   clúster destino y lo protege de borrarse. «Cancelar el traslado» la quita mientras no ha empezado
   (`control.hub.scheduled_move_cancelled`), sin cerrar nada. Tests: `control/tests/test_services.py::TestTheNight` y
   `::TestMoveAtNight`, `base/tenancy/tests/test_move.py::TestAMoveAskedForTheNight` (dos BD reales y el arriendo) y
   `control/tests/test_admin.py::TestMoveToCluster` y `::TestCancelTheMove`. El aviso al negocio de que esa noche se
   le traslada no existe todavía (hub#1510).
+- **Un negocio de cualquier tamaño se traslada** (hub#1509, cierra hub#931): la copia pasa por el bucket de volcados
+  (`HUB_DUMPS_BUCKET`), nunca por el disco del worker, así que `control.hub.move` ya no rechaza por tamaño (se fue el
+  tope de 512 MiB y su 409 `control.hub_too_large`; solo comprueba que la base está en su servidor). El negocio está en
+  mantenimiento mientras dura la copia, como antes, y por eso se pide de madrugada. `pg_dump` sube la copia en partes
+  según la hace (`base.tenancy.dumps.stream_to_bucket`, partes de 32 MiB, una en memoria), y la subida solo se
+  completa si `pg_dump` acabó bien: si falla, se para o se pasa de tiempo, se aborta y no queda nada. En el destino,
+  `pg_restore` lee la copia desde el bucket por su entrada (`move._restore_from_bucket`: primero su índice y después la
+  restauración en una transacción, las dos sin fichero). Cada mitad tiene una hora (`move.COPY_TIMEOUT_SECONDS`): de
+  madrugada acaba antes de las 07:00 y una hora da para decenas de GiB; se puede cancelar en cualquier momento. La
+  copia queda en `<hex>/<AAAAMMDDTHHMMSSZ>-move.dump` los 90 días del bucket, sin fila `HubDump` (no es una copia del
+  negocio para descargar; el worker no puede borrar del bucket). Sin bucket no se cierra nada: el traslado acaba con
+  `move_dump_failed` en `Hub.last_error` y el negocio sigue donde estaba. La restauración a un momento y la copia
+  aparte (BASE-F114) siguen copiando por un fichero del worker, con su tope (`control.services.RESTORE_MAX_BYTES`,
+  hub#1524).
+  Tests: `base/tenancy/tests/test_dumps.py` (los `stream`), `base/tenancy/tests/test_move.py::TestTheCopyGoesThroughTheBucket`
+  y `::TestFeedingAProgram` (dos BD reales y el S3 de moto), `control/tests/test_services.py::TestMove` y
+  `control/tests/test_admin.py::test_its_confirmation_page_promises_no_refusal_by_size`.
 - **«Restaurar desde una copia…»** (BASE-F114, hub#1198) es `control.admin.HubAdmin.restore_from_a_copy`: su página de
   confirmación (`RestoreFromACopyForm`, la plantilla `action_confirmation.html` que comparte con «Mover a otro
   clúster…») y, por cada hub, `control.hub.restore` con el actor del personal; el admin no comprueba nada que la
