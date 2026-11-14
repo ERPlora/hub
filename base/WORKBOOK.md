@@ -3164,8 +3164,11 @@ Pasos:
       en la raíz), cada uno cambiado como lo cambia la pantalla: es lo que la recuperación toca de lo que el negocio
       tiene, y se cuenta aparte, como «Enlaces de servicios a categorías» y «Enlaces de subcategorías a categorías»; si
       el negocio lo mueve mientras tanto, se queda donde lo puso y se cuenta «sin crear» con su porqué
-      (`service.service_moved`). Lo que el negocio movió después (un servicio en otra
-      categoría, una subcategoría en otro sitio) se queda donde está, y la cuenta de la categoría lo dice («Categorías de
+      (`service.service_moved`), y si lo cambia sin moverlo mientras vuelve la categoría (otro precio, otro icono), se
+      queda como lo dejó y se cuenta igual, «sin crear» con su porqué («service.service_changed: volvió sin el servicio
+      <su identificador>: el negocio lo cambió mientras tanto», o `service.subcategory_changed`). Lo que el negocio
+      movió después (un servicio en otra categoría, una subcategoría en otro sitio) se queda donde está, y la cuenta de
+      la categoría lo dice («Categorías de
       servicios: se creó 1, 1 con notas»), con el porqué en sus notas («service.service_moved: volvió sin el servicio <su
       identificador>: se movió a otra categoría después»). Una que el negocio ya volvió
       a crear (otra viva con su nombre, sin distinguir mayúsculas ni espacios) no se repite: se usa la suya, tal como está,
@@ -4294,7 +4297,9 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1505, aws#77
   librería dice que ya no tiene; nunca una foto propia; con la librería sin leer, tal como estaba, para no dejar el
   registro fuera. Primero vuelve lo eliminado y después se crea lo que falta, con las operaciones de la app, en el contexto del
   sistema y en el idioma del personal, dentro de `use_hub`; un `InvalidPayload` o un `NotFound` es de ese registro y los
-  demás siguen, cualquier otro rechazo para la app. Clientes responde con `recoverable_cards_in_copy`,
+  demás siguen, cualquier otro rechazo para la app. Mientras devuelve, `base.recovery.at_work()` dice el actor de la
+  recuperación en marcha (fuera de una, `None`): con él la lectura de una app distingue lo que trajo esta misma
+  recuperación de lo que dejó una anterior (Servicios, hub#1494). Clientes responde con `recoverable_cards_in_copy`,
   `cards_deleted_in_business` con `customer.customer.restore`, que le devuelve lo que el negocio borró después
   (hub#1356), y `cards_not_in_business` (con `has_live_twin`, la regla de la importación) con
   `customer.customer.recover`, que rehace la ficha con sus grupos, etiquetas y campos (hub#1285). Ninguna app cuyos

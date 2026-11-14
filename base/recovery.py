@@ -5,7 +5,9 @@ apps import it and a module never imports the tenancy (``tests/test_guardrails.p
 and its operation; the platform (``base.tenancy.recovery``) connects to the copy and chooses the business's database.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Annotated, Any
 
@@ -27,6 +29,26 @@ ACTOR = "copy_recovery:"
 def actor_of(recovery_id: object) -> str:
     """The actor the recovery ``recovery_id`` runs the apps' operations as."""
     return f"{ACTOR}{recovery_id}"
+
+
+_at_work: ContextVar[str | None] = ContextVar("base_recovery_at_work", default=None)
+
+
+def at_work() -> str | None:
+    """The actor of the recovery giving a separate copy back right now, around its apps' reads and operations; ``None``
+    outside one. What an app reads in the business tells by it what this same recovery did from what an earlier one
+    left there."""
+    return _at_work.get()
+
+
+@contextmanager
+def giving_back(actor: str) -> Iterator[None]:
+    """Inside it, the recovery that runs as ``actor`` is the one at work (``at_work``)."""
+    token = _at_work.set(actor)
+    try:
+        yield
+    finally:
+        _at_work.reset(token)
 
 
 def brought_back(actor: str) -> bool:

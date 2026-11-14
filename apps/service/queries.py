@@ -105,7 +105,7 @@ from base import images
 from base.business import babel_locale, business_zone
 from base.operations import call
 from base.queries import business_language, image_library
-from base.recovery import brought_back
+from base.recovery import at_work, brought_back
 from base.schemas import RecordNameOut
 from base.ordering import list_order_for
 
@@ -1999,14 +1999,16 @@ def service_links_not_in_business(categories: list[dict]) -> list[dict]:
     """The services of a separate copy's categories (``categories_in_copy``) that go back into the category a recovery
     brought back for theirs (``_brought_back_for``), in id order, each as ``service.service.return_to_category`` takes
     it, with its ``id``: one the business keeps where deleting that category left it, without a category, archived
-    too, and has not touched since the category came back (asked again, what the business did since stays)."""
+    too, and has not touched since the category came back (asked again, what the business did since stays). One it
+    touched while the recovery that brought the category back is still at work goes too, for its link to say why it
+    stays out (``_said_while_at_work``)."""
     back = _brought_back_for(categories)
     into = {service: back[one["id"]] for one in categories if one["id"] in back for service in one["service_ids"]}
     kept = Service.objects.filter(pk__in=into, category__isnull=True).order_by("id").values_list("pk", "updated_at")
     return [
         {"id": pk, "service_id": pk, "category_id": into[pk].pk}
         for pk, updated_at in kept
-        if updated_at <= into[pk].created_at
+        if updated_at <= into[pk].created_at or _said_while_at_work(into[pk])
     ]
 
 
@@ -2015,7 +2017,8 @@ def subcategory_links_not_in_business(categories: list[dict]) -> list[dict]:
     recovery brought back for their parent (``_brought_back_for``), in id order, each as
     ``service.category.return_to_parent`` takes it, with its ``id`` and the copy's category it hung from
     (``stands_for``): one the business keeps live where deleting that one left it (``left_by_deleting``), has not
-    touched since the category came back, and that would not hang from one of its own subcategories."""
+    touched since the category came back (or touched while that recovery is still at work, ``_said_while_at_work``),
+    and that would not hang from one of its own subcategories."""
     back = _brought_back_for(categories)
     under = {one["id"]: one["parent_id"] for one in categories if one["parent_id"] in back}
     parent_of = dict(Category.objects.filter(is_deleted=False).values_list("pk", "parent"))
@@ -2025,7 +2028,7 @@ def subcategory_links_not_in_business(categories: list[dict]) -> list[dict]:
         stands_for, into = under[pk], back[under[pk]]
         if (
             parent == left_by_deleting(stands_for)
-            and updated_at <= into.created_at
+            and (updated_at <= into.created_at or _said_while_at_work(into))
             and parent_problem(pk, into.pk, parent_of) is None
         ):
             links.append({"id": pk, "category_id": pk, "parent_id": into.pk, "stands_for": stands_for})
@@ -2040,6 +2043,12 @@ def _brought_back_for(categories: list[dict]) -> dict[UUID, Category]:
     made = Category.objects.filter(pk__in={pk for pk in named.values() if pk is not None})
     by_recovery = {one.pk: one for one in made.only("pk", "created_by", "created_at") if brought_back(one.created_by)}
     return {there: by_recovery[here] for there, here in named.items() if here in by_recovery}
+
+
+def _said_while_at_work(category: Category) -> bool:
+    """Whether ``category`` came back with the recovery at work (``base.recovery.at_work``): what the business touched
+    in it since is its link's to refuse and say, as its link does for what it moved. Asked again, it is not."""
+    return category.created_by == at_work()
 
 
 def left_by_deleting(category_id: UUID | None) -> UUID | None:
