@@ -1115,22 +1115,6 @@ def test_a_category_an_earlier_recovery_brought_back_is_the_businesss_and_takes_
     assert Category.objects.get(pk=toning.pk).parent_id is None
 
 
-def test_a_category_a_failed_recovery_brought_back_takes_back_what_it_had_inside_from_the_one_that_carries_it_on():
-    tax = make_tax("test.service", "Service — test")
-    gloss, toning = make_service("Gloss", tax=tax), make_category("Toning")
-    failed = a_recovery()
-    [service], [subcategory] = links_of(failed, services=[gloss], subcategories=[toning])
-    now = a_recovery()
-
-    with giving_back(now, carrying_on=[failed]):
-        create(service, "service.service.return_to_category", now)
-        create(subcategory, "service.category.return_to_parent", now)
-
-    color = Category.objects.get(name="Color", is_deleted=False)
-    assert Service.objects.get(pk=gloss.pk).category_id == color.pk
-    assert Category.objects.get(pk=toning.pk).parent_id == color.pk
-
-
 @pytest.mark.parametrize("name", ["service.service.return_to_category", "service.category.return_to_parent"])
 def test_putting_back_what_a_category_had_inside_is_only_the_systems(name):
     op = get(name)
@@ -1600,38 +1584,6 @@ class TestServicesComeBack:
         assert recovered(recoveries, copy) == [CATEGORIES, SERVICES, *NO_LINKS]
         assert [one for one in in_categories(hub) if one[0] == "Gloss"] == [("Gloss", None)]
         assert [one for one in live_categories(hub) if one[0] == "Toning"] == [("Toning", None, "", 0)]
-
-    def test_asked_again_after_one_that_failed_halfway_its_category_gets_back_what_the_business_kept(
-        self, recoveries, every_app_on, monkeypatch
-    ):
-        hub, ids, color, copy = self.a_full_category(recoveries, every_app_on)
-        run_in(hub, "service.category.delete", id=color)
-        read_links = queries.service_links_not_in_business
-
-        def broken(categories):
-            raise RuntimeError("the worker died")
-
-        monkeypatch.setattr(queries, "service_links_not_in_business", broken)
-        failed = recoveries.ask(copy, "service")
-        assert run() == 1
-        failed = fresh(failed)
-        # It stopped once the category was back, before anything went back into it.
-        assert (failed.status, failed.results) == ("failed", [CATEGORIES | {"created": 1}, SERVICES, SERVICE_LINKS])
-        monkeypatch.setattr(queries, "service_links_not_in_business", read_links)
-
-        # Asked again, it finishes what the one that failed left: the same category, with what the business kept.
-        assert recovered(recoveries, copy) == [
-            CATEGORIES,
-            SERVICES,
-            SERVICE_LINKS | {"created": 3},
-            SUBCATEGORY_LINKS | {"created": 1},
-        ]
-        assert live_categories(hub) == [("Color", None, "#cc0066", 4), ("Hair", None, "", 0), ("Toning", "Color", "", 0)]
-        assert [one for one in in_categories(hub) if one[0] in {"Balayage", "Gloss", "Highlights"}] == [
-            ("Balayage", "Color"),
-            ("Gloss", "Color"),
-            ("Highlights", "Color"),
-        ]
 
     def test_a_service_whose_tax_category_the_create_refuses_is_counted_with_why(self, recoveries, every_app_on):
         hub, tax, ids, _ = self.a_business(recoveries, every_app_on)

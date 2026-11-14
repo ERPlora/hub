@@ -976,14 +976,6 @@ def recoveries_due() -> list[UUID]:
     )
 
 
-def failed_recoveries(copy_id: UUID) -> list[UUID]:
-    """The recoveries of the copy ``copy_id`` that failed: the next one asked of it carries them on
-    (``base.recovery.carries_on``)."""
-    return list(
-        CopyRecovery.objects.filter(copy_id=copy_id, status=CopyRecovery.Status.FAILED).values_list("pk", flat=True)
-    )
-
-
 def claim_recovery(recovery_id: UUID, now: dt.datetime, lease: dt.timedelta, owner: str) -> CopyRecovery | None:
     """Take for ``owner`` the lease of the recovery ``recovery_id`` still to do, with its copy, its hub and their
     clusters; ``None`` when someone else holds it (or it is done, failed or gone)."""

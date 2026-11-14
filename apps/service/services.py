@@ -842,9 +842,8 @@ def recover_category(ctx: OperationContext, data: CategoryRecoverIn) -> dict:
 
 
 def _brought_back_now(ctx: OperationContext, category: Category) -> Category:
-    """``category``, made again by the recovery that runs (its actor) or by one of the same copy that failed and this
-    one carries on (``base.recovery.carries_on``), whose part it finishes: one an earlier recovery brought back is the
-    business's own, and nothing it kept goes back into it."""
+    """``category``, made again by the recovery that runs or by one it carries on (``base.recovery.carries_on``): one
+    any other recovery brought back is the business's own, and nothing it kept goes back into it."""
     if category.created_by != _actor(ctx) and not carries_on(category.created_by):
         raise Conflict(str(CATEGORY_BROUGHT_EARLIER % {"category": category.pk}), code="service.category_brought_earlier")
     return category

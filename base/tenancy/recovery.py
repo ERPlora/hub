@@ -57,6 +57,7 @@ from base import activation, registry, services
 from base.recovery import HOOK, LeftOut, Recoverable, RecoveredOut, actor_of, giving_back
 from base.tenancy import migrator, move, ops
 from base.tenancy.context import use_hub
+from control import queries as control_queries
 from control import services as control_services
 from control.models import CopyRecovery, Hub
 
@@ -125,7 +126,7 @@ def recover(row: CopyRecovery, *, now: dt.datetime) -> bool:
         if hub.status != Hub.Status.READY or not hub.db_name:
             raise RecoveryFailed("recover_business_unavailable", f"the business {hub.slug} is {hub.status}")
         read = _read(copy, activation.in_requires_order(row.apps, activation.module_graph()))
-        failed = [actor_of(pk) for pk in control_services.failed_recoveries(copy.pk)]
+        failed = [actor_of(pk) for pk in control_queries.failed_recoveries(copy.pk)]
         with translation.override(row.language), use_hub(hub), giving_back(actor_of(row.pk), carrying_on=failed):
             for label, declared, records, refused in read:
                 _give_back(row, hub, results, label, declared, records, refused, ours)
