@@ -161,9 +161,9 @@ acciones solo salen a quien puede gestionar estaciones (responsable, administrad
 ### Historial
 Menú **Cocina → Historial**, título «Historial de cocina». Tabla de lo que pasó en cocina, lo último
 primero, 50 por página (otro tamaño se elige al pie): Acción, Comanda (el número), Plato, Quién (el
-nombre de la persona o, si no tiene, su correo; «Sistema» si lo hizo Cocina sola), Notas y Cuándo
-(fecha y hora del negocio). Buscador «Buscar comanda o notas…» (un trozo del número o palabras de las
-notas); filtro de acción con las mismas palabras de la columna («Recibida», «Creada», «Lanzada»,
+nombre de la persona o, si no tiene, su correo, o el de la API key; «Sistema» si no lo hizo una persona:
+Cocina sola o una automatización), Notas y Cuándo (fecha y hora del negocio). Buscador «Buscar comanda o
+notas…» (un trozo del número o palabras de las notas); filtro de acción con las mismas palabras de la columna («Recibida», «Creada», «Lanzada»,
 «Lista», «Plato listo», «Plato recuperado», «Plato anulado», «Servida», «Recuperada», «Cancelada»,
 «Urgente», «Urgencia quitada», «Reimpresa», «Borrada»). Vacía: «Sin actividad reciente en cocina.». Cargando: el esqueleto. Error:
 el de la tabla con reintento.
@@ -702,7 +702,8 @@ Actor: empleado, responsable, administrador
 Pantalla: Historial
 Pasos:
 1. Abre **Cocina → Historial**: qué pasó, en qué comanda y con qué plato, quién (su nombre o, si no
-   tiene, su correo), sus notas y cuándo, lo último primero.
+   tiene, su correo; «Sistema» si no fue una persona: Cocina sola o una automatización), sus notas y
+   cuándo, lo último primero.
 2. En «Buscar comanda o notas…», escribe un trozo del número de la comanda o unas palabras de las
    notas; filtra por acción («Recibida», «Cancelada»…).
 3. Al pie, pasa de página o elige cuántas entradas ver (25, 50…).

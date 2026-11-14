@@ -3063,10 +3063,11 @@ Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, A
 <!-- origen: nuevo (aws#77; PLAN-DB §13 «Restaurar un hub»: los planes de pago prometen volver a cualquier momento de los últimos 14 días) gh:hub#1198 -->
 Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte, y recuperar desde la copia aparte los
 clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías, las citas,
-las citas periódicas y los precios de tarifa; crear y borrar el clúster temporal es el procedimiento «Devolver un negocio
-a un momento» de ERPlora/aws; la imagen de un
-servicio recuperado, hub#1429; los grupos de suplementos y las opciones de menú de un producto que vuelve, hub#1343;
-los precios de tarifa de un servicio que vuelve como uno nuevo, hub#1459)
+las citas periódicas, los precios de tarifa y los grupos de suplementos de los productos; crear y borrar el clúster
+temporal es el procedimiento «Devolver un negocio a un momento» de ERPlora/aws; la imagen de un servicio recuperado,
+hub#1429; las opciones de menú de un producto que vuelve, hub#1343; los precios de tarifa de un servicio que vuelve como
+uno nuevo, hub#1459; los grupos de suplementos de un producto que vuelve como uno nuevo, hub#1457; los grupos de
+suplementos de una categoría que vuelve, hub#1456; un grupo de suplementos borrado, hub#1458)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
 copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
@@ -3105,9 +3106,10 @@ Pasos:
      avisa otra vez de una cita que ya tenía (hub#1307).
      Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes**, **Categorías de productos,
      Productos, Enlaces de productos a categorías**, **Categorías de servicios, Servicios**, **Citas, Citas
-     periódicas** y **Precios de tarifa**). Pulsa **Recuperar**.
+     periódicas**, **Precios de tarifa** y **Grupos de suplementos de productos**). Pulsa **Recuperar**.
   10. Sale «1 copia aparte devolverá Clientes, Categorías de productos, Productos, Enlaces de productos a categorías,
-      Categorías de servicios, Servicios, Citas, Citas periódicas, Precios de tarifa a su negocio en unos minutos:
+      Categorías de servicios, Servicios, Citas, Citas periódicas, Precios de tarifa, Grupos de suplementos de productos
+      a su negocio en unos minutos:
       Recuperaciones dice cómo
       fue.». En
       Recuperaciones la ve «Pedida» con la copia, qué se pidió y cuándo.
@@ -3120,7 +3122,8 @@ Pasos:
       Uno que el negocio ya no tiene vuelve como ficha nueva, creada como la crea la pantalla de Clientes, con su nombre,
       contacto, NIF, dirección, fechas, origen, etapa, canal y notas, y con sus grupos, etiquetas y campos propios: el
       grupo, la etiqueta o el campo que el negocio tiene con ese nombre es ese, sin hacer otro, y el que ya no tiene se
-      vuelve a crear como estaba (hub#1285); un valor de un campo que el negocio desactivó no vuelve. A una ficha
+      vuelve a crear como estaba (hub#1285); un valor de un campo que el negocio desactivó, o que su campo ya no
+      admite, no vuelve, y la ficha vuelve sin él, con su nota («Clientes: se crearon 2, 1 con notas»; hub#1438). A una ficha
       eliminada que vuelve le vuelven también el grupo, la etiqueta o el campo propio que el negocio borró después, igual
       que a la ficha nueva (hub#1356); lo que el negocio aún tiene se queda como está, aunque la sacara de un grupo o le
       quitara un valor antes de eliminarla, y un valor que ya tiene en un campo que el negocio volvió a crear se queda.
@@ -3206,6 +3209,13 @@ Pasos:
       servicio y la misma «desde cantidad») el negocio ya volvió a ocupar: se queda el suyo. Uno que la tarifa no acepta hoy (desactivada, o su
       producto sigue eliminado) no vuelve y su motivo lo dice. Las reglas de descuento del producto, que eliminarlo solo
       apagó, se vuelven a encender solas con él (PRICING-F14).
+      Los grupos de suplementos de los productos van también después de los productos: «Grupos de suplementos de
+      productos: se crearon 2». Cada grupo que en la copia colgaba de un producto vivo allí y que el negocio ya no tiene
+      enganchado a ese producto se vuelve a enganchar, como lo engancha la hoja del grupo, así que un producto eliminado
+      que vuelve pregunta otra vez en el TPV sus salsas, su punto o sus extras (MODIFIER-F10). No se repite uno cuyo
+      grupo el negocio ya volvió a enganchar a ese producto: se queda el suyo. Uno que la hoja del grupo no acepta hoy
+      (su producto sigue eliminado, o el negocio borró el grupo) no vuelve y su motivo lo dice; los de un producto que
+      vuelve como uno nuevo, tampoco todavía (hub#1457).
 Entra: los negocios elegidos, el clúster temporal con su copia y el momento; para recuperar, la copia aparte hecha y qué
 recuperar.
 Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso
@@ -3229,8 +3239,9 @@ guardaba, viva otra vez con su aviso de cita recuperada (`appointment.appointmen
 una que ya no tenía, con su aviso de cita creada (`appointment.appointment.created`), cada cita periódica borrada que
 aún guardaba, activa otra vez con su aviso de serie recuperada (`appointment.recurring.restored`), una cita periódica
 nueva por cada una que ya no tenía, con su aviso de serie creada (`appointment.recurring.created`) y el de cada cita que
-reserva, y un precio de tarifa por cada uno que le faltaba, con su aviso de precio puesto (`pricing.price_item.added`),
-y nada más. Cada uno
+reserva, un precio de tarifa por cada uno que le faltaba, con su aviso de precio puesto (`pricing.price_item.added`),
+y un grupo de suplementos enganchado a un producto por cada uno que le faltaba, con su aviso de enganche hecho
+(`modifier.link.attached`), y nada más. Cada uno
 de esos avisos dice que lo hizo la recuperación (su autor es `copy_recovery:<id>`, el de la fila de Recuperaciones), así
 que ninguna automatización del negocio arranca con ellos (FLOW-F21), sea de algo creado o de algo recuperado; lo que
 solo pone al día lo del negocio con ellos sigue igual (la Bandeja de WhatsApp enlaza a la ficha su conversación;
@@ -3253,12 +3264,11 @@ página lo vuelve a pedir. Lo que no se puede traer de una app lo dice su result
 el negocio («Clientes: nada (app_inactive: …)»; en una app que devuelve varias cosas, cada una lo dice: «Categorías de
 servicios: nada (app_inactive: …); Servicios: nada (app_inactive: …)»), o la copia no la tenía, le falta la migración que su lectura necesita o
 tiene una que este código no conoce (`recover_not_in_copy`, `recover_copy_behind`, `recover_copy_ahead`). Lo que la
-operación de crear no acepta hoy (un teléfono que ya no vale, un valor de un campo propio que su campo ya no admite, un producto sin categoría fiscal o con una que Impuestos
+operación de crear no acepta hoy (un teléfono que ya no vale, un producto sin categoría fiscal o con una que Impuestos
 ya no tiene activa, un servicio cuya categoría fiscal se desactivó (`service.tax_category_unknown`), una hora ocupada,
 una clienta que ya no está, un servicio que el negocio ya no tiene ni volvió a crear) se cuenta «sin crear» con su
 motivo, y lo demás vuelve; también una ficha eliminada que
-entretanto se unió a otra o se borró («customer.customer_unavailable: …»), o con un valor que el campo que el negocio
-volvió a crear ya no admite, que sigue eliminada («customer.field_invalid_option: …»). Si la copia ya no está,
+entretanto se unió a otra o se borró («customer.customer_unavailable: …»). Si la copia ya no está,
 la recuperación dice «No se pudo hacer» y por qué («recover_copy_unreadable: …»). Mientras el negocio se traslada o se
 restaura, la recuperación espera sin hacer nada. Con la plataforma congelada para una subida de la base de datos, la restauración espera, con el negocio en
 mantenimiento, hasta que se descongela. Con registros solo del entorno de pruebas, después se recupera la cadena
@@ -3267,9 +3277,11 @@ Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
 INVENTORY-F07, INVENTORY-F30, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08,
 SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, PRICING-F07,
-PRICING-F14, PRICING-F15, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284,
+PRICING-F14, PRICING-F15, MODIFIER-F05, MODIFIER-F10, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257,
+hub#1282, hub#1283, hub#1284,
 hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1343,
-hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1442, hub#1459, aws#77
+hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1438, hub#1442, hub#1456, hub#1457,
+hub#1458, hub#1459, aws#77
 
 ## Para quien lo mantiene
 

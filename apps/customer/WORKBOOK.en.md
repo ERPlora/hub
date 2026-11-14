@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:963f98a1e5f74527d27850d1bd9f5f60054660761f15cee04bacb37132349b6d -->
+<!-- generated from WORKBOOK.md sha256:aaf13e67aca65776d9e0f9a90597a7a48b3112cd6d26e36f33aee11fbc7b8dc9 -->
 
 ## What it is for and who it is for
 
@@ -252,7 +252,9 @@ Steps:
 1. From **Customers**, tap the row.
 2. The card shows all its details (also internal notes, birthday, anniversary and custom fields, which
    in the current product were only seen when editing), its groups and tags, its consent per channel, the
-   activity (newest first, 50 per page), its purchases and the blocks of other apps.
+   activity (newest first, 50 per page; each entry says when and who: the person or the API key by their
+   name, or "Done by the platform" when nobody did it in person, such as the purchase a charged sale
+   records, an automation or a recovery from a separate copy), its purchases and the blocks of other apps.
 3. **← Back** returns to the list.
 In: the card and, apart, its activity, its purchases and its consent history.
 Out: nothing; read only. If another person changes it while it is open, the change is seen without
@@ -909,11 +911,15 @@ available."). Nor does it come back if the business has already created the same
 and email, CUSTOMER-F12): the one it made stays. A card the business no longer has at all is created again
 (CUSTOMER-F01), with its groups, tags and custom fields from the copy: the group, tag or field the business has with
 that name is that one, without making another, and one it no longer has is made again as it was (CUSTOMER-F06,
-CUSTOMER-F04, CUSTOMER-F29); a value of a field the business deactivated does not come back, and one its field no
-longer accepts leaves the whole card out with its reason. For a deleted card that comes back, what the business still
-has stays as it is, even if it took the card out of a group or removed a value before deleting it; a value it already
-has in a field the business made again stays, one of a field the business deactivated does not come back, and one its
-field no longer accepts leaves it deleted, with its reason (hub#1356). On a live card it does not fail: it answers fine and
+CUSTOMER-F04, CUSTOMER-F29). A value of a field the business deactivated, or one its field no longer accepts (no
+longer one of its options or no longer of its type), does not come back, but it does not leave the card out: the card
+comes back without it, and Recoveries counts it ("Customers: 2 created, 1 with notes") and says under "notes" which
+field and why, without the value, which is the customer's ("customer.field_inactive: came back without its value of
+the field "Size": deactivated in Customers", "customer.field_invalid_option: … no longer one of its options")
+(hub#1438). For a deleted card that comes back, what the business still has stays as it is, even if it took the card
+out of a group or removed a value before deleting it; a value it already has in a field the business made again stays,
+and one of a field the business deactivated or that its field no longer accepts does not come back: the card comes
+back all the same, without it and with its note (hub#1356, hub#1438). On a live card it does not fail: it answers fine and
 notifies again. What was charged in its name
 while it was deleted does not add up (CUSTOMER-F20).
 Involved: BASE-F114, CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06, CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16,

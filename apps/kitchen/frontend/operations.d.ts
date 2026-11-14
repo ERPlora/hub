@@ -312,6 +312,8 @@ export interface LogOut {
   item_name: string;
   station_name: string;
   actor: string;
+  /** No person did it: the platform (the kitchen by itself, an automation, a recovery). */
+  by_platform: boolean;
   notes: string;
   created_at: string;
 }
