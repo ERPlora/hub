@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2386a08f50985b1173a23aa65cbf3629dabba793df084df47b6ab34bc25a284d -->
+<!-- generated from WORKBOOK.md sha256:5e90de1a5b983df7cb6a23bc9307171f1cc1188603b6bb16c137872dca217e64 -->
 
 ## What it is for and who it is for
 
@@ -2977,12 +2977,13 @@ Steps:
      what comes back is nothing new to the business: it starts none of its automations, so nobody is welcomed or told
      again of a booking they already had (hub#1307). Below, "What to bring back", with what can be brought ticked
      (today, **Customers**, **Product categories, Products, Product links to categories**, **Service categories,
-     Services**, **Appointments, Repeating appointments**, **Price list prices**, **Menu choices of products** and
-     **Modifier groups of categories, Modifier groups of products**). They press **Recover**.
+     Services, Service links to categories, Subcategory links to categories**, **Appointments, Repeating
+     appointments**, **Price list prices**, **Menu choices of products** and **Modifier groups of categories, Modifier
+     groups of products**). They press **Recover**.
   10. "1 separate copy will give back Customers, Product categories, Products, Product links to categories, Service
-      categories, Services, Appointments, Repeating appointments, Price list prices, Menu choices of products, Modifier
-      groups of categories, Modifier groups of products into its business within a few minutes: Recoveries says how it
-      went." appears.
+      categories, Services, Service links to categories, Subcategory links to categories, Appointments, Repeating
+      appointments, Price list prices, Menu choices of products, Modifier groups of categories, Modifier groups of
+      products into its business within a few minutes: Recoveries says how it went." appears.
       In Recoveries they
       see it "Asked" with the copy, what
       was asked and when.
@@ -3021,14 +3022,18 @@ Steps:
       keeps live that were, in the copy, in a category that has just come back go back into it, without losing any other
       (INVENTORY-F07): it is the only thing the recovery touches of what the business has, and it is counted apart, as
       "Product links to categories". A category the business keeps (even with products taken out of it) or made again by
-      hand is not filled. With Services, "Service categories: 1 created; Services: 2 created" (the
-      categories and the services that came back, each with its own count): first each service category the business no longer has (it deleted or
+      hand is not filled. With Services, "Service categories: 1 created; Services: 2 created; Service links to
+      categories: 3 created; Subcategory links to categories: 1 created" (the categories, the services and what the
+      business kept that went back into them, each with its own count): first each service category the business no longer has (it deleted or
       lost it) comes back as a new one, created as the Categories screen creates it, with its name, description, icon,
       colour and order, inside its parent category if the business has it or it comes back too (otherwise at the root);
-      the deleted one stays deleted. It comes back with what it had inside in the copy and the business keeps where
-      deleting it left it (SERVICE-F08): its services still without a category, archived ones too, and its
-      subcategories still hanging where it hung (the root, if it was at the root), each changed as the screen changes it.
-      What the business moved since (a service into another category, a subcategory elsewhere) stays where it is, and
+      the deleted one stays deleted. Last, what it had inside in the copy and the business keeps where deleting it left
+      it goes back into it (SERVICE-F08): its services still without a category, archived ones too, and its
+      subcategories still hanging where it hung (the root, if it was at the root), each changed as the screen changes it:
+      it is what the recovery touches of what the business has, and it is counted apart, as "Service links to
+      categories" and "Subcategory links to categories"; if the business moves one meanwhile, it stays where the
+      business put it and is counted "not created" with its reason (`service.service_moved`). What the business moved
+      since (a service into another category, a subcategory elsewhere) stays where it is, and
       the category's count says so ("Service categories: 1 created, 1 with notes"), with the reason in its notes
       ("service.service_moved: came back without the service <its identifier>: moved to another category since"). One
       the business has already created again (another live one with its name, case
