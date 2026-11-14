@@ -184,6 +184,17 @@ class Hub(models.Model):
     # Its move is to be undone (``control.hub.move_cancel``, or an undo that could not finish): the worker puts it back
     # on its origin on its next pass, never taking it forward. Its restore's too (below): its own database back.
     move_undo_asked_at = models.DateTimeField(_("move undo asked"), null=True, blank=True)
+    # A move asked for the business's night (``control.hub.move`` with ``when="at_night"``): nothing closes until the
+    # worker starts it at ``move_scheduled_for`` (``base.tenancy.move.launch_due``), when ``moving_to`` takes its place.
+    move_scheduled_to = models.ForeignKey(
+        Cluster,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="scheduled_incoming",
+        verbose_name=_("move scheduled to"),
+    )
+    move_scheduled_for = models.DateTimeField(_("move scheduled for"), null=True, blank=True)
     # Its database put back as it was at a moment: asked in the Hub admin
     # (``control.hub.restore``) and done by the worker (``base.tenancy.restore``). ``restoring_from`` is the temporary
     # cluster its copy is on (a point-in-time restore of its own, closed to new hubs), set while it is to do: its host

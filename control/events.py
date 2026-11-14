@@ -14,8 +14,15 @@ CLUSTER_DELETED = "control.cluster.deleted"
 #: moves it (``base.tenancy.move``).
 HUB_MOVE_REQUESTED = "control.hub.move_requested"
 
+#: A hub was asked to move in its next night (``id``, ``slug``, ``from``, ``to``, ``at``: when it starts); open until
+#: the worker starts it (``base.tenancy.move.launch_due``).
+HUB_MOVE_SCHEDULED = "control.hub.move_scheduled"
+
 #: A move was asked to be undone (``id``, ``slug``); the worker puts the hub back on its origin.
 HUB_MOVE_CANCEL_REQUESTED = "control.hub.move_cancel_requested"
+
+#: A move asked for the night was cancelled before it started (``id``, ``slug``, ``to``): nothing was closed.
+HUB_SCHEDULED_MOVE_CANCELLED = "control.hub.scheduled_move_cancelled"
 
 #: A hub was asked to be put back as it was at a moment (``id``, ``slug``, ``from``: the temporary cluster its copy is
 #: on, ``at``: the moment); the worker restores it (``base.tenancy.restore``).
@@ -43,7 +50,9 @@ ALL = [
     CLUSTER_CLOSED,
     CLUSTER_DELETED,
     HUB_MOVE_REQUESTED,
+    HUB_MOVE_SCHEDULED,
     HUB_MOVE_CANCEL_REQUESTED,
+    HUB_SCHEDULED_MOVE_CANCELLED,
     HUB_RESTORE_REQUESTED,
     HUB_RESTORE_ASIDE_REQUESTED,
     COPY_RECOVERY_REQUESTED,

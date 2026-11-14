@@ -4,6 +4,8 @@ The Hub admin asks (``control.hub.move``: ``Hub.moving_to``; its host answers 50
 ``base.registry``); the worker moves it here (:func:`run_due`, in its own thread), one hub at a time, under the hub's
 lease (``hub_due``, provisioning's: :data:`LEASE`, renewed while it copies). Only a database small enough for a copy
 gets here (``control.services.MOVE_MAX_BYTES``); a larger one needs logical replication, which the Hub does not do yet.
+A move asked for the business's night is started by the same pass first (:func:`launch_due`), under the same lease,
+once it is night on the business's own clock; the pass then moves it as any other.
 
 1. **Closed.** On the origin (its cluster, or the settings' own server), ``CONNECT`` and ``TEMPORARY`` are taken from
    the environment's ``hub_app`` and ``hub_admin`` (``base.tenancy.ops.environment_roles``) and every other session on
@@ -108,10 +110,12 @@ def run_due(
     roles: bootstrap.Names | None = None,
     cancelled: Callable[[], bool] | None = None,
 ) -> int:
-    """The worker's pass: move the hub asked longest ago whose lease nobody else holds (one a pass: a copy takes a
-    while), then drop the copies past their days; how many hubs it worked on. ``roles``: the app's roles the origin is
-    closed to (default the environment's); ``cancelled``: whether the worker is stopping."""
+    """The worker's pass: start the moves asked for a night that came (:func:`launch_due`), move the hub asked longest
+    ago whose lease nobody else holds (one a pass: a copy takes a while), then drop the copies past their days; how many
+    hubs it worked on. ``roles``: the app's roles the origin is closed to (default the environment's); ``cancelled``:
+    whether the worker is stopping."""
     now = now or timezone.now()
+    launch_due(now)
     worked = 0
     for hub_id in control_services.hubs_moving():
         if services.claim_hub(hub_id, now, LEASE) is None:
@@ -125,6 +129,25 @@ def run_due(
     drop_old_copies(now)
     drop_leftovers(now)
     return worked
+
+
+def launch_due(now: dt.datetime) -> int:
+    """Start each move asked for a night that is due by ``now`` whose hub's lease nobody else holds
+    (``control.services.start_scheduled_move``): one whose night has not come on the business's clock waits for it, one
+    refused says why; a failure of one is logged and it is tried again on the next pass. How many started."""
+    started = 0
+    for hub_id in control_services.moves_scheduled_due(now):
+        if services.claim_hub(hub_id, now, LEASE) is None:
+            continue
+        try:
+            if control_services.start_scheduled_move(hub_id, now, owner=services.LEASE_OWNER):
+                started += 1
+                logger.info("move: the move of %s asked for its night started.", hub_id)
+        except Exception:
+            logger.exception("move: the move of %s asked for its night could not start; the next pass retries.", hub_id)
+        finally:
+            services.release_hub(hub_id, timezone.now())
+    return started
 
 
 #: What ``last_error`` says after the reason of a move that could not be undone yet.

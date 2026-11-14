@@ -1,11 +1,13 @@
 {% extends "admin/control/action_confirmation.html" %}
 {% load i18n %}
 {% comment %}
-«Move to cluster…» of the Hub admin (control.admin.HubAdmin.move_to_cluster): the chosen hubs and an open cluster to
-move them to. Confirmed, each is asked through control.hub.move; the worker moves it (base.tenancy.move).
+«Move to cluster…» of the Hub admin (control.admin.HubAdmin.move_to_cluster): the chosen hubs, an open cluster to
+move them to and when (start and end: the night's window). Confirmed, each is asked through control.hub.move; the
+worker moves it (base.tenancy.move).
 {% endcomment %}
 {% block intro %}{% blocktranslate trimmed %}
   Each hub chosen closes for a few minutes while its database is copied to the cluster you choose, and opens again
-  there. A database too large for a copy is refused.
+  there: in its next night, starting between {{ start }} and {{ end }} of the business's time, or now. A database too
+  large for a copy is refused.
 {% endblocktranslate %}{% endblock intro %}
 {% block submit %}{% translate 'Move them' %}{% endblock submit %}

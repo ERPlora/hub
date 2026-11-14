@@ -380,6 +380,21 @@ def test_a_hub_on_its_way_to_a_cluster_takes_its_place_there(registry, told):
     assert hub.last_error.startswith("no_cluster_available: ")
 
 
+def test_a_hub_going_to_a_cluster_in_its_night_takes_its_place_there(registry, told):
+    # A move asked for the business's night holds its place until the worker starts it: a new hub placed there
+    # meanwhile would have it refused at night for a full cluster.
+    full = registry.cluster("full", max_hubs=1)
+    tonight = timezone.now() + dt.timedelta(hours=12)
+    registry.hub(status=Hub.Status.READY, db_name="", move_scheduled_to=full, move_scheduled_for=tonight)
+    hub = registry.hub()
+
+    assert provision.provision(hub) is False
+
+    hub = fresh(hub)
+    assert (hub.status, hub.cluster) == ("failed", None)
+    assert hub.last_error.startswith("no_cluster_available: ")
+
+
 def test_a_purged_hub_frees_its_place_on_a_cluster(registry, told):
     small = registry.cluster("small", max_hubs=1)
     registry.hub(status=Hub.Status.PURGED, db_name="", cluster=small)
