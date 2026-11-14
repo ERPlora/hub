@@ -16,6 +16,7 @@ what it read or 404, never a 500.
 
 import threading
 import time
+import uuid
 from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -41,6 +42,7 @@ from apps.service.models import (
 )
 from apps.staff.models import Member
 from apps.tax.models import TaxCategory
+from base.recovery import actor_of
 
 from .conftest import (
     ctx_for,
@@ -931,26 +933,47 @@ def test_a_row_deleted_between_its_name_and_its_detail_is_not_found(world, detai
 # ── A recovery from a separate copy and the business's own edits ───────────────────────────────
 
 
-def run_as_platform(name, data):
-    """``name`` run as a recovery runs it: as the system, with every permission."""
+def run_as_platform(name, data, actor="system"):
+    """``name`` run as a recovery runs it: as ``actor`` (its own, ``base.recovery.actor_of``), with every permission."""
     op = get(name)
-    return op(ctx_for(actor="system", permissions={"*"}), op.input.model_validate(data))
+    return op(ctx_for(actor=actor, permissions={"*"}), op.input.model_validate(data))
 
 
-def test_a_category_brought_back_waits_for_an_edit_of_its_service_and_keeps_what_the_edit_changed(world):
+def test_a_service_put_back_in_the_category_brought_back_waits_for_an_edit_of_it_and_keeps_what_the_edit_changed(world):
     # The recovery put the service back in its category from the row as it read it before the edit committed,
     # and saved it whole over the edit: the new price was lost.
-    gone = make_category("Color", is_deleted=True)
+    recovery = actor_of(uuid.uuid7())
+    back = make_category("Color", created_by=recovery)
     def edit():
         Service.objects.filter(pk=world.cut.pk).update(price=4200)
 
     with held_in_flight(world.cut, made=edit) as edits:
-        made = run_as_platform(
-            "service.category.recover", {"name": "Color", "stands_for": str(gone.pk), "service_ids": [str(world.cut.pk)]}
+        run_as_platform(
+            "service.service.return_to_category",
+            {"service_id": str(world.cut.pk), "category_id": str(back.pk)},
+            recovery,
         )
     assert deleted(edits) == ["ok"]
     cut = Service.objects.get(pk=world.cut.pk)
-    assert (cut.category_id, cut.price) == (made.id, 4200)
+    assert (cut.category_id, cut.price) == (back.pk, 4200)
+
+
+def test_a_subcategory_put_back_in_the_category_brought_back_waits_for_an_edit_of_it_and_keeps_what_it_changed(world):
+    recovery = actor_of(uuid.uuid7())
+    gone = make_category("Old colour", is_deleted=True)
+    back = make_category("Old colour", created_by=recovery)
+    def edit():
+        Category.objects.filter(pk=world.colour.pk).update(icon="ion:color-palette-outline")
+
+    with held_in_flight(world.colour, made=edit) as edits:
+        run_as_platform(
+            "service.category.return_to_parent",
+            {"category_id": str(world.colour.pk), "parent_id": str(back.pk), "stands_for": str(gone.pk)},
+            recovery,
+        )
+    assert deleted(edits) == ["ok"]
+    colour = Category.objects.get(pk=world.colour.pk)
+    assert (colour.parent_id, colour.icon) == (back.pk, "ion:color-palette-outline")
 
 
 def test_a_category_brought_back_while_another_is_deleted_never_waits_in_a_circle(world):
