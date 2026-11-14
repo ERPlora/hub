@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:81818478e7699c059999b64b00c6d041764be33252376612c69ed38cdf4c2429 -->
+<!-- generated from WORKBOOK.md sha256:aac570b2963a25c05f2c4c60c2d4ff73f3423cf1927f224fd7c05b9365a0be31 -->
 
 ## What it is for and who it is for
 
@@ -434,11 +434,13 @@ longer has (created again) and, last, those the business keeps live, which go ba
 category. Recoveries counts those links apart ("Product links to categories"). A category the business keeps, even
 renamed or with products taken out of it since, is the same one: it is neither repeated nor filled; nor is one it made
 again with its name (case and spaces aside): its own is used, as it is, and only the products created again go into it.
-A deleted product that comes back (INVENTORY-F34) does not go into the one the business made again by hand.
+A deleted product that comes back (INVENTORY-F34) does not go into the one the business made again by hand. The
+category that comes back also gets back its modifier groups, if Modifiers is recovered too (MODIFIER-F10); the one the
+business made again by hand keeps those it linked to it.
 If the recovery is asked again from a copy made before the category it brought back, that category still counts as
 brought back: the live products the business took out of it since go back into it.
 If it fails: "The category could not be deleted" (or the reason) above the table.
-Involved: KITCHEN-F04, SALE-F01, BASE-F114, INVENTORY-F34
+Involved: KITCHEN-F04, SALE-F01, BASE-F114, INVENTORY-F34, MODIFIER-F10
 
 ### INVENTORY-F08 Group products into categories for the till
 Status: done

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7a725f05e1737ea606b96533fc97cbf3bdaeeec7caf4f2788f570239d6efb090 -->
+<!-- generated from WORKBOOK.md sha256:3abddbbaa6f73d1784cfcc1c770b1c3ac7bc4198e81a854bfc2033d5e30b143f -->
 
 ## What it is for and who it is for
 
@@ -338,35 +338,43 @@ links of another. If ERPlora's staff later recover the product from a separate c
 (MODIFIER-F10).
 Involved: INVENTORY-F04, INVENTORY-F07, INVENTORY-F34, MODIFIER-F10
 
-### MODIFIER-F10 Recover a product's modifier groups from a separate copy
+### MODIFIER-F10 Recover the modifier groups of a product or of a category from a separate copy
 Status: done
 Actor: ERPlora's staff who run the platform, when a business asks for it (BASE-F114)
 Screen: none of Modifiers: in the Hubs admin, Separate copies › "Recover into the business…", with **Modifier groups
-of products** ticked (it is, like everything that can be brought back)
+of categories, Modifier groups of products** ticked (it is, like everything that can be brought back)
 Steps:
-1. The staff recover from a separate copy with **Modifier groups of products** ticked. Modifiers always goes after
-   Inventory, in whatever order it is asked: a deleted product that comes back is already live when its groups are
-   linked to it.
+1. The staff recover from a separate copy with **Modifier groups of categories, Modifier groups of products** ticked.
+   Modifiers always goes after Inventory, in whatever order it is asked: a deleted category or product that comes back
+   is already live when its groups are linked to it.
 2. Each group that in the copy hung from a product live in it and that the business no longer has linked to that
    product is linked again, as the group's sheet links it (MODIFIER-F05): the product asks again at the till for its
    sauces, its doneness or its extras. A product the business no longer had at all comes back as a new one, with
    another identifier (INVENTORY-F01): its groups are linked to that one, the one the recovery made with its SKU.
-3. Recoveries counts it apart: "Modifier groups of products: 2 created".
+3. Before that, the same with each group that in the copy hung from a category live in it and that the business no
+   longer has linked to that category: all the category's products ask for it again. A deleted category always comes
+   back as a new one, with another identifier (INVENTORY-F07): its groups are linked to that one, the one the recovery
+   brought back with its name.
+4. Recoveries counts each thing apart: "Modifier groups of categories: 2 created" and "Modifier groups of products: 2
+   created".
 In: the separate copy and what the business has today.
 Out: a link for each one that was missing, with its link-made notice (`modifier.link.attached`) made by the recovery,
 so no automation starts (FLOW-F21); nothing else. The open screens of Modifiers, the till and Kitchen's routing see at
-once the product that comes back, as they saw it being deleted.
+once the product that comes back, as they saw it being deleted; those of Modifiers and the till, also each group that
+hangs again from a category or a product.
 If it fails: a link the business still has stays as it is, and one whose group the business has linked to that product
-again is not repeated: the business's own stays, and asking again links nothing twice. A group the business unlinked
+or that category again is not repeated: the business's own stays, and asking again links nothing twice. A group the business unlinked
 from a product by hand after the copy comes back too, like everything the business no longer has (BASE-F114). What the
 group's sheet does not accept today does not come back and Recoveries says why, by the link's identifier in the copy:
 a product that stays deleted or that the business no longer has (Products was not recovered, or the business already
 made another one by hand with its SKU, which keeps the groups it linked to it) or a group the business deleted
 afterwards ("not_found: …"); a deleted group is not recovered from the copy (hub#1458). The product a recovery made is
 known by its SKU, whether this recovery made it or an earlier one: asked again from an earlier copy, it gets back the
-groups the business unlinked from it afterwards, like everything it no longer has. The groups linked to a category do
-not come back: not to a recovered category either (hub#1456).
-Involved: BASE-F114, INVENTORY-F01, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
+groups the business unlinked from it afterwards, like everything it no longer has. The same with the categories: one
+that stays deleted (Products was not recovered) or that the business already made again by hand with its name, which
+keeps the groups it linked to it, gets none and Recoveries says why ("not_found: …"); the one a recovery brought back is
+known by its name, whether this recovery brought it back or an earlier one.
+Involved: BASE-F114, INVENTORY-F01, INVENTORY-F07, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
 
 ## Services: what goes in and what comes out
 

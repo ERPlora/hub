@@ -3063,11 +3063,11 @@ Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, A
 <!-- origen: nuevo (aws#77; PLAN-DB §13 «Restaurar un hub»: los planes de pago prometen volver a cualquier momento de los últimos 14 días) gh:hub#1198 -->
 Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte, y recuperar desde la copia aparte los
 clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías, las citas,
-las citas periódicas, los precios de tarifa y los grupos de suplementos y las elecciones de menú de los productos; crear
-y borrar el clúster temporal es el procedimiento «Devolver un negocio a un momento» de ERPlora/aws; los precios de
-tarifa de un servicio que vuelve como uno nuevo, hub#1459; los grupos de suplementos de una categoría que vuelve,
-hub#1456; un grupo de suplementos borrado, hub#1458; las elecciones de menú de un producto que vuelve como uno nuevo,
-hub#1473; un menú o un plato retirado, hub#1474)
+las citas periódicas, los precios de tarifa, los grupos de suplementos de las categorías y de los productos y las
+elecciones de menú de los productos; crear y borrar el clúster temporal es el procedimiento «Devolver un negocio a un
+momento» de ERPlora/aws; los precios de tarifa de un servicio que vuelve como uno nuevo, hub#1459; un grupo de
+suplementos borrado, hub#1458; las elecciones de menú de un producto que vuelve como uno nuevo, hub#1473; un menú o un
+plato retirado, hub#1474)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
 copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
@@ -3106,11 +3106,11 @@ Pasos:
      avisa otra vez de una cita que ya tenía (hub#1307).
      Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes**, **Categorías de productos,
      Productos, Enlaces de productos a categorías**, **Categorías de servicios, Servicios**, **Citas, Citas
-     periódicas**, **Precios de tarifa**, **Elecciones de menú de productos** y **Grupos de suplementos de productos**).
-     Pulsa **Recuperar**.
+     periódicas**, **Precios de tarifa**, **Elecciones de menú de productos** y **Grupos de suplementos de categorías,
+     Grupos de suplementos de productos**). Pulsa **Recuperar**.
   10. Sale «1 copia aparte devolverá Clientes, Categorías de productos, Productos, Enlaces de productos a categorías,
       Categorías de servicios, Servicios, Citas, Citas periódicas, Precios de tarifa, Elecciones de menú de productos,
-      Grupos de suplementos de productos a su negocio en unos minutos:
+      Grupos de suplementos de categorías, Grupos de suplementos de productos a su negocio en unos minutos:
       Recuperaciones dice cómo
       fue.». En
       Recuperaciones la ve «Pedida» con la copia, qué se pidió y cuándo.
@@ -3218,7 +3218,12 @@ Pasos:
       que vuelve, el mismo o como uno nuevo, pregunta otra vez en el TPV sus salsas, su punto o sus extras
       (MODIFIER-F10). No se repite uno cuyo grupo el negocio ya volvió a enganchar a ese producto: se queda el suyo. Uno
       que la hoja del grupo no acepta hoy (su producto sigue eliminado, o el negocio ya hizo otro a mano con su SKU, o
-      borró el grupo) no vuelve y su motivo lo dice.
+      borró el grupo) no vuelve y su motivo lo dice. Justo antes van, contados aparte, los grupos de suplementos de las
+      categorías: «Grupos de suplementos de categorías: se crearon 2». Cada grupo que en la copia colgaba de una
+      categoría viva allí y que el negocio ya no tiene enganchado a ella se vuelve a enganchar del mismo modo: a la
+      misma categoría si el negocio la conserva, o a la que la recuperación trajo por ella con su nombre, así que sus
+      productos vuelven a preguntarlo en el TPV. Una categoría que sigue eliminada o que el negocio volvió a crear a mano
+      se queda sin él, y su motivo lo dice.
       Las elecciones de menú de los productos van también después de los productos: «Elecciones de menú de productos:
       se crearon 2». Cada elección que en la copia ofrecía un producto vivo allí y que el negocio ya no tiene se vuelve a
       añadir a su plato, como la añade el constructor del menú, con su suplemento y, si estaba agotada, agotada, así que
@@ -3251,8 +3256,8 @@ una que ya no tenía, con su aviso de cita creada (`appointment.appointment.crea
 aún guardaba, activa otra vez con su aviso de serie recuperada (`appointment.recurring.restored`), una cita periódica
 nueva por cada una que ya no tenía, con su aviso de serie creada (`appointment.recurring.created`) y el de cada cita que
 reserva, un precio de tarifa por cada uno que le faltaba, con su aviso de precio puesto (`pricing.price_item.added`),
-un grupo de suplementos enganchado a un producto por cada uno que le faltaba, con su aviso de enganche hecho
-(`modifier.link.attached`), y una elección de menú por cada una que le faltaba, con su aviso de elección nueva
+un grupo de suplementos enganchado a una categoría o a un producto por cada uno que le faltaba, con su aviso de enganche
+hecho (`modifier.link.attached`), y una elección de menú por cada una que le faltaba, con su aviso de elección nueva
 (`combo.option.created`), y nada más. Cada uno
 de esos avisos dice que lo hizo la recuperación (su autor es `copy_recovery:<id>`, el de la fila de Recuperaciones), así
 que ninguna automatización del negocio arranca con ellos (FLOW-F21), sea de algo creado o de algo recuperado; lo que
