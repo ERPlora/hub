@@ -1147,7 +1147,8 @@ def test_what_a_card_came_back_without_is_said_in_the_language_it_is_made_in():
     CustomField.objects.create(name="Pet", is_active=False)
 
     with translation.override("es"):
-        [said] = system("customer.customer.recover", a_card_of_the_copy(field_values=[{"name": "Pet", "value": "Luna"}])).left_out
+        made = system("customer.customer.recover", a_card_of_the_copy(field_values=[{"name": "Pet", "value": "Luna"}]))
+        [said] = made.left_out
         spanish = FIELD_INACTIVE_LEFT % {"field": "Pet"}
 
     assert said.message == spanish
