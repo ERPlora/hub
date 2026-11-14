@@ -8,10 +8,7 @@ Ventas, con las operaciones de aquí (KITCHEN-F18–F20).
 
 > Manual de usuario y especificación de la app `kitchen`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
-> (servidor y páginas). Parte del `WORKFLOW.md` del módulo Cocina del producto actual
-> (`modules-workspace/modules/kitchen`, `origin/main` `fa95827`) y de sus `workflow/*.md`. Los números
-> de flujo se conservan (`KITCHEN-Fnn`) porque otras apps los citan. Lo que cambia frente al producto
-> actual lo dice «Cambios frente al producto actual», al final.
+> (servidor y páginas).
 
 ## Para qué sirve y para quién
 
@@ -42,8 +39,7 @@ ver, o lo que ya no existe, no sale.
 
 ## Referencia adoptada
 
-ERPlora no inventa flujos: adopta los que el mercado ya probó (contrastados en el producto actual el
-10/08, 15/08, 24/08 y 02/09/2026, y revisados al portar).
+ERPlora no inventa flujos: adopta los que el mercado ya probó.
 
 - **Estaciones de preparación, vista de pase (todas las estaciones), marcar listo por plato y por
   comanda, «urgente» después de enviar**:
@@ -58,16 +54,15 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó (contrastados en 
 - **La comanda pasa sola a la siguiente etapa cuando se tacha el último plato**:
   [Odoo — pantalla de preparación](https://www.odoo.com/documentation/18.0/applications/sales/point_of_sale/preparation.html).
 - **Una estación deja de ver una comanda en cuanto termina su parte; el pase («Todas») la sigue
-  viendo entera** (Toast prep stations, Square KDS por estación, Fresh KDS): decisión de mercado de la
-  duda 1 del producto actual.
+  viendo entera** (Toast prep stations, Square KDS por estación, Fresh KDS): decisión de mercado.
 - **Cada tableta recuerda su estación** (Toast, Square y Fresh configuran cada pantalla a una
-  estación): decisión de mercado de la duda 4.
+  estación): decisión de mercado.
 - **Imprimir el pase al marcar listo, apagado de fábrica; un solo interruptor de sonido con volumen
   y tono de una lista cerrada** (Toast, Fresh KDS, MobiPOS).
 - **Lo que va solo a impresora no espera a que nadie lo marque**, y **cobrar no para la cocina**
   (Toast, Lightspeed K, Odoo, LS Central, Simphony): al cobrar sale lo que nadie va a marcar.
 - **La comanda nombra a quien atiende la cuenta («Atiende» del TPV) y, si es «Yo», a quien la envía**
-  (decisión de mercado del 21/10/2026; kitchen#82, hub#2033, staff#59). Así el pase sabe a quién llamar,
+  (decisión de mercado del 21/10/2026). Así el pase sabe a quién llamar,
   aunque esa persona no entre en la app.
   - Los TPV de sala nombran al camarero dueño de la cuenta o de la mesa:
     [Toast](https://support.toasttab.com/en/article/Why-Aren-t-Server-Names-Showing-on-Kitchen-Tickets)
@@ -86,8 +81,7 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó (contrastados en 
     De ahí sale el respaldo de «Yo».
   - [Lightspeed K](https://k-series-support.lightspeedhq.com/hc/articles/4403006478107) deja elegir los
     campos del ticket.
-  - Es también lo que hacía el producto actual y lo que promete el propio TPV en «Quién atiende esta
-    cuenta».
+  - Es lo que promete el propio TPV en «Quién atiende esta cuenta».
 
 ## Antes de empezar
 
@@ -227,7 +221,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | KITCHEN-F27 | Cerrar las rondas al cobrar la cuenta entera | hecho |
 | KITCHEN-F28 | Retirar las rondas de una cuenta eliminada o unida a otra | hecho |
 | KITCHEN-F29 | Anular un plato ya enviado con aviso a cocina | hecho |
-| KITCHEN-F30 | Pasar las comandas de un cliente unido a otro | descartado — la comanda no guarda cliente |
 | KITCHEN-F31 | Dar a Caja las comandas que siguen en marcha | hecho |
 
 ### KITCHEN-F01 Crear una estación
@@ -768,20 +761,6 @@ salió en papel, sale el vale «PLATO ANULADO · Mesa 4» con ese plato.
 Si falla: una ronda Servida o Cancelada no se toca.
 Implicados: SALE-F20, COMBO-F11, KITCHEN-F06, KITCHEN-F10, KITCHEN-F15, KITCHEN-F19, KITCHEN-F25
 
-### KITCHEN-F30 Pasar las comandas de un cliente unido a otro
-Estado: descartado — la comanda no guarda cliente: unir dos fichas de cliente no toca Cocina
-Actor: nadie en Cocina (la unión la hace Clientes)
-Pantalla: ninguna
-Pasos:
-1. En Clientes se unen dos fichas de la misma persona (CUSTOMER-F13) y Ventas pasa sus ventas a la que
-   queda (SALE-F33).
-2. En Cocina no pasa nada: la comanda guarda la etiqueta de la cuenta como texto y ningún cliente, así
-   que no hay nada que pasar.
-Entra: nada; el TPV no manda el cliente a Cocina.
-Sale: nada; las comandas no cambian.
-Si falla: no aplica: Cocina no hace nada que pueda fallar.
-Implicados: CUSTOMER-F13, SALE-F33
-
 ### KITCHEN-F31 Dar a Caja las comandas que siguen en marcha
 Estado: hecho
 Actor: sistema
@@ -914,8 +893,8 @@ avisos de Ventas (`sale.order.*`).
 | Guardar los ajustes | sí | sí | sí | no | `kitchen.change_settings` |
 | Ver el historial | sí | sí | sí | sí | `kitchen.view_log` |
 
-Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); el
-cajero y el cocinero del producto actual son empleados. `kitchen.ticket.sync` pide `kitchen.system`,
+Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
+`kitchen.ticket.sync` pide `kitchen.system`,
 que no tiene ningún papel: solo el sistema (`*`).
 
 ### Notas técnicas
@@ -1013,8 +992,7 @@ que no tiene ningún papel: solo el sistema (`*`).
   y por `DISHES` («Platos»). El tipo de `send` y `receive` lleva `choices_of: order_type` (`OF_ORDER_TYPE`) y la
   prioridad de `receive` es la lista cerrada de la comanda: la tarjeta los dice con las etiquetas de `Ticket`
   («Para llevar», «Urgente»). Lo que Ventas manda se sigue leyendo antes (`_channel`, `_priority`): una palabra
-  desconocida cae a «En sala» y «Normal», y una ronda pedida sin prioridad queda «Normal» (antes llegaba vacía y
-  rompía la restricción `kitchen_ticket_priority`). Sin persona detrás, sin `kitchen.view_ticket`,
+  desconocida cae a «En sala» y «Normal», y una ronda pedida sin prioridad queda «Normal». Sin persona detrás, sin `kitchen.view_ticket`,
   `inventory.view_product`, `inventory.view_category` o `sale.view_sale`, con un id de otro negocio o de algo
   borrado, el registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`); el trinquete de
   `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca o una lista sin etiqueta. Las dos
@@ -1027,36 +1005,14 @@ que no tiene ningún papel: solo el sistema (`*`).
 - **Moneda**: el Total de Comandas va en la moneda del negocio (`useBusinessMoney` de `base`, la de
   `base.business.get`) con los decimales del servidor, nunca los de `Intl` (el forint) ni un euro por defecto:
   mientras el negocio no contesta, un importe es «—», nunca con decimales supuestos. El `total` del servidor ya va en unidades menores de la
-  moneda de la venta (FIX-HUB-KITCHEN-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY, como Caja en hub#273).
+  moneda de la venta (como Caja, hub#273).
 - Toda lista pagina (`limit` ≤ 100) con desempate por `id`; el tablero tiene un tope de 200 comandas en
   marcha (`truncated`).
-
-### Cambios frente al producto actual
-
-| Producto actual | Ahora | Por qué |
-|---|---|---|
-| El reloj vuelve a cero cuando cocina toca la comanda | Cuenta desde el envío | BD-08 y el mercado: el semáforo mide la espera real |
-| «Lista» desde Comandas no tachaba los platos | Los tacha | Dejaba platos colgados que impedían borrar la estación |
-| Una estación ve su tarjeta tachada hasta que terminan las demás | Sale de esa estación al terminar su parte; el pase la sigue viendo | Duda 1, mercado (Toast, Square, Fresh) |
-| La estación elegida no se recuerda | Se recuerda en el dispositivo | Duda 4, mercado |
-| Color e Impresora de la estación no hacían nada; destino y función solo por API | Color en la pantalla; destino, función e impresora en el formulario | Duda 5: lo que se ve, hace algo |
-| Enrutado invisible, sin quitar, y a una estación inactiva decía «guardado» | Lista con «Quitar» y rechazo claro | Parcial de F04 |
-| Nueva comanda a mano sin platos | Con platos | Duda 6: una tarjeta vacía no sirve |
-| Cancelar sin confirmación ni motivo | Confirmación y motivo opcional | Parcial de F22 |
-| Borrar contestaba bien sin borrar | Rechazo claro | Parcial de F24 |
-| No había reimpresión | «Reimprimir» | F09 |
-| Historial sin quién, sin plato; urgencias y borrados sin apuntar | Con quién, plato, urgencia y borrado | Parcial de F25 |
-| El número del día iba en UTC | Día del negocio (Madrid) | Entre medianoche y la 1–2 salía el día anterior |
-| La hoja del TPV enseñaba la hora en UTC | La hora del envío, en la del negocio | F19 |
-| Pase y aviso de urgencia los imprimía la pantalla | Los pide el servidor en la transacción | Sin reacciones del cliente (PLAN §14) |
-| Unión de clientes (F30) | Descartado | La comanda no guarda cliente |
-| Apuntar en el historial a mano (`kitchen.logs.create`) | Retirado | Un historial que se escribe a mano deja de ser historial; ningún KDS lo ofrece |
-| Ajustes retirados en kitchen#48 (aceptar y retirar solas…) | No vuelven | No movían nada |
 
 ### Contradicciones (sin resolver; se señalan)
 
 - **Ronda de una cuenta fusionada**: Ventas conserva su `round_no`, así que la cuenta que queda puede
-  tener dos «Comanda 1»; el producto actual las renumeraba detrás de las suyas.
+  tener dos «Comanda 1».
 
 ### Lo que queda fuera
 
