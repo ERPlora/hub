@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:aa120051c023216ccfa5bfbe7b4663f2c1b8c17fdfbbe503adb3a26b0db29a82 -->
+<!-- generated from WORKBOOK.md sha256:c4ce5b68e9e70d9cb30ff78a1b87f33bc1cef0d70cfec0560986f7a01572d447 -->
 
 ## What it is for and who it is for
 
@@ -28,8 +28,7 @@ Who uses it:
 The cart and order model of an online shop (Shopify Checkout, WooCommerce, Odoo eCommerce): a cart
 with a session code, an order with a consecutive number and the statuses initiated → paid or failed →
 completed. **Only the status model** is adopted: the public shop, the payment gateway, the taxes,
-shipping and stock of those references **do not exist here**. No new research: it is the same scope as
-the current product.
+shipping and stock of those references **do not exist here**.
 
 ## Before you start
 
@@ -292,7 +291,7 @@ Steps:
 3. The order becomes **Failed** and shows its whole reason under the status.
 In: the order and the reason (up to 500 characters).
 Out: status Failed, the reason and the time (`cart_checkout.order.failed`). An order already Paid can also
-fail, as today: **it leaves no trace of a refund** (there are no refunds in this app). The cart
+fail: **it leaves no trace of a refund** (there are no refunds in this app). The cart
 stays as it was. The assistant asks for a stronger confirmation and says the order by its number.
 If it fails: a Completed or already Failed order is refused; an empty reason, under its field, without losing
 what was written.
@@ -340,9 +339,9 @@ Steps:
 1. Each change of the previous flows leaves a notice in the Hub's outbox in its same transaction.
 2. Both screens update by themselves with what changed.
 In: the change that causes it.
-Out: thirteen notices: the twelve of the current product (`cart.created`, `cart.abandoned`, `cart.deleted`,
-`cart.cleared`, `cart.expired`, `item.added`, `item.updated`, `item.removed`, `checkout.initiated`,
-`order.paid`, `order.failed`, `order.completed`) and `customer.erased`, with the prefix `cart_checkout.`.
+Out: thirteen notices (`cart.created`, `cart.abandoned`, `cart.deleted`, `cart.cleared`, `cart.expired`,
+`item.added`, `item.updated`, `item.removed`, `checkout.initiated`, `order.paid`, `order.failed`,
+`order.completed` and `customer.erased`), with the prefix `cart_checkout.`.
 Only Automations listens to them, and it can start an automation with any of them; no
 other app of the Hub listens to them.
 If it fails: a refused change leaves neither the change nor the notice.
