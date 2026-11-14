@@ -698,8 +698,6 @@ def category_links_in_copy(conn) -> list[dict]:
     its category with the business's); nothing where the app's table is not there. ``conn`` is the copy's direct,
     read-only connection."""
     rows = _links_in_copy(conn, "category")
-    if not rows:
-        return []
     named = category_names_in_copy(conn)
     return [dict(zip(CATEGORY_LINK_FIELDS, row, strict=True)) | {"copy_categories": named} for row in rows]
 

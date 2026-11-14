@@ -232,6 +232,21 @@ def test_a_category_gone_gets_its_groups_on_the_one_a_recovery_brought_back_with
     ]
 
 
+@pytest.mark.django_db
+def test_a_category_the_copy_also_holds_is_never_the_stand_in_of_another_with_its_name():
+    sauces = a_group("Sauces")
+    lost = make_category("Specials")
+    run_here("inventory.category.delete", {"id": str(lost.id)})
+    # Brought back by an earlier recovery before the copy was made, and kept: the copy holds it too, as itself.
+    kept = brought_back("Specials")
+    link = a_category_link_of_the_copy(sauces, lost.id, {lost.id: "Specials", kept.id: "Specials"})
+
+    # The lost one has no stand-in: its group keeps the copy's category, which the attach refuses as not found.
+    assert queries.category_links_not_in_business([link]) == [
+        {"id": link["id"], "group_id": sauces.id, "category_id": lost.id}
+    ]
+
+
 def test_the_app_declares_its_groups_of_categories_first_hung_again_by_the_same_attach():
     categories, _links = apps.get_app_config("modifier").recoverable_from_copy()
 
