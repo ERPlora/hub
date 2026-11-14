@@ -56,16 +56,12 @@ async function refusedWindow(name: string | undefined, group: string | Component
 }
 
 describe('useGroupChange', () => {
-  it('a change to the group named after a refused key takes that refusal away, and only it', async () => {
-    const w = await refusedWindow('tiers');
-    expect([w.said('rule-tiers-error'), w.said('rule-code-error')]).toEqual([RISING, TAKEN]);
-    await w.change();
-    expect([w.said('rule-tiers-error'), w.said('rule-code-error')]).toEqual(['', TAKEN]);
-    w.unmount();
-  });
-
-  it('a FieldGroup named after the refused key takes it away the same: its ref is the component, the change its fieldset’s', async () => {
-    const w = await refusedWindow('tiers', FieldGroup);
+  // A FieldGroup's ref is the component, not its fieldset: the change has to come from the fieldset all the same.
+  it.each([
+    ['a plain fieldset', 'fieldset'],
+    ['a FieldGroup', FieldGroup],
+  ] as const)('a change to the group named after a refused key takes that refusal away, and only it: %s', async (_, group) => {
+    const w = await refusedWindow('tiers', group);
     expect([w.said('rule-tiers-error'), w.said('rule-code-error')]).toEqual([RISING, TAKEN]);
     await w.change();
     expect([w.said('rule-tiers-error'), w.said('rule-code-error')]).toEqual(['', TAKEN]);
