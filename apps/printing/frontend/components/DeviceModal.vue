@@ -10,6 +10,7 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { IonCheckbox, IonNote } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
+import FieldGroup from '../../../../base/frontend/components/FieldGroup.vue';
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
 import { useT } from '../composables/useT';
@@ -110,7 +111,7 @@ const canDismiss = useUnsavedFormOnOpen('printing-device', () => ({ name: name.v
           :placeholder="$t('printing.devices.modal.namePlaceholder')"
           :error-text="nameError(fieldErrors)"
         />
-        <fieldset class="printing-device__printers">
+        <FieldGroup class="printing-device__printers">
           <legend>{{ $t('printing.devices.modal.printers') }}</legend>
           <p
             v-if="printers.length === 0"
@@ -140,7 +141,7 @@ const canDismiss = useUnsavedFormOnOpen('printing-device', () => ({ name: name.v
           >
             {{ missingPrinters ? $t('printing.devices.modal.choosePrinters') : fieldErrors.printers }}
           </ion-note>
-        </fieldset>
+        </FieldGroup>
       </div>
     </template>
   </FormModal>
@@ -159,10 +160,6 @@ const canDismiss = useUnsavedFormOnOpen('printing-device', () => ({ name: name.v
 .printing-device__printers {
   display: grid;
   gap: 10px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  min-width: 0;
 }
 .printing-device__printers legend {
   padding: 0;

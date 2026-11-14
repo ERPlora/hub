@@ -17,6 +17,7 @@ import { useGroupChange } from '../../../../base/frontend/lib/group-change';
 import { useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
 
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
+import FieldGroup from '../../../../base/frontend/components/FieldGroup.vue';
 import { useLocale, useT } from '../composables/useT';
 import { type Money, percentFieldText, readPercentBp, useBusinessMoney } from '../lib/format';
 import { searchServices } from '../lib/pickers';
@@ -352,7 +353,7 @@ async function save(): Promise<void> {
             </li>
           </ul>
         </template>
-        <fieldset
+        <FieldGroup
           v-else
           ref="itemsGroup"
           name="items"
@@ -411,7 +412,7 @@ async function save(): Promise<void> {
           >
             {{ fieldErrors.items || t('service.packages.form.noLines') }}
           </InlineFeedback>
-        </fieldset>
+        </FieldGroup>
       </div>
     </template>
   </FormModal>
@@ -439,10 +440,6 @@ async function save(): Promise<void> {
 .service-package-form__lines {
   display: grid;
   gap: 14px;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
 }
 /* Each line: its service on a row of its own, so the name reads whole in the dialog's width; its Sessions
    and «Remove line» below. */

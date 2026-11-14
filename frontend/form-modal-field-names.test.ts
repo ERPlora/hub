@@ -166,9 +166,9 @@ function paintedApart(reach: Reach): Notice[] {
 
 /** The plain HTML fields FormModal hears change under their `name`; on a div or a section it reads none. */
 const TYPED_HTML = new Set(['input', 'select', 'textarea']);
-/** The plain HTML elements whose `name` FormModal reads but that never say a change themselves: a group's `<fieldset>`
- *  counts once the window hands its ref to `useGroupChange`, which says each change for it. */
-const MUTE_HTML = new Set(['button', 'fieldset', 'output']);
+/** The elements whose `name` FormModal reads but that never say a change themselves: a group's `<fieldset>`, or the
+ *  FieldGroup that paints one, counts once the window hands its ref to `useGroupChange`, which says each change for it. */
+const MUTE = new Set(['button', 'fieldset', 'output', 'FieldGroup']);
 
 /** `element`'s plain `ref="…"`, or nothing. */
 function plainRef(element: Element): string | undefined {
@@ -185,7 +185,7 @@ function controlNames(nodes: readonly TemplateNode[], voiced: ReadonlySet<string
     const dynamic = bound(element, 'name');
     const name = plainName(element) ?? (dynamic !== undefined ? literal(dynamic) : undefined);
     if (!name) return;
-    if (MUTE_HTML.has(element.tag)) {
+    if (MUTE.has(element.tag)) {
       if (voiced.has(plainRef(element) ?? '')) heard.add(name);
       else if (!mute.has(name)) mute.set(name, element.tag);
     } else if (TYPED_HTML.has(element.tag) || element.tag.includes('-') || /^[A-Z]/.test(element.tag)) heard.add(name);
@@ -484,6 +484,16 @@ describe('guardrail: every field of a FormModal window that paints its refusal c
     expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': windowWith(group('')) })).toEqual(mute);
     expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': windowWith(group(' ref="tiersGroup"')) })).toEqual(mute);
     expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': windowWith(group(' ref="weekGroup"'), voiced) })).toEqual(mute);
+    expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': windowWith(group(' ref="tiersGroup"'), voiced) })).toEqual([]);
+  });
+
+  it('counts a FieldGroup as the fieldset it paints: named after a refusal, only once its ref goes to useGroupChange', () => {
+    const group = (attributes: string): string =>
+      [`<FieldGroup${attributes} name="tiers">`, '  <p v-if="fieldErrors.tiers">{{ fieldErrors.tiers }}</p>', '</FieldGroup>'].join('\n');
+    const voiced = "const tiersChanged = useGroupChange('tiersGroup');";
+    expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': windowWith(group(' ref="tiersGroup"')) })).toEqual([
+      'apps/x/frontend/components/XFormModal.vue:8: <p> paints fieldErrors.tiers apart and its <FieldGroup name="tiers"> says no change: hand its ref to useGroupChange',
+    ]);
     expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': windowWith(group(' ref="tiersGroup"'), voiced) })).toEqual([]);
   });
 
