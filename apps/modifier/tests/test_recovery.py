@@ -204,6 +204,17 @@ def test_a_copy_without_the_apps_table_gives_no_group_of_a_category():
     assert queries.category_links_in_copy(direct()) == []
 
 
+@pytest.mark.django_db
+@pytest.mark.parametrize("read", [queries.links_in_copy, queries.category_links_in_copy])
+def test_a_copy_with_none_of_the_apps_tables_reads_no_group_for_its_links(read):
+    with connection.cursor() as cursor:
+        # Undone with the test's transaction. A copy taken before the app was switched on has none of its tables: the
+        # groups by name are not read where there is no link to pair.
+        cursor.execute("DROP TABLE modifier_modifierlink, modifier_modifieroption, modifier_modifiergroup CASCADE")
+
+    assert read(direct()) == []
+
+
 def a_category_link_of_the_copy(group, category_id, copy: dict) -> dict:
     """A link of the copy as ``category_links_in_copy`` gives it: ``group`` on ``category_id``, with the copy's live
     categories by name ``copy``."""
