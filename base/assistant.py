@@ -110,7 +110,7 @@ NOT_FROM_CHAT = frozenset({"base.hub.reset", "base.blueprint.export"})
 APP_WORDS = shared.app_words
 #: What a word means in the Hub and nowhere else (``live.assistant`` keeps what it means in any business): a «cuenta», a
 #: check or a tab is a table's open check, ``sale.order``, never the person's account (what it is in erplora.com's
-#: panel); a ticket or a receipt is a sale's, as the till's screens say («Tickets hoy», «Ticket medio», the «Tique» it
+#: panel); a ticket or a receipt is a sale's, as the till's screens say («Tiques hoy», «Tique medio», the «Tique» it
 #: prints), and the kitchen's is its «comanda» (``kitchen.ticket``, as its screens say): «la comanda», «qué comandas»,
 #: «las comandas de…», named by its phrases and never by the word, which live keeps for a table's order and a «comandas»
 #: said in passing («sin alterar las comandas ya enviadas») names no kitchen ticket; a kitchen's «estación», and its

@@ -159,8 +159,8 @@ sin respuesta pasado su plazo; «Cancelar» abre una ventana con «Motivo (opcio
 «Volver». Vacía: «No hay trabajos de impresión.». Error al cargar: el mensaje con «Reintentar».
 
 ### Ajustes
-Menú **Impresión → Ajustes**. Una tarjeta «Ajustes del ticket» con «Imprimir ticket al cobrar», «Abrir cajón al
-cobrar» y «Copias del ticket» (1, 2 o 3); otra «Impresora de cada función» con un desplegable por
+Menú **Impresión → Ajustes**. Una tarjeta «Ajustes del tique» con «Imprimir tique al cobrar», «Abrir cajón al
+cobrar» y «Copias del tique» (1, 2 o 3); otra «Impresora de cada función» con un desplegable por
 función («Recibo», «Cocina», «Barra», «Etiqueta»): «La primera activa con esa función» o una de sus
 impresoras activas. La nota «El encabezado y el pie del tique forman parte de los ajustes de Ventas,
 que es de donde sale el tique.» con el enlace «Abrir los ajustes del tique» (si Ventas está encendida). «Guardar ajustes» guarda lo que
@@ -350,8 +350,8 @@ Actor: administrador, responsable
 Pantalla: Ajustes
 Pasos:
 1. Abre **Impresión → Ajustes**.
-2. Enciende o apaga «Imprimir ticket al cobrar» y «Abrir cajón al cobrar», elige las «Copias del
-   ticket» y, si quieres, la impresora de cada función.
+2. Enciende o apaga «Imprimir tique al cobrar» y «Abrir cajón al cobrar», elige las «Copias del
+   tique» y, si quieres, la impresora de cada función.
 3. Pulsa «Guardar ajustes» (apagado hasta que cambias algo). Se guarda lo que cambiaste; lo demás
    queda como estaba, y sale «Ajustes guardados.» encima del botón.
    Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
@@ -375,7 +375,7 @@ Pasos:
 1. El empleado cobra en **Ventas → Vender**.
 2. Junto con el cobro, Ventas pide a Impresión el tique: el tique simplificado o la factura completa,
    con el QR de VeriFactu.
-3. Si «Imprimir ticket al cobrar» está encendido, el tique entra en la cola de la función Recibo
+3. Si «Imprimir tique al cobrar» está encendido, el tique entra en la cola de la función Recibo
    con las copias de los ajustes y, si «Abrir cajón al cobrar» está encendido y entró efectivo, con la
    orden de abrir el cajón (PRINTING-F13); el dispositivo lo saca (PRINTING-F18). Tras cobrar, Ventas dice
    a qué impresora fue.
@@ -796,7 +796,7 @@ unidades de la moneda (12.50), con `decimals` si no son 2, y las fechas, ya escr
 | `usage` | La función: `receipt`, `kitchen`, `bar` o `label`. Sin ella sale del documento: `kitchen_order` → cocina, `barcode_label` → etiquetas, el resto → tiques. |
 | `printer` | Una impresora concreta por id o por nombre («Cocina»); sin ella, la de la función (ajustes), o la primera activa con esa función, o ninguna (espera). |
 | `copies` | De 1 a 5; sin ella, las copias del tique de los ajustes para `receipt` y 1 para lo demás. |
-| `automatic` | `true` = la impresión sola al cobrar: respeta «Imprimir ticket al cobrar» (apagado → nada en cola, `skipped: "print_on_sale_off"`) y añade «Abrir cajón al cobrar» (`open_drawer`; con el tique apagado y el cajón encendido, encola un trabajo solo de cajón). |
+| `automatic` | `true` = la impresión sola al cobrar: respeta «Imprimir tique al cobrar» (apagado → nada en cola, `skipped: "print_on_sale_off"`) y añade «Abrir cajón al cobrar» (`open_drawer`; con el tique apagado y el cajón encendido, encola un trabajo solo de cajón). |
 | `source_app`, `source_ref` | Quién lo pide y qué documento es («sale», «T-000123»): lo que se ve en la cola. |
 
 Si el documento no trae `locale`, Impresión pone el idioma de quien lo pide; si no trae `decimals`
@@ -990,7 +990,7 @@ la enseña. Tests: `tests/test_apps.py`, `tests/test_integration_home.py` y
 | «Reintentar» solo un trabajo muerto | También uno enviado sin respuesta pasado su plazo | Un dispositivo caído dejaba el trabajo «Imprimiendo» hasta el siguiente `claim` |
 | Imprimir al cobrar y la comanda los hacía el navegador al oír el aviso (`print-on-sale.ts`) | La venta encola en su transacción (`automatic`) | Ronda 9 (PLAN §14): sin reacciones del cliente |
 | `printing.jobs.create` + `printing.print.due` + `host.print` | `printing.job.create` encola directamente | La cola es de la app; sin listener intermedio |
-| Copias: no había | «Copias del ticket» (1–3) y `copies` por trabajo | Encargo; Square y Lightspeed lo ofrecen |
+| Copias: no había | «Copias del tique» (1–3) y `copies` por trabajo | Encargo; Square y Lightspeed lo ofrecen |
 | Cajón sin trabajo propio | `open_drawer` en el tique, o un trabajo de cajón si el tique está apagado | Con el tique apagado el cajón no se abría |
 | Prueba solo desde la app del dispositivo | La prueba es un trabajo de la cola | Funciona desde cualquier dispositivo y lo ve la cola |
 | Permiso `printing.open_drawer` (sin uso) | Retirado | Ninguna operación lo pedía |

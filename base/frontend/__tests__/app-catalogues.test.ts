@@ -1,6 +1,6 @@
 // What the tests every app's catalogues share catch and what they let through, on a made-up app «shop» whose sources
 // are written to a folder of their own.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 
@@ -82,6 +82,7 @@ const PREFIX = 'live under the app prefix, so merging them into the shell never 
 const SAME_KEYS = 'have exactly the same keys';
 const NOT_EMPTY = 'have no empty message';
 const NOT_PASTED = 'have no empty message, and no Spanish that is the English pasted across';
+const TIQUE = 'say «tique» in Spanish, never «ticket»';
 const PLURALS = 'keep the same placeholders and plural forms in both languages';
 const PLACEHOLDERS = 'keep the same placeholders in both languages';
 const COVERAGE = 'cover every key the app’s sources use, literal or built from a known prefix';
@@ -174,15 +175,16 @@ describe('usedKeys and expectInCatalogue', () => {
 
 describe('the shared tests', () => {
   it('are named as every app’s catalogue test names them', () => {
-    expect(titles({ placeholders: 'and plural forms' })).toEqual([PREFIX, SAME_KEYS, NOT_EMPTY, PLURALS, COVERAGE]);
+    expect(titles({ placeholders: 'and plural forms' })).toEqual([PREFIX, SAME_KEYS, NOT_EMPTY, TIQUE, PLURALS, COVERAGE]);
     expect(titles({ placeholders: 'only', sameInBoth: {}, coverage: { moreFilesThan: 5, moreKeysThan: 20 } })).toEqual([
       PREFIX,
       SAME_KEYS,
       NOT_PASTED,
+      TIQUE,
       PLACEHOLDERS,
       COVERAGE,
     ]);
-    expect(titles({ placeholders: 'own', coverage: 'own' })).toEqual([PREFIX, SAME_KEYS, NOT_EMPTY]);
+    expect(titles({ placeholders: 'own', coverage: 'own' })).toEqual([PREFIX, SAME_KEYS, NOT_EMPTY, TIQUE]);
   });
 
   it('let a sound app through', () => {
@@ -216,6 +218,22 @@ describe('the shared tests', () => {
     expect(() => check(pasted)).toThrow('shop.status.open');
     expect(() => onPurpose(pasted)).not.toThrow();
     expect(() => check(shop(EN, edited(ES, 'shop.list.empty', ' ')))).toThrow('shop.list.empty');
+  });
+
+  it('catch a Spanish that says «ticket», «Ticket» or the Catalan «tiquet», in any message', () => {
+    const check = checkNamed(TIQUE);
+    expect(() => check(shop(EN, edited(ES, 'shop.list.title', 'Ticket medio')))).toThrow('shop.list.title: Ticket medio');
+    expect(() => check(shop(EN, edited(ES, 'shop.list.empty', 'Sin tickets.')))).toThrow('shop.list.empty: Sin tickets.');
+    expect(() => check(shop(EN, edited(ES, 'shop.count', '{n} ticket | {n} tickets')))).toThrow('shop.count');
+    expect(() => check(shop(EN, edited(ES, 'shop.status.open', 'Tiquet: {number}')))).toThrow('shop.status.open: Tiquet');
+    expect(() => check(shop(EN, edited(ES, 'shop.status.closed', 'El tiquet fiscal')))).toThrow('shop.status.closed: El tiquet');
+  });
+
+  it('leave the keys, «tique», the English and the code of the series TICKET alone', () => {
+    const tickets = (catalogue: Catalogue, messages: Catalogue): Catalogue => ({ shop: { ...(catalogue.shop as Catalogue), ...messages } });
+    const english = tickets(EN, { tickets: 'Tickets', avgTicket: 'Avg. ticket', series: 'Sales number in TICKET and FACT.' });
+    const spanish = tickets(ES, { tickets: 'Tiques', avgTicket: 'Tique medio', series: 'Las ventas numeran en TICKET y FACT.' });
+    expect(() => checkNamed(TIQUE)(shop(english, spanish))).not.toThrow();
   });
 
   it('catch another placeholder, with or without plural forms', () => {
@@ -260,10 +278,29 @@ describe('itChecksAppCatalogues', () => {
       PREFIX,
       SAME_KEYS,
       NOT_EMPTY,
+      TIQUE,
       PLURALS,
       COVERAGE,
       'registers one test per shared test in the describe that calls it',
     ]);
+  });
+});
+
+/** Each folder of the Hub keeping a catalogue of the SPA: base's and every app's. */
+function catalogueFolders(): string[] {
+  const apps = readdirSync(join(HUB, 'apps')).map((app) => join(HUB, 'apps', app, 'frontend', 'locale'));
+  return [join(HUB, 'base', 'frontend', 'locale'), ...apps].filter((dir) => existsSync(join(dir, 'es.json')));
+}
+
+describe('every catalogue of the SPA', () => {
+  it('runs the shared tests in its own catalogue test, so none of them leaves an app out', () => {
+    const found = catalogueFolders();
+    expect(found.length).toBeGreaterThan(20);
+    const runsThem = (dir: string): boolean => {
+      const test = join(dir, 'locale.test.ts');
+      return existsSync(test) && readFileSync(test, 'utf8').includes('itChecksAppCatalogues(');
+    };
+    expect(found.filter((dir) => !runsThem(dir)).map((dir) => relative(HUB, dir))).toEqual([]);
   });
 });
 
