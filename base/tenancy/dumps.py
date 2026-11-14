@@ -327,8 +327,7 @@ def stream_to_bucket(
         except (BotoCoreError, ClientError) as error:
             raise DumpFailed(f"The copy of {source.slug} could not be uploaded: {error}") from error
         finally:
-            if process.poll() is None:
-                process.kill()
+            process.kill()  # nothing if it ended already
             process.wait()
             process.stdout.close()
     logger.info("base.tenancy.dumps.streamed database=%s key=%s bytes=%d", source.db_name, key, output.sent)
