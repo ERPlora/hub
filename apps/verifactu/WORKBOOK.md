@@ -1673,7 +1673,7 @@ Del bloque fiscal del 2026-10-15 (el resto, en PLAN-HUB §8, «Bloque fiscal: lo
   `@erplora/ui`; hoy, un botón y el nombre del fichero.
 - ~~**`create_platform_hub` solo cuando haya una BD por hub**~~ — **cerrada** por el corte S5 (hub#602): el comando da
   al hub de plataforma su fila del registro y su BD, como un alta, y su emisor solo está en ella; se sigue negando
-  si ya hay otro emisor. Que ERPlora emita sus facturas desde él es hub#502.
+  si ya hay otro emisor. ERPlora ya emite sus facturas desde él (INVOICE-F23).
 - **OSS**: la factura de plataforma no lleva el aviso «VAT included — customer VAT number could not be verified»
   del PDF antiguo cuando el NIF-IVA del cliente no se pudo verificar.
 

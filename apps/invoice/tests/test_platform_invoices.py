@@ -322,7 +322,7 @@ def test_in_prod_it_is_not_ready_while_real_filing_is_closed(platform_hub, setti
 
     health = run("invoice.invoice.platform_health", {}, system())
 
-    assert (health.ready, bool(health.detail)) == (False, True)
+    assert (health.ready, "AEAT" in health.detail) == (False, True)
 
 
 @pytest.mark.parametrize(
