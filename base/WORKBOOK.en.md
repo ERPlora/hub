@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8e54605f2a7aa362795ece78729103bcc5e793dce3ebabb6f833f6b9c5f1b231 -->
+<!-- generated from WORKBOOK.md sha256:b65e66e4477df112355c85c91b00f26618c1c080cb7e14a8c712f3c7129febf4 -->
 
 ## What it is for and who it is for
 
@@ -2934,8 +2934,8 @@ Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APP
 Status: done (the action and the restore, in its place or to a separate copy, and getting back from the separate copy
 the customers that were lost, the deleted ones as they were, the products, the services with their categories, the
 appointments, the repeating appointments and the price list prices; making and deleting the temporary cluster is the
-procedure "Devolver un negocio a un momento" of ERPlora/aws; the image of a product deleted before deleting left it,
-hub#1431; the modifier groups and the menu options of a product that comes back, hub#1343; the
+procedure "Devolver un negocio a un momento" of ERPlora/aws; the modifier groups and the menu options of a product
+that comes back, hub#1343; the
 price list prices of a service that comes back as a new one, hub#1459)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
@@ -3005,7 +3005,8 @@ Steps:
       one it has already made again (another live one with its name, case and spaces aside, that is not already one of
       the copy's; the oldest if there are two) is not repeated: its own is used, as it is. Then a product the business
       deleted and still holds comes back THE SAME and counts as restored, with its stock, its categories that are still
-      live, the one that just came back if it had it in the copy, its image of the library and its whole history in
+      live, the one that just came back if it had it in the copy, its image of the library (the one it had in the copy
+      if it was deleted before deleting left it and it was left without any) and its whole history in
       Movements, active and on sale (INVENTORY-F34). One the business no longer has comes back as a new one, created as the Products screen creates it,
       with its name, SKU, EAN-13, description, type, price, cost, units, threshold, stock control and tax category, active
       or inactive as it was and in its categories: the same one if the business still has it, and otherwise the one that

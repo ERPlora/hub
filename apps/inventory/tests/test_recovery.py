@@ -763,6 +763,26 @@ class TestProductsComeBack:
             }
             assert Product.objects.get(sku="COF-1").pk == ids["coffee"]
 
+    def test_one_deleted_before_deleting_kept_its_image_gets_back_the_copys(
+        self, recoveries, every_app_on, image_library  # noqa: F811
+    ):
+        hub, ids, _ = self.a_business(recoveries, every_app_on)
+        latte = "catalog:hospitality/cafe_con_leche"
+        run_in(hub, "inventory.product.set_image", id=ids["coffee"], image=latte)
+        copy = recoveries.copy_of(hub)
+        run_in(hub, "inventory.product.delete", id=ids["coffee"])
+        with use_hub(hub):
+            # As deleting left a product before it kept the image of the library.
+            Product.objects.filter(pk=ids["coffee"]).update(image="")
+        row = recoveries.ask(copy, "inventory")
+
+        assert run() == 1
+
+        assert said(row) == ("done", [CATEGORIES, PRODUCTS | {"restored": 1}, LINKS])
+        with use_hub(hub):
+            back = Product.objects.get(pk=ids["coffee"])
+            assert (back.is_deleted, back.image) == (False, latte)
+
     def test_asked_again_nothing_is_made_twice_and_what_the_business_has_stays(self, recoveries, every_app_on):
         hub, ids, _ = self.a_business(recoveries, every_app_on)
         copy = recoveries.copy_of(hub)

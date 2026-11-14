@@ -208,6 +208,11 @@ class ProductIdIn(Schema):
     id: UUID = Field(title=T_PRODUCT, description="The product's id.")
 
 
+class ProductRestoreIn(ProductIdIn, ImageInCopyIn):
+    """A deleted product of a separate copy the business still holds, by its id, and the image it showed there: one
+    deleted before deleting kept the image of the library gets it back."""
+
+
 class CategoryRefIn(Schema):
     id: UUID | None = Field(None, title=T_CATEGORY, description="The category's id.", json_schema_extra=A_CATEGORY)
     category: Said | None = Field(
