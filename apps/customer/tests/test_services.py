@@ -886,8 +886,10 @@ def test_restore_gives_back_what_the_business_deleted_since_and_leaves_what_it_h
     not; one it deleted since is made again as the copy had it, by its screen's operation, and the card goes back in
     it, as a card made again from the copy (hub#1285)."""
     regulars = CustomerGroup.objects.create(name="Regulars")
-    # Kept and Size the business still has: it took Ana out of Kept and cleared her Size before deleting her.
+    # Kept, Known and Size the business still has: it took Ana out of Kept and of Known and cleared her Size before
+    # deleting her.
     kept = CustomerGroup.objects.create(name="Kept")
+    known = CustomerTag.objects.create(name="Known")
     size = CustomField.objects.create(name="Size", field_type="select", options=["S", "M"])
     ana = card("Ana", deleted_at=NOW, is_active=False)
     ana.groups.add(regulars)
@@ -901,7 +903,7 @@ def test_restore_gives_back_what_the_business_deleted_since_and_leaves_what_it_h
             {"id": uuid.uuid7(), "name": "VIP", "color": "warning", "sort_order": 2},
             {"id": uuid.uuid7(), "name": "Old", "is_active": False},
         ],
-        tags=[{"id": uuid.uuid7(), "name": "Regular", "color": "success"}],
+        tags=[{"id": known.id, "name": "Known"}, {"id": uuid.uuid7(), "name": "Regular", "color": "success"}],
         field_values=[
             {"id": size.id, "name": "Size", "field_type": "select", "options": ["S", "M"], "value": "M"},
             {"id": uuid.uuid7(), "name": "Pet", "sort_order": 2, "value": "Luna"},
@@ -918,7 +920,7 @@ def test_restore_gives_back_what_the_business_deleted_since_and_leaves_what_it_h
     assert list(ana.tags.values_list("name", "color", "is_active")) == [("Regular", "success", True)]
     pet = CustomField.objects.get(name="Pet")
     assert (pet.sort_order, list(ana.field_values.values_list("field_id", "value"))) == (2, [(pet.id, "Luna")])
-    assert (CustomerGroup.objects.count(), CustomerTag.objects.count(), CustomField.objects.count()) == (4, 1, 2)
+    assert (CustomerGroup.objects.count(), CustomerTag.objects.count(), CustomField.objects.count()) == (4, 2, 2)
     names = [name for name, _ in outbox()]
     assert names[0] == events.CUSTOMER_RESTORED
     assert sorted(names[1:]) == sorted(
