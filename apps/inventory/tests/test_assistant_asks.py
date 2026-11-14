@@ -68,8 +68,12 @@ def test_the_reported_inventory_request_offers_its_existing_operation(catalog_of
 
 
 #: Goods received said as a business says it, in words that are none of the tool's asks nor a probe: «la mercancía» is
-#: what ``inventory.stock.receive`` records only through ``base.assistant.SYNONYMS`` (37th of 40 without them).
-GOODS_IN = [("inventory.stock.receive", "apunta la mercancía que nos ha traído hoy el proveedor")]
+#: what ``inventory.stock.receive`` records only through ``base.assistant.SYNONYMS`` (37th of 40 without them), and
+#: «han entrado» is read as its present «entran» (152nd, behind the cart's items, before live read it so).
+GOODS_IN = [
+    ("inventory.stock.receive", "apunta la mercancía que nos ha traído hoy el proveedor"),
+    ("inventory.stock.receive", "apunta que han entrado 12 unidades de tarta"),
+]
 
 
 @pytest.mark.django_db
