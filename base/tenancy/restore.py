@@ -149,7 +149,8 @@ def restore_hub(
             return
         try:
             copy = source(hub)
-            key = move._dump_to_bucket(hub, copy, origin, ours, cancelled, kind=RESTORE_DUMP_KIND)
+            key = dumps.key_for(hub, RESTORE_DUMP_KIND, timezone.now())
+            move._dump_to_bucket(key, copy, origin, ours, cancelled)
             _close_and_keep(hub, kept_name, roles, ours, copy, origin)
             _make_new(hub, kept_name, roles, ours)
             move._restore_from_bucket(key, hub.db_name, hub.cluster, ours, cancelled)
@@ -247,7 +248,8 @@ def make_aside(
     try:
         if row.source is None:
             raise move.MoveFailed("move_source_missing", "its temporary cluster is gone")
-        key = move._dump_to_bucket(hub, source(hub), row.source, ours, cancelled, kind=aside_dump_kind(row))
+        key = dumps.key_for(hub, aside_dump_kind(row), timezone.now())
+        move._dump_to_bucket(key, source(hub), row.source, ours, cancelled)
         ours()
         move._clone_emptied(hub, cluster, roles, aside=name)
         move._restore_from_bucket(key, name, cluster, ours, cancelled)

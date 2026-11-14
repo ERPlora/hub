@@ -330,9 +330,9 @@ class TestTheOriginIsClosedToTheApp:
         seen: list[bool] = []
         real = move._dump_to_bucket
 
-        def dump(hub, source, cluster, heartbeat, cancelled=None):
+        def dump(key, source, cluster, heartbeat, cancelled=None):
             seen.append(hubs.reaches(app_role, source))
-            return real(hub, source, cluster, heartbeat, cancelled)
+            real(key, source, cluster, heartbeat, cancelled)
 
         monkeypatch.setattr(move, "_dump_to_bucket", dump)
 
@@ -957,14 +957,13 @@ class TestTwoWorkers:
         real_dump = move._dump_to_bucket
         state = {"nested": False}
 
-        def dump(hub_row, source, cluster, heartbeat, cancelled=None):
-            key = real_dump(hub_row, source, cluster, heartbeat, cancelled)
+        def dump(key, source, cluster, heartbeat, cancelled=None):
+            real_dump(key, source, cluster, heartbeat, cancelled)
             if not state["nested"]:
                 state["nested"] = True
                 move.move_hub(hub.id)  # the other worker, all the way to its switch
                 with hubs._maintenance(fresh(hub).db_name) as conn:
                     conn.execute("INSERT INTO w8a_marker VALUES ('written after the switch')")
-            return key
 
         monkeypatch.setattr(move, "_dump_to_bucket", dump)
 
@@ -1015,11 +1014,10 @@ class TestTwoWorkers:
         hub = moves.hub(to=target)
         real = move._dump_to_bucket
 
-        def cancelled_meanwhile(hub_row, source, cluster, heartbeat, cancelled=None):
-            key = real(hub_row, source, cluster, heartbeat, cancelled)
+        def cancelled_meanwhile(key, source, cluster, heartbeat, cancelled=None):
+            real(key, source, cluster, heartbeat, cancelled)
             with use_control():
                 Hub.objects.filter(pk=hub.pk).update(move_undo_asked_at=AT)
-            return key
 
         with monkeypatch.context() as patched:
             patched.setattr(move, "_dump_to_bucket", cancelled_meanwhile)

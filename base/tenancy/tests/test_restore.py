@@ -612,10 +612,9 @@ class TestTwoWorkers:
         real = move._dump_to_bucket
 
         def dump(*args, **kwargs):
-            key = real(*args, **kwargs)
+            real(*args, **kwargs)
             with use_control():
                 Hub.objects.filter(pk=hub.pk).update(restoring_from=None, restore_point=None)
-            return key
 
         monkeypatch.setattr(move, "_dump_to_bucket", dump)
 

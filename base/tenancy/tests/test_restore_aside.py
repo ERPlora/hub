@@ -501,11 +501,10 @@ class TestTwoWorkers:
         real = move._dump_to_bucket
 
         def taken(*args, **kwargs):
-            key = real(*args, **kwargs)
+            real(*args, **kwargs)
             # Another worker took it meanwhile and already made its own database of the copy's name.
             RestoredCopy.objects.filter(pk=aside.pk).update(lease_owner="other:1")
             something_of_its_name(aside, hub)
-            return key
 
         monkeypatch.setattr(move, "_dump_to_bucket", taken)
 

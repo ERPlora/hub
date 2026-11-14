@@ -212,7 +212,8 @@ def move_hub(
             _bucket_named()
             _close_and_rename(hub, copy_name, origin, roles, ours)
             # Their heartbeat checks the move is still this worker's: a cancel or a lease lost stops them.
-            key = _dump_to_bucket(hub, copy_name, origin, ours, cancelled)
+            key = dumps.key_for(hub, MOVE_DUMP_KIND, timezone.now())
+            _dump_to_bucket(key, copy_name, origin, ours, cancelled)
             _make_destination(hub, target, roles, ours)
             _restore_from_bucket(key, hub.db_name, target, ours, cancelled)
             heartbeat()
@@ -420,18 +421,14 @@ def _bucket_named() -> None:
         raise MoveFailed("move_dump_failed", "no bucket is named for the copies (HUB_DUMPS_BUCKET)")
 
 
-def _dump_to_bucket(
-    hub, source: str, cluster, heartbeat: Callable[[], None], cancelled=None, *, kind: str = MOVE_DUMP_KIND
-) -> str:
-    """Step 3, on the origin: ``pg_dump`` of ``source`` sent to the dumps bucket as it is made
-    (``dumps.stream_to_bucket``), under ``hub``'s own key (``<hex>/<AAAAMMDDTHHMMSSZ>-<kind>.dump``); its key."""
-    key = dumps.key_for(hub, kind, timezone.now())
+def _dump_to_bucket(key: str, source: str, cluster, heartbeat: Callable[[], None], cancelled=None) -> None:
+    """Step 3, on the origin: ``pg_dump`` of ``source`` sent to the dumps bucket at ``key`` as it is made
+    (``dumps.stream_to_bucket``; ``dumps.key_for`` names it after its hub)."""
     copied = SimpleNamespace(db_name=source, cluster=cluster, slug=source)
     try:
         dumps.stream_to_bucket(copied, key, timeout=COPY_TIMEOUT_SECONDS, heartbeat=heartbeat, cancelled=cancelled)
     except dumps.DumpError as failed:
         raise MoveFailed("move_dump_failed", failed) from failed
-    return key
 
 
 def _make_destination(hub, target, roles: bootstrap.Names, ours=None) -> None:
