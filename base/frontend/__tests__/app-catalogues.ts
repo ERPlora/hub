@@ -116,15 +116,18 @@ export function expectSamePlaceholders({ EN, ES }: AppCatalogues, { pluralForms 
   }
 }
 
-/** «ticket» or the Catalan «tiquet» as a word: the sales receipt, which Spanish calls «tique» (RAE, and the word of
- *  the invoicing rules, RD 1619/2012). In capitals it is TICKET, the code of the receipts' series, which the business
- *  sees as it is written. */
-const ANGLICISED_RECEIPT = /\b[Tt]i(?:ck|qu)ets?\b/;
+/** «ticket» or the Catalan «tiquet» as a word, in any case: the sales receipt, which Spanish calls «tique» (RAE, and
+ *  the word of the invoicing rules, RD 1619/2012). */
+const ANGLICISED_RECEIPT = /\bti(?:ck|qu)ets?\b/gi;
+
+/** The code of the receipts' series, which the business sees as it is written: the one spelling that is let through. */
+const SERIES_CODE = 'TICKET';
 
 /** Every Spanish message of `ES` that says «ticket» or «tiquet», as «key: message». The keys (`tickets`,
  *  `settingsTickets`) are a published contract, not text, and never count. */
 export function anglicisedReceipts(ES: ReadonlyMap<string, string>): string[] {
-  return [...ES].filter(([, message]) => ANGLICISED_RECEIPT.test(message)).map(([key, message]) => `${key}: ${message}`);
+  const saysIt = (message: string): boolean => (message.match(ANGLICISED_RECEIPT) ?? []).some((word) => word !== SERIES_CODE);
+  return [...ES].filter(([, message]) => saysIt(message)).map(([key, message]) => `${key}: ${message}`);
 }
 
 function expectNoEmptyMessage({ EN, ES }: AppCatalogues): void {

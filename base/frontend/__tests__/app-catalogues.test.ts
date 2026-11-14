@@ -229,10 +229,17 @@ describe('the shared tests', () => {
     expect(() => check(shop(EN, edited(ES, 'shop.status.closed', 'El tiquet fiscal')))).toThrow('shop.status.closed: El tiquet');
   });
 
+  it('catch it in capitals too, but for the code of the series TICKET', () => {
+    const check = checkNamed(TIQUE);
+    expect(() => check(shop(EN, edited(ES, 'shop.list.title', 'TICKETS DE HOY')))).toThrow('shop.list.title: TICKETS DE HOY');
+    expect(() => check(shop(EN, edited(ES, 'shop.list.empty', 'TIQUET')))).toThrow('shop.list.empty: TIQUET');
+    expect(() => check(shop(EN, edited(ES, 'shop.status.open', 'Serie TICKET: un ticket')))).toThrow('shop.status.open');
+  });
+
   it('leave the keys, «tique», the English and the code of the series TICKET alone', () => {
     const tickets = (catalogue: Catalogue, messages: Catalogue): Catalogue => ({ shop: { ...(catalogue.shop as Catalogue), ...messages } });
     const english = tickets(EN, { tickets: 'Tickets', avgTicket: 'Avg. ticket', series: 'Sales number in TICKET and FACT.' });
-    const spanish = tickets(ES, { tickets: 'Tiques', avgTicket: 'Tique medio', series: 'Las ventas numeran en TICKET y FACT.' });
+    const spanish = tickets(ES, { tickets: 'Tiques', avgTicket: 'Tique medio', series: 'Las ventas numeran en TICKET y FACT: TICKET-2026-000031.' });
     expect(() => checkNamed(TIQUE)(shop(english, spanish))).not.toThrow();
   });
 
