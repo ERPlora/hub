@@ -40,7 +40,7 @@ function rules(css: string): Map<string, Record<string, string>> {
   return found;
 }
 
-const BORDERLESS = /^(?:0|none)(?:\s*!important)?$/;
+const BORDERLESS = /^(?:0[a-z%]*|none)(?:\s*!important)?$/;
 
 function takesBorderAway(declarations: Record<string, string> | undefined): boolean {
   if (!declarations) return false;
@@ -121,6 +121,9 @@ describe('a group without a box is a FieldGroup', () => {
     ]);
     expect(boxlessByHand(file, window('<fieldset class="x-week" />', '/* no box */\n.x-other,\n.x-week {\n  border: none;\n}'))).toHaveLength(1);
     expect(boxlessByHand(file, window('<fieldset class="x-week" />', '.x-week { border-width: 0; }'))).toHaveLength(1);
+    expect(boxlessByHand(file, window('<fieldset class="x-week" />', '.x-week { border: 0px; }'))).toHaveLength(1);
+    expect(boxlessByHand(file, window('<fieldset class="x-week" />', '.x-week { border-width: 0rem !important; }'))).toHaveLength(1);
+    expect(boxlessByHand(file, window('<fieldset class="x-tiers" />', '.x-tiers { border-width: 0.5px; }'))).toEqual([]);
     expect(boxlessByHand(file, window('<fieldset class="x-tiers" />', '.x-tiers { border: 1px solid var(--ion-border-color); }'))).toEqual([]);
     expect(boxlessByHand(file, window('<fieldset class="x-tiers" />', '.x-tiers legend { border: 0; }'))).toEqual([]);
     expect(boxlessByHand(file, window('<FieldGroup class="x-week" />', '.x-week { display: grid; border: 0; }'))).toEqual([]);
