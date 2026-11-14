@@ -9,8 +9,9 @@
 // its refusal to (`:field-errors="fieldErrors"`), followed to its file. A refusal the window paints apart from any field
 // (`<p v-if="fieldErrors.tiers">`, `{{ fieldErrors.customer }}`) needs a control named after its key too, or FormModal
 // never hears it corrected and the line stays until the next save: the field it is about (`name="is_default"` on the
-// toggle) or the group's `<fieldset name="tiers">`, which says its changes (`useGroupChange`). The files still waiting
-// are listed below with how many they leave unnamed; the number only goes down, and a fixed file leaves the list.
+// toggle) or the group's `<fieldset ref="tiersGroup" name="tiers">`, whose ref goes to `useGroupChange('tiersGroup')`
+// (a fieldset says no change of its own). The files still waiting are listed below with how many they leave unnamed;
+// the number only goes down, and a fixed file leaves the list.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -165,19 +166,38 @@ function paintedApart(reach: Reach): Notice[] {
   return [...found.values()];
 }
 
-/** The plain HTML elements whose `name` FormModal reads as the element's property; on a div or a section it reads none. */
-const NAMED_HTML = new Set(['button', 'fieldset', 'input', 'output', 'select', 'textarea']);
+/** The plain HTML fields FormModal hears change under their `name`; on a div or a section it reads none. */
+const TYPED_HTML = new Set(['input', 'select', 'textarea']);
+/** The plain HTML elements whose `name` FormModal reads but that never say a change themselves: a group's `<fieldset>`
+ *  counts once the window hands its ref to `useGroupChange`, which says each change for it. */
+const MUTE_HTML = new Set(['button', 'fieldset', 'output']);
 
-/** The names the controls in `nodes` carry, plainly or as a literal: an Ionic field, a component or a named HTML element. */
-function controlNames(nodes: readonly TemplateNode[]): Set<string> {
-  const names = new Set<string>();
+/** `element`'s plain `ref="…"`, or nothing. */
+function plainRef(element: Element): string | undefined {
+  for (const p of element.props) if (p.type === ATTRIBUTE && p.name === 'ref') return p.value?.content;
+  return undefined;
+}
+
+/** The names the controls in `nodes` carry, plainly or as a literal (an Ionic field, a component, a plain HTML field, a
+ *  group whose ref is in `voiced`), and apart the groups that say no change, by name, with their tag. */
+function controlNames(nodes: readonly TemplateNode[], voiced: ReadonlySet<string>): { heard: Set<string>; mute: Map<string, string> } {
+  const heard = new Set<string>();
+  const mute = new Map<string, string>();
   walk(nodes, (element) => {
-    const control = NAMED_HTML.has(element.tag) || element.tag.includes('-') || /^[A-Z]/.test(element.tag);
     const dynamic = bound(element, 'name');
     const name = plainName(element) ?? (dynamic !== undefined ? literal(dynamic) : undefined);
-    if (control && name) names.add(name);
+    if (!name) return;
+    if (MUTE_HTML.has(element.tag)) {
+      if (voiced.has(plainRef(element) ?? '')) heard.add(name);
+      else if (!mute.has(name)) mute.set(name, element.tag);
+    } else if (TYPED_HTML.has(element.tag) || element.tag.includes('-') || /^[A-Z]/.test(element.tag)) heard.add(name);
   });
-  return names;
+  return { heard, mute };
+}
+
+/** The refs a source's script hands to `useGroupChange('<ref>')`. */
+function voicedGroups(script: string): Set<string> {
+  return new Set([...script.matchAll(/\buseGroupChange\(\s*(['"`])(\w+)\1\s*\)/g)].map((match) => match[2]));
 }
 
 /** A source's components brought from a `.vue` file of the hub, by name: `{ RecipientFields: './RecipientFields.vue' }`. */
@@ -187,18 +207,21 @@ function vueImports(script: string): Record<string, string> {
   return found;
 }
 
-/** A source's template tree and the components it imports, or nothing when it has no template. */
-function read(source: string): { nodes: TemplateNode[]; imports: Record<string, string> } | undefined {
+/** A source's template tree, the components it imports and the groups it voices, or nothing when it has no template. */
+function read(source: string): { nodes: TemplateNode[]; imports: Record<string, string>; voiced: Set<string> } | undefined {
   const { descriptor } = parse(source);
   const ast = descriptor.template?.ast as unknown as { children: TemplateNode[] } | undefined;
   if (!ast) return undefined;
-  return { nodes: ast.children, imports: vueImports(`${descriptor.script?.content ?? ''}\n${descriptor.scriptSetup?.content ?? ''}`) };
+  const script = `${descriptor.script?.content ?? ''}\n${descriptor.scriptSetup?.content ?? ''}`;
+  return { nodes: ast.children, imports: vueImports(script), voiced: voicedGroups(script) };
 }
 
-/** Where a window's refusal goes: the name its fields read it by (`fieldErrors`) and the nodes that read it. */
+/** Where a window's refusal goes: the name its fields read it by (`fieldErrors`), the nodes that read it and the refs of
+ *  the groups its file voices with `useGroupChange`. */
 interface Reach {
   refusal: string;
   nodes: readonly TemplateNode[];
+  voiced?: ReadonlySet<string>;
 }
 
 /** The default slot of each FormModal in `nodes` that takes its `fieldErrors`, under the name it gives them. */
@@ -248,12 +271,15 @@ function unnamedFields(file: string, reach: Reach, imports: Record<string, strin
       const prop = camelize(p.arg.content);
       if (seen.has(`${target}#${prop}`)) continue;
       seen.add(`${target}#${prop}`);
-      found.push(...unnamedFields(target, { refusal: prop, nodes: child.nodes }, child.imports, readFile, seen));
+      found.push(...unnamedFields(target, { refusal: prop, nodes: child.nodes, voiced: child.voiced }, child.imports, readFile, seen));
     }
   });
-  const named = controlNames(reach.nodes);
+  const { heard, mute } = controlNames(reach.nodes, reach.voiced ?? new Set());
   for (const notice of paintedApart(reach)) {
-    if (!named.has(notice.key)) found.push(`${file}:${notice.line}: <${notice.tag}> paints ${notice.shown} apart and no control carries name="${notice.key}"`);
+    if (heard.has(notice.key)) continue;
+    const group = mute.get(notice.key);
+    const why = group ? `its <${group} name="${notice.key}"> says no change: hand its ref to useGroupChange` : `no control carries name="${notice.key}"`;
+    found.push(`${file}:${notice.line}: <${notice.tag}> paints ${notice.shown} apart and ${why}`);
   }
   return found;
 }
@@ -263,7 +289,7 @@ function scan(path: string, readFile: Reader): string[] {
   const source = readFile(path);
   const template = source ? read(source) : undefined;
   if (!template) return [];
-  return windows(template.nodes).flatMap((reach) => unnamedFields(path, reach, template.imports, readFile));
+  return windows(template.nodes).flatMap((reach) => unnamedFields(path, { ...reach, voiced: template.voiced }, template.imports, readFile));
 }
 
 // ── The hub's sources ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -393,7 +419,7 @@ describe('guardrail: every field of a FormModal window that paints its refusal c
     const fields = [
       '<ion-toggle name="is_default" :checked="on" />',
       '<p v-if="fieldErrors.is_default">{{ fieldErrors.is_default }}</p>',
-      '<fieldset name="tiers">',
+      '<fieldset ref="tiersGroup" name="tiers">',
       '  <ion-input v-for="(tier, i) in tiers" :key="i" :name="`tiers.${i}.percent`" :error-text="fieldErrors[`tiers.${i}.percent`]" />',
       '  <p v-if="fieldErrors.tiers">{{ fieldErrors.tiers }}</p>',
       '</fieldset>',
@@ -402,7 +428,21 @@ describe('guardrail: every field of a FormModal window that paints its refusal c
       '<CustomerSearch v-model="customer" name="customer" />',
       '<small v-if="fieldErrors.customer">{{ fieldErrors.customer }}</small>',
     ].join('\n');
-    expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': windowWith(fields) })).toEqual([]);
+    const voiced = "const tiersChanged = useGroupChange('tiersGroup');";
+    expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': windowWith(fields, voiced) })).toEqual([]);
+  });
+
+  it('counts a group’s fieldset only when the window hands its ref to useGroupChange: on its own it says no change', () => {
+    const group = (attributes: string): string =>
+      [`<fieldset${attributes} name="tiers">`, '  <p v-if="fieldErrors.tiers">{{ fieldErrors.tiers }}</p>', '</fieldset>'].join('\n');
+    const voiced = "const tiersChanged = useGroupChange('tiersGroup');";
+    const mute = [
+      'apps/x/frontend/components/XFormModal.vue:8: <p> paints fieldErrors.tiers apart and its <fieldset name="tiers"> says no change: hand its ref to useGroupChange',
+    ];
+    expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': windowWith(group('')) })).toEqual(mute);
+    expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': windowWith(group(' ref="tiersGroup"')) })).toEqual(mute);
+    expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': windowWith(group(' ref="weekGroup"'), voiced) })).toEqual(mute);
+    expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': windowWith(group(' ref="tiersGroup"'), voiced) })).toEqual([]);
   });
 
   it('sees a refusal painted apart in the component the window hands it to, under the prop’s name', () => {
