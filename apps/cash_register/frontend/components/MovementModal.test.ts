@@ -5,7 +5,8 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, expectWaitsForTheYen, ionValue, mountCash } from '../__tests__/mount-cash-register';
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
+import { click, expectWaitsForTheYen, ionValue, mountCash, settle } from '../__tests__/mount-cash-register';
 import { itReadsAmountsAsTheHub, itReadsWhatWasLeftOnceTheMoneyArrives } from '../__tests__/money-field';
 import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { plain } from '../lib/money';
@@ -94,6 +95,42 @@ describe('MovementModal', () => {
     await s.submit();
     expect(plain(vi.mocked(toastSuccess).mock.calls[0][0])).toBe('Movimiento de entrada registrado (12,50 €)');
   });
+});
+
+describe('MovementModal: a refused field, corrected, loses its mark without saving again (hub#1470)', () => {
+  it('a refused amount: typing another one takes its mark away, before «Register» is pressed again', async () => {
+    const s = await setup();
+    const amount = () => s.inDoc('cash-register-movement-amount');
+    await ionValue(amount(), '20', 'ionInput');
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the highlighted details.', fields: { amount: 'Input should be greater than 0' } } });
+    await s.submit();
+    expect(prop(amount(), 'errorText')).toBe('Input should be greater than 0');
+    amount()?.dispatchEvent(new Event('input', { bubbles: true }));
+    await ionValue(amount(), '25', 'ionInput');
+    expect(prop(amount(), 'errorText') ?? '').toBe('');
+    expect(s.sent()).toHaveLength(1);
+  });
+
+  it('a zero amount: typing one takes «Invalid amount» away', async () => {
+    const s = await setup();
+    await s.submit();
+    expect(prop(s.inDoc('cash-register-movement-amount'), 'errorText')).toBe('Invalid amount');
+    await ionValue(s.inDoc('cash-register-movement-amount'), '5', 'ionInput');
+    expect(prop(s.inDoc('cash-register-movement-amount'), 'errorText') ?? '').toBe('');
+  });
+
+  const FIELD: Record<string, string> = { type: 'type', amount: 'amount', description: 'concept' };
+  itTellsTheCorrectedFieldApart(
+    ['type', 'amount', 'description'],
+    async (locale, refusal) => {
+      const s = await setup(locale);
+      await ionValue(s.inDoc('cash-register-movement-amount'), '20', 'ionInput');
+      await ionValue(s.inDoc('cash-register-movement-concept'), 'Change', 'ionInput');
+      s.answer(422, refusal);
+      return { field: (key) => s.inDoc(`cash-register-movement-${FIELD[key]}`), send: s.submit, settle };
+    },
+    'amount',
+  );
 });
 
 describe('MovementModal: before the business answers its money (hub#921)', () => {
