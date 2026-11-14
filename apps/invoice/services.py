@@ -371,7 +371,7 @@ def _audit(
         raise Conflict(str(AUDIT_MESSAGES[failure.code]), code=failure.code)
 
 
-def _issue(
+def _issue(  # noqa: PLR0913
     ctx: OperationContext,
     *,
     series: InvoiceSeries,
@@ -534,7 +534,7 @@ def _chosen_card(ctx: OperationContext, data):
     return find_customer(ctx, data.customer_id, data.customer, lock=True)
 
 
-def _recipient(ctx: OperationContext, data, *, full: bool, fallback_name: str = "", card=None) -> dict:
+def _recipient(ctx: OperationContext, data, *, full: bool, fallback_name: str = "", card=None) -> dict:  # noqa: C901
     """The recipient: what was sent, else the customer card's (named by id or reference). A full invoice
     needs name, tax ID and address (409 with the missing fields); a tax ID taken from the card is checked."""
     if card is None:
@@ -974,7 +974,7 @@ def _tell_sales(ctx: OperationContext, invoice: Invoice, written: str) -> None:
     record(as_platform, record.input.model_validate(_issued_notice(invoice)))
 
 
-# ── A full invoice for a ticket (INVOICE-F04, F05) ──────────────────────────────────────────────
+# ── A full invoice for a ticket (INVOICE-F05) ───────────────────────────────────────────────────
 
 
 @operation(
@@ -1056,7 +1056,7 @@ def substitute(ctx: OperationContext, data: SubstituteIn) -> dict:
 # ── Rectifying (INVOICE-F07–F10) ────────────────────────────────────────────────────────────────
 
 
-def _rectify(
+def _rectify(  # noqa: PLR0913
     ctx: OperationContext,
     original: Invoice,
     *,

@@ -147,7 +147,9 @@ del Hub» de erplora-next.
   `use_control()` (el registro, las demos, el outbox de control, el admin sin negocio elegido y `manage.py shell` sin
   `--hub`). El hub de plataforma es una fila más con su BD (`create_platform_hub --execute` la hace). Sin contexto, un modelo o una operación de hub lanza
   `HubContextMissing`: nunca cae a `default`. Una operación de un hub dentro del contexto de otro,
-  `HubContextMismatch`.
+  `HubContextMismatch`; también un objeto cargado de la BD de un hub y usado dentro del contexto de otro (guardarlo,
+  borrarlo, refrescarlo o seguir sus relaciones), antes de mandar SQL: nunca escribe ni lee en la BD de su hub. Sin
+  contexto (un `RunPython`) o en su propio hub, por su alias o por su `…__ddl` (la misma BD), va donde se cargó.
 - **Enrutado** (`base/tenancy/router.py`, detrás de `SharedRouter`): control → `default`; hub → el alias del contexto.
   El alias de un hub con BD propia es `hub_<hex>`, registrado en caliente copiando `hub_template` (PgBouncer en modo
   transacción: sin pool, `CONN_MAX_AGE` 0, sin cursores de servidor ni sentencias preparadas) sin mutar

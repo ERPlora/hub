@@ -215,7 +215,7 @@ def _actor(ctx: OperationContext) -> str:
     return str(getattr(actor, "username", None) or actor or "")[:128]
 
 
-def _event(
+def _event(  # noqa: PLR0913
     ctx: OperationContext,
     kind: str,
     key: str,
@@ -551,7 +551,7 @@ def _refuse_without_a_way(config: Config, environment: str, scope: Scope) -> Non
         )
 
 
-def _seal_alta(
+def _seal_alta(  # noqa: PLR0913
     ctx: OperationContext,
     config: Config,
     invoice: Invoice,
@@ -804,7 +804,7 @@ def _back_in_the_queue(records=None) -> None:
     )
 
 
-def _failed(
+def _failed(  # noqa: PLR0913
     ctx,
     batch,
     code: str,
@@ -903,7 +903,7 @@ def _settle(ctx, batch, answer: aeat.SubmissionAnswer, now, tally: _Tally) -> No
         )
 
 
-def _send_chain(
+def _send_chain(  # noqa: C901, PLR0912, PLR0913, PLR0915, PLR0917
     ctx,
     config: Config,
     system,
@@ -1450,7 +1450,7 @@ def validate_chain(ctx: OperationContext, data: ChainValidateIn) -> ChainValidat
     )
 
 
-def _anchor(
+def _anchor(  # noqa: PLR0913
     ctx,
     nif: str,
     environment: str,
@@ -1539,7 +1539,7 @@ def recover_manual(ctx: OperationContext, data: RecoverManualIn) -> RecoveryOut:
     )
 
 
-def _query_page(
+def _query_page(  # noqa: PLR0913, PLR0917
     ctx: OperationContext,
     config: Config,
     nif: str,
@@ -1594,7 +1594,7 @@ def _query_page(
         ) from None
 
 
-def _query_aeat(
+def _query_aeat(  # noqa: PLR0913, PLR0917
     ctx, config: Config, nif: str, environment: str, year: int, month: int
 ) -> list[aeat.QueriedRecord]:
     """Ask the AEAT, through the gateway, for the records of ``nif`` in a month; replace the last photo."""
@@ -2334,7 +2334,7 @@ def _representation_step(ctx: OperationContext, config: Config, data) -> None:
     )
 
 
-def _representation_payload(
+def _representation_payload(  # noqa: C901, PLR0912
     data: RepresentationSubmitIn, taxpayer_tax_id: str, taxpayer_name: str
 ) -> dict:
     """The contract's body, or ``InvalidPayload`` naming every broken rule with the first one's code: the SaaS's

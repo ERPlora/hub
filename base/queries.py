@@ -425,7 +425,7 @@ def notice_list(ctx: OperationContext, data: NoticeListIn) -> dict:
 # ── Apps ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-def app_off_refusal(
+def app_off_refusal(  # noqa: PLR0913, PLR0917
     ctx: OperationContext,
     label: str,
     current: Mapping[str, activation.Activation],
@@ -1349,7 +1349,7 @@ def business_get(ctx: OperationContext, data: BusinessIn) -> dict:
     )
 
 
-def _business(
+def _business(  # noqa: PLR0913
     ctx: OperationContext, *, name: str, country: str, zone: str, language: str, demo: bool, settings_url: str
 ) -> dict:
     """``BusinessOut`` of one business, each value named in ``ctx``'s language."""

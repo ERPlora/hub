@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:91279b6a65ba4e0e0ceb0f88de764092d85766b127e0687ad247c043816635de -->
+<!-- generated from WORKBOOK.md sha256:c95b41f865491e119c6c7e9c34dd7a1ba6752bf27d6de22c643a46dcf317573e -->
 
 ## What it is for and who it is for
 
@@ -98,8 +98,8 @@ Initial setup, step by step:
 ## Screens
 
 Sales & POS opens from the **Sales & POS** menu and has five entries: **Sell**, **Sales**,
-**Quick notes**, **Sections** and **Settings**. "Sections" is what the current product called
-"Departments": the short word fits in a phone's tab bar with all five in sight.
+**Quick notes**, **Sections** and **Settings**. "Sections" are the till's departments: the short
+word fits in a phone's tab bar with all five in sight.
 
 ### Sell
 It opens in the application's full screen; the ⋮ menu of the category strip has "Full screen" /
@@ -1040,7 +1040,7 @@ Steps:
    payment, date or total, or sort.
 4. Tap a row to see its document (SALE-F29). The table reloads by itself when a sale is charged, voided
    or refunded.
-5. Today's figures are also on **Home**, on the board, as in the current product: "Today's sales" and
+5. Today's figures are also on **Home**, on the board: "Today's sales" and
    "Today's tickets" show from the start; "Sales, last 7 days" (one bar per day, from oldest to today) and
    "Recent activity" (the last eight sales, the newest on top, with their number and their customer) are
    added with ⋮ ("Customize panel"). They update by themselves when a sale is charged, voided or refunded,
@@ -1298,7 +1298,7 @@ Involved: none
 Status: done
 Vertical: common
 Actor: manager, assistant
-Screen: none (assistant or API), like the current product
+Screen: none (assistant or API)
 Steps:
 1. Ask the assistant to add the method and say what type it is ("add Bizum as a payment method, of type
    other"): with no type it is created as cash.
@@ -1354,7 +1354,6 @@ reason) and offers "Retry", which asks for it again; as soon as it arrives, "Add
 Involved: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Charge with what another app adds (the tip)
-<!-- origen: nuevo (hub#562; SALE-G06 del registro de la migración) -->
 Status: not done — the Charge sheet does not paint other apps' steps yet, nor does the sale keep what was charged on top
 (hub#1497, hub#1500, hub#1502)
 Vertical: common
@@ -1555,8 +1554,7 @@ the quick notes and what is refundable can be followed live.
 | See the figures | yes | yes | yes | no | `sale.view_reports` |
 | Settings, sections and quick notes | yes | yes | yes | no | `sale.manage_settings` |
 
-The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); the
-current product's cashier is an employee.
+The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
 
 What the employee cannot do in the POS they ask for on their own device and a manager approves it with
 their PIN or their badge ("An approval is needed", BASE-F84), once and for that very request: voiding and

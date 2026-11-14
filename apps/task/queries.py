@@ -252,7 +252,7 @@ def resolve_task(
     return task
 
 
-def filter_tasks(tasks: QuerySet[Task], params: TaskListIn) -> QuerySet[Task]:
+def filter_tasks(tasks: QuerySet[Task], params: TaskListIn) -> QuerySet[Task]:  # noqa: C901, PLR0912
     if params.search:
         text = params.search
         tasks = tasks.filter(

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6cfdc4869dfc8c80189117fd4c3964d34e91805eafaf55928758cf3c27df8fb0 -->
+<!-- generated from WORKBOOK.md sha256:115c14845c5c400ffe737093b318da0650f643d226170575238f5ca9009fe184 -->
 
 ## What it is for and who it is for
 
@@ -26,9 +26,7 @@ storeroom", "what is left of the opening project?".
 
 ## Reference adopted
 
-**Who a task is assigned to and what the employee sees** (skill `market-decision`, 2026-10-14). In the
-current product the person in charge was a text reference to a user of the hub, with no link to Staff,
-and everyone saw and changed everything.
+**Who a task is assigned to and what the employee sees** (skill `market-decision`, 2026-10-14).
 
 | Product | How it solves it | Source |
 |---|---|---|

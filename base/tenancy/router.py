@@ -8,9 +8,12 @@ database class of each model from ``base.tenancy.inventory`` and the active cont
   guess;
 - ``contextual`` (the outbox) → the alias of the active context, control's included.
 
-A hub's object related to another hub object already loaded (``instance`` hint) goes where that one is, as Django's
-own default does; a control object's hint (a reverse relation from a user) never decides a hub's model: the context
-does.
+A hub's object related to another hub object already loaded (``instance`` hint: its own save, delete and refresh, and
+every relation read or written from it) goes where that one is, as Django's own default does, with no context (a
+migration's ``RunPython``) or in its own hub's, on that hub's alias or its migrator's ``…__ddl`` (one database). Inside
+another hub's context it is :class:`~base.tenancy.context.HubContextMismatch`, before any SQL: an object kept from one
+hub never reads nor writes that hub's rows while another hub works. A control object's hint (a reverse relation from a
+user) never decides a hub's model: the context does.
 
 A model of a module whose tables the hub's database does not have yet answers :class:`~base.tenancy.context.
 AppNotCreated`, the 404 ``app_inactive`` of a module that is off, before any SQL: what no operation's gate covers, an
@@ -51,13 +54,19 @@ def _route(model, hints: dict) -> str | None:
         return None
     related = hints.get("instance")
     if related is not None and related._state.db is not None and inventory.classify(related) != inventory.CONTROL:
-        # A hub's object related to another hub's object lives in that one's database (a migration's RunPython on a
-        # hub's __ddl alias): Django's own rule. A control object's hint (``user.<hub model>_set``) says ``default``,
-        # which is never a hub's: the context decides. On the migrator's alias (not the context's) the tables are being
-        # made: it is never asked what the hub has.
+        # An object related to a loaded hub object lives in that object's database (a migration's RunPython on a hub's
+        # __ddl alias): Django's own rule, as long as no other hub's context is at work. A control object's hint
+        # (``user.<hub model>_set``) says ``default``, which is never a hub's: the context decides. On the migrator's
+        # alias (not the context's) the tables are being made: it is never asked what the hub has.
         active = context.peek()
-        if active is not None and active.kind == context.HUB and active.alias == related._state.db:
-            _refuse_if_not_created(model, active)
+        if active is not None and active.kind == context.HUB:
+            if not _same_database(active.alias, related._state.db):
+                raise context.HubContextMismatch(
+                    f"{model._meta.label} through an object loaded from {related._state.db!r} inside the context of "
+                    f"{active.alias!r}: an object of one hub is never read or written in another hub's context."
+                )
+            if active.alias == related._state.db:
+                _refuse_if_not_created(model, active)
         return related._state.db
     active = context.current()
     if database_class == inventory.HUB and active.kind == context.CONTROL:
@@ -71,7 +80,14 @@ def _route(model, hints: dict) -> str | None:
 
 def _database(alias: str) -> str | None:
     settings = connections.settings.get(alias)
-    return None if settings is None else settings["NAME"]
+    if settings is not None:
+        return settings["NAME"]
+    # The migrator forgets its alias when done, maybe from another thread while this one still works on it.
+    return alias.removesuffix(names.DDL_SUFFIX) if alias.endswith(names.DDL_SUFFIX) else None
+
+
+def _same_database(first: str, second: str) -> bool:
+    return first == second or _database(first) == _database(second)
 
 
 class TenantRouter:
@@ -85,7 +101,7 @@ class TenantRouter:
         first, second = obj1._state.db, obj2._state.db
         if first is None or second is None:
             return None
-        return first == second or _database(first) == _database(second)
+        return _same_database(first, second)
 
     def allow_migrate(self, db: str, app_label: str, model_name: str | None = None, **hints) -> bool | None:
         if model_name is None:

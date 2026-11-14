@@ -321,7 +321,7 @@ def test_the_titles_of_a_writes_preview_are_the_apps_too():
     assert {"Session", "Expected in the drawer"} <= operation_titles("cash_register")
 
 
-def copies_of_the_skeleton(source: str, *, catalogue_test: bool = False) -> set[str]:
+def copies_of_the_skeleton(source: str, *, catalogue_test: bool = False) -> set[str]:  # noqa: C901
     """Which piece of the catalogue tests ``base.tests.po`` shares a module writes out itself: the names of its models
     (``model_texts``), the untranslated entries (``untranslated``), the ``.mo`` against the ``.po``
     (``compiled_differences``), or a key whose context it drops (``missing_from_catalogue`` compares whole keys). In a

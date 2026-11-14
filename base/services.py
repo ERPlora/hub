@@ -444,7 +444,7 @@ def relay_take_events(
     return len(taken)
 
 
-def relay_deliver_next(
+def relay_deliver_next(  # noqa: PLR0913
     now: dt.datetime,
     *,
     deliver: Callable[[str, OutboxEvent], object],
@@ -616,7 +616,7 @@ def _slug_taken() -> Conflict:
     output=HubRegisterOut,
     ai=INTERNAL,
 )
-def hub_register(ctx: OperationContext, data: HubRegistryIn) -> dict:
+def hub_register(ctx: OperationContext, data: HubRegistryIn) -> dict:  # noqa: C901
     """Register the SaaS's business ``data.id`` (or update its name, slug, country…): ``requested``, with a database of
     its own to make (never control's), due in the worker's ``hub_due``.
 
@@ -1371,7 +1371,7 @@ def provision_step(
     return hub
 
 
-def provision_ready(
+def provision_ready(  # noqa: PLR0913
     hub_id: UUID,
     now: dt.datetime,
     schema_apps: dict[str, str],
@@ -2169,7 +2169,7 @@ def active_people(host: str, day: dt.date, window_days: int) -> tuple[int, int]:
     return on_day, in_window
 
 
-def usage_recorded(
+def usage_recorded(  # noqa: PLR0913
     hub_id: UUID,
     day: dt.date,
     *,
@@ -2265,7 +2265,7 @@ def dump_key_taken(key: str) -> bool:
         return HubDump.objects.filter(key=key).exists()
 
 
-def dump_recorded(
+def dump_recorded(  # noqa: PLR0913
     hub_id: UUID, *, kind: str, key: str, size: int, created_at: dt.datetime, requested_by: str = ""
 ) -> HubDump:
     """Keep in control the copy of ``hub_id`` just uploaded to ``key``."""
@@ -4092,7 +4092,7 @@ def _assistant_refusal(outcome: str, code: str, message: str) -> "assistant.Tool
     return assistant.ToolOutcome(outcome, code, assistant.error_content(code, message))
 
 
-def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):
+def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):  # noqa: C901, PLR0911
     """Run one pending ``call`` (a read alone; a write with the person's yes) → ``(outcome, card, shown)``: the card
     when the write still waits for its answer, with what it will do when its app declares a preview (BASE-F98), and
     the fingerprint of what it shows (``shown``, ``assistant.fingerprint``); one that cannot be read is the write's
@@ -4845,7 +4845,7 @@ def app_enable(ctx: OperationContext, data: AppChangeIn) -> dict:
         return _enable(ctx, data)
 
 
-def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:
+def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:  # noqa: C901
     hub = _business_hub(ctx)
     app = _business_module(ctx, data.app, hub).label
     graph = activation.module_graph()

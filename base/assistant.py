@@ -943,7 +943,7 @@ def _reference_problems(op: Operation, declared: Any) -> list[str]:
 ABOVE = {Membership.Role.MANAGER: "the owner or an administrator", Membership.Role.EMPLOYEE: "a manager or the owner"}
 
 
-def instructions(
+def instructions(  # noqa: PLR0913
     *,
     language: str,
     currency: str,
@@ -1126,7 +1126,7 @@ def usage(scope: Scope) -> dict:
     return {key: answer.get(key) for key in ("used", "limit", "resets_at", "demo")}
 
 
-def report(
+def report(  # noqa: PLR0913
     scope: Scope, *, message_id: str, reason: str, comment: str, question: str, answer: str, web: bool | None = None
 ) -> dict:
     """Send erplora.com a bad answer of the assistant: ``{sent, duplicate}``. ``web``: whether its turn brought pages of
@@ -1262,7 +1262,7 @@ def _assistant_message(text: str, calls: list[dict]) -> dict:
     return message
 
 
-async def stream_turn(
+async def stream_turn(  # noqa: C901, PLR0912, PLR0915
     scope: Scope, *, messages: list[dict], tools: list[dict], instructions: str, continuation: str | None
 ) -> AsyncIterator[dict]:
     """A turn through the gateway, as the Hub's frames: ``text`` piece by piece, ``usage``, an ``error``, and ``done``

@@ -5,8 +5,7 @@ que se reparte por estaciones (plancha, barra, postres…) en la pantalla y en p
 listos, el pase entrega lo terminado y queda un historial de lo que pasó. Cocina no cobra, no descuenta stock y no
 sabe de mesas ni de clientes: pinta e imprime la etiqueta que le da la cuenta.
 
-- **Estado**: completa (2026-10-21): 30 de sus 31 flujos, `KITCHEN-F01` … `F31`, están `hecho`, y `KITCHEN-F30`
-  está `descartado` con su motivo (la comanda no guarda cliente).
+- **Estado**: completa (2026-10-21): sus 30 flujos están `hecho`.
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta
   «Para quien lo mantiene»). Lo que se cambie de la app se cambia antes allí.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md).

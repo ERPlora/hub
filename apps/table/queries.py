@@ -680,7 +680,7 @@ def get_zone(ctx: OperationContext, params: ZoneRefIn) -> dict:
         },
     },
 )
-def list_tables(ctx: OperationContext, params: TableListIn) -> dict:
+def list_tables(ctx: OperationContext, params: TableListIn) -> dict:  # noqa: C901
     now = timezone.now()
     rows = (
         tables_now(now)

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:aac570b2963a25c05f2c4c60c2d4ff73f3423cf1927f224fd7c05b9365a0be31 -->
+<!-- generated from WORKBOOK.md sha256:445f7a278f1b7b84574ff69079e27be9588e00f522c8e7679d5607430a56581d -->
 
 ## What it is for and who it is for
 
@@ -63,7 +63,7 @@ but not the quantity left on the till, which does not exist here. Also:
 - **The item's photo on the till's tile and, without a photo, its initials over a colour**: Square (the
   item's image or, without one, its colour and its abbreviation), Loyverse (image, or colour and shape)
   and Shopify POS (the product's image on the grid). The photo is chosen from ERPlora's library or
-  uploaded from the product's card, and it travels in the business's backup, as in the current product.
+  uploaded from the product's card, and it travels in the business's backup.
 
 ## Before you start
 
@@ -1078,7 +1078,6 @@ WebP of up to 2 MB makes the file unreadable ("The file holds a photo that is no
 Involved: BASE-F31, BASE-F34, BASE-F35, BASE-F36, BASE-F37, INVENTORY-F12
 
 ### INVENTORY-F34 Recover a deleted product
-<!-- origen: nuevo (BASE-F114: recuperar desde una copia aparte lo que el negocio perdió) gh:hub#1321 -->
 Status: done
 Actor: the ERPlora staff, when the business asks (in the business no screen undoes a deletion)
 Screen: none of the business; the Hubs admin › Separate copies › "Recover into the business…" (BASE-F114)

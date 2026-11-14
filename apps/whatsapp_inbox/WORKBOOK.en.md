@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e647fc7c37895c3d61a277160f020589b582941f264f2b68eb9f4b559aed4679 -->
+<!-- generated from WORKBOOK.md sha256:364e7398f7b82b43e44f6b14dfd72c6c623f9ab572e7a799616cdcc04334000a -->
 
 ## What it is for and who it is for
 
@@ -43,11 +43,11 @@ conversation as a message from the business (Meta's coexistence).
 **Wins:** an inbox you answer from (Square, Shopify, Fresha, Vagaro, Odoo), with three statuses (open, pending,
 closed) where a new message from the customer reopens the conversation (Zendesk), assignment to whoever can read the
 inbox with "Assign to me" that never overrides someone else (Shopify, Chakra), internal notes in the thread (Fresha,
-Intercom, Front), Meta's 24-hour rule enforced on the server and the templates managed in the app itself (Odoo, WATI,
-Respond.io and the current product).
-**Why not the others:** answering only from the phone (the current product) forces you to pick up the phone and
+Intercom, Front), Meta's 24-hour rule enforced on the server and the templates managed in the app itself (Odoo, WATI
+and Respond.io).
+**Why not the others:** answering only from the phone forces you to pick up the phone and
 leaves the inbox read-only; two statuses (Shopify) do not tell "waiting for the customer" from "it is done";
-assigning by typing an identifier (the current product) is used by nobody; sending the owner to WhatsApp Manager to
+assigning by typing an identifier is used by nobody; sending the owner to WhatsApp Manager to
 create the templates takes them out of the app for something they do every day.
 
 ## Before you start

@@ -1,9 +1,6 @@
 <script setup lang="ts">
-// The card's data, read-only (CUSTOMER-F03): the product's sheet (`dl.meta`) — Email, Phone, Tax ID,
-// Company, Address, Stage, Source, Preferred channel, Purchases, Spent (in the business's currency:
-// customer-business-currency), Last purchase, Active — and,
-// new, the birthday, anniversary, internal notes and custom fields the product only showed when
-// editing (WORKBOOK «Cambios frente al producto actual»).
+// The card's data, read-only (CUSTOMER-F03), with the birthday, anniversary, internal notes and custom
+// fields shown without opening Edit; money in the business's currency.
 import { formatDateTime, formatMoney } from '@erplora/ui/components';
 import { computed } from 'vue';
 

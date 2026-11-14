@@ -5,8 +5,7 @@ Estado de la app: no hecha — especificación escrita el 2026-11-14 (hub#562); 
 
 > Manual de usuario y especificación de la app `tip`. Se escribe **antes** que el código: no se programa
 > nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde (servidor y
-> páginas). Es una app nueva, no un porte: el módulo de Ventas del producto actual no tenía propinas. Su
-> ficha funcional es Toast, completada con lo que hacen Square, Lightspeed, SumUp, Odoo, Shopify y los TPV
+> páginas). Su ficha funcional es Toast, completada con lo que hacen Square, Lightspeed, SumUp, Odoo, Shopify y los TPV
 > españoles (Revo, Ágora, Glop); ver «Referencia adoptada».
 
 ## Para qué sirve y para quién
@@ -158,7 +157,6 @@ importe), cuál sale marcada, «Permitir otra cantidad» y «Guardar».
 | TIP-F14 | Ver mis propinas | común | no hecho |
 
 ### TIP-F01 Configurar las propinas
-<!-- origen: nuevo (hub#562; ficha de Toast, Square, Revo XEF y SumUp) -->
 Estado: no hecho — la app no existe todavía (hub#1498)
 Vertical: común
 Actor: propietario, administrador, asistente
@@ -178,7 +176,6 @@ bloqueada con «No tienes permiso para cambiar estos ajustes.».
 Implicados: SALE-F37
 
 ### TIP-F02 Proponer la propina al cobrar
-<!-- origen: nuevo (hub#562; SALE-G06 del registro de la migración) -->
 Estado: no hecho — la app no existe y la hoja Cobro aún no pinta pasos de otras apps (hub#1498, hub#1500)
 Vertical: común
 Actor: empleado, responsable
@@ -202,7 +199,6 @@ al ajustarla (TIP-F06).
 Implicados: SALE-F39, SALE-F16, CASH_REGISTER-F18
 
 ### TIP-F03 Anotar una propina con tarjeta
-<!-- origen: nuevo (hub#562; Lightspeed «Add tip», Square «liquidar propinas») -->
 Estado: no hecho — la app no existe todavía (hub#1498)
 Vertical: común
 Actor: empleado, responsable, asistente
@@ -220,7 +216,6 @@ una venta de un día ya repartido, «Ese día ya está repartido: reábrelo para
 Implicados: CASH_REGISTER-F18
 
 ### TIP-F04 Anotar una propina en efectivo
-<!-- origen: nuevo (hub#562; Revo XEF «convertir el cambio en propina», SumUp «Use for tip») -->
 Estado: no hecho — la app no existe todavía (hub#1498)
 Vertical: común
 Actor: empleado, responsable, asistente
@@ -240,7 +235,6 @@ total y la propina».
 Implicados: SALE-F01, CASH_REGISTER-F18
 
 ### TIP-F05 Echar al bote una propina sin tique
-<!-- origen: nuevo (hub#562; ficha de Toast, bote del turno) -->
 Estado: no hecho — la app no existe todavía (hub#1498)
 Vertical: restaurante
 Actor: responsable
@@ -256,7 +250,6 @@ Si falla: la caja cerrada, el mismo aviso que TIP-F04.
 Implicados: TIP-F08, CASH_REGISTER-F18
 
 ### TIP-F06 Ajustar o anular una propina
-<!-- origen: nuevo (hub#562; Toast «ajustar propinas de una cuenta cerrada») -->
 Estado: no hecho — la app no existe todavía (hub#1498)
 Vertical: común
 Actor: responsable, asistente
@@ -275,7 +268,6 @@ cambiar sus propinas.».
 Implicados: SALE-F30, SALE-F31, CASH_REGISTER-F18
 
 ### TIP-F07 Declarar las propinas en efectivo al cerrar el turno
-<!-- origen: nuevo (hub#562; Toast «declarar propinas en efectivo») -->
 Estado: no hecho — la app no existe todavía (hub#1501)
 Vertical: restaurante
 Actor: empleado
@@ -294,7 +286,6 @@ debajo de su campo.
 Implicados: ATTENDANCE-F01
 
 ### TIP-F08 Definir el reparto
-<!-- origen: nuevo (hub#562; Toast «Pool Tips and Tipping Out», Square «repartir propinas») -->
 Estado: no hecho — la app no existe todavía (hub#1501)
 Vertical: restaurante
 Actor: responsable, administrador
@@ -313,7 +304,6 @@ aporta y recibe a la vez en la misma regla, «Un puesto no puede aportar y recib
 Implicados: STAFF-F04, ATTENDANCE-F01
 
 ### TIP-F09 Repartir a otro puesto (tip-out)
-<!-- origen: nuevo (hub#562; Toast «tipping out») -->
 Estado: no hecho — la app no existe todavía (hub#1501)
 Vertical: restaurante
 Actor: responsable, administrador
@@ -328,7 +318,6 @@ Si falla: un % de más de 100 o negativo se dice debajo de su campo.
 Implicados: TIP-F08
 
 ### TIP-F10 Ver la vista previa del reparto
-<!-- origen: nuevo (hub#562; ficha de Toast) -->
 Estado: no hecho — la app no existe todavía (hub#1501)
 Vertical: restaurante
 Actor: responsable, administrador
@@ -342,7 +331,6 @@ Si falla: un día sin propinas, «Ese día no tiene propinas.».
 Implicados: TIP-F08
 
 ### TIP-F11 Aprobar el reparto de un día o servicio
-<!-- origen: nuevo (hub#562; ficha de Toast) -->
 Estado: no hecho — la app no existe todavía (hub#1501)
 Vertical: restaurante
 Actor: responsable, administrador, asistente
@@ -359,7 +347,6 @@ pagadas no se reabre: «Ese día ya tiene propinas pagadas.».
 Implicados: ATTENDANCE-F05, ATTENDANCE-F08
 
 ### TIP-F12 Pagar las propinas
-<!-- origen: nuevo (hub#562; Square «pagar propinas desde la caja», Toast «tip out») -->
 Estado: no hecho — la app no existe todavía (hub#1501)
 Vertical: común
 Actor: responsable, administrador, asistente
@@ -376,7 +363,6 @@ más de lo pendiente, «No se puede pagar más de lo pendiente.».
 Implicados: CASH_REGISTER-F05, CASH_REGISTER-F18
 
 ### TIP-F13 Ver el informe por persona y por turno
-<!-- origen: nuevo (hub#562; Square «informe de turno», SumUp «Tips report») -->
 Estado: no hecho — la app no existe todavía (hub#1498)
 Vertical: común
 Actor: responsable, administrador
@@ -391,7 +377,6 @@ Si falla: el error de carga con «Reintentar».
 Implicados: ATTENDANCE-F01
 
 ### TIP-F14 Ver mis propinas
-<!-- origen: nuevo (hub#562; MyToast) -->
 Estado: no hecho — la app no existe todavía (hub#1498)
 Vertical: común
 Actor: empleado

@@ -462,7 +462,7 @@ class AsksFirst:
     that page, ``confirmation_note(obj, action)``, what that page says under it (nothing by default), and
     ``chosen_name(obj)``, its name in what the staff is told."""
 
-    def confirmation(
+    def confirmation(  # noqa: PLR0913, PLR0917
         self, request: HttpRequest, chosen, form: forms.Form, action: str, title: str, template: str, **more
     ):
         """The confirmation page of ``action`` for ``chosen``: what it does and its ``form``, asked again until
@@ -646,7 +646,7 @@ class HubAdmin(AsksFirst, base_admin.HubAdmin):
             ),
         )
 
-    def from_a_copy(self, request: HttpRequest, hubs, action: str, title: str, template: str, operation, said):
+    def from_a_copy(self, request: HttpRequest, hubs, action: str, title: str, template: str, operation, said):  # noqa: PLR0913, PLR0917
         """The temporary cluster and the moment asked on ``action``'s confirmation page, then ``operation`` asked of
         each hub with them; ``said(count)``: what the staff is told of those asked (``closed``: how long all of them
         can stay closed)."""

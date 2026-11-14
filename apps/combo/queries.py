@@ -189,7 +189,7 @@ def _product_lookups(said: str):
     )
 
 
-def find_option(
+def find_option(  # noqa: PLR0913
     option_id: UUID | None,
     *,
     combo_id: UUID | None = None,
@@ -255,7 +255,7 @@ def away_key(product, targets: frozenset[str]) -> str | None:
     return key
 
 
-def offer_status(option: ChoiceOption, targets: frozenset[str]) -> str:
+def offer_status(option: ChoiceOption, targets: frozenset[str]) -> str:  # noqa: PLR0911
     """offered, or why not: the product deleted, deactivated, sold out (INVENTORY-F29) or not sold by
     units in Inventory; with no rate to bill it at in a menu to take away; or sold out here."""
     product = option.product

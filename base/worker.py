@@ -147,7 +147,7 @@ ACTIVATION_LOCK_WAIT = 1.0
 _swept: dict = {}
 
 
-def run(
+def run(  # noqa: C901, PLR0912, PLR0915
     stop: threading.Event,
     *,
     tick_seconds: float = TICK_SECONDS,

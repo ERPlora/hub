@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8bfcee37a61409fb6a57863d03af71e9cb76dfdd01f4de2a00d0822fa0bc7ac6 -->
+<!-- generated from WORKBOOK.md sha256:18a5a43abde8d70a4951fbf5ad6cdf57767fd3e79236474fc4b7cb904e3f3ee5 -->
 
 ## What it is for and who it is for
 
@@ -41,7 +41,7 @@ Who uses it:
 - **Google Calendar / RFC 5545**: editing a series "only this appointment" or "this one and the following
   ones", never all of them, and the series keeps its wall-clock time when the official time changes.
 - **Mindbody/Booker**: the front desk can note down an appointment that has already started.
-- Decisions of the current product that rule here: the business's opening hours live only in Schedules,
+- Decisions that rule here: the business's opening hours live only in Schedules,
   charging is done by the till (Appointments only notes which sale it was charged with), the clock is
   always the business's and series are edited with a cut.
 

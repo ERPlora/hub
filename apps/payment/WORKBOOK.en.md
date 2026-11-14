@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:dbc027cc0f36892b8f499ceb8251c107e4ae95972755527b5fc84f4e6e74b25f -->
+<!-- generated from WORKBOOK.md sha256:5bbd916c4e33acabf5253e3713cc972f403033e29912af5de23c55ed1f4dc0e7 -->
 
 ## What it is for and who it is for
 
@@ -336,7 +336,7 @@ cancelling need a person: an automation does not do them.
 | Manager | yes | yes | yes |
 | Employee | yes | no | no |
 
-Whoever has both permissions can approve what they recorded (as today and as QuickBooks; see
+Whoever has both permissions can approve what they recorded (as QuickBooks; see
 "Reference adopted"); the payment keeps who recorded it, who approved it (`approved_by`,
 `approved_at`), when it was sent and completed (`sent_at`, `completed_at`) and who cancelled it and when
 (`cancelled_by`, `cancelled_at`).

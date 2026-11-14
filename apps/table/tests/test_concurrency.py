@@ -112,7 +112,7 @@ def test_two_transfers_to_the_same_free_table_leave_one_there():
 
 
 @contextmanager
-def crossing_after_the_first_lock(other, table: str):
+def crossing_after_the_first_lock(other, table: str):  # noqa: C901
     """Forces two lock orders to cross instead of hoping two threads interleave (rv-121: released together
     at a barrier, a merge locking its two checks one by one in the order of the call still passed 5 of 5).
 

@@ -163,7 +163,7 @@ def fiscal_key(closing: dict) -> tuple:
     )
 
 
-def value(
+def value(  # noqa: PLR0913, PLR0915
     lines: list[LineIn],
     *,
     tax_included: bool,

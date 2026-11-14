@@ -6,8 +6,8 @@ sustituye a un tique (F3) y la rectificativa (R1–R5) de cada devolución, anul
 entre Ventas y VeriFactu en la cadena fiscal española: aquí nace el número de serie que luego viaja a la AEAT.
 Sirve igual al restaurante y a la peluquería.
 
-- **Estado**: completa (2026-10-31): 21 de los 23 flujos `INVOICE-F01` … `F23` están `hecho`; F04 y F22,
-  `descartado` con su motivo y su issue (hub#500 y hub#501; ver «Qué queda fuera»).
+- **Estado**: completa (2026-10-31): sus 21 flujos están `hecho`; lo que no entra, con su issue, en «Qué queda
+  fuera».
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta
   «Para quien lo mantiene»). Lo que se cambie de la app se cambia antes allí.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md).
@@ -73,8 +73,8 @@ CI=1 pnpm e2e tests/e2e/invoice-sale.spec.ts tests/e2e/invoice-manual.spec.ts te
 
 ## Qué queda fuera
 
-- **hub#500** — El cliente no puede pedir él mismo la factura completa de su tique (INVOICE-F04).
-- **hub#501** — El emisor de Facturación no se rellena con los datos fiscales de la cuenta de ERPlora (INVOICE-F22);
+- **hub#500** — El cliente no puede pedir él mismo la factura completa de su tique.
+- **hub#501** — El emisor de Facturación no se rellena con los datos fiscales de la cuenta de ERPlora;
   choca con «Dos identidades» de PLAN-SAAS (los datos fiscales del negocio viven en el Hub): contradicción señalada,
   sin elegir.
 - Lo que no hace a propósito (enviar a la AEAT, cobrar, presupuestos, vencimientos, el libro registro para la

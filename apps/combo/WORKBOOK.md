@@ -5,12 +5,7 @@ Estado de la app: completa (2026-10-21)
 
 > Manual de usuario y especificación de la app `combo`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
-> (servidor y páginas). Parte del `WORKFLOW.md` del módulo Menús y combos del producto actual
-> (`modules-workspace/modules/combos`, `origin/main` `0fd6e5d`, v0.1.18) y de lo que Ventas e
-> Inventario hacían con los menús (sus tests `combo_fire`, `combo_split`, `order_combo`,
-> `order_menu_checkout`, `combo_stock` y `combo_components_stock`). Hace lo mismo, se ve igual y
-> conserva su funcionalidad salvo lo que dice «Cambios frente al producto actual», al final. Los
-> números de flujo se conservan (`COMBOS-Fnn` → `COMBO-Fnn`) porque otras apps los citan.
+> (servidor y páginas).
 
 ## Para qué sirve y para quién
 
@@ -35,8 +30,7 @@ un descuento ni una variante, ni los extras de un plato (eso es Suplementos).
 
 ## Referencia adoptada
 
-El barrido de mercado del producto actual (`architecture/modules/combos.md`, 24/08/2026: 10
-referencias y sus foros) sigue vigente y se adopta, no más:
+Se adopta lo que hace el mercado:
 
 - [Square — combos](https://squareup.com/help/us/en/article/8558-create-and-sell-combos): el combo es
   un artículo del catálogo, con «elecciones requeridas» por grupo y un cargo por opción; un artículo
@@ -159,7 +153,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | COMBO-F15 | Recuperar los menús, sus platos y sus elecciones desde una copia aparte | hecho |
 
 ### COMBO-F01 Consultar y buscar los menús
-<!-- origen: old:combos/WORKFLOW.md#combos-f01 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado, asistente
 Pantalla: Menús
@@ -176,7 +169,6 @@ primero con el botón +.».
 Implicados: ninguno
 
 ### COMBO-F02 Crear un menú a precio cerrado
-<!-- origen: old:combos/WORKFLOW.md#combos-f02 qa:modules/combos/set-menu-and-combos wf:restaurante-dia#rec_restaurante-f03 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Menús
@@ -210,7 +202,6 @@ permiso de gestión no hay botón +.
 Implicados: TAX-F01
 
 ### COMBO-F03 Cambiar los datos de un menú, ponerlo o quitarlo de la venta
-<!-- origen: wf:restaurante-dia#rec_restaurante-f03 old:combos/WORKFLOW.md#combos-f03 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Menús
@@ -228,7 +219,6 @@ Si falla: los mismos avisos que el alta. Pasar a «en el local» sin tipo de IVA
 Implicados: SALE-F12
 
 ### COMBO-F04 Retirar un menú
-<!-- origen: old:combos/WORKFLOW.md#combos-f04 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Menús
@@ -248,7 +238,6 @@ se retira nada y sale la tarjeta nueva (BASE-F97).
 Implicados: SALE-F12, COMBO-F15
 
 ### COMBO-F05 Montar los platos de un menú
-<!-- origen: qa:modules/combos/set-menu-and-combos wf:restaurante-dia#rec_restaurante-f03 old:combos/WORKFLOW.md#combos-f05 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Constructor del menú
@@ -276,7 +265,6 @@ la tarjeta.
 Implicados: COMBO-F15
 
 ### COMBO-F06 Elegir los productos de cada plato y su suplemento
-<!-- origen: qa:modules/combos/set-menu-and-combos wf:restaurante-dia#rec_restaurante-f03 old:combos/WORKFLOW.md#combos-f06 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Constructor del menú
@@ -319,7 +307,6 @@ menú, el plato y el producto que enseñó la tarjeta.
 Implicados: INVENTORY-F27
 
 ### COMBO-F07 Elegir un menú al vender
-<!-- origen: qa:modules/combos/set-menu-and-combos old:combos/WORKFLOW.md#combos-f07 qa:verticals/restaurant/03-menu-and-prices wf:restaurante-dia#rec_restaurante-f06 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Ventas: Vender
@@ -348,7 +335,6 @@ también se ven y se venden.
 Implicados: SALE-F12, MODIFIER-F06
 
 ### COMBO-F08 Cobrar el menú: precio cerrado y suplementos
-<!-- origen: qa:modules/combos/set-menu-and-combos old:combos/WORKFLOW.md#combos-f08 wf:restaurante-dia#rec_restaurante-f11 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Ventas: Vender
@@ -375,7 +361,6 @@ Sin Menús activa, el TPV no ofrece menús y uno pedido por la API se rechaza.
 Implicados: SALE-F12
 
 ### COMBO-F09 Repartir el IVA de un menú
-<!-- origen: qa:modules/combos/set-menu-and-combos old-hub:HUB_PERIPHERALS-F09 old:combos/WORKFLOW.md#combos-f09 wf:restaurante-dia#rec_restaurante-f12 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Ventas: Vender
@@ -413,7 +398,6 @@ categorías distintas, el menú no sale en el TPV.
 Implicados: SALE-F12, TAX-F19
 
 ### COMBO-F10 Bajar el stock de cada plato al cobrar
-<!-- origen: qa:modules/combos/set-menu-and-combos wf:restaurante-dia#rec_restaurante-f11 old:combos/WORKFLOW.md#combos-f10 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -434,7 +418,6 @@ solo (INVENTORY-F21).
 Implicados: INVENTORY-F22, INVENTORY-F23, INVENTORY-F24, SALE-F12
 
 ### COMBO-F11 Mandar el menú a cocina
-<!-- origen: qa:modules/combos/set-menu-and-combos old-hub:HUB_PERIPHERALS-F10 old:combos/WORKFLOW.md#combos-f11 wf:restaurante-dia#rec_restaurante-f07 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: ninguna (la comanda la pinta Cocina)
@@ -453,7 +436,6 @@ pedirlo), así que nunca llega a cocina a medias. Un plato que es un servicio no
 Implicados: KITCHEN-F06, KITCHEN-F08, SALE-F12, SALE-F20
 
 ### COMBO-F12 Marcar una elección como agotada
-<!-- origen: nuevo (mercado: Square y Lightspeed dejan marcar agotado lo que el menú ofrece, sin quitarlo; INVENTORY-F29) -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Constructor del menú
@@ -472,7 +454,6 @@ en el TPV y el aviso del constructor lo dice. Una cuenta abierta con un plato ya
 Implicados: COMBO-F07, INVENTORY-F29
 
 ### COMBO-F13 Cuando un producto deja el catálogo
-<!-- origen: old:combos/WORKFLOW.md#combos-f06 old:combos/WORKFLOW.md#combos-f09 -->
 Estado: hecho
 Actor: sistema, propietario, administrador, responsable, asistente
 Pantalla: Constructor del menú
@@ -496,7 +477,6 @@ solo; mientras, siguen marcadas y nadie las vende.
 Implicados: INVENTORY-F04, INVENTORY-F34, COMBO-F06, COMBO-F15
 
 ### COMBO-F14 La foto del menú
-<!-- origen: nuevo (decisión de Ioan del 2026-10-30, encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next: «si el menú del día lleva foto en el TPV, se decide con market-decision»). Mercado, 2026-10-30: el menú se vende en el TPV como un artículo más, con su foto: Odoo POS (un combo es un producto, con su imagen; https://www.odoo.com/documentation/19.0/applications/sales/point_of_sale/products.html, https://www.odoo.com/documentation/17.0/applications/sales/point_of_sale/combos.html), Lightspeed Restaurant (el combo tiene su campo «Image»; https://resto-support.lightspeedhq.com/hc/en-us/articles/6455698479899-Creating-and-managing-combos), Toast (el combo es un artículo del menú, que lleva imagen; https://support.toasttab.com/en/article/Adding-Images-to-Menu-Items-in-the-Menu, https://intercom.help/toast-central/en/articles/14726324-build-a-customizable-meal-combo), Shopify POS (el lote es un producto; https://changelog.shopify.com/posts/shopify-bundles-support-on-pos), Loyverse (artículo compuesto con su foto o color y forma; https://help.loyverse.com/help/how-add-items-loyverse-back-office), Square (artículos con foto en la rejilla; https://community.squareup.com/t5/Troubleshooting/Item-images-on-Square-Register-POS/m-p/683217), SumUp (catálogo con fotos y lotes de productos; https://www.sumup.com/en-ie/pos/faq/, https://www.sumup.com/en-gb/business-guide/bundle-products-create-custom-offers-with-sumup-pos/) y Clover (imagen del artículo; https://bypassmobile.zendesk.com/hc/en-us/articles/360043275151). La librería del producto viejo ya tenía menu_dia, menu_infantil, menu_hamburguesa y menu_kebab. Gana: el menú lleva foto, de la librería o propia, como el artículo (INVENTORY-F30, F31). -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Menús
@@ -522,7 +502,6 @@ foto no carga, enseña sus iniciales.
 Implicados: COMBO-F03, COMBO-F04, COMBO-F07, INVENTORY-F30, INVENTORY-F31, INVENTORY-F32
 
 ### COMBO-F15 Recuperar los menús, sus platos y sus elecciones desde una copia aparte
-<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus elecciones en los menús) gh:hub#1343 gh:hub#1473 gh:hub#1474 -->
 Estado: hecho
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide (BASE-F114)
 Pantalla: ninguna de Menús: en el admin de Hubs, Copias aparte › «Recuperar en el negocio…», con **Menús, Platos de
@@ -724,7 +703,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 
 ## Para quien lo mantiene
 
-- **Orden de la lista de menús** (`base.ordering.list_order`; regla hub#2355 del producto viejo): la columna elegida,
+- **Orden de la lista de menús** (`base.ordering.list_order`): la columna elegida,
   después el nombre y al final el `id`, todo en la dirección de la lista: la descendente es la ascendente leída al revés,
   empates incluidos. Lo fija `test_ties_read_backwards_in_a_descending_list`.
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`,
@@ -843,11 +822,10 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   `base/tests/test_assistant_yes_for_its_card.py`). Las listas
   cerradas de sus escrituras (cómo se vende el menú) ya llevan su etiqueta en `en` + `es` por los `choices` del
   modelo.
-- El admin de Django del Hub tiene **CRUD completo** sobre los tres modelos (ronda 12, PLAN §17); una
+- El admin de Django del Hub tiene **CRUD completo** sobre los tres modelos (PLAN §17); una
   escritura cruda del admin no deja aviso.
-- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD (desde el corte S5,
-  hub#602): los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
-  en la misma BD de test (`base/tenancy/tests/legacy.py`, hasta hub#611).
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
+  en la misma BD de test (`base/tenancy/tests/legacy.py`).
 - En el navegador: `tests/e2e/combo-menus.spec.ts` (oculto, con Inventario e Impuestos de verdad), que
   borra lo suyo (`E2E Combo …`, `E2E-CMB-…`) antes y después, y `tests/e2e/combo-till.spec.ts` (el TPV de
   Ventas, Cocina e Inventario de verdad y un paso del relay: COMBO-F07–F11), que borra `e2e Combo …` y
@@ -857,11 +835,11 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 ## Cómo son las páginas (para quien lo mantiene)
 
 - `frontend/routes.ts`: `/combo/menus` (lista) y `/combo/menus/:id` (constructor). Una sola entrada de
-  menú, sin pestañas, como el producto actual.
+  menú, sin pestañas.
 - Lista en vivo con `useLiveList` + `useServerTable` (orden `sort` + `dir`), filtros de columna de
   `DataTable`; el constructor sigue `combo.combo.get` en vivo; escrituras con `useCommand`.
-- Formularios: `FormModal` para el menú; el plato y la elección se editan dentro del constructor, como
-  el producto actual. Confirmaciones con `ConfirmDialog`. Buscador de producto con `Combo`
+- Formularios: `FormModal` para el menú; el plato y la elección se editan dentro del constructor.
+  Confirmaciones con `ConfirmDialog`. Buscador de producto con `Combo`
   (`inventory.product.list`, activos), de categoría fiscal con `Combo` (`tax.category.list`).
 - Reordenar: `ion-reorder-group` (asa) y los botones subir/bajar, que acaban en la misma operación
   (`reorder`). WCAG 2.5.7: todo lo que se arrastra se puede hacer sin arrastrar.
@@ -875,7 +853,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   cambia) con el formulario del menú o la edición de una elección abiertos, el importe que nadie ha tocado
   se reescribe desde lo guardado con los decimales de su moneda; lo tecleado se queda y se lee en ella al
   guardar (si no se puede, lo dice el campo).
-- La foto del menú (COMBO-F14, hecha el 2026-10-30): el campo común `base/frontend/components/ImageField.vue` al
+- La foto del menú (COMBO-F14): el campo común `base/frontend/components/ImageField.vue` al
   final de `MenuFormModal.vue` (tras guardar el menú, `combo.combo.set_image` o `combo.combo.upload_image`; un
   fallo se queda en la ventana con «Reintentar», que solo manda la foto, y «Guardar» apagado), la columna `photo`
   (`ItemImage` de 40 px) en `MenusPage.vue` y la baldosa del TPV en `apps/sale/frontend/components/pos/ComboTiles.vue`.
@@ -883,8 +861,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   `apps/sale/frontend/components/pos/ComboTiles.test.ts` y en Chrome `tests/e2e/combo-photo.spec.ts`. Las cuatro
   imágenes `menu_*` de la librería son hoy el mismo archivo (una bandeja de desayuno) y su manifiesto las titula
   así: buscar «menú del día» no las encuentra.
-- Iconos registrados en la shell; los del producto actual (`restaurant-outline`, `arrow-up-outline`)
-  esperan en `UI-REQUESTS.md` con su sustituto (`layers-outline`, `chevron-up-outline`); el asa la pinta
+- Iconos registrados en la shell; `restaurant-outline` y `arrow-up-outline` esperan en `UI-REQUESTS.md` con su sustituto (`layers-outline`, `chevron-up-outline`); el asa la pinta
   `ion-reorder` con su icono propio.
 
 ## Lo que NO hace, a propósito
@@ -900,51 +877,8 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 - **No enseña en el constructor el reparto con importes** de un menú «para llevar»: el aviso de arriba dice que
   el precio se reparte entre los platos, y el reparto se ve en la cuenta antes de cobrar, igual que se
   cobra (COMBO-F09).
-
-## Cambios frente al producto actual
-
-- **Las elecciones son productos de Inventario por clave ajena** (`requires = ["inventory", "tax"]`),
-  no una referencia opaca a producto o servicio: el nombre, el SKU y el precio se leen siempre, sin el
-  «Artículo {ref} (ya no está en el catálogo)» falso del producto actual cuando el artículo no estaba
-  en la página del buscador. Los servicios de la app Servicios dejan de poder ser elección (ver «Lo que
-  NO hace»); un producto de tipo servicio de Inventario sí.
-- **Solo productos activos y que se venden por unidades** al añadir (antes, cualquier id).
-- **Agotado** (COMBO-F12) es nuevo: antes había que quitar la elección y volver a ponerla.
-- **Producto eliminado** (COMBO-F13): sus elecciones salen solas de todos los menús en unos segundos y,
-  hasta entonces, se marcan «Ya no está en el catálogo» y el TPV no las ofrece ni las cobra; antes
-  quedaban colgando.
-- **Un plato obligatorio sin elecciones bloquea el menú en el TPV**: antes no llegaba a Ventas y el
-  menú se vendía sin él. El constructor dice por qué un menú no sale en el TPV.
-- **Cambiar solo lo enviado**: editar un plato ya no lo manda al primer puesto ni pone mínimo y máximo
-  en 1; cambiar un menú por el asistente ya no lo vuelve a poner a la venta; cambiar una elección ya no
-  pone el suplemento a 0.
-- **Ordenar es una sola operación** con la lista entera (antes, plato a plato y sin transacción común).
-- **Confirmar antes de retirar** un menú, un plato o una elección (antes, al instante).
-- **Nombre de plato único en su menú** («Ese menú ya tiene un plato «Primeros».»): con dos «Primeros»
-  ni el TPV ni el asistente sabrían cuál es.
-- **Topes**: 20 platos por menú y 40 elecciones por plato, para que el menú quepa en una lectura en
-  vivo (256 KB).
-- **El reparto fiscal lo calcula Menús** (`combo.combo.resolve`), no Ventas: Menús ya lee el precio y
-  la categoría de cada producto. Un producto sin categoría fiscal se nombra en el aviso (antes mandaba
-  a arreglarlo en Combos).
-- **La línea del menú la calcula una sola operación** (`resolve`) en vez de leer `combos.options.all`
-  entero: lo que antes era `combos.combos.all` + `combos.options.all` (sin paginar) es
-  `combo.combo.for_sale` (paginado, hasta 50 menús por página) + `combo.combo.resolve`.
-  `combos.groups.list` y `combos.options.list` desaparecen: `combo.combo.get` da el menú con sus platos
-  y elecciones en una sola lectura en vivo.
-- **Nombres**: `combo.*` en vez de `combos.*`; `combo.group.*` y `combo.option.*` en vez de
-  `combos.groups.*` y `combos.options.*`; avisos `combo.group.*` y `combo.option.*` en vez de
-  `combos.choice_group.*` y `combos.choice_option.*`; permisos `combo.view` y `combo.manage` en vez de
-  `combos.view_combo` y `combos.manage_combo`.
-- **Añadir varios** es una sola operación (`bulk_create`, todo o nada); antes, una por elección. Y admite
-  una **categoría entera** de Inventario («Marcar todos los de «…»»), como Square y WooCommerce Composite
-  (combos#12); antes, casilla a casilla.
-- **Crear un producto desde el menú no se hace** (combos#13): Square, Shopify Bundles, Revel, Lightspeed
-  L-Series y WooCommerce Composite mandan crearlo en el catálogo; Lightspeed K-Series, Toast y Odoo (su
-  «Crear» en el campo de producto) lo crean dentro. Gana lo más aceptado: se crea en Inventario y el
-  buscador del constructor lo encuentra en cuanto se guarda.
-- Precios en céntimos enteros (la unidad más pequeña de la moneda del negocio), como el resto de la
-  plataforma.
+- **No crea productos desde el menú**: se crean en Inventario y el buscador del constructor los encuentra en
+  cuanto se guardan (Square, Shopify Bundles, Revel, Lightspeed L-Series y WooCommerce Composite).
 
 ## Contradicciones señaladas
 
@@ -961,10 +895,4 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   no tiene una categoría de fábrica que lo distinga (`restaurant.drink` va igual en los dos): no se mapea.
   Si hace falta, Impuestos tendrá que crear la pareja y añadirse aquí a `TAKEAWAY_CATEGORY`.
 - `useServerTable`, `useLiveList` y `useT` están copiados en cada app; ya pedido en `UI-REQUESTS.md` que suban a
-  `@erplora/ui`. El campo de importe ya subió (hub#924).
-- **El asistente** sale como actor (F01–F06, F12, F13) y en los ejemplos de voz: es la operación con
-  `ai=` y su ruta de la API, porque el asistente del Hub aún no existe (la misma lectura de las rondas
-  CLOSE-DEMO y CLOSE-SERVICE de `PLAN-HUB.md`). Hasta que llegue, esos pasos se hacen por la API.
-- **combos#11** está anotada `aplica` en el registro (hub#139) por la vista previa de Ventas, que
-  reparte igual que el cobro (COMBO-F09, paso 4). Lo que la issue pedía era pintar ese reparto en el
-  constructor del menú, y eso queda fuera, decidido al cerrar (ver «Lo que NO hace, a propósito»).
+  `@erplora/ui`.

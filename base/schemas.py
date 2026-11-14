@@ -19,7 +19,7 @@ from ninja import Schema
 from pydantic import AfterValidator, Field, field_validator
 
 
-def names(
+def names(  # noqa: PLR0913
     read: str,
     by: str = "id",
     name: tuple[str, ...] = ("name",),

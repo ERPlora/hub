@@ -196,7 +196,7 @@ def _by_id(rows: QuerySet, item_id: UUID, *, missing, code: str):
     return found
 
 
-def _find_named(
+def _find_named(  # noqa: PLR0913
     model, item_id: UUID | None, name: str | None, *, missing, code: str, lock: bool
 ):
     rows = model.objects.select_for_update() if lock else model.objects.all()

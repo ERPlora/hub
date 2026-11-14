@@ -739,7 +739,7 @@ def attributed(cluster_id: UUID | None, db_name: str, *, besides: UUID | None = 
     return Hub.objects.filter(Q(cluster_id=cluster_id) | moving_there, db_name=db_name).exists()
 
 
-def move_finished(
+def move_finished(  # noqa: PLR0913
     hub_id: UUID, target_id: UUID, origin: UUID | None, copy_name: str, at: dt.datetime, *, owner: str
 ) -> None:
     """Switch ``hub_id`` to ``target_id`` and date its copy on ``origin`` (none: the settings' own server), in one
@@ -764,7 +764,7 @@ def _dated(hub_id: UUID, cluster_id: UUID | None, copy_name: str, at: dt.datetim
     )
 
 
-def restore_finished(
+def restore_finished(  # noqa: PLR0913
     hub_id: UUID, source_id: UUID, cluster_id: UUID | None, kept_name: str, at: dt.datetime, *, owner: str
 ) -> None:
     """End the restore of ``hub_id`` and date the database it replaced, kept on its cluster (none: the settings' own
@@ -873,7 +873,7 @@ def copies_to_make() -> list[UUID]:
     )
 
 
-def _claim(model, row_id: UUID, now: dt.datetime, lease: dt.timedelta, owner: str, status: str) -> bool:
+def _claim(model, row_id: UUID, now: dt.datetime, lease: dt.timedelta, owner: str, status: str) -> bool:  # noqa: PLR0913, PLR0917
     """Take for ``owner`` the lease of the row ``row_id`` of ``model`` (a separate copy or a recovery from one) while it
     is ``status``; whether it was taken (not when someone else holds it, or it is no longer ``status``, or gone)."""
     with _control_transaction():

@@ -199,7 +199,7 @@ def _refusal(label: str, declared: list[Recoverable] | None, applied: set[str], 
 # ── Step 2: given back in the business, by the app's own operations ─────────────────────────────────────────────────
 
 
-def _give_back(
+def _give_back(  # noqa: PLR0913, PLR0917
     row: CopyRecovery,
     hub: Hub,
     results: list[dict],
@@ -250,7 +250,7 @@ def _result(app: str, refused: str, named=None) -> dict:
     return result
 
 
-def _each(ctx, op, records: list[dict], payload, counted: str, result: dict, ours: Callable[[], None]) -> bool:
+def _each(ctx, op, records: list[dict], payload, counted: str, result: dict, ours: Callable[[], None]) -> bool:  # noqa: PLR0913, PLR0917
     """``op`` run on each of ``records``, its input ``payload(record)``, counted in ``result[counted]``, with what its
     output says the record came back without; ``False`` once it refuses them all (``refused``), and the app's part
     ends."""

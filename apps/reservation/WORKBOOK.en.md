@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:78eb7de51a144aefb010a888cb80880d6a815c7cc5a89b237f0fb241906c12ca -->
+<!-- generated from WORKBOOK.md sha256:8385341398e44c45b13a72a246e1027b74800e488556576ab0dabf2838b8ec9e -->
 
 ## What it is for and who it is for
 
@@ -22,7 +22,7 @@ reservation), does not charge (that is **Sales**) and is not the appointment boo
 
 ERPlora does not invent flows: it adopts the ones the market has already proven (OpenTable, Resy,
 SevenRooms, Toast Tables, Square, Lightspeed, TouchBistro, Tablein, TablesReady, CoverManager, TheFork
-Manager, Odoo). The open questions of the current product were resolved like this; the research, with its
+Manager, Odoo). The questions were resolved like this; the research, with its
 sources, is in "Market research", at the end of this manual.
 
 - **Book by day and by service**, with the day's **covers** and how much is left free in the next slot;
@@ -50,8 +50,8 @@ sources, is in "Market research", at the end of this manual.
   were added; when there is room it becomes a reservation in one tap. The market separates the door queue
   (with an estimated wait and SMS) from the list for full days; without messaging, here it is one list for
   both things (see "What is left out").
-- **The phone is required out of the box on the reservation** (question 7), and always the same (the
-  current product did not ask for it until any setting was saved); the email, not. The waitlist asks for
+- **The phone is required out of the box on the reservation** (question 7), and always the same; the
+  email, not. The waitlist asks for
   nothing but the name: the phone only serves to call.
 - **The booking rules are for the customer who books by themselves** (question 8): minimum and maximum
   guests, minimum notice, maximum days and the full slot bind the reservations made online or through
@@ -706,9 +706,8 @@ For the platform only (without a route in the API, as the system): `reservation.
 | `reservation.settings.updated` | Save the rules | the changed fields |
 | `reservation.customer.reassigned`, `reservation.customer.erased` | Reactions to Customers | `id` (and `absorbed_id`) |
 
-`status_changed` and `updated` also carry the customer's name and their card (it was the load with which
-Tables was going to paint the hold); the others, only ids and numbers. Tables no longer listens to these
-notices: it receives the hold through the call of Reservations in the same transaction (TABLE-F25–F28).
+`status_changed` and `updated` also carry the customer's name and their card; the others, only ids and
+numbers. Tables does not listen to these notices: it receives the hold through the call of Reservations in the same transaction (TABLE-F25–F28).
 
 ### What it reacts to
 

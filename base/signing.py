@@ -92,7 +92,7 @@ def _as_secrets(secret: str | Iterable[str]) -> list[str]:
     return [secret] if isinstance(secret, str) else list(secret)
 
 
-def verify(
+def verify(  # noqa: PLR0913
     body: bytes,
     timestamp: str | None,
     signature: str | None,
@@ -120,7 +120,7 @@ def _header(headers: Mapping[str, str], name: str) -> str | None:
     return None
 
 
-def verify_signed(
+def verify_signed(  # noqa: PLR0913
     method: str,
     path: str,
     body: bytes,

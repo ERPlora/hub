@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2f6a1601a58fdeda9d66f9a738c19e7cd5a6aebe423223e26ec0f4747ca99801 -->
+<!-- generated from WORKBOOK.md sha256:06fe5db391e39625c8c3fcafb0dc4e260864061945087658488b0a4874fb2c32 -->
 
 ## What it is for and who it is for
 
@@ -28,9 +28,7 @@ Who uses it:
 ## Reference adopted
 
 **Which price list wins, how many automatic discounts add up and when the price is set** (skill
-`market-decision`, 2026-10-15). The current product chose the lowest price among all the active
-price lists (without looking at dates or at the default list), chained every rule by priority
-on the ticket's amount, and nobody called it.
+`market-decision`, 2026-10-15).
 
 | Product | How it solves it | Source |
 |---|---|---|
@@ -64,7 +62,7 @@ on the ticket's amount, and nobody called it.
 
 **Why not the others:** "the most specific rule wins" (Odoo) forces the owner to understand an order they
 cannot see, and the forum complains that the customer's pricelist is not applied; chaining every rule
-(the current product, Square with the forum's complaint) undercharges without anyone noticing; discounts
+(Square, with the forum's complaint) undercharges without anyone noticing; discounts
 by ticket amount (minimum spend) need the whole ticket, which this app does not have: they stay out
 ("What it does NOT do").
 
@@ -108,7 +106,7 @@ Price Lists opens from the **Price Lists** menu (tags icon). What a person canno
 show, and the app refuses it even if they try through the API or the assistant.
 
 ### Price Lists
-Two tables, one above the other, as in the current product.
+Two tables, one above the other.
 
 **Price lists**: search box "Search code or name…", columns **Code** (with the tag
 **General** if it is the general price list), **Name**, **Currency**, **Customer group** ("Everybody" if it is
@@ -539,7 +537,7 @@ by their id, their name, their phone or their email. If a name fits several, it 
 | Forgets a deleted customer group | only the platform | F14 | `pricing.catalog.forget_group` |
 | Copies a service's new name | only the platform | F14 | `pricing.catalog.refresh_service` |
 
-When the Hub has API keys (`erpk_live`), they will reach the queries, creating and changing price lists and
+The Hub's API keys (`erpk_live`) reach the queries, creating and changing price lists and
 putting, changing and removing prices (to sync prices from another system); choosing the general one,
 deactivating and the rules, only from the Hub or the assistant.
 

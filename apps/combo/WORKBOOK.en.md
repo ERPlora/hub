@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d4b5c3757590e76d632d70bb087059f8d1560419d28ac1b485d080a9c450823e -->
+<!-- generated from WORKBOOK.md sha256:9d4be4c881631363156ee7d3ca6c61bd6d7ca276289634a0e8867aa6de7084cb -->
 
 ## What it is for and who it is for
 
@@ -23,8 +23,7 @@ station. It is not a discount nor a variant, nor the extras of a dish (that is M
 
 ## Reference adopted
 
-The market sweep of the current product (`architecture/modules/combos.md`, 24/08/2026: 10
-references and their forums) is still valid and is adopted, nothing more:
+What the market does is adopted:
 
 - [Square — combos](https://squareup.com/help/us/en/article/8558-create-and-sell-combos): the combo is
   an item of the catalogue, with "required choices" per group and a charge per option; a sold-out item

@@ -45,7 +45,8 @@ class HubContextMissing(RuntimeError):
 
 
 class HubContextMismatch(RuntimeError):
-    """An operation for one hub ran inside another hub's context: it never reaches the other hub's database."""
+    """Work of one hub ran inside another hub's context, an operation for it or an object loaded from its database
+    (``base.tenancy.router``): it never reaches the other hub's database."""
 
 
 class HubWithoutDatabase(RuntimeError):

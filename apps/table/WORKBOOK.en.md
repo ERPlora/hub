@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:42801a00048351a6097b1701f754a9683ec369c123586f87a5858028bf53015e -->
+<!-- generated from WORKBOOK.md sha256:a728971217d04a8096d8e5376a5a053f4b391b690bbc91638dca78cc7f917cae -->
 
 ## What it is for and who it is for
 
@@ -34,11 +34,11 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
 - **Asking for the guests when seating, transferring and joining checks, taking a table out of service**
   and the list of closed checks with their amount (Toast and Lightspeed).
 - **A table with its check open is not freed by hand**: it is charged, moved to another table or the
-  check is deleted (Toast, Square, Lightspeed and Odoo; tables#124 of the current product).
+  check is deleted (Toast, Square, Lightspeed and Odoo).
 - **Seating at a reserved table is allowed and spends the booking; going over the capacity warns but does
   not prevent it.**
-- **A reserved table is painted Reserved only close to the time of its booking** (market decision on
-  question 1 of the current product). Before that the table stays Available and shows the next booking
+- **A reserved table is painted Reserved only close to the time of its booking** (market decision).
+  Before that the table stays Available and shows the next booking
   with its time. This is how they do it:
 
   | Product | How it solves it | Source |
@@ -53,10 +53,10 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
   | Tabit | The table's upcoming bookings can be seen from it | [support-us.tabit.cloud](https://support-us.tabit.cloud/hc/en-us/article_attachments/4408025435794) |
 
   **Wins:** Reserved from **60 minutes before** the booking's time until its window ends; before that,
-  the table stays Available with "Ana · 21:00". **Why not the old way** (Reserved from the moment it is
-  confirmed, even a week ahead): it blocked the table the whole service and a party seated at noon
-  "spent" the evening's booking.
-- **A deactivated table or zone leaves service** (decision on question 7): it is not painted on the
+  the table stays Available with "Ana · 21:00". **Why not from the moment it is confirmed** (even a
+  week ahead): it would block the table the whole service and a party seated at noon would "spend" the
+  evening's booking.
+- **A deactivated table or zone leaves service** (market decision): it is not painted on the
   service plan and cannot be seated; it stays in "Edit plan", in **Tables** and in **Zones**, like
   [Lightspeed — deactivating a table](https://k-series-support.lightspeedhq.com/hc/articles/1260804656729),
   [Toast — removing a table from the service area](https://support.toasttab.com/article/Creating-Service-Areas-and-Table-Setup-1493049150430)
@@ -337,7 +337,7 @@ Involved: TABLE-F01, TABLE-F04
 ### TABLE-F07 Create many tables at once
 Status: done
 Actor: manager, assistant
-Screen: assistant and API (the current product had no screen for this either)
+Screen: assistant and API
 Steps:
 1. Ask the assistant "create 12 tables on the Terrace, from T1 to T12, for 4".
 2. They are created at once (from 1 to 100), numbered with the prefix and the starting number that are
@@ -746,7 +746,7 @@ Involved: TABLE-F09, TABLE-F25
 ### TABLE-F30 Hold or release a table by hand
 Status: done
 Actor: manager, employee, assistant
-Screen: assistant and API (the current product had no screen for this either)
+Screen: assistant and API
 Steps:
 1. Ask the assistant to set a table aside ("keep table 6 for Pedro from 21:00 to 23:00, 4 people").
 2. From an hour before, the table shows Reserved, with the name and the time; asking for it again with
@@ -938,6 +938,6 @@ hears every notice of Tables, like those of any app.
 | View settings | yes | yes | yes | yes | `table.view_settings` |
 | Change settings | yes | yes | no | no | `table.manage_settings` |
 
-The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`);
-the cashier of the current product is an employee. Seating, splitting and joining also ask for "Build the
+The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
+Seating, splitting and joining also ask for "Build the
 check" of Sales (`sale.add_sale`), which the four roles have.

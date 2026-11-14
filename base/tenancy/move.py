@@ -238,7 +238,7 @@ def move_hub(
         _close_this_processs(hub)
 
 
-def _back(hub, copy_name: str, origin, target, roles, now, ours, *, reason: str) -> None:
+def _back(hub, copy_name: str, origin, target, roles, now, ours, *, reason: str) -> None:  # noqa: PLR0913, PLR0917
     """Undo the move of ``hub`` and note why; one that cannot be undone now stays moving, to be undone next time."""
     try:
         _undo(hub, copy_name, origin, target, roles, ours, now)
@@ -603,7 +603,7 @@ def _kept_entries(listing: str) -> list[str]:
     return [line for line in listing.splitlines() if not any(entry in f"{line} " for entry in SKIPPED_ENTRIES)]
 
 
-def _run(
+def _run(  # noqa: PLR0913
     command: list[str],
     password: str,
     errors_path: Path,
@@ -738,7 +738,7 @@ def _switch(hub_id, target, origin, copy_name: str, now: dt.datetime) -> None:
         raise MoveStopped(str(taken)) from taken
 
 
-def _undo(hub, copy_name: str, origin, target, roles: bootstrap.Names, ours, now: dt.datetime) -> None:
+def _undo(hub, copy_name: str, origin, target, roles: bootstrap.Names, ours, now: dt.datetime) -> None:  # noqa: PLR0913, PLR0917
     """Back where it was, the origin first. Only the worker's note says the data is in the copy (an older copy is dropped
     before the note is written, so a copy there with the note is this move's): then what has the hub's name on the
     destination is dropped if it answers (noted as left over if not) and the copy renamed back. A database with the

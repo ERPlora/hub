@@ -285,7 +285,7 @@ class PrintSocket:
 
     # ── The loop ──────────────────────────────────────────────────────────────────────────────────
 
-    async def _serve(self) -> None:
+    async def _serve(self) -> None:  # noqa: C901
         loop = asyncio.get_running_loop()
         deadline = loop.time() + HELLO_TIMEOUT_SECONDS
         receiving = asyncio.ensure_future(self.receive())

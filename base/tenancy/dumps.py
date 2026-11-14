@@ -151,7 +151,7 @@ def key_for(hub, kind: str, at: dt.datetime) -> str:
     return f"{hub.id.hex}/{at.astimezone(dt.UTC):{KEY_TIME}}-{kind}.dump"
 
 
-def dump_hub(
+def dump_hub(  # noqa: PLR0913
     hub,
     *,
     kind: str,
@@ -363,7 +363,7 @@ class _DumpOutput:
     returns all it was asked for (S3 refuses a part under 5 MiB but the last), and the end only once ``pg_dump`` ended
     well: a failure raises instead, so the upload is aborted and never completed with half a copy."""
 
-    def __init__(self, process, source, complaints, password: str, timeout: float, heartbeat, cancelled) -> None:
+    def __init__(self, process, source, complaints, password: str, timeout: float, heartbeat, cancelled) -> None:  # noqa: PLR0913, PLR0917
         self.process = process
         self.source = source
         self.complaints = complaints
