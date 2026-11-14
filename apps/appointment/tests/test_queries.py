@@ -13,8 +13,7 @@ from live.errors import NotFound
 
 from apps.appointment.models import Appointment, History
 
-from base import recovery
-from base.api_keys import KeyCaller
+from base.tests.actors import who_did_it
 from base.tests.ordering import assert_reads_backwards, listed_with
 
 from .conftest import (
@@ -38,8 +37,6 @@ from .conftest import (
 
 pytestmark = pytest.mark.django_db
 TUESDAY = MONDAY + dt.timedelta(days=1)
-#: The id of an automation's run or of a recovery, as their actors carry it.
-RUN = "0199e7a0-0000-7000-8000-000000000001"
 
 
 def employee_linked_to(member, make_user):
@@ -207,17 +204,7 @@ def test_the_history_lists_every_change_in_order(salon):
     ]
 
 
-@pytest.mark.parametrize(
-    "caller, who, by_platform",
-    [
-        pytest.param(TESTER, "tester", False, id="a person"),
-        pytest.param(KeyCaller(key_id="k1", name="Zapier", prefix="erpk_live_ab"), "API · Zapier", False, id="an API key"),
-        pytest.param("system", "system", True, id="the system"),
-        pytest.param(f"flow_run:{RUN}", f"flow_run:{RUN}", True, id="an automation's step"),
-        pytest.param(recovery.actor_of(RUN), recovery.actor_of(RUN), True, id="a recovery from a copy"),
-        pytest.param(None, "", True, id="no one"),
-    ],
-)
+@pytest.mark.parametrize("caller, who, by_platform", who_did_it(TESTER, "tester"))
 def test_the_history_says_whether_a_person_or_the_platform_did_it(salon, caller, who, by_platform):
     """A person and an API key are named; the platform's own marks are kept, and the line says the platform did it."""
     pending = make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), status="pending")

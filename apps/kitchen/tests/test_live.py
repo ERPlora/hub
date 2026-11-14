@@ -22,6 +22,7 @@ CHECK_MOVES = ["sale.order.opened", "sale.order.changed"]
 CATALOGUE = [
     "inventory.product.updated",
     "inventory.product.deleted",
+    "inventory.product.restored",
     "inventory.category.updated",
     "inventory.category.deleted",
 ]

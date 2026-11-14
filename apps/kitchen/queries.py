@@ -75,6 +75,7 @@ from apps.kitchen.schemas import (
 from apps.sale.models import Order, OrderLine
 from base.business import business_zone, zone_name
 from base.ordering import list_order
+from base.relay import by_platform
 
 TICKET_NOT_FOUND = _("That kitchen ticket does not exist in this business.")
 TICKET_AMBIGUOUS = _(
@@ -1563,6 +1564,7 @@ def log_row(entry: LogEntry, names: dict[str, str] | None = None) -> dict:
         "item_name": entry.item.name if entry.item else "",
         "station_name": entry.station.name if entry.station else "",
         "actor": (names or {}).get(entry.actor, entry.actor),
+        "by_platform": by_platform(entry.actor),
         "notes": entry.notes,
         "created_at": entry.created_at,
     }

@@ -145,6 +145,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | MODIFIER-F07 | Cobrar el suplemento: precio y IVA | hecho |
 | MODIFIER-F08 | Que el suplemento salga en la comanda de cocina | hecho |
 | MODIFIER-F09 | Soltar los grupos de un producto o una categoría que se borra | hecho |
+| MODIFIER-F10 | Recuperar los grupos de suplementos de un producto desde una copia aparte | hecho |
 
 ### MODIFIER-F01 Consultar y buscar los grupos
 <!-- origen: old:modifiers/WORKFLOW.md#modifiers-f01 -->
@@ -344,8 +345,37 @@ Pasos:
 Entra: el aviso de Inventario (producto borrado, categoría borrada).
 Sale: los enganches soltados. Mientras el aviso llega, un enganche a algo borrado ya no se ve en la hoja del
 grupo ni se pregunta en el TPV.
-Si falla: repetir el aviso no cambia nada; el borrado de un negocio nunca suelta los enganches de otro.
-Implicados: INVENTORY-F04, INVENTORY-F07
+Si falla: repetir el aviso no cambia nada; el borrado de un negocio nunca suelta los enganches de otro. Si el personal
+de ERPlora recupera después el producto desde una copia aparte, sus grupos vuelven con él (MODIFIER-F10).
+Implicados: INVENTORY-F04, INVENTORY-F07, INVENTORY-F34, MODIFIER-F10
+
+### MODIFIER-F10 Recuperar los grupos de suplementos de un producto desde una copia aparte
+<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus grupos de suplementos) gh:hub#1343 -->
+Estado: hecho
+Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide (BASE-F114)
+Pantalla: ninguna de Suplementos: en el admin de Hubs, Copias aparte › «Recuperar en el negocio…», con **Grupos de
+suplementos de productos** marcado (lo está, como todo lo que se puede traer)
+Pasos:
+1. El personal recupera desde una copia aparte con **Grupos de suplementos de productos** marcado. Suplementos va
+   siempre después de Inventario, se pida en el orden que se pida: un producto eliminado que vuelve ya está vivo cuando
+   se le enganchan sus grupos.
+2. Cada grupo que en la copia colgaba de un producto vivo en ella y que el negocio ya no tiene enganchado a ese producto
+   se vuelve a enganchar, como lo engancha la hoja del grupo (MODIFIER-F05): el producto vuelve a preguntar en el TPV
+   sus salsas, su punto o sus extras.
+3. Recuperaciones lo cuenta aparte: «Grupos de suplementos de productos: se crearon 2».
+Entra: la copia aparte y lo que el negocio tiene hoy.
+Sale: un enganche por cada uno que faltaba, con su aviso de enganche hecho (`modifier.link.attached`) hecho por la
+recuperación, así que no arranca ninguna automatización (FLOW-F21); nada más. Las pantallas abiertas de Suplementos,
+el TPV y el reparto de Cocina ven al momento el producto que vuelve, como vieron que se eliminaba.
+Si falla: un enganche que el negocio aún tiene se queda como está, y no se repite uno cuyo grupo el negocio ya volvió a
+enganchar a ese producto: se queda el suyo, y pedirlo otra vez no engancha nada dos veces. Un grupo que el negocio soltó
+a mano de un producto después de la copia también vuelve, como todo lo que el negocio ya no tiene (BASE-F114). Lo que la
+hoja del grupo no acepta hoy no vuelve y Recuperaciones dice por qué, por el identificador del enganche en la copia: un
+producto que sigue eliminado (no se recuperó Productos, o el negocio ya hizo otro con su SKU) o un grupo que el negocio
+borró después («not_found: …»); un grupo borrado no se recupera desde la copia (hub#1458). Un producto que el negocio ya
+no tenía en absoluto vuelve como uno nuevo, con otro identificador (INVENTORY-F01), y sus grupos de la copia no vuelven
+con él (hub#1457). Los grupos enganchados a una categoría no vuelven: tampoco a una categoría recuperada (hub#1456).
+Implicados: BASE-F114, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
 
 ## Servicios: lo que entra y lo que sale
 
@@ -403,7 +433,7 @@ Los grupos, un grupo, las opciones, los enganches y los grupos de un producto se
 | Añade una opción a un grupo | gestionar | F04 | `modifier.option.create` |
 | Cambia una opción (lo que no se manda se queda) | gestionar | F04 | `modifier.option.update` |
 | Borra una opción | gestionar | F04 | `modifier.option.delete` |
-| Engancha un grupo a un producto o una categoría | gestionar | F05 | `modifier.link.attach` |
+| Engancha un grupo a un producto o una categoría | gestionar | F05, F10 | `modifier.link.attach` |
 | Suelta un grupo de un producto o una categoría | gestionar | F05 | `modifier.link.detach` |
 
 ### Lo que avisa
@@ -412,7 +442,7 @@ Los grupos, un grupo, las opciones, los enganches y los grupos de un producto se
 |---|---|---|---|
 | Grupo creado, cambiado o borrado | F02, F03 | El grupo (`id`, `name`) | `modifier.group.created`, `.updated`, `.deleted` |
 | Opción creada, cambiada o borrada | F04 | La opción, su grupo, su nombre y su suplemento | `modifier.option.created`, `.updated`, `.deleted` |
-| Enganche hecho o soltado | F05, F09 | El grupo y el producto o la categoría | `modifier.link.attached`, `.detached` |
+| Enganche hecho o soltado | F05, F09, F10 | El grupo y el producto o la categoría | `modifier.link.attached`, `.detached` |
 
 ### A qué reacciona
 
@@ -426,6 +456,8 @@ Los grupos, un grupo, las opciones, los enganches y los grupos de un producto se
 - **Inventario** (requisito): sus productos y categorías, a los que apunta cada enganche, y las
   categorías de cada producto, para saber qué grupos lleva en el TPV.
 - **Impuestos** (requisito): la categoría fiscal propia de una opción.
+- **De la plataforma**: la recuperación desde una copia aparte (BASE-F114), a la que Suplementos dice qué grupos de
+  productos devuelve (F10).
 
 ### Quién la usa
 
@@ -503,7 +535,15 @@ cajero del producto actual es un empleado.
   enganches a lo borrado se excluyen de toda lectura (`LIVE_LINK`).
 - **Reacciones** (`events.REACTIONS`): `inventory.product.deleted` → `modifier.link.drop_product`,
   `inventory.category.deleted` → `modifier.link.drop_category`; como sistema (`modifier.system`, que
-  ningún papel tiene), sin ruta, idempotentes.
+  ningún papel tiene), sin ruta, idempotentes. A `inventory.product.restored` no reacciona: lo que el borrado soltó
+  vuelve desde la copia aparte (F10); `live.py` solo repinta con él.
+- **Desde una copia aparte** (BASE-F114, F10): `recoverable_from_copy` de `apps.py` declara una sola cosa, «Modifier
+  groups of products». `queries.links_in_copy` lee con su propio SQL los `ModifierLink` de la copia que cuelgan de un
+  producto no borrado allí (los de una categoría no, hub#1456) y `queries.links_not_in_business` deja los que el negocio
+  no tiene en su sitio (grupo y producto, el índice único `modifier_link_product_unique`; un enganche nunca cambia de
+  grupo ni de producto, así que el mismo enganche ya está en el suyo); la plataforma los
+  crea con `modifier.link.attach` como la recuperación (`copy_recovery:<id>`), y lo que `attach` rechaza sale «sin
+  crear» con su motivo. Pruebas: `tests/test_recovery.py`.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` al borrar
   un grupo o una opción) y cada campo de `schemas.py` su `description`. Los datos que ningún modelo
   nombra llevan además un `title` en inglés con su `es` en el catálogo de la app (`option` «Opción»,

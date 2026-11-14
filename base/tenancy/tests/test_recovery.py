@@ -818,7 +818,8 @@ def came_back_without(monkeypatch, operation: str, left_out) -> None:
 
     def saying_what_it_left(ctx, data):
         made = plain.model_validate(real(ctx, data))
-        return Recovered(**made.model_dump(), left_out=left_out(data))
+        # An output that mixes it in already, as Customers' does, says here what the test makes it say.
+        return Recovered(**(made.model_dump() | {"left_out": left_out(data)}))
 
     monkeypatch.setattr(op, "fn", saying_what_it_left)
     monkeypatch.setattr(op, "output", Recovered)
@@ -1118,7 +1119,7 @@ def test_the_apps_that_answer_and_never_one_whose_records_reach_the_tax_authorit
     answering = {config.label for config in all_live_app_configs() if hasattr(config, recovery.HOOK)}
     fiscal = {config.label for config in all_live_app_configs() if hasattr(config, "fiscal_record_states")}
 
-    assert answering == {"customer", "inventory", "pricing", "service", "appointment"}
+    assert answering == {"customer", "inventory", "modifier", "pricing", "service", "appointment"}
     assert not answering & fiscal
     assert set(recovery.recoverable_apps()) == answering
 
