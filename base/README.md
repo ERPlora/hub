@@ -6,10 +6,8 @@ documentación de la API, y por debajo lo que comparten todas las apps: el regis
 de datos por negocio), las operaciones, el outbox y su relevo, las tareas programadas y el contrato con erplora.com
 por `/internal`.
 
-- **Estado**: completa (2026-11-01): 107 de sus 112 flujos, `BASE-F01` … `F112`, están `hecho`; `BASE-F02`, `F41` y
-  `F82` están `descartado`, cada uno con su issue (hub#573, hub#576 y hub#579), `BASE-F28` está `descartado` al unirse a
-  `BASE-F40` y `BASE-F109` está `parcial` (hub#738). Los que al cerrar la app quedaron descartados o reabiertos
-  llegaron después: `BASE-F11` (hub#716), `F40` (hub#603), `F50` (hub#577) y `F74` (hub#578).
+- **Estado**: completa (2026-11-01): 112 de sus 113 flujos (`BASE-F01` … `F114`, sin `F28`) están `hecho` y
+  `BASE-F109` está `parcial` (hub#738).
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta «Para quien
   lo mantiene»). Lo que se cambie de la plataforma se cambia antes allí; lo que no entra, en su «Lo que queda fuera».
 - **Peticiones** a `@erplora/ui` que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md).

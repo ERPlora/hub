@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:dde1cb8f6aed8edd95f764864953e18713d9915dea30e226c3b8a8400c53601a -->
+<!-- generated from WORKBOOK.md sha256:a54ffb51ea1f1e0670b117fab1621721b0f0e93df4cbb521543200ff9eef7a71 -->
 
 ## What it is for and who it is for
 
@@ -31,8 +31,7 @@ Who uses it:
 
 ## Reference adopted
 
-It is the Home of ERPlora's old hub, the one businesses already use, with its structure: greeting and
-date, app launcher, setup list with a progress bar, board of panels and the "Summary" and "Activity"
+The Home has this structure: greeting and date, app launcher, setup list with a progress bar, board of panels and the "Summary" and "Activity"
 tabs. It follows what the market does: the "Setup guide" list of Shopify and Square (steps with their
 button, the progress on top and what is done folded away), Odoo's app launcher, the board of panels that
 each person picks and orders of Lightspeed and Toast, and the bell with counters of any back office. System's
@@ -306,7 +305,7 @@ On the Employees screens and the API documentation:
 | ID | Flow | Status |
 |---|---|---|
 | BASE-F01 | See what the business still has to set up | done |
-| BASE-F02 | See the business at a glance on coming in | discarded |
+| BASE-F02 | See the business at a glance on coming in | done |
 | BASE-F03 | Go and set up from "Finish setting up your business" | done |
 | BASE-F04 | See which steps of the list an administrator has to set up | done |
 | BASE-F05 | Open an app from "My apps" | done |
@@ -332,7 +331,6 @@ On the Employees screens and the API documentation:
 | BASE-F25 | See an app refuse to be turned off | done |
 | BASE-F26 | Understand why an app does not open | done |
 | BASE-F27 | See a paid app blocked | done |
-| BASE-F28 | See how much of the plan's limits is in use | discarded |
 | BASE-F29 | Choose a template of the catalogue to import | done |
 | BASE-F30 | Upload a file to import | done |
 | BASE-F31 | Review and load what the file brings | done |
@@ -345,7 +343,7 @@ On the Employees screens and the API documentation:
 | BASE-F38 | See the Home up to date after importing a template | done |
 | BASE-F39 | Open System and move between its tabs | done |
 | BASE-F40 | See what the business uses and whether to upgrade the plan | done |
-| BASE-F41 | Know which version is running and what has been updated | discarded |
+| BASE-F41 | Know which version is running and when it was updated | done |
 | BASE-F42 | See the log of what happened in the system | done |
 | BASE-F43 | See the failed events | done |
 | BASE-F44 | Resend a failed event | done |
@@ -386,7 +384,7 @@ On the Employees screens and the API documentation:
 | BASE-F79 | Give a person a badge or take it away | done |
 | BASE-F80 | Bring back a person who left the business | done |
 | BASE-F81 | Understand how each person gets in | done |
-| BASE-F82 | See the roles and turn on the ones an app brings | discarded |
+| BASE-F82 | See the business's roles | done |
 | BASE-F83 | Give a person a role | done |
 | BASE-F84 | Approve with a manager's PIN | done |
 | BASE-F85 | Look up who approved what | done |
@@ -458,7 +456,7 @@ side to do yet. We are on it.".
 Involved: INVENTORY-F28, BASE-F24, BASE-F25, VERIFACTU-F01, TAX-F17
 
 ### BASE-F02 See the business at a glance on coming in
-Status: discarded — the hub's health row (the printer and WhatsApp, with a link to System) needs each app to say how its own part is doing, and that touches Printing and the WhatsApp Inbox; today the bell already warns when nobody is printing (hub#573)
+Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
 Steps:
@@ -1003,18 +1001,6 @@ If it fails: if nobody tells the hub when the subscribed period ends, the hub no
 passes. A demo business has every app, the paid ones too, to try them.
 Involved: APPS-F07
 
-### BASE-F28 See how much of the plan's limits is in use
-Status: discarded — merged into BASE-F40
-Actor: owner, administrator
-Screen: System · Usage and plan
-Steps:
-  1. They tap "System" in the side menu: "Usage and plan" opens, which joins what was in "Resources" and "Plan and limits".
-  2. The people, the devices and the apps of the plan are in "What your plan includes" (BASE-F40).
-In: the same as BASE-F40.
-Out: nothing saved.
-If it fails: BASE-F40 says it.
-Involved: BASE-F40, BASE-F57
-
 ### BASE-F29 Choose a template of the catalogue to import
 Status: done
 Actor: owner, administrator
@@ -1155,7 +1141,7 @@ Steps:
 In: the import chosen.
 Out: exactly the rows it brought removed, also what came in later because it waited for an app, and what it still
 waited for no longer comes in; what was created afterwards stays (`base.import.undone`).
-If it fails: the reason shows in the dialog itself, which does not close (the old hub said nothing); an
+If it fails: the reason shows in the dialog itself, which does not close; an
 import already undone, "This load was undone already.".
 Involved: BASE-F32
 
@@ -1347,8 +1333,8 @@ does not know the plan: "We do not know this business's plan yet: it shows up as
 BASE-F39 says.
 Involved: BASE-F10, BASE-F11, BASE-F39, BASE-F57, BASE-F72, BASE-F73, BASE-F108, HUBS-F21, HUBS-F22
 
-### BASE-F41 Know which version is running and what has been updated
-Status: discarded — the version and its date, yes; apps no longer have their own version (they are all released together with the hub) and there are no notes for each version to show yet (hub#576)
+### BASE-F41 Know which version is running and when it was updated
+Status: done
 Actor: owner, administrator
 Screen: System · Updates
 Steps:
@@ -1487,7 +1473,7 @@ Actor: owner, administrator, manager, employee
 Screen: Settings
 Steps:
   1. Tap "Settings" in the side menu, or arrive from a link on another screen.
-  2. At the bottom, the tabs "General", "Business", "Printing" and "Data and backups", in the old hub's order;
+  2. At the bottom, the tabs "General", "Business", "Printing" and "Data and backups";
      "General" opens (BASE-F62). The tab chosen stays in the link, so a saved link comes back to it and Back
      leaves Settings instead of walking its tabs. On the phone the four fit, whole.
   3. Old links still take you to their place: the one of the old "General" opens "General", the one of the old
@@ -2141,8 +2127,8 @@ Out: nothing saved. It updates by itself when somebody chooses or loses their PI
 If it fails: "The people of this business could not be loaded." with "Retry".
 Involved: BASE-F77, BASE-F78, BASE-F79
 
-### BASE-F82 See the roles and turn on the ones an app brings
-Status: discarded — the four roles of erplora.com are shown; whether an app brings its own roles to turn on is still to be decided in the new product, where the role is given when inviting on erplora.com (hub#579)
+### BASE-F82 See the business's roles
+Status: done
 Actor: owner, administrator, manager, employee
 Screen: Employees · Roles
 Steps:
@@ -2827,7 +2813,6 @@ mid-copy, the next one takes it up.
 Involved: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (the same deletion of files, when a demo is retired)
 
 ### BASE-F110 Open the business's website on its own domain
-<!-- origin: new (saas#195, HUBS-F17; PLAN-SAAS §37, point 2) -->
 Status: done (the address and what it serves; connecting the domain is erplora.com's HUBS-F17, which shows it on the panel)
 Actor: anyone, without an account
 Screen: The business's public page (WEBSITE-F10), on its domain
@@ -2845,7 +2830,6 @@ published page, the domain says there is nothing there. A business being prepare
 Involved: HUBS-F17, WEBSITE-F10
 
 ### BASE-F111 Wait for the database when it is cut for a moment
-<!-- origin: new (PLAN-DB, round 2026-11-04e, point 5: a restart, an AWS maintenance or the change of version cut the database for a few seconds; twin of erplora.com's ACCOUNTS-F50) gh:hub#831 -->
 Status: done
 Actor: anyone of the business in the Hub, on the web or in the app, and any program connected through the API
 Screen: any of the Hub, Page «We will be back soon»
@@ -2880,7 +2864,6 @@ Involved: ACCOUNTS-F50 (its twin on erplora.com), every app whose local changes 
 business being prepared or moving to another server: the same look); hub#831, hub#1051 and hub#1052
 
 ### BASE-F112 Save a downloaded file inside the app
-<!-- origin: old-hub:HUB_SHELL-F126 old-hub:HUB_SHELL-F132 old-hub:HUB_SHELL-F173 (the Hub's side of ERPlora/app's HUB_APP-F30) gh:hub#1041 -->
 Status: done
 Actor: anyone of the business who downloads a file in the Hub
 Screen: those that download a file the screen already holds: VeriFactu › Configuration (the authorisation's form),
@@ -2924,7 +2907,7 @@ Out: the order to the app to stay listening or to stop. Nothing is kept in the H
 If it fails: with the notices refused ("Not now" to our question, or refused on Android), with nothing to warn about or
 without knowing what Android says, the app is not kept awake. An app without this order (1.1.34 and 1.1.35) refuses it: the Hub
 notes it in the console, does not ask again on that page and the person sees no error; the notices arrive with the app
-on screen, as before. If Android does not let it start, the same, and it is asked again at the next sign-in. While the
+on screen. If Android does not let it start, the same, and it is asked again at the next sign-in. While the
 Hub does not know yet whether there is something to warn about, it asks the app nothing: reloading the page neither
 stops it nor turns it on again. Signing out never waits for the app more than 2 seconds. In a browser there is no app
 to ask.
