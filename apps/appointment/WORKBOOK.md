@@ -235,7 +235,8 @@ suelta, una del lote y una de la serie.
 Si falla: el motivo sale dentro del panel, sin perder lo tecleado: fuera del horario del negocio, el
 profesional no trabaja a esa hora, franja bloqueada, el profesional ya tiene una cita
 (`appointment.slot_taken`), demasiado lejos, la clienta, el servicio o el profesional no existen o no
-se pueden reservar. Desde el mostrador ni la antelación mínima ni una hora ya pasada rechazan (la
+se pueden reservar. El de la clienta, que sale debajo de su buscador, se quita en cuanto se elige otra, sin
+volver a guardar (hub#1448). Desde el mostrador ni la antelación mínima ni una hora ya pasada rechazan (la
 hora pasada solo avisa antes de guardar); una automatización no tiene esas excepciones. Un empleado
 solo reserva para sí; una automatización a la que se permite reservar, con cualquier profesional. Dos personas
 que reservan a la vez el mismo hueco del mismo profesional: entra una y la otra recibe el rechazo.

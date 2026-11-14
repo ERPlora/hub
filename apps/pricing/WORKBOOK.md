@@ -385,7 +385,9 @@ Entra: el formulario.
 Sale: la regla activa y `pricing.rule.created`.
 Si falla: debajo de su campo: «Ya existe una regla con ese código. Elige otro.», un valor que falta o
 fuera de rango para su tipo, tramos repetidos o desordenados, una categoría, un producto o un servicio
-que no existe, «Hasta» antes que «Desde». **Crear** (y **Guardar** al editarla, PRICING-F11) está en gris
+que no existe, «Hasta» antes que «Desde». El de los tramos, que sale debajo de todos ellos, se quita en
+cuanto se cambia cualquier tramo (se escribe en él, se añade o se quita uno), sin volver a guardar
+(hub#1448). **Crear** (y **Guardar** al editarla, PRICING-F11) está en gris
 mientras el negocio no haya dicho todavía su moneda, porque el importe por unidad se lee en ella (sin
 ella, «1500» yenes se guardaría como 150 000); hasta entonces, salir del importe lo deja como se
 escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un
@@ -483,7 +485,7 @@ volvió a borrar antes de que llegue el aviso, no se activa ninguna.
 Implicados: Inventario, Clientes, Servicios, INVENTORY-F34, PRICING-F15
 
 ### PRICING-F15 Recuperar los precios de tarifa desde una copia aparte
-<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus precios de tarifa) gh:hub#1343 -->
+<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus precios de tarifa) gh:hub#1343 gh:hub#1442 -->
 Estado: hecho
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide (BASE-F114)
 Pantalla: ninguna de Tarifas: en el admin de Hubs, Copias aparte › «Recuperar en el negocio…», con **Precios de
@@ -493,7 +495,9 @@ Pasos:
    Inventario, se pida en el orden que se pida: un producto eliminado que vuelve ya está vivo cuando se ponen sus
    precios.
 2. Cada precio de la copia (de un producto vivo en ella o de un servicio) que el negocio ya no tiene vuelve a su
-   tarifa, con su precio y su «desde cantidad», puesto como lo pone el detalle de la tarifa (PRICING-F07).
+   tarifa, con su precio y su «desde cantidad», puesto como lo pone el detalle de la tarifa (PRICING-F07). Un producto
+   que el negocio ya no tenía en absoluto vuelve como uno nuevo, con otro identificador (INVENTORY-F01): sus precios
+   van a ese, el que la recuperación hizo con su SKU.
 3. Recuperaciones lo cuenta aparte: «Precios de tarifa: se crearon 2».
 Entra: la copia aparte y lo que el negocio tiene hoy.
 Sale: un precio por cada uno que faltaba, con su aviso de precio puesto (`pricing.price_item.added`) hecho por la
@@ -502,11 +506,13 @@ Si falla: un precio que el negocio aún tiene, aunque le cambiara el importe o l
 no se repite uno cuyo sitio (la misma tarifa, el mismo producto o servicio y la misma «desde cantidad») el negocio ya
 volvió a ocupar, al precio que sea: se queda el suyo, y pedirlo otra vez no pone nada dos veces. Un precio que el negocio quitó a mano después de la copia también vuelve, como todo lo que el negocio ya no
 tiene (BASE-F114). Lo que el detalle de la tarifa no acepta hoy no vuelve y Recuperaciones dice por qué: una tarifa
-desactivada («pricing.price_list_unavailable: …»), un producto que sigue eliminado (no se recuperó Productos, o el
-negocio ya hizo otro con su SKU: «not_found: …»), un servicio que ya no está o Servicios apagada. Un producto que el
-negocio ya no tenía en absoluto vuelve como uno nuevo, con otro identificador (INVENTORY-F01), y sus precios de la copia
-no vuelven con él (hub#1442).
-Implicados: BASE-F114, INVENTORY-F34, PRICING-F07, PRICING-F14
+desactivada («pricing.price_list_unavailable: …»), un producto que sigue eliminado o que el negocio ya no tiene (no se
+recuperó Productos, o el negocio ya hizo otro a mano con su SKU, que se queda con los precios que él le puso:
+«not_found: …»), un servicio que ya no está o Servicios apagada. El producto que hizo una recuperación se reconoce por
+su SKU la hiciera esta u otra anterior: pedida otra vez desde una copia anterior, le vuelve a poner los precios que el
+negocio le quitó después, como a todo lo que ya no tiene. Un servicio que el negocio ya no tenía en absoluto vuelve como
+uno nuevo y sus precios de la copia no vuelven con él (hub#1459).
+Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F34, PRICING-F07, PRICING-F14
 
 ## Servicios: lo que entra y lo que sale
 
