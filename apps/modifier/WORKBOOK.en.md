@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:24a5ac72b16eda5fe7d5aec06d6284d7b79b662f91e1e52ac680785195457084 -->
+<!-- generated from WORKBOOK.md sha256:7a725f05e1737ea606b96533fc97cbf3bdaeeec7caf4f2788f570239d6efb090 -->
 
 ## What it is for and who it is for
 
@@ -349,7 +349,8 @@ Steps:
    linked to it.
 2. Each group that in the copy hung from a product live in it and that the business no longer has linked to that
    product is linked again, as the group's sheet links it (MODIFIER-F05): the product asks again at the till for its
-   sauces, its doneness or its extras.
+   sauces, its doneness or its extras. A product the business no longer had at all comes back as a new one, with
+   another identifier (INVENTORY-F01): its groups are linked to that one, the one the recovery made with its SKU.
 3. Recoveries counts it apart: "Modifier groups of products: 2 created".
 In: the separate copy and what the business has today.
 Out: a link for each one that was missing, with its link-made notice (`modifier.link.attached`) made by the recovery,
@@ -359,12 +360,13 @@ If it fails: a link the business still has stays as it is, and one whose group t
 again is not repeated: the business's own stays, and asking again links nothing twice. A group the business unlinked
 from a product by hand after the copy comes back too, like everything the business no longer has (BASE-F114). What the
 group's sheet does not accept today does not come back and Recoveries says why, by the link's identifier in the copy:
-a product that stays deleted (Products was not recovered, or the business already made another one with its SKU) or a
-group the business deleted afterwards ("not_found: …"); a deleted group is not recovered from the copy (hub#1458). A
-product the business no longer had at all comes back as a new one, with another identifier (INVENTORY-F01), and its
-groups in the copy do not come back with it (hub#1457). The groups linked to a category do not come back: not to a
-recovered category either (hub#1456).
-Involved: BASE-F114, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
+a product that stays deleted or that the business no longer has (Products was not recovered, or the business already
+made another one by hand with its SKU, which keeps the groups it linked to it) or a group the business deleted
+afterwards ("not_found: …"); a deleted group is not recovered from the copy (hub#1458). The product a recovery made is
+known by its SKU, whether this recovery made it or an earlier one: asked again from an earlier copy, it gets back the
+groups the business unlinked from it afterwards, like everything it no longer has. The groups linked to a category do
+not come back: not to a recovered category either (hub#1456).
+Involved: BASE-F114, INVENTORY-F01, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
 
 ## Services: what goes in and what comes out
 

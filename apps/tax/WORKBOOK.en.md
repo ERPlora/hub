@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:082eed4f25f83c8ead65f08336f3980d217f719a342fe9f9893a471cc5eb3b29 -->
+<!-- generated from WORKBOOK.md sha256:60ba940d13cb38e41d9cb0bbab193237501e91ed515fda3cbea9692438e9b268 -->
 
 ## What it is for and who it is for
 
@@ -195,7 +195,7 @@ Out: the category, unique by key in the business; Taxes announces that there is 
 (`tax.category.created`). It brings no rule: until one is created (TAX-F04), a sale of that category is
 refused. Inventory also creates it when somebody chooses "Create" when importing a file (TAX-F15).
 If it fails: a key with another shape or an empty name show below their field; a key that already exists,
-"There is already a tax category with that key." below the Key. Nothing is saved.
+"There is already a tax category with that key." below the Key. The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888). Nothing is saved.
 Involved: INVENTORY-F09
 
 ### TAX-F03 View and filter the rules
@@ -239,8 +239,8 @@ category…" (it is solved with TAX-F07 or TAX-F08). A country that does not exi
 country, a % outside 0–100, a "Valid to" before "Valid from" or a category that does not exist show below
 their field. A rule of the same country, region and category that starts the same day as another one
 already saved, even a deactivated one: "There is already a rule of this country, region and category from
-that day, perhaps deactivated: reactivate it or start this one another day.", in "Valid from". Nothing is
-saved.
+that day, perhaps deactivated: reactivate it or start this one another day.", in "Valid from". The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888).
+Nothing is saved.
 Involved: INVOICE-F01, SALE-F01
 
 ### TAX-F05 Declare an exempt, not subject or reverse-charge operation
@@ -420,7 +420,7 @@ In: the outside text, the category and the source that the person chooses.
 Out: the alias, kept in lower case and without extra spaces, unique in the business (`tax.alias.created`).
 The next Inventory import understands it, however it is written.
 If it fails: an alias that already exists: "That alias already exists." below the Alias; a category that
-does not exist, below the Category. Nothing is saved.
+does not exist, below the Category. The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888). Nothing is saved.
 Involved: INVENTORY-F09
 
 ### TAX-F15 Tell the Inventory importer which category a text is

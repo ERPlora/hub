@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:13dc5c362a51ab3d9a9e6b1eb2ba11cc30a27ca8cce015788fc59ee6f973d3e0 -->
+<!-- generated from WORKBOOK.md sha256:1e81617ec46512b89b5a2172625a5c01d5995e4869f646379251d1f758adbe9a -->
 
 ## What it is for and who it is for
 
@@ -2935,9 +2935,9 @@ Status: done (the action and the restore, in its place or to a separate copy, an
 the customers that were lost, the deleted ones as they were, the products, the services with their categories, the
 appointments, the repeating appointments, the price list prices and the modifier groups and the menu choices of the
 products; making and deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws;
-the price list prices of a service that comes back as a new one, hub#1459; the modifier groups of a product that comes
-back as a new one, hub#1457; the modifier groups of a category that comes back, hub#1456; a deleted modifier group,
-hub#1458; the menu choices of a product that comes back as a new one, hub#1473; a removed menu or course, hub#1474)
+the price list prices of a service that comes back as a new one, hub#1459; the modifier groups of a category that comes
+back, hub#1456; a deleted modifier group, hub#1458; the menu choices of a product that comes back as a new one,
+hub#1473; a removed menu or course, hub#1474)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -3084,11 +3084,11 @@ Steps:
       rules, which deleting it only switched off, are switched back on by themselves with it (PRICING-F14).
       The modifier groups of the products go after the products too: "Modifier groups of products: 2 created". Each
       group that in the copy hung from a product live there and that the business no longer has linked to that product
-      is linked again, as the group's sheet links it, so a deleted product that comes back asks again at the till for
-      its sauces, its doneness or its extras (MODIFIER-F10). One whose group the business has linked to that product
-      again is not repeated: the business's own stays. One the group's sheet does not accept today (its product still
-      deleted, or the business deleted the group) does not come back and its reason says so; those of a product that
-      comes back as a new one, not yet either (hub#1457).
+      is linked again, as the group's sheet links it, so a deleted product that comes back, the same one or as a new
+      one, asks again at the till for its sauces, its doneness or its extras (MODIFIER-F10). One whose group the
+      business has linked to that product again is not repeated: the business's own stays. One the group's sheet does
+      not accept today (its product still deleted, or the business already made another one by hand with its SKU, or it
+      deleted the group) does not come back and its reason says so.
       The menu choices of the products go after the products too: "Menu choices of products: 2 created". Each choice
       that in the copy offered a product live there and that the business no longer has is added again to its course,
       as the menu builder adds it, with its supplement and, if it was sold out, sold out, so a deleted product that comes

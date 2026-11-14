@@ -16,12 +16,20 @@ from django.apps import apps
 from django.db import connection
 from live.models import OutboxEvent
 
-from apps.inventory.tests.test_recovery import CATEGORIES, LINKS, PRODUCTS, a_tax_key
+from apps.inventory.models import Product
+from apps.inventory.tests.test_recovery import (
+    CATEGORIES,
+    LINKS,
+    PRODUCTS,
+    a_tax_key,
+    gone_altogether,
+    made_by_a_recovery,
+)
 from apps.modifier import queries
 from apps.modifier.models import ModifierLink
 from base.recovery import actor_of
 from base.tenancy.context import use_hub
-from base.tenancy.tests.test_recovery import Recoveries, fresh, run, run_in
+from base.tenancy.tests.test_recovery import Recoveries, fields_held_since, fresh, run, run_in
 
 from .conftest import make_category, make_product
 from .conftest import run as run_here
@@ -58,10 +66,11 @@ def test_the_copy_gives_each_group_hung_from_a_live_product_with_what_its_attach
 
     read = queries.links_in_copy(direct())
 
+    # With each product's SKU there, the article's identity, to find the one made again if the business lost it.
     assert read == [
-        {"id": on_burger.id, "group_id": sauces.id, "product_id": burger.id},
-        {"id": extra_burger.id, "group_id": extras.id, "product_id": burger.id},
-        {"id": on_fries.id, "group_id": sauces.id, "product_id": fries.id},
+        {"id": on_burger.id, "group_id": sauces.id, "product_id": burger.id, "sku": "BUR"},
+        {"id": extra_burger.id, "group_id": extras.id, "product_id": burger.id, "sku": "BUR"},
+        {"id": on_fries.id, "group_id": sauces.id, "product_id": fries.id, "sku": "FRI"},
     ]
 
 
@@ -75,7 +84,12 @@ def test_a_copy_without_the_apps_table_gives_nothing():
 
 
 def a_link_of_the_copy(group, product) -> dict:
-    return {"id": uuid.uuid7(), "group_id": group.id, "product_id": product.id}
+    return {"id": uuid.uuid7(), "group_id": group.id, "product_id": product.id, "sku": product.sku}
+
+
+def a_link_of_a_product_gone(group, sku: str, product_id=None) -> dict:
+    """A link of the copy whose product the business no longer holds at all: only its SKU says which article it was."""
+    return {"id": uuid.uuid7(), "group_id": group.id, "product_id": product_id or uuid.uuid7(), "sku": sku}
 
 
 @pytest.mark.django_db
@@ -101,6 +115,27 @@ def test_lacking_is_a_group_the_business_no_longer_hangs_from_that_product():
     ]
 
 
+@pytest.mark.django_db
+def test_a_product_gone_gets_its_groups_on_the_one_a_recovery_made_again_with_its_sku():
+    sauces, extras = a_group("Sauces"), a_group("Extras")
+    burger = made_by_a_recovery("Burger", "BUR")
+    # Hung again by the business on the one made again, after the recovery made it: the business's stays.
+    hang(sauces, product=burger)
+    hung_again = a_link_of_a_product_gone(sauces, "BUR")
+    lacking_one = a_link_of_a_product_gone(extras, "BUR", hung_again["product_id"])
+    # Made again by hand with its SKU: the business's own, set up as it chose; it keeps the copy's product, which the
+    # attach refuses as not found: not created, and why.
+    make_product("Fries", "FRI")
+    by_hand = a_link_of_a_product_gone(sauces, "FRI")
+
+    lacking = queries.links_not_in_business([hung_again, lacking_one, by_hand])
+
+    assert lacking == [
+        {"id": lacking_one["id"], "group_id": extras.id, "product_id": burger.id},
+        {"id": by_hand["id"], "group_id": sauces.id, "product_id": by_hand["product_id"]},
+    ]
+
+
 def test_with_nothing_read_nothing_is_lacking():
     assert queries.links_not_in_business([]) == []
 
@@ -116,6 +151,10 @@ def test_the_app_declares_its_groups_of_products_hung_again_by_the_group_sheets_
         "",
     )
     assert (str(links.label), links.reads_since) == ("Modifier groups of products", "0001_initial")
+    # A copy that far back holds what the read takes: the link's columns, and of its product, those of Inventory's
+    # migration that one depends on.
+    assert {"id", "group", "product"} <= fields_held_since("modifier", "modifierlink", links.reads_since)
+    assert {"sku", "is_deleted"} <= fields_held_since("inventory", "product", "0001_initial")
 
 
 # ── End to end: the business's own database and its copy ────────────────────────────────────────────────────────────
@@ -197,6 +236,44 @@ class TestGroupsComeBack:
         assert run() == 1
         assert said(again) == ("done", [CATEGORIES, PRODUCTS, LINKS, GROUPS])
         assert len(hung(hub)) == 2
+
+    def test_a_product_gone_altogether_comes_back_as_a_new_one_asking_for_its_groups(self, recoveries, every_app_on):
+        hub, burger, _ = self.a_business(recoveries, every_app_on)
+        copy = recoveries.copy_of(hub)
+        self.deleted(hub, burger)
+        gone_altogether(hub, burger)
+        row = recoveries.ask(copy, "modifier", "inventory")
+
+        assert run() == 1
+
+        assert said(row) == ("done", [CATEGORIES, PRODUCTS | {"created": 1}, LINKS, GROUPS | {"created": 2}])
+        with use_hub(hub):
+            [made] = Product.objects.filter(sku="BUR").values_list("pk", flat=True)
+        assert made != burger
+        assert hung(hub) == [("Extras", made), ("Sauces", made)]
+        # Asked again, nothing is hung twice: its groups are in their place on the one made again.
+        again = recoveries.ask(copy, "inventory", "modifier")
+        assert run() == 1
+        assert said(again) == ("done", [CATEGORIES, PRODUCTS, LINKS, GROUPS])
+        assert len(hung(hub)) == 2
+
+    def test_a_product_gone_the_business_made_again_by_hand_keeps_its_own_groups(self, recoveries, every_app_on):
+        hub, burger, groups = self.a_business(recoveries, every_app_on)
+        copy = recoveries.copy_of(hub)
+        self.deleted(hub, burger)
+        gone_altogether(hub, burger)
+        # Made again by hand with its SKU, the business hung only «Extras» from it.
+        made = run_in(hub, "inventory.product.create", name="Burger", sku="BUR", price=900,
+                      tax_category_key=a_tax_key(hub)).id
+        run_in(hub, "modifier.link.attach", group_id=groups["Extras"], product_id=made)
+        row = recoveries.ask(copy, "inventory", "modifier")
+
+        assert run() == 1
+
+        status, results = said(row)
+        assert (status, results[1]["created"], results[-1]["created"], results[-1]["not_created"]) == ("done", 0, 0, 2)
+        assert [reason["reason"].split(":")[0] for reason in results[-1]["reasons"]] == ["not_found", "not_found"]
+        assert hung(hub) == [("Extras", made)]
 
     def test_a_group_the_business_hung_again_stays_as_it_is(self, recoveries, every_app_on):
         hub, burger, groups = self.a_business(recoveries, every_app_on)
