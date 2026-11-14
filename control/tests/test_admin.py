@@ -1432,6 +1432,14 @@ def test_its_confirmation_page_speaks_spanish(client, root):
     assert "Cada hub elegido se cierra unos minutos" in html and 'value="Moverlos"' in html
 
 
+def test_its_confirmation_page_promises_no_refusal_by_size(client, root):
+    # A database of any size moves (its copy goes through the dumps bucket): the page never says a large one is refused.
+    html = the_move_page_in_spanish(client)
+
+    assert "Cada hub elegido se cierra unos minutos" in html
+    assert "demasiado grande" not in html and "too large" not in html
+
+
 # ── The freeze switch ────────────────────────────────────────────────────────────────────────────────────────────────
 
 
