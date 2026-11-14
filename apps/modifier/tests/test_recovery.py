@@ -381,7 +381,14 @@ def test_a_group_gone_stands_for_the_one_a_recovery_brought_back_with_its_name()
     a_group("Extras")
     lost, gone = uuid.uuid7(), uuid.uuid7()
 
-    standing = queries.groups_standing_for({kept.id: "Sizes", lost: "Sauces", gone: "Extras"})
+    # Still held, renamed since, and its old name taken by one a recovery brought back: it is itself all the same.
+    renamed = a_group("Portions")
+    run_here("modifier.group.update", {"id": str(renamed.id), "name": "Rations"})
+    a_group_brought_back("Portions")
+
+    standing = queries.groups_standing_for(
+        {kept.id: "Sizes", renamed.id: "Portions", lost: "Sauces", gone: "Extras"}
+    )
 
     # One the business still holds is itself, and is not in it.
     assert standing == {lost: back.id}
@@ -488,6 +495,18 @@ def test_an_option_its_create_refuses_today_is_left_out_and_said_and_the_group_c
     [said] = made.left_out
     assert (said.code, said.message) == ("invalid_field", spanish)
     assert spanish != OPTION_LEFT % {"option": "Wine sauce", "why": TAX_CATEGORY_UNKNOWN}
+
+
+@pytest.mark.django_db
+def test_an_option_named_as_one_already_back_in_its_group_is_left_out_with_why():
+    [record] = queries.groups_not_in_business([
+        a_group_of_the_copy("Sauces", options=[an_option_of_the_copy("Alioli"), an_option_of_the_copy("ALIOLI")])
+    ])
+
+    made = recovered(record)
+
+    assert list(ModifierOption.objects.filter(group_id=made.id).values_list("name", flat=True)) == ["Alioli"]
+    assert [one.code for one in made.left_out] == ["modifier.option_name_taken"]
 
 
 @pytest.mark.django_db

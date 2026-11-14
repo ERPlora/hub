@@ -238,9 +238,7 @@ def recover_group(ctx: OperationContext, data: GroupRecoverIn) -> dict:
     left_out = []
     for option in data.options:
         try:
-            # A refused option leaves no trace, a default it took from another included.
-            with atomic():
-                create_option(ctx, OptionIn.model_validate(option.model_dump() | {"group_id": made.id}))
+            create_option(ctx, OptionIn.model_validate(option.model_dump() | {"group_id": made.id}))
         except (InvalidPayload, Conflict) as refused:
             message = OPTION_LEFT % {"option": option.name, "why": refused.message}
             left_out.append(LeftOut(code=refused.code, message=message))
