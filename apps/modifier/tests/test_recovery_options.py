@@ -212,6 +212,17 @@ def test_one_chosen_by_default_never_takes_it_from_the_ones_the_business_chose(m
 
 
 @pytest.mark.django_db
+def test_one_not_chosen_by_default_comes_back_as_it_was_whatever_its_group_holds():
+    sauces = run_here("modifier.group.create", {"name": "Sauces", "max_choices": 1})
+    an_option(sauces, "Ketchup", is_default=True)
+    [record] = queries.options_not_in_business([of_the_copy(sauces.id, "Alioli")])
+
+    made = recovered(record)
+
+    assert (made.is_default, made.left_out) == (False, [])
+
+
+@pytest.mark.django_db
 def test_bringing_an_option_back_is_only_the_systems():
     op = get_operation("modifier.option.recover")
 
