@@ -20,6 +20,7 @@ import urllib.parse
 import urllib.request
 
 import pytest
+from botocore.exceptions import ClientError
 from django.utils import timezone
 from psycopg.conninfo import conninfo_to_dict
 
@@ -444,6 +445,7 @@ def test_while_it_streams_its_heartbeat_beats_and_one_that_fails_stops_it(
 
 def test_its_heartbeat_waits_its_time_between_beats(hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path):
     monkeypatch.setattr(dumps, "POLL_SECONDS", 0.4)
+    monkeypatch.setattr(dumps, "STOP_CHECK_SECONDS", 0.05)
     a_pg_dump(tmp_path, monkeypatch, "time.sleep(1.3); sys.stdout.buffer.write(b'PGDMP')")
     beats = []
 
@@ -484,3 +486,59 @@ def test_a_refused_upload_of_a_large_copy_stops_pg_dump_at_once(hub_a, dumps_buc
 
     # Waited for, not killed, it would take its whole minute.
     assert "could not be uploaded" in str(failed.value) and time.monotonic() - asked < 10
+
+
+def test_a_copy_of_exactly_two_parts_goes_up_in_two(hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path):
+    monkeypatch.setattr(dumps, "STREAM_PART_BYTES", SMALLEST_PART)
+    a_pg_dump(tmp_path, monkeypatch, f"sys.stdout.buffer.write(bytes(range(256)) * (2 * {SMALLEST_PART} // 256))")
+
+    sent = dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60)
+
+    assert sent == 2 * SMALLEST_PART
+    assert client(moto_s3).head_object(Bucket=dumps_bucket, Key=MOVE_KEY)["ETag"].endswith('-2"')
+
+
+def test_an_abort_that_fails_keeps_the_reason_of_the_failure(
+    hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path, caplog
+):
+    monkeypatch.setattr(dumps, "STREAM_PART_BYTES", SMALLEST_PART)
+    a_pg_dump(
+        tmp_path,
+        monkeypatch,
+        "sys.stdout.buffer.write(bytes(6 * 1024 * 1024)); sys.stdout.flush()\n"
+        "sys.stderr.write('pg_dump: error: the connection to the server was lost\\n'); sys.exit(1)",
+    )
+    real = dumps.client
+
+    def refusing_aborts():
+        s3 = real()
+
+        def abort(**kwargs):
+            raise ClientError({"Error": {"Code": "AccessDenied", "Message": "not allowed"}}, "AbortMultipartUpload")
+
+        s3.abort_multipart_upload = abort
+        return s3
+
+    monkeypatch.setattr(dumps, "client", refusing_aborts)
+
+    with pytest.raises(dumps.DumpFailed) as failed:
+        dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60)
+
+    assert "the connection to the server was lost" in str(failed.value)
+    assert "base.tenancy.dumps.abort_failed" in caplog.text
+    assert objects(moto_s3, dumps_bucket) == {}
+
+
+def test_a_pg_dump_that_closes_its_output_but_does_not_end_is_still_stopped(
+    hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path
+):
+    pid = a_pg_dump(
+        tmp_path, monkeypatch, "sys.stdout.buffer.write(b'PGDMP'); sys.stdout.flush(); os.close(1); time.sleep(60)"
+    )
+    asked = time.monotonic()
+
+    with pytest.raises(dumps.DumpStopped):
+        dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60, cancelled=lambda: time.monotonic() - asked > 0.5)
+
+    assert time.monotonic() - asked < 10 and gone(pid)
+    assert nothing_kept(moto_s3, dumps_bucket)

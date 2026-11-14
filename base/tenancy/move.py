@@ -618,9 +618,10 @@ def _run(
     env["PGPASSWORD"] = password
     env["PGGSSENCMODE"] = "disable"
     with open(errors_path, "w+", encoding="utf-8", errors="replace") as complaints:
-        stdin = subprocess.PIPE if feed is not None else None
-        process = subprocess.Popen(command, env=env, stdin=stdin, stdout=subprocess.DEVNULL, stderr=complaints)
-        writing = _Input(process, feed) if feed is not None else None
+        process = subprocess.Popen(
+            command, env=env, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=complaints
+        )
+        writing = _Input(process, _nothing() if feed is None else feed)
         started = last_beat = time.monotonic()
         try:
             while True:
@@ -630,7 +631,7 @@ def _run(
                 if left <= 0:
                     raise MoveFailed("move_restore_failed", f"{what} took longer than {timeout:g} s")
                 wait = min(dumps.POLL_SECONDS, dumps.STOP_CHECK_SECONDS, left)
-                if writing is not None and not writing.done:
+                if not writing.done:
                     writing.write(wait)
                 else:
                     try:
@@ -646,14 +647,18 @@ def _run(
             process.wait()
             raise
         finally:
-            if writing is not None:
-                writing.close()
+            writing.close()
         if process.returncode != 0:
             complaints.seek(0)
             said = " ".join(line.strip() for line in complaints.read().splitlines()[-ERROR_LINES:] if line.strip())
             if password:
                 said = said.replace(password, "***")
             raise MoveFailed("move_restore_failed", f"{what} failed (exit {process.returncode}): {said}")
+
+
+def _nothing():
+    """No input: the program's is closed at once."""
+    yield from ()
 
 
 class _Input:
@@ -680,9 +685,8 @@ class _Input:
         if not writable:
             return
         try:
+            # Once the pipe is writable it takes some of it at least: what it took is written, the rest waits.
             self.pending = self.pending[os.write(self.process.stdin.fileno(), self.pending) :]
-        except BlockingIOError:
-            return
         except BrokenPipeError:
             # The program ended without reading the rest (``pg_restore --list`` reads only the archive's table of
             # contents): how it ended says whether that was well.
@@ -693,12 +697,9 @@ class _Input:
         self.close()
 
     def close(self) -> None:
+        """The feed and the program's input closed; nothing is buffered on it (it is written with ``os.write``)."""
         self.feed.close()
-        if not self.process.stdin.closed:
-            try:
-                self.process.stdin.close()
-            except BrokenPipeError:
-                logger.debug("base.tenancy.move.input_closed: the program had stopped reading already.")
+        self.process.stdin.close()
 
 
 def _verify_identity(name: str, cluster, hub_id) -> None:

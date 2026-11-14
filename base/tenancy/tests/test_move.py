@@ -691,19 +691,75 @@ class TestTheCopyGoesThroughTheBucket:
 
     def test_a_move_has_an_hour_for_each_half_of_its_copy(self, moves, monkeypatch):
         seen = []
-        real = dumps.stream_to_bucket
+        real_stream, real_run = dumps.stream_to_bucket, move._run
 
-        def watched(source, key, **kwargs):
-            seen.append(kwargs["timeout"])
-            return real(source, key, **kwargs)
+        def streamed(source, key, **kwargs):
+            seen.append(("dump", kwargs["timeout"]))
+            return real_stream(source, key, **kwargs)
 
-        monkeypatch.setattr(dumps, "stream_to_bucket", watched)
+        def ran(command, *args, **kwargs):
+            seen.append(("restore", kwargs["timeout"]))
+            return real_run(command, *args, **kwargs)
+
+        monkeypatch.setattr(dumps, "stream_to_bucket", streamed)
+        monkeypatch.setattr(move, "_run", ran)
+        hub = moves.hub(to=moves.cluster())
+
+        run()
+
+        assert fresh(hub).last_error == "" and move.COPY_TIMEOUT_SECONDS == 60 * 60
+        # The dump, then the restore's listing and the restore itself.
+        assert seen == [("dump", 3600), ("restore", 3600), ("restore", 3600)]
+
+    def test_a_dump_that_fails_puts_the_hub_back_and_says_why(
+        self, moves, moto_s3, dumps_bucket, monkeypatch, tmp_path
+    ):
+        failing = tmp_path / "pg_dump"
+        failing.write_text("#!/bin/sh\necho 'pg_dump: error: the connection to the server was lost' >&2\nexit 1\n")
+        failing.chmod(0o755)
+        monkeypatch.setattr(dumps, "pg_dump", lambda: str(failing))
+        hub = moves.hub(to=moves.cluster())
+
+        assert run() == 1
+
+        hub = fresh(hub)
+        assert (hub.cluster_id, hub.moving_to_id, hub.status) == (None, None, "ready")
+        assert hub.last_error.startswith("move_dump_failed:")
+        assert "the connection to the server was lost" in hub.last_error
+        assert marker(hub.db_name) == [MARKER] and objects(moto_s3, dumps_bucket) == {}
+
+    def test_every_read_of_the_copy_from_the_bucket_is_closed(self, moves, monkeypatch):
+        opened, closed = [], []
+        real = dumps.client
+
+        def watched():
+            s3 = real()
+            get = s3.get_object
+
+            def get_object(**kwargs):
+                answer = get(**kwargs)
+                body = answer["Body"]
+                close = body.close
+                opened.append(body)
+
+                def closing():
+                    closed.append(body)
+                    close()
+
+                body.close = closing
+                return answer
+
+            s3.get_object = get_object
+            return s3
+
+        monkeypatch.setattr(dumps, "client", watched)
         hub = moves.hub(to=moves.cluster())
 
         run()
 
         assert fresh(hub).last_error == ""
-        assert seen == [move.COPY_TIMEOUT_SECONDS] == [60 * 60]
+        # The listing reads only the start of it; the restore, all of it: both are closed.
+        assert len(opened) == 2 and closed == opened
 
 
 #: More than a pipe holds (64 KiB on Linux and macOS): a writer that is not read waits.
@@ -722,7 +778,14 @@ class TestFeedingAProgram:
         out = tmp_path / "out"
 
         move._run(
-            ["sh", "-c", f"cat > {out}"], "", tmp_path / "err", lambda: None, None, what="cat", feed=feeding(*FEED)
+            ["sh", "-c", f"cat > {out}"],
+            "",
+            tmp_path / "err",
+            lambda: None,
+            None,
+            what="cat",
+            feed=feeding(*FEED),
+            timeout=30,
         )
 
         assert out.read_bytes() == b"".join(FEED)
@@ -736,6 +799,7 @@ class TestFeedingAProgram:
             None,
             what="head",
             feed=feeding(*FEED),
+            timeout=30,
         )
 
     def test_a_program_that_fails_says_why_even_before_reading_it_all(self, tmp_path):
@@ -788,7 +852,8 @@ class TestFeedingAProgram:
         assert time.monotonic() - asked < 10
 
     def test_its_heartbeat_beats_while_it_feeds(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(dumps, "POLL_SECONDS", 0.2)
+        monkeypatch.setattr(dumps, "POLL_SECONDS", 0.5)
+        monkeypatch.setattr(dumps, "STOP_CHECK_SECONDS", 0.05)
         beats = []
 
         move._run(
@@ -799,9 +864,26 @@ class TestFeedingAProgram:
             None,
             what="cat",
             feed=feeding(*FEED),
+            timeout=30,
         )
 
-        assert 2 <= len(beats) <= 8, beats
+        assert 1 <= len(beats) <= 4, beats
+
+    def test_a_program_slow_to_read_is_waited_for_not_spun_on(self, tmp_path):
+        checks = []
+
+        move._run(
+            ["sh", "-c", "sleep 1.5; cat > /dev/null"],
+            "",
+            tmp_path / "err",
+            lambda: None,
+            lambda: checks.append(1) or False,
+            what="cat",
+            feed=feeding(*FEED),
+            timeout=30,
+        )
+
+        assert len(checks) < 1000, len(checks)
 
     def test_what_the_feed_raises_stops_the_program_and_reaches_the_caller(self, tmp_path):
         def broken():

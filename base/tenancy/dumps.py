@@ -343,13 +343,11 @@ def _upload_in_parts(s3, target: str, key: str, output: "_DumpOutput") -> None:
     try:
         while True:
             chunk = output.read(STREAM_PART_BYTES)
-            if parts and not chunk:
+            if not chunk:
                 break
             number = len(parts) + 1
             sent = s3.upload_part(Bucket=target, Key=key, UploadId=upload, PartNumber=number, Body=chunk)
             parts.append({"ETag": sent["ETag"], "PartNumber": number})
-            if len(chunk) < STREAM_PART_BYTES:
-                break
         s3.complete_multipart_upload(Bucket=target, Key=key, UploadId=upload, MultipartUpload={"Parts": parts})
     except BaseException:
         try:
