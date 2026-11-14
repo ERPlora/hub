@@ -17,8 +17,8 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import assert_its_asks_bring, assert_offered_with_room, comparable, offered_to
-from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import assert_offered_with_room, comparable, english_coverage_test, english_words_test
+from base.tests.test_assistant_asks import offered_to, own_words_test, probe_phrases
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: Every write of Price lists is ``pricing.manage``, which an employee lacks (they only read the prices,
@@ -163,7 +163,32 @@ def test_every_probe_of_price_lists_offers_its_tool_without_being_one_of_its_ask
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, probe["language"]), probe["tool"], probe["phrase"])
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+
+
+#: What the owner says in English in words of their own for each tool of Price lists that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("pricing.catalog.get", "what group is behind that code of the partners?"),
+    ("pricing.price.resolve", "Nuria wants two beers, work out what she pays"),
+    ("pricing.price_item.add", "put the orange juice in Hospitality at 1.50"),
+    ("pricing.price_item.get", "how much is a beer for the partners, from how many?"),
+    ("pricing.price_item.list", "what does the croissant cost in each of them?"),
+    ("pricing.price_item.remove", "Distributors should pay for the juice like everybody else"),
+    ("pricing.price_item.update", "the muffin in Hospitality is 1.60 now"),
+    ("pricing.price_list.activate", "the winter one should apply again for distributors"),
+    ("pricing.price_list.create", "a separate one for the club, call it Club Oro"),
+    ("pricing.price_list.deactivate", "switch off the summer one until next year, keep what it has"),
+    ("pricing.price_list.get", "does Hospitality end at some point this year?"),
+    ("pricing.price_list.list", "what special treatment do I give the distributors?"),
+    ("pricing.price_list.set_default", "make the partners' one apply to everybody else"),
+    ("pricing.price_list.update", "the summer one should last longer, until late October"),
+    ("pricing.rule.activate", "bring back the 2x1 on juices from other summers"),
+    ("pricing.rule.create", "a reduction on toasts for partners who take three"),
+    ("pricing.rule.deactivate", "put the juice deal aside, but keep it for next summer"),
+    ("pricing.rule.get", "what exactly does the summer promo do and how long does it last?"),
+    ("pricing.rule.list", "what's running now in the shop that applies by itself?"),
+    ("pricing.rule.update", "raise what the summer one takes off to a quarter"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_each_tool_has_its_own_english_words = english_coverage_test("pricing", OWN_WORDS_EN)

@@ -13,12 +13,13 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 from live import assistant as shared
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import assert_its_asks_bring, assert_offered_with_room, comparable, offered_to
+from base.tests.test_assistant_asks import assert_offered_with_room, comparable, offered_to
 from base.tests.test_assistant_asks import place_of_no_ask, probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, nobodys_words, own_words_test
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 OWNER, EMPLOYEE = Membership.Role.OWNER, Membership.Role.EMPLOYEE
@@ -71,12 +72,6 @@ PROBES = [
 OFFERED_PROBES = [probe for probe in PROBES if probe["expect"] != "refused"]
 
 
-def is_own_words(tools: dict[str, Operation], phrase: str) -> bool:
-    """Whether ``phrase`` is neither an ask in Spanish of any tool of ``tools`` nor a probe of layer 2."""
-    asks = {comparable(ask) for op in tools.values() for ask in shared.asks_of(op).get("es", ())}
-    return comparable(phrase) not in asks | set(probe_phrases())
-
-
 def test_demo_offers_at_least_8_tools():
     """Demo's tools are at least 8 (``AI``, never ``INTERNAL``): a silent drop of tools fails."""
     tools = {name for name, op in registry.items() if op.app_label == "demo" and assistant.is_tool(op)}
@@ -121,7 +116,7 @@ ELEMENTO = [
 @pytest.mark.parametrize(("name", "phrase"), ELEMENTO)
 def test_a_phrase_that_names_an_elemento_is_offered_its_tool_and_the_read_that_finds_it(catalog_of, name, phrase):
     tools = catalog_of(OWNER, "es")
-    assert is_own_words(tools, phrase)
+    assert nobodys_words(tools, phrase)
     offered = offered_to(tools, phrase)
     assert name in offered[:TOP], (offered.index(name) + 1 if name in offered else None, offered[:TOP])
     assert BY_NAME in offered[:TOP], (offered.index(BY_NAME) + 1 if BY_NAME in offered else None, offered[:TOP])
@@ -137,10 +132,23 @@ OWN_WORDS = [
     ("demo.item.delete", "el Ensayo de otoño ya no sirve: que desaparezca para siempre"),
     ("demo.item.add_line", "al Ensayo de otoño le faltan cables nuevos, cuatro"),
 ]
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_its_asks_bring(catalog_of(OWNER, "es"), name, phrase, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+
+
+#: What the owner says in English in words of their own for each tool of Demo that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("demo.item.add_line", "put four screws on Autumn trial"),
+    ("demo.item.create", "make «Spring trial» with the note «call the technician»"),
+    ("demo.item.delete", "Autumn trial is no use anymore, get rid of it for good"),
+    ("demo.item.detail", "read me what's in Autumn trial"),
+    ("demo.item.list", "find the ones with «autumn» in the name"),
+    ("demo.item.open_count", "how many are still pending?"),
+    ("demo.item.stats", "what are the figures altogether?"),
+    ("demo.item.update", "Autumn trial is done"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_each_tool_has_its_own_english_words = english_coverage_test("demo", OWN_WORDS_EN)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role

@@ -18,8 +18,9 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, assert_offered_with_room, comparable
+from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable
 from base.tests.test_assistant_asks import offered_place, offered_to, place_of_no_ask, probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: The writes of Menus and combos: they need ``combo.manage``, which an employee does not hold, and none of them is one a
@@ -144,10 +145,33 @@ def test_every_probe_of_menus_offers_its_tool_to_whoever_may_run_it(catalog_of, 
     assert_offered_with_room(tools, probe["tool"], probe["phrase"], probe["language"])
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
-    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+
+
+#: What the owner says in English in words of their own for each tool of Menus that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("combo.combo.create", "make a new takeaway one at 9.90"),
+    ("combo.combo.delete", "the Christmas one won't come back, drop it for good"),
+    ("combo.combo.for_sale", "what is on offer at the counter for customers?"),
+    ("combo.combo.get", "what comes in the kids' one?"),
+    ("combo.combo.list", "go over the ones we have and what each costs"),
+    ("combo.combo.resolve", "how much would the tasting one come to with steak?"),
+    ("combo.combo.set_image", "for the summer one use the paella drawing"),
+    ("combo.combo.suggest_image", "what would suit the summer one?"),
+    ("combo.combo.update", "bring the kids' one down to 8.50"),
+    ("combo.group.create", "the kids' one needs one more: dessert"),
+    ("combo.group.delete", "the vegan one no longer has desserts"),
+    ("combo.group.reorder", "desserts should come out before the mains"),
+    ("combo.group.update", "make drinks optional in the kids' one"),
+    ("combo.option.bulk_create", "put three desserts in the kids' one in a go"),
+    ("combo.option.create", "the vegan one gets salad among its starters"),
+    ("combo.option.delete", "we no longer do gazpacho as a starter"),
+    ("combo.option.reorder", "ice cream should be the first of the desserts"),
+    ("combo.option.update", "we've run out of custard for the kids' one"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_each_tool_has_its_own_english_words = english_coverage_test("combo", OWN_WORDS_EN)
 
 
 def test_every_tool_of_menus_has_a_phrase_of_its_own():

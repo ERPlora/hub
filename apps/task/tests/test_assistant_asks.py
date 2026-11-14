@@ -17,7 +17,8 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import assert_offered_with_room, comparable, probe_phrases
+from base.tests.test_assistant_asks import comparable, probe_phrases
+from base.tests.test_assistant_asks import probes_test, reported_test
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: Writes on what the whole team shares that only who runs it holds (``task.delete``, ``task.manage_project``), none
@@ -95,16 +96,9 @@ def test_the_guests_of_a_table_are_no_comment():
     )
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize(("name", "phrase"), REPORTED)
-def test_the_reported_task_request_offers_its_existing_operation(catalog_of, name, phrase):
-    assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
+test_the_reported_task_request_offers_its_existing_operation = reported_test(REPORTED)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
-def test_every_probe_of_tasks_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
-    """The owner's seventeen phrases of layer 2, the ones the model answered right too: a tool of Tasks that a new ask
-    elsewhere pushes out of the ones a turn offers fails here before the real-model QA sees it."""
-    assert (probe["app"], probe["role"], probe["language"]) == ("task", "owner", "es")
-    assert_offered_with_room(catalog_of(Membership.Role.OWNER, probe["language"]), probe["tool"], probe["phrase"])
+#: The owner's seventeen phrases of layer 2, the ones the model answered right too: a tool of Tasks that a new ask
+#: elsewhere pushes out of the ones a turn offers fails here before the real-model QA sees it.
+test_every_probe_of_tasks_offers_its_tool_without_being_one_of_its_asks = probes_test(PROBES, "task")
