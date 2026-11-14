@@ -545,7 +545,7 @@ Si falla: si no cuadra o el XML no pasa el esquema, no se escribe nada ni se gas
 entera se deshace** (Facturación devuelve el número a su serie): reintentarlo fallaría igual. Una factura que
 ya tiene registro contesta el mismo: nunca dos registros ni dos números, tampoco con dos entregas a la vez.
 Una factura que no existe no hace nada.
-Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F03, INVOICE-F04, INVOICE-F05
+Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F03, INVOICE-F05
 
 ### VERIFACTU-F14 Registrar una factura rectificativa
 Estado: hecho — igual que F13

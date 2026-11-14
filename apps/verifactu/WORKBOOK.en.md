@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:67bc7c7fb0645a1a673463f56a1bd6cc96876a7e96734b625de60819711680ab -->
+<!-- generated from WORKBOOK.md sha256:328ded079baf8113c7c83d4b0d0d0eb0dd5e35873d5c77bf1a246a448096b3e3 -->
 
 ## What it is for and who it is for
 
@@ -544,7 +544,7 @@ If it fails: if it does not add up or the XML does not pass the schema, nothing 
 **the whole issuing is undone** (Invoicing gives the number back to its series): retrying would fail the same. An
 invoice that already has a record answers the same one: never two records or two numbers, not even with two
 deliveries at once. An invoice that does not exist does nothing.
-Involved: INVOICE-F01, INVOICE-F02, INVOICE-F03, INVOICE-F04, INVOICE-F05
+Involved: INVOICE-F01, INVOICE-F02, INVOICE-F03, INVOICE-F05
 
 ### VERIFACTU-F14 Record a rectifying invoice
 Status: done — same as F13
