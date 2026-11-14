@@ -1354,8 +1354,10 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   sitio por `_categories_held` la creó una recuperación, `created_by` según `base.recovery.brought_back`; el producto
   sigue vivo aquí y fuera de ella) se crea por la operación de la pantalla, `inventory.product_category.add`, que añade
   sin quitar ninguna otra categoría. Va aparte, con su propia cuenta, porque toca lo que el negocio tiene. Una categoría
-  rehecha a mano (`created_by` de una persona) o conservada no se rellena. Lee desde `0001_initial`; una migración que quite o renombre una
-  columna que lee cambia también la lectura y su `reads_since`. Tests: `tests/test_recovery.py`, de punta a punta
+  rehecha a mano (`created_by` de una persona) o conservada no se rellena. Las categorías y los enlaces se leen desde `0001_initial` y los
+  productos desde `0005_product_image`, la que les dio la imagen (a una copia anterior se le niegan los productos con
+  `recover_copy_behind`); una migración que añada, quite o renombre una columna que se lee cambia también la lectura
+  y su `reads_since`. Tests: `tests/test_recovery.py`, de punta a punta
   incluido, y el contrato de `base/tenancy/tests/test_recovery.py`.
 
 ## El servidor (fase de servidor, 2026-10-14)

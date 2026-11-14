@@ -34,7 +34,7 @@ from apps.service.services import MEMBER_TERMINATED_LEFT, SERVICE_MOVED_LEFT
 from apps.staff.models import Member
 from apps.tax.models import TaxCategory
 from base.tenancy.context import use_hub
-from base.tenancy.tests.test_recovery import Recoveries, fresh, run, run_in
+from base.tenancy.tests.test_recovery import Recoveries, fields_held_since, fresh, run, run_in
 from base.tests.test_image_catalog import image_library  # noqa: F401 - the library fixture
 
 from .conftest import ctx_for, make_category, make_member, make_service, make_tax
@@ -877,7 +877,9 @@ def test_the_app_declares_what_it_gives_back_its_categories_first():
         "service.service.recover",
     )
     assert (str(categories.label), str(services.label)) == ("Service categories", "Services")
-    assert categories.reads_since == services.reads_since == "0001_initial"
+    assert (categories.reads_since, services.reads_since) == ("0001_initial", "0003_service_image")
+    # A copy from before the image is refused for Services alone (recover_copy_behind), never read into an SQL error.
+    assert set(queries.COPY_FIELDS) <= fields_held_since("service", "service", services.reads_since)
 
 
 # ── End to end: the business's own database and its copy ────────────────────────────────────────────────────────────

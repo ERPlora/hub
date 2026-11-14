@@ -1818,9 +1818,10 @@ def _category_held(category_id: UUID | None, name: str | None, here: tuple[set[U
     return by_name.get(_same_name(name)) if name is not None else None
 
 
-#: What ``service.service.recover`` takes of a service of a separate copy, each a column since ``0001_initial``
-#: (``services_in_copy``): its create's and the image it showed; not its category and its tax category, which the
-#: business names its own way, nor who performs it, read apart (``recoverable_services_in_copy``).
+#: What ``service.service.recover`` takes of a service of a separate copy (``services_in_copy``): its create's, each a
+#: column since ``0001_initial``, and the image it showed, one since ``0003_service_image``, the migration its
+#: declaration names (``reads_since``); not its category and its tax category, which the business names its own way,
+#: nor who performs it, read apart (``recoverable_services_in_copy``).
 COPY_FIELDS = (
     "name",
     "pricing_type",
