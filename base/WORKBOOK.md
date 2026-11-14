@@ -3064,7 +3064,7 @@ Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, A
 Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte, y recuperar desde la copia aparte los
 clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías, las citas,
 las citas periódicas y los precios de tarifa; crear y borrar el clúster temporal es el procedimiento «Devolver un negocio
-a un momento» de ERPlora/aws; la imagen de un producto eliminado antes de que eliminar se la dejara, hub#1431; que la página
+a un momento» de ERPlora/aws; que la página
 «Recuperar en el negocio…» nombre la excepción de lo que vuelve a una categoría recuperada, hub#1364; la imagen de un
 servicio recuperado, hub#1429; los grupos de suplementos y las opciones de menú de un producto que vuelve, hub#1343;
 los precios de tarifa de un producto que vuelve como uno nuevo, hub#1442)
@@ -3133,8 +3133,9 @@ Pasos:
       que ya volvió a crear (otra viva con su nombre, sin distinguir mayúsculas ni espacios, que no sea ya una de la
       copia; la más antigua si hay dos) no se repite: se usa la suya, tal como está. Después, un producto que el negocio
       eliminó y aún guarda vuelve EL MISMO y cuenta como restaurado, con su stock, sus categorías que siguen vivas, la que
-      acaba de volver si la tenía en la copia, su imagen de la librería y en Movimientos su historial entero, activo y a
-      la venta (INVENTORY-F34).
+      acaba de volver si la tenía en la copia, su imagen de la librería (la que tenía en la copia si lo eliminó antes de
+      que eliminar se la dejara y se quedó sin ninguna) y en Movimientos su historial entero, activo y a la venta
+      (INVENTORY-F34).
       Uno que el negocio ya no tiene vuelve como uno nuevo, creado como lo crea la pantalla de Productos, con su nombre,
       SKU, EAN-13, descripción, tipo, precio, coste, unidades, umbral, control de stock y categoría fiscal, activo o
       desactivado como estaba y en sus categorías: la misma si el negocio aún la tiene, y si no, la que acaba de volver
@@ -4206,7 +4207,7 @@ hub#1355, hub#1356, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1442, 
   `queries.py` y `create`, la operación que crea cada uno; y, los dos o ninguno, `deleted(records)` en su `queries.py` y
   `restore`, la operación que devuelve lo que el negocio guarda eliminado, hub#1306, que recibe del registro leído lo
   que declara su entrada: el `id` y, si quiere devolverle lo que el negocio le quitó después, lo demás que nombre,
-  hub#1356; las de Citas e Inventario solo declaran el `id`); `base/` no nombra ninguna. Primero vuelve lo eliminado y después se crea lo que falta, con las operaciones de la app, en el contexto del
+  hub#1356; la de Inventario, además, la imagen que el producto tenía en la copia, hub#1431; las de Citas, solo el `id`); `base/` no nombra ninguna. Primero vuelve lo eliminado y después se crea lo que falta, con las operaciones de la app, en el contexto del
   sistema y en el idioma del personal, dentro de `use_hub`; un `InvalidPayload` o un `NotFound` es de ese registro y los
   demás siguen, cualquier otro rechazo para la app. Clientes responde con `recoverable_cards_in_copy`,
   `cards_deleted_in_business` con `customer.customer.restore`, que le devuelve lo que el negocio borró después

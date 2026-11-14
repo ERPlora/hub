@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fe7b49f163afb656eb15a84d9ad6b70f49712f9d8d35f0c83df3401bf0ef6fff -->
+<!-- generated from WORKBOOK.md sha256:3b5dab2c8f7095c8035e5d59113ba1f79f5c57a66a3a7351987a883fb3307680 -->
 
 ## What it is for and who it is for
 
@@ -2934,7 +2934,7 @@ Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APP
 Status: done (the action and the restore, in its place or to a separate copy, and getting back from the separate copy
 the customers that were lost, the deleted ones as they were, the products, the services with their categories, the
 appointments, the repeating appointments and the price list prices; making and deleting the temporary cluster is the
-procedure "Devolver un negocio a un momento" of ERPlora/aws; the image of a product deleted before deleting left it, hub#1431; the page
+procedure "Devolver un negocio a un momento" of ERPlora/aws; the page
 "Recover into the business…" naming the exception of what goes back into a recovered category, hub#1364; the image of a
 service brought back, hub#1429; the modifier groups and the menu options of a product that comes back, hub#1343; the
 price list prices of a product that comes back as a new one, hub#1442)
@@ -3004,7 +3004,8 @@ Steps:
       one it has already made again (another live one with its name, case and spaces aside, that is not already one of
       the copy's; the oldest if there are two) is not repeated: its own is used, as it is. Then a product the business
       deleted and still holds comes back THE SAME and counts as restored, with its stock, its categories that are still
-      live, the one that just came back if it had it in the copy, its image of the library and its whole history in
+      live, the one that just came back if it had it in the copy, its image of the library (the one it had in the copy
+      if it was deleted before deleting left it and it was left without any) and its whole history in
       Movements, active and on sale (INVENTORY-F34). One the business no longer has comes back as a new one, created as the Products screen creates it,
       with its name, SKU, EAN-13, description, type, price, cost, units, threshold, stock control and tax category, active
       or inactive as it was and in its categories: the same one if the business still has it, and otherwise the one that
