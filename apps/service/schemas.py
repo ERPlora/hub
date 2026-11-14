@@ -774,6 +774,25 @@ class ServiceRecoveredOut(ServiceOut, RecoveredOut):
     """A service made again from a separate copy, and who of those who performed it there it came back without."""
 
 
+#: The most services or subcategories a category of a separate copy takes back.
+MAX_INSIDE = 10_000
+
+
+class CategoryRecoverIn(CategoryIn):
+    """A category of a separate copy the business no longer has: what ``service.category.create`` takes and what it
+    had inside it there, each by its id, the same in the copy and in the business."""
+
+    stands_for: UUID | None = Field(
+        None, description="The category of the copy it comes back for, which the business may still hold deleted."
+    )
+    service_ids: list[UUID] = Field([], max_length=MAX_INSIDE, description="The services it had inside it.")
+    subcategory_ids: list[UUID] = Field([], max_length=MAX_INSIDE, description="The categories that hung from it.")
+
+
+class CategoryRecoveredOut(CategoryOut, RecoveredOut):
+    """A category made again from a separate copy, and what of what it had inside it there it came back without."""
+
+
 class AssignmentOut(Schema):
     id: UUID
     service_id: UUID

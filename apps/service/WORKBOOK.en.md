@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:44fc183c5fab97954258b6873d7659179373b27edb89f3ec1217c54fd124c450 -->
+<!-- generated from WORKBOOK.md sha256:2ca0a28c409badf79f92ea61e2c3025590413d6229ab830b064af263f1bc9293 -->
 
 ## What it is for and who it is for
 
@@ -370,7 +370,10 @@ are left **without a category** and its subcategories move to hang from its pare
 If it fails: in the confirmation, the reason (for example, "That category does not exist in this
 business.").
 Involved: SERVICE-F07, SERVICE-F02, BASE-F114 (from a separate copy, the deleted category comes back as a new one,
-with the lost services inside it; those the business kept stay as they are)
+with the lost services inside it and with what the business kept where deleting it left it: its services without a
+category and its subcategories where it hung. What the business moved since stays where it is, and Recoveries says so
+in the category's notes. If it is asked again, the category is the business's already and is not filled: what the
+business took out of it since stays out)
 
 ### SERVICE-F09 Sell a service at the till
 Status: done (Sales does it, SALE-F38)
