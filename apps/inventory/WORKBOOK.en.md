@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e401b7c902280a03558a3d4d6d739fe15f315e056b542601ff8b48b3b041743b -->
+<!-- generated from WORKBOOK.md sha256:ab16b8ebf414f029bfa68e9ec49952b4fc225bfa970125d356b94740ee5ca42a -->
 
 ## What it is for and who it is for
 
@@ -1091,15 +1091,17 @@ Steps:
    It comes back active and on sale, as unarchiving does in Odoo or Square: if it was deactivated or marked as sold
    out before it was deleted, that is done again by hand (INVENTORY-F03, INVENTORY-F29). Recoveries counts it among
    the restored Products.
-In: the deleted product, by its identifier.
-Out: the product live again, active and on sale, with none of its other data changed, and the product-recovered
-notice (`inventory.product.restored`), with the product as it comes back.
+In: the deleted product, by its identifier, and the image it had in the copy.
+Out: the product live again, active and on sale, with none of its other data changed (but for the image of the
+library it gets back if it had none), and the product-recovered notice (`inventory.product.restored`), with the
+product as it comes back.
 If it fails: it does not come back if the business has already made another product with its SKU or its EAN-13 since
 it deleted it: the one it made stays, and the recovery neither counts nor creates it. A product the business no longer
 has at all is created again (INVENTORY-F01), with no stock, with the image of the library it had in the copy. On a
 live product it does not fail: it answers well and announces again. Its own photo does not come back: it was erased
 when it was deleted (INVENTORY-F31). The image of the library does, because deleting leaves it; one deleted before
-deleting left it comes back without it (hub#1431). Its discount rules in Price Lists are switched back on by
+deleting left it, which was left without any, gets back the one it had in the copy, unless the library no longer has
+it. Its discount rules in Price Lists are switched back on by
 themselves (PRICING-F14) and its prices in the price lists come back if Price Lists is recovered too (PRICING-F15).
 Its modifier groups and its options in the menus were erased when it was deleted and do not come back with it yet
 (hub#1343).
