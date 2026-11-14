@@ -540,8 +540,10 @@ class TestMoveToCluster:
 
         html = self.choose(client, hub).content.decode()
 
-        assert re.search(r'<select name="when"[^>]*>\s*<option value="at_night" selected>', html)
-        assert '<option value="now">' in html
+        # Two choices whose text wraps on a phone, as RDS asks when a change applies: radio buttons, never a select.
+        [night] = re.findall(r'<input type="radio" name="when" value="at_night"[^>]*>', html)
+        [now] = re.findall(r'<input type="radio" name="when" value="now"[^>]*>', html)
+        assert "checked" in night and "checked" not in now
         assert "between 03:00 and 05:00" in html
 
     def test_confirmed_each_hub_is_asked_to_move_and_it_says_so(self, client, root):
@@ -1407,7 +1409,7 @@ def test_the_move_at_night_speaks_spanish(client, root):
     ).content.decode()
 
     assert "En su próxima madrugada, entre las 03:00 y las 05:00 de la hora del negocio" in html
-    assert ">Ahora</option>" in html and "Cuándo" in html
+    assert re.search(r'value="now"[^>]*>\s*Ahora</label>', html) and "Cuándo" in html
     with translation.override("es"):
         assert gettext("This hub already has a move asked for the night: cancel it first.") == (
             "Este hub ya tiene un traslado programado para la madrugada: cancélalo primero."

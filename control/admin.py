@@ -344,7 +344,10 @@ class MoveToClusterForm(forms.Form):
         label=gettext_lazy("cluster"),
         empty_label=None,
     )
-    when = forms.ChoiceField(label=pgettext_lazy("move", "When"), initial=MOVE_AT_NIGHT)
+    # Radio buttons, as RDS asks when a change applies: their text wraps on a phone, a select's runs past its edge.
+    when = forms.ChoiceField(
+        label=pgettext_lazy("move", "When"), initial=MOVE_AT_NIGHT, widget=forms.RadioSelect(attrs={"class": "radiolist"})
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
