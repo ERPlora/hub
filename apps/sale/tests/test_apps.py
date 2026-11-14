@@ -251,7 +251,7 @@ def test_the_panels_are_titled_in_english_and_in_spanish_as_the_old_ones():
     ]
     assert spanish == [
         "Ventas hoy",
-        "Tickets hoy",
+        "Tiques hoy",
         "Ventas últimos 7 días",
         "Actividad reciente",
     ]

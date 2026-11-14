@@ -452,7 +452,7 @@ Pasos:
    da ese mismo dato (la línea, el carrito, la factura: una línea en dólares de un negocio que cobra en yenes
    sale en dólares) y, si no da ninguna, en la del paso; un precio de una tarifa, en la de su tarifa; el
    descuento fijo de una regla, que no es de ninguna tarifa, en la del negocio; el límite de pago en efectivo o
-   de ticket de la vista previa de un cobro, en euros, la moneda en que la ley los fija, también en un negocio
+   de tique de la vista previa de un cobro, en euros, la moneda en que la ley los fija, también en un negocio
    que cobra en otra («1.000,00 €»); si no da ninguna, en la del negocio («120,50 €»). Un número que trae el aviso sale tal cual,
    porque el aviso no dice si es dinero. Lo que va a otra acción, a otro sistema o a un «Solo sigue si…» lleva
    cada dato tal cual.

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2386a08f50985b1173a23aa65cbf3629dabba793df084df47b6ab34bc25a284d -->
+<!-- generated from WORKBOOK.md sha256:a7ff5e7c5db37c823fbb6c42193195740c76ccb3a6c4c98a4878303a4193b9ed -->
 
 ## What it is for and who it is for
 
@@ -2936,8 +2936,7 @@ the customers that were lost, the deleted ones as they were, the products, the s
 appointments, the repeating appointments, the price list prices, the modifier groups of the categories and of the
 products and the menu choices of the products; making and deleting the temporary cluster is the procedure "Devolver un
 negocio a un momento" of ERPlora/aws; the price list prices of a service that comes back as a new one, hub#1459; a
-deleted modifier group, hub#1458; the menu choices of a product that comes back as a new one, hub#1473; a removed menu
-or course, hub#1474)
+deleted modifier group, hub#1458; a removed menu or course, hub#1474)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -2977,12 +2976,13 @@ Steps:
      what comes back is nothing new to the business: it starts none of its automations, so nobody is welcomed or told
      again of a booking they already had (hub#1307). Below, "What to bring back", with what can be brought ticked
      (today, **Customers**, **Product categories, Products, Product links to categories**, **Service categories,
-     Services**, **Appointments, Repeating appointments**, **Price list prices**, **Menu choices of products** and
-     **Modifier groups of categories, Modifier groups of products**). They press **Recover**.
+     Services, Service links to categories, Subcategory links to categories**, **Appointments, Repeating
+     appointments**, **Price list prices**, **Menu choices of products** and **Modifier groups of categories, Modifier
+     groups of products**). They press **Recover**.
   10. "1 separate copy will give back Customers, Product categories, Products, Product links to categories, Service
-      categories, Services, Appointments, Repeating appointments, Price list prices, Menu choices of products, Modifier
-      groups of categories, Modifier groups of products into its business within a few minutes: Recoveries says how it
-      went." appears.
+      categories, Services, Service links to categories, Subcategory links to categories, Appointments, Repeating
+      appointments, Price list prices, Menu choices of products, Modifier groups of categories, Modifier groups of
+      products into its business within a few minutes: Recoveries says how it went." appears.
       In Recoveries they
       see it "Asked" with the copy, what
       was asked and when.
@@ -3021,14 +3021,18 @@ Steps:
       keeps live that were, in the copy, in a category that has just come back go back into it, without losing any other
       (INVENTORY-F07): it is the only thing the recovery touches of what the business has, and it is counted apart, as
       "Product links to categories". A category the business keeps (even with products taken out of it) or made again by
-      hand is not filled. With Services, "Service categories: 1 created; Services: 2 created" (the
-      categories and the services that came back, each with its own count): first each service category the business no longer has (it deleted or
+      hand is not filled. With Services, "Service categories: 1 created; Services: 2 created; Service links to
+      categories: 3 created; Subcategory links to categories: 1 created" (the categories, the services and what the
+      business kept that went back into them, each with its own count): first each service category the business no longer has (it deleted or
       lost it) comes back as a new one, created as the Categories screen creates it, with its name, description, icon,
       colour and order, inside its parent category if the business has it or it comes back too (otherwise at the root);
-      the deleted one stays deleted. It comes back with what it had inside in the copy and the business keeps where
-      deleting it left it (SERVICE-F08): its services still without a category, archived ones too, and its
-      subcategories still hanging where it hung (the root, if it was at the root), each changed as the screen changes it.
-      What the business moved since (a service into another category, a subcategory elsewhere) stays where it is, and
+      the deleted one stays deleted. Last, what it had inside in the copy and the business keeps where deleting it left
+      it goes back into it (SERVICE-F08): its services still without a category, archived ones too, and its
+      subcategories still hanging where it hung (the root, if it was at the root), each changed as the screen changes it:
+      it is what the recovery touches of what the business has, and it is counted apart, as "Service links to
+      categories" and "Subcategory links to categories"; if the business moves one meanwhile, it stays where the
+      business put it and is counted "not created" with its reason (`service.service_moved`). What the business moved
+      since (a service into another category, a subcategory elsewhere) stays where it is, and
       the category's count says so ("Service categories: 1 created, 1 with notes"), with the reason in its notes
       ("service.service_moved: came back without the service <its identifier>: moved to another category since"). One
       the business has already created again (another live one with its name, case
@@ -3097,12 +3101,12 @@ Steps:
       it, and its reason says so.
       The menu choices of the products go after the products too: "Menu choices of products: 2 created". Each choice
       that in the copy offered a product live there and that the business no longer has is added again to its course,
-      as the menu builder adds it, with its supplement and, if it was sold out, sold out, so a deleted product that comes
-      back shows again in its menus at the till (COMBO-F15). One the business still has, even if it changed its
-      product, is not repeated, nor one whose product the business has offered in that course again: the business's own
-      stays. One the menu builder does not accept today (its product still deleted or deactivated, or the business
-      removed the menu or the course) does not come back and its reason says so; those of a product that comes back as
-      a new one, not yet either (hub#1473).
+      as the menu builder adds it, with its supplement and, if it was sold out, sold out, so a product that comes back,
+      the same or as a new one, shows again in its menus at the till (COMBO-F15). One the business still has, even if it
+      changed its product, is not repeated, nor one whose product the business has offered in that course again: the
+      business's own stays. One the menu builder does not accept today (its product still deleted or deactivated, or the
+      business already made another one by hand with its SKU, or removed the menu or the course) does not come back and
+      its reason says so.
 In: the chosen businesses, the temporary cluster with their copy and the moment; to recover, the made separate copy and
 what to bring back.
 Out: the business's database as it was at that moment; the one it had, kept 7 days on its server; the notice

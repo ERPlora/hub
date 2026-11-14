@@ -27,8 +27,8 @@ describe('printing catalogues (en source + es)', () => {
     expect(ES.get('printing.summary.heading')).toBe('Cola de impresión');
     expect(ES.get('printing.summary.loadError')).toBe('No se pudo leer la cola de impresión.');
     expect(ES.get('printing.summary.stalled')).toBe('En cola, sin impresora');
-    expect(ES.get('printing.settings.heading')).toBe('Ajustes del ticket');
-    expect(ES.get('printing.settings.fields.print_receipt_on_sale')).toBe('Imprimir ticket al cobrar');
+    expect(ES.get('printing.settings.heading')).toBe('Ajustes del tique');
+    expect(ES.get('printing.settings.fields.print_receipt_on_sale')).toBe('Imprimir tique al cobrar');
     expect(ES.get('printing.settings.fields.open_drawer_on_sale')).toBe('Abrir cajón al cobrar');
     expect(ES.get('printing.settings.save')).toBe('Guardar ajustes');
     expect(ES.get('printing.settings.receiptText')).toBe(

@@ -3066,8 +3066,7 @@ clientes que se perdieron, los eliminados tal como eran, los productos, los serv
 las citas periódicas, los precios de tarifa, los grupos de suplementos de las categorías y de los productos y las
 elecciones de menú de los productos; crear y borrar el clúster temporal es el procedimiento «Devolver un negocio a un
 momento» de ERPlora/aws; los precios de tarifa de un servicio que vuelve como uno nuevo, hub#1459; un grupo de
-suplementos borrado, hub#1458; las elecciones de menú de un producto que vuelve como uno nuevo, hub#1473; un menú o un
-plato retirado, hub#1474)
+suplementos borrado, hub#1458; un menú o un plato retirado, hub#1474)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
 copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
@@ -3105,12 +3104,14 @@ Pasos:
      nuevo para el negocio: no arranca ninguna de sus automatizaciones, así que a nadie se le da la bienvenida ni se le
      avisa otra vez de una cita que ya tenía (hub#1307).
      Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes**, **Categorías de productos,
-     Productos, Enlaces de productos a categorías**, **Categorías de servicios, Servicios**, **Citas, Citas
-     periódicas**, **Precios de tarifa**, **Elecciones de menú de productos** y **Grupos de suplementos de categorías,
-     Grupos de suplementos de productos**). Pulsa **Recuperar**.
+     Productos, Enlaces de productos a categorías**, **Categorías de servicios, Servicios, Enlaces de servicios a
+     categorías, Enlaces de subcategorías a categorías**, **Citas, Citas periódicas**, **Precios de tarifa**,
+     **Elecciones de menú de productos** y **Grupos de suplementos de categorías, Grupos de suplementos de
+     productos**). Pulsa **Recuperar**.
   10. Sale «1 copia aparte devolverá Clientes, Categorías de productos, Productos, Enlaces de productos a categorías,
-      Categorías de servicios, Servicios, Citas, Citas periódicas, Precios de tarifa, Elecciones de menú de productos,
-      Grupos de suplementos de categorías, Grupos de suplementos de productos a su negocio en unos minutos:
+      Categorías de servicios, Servicios, Enlaces de servicios a categorías, Enlaces de subcategorías a categorías,
+      Citas, Citas periódicas, Precios de tarifa, Elecciones de menú de productos, Grupos de suplementos de categorías,
+      Grupos de suplementos de productos a su negocio en unos minutos:
       Recuperaciones dice cómo
       fue.». En
       Recuperaciones la ve «Pedida» con la copia, qué se pidió y cuándo.
@@ -3152,14 +3153,18 @@ Pasos:
       recuperación toca de lo que el negocio tiene, y se cuenta aparte, como «Enlaces de productos a categorías». Una
       categoría que el negocio conserva (aunque le quitara productos) o que volvió a crear a mano no se rellena. Con
       Servicios,
-      «Categorías de servicios: se creó 1; Servicios: se crearon 2» (las categorías y los servicios que volvieron, cada uno
-      con su cuenta): primero
+      «Categorías de servicios: se creó 1; Servicios: se crearon 2; Enlaces de servicios a categorías: se crearon 3;
+      Enlaces de subcategorías a categorías: se creó 1» (las categorías, los servicios y lo que el negocio conservaba y
+      volvió a ellas, cada uno con su cuenta): primero
       vuelve cada categoría de servicios que el negocio ya no tiene (la eliminó o la perdió), como una nueva, creada como
       la crea la pantalla de Categorías, con su nombre, descripción, icono, color y orden, dentro de su categoría padre si
-      el negocio la tiene o vuelve también (si no, en la raíz); la eliminada sigue eliminada. Vuelve con lo que tenía
-      dentro en la copia y el negocio conserva donde lo dejó eliminarla (SERVICE-F08): sus servicios que siguen sin
-      categoría, archivados también, y sus subcategorías que siguen colgando de donde colgaba ella (la raíz, si estaba en
-      la raíz), cada uno cambiado como lo cambia la pantalla. Lo que el negocio movió después (un servicio en otra
+      el negocio la tiene o vuelve también (si no, en la raíz); la eliminada sigue eliminada. Al final vuelve a ella lo
+      que tenía dentro en la copia y el negocio conserva donde lo dejó eliminarla (SERVICE-F08): sus servicios que siguen
+      sin categoría, archivados también, y sus subcategorías que siguen colgando de donde colgaba ella (la raíz, si estaba
+      en la raíz), cada uno cambiado como lo cambia la pantalla: es lo que la recuperación toca de lo que el negocio
+      tiene, y se cuenta aparte, como «Enlaces de servicios a categorías» y «Enlaces de subcategorías a categorías»; si
+      el negocio lo mueve mientras tanto, se queda donde lo puso y se cuenta «sin crear» con su porqué
+      (`service.service_moved`). Lo que el negocio movió después (un servicio en otra
       categoría, una subcategoría en otro sitio) se queda donde está, y la cuenta de la categoría lo dice («Categorías de
       servicios: se creó 1, 1 con notas»), con el porqué en sus notas («service.service_moved: volvió sin el servicio <su
       identificador>: se movió a otra categoría después»). Una que el negocio ya volvió
@@ -3227,11 +3232,10 @@ Pasos:
       Las elecciones de menú de los productos van también después de los productos: «Elecciones de menú de productos:
       se crearon 2». Cada elección que en la copia ofrecía un producto vivo allí y que el negocio ya no tiene se vuelve a
       añadir a su plato, como la añade el constructor del menú, con su suplemento y, si estaba agotada, agotada, así que
-      un producto eliminado que vuelve sale otra vez en sus menús del TPV (COMBO-F15). No se repite una que el negocio aún
-      tiene, aunque le cambiara el producto, ni una cuyo producto el negocio ya volvió a ofrecer en ese plato: se queda la
-      suya. Una que el constructor no acepta hoy (su producto sigue eliminado o está desactivado, o el negocio retiró el
-      menú o el plato) no vuelve y su motivo lo dice; las de un producto que vuelve como uno nuevo, tampoco todavía
-      (hub#1473).
+      un producto que vuelve, el mismo o como uno nuevo, sale otra vez en sus menús del TPV (COMBO-F15). No se repite una
+      que el negocio aún tiene, aunque le cambiara el producto, ni una cuyo producto el negocio ya volvió a ofrecer en ese
+      plato: se queda la suya. Una que el constructor no acepta hoy (su producto sigue eliminado o está desactivado, o el
+      negocio ya hizo otro a mano con su SKU, o retiró el menú o el plato) no vuelve y su motivo lo dice.
 Entra: los negocios elegidos, el clúster temporal con su copia y el momento; para recuperar, la copia aparte hecha y qué
 recuperar.
 Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso

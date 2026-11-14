@@ -522,7 +522,7 @@ foto no carga, enseña sus iniciales.
 Implicados: COMBO-F03, COMBO-F04, COMBO-F07, INVENTORY-F30, INVENTORY-F31, INVENTORY-F32
 
 ### COMBO-F15 Recuperar las elecciones de un producto desde una copia aparte
-<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus elecciones en los menús) gh:hub#1343 -->
+<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus elecciones en los menús) gh:hub#1343 gh:hub#1473 -->
 Estado: hecho
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide (BASE-F114)
 Pantalla: ninguna de Menús: en el admin de Hubs, Copias aparte › «Recuperar en el negocio…», con **Elecciones de menú de
@@ -533,7 +533,9 @@ Pasos:
    sus elecciones.
 2. Cada elección que en la copia ofrecía un producto vivo en ella y que el negocio ya no tiene se vuelve a añadir a su
    plato, como la añade el constructor del menú (COMBO-F06): con su suplemento y, si en la copia estaba agotada, agotada
-   (COMBO-F12). Entra al final del plato, en el orden que tenía en la copia.
+   (COMBO-F12). Entra al final del plato, en el orden que tenía en la copia. Un producto que el negocio ya no tenía en
+   absoluto vuelve como uno nuevo, con otro identificador (INVENTORY-F01): sus elecciones se añaden a ese, el que la
+   recuperación hizo con su SKU.
 3. Recuperaciones lo cuenta aparte: «Elecciones de menú de productos: se crearon 2».
 Entra: la copia aparte y lo que el negocio tiene hoy.
 Sale: una elección por cada una que faltaba, con su aviso de elección nueva (`combo.option.created`) hecho por la
@@ -544,13 +546,14 @@ Si falla: una elección que el negocio aún tiene se queda como está, aunque de
 repite una cuyo producto el negocio ya volvió a ofrecer en ese plato: se queda la suya, con su suplemento, y pedirlo otra
 vez no añade nada dos veces. Una elección que el negocio quitó a mano después de la copia también vuelve, como todo lo
 que el negocio ya no tiene (BASE-F114). Lo que el constructor no acepta hoy no vuelve y Recuperaciones dice por qué, por
-el identificador de la elección en la copia: un producto que sigue eliminado (no se recuperó Productos, o el negocio ya
-hizo otro con su SKU) («invalid_field: …»), desactivado o que ya no se vende por unidades (`combo.product_inactive`,
+el identificador de la elección en la copia: un producto que sigue eliminado o que el negocio ya no tiene (no se
+recuperó Productos, o el negocio ya hizo otro a mano con su SKU, que se queda con las elecciones que él le dio)
+(«invalid_field: …»), desactivado o que ya no se vende por unidades (`combo.product_inactive`,
 `combo.product_not_by_unit`), un plato lleno (`combo.too_many_options`), o un menú o un plato que el negocio retiró
-después («not_found: …»); un menú o un plato retirado no se recupera desde la copia (hub#1474). Un producto que el negocio
-ya no tenía en absoluto vuelve como uno nuevo, con otro identificador (INVENTORY-F01), y sus elecciones de la copia no
-vuelven con él (hub#1473).
-Implicados: BASE-F114, INVENTORY-F34, COMBO-F06, COMBO-F12, COMBO-F13
+después («not_found: …»); un menú o un plato retirado no se recupera desde la copia (hub#1474). El producto que hizo una
+recuperación se reconoce por su SKU la hiciera esta u otra anterior: pedida otra vez desde una copia anterior, le vuelve
+a ofrecer en sus platos las elecciones que el negocio le quitó después, como todo lo que ya no tiene.
+Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F34, COMBO-F06, COMBO-F12, COMBO-F13
 
 ## Servicios: lo que entra y lo que sale
 
@@ -721,9 +724,11 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   migración depende de `inventory 0001` y `tax 0005`.
 - **Desde una copia aparte** (BASE-F114, F15): `recoverable_from_copy` de `apps.py` declara una sola cosa, «Menu choices
   of products». `queries.options_in_copy` lee con su propio SQL las `ChoiceOption` de la copia de un producto no borrado
-  allí, plato a plato en su orden, y `queries.options_not_in_business` deja las que el negocio no tiene ni por id (una
-  elección puede cambiar de producto, nunca de plato) ni por sitio (plato y producto, el índice único
-  `combo_option_product_unique`); la plataforma las crea con `combo.option.create` como la recuperación
+  allí, plato a plato en su orden, con el SKU del producto allí, y `queries.options_not_in_business` pone cada una en el
+  producto que hace de él en el negocio (`apps.inventory.queries.products_standing_for`, la misma pareja que Tarifas y
+  Suplementos: el mismo mientras vive; si no, el vivo con su SKU que hizo una recuperación, `base.recovery.brought_back`;
+  uno hecho a mano con su SKU no recibe nada) y deja las que el negocio no tiene ni por id (una elección puede cambiar de
+  producto, nunca de plato) ni por sitio (plato y producto, el índice único `combo_option_product_unique`); la plataforma las crea con `combo.option.create` como la recuperación
   (`copy_recovery:<id>`), y lo que `create` rechaza sale «sin crear» con su motivo. A `inventory.product.restored` no
   reacciona: `live.py` solo repinta con él. Pruebas: `tests/test_recovery.py`.
 - Modelos: `Combo` (precio en céntimos ≥ 0; `supply_kind` `service` | `goods`; restricción: `service`

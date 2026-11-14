@@ -36,7 +36,7 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
 describe('DiscountSheet: the ticket', () => {
   it('is «Ticket discount», in percent, with «%» and the currency to choose', async () => {
     const m = await setup({}, 'es');
-    expect(m.find('pos-discount-title').text()).toBe('Descuento del ticket');
+    expect(m.find('pos-discount-title').text()).toBe('Descuento del tique');
     const options = m.find('pos-discount-mode').findAll('ion-segment-button').map((b) => (b.element as HTMLElement & { value?: string }).value);
     expect(options).toEqual(['percent', 'amount']);
     expect(m.find('pos-discount-mode').findAll('ion-label').map((l) => l.element.innerHTML.trim())).toEqual(['%', '€']);

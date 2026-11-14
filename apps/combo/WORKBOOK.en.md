@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:189bb6eb04763559f7d7bf42c93255174b908dec2c79b5932cc1a9350514b3d8 -->
+<!-- generated from WORKBOOK.md sha256:e604d28439236af9754d2d15c32956bf3b22395eba17c9f108ff4e0b87317366 -->
 
 ## What it is for and who it is for
 
@@ -507,7 +507,9 @@ Steps:
    in whatever order it is asked: a deleted product that comes back is already live when its choices are given back.
 2. Each choice that in the copy offered a product live in it and that the business no longer has is added again to its
    course, as the menu builder adds it (COMBO-F06): with its supplement and, if it was sold out in the copy, sold out
-   (COMBO-F12). It goes at the end of the course, in the order it had in the copy.
+   (COMBO-F12). It goes at the end of the course, in the order it had in the copy. A product the business no longer had
+   at all comes back as a new one, with another identifier (INVENTORY-F01): its choices are added to that one, the one
+   the recovery made with its SKU.
 3. Recoveries counts it apart: "Menu choices of products: 2 created".
 In: the separate copy and what the business has today.
 Out: a choice for each one that was missing, with its new-choice notice (`combo.option.created`) made by the recovery,
@@ -517,13 +519,14 @@ If it fails: a choice the business still has stays as it is, even if its product
 product the business has offered in that course again is not repeated: the business's own stays, with its supplement,
 and asking again adds nothing twice. A choice the business removed by hand after the copy comes back too, like
 everything the business no longer has (BASE-F114). What the menu builder does not accept today does not come back and
-Recoveries says why, by the choice's identifier in the copy: a product that stays deleted (Products was not recovered,
-or the business already made another one with its SKU) ("invalid_field: …"), deactivated or no longer sold by units
-(`combo.product_inactive`, `combo.product_not_by_unit`), a full course (`combo.too_many_options`), or a menu or a
-course the business removed afterwards ("not_found: …"); a removed menu or course is not recovered from the copy
-(hub#1474). A product the business no longer had at all comes back as a new one, with another identifier
-(INVENTORY-F01), and its choices in the copy do not come back with it (hub#1473).
-Involved: BASE-F114, INVENTORY-F34, COMBO-F06, COMBO-F12, COMBO-F13
+Recoveries says why, by the choice's identifier in the copy: a product that stays deleted or that the business no
+longer has (Products was not recovered, or the business already made another one by hand with its SKU, which keeps the
+choices it gave it) ("invalid_field: …"), deactivated or no longer sold by units (`combo.product_inactive`,
+`combo.product_not_by_unit`), a full course (`combo.too_many_options`), or a menu or a course the business removed
+afterwards ("not_found: …"); a removed menu or course is not recovered from the copy (hub#1474). The product a recovery
+made is recognised by its SKU, whether this recovery or an earlier one made it: asked again from an earlier copy, it is
+offered again in its courses the choices the business took from it afterwards, like everything it no longer has.
+Involved: BASE-F114, INVENTORY-F01, INVENTORY-F34, COMBO-F06, COMBO-F12, COMBO-F13
 
 ## Services: what goes in and what comes out
 

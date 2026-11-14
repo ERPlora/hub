@@ -43,7 +43,7 @@ teclearla y la línea pagada con un bono).
 | Usa de otras apps | por nombre y sin requisito: el catálogo de Inventario, los grupos de Suplementos, los menús de Menús y combos, los servicios, asignaciones y sesiones de bono de Servicios, el documento fiscal de Facturación, la sesión de Caja, las mesas de Mesas, la cita de Citas y el equipo de Personal; sin la app, su parte no aparece o se rechaza con su motivo |
 | Quién la lee | Inventario y Clientes (avisos de venta cobrada, anulada y devuelta), Facturación (la requiere: venta, líneas y devoluciones), Caja (la requiere: las ventas de cada turno), Cocina (las comandas), Mesas y Citas (abren y mueven cuentas con sus operaciones) |
 | Pantallas | `/sale/pos`, `/sale/sales`, `/sale/quick-notes`, `/sale/departments` y `/sale/settings` |
-| Inicio | los paneles «Ventas hoy», «Tickets hoy», «Ventas últimos 7 días» y «Actividad reciente» |
+| Inicio | los paneles «Ventas hoy», «Tiques hoy», «Ventas últimos 7 días» y «Actividad reciente» |
 | Operaciones | 21 consultas (`queries.py`) y 43 acciones (`services.py`), todas con `ai=`; 58 con ruta en `/api/sale/…` (sin ruta: las reacciones `sale.customer.reassign` y `sale.sale.record_invoice`, solo el sistema, y `sale.record.get`, `sale.sale.voucher_sold`, `sale.sale.voucher_unsold` y `sale.voucher_session.record`) |
 | Eventos | 24 propios (`sale.sale.*`, `sale.voucher_session.recorded`, `sale.order.*`, `sale.payment_method.created`, `sale.settings.updated`, `sale.department.*` y `sale.quick_note.*`; `events.py`); reacciona a `customer.customer.merged` y a `invoice.invoice.issued` |
 | Migraciones | `0001_initial` … `0017_vouchersession` |

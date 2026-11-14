@@ -2,7 +2,8 @@
 Prefijo: SALE
 Alcance MVP: núcleo
 Estado de la app: completa (2026-10-31)
-Lo que no entra todavía: ver «Lo que queda fuera» (la propina, SALE-G06, descartada con su issue).
+Lo que no entra todavía: ver «Lo que queda fuera». La propina (SALE-G06) es de la app Propinas (`tip`), que añade
+su paso al cobro (SALE-F39, no hecho).
 
 > Manual de usuario y especificación de la app `sale`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -133,7 +134,7 @@ zonas:
   «Atiende …» y «Falta el cliente». Cada línea: nombre, precio por unidad, marca de descuento o
   «Invitación», nota y profesional debajo; botones de descuento, nota, invitación y el selector de
   cantidad (una línea enviada a cocina solo enseña su cantidad, «Comanda N» y el botón ⊗ «Anular
-  este artículo»; una pagada con bono, «Ya pagado · <bono>», 0,00 € y solo el botón de quitarla). Pie: la fila «Descuento del ticket» si lo hay, «Total» (el que calcula el
+  este artículo»; una pagada con bono, «Ya pagado · <bono>», 0,00 € y solo el botón de quitarla). Pie: la fila «Descuento del tique» si lo hay, «Total» (el que calcula el
   servidor), el botón de descuento, la impresora («Imprimir cuenta») y «Cobrar · <importe>». En el
   cajón del móvil la barra de arriba y el pie con «Cobrar» se quedan siempre a la vista, encima de la
   barra de pestañas, también en un teléfono de 320×568; lo de en medio (título, chips, pestañas y
@@ -172,7 +173,8 @@ de alto fijo con lo que le falta al importe («Marca en el teclado el importe en
 o, en su sitio, el «Cambio» en grande, y el teclado, que no se mueve mientras se teclea (hub#456); con otro medio,
 «Importe exacto» y «Cobra <importe> en el datáfono y confirma.»; «Repartir el cobro» y «Añadir este cobro». Pie: el
 motivo si no se puede cobrar (los del importe entregado van encima del teclado) y «Cobrar <importe>»
-(«Cobrando…» mientras va); con la caja cerrada y efectivo, el rechazo y «Abrir sesión de caja».
+(«Cobrando…» mientras va); con la caja cerrada y efectivo, el rechazo y «Abrir sesión de caja». Con una app que
+añade un paso al cobro (hoy, Propinas), su fila sale entre el importe y los medios de pago (SALE-F39).
 
 ### Cuentas abiertas
 Desplegable del icono de tique de la cuenta: «Aparcar esta cuenta» con su explicación, «Cuentas
@@ -182,11 +184,11 @@ de las filas. Se cierra tocando fuera, con Esc o con el botón atrás del móvil
 
 ### Cuenta (precuenta)
 Ventana «Cuenta» que abre la impresora del pie: el papel que se lleva a la mesa, con el aviso «Cuenta
-— no es una factura. El tiquet fiscal se entrega al cobrar.», y los botones de imprimir y cerrar.
+— no es una factura. El tique fiscal se entrega al cobrar.», y los botones de imprimir y cerrar.
 
 ### Ventas
-Título «Ventas», periodo («Hoy», «7 días», «30 días», «Todo»), seis cifras («Tickets», «Ingresos»,
-«Ticket medio», «IVA», «Descuentos», «Anuladas») y la tabla (Fecha, Número, Cliente, Pago, Estado,
+Título «Ventas», periodo («Hoy», «7 días», «30 días», «Todo»), seis cifras («Tiques», «Ingresos»,
+«Tique medio», «IVA», «Descuentos», «Anuladas») y la tabla (Fecha, Número, Cliente, Pago, Estado,
 Total) con el buscador «Buscar número o cliente…», filtros, vista tabla o tarjetas, 50 por página.
 Por fila: «Documento», «Reimprimir», «Anular» y «Devolver», cada una donde aplica; quien no tiene el
 permiso de anular o de devolver también las ve, y un responsable se lo aprueba con su PIN. Vacía: «Aún
@@ -194,7 +196,7 @@ no hay ventas.»; cargando: «Cargando…»; error: el aviso con «Reintentar».
 
 ### Documento de venta
 Ventana del tique de una venta: el papel tal como se imprime (título «Tique» o «Factura», el negocio con su NIF,
-el número que le dio Facturación —«Factura FACT-2026-000012», «Tiquet TICKET-2026-000031»— o, sin
+el número que le dio Facturación —«Factura FACT-2026-000012», «Tique TICKET-2026-000031»— o, sin
 él, el de la venta, fecha, líneas, una fila de IVA por clave fiscal, total, forma de pago, entregado y
 cambio, pie), la ✕ y la impresora. Toda impresión desde **Ventas** sale con «DUPLICADO». Error:
 «Error cargando el documento».
@@ -287,6 +289,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | SALE-F36 | Preparar las notas rápidas | común | hecho |
 | SALE-F37 | Añadir un medio de pago (Bizum, transferencia…) | común | hecho |
 | SALE-F38 | Vender un servicio de Servicios | peluquería | hecho |
+| SALE-F39 | Cobrar con lo que añade otra app (la propina) | común | no hecho |
 
 ### SALE-F01 Vender y cobrar en efectivo
 <!-- origen: qa:verticals/beauty/05-sale-upsell-and-payment wf:restaurante-dia#rec_restaurante-f06 wf:restaurante-dia#rec_restaurante-f11 wf:restaurante-dia#rec_restaurante-f17 wf:cadena-fiscal#rec_fiscal-f02 qa:verticals/restaurant/07-payment-and-fiscal fi:modules/sales#command-sales-complete_sale-handler-wasm-complete_sale fi:modules/sales#event-emitidos-consumidos fi:modules/sales#navigation old:sales/workflow/vender-y-cobrar.md#sales-f01 qa:modules/sales/cash-payment-with-change qa:modules/sales/quick-counter-sale -->
@@ -672,11 +675,11 @@ Actor: empleado, responsable; por encima del máximo, el cajero con la aprobaci�
 Pantalla: Vender, Hace falta una aprobación
 Pasos:
 1. Para una línea, toca su etiqueta de precio («Descuento en la línea»); para toda la cuenta, el botón
-   de etiqueta del pie («Descuento del ticket»).
+   de etiqueta del pie («Descuento del tique»).
 2. Marca el porcentaje; en la cuenta puedes cambiar a importe fijo con el botón de la moneda del negocio
    («€», «zł»…).
 3. Pulsa «Aplicar −N %» (o «Aplicar −<importe>»). «Quitar» lo borra. La línea enseña «−N %» y el pie
-   la fila «Descuento del ticket −N %» con lo que el descuento de la cuenta quita, sea porcentaje o
+   la fila «Descuento del tique −N %» con lo que el descuento de la cuenta quita, sea porcentaje o
    importe fijo: un 10 % sobre 8,50 € dice «−0,85 €», nunca «−0,00 €». Lo calcula el servidor (la
    valoración del cobro, `ticket_discount_amount`) sobre las líneas ya con su propio descuento.
 4. Si el descuento pasa del máximo que el negocio deja dar sin autorización, lo da un responsable: quien
@@ -897,7 +900,7 @@ Pasos:
 1. Con la cuenta en pantalla, pulsa la impresora del pie («Imprimir cuenta»).
 2. Se abre «Cuenta» con el negocio (nombre, domicilio y NIF del emisor de hoy, con la «Cabecera del
    recibo» debajo como añadido; sin emisor, como dice SALE-F29), las líneas, notas, descuentos, el
-   desglose de IVA, el total y el título, y el aviso «Cuenta — no es una factura. El tiquet fiscal se entrega al cobrar.». Con descuento en la
+   desglose de IVA, el total y el título, y el aviso «Cuenta — no es una factura. El tique fiscal se entrega al cobrar.». Con descuento en la
    cuenta, la fila «Descuento» dice lo que quita (el mismo importe que el pie del TPV, SALE-F14): con
    precios con IVA, las líneas menos el descuento dan el total.
 3. Pulsa la impresora de arriba: con **Impresión** y una impresora de tiques activa, la cuenta va a su
@@ -1056,7 +1059,7 @@ Pantalla: Ventas
 Pasos:
 1. Abre **Ventas / TPV → Ventas**. Arriba, el periodo («Hoy» por defecto, «7 días», «30 días»,
    «Todo»), contado en el día del negocio.
-2. Las cifras del periodo: «Tickets», «Ingresos», «Ticket medio», «IVA», «Descuentos» y «Anuladas».
+2. Las cifras del periodo: «Tiques», «Ingresos», «Tique medio», «IVA», «Descuentos» y «Anuladas».
    «Ingresos» ya resta lo devuelto. La cifra del impuesto lleva el nombre del impuesto con que se
    declararon las ventas del periodo: «IVA», «IGIC» si todas se cobraron con IGIC (Canarias) o «IPSI»
    (Ceuta y Melilla). Si en el periodo hay ventas de dos impuestos (porque el negocio cambió de
@@ -1069,7 +1072,7 @@ Pasos:
 4. Toca una fila para ver su documento (SALE-F29). La tabla se recarga sola cuando se cobra, anula o
    devuelve una venta.
 5. Las cifras de hoy también están en el **Inicio**, en el tablero, como en el producto actual: «Ventas
-   hoy» y «Tickets hoy» salen de entrada; «Ventas últimos 7 días» (una barra por día, de más antiguo a
+   hoy» y «Tiques hoy» salen de entrada; «Ventas últimos 7 días» (una barra por día, de más antiguo a
    hoy) y «Actividad reciente» (las ocho últimas ventas, la más nueva arriba, con su número y su
    cliente) se añaden con ⋮ («Personalizar panel»). Se ponen al día solos al cobrar, anular o devolver
    una venta, sin recargar. Quien no tiene permiso de informes solo puede poner «Actividad reciente».
@@ -1120,7 +1123,7 @@ Pasos:
    recibo» debajo como añadido, sin repetir lo que el emisor ya dice. Sin emisor configurado, la primera
    línea de la cabecera es el nombre y el resto el domicilio; sin cabecera, el nombre con el que se dio de
    alta el negocio. En una factura, bajo «Cliente», su NIF y su domicilio. Luego, el número que le
-   dio Facturación en el cobro («Factura FACT-2026-000012», «Tiquet TICKET-2026-000031»; sin
+   dio Facturación en el cobro («Factura FACT-2026-000012», «Tique TICKET-2026-000031»; sin
    Facturación, o mientras su documento está pendiente, el número de la venta), fecha, líneas, una fila
    de IVA por clave fiscal (un exento dice su causa: «Exento (E1)»), total, forma de pago, entregado y
    cambio, y el pie. Con **VeriFactu**, antes del pie va el QR fiscal: «QR tributario:» encima,
@@ -1398,13 +1401,43 @@ Si la moneda no se puede leer, la hoja lo dice («No se ha podido leer la moneda
 y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Añadir <importe>» y «Usar <precio>» se encienden (hub#938).
 Implicados: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
+### SALE-F39 Cobrar con lo que añade otra app (la propina)
+<!-- origen: nuevo (hub#562; SALE-G06 del registro de la migración) -->
+Estado: no hecho — la hoja Cobro todavía no pinta pasos de otras apps ni la venta guarda lo cobrado de más
+(hub#1497, hub#1500, hub#1502)
+Vertical: común
+Actor: empleado, responsable
+Pantalla: Cobro, Documento de venta
+Pasos:
+1. Con una app encendida que añade un paso al cobro (hoy solo Propinas, con «Pedir propina al cobrar»), la hoja
+   **Cobro** pinta su fila entre el importe y los medios de pago (la de Propinas, TIP-F02). Sin ninguna, la hoja es
+   la de siempre.
+2. Lo que el paso añade se cobra junto con la venta, pero fuera de ella: el importe grande dice «<total> + <propina>
+   de propina»; con tarjeta, «Cobra <total + propina> en el datáfono y confirma.» y el botón «Cobrar <total +
+   propina>»; en efectivo, lo entregado tiene que cubrir las dos cosas y el cambio las descuenta. Con «Repartir el
+   cobro», cada cobro lleva lo suyo y «Restante» cuenta solo la venta.
+3. Cobra. Se abre el **Documento de venta**: el tique es el de siempre (líneas, IVA y total de la venta) y, en el
+   bloque del pago, debajo de «Entregado», sale la línea «Propina <importe>» antes del «Cambio».
+Entra: los pasos que declaran las apps activas y lo que cada uno añade a cada cobro.
+Sale: la venta con su base, su IVA y su total **sin la propina**: el tique, la factura de Facturación y su
+registro de VeriFactu son los mismos que sin ella (INVOICE-F01), porque la propina voluntaria no es precio y no
+lleva IVA (ver «Por qué la propina no entra en el tique» en el manual de Propinas). La venta guarda aparte, en cada
+cobro, lo cobrado de más y su nombre, para cuadrar lo entregado y el cambio y para el papel, y el aviso de venta
+cobrada lo lleva aparte; las cifras de **Ventas** (SALE-F28) no lo suman. Lo suyo lo guarda la app del paso
+(TIP-F02).
+Si falla: si la app del paso se apaga con la hoja abierta, la fila desaparece y se cobra sin ella. Si la venta se
+cobra y el paso no consigue guardar lo suyo, la venta queda cobrada y la hoja dice el aviso del paso con
+«Reintentar» (TIP-F02); el reintento usa la misma clave del intento y no cobra dos veces (SALE-F06). El tope del
+tique (3.000 €) y el del efectivo (1.000 €) miran el total de la venta, como siempre: la propina no es precio.
+Implicados: TIP-F02, TIP-F03, TIP-F04, CASH_REGISTER-F18, INVOICE-F01
+
 ## Qué comparten los verticales
 
 | Pieza compartida | Flujos que la usan |
 |---|---|
 | El cobro: mismo precio del servidor, mismo IVA, mismos rechazos y el mismo aviso de venta cobrada que escuchan Inventario y Clientes | F01–F06, F22, F26 |
 | La cuenta abierta y sus líneas: el precio se congela al añadir la línea; aparcar, recuperar y cita son la misma cuenta | F09–F18, F22–F24, F26 |
-| La hoja **Cobro**: medios, teclado, tique o factura, datos del cliente | F01–F05, F22 |
+| La hoja **Cobro**: medios, teclado, tique o factura, datos del cliente y los pasos de otras apps | F01–F05, F22, F39 |
 | La marca de líneas: sirve para cobrar una parte y para dividir la cuenta | F22, F23 |
 | El chip «Atiende» y el sello de la línea | F16, F20, F26 |
 | La anulación de una venta: un solo aviso, y cada app que reacciona decide su efecto | F30 |
@@ -1432,6 +1465,7 @@ diciendo cuáles (409 `*_ambiguous`).
 | Lo vendido cada uno de los últimos 7 días | informes | F28 | `sale.sale.last_7_days` |
 | Lo vendido por cada profesional en un periodo: bruto, base, impuesto, lo devuelto de sus líneas, lo que queda, lo que pagó bonos que vendió, lo que valen las sesiones de bono que hizo y su producción (sobre la que va la comisión) | informes | F16, F28 | `sale.sale.by_staff` |
 | Lo que cobraría una cuenta, o unas líneas, sin cobrar nada (total, base, IVA, descuentos, desglose y líneas) | ver ventas | F01, F21, F22 | `sale.checkout.preview` |
+| Los pasos que las apps activas añaden al cobro (hoy, la propina de Propinas), sin saber cuáles son | ver ventas | F39 | `sale.checkout.steps` |
 | Las cuentas abiertas (o de otro estado), con búsqueda por título y páginas | ver ventas | F17 | `sale.order.list` |
 | Una cuenta con sus líneas sin cobrar | ver ventas | F17, F19 | `sale.order.get` |
 | Los medios de pago activos, con los que permite hoy el negocio | ver medios de pago | F02, F03 | `sale.payment_method.list` |
@@ -1910,7 +1944,7 @@ es una línea.
     medio de pago por nombre o tipo, sección y nota por nombre (409 `*_ambiguous` si casan
     varios).
 12. **El cajero** es un empleado: monta la cuenta y cobra.
-13. **Las cifras del panel de inicio** («Ventas hoy», «Tickets hoy», «Ventas últimos 7 días»,
+13. **Las cifras del panel de inicio** («Ventas hoy», «Tiques hoy», «Ventas últimos 7 días»,
     «Actividad reciente») vuelven al tablero del Inicio, como en el producto actual (ronda PLAN-HUB
     2026-10-21, que deroga el «no tienen dónde pintarse» anterior): son los `widgets` del
     `LiveAppConfig` sobre `sale.sale.today`, `sale.sale.last_7_days` y `sale.sale.list` (ocho, la más
@@ -1997,7 +2031,8 @@ es una línea.
   VeriFactu.
 - No mueve stock ni cuadra la caja: Inventario al oír la venta; Caja lee las ventas de cada turno.
 - No habla con el datáfono ni con la báscula.
-- No tiene propinas (SALE-G06, hub#562), ni comensal por línea, ni cursos con retención.
+- No guarda propinas: son de la app Propinas (`tip`), que añade su paso al cobro (SALE-F39, TIP-F02). Tampoco
+  tiene comensal por línea ni cursos con retención.
 - No marca artículos como agotados («86»): es un dato del artículo, de Inventario; el TPV enseña en gris
   con «Agotado» lo que Inventario tiene agotado y no deja pedirlo (`sale.product_sold_out`), pero cobra lo
   que ya estaba pedido (SALE-F07, INVENTORY-F29; el «86» del QA viejo, SALE-G05, queda cubierto así).
@@ -2028,9 +2063,9 @@ es una línea.
   (se abre desde el plano, TABLE-F11, o desde **Cuentas abiertas**); y el icono relleno `grid` del botón
   con mesa (no está registrado en `packages/ui`: se pinta `grid-outline` en color).
 
-- **Cobrar con propina** (SALE-G06): un flujo nuevo que cruza Ventas y Caja y que nunca entra en la base ni
-  en el IVA del tique; el producto la aplazó tras el MVP (pm#100). Mientras, la propina en efectivo se anota
-  en Caja como «Entrada» (CASH_REGISTER-F05). Issue hub#562.
+- **Cobrar con propina** (SALE-G06): ya no es «fuera del MVP». Es la app nueva Propinas (`tip`, su
+  `WORKBOOK.md`), con el paso del cobro que pinta Ventas (SALE-F39), las dos `no hecho`; el código va por las
+  issues hijas de hub#562. Mientras, la propina en efectivo se anota en Caja como «Entrada» (CASH_REGISTER-F05).
 
 ### Dudas abiertas
 
