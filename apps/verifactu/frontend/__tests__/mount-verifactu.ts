@@ -5,7 +5,7 @@
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Component } from 'vue';
 
-import { mountInShell, type MountOptions, overBase } from '../../../../base/frontend/__tests__/mount-in-shell';
+import { type BusinessMountOptions, mountInShell, overBase } from '../../../../base/frontend/__tests__/mount-in-shell';
 import { ComposableHost } from './composable-host';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
@@ -40,6 +40,10 @@ export const EMPLOYEE: SessionMe = {
   ...OWNER,
   permissions: ['verifactu.view_record', 'verifactu.add_record', 'invoice.view_invoice'],
 };
+
+/** What a test mounts a screen with; Records reads its total in the business's money, so a test can say how the
+ *  business answers. */
+export type MountOptions = BusinessMountOptions;
 
 export async function mountVerifactu(component: Component, options: MountOptions = {}) {
   return mountInShell(component, options, { path: '/verifactu/records', session: OWNER, messages: overBase(en, es), inDocFrom: 'component' });
