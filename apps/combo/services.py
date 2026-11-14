@@ -378,7 +378,7 @@ def recover_combo(ctx: OperationContext, data: ComboRecoverIn) -> dict:
     made = create_combo(ctx, ComboIn.model_validate(data.model_dump(include=set(ComboIn.model_fields))))
     Combo.objects.filter(pk=made.id).update(stands_for=data.stands_for)
     if image := images.from_copy(ctx, data.image):
-        _change_image(ctx, find_combo(made.id, None, lock=True), image)
+        _change_image(ctx, find_combo(made.id, None), image)
     return load_detail(made.id, ctx.scope)
 
 

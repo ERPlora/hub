@@ -192,20 +192,20 @@ def test_a_choice_of_a_course_gone_goes_to_the_one_a_recovery_made_again_for_it(
 
 @pytest.mark.django_db
 def test_the_copy_gives_each_menu_with_what_its_recover_takes():
+    day = make_combo("Menu of the day", sort_order=1)
     takeaway = make_combo(
-        "Sandwich and beer", price=900, supply_kind="goods", kitchen_name="SANDWICH", sort_order=1, is_active=False,
+        "Sandwich and beer", price=900, supply_kind="goods", kitchen_name="SANDWICH", sort_order=0, is_active=False,
         image=LIBRARY_IMAGE,
     )
-    day = make_combo("Menu of the day", sort_order=0)
 
     read = queries.combos_in_copy(direct())
 
     # In the menus' order, with the id of its tax category there (Taxes never deletes one).
     assert read == [
-        {"id": day.id, "name": "Menu of the day", "kitchen_name": "", "price": 1350, "supply_kind": "service",
-         "sort_order": 0, "is_active": True, "image": "", "tax_category_id": day.tax_category_id},
         {"id": takeaway.id, "name": "Sandwich and beer", "kitchen_name": "SANDWICH", "price": 900,
-         "supply_kind": "goods", "sort_order": 1, "is_active": False, "image": LIBRARY_IMAGE, "tax_category_id": None},
+         "supply_kind": "goods", "sort_order": 0, "is_active": False, "image": LIBRARY_IMAGE, "tax_category_id": None},
+        {"id": day.id, "name": "Menu of the day", "kitchen_name": "", "price": 1350, "supply_kind": "service",
+         "sort_order": 1, "is_active": True, "image": "", "tax_category_id": day.tax_category_id},
     ]
 
 
@@ -229,7 +229,9 @@ def test_the_copy_gives_each_course_menu_by_menu_in_its_order():
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize(("table", "read"), [("combo_combo", "combos_in_copy"), ("combo_choicegroup", "groups_in_copy")])
+@pytest.mark.parametrize(
+    ("table", "read"), [("combo_combo", "combos_in_copy"), ("combo_choicegroup", "groups_in_copy")]
+)
 def test_a_copy_without_the_menus_or_the_courses_table_gives_none(table, read):
     with connection.cursor() as cursor:
         # Undone with the test's transaction.
@@ -263,15 +265,22 @@ def test_lacking_is_a_menu_the_business_no_longer_has():
     # Two of the copy with one name and one made again by hand: it stands for the oldest, the other is lacking.
     make_combo("Brunch")
     brunch, other_brunch = a_menu_of_the_copy("Brunch"), a_menu_of_the_copy("Brunch", price=2000)
+    # Two of the copy with one name, one made again by a recovery: it is that one's, never the other's.
+    dinner, other_dinner = a_menu_of_the_copy("Dinner"), a_menu_of_the_copy("Dinner")
+    make_combo("Dinner", stands_for=dinner["id"])
     # Lacking: one eaten in, with the key of its tax category; one to take away without one, off sale, with its image.
     vegan = a_menu_of_the_copy("Vegan menu", kitchen_name="VEGAN", price=1250, sort_order=3)
     takeaway = a_menu_of_the_copy(
         "Sandwich and beer", supply_kind="goods", tax_category_id=None, is_active=False, image=LIBRARY_IMAGE
     )
 
-    lacking = queries.combos_not_in_business([still, brought, by_hand, other_brunch, brunch, vegan, takeaway])
+    lacking = queries.combos_not_in_business(
+        [still, brought, by_hand, other_brunch, brunch, dinner, other_dinner, vegan, takeaway]
+    )
 
-    assert lacking == [as_recovered(other_brunch), as_recovered(vegan), as_recovered(takeaway)]
+    assert lacking == [
+        as_recovered(other_brunch), as_recovered(other_dinner), as_recovered(vegan), as_recovered(takeaway)
+    ]
 
 
 def a_course_of_the_copy(menu_id, name: str = "Sides", **fields) -> dict:
@@ -505,7 +514,9 @@ class TestChoicesComeBack:
         assert run() == 1
 
         # Inventory first, whatever the order asked: the product is back, the same, before its choices are offered.
-        assert said(row) == ("done", [CATEGORIES, PRODUCTS | {"restored": 1}, LINKS, MENUS, COURSES, CHOICES | {"created": 2}])
+        assert said(row) == (
+            "done", [CATEGORIES, PRODUCTS | {"restored": 1}, LINKS, MENUS, COURSES, CHOICES | {"created": 2}]
+        )
         # As the copy had them: its supplement, and the side still sold out.
         assert offered(hub) == [("Mains", burger, 150, True), ("Sides", burger, 0, False)]
         assert created_by(hub)[-2:] == [actor_of(row.pk)] * 2
@@ -527,7 +538,9 @@ class TestChoicesComeBack:
 
         assert run() == 1
 
-        assert said(row) == ("done", [CATEGORIES, PRODUCTS | {"created": 1}, LINKS, MENUS, COURSES, CHOICES | {"created": 2}])
+        assert said(row) == (
+            "done", [CATEGORIES, PRODUCTS | {"created": 1}, LINKS, MENUS, COURSES, CHOICES | {"created": 2}]
+        )
         with use_hub(hub):
             [made] = Product.objects.filter(sku="BUR").values_list("pk", flat=True)
         assert made != burger

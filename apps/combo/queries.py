@@ -917,8 +917,8 @@ def _rows_in_copy(conn, meta, read: tuple[str, ...], order: tuple[str, ...]) -> 
     def columns(fields: tuple[str, ...]) -> sql.Composed:
         return sql.SQL(", ").join(sql.Identifier(meta.get_field(field).column) for field in fields)
 
-    read_all = sql.SQL("SELECT {} FROM {} ORDER BY {}").format(columns(read), sql.Identifier(meta.db_table), columns(order))
-    return conn.execute(read_all).fetchall()
+    query = sql.SQL("SELECT {} FROM {} ORDER BY {}")
+    return conn.execute(query.format(columns(read), sql.Identifier(meta.db_table), columns(order))).fetchall()
 
 
 def combos_not_in_business(combos: list[dict]) -> list[dict]:
@@ -961,7 +961,8 @@ def groups_not_in_business(groups: list[dict]) -> list[dict]:
     if not groups:
         return []
     ids = [one["id"] for one in groups]
-    here = set(ChoiceGroup.objects.filter(pk__in=ids).values_list("pk", flat=True)) | set(_standing_for(ChoiceGroup, ids))
+    held = set(ChoiceGroup.objects.filter(pk__in=ids).values_list("pk", flat=True))
+    here = held | set(_standing_for(ChoiceGroup, ids))
     menus = _standing_for(Combo, {one["combo_id"] for one in groups})
     wanted = [(one, menus.get(one["combo_id"], one["combo_id"])) for one in groups if one["id"] not in here]
     named = ChoiceGroup.objects.filter(combo_id__in={menu for _one, menu in wanted}).values_list("combo_id", "name")
@@ -974,12 +975,11 @@ def groups_not_in_business(groups: list[dict]) -> list[dict]:
 
 
 def _standing_for(model, ids) -> dict[UUID, UUID]:
-    """The business's menu or course (``model``) that stands for each of a separate copy's (``ids``, there) it no
-    longer holds, as ``{id there: id here}``: the one a recovery made again for it (``stands_for``), renamed or not; the
-    oldest if one was made twice. One the business made again by hand is its own, set up as it chose: it stands for
-    none. One still held is itself, and is not in the result."""
-    held = set(model.objects.filter(pk__in=ids).values_list("pk", flat=True))
-    made = model.objects.filter(stands_for__in=[one for one in ids if one not in held]).order_by("created_at", "id")
+    """The business's menu or course (``model``) a recovery made again for each of a separate copy's (``ids``, there),
+    as ``{id there: id here}`` (``stands_for``), renamed or not; the oldest if one was made twice. A recovery only makes
+    one the business no longer holds, so one still held is in none. One the business made again by hand is its own, set
+    up as it chose: it stands for none."""
+    made = model.objects.filter(stands_for__in=ids).order_by("created_at", "id")
     standing: dict[UUID, UUID] = {}
     for there, here in made.values_list("stands_for", "pk"):
         standing.setdefault(there, here)
