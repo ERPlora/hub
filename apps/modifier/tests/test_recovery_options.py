@@ -175,13 +175,20 @@ def test_an_option_comes_back_by_the_option_sheets_own_create():
     assert list(OutboxEvent.objects.filter(actor=actor).values_list("name", flat=True)) == ["modifier.option.created"]
 
 
-@pytest.mark.django_db
-@pytest.mark.parametrize(("most", "chosen"), [(1, []), (0, ["Ketchup"]), (2, ["Ketchup"])])
-def test_one_chosen_by_default_comes_back_chosen_where_its_group_has_room(most, chosen):
+def alioli_back_to(most: int, chosen: list[str], **fields) -> tuple:
+    """A group «Sauces» that takes at most ``most`` options, with ``chosen`` chosen by default, and the copy's «Alioli»
+    it no longer has, as its recover takes it: the group and the record."""
     sauces = run_here("modifier.group.create", {"name": "Sauces", "max_choices": most})
     for name in chosen:
         an_option(sauces, name, is_default=True)
-    [record] = queries.options_not_in_business([of_the_copy(sauces.id, "Alioli", is_default=True)])
+    [record] = queries.options_not_in_business([of_the_copy(sauces.id, "Alioli", **fields)])
+    return sauces, record
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("most", "chosen"), [(1, []), (0, ["Ketchup"]), (2, ["Ketchup"])])
+def test_one_chosen_by_default_comes_back_chosen_where_its_group_has_room(most, chosen):
+    _sauces, record = alioli_back_to(most, chosen, is_default=True)
 
     made = recovered(record)
 
@@ -192,10 +199,7 @@ def test_one_chosen_by_default_comes_back_chosen_where_its_group_has_room(most, 
 @pytest.mark.parametrize(("most", "chosen"), [(1, ["Ketchup"]), (2, ["BBQ", "Ketchup"])])
 def test_one_chosen_by_default_never_takes_it_from_the_ones_the_business_chose(most, chosen):
     actor = actor_of(uuid.uuid7())
-    sauces = run_here("modifier.group.create", {"name": "Sauces", "max_choices": most})
-    for name in chosen:
-        an_option(sauces, name, is_default=True)
-    [record] = queries.options_not_in_business([of_the_copy(sauces.id, "Alioli", is_default=True)])
+    sauces, record = alioli_back_to(most, chosen, is_default=True)
 
     with translation.override("es"):
         made = recovered(record, actor)
@@ -213,9 +217,7 @@ def test_one_chosen_by_default_never_takes_it_from_the_ones_the_business_chose(m
 
 @pytest.mark.django_db
 def test_one_not_chosen_by_default_comes_back_as_it_was_whatever_its_group_holds():
-    sauces = run_here("modifier.group.create", {"name": "Sauces", "max_choices": 1})
-    an_option(sauces, "Ketchup", is_default=True)
-    [record] = queries.options_not_in_business([of_the_copy(sauces.id, "Alioli")])
+    _sauces, record = alioli_back_to(1, ["Ketchup"])
 
     made = recovered(record)
 
