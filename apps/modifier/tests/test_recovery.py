@@ -311,6 +311,13 @@ def hung_from_categories(hub) -> list[tuple]:
         )
 
 
+def asked_again_hangs_nothing_twice(recoveries, copy) -> None:
+    """``copy`` asked again, Inventory and Modifiers: every group is in its place already, nothing is hung twice."""
+    again = recoveries.ask(copy, "inventory", "modifier")
+    assert run() == 1
+    assert said(again) == ("done", [CATEGORIES, PRODUCTS, LINKS, CATEGORY_GROUPS, GROUPS])
+
+
 def attached(hub) -> int:
     with use_hub(hub):
         return OutboxEvent.objects.filter(name="modifier.link.attached").count()
@@ -353,10 +360,7 @@ class TestGroupsComeBack:
         with use_hub(hub):
             assert set(ModifierLink.objects.values_list("created_by", flat=True)) == {actor_of(row.pk)}
         assert attached(hub) == before + 2
-        # Asked again, nothing is hung twice.
-        again = recoveries.ask(copy, "inventory", "modifier")
-        assert run() == 1
-        assert said(again) == ("done", [CATEGORIES, PRODUCTS, LINKS, CATEGORY_GROUPS, GROUPS])
+        asked_again_hangs_nothing_twice(recoveries, copy)
         assert len(hung(hub)) == 2
 
     def test_a_product_gone_altogether_comes_back_as_a_new_one_asking_for_its_groups(self, recoveries, every_app_on):
@@ -375,10 +379,8 @@ class TestGroupsComeBack:
             [made] = Product.objects.filter(sku="BUR").values_list("pk", flat=True)
         assert made != burger
         assert hung(hub) == [("Extras", made), ("Sauces", made)]
-        # Asked again, nothing is hung twice: its groups are in their place on the one made again.
-        again = recoveries.ask(copy, "inventory", "modifier")
-        assert run() == 1
-        assert said(again) == ("done", [CATEGORIES, PRODUCTS, LINKS, CATEGORY_GROUPS, GROUPS])
+        # Its groups are in their place on the one made again.
+        asked_again_hangs_nothing_twice(recoveries, copy)
         assert len(hung(hub)) == 2
 
     def test_a_product_gone_the_business_made_again_by_hand_keeps_its_own_groups(self, recoveries, every_app_on):
@@ -489,10 +491,8 @@ class TestCategoryGroupsComeBack:
         with use_hub(hub):
             assert set(ModifierLink.objects.values_list("created_by", flat=True)) == {actor_of(row.pk)}
         assert attached(hub) == before + 2
-        # Asked again, nothing is hung twice: its groups are in their place on the one brought back.
-        again = recoveries.ask(copy, "inventory", "modifier")
-        assert run() == 1
-        assert said(again) == ("done", [CATEGORIES, PRODUCTS, LINKS, CATEGORY_GROUPS, GROUPS])
+        # Its groups are in their place on the one brought back.
+        asked_again_hangs_nothing_twice(recoveries, copy)
         assert len(hung_from_categories(hub)) == 2
 
     def test_a_category_that_stays_deleted_gets_no_group_and_says_why(self, recoveries, every_app_on):
