@@ -307,6 +307,11 @@ for arguments in "--bogus" "--spec" "--spec ../../etc/passwd" "--spec tests/e2e/
 done
 night NIGHTLY_HUB_PORT=80x
 expect "a port that is no port is refused (2)" 2 "$status"
+for port in 1023 65527; do
+  night NIGHTLY_HUB_PORT="$port"
+  expect "port $port, out of 1024–65526, is refused (2)" 2 "$status"
+  expect "and nothing runs" 0 "$(calls_re '^(uv|pnpm|node|e2e|runserver) ')"
+done
 
 # --- one night at a time --------------------------------------------------------------------------
 mkdir -p "$nightly/lock"

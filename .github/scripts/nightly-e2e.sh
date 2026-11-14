@@ -48,7 +48,9 @@ number NIGHTLY_HUB_PORT "$PORT"
 number NIGHTLY_MAX_MINUTES "$MAX_MINUTES"
 number NIGHTLY_START_SECONDS "$START_SECONDS"
 number NIGHTLY_KEEP_RUNS "$KEEP_RUNS"
-[ "$PORT" -ge 1024 ] && [ "$PORT" -le 65526 ] || usage_error "NIGHTLY_HUB_PORT must be a port from 1024 to 65526"
+if [ "$PORT" -lt 1024 ] || [ "$PORT" -gt 65526 ]; then
+  usage_error "NIGHTLY_HUB_PORT must be a port from 1024 to 65526"
+fi
 [ "$KEEP_RUNS" -ge 1 ] || usage_error "NIGHTLY_KEEP_RUNS must keep at least this night"
 
 cmd=night
