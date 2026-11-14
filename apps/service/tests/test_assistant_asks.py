@@ -295,8 +295,8 @@ BY_THE_GROUPS = [
 def test_the_groups_of_services_bring_a_new_request_to_its_tool(catalog_of, name, phrase):
     tools = catalog_of(Membership.Role.OWNER, "es")
     assert comparable(phrase) not in probe_phrases()
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    assert name in offered_to(tools, phrase)[:10]
+    assert_offered_with_room(tools, name, phrase, room=10)
+
     assert name not in offered_to(tools, phrase, synonyms=without_services_groups())[:10]
 
 
