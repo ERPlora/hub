@@ -250,7 +250,7 @@ def _is_db_handle(dotted: str) -> bool:
     return parts[:2] == ["django", "db"] and len(parts) > 2 and parts[2] in DB_HANDLES
 
 
-def orm_touches(source: str) -> list[tuple[int, str]]:
+def orm_touches(source: str) -> list[tuple[int, str]]:  # noqa: C901
     """``(line, what)`` for every place in ``source`` that reaches the ORM or the database."""
     found: set[tuple[int, str]] = set()
     for node in ast.walk(ast.parse(source)):
@@ -1550,7 +1550,7 @@ def _bind_fixed(statements, fixed: set[str]) -> set[str]:
     return fixed
 
 
-def fixed_leases(source: str) -> list[tuple[int, str]]:
+def fixed_leases(source: str) -> list[tuple[int, str]]:  # noqa: C901
     """``(line, what)`` for every lease ``source`` writes until a fixed moment: ``lease_until=`` in a call (``create``,
     ``update``, a helper's), ``"lease_until": …`` in a dict or ``….lease_until = …``, built from a ``datetime(…)`` or
     from a name bound to one in the body of the module, of a class or of the function that writes it.

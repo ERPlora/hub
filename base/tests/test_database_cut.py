@@ -710,7 +710,7 @@ def _meant(names: dict, node):
 
 
 @functools.cache
-def _steps(fn) -> tuple[frozenset[str], tuple, frozenset[str]]:
+def _steps(fn) -> tuple[frozenset[str], tuple, frozenset[str]]:  # noqa: C901, PLR0912
     """What ``fn`` touches (by dotted name), the functions of the Hub it goes on to (and the methods its models
     override) and the operations it names. What it leaves for after the COMMIT of its operation
     (``live.operations.on_commit(...)``) is not a step; Django's own ``transaction.on_commit`` on ``default`` would run at

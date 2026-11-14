@@ -443,7 +443,7 @@ def list_low_stock(ctx: OperationContext, params: LowStockListIn) -> dict:
     )
 
 
-def filter_products(products, params: ProductFiltersIn):
+def filter_products(products, params: ProductFiltersIn):  # noqa: C901
     """The product list's search, filters and order (the export takes the same)."""
     if params.search:
         products = products.filter(

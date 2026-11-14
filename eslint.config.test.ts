@@ -2,7 +2,7 @@
 // Lint of hub-next: the SPA reaches the server only through the SDK (`@erplora/ui/sdk`), so the
 // shell entry and every app frontend are linted for raw network globals. Linted for real here, by the hub's ESLint
 // in a thread of its own (`lintInThread`).
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -62,6 +62,19 @@ const PROBE = 'apps/demo/frontend/pages/Probe.vue';
 const uses = (name: string) => `export const x = ${name};\n`;
 const SCRIPT_SETUP = `<script setup lang="ts">\nconst items = fetch('/api/demo/items');\n</script>\n<template><div>{{ items }}</div></template>\n`;
 const slottedIn = (tag: string) => `<template><ion-button><${tag} slot="start" /></ion-button></template>\n`;
+const APP_TEST = 'apps/demo/frontend/pages/ItemListPage.test.ts';
+const E2E_HELPER = 'tests/e2e/probe.ts';
+/** A function with `branches` ifs: its complexity is `branches` + 1. */
+const branchy = (branches: number) =>
+  `export function f(v: number): number {\n${Array.from({ length: branches }, (_, i) => `  if (v === ${i}) v += 1;\n`).join('')}  return v;\n}\n`;
+/** Ifs nested `depth` deep. */
+const nested = (depth: number) =>
+  `export function f(v: number): number {\n${'  if (v) {\n'.repeat(depth)}  v += 1;\n${'  }\n'.repeat(depth)}  return v;\n}\n`;
+const taking = (count: number) =>
+  `export function f(${Array.from({ length: count }, (_, i) => `a${i}: number`).join(', ')}): number {\n  return a0;\n}\n`;
+/** A function of `lines` lines, braces included, with a blank line and a comment that do not count. */
+const long = (lines: number) =>
+  `export function f(): number {\n  let v = 0;\n\n  // a comment\n${'  v += 1;\n'.repeat(lines - 4)}  return v;\n}\n`;
 
 /** Every lint these tests read. */
 const LINTS: readonly Lint[] = [
@@ -71,11 +84,17 @@ const LINTS: readonly Lint[] = [
   ]),
   [SCRIPT_SETUP, VUE_PAGE],
   ...['ion-icon', 'HubIcon', 'ok-icon'].map((tag): Lint => [slottedIn(tag), PROBE]),
+  ...[branchy(14), branchy(15), nested(4), nested(5), taking(3), taking(4), long(50), long(51)].flatMap((code): Lint[] => [
+    [code, APP_PAGE],
+    [code, APP_TEST],
+    [code, E2E_HELPER],
+  ]),
 ];
 /** What ESLint must ignore: the build and collectstatic output, the repo's own .venv (uv), which carries the admin's
- *  JavaScript, and packages/ui and packages/live, linted in their own repos. */
+ *  JavaScript, packages/ui and packages/live, linted in their own repos, and the shell scripts' tests. */
 const IGNORED = [
   'frontend/dist/assets/main-abc.js',
+  '.github/scripts/pytest-shard.test.sh',
   'staticfiles/admin/js/core.js',
   '.venv/lib/python3.14/site-packages/django/contrib/admin/static/admin/js/core.js',
   'packages/ui/src/sdk/client.ts',
@@ -112,12 +131,47 @@ describe('eslint config', () => {
     expect(slotted('ok-icon')).toBe(1); // OutfitKit is gone: no exception left for it
   });
 
+  it('caps the complexity of a function at 15, in tests too', () => {
+    for (const file of [APP_PAGE, APP_TEST, E2E_HELPER]) {
+      expect(said(branchy(14), file, 'complexity')).toEqual([]);
+      expect(said(branchy(15), file, 'complexity')).toHaveLength(1);
+    }
+  });
+
+  it('caps the nesting of blocks at 4, in tests too', () => {
+    for (const file of [APP_PAGE, APP_TEST, E2E_HELPER]) {
+      expect(said(nested(4), file, 'max-depth')).toEqual([]);
+      expect(said(nested(5), file, 'max-depth')).toHaveLength(1);
+    }
+  });
+
+  it('caps a function at 3 parameters and 50 lines, not counting blanks and comments, outside tests', () => {
+    expect(said(taking(3), APP_PAGE, 'max-params')).toEqual([]);
+    expect(said(taking(4), APP_PAGE, 'max-params')).toHaveLength(1);
+    expect(said(long(50), APP_PAGE, 'max-lines-per-function')).toEqual([]);
+    expect(said(long(51), APP_PAGE, 'max-lines-per-function')).toHaveLength(1);
+  });
+
+  it('leaves the parameters and the length of a function free in tests, where each describe is one', () => {
+    for (const file of [APP_TEST, E2E_HELPER]) {
+      expect(said(taking(4), file, 'max-params')).toEqual([]);
+      expect(said(long(51), file, 'max-lines-per-function')).toEqual([]);
+    }
+  });
+
+  it('keeps the suppressions of what already broke a limit, and fails on one no longer needed', () => {
+    const { scripts } = JSON.parse(readFileSync(join(HUB_DIR, 'package.json'), 'utf8')) as { scripts: Record<string, string> };
+    expect(existsSync(join(HUB_DIR, 'eslint-suppressions.json'))).toBe(true);
+    expect(scripts.lint).toMatch(/^eslint /);
+    expect(scripts.lint).not.toMatch(/--(pass-on-unpruned-suppressions|suppress-all|suppress-rule|suppressions-location)/);
+  });
+
   it('lints in a thread of its own: this worker never loads ESLint', () => {
     const loaded = Object.keys(nodeRequire.cache).filter((file) => file.includes(join('node_modules', 'eslint', 'lib')));
     expect(loaded).toEqual([]);
   });
 
-  it('ignores the build and collectstatic output, the virtualenv, and the live and ui submodules', () => {
+  it('ignores the build and collectstatic output, the virtualenv, the live and ui submodules and the shell scripts', () => {
     expect(IGNORED.filter((_path, index) => !found.ignored[index])).toEqual([]);
   });
 });

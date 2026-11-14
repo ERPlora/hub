@@ -262,7 +262,7 @@ def system_cards(ctx: OperationContext, configs: Iterable[LiveAppConfig]) -> lis
     return cards
 
 
-def module_steps(ctx: OperationContext, configs: Iterable[LiveAppConfig], hub_country: str) -> list[dict]:
+def module_steps(ctx: OperationContext, configs: Iterable[LiveAppConfig], hub_country: str) -> list[dict]:  # noqa: C901
     """The modules' steps of the list, as the person of ``ctx`` may be told about them."""
     items = []
     for config in configs:

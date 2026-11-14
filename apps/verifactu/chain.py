@@ -71,7 +71,7 @@ def _sha256_upper(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest().upper()
 
 
-def alta_hash(
+def alta_hash(  # noqa: PLR0913
     *,
     issuer_nif: str,
     number: str,

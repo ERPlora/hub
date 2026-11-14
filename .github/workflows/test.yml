@@ -52,11 +52,14 @@ jobs:
       DB_USER: hub
       DB_PASSWORD: hub
     steps:
-      # packages/live and packages/ui are public submodules (ERPlora/live, ERPlora/ui): no token.
+      # packages/live and packages/ui are public submodules (ERPlora/live, ERPlora/ui): no token. The whole history,
+      # origin/main included: tests/test_guardrails_size.py compares the size allow list with the one where the branch
+      # left main.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
           persist-credentials: false
+          fetch-depth: 0
       # WeasyPrint's libraries (apps/invoice/pdf.py), as the Dockerfile installs them. Their .deb files live in GitHub's
       # cache, one entry per runner image and per version of this file (where the package list is), so a run installs
       # them without Ubuntu's mirror: a DNS outage of the mirror kept every run red for hours (hub#1222). Without the

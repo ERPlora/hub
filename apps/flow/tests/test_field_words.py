@@ -246,7 +246,7 @@ class PayloadReader:
         self.unread.append(f"{site}: {ast.unparse(expr)[:80]}")
         return set()
 
-    def read(self, expr: ast.expr | None, scope: ast.AST, site: str, seen: frozenset[str]) -> set[str]:
+    def read(self, expr: ast.expr | None, scope: ast.AST, site: str, seen: frozenset[str]) -> set[str]:  # noqa: C901, PLR0911, PLR0912
         if expr is None or (isinstance(expr, ast.Constant) and expr.value is None):
             return set()
         if isinstance(expr, ast.Dict):
@@ -340,7 +340,7 @@ class PayloadReader:
         found = [node.value for node in ast.walk(function) if isinstance(node, ast.Return) and node.value]
         return set().union(*(self.read(value, function, site, seen | {function.name}) for value in found))
 
-    def _name(self, name: str, scope: ast.AST, site: str, seen: frozenset[str]) -> set[str]:
+    def _name(self, name: str, scope: ast.AST, site: str, seen: frozenset[str]) -> set[str]:  # noqa: C901, PLR0912
         keys: set[str] = set()
         assigned = False
         for node in ast.walk(scope):

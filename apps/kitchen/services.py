@@ -187,7 +187,7 @@ def take_number(day) -> int:
     return counter.last_number
 
 
-def write_log(
+def write_log(  # noqa: PLR0913
     ticket_id,
     action: str,
     *,
@@ -412,7 +412,7 @@ def require(ticket: Ticket, action: str) -> None:
 # ── Paper (KITCHEN-F08, F09, F14, F17, F22, F29) ─────────────────────────────────────────────────
 
 
-def _print(
+def _print(  # noqa: PLR0913
     ctx: OperationContext,
     *,
     key: str,
@@ -463,7 +463,7 @@ def _quantity(value) -> float:
     return float(Decimal(value).normalize())
 
 
-def _sheet(
+def _sheet(  # noqa: PLR0913
     ticket: Ticket,
     items,
     *,
@@ -562,7 +562,7 @@ def _round_ticket(line_ids) -> Ticket | None:
     return locked_row(Ticket, ticket_id) if ticket_id is not None else None
 
 
-def _enrich(
+def _enrich(  # noqa: PLR0913
     ctx: OperationContext,
     ticket: Ticket,
     *,

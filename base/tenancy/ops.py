@@ -78,7 +78,7 @@ def environment_roles(control: str) -> bootstrap.Names:
         return bootstrap.Names()
 
 
-def clone_database(
+def clone_database(  # noqa: PLR0913
     name: str,
     *,
     template: str,
@@ -107,7 +107,7 @@ def clone_database(
     return made
 
 
-def _create(conn, statement, name: str, template: str, waits: Sequence[float], sleep) -> bool:
+def _create(conn, statement, name: str, template: str, waits: Sequence[float], sleep) -> bool:  # noqa: PLR0913, PLR0917
     for wait in (*waits, None):
         try:
             conn.execute(statement)

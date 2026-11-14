@@ -186,7 +186,7 @@ class _Steps:
         return time.monotonic() - self.started
 
 
-def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = None, tell_saas: bool = True) -> None:
+def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = None, tell_saas: bool = True) -> None:  # noqa: C901, PLR0912, PLR0915
     """The steps of a hub's preparation, its lease held; a failure is noted on it, a hub that left them is left.
     ``apps``: more apps than its template's whose tables it gets (:func:`provision`)."""
     apps = list(apps or ())

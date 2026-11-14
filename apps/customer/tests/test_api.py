@@ -256,7 +256,7 @@ def test_an_unknown_card_is_404_with_the_apps_code(admin_client):
 
 
 @pytest.mark.django_db
-def test_the_card_round_trip(admin_client):
+def test_the_card_round_trip(admin_client):  # noqa: PLR0915
     created = post(
         admin_client,
         "/customer/customers",

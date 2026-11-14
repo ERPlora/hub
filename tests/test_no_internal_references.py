@@ -320,7 +320,7 @@ def python_prose(text: str) -> dict[int, str]:
     return prose
 
 
-def marked_prose(kind: str, text: str) -> dict[int, str]:
+def marked_prose(kind: str, text: str) -> dict[int, str]:  # noqa: C901, PLR0912
     """The comments of a file whose comments are marked (``//``, ``/* */``, ``<!-- -->``, ``#``…) and, in a script,
     the titles of its tests; every other string literal is left out."""
     script = kind in SCRIPT_SUFFIXES

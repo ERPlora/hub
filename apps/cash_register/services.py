@@ -285,7 +285,7 @@ def _number(day: dt.date) -> int:
     return counter.last
 
 
-def _close(
+def _close(  # noqa: PLR0913
     ctx: OperationContext,
     session: Session,
     *,

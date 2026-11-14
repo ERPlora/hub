@@ -208,7 +208,7 @@ def _bounds(**bounds) -> dict:
         "risk": "normal",
     },
 )
-def list_payments(ctx: OperationContext, params: PaymentListIn) -> dict:
+def list_payments(ctx: OperationContext, params: PaymentListIn) -> dict:  # noqa: C901
     payments = Payment.objects.select_related("method")
     if params.search:
         payments = payments.filter(

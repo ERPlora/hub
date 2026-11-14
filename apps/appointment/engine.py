@@ -194,7 +194,7 @@ def _fits_staff(agenda: Agenda, begin: dt.datetime, finish: dt.datetime) -> bool
     return True
 
 
-def verdict(
+def verdict(  # noqa: PLR0911
     agenda: Agenda,
     start: dt.datetime,
     end: dt.datetime,

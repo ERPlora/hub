@@ -775,7 +775,7 @@ _COMPARED = (
         "risk": "normal",
     },
 )
-def update_rule(ctx: OperationContext, data: RulePatchIn) -> dict:
+def update_rule(ctx: OperationContext, data: RulePatchIn) -> dict:  # noqa: C901
     rule = find_rule(data.id, data.rule, lock=True)
     sent = data.model_fields_set - {"id", "rule"}
     before = {name: getattr(rule, name) for name in _COMPARED}

@@ -1910,7 +1910,7 @@ def _checked_tax_id(tax_id: str, country: str, id_type: str) -> str:
         ) from None
 
 
-def _check_discounts(
+def _check_discounts(  # noqa: PLR0913
     lines: list[OrderLine],
     percent: Decimal,
     amount: int,
@@ -1948,7 +1948,7 @@ def _check_discounts(
         raise Conflict(str(DISCOUNT_OVER_LIMIT), code="sale.discount_over_limit")
 
 
-def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> list[dict]:
+def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> list[dict]:  # noqa: C901, PLR0912
     """The tenders, resolved and checked: methods allowed, amounts adding up, cash tendered, change, and
     no cash at all when the whole ``operation`` reaches the cash limit."""
     if total == 0:
@@ -2042,7 +2042,7 @@ RECIPIENT_KEYS = (
 )
 
 
-def _fiscal_document(
+def _fiscal_document(  # noqa: C901
     ctx: OperationContext,
     name: str,
     data: dict,
@@ -2223,7 +2223,7 @@ def _claim_counter(ctx: OperationContext, data: CompleteIn) -> Order | dict:
         return answer
 
 
-def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> dict:
+def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> dict:  # noqa: C901, PLR0912, PLR0915
     answer = _replay(ctx, data)
     if answer is not None:
         return answer
@@ -2636,7 +2636,7 @@ def _sale_lines(
     return rows
 
 
-def _completed_payload(
+def _completed_payload(  # noqa: PLR0913, PLR0917
     sale, lines, payments, tax_id, address, country, id_type
 ) -> dict:
     """What ``sale.sale.completed`` carries: Inventory reads ``items``, Customers the customer and total."""
@@ -3326,7 +3326,7 @@ def _fiscal_record(ctx: OperationContext, sale: SaleOut) -> dict | None:
     return found.record.model_dump() if found.record else None
 
 
-def _print_sale(ctx: OperationContext, sale: Sale, detail: SaleOut, *, duplicate: bool, key: str, at_checkout: bool = False) -> dict:
+def _print_sale(ctx: OperationContext, sale: Sale, detail: SaleOut, *, duplicate: bool, key: str, at_checkout: bool = False) -> dict:  # noqa: PLR0913
     """The receipt (or the full invoice) of ``sale`` to the receipt printer's queue. ``at_checkout``: the print by
     itself of the charge — it follows the printing settings, and the drawer opens only when cash came in. A
     fiscal document still pending never prints as if issued: the screen's paper says it is pending."""
