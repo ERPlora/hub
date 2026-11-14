@@ -53,6 +53,7 @@ from apps.customer.schemas import (
     FieldPage,
     GroupListIn,
     GroupPage,
+    NoteIn,
     OrderCustomerOut,
     OrderIn,
     OrderListIn,
@@ -63,6 +64,8 @@ from apps.customer.schemas import (
     TagListIn,
     TagPage,
 )
+
+from base.tests.actors import who_did_it
 
 from .conftest import run
 
@@ -791,6 +794,17 @@ def test_the_activity_is_newest_first_and_searchable():
             "customer.activity.list", ActivityListIn(customer="Ana", search="morning")
         ).rows
     ] == ["Prefers mornings"]
+
+
+@pytest.mark.parametrize("caller, who, by_platform", who_did_it("tester", "tester"))
+def test_the_activity_says_whether_a_person_or_the_platform_did_it(caller, who, by_platform):
+    """A person and an API key are named; the platform's own marks are kept, and the entry says the platform did it."""
+    ana = card("Ana")
+    run("customer.note.add", NoteIn(customer_id=ana.id, content="Prefers mornings"), actor=caller)
+
+    page = run("customer.activity.list", ActivityListIn(customer_id=ana.id))
+
+    assert [(row.kind, row.actor, row.by_platform) for row in page.rows] == [("note_added", who, by_platform)]
 
 
 def test_the_timeline_of_a_card_that_is_gone_is_not_found():

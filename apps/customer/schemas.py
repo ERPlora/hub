@@ -24,6 +24,7 @@ from pydantic import (
 
 from apps.customer.models import Activity, Purchase
 from base.business import currency_decimals
+from base.relay import by_platform
 from base.schemas import names, unless_given
 
 T = TypeVar("T")
@@ -1069,12 +1070,17 @@ class ActivityRow(Schema):
     )
     related_id: str = Field(description="The id of what it is about.")
     related_type: str = Field(description="The type of what it is about.")
-    actor: str = Field(description="Who did it.")
+    actor: str = Field(description="Who did it: a person's name, an API key's or the platform's own mark.")
+    by_platform: bool = Field(description="No person did it: the platform (the system, an automation, a recovery).")
     created_at: datetime = Field(description="When.")
 
     @staticmethod
     def resolve_currency_decimals(entry: Activity) -> int | None:
         return _decimals((entry.data or {}).get("currency"))
+
+    @staticmethod
+    def resolve_by_platform(entry: Activity) -> bool:
+        return by_platform(entry.actor)
 
 
 ActivityPage = Page[ActivityRow]

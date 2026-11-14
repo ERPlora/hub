@@ -13,6 +13,7 @@ from live.context import system_context
 from live.errors import Conflict, NotFound, PermissionDenied
 
 from apps.kitchen.models import Ticket
+from base.tests.actors import who_did_it
 from base.tests.ordering import assert_reads_backwards, listed_with
 
 from .conftest import (
@@ -709,6 +710,21 @@ def test_the_history_names_who_did_it_by_their_name_never_their_session_id(clock
         ("cancelled", "Marta Ruiz"),
         ("started", "luis"),
         ("received", ""),
+    ]
+
+
+@pytest.mark.parametrize("caller, who, by_platform", who_did_it("luis", "luis"))
+def test_the_history_says_whether_a_person_or_the_platform_did_it(product, caller, who, by_platform):
+    """KITCHEN-F25: a person and an API key are named; the platform's own marks are kept, and the entry says the
+    platform did it, as what the kitchen does by itself (a round received)."""
+    _, lines = fired_round(product, "Burger", label="Table 4")
+    run("kitchen.ticket.start", {"ticket_id": str(lines[0].id)}, ctx_for(actor=caller))
+
+    rows = run("kitchen.log.list", {}).rows
+
+    assert [(r.action, r.actor, r.by_platform) for r in rows] == [
+        ("started", who, by_platform),
+        ("received", "", True),
     ]
 
 
