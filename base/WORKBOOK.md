@@ -4248,20 +4248,20 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1505, aws#77
   le traslada no existe todavía (hub#1510).
 - **Un negocio de cualquier tamaño se traslada** (hub#1509, cierra hub#931): la copia pasa por el bucket de volcados
   (`HUB_DUMPS_BUCKET`), nunca por el disco del worker, así que `control.hub.move` ya no rechaza por tamaño (se fue el
-  tope de 512 MiB y su 409 `control.hub_too_large`; solo comprueba que la base está en su servidor). El negocio está en
-  mantenimiento mientras dura la copia, como antes, y por eso se pide de madrugada. `pg_dump` sube la copia en partes
-  según la hace (`base.tenancy.dumps.stream_to_bucket`, partes de 32 MiB, una en memoria), y la subida solo se
+  tope de 512 MiB y su 409 `control.hub_too_large`; solo comprueba que la base está en su servidor). El negocio está
+  en mantenimiento mientras dura la copia, como antes, y por eso se pide de madrugada. `pg_dump` sube la copia en
+  partes según la hace (`base.tenancy.dumps.stream_to_bucket`, partes de 32 MiB, una en memoria), y la subida solo se
   completa si `pg_dump` acabó bien: si falla, se para o se pasa de tiempo, se aborta y no queda nada. En el destino,
-  `pg_restore` lee la copia desde el bucket por su entrada (`move._restore_from_bucket`: primero su índice y después la
-  restauración en una transacción, las dos sin fichero). Cada mitad tiene una hora (`move.COPY_TIMEOUT_SECONDS`): de
-  madrugada acaba antes de las 07:00 y una hora da para decenas de GiB; se puede cancelar en cualquier momento. La
-  copia queda en `<hex>/<AAAAMMDDTHHMMSSZ>-move.dump` los 90 días del bucket, sin fila `HubDump` (no es una copia del
-  negocio para descargar; el worker no puede borrar del bucket). Sin bucket no se cierra nada: el traslado acaba con
-  `move_dump_failed` en `Hub.last_error` y el negocio sigue donde estaba. La restauración a un momento y la copia
-  aparte (BASE-F114) siguen copiando por un fichero del worker, con su tope (`control.services.RESTORE_MAX_BYTES`,
-  hub#1524).
-  Tests: `base/tenancy/tests/test_dumps.py` (los `stream`), `base/tenancy/tests/test_move.py::TestTheCopyGoesThroughTheBucket`
-  y `::TestFeedingAProgram` (dos BD reales y el S3 de moto), `control/tests/test_services.py::TestMove` y
+  `pg_restore` lee la copia desde el bucket por su entrada (`dumps.stream_from_bucket` en `move._restore_from_bucket`:
+  primero su índice y después la restauración en una transacción, las dos sin fichero). Cada mitad tiene una hora
+  (`move.COPY_TIMEOUT_SECONDS`): de madrugada acaba antes de las 07:00 y una hora da para decenas de GiB; se puede
+  cancelar en cualquier momento. La copia queda en `<hex>/<AAAAMMDDTHHMMSSZ>-move.dump` los 90 días del bucket, sin
+  fila `HubDump` (no es una copia del negocio para descargar; el worker no puede borrar del bucket). Sin bucket no se
+  cierra nada: el traslado acaba con `move_dump_failed` en `Hub.last_error` y el negocio sigue donde estaba. La
+  restauración a un momento y la copia aparte (BASE-F114) siguen copiando por un fichero del worker, con su tope
+  (`control.services.RESTORE_MAX_BYTES`, hub#1524). Tests: `base/tenancy/tests/test_dumps.py` (los `stream`),
+  `base/tenancy/tests/test_move.py::TestTheCopyGoesThroughTheBucket` y `::TestFeedingAProgram` (dos BD reales y el S3
+  de moto), `control/tests/test_services.py::TestMove` y
   `control/tests/test_admin.py::test_its_confirmation_page_promises_no_refusal_by_size`.
 - **«Restaurar desde una copia…»** (BASE-F114, hub#1198) es `control.admin.HubAdmin.restore_from_a_copy`: su página de
   confirmación (`RestoreFromACopyForm`, la plantilla `action_confirmation.html` que comparte con «Mover a otro

@@ -70,7 +70,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import psycopg
-from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 from django.utils import timezone
 from psycopg import errors, sql
@@ -96,8 +95,6 @@ RESTORE_TIMEOUT_SECONDS = dumps.DUMP_TIMEOUT_SECONDS
 COPY_TIMEOUT_SECONDS = 60 * 60
 #: The kind of a move's copy in the dumps bucket (``<hex>/<AAAAMMDDTHHMMSSZ>-move.dump``).
 MOVE_DUMP_KIND = "move"
-#: How much of the copy is read from the bucket at once.
-FEED_BYTES = 1024 * 1024
 #: How many times the rename waits for a session that came back to the origin before it gives up.
 RENAME_WAITS = (0.5, 1.0)
 #: The entries of a dump the restore leaves out: the destination's template has its extensions already, and the public
@@ -556,15 +553,11 @@ def _restore_from_bucket(key: str, name: str, cluster, heartbeat: Callable[[], N
 
 
 def _from_bucket(key: str):
-    """The copy at ``key``, read from the dumps bucket a part at a time."""
+    """The copy at ``key``, read from the dumps bucket a part at a time (``dumps.stream_from_bucket``)."""
     try:
-        copy = dumps.client().get_object(Bucket=dumps.bucket(), Key=key)["Body"]
-        try:
-            yield from copy.iter_chunks(FEED_BYTES)
-        finally:
-            copy.close()
-    except (BotoCoreError, ClientError) as error:
-        raise MoveFailed("move_restore_failed", f"its copy could not be read from the bucket: {error}") from error
+        yield from dumps.stream_from_bucket(key)
+    except dumps.DumpError as failed:
+        raise MoveFailed("move_restore_failed", failed) from failed
 
 
 def _entries(listing: str, path: Path) -> Path:

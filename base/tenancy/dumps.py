@@ -22,6 +22,7 @@ from ``pg_dump``'s output to its key and never through a file, so the worker's d
 :data:`STREAM_PART_BYTES`, read in this thread, with the same heartbeat, stop and time limit. The object is completed
 only once ``pg_dump`` ended well; a dump that fails, is stopped or runs too long aborts the upload, and nothing is kept.
 No ``HubDump`` is noted: it is no copy of the business's to download, and the bucket keeps it its 90 days.
+:func:`stream_from_bucket` reads such a copy back a part at a time, for ``pg_restore``'s input.
 
 A hub without its own database is never dumped (:class:`HubWithoutDatabase`: a business not cut yet);
 without a bucket there is nothing to dump to (:class:`DumpsUnavailable`). Every failure is a :class:`DumpFailed` with
@@ -84,7 +85,7 @@ CUT = "cut"
 #: The size of each part of a copy streamed to the bucket: S3 takes 10 000 parts at most, so up to 312 GiB. One part is
 #: held in memory at a time.
 STREAM_PART_BYTES = 32 * 1024 * 1024
-#: How much of ``pg_dump``'s output is read at once.
+#: How much of ``pg_dump``'s output, or of a copy in the bucket, is read at once.
 READ_BYTES = 1024 * 1024
 
 
@@ -412,6 +413,19 @@ class _DumpOutput:
         if self.process.returncode != 0:
             said = _complaint(self.complaints, self.password)
             raise DumpFailed(f"pg_dump could not copy {self.source.db_name} (exit {self.process.returncode}): {said}")
+
+
+def stream_from_bucket(key: str):
+    """The copy at ``key`` read from the bucket, :data:`READ_BYTES` at a time, and closed once its reader is done (or
+    closes it); one that cannot be read is a :class:`DumpFailed`."""
+    try:
+        copy = client().get_object(Bucket=bucket(), Key=key)["Body"]
+        try:
+            yield from copy.iter_chunks(READ_BYTES)
+        finally:
+            copy.close()
+    except (BotoCoreError, ClientError) as error:
+        raise DumpFailed(f"The copy at {key} could not be read from the bucket: {error}") from error
 
 
 def link_expires_at(url: str) -> dt.datetime:
