@@ -42,3 +42,20 @@ class ComboConfig(LiveAppConfig):
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. One entry, no tabbar.
     navigation = [Nav("menus", _("Menus"), "ion:layers-outline", "/combo/menus")]
+
+    def recoverable_from_copy(self) -> list:
+        """What a separate copy of the business gives back when ERPlora's staff recovers from it (BASE-F114): each
+        choice of a product that the business no longer offers in its course, offered again by ``combo.option.create``,
+        the menu builder's own. It goes after Inventory, so a deleted product is back before its choices."""
+        from apps.combo import queries  # the models are not loaded yet when this module is
+        from base.recovery import Recoverable
+
+        return [
+            Recoverable(
+                label=_("Menu choices of products"),
+                reads_since="0001_initial",
+                read=queries.options_in_copy,
+                missing=queries.options_not_in_business,
+                create="combo.option.create",
+            )
+        ]

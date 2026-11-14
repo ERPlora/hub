@@ -22,6 +22,7 @@ from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope
 from live.errors import Conflict, NotFound
 from live.operations import INTERNAL, operation
+from psycopg import sql
 
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
 from apps.combo.schemas import (
@@ -40,7 +41,7 @@ from apps.combo.schemas import (
     ResolveIn,
     SaleComboPage,
 )
-from apps.inventory.models import ProductCategory, Unit
+from apps.inventory.models import Product, ProductCategory, Unit
 from apps.tax.models import TaxCategory
 from base import images
 from base.queries import business_language, image_library
@@ -877,3 +878,59 @@ def resolve(ctx: OperationContext, data: ResolveIn) -> dict:
         # The till's 409: a 404 also means «this app is not active here», which is another fix.
         raise Conflict(missing.message, code="combo.combo_missing") from None
     return resolve_line(combo, data, takeaway_targets())
+
+
+# ── A separate copy of the business (BASE-F114): what Menus gives back from it ──────────────────────────────────────
+
+#: What a choice of a separate copy is read with: its id there and what ``combo.option.create`` takes, each a column
+#: since ``0001_initial``.
+OPTION_FIELDS = ("id", "group_id", "product_id", "price_delta", "is_available")
+
+
+def options_in_copy(conn) -> list[dict]:
+    """Each choice of a separate copy of the business, of a product Inventory had not deleted there, with what
+    ``OPTION_FIELDS`` names, course by course in its order; nothing where the app's table is not there. ``conn`` is the
+    copy's direct, read-only connection: it is read by its own SQL over the models' names, never the ORM."""
+    option, product = ChoiceOption._meta, Product._meta
+    if conn.execute("SELECT to_regclass(%s)", [option.db_table]).fetchone()[0] is None:
+        return []
+
+    def column(meta, field: str) -> sql.Identifier:
+        return sql.Identifier(meta.get_field(field).column)
+
+    read = sql.SQL(
+        "SELECT {columns} FROM {options} o JOIN {products} p ON p.{product_pk} = o.{product_id}"
+        " WHERE NOT p.{deleted} ORDER BY o.{group_id}, o.{order}, o.{option_pk}"
+    ).format(
+        columns=sql.SQL(", ").join(
+            sql.SQL("o.{}").format(column(option, field))
+            for field in ("id", "group", "product", "price_delta", "is_available")
+        ),
+        options=sql.Identifier(option.db_table),
+        products=sql.Identifier(product.db_table),
+        product_pk=column(product, "id"),
+        product_id=column(option, "product"),
+        deleted=column(product, "is_deleted"),
+        group_id=column(option, "group"),
+        order=column(option, "sort_order"),
+        option_pk=column(option, "id"),
+    )
+    return [dict(zip(OPTION_FIELDS, row, strict=True)) for row in conn.execute(read)]
+
+
+def options_not_in_business(options: list[dict]) -> list[dict]:
+    """The choices of a separate copy (``options_in_copy``) the business no longer offers, in their order, each as
+    ``combo.option.create`` takes it with its ``id`` there. Not lacking: one the business still holds, even with another
+    product it was given since, nor one whose product the business offers again in that course: it stays as the
+    business has it."""
+    held = set(ChoiceOption.objects.filter(pk__in=[one["id"] for one in options]).values_list("pk", flat=True))
+    taken = set(
+        ChoiceOption.objects.filter(group_id__in={one["group_id"] for one in options}).values_list(
+            "group_id", "product_id"
+        )
+    )
+    return [
+        {field: one[field] for field in OPTION_FIELDS}
+        for one in options
+        if one["id"] not in held and (one["group_id"], one["product_id"]) not in taken
+    ]
