@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:73466ade0191d641920c6c03a377ce430457f474ff249a1a490ad7d298db13ae -->
+<!-- generated from WORKBOOK.md sha256:c17f63ce331a609e58955d32739ca1871a764ba77d70162e029ab545bd26b0d7 -->
 
 ## What it is for and who it is for
 
@@ -342,10 +342,11 @@ Involved: INVENTORY-F04, INVENTORY-F07, INVENTORY-F34, MODIFIER-F10
 Status: done
 Actor: ERPlora's staff who run the platform, when a business asks for it (BASE-F114)
 Screen: none of Modifiers: in the Hubs admin, Separate copies › "Recover into the business…", with **Modifier groups,
-Modifier groups of categories, Modifier groups of products** ticked (it is, like everything that can be brought back)
+Modifier options, Modifier groups of categories, Modifier groups of products** ticked (it is, like everything that can
+be brought back)
 Steps:
-1. The staff recover from a separate copy with **Modifier groups, Modifier groups of categories, Modifier groups of
-   products** ticked. Modifiers always goes after Inventory, in whatever order it is asked: a deleted category or
+1. The staff recover from a separate copy with **Modifier groups, Modifier options, Modifier groups of categories,
+   Modifier groups of products** ticked. Modifiers always goes after Inventory, in whatever order it is asked: a deleted category or
    product that comes back is already live when its groups are linked to it.
 2. First, each group of the copy the business no longer has (it deleted it, and deleting it takes its options and its
    links with it, F03) is created again as the Modifiers screen creates it (F02), with its name, its kitchen ticket
@@ -353,40 +354,55 @@ Steps:
    group's sheet adds them (F04), each with its name, its kitchen ticket name, its supplement, its own tax category,
    whether it comes chosen by default and its order. It comes back as a new group, with another identifier, and in the
    next steps its links of the copy are made to that one: the one the recovery brought back with its name.
-3. Each group that in the copy hung from a product live in it and that the business no longer has linked to that
+3. Then, each option that in the copy had a group the business keeps (the same one, even renamed, or the one an
+   earlier recovery brought back with its name) and that this group no longer has, because the business took it away
+   (F04), is added again as the group's sheet adds it (F04), with its name, its kitchen ticket name, its supplement,
+   its own tax category and its order. If in the copy it came chosen by default, it comes back chosen only if the
+   group has room for it: it never takes that from the ones the business chose. In a "choose one" group that already
+   comes with another one by default, or in one that already comes with as many as its maximum, it comes back not
+   chosen and its note says so.
+4. Each group that in the copy hung from a product live in it and that the business no longer has linked to that
    product is linked again, as the group's sheet links it (MODIFIER-F05): the product asks again at the till for its
    sauces, its doneness or its extras. A product the business no longer had at all comes back as a new one, with
    another identifier (INVENTORY-F01): its groups are linked to that one, the one the recovery made with its SKU.
-4. Before that, the same with each group that in the copy hung from a category live in it and that the business no
+5. Before that, the same with each group that in the copy hung from a category live in it and that the business no
    longer has linked to that category: all the category's products ask for it again. A deleted category always comes
    back as a new one, with another identifier (INVENTORY-F07): its groups are linked to that one, the one the recovery
    brought back with its name.
-5. Recoveries counts each thing apart: "Modifier groups: 1 created", "Modifier groups of categories: 2 created" and
-   "Modifier groups of products: 2 created".
+6. Recoveries counts each thing apart: "Modifier groups: 1 created", "Modifier options: 1 created", "Modifier groups
+   of categories: 2 created" and "Modifier groups of products: 2 created".
 In: the separate copy and what the business has today.
-Out: a group for each one that was missing, with its group-created notice (`modifier.group.created`) and that of each
-of its options (`modifier.option.created`), and a link for each one that was missing, with its link-made notice
-(`modifier.link.attached`), all made by the recovery, so no automation starts (FLOW-F21); nothing else. The open screens of Modifiers, the till and Kitchen's routing see at
-once the product that comes back, as they saw it being deleted; those of Modifiers and the till, also each group that
-hangs again from a category or a product.
+Out: a group for each one that was missing, with its group-created notice (`modifier.group.created`) and that of each of
+its options (`modifier.option.created`), an option for each one a group the business keeps was missing, with its
+option-created notice (`modifier.option.created`), and a link for each one that was missing, with its link-made notice
+(`modifier.link.attached`), all made by the recovery, so no automation starts (FLOW-F21); nothing else. The open screens
+of Modifiers, the till and Kitchen's routing see at once the product that comes back, as they saw it being deleted;
+those of Modifiers and the till, also each group that hangs again from a category or a product.
 If it fails: a link the business still has stays as it is, and one whose group the business has linked to that product
-or that category again is not repeated: the business's own stays, and asking again links nothing twice. A group the business unlinked
-from a product by hand after the copy comes back too, like everything the business no longer has (BASE-F114). What the
-group's sheet does not accept today does not come back and Recoveries says why, by the link's identifier in the copy:
-a product that stays deleted or that the business no longer has (Products was not recovered, or the business already
-made another one by hand with its SKU, which keeps the groups it linked to it) or a group the business deleted and
-already made again by hand with its name ("not_found: …"). That group made by hand stays as the business left it, with
-its options and its links: no other one is created with its name, and nothing is added to it or linked. A group the
-business keeps, even renamed, also stays with the options it has; an option it took away does not come back yet
-(hub#1505). An option the group's sheet does not accept today (its own tax category is no longer active in Taxes) does
-not come back: the group comes back without it, its count says so ("Modifier groups: 1 created, 1 with notes") and its
-page says in "notes" which option and why, by the group's identifier in the copy. Asking again creates no group twice:
-the one the recovery brought back is the business's already. The product a recovery made is
-known by its SKU, whether this recovery made it or an earlier one: asked again from an earlier copy, it gets back the
-groups the business unlinked from it afterwards, like everything it no longer has. The same with the categories: one
-that stays deleted (Products was not recovered) or that the business already made again by hand with its name, which
-keeps the groups it linked to it, gets none and Recoveries says why ("not_found: …"); the one a recovery brought back is
-known by its name, whether this recovery brought it back or an earlier one.
+or that category again is not repeated: the business's own stays, and asking again links nothing twice. A group the
+business unlinked from a product by hand after the copy comes back too, like everything the business no longer has
+(BASE-F114). What the group's sheet does not accept today does not come back and Recoveries says why, by the link's
+identifier in the copy: a product that stays deleted or that the business no longer has (Products was not recovered, or
+the business already made another one by hand with its SKU, which keeps the groups it linked to it) or a group the
+business deleted and already made again by hand with its name ("not_found: …"). That group made by hand stays as the
+business left it, with its options and its links: no other one is created with its name, and nothing is added to it or
+linked. A group the business keeps, even renamed, stays with the options it has, changed or not, and only gets back the
+ones it took away; one the business already made again with its name in that group, the case aside, is not repeated: the
+business's own stays. An option chosen by default that does not fit comes back not chosen, the business's stay chosen,
+and its count says so ("Modifier options: 1 created, 1 with notes"), with the note "came back not chosen by default: its
+group already comes with "Ketchup"" by the option's identifier in the copy. An option the group's sheet does not accept
+today (its own tax category is no longer active in Taxes, or the group already has 100 options) does not come back and
+its reason says why, and none comes back to a group the business deleted and made again by hand ("not_found: …"). The
+options of a group that comes back whole in that same recovery come back with it and are not counted twice: of those,
+one the group's sheet does not accept today (its own tax category is no longer active in Taxes) does not come back: the
+group comes back without it, its count says so ("Modifier groups: 1 created, 1 with notes") and its page says in "notes"
+which option and why, by the group's identifier in the copy. Asking again creates no group twice: the one the recovery
+brought back is the business's already. The product a recovery made is known by its SKU, whether this recovery made it
+or an earlier one: asked again from an earlier copy, it gets back the groups the business unlinked from it afterwards,
+like everything it no longer has. The same with the categories: one that stays deleted (Products was not recovered) or
+that the business already made again by hand with its name, which keeps the groups it linked to it, gets none and
+Recoveries says why ("not_found: …"); the one a recovery brought back is known by its name, whether this recovery
+brought it back or an earlier one.
 Involved: BASE-F114, INVENTORY-F01, INVENTORY-F07, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
 
 ## Services: what goes in and what comes out
