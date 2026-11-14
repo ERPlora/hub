@@ -15,15 +15,20 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 from live import assistant as shared
-from live.context import OperationContext, Scope
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, comparable, probe_phrases
+from base.tests.test_assistant_asks import (
+    TOP,
+    assert_its_asks_bring,
+    assert_offered_with_room,
+    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
+    comparable,
+    offered_place,
+    probe_phrases,
+)
 
-A = Scope("host", "a")
 OWNER, ADMIN, MANAGER, EMPLOYEE = (
     Membership.Role.OWNER,
     Membership.Role.ADMIN,
@@ -65,9 +70,6 @@ REPORTED = [
      "renombra Sin azúcar QA como «Sin azúcar ni edulcorante QA» y quítala como opción predeterminada"),
     (EMPLOYEE, "modifier.selection.resolve", "¿cuánto cuesta un Café con Sin azúcar QA y qué nota manda a cocina?"),
 ]
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a request of the QA may bring its tool: half of them, so
-#: twenty tools of the apps that say their asks later may climb past it before the model loses it.
-WITH_ROOM = 20
 #: Every probe of layer 2 of Modifiers, the owner's and the employee's real phrases: the ones above and the ones the
 #: model got right, or refused right (an employee asking for a write it does not hold).
 PROBES = [
@@ -105,35 +107,6 @@ OWN_WORDS = [
 BY_DEFAULT = "la salsa de la casa ya no tiene que salir como predeterminada"
 
 
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
-
-
-def offered_place(
-    tools: dict[str, Operation], name: str, phrase: str, synonyms=assistant.SYNONYMS, language: str = "es"
-) -> int | None:
-    """The place a turn in ``language`` offers ``name`` at for ``phrase`` (1 is first), ``None`` when it is not offered;
-    with the Hub's ``synonyms`` unless others are given."""
-    ranking = {**assistant.RANKING, "synonyms": synonyms}
-    offered = [op.name for op in shared.relevant(tools, [phrase], language, **ranking)]
-    return offered.index(name) + 1 if name in offered else None
-
-
-def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str) -> int | None:
-    """``offered_place`` of a tool the person holds for a ``phrase`` that is none of its asks in Spanish."""
-    assert name in tools  # positive control: the person holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    return offered_place(tools, name, phrase)
-
-
 def test_modifiers_is_listed_so_layer_1_sweeps_every_ask_of_it():
     """Modifiers is in ``LIVE_ASSISTANT_ASKS_REQUIRED``: ``base/tests/test_assistant_asks.py`` ranks each of its asks
     for every role and language, and ``live.E020`` requires them of each of its tools."""
@@ -169,9 +142,7 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("role", "name", "phrase"), REPORTED, ids=[f"{role}-{name}" for role, name, _ in REPORTED])
 def test_the_reported_modifier_request_offers_its_existing_operation(catalog_of, role, name, phrase):
-    tools = catalog_of(role, "es")
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= WITH_ROOM, place
+    assert_offered_with_room(catalog_of(role, "es"), name, phrase)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -188,8 +159,7 @@ def test_every_probe_of_modifiers_offers_its_tool_without_being_one_of_its_asks(
     if role == EMPLOYEE and name in NOT_THE_EMPLOYEES:
         assert name not in tools
         return
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= WITH_ROOM, place
+    assert_offered_with_room(tools, name, phrase)
 
 
 def test_the_probes_of_modifiers_are_read():
@@ -215,8 +185,8 @@ def test_the_hub_reads_predeterminada_as_the_default():
 def test_a_request_with_predeterminada_reaches_the_change_of_an_option_by_the_hubs_synonyms(catalog_of):
     tools = catalog_of(OWNER, "es")
     assert comparable(BY_DEFAULT) not in probe_phrases()
-    place = place_of_no_ask(tools, "modifier.option.update", BY_DEFAULT)
-    assert place is not None and place <= TOP, place
+    assert_offered_with_room(tools, "modifier.option.update", BY_DEFAULT, room=TOP)
+
     without = tuple(group for group in assistant.SYNONYMS if "predeterminada" not in group)
     assert len(without) == len(assistant.SYNONYMS) - 1  # positive control: one group is left out, the default's
     unread = offered_place(tools, "modifier.option.update", BY_DEFAULT, synonyms=without)

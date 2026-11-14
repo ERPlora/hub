@@ -11,15 +11,16 @@ from pathlib import Path
 
 import pytest
 from django.conf import settings
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import (
     assert_its_asks_bring,
+    assert_offered_with_room,
     catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
     comparable,
-    place_of_no_ask,
+    offered_to,
     probe_phrases,
 )
 
@@ -60,9 +61,6 @@ REPORTED = [
     ("tax.rule.end", "haz que la regla española de product.qa deje de aplicarse después del 31/12/2026 inclusive"),
 ]
 
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a request of the QA may bring its tool: half of them, so
-#: twenty tools of the apps that say their asks later may climb past it before the model loses it.
-WITH_ROOM = 20
 #: Every probe of layer 2 of Taxes, the owner's and the employee's real phrases of the QA: the three above and the
 #: ones the model got right.
 PROBES = [
@@ -101,13 +99,6 @@ OWN_WORDS = [
     ("tax.rule.activate", "recupera el IVA del calzado"),
     ("tax.settings.update", "nos mudamos a Ceuta: que los impuestos sean los de allí"),
 ]
-
-
-def assert_offered_with_room(tools: dict[str, Operation], name: str, phrase: str) -> None:
-    """That ``phrase``, a person's real words of layer 2 and none of the asks of tool ``name``, brings it among the first
-    ``WITH_ROOM`` a turn offers."""
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= WITH_ROOM, place
 
 
 def test_tax_offers_its_eighteen_tools():
@@ -158,7 +149,8 @@ def test_every_probe_of_taxes_offers_its_tool_to_whoever_may_run_it(catalog_of, 
 @pytest.mark.parametrize(("name", "instead"), CHOSEN_INSTEAD)
 def test_the_reported_request_offers_its_tool_before_the_switch_of_an_app(catalog_of, name, instead):
     tools = catalog_of(Membership.Role.OWNER, "es")
-    offered = [op.name for op in assistant.relevant(tools, [dict(REPORTED)[name]], "es")]
+    offered = offered_to(tools, dict(REPORTED)[name])
+
     assert instead in tools  # positive control: what comes ahead is a tool of the owner too
     assert name in offered, offered[:10]
     assert instead not in offered or offered.index(name) < offered.index(instead), offered[:10]

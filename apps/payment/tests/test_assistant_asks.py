@@ -16,15 +16,21 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 from live import assistant as shared
-from live.context import OperationContext, Scope
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, comparable, probe_phrases
+from base.tests.test_assistant_asks import (
+    TOP,
+    assert_its_asks_bring,
+    assert_offered_with_room,
+    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
+    comparable,
+    offered_to,
+    place_in,
+    probe_phrases,
+)
 
-A = Scope("host", "a")
 #: Every write of Payments: an employee only looks (``payment.view_payment``), and none of them is a write a manager
 #: approves, so an employee's assistant is never offered them and answers it has no permission (``expect: refused``).
 NOT_THE_EMPLOYEES = {
@@ -56,9 +62,6 @@ REPORTED = [
     ("payment.method.activate", "vuelve a habilitar Banco QA para registrar pagos salientes"),
 ]
 
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a request of the QA may bring its tool: half of them, so
-#: the apps that say their asks later may push it down before the model loses it.
-WITH_ROOM = 20
 #: Every probe of layer 2 of Payments, the owner's and the employee's real phrases of the QA: the six above and the ones
 #: the model got right, or refused as it should.
 PROBES = [
@@ -83,35 +86,6 @@ TENDERS = [
     for probe in json.loads(path.read_text(encoding="utf-8"))["probes"]
     if probe["tool"].startswith(TILLS) and probe["language"] == "es" and probe["role"] == "owner"
 ]
-
-
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
-
-
-def offered_to(tools: dict[str, Operation], phrase: str, language: str = "es") -> list[str]:
-    return [op.name for op in assistant.relevant(tools, [phrase], language)]
-
-
-def place(offered: list[str], name: str) -> int | None:
-    return offered.index(name) + 1 if name in offered else None
-
-
-def assert_offered_with_room(tools: dict[str, Operation], name: str, phrase: str) -> None:
-    """``phrase``, a probe of layer 2, is none of the asks of tool ``name``, and a turn offers ``name`` for it among the
-    first ``WITH_ROOM``."""
-    assert name in tools  # positive control: the person holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    offered = offered_to(tools, phrase)
-    assert name in offered[:WITH_ROOM], (place(offered, name), offered[:10])
 
 
 def test_payment_offers_its_thirteen_tools():
@@ -173,8 +147,8 @@ def test_where_the_business_pays_a_supplier_from_goes_ahead_of_the_tills_tender(
     offered = offered_to(catalog_of(ROLES[probe["role"]], "es"), probe["phrase"])
     tender = TENDER_OF[probe["tool"]]
     assert tender in offered  # positive control: the tender competes in the ranking
-    mine = place(offered, probe["tool"]) or len(offered) + 1  # not offered: behind the tender
-    assert mine < place(offered, tender), (mine, place(offered, tender))
+    mine = place_in(offered, probe["tool"]) or len(offered) + 1  # not offered: behind the tender
+    assert mine < place_in(offered, tender), (mine, place_in(offered, tender))
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -183,8 +157,8 @@ def test_a_tender_of_the_till_is_never_taken_for_where_the_business_pays_its_sup
     """The other way round: how a customer pays at the till (Sales' probes) never puts a Payments' method ahead of the
     till's tender it asks for, whatever place the tender itself has."""
     offered = offered_to(catalog_of(Membership.Role.OWNER, "es"), probe["phrase"])
-    outgoing = [place(offered, name) for name in offered if name.startswith(OUTGOING)]
-    tender = place(offered, probe["tool"]) or len(offered) + 1
+    outgoing = [place_in(offered, name) for name in offered if name.startswith(OUTGOING)]
+    tender = place_in(offered, probe["tool"]) or len(offered) + 1
     assert all(tender < at for at in outgoing), (tender, outgoing)
 
 
@@ -195,7 +169,7 @@ def test_a_tender_of_the_till_is_never_taken_for_where_the_business_pays_its_sup
 def test_the_reported_request_to_bring_a_method_back_goes_ahead_of_turning_an_app_on(catalog_of):
     offered = offered_to(catalog_of(Membership.Role.OWNER, "es"), dict(REPORTED)["payment.method.activate"])
     assert "base.app.enable" in offered  # positive control: turning an app on competes in the ranking
-    assert place(offered, "payment.method.activate") < place(offered, "base.app.enable"), offered[:10]
+    assert place_in(offered, "payment.method.activate") < place_in(offered, "base.app.enable"), offered[:10]
 
 
 #: Where the business pays from in the Hub's words (``base.assistant.SYNONYMS``): a «cuenta bancaria» or «cuenta del
@@ -233,11 +207,10 @@ def without_the_bank_account():
 @pytest.mark.parametrize(("language", "name", "phrase"), PAYMENT_WORDS)
 def test_a_bank_account_said_by_its_name_brings_the_payments_method(catalog_of, language, name, phrase):
     tools = catalog_of(Membership.Role.OWNER, language)
-    ranking = {**assistant.RANKING, "synonyms": without_the_bank_account()}
     offered = offered_to(tools, phrase, language)
-    assert name in offered[:TOP], (place(offered, name), offered[:TOP])
-    unnamed = [op.name for op in shared.relevant(tools, [phrase], language, **ranking)]
-    assert name not in unnamed[:TOP], place(unnamed, name)
+    assert name in offered[:TOP], (place_in(offered, name), offered[:TOP])
+    unnamed = offered_to(tools, phrase, language, synonyms=without_the_bank_account())
+    assert name not in unnamed[:TOP], place_in(unnamed, name)
 
 
 #: What a person says in words of their own, neither an ask nor a probe of layer 2 (nor an ask with a word changed), one

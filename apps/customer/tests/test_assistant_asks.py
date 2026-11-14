@@ -18,6 +18,7 @@ from base.models import Membership
 from base.tests.test_assistant_asks import (
     assert_its_asks_bring,
     catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
+    offered_to,
 )
 
 from .conftest import ctx_for
@@ -69,7 +70,7 @@ WITH_ROOM = 7
 def test_a_customers_orders_bring_the_tool_of_customers_with_room_to_spare(catalog_of, role, language, name, phrase):
     tools = catalog_of(role, language)
     assert name in tools  # positive control: the role holds the tool, so its place is known
-    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
+    offered = offered_to(tools, phrase, language)
     assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:WITH_ROOM])
 
 
@@ -139,7 +140,7 @@ def test_a_merge_by_two_phones_offers_the_existing_operation_with_room_to_spare(
     tools = catalog_of(Membership.Role.OWNER, language)
     name = "customer.customer.merge"
     assert name in tools  # positive control: the owner holds it, so the model can receive it
-    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
+    offered = offered_to(tools, phrase, language)
     assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:WITH_ROOM])
 
 

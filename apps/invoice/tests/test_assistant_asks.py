@@ -21,10 +21,11 @@ from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import (
     assert_its_asks_bring,
+    assert_offered_with_room,
     assert_reported_are_owner_probes,
-    context_of,  # noqa: F401 (a fixture: the tests below take it by name)
+    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
     offered_place,
-    place_of_no_ask,
+    offered_to,
     without_its_asks,
 )
 
@@ -95,9 +96,6 @@ REPORTED = [
         "Mayor 1",
     ),
 ]
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) any request of the QA may bring its tool: half of them, so
-#: twenty tools of the apps that say their asks later may climb past it before the model loses it.
-WITH_ROOM = 20
 #: How far down the tools a turn offers the reported requests bring theirs: among the first eight, the three
 #: ``ALWAYS`` in front, so the model sees the write it was asked for near the top and calls it.
 NEAR_THE_TOP = 8
@@ -208,13 +206,6 @@ OWN_WORDS = [
 ]
 
 
-def assert_offered_within(tools, name: str, phrase: str, within: int) -> None:
-    """That ``phrase``, a person's words and none of the asks of tool ``name``, brings it among the first ``within`` a
-    turn offers."""
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= within, place
-
-
 def test_invoice_offers_its_twenty_five_tools():
     """Invoicing's assistant tools (``AI``, never ``INTERNAL``): a silent drop of a tool fails."""
     tools = {name for name, op in registry.items() if op.app_label == "invoice" and assistant.is_tool(op)}
@@ -223,14 +214,14 @@ def test_invoice_offers_its_twenty_five_tools():
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
-def test_an_employee_is_never_offered_what_rectifies_numbers_or_names_who_issues(context_of):
+def test_an_employee_is_never_offered_what_rectifies_numbers_or_names_who_issues(catalog_of):
     for role, lacked in (
         (Membership.Role.OWNER, set()),
         (Membership.Role.ADMIN, set()),
         (Membership.Role.MANAGER, NOT_THE_MANAGERS),
         (Membership.Role.EMPLOYEE, NOT_THE_EMPLOYEES),
     ):
-        offered = {name for name in assistant.catalog(context_of(role, "es")) if name.startswith("invoice.")}
+        offered = {name for name in catalog_of(role, "es") if name.startswith("invoice.")}
         assert offered == TOOLS - lacked, role
     # Positive control: an employee marks an invoice paid and replaces a ticket (INVOICE-F05, INVOICE-F19).
     assert {"invoice.invoice.mark_paid", "invoice.invoice.substitute"} <= TOOLS - NOT_THE_EMPLOYEES
@@ -243,26 +234,26 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED, ids=[name for name, _ in REPORTED])
-def test_the_reported_invoice_request_offers_its_existing_operation(context_of, name, phrase):
-    assert_offered_within(assistant.catalog(context_of(Membership.Role.OWNER, "es")), name, phrase, WITH_ROOM)
+def test_the_reported_invoice_request_offers_its_existing_operation(catalog_of, name, phrase):
+    assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), THE_ISSUES)
-def test_the_request_of_the_issue_offers_its_write_near_the_top(context_of, name, phrase):
+def test_the_request_of_the_issue_offers_its_write_near_the_top(catalog_of, name, phrase):
     """The owner asks to mark an invoice paid or to rectify it, and the write is among the first eight a turn
     offers, so the model calls it and its card comes (INVOICE-F08, INVOICE-F19)."""
-    assert_offered_within(assistant.catalog(context_of(Membership.Role.OWNER, "es")), name, phrase, NEAR_THE_TOP)
+    assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase, room=NEAR_THE_TOP)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
-def test_every_probe_of_invoicing_offers_its_tool_without_being_one_of_its_asks(context_of, probe):
+def test_every_probe_of_invoicing_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
     """The owner's twenty-five phrases of layer 2, the ones the model answered right too: a tool of Invoicing that a
     new ask elsewhere pushes out of the first twenty fails here before the real-model QA sees it."""
     assert (probe["app"], probe["language"]) == ("invoice", "es")
-    tools = assistant.catalog(context_of(ROLES[probe["role"]], "es"))
-    assert_offered_within(tools, probe["tool"], probe["phrase"], WITH_ROOM)
+    tools = catalog_of(ROLES[probe["role"]], "es")
+    assert_offered_with_room(tools, probe["tool"], probe["phrase"])
 
 
 @pytest.mark.parametrize("words", [words for words in PAID if words != "paid"])  # «paid» is its own stem already
@@ -291,15 +282,14 @@ def without_the_paid_group():
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-def test_an_invoice_said_paid_brings_marking_it_paid_by_the_hubs_words(context_of):
+def test_an_invoice_said_paid_brings_marking_it_paid_by_the_hubs_words(catalog_of):
     """«marca como cobrada la FACT-2026-000001»: with the Hub's words of a paid invoice, marking it paid is among the
     first eight; without them, behind the reads and writes of the sale a «cobrada» names, it is not."""
-    tools = assistant.catalog(context_of(Membership.Role.OWNER, "es"))
+    tools = catalog_of(Membership.Role.OWNER, "es")
     phrase = "marca como cobrada la FACT-2026-000001"
-    offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
+    offered = offered_to(tools, phrase)
     assert "invoice.invoice.mark_paid" in offered[:NEAR_THE_TOP], offered[:NEAR_THE_TOP]
-    ranking = {**assistant.RANKING, "synonyms": without_the_paid_group()}
-    unnamed = [op.name for op in shared.relevant(tools, [phrase], "es", **ranking)]
+    unnamed = offered_to(tools, phrase, synonyms=without_the_paid_group())
     assert "invoice.invoice.mark_paid" not in unnamed[:NEAR_THE_TOP], unnamed[:NEAR_THE_TOP]
 
 
@@ -315,8 +305,8 @@ def test_each_tool_of_invoicing_has_its_own_words_in_each_language():
 @pytest.mark.parametrize(
     ("language", "name", "phrase"), OWN_WORDS, ids=[f"{name}-{language}" for language, name, _ in OWN_WORDS]
 )
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(context_of, language, name, phrase):
-    assert_its_asks_bring(assistant.catalog(context_of(Membership.Role.OWNER, language)), name, phrase, language)
+def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, language, name, phrase):
+    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, language), name, phrase, language)
 
 
 #: The tools of Sales whose asks speak of an invoice, by language: printing a sale's copy and what a sale issues by
@@ -329,11 +319,11 @@ SALES_OF_AN_INVOICE = [("en", "sale.sale.print", "invoice"), ("es", "sale.settin
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("language", "name", "word"), SALES_OF_AN_INVOICE, ids=[n for _, n, _ in SALES_OF_AN_INVOICE])
 def test_invoicings_asks_take_no_place_from_the_asks_of_sales_that_speak_of_an_invoice(
-    context_of, language, name, word
+    catalog_of, language, name, word
 ):
     """An ask of Sales that says «factura» or «invoice» brings its tool to the very place it has without the asks of
     Invoicing: the words of the twenty-five tools here push no request of the till down."""
-    tools = assistant.catalog(context_of(Membership.Role.OWNER, language))
+    tools = catalog_of(Membership.Role.OWNER, language)
     unasked = tools
     for tool in TOOLS:
         unasked = without_its_asks(unasked, tool)

@@ -22,12 +22,15 @@ from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import (
     assert_its_asks_bring,
+    assert_offered_with_room,
     assert_reported_are_owner_probes,
     catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
     comparable,
+    offered_place,
+    offered_to,
     probe_phrases,
 )
-from base.tests.test_assistant_asks import offered_place as place
+
 PROBES_DIR = Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes"
 
 #: The requests of the real-model QA (``tests/e2e/qa/probes/owner-es-service-2026-11-08.json``) as the owner said them,
@@ -63,9 +66,6 @@ REPORTED = [
     ),
 ]
 
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a request of the QA may bring its tool: half of them, so
-#: twenty tools of the apps that say their asks later may climb past it before the model loses it.
-WITH_ROOM = 20
 #: Every probe of layer 2 of Services, the owner's real phrases of the QA: the eleven above and the ones the model got
 #: right.
 PROBES = json.loads((PROBES_DIR / "owner-es-service-2026-11-08.json").read_text(encoding="utf-8"))["probes"]
@@ -185,14 +185,6 @@ def neighbour_probes() -> list[dict]:
     ]
 
 
-def offered_with_room(tools: dict[str, Operation], name: str, phrase: str) -> None:
-    """``phrase`` is none of ``name``'s asks, and a turn offers ``name`` for it among the first ``WITH_ROOM``."""
-    assert name in tools  # positive control: the owner holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    found = place(tools, name, phrase)
-    assert found is not None and found <= WITH_ROOM, found
-
-
 def without_services_asks(tools: dict[str, Operation]) -> dict[str, Operation]:
     """``tools`` with Services' tools saying no asks: how a turn ranked them before Services said its own."""
     return {
@@ -218,7 +210,7 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_service_request_offers_its_existing_operation(catalog_of, name, phrase):
     tools = catalog_of(Membership.Role.OWNER, "es")
-    offered_with_room(tools, name, phrase)
+    assert_offered_with_room(tools, name, phrase)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -229,7 +221,7 @@ def test_every_probe_of_services_offers_its_tool_without_being_one_of_its_asks(c
     assert (probe["app"], probe["role"], probe["language"]) == ("service", "owner", "es")
     tools = catalog_of(Membership.Role.OWNER, probe["language"])
     name, phrase = probe["tool"], probe["phrase"]
-    offered_with_room(tools, name, phrase)
+    assert_offered_with_room(tools, name, phrase)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -239,7 +231,7 @@ def test_every_probe_of_services_offers_its_tool_without_being_one_of_its_asks(c
 def test_the_probes_that_come_close_stay_among_the_first_ten(catalog_of, probe):
     """What its own asks give each of these tools: without them, more than half of them would fall behind the tenth
     (the session's release 17th, the voucher's redemption 17th, the service settings 19th)."""
-    found = place(catalog_of(Membership.Role.OWNER, "es"), probe["tool"], probe["phrase"])
+    found = offered_place(catalog_of(Membership.Role.OWNER, "es"), probe["tool"], probe["phrase"])
     assert found is not None and found <= 10, found
 
 
@@ -267,7 +259,7 @@ def test_services_leaves_room_to_the_asks_of_other_apps_it_moves(catalog_of, nam
     for role in Membership.Role:
         tools = catalog_of(role, language)
         if name in tools:
-            places[role] = place(tools, name, ask, language)
+            places[role] = offered_place(tools, name, ask, language)
     assert places  # positive control: some role holds the tool
     assert {role: found for role, found in places.items() if found is None or found > TOP - ROOM} == {}
 
@@ -310,8 +302,8 @@ def test_the_groups_of_services_bring_a_new_request_to_its_tool(catalog_of, name
     tools = catalog_of(Membership.Role.OWNER, "es")
     assert comparable(phrase) not in probe_phrases()
     assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    assert name in ranked(tools, phrase)[:10]
-    assert name not in ranked(tools, phrase, without_services_groups())[:10]
+    assert name in offered_to(tools, phrase)[:10]
+    assert name not in offered_to(tools, phrase, synonyms=without_services_groups())[:10]
 
 
 #: Services' own records that the words of a check or an appointment («el bono», «la sesión», «asigna») are of too:
@@ -334,12 +326,6 @@ def without_services_groups() -> tuple[tuple[str, ...], ...]:
     kept = tuple(group for group in assistant.SYNONYMS if not {"bono", "asignacion"} & set(group))
     assert len(assistant.SYNONYMS) - len(kept) == 2  # positive control: both of Services' groups are there
     return kept
-
-
-def ranked(tools: dict[str, Operation], phrase: str, synonyms: tuple | None = None) -> list[str]:
-    """The tools a turn offers for ``phrase`` in Spanish, as ``base.assistant.RANKING`` ranks, with ``synonyms``."""
-    ranking = {**assistant.RANKING} if synonyms is None else {**assistant.RANKING, "synonyms": synonyms}
-    return [op.name for op in shared.relevant(tools, [phrase], "es", **ranking)]
 
 
 def passed_by(offered: list[str], name: str) -> set[str] | None:
@@ -372,7 +358,7 @@ def test_services_asks_take_no_place_from_sales_nor_appointments(catalog_of):
     lost = {}
     for probe in probes:
         name, phrase = probe["tool"], probe["phrase"]
-        if (passed := lost_places(ranked(before, phrase), ranked(tools, phrase), name)) != set():
+        if (passed := lost_places(offered_to(before, phrase), offered_to(tools, phrase), name)) != set():
             lost[probe["id"]] = passed
     assert lost == {}
 
@@ -387,7 +373,8 @@ def test_services_groups_take_no_place_from_sales_nor_appointments(catalog_of):
     lost, named = {}, []
     for probe in probes:
         name, phrase = probe["tool"], probe["phrase"]
-        if (passed := lost_places(ranked(tools, phrase, without), ranked(tools, phrase), name)) != set():
+        if (passed := lost_places(offered_to(tools, phrase, synonyms=without), offered_to(tools, phrase), name)
+) != set():
             if NAMES_AN_ASSIGNMENT.search(phrase) and passed:
                 named.append(probe["id"])
                 continue

@@ -14,15 +14,22 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 from live import assistant as shared
-from live.context import OperationContext, Scope
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, comparable, probe_phrases
+from base.tests.test_assistant_asks import (
+    TOP,
+    assert_its_asks_bring,
+    assert_offered_with_room,
+    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
+    comparable,
+    offered_place,
+    offered_to,
+    place_of_no_ask,
+    probe_phrases,
+)
 
-A = Scope("host", "a")
 #: The writes of Menus and combos: they need ``combo.manage``, which an employee does not hold, and none of them is one a
 #: manager approves, so an employee's assistant is never offered them (the QA's employee probes of them are refusals).
 WRITES = {
@@ -48,9 +55,6 @@ REPORTED = (
     "combo.option.reorder",
     "ordena las opciones de Platos QA del Menú QA así: flan, merluza, lentejas y café, incluyendo todas",
 )
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a probe of the QA may bring its tool: half of them, so the
-#: tools of the apps that say their asks later may climb past it before the model loses it.
-WITH_ROOM = 20
 PROBES_DIR = Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes"
 #: Every probe of layer 2 of Menus and combos, the owner's and the employee's real phrases from QA, and
 #: the owner's of the day a restaurant gets ready to sell.
@@ -88,31 +92,6 @@ OWN_WORDS = [
 CHOICES = ("opcion", "opciones", "eleccion", "elecciones", "option", "options", "choice", "choices")
 #: The places an ask of another app keeps free below the first ten: the asks of the next app to say its own take them.
 ROOM = 2
-
-
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
-
-
-def offered(tools: dict[str, Operation], phrase: str, language: str = "es", **ranking) -> list[str]:
-    """The tools a turn offers for ``phrase``, best first, ranked as ``base.assistant.RANKING`` says (or ``ranking``)."""
-    return [op.name for op in shared.relevant(tools, [phrase], language, **{**assistant.RANKING, **ranking})]
-
-
-def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str, language: str = "es") -> int | None:
-    """The place (1 is first) a turn offers ``name`` at for ``phrase``, none of its asks; ``None`` if not offered."""
-    assert name in tools  # positive control: the person holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get(language, ())}
-    ranked = offered(tools, phrase, language)
-    return ranked.index(name) + 1 if name in ranked else None
 
 
 def test_menus_and_combos_is_listed_so_layer_1_sweeps_every_ask_of_it():
@@ -153,7 +132,7 @@ def test_putting_the_choices_in_order_is_offered_ahead_of_deleting_and_creating_
     name, phrase = REPORTED
     place = place_of_no_ask(tools, name, phrase)
     assert place is not None and place <= TOP, place
-    ranked = offered(tools, phrase)
+    ranked = offered_to(tools, phrase)
     ahead = [tool for tool in ranked[: place - 1] if tool in WRITES]
     assert ahead == [], ahead
 
@@ -170,8 +149,7 @@ def test_every_probe_of_menus_offers_its_tool_to_whoever_may_run_it(catalog_of, 
         assert (probe["role"], probe["tool"] in WRITES) == ("employee", True)
         assert probe["tool"] not in tools
         return
-    place = place_of_no_ask(tools, probe["tool"], probe["phrase"], probe["language"])
-    assert place is not None and place <= WITH_ROOM, place
+    assert_offered_with_room(tools, probe["tool"], probe["phrase"], probe["language"])
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -204,9 +182,9 @@ def test_the_choices_named_as_elecciones_bring_their_reorder_only_with_the_hubs_
     tools = catalog_of(Membership.Role.OWNER, "es")
     phrase = "ordena las elecciones del segundo plato: pollo, merluza y tortilla"
     assert comparable(phrase) not in probe_phrases()
-    assert "combo.option.reorder" in offered(tools, phrase)[:TOP]
+    assert "combo.option.reorder" in offered_to(tools, phrase)[:TOP]
     without = tuple(group for group in assistant.SYNONYMS if group != CHOICES)
-    assert "combo.option.reorder" not in offered(tools, phrase, synonyms=without)[:TOP]
+    assert "combo.option.reorder" not in offered_to(tools, phrase, synonyms=without)[:TOP]
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
@@ -218,8 +196,6 @@ def test_a_value_of_a_customers_field_takes_no_place_from_the_choices_of_a_menu(
     the tenth place, the last ``base/tests/test_assistant_asks.py`` allows."""
     tools = catalog_of(role, language)
     name = "customer.field.update"
-    places = {}
-    for ask in shared.asks_of(tools[name])[language]:
-        ranked = offered(tools, ask, language)
-        places[ask] = ranked.index(name) + 1 if name in ranked else None
+    places = {ask: offered_place(tools, name, ask, language) for ask in shared.asks_of(tools[name])[language]}
+
     assert {ask: place for ask, place in places.items() if place is None or place > TOP - ROOM} == {}
