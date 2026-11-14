@@ -861,9 +861,10 @@ def test_a_subcategory_whose_return_would_close_a_loop_stays_where_it_is_and_is_
 @pytest.mark.parametrize("held", ["kept", "made_again_by_hand"])
 def test_a_category_the_business_kept_or_made_again_by_hand_is_its_own_and_gets_nothing_back_by_links(held):
     tax = make_tax("test.service", "Service — test")
+    # Untouched since before the category came to be, without a category and at the root.
+    gloss, toning = make_service("Gloss", tax=tax), make_category("Toning")
     # Brought back by an earlier recovery and kept since: the copy's own, live under its id.
     color = brought_back("Color", a_recovery())
-    gloss, toning = make_service("Gloss", tax=tax), make_category("Toning")
     if held == "made_again_by_hand":
         Category.objects.filter(pk=color.pk).update(is_deleted=True, deleted_at=timezone.now())
         make_category("COLOR", created_by="Ana Gil")

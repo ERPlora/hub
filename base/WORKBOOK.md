@@ -3105,10 +3105,12 @@ Pasos:
      nuevo para el negocio: no arranca ninguna de sus automatizaciones, así que a nadie se le da la bienvenida ni se le
      avisa otra vez de una cita que ya tenía (hub#1307).
      Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes**, **Categorías de productos,
-     Productos, Enlaces de productos a categorías**, **Categorías de servicios, Servicios**, **Citas, Citas
-     periódicas**, **Precios de tarifa** y **Grupos de suplementos de productos**). Pulsa **Recuperar**.
+     Productos, Enlaces de productos a categorías**, **Categorías de servicios, Servicios, Enlaces de servicios a
+     categorías, Enlaces de subcategorías a categorías**, **Citas, Citas periódicas**, **Precios de tarifa** y
+     **Grupos de suplementos de productos**). Pulsa **Recuperar**.
   10. Sale «1 copia aparte devolverá Clientes, Categorías de productos, Productos, Enlaces de productos a categorías,
-      Categorías de servicios, Servicios, Citas, Citas periódicas, Precios de tarifa, Grupos de suplementos de productos
+      Categorías de servicios, Servicios, Enlaces de servicios a categorías, Enlaces de subcategorías a categorías,
+      Citas, Citas periódicas, Precios de tarifa, Grupos de suplementos de productos
       a su negocio en unos minutos:
       Recuperaciones dice cómo
       fue.». En
@@ -3151,14 +3153,18 @@ Pasos:
       recuperación toca de lo que el negocio tiene, y se cuenta aparte, como «Enlaces de productos a categorías». Una
       categoría que el negocio conserva (aunque le quitara productos) o que volvió a crear a mano no se rellena. Con
       Servicios,
-      «Categorías de servicios: se creó 1; Servicios: se crearon 2» (las categorías y los servicios que volvieron, cada uno
-      con su cuenta): primero
+      «Categorías de servicios: se creó 1; Servicios: se crearon 2; Enlaces de servicios a categorías: se crearon 3;
+      Enlaces de subcategorías a categorías: se creó 1» (las categorías, los servicios y lo que el negocio conservaba y
+      volvió a ellas, cada uno con su cuenta): primero
       vuelve cada categoría de servicios que el negocio ya no tiene (la eliminó o la perdió), como una nueva, creada como
       la crea la pantalla de Categorías, con su nombre, descripción, icono, color y orden, dentro de su categoría padre si
-      el negocio la tiene o vuelve también (si no, en la raíz); la eliminada sigue eliminada. Vuelve con lo que tenía
-      dentro en la copia y el negocio conserva donde lo dejó eliminarla (SERVICE-F08): sus servicios que siguen sin
-      categoría, archivados también, y sus subcategorías que siguen colgando de donde colgaba ella (la raíz, si estaba en
-      la raíz), cada uno cambiado como lo cambia la pantalla. Lo que el negocio movió después (un servicio en otra
+      el negocio la tiene o vuelve también (si no, en la raíz); la eliminada sigue eliminada. Al final vuelve a ella lo
+      que tenía dentro en la copia y el negocio conserva donde lo dejó eliminarla (SERVICE-F08): sus servicios que siguen
+      sin categoría, archivados también, y sus subcategorías que siguen colgando de donde colgaba ella (la raíz, si estaba
+      en la raíz), cada uno cambiado como lo cambia la pantalla: es lo que la recuperación toca de lo que el negocio
+      tiene, y se cuenta aparte, como «Enlaces de servicios a categorías» y «Enlaces de subcategorías a categorías»; si
+      el negocio lo mueve mientras tanto, se queda donde lo puso y se cuenta «sin crear» con su porqué
+      (`service.service_moved`). Lo que el negocio movió después (un servicio en otra
       categoría, una subcategoría en otro sitio) se queda donde está, y la cuenta de la categoría lo dice («Categorías de
       servicios: se creó 1, 1 con notas»), con el porqué en sus notas («service.service_moved: volvió sin el servicio <su
       identificador>: se movió a otra categoría después»). Una que el negocio ya volvió

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a1721a80e54ceb99a400b7cd8f7baeb492fa3a515a9733f19d116bfc6af22f19 -->
+<!-- generated from WORKBOOK.md sha256:5e154a7cf3c5be73543f803b3c1c0e51122499bef3fffe42b692c1aca0bb62be -->
 
 ## What it is for and who it is for
 
@@ -371,8 +371,9 @@ If it fails: in the confirmation, the reason (for example, "That category does n
 business.").
 Involved: SERVICE-F07, SERVICE-F02, BASE-F114 (from a separate copy, the deleted category comes back as a new one,
 with the lost services inside it and with what the business kept where deleting it left it: its services without a
-category and its subcategories where it hung. What the business moved since stays where it is, and Recoveries says so
-in the category's notes. If it is asked again, the category is the business's already and is not filled: what the
+category and its subcategories where it hung, which Recoveries counts apart ("Service links to categories",
+"Subcategory links to categories"). What the business moved since stays where it is, and Recoveries says so in the
+category's notes. If it is asked again, the category is the business's already and is not filled: what the
 business took out of it since stays out)
 
 ### SERVICE-F09 Sell a service at the till

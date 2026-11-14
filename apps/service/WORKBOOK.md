@@ -389,8 +389,9 @@ servicios se quedan **sin categoría** y sus subcategorías pasan a colgar de su
 Si falla: en la confirmación, el motivo (por ejemplo, «Esa categoría no existe en este negocio.»).
 Implicados: SERVICE-F07, SERVICE-F02, BASE-F114 (desde una copia aparte, la categoría eliminada vuelve como una nueva,
 con los servicios perdidos dentro y con lo que el negocio conserva donde lo dejó eliminarla: sus servicios sin
-categoría y sus subcategorías donde colgaba ella. Lo que el negocio movió después se queda donde está, y Recuperaciones
-lo dice en las notas de la categoría. Si se pide otra vez, la categoría ya es del negocio y no se rellena: lo que le
+categoría y sus subcategorías donde colgaba ella, que Recuperaciones cuenta aparte («Enlaces de servicios a
+categorías», «Enlaces de subcategorías a categorías»). Lo que el negocio movió después se queda donde está, y
+Recuperaciones lo dice en las notas de la categoría. Si se pide otra vez, la categoría ya es del negocio y no se rellena: lo que le
 quitó después se queda fuera)
 
 ### SERVICE-F09 Vender un servicio en el TPV
