@@ -83,7 +83,7 @@ Configuración inicial, paso a paso:
 
 1. En **Facturación → Emisor**, escribe la razón social, el NIF y el domicilio del negocio y guarda.
 2. Si quieres otro prefijo, otro formato o continuar la numeración de otro sistema, crea **antes de la
-   primera venta del año** las series `TICKET` (Ticket F2), `FACT` (Factura F1) y `RECT` (Rectificativa
+   primera venta del año** las series `TICKET` (Tique F2), `FACT` (Factura F1) y `RECT` (Rectificativa
    R1) del año en curso con su «Siguiente número» (INVOICE-F12). Comprueba el «Siguiente número» al
    editarlas (INVOICE-F13).
 3. Haz una venta de prueba y comprueba en **Facturación → Facturas** que aparece su tique con el número
@@ -140,7 +140,7 @@ cancelada.») y el resultado «Rectificativa {número} emitida. {original} queda
 «Cerrar».
 
 ### Factura completa (sustituir un tique)
-Ventana que abre «Factura completa» en la ficha de un tique. Título «Factura completa del ticket
+Ventana que abre «Factura completa» en la ficha de un tique. Título «Factura completa del tique
 {número}», el buscador de clientes de Clientes (rellena los datos) y «Nombre o razón social», «País»,
 «Tipo de documento» (solo fuera de España), «NIF» y «Domicilio», todos obligatorios salvo el tipo.
 «Emitir factura completa» y «Cancelar». Al emitir, la ventana se cierra y la ficha abre la F3 nueva.
@@ -187,7 +187,7 @@ ninguna factura.»; si lo mandó la cuenta de ERPlora, «Datos recibidos de tu c
 ## Cambios sin guardar en Android
 
 En «Nueva factura manual», «Rectificar», «Nueva serie de numeración», «Editar serie» y «Factura completa del
-ticket», el botón atrás del móvil pregunta «¿Descartar los cambios?» cuando hay algo escrito o elegido sin guardar:
+tique», el botón atrás del móvil pregunta «¿Descartar los cambios?» cuando hay algo escrito o elegido sin guardar:
 «Seguir editando» conserva lo tecleado y «Descartar cambios» cierra la ventana sin guardarlo. Con la ventana como
 se abrió, atrás la cierra sin preguntar; la serie que la ventana elige sola al abrirse y el tipo que llega del
 territorio no cuentan como cambio, ni una rectificativa ya emitida: atrás cierra su resultado (BASE-F05).
@@ -231,7 +231,7 @@ Pasos:
    serie «TICKET» del año, fechada el día del negocio, con la fecha de operación del cobro, las líneas de
    la venta y el cliente si la venta tenía uno. La factura nace **«Pagada»** (el dinero ya está en la
    caja), con la hora del cobro, y el tique de Ventas ya lleva su número.
-3. La factura aparece en **Facturación → Facturas** como «Ticket», «Pagada», con «Origen» «Venta del
+3. La factura aparece en **Facturación → Facturas** como «Tique», «Pagada», con «Origen» «Venta del
    TPV».
 4. Se comprueba abriéndola: las líneas y el «Total» son los del tique de Ventas, al céntimo.
 Entra: la venta cobrada de Ventas (`sale.sale.completed`), leída de la propia venta: sus líneas con

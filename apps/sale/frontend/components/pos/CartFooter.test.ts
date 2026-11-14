@@ -46,7 +46,7 @@ describe('CartFooter', () => {
   it('the ticket discount row: the percentage, and what it takes off as the server says', async () => {
     const m = await setup({ discountPercent: '10.00', ticketDiscount: 139 }, 'es');
     const row = m.find('pos-ticket-discount-row');
-    expect(plain(row.text())).toContain('Descuento del ticket −10 %');
+    expect(plain(row.text())).toContain('Descuento del tique −10 %');
     expect(plain(row.text())).toContain('−1,39 €');
     const amount = await setup({ discountAmount: 500, ticketDiscount: 500 });
     expect(plain(amount.find('pos-ticket-discount-row').text())).toContain('−€5.00');

@@ -1,5 +1,5 @@
 // flow: Sales' panels on the Home (LiveAppConfig hooks) — the Home with Sales' four panels, as the owner of hub `a`
-// reads it in Spanish: «Ventas hoy» and «Tickets
+// reads it in Spanish: «Ventas hoy» and «Tiques
 // hoy» on by default with today's figures, both moving without a reload when another sale is charged, and «Ventas
 // últimos 7 días» and «Actividad reciente» turned on from «Customize panel». Each viewport leaves its capture with the
 // four panels on the board.
@@ -96,8 +96,8 @@ test('paneles de Ventas en el Inicio (hooks de LiveAppConfig): today\'s figures 
     const first = await charge(context);
     await page.reload();
 
-    // The defaults: «Ventas hoy» and «Tickets hoy», with what the server counts today.
-    for (const [key, title] of [['sale.today', 'Ventas hoy'], ['sale.tickets_today', 'Tickets hoy']]) {
+    // The defaults: «Ventas hoy» and «Tiques hoy», with what the server counts today.
+    for (const [key, title] of [['sale.today', 'Ventas hoy'], ['sale.tickets_today', 'Tiques hoy']]) {
       await expect(panel(page, key).locator('[data-testid="widget-title"]')).toHaveText(title);
     }
     await expect(panel(page, 'sale.last_7_days')).toHaveCount(0);
