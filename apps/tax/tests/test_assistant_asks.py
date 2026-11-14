@@ -15,14 +15,9 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    assert_its_asks_bring,
-    assert_offered_with_room,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    offered_to,
-    probe_phrases,
-)
+from base.tests.test_assistant_asks import assert_its_asks_bring, assert_offered_with_room, comparable, offered_to
+from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: Taxes' assistant tools: its reads (the calculator, categories, rules, aliases and the business's tax region) and
 #: its writes (categories, aliases, rules one by one or in a batch, their end, deactivation and reactivation, and the

@@ -12,14 +12,8 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    TOP,
-    assert_offered_with_room,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    place_of_no_ask,
-    probe_phrases,
-)
+from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, place_of_no_ask, probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: The requests of the real-model QA (``qa20261108.owner.es.inventory.*``), as the owner said them: each is offered its
 #: existing operation (among the ``MAX_TOOLS`` a turn offers, so the model can choose it), without being one of its

@@ -14,15 +14,9 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    PROBES,
-    TOP,
-    assert_offered_with_room,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    place_of_no_ask,
-    probe_phrases,
-)
+from base.tests.test_assistant_asks import PROBES, TOP, assert_offered_with_room, comparable, place_of_no_ask
+from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: The requests of the real-model QA (``owner.es.staff.*`` of ``owner-es-staff-2026-11-08.json``), as the owner said
 #: them: before Staff said its asks, none of these tools was among the ones a turn offers (``MAX_TOOLS``), so the model

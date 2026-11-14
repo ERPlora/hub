@@ -14,18 +14,10 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    PROBES,
-    TOP,
-    assert_its_asks_bring,
-    assert_offered_with_room,
-    assert_reported_are_owner_probes,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    offered_place,
-    offered_to,
-    probe_phrases,
-)
+from base.tests.test_assistant_asks import PROBES, TOP, assert_its_asks_bring, assert_offered_with_room
+from base.tests.test_assistant_asks import assert_reported_are_owner_probes, comparable, offered_place, offered_to
+from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: The requests of hub#1108's QA (``owner.es.whatsapp_inbox.*`` of ``owner-es-whatsapp_inbox-2026-11-08.json``), as the
 #: owner said them: before the inbox said its asks, none of these tools was among the ones a turn offers

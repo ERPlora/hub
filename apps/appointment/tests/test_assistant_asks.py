@@ -17,17 +17,9 @@ from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    TOP,
-    assert_its_asks_bring,
-    assert_offered_with_room,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    offered_place,
-    offered_to,
-    place_of_no_ask,
-    probe_phrases,
-)
+from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, assert_offered_with_room, comparable
+from base.tests.test_assistant_asks import offered_place, offered_to, place_of_no_ask, probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: The requests of hub#1097's QA (``tests/e2e/qa/probes/owner-es-appointment-2026-11-08.json``), as the owner said them,
 #: and nothing of the tools' ``asks``: before Appointments said its asks, the blocks of the agenda and generating the

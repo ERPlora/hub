@@ -17,14 +17,9 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    TOP,
-    assert_its_asks_bring,
-    assert_offered_with_room,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    probe_phrases,
-)
+from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, assert_offered_with_room, comparable
+from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: The requests of hub#1107's QA (``tests/e2e/qa/probes/owner-es-online_booking-2026-11-08.json``), as the owner said
 #: them, and nothing of the tools' ``asks``: before Online booking said its asks, booking from the public page as the

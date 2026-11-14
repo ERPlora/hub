@@ -14,15 +14,8 @@ from live.operations import registry
 
 from apps.sale.tests.conftest import ctx_for
 from base import assistant
-from base.tests.test_assistant_asks import (
-    assert_its_asks_bring,
-    comparable,
-    offered_place,
-    offered_to,
-    probe_phrases,
-    probes_of_layer_2,
-    without_its_asks,
-)
+from base.tests.test_assistant_asks import assert_its_asks_bring, comparable, offered_place, offered_to, probe_phrases
+from base.tests.test_assistant_asks import probes_of_layer_2, without_its_asks
 
 LANGUAGES = ("en", "es")
 #: The phrases of sale's tools put to the turn at least, both languages together: a silent drop of asks fails.

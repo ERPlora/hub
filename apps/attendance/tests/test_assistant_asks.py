@@ -18,14 +18,9 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    TOP,
-    assert_its_asks_bring,
-    assert_offered_with_room,
-    assert_reported_are_owner_probes,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    offered_place,
-)
+from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, assert_offered_with_room
+from base.tests.test_assistant_asks import assert_reported_are_owner_probes, offered_place
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 #: What only who sees, corrects or sets up the team's time clock holds (``attendance.view_all``,
 #: ``attendance.correct``, ``attendance.manage_settings``): an employee clocks and reads their own days, never these.
 NOT_THE_EMPLOYEES = {

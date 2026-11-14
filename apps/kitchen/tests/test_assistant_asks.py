@@ -23,14 +23,8 @@ from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    TOP,
-    assert_offered_with_room,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    offered_place,
-    probe_phrases,
-)
+from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, offered_place, probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: What only who runs the kitchen holds (``KitchenConfig.role_permissions``): cancelling or deleting a ticket, the
 #: stations and their routing, and the display's settings. An employee moves tickets and dishes, never these.

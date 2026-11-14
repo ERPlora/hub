@@ -14,12 +14,8 @@ from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    place_of_no_ask,
-    probe_phrases,
-)
+from base.tests.test_assistant_asks import comparable, place_of_no_ask, probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: The requests of hub#1105's QA (``owner.es.reservation.*`` of ``tests/e2e/qa/probes/owner-es-reservation-*.json``),
 #: as the owner said them: each is offered its existing operation (among the ``MAX_TOOLS`` a turn offers, so the model

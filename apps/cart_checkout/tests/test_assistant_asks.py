@@ -16,14 +16,8 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    TOP,
-    assert_offered_with_room,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    offered_to,
-    place_of_no_ask,
-)
+from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, offered_to, place_of_no_ask
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: Cart & Checkout's reads: its carts, their lines and the orders made from them.
 READS = {

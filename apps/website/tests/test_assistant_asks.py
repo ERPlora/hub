@@ -14,11 +14,8 @@ from django.conf import settings
 from live.operations import AI, registry
 
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    place_of_no_ask,
-)
+from base.tests.test_assistant_asks import comparable, place_of_no_ask
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: Website's assistant tools: what the page is, the categories its catalog can show, and the draft's save, publication
 #: and taking offline.

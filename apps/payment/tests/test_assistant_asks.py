@@ -20,16 +20,9 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    TOP,
-    assert_its_asks_bring,
-    assert_offered_with_room,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    offered_to,
-    place_in,
-    probe_phrases,
-)
+from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, assert_offered_with_room, comparable, offered_to
+from base.tests.test_assistant_asks import place_in, probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: Every write of Payments: an employee only looks (``payment.view_payment``), and none of them is a write a manager
 #: approves, so an employee's assistant is never offered them and answers it has no permission (``expect: refused``).

@@ -17,14 +17,9 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    assert_its_asks_bring,
-    assert_offered_with_room,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    offered_to,
-    probe_phrases,
-)
+from base.tests.test_assistant_asks import assert_its_asks_bring, assert_offered_with_room, comparable, offered_to
+from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: Every write of Price lists is ``pricing.manage``, which an employee lacks (they only read the prices,
 #: ``pricing.view``): an employee's assistant is never offered one.

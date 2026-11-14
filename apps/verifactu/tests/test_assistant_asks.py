@@ -23,14 +23,9 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    assert_its_asks_bring,
-    assert_offered_with_room,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    offered_to,
-    probe_phrases,
-)
+from base.tests.test_assistant_asks import assert_its_asks_bring, assert_offered_with_room, comparable, offered_to
+from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: The requests of the real-model QA (``tests/e2e/qa/probes/owner-es-verifactu-2026-11-08.json``), as the owner said
 #: them, and nothing of the tools' ``asks``: before VeriFactu said its asks, none of these tools was among the ones a

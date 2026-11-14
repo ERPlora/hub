@@ -15,13 +15,8 @@ from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    offered_to,
-    place_of_no_ask,
-    probe_phrases,
-)
+from base.tests.test_assistant_asks import comparable, offered_to, place_of_no_ask, probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 OWNER, EMPLOYEE = Membership.Role.OWNER, Membership.Role.EMPLOYEE
 

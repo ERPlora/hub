@@ -17,12 +17,8 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    assert_offered_with_room,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    probe_phrases,
-)
+from base.tests.test_assistant_asks import assert_offered_with_room, comparable, probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: Writes on what the whole team shares that only who runs it holds (``task.delete``, ``task.manage_project``), none
 #: of them a manager approves: an employee's assistant is never offered them.

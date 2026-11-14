@@ -15,11 +15,8 @@ from apps.customer.models import Customer
 from apps.customer.schemas import MergeIn
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    assert_its_asks_bring,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    offered_to,
-)
+from base.tests.test_assistant_asks import assert_its_asks_bring, offered_to
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 from .conftest import ctx_for
 
