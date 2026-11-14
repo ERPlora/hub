@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b8c5f7ec0b9f9ceaf14d9513e9432347f9cb5abc7e81489684200785ff39abeb -->
+<!-- generated from WORKBOOK.md sha256:6e35dcea21889c7c4108d7c1aa7bb1f979b1cb837019cc8ac21aa592036d23b1 -->
 
 ## What it is for and who it is for
 
@@ -210,7 +210,8 @@ In: the drawer's name.
 Out: the drawer (announces: `cash_register.register.created` or `cash_register.register.updated`). A
 drawer is never deleted: the sessions name it.
 If it fails: without a name, "Type the drawer's name."; with a name another drawer already has (whatever
-the case), "There is already a drawer with that name.".
+the case), "There is already a drawer with that name.". Both show under the name and go as soon as
+something is typed in it, without tapping "Save" again (hub#1470).
 Involved: CASH_REGISTER-F03
 
 ### CASH_REGISTER-F03 Open the cash shift with the starting float
@@ -235,7 +236,9 @@ give the cash the drawer starts with." under the field; a deactivated drawer or 
 "That drawer is not available."; an unreadable amount ("This is not an amount. Type a figure, for example
 12.50."), a negative ("This amount cannot be negative.") or an ambiguous one ("1,250") is said under the field on
 leaving it or on tapping "Open session", and nothing is sent; "12.555" is not ambiguous: it is €12,555.00, as in a
-price (hub#1160). "Open session" is grey while
+price (hub#1160). The notice the server puts under a field (the required float) goes as soon as that field
+changes, without tapping "Open session" again; another field's stays until its own changes (hub#1470).
+"Open session" is grey while
 the business has not yet said its currency, because the float is read in it (without it, "1500" yen would
 be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, "Open session" lights up (hub#938).
@@ -278,7 +281,8 @@ Out: the movement, in the name of whoever records it (announces: `cash_register.
 sign is set by the system according to the type.
 If it fails: "This cash-out would leave the drawer below zero and a negative balance is not allowed." if
 the settings do not allow it; a zero ("Invalid amount"), unreadable, negative or ambiguous amount is said under the
-field and nothing is sent (it is read as in F03); the
+field and nothing is sent (it is read as in F03); a field's notice goes as soon as that field changes,
+without tapping "Register" again, and another field's stays until its own changes (hub#1470); the
 session closed on another device: "That cash session is closed: a closed session takes no new
 movements.". "Register" is grey while the business has not yet said its currency, because the amount is
 read in it (without it, "1500" yen would be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
