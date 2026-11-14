@@ -14,10 +14,12 @@ OPTION = [
     "modifier.option.deleted",
 ]
 LINK = ["modifier.link.attached", "modifier.link.detached"]
-# What Inventory says that changes what a link names or which groups a product carries.
+# What Inventory says that changes what a link names or which groups a product carries. A product recovered from the
+# separate copy is the same one again (INVENTORY-F34): what showed it gone shows it back.
 INVENTORY_TARGET = [
     "inventory.product.updated",
     "inventory.product.deleted",
+    "inventory.product.restored",
     "inventory.category.updated",
     "inventory.category.deleted",
 ]
@@ -41,12 +43,13 @@ def test_the_registry_is_valid():
 
 def test_each_read_and_its_events():
     assert modifier_queries() == {
-        # The counts of options and links are columns of the table; a deleted target stops counting.
+        # The counts of options and links are columns of the table; a deleted target stops counting, a restored one counts again.
         "modifier.group.list": [
             *GROUP,
             *OPTION,
             *LINK,
             "inventory.product.deleted",
+            "inventory.product.restored",
             "inventory.category.deleted",
         ],
         "modifier.group.get": [
@@ -54,6 +57,7 @@ def test_each_read_and_its_events():
             *OPTION,
             *LINK,
             "inventory.product.deleted",
+            "inventory.product.restored",
             "inventory.category.deleted",
         ],
         # An option shows its group's name.
