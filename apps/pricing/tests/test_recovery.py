@@ -4,7 +4,8 @@ The copy is no business, so it has no alias and the ORM never reaches it: the pl
 read-only connection, and Price Lists answers with its own SQL over its models' names. Its prices: each one of a live
 product or of a service that the business no longer has is put back by ``pricing.price_item.add``, the list detail's
 own, unless the business has a price in that place again (the same list, article and from quantity). Price Lists goes
-after Inventory (its ``requires``), so a deleted product is back, the same, before its prices are put.
+after Inventory (its ``requires``), so a deleted product is back, the same, before its prices are put; one the business
+no longer had at all is back as a new one, with another id, and its prices go to that one, found by its SKU.
 
 Then, end to end on real databases (``hubs.CopiedHubs``): the business's own and its copy, a clone of it.
 """
@@ -17,7 +18,8 @@ from django.apps import apps
 from django.db import connection
 from live.models import OutboxEvent
 
-from apps.inventory.tests.test_recovery import CATEGORIES, LINKS, PRODUCTS, a_tax_key
+from apps.inventory.models import Product
+from apps.inventory.tests.test_recovery import CATEGORIES, LINKS, PRODUCTS, a_tax_key, gone_altogether
 from apps.pricing import queries
 from apps.pricing.models import PriceItem
 from base.recovery import actor_of
@@ -46,13 +48,14 @@ def test_the_copy_gives_each_price_of_a_live_product_or_of_a_service_with_what_i
 
     read = queries.prices_in_copy(direct())
 
+    # With its product's SKU, to find the product the business made again if that one is gone (none for a service).
     assert sorted(read, key=lambda one: one["id"]) == [
         {"id": one.id, "price_list_id": vip.id, "product_id": shampoo.id, "service_id": None, "price": 900,
-         "min_quantity": Decimal("1.000")},
+         "min_quantity": Decimal("1.000"), "sku": "SH-1"},
         {"id": ten.id, "price_list_id": vip.id, "product_id": shampoo.id, "service_id": None, "price": 800,
-         "min_quantity": Decimal("10.000")},
+         "min_quantity": Decimal("10.000"), "sku": "SH-1"},
         {"id": cut.id, "price_list_id": vip.id, "product_id": None, "service_id": haircut.id, "price": 1500,
-         "min_quantity": Decimal("1.000")},
+         "min_quantity": Decimal("1.000"), "sku": None},
     ]
 
 
@@ -73,6 +76,7 @@ def a_price_of_the_copy(price_list, *, product=None, service=None, price=1000, m
         "service_id": service.id if service else None,
         "price": price,
         "min_quantity": Decimal(min_quantity),
+        "sku": product.sku if product else None,
     }
 
 
@@ -108,6 +112,79 @@ def test_lacking_is_a_price_the_business_no_longer_has_in_a_place_it_left_free()
 
 def test_with_nothing_read_nothing_is_lacking():
     assert queries.prices_not_in_business([]) == []
+
+
+def a_price_of_a_product_gone(price_list, sku: str, **fields) -> dict:
+    """A price of the copy whose product the business no longer holds at all: only its SKU says which article it was."""
+    return a_price_of_the_copy(price_list, **fields) | {"product_id": uuid.uuid7(), "sku": sku}
+
+
+def made_by_a_recovery(name: str, sku: str, **fields):
+    """A product a recovery from a separate copy made again, as ``inventory.product.recover`` leaves it."""
+    return make_product(name, sku, created_by=actor_of(uuid.uuid7()), **fields)
+
+
+@pytest.mark.django_db
+def test_a_product_no_longer_held_live_is_the_one_a_recovery_made_again_with_its_sku():
+    vip = make_list("VIP")
+    shampoo = made_by_a_recovery("Shampoo", "SH-1")
+    gone = a_price_of_a_product_gone(vip, "SH-1", price=900)
+    # Still held, but deleted (another product took its SKU since, so it never comes back): the same goes for it.
+    old = make_product("Conditioner", "CO-1", is_deleted=True)
+    conditioner = made_by_a_recovery("Conditioner", "CO-1")
+    deleted = a_price_of_the_copy(vip, product=old, price=700)
+
+    lacking = queries.prices_not_in_business([gone, deleted])
+
+    assert lacking == [
+        {"id": gone["id"], "price_list_id": vip.id, "product_id": shampoo.id, "price": 900,
+         "min_quantity": Decimal("1")},
+        {"id": deleted["id"], "price_list_id": vip.id, "product_id": conditioner.id, "price": 700,
+         "min_quantity": Decimal("1")},
+    ]
+
+
+@pytest.mark.django_db
+def test_the_copys_product_is_the_business_own_by_its_id_before_any_sku():
+    vip = make_list("VIP")
+    shampoo = make_product("Shampoo", "SH-2")
+    made_by_a_recovery("Old shampoo", "SH-1")
+    # The copy knew it by another SKU: it is still live here, so its price is its own.
+    price = a_price_of_the_copy(vip, product=shampoo) | {"sku": "SH-1"}
+
+    [lacking] = queries.prices_not_in_business([price])
+
+    assert lacking["product_id"] == shampoo.id
+
+
+@pytest.mark.django_db
+def test_a_product_made_again_by_hand_or_deleted_since_takes_none_of_the_copys_prices():
+    vip = make_list("VIP")
+    # Made again by hand with the SKU: the business's own, priced as the business chose.
+    make_product("Shampoo", "SH-1", created_by="ana")
+    by_hand = a_price_of_a_product_gone(vip, "SH-1")
+    # Made again by a recovery, then deleted by the business: its prices went with it.
+    made_by_a_recovery("Conditioner", "CO-1", is_deleted=True)
+    deleted = a_price_of_a_product_gone(vip, "CO-1")
+
+    lacking = queries.prices_not_in_business([by_hand, deleted])
+
+    # Each stays the copy's own product, which the list detail's add refuses as not found: not created, and why.
+    assert [one["product_id"] for one in lacking] == [by_hand["product_id"], deleted["product_id"]]
+
+
+@pytest.mark.django_db
+def test_the_place_of_a_product_made_again_the_business_priced_since_stays_as_it_is():
+    vip = make_list("VIP")
+    shampoo = made_by_a_recovery("Shampoo", "SH-1")
+    # Priced again by the business after the recovery made the product, at another price.
+    make_item(vip, shampoo, price=950)
+    taken = a_price_of_a_product_gone(vip, "SH-1", price=900)
+    free = a_price_of_a_product_gone(vip, "SH-1", price=800, min_quantity="10") | {"product_id": taken["product_id"]}
+
+    lacking = queries.prices_not_in_business([taken, free])
+
+    assert [(one["id"], one["product_id"]) for one in lacking] == [(free["id"], shampoo.id)]
 
 
 def test_the_app_declares_its_prices_put_back_by_the_list_details_add():
@@ -198,6 +275,26 @@ class TestPricesComeBack:
             assert set(PriceItem.objects.values_list("created_by", flat=True)) == {actor_of(row.pk)}
         assert added(hub) == before + 2
         # Asked again, nothing is put twice.
+        again = recoveries.ask(copy, "inventory", "pricing")
+        assert run() == 1
+        assert said(again) == ("done", [CATEGORIES, PRODUCTS, LINKS, PRICES])
+        assert len(prices(hub)) == 2
+
+    def test_a_product_gone_altogether_comes_back_as_a_new_one_with_its_prices(self, recoveries, every_app_on):
+        hub, shampoo = self.a_business(recoveries, every_app_on)
+        copy = recoveries.copy_of(hub)
+        self.deleted(hub, shampoo)
+        gone_altogether(hub, shampoo)
+        row = recoveries.ask(copy, "pricing", "inventory")
+
+        assert run() == 1
+
+        assert said(row) == ("done", [CATEGORIES, PRODUCTS | {"created": 1}, LINKS, PRICES | {"created": 2}])
+        with use_hub(hub):
+            [made] = Product.objects.filter(sku="SH-1").values_list("pk", flat=True)
+        assert made != shampoo
+        assert prices(hub) == [("BULK", made, 800, Decimal("10.000")), ("VIP", made, 900, Decimal("1.000"))]
+        # Asked again, nothing is put twice: its places are taken by the prices just put.
         again = recoveries.ask(copy, "inventory", "pricing")
         assert run() == 1
         assert said(again) == ("done", [CATEGORIES, PRODUCTS, LINKS, PRICES])
