@@ -542,6 +542,10 @@ class OptionOut(Schema):
     updated_at: datetime = Field(description="When it was last changed.")
 
 
+class OptionRecoveredOut(OptionOut, RecoveredOut):
+    """An option added again from a separate copy, and why it came back without being chosen by default."""
+
+
 class LinkOut(Schema):
     id: UUID = Field(description="The link's id.")
     group_id: UUID = Field(description="The group.")

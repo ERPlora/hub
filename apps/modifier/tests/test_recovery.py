@@ -205,7 +205,7 @@ def test_a_copy_without_the_apps_table_gives_no_group_of_a_category():
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("read", [queries.links_in_copy, queries.category_links_in_copy])
+@pytest.mark.parametrize("read", [queries.links_in_copy, queries.category_links_in_copy, queries.options_in_copy])
 def test_a_copy_with_none_of_the_apps_tables_reads_no_group_for_its_links(read):
     with connection.cursor() as cursor:
         # Undone with the test's transaction. A copy taken before the app was switched on has none of its tables: the
@@ -529,7 +529,7 @@ def test_making_a_group_again_with_its_options_is_only_the_systems():
 
 
 def test_the_app_declares_its_groups_first_made_again_with_their_options():
-    groups, _categories, _links = apps.get_app_config("modifier").recoverable_from_copy()
+    groups, _options, _categories, _links = apps.get_app_config("modifier").recoverable_from_copy()
 
     assert (groups.read, groups.missing, groups.create, groups.deleted, groups.restore) == (
         queries.groups_in_copy,
@@ -547,7 +547,7 @@ def test_the_app_declares_its_groups_first_made_again_with_their_options():
 
 
 def test_the_app_declares_its_groups_of_categories_first_hung_again_by_the_same_attach():
-    _groups, categories, _links = apps.get_app_config("modifier").recoverable_from_copy()
+    _groups, _options, categories, _links = apps.get_app_config("modifier").recoverable_from_copy()
 
     assert (categories.read, categories.missing, categories.create, categories.deleted, categories.restore) == (
         queries.category_links_in_copy,
@@ -565,7 +565,7 @@ def test_the_app_declares_its_groups_of_categories_first_hung_again_by_the_same_
 
 
 def test_the_app_declares_its_groups_of_products_hung_again_by_the_group_sheets_attach():
-    _groups, _categories, links = apps.get_app_config("modifier").recoverable_from_copy()
+    _groups, _options, _categories, links = apps.get_app_config("modifier").recoverable_from_copy()
 
     assert (links.read, links.missing, links.create, links.deleted, links.restore) == (
         queries.links_in_copy,
@@ -599,6 +599,7 @@ GROUPS = {
 }
 CATEGORY_GROUPS = GROUPS | {"label": "Modifier groups of categories"}
 MODIFIER_GROUPS = GROUPS | {"label": "Modifier groups"}
+OPTIONS = GROUPS | {"label": "Modifier options"}
 
 
 def said(row) -> tuple[str, list[dict]]:
@@ -632,7 +633,7 @@ def asked_again_hangs_nothing_twice(recoveries, copy) -> None:
     """``copy`` asked again, Inventory and Modifiers: every group is in its place already, nothing is hung twice."""
     again = recoveries.ask(copy, "inventory", "modifier")
     assert run() == 1
-    assert said(again) == ("done", [CATEGORIES, PRODUCTS, LINKS, MODIFIER_GROUPS, CATEGORY_GROUPS, GROUPS])
+    assert said(again) == ("done", [CATEGORIES, PRODUCTS, LINKS, MODIFIER_GROUPS, OPTIONS, CATEGORY_GROUPS, GROUPS])
 
 
 def attached(hub) -> int:
@@ -671,7 +672,8 @@ class TestGroupsComeBack:
 
         # Inventory first, whatever the order asked: the product is back, the same, before its groups are hung.
         assert said(row) == (
-            "done", [CATEGORIES, PRODUCTS | {"restored": 1}, LINKS, MODIFIER_GROUPS, CATEGORY_GROUPS, GROUPS | {"created": 2}]
+            "done",
+            [CATEGORIES, PRODUCTS | {"restored": 1}, LINKS, MODIFIER_GROUPS, OPTIONS, CATEGORY_GROUPS, GROUPS | {"created": 2}],
         )
         assert hung(hub) == [("Extras", burger), ("Sauces", burger)]
         with use_hub(hub):
@@ -690,7 +692,8 @@ class TestGroupsComeBack:
         assert run() == 1
 
         assert said(row) == (
-            "done", [CATEGORIES, PRODUCTS | {"created": 1}, LINKS, MODIFIER_GROUPS, CATEGORY_GROUPS, GROUPS | {"created": 2}]
+            "done",
+            [CATEGORIES, PRODUCTS | {"created": 1}, LINKS, MODIFIER_GROUPS, OPTIONS, CATEGORY_GROUPS, GROUPS | {"created": 2}],
         )
         with use_hub(hub):
             [made] = Product.objects.filter(sku="BUR").values_list("pk", flat=True)
@@ -730,7 +733,7 @@ class TestGroupsComeBack:
 
         assert run() == 1
 
-        assert said(row) == ("done", [MODIFIER_GROUPS, CATEGORY_GROUPS, GROUPS | {"created": 1}])
+        assert said(row) == ("done", [MODIFIER_GROUPS, OPTIONS, CATEGORY_GROUPS, GROUPS | {"created": 1}])
         assert hung(hub) == [("Extras", burger), ("Sauces", burger)]
         with use_hub(hub):
             assert ModifierLink.objects.get(group_id=groups["Sauces"]).created_by == "system"
@@ -744,8 +747,8 @@ class TestGroupsComeBack:
 
         assert run() == 1
 
-        status, [of_groups, of_categories, result] = said(row)
-        assert (of_groups, of_categories) == (MODIFIER_GROUPS, CATEGORY_GROUPS)
+        status, [of_groups, of_options, of_categories, result] = said(row)
+        assert (of_groups, of_options, of_categories) == (MODIFIER_GROUPS, OPTIONS, CATEGORY_GROUPS)
         assert (status, result["created"], result["not_created"], result["refused"]) == ("done", 0, 2, "")
         assert [reason["reason"].split(":")[0] for reason in result["reasons"]] == ["not_found", "not_found"]
         assert hung(hub) == []
@@ -769,7 +772,7 @@ class TestGroupsComeBack:
         # The group first, made again by the group sheet's create with its options, then hung from the burger back.
         assert said(row) == (
             "done",
-            [CATEGORIES, PRODUCTS | {"restored": 1}, LINKS, MODIFIER_GROUPS | {"created": 1}, CATEGORY_GROUPS,
+            [CATEGORIES, PRODUCTS | {"restored": 1}, LINKS, MODIFIER_GROUPS | {"created": 1}, OPTIONS, CATEGORY_GROUPS,
              GROUPS | {"created": 2}],
         )
         with use_hub(hub):
@@ -807,6 +810,9 @@ class TestGroupsComeBack:
         assert [(reason["id"], reason["reason"].split(":")[0]) for reason in results[-1]["reasons"]] == [
             (str(sauces_link), "not_found")
         ]
+        # Nor is anything added to it: the copy's options find no group of theirs either.
+        assert (results[4]["label"], results[4]["created"], results[4]["not_created"]) == ("Modifier options", 0, 2)
+        assert {reason["reason"].split(":")[0] for reason in results[4]["reasons"]} == {"not_found"}
         with use_hub(hub):
             assert list(ModifierGroup.objects.order_by("name").values_list("name", flat=True)) == ["Extras", "SAUCES"]
             assert list(ModifierOption.objects.filter(group_id=mine).values_list("name", flat=True)) == ["Mayo"]
@@ -829,9 +835,10 @@ class TestGroupsComeBack:
         assert run() == 1
 
         # The group back, without the option, counted and said by the group's id in the copy, and hung again.
-        [made, of_categories, of_products] = fresh(row).results
-        assert (made["label"], made["created"], made["noted"], of_categories, of_products["created"]) == (
-            "Modifier groups", 1, 1, CATEGORY_GROUPS, 1
+        [made, of_options, of_categories, of_products] = fresh(row).results
+        # Its options came back with it, and what it came back without is said once, with the group.
+        assert (made["label"], made["created"], made["noted"], of_options, of_categories, of_products["created"]) == (
+            "Modifier groups", 1, 1, OPTIONS, CATEGORY_GROUPS, 1
         )
         assert [(note["id"], note["note"].split(":")[0]) for note in made["notes"]] == [
             (str(groups["Sauces"]), "invalid_field")
@@ -877,7 +884,8 @@ class TestCategoryGroupsComeBack:
             back = Category.objects.get(name="Mains", is_deleted=False).pk
         assert back != mains
         assert said(row) == (
-            "done", [CATEGORIES | {"created": 1}, PRODUCTS, LINKS, MODIFIER_GROUPS, CATEGORY_GROUPS | {"created": 2}, GROUPS]
+            "done",
+            [CATEGORIES | {"created": 1}, PRODUCTS, LINKS, MODIFIER_GROUPS, OPTIONS, CATEGORY_GROUPS | {"created": 2}, GROUPS],
         )
         assert hung_from_categories(hub) == [("Extras", back), ("Sauces", back)]
         with use_hub(hub):
@@ -897,8 +905,8 @@ class TestCategoryGroupsComeBack:
         assert run() == 1
 
         assert said(row)[0] == "done"
-        [of_groups, result, of_products] = fresh(row).results
-        assert (of_groups, of_products) == (MODIFIER_GROUPS, GROUPS)
+        [of_groups, of_options, result, of_products] = fresh(row).results
+        assert (of_groups, of_options, of_products) == (MODIFIER_GROUPS, OPTIONS, GROUPS)
         assert (result["label"], result["created"], result["not_created"], result["refused"]) == (
             "Modifier groups of categories", 0, 2, ""
         )

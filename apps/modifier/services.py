@@ -52,6 +52,7 @@ from apps.modifier.schemas import (
     OptionIn,
     OptionOut,
     OptionPatchIn,
+    OptionRecoveredOut,
     OptionRefIn,
 )
 from apps.tax.models import TaxCategory
@@ -70,6 +71,9 @@ LINK_EXISTS = _("This group already applies there.")
 #: What a group made again from a separate copy came back without, said by the option's name and why its create
 #: refused it (``modifier.group.recover``).
 OPTION_LEFT = _('came back without its option "%(option)s": %(why)s')
+#: Why an option chosen by default in a separate copy came back not chosen: its group already comes with as many as
+#: it takes, the business's own (``modifier.option.recover``).
+DEFAULT_KEPT = _('came back not chosen by default: its group already comes with "%(chosen)s"')
 
 #: Run only by the platform (events.py, and the recovery from a separate copy): no role holds it, so no person and no
 #: API key reaches it.
@@ -294,6 +298,31 @@ def create_option(ctx: OperationContext, data: OptionIn) -> dict:
     _save(option)
     record_event(ctx, events.OPTION_CREATED, _option_payload(option))
     return load_option(option.id)
+
+
+# Not an assistant tool: its one door is the recovery from a separate copy (BASE-F114, MODIFIER-F10), for an option a
+# group the business keeps no longer has.
+@operation(
+    "modifier.option.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=OptionIn,
+    output=OptionRecoveredOut,
+    ai=INTERNAL,
+)
+def recover_option(ctx: OperationContext, data: OptionIn) -> dict:
+    """An option of a separate copy added again by ``modifier.option.create``. One chosen by default there comes back
+    chosen only while its group has room for one more: it never takes it from those the business chose, and the output
+    says why it came back without (``left_out``)."""
+    group = find_group(data.group_id, data.group, lock=True)
+    chosen = _defaults_in_full(group) if data.is_default else []
+    left_out = []
+    if chosen:
+        data = data.model_copy(update={"is_default": False})
+        left_out.append(LeftOut(code="modifier.default_kept", message=DEFAULT_KEPT % {"chosen": ", ".join(chosen)}))
+    made = create_option(ctx, data)
+    return load_option(made.id) | {"left_out": left_out}
 
 
 @operation(
@@ -596,6 +625,15 @@ def _make_room_for_a_default(
             record_event(ctx, events.OPTION_UPDATED, _option_payload(previous))
     elif group.max_choices and others.count() + 1 > group.max_choices:
         raise _too_many_defaults("is_default")
+
+
+def _defaults_in_full(group: ModifierGroup) -> list[str]:
+    """The names of ``group``'s options chosen by default when they are as many as it takes, in its order; none while
+    it has room for one more. The group's row is locked by the caller."""
+    if not group.max_choices:
+        return []
+    chosen = list(group.options.filter(is_default=True).order_by("sort_order", "name").values_list("name", flat=True))
+    return chosen if len(chosen) >= group.max_choices else []
 
 
 def _target(data, *, hold: bool = False):
