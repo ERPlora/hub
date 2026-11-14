@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:85ac64925a742372814e667747419d5d6371725bdd6489a106f3c624a5d66b4f -->
+<!-- generated from WORKBOOK.md sha256:1a9e425bea1ed6dfb31262136c711f46e49942a670ed898a6e5276db77994f76 -->
 
 ## What it is for and who it is for
 
@@ -3031,7 +3031,10 @@ Steps:
       subcategories still hanging where it hung (the root, if it was at the root), each changed as the screen changes it:
       it is what the recovery touches of what the business has, and it is counted apart, as "Service links to
       categories" and "Subcategory links to categories"; if the business moves one meanwhile, it stays where the
-      business put it and is counted "not created" with its reason (`service.service_moved`). What the business moved
+      business put it and is counted "not created" with its reason (`service.service_moved`), and if it changes one
+      without moving it while the category comes back (another price, another icon), it stays as the business left it
+      and is counted the same, "not created" with its reason ("service.service_changed: came back without the service
+      <its identifier>: changed by the business meanwhile", or `service.subcategory_changed`). What the business moved
       since (a service into another category, a subcategory elsewhere) stays where it is, and
       the category's count says so ("Service categories: 1 created, 1 with notes"), with the reason in its notes
       ("service.service_moved: came back without the service <its identifier>: moved to another category since"). One
