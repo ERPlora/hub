@@ -232,6 +232,7 @@ function retryPhoto(): void {
         </InlineFeedback>
         <ion-input
           data-testid="service-form-name"
+          name="name"
           :value="form.name"
           :label="$t('service.services.form.name')"
           label-placement="floating"
@@ -244,6 +245,7 @@ function retryPhoto(): void {
         />
         <ion-select
           data-testid="service-form-pricing_type"
+          name="pricing_type"
           :value="form.pricing"
           :label="$t('service.services.form.pricingType')"
           label-placement="floating"
@@ -263,6 +265,7 @@ function retryPhoto(): void {
         </ion-select>
         <MoneyInput
           testid="service-form-price"
+          name="price"
           :model-value="form.price"
           :money="money"
           :label="money ? t('service.services.form.priceIn', { currency: money.currency }) : t('service.services.form.price')"
@@ -272,6 +275,7 @@ function retryPhoto(): void {
         />
         <ion-input
           data-testid="service-form-duration"
+          name="duration_minutes"
           type="number"
           inputmode="numeric"
           min="1"
@@ -286,6 +290,7 @@ function retryPhoto(): void {
         />
         <Combo
           testid="service-form-category"
+          name="category_id"
           :model-value="form.category"
           :search="searchCategories"
           :label="t('service.services.form.category')"
@@ -295,6 +300,7 @@ function retryPhoto(): void {
         />
         <Combo
           testid="service-form-tax"
+          name="tax_category_key"
           :model-value="form.tax"
           :search="searchTaxes"
           :clearable="false"
