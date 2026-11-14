@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:72aa2a2096f7fbd7b276c6bf7fd8aaaebfdbee7f32631ca934932cacdcb6beac -->
+<!-- generated from WORKBOOK.md sha256:31c8353c2d867682e2a9d21f67a6c8dab244ede3fe7785e4cd4477e275a89ac8 -->
 
 ## What it is for and who it is for
 
@@ -2935,10 +2935,9 @@ Status: done (the action and the restore, in its place or to a separate copy, an
 the customers that were lost, the deleted ones as they were, the products, the services with their categories, the
 appointments, the repeating appointments, the price list prices and the modifier groups of the products; making and
 deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws; the image of a
-product deleted before deleting left it, hub#1431; the image of a service brought back, hub#1429; the menu options of a
-product that comes back, hub#1343; the price list prices of a service that comes back as a new one, hub#1459; the
-modifier groups of a product that comes back as a new one, hub#1457; the modifier groups of a category that comes back,
-hub#1456; a deleted modifier group, hub#1458)
+service brought back, hub#1429; the menu options of a product that comes back, hub#1343; the price list prices of a
+service that comes back as a new one, hub#1459; the modifier groups of a product that comes back as a new one,
+hub#1457; the modifier groups of a category that comes back, hub#1456; a deleted modifier group, hub#1458)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -3008,7 +3007,8 @@ Steps:
       one it has already made again (another live one with its name, case and spaces aside, that is not already one of
       the copy's; the oldest if there are two) is not repeated: its own is used, as it is. Then a product the business
       deleted and still holds comes back THE SAME and counts as restored, with its stock, its categories that are still
-      live, the one that just came back if it had it in the copy, its image of the library and its whole history in
+      live, the one that just came back if it had it in the copy, its image of the library (the one it had in the copy
+      if it was deleted before deleting left it and it was left without any) and its whole history in
       Movements, active and on sale (INVENTORY-F34). One the business no longer has comes back as a new one, created as the Products screen creates it,
       with its name, SKU, EAN-13, description, type, price, cost, units, threshold, stock control and tax category, active
       or inactive as it was and in its categories: the same one if the business still has it, and otherwise the one that

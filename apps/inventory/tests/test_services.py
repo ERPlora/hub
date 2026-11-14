@@ -619,9 +619,9 @@ def test_an_employee_cannot_delete():
 # inventory.product.restore (INVENTORY-F34)
 
 
-def restore(product_id, ctx=None):
+def restore(product_id, ctx=None, **given):
     op = get("inventory.product.restore")
-    return op(ctx or system_context(A), op.input.model_validate({"id": str(product_id)}))
+    return op(ctx or system_context(A), op.input.model_validate({"id": str(product_id)} | given))
 
 
 def restored_payload(product_id, sku, name, **fields):
@@ -716,9 +716,75 @@ def test_restore_brings_back_the_image_of_the_library_it_had(image_library):  # 
     assert Product.objects.get().image == LATTE
 
 
+def deleted_without_its_image(created) -> None:
+    """``created`` deleted as deleting left a product before it kept the image of the library: without any."""
+    run("inventory.product.delete", ProductRefIn(id=created.id))
+    Product.objects.filter(pk=created.id).update(image="")
+    clear_outbox()
+
+
+def test_one_deleted_without_its_image_gets_back_the_one_of_the_library_the_copy_had(image_library):  # noqa: F811
+    created = create("Coffee", "CAF-1")
+    deleted_without_its_image(created)
+
+    back = restore(created.id, image=LATTE)
+
+    assert (back.image, Product.objects.get().image) == (LATTE, LATTE)
+    # One change, as it comes back: the product is restored with it, and said once.
+    assert outbox() == [(events.PRODUCT_RESTORED, restored_payload(created.id, "CAF-1", "Coffee"))]
+
+
+@pytest.mark.parametrize(
+    "copy",
+    [
+        "catalog:hospitality/gone_since",  # the library no longer has it
+        # A photo of its own: deleted with the product. A fixed name: every process must collect the same test id.
+        "file:inventory/products/0193a1b2c3d47e8f9a0b1c2d3e4f5a6b.webp",
+    ],
+)
+def test_an_image_that_cannot_come_back_leaves_the_product_restored_without_any(copy, image_library):  # noqa: F811
+    created = create("Coffee", "CAF-1")
+    deleted_without_its_image(created)
+
+    back = restore(created.id, image=copy)
+
+    assert (back.is_active, back.image, Product.objects.get().image) == (True, "", "")
+
+
+def test_with_the_library_unread_the_one_restored_gets_the_image_as_the_copy_had_it(settings, tmp_path):
+    created = create("Coffee", "CAF-1")
+    deleted_without_its_image(created)
+    settings.CATALOG_DIR = str(tmp_path / "nowhere")
+
+    assert restore(created.id, image=LATTE).image == LATTE
+
+
+def test_the_image_a_deleted_product_kept_is_the_one_it_comes_back_with(image_library):  # noqa: F811
+    created = create("Coffee", "CAF-1")
+    run("inventory.product.set_image", ProductImageIn(id=created.id, image="catalog:hospitality/cafe_solo"))
+    run("inventory.product.delete", ProductRefIn(id=created.id))
+
+    restore(created.id, image=LATTE)
+
+    assert Product.objects.get().image == "catalog:hospitality/cafe_solo"
+
+
+def test_restoring_a_live_product_never_gives_it_an_image(image_library):  # noqa: F811
+    # A cut before the COMMIT runs it again: the second time finds it live, as the business has it.
+    created = create("Coffee", "CAF-1")
+    clear_outbox()
+
+    restore(created.id, image=LATTE)
+
+    assert Product.objects.get().image == ""
+    assert outbox() == [(events.PRODUCT_RESTORED, restored_payload(created.id, "CAF-1", "Coffee"))]
+
+
 def test_restore_is_the_platforms_without_a_route():
     op = get("inventory.product.restore")
     assert (op.kind, op.permission, op.expose_api, op.repeatable) == ("command", "inventory.system", False, True)
+    # What a recovery gives it of the product in the copy: its id, and the image it showed there.
+    assert set(op.input.model_fields) == {"id", "image"}
     assert op.ai["risk"] == "normal" and op.ai["description"]
     created = create()
     run("inventory.product.delete", ProductRefIn(id=created.id))

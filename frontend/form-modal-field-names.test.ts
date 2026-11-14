@@ -6,8 +6,12 @@
 // of a FormModal window that paints the window's refusal (`:error-text="fieldErrors.<k>"`) carries `name="<k>"`; one
 // that paints `fieldErrors[<expr>]` carries `:name="<expr>"`; one that paints it some other way
 // (`errorOf(fieldErrors, index, 'price')`) carries a `name` of its own. The same holds in a component the window hands
-// its refusal to (`:field-errors="fieldErrors"`), followed to its file. The files still waiting are listed below with
-// how many fields they leave unnamed; the number only goes down, and a fixed file leaves the list.
+// its refusal to (`:field-errors="fieldErrors"`), followed to its file. A refusal the window paints apart from any field
+// (`<p v-if="fieldErrors.tiers">`, `{{ fieldErrors.customer }}`) needs a control named after its key too, or FormModal
+// never hears it corrected and the line stays until the next save: the field it is about (`name="is_default"` on the
+// toggle) or the group's `<fieldset ref="tiersGroup" name="tiers">`, whose ref goes to `useGroupChange('tiersGroup')`
+// (a fieldset says no change of its own). The files still waiting are listed below with how many they leave unnamed;
+// the number only goes down, and a fixed file leaves the list.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,12 +30,19 @@ const STILL_UNNAMED: Record<string, number> = {
   'apps/service/frontend/components/CategoryFormModal.vue': 3,
   'apps/service/frontend/components/GrantAdjustModal.vue': 3,
   'apps/service/frontend/components/GrantVoidModal.vue': 1,
-  'apps/service/frontend/components/PackageFormModal.vue': 8,
+  'apps/service/frontend/components/PackageFormModal.vue': 9,
   'apps/service/frontend/components/ServiceFormModal.vue': 6,
   'apps/tax/frontend/components/AliasCreateModal.vue': 3,
   'apps/tax/frontend/components/CategoryCreateModal.vue': 3,
   'apps/tax/frontend/components/RuleCreateModal.vue': 12,
   'apps/tax/frontend/components/RuleEndModal.vue': 1,
+};
+
+/** Windows that take away themselves a refusal they paint apart, once the person changes what it is about, rather than
+ *  through FormModal hearing a control of its name: by file, those keys. This guard cannot see that; the window's own
+ *  test proves each, and an entry the tree no longer needs leaves. */
+const TAKEN_AWAY_BY_THE_WINDOW: Record<string, readonly string[]> = {
+  'apps/whatsapp_inbox/frontend/components/TemplateFormModal.vue': ['buttons', 'header_sample'],
 };
 
 // ── Reading a template ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -55,9 +66,15 @@ interface Element {
   children: TemplateNode[];
   loc: { start: { line: number } };
 }
+interface Interpolation {
+  type: 5;
+  content: { content?: string };
+  loc: { start: { line: number } };
+}
 type TemplateNode = Element | { type: number; children?: unknown };
 
 const ELEMENT = 1;
+const INTERPOLATION = 5;
 const ATTRIBUTE = 6;
 const DIRECTIVE = 7;
 
@@ -112,6 +129,77 @@ function unnamed(element: Element, refusal: string): string | undefined {
   return plain || dynamic ? undefined : `paints ${shown} without a name`;
 }
 
+/** A refusal a window paints apart from any field: where, and under which key. */
+interface Notice {
+  key: string;
+  line: number;
+  tag: string;
+  shown: string;
+}
+
+/** The directives a node is painted on. */
+const CONDITIONS = new Set(['if', 'else-if', 'show']);
+
+/** Each key of the refusal that `reach` paints in an element of its own (`<p v-if="fieldErrors.tiers">`, or
+ *  `{{ fieldErrors.tiers }}` in any element) rather than in a field's `:error-text`, once, where it first does. */
+function paintedApart(reach: Reach): Notice[] {
+  const found = new Map<string, Notice>();
+  const note = (expression: string | undefined, line: number, tag: string): void => {
+    for (const [shown, key] of (expression ?? '').matchAll(new RegExp(`\\b${reach.refusal}\\??\\.(\\w+)`, 'g'))) {
+      if (!found.has(key)) found.set(key, { key, line, tag, shown });
+    }
+  };
+  const visit = (nodes: readonly TemplateNode[], parent: Element | undefined): void => {
+    for (const node of nodes) {
+      if (node.type === INTERPOLATION && parent) {
+        const { content, loc } = node as Interpolation;
+        note(content.content, loc.start.line, parent.tag);
+      }
+      if (!isElement(node)) continue;
+      if (bound(node, 'error-text') === undefined) {
+        for (const p of node.props) if (p.type === DIRECTIVE && CONDITIONS.has(p.name)) note(p.exp?.content, node.loc.start.line, node.tag);
+      }
+      visit(node.children, node);
+    }
+  };
+  visit(reach.nodes, undefined);
+  return [...found.values()];
+}
+
+/** The plain HTML fields FormModal hears change under their `name`; on a div or a section it reads none. */
+const TYPED_HTML = new Set(['input', 'select', 'textarea']);
+/** The plain HTML elements whose `name` FormModal reads but that never say a change themselves: a group's `<fieldset>`
+ *  counts once the window hands its ref to `useGroupChange`, which says each change for it. */
+const MUTE_HTML = new Set(['button', 'fieldset', 'output']);
+
+/** `element`'s plain `ref="…"`, or nothing. */
+function plainRef(element: Element): string | undefined {
+  for (const p of element.props) if (p.type === ATTRIBUTE && p.name === 'ref') return p.value?.content;
+  return undefined;
+}
+
+/** The names the controls in `nodes` carry, plainly or as a literal (an Ionic field, a component, a plain HTML field, a
+ *  group whose ref is in `voiced`), and apart the groups that say no change, by name, with their tag. */
+function controlNames(nodes: readonly TemplateNode[], voiced: ReadonlySet<string>): { heard: Set<string>; mute: Map<string, string> } {
+  const heard = new Set<string>();
+  const mute = new Map<string, string>();
+  walk(nodes, (element) => {
+    const dynamic = bound(element, 'name');
+    const name = plainName(element) ?? (dynamic !== undefined ? literal(dynamic) : undefined);
+    if (!name) return;
+    if (MUTE_HTML.has(element.tag)) {
+      if (voiced.has(plainRef(element) ?? '')) heard.add(name);
+      else if (!mute.has(name)) mute.set(name, element.tag);
+    } else if (TYPED_HTML.has(element.tag) || element.tag.includes('-') || /^[A-Z]/.test(element.tag)) heard.add(name);
+  });
+  return { heard, mute };
+}
+
+/** The refs a source's script hands to `useGroupChange('<ref>')`. */
+function voicedGroups(script: string): Set<string> {
+  return new Set([...script.matchAll(/\buseGroupChange\(\s*(['"`])(\w+)\1\s*\)/g)].map((match) => match[2]));
+}
+
 /** A source's components brought from a `.vue` file of the hub, by name: `{ RecipientFields: './RecipientFields.vue' }`. */
 function vueImports(script: string): Record<string, string> {
   const found: Record<string, string> = {};
@@ -119,18 +207,21 @@ function vueImports(script: string): Record<string, string> {
   return found;
 }
 
-/** A source's template tree and the components it imports, or nothing when it has no template. */
-function read(source: string): { nodes: TemplateNode[]; imports: Record<string, string> } | undefined {
+/** A source's template tree, the components it imports and the groups it voices, or nothing when it has no template. */
+function read(source: string): { nodes: TemplateNode[]; imports: Record<string, string>; voiced: Set<string> } | undefined {
   const { descriptor } = parse(source);
   const ast = descriptor.template?.ast as unknown as { children: TemplateNode[] } | undefined;
   if (!ast) return undefined;
-  return { nodes: ast.children, imports: vueImports(`${descriptor.script?.content ?? ''}\n${descriptor.scriptSetup?.content ?? ''}`) };
+  const script = `${descriptor.script?.content ?? ''}\n${descriptor.scriptSetup?.content ?? ''}`;
+  return { nodes: ast.children, imports: vueImports(script), voiced: voicedGroups(script) };
 }
 
-/** Where a window's refusal goes: the name its fields read it by (`fieldErrors`) and the nodes that read it. */
+/** Where a window's refusal goes: the name its fields read it by (`fieldErrors`), the nodes that read it and the refs of
+ *  the groups its file voices with `useGroupChange`. */
 interface Reach {
   refusal: string;
   nodes: readonly TemplateNode[];
+  voiced?: ReadonlySet<string>;
 }
 
 /** The default slot of each FormModal in `nodes` that takes its `fieldErrors`, under the name it gives them. */
@@ -180,9 +271,16 @@ function unnamedFields(file: string, reach: Reach, imports: Record<string, strin
       const prop = camelize(p.arg.content);
       if (seen.has(`${target}#${prop}`)) continue;
       seen.add(`${target}#${prop}`);
-      found.push(...unnamedFields(target, { refusal: prop, nodes: child.nodes }, child.imports, readFile, seen));
+      found.push(...unnamedFields(target, { refusal: prop, nodes: child.nodes, voiced: child.voiced }, child.imports, readFile, seen));
     }
   });
+  const { heard, mute } = controlNames(reach.nodes, reach.voiced ?? new Set());
+  for (const notice of paintedApart(reach)) {
+    if (heard.has(notice.key)) continue;
+    const group = mute.get(notice.key);
+    const why = group ? `its <${group} name="${notice.key}"> says no change: hand its ref to useGroupChange` : `no control carries name="${notice.key}"`;
+    found.push(`${file}:${notice.line}: <${notice.tag}> paints ${notice.shown} apart and ${why}`);
+  }
   return found;
 }
 
@@ -191,7 +289,7 @@ function scan(path: string, readFile: Reader): string[] {
   const source = readFile(path);
   const template = source ? read(source) : undefined;
   if (!template) return [];
-  return windows(template.nodes).flatMap((reach) => unnamedFields(path, reach, template.imports, readFile));
+  return windows(template.nodes).flatMap((reach) => unnamedFields(path, { ...reach, voiced: template.voiced }, template.imports, readFile));
 }
 
 // ── The hub's sources ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -210,11 +308,24 @@ const SOURCES: ReadonlyMap<string, string> = new Map(
 
 /** Every field without its name in the hub's windows, once (a component two windows hand their refusal to is one
  *  file), as `<file>:<line>: …`. */
-function unnamedInTheHub(): string[] {
+function everyUnnamedInTheHub(): string[] {
   return [...new Set([...SOURCES.keys()].flatMap((file) => scan(file, (path) => SOURCES.get(path))))];
 }
 
 const fileOf = (field: string): string => field.slice(0, field.indexOf(':'));
+
+/** The `<file>#<key>` of a refusal painted apart without a control of its name, or nothing for any other finding. */
+function apartKeyOf(field: string): string | undefined {
+  const key = / apart and no control carries name="(\w+)"$/.exec(field)?.[1];
+  return key === undefined ? undefined : `${fileOf(field)}#${key}`;
+}
+
+const TAKEN_AWAY = new Set(Object.entries(TAKEN_AWAY_BY_THE_WINDOW).flatMap(([file, keys]) => keys.map((key) => `${file}#${key}`)));
+
+/** Every field and refusal painted apart without its name in the hub's windows, but those a window takes away itself. */
+function unnamedInTheHub(): string[] {
+  return everyUnnamedInTheHub().filter((field) => !TAKEN_AWAY.has(apartKeyOf(field) ?? ''));
+}
 
 /** How many fields each file leaves without their name. */
 function unnamedByFile(): Record<string, number> {
@@ -286,6 +397,62 @@ describe('guardrail: every field of a FormModal window that paints its refusal c
     ]);
   });
 
+  it('sees a refusal the window paints apart, under a field or a group, with no control named after it (hub#1448)', () => {
+    const fields = [
+      '<ion-toggle :checked="on" @ion-change="on = $event.detail.checked" />',
+      '<p v-if="fieldErrors.is_default" data-testid="x-is_default-error">{{ fieldErrors.is_default }}</p>',
+      '<div name="customer">',
+      '  <small v-if="fieldErrors.customer">{{ fieldErrors.customer }}</small>',
+      '</div>',
+      '<InlineFeedback v-if="fieldErrors?.days" tone="danger">{{ fieldErrors?.days }}</InlineFeedback>',
+      '<span>{{ fieldErrors.buttons }}</span>',
+    ].join('\n');
+    expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': windowWith(fields) })).toEqual([
+      'apps/x/frontend/components/XFormModal.vue:8: <p> paints fieldErrors.is_default apart and no control carries name="is_default"',
+      'apps/x/frontend/components/XFormModal.vue:10: <small> paints fieldErrors.customer apart and no control carries name="customer"',
+      'apps/x/frontend/components/XFormModal.vue:12: <InlineFeedback> paints fieldErrors?.days apart and no control carries name="days"',
+      'apps/x/frontend/components/XFormModal.vue:13: <span> paints fieldErrors.buttons apart and no control carries name="buttons"',
+    ]);
+  });
+
+  it('lets through a refusal painted apart when a field, a group of fields or a component carries its name', () => {
+    const fields = [
+      '<ion-toggle name="is_default" :checked="on" />',
+      '<p v-if="fieldErrors.is_default">{{ fieldErrors.is_default }}</p>',
+      '<fieldset ref="tiersGroup" name="tiers">',
+      '  <ion-input v-for="(tier, i) in tiers" :key="i" :name="`tiers.${i}.percent`" :error-text="fieldErrors[`tiers.${i}.percent`]" />',
+      '  <p v-if="fieldErrors.tiers">{{ fieldErrors.tiers }}</p>',
+      '</fieldset>',
+      '<ion-checkbox v-for="day in week" :key="day" :name="\'days\'" />',
+      '<InlineFeedback v-if="fieldErrors.days">{{ fieldErrors.days }}</InlineFeedback>',
+      '<CustomerSearch v-model="customer" name="customer" />',
+      '<small v-if="fieldErrors.customer">{{ fieldErrors.customer }}</small>',
+    ].join('\n');
+    const voiced = "const tiersChanged = useGroupChange('tiersGroup');";
+    expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': windowWith(fields, voiced) })).toEqual([]);
+  });
+
+  it('counts a group’s fieldset only when the window hands its ref to useGroupChange: on its own it says no change', () => {
+    const group = (attributes: string): string =>
+      [`<fieldset${attributes} name="tiers">`, '  <p v-if="fieldErrors.tiers">{{ fieldErrors.tiers }}</p>', '</fieldset>'].join('\n');
+    const voiced = "const tiersChanged = useGroupChange('tiersGroup');";
+    const mute = [
+      'apps/x/frontend/components/XFormModal.vue:8: <p> paints fieldErrors.tiers apart and its <fieldset name="tiers"> says no change: hand its ref to useGroupChange',
+    ];
+    expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': windowWith(group('')) })).toEqual(mute);
+    expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': windowWith(group(' ref="tiersGroup"')) })).toEqual(mute);
+    expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': windowWith(group(' ref="weekGroup"'), voiced) })).toEqual(mute);
+    expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': windowWith(group(' ref="tiersGroup"'), voiced) })).toEqual([]);
+  });
+
+  it('sees a refusal painted apart in the component the window hands it to, under the prop’s name', () => {
+    const files = {
+      'apps/x/frontend/components/XFormModal.vue': windowWith('<WeekEditor v-model="week" :errors="fieldErrors" />', "import WeekEditor from './WeekEditor.vue';"),
+      'apps/x/frontend/components/WeekEditor.vue': '<template>\n  <div>\n    <p v-if="errors.days">{{ errors.days }}</p>\n  </div>\n</template>\n',
+    };
+    expect(scanOf(files)).toEqual(['apps/x/frontend/components/WeekEditor.vue:3: <p> paints errors.days apart and no control carries name="days"']);
+  });
+
   it('reads the refusal under the name the slot gives it, and on a FormModal that takes the slot itself', () => {
     const renamed = windowWith('<ion-input :error-text="errors.code" />', '', '#default="{ fieldErrors: errors }"');
     expect(scanOf({ 'apps/x/frontend/components/XFormModal.vue': renamed })).toEqual([
@@ -338,6 +505,21 @@ describe('guardrail: every field of a FormModal window that paints its refusal c
     expect(reaches.length).toBeGreaterThan(40);
     expect(reaches).toContain('apps/invoice/frontend/components/SeriesFormModal.vue');
   });
+
+  it('reads the real windows: it finds the refusals they paint apart', () => {
+    const apart = [...SOURCES.entries()].flatMap(([file, source]) =>
+      windows(read(source)?.nodes ?? []).flatMap((reach) => paintedApart(reach).map((notice) => `${file}#${notice.key}`)),
+    );
+    expect(apart).toEqual(
+      expect.arrayContaining([
+        'apps/appointment/frontend/components/AppointmentFormModal.vue#customer',
+        'apps/modifier/frontend/components/OptionFormModal.vue#is_default',
+        'apps/pricing/frontend/components/RuleFormModal.vue#tiers',
+        'apps/staff/frontend/components/ScheduleFormModal.vue#days',
+        'apps/whatsapp_inbox/frontend/components/TemplateFormModal.vue#buttons',
+      ]),
+    );
+  });
 });
 
 // ── The real tree ───────────────────────────────────────────────────────────────────────────────────────────────────
@@ -350,6 +532,11 @@ describe('the hub’s FormModal windows name the fields they paint the refusal o
 
   it('the list only goes down: a file that names more of its fields lowers its number, a fixed one leaves', () => {
     expect(offTheList(unnamedByFile(), STILL_UNNAMED).stale).toEqual([]);
+  });
+
+  it('a window listed as taking a refusal away itself still paints it apart without a control of its name', () => {
+    const apart = new Set(everyUnnamedInTheHub().map(apartKeyOf));
+    expect([...TAKEN_AWAY].filter((entry) => !apart.has(entry))).toEqual([]);
   });
 
   it('the list holds files of the hub with fields left, in order', () => {

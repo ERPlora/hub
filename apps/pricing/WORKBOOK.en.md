@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d6862e27e9201e1730d98745baf8cf3d2c70ec9fb6a8432ea9f3708a7dbf4030 -->
+<!-- generated from WORKBOOK.md sha256:e6911850a8b3780b50efd421c38a4e93b54200e99d25f7728309ba03f486522c -->
 
 ## What it is for and who it is for
 
@@ -366,7 +366,8 @@ In: the form.
 Out: the active rule and `pricing.rule.created`.
 If it fails: under its field: "A discount rule with that code already exists. Pick a different code.", a value that is missing or
 out of range for its type, repeated or unordered tiers, a category, a product or a service
-that does not exist, "Until" before "From". **Create** (and **Save** when editing it, PRICING-F11) is grey
+that does not exist, "Until" before "From". The tiers' one, shown under all of them, goes away as soon as
+any tier changes (typed in, one added or one removed), without saving again (hub#1448). **Create** (and **Save** when editing it, PRICING-F11) is grey
 while the business has not yet said its currency, because the amount per unit is read in it (without it,
 "1500" yen would be saved as 150,000); until then, leaving the amount keeps it as typed, without inventing
 decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as

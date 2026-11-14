@@ -1154,15 +1154,16 @@ Pasos:
    Vuelve activo y a la venta, como al desarchivar en Odoo o Square: si estaba desactivado o marcado como agotado
    antes de eliminarse, se vuelve a hacer a mano (INVENTORY-F03, INVENTORY-F29). Recuperaciones lo cuenta entre los
    restaurados de Productos.
-Entra: el producto eliminado, por su identificador.
-Sale: el producto vivo otra vez, activo y a la venta, sin cambiar ninguno de sus demás datos, y el aviso de producto
-recuperado (`inventory.product.restored`), con el producto tal como vuelve.
+Entra: el producto eliminado, por su identificador, y la imagen que tenía en la copia.
+Sale: el producto vivo otra vez, activo y a la venta, sin cambiar ninguno de sus demás datos (salvo la imagen de la
+librería que recupera si no tenía ninguna), y el aviso de producto recuperado (`inventory.product.restored`), con el
+producto tal como vuelve.
 Si falla: no vuelve si el negocio ya hizo otro producto con su SKU o su EAN-13 desde que lo eliminó: se queda el que
 hizo, y la recuperación no lo cuenta ni lo crea. Un producto que el negocio ya no tiene en absoluto se crea de nuevo
 (INVENTORY-F01), sin stock, con la imagen de la librería que tenía en la copia. Sobre un producto vivo no falla:
 responde bien y vuelve a avisar. Su foto propia no vuelve: se borró al eliminarlo (INVENTORY-F31). La imagen de la
-librería sí, porque eliminar se la deja; uno eliminado antes de que se la dejara vuelve sin ella (hub#1431). Sus
-reglas de descuento de Tarifas se vuelven a activar solas (PRICING-F14) y sus precios en las tarifas vuelven si se
+librería sí, porque eliminar se la deja; uno eliminado antes de que se la dejara, que se quedó sin ninguna, recupera
+la que tenía en la copia, salvo una que la librería ya no tiene. Sus reglas de descuento de Tarifas se vuelven a activar solas (PRICING-F14) y sus precios en las tarifas vuelven si se
 recupera también Tarifas (PRICING-F15), y sus grupos de suplementos, si se recupera también Suplementos
 (MODIFIER-F10). Sus opciones en los menús se borraron al eliminarlo y todavía no vuelven con él (hub#1343).
 Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29, INVENTORY-F30,
@@ -1342,7 +1343,10 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   sin ruta, `ProductRecoverIn`): el alta de la pantalla y, en el mismo paso, la imagen que tenía en la copia, como la
   pone la pantalla con `set_image` (`_library_image`: la de la librería, salvo una que la librería dice que ya no
   tiene; nunca una foto propia; con la librería sin leer, tal como estaba, para no dejar el producto fuera). El
-  eliminado vuelve con la suya porque `inventory.product.delete` ya no le quita la de la librería, solo la foto propia.
+  eliminado vuelve con la suya porque `inventory.product.delete` ya no le quita la de la librería, solo la foto propia;
+  al que se eliminó antes de eso, sin ninguna, `inventory.product.restore` le devuelve la de la copia en el mismo paso
+  y con la misma regla (`ProductRestoreIn`: el `id` y la `image` del registro leído, que es lo que la plataforma le
+  da de la copia, `base.tenancy.recovery._restore_input`). Uno que el negocio tiene vivo no cambia.
   Al final, los enlaces vivos de la copia (`queries.product_links_in_copy`:
   producto y categoría vivos allí, con el id del enlace y `copy_categories`): cada uno que le falta a una categoría que
   trajo una recuperación (`queries.product_links_not_in_business`: la de la copia ya no está viva aquí y la que ocupa su
