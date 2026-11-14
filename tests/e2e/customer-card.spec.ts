@@ -6,7 +6,7 @@
 import { type BrowserContext, expect, test } from '@playwright/test';
 
 import { cardOf, cleanUp, createCard, customersReady, e2eName, FLOW_VIEWPORTS, inputOf, rowNamed, searchList, spanishMobile } from './customer-helpers';
-import { A, api, login, shot, shown } from './helpers';
+import { A, api, capture, login, psql, shot, shown } from './helpers';
 
 test.afterAll(() => cleanUp());
 
@@ -31,6 +31,39 @@ test('a note added in one tab shows live in the other tab\'s activity', async ({
   await expect(item).toContainText(/Note added|Nota añadida/);
   await other.screenshot({ path: shot('customer-card-note-live-other-tab') });
   await other.close();
+});
+
+// flow: CUSTOMER-F03 — each entry of the activity says who did it: a person by their name and the platform in its own
+// words, never its mark («system», «flow_run:…»; hub#1445). The purchase is written here as Sales' notice records it,
+// because the e2e stack's worker does not relay that notice.
+test('the activity names the person who wrote a note and says the platform recorded a purchase', async ({ page, context }) => {
+  await login(page, A, '/customer/customers');
+  const card = await createCard(context, { name: e2eName('Done by'), phone: spanishMobile() });
+  psql(
+    `insert into customer_activity (id, customer_id, kind, title, text, data, related_id, related_type, actor, created_at) values ` +
+      `(gen_random_uuid(), '${card.id}', 'purchase_recorded', '', '', jsonb_build_object('amount', 1250, 'currency', 'EUR'), '', 'sale', 'system', now() - interval '1 minute')`,
+  );
+
+  await page.goto(`/customer/customers/${card.id}`);
+  const form = shown(page).locator('[data-testid=customer-note-form]');
+  await form.locator('[data-testid=customer-note-text] textarea').fill('Prefers mornings');
+  await form.locator('[data-testid=customer-note-add]').click();
+
+  const items = shown(page).locator('[data-testid=customer-activity-item]');
+  await expect(items).toHaveCount(2);
+  await expect(items.nth(0).locator('.customer-activity__when')).toHaveText(/ · (by|por) \S.*$/);
+  await expect(items.nth(1).locator('.customer-activity__when')).toHaveText(/ · (Done by the platform|Lo hizo la plataforma)$/);
+  await expect(shown(page).locator('[data-testid=customer-activity]')).not.toContainText('system');
+
+  // In Spanish, at the fleet's three sizes.
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.reload();
+  await expect(items.nth(1).locator('.customer-activity__when')).toHaveText(/ · Lo hizo la plataforma$/);
+  for (const [width, height] of [[1440, 900], [820, 1180], [375, 667]]) {
+    await page.setViewportSize({ width, height });
+    await shown(page).locator('[data-testid=customer-activity]').scrollIntoViewIfNeeded();
+    await capture(page, `customer-card-activity-done-by-the-platform-${width}x${height}`);
+  }
 });
 
 // flow: CUSTOMER-F06 — saving the groups refreshes the card live; that refresh must not untick the tag
