@@ -20,7 +20,7 @@ import re
 import unicodedata
 import warnings
 from collections import Counter
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from types import ModuleType
 
@@ -65,17 +65,22 @@ class AsksReach(UserWarning):
     a person's new phrase would fare (``own_asks=False``), information and never a failure."""
 
 
-@pytest.fixture
-def context_of(make_user):
+def members(make_user, prefix: str) -> Callable[[str, str], OperationContext]:
+    """``of(role, language)``: the context of a member of business ``a`` with ``role``, who asks in ``language``."""
     users = {}
 
     def of(role: str, language: str) -> OperationContext:
         if role not in users:  # one person per role, whatever the language they ask in
-            users[role] = make_user(f"qa-{role}", host=A.key, role=role)
+            users[role] = make_user(f"{prefix}-{role}", host=A.key, role=role)
         user = users[role]
         return OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language=language)
 
     return of
+
+
+@pytest.fixture
+def context_of(make_user):
+    return members(make_user, "qa")
 
 
 def of_app(tool_name: str, label: str) -> bool:
@@ -164,29 +169,55 @@ def probe_phrases() -> dict[str, str]:
 # ── What an app's own test of its asks ranks with (``apps/<app>/tests/test_assistant_asks.py`` imports them) ────────
 
 
+#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a person's own words may bring their tool: half of them, so
+#: twenty tools of the apps that say their asks later may climb past it before the model loses it.
+WITH_ROOM = 20
+
+
 @pytest.fixture
 def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
+    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``. Its people are
+    not ``context_of``'s, so a test may take both: an app's test imports this one alone, and its ``make_user`` is the
+    one of the app's ``conftest.py``."""
+    context_of = members(make_user, "asker")
 
     def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
+        return assistant.catalog(context_of(role, language))
 
     return of
 
 
-def offered_place(tools: dict[str, Operation], name: str, phrase: str, language: str = "es") -> int | None:
-    """The place a turn offers ``name`` at for ``phrase`` (1 is first), ``None`` when it is not offered at all."""
-    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
+def offered_to(tools: dict[str, Operation], phrase: str, language: str = "es", **ranking) -> list[str]:
+    """The tools a turn in ``language`` offers for ``phrase``, best first, as ``base.assistant.RANKING`` ranks them, or
+    with what ``ranking`` puts in its place (``synonyms=``…)."""
+    return [op.name for op in shared.relevant(tools, [phrase], language, **{**assistant.RANKING, **ranking})]
+
+
+def place_in(offered: list[str], name: str) -> int | None:
+    """The place of ``name`` in ``offered`` (1 is first), ``None`` when it is not there."""
     return offered.index(name) + 1 if name in offered else None
 
 
-def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str) -> int | None:
-    """``offered_place`` of a tool the person holds for a ``phrase`` that is none of its asks in Spanish."""
+def offered_place(tools: dict[str, Operation], name: str, phrase: str, language: str = "es", **ranking) -> int | None:
+    """The place a turn offers ``name`` at for ``phrase`` (1 is first), ``None`` when it is not offered at all."""
+    return place_in(offered_to(tools, phrase, language, **ranking), name)
+
+
+def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str, language: str = "es") -> int | None:
+    """``offered_place`` of a tool the person holds for a ``phrase`` that is none of its asks, in any language: every
+    ask scores for the phrases that share its words, whatever the language of the turn."""
     assert name in tools  # positive control: the person holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    return offered_place(tools, name, phrase)
+    assert comparable(phrase) not in {comparable(ask) for asks in shared.asks_of(tools[name]).values() for ask in asks}
+    return offered_place(tools, name, phrase, language)
+
+
+def assert_offered_with_room(
+    tools: dict[str, Operation], name: str, phrase: str, language: str = "es", room: int = WITH_ROOM
+) -> None:
+    """That ``phrase``, a person's words and none of the asks of tool ``name``, brings it among the first ``room`` a
+    turn offers."""
+    place = place_of_no_ask(tools, name, phrase, language)
+    assert place is not None and place <= room, place
 
 
 def assert_reported_are_owner_probes(reported: Iterable[tuple[str, str]]) -> None:
@@ -256,11 +287,10 @@ def assert_its_asks_bring(tools: dict[str, Operation], name: str, phrase: str, l
     assert comparable(phrase) not in probe_phrases(), "it is a probe of layer 2"
     said = [ask for asks in shared.asks_of(tools[name]).values() for ask in asks if alike(ask, phrase)]
     assert not said, ("it is an ask but for a word at most", said)
-    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
-    place = offered.index(name) + 1 if name in offered else None
-    assert name in offered[:TOP], ("its asks do not bring it", place, offered[:TOP])
-    unasked = [op.name for op in assistant.relevant(without_its_asks(tools, name), [phrase], language)]
-    assert name not in unasked[:TOP], ("it comes without its asks", unasked.index(name) + 1)
+    offered = offered_to(tools, phrase, language)
+    assert name in offered[:TOP], ("its asks do not bring it", place_in(offered, name), offered[:TOP])
+    unasked = offered_to(without_its_asks(tools, name), phrase, language)
+    assert name not in unasked[:TOP], ("it comes without its asks", place_in(unasked, name))
 
 
 def near_copies(asks: dict[str, tuple[str, ...]], probes: Iterable[dict]) -> list[tuple[str, str, str]]:
@@ -459,11 +489,7 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_platform_request_offers_its_existing_operation(context_of, name, phrase):
-    tools = assistant.catalog(context_of(Membership.Role.OWNER, "es"))
-    assert name in tools
-    assert phrase not in shared.asks_of(tools[name])["es"]
-    offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
-    assert name in offered
+    assert place_of_no_ask(assistant.catalog(context_of(Membership.Role.OWNER, "es")), name, phrase) is not None
 
 
 #: A phrase of some tools, each with the tool it asks for: reads and writes, both languages, and words only the Hub's

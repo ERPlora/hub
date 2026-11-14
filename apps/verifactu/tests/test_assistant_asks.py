@@ -19,19 +19,13 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 from live import assistant as shared
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-# ``context_of`` is base's fixture (a member of business ``a``, which has every app on, with a role and a language):
-# imported here, pytest hands it to the tests of this module as it does to base's.
-from base.tests.test_assistant_asks import (
-    assert_its_asks_bring,
-    comparable,
-    context_of,
-    place_of_no_ask,
-    probe_phrases,
-)
+from base.tests.test_assistant_asks import assert_its_asks_bring, assert_offered_with_room, comparable, offered_to
+from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: The requests of the real-model QA (``tests/e2e/qa/probes/owner-es-verifactu-2026-11-08.json``), as the owner said
 #: them, and nothing of the tools' ``asks``: before VeriFactu said its asks, none of these tools was among the ones a
@@ -67,9 +61,6 @@ SAID_SHORT = [
 ]
 #: How far down the tools a turn offers the requests of the issue bring their tool: the model weighs the first ones.
 FIRST = 8
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a probe of the QA may bring its tool: half of them, so the
-#: tools of the apps that say their asks later may climb past it before the model loses it.
-WITH_ROOM = 20
 PROBES_DIR = Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes"
 #: Every probe of layer 2 of VeriFactu, the owner's and the employee's real phrases of the QA: the ones above and the
 #: ones the model answered right.
@@ -166,11 +157,6 @@ def no_way_out(monkeypatch):
     monkeypatch.setattr(socket.socket, "connect", only_here)
 
 
-def owners_catalog(context_of, language: str = "es") -> dict[str, Operation]:
-    """The real catalogue of the assistant of the owner of business ``a``, which has every app on."""
-    return assistant.catalog(context_of(Membership.Role.OWNER, language))
-
-
 def verifactu_tools() -> list[str]:
     return sorted(name for name, op in registry.items() if op.app_label == "verifactu" and assistant.is_tool(op))
 
@@ -207,17 +193,16 @@ def test_the_reported_requests_are_probes_of_layer_2():
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED + SAID_SHORT)
-def test_the_owners_request_offers_its_existing_operation_among_the_first_eight(context_of, name, phrase):
-    place = place_of_no_ask(owners_catalog(context_of), name, phrase)
-    assert place is not None and place <= FIRST, place
+def test_the_owners_request_offers_its_existing_operation_among_the_first_eight(catalog_of, name, phrase):
+    assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase, room=FIRST)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-def test_sealing_the_record_of_an_issued_invoice_comes_before_creating_another_test_invoice(context_of):
+def test_sealing_the_record_of_an_issued_invoice_comes_before_creating_another_test_invoice(catalog_of):
     """The owner asked to seal the record of the test invoice already issued, and the model created another
     test invoice (``verifactu.test_invoice.create``): sealing the record of an issued invoice goes ahead of it."""
-    tools = owners_catalog(context_of)
-    ranked = [op.name for op in assistant.relevant(tools, [dict(REPORTED)["verifactu.record.create"]], "es")]
+    tools = catalog_of(Membership.Role.OWNER, "es")
+    ranked = offered_to(tools, dict(REPORTED)["verifactu.record.create"])
     assert "verifactu.record.create" in ranked
     assert "verifactu.test_invoice.create" in tools  # positive control: the owner may create one
     later = ranked.index("verifactu.test_invoice.create") if "verifactu.test_invoice.create" in ranked else len(ranked)
@@ -233,35 +218,34 @@ def test_sealing_the_record_of_an_issued_invoice_comes_before_creating_another_t
     ],
     ids=[probe["id"] for probe in PROBES],
 )
-def test_every_probe_of_verifactu_offers_its_tool_to_whoever_may_run_it(context_of, probe):
+def test_every_probe_of_verifactu_offers_its_tool_to_whoever_may_run_it(catalog_of, probe):
     """The phrases of layer 2 of VeriFactu, the ones the model answered right too: a tool of VeriFactu that a new ask
     elsewhere pushes out of the first half of the ones a turn offers fails here before the real-model QA sees it. What
     the employee asks of a write only who runs the business holds is a refusal: the tool is not theirs to be offered."""
     assert probe["language"] == "es"  # the QA of VeriFactu asked in Spanish: base's place_of_no_ask ranks in it
     role = {"owner": Membership.Role.OWNER, "employee": Membership.Role.EMPLOYEE}[probe["role"]]
-    tools = assistant.catalog(context_of(role, probe["language"]))
+    tools = catalog_of(role, probe["language"])
     if probe["expect"] == "refused":
         assert probe["role"] == "employee"
-        assert probe["tool"] in owners_catalog(context_of, probe["language"])
+        assert probe["tool"] in catalog_of(Membership.Role.OWNER, probe["language"])
         assert probe["tool"] not in tools
         return
-    place = place_of_no_ask(tools, probe["tool"], probe["phrase"])
-    assert place is not None and place <= WITH_ROOM, place
+    assert_offered_with_room(tools, probe["tool"], probe["phrase"])
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-def test_going_live_is_offered_although_the_account_is_read_as_a_check(context_of):
+def test_going_live_is_offered_although_the_account_is_read_as_a_check(catalog_of):
     """Before VeriFactu said its asks, going live was not offered at all for the owner's request; now it is, behind the
     writes of a check that «activa … la cuenta» brings (``GO_LIVE``)."""
     probe = next(probe for probe in PROBES if probe["id"] == GO_LIVE)
-    place = place_of_no_ask(owners_catalog(context_of), probe["tool"], probe["phrase"])
-    assert place is not None and place <= shared.MAX_TOOLS, place
+    tools = catalog_of(Membership.Role.OWNER, "es")
+    assert_offered_with_room(tools, probe["tool"], probe["phrase"], room=shared.MAX_TOOLS)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), OWN_WORDS)
-def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(context_of, name, phrase):
-    assert_its_asks_bring(owners_catalog(context_of), name, phrase, "es")
+def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
+    assert_its_asks_bring(catalog_of(Membership.Role.OWNER, "es"), name, phrase, "es")
 
 
 def test_every_tool_of_verifactu_has_a_phrase_of_its_own():

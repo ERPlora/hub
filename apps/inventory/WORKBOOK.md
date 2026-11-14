@@ -1341,8 +1341,9 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   el negocio volvió a crear con su nombre), activo o no como estaba (`ProductIn.is_active`), sin stock (el saldo de la
   copia es de otro día). No es `inventory.product.create` sino `inventory.product.recover` (permiso `inventory.system`,
   sin ruta, `ProductRecoverIn`): el alta de la pantalla y, en el mismo paso, la imagen que tenía en la copia, como la
-  pone la pantalla con `set_image` (`_library_image`: la de la librería, salvo una que la librería dice que ya no
-  tiene; nunca una foto propia; con la librería sin leer, tal como estaba, para no dejar el producto fuera). El
+  pone la pantalla con `set_image` (`base.images.from_copy`, la misma regla que Servicios: la de la librería, salvo una
+  que la librería dice que ya no tiene; nunca una foto propia; con la librería sin leer, tal como estaba, para no dejar
+  el producto fuera). El
   eliminado vuelve con la suya porque `inventory.product.delete` ya no le quita la de la librería, solo la foto propia;
   al que se eliminó antes de eso, sin ninguna, `inventory.product.restore` le devuelve la de la copia en el mismo paso
   y con la misma regla (`ProductRestoreIn`: el `id` y la `image` del registro leído, que es lo que la plataforma le
@@ -1353,9 +1354,15 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   sitio por `_categories_held` la creó una recuperación, `created_by` según `base.recovery.brought_back`; el producto
   sigue vivo aquí y fuera de ella) se crea por la operación de la pantalla, `inventory.product_category.add`, que añade
   sin quitar ninguna otra categoría. Va aparte, con su propia cuenta, porque toca lo que el negocio tiene. Una categoría
-  rehecha a mano (`created_by` de una persona) o conservada no se rellena. Lee desde `0001_initial`; una migración que quite o renombre una
-  columna que lee cambia también la lectura y su `reads_since`. Tests: `tests/test_recovery.py`, de punta a punta
+  rehecha a mano (`created_by` de una persona) o conservada no se rellena. Las categorías y los enlaces se leen desde `0001_initial` y los
+  productos desde `0005_product_image`, la que les dio la imagen (a una copia anterior se le niegan los productos con
+  `recover_copy_behind`); una migración que añada, quite o renombre una columna que se lee cambia también la lectura
+  y su `reads_since`. Tests: `tests/test_recovery.py`, de punta a punta
   incluido, y el contrato de `base/tenancy/tests/test_recovery.py`.
+  Las apps cuyos registros de la copia cuelgan de un producto (Tarifas, Suplementos) no emparejan a su manera: piden a
+  `queries.products_standing_for` (`{id allí: SKU allí}`) el producto del negocio que hace de cada uno que ya no está
+  vivo aquí: el vivo con su SKU que hizo una recuperación (`base.recovery.brought_back`), la de esta pasada u otra
+  anterior. Uno vivo es él mismo y no sale; uno hecho a mano con su SKU es del negocio y no hace de ninguno.
 
 ## El servidor (fase de servidor, 2026-10-14)
 

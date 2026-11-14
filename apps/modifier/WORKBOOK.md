@@ -350,7 +350,7 @@ de ERPlora recupera después el producto desde una copia aparte, sus grupos vuel
 Implicados: INVENTORY-F04, INVENTORY-F07, INVENTORY-F34, MODIFIER-F10
 
 ### MODIFIER-F10 Recuperar los grupos de suplementos de un producto desde una copia aparte
-<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus grupos de suplementos) gh:hub#1343 -->
+<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus grupos de suplementos) gh:hub#1343 gh:hub#1457 -->
 Estado: hecho
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide (BASE-F114)
 Pantalla: ninguna de Suplementos: en el admin de Hubs, Copias aparte › «Recuperar en el negocio…», con **Grupos de
@@ -361,7 +361,8 @@ Pasos:
    se le enganchan sus grupos.
 2. Cada grupo que en la copia colgaba de un producto vivo en ella y que el negocio ya no tiene enganchado a ese producto
    se vuelve a enganchar, como lo engancha la hoja del grupo (MODIFIER-F05): el producto vuelve a preguntar en el TPV
-   sus salsas, su punto o sus extras.
+   sus salsas, su punto o sus extras. Un producto que el negocio ya no tenía en absoluto vuelve como uno nuevo, con
+   otro identificador (INVENTORY-F01): sus grupos se enganchan a ese, el que la recuperación hizo con su SKU.
 3. Recuperaciones lo cuenta aparte: «Grupos de suplementos de productos: se crearon 2».
 Entra: la copia aparte y lo que el negocio tiene hoy.
 Sale: un enganche por cada uno que faltaba, con su aviso de enganche hecho (`modifier.link.attached`) hecho por la
@@ -371,11 +372,13 @@ Si falla: un enganche que el negocio aún tiene se queda como está, y no se rep
 enganchar a ese producto: se queda el suyo, y pedirlo otra vez no engancha nada dos veces. Un grupo que el negocio soltó
 a mano de un producto después de la copia también vuelve, como todo lo que el negocio ya no tiene (BASE-F114). Lo que la
 hoja del grupo no acepta hoy no vuelve y Recuperaciones dice por qué, por el identificador del enganche en la copia: un
-producto que sigue eliminado (no se recuperó Productos, o el negocio ya hizo otro con su SKU) o un grupo que el negocio
-borró después («not_found: …»); un grupo borrado no se recupera desde la copia (hub#1458). Un producto que el negocio ya
-no tenía en absoluto vuelve como uno nuevo, con otro identificador (INVENTORY-F01), y sus grupos de la copia no vuelven
-con él (hub#1457). Los grupos enganchados a una categoría no vuelven: tampoco a una categoría recuperada (hub#1456).
-Implicados: BASE-F114, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
+producto que sigue eliminado o que el negocio ya no tiene (no se recuperó Productos, o el negocio ya hizo otro a mano
+con su SKU, que se queda con los grupos que él le enganchó) o un grupo que el negocio borró después («not_found: …»); un
+grupo borrado no se recupera desde la copia (hub#1458). El producto que hizo una recuperación se reconoce por su SKU la
+hiciera esta u otra anterior: pedida otra vez desde una copia anterior, le vuelve a enganchar los grupos que el negocio
+le soltó después, como a todo lo que ya no tiene. Los grupos enganchados a una categoría no vuelven: tampoco a una
+categoría recuperada (hub#1456).
+Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
 
 ## Servicios: lo que entra y lo que sale
 
@@ -539,11 +542,14 @@ cajero del producto actual es un empleado.
   vuelve desde la copia aparte (F10); `live.py` solo repinta con él.
 - **Desde una copia aparte** (BASE-F114, F10): `recoverable_from_copy` de `apps.py` declara una sola cosa, «Modifier
   groups of products». `queries.links_in_copy` lee con su propio SQL los `ModifierLink` de la copia que cuelgan de un
-  producto no borrado allí (los de una categoría no, hub#1456) y `queries.links_not_in_business` deja los que el negocio
-  no tiene en su sitio (grupo y producto, el índice único `modifier_link_product_unique`; un enganche nunca cambia de
-  grupo ni de producto, así que el mismo enganche ya está en el suyo); la plataforma los
-  crea con `modifier.link.attach` como la recuperación (`copy_recovery:<id>`), y lo que `attach` rechaza sale «sin
-  crear» con su motivo. Pruebas: `tests/test_recovery.py`.
+  producto no borrado allí (los de una categoría no, hub#1456), con el SKU del producto allí, y
+  `queries.links_not_in_business` pone cada uno en el producto que hace de él en el negocio
+  (`apps.inventory.queries.products_standing_for`, la misma pareja que Tarifas: el mismo mientras vive; si no, el vivo
+  con su SKU que hizo una recuperación, `base.recovery.brought_back`; uno hecho a mano con su SKU no recibe nada) y deja
+  los que el negocio no tiene en su sitio (grupo y producto, el índice único `modifier_link_product_unique`; un
+  enganche nunca cambia de grupo ni de producto, así que el mismo enganche ya está en el suyo); la plataforma los crea
+  con `modifier.link.attach` como la recuperación (`copy_recovery:<id>`), y lo que `attach` rechaza sale «sin crear»
+  con su motivo. Pruebas: `tests/test_recovery.py`.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` al borrar
   un grupo o una opción) y cada campo de `schemas.py` su `description`. Los datos que ningún modelo
   nombra llevan además un `title` en inglés con su `es` en el catálogo de la app (`option` «Opción»,

@@ -13,15 +13,14 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 from live import assistant as shared
-from live.context import OperationContext, Scope
 from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import assert_its_asks_bring, comparable, probe_phrases
+from base.tests.test_assistant_asks import assert_its_asks_bring, assert_offered_with_room, comparable, offered_to
+from base.tests.test_assistant_asks import place_of_no_ask, probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
-A = Scope("host", "a")
 OWNER, EMPLOYEE = Membership.Role.OWNER, Membership.Role.EMPLOYEE
 #: The role of a probe as its file says it (``"role": "owner"``).
 PROBE_ROLE = {"owner": OWNER, "employee": EMPLOYEE}
@@ -60,9 +59,6 @@ BY_NAME = "demo.item.list"
 #: own name alone («elimina Ejemplo QA…»), with no word of Demo's that would bring the list, acts on it (hub#1162).
 NAMES_AN_ITEM = {"demo.item.detail", "demo.item.update", "demo.item.delete", "demo.item.add_line"}
 
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a probe of the QA may bring its tool: half of them, so
-#: twenty tools of the apps that say their asks later may climb past it before the model loses it.
-WITH_ROOM = 20
 #: How far down the tools a turn offers an ask brings its own tool in layer 1 (``base/tests/test_assistant_asks.py``).
 TOP = 10
 #: Every probe of layer 2 of Demo, both roles: the reported ones and the ones the model got right.
@@ -73,22 +69,6 @@ PROBES = [
 ]
 #: The probes a role is offered its tool for; the others (``"expect": "refused"``) ask for what the role may not do.
 OFFERED_PROBES = [probe for probe in PROBES if probe["expect"] != "refused"]
-
-
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
-
-
-def offered_to(tools: dict[str, Operation], phrase: str) -> list[str]:
-    return [op.name for op in assistant.relevant(tools, [phrase], "es")]
 
 
 def is_own_words(tools: dict[str, Operation], phrase: str) -> bool:
@@ -178,11 +158,7 @@ def test_an_employee_is_never_offered_what_only_who_manages_the_items_may_do(cat
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize(("role", "name", "phrase"), REPORTED)
 def test_the_reported_demo_request_offers_its_existing_operation(catalog_of, role, name, phrase):
-    tools = catalog_of(role, "es")
-    assert name in tools  # positive control: the role holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    offered = offered_to(tools, phrase)
-    assert name in offered, (len(offered), offered[:10])
+    assert place_of_no_ask(catalog_of(role, "es"), name, phrase) is not None
 
 
 #: Every probe of layer 2 whose tool acts on one item, as its role said it: all but the owner's detail («enséñame el
@@ -208,8 +184,7 @@ def test_a_probe_that_names_an_item_is_offered_its_tool_which_takes_the_item_by_
     """The tool the probe is offered takes the item as the person said it, so the model sends «Ejemplo QA» and never
     asks for the item's id, whether or not the list that finds it comes beside it."""
     tools = catalog_of(role, "es")
-    offered = offered_to(tools, phrase)
-    assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:10])
+    assert_offered_with_room(tools, name, phrase)
     parameters = shared.tool_spec(tools[name])["parameters"]
     assert "called" in parameters["properties"] and "id" in parameters["properties"]
     assert not {"id", "called"} & set(parameters.get("required", ()))
@@ -228,9 +203,4 @@ def test_the_owners_probe_that_says_elemento_is_offered_the_list_that_finds_it_t
 def test_every_probe_of_demo_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
     """Both roles' phrases of layer 2, the ones the model answered right too: a tool of Demo that a new ask elsewhere
     pushes out of the first half of the ones a turn offers fails here before the real-model QA sees it."""
-    tools = catalog_of(PROBE_ROLE[probe["role"]], probe["language"])
-    name, phrase = probe["tool"], probe["phrase"]
-    assert name in tools  # positive control: the role holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    offered = offered_to(tools, phrase)
-    assert name in offered[:WITH_ROOM], (offered.index(name) + 1 if name in offered else None, offered[:10])
+    assert_offered_with_room(catalog_of(PROBE_ROLE[probe["role"]], probe["language"]), probe["tool"], probe["phrase"])

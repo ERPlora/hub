@@ -3064,9 +3064,8 @@ Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, A
 Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte, y recuperar desde la copia aparte los
 clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías, las citas,
 las citas periódicas, los precios de tarifa y los grupos de suplementos de los productos; crear y borrar el clúster
-temporal es el procedimiento «Devolver un negocio a un momento» de ERPlora/aws; la imagen de un servicio recuperado,
-hub#1429; las opciones de menú de un producto que vuelve, hub#1343; los precios de tarifa de un servicio que vuelve como
-uno nuevo, hub#1459; los grupos de suplementos de un producto que vuelve como uno nuevo, hub#1457; los grupos de
+temporal es el procedimiento «Devolver un negocio a un momento» de ERPlora/aws; las opciones de menú de un producto
+que vuelve, hub#1343; los precios de tarifa de un servicio que vuelve como uno nuevo, hub#1459; los grupos de
 suplementos de una categoría que vuelve, hub#1456; un grupo de suplementos borrado, hub#1458)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
@@ -3172,7 +3171,9 @@ Pasos:
       Servicios (SERVICE-F31): como su servicio principal si el negocio no le ha dado otro desde entonces, y apagado si lo
       estaba. A quien Personal dio de baja, o el negocio ya no tiene, no se le asigna, porque ya no se le puede reservar,
       y Recuperaciones lo dice en las notas del servicio («service.member_terminated: volvió sin el profesional <su
-      identificador>: dado de baja en Personal», o «…: ya no está en Personal»). Sin su imagen (hub#1429). Uno archivado sigue
+      identificador>: dado de baja en Personal», o «…: ya no está en Personal»). Vuelve con la imagen de la librería que
+      tenía, como la pone Servicios (SERVICE-F34): una que la librería ya no tiene, no; una foto propia, nunca, porque la
+      copia aparte es de la base de datos y no de los ficheros. Uno archivado sigue
       en el negocio y no vuelve (se restaura en Servicios), tampoco uno que la copia tenía archivado, y no se repite uno
       que el negocio ya volvió a crear (otro con el mismo nombre en la misma categoría, que no sea ya uno de la copia; cada
       uno vale por uno solo, así que dos servicios con el mismo nombre vuelven los dos). Pedirlo otra vez no crea nada
@@ -3212,10 +3213,10 @@ Pasos:
       Los grupos de suplementos de los productos van también después de los productos: «Grupos de suplementos de
       productos: se crearon 2». Cada grupo que en la copia colgaba de un producto vivo allí y que el negocio ya no tiene
       enganchado a ese producto se vuelve a enganchar, como lo engancha la hoja del grupo, así que un producto eliminado
-      que vuelve pregunta otra vez en el TPV sus salsas, su punto o sus extras (MODIFIER-F10). No se repite uno cuyo
-      grupo el negocio ya volvió a enganchar a ese producto: se queda el suyo. Uno que la hoja del grupo no acepta hoy
-      (su producto sigue eliminado, o el negocio borró el grupo) no vuelve y su motivo lo dice; los de un producto que
-      vuelve como uno nuevo, tampoco todavía (hub#1457).
+      que vuelve, el mismo o como uno nuevo, pregunta otra vez en el TPV sus salsas, su punto o sus extras
+      (MODIFIER-F10). No se repite uno cuyo grupo el negocio ya volvió a enganchar a ese producto: se queda el suyo. Uno
+      que la hoja del grupo no acepta hoy (su producto sigue eliminado, o el negocio ya hizo otro a mano con su SKU, o
+      borró el grupo) no vuelve y su motivo lo dice.
 Entra: los negocios elegidos, el clúster temporal con su copia y el momento; para recuperar, la copia aparte hecha y qué
 recuperar.
 Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso
@@ -3276,7 +3277,7 @@ mantenimiento, hasta que se descongela. Con registros solo del entorno de prueba
 Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
 INVENTORY-F07, INVENTORY-F30, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08,
-SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, PRICING-F07,
+SERVICE-F31, SERVICE-F34, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, PRICING-F07,
 PRICING-F14, PRICING-F15, MODIFIER-F05, MODIFIER-F10, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257,
 hub#1282, hub#1283, hub#1284,
 hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1343,
@@ -4228,7 +4229,11 @@ hub#1458, hub#1459, aws#77
   `queries.py` y `create`, la operación que crea cada uno; y, los dos o ninguno, `deleted(records)` en su `queries.py` y
   `restore`, la operación que devuelve lo que el negocio guarda eliminado, hub#1306, que recibe del registro leído lo
   que declara su entrada: el `id` y, si quiere devolverle lo que el negocio le quitó después, lo demás que nombre,
-  hub#1356; la de Inventario, además, la imagen que el producto tenía en la copia, hub#1431; las de Citas, solo el `id`); `base/` no nombra ninguna. Primero vuelve lo eliminado y después se crea lo que falta, con las operaciones de la app, en el contexto del
+  hub#1356; la de Inventario, además, la imagen que el producto tenía en la copia, hub#1431; las de Citas, solo el
+  `id`); `base/` no nombra ninguna. La imagen de lo que vuelve (productos, servicios) la lleva la entrada con
+  `base.recovery.ImageInCopyIn` y se queda lo que deja `base.images.from_copy`: la de la librería, salvo una que la
+  librería dice que ya no tiene; nunca una foto propia; con la librería sin leer, tal como estaba, para no dejar el
+  registro fuera. Primero vuelve lo eliminado y después se crea lo que falta, con las operaciones de la app, en el contexto del
   sistema y en el idioma del personal, dentro de `use_hub`; un `InvalidPayload` o un `NotFound` es de ese registro y los
   demás siguen, cualquier otro rechazo para la app. Clientes responde con `recoverable_cards_in_copy`,
   `cards_deleted_in_business` con `customer.customer.restore`, que le devuelve lo que el negocio borró después

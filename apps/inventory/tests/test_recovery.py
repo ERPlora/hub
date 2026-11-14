@@ -33,7 +33,7 @@ from apps.inventory.schemas import CategoryRecoverIn, ProductCategoryIn, Product
 from apps.tax.models import TaxCategory
 from base.recovery import actor_of
 from base.tenancy.context import use_hub
-from base.tenancy.tests.test_recovery import Recoveries, fresh, run, run_in
+from base.tenancy.tests.test_recovery import Recoveries, fields_held_since, fresh, run, run_in
 from base.tests.test_image_catalog import image_library  # noqa: F401 - the library fixture
 
 TAX = "test.general"
@@ -212,6 +212,41 @@ def test_a_lacking_product_without_a_tax_category_names_none_and_its_create_says
     assert "tax_category_key" not in lacking
     with pytest.raises(ValueError, match="tax_category_key"):
         ProductIn.model_validate({key: value for key, value in lacking.items() if key != "id"})
+
+
+def made_by_a_recovery(name: str, sku: str, **fields) -> Product:
+    """A product a recovery from a separate copy made again, as ``inventory.product.recover`` leaves it."""
+    return product(name, sku, created_by=actor_of(uuid.uuid7()), **fields)
+
+
+@pytest.mark.django_db
+def test_a_product_no_longer_held_live_stands_for_the_one_a_recovery_made_again_with_its_sku():
+    tea = made_by_a_recovery("Tea", "TEA-1")
+    gone = uuid.uuid7()
+    # Still held, but deleted, and its SKU taken since by one a recovery made: that one stands for it too.
+    old = product("Cake", "CAK-1", is_deleted=True)
+    cake = made_by_a_recovery("Cake", "CAK-1")
+
+    assert queries.products_standing_for({gone: "TEA-1", old.pk: "CAK-1"}) == {gone: tea.pk, old.pk: cake.pk}
+
+
+@pytest.mark.django_db
+def test_a_product_still_live_is_itself_by_its_id_before_any_sku():
+    tea = product("Tea", "TEA-2")
+    made_by_a_recovery("Old tea", "TEA-1")
+
+    # The copy knew it by another SKU, and it is still live here: no other stands for it.
+    assert queries.products_standing_for({tea.pk: "TEA-1"}) == {}
+
+
+@pytest.mark.django_db
+def test_one_made_again_by_hand_or_deleted_since_stands_for_none():
+    # Made again by hand with the SKU: the business's own, set up as the business chose.
+    product("Tea", "TEA-1", created_by="ana")
+    # Made again by a recovery, then deleted by the business.
+    made_by_a_recovery("Cake", "CAK-1", is_deleted=True)
+
+    assert queries.products_standing_for({uuid.uuid7(): "TEA-1", uuid.uuid7(): "CAK-1"}) == {}
 
 
 def category(name: str, **fields) -> Category:
@@ -564,12 +599,18 @@ def test_the_app_declares_what_it_gives_back_its_categories_first_its_links_last
         None,
         "",
     )
+    assert [one.reads_since for one in (categories, products, links)] == [
+        "0001_initial",
+        "0005_product_image",
+        "0001_initial",
+    ]
+    # Its products are read with their image: a copy from before it is refused them (recover_copy_behind).
+    assert fields_held_since("inventory", "product", products.reads_since) >= set(queries.PRODUCT_FIELDS)
     assert [str(one.label) for one in (categories, products, links)] == [
         "Product categories",
         "Products",
         "Product links to categories",
     ]
-    assert categories.reads_since == products.reads_since == links.reads_since == "0001_initial"
 
 
 # ── End to end: the business's own database and its copy ────────────────────────────────────────────────────────────

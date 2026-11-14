@@ -208,7 +208,7 @@ Sale: la categoría, única por clave en el negocio; Impuestos avisa de que hay 
 categoría se rechaza. Inventario también la crea cuando alguien elige «Crear» al importar un fichero
 (TAX-F15).
 Si falla: una clave con otra forma o un nombre vacío salen debajo de su campo; una clave que ya existe,
-«Ya hay una categoría fiscal con esa clave.» debajo de la Clave. No se guarda nada.
+«Ya hay una categoría fiscal con esa clave.» debajo de la Clave. El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888). No se guarda nada.
 Implicados: INVENTORY-F09
 
 ### TAX-F03 Ver y filtrar las reglas
@@ -254,7 +254,7 @@ categoría…» (se resuelve con TAX-F07 o TAX-F08). Un país que no existe, una
 fuera de 0–100, un «Vigente hasta» anterior a «Vigente desde» o una categoría que no existe salen
 debajo de su campo. Una regla del mismo país, región y categoría que empieza el mismo día que otra ya
 guardada, aunque esté desactivada: «Ya hay una regla de este país, región y categoría desde ese día,
-quizá desactivada: reactívala o empieza esta otro día.», en «Vigente desde». No se guarda nada.
+quizá desactivada: reactívala o empieza esta otro día.», en «Vigente desde». El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888). No se guarda nada.
 Implicados: INVOICE-F01, SALE-F01
 
 ### TAX-F05 Declarar una operación exenta, no sujeta o con inversión del sujeto pasivo
@@ -449,7 +449,7 @@ Entra: el texto externo, la categoría y el origen que elige la persona.
 Sale: el alias, guardado en minúsculas y sin espacios de sobra, único en el negocio
 (`tax.alias.created`). La próxima importación de Inventario lo entiende, se escriba como se escriba.
 Si falla: un alias que ya existe: «Ese alias ya existe.» debajo del Alias; una categoría que no existe,
-debajo de la Categoría. No se guarda nada.
+debajo de la Categoría. El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888). No se guarda nada.
 Implicados: INVENTORY-F09
 
 ### TAX-F15 Decir al importador de Inventario qué categoría es un texto

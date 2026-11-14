@@ -1097,8 +1097,9 @@ def _csv(filename, headers, rows) -> dict:
 #: and its tax category, by its key here.
 CATEGORY_FIELDS = ("name", "slug", "description", "icon", "color", "order")
 
-#: What ``inventory.product.recover`` takes of a product of a separate copy, all of its columns since
-#: ``0001_initial`` (``products_in_copy``): its create's and the image it showed. Not its stock (the copy's balance is
+#: What ``inventory.product.recover`` takes of a product of a separate copy (``products_in_copy``): its create's, each
+#: a column since ``0001_initial``, and the image it showed, one since ``0005_product_image``, the migration its
+#: declaration names (``reads_since``). Not its stock (the copy's balance is
 #: another day's: a count says today's, INVENTORY-F14) nor its «sold out» (a day's state).
 PRODUCT_FIELDS = (
     "name",
@@ -1317,6 +1318,19 @@ def products_not_in_business(products: list[dict]) -> list[dict]:
     keys = _tax_keys({one["tax_category"] for one in lacking})
     categories = _categories_held(next((one["copy_categories"] for one in products), {}))
     return [_as_created(one, keys.get(one["tax_category"]), categories) for one in lacking]
+
+
+def products_standing_for(skus: dict[UUID, str]) -> dict[UUID, UUID]:
+    """The business's product that stands for each of a separate copy's products (``{id there: SKU there}``) it no
+    longer holds live, as ``{id there: id here}``: the live one with its SKU, the article's identity, that a recovery
+    made (``brought_back``), as ``products_not_in_business`` has one the business no longer holds at all made again
+    with another id (INVENTORY-F01). One the business made again by hand is its own, set up as it chose: it stands for
+    none. A product still live here is itself, and is not in the result. For the apps whose records hang from a
+    product to give each back to the product it is now."""
+    live = set(Product.objects.filter(pk__in=list(skus), is_deleted=False).values_list("pk", flat=True))
+    wanted = {sku: there for there, sku in skus.items() if there not in live}
+    made = Product.objects.filter(sku__in=list(wanted), is_deleted=False).values_list("sku", "pk", "created_by")
+    return {wanted[sku]: pk for sku, pk, created_by in made if brought_back(created_by)}
 
 
 def _as_created(product: dict, tax_key: str | None, categories: dict[UUID, UUID]) -> dict:
