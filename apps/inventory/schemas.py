@@ -207,6 +207,21 @@ class ProductIdIn(Schema):
     id: UUID = Field(title=T_PRODUCT, description="The product's id.")
 
 
+class ImageInCopyIn(Schema):
+    """The image a product showed in a separate copy of the business (BASE-F114)."""
+
+    image: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] = Field(
+        "",
+        description="The image it showed in the copy: one of the shared library (catalog:<folder>/<name>) comes back "
+        "with it, a photo of its own does not (it was deleted with the product).",
+    )
+
+
+class ProductRestoreIn(ProductIdIn, ImageInCopyIn):
+    """A deleted product of a separate copy the business still holds, by its id, and the image it showed there: one
+    deleted before deleting kept the image of the library gets it back."""
+
+
 class CategoryRefIn(Schema):
     id: UUID | None = Field(None, title=T_CATEGORY, description="The category's id.", json_schema_extra=A_CATEGORY)
     category: Said | None = Field(
@@ -452,15 +467,9 @@ class ProductIn(Schema):
     )
 
 
-class ProductRecoverIn(ProductIn):
+class ProductRecoverIn(ProductIn, ImageInCopyIn):
     """A product of a separate copy the business no longer holds: what ``inventory.product.create`` takes and the image
     it showed there (the business makes its own id)."""
-
-    image: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] = Field(
-        "",
-        description="The image it showed in the copy: one of the shared library (catalog:<folder>/<name>) comes back "
-        "with it, a photo of its own does not (it was deleted with the product).",
-    )
 
 
 class ProductPatchIn(ProductRefIn):
