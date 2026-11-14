@@ -5,7 +5,9 @@
 // STAFF-F22) and «Create schedule» lists it as the default one with its
 // hours; a day ending before it starts is refused under that day (422), and its reason goes as soon as that
 // day is changed, while another refused day keeps its own; editing drops Friday; «Delete» asks first and
-// empties the list. Everything this spec creates is named «E2E …» and removed after it.
+// empties the list. In English and in Spanish, from a phone to a desk, every day's name reads whole, on one line
+// and in one column, whether the day is worked or off. Everything this spec creates is named «E2E …» and removed
+// after it.
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, psql, shot, shown } from './helpers';
@@ -197,7 +199,7 @@ test('Schedules: the default week, a day refused under its row and corrected on 
 });
 
 for (const language of ['en', 'es'] as const) {
-  test(`Schedules: in ${language}, every day's name reads whole on one line, worked or off, from a phone to a desk`, async ({ browser }) => {
+  test(`Schedules: in ${language}, every day's name reads whole, on one line and in one column, worked or off, from a phone to a desk`, async ({ browser }) => {
     // flow: STAFF-F13, STAFF-F14 (hub#1461)
     const stamp = Date.now().toString(36);
     const { context, page } = await ownerPage(browser, '/staff/schedules');
