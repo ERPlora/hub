@@ -2,15 +2,11 @@
 Prefijo: CUSTOMER
 Alcance MVP: núcleo
 Estado de la app: completa (2026-10-31)
-Lo que no entra todavía: nada (ver «Lo que queda fuera»).
+Lo que no entra todavía: nada.
 
 > Manual de usuario y especificación de la app `customer`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
-> verde (servidor y páginas). Parte del `WORKFLOW.md` del módulo Clientes del producto actual
-> (`modules-workspace/modules/customers`, `origin/main` `32b0831`, v2.3.70). La app hace lo mismo,
-> corrige los fallos que ese documento tenía anotados (lista en «Cambios frente al producto actual»,
-> en la parte de quien lo mantiene) y deja en «Dudas abiertas» lo que todavía no está decidido.
-> Los números de flujo son los del producto actual (`CUSTOMERS-Fnn` → `CUSTOMER-Fnn`).
+> verde (servidor y páginas). Lo que todavía no está decidido está en «Dudas abiertas».
 
 ## Para qué sirve y para quién
 
@@ -203,7 +199,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | CUSTOMER-F33 | Recuperar una ficha eliminada | hecho | común |
 
 «Hecho»: servidor y páginas con sus tests (de las páginas y de extremo a extremo en Chrome).
-«Descartado»: no entra en la app por ahora; el motivo y su issue van en su «Estado».
 
 ### CUSTOMER-F01 Dar de alta una ficha
 Estado: hecho
@@ -264,7 +259,7 @@ Pantalla: Ficha de cliente
 Pasos:
 1. Desde **Clientes**, toca la fila.
 2. La ficha enseña todos sus datos (también notas internas, cumpleaños, aniversario y campos
-   personalizados, que en el producto actual solo se veían al editar), sus grupos y etiquetas, su
+   personalizados), sus grupos y etiquetas, su
    consentimiento por canal, la actividad (más reciente primero, 50 por página; cada entrada dice
    cuándo y quién: la persona o la API key por su nombre, o «Lo hizo la plataforma» cuando no la hizo
    nadie en persona, como la compra que apunta una venta cobrada, una automatización o una recuperación
@@ -380,8 +375,8 @@ Entra: el fichero, que la pantalla envía en bloques de 50 filas.
 Sale: las fichas creadas, con origen «Importación», el teléfono en formato internacional y sin
 consentimiento (aunque el fichero traiga una columna de consentimiento), y un aviso de ficha creada
 por cada una, así WhatsApp une sus conversaciones como en el alta a mano. Una fila sin etapa entra
-como «Activo» (es un cliente que ya se tenía), igual que en el producto actual; la etapa antigua
-`customer` también se lee como «Activo». Una fila sin origen entra como «Importación».
+como «Activo» (es un cliente que ya se tenía); la etapa `customer` también se lee como «Activo». Una fila
+sin origen entra como «Importación».
 Si falla: una fila mala se omite con su motivo y las demás se crean. Una fila con el mismo nombre,
 teléfono y email que una ficha que ya está (porque ya se importó o porque el fichero la repite) se
 omite con «Ya hay una ficha con este nombre, teléfono y email: no se vuelve a crear.»; así, volver a
@@ -1091,7 +1086,7 @@ ellas las que usan los servicios de Clientes.
 | Borrar datos personales | sí | sí | no | no | `customer.erase` |
 
 «Con PIN»: el empleado lo hace si un responsable lo aprueba en el momento con su PIN (o su placa) en
-el mismo dispositivo (BASE-F84), como en el producto actual: lo que tiene el responsable, otro perfil
+el mismo dispositivo (BASE-F84): lo que tiene el responsable, otro perfil
 lo hace con su aprobación. Exportar es una lectura y no se aprueba; eliminar fichas, grupos y
 etiquetas y borrar datos personales son solo del propietario y del administrador, y nunca se piden.
 
@@ -1101,7 +1096,7 @@ eliminada ni volver a crear la que el negocio ya no tiene: lo hace el sistema cu
 desde una copia aparte (CUSTOMER-F33, `customer.restore`, que tampoco declara ninguna app).
 
 El servidor aplica estos permisos aunque la pantalla enseñe el botón, también por la API y el
-asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aquí el empleado.
+asistente.
 
 ## Para quien lo mantiene
 
@@ -1109,14 +1104,12 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
   `tests/test_<fichero>.py` por fichero. Además, `phones.py` (la lectura E.164) y `search.py` (el
   texto de búsqueda), sin ORM.
-- **Orden de las listas** (`_ordered`, con `base.ordering.list_order`; regla hub#2355 del producto viejo): fichas,
+- **Orden de las listas** (`_ordered`, con `base.ordering.list_order`): fichas,
   grupos, etiquetas, campos y compras van por la columna elegida y desempatan por `id`, todo en la dirección de la
   lista y con los vacíos al final en las dos. La lista descendente es la ascendente leída al revés, empates incluidos,
   y el CSV sale en el mismo orden. Lo fija `test_ties_go_by_id_in_the_lists_own_direction`, por lista.
 - `phones.py` lee el teléfono con `phonenumbers` (el port de Python de libphonenumber) y exige un
-  número válido de su país; sus tests son el contrato del SDK del producto actual
-  (`crates/guest-sdk/tests/phone_test.rs`), corregido donde ese SDK, que solo copiaba longitudes, se
-  apartaba de libphonenumber. Los países se validan con `pycountry` (ISO 3166). El país del negocio
+  número válido de su país. Los países se validan con `pycountry` (ISO 3166). El país del negocio
   para un teléfono sin prefijo es el que erplora.com registró (`queries.business_country(ctx)` →
   `base.operations.business_country`, que lee `base.business.get` como la moneda y, sin país, España
   por `base.business.country_or_market`). Guardar y buscar lo leen igual: `find_customer(ctx, …)`
@@ -1227,64 +1220,11 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   (`components/CustomerCardBlocks.vue`), pinta solo los de las apps encendidas en el negocio, cada uno
   en su trozo y en su marco (si falla, «No se pudo mostrar este bloque.» en su sitio y la ficha sigue).
 - El administrador de Django (solo en `hubs.erplora.com`, para el staff) tiene CRUD completo sobre
-  todas las tablas (ronda 12, PLAN §17); lo que cambia ahí no deja aviso en el outbox.
+  todas las tablas (PLAN §17); lo que cambia ahí no deja aviso en el outbox.
 - Toda escritura sobre una ficha bloquea antes su fila (también nota, actividad, consentimiento y
   enlace de pedido), así no se cuela en una ficha que se está eliminando o uniendo. El orden de los
   bloqueos es siempre la ficha y después lo que cuelga de ella (compras, enlaces), el mismo que el de
   la fusión: anular una venta bloquea primero la ficha y luego su compra.
-
-## Cambios frente al producto actual
-
-- **Permisos**: ocho claves (`view`, `manage`, `configure`, `merge`, `export`, `delete`, `erase`,
-  `record_activity`) en lugar de veintiuna, juntando las que todos los papeles tenían a la vez; cada
-  papel puede lo mismo que antes. El perfil «Cajero» desaparece y sus permisos pasan al empleado, que
-  ahora edita fichas y registra consentimientos.
-- **Exportar** se comprueba en el servidor y exporta todas las fichas que cumplen la búsqueda, con
-  más columnas (antes: solo la página visible y el permiso solo escondía el botón).
-- **Email** comprobado al guardar en el alta, la edición y la importación (antes se guardaba mal
-  formado).
-- **Importar** avisa de cada ficha creada (antes no, y WhatsApp no unía sus conversaciones); una fila
-  sin etapa sigue entrando como «Activo», como en el producto actual. Volver a importar el mismo
-  fichero ya no duplica: la fila con el mismo nombre, teléfono y email que una ficha viva se omite
-  (services#152, customers#15).
-- **Borrar datos personales** alcanza también a las fichas duplicadas unidas en la borrada (antes la
-  absorbida se quedaba con sus datos y la única pista hacia ella, la actividad «fusionada», se
-  borraba).
-- **Grupos y etiquetas**: eliminarlos los quita de verdad de las fichas (antes la pertenencia se
-  quedaba y bloqueaba guardar los grupos de esas fichas). Desactivarlos ya no los pierde: siguen en la
-  lista con el filtro de inactivos y se reactivan. Eliminar un campo borra sus valores.
-- **Campos**: no se puede cambiar el tipo de un campo con valores (antes se cambiaba y las fichas no
-  se podían guardar hasta corregirlo). Fechas comprobadas en el calendario real.
-- **Ficha**: notas internas, cumpleaños, aniversario y campos personalizados se ven sin pulsar
-  Editar; las compras salen con su importe y su estado (antes solo por el asistente).
-- **Notas**: una sola fila con su actividad (antes dos tablas).
-- **Avisos** sin datos personales: solo identificadores (antes llevaban la ficha entera y había que
-  vaciarlos al borrar datos).
-- **Borrado de datos**: borra la actividad, las notas y los valores de campo en lugar de vaciarlos y
-  esconderlos.
-- **Consentimiento**: la dirección la pone el servidor con la de la ficha; sin la casilla antigua ni
-  el estado «Marcado antes de que hubiera registro», que solo existía para migrar datos viejos; sin
-  marca derivada en la ficha (el estado por canal sale del libro).
-- **Teléfono**: con la librería libphonenumber entera, el número tiene que ser válido en su país (el
-  SDK del producto solo miraba la longitud y dejaba pasar `+44012345678`). Sin la tarea programada que
-  reescribía teléfonos antiguos ni su copia: aquí todo teléfono entra ya en E.164.
-- **Referencias humanas**: toda operación sobre una ficha acepta su nombre exacto, teléfono o email
-  además del id, y las de grupos, etiquetas y campos, su nombre (para el asistente por voz).
-- **Enlace al pedido**: quitar el cliente de un pedido es el mismo servicio con cliente vacío; una
-  ficha que ya no está disponible no se devuelve como cliente del pedido.
-- **Pantallas** (las mismas vistas, pestañas y textos; `UI-REQUESTS.md` lleva lo que falta en
-  `@erplora/ui`): el alta y la edición de grupos, etiquetas y campos van en un diálogo, no en el panel
-  lateral de la tabla; el color de un grupo o etiqueta se elige de los colores del tema (antes, texto
-  libre); el país se busca por su nombre; los teléfonos se pintan agrupados (`+34 600 111 222`); la ficha
-  enseña además las compras y los pedidos enlazados; en el móvil «Cargar más» pide trozos de 100 como
-  mucho (lo que acepta una consulta).
-- **Cifras**: los tres «widgets de escritorio» (clientes, activos e ingresos) que anunciaba la
-  documentación del producto nunca se declararon en el módulo; aquí no hay escritorio de widgets y esas
-  cifras, más «VIP», son las de arriba de la lista (F31).
-- Fuera, a propósito: el descuento por grupo (ya retirado en el producto), la tarea de reescribir
-  teléfonos antiguos y su copia, el estado «Marcado antes de que hubiera registro» y el canal «any»
-  del consentimiento (solo existían para datos heredados) y el permiso `customers.manage_settings`
-  (no había ajustes).
 
 ## Datos: de quién es cada dato
 
@@ -1330,11 +1270,6 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   supuestos. Cada compra, en la moneda en que se cobró.
 - **Buscar por teléfono nunca devuelve a todos.**
 - **Clientes no depende de ninguna app**: se enciende sola.
-
-## Lo que queda fuera
-
-El país de un teléfono sin prefijo (hub#527) ya es el del negocio en Clientes y en todas las apps que buscan una
-ficha por su teléfono.
 
 ## Lo que NO hace, a propósito
 

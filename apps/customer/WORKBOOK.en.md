@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:aaf13e67aca65776d9e0f9a90597a7a48b3112cd6d26e36f33aee11fbc7b8dc9 -->
+<!-- generated from WORKBOOK.md sha256:46a072ac4c989b32b9e61da2a2ff57e10e02c1ab73579f949e9d8d3ed4f8144d -->
 
 ## What it is for and who it is for
 
@@ -190,7 +190,6 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | CUSTOMER-F33 | Recover a deleted card | done | common |
 
 "Done": server and pages with their tests (of the pages and end to end in Chrome).
-"Discarded": it does not go into the app for now; the reason and its issue go in its "Status".
 
 ### CUSTOMER-F01 Add a card
 Status: done
@@ -250,8 +249,8 @@ Actor: everyone
 Screen: Customer card
 Steps:
 1. From **Customers**, tap the row.
-2. The card shows all its details (also internal notes, birthday, anniversary and custom fields, which
-   in the current product were only seen when editing), its groups and tags, its consent per channel, the
+2. The card shows all its details (also internal notes, birthday, anniversary and custom fields), its
+   groups and tags, its consent per channel, the
    activity (newest first, 50 per page; each entry says when and who: the person or the API key by their
    name, or "Done by the platform" when nobody did it in person, such as the purchase a charged sale
    records, an automation or a recovery from a separate copy), its purchases and the blocks of other apps.
@@ -365,7 +364,7 @@ In: the file, which the screen sends in blocks of 50 rows.
 Out: the cards created, with source "Import", the phone in the international format and without consent
 (even if the file brings a consent column), and a card-created notice for each one, so WhatsApp joins
 their conversations as with adding by hand. A row without stage comes in as "Active" (it is a customer
-already had), just as in the current product; the old stage `customer` is also read as "Active". A row
+already had); the stage `customer` is also read as "Active". A row
 without source comes in as "Import".
 If it fails: a bad row is skipped with its reason and the others are created. A row with the same name,
 phone and email as a card already there (because it was already imported or because the file repeats it)
@@ -1080,7 +1079,7 @@ who use the services of Customers.
 | Erase personal data | yes | yes | no | no | `customer.erase` |
 
 "With PIN": the employee does it if a manager approves it on the spot with their PIN (or their badge) on
-the same device (BASE-F84), as in the current product: what the manager holds, another profile does with
+the same device (BASE-F84): what the manager holds, another profile does with
 their approval. Exporting is a read and is not approved; deleting cards, groups and tags and erasing
 personal data belong only to the owner and the administrator, and are never asked for.
 
@@ -1090,4 +1089,4 @@ card back or making again the one the business no longer has: the system does it
 separate copy (CUSTOMER-F33, `customer.restore`, which no app declares either).
 
 The server applies these permissions even if the screen shows the button, also through the API and the
-assistant. What the "Cashier" profile had in the current product, the employee has here.
+assistant.
