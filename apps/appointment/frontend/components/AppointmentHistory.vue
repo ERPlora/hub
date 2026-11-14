@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // APPOINTMENT-F10: the history of one appointment (the old «Historial de la cita» panel). Each line says
 // what happened, when on the business's clock, who did it («Requested by the customer» when she asked;
-// the platform when nobody did) and what changed: from which professional or service to which, the new
-// time and the reason. Live: a change shows up as soon as it is saved.
+// «Done by the platform» when no person did: the system, an automation, a recovery) and what changed: from
+// which professional or service to which, the new time and the reason. Live: a change shows up as soon as it
+// is saved.
 import { EmptyState, InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { IonButton, IonSpinner } from '@ionic/vue';
@@ -27,7 +28,7 @@ const text = (value: unknown): string => (Array.isArray(value) ? value.join(', '
 
 function who(line: HistoryOut): string {
   if (line.by_customer) return t('appointment.history.byCustomer');
-  return line.actor || t('appointment.history.byPlatform');
+  return line.by_platform ? t('appointment.history.byPlatform') : line.actor;
 }
 
 /** What changed, as a person reads it; empty when the action says it all. */

@@ -366,11 +366,16 @@ for (const { label, viewport } of SIZES) {
     expect(psql(`select count(*) from appointment_appointment where customer_name = 'Booked ${label} ${RUN}'`)).toBe('1');
     await context.close();
 
-    // In the business's Agenda, its «History» keeps its lines and ends in «Restored» (APPOINTMENT-F10).
+    // In the business's Agenda, its «History» keeps its lines and ends in «Restored» (APPOINTMENT-F10). The system booked
+    // and deleted it and the recovery brought it back: each line says the platform did it, never its internal mark.
     const agenda = await ownerPage(browser, `/appointment/agenda?date=${aMondayAt('10:00').slice(0, 10)}`, viewport);
     await rowAction(agenda.page, 'appointment-list', appointment, 'history');
     const history = agenda.page.locator('ion-modal[data-testid=appointment-history-modal]');
-    await expect(history.locator('[data-testid=appointment-history-entry]')).toHaveText([/^Booked/, /^Deleted/, /^Restored/]);
+    await expect(history.locator('[data-testid=appointment-history-entry]')).toHaveText([
+      /^Booked.* · Done by the platform$/,
+      /^Deleted.* · Done by the platform$/,
+      /^Restored.* · Done by the platform$/,
+    ]);
     await capture(agenda.page, `${KEY}-${label}-6-history`);
     await agenda.context.close();
   });

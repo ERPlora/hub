@@ -79,6 +79,7 @@ from apps.staff.queries import member_availability, own_member, resolve_member
 from apps.staff.schemas import AvailabilityIn
 from base.business import business_zone, zone_name
 from base.ordering import list_order_for
+from base.relay import by_platform
 
 VIEW_ALL = "appointment.view_appointment"
 VIEW_OWN = "appointment.view_own_appointment"
@@ -500,6 +501,7 @@ def appointment_history(ctx: OperationContext, data: HistoryIn) -> dict:
             "at": line.at.astimezone(business_zone()),
             "actor": line.actor,
             "by_customer": line.by_customer,
+            "by_platform": by_platform(line.actor),
             "reason": line.reason,
             "old_value": line.old_value,
             "new_value": line.new_value,

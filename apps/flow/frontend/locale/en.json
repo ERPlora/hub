@@ -1498,6 +1498,7 @@
       "business_day": "Business day",
       "buy_quantity": "Buy quantity",
       "by_customer": "By customer",
+      "by_platform": "By the platform",
       "calendar_end_hour": "Calendar end hour",
       "calendar_start_hour": "Calendar start hour",
       "called": "By its name",
