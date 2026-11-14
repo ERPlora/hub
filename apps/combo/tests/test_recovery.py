@@ -19,7 +19,14 @@ from live.models import OutboxEvent
 from apps.combo import queries
 from apps.combo.models import ChoiceOption
 from apps.inventory.models import Product
-from apps.inventory.tests.test_recovery import CATEGORIES, LINKS, PRODUCTS, a_tax_key
+from apps.inventory.tests.test_recovery import (
+    CATEGORIES,
+    LINKS,
+    PRODUCTS,
+    a_tax_key,
+    gone_altogether,
+    made_by_a_recovery,
+)
 from base.recovery import actor_of
 from base.tenancy.context import use_hub
 from base.tenancy.tests.test_recovery import Recoveries, fields_held_since, fresh, run, run_in
@@ -35,7 +42,8 @@ def direct():
 
 @pytest.mark.django_db
 def test_the_copy_gives_each_choice_of_a_live_product_with_what_its_create_takes():
-    lentils, soup, steak = make_product("Lentils"), make_product("Soup"), make_product("Steak")
+    lentils, soup = make_product("Lentils", sku="LEN"), make_product("Soup", sku="SOU")
+    steak = make_product("Steak", sku="STE")
     menu = make_combo()
     starters, mains = make_group(menu, "Starters"), make_group(menu, "Mains")
     # Read in each course's order, whatever order they were added in.
@@ -49,10 +57,14 @@ def test_the_copy_gives_each_choice_of_a_live_product_with_what_its_create_takes
 
     read = queries.options_in_copy(direct())
 
+    # With each product's SKU there, the article's identity, to find the one made again if the business lost it.
     assert read == [
-        {"id": on_lentils.id, "group_id": starters.id, "product_id": lentils.id, "price_delta": 0, "is_available": True},
-        {"id": on_soup.id, "group_id": starters.id, "product_id": soup.id, "price_delta": -50, "is_available": False},
-        {"id": on_steak.id, "group_id": mains.id, "product_id": steak.id, "price_delta": 300, "is_available": True},
+        {"id": on_lentils.id, "group_id": starters.id, "product_id": lentils.id, "price_delta": 0, "is_available": True,
+         "sku": "LEN"},
+        {"id": on_soup.id, "group_id": starters.id, "product_id": soup.id, "price_delta": -50, "is_available": False,
+         "sku": "SOU"},
+        {"id": on_steak.id, "group_id": mains.id, "product_id": steak.id, "price_delta": 300, "is_available": True,
+         "sku": "STE"},
     ]
 
 
@@ -67,7 +79,14 @@ def test_a_copy_without_the_apps_table_gives_nothing():
 
 def a_choice_of_the_copy(group, product, **fields) -> dict:
     return {"id": uuid.uuid7(), "group_id": group.id, "product_id": product.id, "price_delta": 0,
-            "is_available": True} | fields
+            "is_available": True, "sku": product.sku} | fields
+
+
+def a_choice_of_a_product_gone(group, sku: str, product_id=None, **fields) -> dict:
+    """A choice of the copy whose product the business no longer holds at all: only its SKU says which article it
+    was."""
+    return {"id": uuid.uuid7(), "group_id": group.id, "product_id": product_id or uuid.uuid7(), "price_delta": 0,
+            "is_available": True, "sku": sku} | fields
 
 
 @pytest.mark.django_db
@@ -96,6 +115,36 @@ def test_lacking_is_a_choice_the_business_no_longer_offers_in_that_course():
     ]
 
 
+@pytest.mark.django_db
+def test_a_product_gone_gets_its_choices_on_the_one_a_recovery_made_again_with_its_sku():
+    burger = made_by_a_recovery("Burger", "BUR")
+    menu = make_combo()
+    starters, mains = make_group(menu, "Starters"), make_group(menu, "Mains")
+    # Offered again by the business on the one made again, after the recovery made it: the business's stays.
+    make_option(mains, burger, price_delta=400)
+    offered_again = a_choice_of_a_product_gone(mains, "BUR", price_delta=150)
+    gone = offered_again["product_id"]
+    # Lacking: the same course with the one made again of another article, and the one made again in another course.
+    fries = made_by_a_recovery("Fries", "FRI")
+    other_product = a_choice_of_a_product_gone(mains, "FRI", price_delta=50)
+    other_course = a_choice_of_a_product_gone(starters, "BUR", gone, is_available=False)
+    # Made again by hand with its SKU: the business's own, set up as it chose; it keeps the copy's product, which the
+    # menu builder refuses as not in the hub: not created, and why.
+    make_product("Salad", sku="SAL")
+    by_hand = a_choice_of_a_product_gone(starters, "SAL")
+
+    lacking = queries.options_not_in_business([offered_again, other_product, other_course, by_hand])
+
+    assert lacking == [
+        {"id": other_product["id"], "group_id": mains.id, "product_id": fries.id, "price_delta": 50,
+         "is_available": True},
+        {"id": other_course["id"], "group_id": starters.id, "product_id": burger.id, "price_delta": 0,
+         "is_available": False},
+        {"id": by_hand["id"], "group_id": starters.id, "product_id": by_hand["product_id"], "price_delta": 0,
+         "is_available": True},
+    ]
+
+
 def test_with_nothing_read_nothing_is_lacking():
     assert queries.options_not_in_business([]) == []
 
@@ -116,7 +165,7 @@ def test_the_app_declares_its_choices_offered_again_by_the_menu_builders_create(
     assert {"id", "group", "product", "price_delta", "is_available", "sort_order"} <= fields_held_since(
         "combo", "choiceoption", choices.reads_since
     )
-    assert {"id", "is_deleted"} <= fields_held_since("inventory", "product", "0001_initial")
+    assert {"id", "sku", "is_deleted"} <= fields_held_since("inventory", "product", "0001_initial")
 
 
 # ── End to end: the business's own database and its copy ────────────────────────────────────────────────────────────
@@ -204,6 +253,48 @@ class TestChoicesComeBack:
         assert run() == 1
         assert said(again) == ("done", [CATEGORIES, PRODUCTS, LINKS, CHOICES])
         assert len(offered(hub)) == 2
+
+    def test_a_product_gone_altogether_comes_back_as_a_new_one_offered_in_its_menus(self, recoveries, every_app_on):
+        hub, burger, _ = self.a_business(recoveries, every_app_on)
+        copy = recoveries.copy_of(hub)
+        self.deleted(hub, burger)
+        gone_altogether(hub, burger)
+        row = recoveries.ask(copy, "combo", "inventory")
+
+        assert run() == 1
+
+        assert said(row) == ("done", [CATEGORIES, PRODUCTS | {"created": 1}, LINKS, CHOICES | {"created": 2}])
+        with use_hub(hub):
+            [made] = Product.objects.filter(sku="BUR").values_list("pk", flat=True)
+        assert made != burger
+        # On the one made again, as the copy had them: its supplement, and the side still sold out.
+        assert offered(hub) == [("Mains", made, 150, True), ("Sides", made, 0, False)]
+        [menu] = run_in(hub, "combo.combo.for_sale").rows
+        assert [option.product_id for group in menu.groups for option in group.options] == [made]
+        # Asked again, nothing is offered twice: its choices are in their place on the one made again.
+        again = recoveries.ask(copy, "inventory", "combo")
+        assert run() == 1
+        assert said(again) == ("done", [CATEGORIES, PRODUCTS, LINKS, CHOICES])
+        assert len(offered(hub)) == 2
+
+    def test_a_product_gone_the_business_made_again_by_hand_keeps_its_own_choices(self, recoveries, every_app_on):
+        hub, burger, courses = self.a_business(recoveries, every_app_on)
+        copy = recoveries.copy_of(hub)
+        self.deleted(hub, burger)
+        gone_altogether(hub, burger)
+        # Made again by hand with its SKU, the business offered it only as a side.
+        made = run_in(hub, "inventory.product.create", name="Burger", sku="BUR", price=900,
+                      tax_category_key=a_tax_key(hub)).id
+        run_in(hub, "combo.option.create", group_id=courses["Sides"], product_id=made)
+        row = recoveries.ask(copy, "inventory", "combo")
+
+        assert run() == 1
+
+        status, results = said(row)
+        assert (status, results[1]["created"], results[-1]["created"], results[-1]["not_created"]) == ("done", 0, 0, 2)
+        reasons = [reason["reason"].split(":")[0] for reason in results[-1]["reasons"]]
+        assert reasons == ["invalid_field", "invalid_field"]
+        assert offered(hub) == [("Sides", made, 0, True)]
 
     def test_a_choice_the_business_offered_again_stays_as_it_is(self, recoveries, every_app_on):
         hub, burger, courses = self.a_business(recoveries, every_app_on)
