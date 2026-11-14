@@ -120,7 +120,9 @@ Desde **Caja**, «Detalle» o tocar una fila: se abre como página, con su flech
 en dos columnas: Estado, Cajón, Abierta (cuándo y quién), Cerrada (cuándo y quién, o «Cerrada sola»),
 Movimientos (cuántos), Fondo de apertura, Ventas (todas las formas de pago) y, debajo, Ventas en
 efectivo, Ventas con tarjeta y Ventas con otras formas de pago (esta solo si hubo), Devoluciones,
-Entradas, Salidas, Invitaciones, Esperado, Contado y Diferencia, y las notas de apertura y de cierre.
+Entradas, Salidas, Invitaciones, Esperado, Contado y Diferencia, y las notas de apertura y de cierre. Con la app
+Propinas encendida, además, «Propinas en efectivo», «Propinas con tarjeta» y «Propinas pagadas»
+(CASH_REGISTER-F18).
 En una sesión abierta Contado y Diferencia salen «—». Debajo, dos tablas, de lo más reciente a lo más
 antiguo, 50 por página y en tarjetas en el móvil: **Movimientos** (Cuándo, Tipo, Importe con su signo,
 Método, Concepto) y **Arqueos** (Cuándo, Tipo de arqueo, Total contado, Notas). Vacías: «Sin
@@ -177,6 +179,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | CASH_REGISTER-F15 | Anotar en la caja una devolución | común | hecho |
 | CASH_REGISTER-F16 | Imprimir el informe de la sesión (X o Z) | común | hecho |
 | CASH_REGISTER-F17 | Ver los cobros fuera de turno | común | hecho |
+| CASH_REGISTER-F18 | Ver las propinas en la caja | común | no hecho |
 
 ### CASH_REGISTER-F01 Configurar cómo funciona la caja
 <!-- origen: fi:modules/cash_register#command-cash_register-settings-update fi:modules/cash_register#events-emitidos-catalogo fi:modules/cash_register#navigation-settings fi:modules/cash_register#permission-role_permissions fi:modules/cash_register#query-cash_register-settings-get old:cash_register/WORKFLOW.md#cash_register-f01 -->
@@ -608,6 +611,33 @@ Sale: nada; avisa. Con «Activar caja» apagado no hay turnos que cumplir y no a
 Si falla: nada propio.
 Implicados: CASH_REGISTER-F04, F10, F13
 
+### CASH_REGISTER-F18 Ver las propinas en la caja
+<!-- origen: nuevo (hub#562; SumUp, propinas en el informe X y el Z; Square, informe de turno) -->
+Estado: no hecho — Caja todavía no distingue lo que apunta otra app
+Vertical: común
+Actor: sistema, empleado, responsable
+Pantalla: Caja, Detalle de la sesión
+Pasos:
+1. Con la app Propinas encendida, el cajero cobra una propina (TIP-F02 a TIP-F05) o un responsable la paga
+   (TIP-F12).
+2. Sin que nadie teclee nada, la sesión abierta recibe su línea: «Propina» en efectivo o con tarjeta, o
+   «Propinas pagadas» en efectivo, con la venta o la persona en el concepto.
+3. En el **Detalle de la sesión**, el resumen las enseña aparte de las ventas, de las entradas y de las salidas:
+   «Propinas en efectivo», «Propinas con tarjeta» (y con otras formas de pago, si las hubo) y «Propinas pagadas».
+4. Solo el efectivo toca el esperado: la propina en efectivo lo sube (está en el cajón) y la pagada en efectivo
+   lo baja (salió del cajón); la de tarjeta no. Así el arqueo cuadra al cerrar (F09).
+5. El informe X o Z (F16) lleva las mismas tres líneas, y la ventana «Cerrar sesión» cuenta la propina en
+   efectivo en el «Esperado en el cajón».
+Entra: las entradas y salidas que Propinas apunta en la sesión abierta, marcadas como suyas
+(`cash_register.movement.add`).
+Sale: las líneas en la sesión (avisa: `cash_register.movement.added`), con el nombre de la app que las apunta.
+Las cifras de ventas no cambian: la propina nunca es venta.
+Si falla: sin sesión abierta, Propinas no apunta la propina en efectivo y la rechaza con su aviso (TIP-F04); la de
+tarjeta se guarda en Propinas y no entra en ninguna sesión. Una línea de propina no se corrige con un movimiento a
+mano: se ajusta o se anula en Propinas (TIP-F06), que apunta la diferencia en la sesión abierta; la cerrada no se
+toca.
+Implicados: TIP-F02, TIP-F03, TIP-F04, TIP-F05, TIP-F06, TIP-F12, CASH_REGISTER-F09, CASH_REGISTER-F16
+
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de la propia
@@ -645,7 +675,7 @@ Todas se pueden seguir en vivo.
 | Abre una sesión con su fondo | abrir | F03, F10 | `cash_register.session.open` |
 | Cierra una sesión con el efectivo contado | cerrar | F09 | `cash_register.session.close` |
 | Cierra las sesiones olvidadas al corte del día | cerrar | F10 | `cash_register.session.auto_close` |
-| Apunta una entrada o una salida | apuntar | F05 | `cash_register.movement.add` |
+| Apunta una entrada o una salida (también la que apunta otra app, como Propinas, marcada como suya) | apuntar | F05, F18 | `cash_register.movement.add` |
 | Registra un arqueo | contar | F06 | `cash_register.count.add` |
 | Imprime el informe X o Z de una sesión en la impresora de recibos | ver sesiones | F16 | `cash_register.session.print` |
 
@@ -705,6 +735,7 @@ Caja estaba apagada o no respondió se ve en CASH_REGISTER-F17.
 | App | Para qué | Servicio |
 |---|---|---|
 | Ventas | Saber si puede cobrar en efectivo (F04) | `cash_register.session.current` |
+| Propinas | Apuntar lo que entra y sale de propinas (F18) | `cash_register.movement.add` |
 
 ### Quién puede qué
 
@@ -901,7 +932,8 @@ cajero del producto actual es un empleado.
   fuera de esta versión: el negocio del norte (una peluquería o un restaurante con una sola caja) no la
   necesita, y cambiarla toca a Ventas (F04 pregunta por «la» sesión abierta).
 - No reabre turnos ni edita o borra movimientos o arqueos: se corrige con otro movimiento.
-- No gestiona propinas, banco ni caja fuerte más allá de una salida de efectivo.
+- No gestiona propinas: son de la app Propinas (`tip`), que apunta en la sesión abierta lo que entra y sale de
+  ellas (F18). Tampoco gestiona banco ni caja fuerte más allá de una salida de efectivo.
 - No pide aprobación ni nota obligatoria cuando la diferencia pasa de un umbral. Toast y Lightspeed lo
   ofrecen como opción, no de fábrica; si llega, será una política del dueño (ADR-0476: el número y la
   consecuencia los pone él) sobre el cierre de F09.

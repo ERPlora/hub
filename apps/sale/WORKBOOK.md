@@ -2,7 +2,8 @@
 Prefijo: SALE
 Alcance MVP: núcleo
 Estado de la app: completa (2026-10-31)
-Lo que no entra todavía: ver «Lo que queda fuera» (la propina, SALE-G06, descartada con su issue).
+Lo que no entra todavía: ver «Lo que queda fuera». La propina (SALE-G06) es de la app Propinas (`tip`), que añade
+su paso al cobro (SALE-F39, no hecho).
 
 > Manual de usuario y especificación de la app `sale`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -172,7 +173,8 @@ de alto fijo con lo que le falta al importe («Marca en el teclado el importe en
 o, en su sitio, el «Cambio» en grande, y el teclado, que no se mueve mientras se teclea (hub#456); con otro medio,
 «Importe exacto» y «Cobra <importe> en el datáfono y confirma.»; «Repartir el cobro» y «Añadir este cobro». Pie: el
 motivo si no se puede cobrar (los del importe entregado van encima del teclado) y «Cobrar <importe>»
-(«Cobrando…» mientras va); con la caja cerrada y efectivo, el rechazo y «Abrir sesión de caja».
+(«Cobrando…» mientras va); con la caja cerrada y efectivo, el rechazo y «Abrir sesión de caja». Con una app que
+añade un paso al cobro (hoy, Propinas), su fila sale entre el importe y los medios de pago (SALE-F39).
 
 ### Cuentas abiertas
 Desplegable del icono de tique de la cuenta: «Aparcar esta cuenta» con su explicación, «Cuentas
@@ -287,6 +289,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | SALE-F36 | Preparar las notas rápidas | común | hecho |
 | SALE-F37 | Añadir un medio de pago (Bizum, transferencia…) | común | hecho |
 | SALE-F38 | Vender un servicio de Servicios | peluquería | hecho |
+| SALE-F39 | Cobrar con lo que añade otra app (la propina) | común | no hecho |
 
 ### SALE-F01 Vender y cobrar en efectivo
 <!-- origen: qa:verticals/beauty/05-sale-upsell-and-payment wf:restaurante-dia#rec_restaurante-f06 wf:restaurante-dia#rec_restaurante-f11 wf:restaurante-dia#rec_restaurante-f17 wf:cadena-fiscal#rec_fiscal-f02 qa:verticals/restaurant/07-payment-and-fiscal fi:modules/sales#command-sales-complete_sale-handler-wasm-complete_sale fi:modules/sales#event-emitidos-consumidos fi:modules/sales#navigation old:sales/workflow/vender-y-cobrar.md#sales-f01 qa:modules/sales/cash-payment-with-change qa:modules/sales/quick-counter-sale -->
@@ -1398,13 +1401,42 @@ Si la moneda no se puede leer, la hoja lo dice («No se ha podido leer la moneda
 y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Añadir <importe>» y «Usar <precio>» se encienden (hub#938).
 Implicados: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
+### SALE-F39 Cobrar con lo que añade otra app (la propina)
+<!-- origen: nuevo (hub#562; SALE-G06 del registro de la migración) -->
+Estado: no hecho — la hoja Cobro todavía no pinta pasos de otras apps ni la venta guarda lo cobrado de más
+Vertical: común
+Actor: empleado, responsable
+Pantalla: Cobro, Documento de venta
+Pasos:
+1. Con una app encendida que añade un paso al cobro (hoy solo Propinas, con «Pedir propina al cobrar»), la hoja
+   **Cobro** pinta su fila entre el importe y los medios de pago (la de Propinas, TIP-F02). Sin ninguna, la hoja es
+   la de siempre.
+2. Lo que el paso añade se cobra junto con la venta, pero fuera de ella: el importe grande dice «<total> + <propina>
+   de propina»; con tarjeta, «Cobra <total + propina> en el datáfono y confirma.» y el botón «Cobrar <total +
+   propina>»; en efectivo, lo entregado tiene que cubrir las dos cosas y el cambio las descuenta. Con «Repartir el
+   cobro», cada cobro lleva lo suyo y «Restante» cuenta solo la venta.
+3. Cobra. Se abre el **Documento de venta**: el tique es el de siempre (líneas, IVA y total de la venta) y, en el
+   bloque del pago, debajo de «Entregado», sale la línea «Propina <importe>» antes del «Cambio».
+Entra: los pasos que declaran las apps activas y lo que cada uno añade a cada cobro.
+Sale: la venta con su base, su IVA y su total **sin la propina**: el tique, la factura de Facturación y su
+registro de VeriFactu son los mismos que sin ella (INVOICE-F01), porque la propina voluntaria no es precio y no
+lleva IVA (ver «Por qué la propina no entra en el tique» en el manual de Propinas). La venta guarda aparte, en cada
+cobro, lo cobrado de más y su nombre, para cuadrar lo entregado y el cambio y para el papel, y el aviso de venta
+cobrada lo lleva aparte; las cifras de **Ventas** (SALE-F28) no lo suman. Lo suyo lo guarda la app del paso
+(TIP-F02).
+Si falla: si la app del paso se apaga con la hoja abierta, la fila desaparece y se cobra sin ella. Si la venta se
+cobra y el paso no consigue guardar lo suyo, la venta queda cobrada y la hoja dice el aviso del paso con
+«Reintentar» (TIP-F02); el reintento usa la misma clave del intento y no cobra dos veces (SALE-F06). El tope del
+tique (3.000 €) y el del efectivo (1.000 €) miran el total de la venta, como siempre: la propina no es precio.
+Implicados: TIP-F02, TIP-F03, TIP-F04, CASH_REGISTER-F18, INVOICE-F01
+
 ## Qué comparten los verticales
 
 | Pieza compartida | Flujos que la usan |
 |---|---|
 | El cobro: mismo precio del servidor, mismo IVA, mismos rechazos y el mismo aviso de venta cobrada que escuchan Inventario y Clientes | F01–F06, F22, F26 |
 | La cuenta abierta y sus líneas: el precio se congela al añadir la línea; aparcar, recuperar y cita son la misma cuenta | F09–F18, F22–F24, F26 |
-| La hoja **Cobro**: medios, teclado, tique o factura, datos del cliente | F01–F05, F22 |
+| La hoja **Cobro**: medios, teclado, tique o factura, datos del cliente y los pasos de otras apps | F01–F05, F22, F39 |
 | La marca de líneas: sirve para cobrar una parte y para dividir la cuenta | F22, F23 |
 | El chip «Atiende» y el sello de la línea | F16, F20, F26 |
 | La anulación de una venta: un solo aviso, y cada app que reacciona decide su efecto | F30 |
@@ -1432,6 +1464,7 @@ diciendo cuáles (409 `*_ambiguous`).
 | Lo vendido cada uno de los últimos 7 días | informes | F28 | `sale.sale.last_7_days` |
 | Lo vendido por cada profesional en un periodo: bruto, base, impuesto, lo devuelto de sus líneas, lo que queda, lo que pagó bonos que vendió, lo que valen las sesiones de bono que hizo y su producción (sobre la que va la comisión) | informes | F16, F28 | `sale.sale.by_staff` |
 | Lo que cobraría una cuenta, o unas líneas, sin cobrar nada (total, base, IVA, descuentos, desglose y líneas) | ver ventas | F01, F21, F22 | `sale.checkout.preview` |
+| Los pasos que las apps activas añaden al cobro (hoy, la propina de Propinas), sin saber cuáles son | ver ventas | F39 | `sale.checkout.steps` |
 | Las cuentas abiertas (o de otro estado), con búsqueda por título y páginas | ver ventas | F17 | `sale.order.list` |
 | Una cuenta con sus líneas sin cobrar | ver ventas | F17, F19 | `sale.order.get` |
 | Los medios de pago activos, con los que permite hoy el negocio | ver medios de pago | F02, F03 | `sale.payment_method.list` |
@@ -1997,7 +2030,8 @@ es una línea.
   VeriFactu.
 - No mueve stock ni cuadra la caja: Inventario al oír la venta; Caja lee las ventas de cada turno.
 - No habla con el datáfono ni con la báscula.
-- No tiene propinas (SALE-G06, hub#562), ni comensal por línea, ni cursos con retención.
+- No guarda propinas: son de la app Propinas (`tip`), que añade su paso al cobro (SALE-F39, TIP-F02). Tampoco
+  tiene comensal por línea ni cursos con retención.
 - No marca artículos como agotados («86»): es un dato del artículo, de Inventario; el TPV enseña en gris
   con «Agotado» lo que Inventario tiene agotado y no deja pedirlo (`sale.product_sold_out`), pero cobra lo
   que ya estaba pedido (SALE-F07, INVENTORY-F29; el «86» del QA viejo, SALE-G05, queda cubierto así).
@@ -2028,9 +2062,9 @@ es una línea.
   (se abre desde el plano, TABLE-F11, o desde **Cuentas abiertas**); y el icono relleno `grid` del botón
   con mesa (no está registrado en `packages/ui`: se pinta `grid-outline` en color).
 
-- **Cobrar con propina** (SALE-G06): un flujo nuevo que cruza Ventas y Caja y que nunca entra en la base ni
-  en el IVA del tique; el producto la aplazó tras el MVP (pm#100). Mientras, la propina en efectivo se anota
-  en Caja como «Entrada» (CASH_REGISTER-F05). Issue hub#562.
+- **Cobrar con propina** (SALE-G06): ya no es «fuera del MVP». Es la app nueva Propinas (`tip`, su
+  `WORKBOOK.md`), con el paso del cobro que pinta Ventas (SALE-F39), las dos `no hecho`; el código va por las
+  issues hijas de hub#562. Mientras, la propina en efectivo se anota en Caja como «Entrada» (CASH_REGISTER-F05).
 
 ### Dudas abiertas
 

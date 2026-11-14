@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6e35dcea21889c7c4108d7c1aa7bb1f979b1cb837019cc8ac21aa592036d23b1 -->
+<!-- generated from WORKBOOK.md sha256:f25dc21d31d20e0901a140fcee01e4cecc569bbcb5fd4e8dbcf6383b167368ec -->
 
 ## What it is for and who it is for
 
@@ -111,7 +111,8 @@ From **Cash register**, "Detail" or tapping a row: it opens as a page, with its 
 in two columns: Status, Drawer, Opened (when and by whom), Closed (when and by whom, or "Closed by
 itself"), Movements (how many), Opening float, Sales (all payment methods) and, below, Cash sales, Card
 sales and Sales with other payment methods (this one only if there were any), Refunds, Cash in, Cash out,
-Comps, Expected, Counted and Difference, and the opening and closing notes. In an open session Counted
+Comps, Expected, Counted and Difference, and the opening and closing notes. With the Tips app turned on, also
+"Cash tips", "Card tips" and "Tips paid out" (CASH_REGISTER-F18). In an open session Counted
 and Difference show "—". Below, two tables, from the most recent to the oldest, 50 per page and as cards
 on the phone: **Movements** (When, Type, Amount with its sign, Method, Concept) and **Counts** (When,
 Count type, Total counted, Notes). Empty: "No movements in this session." and "No counts in this
@@ -167,6 +168,7 @@ With the window as it opened, Back closes it without asking (BASE-F05); the draw
 | CASH_REGISTER-F15 | Record a refund in the cash register | common | done |
 | CASH_REGISTER-F16 | Print the session report (X or Z) | common | done |
 | CASH_REGISTER-F17 | See the sale lines in no shift | common | done |
+| CASH_REGISTER-F18 | See the tips in the cash register | common | not done |
 
 ### CASH_REGISTER-F01 Set up how the cash register works
 Status: done
@@ -586,6 +588,33 @@ warn.
 If it fails: nothing of its own.
 Involved: CASH_REGISTER-F04, F10, F13
 
+### CASH_REGISTER-F18 See the tips in the cash register
+<!-- origen: nuevo (hub#562; SumUp, propinas en el informe X y el Z; Square, informe de turno) -->
+Status: not done — the Cash register does not tell yet what another app records
+Vertical: common
+Actor: system, employee, manager
+Screen: Cash register, Session detail
+Steps:
+1. With the Tips app turned on, the cashier takes a tip (TIP-F02 to TIP-F05) or a manager pays it out
+   (TIP-F12).
+2. Without anyone typing anything, the open session gets its line: "Tip" in cash or by card, or "Tips paid
+   out" in cash, with the sale or the person in the concept.
+3. In the **Session detail**, the summary shows them apart from the sales, the cash in and the cash out: "Cash
+   tips", "Card tips" (and with other payment methods, if there were any) and "Tips paid out".
+4. Only cash touches the expected cash: a cash tip raises it (it is in the drawer) and a tip paid out in cash
+   lowers it (it left the drawer); a card tip does not. That way the count squares at closing (F09).
+5. The X or Z report (F16) carries the same three lines, and the "Close session" window counts the cash tips
+   in "Expected in the drawer".
+In: the cash in and cash out that Tips records in the open session, marked as its own
+(`cash_register.movement.add`).
+Out: the lines in the session (announces: `cash_register.movement.added`), with the name of the app that
+records them. The sales figures do not change: a tip is never a sale.
+If it fails: with no open session, Tips does not record a cash tip and refuses it with its notice (TIP-F04); a
+card tip is kept in Tips and goes into no session. A tip line is not corrected with a movement by hand: it is
+adjusted or voided in Tips (TIP-F06), which records the difference in the open session; the closed one is never
+touched.
+Involved: TIP-F02, TIP-F03, TIP-F04, TIP-F05, TIP-F06, TIP-F12, CASH_REGISTER-F09, CASH_REGISTER-F16
+
 ## Services: what goes in and what comes out
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the person's own
@@ -623,7 +652,7 @@ All of them can be followed live.
 | Opens a session with its float | open | F03, F10 | `cash_register.session.open` |
 | Closes a session with the counted cash | close | F09 | `cash_register.session.close` |
 | Closes the sessions forgotten at the cut-off of the day | close | F10 | `cash_register.session.auto_close` |
-| Records cash in or cash out | record | F05 | `cash_register.movement.add` |
+| Records cash in or cash out (also the one another app records, such as Tips, marked as its own) | record | F05, F18 | `cash_register.movement.add` |
 | Registers a count | count | F06 | `cash_register.count.add` |
 | Prints the X or Z report of a session on the receipt printer | view sessions | F16 | `cash_register.session.print` |
 
@@ -684,6 +713,7 @@ Cash register was off or did not answer is seen in CASH_REGISTER-F17.
 | App | What for | Service |
 |---|---|---|
 | Sales & POS | Knowing whether it can charge in cash (F04) | `cash_register.session.current` |
+| Tips | Recording what comes in and goes out of tips (F18) | `cash_register.movement.add` |
 
 ### Who can do what
 
