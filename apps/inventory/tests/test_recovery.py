@@ -220,7 +220,7 @@ def made_by_a_recovery(name: str, sku: str, **fields) -> Product:
 
 
 @pytest.mark.django_db
-def test_a_product_no_longer_held_live_is_the_one_a_recovery_made_again_with_its_sku():
+def test_a_product_no_longer_held_live_stands_for_the_one_a_recovery_made_again_with_its_sku():
     tea = made_by_a_recovery("Tea", "TEA-1")
     gone = uuid.uuid7()
     # Still held, but deleted, and its SKU taken since by one a recovery made: that one stands for it too.

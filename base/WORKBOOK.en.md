@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ee90c528bd40b49ec91a52e82514f54aa1d1b348bb662dca4daa2f822e4d676e -->
+<!-- generated from WORKBOOK.md sha256:bfcc843a2185b1b17c2ce87e261d21c14bdf6ed31560654b1d4078082fddef1d -->
 
 ## What it is for and who it is for
 
@@ -2936,8 +2936,8 @@ the customers that were lost, the deleted ones as they were, the products, the s
 appointments, the repeating appointments, the price list prices and the modifier groups of the products; making and
 deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws; the image of a
 service brought back, hub#1429; the menu options of a product that comes back, hub#1343; the price list prices of a
-service that comes back as a new one, hub#1459; the modifier groups of a product that comes back as a new one,
-hub#1457; the modifier groups of a category that comes back, hub#1456; a deleted modifier group, hub#1458)
+service that comes back as a new one, hub#1459; the modifier groups of a category that comes back, hub#1456; a deleted
+modifier group, hub#1458)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -3083,11 +3083,11 @@ Steps:
       rules, which deleting it only switched off, are switched back on by themselves with it (PRICING-F14).
       The modifier groups of the products go after the products too: "Modifier groups of products: 2 created". Each
       group that in the copy hung from a product live there and that the business no longer has linked to that product
-      is linked again, as the group's sheet links it, so a deleted product that comes back asks again at the till for
-      its sauces, its doneness or its extras (MODIFIER-F10). One whose group the business has linked to that product
-      again is not repeated: the business's own stays. One the group's sheet does not accept today (its product still
-      deleted, or the business deleted the group) does not come back and its reason says so; those of a product that
-      comes back as a new one, not yet either (hub#1457).
+      is linked again, as the group's sheet links it, so a deleted product that comes back, the same one or as a new
+      one, asks again at the till for its sauces, its doneness or its extras (MODIFIER-F10). One whose group the
+      business has linked to that product again is not repeated: the business's own stays. One the group's sheet does
+      not accept today (its product still deleted, or the business already made another one by hand with its SKU, or it
+      deleted the group) does not come back and its reason says so.
 In: the chosen businesses, the temporary cluster with their copy and the moment; to recover, the made separate copy and
 what to bring back.
 Out: the business's database as it was at that moment; the one it had, kept 7 days on its server; the notice

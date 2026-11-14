@@ -1356,6 +1356,10 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   rehecha a mano (`created_by` de una persona) o conservada no se rellena. Lee desde `0001_initial`; una migración que quite o renombre una
   columna que lee cambia también la lectura y su `reads_since`. Tests: `tests/test_recovery.py`, de punta a punta
   incluido, y el contrato de `base/tenancy/tests/test_recovery.py`.
+  Las apps cuyos registros de la copia cuelgan de un producto (Tarifas, Suplementos) no emparejan a su manera: piden a
+  `queries.products_standing_for` (`{id allí: SKU allí}`) el producto del negocio que hace de cada uno que ya no está
+  vivo aquí: el vivo con su SKU que hizo una recuperación (`base.recovery.brought_back`), la de esta pasada u otra
+  anterior. Uno vivo es él mismo y no sale; uno hecho a mano con su SKU es del negocio y no hace de ninguno.
 
 ## El servidor (fase de servidor, 2026-10-14)
 
