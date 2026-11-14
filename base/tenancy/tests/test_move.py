@@ -20,6 +20,7 @@ the move handles as any other, since the origin is renamed before the destinatio
 
 import datetime as dt
 import uuid
+from zoneinfo import ZoneInfo
 
 import psycopg
 import pytest
@@ -160,6 +161,104 @@ class TestAMove:
         moves.hub(to=None)
 
         assert run() == 0
+
+
+def zone_at(now: dt.datetime, hour: int) -> str:
+    """A fixed-offset zone (``Etc/GMT±N``, whose sign is the other way round) whose clock says ``hour`` o'clock at
+    ``now``: the pass runs on the real clock, the one a lease is taken by."""
+    offset = (hour - now.hour) % 24
+    if offset > 14:
+        offset -= 24
+    return f"Etc/GMT{-offset:+d}"
+
+
+class TestAMoveAskedForTheNight:
+    """A move asked for the business's night (``control.hub.move`` with ``when="at_night"``) is started by the worker's
+    pass once it is due and it is night on the business's own clock, under the hub's lease (``claim_hub``, as a move),
+    with the checks of a move asked then; the same pass moves it. By day it waits for the next night."""
+
+    def scheduled(self, moves, target: Cluster, now: dt.datetime, *, hour: int, due: dt.timedelta) -> Hub:
+        return moves.hub(
+            to=None, move_scheduled_to=target, move_scheduled_for=now - due, timezone=zone_at(now, hour)
+        )
+
+    def test_it_starts_in_the_business_s_night_and_the_same_pass_moves_it(self, moves):
+        target = moves.cluster()
+        now = timezone.now()
+        hub = self.scheduled(moves, target, now, hour=3, due=dt.timedelta(minutes=1))
+
+        assert run(now) == 1
+
+        moved = fresh(hub)
+        assert (moved.cluster_id, moved.moving_to_id) == (target.pk, None)
+        assert (moved.move_scheduled_to_id, moved.move_scheduled_for, moved.last_error) == (None, None, "")
+        assert marker(moved.db_name) == [MARKER]
+
+    def test_by_the_business_s_day_it_waits_for_its_next_night_and_closes_nothing(self, moves):
+        target = moves.cluster()
+        now = timezone.now()
+        hub = self.scheduled(moves, target, now, hour=15, due=dt.timedelta(hours=12))
+
+        assert run(now) == 0
+
+        waiting = fresh(hub)
+        assert (waiting.cluster_id, waiting.moving_to_id, waiting.move_scheduled_to_id) == (None, None, target.pk)
+        assert waiting.move_scheduled_for == move.control_services.night_start(now, ZoneInfo(waiting.timezone))
+        assert waiting.move_scheduled_for > now
+
+    def test_one_not_due_yet_waits_even_at_night(self, moves):
+        target = moves.cluster()
+        now = timezone.now()
+        hub = self.scheduled(moves, target, now, hour=3, due=-dt.timedelta(minutes=30))
+
+        assert run(now) == 0
+
+        assert (fresh(hub).moving_to_id, fresh(hub).move_scheduled_to_id) == (None, target.pk)
+
+    def test_the_lease_says_which_worker_starts_it(self, moves):
+        target = moves.cluster()
+        now = timezone.now()
+        hub = self.scheduled(moves, target, now, hour=3, due=dt.timedelta(minutes=1))
+        with use_control():
+            HubDue.objects.create(hub=hub, due_at=now, lease_until=now + dt.timedelta(minutes=1), lease_owner="other:1")
+
+        assert run(now) == 0
+        assert (fresh(hub).moving_to_id, fresh(hub).move_scheduled_to_id) == (None, target.pk)
+
+        with use_control():
+            HubDue.objects.filter(pk=hub.pk).update(lease_until=None, lease_owner="")
+        assert run(now) == 1
+        assert fresh(hub).cluster_id == target.pk
+
+    def test_two_workers_never_start_it_twice(self, moves):
+        target = moves.cluster()
+        now = timezone.now()
+        hub = self.scheduled(moves, target, now, hour=3, due=dt.timedelta(minutes=1))
+        start = move.control_services.start_scheduled_move
+
+        with use_control():
+            assert services.claim_hub(hub.id, now, move.LEASE, owner="a:1") is not None
+            with pytest.raises(move.control_services.MoveTaken):
+                start(hub.id, now, owner="b:2")
+            assert (fresh(hub).moving_to_id, fresh(hub).move_scheduled_to_id) == (None, target.pk)
+
+            assert start(hub.id, now, owner="a:1") is True
+            assert start(hub.id, now, owner="a:1") is False
+        started = fresh(hub)
+        assert (started.moving_to_id, started.move_scheduled_to_id) == (target.pk, None)
+        assert started.move_scheduled_for is None
+
+    def test_one_refused_when_its_night_comes_says_why_and_closes_nothing(self, moves):
+        target = moves.cluster(is_open=False)
+        now = timezone.now()
+        hub = self.scheduled(moves, target, now, hour=3, due=dt.timedelta(minutes=1))
+
+        assert run(now) == 0
+
+        refused = fresh(hub)
+        assert (refused.cluster_id, refused.moving_to_id, refused.move_scheduled_to_id) == (None, None, None)
+        assert refused.last_error.startswith("move_not_started: control.cluster_closed")
+        assert marker(refused.db_name) == [MARKER]
 
 
 class TestTheOriginIsClosedToTheApp:

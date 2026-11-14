@@ -14,6 +14,10 @@ hubs with their database.
   ``control.cluster.sizes``, once per cluster on the page, kept ten minutes; a cluster that cannot be measured is said
   in a warning and its hubs show no size.
 
+- **«Move to cluster…»** asks ``control.hub.move`` for each chosen hub, with an open cluster and when: in the business's
+  next night (first, as a database's maintenance waits for its window) or now. One asked for the night stays open and
+  its cluster says where and when it goes, on the business's own clock, until the worker starts it; «Cancel the move»
+  takes it away until then, and undoes a started one.
 - **«Restore from a copy…»** (BASE-F114) asks ``control.hub.restore`` for each chosen hub, with the temporary
   cluster its copy is on and the moment it is of; the worker restores it (``base.tenancy.restore``), or refuses it for
   its fiscal records, and then the hub's page says why in its ``last_error``, as the worker noted it. While it is
@@ -55,6 +59,7 @@ from live.context import OperationContext
 from live.errors import OperationError
 
 from base import admin as base_admin
+from base.business import zone_name, zone_of
 from base.registry import REGISTRY_SCOPE, database_is_made
 from base.tenancy.move import MOVED_COPY_DAYS
 from base.tenancy.recovery import recoverable_apps
@@ -69,11 +74,15 @@ from control.schemas import (
     FreezeGetIn,
     FreezeIn,
     HubIdIn,
+    MOVE_AT_NIGHT,
+    MOVE_NOW,
     HubMoveIn,
     HubRestoreIn,
 )
 from control.services import (
     CLUSTER_FIELDS,
+    NIGHT_ENDS,
+    NIGHT_STARTS,
     cluster_close,
     cluster_create,
     cluster_delete,
@@ -106,6 +115,17 @@ def is_platform_admin(request: HttpRequest) -> bool:
 def utc(moment: dt.datetime) -> str:
     """A moment as the Hub admin says it, whatever its language: ``2026-11-09 14:30 UTC``."""
     return f"{moment.astimezone(dt.UTC):%Y-%m-%d %H:%M} UTC"
+
+
+def the_night() -> dict[str, str]:
+    """The window a move asked for the night starts in, as a page says it: ``{"start": "03:00", "end": "05:00"}``."""
+    return {"start": f"{NIGHT_STARTS:%H:%M}", "end": f"{NIGHT_ENDS:%H:%M}"}
+
+
+def on_its_clock(moment: dt.datetime, timezone_name: str) -> str:
+    """A moment on a business's own clock, with it: ``2026-11-17 03:00 Europe/Madrid``."""
+    zone = zone_of(timezone_name)
+    return f"{moment.astimezone(zone):%Y-%m-%d %H:%M} {zone_name(zone)}"
 
 
 def copy_said(copy: RestoredCopy) -> str:
@@ -316,13 +336,20 @@ class ClusterAdmin(admin.ModelAdmin):
 
 
 class MoveToClusterForm(forms.Form):
-    """The cluster the chosen hubs move to: an open one (``control.hub.move`` checks its room, hub by hub)."""
+    """The cluster the chosen hubs move to, an open one (``control.hub.move`` checks its room, hub by hub), and when:
+    in each business's next night, first, or now."""
 
     cluster = forms.ModelChoiceField(
         queryset=Cluster.objects.filter(is_open=True).order_by("name"),
         label=gettext_lazy("cluster"),
         empty_label=None,
     )
+    when = forms.ChoiceField(label=pgettext_lazy("move", "When"), initial=MOVE_AT_NIGHT)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        at_night = gettext("In its next night, between %(start)s and %(end)s of the business's time") % the_night()
+        self.fields["when"].choices = [(MOVE_AT_NIGHT, at_night), (MOVE_NOW, pgettext("move", "Now"))]
 
 
 class RestoreFromACopyForm(forms.Form):
@@ -440,7 +467,7 @@ class HubAdmin(AsksFirst, base_admin.HubAdmin):
         "created_at",
     )
     list_filter = ("status", ("cluster", ClusterListFilter), "schema_state", "is_demo")
-    list_select_related = ("cluster", "moving_to", "restoring_from")
+    list_select_related = ("cluster", "moving_to", "move_scheduled_to", "restoring_from")
     actions = [
         *base_admin.HubAdmin.actions,
         "move_to_cluster",
@@ -464,37 +491,62 @@ class HubAdmin(AsksFirst, base_admin.HubAdmin):
         (``control.hub.move``): the worker moves it, its host answering 503 «maintenance» meanwhile."""
         form = MoveToClusterForm(request.POST if "apply" in request.POST else None)
         if not form.is_bound or not form.is_valid():
-            return self.confirmation(request, queryset, form, "move_to_cluster", gettext("Move to cluster"), MOVE_TEMPLATE)
-        target = form.cleaned_data["cluster"]
+            title = gettext("Move to cluster")
+            return self.confirmation(request, queryset, form, "move_to_cluster", title, MOVE_TEMPLATE, **the_night())
+        target, when = form.cleaned_data["cluster"], form.cleaned_data["when"]
         ctx = staff_context(request)
-        asked = self.ask_each(request, queryset, lambda hub: hub_move(ctx, HubMoveIn(hub=hub.pk, cluster=target.pk)))
-        if asked:
-            self.message_user(
-                request,
-                ngettext(
-                    "%(count)d hub will move to %(cluster)s: closed for a few minutes while it moves.",
-                    "%(count)d hubs will move to %(cluster)s: each closed for a few minutes while it moves.",
-                    asked,
-                )
-                % {"count": asked, "cluster": target.name},
-                messages.SUCCESS,
+        asked = self.ask_each(
+            request, queryset, lambda hub: hub_move(ctx, HubMoveIn(hub=hub.pk, cluster=target.pk, when=when))
+        )
+        if not asked:
+            return None
+        if when == MOVE_AT_NIGHT:
+            said = ngettext(
+                "%(count)d hub will move to %(cluster)s in its next night, starting between %(start)s and %(end)s on "
+                "its own clock: open until then, and closed for a few minutes while it moves.",
+                "%(count)d hubs will move to %(cluster)s in their next night, each starting between %(start)s and "
+                "%(end)s on its own clock: open until then, and closed for a few minutes while it moves.",
+                asked,
             )
+        else:
+            said = ngettext(
+                "%(count)d hub will move to %(cluster)s: closed for a few minutes while it moves.",
+                "%(count)d hubs will move to %(cluster)s: each closed for a few minutes while it moves.",
+                asked,
+            )
+        self.message_user(
+            request, said % ({"count": asked, "cluster": target.name} | the_night()), messages.SUCCESS
+        )
         return None
 
     @admin.action(description=gettext_lazy("Cancel the move"), permissions=["move"])
     def cancel_the_move(self, request: HttpRequest, queryset) -> None:
-        """Ask the worker to undo each chosen hub's move (``control.hub.move_cancel``): back on its own cluster."""
+        """Ask the worker to undo each chosen hub's move (``control.hub.move_cancel``): back on its own cluster. One
+        asked for the night that has not started is taken away: it stays where it is, open."""
         ctx = staff_context(request)
-        asked = self.ask_each(request, queryset, lambda hub: hub_move_cancel(ctx, HubIdIn(id=hub.pk)))
-        if asked:
+        answers: list = []
+        self.ask_each(request, queryset, lambda hub: answers.append(hub_move_cancel(ctx, HubIdIn(id=hub.pk))))
+        undone = sum(1 for answer in answers if answer.moving_to is not None)
+        if undone:
             self.message_user(
                 request,
                 ngettext(
                     "%(count)d move will be undone: the hub goes back to its cluster within a minute.",
                     "%(count)d moves will be undone: each hub goes back to its cluster within a minute.",
-                    asked,
+                    undone,
                 )
-                % {"count": asked},
+                % {"count": undone},
+                messages.SUCCESS,
+            )
+        if unscheduled := len(answers) - undone:
+            self.message_user(
+                request,
+                ngettext(
+                    "%(count)d move asked for the night was cancelled: the hub stays where it is, open.",
+                    "%(count)d moves asked for the night were cancelled: each hub stays where it is, open.",
+                    unscheduled,
+                )
+                % {"count": unscheduled},
                 messages.SUCCESS,
             )
 
@@ -598,6 +650,12 @@ class HubAdmin(AsksFirst, base_admin.HubAdmin):
             return f"{here} → {hub.moving_to.name}"
         if hub.restoring_from_id:
             return f"{here} ← {hub.restoring_from.name}"
+        if hub.move_scheduled_to_id:
+            return pgettext("scheduled move", "%(here)s (to %(there)s at %(moment)s)") % {
+                "here": here,
+                "there": hub.move_scheduled_to.name,
+                "moment": on_its_clock(hub.move_scheduled_for, hub.timezone),
+            }
         return here
 
     @admin.display(description=pgettext_lazy("hub database", "size"))

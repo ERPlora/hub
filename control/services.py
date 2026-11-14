@@ -17,6 +17,9 @@ on control (the registry's scope) and records its event in control's outbox in t
   only to an open one with room (as a new hub is placed, counting the hubs on their way there), and only a database
   small enough for a copy (:data:`MOVE_MAX_BYTES`, measured on its server: ``control.queries``); a larger one needs
   logical replication, which the Hub does not do yet. Its host answers 503 «maintenance» until the worker is done.
+  Asked for the business's night (``when="at_night"``), nothing closes: the hub keeps the cluster and the moment it
+  starts (:func:`night_start`, on the business's own clock), the same checks are made again when the worker starts it
+  (:func:`start_scheduled_move`, under the hub's lease), and «Cancel the move» takes it away until then.
 - ``control.hub.restore`` asks the worker to put a ready hub's database back as it was at a moment
   (``base.tenancy.restore``): from the copy of it on a temporary cluster (a point-in-time restore of its own, registered
   closed to new hubs, with no hub on it), small enough for a copy. Its host answers 503 «maintenance» until the worker
@@ -51,6 +54,7 @@ from live.errors import Conflict, InvalidPayload, NotFound
 from live.operations import INTERNAL, atomic, operation
 from live.outbox import record_event
 
+from base.business import zone_of
 from base.registry import internal_only
 from base.tenancy import names
 from base.tenancy.connections import control_name
@@ -80,6 +84,7 @@ from control.schemas import (
     HubMoveIn,
     HubMoveOut,
     HubRestoreIn,
+    MOVE_AT_NIGHT,
     HubRestoreOut,
     RestoredCopyOut,
 )
@@ -91,6 +96,20 @@ WRITER_FIELDS = ("host", "port")
 #: The largest database a move copies (``pg_dump``/``pg_restore``, its hub closed meanwhile): a few minutes' work. A
 #: larger one needs logical replication, which the Hub does not do yet.
 MOVE_MAX_BYTES = 512 * 1024 * 1024
+#: When a move asked for the night may start, on the business's own clock: Square's nightly updates run at 03:00, after
+#: the bars close and before the bakeries open. It bounds the start, as AWS's maintenance window does, not the end.
+NIGHT_STARTS = dt.time(3)
+NIGHT_ENDS = dt.time(5)
+
+
+def night_start(now: dt.datetime, zone: dt.tzinfo) -> dt.datetime:
+    """When a move asked at ``now`` for the night of a business on ``zone`` starts: ``now`` inside its window, else
+    the next :data:`NIGHT_STARTS` on that clock."""
+    local = now.astimezone(zone)
+    if NIGHT_STARTS <= local.time() < NIGHT_ENDS:
+        return now
+    day = local.date() if local.time() < NIGHT_STARTS else local.date() + dt.timedelta(days=1)
+    return dt.datetime.combine(day, NIGHT_STARTS, tzinfo=zone)
 
 
 def platform_admin_only(ctx: OperationContext) -> None:
@@ -111,7 +130,7 @@ def _holds_anything(cluster: Cluster) -> bool:
     copy or a leftover of a move kept there, a separate copy there or one still to make from it."""
     return (
         living_hubs(cluster).exists()
-        or Hub.objects.filter(Q(moving_to=cluster) | Q(restoring_from=cluster)).exists()
+        or Hub.objects.filter(Q(moving_to=cluster) | Q(move_scheduled_to=cluster) | Q(restoring_from=cluster)).exists()
         or MovedCopy.objects.filter(cluster=cluster).exists()
         or LeftoverDatabase.objects.filter(cluster=cluster).exists()
         or RestoredCopy.objects.filter(Q(cluster=cluster) | Q(source=cluster)).exists()
@@ -225,7 +244,9 @@ def cluster_delete(ctx: OperationContext, data: ClusterIdIn) -> dict:
     """Delete a cluster that no hub's row points at; one that holds any is refused with how many."""
     platform_admin_only(ctx)
     cluster = _locked(data.id)
-    held = Hub.objects.filter(Q(cluster=cluster) | Q(moving_to=cluster) | Q(restoring_from=cluster)).count()
+    held = Hub.objects.filter(
+        Q(cluster=cluster) | Q(moving_to=cluster) | Q(move_scheduled_to=cluster) | Q(restoring_from=cluster)
+    ).count()
     if held:
         raise Conflict(
             ngettext(
@@ -271,23 +292,24 @@ def _move_refused(message: str, code: str) -> Conflict:
     return Conflict(message, code=code)
 
 
-def _room_for_one_more(cluster: Cluster) -> bool:
-    """Whether ``cluster`` takes one more hub: its living hubs and the ones on their way there, under its limit."""
+def _room_for_one_more(cluster: Cluster, besides: Hub) -> bool:
+    """Whether ``cluster`` takes ``besides`` too: its living hubs and the others on their way there, now or in their
+    night, under its limit."""
     if cluster.max_hubs == 0:
         return True
-    taken = living_hubs(cluster).count() + Hub.objects.filter(moving_to=cluster).count()
-    return taken < cluster.max_hubs
+    coming = Hub.objects.filter(Q(moving_to=cluster) | Q(move_scheduled_to=cluster)).exclude(pk=besides.pk)
+    return living_hubs(cluster).count() + coming.count() < cluster.max_hubs
 
 
-# Not an assistant tool: the platform's admins, in the Hub admin («Move to cluster…»).
-@operation("control.hub.move", kind="command", permission=None, input=HubMoveIn, output=HubMoveOut, ai=INTERNAL)
-def hub_move(ctx: OperationContext, data: HubMoveIn) -> dict:
-    """Ask the worker to move the ready hub ``data.hub``'s own database to the cluster ``data.cluster``."""
-    platform_admin_only(ctx)
-    hub = Hub.objects.select_for_update(of=("self",)).select_related("cluster").filter(pk=data.hub).first()
-    if hub is None:
-        raise NotFound(gettext("No hub has this id."))
-    target = _locked(data.cluster)
+def _scheduled_move_refused() -> Conflict:
+    return _move_refused(
+        gettext("This hub already has a move asked for the night: cancel it first."), "control.hub_move_scheduled"
+    )
+
+
+def _movable(hub: Hub, target: Cluster) -> None:
+    """Refuse (``Conflict``) unless the ready ``hub`` moves to ``target`` now: what a move asked now checks, and a move
+    asked for the night checks again when the worker starts it."""
     if hub.status != Hub.Status.READY or not hub.db_name:
         raise _move_refused(
             gettext("Only a ready hub with a database of its own moves."), "control.hub_not_movable"
@@ -302,7 +324,7 @@ def hub_move(ctx: OperationContext, data: HubMoveIn) -> dict:
         raise _move_refused(gettext("This hub is on that cluster already."), "control.hub_already_there")
     if not target.is_open:
         raise _move_refused(gettext("That cluster is closed to new hubs."), "control.cluster_closed")
-    if not _room_for_one_more(target):
+    if not _room_for_one_more(target, hub):
         raise _move_refused(gettext("That cluster has no room for another hub."), "control.cluster_full")
     size = queries.measure(hub.cluster, [hub.db_name]).get(hub.db_name)
     if size is None:
@@ -315,16 +337,48 @@ def hub_move(ctx: OperationContext, data: HubMoveIn) -> dict:
             gettext("This hub's database is too large to move with a copy: it needs logical replication."),
             "control.hub_too_large",
         )
-    origin = hub.cluster_id
-    hub.moving_to = target
+
+
+def _move_answer(hub: Hub) -> dict:
+    return {
+        "id": hub.pk,
+        "slug": hub.slug,
+        "cluster": hub.cluster_id,
+        "moving_to": hub.moving_to_id,
+        "scheduled_to": hub.move_scheduled_to_id,
+        "scheduled_for": hub.move_scheduled_for,
+    }
+
+
+# Not an assistant tool: the platform's admins, in the Hub admin («Move to cluster…»).
+@operation("control.hub.move", kind="command", permission=None, input=HubMoveIn, output=HubMoveOut, ai=INTERNAL)
+def hub_move(ctx: OperationContext, data: HubMoveIn) -> dict:
+    """Ask the worker to move the ready hub ``data.hub``'s own database to the cluster ``data.cluster``: now, or in the
+    business's next night (``data.when``)."""
+    platform_admin_only(ctx)
+    hub = Hub.objects.select_for_update(of=("self",)).select_related("cluster").filter(pk=data.hub).first()
+    if hub is None:
+        raise NotFound(gettext("No hub has this id."))
+    target = _locked(data.cluster)
+    if hub.move_scheduled_to_id is not None:
+        raise _scheduled_move_refused()
+    _movable(hub, target)
+    origin = str(hub.cluster_id) if hub.cluster_id else ""
     hub.last_error = ""
+    if data.when == MOVE_AT_NIGHT:
+        hub.move_scheduled_to = target
+        hub.move_scheduled_for = night_start(timezone.now(), zone_of(hub.timezone))
+        hub.save(update_fields=["move_scheduled_to", "move_scheduled_for", "last_error", "updated_at"])
+        at = hub.move_scheduled_for.astimezone(dt.UTC).isoformat()
+        payload = {"id": str(hub.pk), "slug": hub.slug, "from": origin, "to": str(target.pk), "at": at}
+        record_event(ctx, events.HUB_MOVE_SCHEDULED, payload)
+        return _move_answer(hub)
+    hub.moving_to = target
     hub.save(update_fields=["moving_to", "last_error", "updated_at"])
     record_event(
-        ctx,
-        events.HUB_MOVE_REQUESTED,
-        {"id": str(hub.pk), "slug": hub.slug, "from": str(origin) if origin else "", "to": str(target.pk)},
+        ctx, events.HUB_MOVE_REQUESTED, {"id": str(hub.pk), "slug": hub.slug, "from": origin, "to": str(target.pk)}
     )
-    return {"id": hub.pk, "slug": hub.slug, "cluster": origin, "moving_to": target.pk}
+    return _move_answer(hub)
 
 
 # Not an assistant tool: the platform's admins, in the Hub admin («Cancel the move»).
@@ -334,18 +388,27 @@ def hub_move(ctx: OperationContext, data: HubMoveIn) -> dict:
 def hub_move_cancel(ctx: OperationContext, data: HubIdIn) -> dict:
     """Ask the worker to undo the move of ``data.id``, started or not: the hub is marked (``move_undo_asked_at``) and the
     worker puts it back on its origin. No note of a copy is made nor taken here: an older copy of the same hub on its
-    server is never taken for its data."""
+    server is never taken for its data. A move asked for the night that has not started is just taken away: nothing
+    was closed."""
     platform_admin_only(ctx)
     hub = Hub.objects.select_for_update().filter(pk=data.id).first()
     if hub is None:
         raise NotFound(gettext("No hub has this id."))
+    if hub.moving_to_id is None and hub.move_scheduled_to_id is not None:
+        target = hub.move_scheduled_to_id
+        hub.move_scheduled_to, hub.move_scheduled_for = None, None
+        hub.save(update_fields=["move_scheduled_to", "move_scheduled_for", "updated_at"])
+        record_event(
+            ctx, events.HUB_SCHEDULED_MOVE_CANCELLED, {"id": str(hub.pk), "slug": hub.slug, "to": str(target)}
+        )
+        return _move_answer(hub)
     if hub.moving_to_id is None:
         raise _move_refused(gettext("This hub is not moving."), "control.hub_not_moving")
     hub.move_undo_asked_at = timezone.now()
     hub.last_error = "move_cancelled: the move was cancelled in the Hub admin."
     hub.save(update_fields=["move_undo_asked_at", "last_error", "updated_at"])
     record_event(ctx, events.HUB_MOVE_CANCEL_REQUESTED, {"id": str(hub.pk), "slug": hub.slug})
-    return {"id": hub.pk, "slug": hub.slug, "cluster": hub.cluster_id, "moving_to": hub.moving_to_id}
+    return _move_answer(hub)
 
 
 def _restoring() -> Conflict:
@@ -578,6 +641,42 @@ def _control_transaction():
 
     with use_control(), atomic():
         yield
+
+
+def moves_scheduled_due(now: dt.datetime) -> list[UUID]:
+    """The hubs whose move asked for the night is due by ``now``, the earliest first."""
+    due = Hub.objects.filter(move_scheduled_to__isnull=False, move_scheduled_for__lte=now)
+    return list(due.order_by("move_scheduled_for", "pk").values_list("pk", flat=True))
+
+
+def start_scheduled_move(hub_id: UUID, now: dt.datetime, *, owner: str) -> bool:
+    """Start the move of ``hub_id`` asked for its night, in one transaction on its locked row, while ``owner`` holds its
+    lease (``MoveTaken`` otherwise, nothing written): due and in its night, it moves from now on (``moving_to``); due
+    by its day, it waits for its next night; one a move now would be refused ends with why (``last_error``), nothing
+    closed. Whether it started."""
+    with _control_transaction():
+        hub = Hub.objects.select_for_update(of=("self",)).select_related("cluster").filter(pk=hub_id).first()
+        if hub is None or hub.move_scheduled_to_id is None or hub.move_scheduled_for > now:
+            return False
+        _held(hub, owner, forward=False, lock=True)
+        starts = night_start(now, zone_of(hub.timezone))
+        if starts != now:
+            hub.move_scheduled_for = starts
+            hub.save(update_fields=["move_scheduled_for", "updated_at"])
+            return False
+        target = _locked(hub.move_scheduled_to_id)
+        hub.move_scheduled_to, hub.move_scheduled_for = None, None
+        fields = ["move_scheduled_to", "move_scheduled_for", "last_error", "updated_at"]
+        try:
+            _movable(hub, target)
+        except Conflict as refused:
+            hub.last_error = f"move_not_started: {refused.code}: {refused.message}"[:2000]
+            hub.save(update_fields=fields)
+            return False
+        hub.moving_to = target
+        hub.last_error = ""
+        hub.save(update_fields=[*fields, "moving_to"])
+        return True
 
 
 def hubs_moving() -> list[UUID]:
