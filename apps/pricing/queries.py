@@ -54,6 +54,7 @@ from apps.pricing.schemas import (
 from base import operations as platform
 from base.business import babel_locale, business_zone
 from base.ordering import list_order
+from base.recovery import brought_back
 
 #: Candidates named when a text matches several.
 MAX_CANDIDATES = 5
@@ -800,9 +801,9 @@ def snapshot_values(rule: DiscountRule) -> dict[str, Any]:
 
 # ── A separate copy of the business (BASE-F114): what Price Lists gives back from it ─────────────────────────────────
 
-#: What a price of a separate copy is read with: its id there and what ``pricing.price_item.add`` takes, each a column
-#: since ``0001_initial``.
-PRICE_FIELDS = ("id", "price_list_id", "product_id", "service_id", "price", "min_quantity")
+#: What a price of a separate copy is read with: its id there, what ``pricing.price_item.add`` takes and its product's
+#: SKU there (``None`` for a service's), each a column since ``0001_initial``.
+PRICE_FIELDS = ("id", "price_list_id", "product_id", "service_id", "price", "min_quantity", "sku")
 
 
 def prices_in_copy(conn) -> list[dict]:
@@ -821,8 +822,13 @@ def prices_in_copy(conn) -> list[dict]:
         " WHERE i.{product_id} IS NULL OR NOT p.{deleted} ORDER BY i.{item_pk}"
     ).format(
         columns=sql.SQL(", ").join(
-            sql.SQL("i.{}").format(column(item, field))
-            for field in ("id", "price_list", "product", "service_id", "price", "min_quantity")
+            [
+                *(
+                    sql.SQL("i.{}").format(column(item, field))
+                    for field in ("id", "price_list", "product", "service_id", "price", "min_quantity")
+                ),
+                sql.SQL("p.{}").format(column(product, "sku")),
+            ]
         ),
         items=sql.Identifier(item.db_table),
         products=sql.Identifier(product.db_table),
@@ -837,23 +843,41 @@ def prices_in_copy(conn) -> list[dict]:
 def prices_not_in_business(prices: list[dict]) -> list[dict]:
     """The prices of a separate copy (``prices_in_copy``) the business no longer has, in their order, each as
     ``pricing.price_item.add`` takes it with its ``id`` there: its list, its one article (a product or a service), its
-    price and its from quantity. Not lacking: one the business still holds, nor one whose place (its list, its article
-    and its from quantity) the business has taken again, at whatever price: that one stays as the business has it."""
+    price and its from quantity. Its product is the business's that stands for the copy's (``_products_here``). Not
+    lacking: one the business still holds, nor one whose place (its list, its article and its from quantity) the
+    business has taken again, at whatever price: that one stays as the business has it."""
     held = set(PriceItem.objects.filter(pk__in=[one["id"] for one in prices]).values_list("pk", flat=True))
     taken = set(
         PriceItem.objects.filter(price_list_id__in={one["price_list_id"] for one in prices}).values_list(
             "price_list_id", "product_id", "service_id", "min_quantity"
         )
     )
-    return [
-        {
-            "id": one["id"],
-            "price_list_id": one["price_list_id"],
-            **({"product_id": one["product_id"]} if one["product_id"] else {"service_id": one["service_id"]}),
-            "price": one["price"],
-            "min_quantity": one["min_quantity"],
-        }
-        for one in prices
-        if one["id"] not in held
-        and (one["price_list_id"], one["product_id"], one["service_id"], one["min_quantity"]) not in taken
-    ]
+    here = _products_here(prices)
+    lacking = []
+    for one in prices:
+        product = here.get(one["product_id"], one["product_id"])
+        if one["id"] in held or (one["price_list_id"], product, one["service_id"], one["min_quantity"]) in taken:
+            continue
+        lacking.append(
+            {
+                "id": one["id"],
+                "price_list_id": one["price_list_id"],
+                **({"product_id": product} if product else {"service_id": one["service_id"]}),
+                "price": one["price"],
+                "min_quantity": one["min_quantity"],
+            }
+        )
+    return lacking
+
+
+def _products_here(prices: list[dict]) -> dict[UUID, UUID]:
+    """The business's product that stands for each of the copy's in ``prices`` it no longer holds live (``{id there:
+    id here}``): the live one with its SKU, the article's identity, that a recovery made (``brought_back``), as
+    Inventory makes again with another id a product the business no longer holds at all (INVENTORY-F01). One the
+    business made again by hand is its own, priced as it chose: none of the copy's prices goes to it. A product still
+    live here is itself, and is not in the result."""
+    skus = {one["product_id"]: one["sku"] for one in prices if one["product_id"]}
+    live = set(Product.objects.filter(pk__in=list(skus), is_deleted=False).values_list("pk", flat=True))
+    wanted = {sku: there for there, sku in skus.items() if there not in live}
+    made = Product.objects.filter(sku__in=list(wanted), is_deleted=False).values_list("sku", "pk", "created_by")
+    return {wanted[sku]: pk for sku, pk, created_by in made if brought_back(created_by)}
