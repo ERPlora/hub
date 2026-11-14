@@ -131,5 +131,5 @@ def test_an_erased_customer_keeps_the_sales_printed_name(coffee, customer):
     )
     run("customer.customer.erase", {"id": str(ana.id), "reason": "GDPR request"})
     found = run("sale.sale.get", {"sale_id": str(sale.id)})
-    # A sale is a fiscal record: its copy of the name stays (WORKBOOK «Dudas abiertas»).
+    # A sale is a fiscal record: its copy of the name stays.
     assert found.customer_name == "Ana López" and found.customer_id == ana.id

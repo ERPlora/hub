@@ -6,8 +6,7 @@ fechas (IVA, IGIC o IPSI; sujeta, exenta, no sujeta o con inversión del sujeto 
 equivalencia como componente); los alias que reconoce el importador de Inventario, y el territorio fiscal del
 negocio. Ventas y Facturación calculan con ella cada línea; no fija precios ni habla con la AEAT.
 
-- **Estado**: completa (2026-10-22): de sus 19 flujos, 17 están `hecho` y `TAX-F09` y `TAX-F10`,
-  `descartado` con su motivo (ninguna puerta deja nacer la regla incoherente o solapada que reparaban).
+- **Estado**: completa (2026-10-22): sus 17 flujos están `hecho`.
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta
   «Para quien lo mantiene»). Lo que se cambie de la app se cambia antes allí.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md).
